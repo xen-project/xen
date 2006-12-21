@@ -37,7 +37,7 @@ spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
 
 xen_kexec_reserve_t kexec_crash_area;
 
-static void __init parse_crashkernel(char *str)
+static void __init parse_crashkernel(const char *str)
 {
     unsigned long start, size;
 

@@ -288,7 +288,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_first_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(*(unsigned long *)addr)) : \
+  (__scanbit(*(const unsigned long *)addr)) : \
   __find_first_bit(addr,size)))
 
 /**
@@ -299,7 +299,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_next_bit(addr,size,off) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  ((off) + (__scanbit((*(unsigned long *)addr) >> (off)))) : \
+  ((off) + (__scanbit((*(const unsigned long *)addr) >> (off)))) : \
   __find_next_bit(addr,size,off)))
 
 /**
@@ -312,7 +312,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_first_zero_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(~*(unsigned long *)addr)) : \
+  (__scanbit(~*(const unsigned long *)addr)) : \
   __find_first_zero_bit(addr,size)))
 
 /**
@@ -323,7 +323,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_next_zero_bit(addr,size,off) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off))))) : \
+  ((off)+(__scanbit(~(((*(const unsigned long *)addr)) >> (off))))) : \
   __find_next_zero_bit(addr,size,off)))
 
 

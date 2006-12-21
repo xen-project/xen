@@ -197,7 +197,7 @@ paddr_t init_boot_allocator(paddr_t bitmap_start)
 void init_boot_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long bad_spfn, bad_epfn, i;
-    char *p;
+    const char *p;
 
     ps = round_pgup(ps);
     pe = round_pgdown(pe);

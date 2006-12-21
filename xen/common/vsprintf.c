@@ -28,7 +28,8 @@
  * @endp: A pointer to the end of the parsed string will be placed here
  * @base: The number base to use
  */
-unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
+unsigned long simple_strtoul(
+    const char *cp, const char **endp, unsigned int base)
 {
     unsigned long result = 0,value;
 
@@ -52,7 +53,7 @@ unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
         cp++;
     }
     if (endp)
-        *endp = (char *)cp;
+        *endp = cp;
     return result;
 }
 
@@ -64,7 +65,7 @@ EXPORT_SYMBOL(simple_strtoul);
  * @endp: A pointer to the end of the parsed string will be placed here
  * @base: The number base to use
  */
-long simple_strtol(const char *cp,char **endp,unsigned int base)
+long simple_strtol(const char *cp, const char **endp, unsigned int base)
 {
     if(*cp=='-')
         return -simple_strtoul(cp+1,endp,base);
@@ -79,7 +80,8 @@ EXPORT_SYMBOL(simple_strtol);
  * @endp: A pointer to the end of the parsed string will be placed here
  * @base: The number base to use
  */
-unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
+unsigned long long simple_strtoull(
+    const char *cp, const char **endp, unsigned int base)
 {
     unsigned long long result = 0,value;
 
@@ -103,7 +105,7 @@ unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
         cp++;
     }
     if (endp)
-        *endp = (char *)cp;
+        *endp = cp;
     return result;
 }
 
@@ -115,7 +117,7 @@ EXPORT_SYMBOL(simple_strtoull);
  * @endp: A pointer to the end of the parsed string will be placed here
  * @base: The number base to use
  */
-long long simple_strtoll(const char *cp,char **endp,unsigned int base)
+long long simple_strtoll(const char *cp,const char **endp,unsigned int base)
 {
     if(*cp=='-')
         return -simple_strtoull(cp+1,endp,base);
@@ -139,7 +141,9 @@ static int skip_atoi(const char **s)
 #define SPECIAL 32              /* 0x */
 #define LARGE   64              /* use 'ABCDEF' instead of 'abcdef' */
 
-static char * number(char * buf, char * end, unsigned long long num, int base, int size, int precision, int type)
+static char *number(
+    char *buf, char *end, unsigned long long num,
+    int base, int size, int precision, int type)
 {
     char c,sign,tmp[66];
     const char *digits;

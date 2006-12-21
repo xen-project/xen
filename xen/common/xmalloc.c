@@ -87,7 +87,7 @@ static void *data_from_header(struct xmalloc_hdr *hdr)
 #endif
 }
 
-static struct xmalloc_hdr *header_from_data(const void *p)
+static struct xmalloc_hdr *header_from_data(void *p)
 {
 #if XMALLOC_DEBUG
     unsigned char *data = (unsigned char *)p - SMP_CACHE_BYTES;
@@ -208,7 +208,7 @@ void *_xmalloc(size_t size, size_t align)
     return xmalloc_new_page(size);
 }
 
-void xfree(const void *p)
+void xfree(void *p)
 {
     unsigned long flags;
     struct xmalloc_hdr *i, *tmp, *hdr;

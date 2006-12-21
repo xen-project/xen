@@ -40,7 +40,7 @@ struct tm gmtime(unsigned long t)
     struct tm tbuf;
     long days, rem;
     int y;
-    unsigned short int *ip;
+    const unsigned short int *ip;
 
     days = t / SECS_PER_DAY;
     rem = t % SECS_PER_DAY;
@@ -66,7 +66,7 @@ struct tm gmtime(unsigned long t)
     }
     tbuf.tm_year = y - 1900;
     tbuf.tm_yday = days;
-    ip = (unsigned short int *)__mon_lengths[__isleap(y)];
+    ip = (const unsigned short int *)__mon_lengths[__isleap(y)];
     for ( y = 0; days >= ip[y]; ++y )
         days -= ip[y];
     tbuf.tm_mon = y;

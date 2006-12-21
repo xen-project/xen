@@ -202,8 +202,8 @@ struct domain_setup_info
      * You should use the xen_elfnote_* accessors below in order to
      * pickup the correct one and retain backwards compatibility.
      */
-    void *__elfnote_section, *__elfnote_section_end;
-    char *__xen_guest_string;
+    const void *__elfnote_section, *__elfnote_section_end;
+    const char *__xen_guest_string;
 };
 
 extern struct vcpu *idle_vcpu[NR_CPUS];

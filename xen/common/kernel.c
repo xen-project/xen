@@ -20,7 +20,8 @@ int tainted;
 
 void cmdline_parse(char *cmdline)
 {
-    char opt[100], *optval, *p = cmdline, *q;
+    char opt[100], *optval, *q;
+    const char *p = cmdline;
     struct kernel_param *param;
     
     if ( p == NULL )
@@ -70,13 +71,13 @@ void cmdline_parse(char *cmdline)
                 break;
             case OPT_UINT:
                 *(unsigned int *)param->var =
-                    simple_strtol(optval, (char **)&optval, 0);
+                    simple_strtol(optval, (const char **)&optval, 0);
                 break;
             case OPT_BOOL:
                 *(int *)param->var = 1;
                 break;
             case OPT_CUSTOM:
-                ((void (*)(char *))param->var)(optval);
+                ((void (*)(const char *))param->var)(optval);
                 break;
             }
         }

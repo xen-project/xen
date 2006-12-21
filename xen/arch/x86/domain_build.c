@@ -55,12 +55,12 @@ static long dom0_nrpages, dom0_min_nrpages, dom0_max_nrpages = LONG_MAX;
  *  If +ve: The specified amount is an absolute value.
  *  If -ve: The specified amount is subtracted from total available memory.
  */
-static long parse_amt(char *s, char **ps)
+static long parse_amt(const char *s, const char **ps)
 {
     long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
     return (*s == '-') ? -pages : pages;
 }
-static void parse_dom0_mem(char *s)
+static void parse_dom0_mem(const char *s)
 {
     do {
         if ( !strncmp(s, "min:", 4) )
@@ -152,7 +152,8 @@ static unsigned long compute_dom0_nr_pages(void)
 static void process_dom0_ioports_disable(void)
 {
     unsigned long io_from, io_to;
-    char *t, *u, *s = opt_dom0_ioports_disable;
+    char *t, *s = opt_dom0_ioports_disable;
+    const char *u;
 
     if ( *s == '\0' )
         return;
@@ -892,7 +893,7 @@ int construct_dom0(struct domain *d,
     return 0;
 }
 
-int elf_sanity_check(Elf_Ehdr *ehdr)
+int elf_sanity_check(const Elf_Ehdr *ehdr)
 {
     if ( !IS_ELF(*ehdr) ||
 #if defined(__i386__)

@@ -439,11 +439,14 @@ s64 __moddi3(s64 a, s64 b)
 
 #endif /* BITS_PER_LONG == 32 */
 
-unsigned long long parse_size_and_unit(const char *s, char **ps)
+unsigned long long parse_size_and_unit(const char *s, const char **ps)
 {
-	unsigned long long ret = simple_strtoull(s, (char **)&s, 0);
+	unsigned long long ret;
+	const char *s1;
 
-	switch (*s) {
+	ret = simple_strtoull(s, &s1, 0);
+
+	switch (*s1) {
 	case 'G': case 'g':
 		ret <<= 10;
 	case 'M': case 'm':
@@ -459,7 +462,7 @@ unsigned long long parse_size_and_unit(const char *s, char **ps)
 	}
 
 	if (ps != NULL)
-		*ps = (char *)s;
+		*ps = s1;
 
 	return ret;
 }

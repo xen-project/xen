@@ -12,7 +12,7 @@
 #define xmalloc_bytes(_bytes) (_xmalloc(_bytes, SMP_CACHE_BYTES))
 
 /* Free any of the above. */
-extern void xfree(const void *);
+extern void xfree(void *);
 
 /* Underlying functions */
 extern void *_xmalloc(size_t size, size_t align);

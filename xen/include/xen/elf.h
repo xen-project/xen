@@ -526,7 +526,7 @@ extern unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
 extern const char *xen_elfnote_string(struct domain_setup_info *dsi, int type);
 
 #ifdef Elf_Ehdr
-extern int elf_sanity_check(Elf_Ehdr *ehdr);
+extern int elf_sanity_check(const Elf_Ehdr *ehdr);
 #endif
 
 #endif /* __XEN_ELF_H__ */

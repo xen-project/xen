@@ -41,19 +41,19 @@
  * @member:	the name of the member within the struct.
  *
  */
-#define container_of(ptr, type, member) ({			\
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+#define container_of(ptr, type, member) ({                      \
+        typeof( ((type *)0)->member ) *__mptr = (ptr);          \
         (type *)( (char *)__mptr - offsetof(type,member) );})
 
 /*
  * Check at compile time that something is of a particular type.
  * Always evaluates to 1 so you may use it easily in comparisons.
  */
-#define typecheck(type,x) \
-({	type __dummy; \
-	typeof(x) __dummy2; \
-	(void)(&__dummy == &__dummy2); \
-	1; \
+#define typecheck(type,x)                       \
+({	type __dummy;                           \
+	typeof(x) __dummy2;                     \
+	(void)(&__dummy == &__dummy2);          \
+	1;                                      \
 })
 
 

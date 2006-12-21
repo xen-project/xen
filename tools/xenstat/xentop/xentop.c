@@ -269,7 +269,7 @@ static void print(const char *fmt, ...)
 	if (!batch) {
 		if((current_row() < lines()-1)) {
 			va_start(args, fmt);
-			vwprintw(stdscr, (char *)fmt, args);
+			vwprintw(stdscr, (const char *)fmt, args);
 			va_end(args);
 		}
 	} else {
@@ -283,7 +283,7 @@ static void print(const char *fmt, ...)
 static void attr_addstr(int attr, const char *str)
 {
 	attron(attr);
-	addstr((char *)str);
+	addstr((const char *)str);
 	attroff(attr);
 }
 

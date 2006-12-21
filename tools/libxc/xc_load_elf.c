@@ -75,7 +75,7 @@ int probe_elf(const char *image,
               unsigned long image_size,
               struct load_funcs *load_funcs)
 {
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
+    const Elf_Ehdr *ehdr = (const Elf_Ehdr *)image;
 
     if ( !IS_ELF(*ehdr) )
         return -EINVAL;
@@ -86,7 +86,7 @@ int probe_elf(const char *image,
     return 0;
 }
 
-static inline int is_loadable_phdr(Elf_Phdr *phdr)
+static inline int is_loadable_phdr(const Elf_Phdr *phdr)
 {
     return ((phdr->p_type == PT_LOAD) &&
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
@@ -96,12 +96,13 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
  * Fallback for kernels containing only the legacy __xen_guest string
  * and no ELF notes.
  */
-static int is_xen_guest_section(Elf_Shdr *shdr, const char *shstrtab)
+static int is_xen_guest_section(const Elf_Shdr *shdr, const char *shstrtab)
 {
     return strcmp(&shstrtab[shdr->sh_name], "__xen_guest") == 0;
 }
 
-static const char *xen_guest_lookup(struct domain_setup_info *dsi, int type)
+static const char *xen_guest_lookup(
+    const struct domain_setup_info *dsi, int type)
 {
     const char *xenguest_fallbacks[] = {
         [XEN_ELFNOTE_ENTRY] = "VIRT_ENTRY=",
@@ -134,7 +135,8 @@ static const char *xen_guest_lookup(struct domain_setup_info *dsi, int type)
     return p + strlen(fallback);
 }
 
-static const char *xen_guest_string(struct domain_setup_info *dsi, int type)
+static const char *xen_guest_string(
+    const struct domain_setup_info *dsi, int type)
 {
     const char *p = xen_guest_lookup(dsi, type);
 
@@ -148,8 +150,8 @@ static const char *xen_guest_string(struct domain_setup_info *dsi, int type)
     return p;
 }
 
-static unsigned long long xen_guest_numeric(struct domain_setup_info *dsi,
-                                                   int type, int *defined)
+static unsigned long long xen_guest_numeric(
+    const struct domain_setup_info *dsi, int type, int *defined)
 {
     const char *p = xen_guest_lookup(dsi, type);
     unsigned long long value;
@@ -175,19 +177,19 @@ static unsigned long long xen_guest_numeric(struct domain_setup_info *dsi,
 /*
  * Interface to the Xen ELF notes.
  */
-#define ELFNOTE_NAME(_n_)   ((void*)(_n_) + sizeof(*(_n_)))
+#define ELFNOTE_NAME(_n_)   ((const void*)(_n_) + sizeof(*(_n_)))
 #define ELFNOTE_DESC(_n_)   (ELFNOTE_NAME(_n_) + (((_n_)->namesz+3)&~3))
 #define ELFNOTE_NEXT(_n_)   (ELFNOTE_DESC(_n_) + (((_n_)->descsz+3)&~3))
 
-static int is_xen_elfnote_section(const char *image, Elf_Shdr *shdr)
+static int is_xen_elfnote_section(const char *image, const Elf_Shdr *shdr)
 {
-    Elf_Note *note;
+    const Elf_Note *note;
 
     if ( shdr->sh_type != SHT_NOTE )
         return 0;
 
-    for ( note = (Elf_Note *)(image + shdr->sh_offset);
-          note < (Elf_Note *)(image + shdr->sh_offset + shdr->sh_size);
+    for ( note = (const Elf_Note *)(image + shdr->sh_offset);
+          note < (const Elf_Note *)(image + shdr->sh_offset + shdr->sh_size);
           note = ELFNOTE_NEXT(note) )
     {
         if ( !strncmp(ELFNOTE_NAME(note), "Xen", 4) )
@@ -197,15 +199,16 @@ static int is_xen_elfnote_section(const char *image, Elf_Shdr *shdr)
     return 0;
 }
 
-static Elf_Note *xen_elfnote_lookup(struct domain_setup_info *dsi, int type)
+static const Elf_Note *xen_elfnote_lookup(
+    const struct domain_setup_info *dsi, int type)
 {
-    Elf_Note *note;
+    const Elf_Note *note;
 
     if ( !dsi->__elfnote_section )
         return NULL;
 
-    for ( note = (Elf_Note *)dsi->__elfnote_section;
-          note < (Elf_Note *)dsi->__elfnote_section_end;
+    for ( note = (const Elf_Note *)dsi->__elfnote_section;
+          note < (const Elf_Note *)dsi->__elfnote_section_end;
           note = ELFNOTE_NEXT(note) )
     {
         if ( strncmp(ELFNOTE_NAME(note), "Xen", 4) )
@@ -218,9 +221,9 @@ static Elf_Note *xen_elfnote_lookup(struct domain_setup_info *dsi, int type)
     return NULL;
 }
 
-const char *xen_elfnote_string(struct domain_setup_info *dsi, int type)
+const char *xen_elfnote_string(const struct domain_setup_info *dsi, int type)
 {
-    Elf_Note *note;
+    const Elf_Note *note;
 
     if ( !dsi->__elfnote_section )
         return xen_guest_string(dsi, type);
@@ -232,10 +235,10 @@ const char *xen_elfnote_string(struct domain_setup_info *dsi, int type)
     return (const char *)ELFNOTE_DESC(note);
 }
 
-unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
+unsigned long long xen_elfnote_numeric(const struct domain_setup_info *dsi,
                                        int type, int *defined)
 {
-    Elf_Note *note;
+    const Elf_Note *note;
 
     *defined = 0;
 
@@ -252,10 +255,10 @@ unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
     {
     case 4:
         *defined = 1;
-        return *(uint32_t*)ELFNOTE_DESC(note);
+        return *(const uint32_t*)ELFNOTE_DESC(note);
     case 8:
         *defined = 1;
-        return *(uint64_t*)ELFNOTE_DESC(note);
+        return *(const uint64_t*)ELFNOTE_DESC(note);
     default:
         xc_set_error(XC_INVALID_KERNEL,
                      "elfnotes: unknown data size %#x for numeric type note %#x\n",
@@ -268,9 +271,9 @@ static int parseelfimage(const char *image,
                          unsigned long image_len,
                          struct domain_setup_info *dsi)
 {
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
-    Elf_Phdr *phdr;
-    Elf_Shdr *shdr;
+    const Elf_Ehdr *ehdr = (const Elf_Ehdr *)image;
+    const Elf_Phdr *phdr;
+    const Elf_Shdr *shdr;
     Elf_Addr kernstart = ~0, kernend = 0, vaddr, virt_entry;
     const char *shstrtab, *p;
     int h, virt_base_defined, elf_pa_off_defined, virt_entry_defined;
@@ -331,12 +334,13 @@ static int parseelfimage(const char *image,
     /* Look for .notes segment containing at least one Xen note */
     for ( h = 0; h < ehdr->e_shnum; h++ )
     {
-        shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
+        shdr = (const Elf_Shdr *)(
+            image + ehdr->e_shoff + (h*ehdr->e_shentsize));
         if ( !is_xen_elfnote_section(image, shdr) )
             continue;
-        dsi->__elfnote_section = (void *)image + shdr->sh_offset;
+        dsi->__elfnote_section = (const void *)image + shdr->sh_offset;
         dsi->__elfnote_section_end =
-            (void *)image + shdr->sh_offset + shdr->sh_size;
+            (const void *)image + shdr->sh_offset + shdr->sh_size;
         break;
     }
 
@@ -350,16 +354,18 @@ static int parseelfimage(const char *image,
                          "ELF image has no section-header strings table.");
             return -EINVAL;
         }
-        shdr = (Elf_Shdr *)(image + ehdr->e_shoff +
+        shdr = (const Elf_Shdr *)(image + ehdr->e_shoff +
                             (ehdr->e_shstrndx*ehdr->e_shentsize));
         shstrtab = image + shdr->sh_offset;
 
         for ( h = 0; h < ehdr->e_shnum; h++ )
         {
-            shdr = (Elf_Shdr *)(image + ehdr->e_shoff + (h*ehdr->e_shentsize));
+            shdr = (const Elf_Shdr *)(
+                image + ehdr->e_shoff + (h*ehdr->e_shentsize));
             if ( is_xen_guest_section(shdr, shstrtab) )
             {
-                dsi->__xen_guest_string = (char *)image + shdr->sh_offset;
+                dsi->__xen_guest_string =
+                    (const char *)image + shdr->sh_offset;
                 break;
             }
         }
@@ -442,8 +448,8 @@ static int parseelfimage(const char *image,
      * If we are using the modern ELF notes interface then the default
      * is 0.
      */
-    dsi->elf_paddr_offset =
-        xen_elfnote_numeric(dsi, XEN_ELFNOTE_PADDR_OFFSET, &elf_pa_off_defined);
+    dsi->elf_paddr_offset = xen_elfnote_numeric(dsi, XEN_ELFNOTE_PADDR_OFFSET,
+                                                &elf_pa_off_defined);
     if ( !elf_pa_off_defined )
     {
         if ( dsi->__elfnote_section )
@@ -462,7 +468,8 @@ static int parseelfimage(const char *image,
 
     for ( h = 0; h < ehdr->e_phnum; h++ )
     {
-        phdr = (Elf_Phdr *)(image + ehdr->e_phoff + (h*ehdr->e_phentsize));
+        phdr = (const Elf_Phdr *)(
+            image + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
         vaddr = phdr->p_paddr - dsi->elf_paddr_offset + dsi->v_start;
@@ -514,8 +521,8 @@ loadelfimage(
     const char *image, unsigned long elfsize, int xch, uint32_t dom,
     xen_pfn_t *parray, struct domain_setup_info *dsi)
 {
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
-    Elf_Phdr *phdr;
+    const Elf_Ehdr *ehdr = (const Elf_Ehdr *)image;
+    const Elf_Phdr *phdr;
     int h;
 
     char         *va;
@@ -523,7 +530,8 @@ loadelfimage(
 
     for ( h = 0; h < ehdr->e_phnum; h++ )
     {
-        phdr = (Elf_Phdr *)(image + ehdr->e_phoff + (h*ehdr->e_phentsize));
+        phdr = (const Elf_Phdr *)(
+            image + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
 
@@ -569,7 +577,8 @@ loadelfsymtab(
     const char *image, int xch, uint32_t dom, xen_pfn_t *parray,
     struct domain_setup_info *dsi)
 {
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)image, *sym_ehdr;
+    const Elf_Ehdr *ehdr = (const Elf_Ehdr *)image;
+    Elf_Ehdr *sym_ehdr;
     Elf_Shdr *shdr;
     unsigned long maxva, symva;
     char *p;

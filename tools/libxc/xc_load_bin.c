@@ -98,7 +98,7 @@ struct xen_bin_image_table
 #define FLAGS_MASK     ((~ 0) & (~ XEN_REACTOS_FLAG_ALIGN4K))
 #define FLAGS_REQUIRED XEN_REACTOS_FLAG_ADDRSVALID
 
-static struct xen_bin_image_table *
+static const struct xen_bin_image_table *
 findtable(const char *image, unsigned long image_size);
 static int
 parsebinimage(
@@ -122,11 +122,11 @@ int probe_bin(const char *image,
     return 0;
 }
 
-static struct xen_bin_image_table *
+static const struct xen_bin_image_table *
 findtable(const char *image, unsigned long image_size)
 {
-    struct xen_bin_image_table *table;
-    unsigned long *probe_ptr;
+    const struct xen_bin_image_table *table;
+    const unsigned long *probe_ptr;
     unsigned probe_index;
     unsigned probe_count;
 
@@ -142,13 +142,13 @@ findtable(const char *image, unsigned long image_size)
                   sizeof(unsigned long);
 
     /* Search for the magic header */
-    probe_ptr = (unsigned long *) image;
+    probe_ptr = (const unsigned long *) image;
     table = NULL;
     for ( probe_index = 0; probe_index < probe_count; probe_index++ )
     {
         if ( XEN_REACTOS_MAGIC3 == *probe_ptr )
         {
-            table = (struct xen_bin_image_table *) probe_ptr;
+            table = (const struct xen_bin_image_table *) probe_ptr;
             /* Checksum correct? */
             if ( 0 == table->magic + table->flags + table->checksum )
             {
@@ -165,7 +165,7 @@ static int parsebinimage(const char *image,
                          unsigned long image_size,
                          struct domain_setup_info *dsi)
 {
-    struct xen_bin_image_table *image_info;
+    const struct xen_bin_image_table *image_info;
     unsigned long start_addr;
     unsigned long end_addr;
 
@@ -186,13 +186,13 @@ static int parsebinimage(const char *image,
 
     /* Sanity check on the addresses */
     if ( image_info->header_addr < image_info->load_addr ||
-         ((char *) image_info - image) <
+         ((const char *) image_info - image) <
          (image_info->header_addr - image_info->load_addr) )
     {
         ERROR("Invalid header_addr.");
         return -EINVAL;
     }
-    start_addr = image_info->header_addr - ((char *) image_info - image);
+    start_addr = image_info->header_addr - ((const char *) image_info - image);
     if ( 0 != image_info->load_end_addr &&
          ( image_info->load_end_addr < image_info->load_end_addr ||
            start_addr + image_size < image_info->load_end_addr ) )
@@ -221,7 +221,7 @@ static int parsebinimage(const char *image,
     else
     {
         dsi->v_end = image_info->load_addr + image_size -
-                     (((char *) image_info - image) -
+                     (((const char *) image_info - image) -
                       (image_info->header_addr - image_info->load_addr));
     }
     dsi->v_kernstart = dsi->v_start;
@@ -240,7 +240,7 @@ loadbinimage(
     unsigned long size;
     char         *va;
     unsigned long done, chunksz;
-    struct xen_bin_image_table *image_info;
+    const struct xen_bin_image_table *image_info;
 
     image_info = findtable(image, image_size);
     if ( NULL == image_info )
@@ -252,7 +252,7 @@ loadbinimage(
     /* Determine image size */
     if ( 0 == image_info->load_end_addr )
     {
-        size = image_size  - (((char *) image_info - image) -
+        size = image_size  - (((const char *)image_info - image) -
                               (image_info->header_addr -
                                image_info->load_addr));
     }
@@ -262,7 +262,7 @@ loadbinimage(
     }
 
     /* It's possible that we need to skip the first part of the image */
-    image += ((char *)image_info - image) -
+    image += ((const char *)image_info - image) -
              (image_info->header_addr - image_info->load_addr);
 
     for ( done = 0; done < size; done += chunksz )

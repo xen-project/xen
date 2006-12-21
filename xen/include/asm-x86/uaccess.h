@@ -140,7 +140,7 @@ extern void __put_user_bad(void);
 })							
 
 struct __large_struct { unsigned long buf[100]; };
-#define __m(x) (*(struct __large_struct *)(x))
+#define __m(x) (*(const struct __large_struct *)(x))
 
 /*
  * Tell gcc we read from memory instead of writing: this is because
@@ -200,16 +200,16 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 
         switch (n) {
         case 1:
-            __put_user_size(*(u8 *)from, (u8 __user *)to, 1, ret, 1);
+            __put_user_size(*(const u8 *)from, (u8 __user *)to, 1, ret, 1);
             return ret;
         case 2:
-            __put_user_size(*(u16 *)from, (u16 __user *)to, 2, ret, 2);
+            __put_user_size(*(const u16 *)from, (u16 __user *)to, 2, ret, 2);
             return ret;
         case 4:
-            __put_user_size(*(u32 *)from, (u32 __user *)to, 4, ret, 4);
+            __put_user_size(*(const u32 *)from, (u32 __user *)to, 4, ret, 4);
             return ret;
         case 8:
-            __put_user_size(*(u64 *)from, (u64 __user *)to, 8, ret, 8);
+            __put_user_size(*(const u64 *)from, (u64 __user *)to, 8, ret, 8);
             return ret;
         }
     }

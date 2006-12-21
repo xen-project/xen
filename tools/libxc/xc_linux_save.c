@@ -80,7 +80,7 @@ static xen_pfn_t *live_m2p = NULL;
 #define BITMAP_SIZE   ((max_pfn + BITS_PER_LONG - 1) / 8)
 
 #define BITMAP_ENTRY(_nr,_bmap) \
-   ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
+   ((volatile unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
 
 #define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
 
@@ -112,7 +112,7 @@ static inline unsigned int hweight32(unsigned int w)
 static inline int count_bits ( int nr, volatile void *addr)
 {
     int i, count = 0;
-    unsigned long *p = (unsigned long *)addr;
+    volatile unsigned long *p = (volatile unsigned long *)addr;
     /* We know that the array is padded to unsigned long. */
     for( i = 0; i < (nr / (sizeof(unsigned long)*8)); i++, p++ )
         count += hweight32(*p);
@@ -443,7 +443,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
 /* XXX index of the L2 entry in PAE mode which holds the guest LPT */
 #define PAE_GLPT_L2ENTRY (495)
-        pte = ((uint64_t*)spage)[PAE_GLPT_L2ENTRY];
+        pte = ((const uint64_t*)spage)[PAE_GLPT_L2ENTRY];
 
         if(((pte >> PAGE_SHIFT) & 0x0fffffff) == live_p2m[pfn])
             xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
@@ -464,9 +464,9 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
         unsigned long pfn, mfn;
 
         if (pt_levels == 2)
-            pte = ((uint32_t*)spage)[i];
+            pte = ((const uint32_t*)spage)[i];
         else
-            pte = ((uint64_t*)spage)[i];
+            pte = ((const uint64_t*)spage)[i];
 
         if (i >= xen_start && i < xen_end)
             pte = 0;
