@@ -965,7 +965,7 @@ void handle_mmio(unsigned long gpa)
         if ( ad_size == WORD )
             addr &= 0xFFFF;
         addr += hvm_get_segment_base(v, x86_seg_es);
-        if ( addr == gpa )
+        if ( shadow_gva_to_gpa(v, addr) == gpa )
         {
             enum x86_segment seg;
 
