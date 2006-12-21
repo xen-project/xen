@@ -244,18 +244,6 @@ The following enumeration types are used:
 \vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
-{\tt enum boot\_type} & \\
-\hline
-\hspace{0.5cm}{\tt bios} & boot an HVM guest using an emulated BIOS \\
-\hspace{0.5cm}{\tt grub} & boot from inside the machine using grub \\
-\hspace{0.5cm}{\tt kernel\_external} & boot from an external kernel \\
-\hspace{0.5cm}{\tt kernel\_internal} & boot from a kernel inside the guest filesystem \\
-\hline
-\end{longtable}
-
-\vspace{1cm}
-\begin{longtable}{|ll|}
-\hline
 {\tt enum vbd\_mode} & \\
 \hline
 \hspace{0.5cm}{\tt RO} & disk is mounted read-only \\
@@ -1182,7 +1170,34 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VM} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual machine (or 'guest')}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual machine (or 'guest').
+
+VM booting is controlled by setting one of the two mutually exclusive
+groups: "PV", and "HVM".  If HVM.boot is the empty string, then paravirtual
+domain building and booting will be used; otherwise the VM will be loaded
+as an HVM domain, and booted using an emulated BIOS.
+
+When paravirtual booting is in use, the PV/bootloader field indicates the
+bootloader to use.  It may be "pygrub", in which case the platform's
+default installation of pygrub will be used, or a full path within the
+control domain to some other bootloader.  The other fields, PV/kernel,
+PV/ramdisk, PV/args and PV/bootloader\_args will be passed to the
+bootloader unmodified, and interpretation of those fields is then specific
+to the bootloader itself, including the possibility that the bootloader
+will ignore some or all of those given values.
+
+If the bootloader is pygrub, then the menu.lst is parsed if present in the
+guest's filesystem, otherwise the specified kernel and ramdisk are used, or
+an autodetected kernel is used if nothing is specified and autodetection is
+possible.  PV/args is appended to the kernel command line, no matter which
+mechanism is used for finding the kernel.
+
+If PV/bootloader is empty but PV/kernel is specified, then the kernel and
+ramdisk values will be treated as paths within the control domain.  If both
+PV/bootloader and PV/kernel are empty, then the behaviour is as if
+PV/bootloader was specified as "pygrub".
+
+When using HVM booting, HVM/boot specifies the order of the boot devices}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -1215,18 +1230,17 @@ $\mathit{RO}_\mathit{run}$ &  {\tt consoles} & (console ref) Set & virtual conso
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
-$\mathit{RW}$ &  {\tt bios/boot} & string & device to boot the guest from \\
+$\mathit{RW}$ &  {\tt PV/bootloader} & string & name of or path to bootloader \\
+$\mathit{RW}$ &  {\tt PV/kernel} & string & path to the kernel \\
+$\mathit{RW}$ &  {\tt PV/ramdisk} & string & path to the initrd \\
+$\mathit{RW}$ &  {\tt PV/args} & string & kernel command-line arguments \\
+$\mathit{RW}$ &  {\tt PV/bootloader\_args} & string & miscellaneous arguments for the bootloader \\
+$\mathit{RW}$ &  {\tt HVM/boot} & string & device boot order \\
 $\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
 $\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
 $\mathit{RW}$ &  {\tt platform/localtime} & bool & set RTC to local time \\
 $\mathit{RW}$ &  {\tt platform/clock\_offset} & bool & timeshift applied to guest's clock \\
 $\mathit{RW}$ &  {\tt platform/enable\_audio} & bool & emulate audio \\
-$\mathit{RW}$ &  {\tt builder} & string & domain builder to use \\
-$\mathit{RW}$ &  {\tt boot\_method} & boot\_type & select how this machine should boot \\
-$\mathit{RW}$ &  {\tt kernel/kernel} & string & path to kernel e.g. /boot/vmlinuz \\
-$\mathit{RW}$ &  {\tt kernel/initrd} & string & path to the initrd e.g. /boot/initrd.img \\
-$\mathit{RW}$ &  {\tt kernel/args} & string & extra kernel command-line arguments \\
-$\mathit{RW}$ &  {\tt grub/cmdline} & string & grub command-line \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt tools\_version} & (string $\rightarrow$ string) Map & versions of installed paravirtualised drivers \\
 $\mathit{RW}$ &  {\tt otherConfig} & (string $\rightarrow$ string) Map & additional configuration \\
@@ -3192,13 +3206,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_bios\_boot}
+\subsubsection{RPC name:~get\_PV\_bootloader}
 
 {\bf Overview:} 
-Get the bios/boot field of the given VM.
+Get the PV/bootloader field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_bios_boot (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} string get_PV_bootloader (session_id s, VM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3224,13 +3238,343 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_bios\_boot}
+\subsubsection{RPC name:~set\_PV\_bootloader}
 
 {\bf Overview:} 
-Set the bios/boot field of the given VM.
+Set the PV/bootloader field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_bios_boot (session_id s, VM ref self, string value)\end{verbatim}
+\begin{verbatim} void set_PV_bootloader (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_kernel}
+
+{\bf Overview:} 
+Get the PV/kernel field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_kernel (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_kernel}
+
+{\bf Overview:} 
+Set the PV/kernel field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_kernel (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_ramdisk}
+
+{\bf Overview:} 
+Get the PV/ramdisk field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_ramdisk (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_ramdisk}
+
+{\bf Overview:} 
+Set the PV/ramdisk field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_ramdisk (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_args}
+
+{\bf Overview:} 
+Get the PV/args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_args (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_args}
+
+{\bf Overview:} 
+Set the PV/args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_args (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_bootloader\_args}
+
+{\bf Overview:} 
+Get the PV/bootloader\_args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_bootloader_args (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_bootloader\_args}
+
+{\bf Overview:} 
+Set the PV/bootloader\_args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_bootloader_args (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_HVM\_boot}
+
+{\bf Overview:} 
+Get the HVM/boot field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_HVM_boot (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_HVM\_boot}
+
+{\bf Overview:} 
+Set the HVM/boot field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_HVM_boot (session_id s, VM ref self, string value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3573,402 +3917,6 @@ Set the platform/enable\_audio field of the given VM.
 {\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_builder}
-
-{\bf Overview:} 
-Get the builder field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_builder (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_builder}
-
-{\bf Overview:} 
-Set the builder field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_builder (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_boot\_method}
-
-{\bf Overview:} 
-Get the boot\_method field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (boot_type) get_boot_method (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-boot\_type
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_boot\_method}
-
-{\bf Overview:} 
-Set the boot\_method field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_boot_method (session_id s, VM ref self, boot_type value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt boot\_type } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_kernel\_kernel}
-
-{\bf Overview:} 
-Get the kernel/kernel field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_kernel_kernel (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_kernel\_kernel}
-
-{\bf Overview:} 
-Set the kernel/kernel field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_kernel_kernel (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_kernel\_initrd}
-
-{\bf Overview:} 
-Get the kernel/initrd field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_kernel_initrd (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_kernel\_initrd}
-
-{\bf Overview:} 
-Set the kernel/initrd field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_kernel_initrd (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_kernel\_args}
-
-{\bf Overview:} 
-Get the kernel/args field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_kernel_args (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_kernel\_args}
-
-{\bf Overview:} 
-Set the kernel/args field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_kernel_args (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_grub\_cmdline}
-
-{\bf Overview:} 
-Get the grub/cmdline field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_grub_cmdline (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_grub\_cmdline}
-
-{\bf Overview:} 
-Set the grub/cmdline field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_grub_cmdline (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
 
 \end{tabular}
 
