@@ -256,6 +256,22 @@ struct acpi_20_madt {
 
 #define ACPI_2_0_MADT_REVISION 0x01
 
+
+/*
+ * HPET Description Table
+ */
+struct acpi_20_hpet {
+    struct acpi_header header;
+    uint32_t           timer_block_id;
+    struct acpi_20_generic_address addr;
+    uint8_t            hpet_number;
+    uint16_t           min_tick;
+    uint8_t            page_protect;
+};
+
+#define ACPI_2_0_HPET_REVISION 0x01
+#define ACPI_HPET_ADDRESS 0xFED00000UL
+
 /*
  * Multiple APIC Flags.
  */
@@ -325,6 +341,7 @@ struct acpi_20_madt_intsrcovr {
 #define ACPI_2_0_RSDT_SIGNATURE ASCII32('R','S','D','T')
 #define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
 #define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
+#define ACPI_2_0_HPET_SIGNATURE ASCII32('H','P','E','T')
 
 #pragma pack ()
 

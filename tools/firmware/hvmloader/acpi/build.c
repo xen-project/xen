@@ -110,10 +110,33 @@ int construct_madt(struct acpi_20_madt *madt)
     return align16(offset);
 }
 
+int construct_hpet(struct acpi_20_hpet *hpet)
+{
+    int offset;
+
+    memset(hpet, 0, sizeof(*hpet));
+    hpet->header.signature    = ACPI_2_0_HPET_SIGNATURE;
+    hpet->header.revision     = ACPI_2_0_HPET_REVISION;
+    strncpy(hpet->header.oem_id, "INTEL ", 6);
+    hpet->header.oem_table_id = ACPI_OEM_TABLE_ID;
+    hpet->header.oem_revision = ACPI_OEM_REVISION;
+    hpet->header.creator_id   = ACPI_CREATOR_ID;
+    hpet->header.creator_revision = ACPI_CREATOR_REVISION;
+    hpet->timer_block_id      = 0x8086a201;
+    hpet->addr.address        = ACPI_HPET_ADDRESS;
+    offset = sizeof(*hpet);
+
+    hpet->header.length = offset;
+    set_checksum(hpet, offsetof(struct acpi_header, checksum), offset);
+
+    return offset;
+}
+
 int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
 {
     int offset = 0, nr_tables = 0;
     struct acpi_20_madt *madt;
+    struct acpi_20_hpet *hpet;
     struct acpi_20_tcpa *tcpa;
     static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
     uint16_t *tis_hdr;
@@ -125,6 +148,11 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         offset += construct_madt(madt);
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
+
+    /* HPET. */
+    hpet = (struct acpi_20_hpet *)&buf[offset];
+    offset += construct_hpet(hpet);
+    table_ptrs[nr_tables++] = (unsigned long)hpet;
 
     /* TPM TCPA and SSDT. */
     tis_hdr = (uint16_t *)0xFED40F00;

@@ -30,8 +30,47 @@
 #include <xen/list.h>
 #include <asm/hvm/vpic.h>
 
-#define PIT_FREQ 1193181
-#define PIT_BASE 0x40
+
+#define HPET_TIMER_NUM     3    /* 3 timers supported now */
+struct HPET {
+    uint64_t capability;        /* capabilities */
+    uint64_t res0;              /* reserved */
+    uint64_t config;            /* configuration */
+    uint64_t res1;              /* reserved */
+    uint64_t isr;               /* interrupt status reg */
+    uint64_t res2[25];          /* reserved */
+    union {                     /* main counter */
+        uint64_t mc64;
+        uint32_t mc32;
+    };
+    uint64_t res3;              /* reserved */
+    struct {                    /* timers */
+        uint64_t config;        /* configuration/cap */
+        union {                 /* timer compare register */
+            uint64_t c64;
+            uint32_t c32;
+        };
+        uint64_t hpet_fsb[2];   /* FSB route, not supported now */
+    } timers[HPET_TIMER_NUM];
+};
+
+struct HPETState;
+struct HPET_timer_fn_info {
+    struct HPETState       *hs;
+    unsigned int    tn;
+};
+
+typedef struct HPETState {
+    struct HPET     hpet;
+    struct vcpu     *vcpu;
+    uint64_t        tsc_freq;
+    uint64_t        mc_offset;
+    uint64_t        t0_initial_cnt;
+    uint64_t        t0_period;
+    struct timer timers[HPET_TIMER_NUM];
+    struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 
+} HPETState;
+
 
 /*
  * Abstract layer of periodic time, one short time.
@@ -53,6 +92,10 @@ struct periodic_time {
     time_cb *cb;
     void *priv;                 /* ponit back to platform time source */
 };
+
+
+#define PIT_FREQ 1193181
+#define PIT_BASE 0x40
 
 typedef struct PITChannelState {
     int count; /* can be 65536 */
@@ -103,6 +146,7 @@ typedef struct PMTState {
 struct pl_time {    /* platform time */
     struct PITState  vpit;
     struct RTCState  vrtc;
+    struct HPETState vhpet;
     struct PMTState  vpmt;
 };
 
@@ -121,6 +165,7 @@ void destroy_periodic_time(struct periodic_time *pt);
 
 int pv_pit_handler(int port, int data, int write);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
+void pit_stop_channel0_irq(PITState * pit);
 void pit_migrate_timers(struct vcpu *v);
 void pit_deinit(struct domain *d);
 void rtc_init(struct vcpu *v, int base, int irq);
@@ -130,5 +175,9 @@ int is_rtc_periodic_irq(void *opaque);
 void pmtimer_init(struct vcpu *v, int base);
 void pmtimer_migrate_timers(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);
+
+void hpet_migrate_timers(struct vcpu *v);
+void hpet_init(struct vcpu *v);
+void hpet_deinit(struct domain *d);
 
 #endif /* __ASM_X86_HVM_VPT_H__ */

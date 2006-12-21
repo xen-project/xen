@@ -352,6 +352,12 @@ static uint32_t pit_ioport_read(void *opaque, uint32_t addr)
     return ret;
 }
 
+void pit_stop_channel0_irq(PITState * pit)
+{
+    PITChannelState *s = &pit->channels[0];
+    destroy_periodic_time(&s->pt);
+}
+
 static void pit_reset(void *opaque)
 {
     PITState *pit = opaque;

@@ -31,13 +31,15 @@
 #include <xen/event.h>
 
 
+extern struct hvm_mmio_handler hpet_mmio_handler;
 extern struct hvm_mmio_handler vlapic_mmio_handler;
 extern struct hvm_mmio_handler vioapic_mmio_handler;
 
-#define HVM_MMIO_HANDLER_NR 2
+#define HVM_MMIO_HANDLER_NR 3
 
 static struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
 {
+    &hpet_mmio_handler,
     &vlapic_mmio_handler,
     &vioapic_mmio_handler
 };

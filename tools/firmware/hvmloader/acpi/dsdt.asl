@@ -280,6 +280,22 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                 }
             }
 
+            Device(HPET) {
+                Name(_HID,  EISAID("PNP0103"))
+                Name(_UID, 0)
+                Name(_CRS, ResourceTemplate() {
+                    DWordMemory(
+                        ResourceConsumer, PosDecode, MinFixed, MaxFixed,
+                        NonCacheable, ReadWrite,
+                        0x00000000,
+                        0xFED00000,
+                        0xFED003FF,
+                        0x00000000,
+                        0x00000400 /* 1K memory: FED00000 - FED003FF */
+                    )
+                })
+            }
+
             Method(_PRT,0) {
                 If(PICD) {
                     Return(PRTA)

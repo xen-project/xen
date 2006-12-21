@@ -86,6 +86,7 @@ void hvm_migrate_timers(struct vcpu *v)
 {
     pit_migrate_timers(v);
     rtc_migrate_timers(v);
+    hpet_migrate_timers(v);
     pmtimer_migrate_timers(v);
     if ( vcpu_vlapic(v)->pt.enabled )
         migrate_timer(&vcpu_vlapic(v)->pt.timer, v->processor);
@@ -151,6 +152,7 @@ void hvm_domain_destroy(struct domain *d)
     pit_deinit(d);
     rtc_deinit(d);
     pmtimer_deinit(d);
+    hpet_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -186,6 +188,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
+    hpet_init(v);
 
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
