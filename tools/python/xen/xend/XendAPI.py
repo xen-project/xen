@@ -15,11 +15,12 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
+import re
+
 from xen.xend import XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging
 
 from xen.xend.XendAuthSessions import instance as auth_manager
-from xen.xend.XendAuthSessions import session_required
 from xen.xend.XendError import *
 from xen.xend.XendClient import ERROR_INVALID_DOMAIN
 from xen.xend.XendLogging import log
@@ -44,7 +45,16 @@ def xen_api_success_void():
 
 def xen_api_error(error):
     """Wraps an error value in XenAPI format."""
-    return {"Status": "Error", "ErrorDescription": error}
+    if type(error) == tuple:
+        error = list(error)
+    if type(error) != list:
+        error = [error]
+    if len(error) == 0:
+        error = ['INTERNAL_ERROR', 'Empty list given to xen_api_error']
+
+    return { "Status": "Error",
+             "ErrorDescription": [str(x) for x in error] }
+
 
 def xen_api_todo():
     """Temporary method to make sure we track down all the TODOs"""
@@ -68,6 +78,56 @@ def trace(func, api_name = ''):
     trace_func.api = api_name
     return trace_func
 
+
+takesRE = re.compile(r'^(.*)\(\) takes exactly ([0-9]*) argument')
+def deconstruct_typeerror(exn):
+    m = takesRE.search(exn[0])
+    return m and m.groups() or None
+
+
+def catch_typeerror(func):
+    """Decorator to catch any TypeErrors and translate them into Xen-API
+    errors.
+
+    @param func: function with params: (self, session, host_ref)
+    @rtype: callable object
+    """
+    def f(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except TypeError, exn:
+            if hasattr(func, 'api'):
+                mt = deconstruct_typeerror(exn)
+                if mt:
+                    method, takes = mt
+                    if method.endswith(func.api.split('.')[-1]):
+                        return xen_api_error(
+                            ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                             func.api, int(takes) - 2,
+                             len(args) + len(kwargs) - 1])
+            raise
+
+    # make sure we keep the 'api' attribute
+    if hasattr(func, 'api'):
+        f.api = func.api
+        
+    return f
+
+
+def session_required(func):
+    def check_session(self, session, *args, **kwargs):
+        if auth_manager().is_session_valid(session):
+            return func(self, session, *args, **kwargs)
+        else:
+            return xen_api_error(['SESSION_INVALID', session])
+
+    # make sure we keep the 'api' attribute
+    if hasattr(func, 'api'):
+        check_session.api = func.api
+
+    return check_session
+
+
 def valid_host(func):
     """Decorator to verify if host_ref is valid before calling
     method.
@@ -80,8 +140,7 @@ def valid_host(func):
         if type(host_ref) == type(str()) and xennode.is_valid_host(host_ref):
             return func(self, session, host_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_HOST_INVALID}
+            return xen_api_error(['HOST_HANDLE_INVALID', host_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -102,8 +161,7 @@ def valid_host_cpu(func):
                xennode.is_valid_cpu(host_cpu_ref):
             return func(self, session, host_cpu_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_HOST_CPU_INVALID}
+            return xen_api_error(['HOST_CPU_HANDLE_INVALID', host_cpu_ref])
         
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -120,8 +178,10 @@ def valid_vm(func):
     """    
     def check_vm_ref(self, session, *args, **kwargs):
         if len(args) == 0:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VM_INVALID}
+            # This will trigger a TypeError, because there aren't enough
+            # arguments, which will be caught higher up and diagnosed.
+            func(self, session)
+            assert false
 
         vm_ref = args[0]
         xendom = XendDomain.instance()
@@ -129,8 +189,7 @@ def valid_vm(func):
                xendom.is_valid_vm(vm_ref):
             return func(self, session, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VM_INVALID}
+            return xen_api_error(['VM_HANDLE_INVALID', vm_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -151,8 +210,7 @@ def valid_vbd(func):
                xendom.is_valid_dev('vbd', vbd_ref):
             return func(self, session, vbd_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VBD_INVALID}
+            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -173,8 +231,7 @@ def valid_vif(func):
                xendom.is_valid_dev('vif', vif_ref):
             return func(self, session, vif_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VIF_INVALID}
+            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -196,8 +253,7 @@ def valid_vdi(func):
                xennode.get_sr().is_valid_vdi(vdi_ref):
             return func(self, session, vdi_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VDI_INVALID}
+            return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -218,8 +274,7 @@ def valid_vtpm(func):
                xendom.is_valid_dev('vtpm', vtpm_ref):
             return func(self, session, vtpm_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VTPM_INVALID}
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -240,8 +295,7 @@ def valid_sr(func):
                xennode.get_sr().uuid == sr_ref:
             return func(self, session, sr_ref, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_SR_INVALID}
+            return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
 
     # make sure we keep the 'api' attribute
     if hasattr(func, 'api'):
@@ -274,7 +328,7 @@ class XendAPI:
     used via XMLRPCServer.
 
     All methods that need a valid session are marked with
-    a L{XendAuthManager.session_required} decorator that will
+    a L{session_required} decorator that will
     transparently perform the required session authentication.
 
     We need to support Python <2.4, so we use the old decorator syntax.
@@ -291,15 +345,15 @@ class XendAPI:
         self.auth = auth
 
         classes = {
-            'session': (session_required,),
-            'host': (valid_host, session_required),
-            'host_cpu': (valid_host_cpu, session_required),
-            'VM': (valid_vm, session_required),
-            'VBD': (valid_vbd, session_required),
-            'VIF': (valid_vif, session_required),
-            'VDI': (valid_vdi, session_required),
-            'VTPM':(valid_vtpm, session_required),
-            'SR':  (valid_sr, session_required)}
+            'session': (session_required, catch_typeerror),
+            'host': (valid_host, session_required, catch_typeerror),
+            'host_cpu': (valid_host_cpu, session_required, catch_typeerror),
+            'VM': (valid_vm, session_required, catch_typeerror),
+            'VBD': (valid_vbd, session_required, catch_typeerror),
+            'VIF': (valid_vif, session_required, catch_typeerror),
+            'VDI': (valid_vdi, session_required, catch_typeerror),
+            'VTPM':(valid_vtpm, session_required, catch_typeerror),
+            'SR':  (valid_sr, session_required, catch_typeerror)}
         
         # Cheat methods
         # -------------
@@ -375,7 +429,7 @@ class XendAPI:
                 func_full_name = '%s_%s' % (cls, func_name)
                 try:
                     method = getattr(XendAPI, func_full_name)
-                    method = session_required(method)
+                    method = catch_typeerror(session_required(method))
                     method.api = '%s.%s' % (cls, func_name)
                     setattr(XendAPI, func_full_name, method)
                 except AttributeError:
@@ -396,14 +450,20 @@ class XendAPI:
     session_methods = ['logout']
     # session_funcs = ['login_with_password']    
 
-    def session_login_with_password(self, username, password):
+    def session_login_with_password(self, *args):
+        if len(args) != 2:
+            return xen_api_error(
+                ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                 'session.login_with_password', 2, len(args)])
+        username = args[0]
+        password = args[1]
         try:
             session = (self.auth == AUTH_NONE and
                        auth_manager().login_unconditionally(username) or
                        auth_manager().login_with_password(username, password))
             return xen_api_success(session)
         except XendError, e:
-            return xen_api_error(XEND_ERROR_AUTHENTICATION_FAILED)
+            return xen_api_error(['SESSION_AUTHENTICATION_FAILED'])
     session_login_with_password.api = 'session.login_with_password'
 
 
@@ -425,7 +485,7 @@ class XendAPI:
         user = auth_manager().get_user(session)
         if user:
             return xen_api_success(user)
-        return xen_api_error(XEND_ERROR_SESSION_INVALID)
+        return xen_api_error(['SESSION_INVALID', session])
 
 
     # Xen API: Class User
@@ -937,7 +997,7 @@ class XendAPI:
         dom = xendom.domain_lookup_nr(label)
         if dom:
             return xen_api_success([dom.get_uuid()])
-        return xen_api_error(XEND_ERROR_VM_INVALID)
+        return xen_api_success([])
     
     def VM_create(self, session, vm_struct):
         xendom = XendDomain.instance()
@@ -949,7 +1009,7 @@ class XendAPI:
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         if not xeninfo:
-            return xen_api_error(XEND_ERROR_VM_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vm_ref])
         
         record = {
             'uuid': xeninfo.get_uuid(),
@@ -1051,10 +1111,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VBD_INVALID)
+            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
         cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VBD_INVALID)
+            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
 
         valid_vbd_keys = self.VBD_attr_ro + self.VBD_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
@@ -1073,7 +1133,7 @@ class XendAPI:
     def VBD_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
         if not xendom.is_valid_vm(vbd_struct['VM']):
-            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vbd_struct['VM']])
         
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
         vbd_ref = ''
@@ -1087,7 +1147,7 @@ class XendAPI:
                 sr = XendNode.instance().get_sr()
                 vdi_image = sr.xen_api_get_by_uuid(vdi_ref)
                 if not vdi_image:
-                    return xen_api_error(XEND_ERROR_VDI_INVALID)
+                    return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
                 vdi_image = vdi_image.qcow_path
                 vbd_ref = dom.create_vbd_with_vdi(vbd_struct, vdi_image)
         except XendError:
@@ -1137,10 +1197,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VIF_INVALID)
+            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
         cfg = vm.get_dev_xenapi_config('vif', vif_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VIF_INVALID)
+            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
         
         valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
@@ -1164,7 +1224,7 @@ class XendAPI:
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
-            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vif_struct['VM']])
 
 
     # Xen API: Class VDI
@@ -1295,14 +1355,14 @@ class XendAPI:
                 'read_only': image.read_only,
                 })
 
-        return xen_api_error(XEND_ERROR_VDI_INVALID)
+        return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
 
     # Class Functions    
     def VDI_create(self, session, vdi_struct):
         sr = XendNode.instance().get_sr()
         sr_ref = vdi_struct['SR']
         if sr.uuid != sr_ref:
-            return xen_api_error(XEND_ERROR_SR_INVALID)
+            return xen_api_error(['SR_HANDLE_INVALID', vdi_struct['SR']])
 
         vdi_uuid = sr.create_image(vdi_struct)
         return xen_api_success(vdi_uuid)
@@ -1315,9 +1375,8 @@ class XendAPI:
         sr = XendNode.instance().get_sr()
         image_uuid = sr.xen_api_get_by_name_label(name)
         if image_uuid:
-            return xen_api_success(image_uuid)
-        
-        return xen_api_error(XEND_ERROR_VDI_INVALID)
+            return xen_api_success([image_uuid])
+        return xen_api_success([])
 
 
     # Xen API: Class VTPM
@@ -1336,10 +1395,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         valid_vtpm_keys = self.VTPM_attr_ro + self.VTPM_attr_rw + \
                           self.Base_attr_ro + self.Base_attr_rw
         for k in cfg.keys():
@@ -1353,10 +1412,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         if cfg.has_key('instance'):
             instance = cfg['instance']
         else:
@@ -1367,10 +1426,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         if cfg.has_key('type'):
             driver = cfg['type']
         else:
@@ -1381,10 +1440,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         if cfg.has_key('backend'):
             backend = cfg['backend']
         else:
@@ -1407,7 +1466,7 @@ class XendAPI:
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
-            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vtpm_struct['VM']])
 
 
     # Xen API: Class SR
@@ -1439,7 +1498,7 @@ class XendAPI:
     def SR_get_by_name_label(self, session, label):
         sr = XendNode.instance().get_sr()
         if sr.name_label != label:
-            return xen_api_error(XEND_ERROR_SR_INVALID)
+            return xen_api_success([])
         return xen_api_success([sr.uuid])
 
     def SR_create(self, session):
