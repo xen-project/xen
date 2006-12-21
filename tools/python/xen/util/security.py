@@ -115,7 +115,7 @@ def get_security_info(info, field):
     if isinstance(info, dict):
         security = info['security']
     elif isinstance(info, list):
-        security = sxp.child_value(info, 'security', )
+        security = sxp.child_value(info, 'security')
     if not security:
         if field == 'ssidref':
             #return default ssid
@@ -357,7 +357,7 @@ def refresh_ssidref(config):
     if isinstance(config, dict):
         security = config['security']
     elif isinstance(config, list):
-        security = sxp.child_value(config, 'security',)
+        security = sxp.child_value(config, 'security')
     else:
         err("Instance type of config parameter not supported.")
     if not security:
