@@ -10494,15 +10494,25 @@ Each possible error code is documented in the following section.
 \subsection{Error Codes}
 
 \vspace{0.9cm}
-\subsubsection{MAP\_DUPLICATE\_KEY}
+\subsubsection{HOST\_CPU\_HANDLE\_INVALID}
 
-You tried to add a key-value pair to a map, but that key is already there. 
-The key, current value, and the new value that you tried to set are all
-echoed.
+You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
+deleted.  The handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
 \noindent{\bf Signature:}
-\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+\begin{verbatim}HOST_CPU_HANDLE_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{HOST\_HANDLE\_INVALID}
+
+You gave an invalid host handle.  The host may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
 
 
 \vspace{0.9cm}
@@ -10515,6 +10525,79 @@ given message may give details useful for debugging the problem.
 \noindent{\bf Signature:}
 \begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
 
+
+\subsubsection{HOST\_CPU\_HANDLE\_INVALID}
+
+You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
+deleted.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HOST_CPU_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{HOST\_HANDLE\_INVALID}
+
+You gave an invalid host handle.  The host may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{INTERNAL\_ERROR}
+
+The server failed to handle your request, due to an internal error.  The
+given message may give details useful for debugging the problem.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MAP\_DUPLICATE\_KEY}
+
+You tried to add a key-value pair to a map, but that key is already there. 
+The key, current value, and the new value that you tried to set are all
+echoed.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{MESSAGE\_METHOD\_UNKNOWN}
+
+You tried to call a method that does not exist.  The method name that you
+used is echoed.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
+
+You tried to call a method with the incorrect number of parameters.  The
+fully-qualified method name that you used, and the number of received and
+expected parameters are returned.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{SESSION\_AUTHENTICATION\_FAILED}
+
+The credentials given by the user are incorrect, so access has been denied,
+and you have not been issued a session handle.
+
+\vspace{0.3cm}
+No parameters.
 
 \vspace{0.9cm}
 \subsubsection{SESSION\_INVALID}
@@ -10530,6 +10613,50 @@ current connection.  The handle parameter echoes the bad value given.
 
 
 \vspace{0.9cm}
+\subsubsection{SR\_HANDLE\_INVALID}
+
+You gave an invalid SR handle.  The SR may have recently been deleted.  The
+handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}SR_HANDLE_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{VBD\_HANDLE\_INVALID}
+
+You gave an invalid VBD handle.  The VBD may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}VBD_HANDLE_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{VDI\_HANDLE\_INVALID}
+
+You gave an invalid VDI handle.  The VDI may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}VDI_HANDLE_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{VIF\_HANDLE\_INVALID}
+
+You gave an invalid VIF handle.  The VIF may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}VIF_HANDLE_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
 \subsubsection{VM\_HANDLE\_INVALID}
 
 You gave an invalid VM handle.  The VM may have recently been deleted.  The
@@ -10538,6 +10665,17 @@ handle parameter echoes the bad value given.
 \vspace{0.3cm}
 \noindent{\bf Signature:}
 \begin{verbatim}VM_HANDLE_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{VTPM\_HANDLE\_INVALID}
+
+You gave an invalid VTPM handle.  The VTPM may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}VTPM_HANDLE_INVALID(handle)\end{verbatim}
 
 \newpage
 \section{DTD}
