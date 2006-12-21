@@ -78,6 +78,7 @@
 #define VGA_MAX_HEIGHT 2048
 
 #define VGA_STATE_COMMON                                                \
+    uint8_t *vram_alloc;                                                \
     uint8_t *vram_ptr;                                                  \
     uint8_t *vram_shadow;                                               \
     unsigned long vram_offset;                                          \

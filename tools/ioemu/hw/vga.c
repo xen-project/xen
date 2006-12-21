@@ -2002,7 +2002,10 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
     s->vram_shadow = (uint8_t *)((long)(s->vram_shadow + TARGET_PAGE_SIZE - 1)
                                  & ~(TARGET_PAGE_SIZE - 1));
 
-    s->vram_ptr = qemu_malloc(vga_ram_size);
+    /* Video RAM must be 128-bit aligned for SSE optimizations later */
+    s->vram_alloc = qemu_malloc(vga_ram_size + 15);
+    s->vram_ptr = (uint8_t *)((long)(s->vram_alloc + 15) & ~15L);
+
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;
     s->ds = ds;
@@ -2126,7 +2129,7 @@ void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
     }
 
     if (!vga_ram_base) {
-        vga_ram_base = qemu_malloc(vga_ram_size);
+        vga_ram_base = qemu_malloc(vga_ram_size + TARGET_PAGE_SIZE + 1);
         if (!vga_ram_base) {
             fprintf(stderr, "reallocate error\n");
             return NULL;
@@ -2134,8 +2137,10 @@ void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
     }
 
     /* XXX lock needed? */
+    old_pointer = s->vram_alloc;
+    s->vram_alloc = vga_ram_base;
+    vga_ram_base = (uint8_t *)((long)(vga_ram_base + 15) & ~15L);
     memcpy(vga_ram_base, s->vram_ptr, vga_ram_size);
-    old_pointer = s->vram_ptr;
     s->vram_ptr = vga_ram_base;
 
     return old_pointer;
