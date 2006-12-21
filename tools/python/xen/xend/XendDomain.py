@@ -869,6 +869,26 @@ class XendDomain:
             self.domains_lock.release()
 
 
+    def domain_create_from_dict(self, config_dict):
+        """Create a domain from a configuration dictionary.
+
+        @param config_dict: configuration
+        @rtype: XendDomainInfo
+        """
+        self.domains_lock.acquire()
+        try:
+            self._refresh()
+
+            dominfo = XendDomainInfo.create_from_dict(config_dict)
+            self._add_domain(dominfo)
+            self.domain_sched_credit_set(dominfo.getDomid(),
+                                         dominfo.getWeight(),
+                                         dominfo.getCap())
+            return dominfo
+        finally:
+            self.domains_lock.release()
+
+
     def domain_new(self, config):
         """Create a domain from a configuration but do not start it.
         

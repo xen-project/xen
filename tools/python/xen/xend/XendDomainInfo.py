@@ -81,18 +81,39 @@ log = logging.getLogger("xend.XendDomainInfo")
 
 def create(config):
     """Creates and start a VM using the supplied configuration. 
-    (called from XMLRPCServer directly)
 
     @param config: A configuration object involving lists of tuples.
     @type  config: list of lists, eg ['vm', ['image', 'xen.gz']]
 
     @rtype:  XendDomainInfo
-    @return: A up and running XendDomainInfo instance
+    @return: An up and running XendDomainInfo instance
     @raise VmError: Invalid configuration or failure to start.
     """
 
     log.debug("XendDomainInfo.create(%s)", scrub_password(config))
     vm = XendDomainInfo(XendConfig.XendConfig(sxp_obj = config))
+    try:
+        vm.start()
+    except:
+        log.exception('Domain construction failed')
+        vm.destroy()
+        raise
+
+    return vm
+
+def create_from_dict(config_dict):
+    """Creates and start a VM using the supplied configuration. 
+
+    @param config_dict: An configuration dictionary.
+
+    @rtype:  XendDomainInfo
+    @return: An up and running XendDomainInfo instance
+    @raise VmError: Invalid configuration or failure to start.
+    """
+
+    log.debug("XendDomainInfo.create_from_dict(%s)",
+              scrub_password(config_dict))
+    vm = XendDomainInfo(XendConfig.XendConfig(xapi = config_dict))
     try:
         vm.start()
     except:
@@ -1051,12 +1072,6 @@ class XendDomainInfo:
         """
         from xen.xend import XendDomain
         
-        config = self.sxpr()
-
-        if self._infoIsSet('cpus') and len(self.info['cpus']) != 0:
-            config.append(['cpus', reduce(lambda x, y: str(x) + "," + str(y),
-                                          self.info['cpus'])])
-
         if self._readVm(RESTART_IN_PROGRESS):
             log.error('Xend failed during restart of domain %s.  '
                       'Refusing to restart to avoid loops.',
@@ -1097,7 +1112,8 @@ class XendDomainInfo:
 
             new_dom = None
             try:
-                new_dom = XendDomain.instance().domain_create(config)
+                new_dom = XendDomain.instance().domain_create_from_dict(
+                    self.info)
                 new_dom.unpause()
                 rst_cnt = self._readVm('xend/restart_count')
                 rst_cnt = int(rst_cnt) + 1
