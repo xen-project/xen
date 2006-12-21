@@ -10428,6 +10428,118 @@ all fields from the object
 \vspace{0.3cm}
 
 \vspace{1cm}
+\newpage
+\section{Error Handling}
+When a low-level transport error occurs, or a request is malformed at the HTTP
+or XML-RPC level, the server may send an XML-RPC Fault response, or the client
+may simulate the same.  The client must be prepared to handle these errors,
+though they may be treated as fatal.  On the wire, these are transmitted in a
+form similar to this:
+
+\begin{verbatim}
+    <methodResponse>
+      <fault>
+        <value>
+          <struct>
+            <member>
+                <name>faultCode</name>
+                <value><int>-1</int></value>
+              </member>
+              <member>
+                <name>faultString</name>
+                <value><string>Malformed request</string></value>
+            </member>
+          </struct>
+        </value>
+      </fault>
+    </methodResponse>
+\end{verbatim}
+
+All other failures are reported with a more structured error response, to
+allow better automatic response to failures, proper internationalisation of
+any error message, and easier debugging.  On the wire, these are transmitted
+like this:
+
+\begin{verbatim}
+    <struct>
+      <member>
+        <name>Status</name>
+        <value>Failure</value>
+      </member>
+      <member>
+        <name>ErrorDescription</name>
+        <value>
+          <array>
+            <data>
+              <value>MAP_DUPLICATE_KEY</value>
+              <value>Customer</value>
+              <value>eSpeil Inc.</value>
+              <value>eSpeil Incorporated</value>
+            </data>
+          </array>
+        </value>
+      </member>
+    </struct>
+\end{verbatim}
+
+Note that {\tt ErrorDescription} value is an array of string values. The
+first element of the array is an error code; the remainder of the array are
+strings representing error parameters relating to that code.  In this case,
+the client has attempted to add the mapping {\tt Customer $\rightarrow$
+eSpiel Incorporated} to a Map, but it already contains the mapping
+{\tt Customer $\rightarrow$ eSpiel Inc.}, and so the request has failed.
+
+Each possible error code is documented in the following section.
+
+\subsection{Error Codes}
+
+\vspace{0.9cm}
+\subsubsection{MAP\_DUPLICATE\_KEY}
+
+You tried to add a key-value pair to a map, but that key is already there. 
+The key, current value, and the new value that you tried to set are all
+echoed.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{INTERNAL\_ERROR}
+
+The server failed to handle your request, due to an internal error.  The
+given message may give details useful for debugging the problem.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{SESSION\_INVALID}
+
+You gave an invalid session handle.  It may have been invalidated by a
+server restart, or timed out.  You should get a new session handle, using
+one of the session.login\_ calls.  This error does not invalidate the
+current connection.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
+
+
+\vspace{0.9cm}
+\subsubsection{VM\_HANDLE\_INVALID}
+
+You gave an invalid VM handle.  The VM may have recently been deleted.  The
+handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+\noindent{\bf Signature:}
+\begin{verbatim}VM_HANDLE_INVALID(handle)\end{verbatim}
+
+\newpage
 \section{DTD}
 General notes:
 \begin{itemize}
