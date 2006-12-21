@@ -893,55 +893,55 @@ class XendAPI:
         dom.setName(label)
         return xen_api_success_void()
     
-    def VM_set_name_description(self, session, vm_ref):
+    def VM_set_name_description(self, session, vm_ref, desc):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_user_version(self, session, vm_ref):
+    def VM_set_user_version(self, session, vm_ref, ver):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_is_a_template(self, session, vm_ref):
+    def VM_set_is_a_template(self, session, vm_ref, is_template):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_memory_dynamic_max(self, session, vm_ref):
+    def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_memory_dynamic_min(self, session, vm_ref):
+    def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_policy(self, session, vm_ref):
+    def VM_set_VCPUs_policy(self, session, vm_ref, policy):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_params(self, session, vm_ref):
+    def VM_set_VCPUs_params(self, session, vm_ref, params):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_features_force_on(self, session, vm_ref):
+    def VM_set_VCPUs_features_force_on(self, session, vm_ref, features):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_features_force_off(self, session, vm_ref):
+    def VM_set_VCPUs_features_force_off(self, session, vm_ref, features):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_shutdown(self, session, vm_ref):
+    def VM_set_actions_after_shutdown(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_reboot(self, session, vm_ref):
+    def VM_set_actions_after_reboot(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_suspend(self, session, vm_ref):
+    def VM_set_actions_after_suspend(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_crash(self, session, vm_ref):
+    def VM_set_actions_after_crash(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
 
@@ -965,27 +965,27 @@ class XendAPI:
 
     def VM_set_platform_std_VGA(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_serial(self, session, vm_ref):
+    def VM_set_platform_serial(self, session, vm_ref, serial):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_localtime(self, session, vm_ref):
+    def VM_set_platform_localtime(self, session, vm_ref, localtime):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_clock_offset(self, session, vm_ref):
+    def VM_set_platform_clock_offset(self, session, vm_ref, clock_offset):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_enable_audio(self, session, vm_ref):
+    def VM_set_platform_enable_audio(self, session, vm_ref, enable_audio):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
     def VM_set_otherConfig(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
     # class methods
     def VM_get_all(self, session):

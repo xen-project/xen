@@ -1831,8 +1831,7 @@ class XendDomainInfo:
         return self.info.get('memory_dynamic_max', 0)
     def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_min', 0)
-    
-    
+
     def get_vcpus_policy(self):
         sched_id = xc.sched_id_get()
         if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
@@ -1847,8 +1846,6 @@ class XendDomainInfo:
         return XEN_API_VM_POWER_STATE[self.state]
     def get_platform_std_vga(self):
         return self.info.get('platform_std_vga', False)    
-    def get_platform_keymap(self):
-        return ''
     def get_platform_serial(self):
         return self.info.get('platform_serial', '')
     def get_platform_localtime(self):
