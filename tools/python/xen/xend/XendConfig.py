@@ -93,6 +93,8 @@ XENAPI_CFG_TO_LEGACY_CFG = {
     'actions_after_reboot': 'on_reboot',
     'actions_after_crash': 'on_crash', 
     'platform_localtime': 'localtime',
+    'PV_bootloader': 'bootloader',
+    'PV_bootloader_args': 'bootloader_args',
 }
 
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
