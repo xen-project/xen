@@ -278,6 +278,7 @@ typedef unsigned short Bit16u;
 typedef unsigned short bx_bool;
 typedef unsigned long  Bit32u;
 
+#if BX_USE_ATADRV
 
   void memsetb(seg,offset,value,count);
   void memcpyb(dseg,doffset,sseg,soffset,count);
@@ -417,6 +418,7 @@ typedef unsigned long  Bit32u;
   ASM_END
   }
 #endif
+#endif //BX_USE_ATADRV
 
   // read_dword and write_dword functions
   static Bit32u         read_dword();
@@ -883,7 +885,7 @@ static void           int14_function();
 static void           int15_function();
 static void           int16_function();
 static void           int17_function();
-static void           int19_function();
+static Bit32u         int19_function();
 static void           int1a_function();
 static void           int70_function();
 static void           int74_function();
@@ -1845,99 +1847,28 @@ print_bios_banner()
   printf("\n");
 }
 
-
-//--------------------------------------------------------------------------
-// BIOS Boot Specification 1.0.1 compatibility
-//
-// Very basic support for the BIOS Boot Specification, which allows expansion 
-// ROMs to register themselves as boot devices, instead of just stealing the 
-// INT 19h boot vector.
-// 
-// This is a hack: to do it properly requires a proper PnP BIOS and we aren't
-// one; we just lie to the option ROMs to make them behave correctly. 
-// We also don't support letting option ROMs register as bootable disk 
-// drives (BCVs), only as bootable devices (BEVs). 
-//
-// http://www.phoenix.com/en/Customer+Services/White+Papers-Specs/pc+industry+specifications.htm
-//--------------------------------------------------------------------------
-
-/* 256 bytes at 0x0600 -- 0x06ff is used for the IPL boot table.  This
- * ought really to be in NVRAM somewhere where a failed boot attempt can't 
- * corrupt it. */
-#define IPL_SEG           0x0060
-#define IPL_TABLE_OFFSET  0x0000
-#define IPL_TABLE_ENTRIES 8
-#define IPL_COUNT_OFFSET  0x0080
-
-struct ipl_entry {
-  Bit16u type;
-  Bit16u flags;
-  Bit32u vector;
-  Bit32u description;
-  Bit32u reserved;
-};
-
-static void 
-init_boot_vectors() 
-{
-  struct ipl_entry e; 
-  Bit16u count = 0;
-  Bit16u ss = get_SS();
-
-  /* Clear out the IPL table. */
-  memsetb(IPL_SEG, IPL_TABLE_OFFSET, 0, 0xff);
-
-  /* Floppy drive */
-  e.type = 1; e.flags = 0; e.vector = 0; e.description = 0; e.reserved = 0;
-  memcpyb(IPL_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
-  count++;
-
-  /* First HDD */
-  e.type = 2; e.flags = 0; e.vector = 0; e.description = 0; e.reserved = 0;
-  memcpyb(IPL_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
-  count++;
-
-#if BX_ELTORITO_BOOT
-  /* CDROM */
-  e.type = 3; e.flags = 0; e.vector = 0; e.description = 0; e.reserved = 0;
-  memcpyb(IPL_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
-  count++;
-#endif  
-
-  /* Remember how many devices we have */
-  write_word(IPL_SEG, IPL_COUNT_OFFSET, count);
-}
-
-static Bit8u
-get_boot_vector(i, e)
-Bit16u i; struct ipl_entry *e; 
-{
-  Bit16u count;
-  Bit16u ss = get_SS();
-  /* Get the count of boot devices, and refuse to overrun the array */
-  count = read_word(IPL_SEG, IPL_COUNT_OFFSET);
-  if (i >= count) return 0;
-  /* OK to read this device */
-  memcpyb(ss, e, IPL_SEG, IPL_TABLE_OFFSET + i * sizeof (*e), sizeof (*e));
-  return 1;
-}
-
-
 //--------------------------------------------------------------------------
 // print_boot_device
 //   displays the boot device
 //--------------------------------------------------------------------------
 
-static char drivetypes[][10]={"", "Floppy","Hard Disk","CD-Rom", "Network"};
+static char drivetypes[][10]={"Floppy","Hard Disk","CD-Rom"};
 
 void
-print_boot_device(type)
-  Bit16u type;
+print_boot_device(cdboot, drive)
+  Bit8u cdboot; Bit16u drive;
 {
-  /* NIC appears as type 0x80 */ 
-  if (type == 0x80 ) type = 0x4;
-  if (type == 0 || type > 0x4) BX_PANIC("Bad drive type\n"); 
-  printf("Booting from %s...\n", drivetypes[type]);
+  Bit8u i;
+
+  // cdboot contains 0 if floppy/harddisk, 1 otherwise
+  // drive contains real/emulated boot drive
+
+  if(cdboot)i=2;                    // CD-Rom
+  else if((drive&0x0080)==0x00)i=0; // Floppy
+  else if((drive&0x0080)==0x80)i=1; // Hard drive
+  else return;
+  
+  printf("Booting from %s...\n",drivetypes[i]);
 }
 
 //--------------------------------------------------------------------------
@@ -1945,20 +1876,29 @@ print_boot_device(type)
 //   displays the reason why boot failed
 //--------------------------------------------------------------------------
   void
-print_boot_failure(type, reason)
-  Bit16u type; Bit8u reason;
+print_boot_failure(cdboot, drive, reason, lastdrive)
+  Bit8u cdboot; Bit8u drive; Bit8u lastdrive;
 {
-  if (type == 0 || type > 0x3) BX_PANIC("Bad drive type\n"); 
+  Bit16u drivenum = drive&0x7f;
 
-  printf("Boot from %s failed", drivetypes[type]);
-  if (type < 4) {
-    /* Report the reason too */
-  if (reason==0) 
-    printf(": not a bootable disk");
+  // cdboot: 1 if boot from cd, 0 otherwise
+  // drive : drive number
+  // reason: 0 signature check failed, 1 read error
+  // lastdrive: 1 boot drive is the last one in boot sequence
+ 
+  if (cdboot)
+    bios_printf(BIOS_PRINTF_INFO | BIOS_PRINTF_SCREEN, "Boot from %s failed\n",drivetypes[2]);
+  else if (drive & 0x80)
+    bios_printf(BIOS_PRINTF_INFO | BIOS_PRINTF_SCREEN, "Boot from %s %d failed\n", drivetypes[1],drivenum);
   else
-    printf(": could not read the boot disk");
+    bios_printf(BIOS_PRINTF_INFO | BIOS_PRINTF_SCREEN, "Boot from %s %d failed\n", drivetypes[0],drivenum);
+
+  if (lastdrive==1) {
+    if (reason==0)
+      BX_PANIC("Not a bootable disk\n");
+    else
+      BX_PANIC("Could not read the boot disk\n");
   }
-  printf("\n");
 }
 
 //--------------------------------------------------------------------------
@@ -7606,19 +7546,19 @@ int17_function(regs, ds, iret_addr)
   }
 }
 
-void
-int19_function(seq_nr)
-Bit16u seq_nr;
+// returns bootsegment in ax, drive in bl
+  Bit32u 
+int19_function(bseqnr)
+Bit8u bseqnr;
 {
   Bit16u ebda_seg=read_word(0x0040,0x000E);
-  Bit16u bootdev;
+  Bit16u bootseq;
   Bit8u  bootdrv;
+  Bit8u  bootcd;
   Bit8u  bootchk;
   Bit16u bootseg;
-  Bit16u bootip;
   Bit16u status;
-
-  struct ipl_entry e;
+  Bit8u  lastdrive=0;
 
   // if BX_ELTORITO_BOOT is not defined, old behavior
   //   check bit 5 in CMOS reg 0x2d.  load either 0x00 or 0x80 into DL
@@ -7635,43 +7575,54 @@ Bit16u seq_nr;
   //     0x01 : first floppy 
   //     0x02 : first harddrive
   //     0x03 : first cdrom
-  //     0x04 - 0x10 : PnP expansion ROMs (e.g. Etherboot)
   //     else : boot failure
 
   // Get the boot sequence
 #if BX_ELTORITO_BOOT
-  bootdev = inb_cmos(0x3d);
-  bootdev |= ((inb_cmos(0x38) & 0xf0) << 4);
-  bootdev >>= 4 * seq_nr;
-  bootdev &= 0xf;
-  if (bootdev == 0) BX_PANIC("No bootable device.\n");
-  
-  /* Translate from CMOS runes to an IPL table offset by subtracting 1 */
-  bootdev -= 1;
-#else  
-  if (seq_nr ==2) BX_PANIC("No more boot devices.");
-  if (!!(inb_cmos(0x2d) & 0x20) ^ (seq_nr == 1)) 
-      /* Floppy first if the bit is set or it's the second boot */
-    bootdev = 0x00;
-  else 
-    bootdev = 0x01;
-#endif
+  bootseq=inb_cmos(0x3d);
+  bootseq|=((inb_cmos(0x38) & 0xf0) << 4);
 
-  /* Read the boot device from the IPL table */
-  if (get_boot_vector(bootdev, &e) == 0) {
-    BX_INFO("Invalid boot device (0x%x)\n", bootdev);
-    return;
+  if (bseqnr==2) bootseq >>= 4;
+  if (bseqnr==3) bootseq >>= 8;
+  if (bootseq<0x10) lastdrive = 1;
+  bootdrv=0x00; bootcd=0;
+  switch(bootseq & 0x0f) {
+    case 0x01: bootdrv=0x00; bootcd=0; break;
+    case 0x02: bootdrv=0x80; bootcd=0; break;
+    case 0x03: bootdrv=0x00; bootcd=1; break;
+    default:   return 0x00000000;
+    }
+#else
+  bootseq=inb_cmos(0x2d);
+
+  if (bseqnr==2) {
+    bootseq ^= 0x20;
+    lastdrive = 1;
   }
+  bootdrv=0x00; bootcd=0;
+  if((bootseq&0x20)==0) bootdrv=0x80;
+#endif // BX_ELTORITO_BOOT
 
-  /* Do the loading, and set up vector as a far pointer to the boot
-   * address, and bootdrv as the boot drive */
-  print_boot_device(e.type);
+#if BX_ELTORITO_BOOT
+  // We have to boot from cd
+  if (bootcd != 0) {
+    status = cdrom_boot();
 
-  switch(e.type) {
-  case 0x01: /* FDD */
-  case 0x02: /* HDD */
+    // If failure
+    if ( (status & 0x00ff) !=0 ) {
+      print_cdromboot_failure(status);
+      print_boot_failure(bootcd, bootdrv, 1, lastdrive);
+      return 0x00000000;
+      }
 
-    bootdrv = (e.type == 0x02) ? 0x80 : 0x00;
+    bootseg = read_word(ebda_seg,&EbdaData->cdemu.load_segment);
+    bootdrv = (Bit8u)(status>>8);
+    }
+
+#endif // BX_ELTORITO_BOOT
+
+  // We have to boot from harddisk or floppy
+  if (bootcd == 0) {
     bootseg=0x07c0;
 
 ASM_START
@@ -7699,71 +7650,39 @@ int19_load_done:
 ASM_END
     
     if (status != 0) {
-      print_boot_failure(e.type, 1);
-      return;
-    }
-
-    // check signature if instructed by cmos reg 0x38, only for floppy
-    if (e.type == 0x00 && (inb_cmos(0x38) & 0x01)) {
-      if (read_word(bootseg,0x1fe) != 0xaa55) {
-        print_boot_failure(e.type, 0);
-        return;
+      print_boot_failure(bootcd, bootdrv, 1, lastdrive);
+      return 0x00000000;
       }
     }
 
-    /* Canonicalize bootseg:bootip */
-    bootip = (bootseg & 0x0fff) << 4;
-    bootseg &= 0xf000;
-  break;
+  // check signature if instructed by cmos reg 0x38, only for floppy
+  // bootchk = 1 : signature check disabled
+  // bootchk = 0 : signature check enabled
+  if (bootdrv != 0) bootchk = 0;
+  else bootchk = inb_cmos(0x38) & 0x01;
 
 #if BX_ELTORITO_BOOT
-  case 0x03: /* CD-ROM */
-    status = cdrom_boot();
+  // if boot from cd, no signature check
+  if (bootcd != 0)
+    bootchk = 1;
+#endif // BX_ELTORITO_BOOT
 
-    // If failure
-    if ( (status & 0x00ff) !=0 ) {
-      print_cdromboot_failure(status);
-      print_boot_failure(e.type, 1);
-      return;
+  if (bootchk == 0) {
+    if (read_word(bootseg,0x1fe) != 0xaa55) {
+      print_boot_failure(bootcd, bootdrv, 0, lastdrive);
+      return 0x00000000;
+      }
     }
-
-    bootdrv = (Bit8u)(status>>8);
-    bootseg = read_word(ebda_seg,&EbdaData->cdemu.load_segment);
-    /* Canonicalize bootseg:bootip */
-    bootip = (bootseg & 0x0fff) << 4;
-    bootseg &= 0xf000;
-    break;
-#endif
-
-  case 0x80: /* Expansion ROM with a Bootstrap Entry Vector (a far pointer) */
-    bootseg = e.vector >> 16;
-    bootip = e.vector & 0xffff;
-    break;
-
-  default: return;
-  }
   
-  /* Jump to the boot vector */
-ASM_START
-    mov  bp, sp
-    ;; Build an iret stack frame that will take us to the boot vector.
-    ;; iret pops ip, then cs, then flags, so push them in the opposite order.
-    pushf
-    mov  ax, _int19_function.bootseg + 0[bp] 
-    push ax
-    mov  ax, _int19_function.bootip + 0[bp] 
-    push ax
-    ;; Set the magic number in ax and the boot drive in dl.
-    mov  ax, #0xaa55
-    mov  dl, _int19_function.bootdrv + 0[bp]
-    ;; Zero some of the other registers.
-    xor  bx, bx
-    mov  ds, bx
-    mov  es, bx
-    mov  bp, bx
-    ;; Go!
-    iret
-ASM_END
+#if BX_ELTORITO_BOOT
+  // Print out the boot string
+  print_boot_device(bootcd, bootdrv);
+#else // BX_ELTORITO_BOOT
+  print_boot_device(0, bootdrv);
+#endif // BX_ELTORITO_BOOT
+
+  // return the boot segment
+  return (((Bit32u)bootdrv) << 16) + bootseg;
 }
 
   void
@@ -8220,26 +8139,14 @@ int13_out:
   popa
   iret 
 
+
 ;----------
 ;- INT18h -
 ;----------
-int18_handler: ;; Boot Failure recovery: try the next device.
-
-  ;; Reset DS, SS and SP
-  xor  ax, ax
-  mov  ds, ax
-  mov  ss, ax
-  mov  ax, #0xfffe
-  mov  sp, ax
-
-  ;; Get the boot sequence number off the top of the stack
-  sub  sp, #2
-  pop  ax
-  ;; Increment the boot sequence number, and carry on in the INT 19h handler
-  inc  ax
-  push ax
-
-  jmp  int19_next_boot
+int18_handler: ;; Boot Failure routing
+  call _int18_panic_msg
+  hlt
+  iret
 
 ;----------
 ;- INT19h -
@@ -8253,25 +8160,56 @@ int19_relocated: ;; Boot function, relocated
 
   push bp
   mov  bp, sp
-  
-  ;; Reset DS, SS and SP
+
+  ;; drop ds
   xor  ax, ax
   mov  ds, ax
-  mov  ss, ax
-  mov  ax, #0xfffe
-  mov  sp, ax
 
-  ;; Start from the first boot device.
-  mov  ax, #0000
+  ;; 1st boot device
+  mov  ax, #0x0001
   push ax
-
-int19_next_boot:
-
-  ;; Call the C code for the next boot device
   call _int19_function
+  inc  sp
+  inc  sp
+  ;; bl contains the boot drive
+  ;; ax contains the boot segment or 0 if failure
 
-  ;; Boot failed: invoke the boot recovery function
-  int  #0x18
+  test       ax, ax  ;; if ax is 0 try next boot device
+  jnz        boot_setup
+
+  ;; 2nd boot device
+  mov  ax, #0x0002
+  push ax
+  call _int19_function
+  inc  sp
+  inc  sp
+  test       ax, ax  ;; if ax is 0 try next boot device
+  jnz        boot_setup
+
+  ;; 3rd boot device
+  mov  ax, #0x0003
+  push ax
+  call _int19_function
+  inc  sp
+  inc  sp
+  test       ax, ax  ;; if ax is 0 call int18
+  jz         int18_handler
+
+boot_setup:
+  mov dl,    bl      ;; set drive so guest os find it
+  shl eax,   #0x04   ;; convert seg to ip
+  mov 2[bp], ax      ;; set ip
+
+  shr eax,   #0x04   ;; get cs back
+  and ax,    #0xF000 ;; remove what went in ip
+  mov 4[bp], ax      ;; set cs
+  xor ax,    ax
+  mov es,    ax      ;; set es to zero fixes [ 549815 ]
+  mov [bp],  ax      ;; set bp to zero
+  mov ax,    #0xaa55 ;; set ok flag
+
+  pop bp
+  iret               ;; Beam me up Scotty
 
 ;----------
 ;- INT1Ch -
@@ -9449,15 +9387,6 @@ checksum_loop:
   pop  ax
   ret
 
-
-;; We need a copy of this string, but we are not actually a PnP BIOS, 
-;; so make sure it is *not* aligned, so OSes will not see it if they scan.
-.align 16
-  db 0
-pnp_string:
-  .ascii "$PnP"
-
-
 rom_scan:
   ;; Scan for existence of valid expansion ROMS.
   ;;   Video ROM:   from 0xC0000..0xC7FFF in 2k increments
@@ -9492,17 +9421,9 @@ block_count_rounded:
   xor  bx, bx   ;; Restore DS back to 0000:
   mov  ds, bx
   push ax       ;; Save AX
-  push di       ;; Save DI
   ;; Push addr of ROM entry point
   push cx       ;; Push seg
   push #0x0003  ;; Push offset
-
-  ;; Point ES:DI at "$PnP", which tells the ROM that we are a PnP BIOS.  
-  ;; That should stop it grabbing INT 19h; we will use its BEV instead.
-  mov  ax, #0xf000
-  mov  es, ax
-  lea  di, pnp_string 
-
   mov  bp, sp   ;; Call ROM init routine using seg:off on stack
   db   0xff     ;; call_far ss:[bp+0]
   db   0x5e
@@ -9510,38 +9431,6 @@ block_count_rounded:
   cli           ;; In case expansion ROM BIOS turns IF on
   add  sp, #2   ;; Pop offset value
   pop  cx       ;; Pop seg value (restore CX)
-
-  ;; Look at the ROM's PnP Expansion header.  Properly, we're supposed 
-  ;; to init all the ROMs and then go back and build an IPL table of 
-  ;; all the bootable devices, but we can get away with one pass.
-  mov  ds, cx       ;; ROM base
-  mov  bx, 0x001a   ;; 0x1A is the offset into ROM header that contains...
-  mov  ax, [bx]     ;; the offset of PnP expansion header, where...
-  cmp  ax, #0x5024  ;; we look for signature "$PnP"
-  jne  no_bev
-  mov  ax, 2[bx]
-  cmp  ax, #0x506e 
-  jne  no_bev
-  mov  ax, 0x1a[bx] ;; 0x1A is also the offset into the expansion header of...
-  cmp  ax, #0x0000  ;; the Bootstrap Entry Vector, or zero if there is none.
-  je   no_bev
-
-  ;; Found a device that thinks it can boot the system.  Record its BEV.
-  mov  bx, #IPL_SEG            ;; Go to the segment where the IPL table lives 
-  mov  ds, bx
-  mov  bx, IPL_COUNT_OFFSET    ;; Read the number of entries so far
-  cmp  bx, #IPL_TABLE_ENTRIES
-  je   no_bev                  ;; Get out if the table is full
-  shl  bx, #0x4                ;; Turn count into offset (entries are 16 bytes)
-  mov  0[bx], #0x80            ;; This entry is a BEV device
-  mov  6[bx], cx               ;; Build a far pointer from the segment...
-  mov  4[bx], ax               ;; and the offset
-  shr  bx, #0x4                ;; Turn the offset back into a count
-  inc  bx                      ;; We have one more entry now
-  mov  IPL_COUNT_OFFSET, bx    ;; Remember that.
-
-no_bev:
-  pop  di       ;; Restore DI
   pop  ax       ;; Restore AX
 rom_scan_increment:
   shl  ax, #5   ;; convert 512-bytes blocks to 16-byte increments
@@ -9874,8 +9763,6 @@ post_default_ints:
   call _copy_e820_table
   call smbios_init
 #endif
-
-  call _init_boot_vectors
 
   call rom_scan
 
