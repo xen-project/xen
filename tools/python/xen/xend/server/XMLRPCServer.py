@@ -89,8 +89,8 @@ methods = ['device_create', 'device_configure',
 exclude = ['domain_create', 'domain_restore']
 
 class XMLRPCServer:
-    def __init__(self, auth, use_tcp=False, host = "localhost", port = 8006,
-                 path = XML_RPC_SOCKET, hosts_allowed = None):
+    def __init__(self, auth, use_xenapi, use_tcp=False, host = "localhost",
+                 port = 8006, path = XML_RPC_SOCKET, hosts_allowed = None):
         self.use_tcp = use_tcp
         self.port = port
         self.host = host
@@ -100,7 +100,7 @@ class XMLRPCServer:
         self.ready = False        
         self.running = True
         self.auth = auth
-        self.xenapi = XendAPI.XendAPI(auth)
+        self.xenapi = use_xenapi and XendAPI.XendAPI(auth) or None
         
     def run(self):
         authmsg = (self.auth == XendAPI.AUTH_NONE and 
@@ -115,11 +115,13 @@ class XMLRPCServer:
                          self.port, authmsg)
                 self.server = TCPXMLRPCServer((self.host, self.port),
                                               self.hosts_allowed,
+                                              self.xenapi is not None,
                                               logRequests = False)
             else:
                 log.info("Opening Unix domain socket XML-RPC server on %s%s",
                          self.path, authmsg)
                 self.server = UnixXMLRPCServer(self.path, self.hosts_allowed,
+                                               self.xenapi is not None,
                                                logRequests = False)
         except socket.error, exn:
             log.error('Cannot start server: %s!', exn.args[1])
@@ -133,9 +135,10 @@ class XMLRPCServer:
         # and has the 'api' attribute.
         
         for meth_name in dir(self.xenapi):
-            meth = getattr(self.xenapi, meth_name)
-            if meth_name[0] != '_' and callable(meth) and hasattr(meth, 'api'):
-                self.server.register_function(meth, getattr(meth, 'api'))
+            if meth_name[0] != '_':
+                meth = getattr(self.xenapi, meth_name)
+                if callable(meth) and hasattr(meth, 'api'):
+                    self.server.register_function(meth, getattr(meth, 'api'))
                 
         # Legacy deprecated xm xmlrpc api
         # --------------------------------------------------------------------

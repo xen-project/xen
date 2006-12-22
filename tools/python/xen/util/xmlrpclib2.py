@@ -20,6 +20,7 @@
 An enhanced XML-RPC client/server interface for Python.
 """
 
+import re
 import string
 import fcntl
 from types import *
@@ -163,8 +164,10 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
-    def __init__(self, addr, allowed, requestHandler=None,
+    def __init__(self, addr, allowed, xenapi, requestHandler=None,
                  logRequests = 1):
+        self.xenapi = xenapi
+        
         if requestHandler is None:
             requestHandler = XMLRPCRequestHandler
         SimpleXMLRPCServer.__init__(self, addr,
@@ -182,7 +185,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
         flags |= fcntl.FD_CLOEXEC
         fcntl.fcntl(client.fileno(), fcntl.F_SETFD, flags)
         return (client, addr)
-                                                                                
+
     def _marshaled_dispatch(self, data, dispatch_method = None):
         params, method = xmlrpclib.loads(data)
         if False:
@@ -214,12 +217,29 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
         except xmlrpclib.Fault, fault:
             response = xmlrpclib.dumps(fault)
         except Exception, exn:
-            import xen.xend.XendClient
-            log.exception(exn)
-            response = xmlrpclib.dumps(
-                xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
-
+            if self.xenapi:
+                if _is_not_supported(exn):
+                    errdesc = ['MESSAGE_METHOD_UNKNOWN', method]
+                else:
+                    log.exception('Internal error handling %s', method)
+                    errdesc = ['INTERNAL_ERROR', str(exn)]
+                response = xmlrpclib.dumps(
+                    ({ "Status": "Failure",
+                       "ErrorDescription": errdesc },),
+                    methodresponse = 1)
+            else:
+                log.exception('Internal error handling %s', method)
+                import xen.xend.XendClient
+                response = xmlrpclib.dumps(
+                    xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
         return response
+
+
+notSupportedRE = re.compile(r'method "(.*)" is not supported')
+def _is_not_supported(exn):
+    m = notSupportedRE.search(exn[0])
+    return m is not None
+
 
 # This is a XML-RPC server that sits on a Unix domain socket.
 # It implements proper support for allow_reuse_address by
@@ -235,10 +255,10 @@ class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
-    def __init__(self, addr, allowed, logRequests = 1):
+    def __init__(self, addr, allowed, xenapi, logRequests = 1):
         mkdir.parents(os.path.dirname(addr), stat.S_IRWXU, True)
         if self.allow_reuse_address and os.path.exists(addr):
             os.unlink(addr)
 
-        TCPXMLRPCServer.__init__(self, addr, allowed,
+        TCPXMLRPCServer.__init__(self, addr, allowed, xenapi,
                                  UnixXMLRPCRequestHandler, logRequests)
