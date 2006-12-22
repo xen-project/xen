@@ -15,7 +15,12 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
+import inspect
+import os
 import re
+import string
+import sys
+import traceback
 
 from xen.xend import XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging
@@ -52,7 +57,7 @@ def xen_api_error(error):
     if len(error) == 0:
         error = ['INTERNAL_ERROR', 'Empty list given to xen_api_error']
 
-    return { "Status": "Error",
+    return { "Status": "Failure",
              "ErrorDescription": [str(x) for x in error] }
 
 
@@ -79,17 +84,17 @@ def trace(func, api_name = ''):
     return trace_func
 
 
-takesRE = re.compile(r'^(.*)\(\) takes exactly ([0-9]*) argument')
+takesRE = re.compile(r' ([0-9]*) argument')
 def deconstruct_typeerror(exn):
     m = takesRE.search(exn[0])
-    return m and m.groups() or None
+    return m and m.group(1) or None
 
 
 def catch_typeerror(func):
     """Decorator to catch any TypeErrors and translate them into Xen-API
     errors.
 
-    @param func: function with params: (self, session, host_ref)
+    @param func: function with params: (self, ...)
     @rtype: callable object
     """
     def f(self, *args, **kwargs):
@@ -97,44 +102,48 @@ def catch_typeerror(func):
             return func(self, *args, **kwargs)
         except TypeError, exn:
             if hasattr(func, 'api'):
-                mt = deconstruct_typeerror(exn)
-                if mt:
-                    method, takes = mt
-                    if method.endswith(func.api.split('.')[-1]):
-                        return xen_api_error(
-                            ['MESSAGE_PARAMETER_COUNT_MISMATCH',
-                             func.api, int(takes) - 2,
-                             len(args) + len(kwargs) - 1])
+                takes = deconstruct_typeerror(exn)
+                if takes is not None:
+                    # Assume that if the exception was thrown inside this
+                    # file, then it is due to an invalid call from the client,
+                    # but if it was thrown elsewhere, then it's an internal
+                    # error (which will be handled further up).
+                    tb = sys.exc_info()[2]
+                    try:
+                        sourcefile = traceback.extract_tb(tb)[-1][0]
+                        if sourcefile == inspect.getsourcefile(XendAPI):
+                            return xen_api_error(
+                                ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                                 func.api, int(takes) - 2,
+                                 len(args) + len(kwargs) - 1])
+                    finally:
+                        del tb
             raise
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        f.api = func.api
-        
     return f
 
 
 def session_required(func):
+    """Decorator to verify if session is valid before calling method.
+
+    @param func: function with params: (self, session, ...)
+    @rtype: callable object
+    """    
     def check_session(self, session, *args, **kwargs):
         if auth_manager().is_session_valid(session):
             return func(self, session, *args, **kwargs)
         else:
             return xen_api_error(['SESSION_INVALID', session])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_session.api = func.api
-
     return check_session
 
 
 def valid_host(func):
-    """Decorator to verify if host_ref is valid before calling
-    method.
+    """Decorator to verify if host_ref is valid before calling method.
 
-    @param func: function with params: (self, session, host_ref)
+    @param func: function with params: (self, session, host_ref, ...)
     @rtype: callable object
-    """    
+    """
     def check_host_ref(self, session, host_ref, *args, **kwargs):
         xennode = XendNode.instance()
         if type(host_ref) == type(str()) and xennode.is_valid_host(host_ref):
@@ -142,17 +151,12 @@ def valid_host(func):
         else:
             return xen_api_error(['HOST_HANDLE_INVALID', host_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_host_ref.api = func.api
-        
     return check_host_ref
 
 def valid_host_cpu(func):
-    """Decorator to verify if host_cpu_ref is valid before calling
-    method.
+    """Decorator to verify if host_cpu_ref is valid before calling method.
 
-    @param func: function with params: (self, session, host_cpu_ref)
+    @param func: function with params: (self, session, host_cpu_ref, ...)
     @rtype: callable object
     """    
     def check_host_cpu_ref(self, session, host_cpu_ref, *args, **kwargs):
@@ -163,45 +167,28 @@ def valid_host_cpu(func):
         else:
             return xen_api_error(['HOST_CPU_HANDLE_INVALID', host_cpu_ref])
         
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_host_cpu_ref.api = func.api
-        
     return check_host_cpu_ref
 
 def valid_vm(func):
-    """Decorator to verify if vm_ref is valid before calling
-    method.
+    """Decorator to verify if vm_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vm_ref)
+    @param func: function with params: (self, session, vm_ref, ...)
     @rtype: callable object
     """    
-    def check_vm_ref(self, session, *args, **kwargs):
-        if len(args) == 0:
-            # This will trigger a TypeError, because there aren't enough
-            # arguments, which will be caught higher up and diagnosed.
-            func(self, session)
-            assert false
-
-        vm_ref = args[0]
+    def check_vm_ref(self, session, vm_ref, *args, **kwargs):
         xendom = XendDomain.instance()
         if type(vm_ref) == type(str()) and \
                xendom.is_valid_vm(vm_ref):
-            return func(self, session, *args, **kwargs)
+            return func(self, session, vm_ref, *args, **kwargs)
         else:
             return xen_api_error(['VM_HANDLE_INVALID', vm_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vm_ref.api = func.api
-        
     return check_vm_ref
 
 def valid_vbd(func):
-    """Decorator to verify if vbd_ref is valid before calling
-    method.
+    """Decorator to verify if vbd_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vbd_ref)
+    @param func: function with params: (self, session, vbd_ref, ...)
     @rtype: callable object
     """    
     def check_vbd_ref(self, session, vbd_ref, *args, **kwargs):
@@ -212,17 +199,12 @@ def valid_vbd(func):
         else:
             return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vbd_ref.api = func.api
-        
     return check_vbd_ref
 
 def valid_vif(func):
-    """Decorator to verify if vif_ref is valid before calling
-    method.
+    """Decorator to verify if vif_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vif_ref)
+    @param func: function with params: (self, session, vif_ref, ...)
     @rtype: callable object
     """
     def check_vif_ref(self, session, vif_ref, *args, **kwargs):
@@ -233,18 +215,13 @@ def valid_vif(func):
         else:
             return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vif_ref.api = func.api
-        
     return check_vif_ref
 
 
 def valid_vdi(func):
-    """Decorator to verify if vdi_ref is valid before calling
-    method.
+    """Decorator to verify if vdi_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vdi_ref)
+    @param func: function with params: (self, session, vdi_ref, ...)
     @rtype: callable object
     """
     def check_vdi_ref(self, session, vdi_ref, *args, **kwargs):
@@ -255,17 +232,12 @@ def valid_vdi(func):
         else:
             return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vdi_ref.api = func.api
-        
     return check_vdi_ref
 
 def valid_vtpm(func):
-    """Decorator to verify if vtpm_ref is valid before calling
-    method.
+    """Decorator to verify if vtpm_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vtpm_ref)
+    @param func: function with params: (self, session, vtpm_ref, ...)
     @rtype: callable object
     """
     def check_vtpm_ref(self, session, vtpm_ref, *args, **kwargs):
@@ -276,17 +248,12 @@ def valid_vtpm(func):
         else:
             return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vtpm_ref.api = func.api
-
     return check_vtpm_ref
 
 def valid_sr(func):
-    """Decorator to verify if sr_ref is valid before calling
-    method.
+    """Decorator to verify if sr_ref is valid before calling method.
 
-    @param func: function with params: (self, session, sr_ref)
+    @param func: function with params: (self, session, sr_ref, ...)
     @rtype: callable object
     """
     def check_sr_ref(self, session, sr_ref, *args, **kwargs):
@@ -297,10 +264,6 @@ def valid_sr(func):
         else:
             return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_sr_ref.api = func.api
-        
     return check_sr_ref
 
 # -----------------------------
@@ -338,109 +301,13 @@ class XendAPI:
     """
 
     def __init__(self, auth):
-        """Initialised Xen API wrapper by making sure all functions
-        have the correct validation decorators such as L{valid_host}
-        and L{session_required}.
-        """
         self.auth = auth
-
-        classes = {
-            'session': (session_required, catch_typeerror),
-            'host': (valid_host, session_required, catch_typeerror),
-            'host_cpu': (valid_host_cpu, session_required, catch_typeerror),
-            'VM': (valid_vm, session_required, catch_typeerror),
-            'VBD': (valid_vbd, session_required, catch_typeerror),
-            'VIF': (valid_vif, session_required, catch_typeerror),
-            'VDI': (valid_vdi, session_required, catch_typeerror),
-            'VTPM':(valid_vtpm, session_required, catch_typeerror),
-            'SR':  (valid_sr, session_required, catch_typeerror)}
-        
-        # Cheat methods
-        # -------------
-        # Methods that have a trivial implementation for all classes.
-        # 1. get_by_uuid == getting by ref, so just return uuid for
-        #    all get_by_uuid() methods.
-        
-        for cls in classes.keys():
-            get_by_uuid = '%s_get_by_uuid' % cls
-            get_uuid = '%s_get_uuid' % cls
-            setattr(XendAPI, get_by_uuid,
-                    lambda s, sess, obj_ref: xen_api_success(obj_ref))
-            setattr(XendAPI, get_uuid,
-                    lambda s, sess, obj_ref: xen_api_success(obj_ref))
-
-        # 2. get_record is just getting all the attributes, so provide
-        #    a fake template implementation.
-        # 
-        # TODO: ...
-
-
-        # Wrapping validators around XMLRPC calls
-        # ---------------------------------------
-        
-        for cls, validators in classes.items():
-            ro_attrs = getattr(self, '%s_attr_ro' % cls, [])
-            rw_attrs = getattr(self, '%s_attr_rw' % cls, [])
-            methods  = getattr(self, '%s_methods' % cls, [])
-            funcs    = getattr(self, '%s_funcs' % cls, [])
-
-            # wrap validators around readable class attributes
-            for attr_name in ro_attrs + rw_attrs + self.Base_attr_ro:
-                getter_name = '%s_get_%s' % (cls, attr_name)
-                try:
-                    getter = getattr(XendAPI, getter_name)
-                    for validator in validators:
-                        getter = validator(getter)
-                    getter.api = '%s.get_%s' % (cls, attr_name)
-                    setattr(XendAPI, getter_name, getter)
-                except AttributeError:
-                    pass
-                    #log.warn("API call: %s not found" % getter_name)
-
-            # wrap validators around writable class attrributes
-            for attr_name in rw_attrs + self.Base_attr_rw:
-                setter_name = '%s_set_%s' % (cls, attr_name)
-                try:
-                    setter = getattr(XendAPI, setter_name)
-                    for validator in validators:
-                        setter = validator(setter)
-                    setter.api = '%s.set_%s' % (cls, attr_name)
-                    setattr(XendAPI, setter_name, setter)
-                except AttributeError:
-                    pass
-                    #log.warn("API call: %s not found" % setter_name)
-
-            # wrap validators around methods
-            for method_name in methods + self.Base_methods:
-                method_full_name = '%s_%s' % (cls, method_name)
-
-                try:
-                    method = getattr(XendAPI, method_full_name)
-                    for validator in validators:
-                        method = validator(method)
-                    method.api = '%s.%s' % (cls, method_name)
-                    setattr(XendAPI, method_full_name, method)
-                except AttributeError:
-                    pass
-                    #log.warn('API call: %s not found' % method_full_name)
-
-            # wrap validators around class functions
-            for func_name in funcs + self.Base_funcs:
-                func_full_name = '%s_%s' % (cls, func_name)
-                try:
-                    method = getattr(XendAPI, func_full_name)
-                    method = catch_typeerror(session_required(method))
-                    method.api = '%s.%s' % (cls, func_name)
-                    setattr(XendAPI, func_full_name, method)
-                except AttributeError:
-                    pass
-                    #log.warn('API call: %s not found' % func_full_name)
 
 
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
     Base_methods = ['destroy', 'get_record']
-    Base_funcs   = ['create', 'get_by_uuid', 'get_all']
+    Base_funcs   = ['create', 'get_all']
 
     # Xen API: Class Session
     # ----------------------------------------------------------------
@@ -511,7 +378,7 @@ class XendAPI:
                     'reboot',
                     'shutdown']
     
-    host_funcs = ['get_by_name_label']
+    host_funcs = ['get_by_uuid', 'get_by_name_label']
 
     # attributes
     def host_get_name_label(self, session, host_ref):
@@ -680,7 +547,7 @@ class XendAPI:
                   'suspend',
                   'resume']
     
-    VM_funcs  = ['get_by_name_label']
+    VM_funcs  = ['get_by_uuid', 'get_by_name_label']
 
     # parameters required for _create()
     VM_attr_inst = [
@@ -1244,7 +1111,7 @@ class XendAPI:
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
     VDI_methods = ['snapshot']
-    VDI_funcs = ['get_by_name_label']
+    VDI_funcs = ['get_by_uuid', 'get_by_name_label']
     
     def VDI_get_VBDs(self, session, vdi_ref):
         return xen_api_todo()
@@ -1488,7 +1355,7 @@ class XendAPI:
                     'name_description']
     
     SR_methods = ['clone']
-    SR_funcs = ['get_by_name_label']
+    SR_funcs = ['get_by_uuid', 'get_by_name_label']
 
     # Class Functions
     def SR_get_all(self, session):
@@ -1570,6 +1437,112 @@ class XendAPI:
         sr = XendNode.instance().get_sr()
         sr.name_description = value
         return xen_api_success_void()
+
+
+def _decorate():
+    """Initialise Xen API wrapper by making sure all functions
+    have the correct validation decorators such as L{valid_host}
+    and L{session_required}.
+    """
+
+    classes = {
+        'session': (session_required, catch_typeerror),
+        'host': (valid_host, session_required, catch_typeerror),
+        'host_cpu': (valid_host_cpu, session_required, catch_typeerror),
+        'VM': (valid_vm, session_required, catch_typeerror),
+        'VBD': (valid_vbd, session_required, catch_typeerror),
+        'VIF': (valid_vif, session_required, catch_typeerror),
+        'VDI': (valid_vdi, session_required, catch_typeerror),
+        'VTPM':(valid_vtpm, session_required, catch_typeerror),
+        'SR':  (valid_sr, session_required, catch_typeerror)}
+
+    # Cheat methods
+    # -------------
+    # Methods that have a trivial implementation for all classes.
+    # 1. get_by_uuid == getting by ref, so just return uuid for
+    #    all get_by_uuid() methods.
+
+    for cls in classes.keys():
+        get_by_uuid = '%s_get_by_uuid' % cls
+        get_uuid = '%s_get_uuid' % cls
+        def _get_by_uuid(_1, _2, ref):
+            return xen_api_success(ref)
+
+        def _get_uuid(_1, _2, ref):
+            return xen_api_success(ref)
+
+        setattr(XendAPI, get_by_uuid, _get_by_uuid)
+        setattr(XendAPI, get_uuid,    _get_uuid)
+
+    # 2. get_record is just getting all the attributes, so provide
+    #    a fake template implementation.
+    # 
+    # TODO: ...
+
+
+    # Wrapping validators around XMLRPC calls
+    # ---------------------------------------
+
+    for cls, validators in classes.items():
+        ro_attrs = getattr(XendAPI, '%s_attr_ro' % cls, [])
+        rw_attrs = getattr(XendAPI, '%s_attr_rw' % cls, [])
+        methods  = getattr(XendAPI, '%s_methods' % cls, [])
+        funcs    = getattr(XendAPI, '%s_funcs'   % cls, [])
+
+        # wrap validators around readable class attributes
+        for attr_name in ro_attrs + rw_attrs + XendAPI.Base_attr_ro:
+            getter_name = '%s_get_%s' % (cls, attr_name)
+            try:
+                getter = getattr(XendAPI, getter_name)
+                for validator in validators:
+                    getter = validator(getter)
+                    getter.api = '%s.get_%s' % (cls, attr_name)
+                setattr(XendAPI, getter_name, getter)
+            except AttributeError:
+                pass
+                #log.warn("API call: %s not found" % getter_name)
+
+        # wrap validators around writable class attrributes
+        for attr_name in rw_attrs + XendAPI.Base_attr_rw:
+            setter_name = '%s_set_%s' % (cls, attr_name)
+            try:
+                setter = getattr(XendAPI, setter_name)
+                for validator in validators:
+                    setter = validator(setter)
+                    setter.api = '%s.set_%s' % (cls, attr_name)
+                setattr(XendAPI, setter_name, setter)
+            except AttributeError:
+                pass
+                #log.warn("API call: %s not found" % setter_name)
+
+        # wrap validators around methods
+        for method_name in methods + XendAPI.Base_methods:
+            method_full_name = '%s_%s' % (cls, method_name)
+            try:
+                method = getattr(XendAPI, method_full_name)
+                for validator in validators:
+                    method = validator(method)
+                    method.api = '%s.%s' % (cls, method_name)
+                setattr(XendAPI, method_full_name, method)
+            except AttributeError:
+                pass
+                #log.warn('API call: %s not found' % method_full_name)
+
+        # wrap validators around class functions
+        for func_name in funcs + XendAPI.Base_funcs:
+            func_full_name = '%s_%s' % (cls, func_name)
+            try:
+                method = getattr(XendAPI, func_full_name)
+                method = session_required(method)
+                method.api = '%s.%s' % (cls, func_name)
+                method = catch_typeerror(method)
+                method.api = '%s.%s' % (cls, func_name)
+                setattr(XendAPI, func_full_name, method)
+            except AttributeError:
+                log.warn('API call: %s not found' % func_full_name)
+
+_decorate()
+
 
 #   
 # Auto generate some stubs based on XendAPI introspection
