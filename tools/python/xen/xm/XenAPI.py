@@ -72,6 +72,9 @@ class Failure(Exception):
                      for i in range(len(self.details))])
 
 
+_RECONNECT_AND_RETRY = (lambda _ : ())
+
+
 class Session(xen.util.xmlrpclib2.ServerProxy):
     """A server proxy and session manager for communicating with Xend using
     the Xen-API.
@@ -102,13 +105,27 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
             self._login(methodname, params)
             return None
         else:
-            full_params = (self._session,) + params
-            return _parse_result(getattr(self, methodname)(*full_params))
+            retry_count = 0
+            while retry_count < 3:
+                full_params = (self._session,) + params
+                result = _parse_result(getattr(self, methodname)(*full_params))
+                if result == _RECONNECT_AND_RETRY:
+                    retry_count += 1
+                    self._login(self.last_login_method, self.last_login_params)
+                else:
+                    return result
+            raise xmlrpclib.Fault(
+                500, 'Tried 3 times to get a valid session, but failed')
 
 
     def _login(self, method, params):
-        self._session = _parse_result(
-            getattr(self, 'session.%s' % method)(*params))
+        result = _parse_result(getattr(self, 'session.%s' % method)(*params))
+        if result == _RECONNECT_AND_RETRY:
+            raise xmlrpclib.Fault(
+                500, 'Received SESSION_INVALID when logging in')
+        self._session = result
+        self.last_login_method = method
+        self.last_login_params = params
 
 
     def __getattr__(self, name):
@@ -131,7 +148,10 @@ def _parse_result(result):
                                   'Missing Value in response from server')
     else:
         if 'ErrorDescription' in result:
-            raise Failure(result['ErrorDescription'])
+            if result['ErrorDescription'][0] == 'SESSION_INVALID':
+                return _RECONNECT_AND_RETRY
+            else:
+                raise Failure(result['ErrorDescription'])
         else:
             raise xmlrpclib.Fault(
                 500, 'Missing ErrorDescription in response from server')
