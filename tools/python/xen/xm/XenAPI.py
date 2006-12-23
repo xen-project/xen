@@ -44,17 +44,32 @@
 # OF THIS SOFTWARE.
 # --------------------------------------------------------------------
 
+import gettext
 import xmlrpclib
 
 import xen.util.xmlrpclib2
 
+
+gettext.install('xen-xm')
 
 class Failure(Exception):
     def __init__(self, details):
         self.details = details
 
     def __str__(self):
-        return "Xen-API failure: %s" % str(self.details)
+        try:
+            return _(self.details[0]) % self._details_map()
+        except TypeError, exn:
+            return "Message database broken: %s.\nXen-API failure: %s" % \
+                   (exn, str(self.details))
+        except Exception, exn:
+            import sys
+            print >>sys.stderr, exn
+            return "Xen-API failure: %s" % str(self.details)
+
+    def _details_map(self):
+        return dict([(str(i), self.details[i])
+                     for i in range(len(self.details))])
 
 
 class Session(xen.util.xmlrpclib2.ServerProxy):
