@@ -867,7 +867,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 #endif
 
 // see arch/x86/xxx/domain_build.c
-int elf_sanity_check(Elf_Ehdr *ehdr)
+int elf_sanity_check(const Elf_Ehdr *ehdr)
 {
 	if (!(IS_ELF(*ehdr)))
 	{
