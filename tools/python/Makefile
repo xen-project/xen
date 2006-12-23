@@ -26,8 +26,10 @@ install: install-messages
 endif
 
 install-messages: all
-	mkdir -p "$(DESTDIR)/usr/share/locale"
-	cp -R build/messages/* "$(DESTDIR)/usr/share/locale/"
+	if which msgfmt >/dev/null ; then \
+	  mkdir -p "$(DESTDIR)/usr/share/locale"; \
+	  cp -R build/messages/* "$(DESTDIR)/usr/share/locale/"; \
+	fi
 
 .PHONY: test
 test:
