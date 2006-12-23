@@ -306,7 +306,7 @@ class XendAPI:
 
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
-    Base_methods = ['destroy', 'get_record']
+    Base_methods = ['destroy', 'get_by_uuid', 'get_record']
     Base_funcs   = ['create', 'get_all']
 
     # Xen API: Class Session
@@ -378,7 +378,7 @@ class XendAPI:
                     'reboot',
                     'shutdown']
     
-    host_funcs = ['get_by_uuid', 'get_by_name_label']
+    host_funcs = ['get_by_name_label']
 
     # attributes
     def host_get_name_label(self, session, host_ref):
@@ -547,7 +547,7 @@ class XendAPI:
                   'suspend',
                   'resume']
     
-    VM_funcs  = ['get_by_uuid', 'get_by_name_label']
+    VM_funcs  = ['get_by_name_label']
 
     # parameters required for _create()
     VM_attr_inst = [
@@ -1111,7 +1111,7 @@ class XendAPI:
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
     VDI_methods = ['snapshot']
-    VDI_funcs = ['get_by_uuid', 'get_by_name_label']
+    VDI_funcs = ['get_by_name_label']
     
     def VDI_get_VBDs(self, session, vdi_ref):
         return xen_api_todo()
@@ -1355,7 +1355,7 @@ class XendAPI:
                     'name_description']
     
     SR_methods = ['clone']
-    SR_funcs = ['get_by_uuid', 'get_by_name_label']
+    SR_funcs = ['get_by_name_label']
 
     # Class Functions
     def SR_get_all(self, session):
