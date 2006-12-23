@@ -382,7 +382,7 @@ gdbstub_detach(struct gdb_context *ctx)
 static int 
 process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
 {
-    char *ptr;
+    const char *ptr;
     unsigned long addr, length;
     int resume = 0;
 

@@ -23,6 +23,7 @@
  */
 
 #define ADDR (*(volatile long *) addr)
+#define CONST_ADDR (*(const volatile long *) addr)
 
 /**
  * set_bit - Atomically set a bit in memory
@@ -253,7 +254,7 @@ static __inline__ int variable_test_bit(int nr, const volatile void * addr)
 	__asm__ __volatile__(
 		"btl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit)
-		:"m" (ADDR),"dIr" (nr));
+		:"m" (CONST_ADDR),"dIr" (nr));
 	return oldbit;
 }
 
