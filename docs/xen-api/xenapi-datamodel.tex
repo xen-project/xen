@@ -1279,8 +1279,10 @@ VM ref
 
 The ID of the newly created VM.
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~start}
 
 {\bf Overview:} 
@@ -1313,8 +1315,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~pause}
 
 {\bf Overview:} 
@@ -1345,8 +1349,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~unpause}
 
 {\bf Overview:} 
@@ -1363,7 +1369,7 @@ Resume the specified VM. This can only be called when the specified VM is in the
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & vm & The VM to pause \\ \hline 
+{\tt VM ref } & vm & The VM to unpause \\ \hline 
 
 \end{tabular}
 
@@ -1377,14 +1383,18 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~clean\_shutdown}
 
 {\bf Overview:} 
 Attempt to cleanly shutdown the specified VM. (Note: this may not be supported---e.g. if a guest agent is not installed).
 
 Once shutdown has been completed perform poweroff action specified in guest configuration.
+
+This can only be called when the specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void clean_shutdown (session_id s, VM ref vm)\end{verbatim}
@@ -1411,14 +1421,18 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~clean\_reboot}
 
 {\bf Overview:} 
 Attempt to cleanly shutdown the specified VM (Note: this may not be supported---e.g. if a guest agent is not installed).
 
 Once shutdown has been completed perform reboot action specified in guest configuration.
+
+This can only be called when the specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void clean_reboot (session_id s, VM ref vm)\end{verbatim}
@@ -1445,8 +1459,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~hard\_shutdown}
 
 {\bf Overview:} 
@@ -1514,7 +1530,7 @@ void
 \subsubsection{RPC name:~suspend}
 
 {\bf Overview:} 
-Suspend the specified VM to disk.
+Suspend the specified VM to disk.  This can only be called when the specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void suspend (session_id s, VM ref vm)\end{verbatim}
@@ -1541,12 +1557,14 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~resume}
 
 {\bf Overview:} 
-Awaken the specified VM and resume it.
+Awaken the specified VM and resume it.  This can only be called when the specified VM is in the Suspended state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void resume (session_id s, VM ref vm, bool start_paused)\end{verbatim}
@@ -1575,8 +1593,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -10493,39 +10513,6 @@ Each possible error code is documented in the following section.
 
 \subsection{Error Codes}
 
-\vspace{0.9cm}
-\subsubsection{HOST\_CPU\_HANDLE\_INVALID}
-
-You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
-deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-\noindent{\bf Signature:}
-\begin{verbatim}HOST_CPU_HANDLE_INVALID(handle)\end{verbatim}
-
-
-\vspace{0.9cm}
-\subsubsection{HOST\_HANDLE\_INVALID}
-
-You gave an invalid host handle.  The host may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-\noindent{\bf Signature:}
-\begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
-
-
-\vspace{0.9cm}
-\subsubsection{INTERNAL\_ERROR}
-
-The server failed to handle your request, due to an internal error.  The
-given message may give details useful for debugging the problem.
-
-\vspace{0.3cm}
-\noindent{\bf Signature:}
-\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
-
-
 \subsubsection{HOST\_CPU\_HANDLE\_INVALID}
 
 You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
@@ -10563,22 +10550,20 @@ The key, current value, and the new value that you tried to set are all
 echoed.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{MESSAGE\_METHOD\_UNKNOWN}
 
 You tried to call a method that does not exist.  The method name that you
 used is echoed.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
 
 You tried to call a method with the incorrect number of parameters.  The
@@ -10586,11 +10571,10 @@ fully-qualified method name that you used, and the number of received and
 expected parameters are returned.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{SESSION\_AUTHENTICATION\_FAILED}
 
 The credentials given by the user are incorrect, so access has been denied,
@@ -10598,8 +10582,8 @@ and you have not been issued a session handle.
 
 \vspace{0.3cm}
 No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-\vspace{0.9cm}
 \subsubsection{SESSION\_INVALID}
 
 You gave an invalid session handle.  It may have been invalidated by a
@@ -10608,74 +10592,83 @@ one of the session.login\_ calls.  This error does not invalidate the
 current connection.  The handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{SR\_HANDLE\_INVALID}
 
 You gave an invalid SR handle.  The SR may have recently been deleted.  The
 handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}SR_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{VBD\_HANDLE\_INVALID}
 
 You gave an invalid VBD handle.  The VBD may have recently been deleted. 
 The handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}VBD_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{VDI\_HANDLE\_INVALID}
 
 You gave an invalid VDI handle.  The VDI may have recently been deleted. 
 The handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}VDI_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{VIF\_HANDLE\_INVALID}
 
 You gave an invalid VIF handle.  The VIF may have recently been deleted. 
 The handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}VIF_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
+\subsubsection{VM\_BAD\_POWER\_STATE}
 
-\vspace{0.9cm}
+You attempted an operation on a VM that was not in an appropriate power
+state at the time; for example, you attempted to start a VM that was
+already running.  The parameters returned are the VM's UUID, and the
+expected and actual VM state at the time of the call.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
 \subsubsection{VM\_HANDLE\_INVALID}
 
 You gave an invalid VM handle.  The VM may have recently been deleted.  The
 handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}VM_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
-
-\vspace{0.9cm}
 \subsubsection{VTPM\_HANDLE\_INVALID}
 
 You gave an invalid VTPM handle.  The VTPM may have recently been deleted. 
 The handle parameter echoes the bad value given.
 
 \vspace{0.3cm}
-\noindent{\bf Signature:}
+{\bf Signature:}
 \begin{verbatim}VTPM_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+
 
 \newpage
 \section{DTD}
