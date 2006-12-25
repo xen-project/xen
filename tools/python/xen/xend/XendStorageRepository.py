@@ -103,16 +103,16 @@ class XendStorageRepository:
         retval = {'uuid': self.uuid,
                   'name_label': self.name_label,
                   'name_description': self.name_description,
-                  'virtual_allocation': self.storage_alloc,
-                  'physical_utilisation': self.storage_used,
-                  'physical_size': self.storage_max,
+                  'virtual_allocation': str(self.storage_alloc),
+                  'physical_utilisation': str(self.storage_used),
+                  'physical_size': str(self.storage_max),
                   'type': self.type,
                   'location': self.location,
                   'VDIs': self.images.keys()}
         
         if self.storage_max == XEND_STORAGE_NO_MAXIMUM:
             stfs = os.statvfs(self.location)
-            retval['physical_size'] = stfs.f_blocks * stfs.f_frsize
+            retval['physical_size'] = str(stfs.f_blocks * stfs.f_frsize)
 
         return retval
         
@@ -148,7 +148,11 @@ class XendStorageRepository:
                                           virt_size, phys_size)
                         
                         if cfg_path and os.path.exists(cfg_path):
-                            vdi.load_config(cfg_path)
+                            try:
+                                vdi.load_config(cfg_path)
+                            except:
+                                log.error('Corrupt VDI configuration file %s' %
+                                          cfg_path)
                         
                         self.images[image_uuid] = vdi
 
