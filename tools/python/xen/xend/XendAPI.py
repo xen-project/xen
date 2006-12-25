@@ -17,7 +17,6 @@
 
 import inspect
 import os
-import re
 import string
 import sys
 import traceback
@@ -35,6 +34,8 @@ from xen.util.xmlrpclib2 import stringify
 
 AUTH_NONE = 'none'
 AUTH_PAM = 'pam'
+
+argcounts = {}
 
 # ------------------------------------------
 # Utility Methods for Xen API Implementation
@@ -84,12 +85,6 @@ def trace(func, api_name = ''):
     return trace_func
 
 
-takesRE = re.compile(r' ([0-9]*) argument')
-def deconstruct_typeerror(exn):
-    m = takesRE.search(exn[0])
-    return m and m.group(1) or None
-
-
 def catch_typeerror(func):
     """Decorator to catch any TypeErrors and translate them into Xen-API
     errors.
@@ -101,23 +96,21 @@ def catch_typeerror(func):
         try:
             return func(self, *args, **kwargs)
         except TypeError, exn:
-            if hasattr(func, 'api'):
-                takes = deconstruct_typeerror(exn)
-                if takes is not None:
-                    # Assume that if the exception was thrown inside this
-                    # file, then it is due to an invalid call from the client,
-                    # but if it was thrown elsewhere, then it's an internal
-                    # error (which will be handled further up).
-                    tb = sys.exc_info()[2]
-                    try:
-                        sourcefile = traceback.extract_tb(tb)[-1][0]
-                        if sourcefile == inspect.getsourcefile(XendAPI):
-                            return xen_api_error(
-                                ['MESSAGE_PARAMETER_COUNT_MISMATCH',
-                                 func.api, int(takes) - 2,
-                                 len(args) + len(kwargs) - 1])
-                    finally:
-                        del tb
+            if hasattr(func, 'api') and func.api in argcounts:
+                # Assume that if the exception was thrown inside this
+                # file, then it is due to an invalid call from the client,
+                # but if it was thrown elsewhere, then it's an internal
+                # error (which will be handled further up).
+                tb = sys.exc_info()[2]
+                try:
+                    sourcefile = traceback.extract_tb(tb)[-1][0]
+                    if sourcefile == inspect.getsourcefile(XendAPI):
+                        return xen_api_error(
+                            ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                             func.api, argcounts[func.api],
+                             len(args) + len(kwargs)])
+                finally:
+                    del tb
             raise
 
     return f
@@ -138,20 +131,25 @@ def session_required(func):
     return check_session
 
 
+def _is_valid_ref(ref, validator):
+    return type(ref) == str and validator(ref)
+
+def _check_ref(validator, errcode, func, api, session, ref, *args, **kwargs):
+    if _is_valid_ref(ref, validator):
+        return func(api, session, ref, *args, **kwargs)
+    else:
+        return xen_api_error([errcode, ref])
+
+
 def valid_host(func):
     """Decorator to verify if host_ref is valid before calling method.
 
     @param func: function with params: (self, session, host_ref, ...)
     @rtype: callable object
     """
-    def check_host_ref(self, session, host_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(host_ref) == type(str()) and xennode.is_valid_host(host_ref):
-            return func(self, session, host_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['HOST_HANDLE_INVALID', host_ref])
-
-    return check_host_ref
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().is_valid_host,
+                      'HOST_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_host_cpu(func):
     """Decorator to verify if host_cpu_ref is valid before calling method.
@@ -159,15 +157,9 @@ def valid_host_cpu(func):
     @param func: function with params: (self, session, host_cpu_ref, ...)
     @rtype: callable object
     """    
-    def check_host_cpu_ref(self, session, host_cpu_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(host_cpu_ref) == type(str()) and \
-               xennode.is_valid_cpu(host_cpu_ref):
-            return func(self, session, host_cpu_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['HOST_CPU_HANDLE_INVALID', host_cpu_ref])
-        
-    return check_host_cpu_ref
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().is_valid_cpu,
+                      'HOST_CPU_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vm(func):
     """Decorator to verify if vm_ref is valid before calling method.
@@ -175,15 +167,19 @@ def valid_vm(func):
     @param func: function with params: (self, session, vm_ref, ...)
     @rtype: callable object
     """    
-    def check_vm_ref(self, session, vm_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vm_ref) == type(str()) and \
-               xendom.is_valid_vm(vm_ref):
-            return func(self, session, vm_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['VM_HANDLE_INVALID', vm_ref])
+    return lambda *args, **kwargs: \
+           _check_ref(XendDomain.instance().is_valid_vm,
+                      'VM_HANDLE_INVALID', func, *args, **kwargs)
 
-    return check_vm_ref
+def valid_network(func):
+    """Decorator to verify if network_ref is valid before calling method.
+
+    @param func: function with params: (self, session, network_ref, ...)
+    @rtype: callable object
+    """    
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().is_valid_network,
+                      'NETWORK_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vbd(func):
     """Decorator to verify if vbd_ref is valid before calling method.
@@ -191,15 +187,9 @@ def valid_vbd(func):
     @param func: function with params: (self, session, vbd_ref, ...)
     @rtype: callable object
     """    
-    def check_vbd_ref(self, session, vbd_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vbd_ref) == type(str()) and \
-               xendom.is_valid_dev('vbd', vbd_ref):
-            return func(self, session, vbd_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
-
-    return check_vbd_ref
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vbd', r),
+                      'VBD_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vif(func):
     """Decorator to verify if vif_ref is valid before calling method.
@@ -207,16 +197,9 @@ def valid_vif(func):
     @param func: function with params: (self, session, vif_ref, ...)
     @rtype: callable object
     """
-    def check_vif_ref(self, session, vif_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vif_ref) == type(str()) and \
-               xendom.is_valid_dev('vif', vif_ref):
-            return func(self, session, vif_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
-
-    return check_vif_ref
-
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vif', r),
+                      'VIF_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vdi(func):
     """Decorator to verify if vdi_ref is valid before calling method.
@@ -224,15 +207,9 @@ def valid_vdi(func):
     @param func: function with params: (self, session, vdi_ref, ...)
     @rtype: callable object
     """
-    def check_vdi_ref(self, session, vdi_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(vdi_ref) == type(str()) and \
-               xennode.get_sr().is_valid_vdi(vdi_ref):
-            return func(self, session, vdi_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
-
-    return check_vdi_ref
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().get_sr().is_valid_vdi,
+                      'VDI_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vtpm(func):
     """Decorator to verify if vtpm_ref is valid before calling method.
@@ -240,15 +217,9 @@ def valid_vtpm(func):
     @param func: function with params: (self, session, vtpm_ref, ...)
     @rtype: callable object
     """
-    def check_vtpm_ref(self, session, vtpm_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vtpm_ref) == type(str()) and \
-               xendom.is_valid_dev('vtpm', vtpm_ref):
-            return func(self, session, vtpm_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-
-    return check_vtpm_ref
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vtpm', r),
+                      'VTPM_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_sr(func):
     """Decorator to verify if sr_ref is valid before calling method.
@@ -256,16 +227,9 @@ def valid_sr(func):
     @param func: function with params: (self, session, sr_ref, ...)
     @rtype: callable object
     """
-    def check_sr_ref(self, session, sr_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(sr_ref) == type(str()) and \
-               xennode.get_sr().uuid == sr_ref:
-            return func(self, session, sr_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
-
-    return check_sr_ref
-
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendNode.instance().get_sr().uuid == r,
+                      'SR_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_pif(func):
     """Decorator to verify if sr_ref is valid before calling
@@ -274,20 +238,9 @@ def valid_pif(func):
     @param func: function with params: (self, session, sr_ref)
     @rtype: callable object
     """
-    def check_pif_ref(self, session, pif_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(pif_ref) == type(str()) and pif_ref in xennode.pifs:
-            return func(self, session, pif_ref, *args, **kwargs)
-        else:
-            return xen_api_error(['PIF_HANDLE_INVALID', pif_ref])
-
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_pif_ref.api = func.api
-        
-    return check_pif_ref
-
-
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: r in XendNode.instance().pifs,
+                      'PIF_HANDLE_INVALID', func, *args, **kwargs)
 
 # -----------------------------
 # Bridge to Legacy XM API calls
@@ -1532,17 +1485,20 @@ def _decorate():
     and L{session_required}.
     """
 
+    global_validators = [session_required, catch_typeerror]
     classes = {
-        'session': (session_required, catch_typeerror),
-        'host': (valid_host, session_required, catch_typeerror),
-        'host_cpu': (valid_host_cpu, session_required, catch_typeerror),
-        'VM': (valid_vm, session_required, catch_typeerror),
-        'VBD': (valid_vbd, session_required, catch_typeerror),
-        'VIF': (valid_vif, session_required, catch_typeerror),
-        'VDI': (valid_vdi, session_required, catch_typeerror),
-        'VTPM':(valid_vtpm, session_required, catch_typeerror),
-        'SR':  (valid_sr, session_required, catch_typeerror),
-        'PIF': (valid_pif, session_required, catch_typeerror)}
+        'session' : None,
+        'host'    : valid_host,
+        'host_cpu': valid_host_cpu,
+        'network' : valid_network,
+        'VM'      : valid_vm,
+        'VBD'     : valid_vbd,
+        'VIF'     : valid_vif,
+        'VDI'     : valid_vdi,
+        'VTPM'    : valid_vtpm,
+        'SR'      : valid_sr,
+        'PIF'     : valid_pif
+        }
 
     # Cheat methods
     # -------------
@@ -1571,7 +1527,24 @@ def _decorate():
     # Wrapping validators around XMLRPC calls
     # ---------------------------------------
 
-    for cls, validators in classes.items():
+    for cls, validator in classes.items():
+        def doit(n, takes_instance):
+            n_ = n.replace('.', '_')
+            try:
+                f = getattr(XendAPI, n_)
+                argcounts[n] = f.func_code.co_argcount - 1
+
+                validators = takes_instance and validator and [validator] \
+                             or []
+                validators += global_validators
+                for v in validators:
+                    f = v(f)
+                    f.api = n
+                setattr(XendAPI, n_, f)
+            except AttributeError:
+                log.warn("API call: %s not found" % n)
+
+
         ro_attrs = getattr(XendAPI, '%s_attr_ro' % cls, [])
         rw_attrs = getattr(XendAPI, '%s_attr_rw' % cls, [])
         methods  = getattr(XendAPI, '%s_methods' % cls, [])
@@ -1579,55 +1552,19 @@ def _decorate():
 
         # wrap validators around readable class attributes
         for attr_name in ro_attrs + rw_attrs + XendAPI.Base_attr_ro:
-            getter_name = '%s_get_%s' % (cls, attr_name)
-            try:
-                getter = getattr(XendAPI, getter_name)
-                for validator in validators:
-                    getter = validator(getter)
-                    getter.api = '%s.get_%s' % (cls, attr_name)
-                setattr(XendAPI, getter_name, getter)
-            except AttributeError:
-                pass
-                #log.warn("API call: %s not found" % getter_name)
+            doit('%s.get_%s' % (cls, attr_name), True)
 
         # wrap validators around writable class attrributes
         for attr_name in rw_attrs + XendAPI.Base_attr_rw:
-            setter_name = '%s_set_%s' % (cls, attr_name)
-            try:
-                setter = getattr(XendAPI, setter_name)
-                for validator in validators:
-                    setter = validator(setter)
-                    setter.api = '%s.set_%s' % (cls, attr_name)
-                setattr(XendAPI, setter_name, setter)
-            except AttributeError:
-                pass
-                #log.warn("API call: %s not found" % setter_name)
+            doit('%s.set_%s' % (cls, attr_name), True)
 
         # wrap validators around methods
         for method_name in methods + XendAPI.Base_methods:
-            method_full_name = '%s_%s' % (cls, method_name)
-            try:
-                method = getattr(XendAPI, method_full_name)
-                for validator in validators:
-                    method = validator(method)
-                    method.api = '%s.%s' % (cls, method_name)
-                setattr(XendAPI, method_full_name, method)
-            except AttributeError:
-                pass
-                #log.warn('API call: %s not found' % method_full_name)
+            doit('%s.%s' % (cls, method_name), True)
 
         # wrap validators around class functions
         for func_name in funcs + XendAPI.Base_funcs:
-            func_full_name = '%s_%s' % (cls, func_name)
-            try:
-                method = getattr(XendAPI, func_full_name)
-                method = session_required(method)
-                method.api = '%s.%s' % (cls, func_name)
-                method = catch_typeerror(method)
-                method.api = '%s.%s' % (cls, func_name)
-                setattr(XendAPI, func_full_name, method)
-            except AttributeError:
-                log.warn('API call: %s not found' % func_full_name)
+            doit('%s.%s' % (cls, func_name), False)
 
 _decorate()
 
