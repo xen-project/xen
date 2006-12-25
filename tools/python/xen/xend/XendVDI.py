@@ -141,6 +141,21 @@ class XendVDI(AutoSaveObject):
 
         return True
 
+    def get_record(self):
+        return {'uuid': self.uuid,
+                'name_label': self.name_label,
+                'name_description': self.name_description,
+                'virtual_size': self.virtual_size,
+                'physical_utilisation': self.physical_utilisation,
+                'sector_size': self.sector_size,
+                'parent': None,
+                'children': [],
+                'sharable': False,
+                'readonly': False,
+                'SR': self.sr.get_uuid(),
+                'VBDs': []}
+                
+
 class XendQCOWVDI(XendVDI):
 
     def __init__(self, uuid, sr_uuid, qcow_path, cfg_path, vsize, psize):
