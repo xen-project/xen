@@ -451,14 +451,30 @@ class XendAPI:
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
 
-    # Xen API: Class Network
+    # Xen API: Class network
     # ----------------------------------------------------------------
 
-    Network_attr_ro = ['VIFs', 'PIFs']
-    Network_attr_rw = ['name_label',
+    network_attr_ro = ['VIFs', 'PIFs']
+    network_attr_rw = ['name_label',
                        'name_description',
                        'default_gateway',
                        'default_netmask']
+
+    def _get_network(self, ref):
+        return XendNode.instance().get_network(ref)
+
+    def network_get_all(self, session):
+        return xen_api_success(XendNode.instance().get_network_refs())
+
+    def network_get_record(self, session, ref):
+        return xen_api_success(
+            XendNode.instance().get_network(ref).get_record())
+
+    def network_get_VIFs(self, _, ref):
+        return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
+
+    def network_get_PIFs(self, session, ref):
+        return xen_api_success(self._get_network(ref).get_PIF_UUIDs())
 
     # Xen API: Class PIF
     # ----------------------------------------------------------------

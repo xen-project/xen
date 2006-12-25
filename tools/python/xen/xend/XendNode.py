@@ -83,20 +83,6 @@ class XendNode:
         self.pifs = {}
         self.networks = {}
 
-        # initialise PIFs
-        saved_pifs = self.state_store.load_state('pif')
-        if saved_pifs:
-            for pif_uuid, pif in saved_pifs.items():
-                self.pifs[pif_uuid] = XendPIF(pif_uuid,
-                                              pif['name'],
-                                              pif['MTU'],
-                                              pif['MAC'])
-        else:
-            for name, mtu, mac in linux_get_phy_ifaces():
-                pif_uuid = uuid.createString()
-                pif = XendPIF(pif_uuid, name, mtu, mac)
-                self.pifs[pif_uuid] = pif
-
         # initialise networks
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
@@ -106,16 +92,30 @@ class XendNode:
                                 network.get('name_description', ''),
                                 network.get('default_gateway', ''),
                                 network.get('default_netmask', ''))
-                
-                for pif_uuid in network.get('PIFs', {}).keys():
-                    pif = self.pifs.get(pif_uuid)
-                    if pif:
-                        self.networks.pifs[pif_uuid] = pif
         else:
             gateway, netmask = linux_get_default_network()
             net_uuid = uuid.createString()
             net = XendNetwork(net_uuid, 'net0', '', gateway, netmask)
             self.networks[net_uuid] = net
+
+        # initialise PIFs
+        saved_pifs = self.state_store.load_state('pif')
+        if saved_pifs:
+            for pif_uuid, pif in saved_pifs.items():
+                if pif['network'] in self.networks:
+                    network = self.networks[pif['network']]
+                    self.pifs[pif_uuid] = XendPIF(pif_uuid,
+                                                  pif['name'],
+                                                  pif['MTU'],
+                                                  pif['MAC'],
+                                                  network,
+                                                  self)
+        else:
+            for name, mtu, mac in linux_get_phy_ifaces():
+                network = self.networks.values()[0]
+                pif_uuid = uuid.createString()
+                pif = XendPIF(pif_uuid, name, mtu, mac, network, self)
+                self.pifs[pif_uuid] = pif
 
         # initialise storage
         saved_sr = self.state_store.load_state('sr')
@@ -125,7 +125,6 @@ class XendNode:
         else:
             sr_uuid = uuid.createString()
             self.sr = XendStorageRepository(sr_uuid)
-        self.save()
 
     def save(self):
         # save state
@@ -133,10 +132,10 @@ class XendNode:
                                    'name_description':self.desc}}
         self.state_store.save_state('host',host_record)
         self.state_store.save_state('cpu', self.cpus)
-        pif_records = dict([(k, v.get_record())
+        pif_records = dict([(k, v.get_record(transient = False))
                             for k, v in self.pifs.items()])
         self.state_store.save_state('pif', pif_records)
-        net_records = dict([(k, v.get_record())
+        net_records = dict([(k, v.get_record(transient = False))
                             for k, v in self.networks.items()])
         self.state_store.save_state('network', net_records)
 
@@ -163,6 +162,9 @@ class XendNode:
 
     def is_valid_cpu(self, cpu_ref):
         return (cpu_ref in self.cpus)
+
+    def is_valid_network(self, network_ref):
+        return (network_ref in self.networks)
 
     #
     # Storage Repo
@@ -233,7 +235,17 @@ class XendNode:
     def get_host_cpu_load(self, host_cpu_ref):
         return 0.0
 
+
+    #
+    # Network Functions
+    #
     
+    def get_network_refs(self):
+        return self.networks.keys()
+
+    def get_network(self, network_ref):
+        return self.networks[network_ref]
+
 
     #
     # Getting host information.
@@ -318,5 +330,5 @@ def instance():
         inst
     except:
         inst = XendNode()
+        inst.save()
     return inst
-

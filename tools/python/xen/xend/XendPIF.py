@@ -12,7 +12,6 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (c) 2006 Xensource Inc.
 #============================================================================
 
@@ -100,29 +99,18 @@ def same_dir_rename(old_path, new_path):
 class XendPIF:
     """Representation of a Physical Network Interface."""
     
-    def __init__(self, uuid, name, mtu, mac):
+    def __init__(self, uuid, name, mtu, mac, network, host):
         self.uuid = uuid
         self.name = name
         self.mac = mac
         self.mtu = mtu
         self.vlan = ''
-        self.network = None
+        self.network = network
+        self.host = host
 
     def set_name(self, new_name):
         self.name = new_name
             
-    def get_name(self):
-        return self.name
-
-    def get_uuid(self):
-        return self.uuid
-
-    def get_mac(self):
-        return self.mac
-
-    def get_vlan(self):
-        return self.vlan
-
     def set_mac(self, new_mac):
         success = linux_set_mac(new_mac)
         if success:
@@ -141,17 +129,14 @@ class XendPIF:
     def get_io_write_kbs(self):
         return 0.0
 
-    def get_record(self):
-        if self.network:
-            network_uuid = self.network.get_uuid()
-        else:
-            network_uuid = None
-
-        return {'name': self.name,
-                'MAC': self.mac,
-                'MTU': self.mtu,
-                'VLAN': self.vlan,
-                'network': network_uuid,
-                'io_read_kbs': self.get_io_read_kbs(),
-                'io_write_kbs': self.get_io_write_kbs()}
-                
+    def get_record(self, transient = True):
+        result = {'name': self.name,
+                  'MAC': self.mac,
+                  'MTU': self.mtu,
+                  'VLAN': self.vlan,
+                  'host': self.host.uuid,
+                  'network': self.network.uuid}
+        if transient:
+            result['io_read_kbs'] = self.get_io_read_kbs()
+            result['io_write_kbs'] = self.get_io_write_kbs()
+        return result

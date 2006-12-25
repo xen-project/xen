@@ -12,7 +12,6 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (c) 2006 Xensource Inc.
 #============================================================================
 
@@ -22,7 +21,8 @@ import re
 import struct
 import socket
 
-from xen.xend.XendRoot import instance as xendroot
+import XendNode
+from XendLogging import log
 
 IP_ROUTE_RE = r'^default via ([\d\.]+) dev (\w+)'
 
@@ -63,57 +63,37 @@ class XendNetwork:
         self.name_description = description
         self.default_gateway = gateway
         self.default_netmask = netmask
-        self.vifs = {}
-        self.pifs = {}
-
-    def get_name_label(self):
-        return self.name_label
 
     def set_name_label(self, new_name):
         self.name_label = new_name
 
-    def get_name_description(self):
-        return self.name_description
-
     def set_name_description(self, new_desc):
         self.name_description = new_desc
-
-    def get_default_gateway(self):
-        return self.default_gateway
 
     def set_default_gateway(self, new_gateway):
         if re.search('^\d+\.\d+\.\d+\.\d+$', new_gateway):
             self.default_gateway = new_gateway
 
-    def get_default_netmask(self):
-        return self.default_netmask
-
     def set_default_netmask(self, new_netmask):
         if re.search('^\d+\.\d+\.\d+\.\d+$', new_netmask):
             self.default_netmask = new_netmask
 
-    def add_pif(self, pif):
-        self.pifs[pif.get_uuid()] = pif
+    def get_VIF_UUIDs(self):
+        return []
 
-    def remove_pif(self, pif_uuid):
-        if pif_uuid in self.pifs:
-            del self.pifs[pif_uuid]
+    def get_PIF_UUIDs(self):
+        return [x.uuid for x in XendNode.instance().pifs.values()
+                if x.network == self]
 
-    def add_vif(self, vif):
-        self.vifs[vif.get_uuid()] = vif
-
-    def remove_vif(self, vif_uuid):
-        if vif_uuid in self.vifs:
-            del self.vifs[vif_uuid]
-        
-    def get_record(self):
-        return {
+    def get_record(self, transient = True):
+        result = {
             'uuid': self.uuid,
             'name_label': self.name_label,
             'name_description': self.name_description,
             'default_gateway': self.default_gateway,
             'default_netmask': self.default_netmask,
-            'VIFs': self.vifs.keys(),
-            'PIFs': self.pifs.keys()
         }
-           
+        if transient:
+            result['VIFs'] = self.get_VIF_UUIDs()
+            result['PIFs'] = self.get_PIF_UUIDs()
+        return result
