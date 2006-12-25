@@ -488,6 +488,19 @@ class XendAPI:
     def network_get_PIFs(self, session, ref):
         return xen_api_success(self._get_network(ref).get_PIF_UUIDs())
 
+    def network_set_name_label(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_name_label(val))
+
+    def network_set_name_description(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_name_description(val))
+
+    def network_set_default_gateway(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_default_gateway(val))
+
+    def network_set_default_netmask(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_default_netmask(val))
+
+
     # Xen API: Class PIF
     # ----------------------------------------------------------------
 
