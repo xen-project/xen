@@ -266,6 +266,29 @@ def valid_sr(func):
 
     return check_sr_ref
 
+
+def valid_pif(func):
+    """Decorator to verify if sr_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, sr_ref)
+    @rtype: callable object
+    """
+    def check_pif_ref(self, session, pif_ref, *args, **kwargs):
+        xennode = XendNode.instance()
+        if type(pif_ref) == type(str()) and pif_ref in xennode.pifs:
+            return func(self, session, pif_ref, *args, **kwargs)
+        else:
+            return xen_api_error(['PIF_HANDLE_INVALID', pif_ref])
+
+    # make sure we keep the 'api' attribute
+    if hasattr(func, 'api'):
+        check_pif_ref.api = func.api
+        
+    return check_pif_ref
+
+
+
 # -----------------------------
 # Bridge to Legacy XM API calls
 # -----------------------------
@@ -477,15 +500,80 @@ class XendAPI:
 
     # Xen API: Class Network
     # ----------------------------------------------------------------
-    # TODO: NOT IMPLEMENTED
 
-    Network_attr_ro = ['VIFs']
+    Network_attr_ro = ['VIFs', 'PIFs']
     Network_attr_rw = ['name_label',
                        'name_description',
-                       'NIC',
-                       'VLAN',
                        'default_gateway',
                        'default_netmask']
+
+    # Xen API: Class PIF
+    # ----------------------------------------------------------------
+
+    PIF_attr_ro = ['io_read_kbs',
+                   'io_write_kbs']
+    PIF_attr_rw = ['name',
+                   'network',
+                   'host',
+                   'MAC',
+                   'MTU',
+                   'VLAN']
+
+    PIF_attr_inst = PIF_attr_rw
+
+    # object methods
+    def PIF_get_record(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_record())
+
+    def PIF_get_all(self, session):
+        return xen_api_success(XendNode.instance().pifs.keys())
+
+    def PIF_set_name(self, session, pif_ref, name):
+        node = XendNode.instance()
+        pif = node.pifs.get(pif_ref)
+        if pif:
+            pif.set_name(name)
+        return xen_api_void()        
+
+    def PIF_set_mac(self, session, pif_ref, mac):
+        node = XendNode.instance()
+        pif = node.pifs.get(pif_ref)
+        if pif:
+            pif.set_mac(mac)
+        return xen_api_void()
+
+    def PIF_set_mtu(self, session, pif_ref, mtu):
+        node = XendNode.instance()
+        pif = node.pifs.get(pif_ref)
+        if pif:
+            pif.set_mtu(mtu)
+        return xen_api_void()    
+
+    def PIF_get_mac(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_mac())
+
+    def PIF_get_mtu(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_mtu())
+
+    def PIF_get_vlan(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_vlan())
+
+    def PIF_get_name(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_name())
+
+    def PIF_get_io_read_kbs(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_io_read_kbs())
+
+    def PIF_get_io_write_kbs(self, session, pif_ref):
+        node = XendNode.instance()
+        return xen_api_success(node.pifs[pif_ref].get_io_write_kbs())    
+    
 
     # Xen API: Class VM
     # ----------------------------------------------------------------        
@@ -1189,9 +1277,16 @@ class XendAPI:
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
     def VDI_set_sharable(self, session, vdi_ref, value):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        image.sharable = bool(value)
+        return xen_api_success_void()
+    
     def VDI_set_read_only(self, session, vdi_ref, value):
-        return xen_api_todo()
+        sr = XendNode.instance().get_sr()
+        image = sr.xen_api_get_by_uuid(vdi_ref)
+        image.read_only = bool(value)
+        return xen_api_success_void()
 
     # Object Methods
     def VDI_snapshot(self, session, vdi_ref):
@@ -1383,17 +1478,7 @@ class XendAPI:
     
     def SR_get_record(self, session, sr_ref):
         sr = XendNode.instance().get_sr()
-        return xen_api_success({
-            'uuid': sr.uuid,
-            'name_label': sr.name_label,
-            'name_description': sr.name_description,
-            'VDIs': sr.list_images(),
-            'virtual_allocation': sr.used_space_bytes(),
-            'physical_utilisation': sr.used_space_bytes(),
-            'physical_size': sr.total_space_bytes(),
-            'type': sr.type,
-            'location': sr.location
-            })
+        return xen_api_success(sr.get_record())
 
     # Attribute acceess
     def SR_get_VDIs(self, session, sr_ref):
@@ -1431,11 +1516,13 @@ class XendAPI:
     def SR_set_name_label(self, session, sr_ref, value):
         sr = XendNode.instance().get_sr()
         sr.name_label = value
+        XendNode.instance().save()
         return xen_api_success_void()
     
     def SR_set_name_description(self, session, sr_ref, value):
         sr = XendNode.instance().get_sr()
         sr.name_description = value
+        XendNode.instance().save()        
         return xen_api_success_void()
 
 
@@ -1454,7 +1541,8 @@ def _decorate():
         'VIF': (valid_vif, session_required, catch_typeerror),
         'VDI': (valid_vdi, session_required, catch_typeerror),
         'VTPM':(valid_vtpm, session_required, catch_typeerror),
-        'SR':  (valid_sr, session_required, catch_typeerror)}
+        'SR':  (valid_sr, session_required, catch_typeerror),
+        'PIF': (valid_pif, session_required, catch_typeerror)}
 
     # Cheat methods
     # -------------

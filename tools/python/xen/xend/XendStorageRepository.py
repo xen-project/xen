@@ -24,13 +24,17 @@ import logging
 import os
 import stat
 import threading
+import re
+import sys
+import struct
 
 from xen.util import mkdir
 from xen.xend import uuid
 from xen.xend.XendError import XendError
 from xen.xend.XendVDI import *
 
-XEND_STORAGE_MAX_IGNORE = -1
+
+XEND_STORAGE_NO_MAXIMUM = sys.maxint
 XEND_STORAGE_DIR = "/var/lib/xend/storage/"
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
 XEND_STORAGE_VDICFG_FILENAME = "%s.vdi.xml"
@@ -41,8 +45,17 @@ MB = 1024 * 1024
 log = logging.getLogger("xend.XendStorageRepository")
 
 
-class DeviceInvalidError(Exception):
-    pass
+def qcow_virtual_size(qcow_file):
+    """Read the first 32 bytes of the QCoW header to determine its size.
+
+    See: http://www.gnome.org/~markmc/qcow-image-format.html.
+    """
+    try:
+        qcow_header = open(qcow_file, 'rb').read(32)
+        parts = struct.unpack('>IIQIIQ', qcow_header)
+        return parts[-1]
+    except IOError:
+        return -1
 
 class XendStorageRepository:
     """A simple file backed QCOW Storage Repository.
@@ -54,11 +67,13 @@ class XendStorageRepository:
     The actual images are created in the format <uuid>.img and <uuid>.qcow.
     """
     
-    def __init__(self, storage_dir = XEND_STORAGE_DIR,
-                 storage_max = XEND_STORAGE_MAX_IGNORE):
+    def __init__(self, uuid,
+                 sr_type = "qcow_file",
+                 name_label = "Local",
+                 name_description = "Xend Storage Repository",
+                 location = XEND_STORAGE_DIR,
+                 storage_max = XEND_STORAGE_NO_MAXIMUM):
         """
-        @keyword storage_dir: Where the images will be stored.
-        @type    storage_dir: string
         @keyword storage_max: Maximum disk space to use in bytes.
         @type    storage_max: int
 
@@ -67,71 +82,78 @@ class XendStorageRepository:
         @type    images: dictionary by image uuid.
         @ivar    lock:   lock to provide thread safety.
         """
-        
-        self.storage_dir = storage_dir
-        self.storage_max = storage_max
-        self.storage_free = 0
-        self.images = {}
 
         # XenAPI Parameters
-        self.uuid = self._sr_uuid()
-        self.type = "qcow-file"
-        self.location = self.storage_dir
-        self.name_label = "Local"
-        self.name_description = "Xend Storage Repository"
+        self.uuid = uuid
+        self.type = sr_type
+        self.location = location
+        self.name_label = name_label
+        self.name_description = name_description
+        self.images = {}
+
+        self.storage_max = storage_max
+        self.storage_free = 0
+        self.storage_used = 0
+        self.storage_alloc = 0
 
         self.lock = threading.RLock()
-        self._refresh()        
+        self._refresh()
 
-    def _sr_uuid(self):
-        uuid_file = os.path.join(XEND_STORAGE_DIR, 'uuid')
-        try:
-            if uuid_file and os.path.exists(uuid_file):
-                return open(uuid_file, 'r').read().strip()
-            else:
-                new_uuid = uuid.createString()
-                open(uuid_file, 'w').write(new_uuid + '\n')
-                return new_uuid
-        except IOError:
-            log.exception("Failed to determine SR UUID")
+    def get_record(self):
+        retval = {'uuid': self.uuid,
+                  'name_label': self.name_label,
+                  'name_description': self.name_description,
+                  'virtual_allocation': self.storage_alloc,
+                  'physical_utilisation': self.storage_used,
+                  'physical_size': self.storage_max,
+                  'type': self.type,
+                  'location': self.location,
+                  'VDIs': self.images.keys()}
+        
+        if self.storage_max == XEND_STORAGE_NO_MAXIMUM:
+            stfs = os.statvfs(self.location)
+            retval['physical_size'] = stfs.f_blocks * stfs.f_frsize
 
-        return uuid.createString()
-
+        return retval
+        
     def _refresh(self):
         """Internal function that refreshes the state of the disk and
         updates the list of images available.
         """
         self.lock.acquire()
         try:
-            mkdir.parents(XEND_STORAGE_DIR, stat.S_IRWXU)
+            mkdir.parents(self.location, stat.S_IRWXU)
 
             # scan the directory and populate self.images
-            total_used = 0
+            virtual_alloc = 0
+            physical_used = 0
             seen_images = []
-            for filename in os.listdir(XEND_STORAGE_DIR):
+            for filename in os.listdir(self.location):
                 if filename[-5:] == XEND_STORAGE_QCOW_FILENAME[-5:]:
                     image_uuid = filename[:-5]
                     seen_images.append(image_uuid)
+
+                    qcow_file = XEND_STORAGE_QCOW_FILENAME % image_uuid
+                    cfg_file = XEND_STORAGE_VDICFG_FILENAME % image_uuid
+                    qcow_path = os.path.join(self.location, qcow_file)
+                    cfg_path = os.path.join(self.location, cfg_file)
+                    
+                    phys_size = os.stat(qcow_path).st_size
+                    virt_size = qcow_virtual_size(qcow_path)
                     
                     # add this image if we haven't seen it before
                     if image_uuid not in self.images:
-                        qcow_file = XEND_STORAGE_QCOW_FILENAME % image_uuid
-                        cfg_file = XEND_STORAGE_VDICFG_FILENAME % image_uuid
-                        qcow_path = os.path.join(XEND_STORAGE_DIR, qcow_file)
-                        cfg_path = os.path.join(XEND_STORAGE_DIR, cfg_file)
-
-                        qcow_size = os.stat(qcow_path).st_size
-
-                        # TODO: no way to stat virtual size of qcow
                         vdi = XendQCOWVDI(image_uuid, self.uuid,
                                           qcow_path, cfg_path,
-                                          qcow_size, qcow_size) 
+                                          virt_size, phys_size)
                         
                         if cfg_path and os.path.exists(cfg_path):
                             vdi.load_config(cfg_path)
                         
                         self.images[image_uuid] = vdi
-                        total_used += qcow_size
+
+                    physical_used += phys_size
+                    virtual_alloc += virt_size
 
             # remove images that aren't valid
             for image_uuid in self.images.keys():
@@ -142,11 +164,14 @@ class XendStorageRepository:
                         pass
                     del self.images[image_uuid]
 
+            self.storage_alloc = virtual_alloc
+            self.storage_used = physical_used
+
             # update free storage if we have to track that
-            if self.storage_max != XEND_STORAGE_MAX_IGNORE:
-                self.storage_free = self.storage_max - total_used
-            else:
+            if self.storage_max == XEND_STORAGE_NO_MAXIMUM:
                 self.storage_free = self._get_free_space()
+            else:
+                self.storage_free = self.storage_max - self.storage_alloc
                         
         finally:
             self.lock.release()
@@ -158,7 +183,7 @@ class XendStorageRepository:
 
         @rtype: int
         """
-        stfs = os.statvfs(self.storage_dir)
+        stfs = os.statvfs(self.location)
         return stfs.f_bavail * stfs.f_frsize
 
     def _has_space_available_for(self, size_bytes):
@@ -167,22 +192,19 @@ class XendStorageRepository:
 
         @rtype: bool
         """
-        if self.storage_max != -1:
-            return self.storage_free
+        if self.storage_max != XEND_STORAGE_NO_MAXIMUM:
+            return self.storage_free > size_bytes
         
         bytes_free = self._get_free_space()
-        try:
-            if size_bytes < bytes_free:
-                return True
-        except DeviceInvalidError:
-            pass
+        if size_bytes < bytes_free:
+            return True
         return False
 
     def _create_image_files(self, desired_size_bytes):
         """Create an image and return its assigned UUID.
 
-        @param desired_size_kb: Desired image size in KB.
-        @type  desired_size_kb: int
+        @param desired_size_bytes: Desired image size in bytes
+        @type  desired_size_bytes: int
         @rtype: string
         @return: uuid
 
@@ -194,7 +216,7 @@ class XendStorageRepository:
                 raise XendError("Not enough space")
 
             image_uuid = uuid.createString()
-            qcow_path = os.path.join(XEND_STORAGE_DIR,
+            qcow_path = os.path.join(self.location,
                                      XEND_STORAGE_QCOW_FILENAME % image_uuid)
             
             if qcow_path and os.path.exists(qcow_path):
@@ -268,10 +290,7 @@ class XendStorageRepository:
         """
         self.lock.acquire()
         try:
-            if self.storage_max != XEND_STORAGE_MAX_IGNORE:
-                return self.storage_max
-            else:
-                return self.free_space_bytes() + self.used_space_bytes()
+            return self.storage_max
         finally:
             self.lock.release()
             
@@ -315,7 +334,7 @@ class XendStorageRepository:
 
             # save configuration to file
             cfg_filename =  XEND_STORAGE_VDICFG_FILENAME % image_uuid
-            cfg_path = os.path.join(XEND_STORAGE_DIR, cfg_filename)
+            cfg_path = os.path.join(self.location, cfg_filename)
             image.save_config(cfg_path)
             
         except Exception, e:
@@ -327,10 +346,10 @@ class XendStorageRepository:
 
         return image_uuid
         
-    def xen_api_get_by_label(self, label):
+    def xen_api_get_by_name_label(self, label):
         self.lock.acquire()
         try:
-            for image_uuid, val in self.images.values():
+            for image_uuid, val in self.images.items():
                 if val.name_label == label:
                     return image_uuid
             return None
