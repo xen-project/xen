@@ -66,17 +66,21 @@ class XendNetwork:
 
     def set_name_label(self, new_name):
         self.name_label = new_name
+        XendNode.instance().save_networks()
 
     def set_name_description(self, new_desc):
         self.name_description = new_desc
+        XendNode.instance().save_networks()
 
     def set_default_gateway(self, new_gateway):
         if re.search('^\d+\.\d+\.\d+\.\d+$', new_gateway):
             self.default_gateway = new_gateway
+            XendNode.instance().save_networks()
 
     def set_default_netmask(self, new_netmask):
         if re.search('^\d+\.\d+\.\d+\.\d+$', new_netmask):
             self.default_netmask = new_netmask
+            XendNode.instance().save_networks()
 
     def get_VIF_UUIDs(self):
         return []

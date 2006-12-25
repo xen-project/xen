@@ -135,13 +135,16 @@ class XendNode:
         pif_records = dict([(k, v.get_record(transient = False))
                             for k, v in self.pifs.items()])
         self.state_store.save_state('pif', pif_records)
-        net_records = dict([(k, v.get_record(transient = False))
-                            for k, v in self.networks.items()])
-        self.state_store.save_state('network', net_records)
 
+        self.save_networks()
 
         sr_record = {self.sr.uuid: self.sr.get_record()}
         self.state_store.save_state('sr', sr_record)
+
+    def save_networks(self):
+        net_records = dict([(k, v.get_record(transient = False))
+                            for k, v in self.networks.items()])
+        self.state_store.save_state('network', net_records)
 
     def shutdown(self):
         return 0
