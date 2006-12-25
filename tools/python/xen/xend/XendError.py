@@ -32,6 +32,16 @@ class XendError(Fault):
     def __str__(self):
         return self.value
 
+class VMBadState(XendError):
+    
+    def __init__(self, value, expected, actual):
+        XendError.__init__(self, value)
+        self.expected = expected
+        self.actual = actual
+
+    def __str__(self):
+        return self.value
+
 class VmError(XendError):
     """Vm construction error."""
     pass

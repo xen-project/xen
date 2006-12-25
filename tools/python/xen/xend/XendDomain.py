@@ -36,6 +36,7 @@ from xen.xend import XendRoot, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
+from xen.xend.XendError import VMBadState
 from xen.xend.XendLogging import log
 from xen.xend.XendAPIConstants import XEN_API_VM_POWER_STATE
 from xen.xend.XendConstants import XS_VMROOT
@@ -782,7 +783,9 @@ class XendDomain:
                 raise XendError("Cannot save privileged domain %s" % domname)
 
             if dominfo.state != DOM_STATE_RUNNING:
-                raise XendError("Cannot suspend domain that is not running.")
+                raise VMBadState("Domain is not running",
+                                 POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                                 POWER_STATE_NAMES[dominfo.state])
 
             dom_uuid = dominfo.get_uuid()
 
@@ -932,7 +935,9 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
 
             if dominfo.state != DOM_STATE_HALTED:
-                raise XendError("Domain is already running")
+                raise VMBadState("Domain is already running",
+                                 POWER_STATE_NAMES[DOM_STATE_HALTED],
+                                 POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
             self._add_domain(dominfo)
@@ -960,7 +965,9 @@ class XendDomain:
                     raise XendInvalidDomain(str(domid))
 
                 if dominfo.state != DOM_STATE_HALTED:
-                    raise XendError("Domain is still running")
+                    raise VMBadState("Domain is still running",
+                                     POWER_STATE_NAMES[DOM_STATE_HALTED],
+                                     POWER_STATE_NAMES[dominfo.state])
 
                 log.info("Domain %s (%s) deleted." %
                          (dominfo.getName(), dominfo.info.get('uuid')))

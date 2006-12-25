@@ -260,10 +260,14 @@ def do_vm_func(fn_name, vm_ref, *args, **kwargs):
     @param *args: more arguments
     @type *args: tuple
     """
-    xendom = XendDomain.instance()
-    fn = getattr(xendom, fn_name)
-    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args, **kwargs)
-    return xen_api_success_void()
+    try:
+        xendom = XendDomain.instance()
+        fn = getattr(xendom, fn_name)
+        xendom.do_legacy_api_with_uuid(fn, vm_ref, *args, **kwargs)
+        return xen_api_success_void()
+    except VMBadState, exn:
+        return xen_api_error(['VM_BAD_POWER_STATE', vm_ref, exn.expected,
+                              exn.actual])
 
 
 class XendAPI:
