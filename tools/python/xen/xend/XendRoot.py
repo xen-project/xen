@@ -104,6 +104,9 @@ class XendRoot:
     """Default session storage path."""
     xend_domains_path_default = '/var/lib/xend/domains'
 
+    """Default xend management state storage."""
+    xend_state_path_default = '/var/lib/xend/state'
+
     components = {}
 
     def __init__(self):
@@ -262,6 +265,11 @@ class XendRoot:
         """ Get the path for persistent domain configuration storage
         """
         return self.get_config_value("xend-domains-path", self.xend_domains_path_default)
+
+    def get_xend_state_path(self):
+        """ Get the path for persistent domain configuration storage
+        """
+        return self.get_config_value("xend-state-path", self.xend_state_path_default)    
 
     def get_network_script(self):
         """@return the script used to alter the network configuration when
