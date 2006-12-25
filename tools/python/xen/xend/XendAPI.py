@@ -43,7 +43,11 @@ argcounts = {}
 
 def xen_api_success(value):
     """Wraps a return value in XenAPI format."""
-    return {"Status": "Success", "Value": stringify(value)}
+    if value is None:
+        s = ''
+    else:
+        s = stringify(value)
+    return {"Status": "Success", "Value": s}
 
 def xen_api_success_void():
     """Return success, but caller expects no return value."""
@@ -515,59 +519,49 @@ class XendAPI:
 
     PIF_attr_inst = PIF_attr_rw
 
-    # object methods
-    def PIF_get_record(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_record())
+    def _get_PIF(self, ref):
+        return XendNode.instance().pifs[ref]
 
-    def PIF_get_all(self, session):
+    # object methods
+    def PIF_get_record(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).get_record())
+
+    def PIF_get_all(self, _):
         return xen_api_success(XendNode.instance().pifs.keys())
 
-    def PIF_set_name(self, session, pif_ref, name):
-        node = XendNode.instance()
-        pif = node.pifs.get(pif_ref)
-        if pif:
-            pif.set_name(name)
-        return xen_api_void()        
+    def PIF_get_name(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).name)
 
-    def PIF_set_mac(self, session, pif_ref, mac):
-        node = XendNode.instance()
-        pif = node.pifs.get(pif_ref)
-        if pif:
-            pif.set_mac(mac)
-        return xen_api_void()
+    def PIF_get_network(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).network.uuid)
 
-    def PIF_set_mtu(self, session, pif_ref, mtu):
-        node = XendNode.instance()
-        pif = node.pifs.get(pif_ref)
-        if pif:
-            pif.set_mtu(mtu)
-        return xen_api_void()    
+    def PIF_get_host(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).host.uuid)
 
-    def PIF_get_mac(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_mac())
+    def PIF_get_MAC(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).mac)
 
-    def PIF_get_mtu(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_mtu())
+    def PIF_get_MTU(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).mtu)
 
-    def PIF_get_vlan(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_vlan())
+    def PIF_get_VLAN(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).vlan)
 
-    def PIF_get_name(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_name())
+    def PIF_get_io_read_kbs(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).get_io_read_kbs())
 
-    def PIF_get_io_read_kbs(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_io_read_kbs())
-
-    def PIF_get_io_write_kbs(self, session, pif_ref):
-        node = XendNode.instance()
-        return xen_api_success(node.pifs[pif_ref].get_io_write_kbs())    
+    def PIF_get_io_write_kbs(self, session, ref):
+        return xen_api_success(self._get_PIF(ref).get_io_write_kbs())
     
+    def PIF_set_name(self, _, ref, name):
+        return xen_api_success(self._get_PIF(ref).set_name(name))
+
+    def PIF_set_MAC(self, session, ref, mac):
+        return xen_api_success(self._get_PIF(ref).set_mac(name))
+
+    def PIF_set_MTU(self, session, ref, mtu):
+        return xen_api_success(self._get_PIF(ref).set_mtu(name))
+
 
     # Xen API: Class VM
     # ----------------------------------------------------------------        
