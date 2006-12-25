@@ -54,7 +54,17 @@ gettext.install('xen-xm')
 
 class Failure(Exception):
     def __init__(self, details):
-        self.details = details
+        try:
+            # If this failure is MESSAGE_PARAMETER_COUNT_MISMATCH, then we
+            # correct the return values here, to account for the fact that we
+            # transparently add the session handle as the first argument.
+            if details[0] == 'MESSAGE_PARAMETER_COUNT_MISMATCH':
+                details[2] = str(int(details[2]) - 1)
+                details[3] = str(int(details[3]) - 1)
+
+            self.details = details
+        except Exception, exn:
+            self.details = ['INTERNAL_ERROR', 'Client-side: ' + str(exn)]
 
     def __str__(self):
         try:
