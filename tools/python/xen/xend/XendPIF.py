@@ -99,12 +99,12 @@ def same_dir_rename(old_path, new_path):
 class XendPIF:
     """Representation of a Physical Network Interface."""
     
-    def __init__(self, uuid, name, mtu, mac, network, host):
+    def __init__(self, uuid, name, mtu, vlan, mac, network, host):
         self.uuid = uuid
         self.name = name
         self.mac = mac
         self.mtu = mtu
-        self.vlan = ''
+        self.vlan = vlan
         self.network = network
         self.host = host
 
@@ -132,11 +132,11 @@ class XendPIF:
     def get_record(self, transient = True):
         result = {'name': self.name,
                   'MAC': self.mac,
-                  'MTU': self.mtu,
+                  'MTU': str(self.mtu),
                   'VLAN': self.vlan,
                   'host': self.host.uuid,
                   'network': self.network.uuid}
         if transient:
-            result['io_read_kbs'] = self.get_io_read_kbs()
-            result['io_write_kbs'] = self.get_io_write_kbs()
+            result['io_read_kbs'] = str(self.get_io_read_kbs())
+            result['io_write_kbs'] = str(self.get_io_write_kbs())
         return result

@@ -107,6 +107,7 @@ class XendNode:
                     self.pifs[pif_uuid] = XendPIF(pif_uuid,
                                                   pif['name'],
                                                   pif['MTU'],
+                                                  pif['VLAN'],
                                                   pif['MAC'],
                                                   network,
                                                   self)
@@ -114,7 +115,7 @@ class XendNode:
             for name, mtu, mac in linux_get_phy_ifaces():
                 network = self.networks.values()[0]
                 pif_uuid = uuid.createString()
-                pif = XendPIF(pif_uuid, name, mtu, mac, network, self)
+                pif = XendPIF(pif_uuid, name, mtu, '', mac, network, self)
                 self.pifs[pif_uuid] = pif
 
         # initialise storage
