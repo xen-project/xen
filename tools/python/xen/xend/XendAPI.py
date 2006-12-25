@@ -470,6 +470,18 @@ class XendAPI:
         return xen_api_success(
             XendNode.instance().get_network(ref).get_record())
 
+    def network_get_name_label(self, _, ref):
+        return xen_api_success(self._get_network(ref).name_label)
+
+    def network_get_name_description(self, _, ref):
+        return xen_api_success(self._get_network(ref).name_description)
+
+    def network_get_default_gateway(self, _, ref):
+        return xen_api_success(self._get_network(ref).default_gateway)
+
+    def network_get_default_netmask(self, _, ref):
+        return xen_api_success(self._get_network(ref).default_netmask)
+
     def network_get_VIFs(self, _, ref):
         return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
 
