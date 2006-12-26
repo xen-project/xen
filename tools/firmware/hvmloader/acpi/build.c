@@ -69,16 +69,28 @@ int construct_madt(struct acpi_20_madt *madt)
     intsrcovr = (struct acpi_20_madt_intsrcovr *)(madt + 1);
     for ( i = 0; i < 16; i++ )
     {
-        if ( !(PCI_ISA_IRQ_MASK & (1U << i)) )
-            continue;
-
-        /* PCI: active-low level-triggered */
         memset(intsrcovr, 0, sizeof(*intsrcovr));
         intsrcovr->type   = ACPI_INTERRUPT_SOURCE_OVERRIDE;
         intsrcovr->length = sizeof(*intsrcovr);
         intsrcovr->source = i;
-        intsrcovr->gsi    = i;
-        intsrcovr->flags  = 0xf;
+
+        if ( i == 0 )
+        {
+            /* ISA IRQ0 routed to IOAPIC GSI 2. */
+            intsrcovr->gsi    = 2;
+            intsrcovr->flags  = 0x0;
+        }
+        else if ( PCI_ISA_IRQ_MASK & (1U << i) )
+        {
+            /* PCI: active-low level-triggered. */
+            intsrcovr->gsi    = i;
+            intsrcovr->flags  = 0xf;
+        }
+        else
+        {
+            /* No need for a INT source override structure. */
+            continue;
+        }
 
         offset += sizeof(*intsrcovr);
         intsrcovr++;

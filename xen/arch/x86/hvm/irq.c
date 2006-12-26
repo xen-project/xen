@@ -85,15 +85,16 @@ void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int gsi = (isa_irq == 0) ? 2 : isa_irq;
 
     ASSERT(isa_irq <= 15);
 
     spin_lock(&hvm_irq->lock);
 
     if ( !__test_and_set_bit(isa_irq, &hvm_irq->isa_irq) &&
-         (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
+         (hvm_irq->gsi_assert_count[gsi]++ == 0) )
     {
-        vioapic_irq_positive_edge(d, isa_irq);
+        vioapic_irq_positive_edge(d, gsi);
         vpic_irq_positive_edge(d, isa_irq);
     }
 
@@ -104,13 +105,14 @@ void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int gsi = (isa_irq == 0) ? 2 : isa_irq;
 
     ASSERT(isa_irq <= 15);
 
     spin_lock(&hvm_irq->lock);
 
     if ( __test_and_clear_bit(isa_irq, &hvm_irq->isa_irq) &&
-         (--hvm_irq->gsi_assert_count[isa_irq] == 0) )
+         (--hvm_irq->gsi_assert_count[gsi] == 0) )
         vpic_irq_negative_edge(d, isa_irq);
 
     spin_unlock(&hvm_irq->lock);

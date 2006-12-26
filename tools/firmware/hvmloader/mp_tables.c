@@ -373,7 +373,7 @@ void create_mp_tables(void)
     {
         if ( i == 2 ) continue; /* skip the slave PIC connection */
         fill_mp_io_intr_entry((struct mp_io_intr_entry *)p, 
-                              BUS_ID_ISA, i, IOAPIC_ID, i);
+                              BUS_ID_ISA, i, IOAPIC_ID, (i == 0) ? 2 : i);
         p += sizeof(struct mp_io_intr_entry);
     }
 

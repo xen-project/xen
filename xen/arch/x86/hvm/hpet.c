@@ -97,9 +97,6 @@
     ((timer_config(h, n) & HPET_TN_INT_ROUTE_CAP_MASK) \
         >> HPET_TN_INT_ROUTE_CAP_SHIFT)
 
-#define timer_int_route_valid(h, n)  \
-    (timer_int_route_cap(h, n) & (1 << timer_int_route(h, n)))    
- 
 #define hpet_time_after(a, b)   ((int32_t)(b) -(int32_t)(a) < 0)
 #define hpet_time_after64(a, b)   ((int64_t)(b) -(int64_t)(a) < 0)
 
@@ -409,54 +406,14 @@ struct hvm_mmio_handler hpet_mmio_handler = {
     .write_handler = hpet_write
 };
 
-static void hpet_irq_assert(struct domain *d, 
-                            unsigned int isa_irq, unsigned int intr)
-{
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-
-    spin_lock(&hvm_irq->lock);
-
-    if ( !__test_and_set_bit(isa_irq, &hvm_irq->isa_irq) &&
-         (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
-    {
-        vioapic_irq_positive_edge(d, intr);
-        vpic_irq_positive_edge(d, isa_irq);
-    }
-
-    spin_unlock(&hvm_irq->lock);
-}
-
-static void hpet_irq_deassert(struct domain *d,
-                unsigned int isa_irq, unsigned int intr)
-{
-    hvm_isa_irq_deassert(d, isa_irq);
-}
-
 static void hpet_set_irq(struct domain *d, int hpet_tn)
 {
-    int irq, intr;
-
-    if ( (hpet_tn != 0) && (hpet_tn != 1) )
-        return;
-
     /* if LegacyReplacementRoute bit is set, HPET specification requires
        timer0 be routed to IRQ0 in NON-APIC or IRQ2 in the I/O APIC,
-       timer1 be routed to IRQ8 in NON-APIC or IRQ8 in the I/O APIC.
-       It's hard to distinguish NON-APIC and I/O APIC, so we set both PIC
-       and I/O APIC here. Guest OS shall make proper mask setting to ensure
-       only one interrupt is injected into it. */
-    if ( hpet_tn == 0 )
-    {
-        irq  = 0;
-        intr = 2;
-    }
-    else
-    {
-        irq = intr = 8;
-    }
-    
-    hpet_irq_deassert(d, irq, intr);
-    hpet_irq_assert(d, irq, intr);
+       timer1 be routed to IRQ8 in NON-APIC or IRQ8 in the I/O APIC. */
+    int isa_irq = (hpet_tn == 0) ? 0 : 8;
+    hvm_isa_irq_deassert(d, isa_irq);
+    hvm_isa_irq_assert(d, isa_irq);
 }
 
 static void hpet_route_interrupt(HPETState *h, unsigned int tn)
@@ -465,7 +422,7 @@ static void hpet_route_interrupt(HPETState *h, unsigned int tn)
     struct domain *d = h->vcpu->domain;
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
 
-    if ( (tn_int_route >= VIOAPIC_NUM_PINS) || !timer_int_route_valid(h, tn) )
+    if ( !(timer_int_route_cap(h, tn) & (1U << tn_int_route)) )
     {
         gdprintk(XENLOG_ERR,
                  "HPET: timer%u: invalid interrupt route config\n", tn);
