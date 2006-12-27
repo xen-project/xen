@@ -1555,6 +1555,8 @@ class XendDomainInfo:
         if boot:
             # HVM booting.
             self.info['image']['type'] = 'hvm'
+            if not 'devices' in self.info['image']:
+                self.info['image']['devices'] = {}
             self.info['image']['devices']['boot'] = boot
         elif not blexec and kernel:
             # Boot from dom0.  Nothing left to do -- the kernel and ramdisk

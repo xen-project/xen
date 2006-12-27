@@ -312,6 +312,9 @@ class HVMImageHandler(ImageHandler):
     def configure(self, vmConfig, imageConfig, deviceConfig):
         ImageHandler.configure(self, vmConfig, imageConfig, deviceConfig)
 
+        if not self.kernel:
+            self.kernel = '/usr/lib/xen/boot/hvmloader'
+
         info = xc.xeninfo()
         if 'hvm' not in info['xen_caps']:
             raise VmError("HVM guest support is unavailable: is VT/AMD-V "
