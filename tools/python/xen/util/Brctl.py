@@ -28,6 +28,31 @@ def cmd(p, s):
     if not opts.dryrun:
         os.system(c)
 
+bridgeRE = re.compile(r'([^\t]*)\t*[^\t]*\t*[^\t]*\t*([^\t]*)')
+def get_state():
+    fin = os.popen(CMD_BRCTL + ' show', 'r')
+    try:
+        bridges = {}
+        brlist = None
+        brname = None
+        first = True
+        for line in fin:
+            if first:
+                first = False
+            elif line[0] == '\t':
+                brlist.append(line.strip())
+            else:
+                if brname:
+                    bridges[brname] = brlist
+                m = bridgeRE.match(line)
+                brname = m.group(1)
+                brlist = [m.group(2).strip()]
+        if brname:
+            bridges[brname] = brlist
+        return bridges
+    finally:
+        fin.close()
+
 def vif_bridge_add(params):
     """Add the network interface for vif on dom to a bridge.
     """
