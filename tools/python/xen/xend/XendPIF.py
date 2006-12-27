@@ -15,16 +15,18 @@
 # Copyright (c) 2006 Xensource Inc.
 #============================================================================
 
-import os
 import commands
+import logging
+import os
 import re
-import socket
 
-from xen.xend.XendRoot import instance as xendroot
-from xen.xend.XendLogging import log
 
-MAC_RE = ':'.join(['[0-9a-f]{2}'] * 6)
-IP_IFACE_RE = r'^\d+: (\w+):.*mtu (\d+) .* link/\w+ ([0-9a-f:]+)'
+log = logging.getLogger("xend.XendPIF")
+log.setLevel(logging.TRACE)
+
+
+MAC_RE = re.compile(':'.join(['[0-9a-f]{2}'] * 6))
+IP_IFACE_RE = re.compile(r'^\d+: (\w+):.*mtu (\d+) .* link/\w+ ([0-9a-f:]+)')
 
 def linux_phy_to_virt(pif_name):
     return 'eth' + re.sub(r'^[a-z]+', '', pif_name)
@@ -40,7 +42,7 @@ def linux_get_phy_ifaces():
     @rtype: array of 3-element tuple (name, mtu, mac)
     """
     
-    ip_cmd = '/sbin/ip -o link show'
+    ip_cmd = 'ip -o link show'
     rc, output = commands.getstatusoutput(ip_cmd)
     ifaces = {}
     phy_ifaces = []
@@ -66,7 +68,7 @@ def linux_set_mac(iface, mac):
     if not re.search(MAC_RE, mac):
         return False
 
-    ip_mac_cmd = '/sbin/ip link set %s addr %s' % \
+    ip_mac_cmd = 'ip link set %s addr %s' % \
                  (linux_phy_to_virt(iface), mac)
     rc, output = commands.getstatusoutput(ip_mac_cmd)
     if rc == 0:
@@ -76,7 +78,7 @@ def linux_set_mac(iface, mac):
 
 def linux_set_mtu(iface, mtu):
     try:
-        ip_mtu_cmd = '/sbin/ip link set %s mtu %d' % \
+        ip_mtu_cmd = 'ip link set %s mtu %d' % \
                      (linux_phy_to_virt(iface), int(mtu))
         rc, output = commands.getstatusoutput(ip_mtu_cmd)
         if rc == 0:
@@ -84,17 +86,6 @@ def linux_set_mtu(iface, mtu):
         return False
     except ValueError:
         return False
-
-def same_dir_rename(old_path, new_path):
-    """Ensure that the old_path and new_path refer to files in the same
-    directory."""
-    old_abs = os.path.normpath(old_path)
-    new_abs = os.path.normpath(new_path)
-    if os.path.dirname(old_abs) == os.path.dirname(new_abs):
-        os.rename(old_abs, new_abs)
-    else:
-        log.warning("Unable to ensure name is new name is safe: %s" % new_abs)
-    
 
 class XendPIF:
     """Representation of a Physical Network Interface."""
@@ -140,3 +131,68 @@ class XendPIF:
             result['io_read_kbs'] = str(self.get_io_read_kbs())
             result['io_write_kbs'] = str(self.get_io_write_kbs())
         return result
+
+
+    def refresh(self, bridges):
+        ifname = self._ifname()
+        rc, _ = _cmd('ip link show %s', ifname)
+        if rc != 0:
+            # Interface does not exist.  If it's a physical interface, then
+            # there's nothing we can do -- this should have been set up with
+            # the network script.  Otherwise, we can use vconfig to derive
+            # a subinterface.
+            if not self.vlan:
+                return
+            
+            rc, _ = _cmd('vconfig add %s %s', self.name, self.vlan)
+            if rc != 0:
+                log.error('Could not refresh %s', ifname)
+                return
+            log.info('Created network interface %s', ifname)
+
+        for brname, nics in bridges.items():
+            if ifname in nics:
+                log.debug('%s is already attached to %s', ifname, brname)
+                return
+
+        # The interface is not attached to a bridge.  Create one, and attach
+        # the interface to it.
+        brname = _new_bridge_name(bridges)
+        rc, _ = _cmd('brctl addbr %s', brname)
+        if rc != 0:
+            log.error('Could not create bridge %s for interface %s', brname,
+                      ifname)
+            return
+        log.info('Created network bridge %s', brname)
+        
+        rc, _ = _cmd('brctl addif %s %s', brname, ifname)
+        if rc != 0:
+            log.error('Could not add %s to %s', ifname, brname)
+            return
+        log.info('Added network interface %s to bridge %s', ifname, brname)
+
+
+    def _ifname(self):
+        if self.vlan:
+            return '%s.%s' % (self.name, self.vlan)
+        else:
+            return self.name
+
+
+def _cmd(cmd, *args):
+    if len(args) > 0:
+        cmd = cmd % args
+    rc, output = commands.getstatusoutput(cmd)
+    if rc != 0:
+        log.debug('%s failed with code %d' % (cmd, rc))
+    log.trace('%s: %s' % (cmd, output))
+    return rc, output
+
+
+def _new_bridge_name(bridges):
+    n = 0
+    while True:
+        brname = 'xenbr%d' % n
+        if brname not in bridges:
+            return brname
+        n += 1

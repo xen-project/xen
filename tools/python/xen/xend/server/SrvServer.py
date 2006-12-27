@@ -48,7 +48,7 @@ from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendRoot, XendAPI
+from xen.xend import XendNode, XendRoot, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
@@ -100,6 +100,8 @@ class XendServers:
         signal.signal(signal.SIGHUP, self.reloadConfig)
 
         while True:
+            XendNode.instance().refreshBridges()
+
             threads = []
             for server in self.servers:
                 if server.ready:

@@ -469,13 +469,23 @@ class XendAPI:
                        'default_gateway',
                        'default_netmask']
 
+    def network_create(self, _, name_label, name_description,
+                       default_gateway, default_netmask):
+        return xen_api_success(
+            XendNode.instance().network_create(name_label, name_description,
+                                               default_gateway,
+                                               default_netmask))
+
+    def network_destroy(self, _, ref):
+        return xen_api_success(XendNode.instance().network_destroy(ref))
+
     def _get_network(self, ref):
         return XendNode.instance().get_network(ref)
 
-    def network_get_all(self, session):
+    def network_get_all(self, _):
         return xen_api_success(XendNode.instance().get_network_refs())
 
-    def network_get_record(self, session, ref):
+    def network_get_record(self, _, ref):
         return xen_api_success(
             XendNode.instance().get_network(ref).get_record())
 
@@ -524,8 +534,25 @@ class XendAPI:
 
     PIF_attr_inst = PIF_attr_rw
 
+    PIF_methods = ['create_VLAN']
+
     def _get_PIF(self, ref):
         return XendNode.instance().pifs[ref]
+
+    def PIF_create(self, _, name, network_uuid, host_uuid, mac, mtu, vlan):
+        node = XendNode.instance()
+        if host_uuid != node.uuid:
+            return xen_api_error([HOST_HANDLE_INVALID, host_uuid])
+
+        elif _is_valid_ref(network_uuid, node.is_valid_network):
+            network = node.get_network(network_uuid)
+            return xen_api_success(node.PIF_create(name, mtu, vlan, mac,
+                                                   network))
+        else:
+            return xen_api_error([NETWORK_HANDLE_INVALID, network_uuid])
+
+    def PIF_destroy(self, _, ref):
+        return xen_api_success(XendNode.instance().PIF_destroy(ref))
 
     # object methods
     def PIF_get_record(self, _, ref):
@@ -534,38 +561,45 @@ class XendAPI:
     def PIF_get_all(self, _):
         return xen_api_success(XendNode.instance().pifs.keys())
 
-    def PIF_get_name(self, session, ref):
+    def PIF_get_name(self, _, ref):
         return xen_api_success(self._get_PIF(ref).name)
 
-    def PIF_get_network(self, session, ref):
+    def PIF_get_network(self, _, ref):
         return xen_api_success(self._get_PIF(ref).network.uuid)
 
-    def PIF_get_host(self, session, ref):
+    def PIF_get_host(self, _, ref):
         return xen_api_success(self._get_PIF(ref).host.uuid)
 
-    def PIF_get_MAC(self, session, ref):
+    def PIF_get_MAC(self, _, ref):
         return xen_api_success(self._get_PIF(ref).mac)
 
-    def PIF_get_MTU(self, session, ref):
+    def PIF_get_MTU(self, _, ref):
         return xen_api_success(self._get_PIF(ref).mtu)
 
-    def PIF_get_VLAN(self, session, ref):
+    def PIF_get_VLAN(self, _, ref):
         return xen_api_success(self._get_PIF(ref).vlan)
 
-    def PIF_get_io_read_kbs(self, session, ref):
+    def PIF_get_io_read_kbs(self, _, ref):
         return xen_api_success(self._get_PIF(ref).get_io_read_kbs())
 
-    def PIF_get_io_write_kbs(self, session, ref):
+    def PIF_get_io_write_kbs(self, _, ref):
         return xen_api_success(self._get_PIF(ref).get_io_write_kbs())
     
     def PIF_set_name(self, _, ref, name):
         return xen_api_success(self._get_PIF(ref).set_name(name))
 
-    def PIF_set_MAC(self, session, ref, mac):
+    def PIF_set_MAC(self, _, ref, mac):
         return xen_api_success(self._get_PIF(ref).set_mac(name))
 
-    def PIF_set_MTU(self, session, ref, mtu):
+    def PIF_set_MTU(self, _, ref, mtu):
         return xen_api_success(self._get_PIF(ref).set_mtu(name))
+
+    def PIF_create_VLAN(self, _, ref, network, vlan):
+        if _is_valid_ref(network, XendNode.instance().is_valid_network):
+            return xen_api_success(XendNode.instance().PIF_create_VLAN(
+                ref, network, vlan))
+        else:
+            return xen_api_error([NETWORK_HANDLE_INVALID, network_uuid])
 
 
     # Xen API: Class VM

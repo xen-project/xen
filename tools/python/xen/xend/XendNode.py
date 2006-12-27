@@ -19,6 +19,9 @@
 import os
 import socket
 import xen.lowlevel.xc
+
+from xen.util import Brctl
+
 from xen.xend import uuid
 from xen.xend.XendError import XendError
 from xen.xend.XendRoot import instance as xendroot
@@ -87,16 +90,14 @@ class XendNode:
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
             for net_uuid, network in saved_networks.items():
-                self.networks[net_uuid] = XendNetwork(net_uuid,
-                                network.get('name_label'),
-                                network.get('name_description', ''),
-                                network.get('default_gateway', ''),
-                                network.get('default_netmask', ''))
+                self.network_create(network.get('name_label'),
+                                    network.get('name_description', ''),
+                                    network.get('default_gateway', ''),
+                                    network.get('default_netmask', ''),
+                                    False, net_uuid)
         else:
             gateway, netmask = linux_get_default_network()
-            net_uuid = uuid.createString()
-            net = XendNetwork(net_uuid, 'net0', '', gateway, netmask)
-            self.networks[net_uuid] = net
+            self.network_create('net0', '', gateway, netmask, False)
 
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
@@ -104,19 +105,12 @@ class XendNode:
             for pif_uuid, pif in saved_pifs.items():
                 if pif['network'] in self.networks:
                     network = self.networks[pif['network']]
-                    self.pifs[pif_uuid] = XendPIF(pif_uuid,
-                                                  pif['name'],
-                                                  pif['MTU'],
-                                                  pif['VLAN'],
-                                                  pif['MAC'],
-                                                  network,
-                                                  self)
+                    self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
+                                    pif['MAC'], network, False, pif_uuid)
         else:
             for name, mtu, mac in linux_get_phy_ifaces():
                 network = self.networks.values()[0]
-                pif_uuid = uuid.createString()
-                pif = XendPIF(pif_uuid, name, mtu, '', mac, network, self)
-                self.pifs[pif_uuid] = pif
+                self.PIF_create(name, mtu, '', mac, network, False)
 
         # initialise storage
         saved_sr = self.state_store.load_state('sr')
@@ -127,20 +121,65 @@ class XendNode:
             sr_uuid = uuid.createString()
             self.sr = XendStorageRepository(sr_uuid)
 
+
+    def network_create(self, name_label, name_description,
+                       default_gateway, default_netmask, persist = True,
+                       net_uuid = None):
+        if net_uuid is None:
+            net_uuid = uuid.createString()
+        self.networks[net_uuid] = XendNetwork(net_uuid, name_label,
+                                              name_description,
+                                              default_gateway,
+                                              default_netmask)
+        if persist:
+            self.save_networks()
+        return net_uuid
+
+
+    def network_destroy(self, net_uuid):
+        del self.networks[net_uuid]
+        self.save_networks()
+
+
+    def PIF_create(self, name, mtu, vlan, mac, network, persist = True,
+                   pif_uuid = None):
+        if pif_uuid is None:
+            pif_uuid = uuid.createString()
+        self.pifs[pif_uuid] = XendPIF(pif_uuid, name, mtu, vlan, mac, network,
+                                      self)
+        if persist:
+            self.save_PIFs()
+            self.refreshBridges()
+        return pif_uuid
+
+
+    def PIF_create_VLAN(self, pif_uuid, network_uuid, vlan):
+        pif = self.pifs[pif_uuid]
+        network = self.networks[network_uuid]
+        return self.PIF_create(pif.name, pif.mtu, vlan, pif.mac, network)
+
+
+    def PIF_destroy(self, pif_uuid):
+        del self.pifs[pif_uuid]
+        self.save_PIFs()
+
+
     def save(self):
         # save state
         host_record = {self.uuid: {'name_label':self.name,
                                    'name_description':self.desc}}
         self.state_store.save_state('host',host_record)
         self.state_store.save_state('cpu', self.cpus)
-        pif_records = dict([(k, v.get_record(transient = False))
-                            for k, v in self.pifs.items()])
-        self.state_store.save_state('pif', pif_records)
-
+        self.save_PIFs()
         self.save_networks()
 
         sr_record = {self.sr.uuid: self.sr.get_record()}
         self.state_store.save_state('sr', sr_record)
+
+    def save_PIFs(self):
+        pif_records = dict([(k, v.get_record(transient = False))
+                            for k, v in self.pifs.items()])
+        self.state_store.save_state('pif', pif_records)
 
     def save_networks(self):
         net_records = dict([(k, v.get_record(transient = False))
@@ -326,7 +365,12 @@ class XendNode:
         return dict(self.physinfo())
     def info_dict(self):
         return dict(self.info())
-    
+
+
+    def refreshBridges(self):
+        for pif in self.pifs.values():
+            pif.refresh(Brctl.get_state())
+
 
 def instance():
     global inst
