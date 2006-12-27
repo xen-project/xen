@@ -16,7 +16,10 @@
 # Copyright (C) 2005, 2006 XenSource Ltd.
 #============================================================================
 
+import inspect
 import os
+import os.path
+import sys
 import stat
 import tempfile
 import types
@@ -38,6 +41,24 @@ if 'TRACE' not in logging.__dict__:
         self.log(logging.TRACE, *args, **kwargs)
     logging.Logger.trace = trace
 
+    def findCaller(self):
+        """
+        Override logging.Logger.findCaller so that the above trace function
+        does not appear as the source of log messages.  The signature of this
+        function changed between Python 2.3 and 2.4.
+        """
+        frames = inspect.stack()
+        thisfile = os.path.normcase(frames[0][1])
+        for frame in frames:
+            filename = os.path.normcase(frame[1])
+            if filename != thisfile and filename != logging._srcfile:
+                major, minor, _, _, _ = sys.version_info
+                if major == 2 and minor >= 4:
+                    return filename, frame[2], frame[3]
+                else:
+                    return filename, frame[2]
+    logging.Logger.findCaller = findCaller
+
 
 log = logging.getLogger("xend")
 
@@ -46,7 +67,7 @@ MAX_BYTES = 1 << 20  # 1MB
 BACKUP_COUNT = 5
 
 STDERR_FORMAT = "[%(name)s] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
-LOGFILE_FORMAT = "[%(asctime)s %(name)s %(process)d] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
+LOGFILE_FORMAT = "[%(asctime)s %(process)d] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
