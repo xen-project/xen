@@ -1192,74 +1192,54 @@ class XendAPI:
 
     VDI_methods = ['snapshot']
     VDI_funcs = ['get_by_name_label']
+
+    def _get_VDI(self, ref):
+        return XendNode.instance().get_sr().xen_api_get_by_uuid(ref)
     
     def VDI_get_VBDs(self, session, vdi_ref):
         return xen_api_todo()
     
     def VDI_get_physical_utilisation(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.get_physical_utilisation())        
+        return xen_api_success(self._get_VDI(vdi_ref).
+                               get_physical_utilisation())        
     
     def VDI_get_sector_size(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.sector_size)        
+        return xen_api_success(self._get_VDI(vdi_ref).sector_size)        
     
     def VDI_get_type(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.type)
+        return xen_api_success(self._get_VDI(vdi_ref).type)
     
     def VDI_get_parent(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.parent)        
+        return xen_api_success(self._get_VDI(vdi_ref).parent)        
     
     def VDI_get_children(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.children)        
+        return xen_api_success(self._get_VDI(vdi_ref).children)        
     
     def VDI_get_name_label(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.name_label)
+        return xen_api_success(self._get_VDI(vdi_ref).name_label)
 
     def VDI_get_name_description(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.name_description)
+        return xen_api_success(self._get_VDI(vdi_ref).name_description)
 
     def VDI_get_SR(self, session, vdi_ref):
         sr = XendNode.instance().get_sr()
         return xen_api_success(sr.uuid)
 
     def VDI_get_virtual_size(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.virtual_size)
+        return xen_api_success(self._get_VDI(vdi_ref).virtual_size)
 
     def VDI_get_sharable(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.sharable)
+        return xen_api_success(self._get_VDI(vdi_ref).sharable)
 
     def VDI_get_read_only(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.sharable)        
+        return xen_api_success(self._get_VDI(vdi_ref).read_only)        
 
     def VDI_set_name_label(self, session, vdi_ref, value):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        image.name_label = value
+        self._get_VDI(vdi_ref).name_label = value
         return xen_api_success_void()
 
     def VDI_set_name_description(self, session, vdi_ref, value):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        image.name_description = value
+        self._get_VDI(vdi_ref).name_description = value
         return xen_api_success_void()
 
     def VDI_set_SR(self, session, vdi_ref, value):
@@ -1269,15 +1249,11 @@ class XendAPI:
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
     def VDI_set_sharable(self, session, vdi_ref, value):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        image.sharable = bool(value)
+        self._get_VDI(vdi_ref).sharable = bool(value)
         return xen_api_success_void()
     
     def VDI_set_read_only(self, session, vdi_ref, value):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        image.read_only = bool(value)
+        self._get_VDI(vdi_ref).read_only = bool(value)
         return xen_api_success_void()
 
     # Object Methods
@@ -1292,24 +1268,21 @@ class XendAPI:
     def VDI_get_record(self, session, vdi_ref):
         sr = XendNode.instance().get_sr()
         image = sr.xen_api_get_by_uuid(vdi_ref)
-        if image:
-            return xen_api_success({
-                'uuid': vdi_ref,
-                'name_label': image.name_label,
-                'name_description': image.name_description,
-                'SR': sr.uuid,
-                'VBDs': [], # TODO
-                'virtual_size': image.virtual_size,
-                'physical_utilisation': image.physical_utilisation,
-                'sector_size': image.sector_size,
-                'type': image.type,
-                'parent': image.parent,
-                'children': image.children,
-                'sharable': image.sharable,
-                'read_only': image.read_only,
-                })
-
-        return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
+        return xen_api_success({
+            'uuid': vdi_ref,
+            'name_label': image.name_label,
+            'name_description': image.name_description,
+            'SR': sr.uuid,
+            'VBDs': [], # TODO
+            'virtual_size': image.virtual_size,
+            'physical_utilisation': image.physical_utilisation,
+            'sector_size': image.sector_size,
+            'type': image.type,
+            'parent': image.parent,
+            'children': image.children,
+            'sharable': image.sharable,
+            'read_only': image.read_only,
+            })
 
     # Class Functions    
     def VDI_create(self, session, vdi_struct):
