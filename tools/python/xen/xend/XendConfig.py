@@ -141,7 +141,7 @@ XENAPI_CFG_TYPES = {
     'tpm_backend': int,    
     'PV_bootloader': str,
     'PV_kernel': str,
-    'PV_initrd': str,
+    'PV_ramdisk': str,
     'PV_args': str,
     'PV_bootloader_args': str,
     'HVM_boot': str,
