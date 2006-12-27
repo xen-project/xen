@@ -100,6 +100,7 @@ def catch_typeerror(func):
         try:
             return func(self, *args, **kwargs)
         except TypeError, exn:
+            #log.exception('catch_typeerror')
             if hasattr(func, 'api') and func.api in argcounts:
                 # Assume that if the exception was thrown inside this
                 # file, then it is due to an invalid call from the client,
@@ -1446,37 +1447,40 @@ class XendAPI:
         return xen_api_success(sr.get_record())
 
     # Attribute acceess
-    def SR_get_VDIs(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.list_images())
 
-    def SR_get_virtual_allocation(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()        
-        return sr.used_space_bytes()
+    def _get_SR_func(self, _, func, conv = None):
+        result = getattr(XendNode.instance().get_sr(), func)()
+        if conv:
+            result = conv(result)
+        return xen_api_success(result)
 
-    def SR_get_physical_utilisation(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()        
-        return sr.used_space_bytes()
+    def _get_SR_attr(self, _, attr):
+        return xen_api_success(str(getattr(XendNode.instance().get_sr(),
+                                           attr)))
 
-    def SR_get_physical_size(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()        
-        return sr.total_space_bytes()
+    def SR_get_VDIs(self, _, ref):
+        return self._get_SR_func(ref, 'list_images')
+
+    def SR_get_virtual_allocation(self, _, ref):
+        return self._get_SR_func(ref, 'virtual_allocation', str)
+
+    def SR_get_physical_utilisation(self, _, ref):
+        return self._get_SR_func(ref, 'used_space_bytes', str)
+
+    def SR_get_physical_size(self, _, ref):
+        return self._get_SR_func(ref, 'total_space_bytes', str)
     
-    def SR_get_type(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.type)
+    def SR_get_type(self, _, ref):
+        return self._get_SR_attr(ref, 'type')
 
-    def SR_get_location(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.location)
+    def SR_get_location(self, _, ref):
+        return self._get_SR_attr(ref, 'location')
 
-    def SR_get_name_label(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.name_label)      
+    def SR_get_name_label(self, _, ref):
+        return self._get_SR_attr(ref, 'name_label')
     
-    def SR_get_name_description(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.name_description)        
+    def SR_get_name_description(self, _, ref):
+        return self._get_SR_attr(ref, 'name_description')
 
     def SR_set_name_label(self, session, sr_ref, value):
         sr = XendNode.instance().get_sr()

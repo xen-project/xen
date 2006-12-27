@@ -294,7 +294,11 @@ class XendStorageRepository:
         """
         self.lock.acquire()
         try:
-            return self.storage_max
+            if self.storage_max == XEND_STORAGE_NO_MAXIMUM:
+                stfs = os.statvfs(self.location)
+                return stfs.f_blocks * stfs.f_frsize
+            else:
+                return self.storage_max
         finally:
             self.lock.release()
             
@@ -304,10 +308,17 @@ class XendStorageRepository:
         """
         self.lock.acquire()
         try:
-            total_used = 0
-            for val in self.images.values():
-                total_used += val.physical_utilisation
-            return total_used
+            return self.storage_used
+        finally:
+            self.lock.release()
+
+    def virtual_allocation(self):
+        """Returns the total virtual space allocated within the storage repo.
+        @rtype: int
+        """
+        self.lock.acquire()
+        try:
+            return self.storage_alloc
         finally:
             self.lock.release()
 
