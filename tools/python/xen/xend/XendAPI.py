@@ -1112,7 +1112,7 @@ class XendAPI:
         return_cfg = {}
         for k in cfg.keys():
             if k in valid_vbd_keys:
-                return_cfg[k] = str(cfg[k])
+                return_cfg[k] = cfg[k]
                 
         return xen_api_success(return_cfg)
 
@@ -1198,7 +1198,7 @@ class XendAPI:
         return_cfg = {}
         for k in cfg.keys():
             if k in valid_vif_keys:
-                return_cfg[k] = str(cfg[k])
+                return_cfg[k] = cfg[k]
             
         return xen_api_success(return_cfg)
 
@@ -1490,27 +1490,23 @@ class XendAPI:
 
     # Attribute acceess
 
-    def _get_SR_func(self, _, func, conv = None):
-        result = getattr(XendNode.instance().get_sr(), func)()
-        if conv:
-            result = conv(result)
-        return xen_api_success(result)
+    def _get_SR_func(self, _, func):
+        return xen_api_success(getattr(XendNode.instance().get_sr(), func)())
 
     def _get_SR_attr(self, _, attr):
-        return xen_api_success(str(getattr(XendNode.instance().get_sr(),
-                                           attr)))
+        return xen_api_success(getattr(XendNode.instance().get_sr(), attr))
 
     def SR_get_VDIs(self, _, ref):
         return self._get_SR_func(ref, 'list_images')
 
     def SR_get_virtual_allocation(self, _, ref):
-        return self._get_SR_func(ref, 'virtual_allocation', str)
+        return self._get_SR_func(ref, 'virtual_allocation')
 
     def SR_get_physical_utilisation(self, _, ref):
-        return self._get_SR_func(ref, 'used_space_bytes', str)
+        return self._get_SR_func(ref, 'used_space_bytes')
 
     def SR_get_physical_size(self, _, ref):
-        return self._get_SR_func(ref, 'total_space_bytes', str)
+        return self._get_SR_func(ref, 'total_space_bytes')
     
     def SR_get_type(self, _, ref):
         return self._get_SR_attr(ref, 'type')

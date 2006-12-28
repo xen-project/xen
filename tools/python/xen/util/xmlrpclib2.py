@@ -50,13 +50,15 @@ except ImportError:
 
 
 def stringify(value):
-    if isinstance(value, IntType) and not isinstance(value, BooleanType):
+    if isinstance(value, float) or \
+       isinstance(value, long) or \
+       (isinstance(value, int) and not isinstance(value, bool)):
         return str(value)
-    elif isinstance(value, DictType):
+    elif isinstance(value, dict):
         for k, v in value.items():
             value[k] = stringify(v)
         return value
-    elif isinstance(value, (TupleType, ListType)):
+    elif isinstance(value, (tuple, list)):
         return [stringify(v) for v in value]
     else:
         return value
