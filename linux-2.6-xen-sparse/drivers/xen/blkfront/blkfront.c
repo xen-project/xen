@@ -384,6 +384,8 @@ static int blkfront_remove(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
 
+	xenbus_free_evtchn(dev, info->evtchn);
+
 	blkif_free(info, 0);
 
 	kfree(info);
