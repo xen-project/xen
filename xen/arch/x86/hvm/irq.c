@@ -85,7 +85,7 @@ void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    unsigned int gsi = (isa_irq == 0) ? 2 : isa_irq;
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
 
@@ -105,7 +105,7 @@ void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    unsigned int gsi = (isa_irq == 0) ? 2 : isa_irq;
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
 
@@ -257,23 +257,25 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
     return -1;
 }
 
-int get_intr_vector(struct vcpu* v, int irq, int type)
+int get_isa_irq_vector(struct vcpu *v, int isa_irq, int type)
 {
-    if ( type == APIC_DM_EXTINT )
-        return v->domain->arch.hvm_domain.irq.vpic[irq >> 3].irq_base
-                + (irq & 0x7);
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
-    return domain_vioapic(v->domain)->redirtbl[irq].fields.vector;
+    if ( type == APIC_DM_EXTINT )
+        return (v->domain->arch.hvm_domain.irq.vpic[isa_irq >> 3].irq_base
+                + (isa_irq & 7));
+
+    return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
 }
 
-int is_irq_masked(struct vcpu *v, int irq)
+int is_isa_irq_masked(struct vcpu *v, int isa_irq)
 {
-    if ( is_lvtt(v, irq) )
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
+
+    if ( is_lvtt(v, isa_irq) )
         return !is_lvtt_enabled(v);
 
-    if ( v->domain->arch.hvm_domain.irq.vpic[irq >> 3].imr & (1 << (irq & 7))
-            && domain_vioapic(v->domain)->redirtbl[irq].fields.mask )
-        return 1;
-
-    return 0;
+    return ((v->domain->arch.hvm_domain.irq.vpic[isa_irq >> 3].imr &
+             (1 << (isa_irq & 7))) &&
+            domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
 }

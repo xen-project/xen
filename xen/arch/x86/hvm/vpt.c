@@ -108,16 +108,18 @@ void pt_update_irq(struct vcpu *v)
     list_for_each( list, head )
     {
         pt = list_entry(list, struct periodic_time, list);
-        if ( !is_irq_masked(v, pt->irq) && pt->pending_intr_nr 
-                && pt->last_plt_gtime + pt->period < max_lag )
+        if ( !is_isa_irq_masked(v, pt->irq) && pt->pending_intr_nr &&
+             ((pt->last_plt_gtime + pt->period_cycles) < max_lag) )
         {
-            max_lag = pt->last_plt_gtime + pt->period;
+            max_lag = pt->last_plt_gtime + pt->period_cycles;
             irq = pt->irq;
         }
     }
 
     if ( is_lvtt(v, irq) )
+    {
         vlapic_set_irq(vcpu_vlapic(v), irq, 0);
+    }
     else if ( irq >= 0 )
     {
         hvm_isa_irq_deassert(v->domain, irq);
@@ -141,16 +143,15 @@ struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type)
 
         if ( is_lvtt(v, pt->irq) )
         {
-            if (pt->irq == vector)
-                return pt;
-            else
+            if ( pt->irq != vector )
                 continue;
+            return pt;
         }
 
-        vec = get_intr_vector(v, pt->irq, type);
+        vec = get_isa_irq_vector(v, pt->irq, type);
 
         /* RTC irq need special care */
-        if ( vector != vec || (pt->irq == 8 && !is_rtc_periodic_irq(rtc)) )
+        if ( (vector != vec) || (pt->irq == 8 && !is_rtc_periodic_irq(rtc)) )
             continue;
 
         return pt;
@@ -163,14 +164,14 @@ void pt_intr_post(struct vcpu *v, int vector, int type)
 {
     struct periodic_time *pt = is_pt_irq(v, vector, type);
 
-    if (pt == NULL)
+    if ( pt == NULL )
         return;
 
     pt->pending_intr_nr--;
     pt->last_plt_gtime += pt->period_cycles;
     hvm_set_guest_time(pt->vcpu, pt->last_plt_gtime);
 
-    if (pt->cb)
+    if ( pt->cb != NULL )
         pt->cb(pt->vcpu, pt->priv);
 }
 
@@ -200,9 +201,11 @@ void create_periodic_time(struct periodic_time *pt, uint64_t period,
     destroy_periodic_time(pt);
 
     pt->enabled = 1;
-    if (period < 900000) /* < 0.9 ms */
+    if ( period < 900000 ) /* < 0.9 ms */
     {
-        printk("HVM_PlatformTime: program too small period %"PRIu64"\n", period);
+        gdprintk(XENLOG_WARNING,
+                 "HVM_PlatformTime: program too small period %"PRIu64"\n",
+                 period);
         period = 900000; /* force to 0.9ms */
     }
     pt->period = period;
