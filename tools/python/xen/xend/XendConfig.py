@@ -1099,21 +1099,13 @@ class XendConfig(dict):
 
         return image
 
-    def update_with_image_sxp(self, image_sxp):
+    def update_with_image_sxp(self, image_sxp, bootloader = False):
         # Convert Legacy "image" config to Xen API PV_*
         # configuration
         log.debug("update_with_image_sxp(%s)" % scrub_password(image_sxp))
 
-        self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
-        self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
-        if not self['PV_bootloader'] \
-               and sxp.child_value(image_sxp, 'kernel', ''):
-            # We've set PV_kernel using the call above, so now we need to set
-            # PV_bootloader as well, otherwise we're going to do the wrong
-            # thing on reboot.
-            self['PV_bootloader'] = 'pygrub'
         kernel_args = sxp.child_value(image_sxp, 'args', '')
-        
+
         # attempt to extract extra arguments from SXP config
         arg_ip = sxp.child_value(image_sxp, 'ip')
         if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
@@ -1121,7 +1113,16 @@ class XendConfig(dict):
         arg_root = sxp.child_value(image_sxp, 'root')
         if arg_root and not re.search(r'root=', kernel_args):
             kernel_args += ' root=%s' % arg_root
-        self['PV_args'] = kernel_args
+
+        if bootloader:
+            self['_temp_using_bootloader'] = '1'
+            self['_temp_kernel'] = sxp.child_value(image_sxp, 'kernel','')
+            self['_temp_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
+            self['_temp_args'] = kernel_args
+        else:
+            self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
+            self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
+            self['PV_args'] = kernel_args
 
         # Store image SXP in python dictionary format
         image = {}

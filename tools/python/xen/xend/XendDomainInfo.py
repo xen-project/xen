@@ -1616,7 +1616,7 @@ class XendDomainInfo:
                 log.error(msg)
                 raise VmError(msg)
         
-            self.info.update_with_image_sxp(blcfg)
+            self.info.update_with_image_sxp(blcfg, True)
 
 
     # 

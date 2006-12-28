@@ -68,7 +68,7 @@ class ImageHandler:
     def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
         self.vm = vm
 
-        self.bootloader = None
+        self.bootloader = False
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
@@ -77,10 +77,15 @@ class ImageHandler:
 
     def configure(self, vmConfig, imageConfig, _):
         """Config actions common to all unix-like domains."""
-        self.bootloader = vmConfig['PV_bootloader']
-        self.kernel = vmConfig['PV_kernel']
-        self.cmdline = vmConfig['PV_args']
-        self.ramdisk = vmConfig['PV_ramdisk']
+        if '_temp_using_bootloader' in vmConfig:
+            self.bootloader = True
+            self.kernel = vmConfig['_temp_kernel']
+            self.cmdline = vmConfig['_temp_args']
+            self.ramdisk = vmConfig['_temp_ramdisk']
+        else:
+            self.kernel = vmConfig['PV_kernel']
+            self.cmdline = vmConfig['PV_args']
+            self.ramdisk = vmConfig['PV_ramdisk']
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
