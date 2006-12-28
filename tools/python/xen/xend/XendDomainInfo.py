@@ -1969,9 +1969,16 @@ class XendDomainInfo:
                     config['device'] = ''
 
             if not config.has_key('network'):
-                config['network'] = \
-                    XendNode.instance().bridge_to_network(
-                    config.get('bridge')).uuid
+                try:
+                    config['network'] = \
+                        XendNode.instance().bridge_to_network(
+                        config.get('bridge')).uuid
+                except Exception:
+                    log.exception('bridge_to_network')
+                    # Ignore this for now -- it may happen if the device
+                    # has been specified using the legacy methods, but at
+                    # some point we're going to have to figure out how to
+                    # handle that properly.
 
             config['MTU'] = 1500 # TODO
             config['io_read_kbs'] = 0.0

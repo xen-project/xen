@@ -23,7 +23,7 @@ import xen.lowlevel.xc
 from xen.util import Brctl
 
 from xen.xend import uuid
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, NetworkAlreadyConnected
 from xen.xend.XendRoot import instance as xendroot
 from xen.xend.XendStorageRepository import XendStorageRepository
 from xen.xend.XendLogging import log
@@ -105,8 +105,13 @@ class XendNode:
             for pif_uuid, pif in saved_pifs.items():
                 if pif['network'] in self.networks:
                     network = self.networks[pif['network']]
-                    self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
-                                    pif['MAC'], network, False, pif_uuid)
+                    try:
+                        self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
+                                        pif['MAC'], network, False, pif_uuid)
+                    except NetworkAlreadyConnected, exn:
+                        log.error('Cannot load saved PIF %s, as network %s ' +
+                                  'is already connected to PIF %s',
+                                  pif_uuid, pif['network'], exn.pif_uuid)
         else:
             for name, mtu, mac in linux_get_phy_ifaces():
                 network = self.networks.values()[0]
@@ -143,6 +148,10 @@ class XendNode:
 
     def PIF_create(self, name, mtu, vlan, mac, network, persist = True,
                    pif_uuid = None):
+        for pif in self.pifs.values():
+            if pif.network == network:
+                raise NetworkAlreadyConnected(pif.uuid)
+
         if pif_uuid is None:
             pif_uuid = uuid.createString()
         self.pifs[pif_uuid] = XendPIF(pif_uuid, name, mtu, vlan, mac, network,
@@ -290,6 +299,15 @@ class XendNode:
         return self.networks[network_ref]
 
     def bridge_to_network(self, bridge):
+        """
+        Determine which network a particular bridge is attached to.
+
+        @param bridge The name of the bridge.  If empty, the default bridge
+        will be used instead (the first one in the list returned by brctl
+        show); this is the behaviour of the vif-bridge script.
+        @return The XendNetwork instance to which this bridge is attached.
+        @raise Exception if the interface is not connected to a network.
+        """
         if not bridge:
             rc, bridge = commands.getstatusoutput(
                 'brctl show | cut -d "\n" -f 2 | cut -f 1')

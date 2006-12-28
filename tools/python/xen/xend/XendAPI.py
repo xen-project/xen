@@ -540,16 +540,20 @@ class XendAPI:
         return XendNode.instance().pifs[ref]
 
     def PIF_create(self, _, name, network_uuid, host_uuid, mac, mtu, vlan):
-        node = XendNode.instance()
-        if host_uuid != node.uuid:
-            return xen_api_error([HOST_HANDLE_INVALID, host_uuid])
+        try:
+            node = XendNode.instance()
+            if host_uuid != node.uuid:
+                return xen_api_error([HOST_HANDLE_INVALID, host_uuid])
 
-        elif _is_valid_ref(network_uuid, node.is_valid_network):
-            network = node.get_network(network_uuid)
-            return xen_api_success(node.PIF_create(name, mtu, vlan, mac,
-                                                   network))
-        else:
-            return xen_api_error([NETWORK_HANDLE_INVALID, network_uuid])
+            elif _is_valid_ref(network_uuid, node.is_valid_network):
+                network = node.get_network(network_uuid)
+                return xen_api_success(node.PIF_create(name, mtu, vlan, mac,
+                                                       network))
+            else:
+                return xen_api_error([NETWORK_HANDLE_INVALID, network_uuid])
+        except NetworkAlreadyConnected, exn:
+            return xen_api_error(['NETWORK_ALREADY_CONNECTED',
+                                  network_uuid, exn.pif_uuid])
 
     def PIF_destroy(self, _, ref):
         return xen_api_success(XendNode.instance().PIF_destroy(ref))
@@ -595,11 +599,15 @@ class XendAPI:
         return xen_api_success(self._get_PIF(ref).set_mtu(name))
 
     def PIF_create_VLAN(self, _, ref, network, vlan):
-        if _is_valid_ref(network, XendNode.instance().is_valid_network):
-            return xen_api_success(XendNode.instance().PIF_create_VLAN(
-                ref, network, vlan))
-        else:
-            return xen_api_error([NETWORK_HANDLE_INVALID, network_uuid])
+        try:
+            if _is_valid_ref(network, XendNode.instance().is_valid_network):
+                return xen_api_success(XendNode.instance().PIF_create_VLAN(
+                    ref, network, vlan))
+            else:
+                return xen_api_error([NETWORK_HANDLE_INVALID, network])
+        except NetworkAlreadyConnected, exn:
+            return xen_api_error(['NETWORK_ALREADY_CONNECTED',
+                                  network, exn.pif_uuid])
 
 
     # Xen API: Class VM
