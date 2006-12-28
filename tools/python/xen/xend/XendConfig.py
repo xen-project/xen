@@ -1106,7 +1106,8 @@ class XendConfig(dict):
 
         self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
         self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
-        if not self['PV_bootloader'] and self['PV_kernel']:
+        if not self['PV_bootloader'] \
+               and sxp.child_value(image_sxp, 'kernel', ''):
             # We've set PV_kernel using the call above, so now we need to set
             # PV_bootloader as well, otherwise we're going to do the wrong
             # thing on reboot.
