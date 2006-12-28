@@ -1780,7 +1780,8 @@ def _run_cmd(cmd, cmd_name, args):
     except SystemExit, code:
         return code == 0, code
     except XenAPI.Failure, exn:
-        print >>sys.stderr, str(exn)
+        for line in [''] + wrap(str(exn), 80) + ['']:
+            print >>sys.stderr, line
     except xmlrpclib.Fault, ex:
         if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
             err("Domain '%s' does not exist." % ex.faultString)
