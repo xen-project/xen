@@ -1106,6 +1106,11 @@ class XendConfig(dict):
 
         self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
         self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
+        if not self['PV_bootloader'] and self['PV_kernel']:
+            # We've set PV_kernel using the call above, so now we need to set
+            # PV_bootloader as well, otherwise we're going to do the wrong
+            # thing on reboot.
+            self['PV_bootloader'] = 'pygrub'
         kernel_args = sxp.child_value(image_sxp, 'args', '')
         
         # attempt to extract extra arguments from SXP config
