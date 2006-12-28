@@ -123,13 +123,13 @@ class XendPIF:
     def get_record(self, transient = True):
         result = {'name': self.name,
                   'MAC': self.mac,
-                  'MTU': str(self.mtu),
+                  'MTU': self.mtu,
                   'VLAN': self.vlan,
                   'host': self.host.uuid,
                   'network': self.network.uuid}
         if transient:
-            result['io_read_kbs'] = str(self.get_io_read_kbs())
-            result['io_write_kbs'] = str(self.get_io_write_kbs())
+            result['io_read_kbs'] = self.get_io_read_kbs()
+            result['io_write_kbs'] = self.get_io_write_kbs()
         return result
 
 
