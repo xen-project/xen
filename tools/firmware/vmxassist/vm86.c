@@ -297,7 +297,7 @@ getreg32(struct regs *regs, int r)
 	case 1: return regs->ecx;
 	case 2: return regs->edx;
 	case 3: return regs->ebx;
-	case 4: return regs->esp;
+	case 4: return regs->uesp;
 	case 5: return regs->ebp;
 	case 6: return regs->esi;
 	case 7: return regs->edi;
@@ -319,10 +319,10 @@ getreg8(struct regs *regs, int r)
 	case 1: return regs->ecx & 0xFF; /* cl */
 	case 2: return regs->edx & 0xFF; /* dl */
 	case 3: return regs->ebx & 0xFF; /* bl */
-	case 4: return (regs->esp >> 8) & 0xFF; /* ah */
-	case 5: return (regs->ebp >> 8) & 0xFF; /* ch */
-	case 6: return (regs->esi >> 8) & 0xFF; /* dh */
-	case 7: return (regs->edi >> 8) & 0xFF; /* bh */
+	case 4: return (regs->eax >> 8) & 0xFF; /* ah */
+	case 5: return (regs->ecx >> 8) & 0xFF; /* ch */
+	case 6: return (regs->edx >> 8) & 0xFF; /* dh */
+	case 7: return (regs->ebx >> 8) & 0xFF; /* bh */
 	}
 	return ~0;
 }
@@ -335,7 +335,7 @@ setreg32(struct regs *regs, int r, unsigned v)
 	case 1: regs->ecx = v; break;
 	case 2: regs->edx = v; break;
 	case 3: regs->ebx = v; break;
-	case 4: regs->esp = v; break;
+	case 4: regs->uesp = v; break;
 	case 5: regs->ebp = v; break;
 	case 6: regs->esi = v; break;
 	case 7: regs->edi = v; break;
@@ -357,10 +357,10 @@ setreg8(struct regs *regs, int r, unsigned v)
 	case 1: regs->ecx = (regs->ecx & ~0xFF) | v; break;
 	case 2: regs->edx = (regs->edx & ~0xFF) | v; break;
 	case 3: regs->ebx = (regs->ebx & ~0xFF) | v; break;
-	case 4: regs->esp = (regs->esp & ~0xFF00) | (v << 8); break;
-	case 5: regs->ebp = (regs->ebp & ~0xFF00) | (v << 8); break;
-	case 6: regs->esi = (regs->esi & ~0xFF00) | (v << 8); break;
-	case 7: regs->edi = (regs->edi & ~0xFF00) | (v << 8); break;
+	case 4: regs->eax = (regs->eax & ~0xFF00) | (v << 8); break;
+	case 5: regs->ecx = (regs->ecx & ~0xFF00) | (v << 8); break;
+	case 6: regs->edx = (regs->edx & ~0xFF00) | (v << 8); break;
+	case 7: regs->ebx = (regs->ebx & ~0xFF00) | (v << 8); break;
 	}
 }
 
