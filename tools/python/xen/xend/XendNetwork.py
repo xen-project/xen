@@ -90,7 +90,7 @@ class XendNetwork:
             vifs = vm.get_vifs()
             for vif in vifs:
                 vif_cfg = vm.get_dev_xenapi_config('vif', vif)
-                if vif_cfg['network'] == self.uuid:
+                if vif_cfg.get('network') == self.uuid:
                     result.append(vif)
         return result
 
