@@ -372,10 +372,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 #if CONFIG_PAGING_LEVELS >= 3
             if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
 #endif
-            {
                 clear_bit(X86_FEATURE_PAE & 31, edx);
-                clear_bit(X86_FEATURE_CX8 & 31, edx);
-            }
             clear_bit(X86_FEATURE_PSE36 & 31, edx);
         }
         else if ( input == 0x80000001 )
