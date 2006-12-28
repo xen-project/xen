@@ -1104,7 +1104,7 @@ class XendAPI:
         return_cfg = {}
         for k in cfg.keys():
             if k in valid_vbd_keys:
-                return_cfg[k] = cfg[k]
+                return_cfg[k] = str(cfg[k])
                 
         return xen_api_success(return_cfg)
 
@@ -1190,7 +1190,7 @@ class XendAPI:
         return_cfg = {}
         for k in cfg.keys():
             if k in valid_vif_keys:
-                return_cfg[k] = cfg[k]
+                return_cfg[k] = str(cfg[k])
             
         return xen_api_success(return_cfg)
 
