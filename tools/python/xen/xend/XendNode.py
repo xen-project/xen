@@ -289,6 +289,22 @@ class XendNode:
     def get_network(self, network_ref):
         return self.networks[network_ref]
 
+    def bridge_to_network(self, bridge):
+        if not bridge:
+            rc, bridge = commands.getstatusoutput(
+                'brctl show | cut -d "\n" -f 2 | cut -f 1')
+            if rc != 0 or not bridge:
+                raise Exception(
+                    'Could not find default bridge, and none was specified')
+
+        bridges = Brctl.get_state()
+        if bridge not in bridges:
+            raise Exception('Bridge %s is not up' % bridge)
+        for pif in self.pifs.values():
+            if pif.interface_name() in bridges[bridge]:
+                return pif.network
+        raise Exception('Bridge %s is not connected to a network' % bridge)
+
 
     #
     # Getting host information.

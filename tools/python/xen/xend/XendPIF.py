@@ -134,7 +134,7 @@ class XendPIF:
 
 
     def refresh(self, bridges):
-        ifname = self._ifname()
+        ifname = self.interface_name()
         rc, _ = _cmd('ip link show %s', ifname)
         if rc != 0:
             # Interface does not exist.  If it's a physical interface, then
@@ -172,7 +172,7 @@ class XendPIF:
         log.info('Added network interface %s to bridge %s', ifname, brname)
 
 
-    def _ifname(self):
+    def interface_name(self):
         if self.vlan:
             return '%s.%s' % (self.name, self.vlan)
         else:

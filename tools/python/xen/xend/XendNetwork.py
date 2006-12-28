@@ -21,6 +21,7 @@ import re
 import struct
 import socket
 
+import XendDomain
 import XendNode
 from XendLogging import log
 
@@ -83,7 +84,15 @@ class XendNetwork:
             XendNode.instance().save_networks()
 
     def get_VIF_UUIDs(self):
-        return []
+        result = []
+        vms = XendDomain.instance().get_all_vms()
+        for vm in vms:
+            vifs = vm.get_vifs()
+            for vif in vifs:
+                vif_cfg = vm.get_dev_xenapi_config('vif', vif)
+                if vif_cfg['network'] == self.uuid:
+                    result.append(vif)
+        return result
 
     def get_PIF_UUIDs(self):
         return [x.uuid for x in XendNode.instance().pifs.values()

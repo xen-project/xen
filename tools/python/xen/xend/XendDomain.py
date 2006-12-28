@@ -605,6 +605,16 @@ class XendDomain:
         finally:
             self.domains_lock.release()
 
+    def get_all_vms(self):
+        self.domains_lock.acquire()
+        try:
+            result = self.domains.values()
+            result += [x for x in self.managed_domains.values() if
+                       x not in result]
+            return result
+        finally:
+            self.domains_lock.release()
+
     def get_vm_by_uuid(self, vm_uuid):
         self.domains_lock.acquire()
         try:

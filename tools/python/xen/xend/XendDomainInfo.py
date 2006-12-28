@@ -1967,8 +1967,12 @@ class XendDomainInfo:
                     config['device'] = 'eth%d' % devid
                 else:
                     config['device'] = ''
-                    
-            config['network'] = '' # Invalid for Xend
+
+            if not config.has_key('network'):
+                config['network'] = \
+                    XendNode.instance().bridge_to_network(
+                    config.get('bridge')).uuid
+
             config['MTU'] = 1500 # TODO
             config['io_read_kbs'] = 0.0
             config['io_write_kbs'] = 0.0
