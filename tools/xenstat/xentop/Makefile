@@ -26,6 +26,7 @@ sbindir=$(prefix)/sbin
 CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT)
 LDLIBS += -lxenstat $(CURSES_LIBS) $(SOCKET_LIBS)
+CFLAGS += -DHOST_$(XEN_OS)
 
 .PHONY: all
 all: xentop
