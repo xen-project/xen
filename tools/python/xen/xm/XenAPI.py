@@ -50,7 +50,7 @@ import xmlrpclib
 import xen.util.xmlrpclib2
 
 
-gettext.install('xen-xm')
+translation = gettext.translation('xen-xm', fallback = True)
 
 class Failure(Exception):
     def __init__(self, details):
@@ -68,7 +68,7 @@ class Failure(Exception):
 
     def __str__(self):
         try:
-            return _(self.details[0]) % self._details_map()
+            return translation.ugettext(self.details[0]) % self._details_map()
         except TypeError, exn:
             return "Message database broken: %s.\nXen-API failure: %s" % \
                    (exn, str(self.details))
@@ -108,6 +108,8 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
                                                  encoding, verbose,
                                                  allow_none)
         self._session = None
+        self.last_login_method = None
+        self.last_login_params = None
 
 
     def xenapi_request(self, methodname, params):
@@ -121,7 +123,11 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
                 result = _parse_result(getattr(self, methodname)(*full_params))
                 if result == _RECONNECT_AND_RETRY:
                     retry_count += 1
-                    self._login(self.last_login_method, self.last_login_params)
+                    if self.last_login_method:
+                        self._login(self.last_login_method,
+                                    self.last_login_params)
+                    else:
+                        raise xmlrpclib.Fault(401, 'You must log in')
                 else:
                     return result
             raise xmlrpclib.Fault(
@@ -172,10 +178,18 @@ class _Dispatcher:
     def __init__(self, send, name):
         self.__send = send
         self.__name = name
+
+    def __repr__(self):
+        if self.__name:
+            return '<XenAPI._Dispatcher for %s>' % self.__name
+        else:
+            return '<XenAPI._Dispatcher>'
+
     def __getattr__(self, name):
         if self.__name is None:
             return _Dispatcher(self.__send, name)
         else:
             return _Dispatcher(self.__send, "%s.%s" % (self.__name, name))
+
     def __call__(self, *args):
         return self.__send(self.__name, args)
