@@ -3123,7 +3123,7 @@ void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn)
 static int shadow_log_dirty_op(
     struct domain *d, struct xen_domctl_shadow_op *sc)
 {
-    int i, rv = 0, clean = 0;
+    int i, rv = 0, clean = 0, peek = 1;
 
     domain_pause(d);
     shadow_lock(d);
@@ -3137,12 +3137,12 @@ static int shadow_log_dirty_op(
                   d->arch.shadow.dirty_count);
 
     sc->stats.fault_count = d->arch.shadow.fault_count;
-    sc->stats.dirty_count = d->arch.shadow.dirty_count;    
-        
-    if ( clean ) 
+    sc->stats.dirty_count = d->arch.shadow.dirty_count;
+
+    if ( clean )
     {
-        /* Need to revoke write access to the domain's pages again. 
-         * In future, we'll have a less heavy-handed approach to this, 
+        /* Need to revoke write access to the domain's pages again.
+         * In future, we'll have a less heavy-handed approach to this,
          * but for now, we just unshadow everything except Xen. */
         shadow_blow_tables(d);
 
@@ -3150,31 +3150,37 @@ static int shadow_log_dirty_op(
         d->arch.shadow.dirty_count = 0;
     }
 
-    if ( guest_handle_is_null(sc->dirty_bitmap) ||
-         (d->arch.shadow.dirty_bitmap == NULL) )
+    if ( guest_handle_is_null(sc->dirty_bitmap) )
+        /* caller may have wanted just to clean the state or access stats. */
+        peek = 0;
+
+    if ( (peek || clean) && (d->arch.shadow.dirty_bitmap == NULL) )
     {
-        rv = -EINVAL;
+        rv = -EINVAL; /* perhaps should be ENOMEM? */
         goto out;
     }
  
     if ( sc->pages > d->arch.shadow.dirty_bitmap_size )
-        sc->pages = d->arch.shadow.dirty_bitmap_size; 
+        sc->pages = d->arch.shadow.dirty_bitmap_size;
 
 #define CHUNK (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
     for ( i = 0; i < sc->pages; i += CHUNK )
     {
-        int bytes = ((((sc->pages - i) > CHUNK) 
-                      ? CHUNK 
+        int bytes = ((((sc->pages - i) > CHUNK)
+                      ? CHUNK
                       : (sc->pages - i)) + 7) / 8;
-     
-        if ( copy_to_guest_offset(
-                 sc->dirty_bitmap, 
-                 i/(8*sizeof(unsigned long)),
-                 d->arch.shadow.dirty_bitmap + (i/(8*sizeof(unsigned long))),
-                 (bytes + sizeof(unsigned long) - 1) / sizeof(unsigned long)) )
+
+        if ( likely(peek) )
         {
-            rv = -EINVAL;
-            goto out;
+            if ( copy_to_guest_offset(
+                     sc->dirty_bitmap,
+                     i/(8*sizeof(unsigned long)),
+                     d->arch.shadow.dirty_bitmap+(i/(8*sizeof(unsigned long))),
+                     (bytes+sizeof(unsigned long)-1) / sizeof(unsigned long)) )
+            {
+                    rv = -EFAULT;
+                    goto out;
+            }
         }
 
         if ( clean )
