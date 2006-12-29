@@ -915,14 +915,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                 if(!is_mapped(pfn_type[batch])) {
 
-                    /* not currently in pusedo-physical map -- set bit
-                       in to_fix that we must send this page in last_iter
-                       unless its sent sooner anyhow */
+                    /*
+                    ** not currently in psuedo-physical map -- set bit
+                    ** in to_fix since we must send this page in last_iter
+                    ** unless its sent sooner anyhow, or it never enters
+                    ** pseudo-physical map (e.g. for ballooned down domains)
+                    */
 
                     set_bit(n, to_fix);
-                    if( (iter > 1) && IS_REAL_PFN(n) )
-                        DPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
-                                iter, n, pfn_type[batch]);
                     continue;
                 }
 
