@@ -7,12 +7,12 @@ all: build
 .PHONY: build
 build:
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
-	if which msgfmt >/dev/null ; then \
+	if which $(MSGFMT) >/dev/null ; then \
           for file in `cd xen/xm; find messages -name xen-xm.po`; do \
             dest=`echo "build/$$file" | \
                   sed -e 's#xen-xm.po#LC_MESSAGES/xen-xm.mo#'`; \
             mkdir -p `dirname "$$dest"`; \
-            msgfmt -c -o "$$dest" "xen/xm/$$file"; \
+            $(MSGFMT) -c -o "$$dest" "xen/xm/$$file"; \
           done; \
         fi
 
@@ -26,7 +26,7 @@ install: install-messages
 endif
 
 install-messages: all
-	if which msgfmt >/dev/null ; then \
+	if which $(MSGFMT) >/dev/null ; then \
 	  mkdir -p "$(DESTDIR)/usr/share/locale"; \
 	  cp -R build/messages/* "$(DESTDIR)/usr/share/locale/"; \
 	fi

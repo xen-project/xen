@@ -9,6 +9,8 @@ STRIP      = $(CROSS_COMPILE)gstrip
 OBJCOPY    = $(CROSS_COMPILE)gobjcopy
 OBJDUMP    = $(CROSS_COMPILE)gobjdump
 
+MSGFMT     = gmsgfmt
+
 SHELL      = bash
 
 INSTALL      = ginstall
