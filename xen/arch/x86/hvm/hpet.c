@@ -52,9 +52,9 @@
 #define HPET_TN_ENABLE           0x004
 #define HPET_TN_PERIODIC         0x008
 #define HPET_TN_PERIODIC_CAP     0x010
+#define HPET_TN_SIZE_CAP         0x020
 #define HPET_TN_SETVAL           0x040
 #define HPET_TN_32BIT            0x100
-#define HPET_TN_SIZE_CAP         0x200
 #define HPET_TN_INT_ROUTE_MASK  0x3e00
 #define HPET_TN_INT_ROUTE_SHIFT      9
 #define HPET_TN_INT_ROUTE_CAP_SHIFT 32
@@ -91,7 +91,8 @@ static inline uint64_t hpet_read64(HPETState *h, unsigned long addr)
     return (addr >= HPET_T3_CFG) ? 0 : *p;
 }
 
-static int hpet_check_access_length(unsigned long addr, unsigned long len)
+static inline int hpet_check_access_length(
+    unsigned long addr, unsigned long len)
 {
     if ( (addr & (len - 1)) || (len > 8) )
     {
@@ -104,7 +105,7 @@ static int hpet_check_access_length(unsigned long addr, unsigned long len)
     return 0;
 }
 
-static uint64_t hpet_update_maincounter(HPETState *h)
+static inline uint64_t hpet_read_maincounter(HPETState *h)
 {
     if ( hpet_enabled(h) )
         return hvm_get_guest_time(h->vcpu) + h->mc_offset;
@@ -126,7 +127,7 @@ static unsigned long hpet_read(
 
     val = hpet_read64(h, addr & ~7);
     if ( (addr & ~7) == HPET_COUNTER )
-        val = hpet_update_maincounter(h);
+        val = hpet_read_maincounter(h);
 
     result = val;
     if ( length != 8 )
@@ -159,7 +160,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
     }
 
     tn_cmp   = h->hpet.timers[tn].cmp;
-    cur_tick = hpet_update_maincounter(h);
+    cur_tick = hpet_read_maincounter(h);
     if ( timer_is_32bit(h, tn) )
     {
         tn_cmp   = (uint32_t)tn_cmp;
@@ -173,7 +174,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
         set_timer(&h->timers[tn], NOW());
 }
 
-static uint64_t hpet_fixup_reg(uint64_t new, uint64_t old, uint64_t mask)
+static inline uint64_t hpet_fixup_reg(
+    uint64_t new, uint64_t old, uint64_t mask)
 {
     new &= mask;
     new |= old & ~mask;
@@ -195,7 +197,7 @@ static void hpet_write(
 
     old_val = hpet_read64(h, addr & ~7);
     if ( (addr & ~7) == HPET_COUNTER )
-        old_val = hpet_update_maincounter(h);
+        old_val = hpet_read_maincounter(h);
 
     new_val = val;
     if ( length != 8 )
@@ -340,7 +342,7 @@ static void hpet_timer_fn(void *opaque)
 
     if ( timer_is_periodic(h, tn) && (h->period[tn] != 0) )
     {
-        uint64_t mc = hpet_update_maincounter(h);
+        uint64_t mc = hpet_read_maincounter(h);
         if ( timer_is_32bit(h, tn) )
         {
             while ( hpet_time_after(mc, h->hpet.timers[tn].cmp) )
