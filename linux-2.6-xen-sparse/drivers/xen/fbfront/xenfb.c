@@ -56,7 +56,6 @@ struct xenfb_info
 	struct page		**pages;
 	struct list_head	mappings; /* protected by mm_lock */
 
-	unsigned		evtchn;
 	int			irq;
 	struct xenfb_page	*page;
 	unsigned long 		*mfns;
@@ -156,7 +155,7 @@ static void xenfb_do_update(struct xenfb_info *info,
 	wmb();			/* ensure ring contents visible */
 	info->page->out_prod = prod + 1;
 
-	notify_remote_via_evtchn(info->evtchn);
+	notify_remote_via_irq(info->irq);
 }
 
 static int xenfb_queue_full(struct xenfb_info *info)
@@ -429,7 +428,7 @@ static irqreturn_t xenfb_event_handler(int rq, void *dev_id,
 
 	if (page->in_cons != page->in_prod) {
 		info->page->in_cons = info->page->in_prod;
-		notify_remote_via_evtchn(info->evtchn);
+		notify_remote_via_irq(info->irq);
 	}
 	return IRQ_HANDLED;
 }
@@ -618,14 +617,11 @@ static int xenfb_connect_backend(struct xenbus_device *dev,
 	int ret;
 	struct xenbus_transaction xbt;
 
-	ret = xenbus_alloc_evtchn(dev, &info->evtchn);
-	if (ret)
-		return ret;
-	ret = bind_evtchn_to_irqhandler(info->evtchn, xenfb_event_handler,
-					0, "xenfb", info);
+	ret = bind_listening_port_to_irqhandler(
+		dev->otherend_id, xenfb_event_handler, 0, "xenfb", info);
 	if (ret < 0) {
-		xenbus_free_evtchn(dev, info->evtchn);
-		xenbus_dev_fatal(dev, ret, "bind_evtchn_to_irqhandler");
+		xenbus_dev_fatal(dev, ret,
+				 "bind_listening_port_to_irqhandler");
 		return ret;
 	}
 	info->irq = ret;
@@ -641,7 +637,7 @@ static int xenfb_connect_backend(struct xenbus_device *dev,
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "event-channel", "%u",
-			    info->evtchn);
+			    irq_to_evtchn_port(info->irq));
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "feature-update", "1");

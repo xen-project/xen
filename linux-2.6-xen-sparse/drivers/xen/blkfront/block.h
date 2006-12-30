@@ -119,7 +119,7 @@ struct blkfront_info
 	int connected;
 	int ring_ref;
 	blkif_front_ring_t ring;
-	unsigned int evtchn, irq;
+	unsigned int irq;
 	struct xlbd_major_info *mi;
 	request_queue_t *rq;
 	struct work_struct work;

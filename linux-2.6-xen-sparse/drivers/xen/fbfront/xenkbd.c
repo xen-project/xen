@@ -31,7 +31,6 @@ struct xenkbd_info
 {
 	struct input_dev *dev;
 	struct xenkbd_page *page;
-	unsigned evtchn;
 	int irq;
 	struct xenbus_device *xbdev;
 };
@@ -76,7 +75,7 @@ static irqreturn_t input_handler(int rq, void *dev_id, struct pt_regs *regs)
 	input_sync(info->dev);
 	mb();			/* ensure we got ring contents */
 	page->in_cons = cons;
-	notify_remote_via_evtchn(info->evtchn);
+	notify_remote_via_irq(info->irq);
 
 	return IRQ_HANDLED;
 }
@@ -168,14 +167,11 @@ static int xenkbd_connect_backend(struct xenbus_device *dev,
 	int ret;
 	struct xenbus_transaction xbt;
 
-	ret = xenbus_alloc_evtchn(dev, &info->evtchn);
-	if (ret)
-		return ret;
-	ret = bind_evtchn_to_irqhandler(info->evtchn, input_handler, 0,
-					"xenkbd", info);
+	ret = bind_listening_port_to_irqhandler(
+		dev->otherend_id, input_handler, 0, "xenkbd", info);
 	if (ret < 0) {
-		xenbus_free_evtchn(dev, info->evtchn);
-		xenbus_dev_fatal(dev, ret, "bind_evtchn_to_irqhandler");
+		xenbus_dev_fatal(dev, ret,
+				 "bind_listening_port_to_irqhandler");
 		return ret;
 	}
 	info->irq = ret;
@@ -191,7 +187,7 @@ static int xenkbd_connect_backend(struct xenbus_device *dev,
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "event-channel", "%u",
-			    info->evtchn);
+			    irq_to_evtchn_port(info->irq));
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_transaction_end(xbt, 0);

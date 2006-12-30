@@ -54,7 +54,6 @@ struct tpm_private {
 
 	tpmif_tx_interface_t *tx;
 	atomic_t refcnt;
-	unsigned int evtchn;
 	unsigned int irq;
 	u8 is_connected;
 	u8 is_suspended;
@@ -271,7 +270,7 @@ static void destroy_tpmring(struct tpm_private *tp)
 	if (tp->irq)
 		unbind_from_irqhandler(tp->irq, tp);
 
-	tp->evtchn = tp->irq = 0;
+	tp->irq = 0;
 }
 
 
@@ -302,8 +301,8 @@ again:
 		goto abort_transaction;
 	}
 
-	err = xenbus_printf(xbt, dev->nodename,
-			    "event-channel", "%u", tp->evtchn);
+	err = xenbus_printf(xbt, dev->nodename, "event-channel", "%u",
+			    irq_to_evtchn_port(tp->irq));
 	if (err) {
 		message = "writing event-channel";
 		goto abort_transaction;
@@ -459,19 +458,15 @@ static int tpmif_connect(struct xenbus_device *dev,
 
 	tp->backend_id = domid;
 
-	err = xenbus_alloc_evtchn(dev, &tp->evtchn);
-	if (err)
-		return err;
-
-	err = bind_evtchn_to_irqhandler(tp->evtchn,
-					tpmif_int, SA_SAMPLE_RANDOM, "tpmif",
-					tp);
+	err = bind_listening_port_to_irqhandler(
+		domid, tpmif_int, SA_SAMPLE_RANDOM, "tpmif", tp);
 	if (err <= 0) {
-		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
+		WPRINTK("bind_listening_port_to_irqhandler failed "
+			"(err=%d)\n", err);
 		return err;
 	}
-
 	tp->irq = err;
+
 	return 0;
 }
 
@@ -655,9 +650,6 @@ static int tpm_xmit(struct tpm_private *tp,
 	tp->tx_remember = remember;
 
 	mb();
-
-	DPRINTK("Notifying backend via event channel %d\n",
-	        tp->evtchn);
 
 	notify_remote_via_irq(tp->irq);
 

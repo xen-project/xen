@@ -97,7 +97,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
 	blkif_sring_t *sring;
 	int err;
-	struct evtchn_bind_interdomain bind_interdomain;
 
 	/* Already connected through? */
 	if (blkif->irq)
@@ -112,24 +111,18 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	bind_interdomain.remote_dom  = blkif->domid;
-	bind_interdomain.remote_port = evtchn;
+	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
+	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
 
-	err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
-					  &bind_interdomain);
-	if (err) {
+	err = bind_interdomain_evtchn_to_irqhandler(
+		blkif->domid, evtchn, blkif_be_int, 0, "blkif-backend", blkif);
+	if (err < 0)
+	{
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
 		return err;
 	}
-
-	blkif->evtchn = bind_interdomain.local_port;
-
-	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
-	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
-
-	blkif->irq = bind_evtchn_to_irqhandler(
-		blkif->evtchn, blkif_be_int, 0, "blkif-backend", blkif);
+	blkif->irq = err;
 
 	return 0;
 }

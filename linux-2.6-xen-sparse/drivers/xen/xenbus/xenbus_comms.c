@@ -196,7 +196,7 @@ int xb_init_comms(void)
 	if (xenbus_irq)
 		unbind_from_irqhandler(xenbus_irq, &xb_waitq);
 
-	err = bind_evtchn_to_irqhandler(
+	err = bind_caller_port_to_irqhandler(
 		xen_store_evtchn, wake_waiting,
 		0, "xenbus", &xb_waitq);
 	if (err <= 0) {

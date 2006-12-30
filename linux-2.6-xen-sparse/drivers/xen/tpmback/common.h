@@ -30,7 +30,6 @@ typedef struct tpmif_st {
 	unsigned int handle;
 
 	/* Physical parameters of the comms window. */
-	unsigned int evtchn;
 	unsigned int irq;
 
 	/* The shared rings and indexes. */

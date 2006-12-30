@@ -174,8 +174,8 @@ again:
 		message = "writing ring-ref";
 		goto abort_transaction;
 	}
-	err = xenbus_printf(xbt, dev->nodename,
-			    "event-channel", "%u", info->evtchn);
+	err = xenbus_printf(xbt, dev->nodename, "event-channel", "%u",
+			    irq_to_evtchn_port(info->irq));
 	if (err) {
 		message = "writing event-channel";
 		goto abort_transaction;
@@ -228,15 +228,11 @@ static int setup_blkring(struct xenbus_device *dev,
 	}
 	info->ring_ref = err;
 
-	err = xenbus_alloc_evtchn(dev, &info->evtchn);
-	if (err)
-		goto fail;
-
-	err = bind_evtchn_to_irqhandler(
-		info->evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", info);
+	err = bind_listening_port_to_irqhandler(
+		dev->otherend_id, blkif_int, SA_SAMPLE_RANDOM, "blkif", info);
 	if (err <= 0) {
 		xenbus_dev_fatal(dev, err,
-				 "bind_evtchn_to_irqhandler failed");
+				 "bind_listening_port_to_irqhandler");
 		goto fail;
 	}
 	info->irq = err;
@@ -775,8 +771,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	}
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info);
-	info->evtchn = info->irq = 0;
-
+	info->irq = 0;
 }
 
 static void blkif_completion(struct blk_shadow *s)
