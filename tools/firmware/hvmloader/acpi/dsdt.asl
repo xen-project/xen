@@ -17,7 +17,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
+DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 {
     Name (\PMBS, 0x0C00)
     Name (\PMLN, 0x08)

@@ -24,7 +24,7 @@ C_SRC = build.c dsdt.c static_tables.c
 H_SRC = $(wildcard *.h)
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
-IASL_VER = acpica-unix-20050513
+IASL_VER = acpica-unix-20060707
 IASL_URL = http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER).tar.gz
 
 # Disable PIE/SSP if GCC supports them. They can break us.

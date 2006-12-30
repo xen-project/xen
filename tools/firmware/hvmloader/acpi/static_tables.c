@@ -118,7 +118,7 @@ struct acpi_20_xsdt Xsdt = {
         .signature    = ACPI_2_0_XSDT_SIGNATURE,
         .length       = sizeof(struct acpi_header),
         .revision     = ACPI_2_0_XSDT_REVISION,
-        .oem_id       = ACPI_OEM_ID, 
+        .oem_id       = ACPI_OEM_ID,
         .oem_table_id = ACPI_OEM_TABLE_ID,
         .oem_revision = ACPI_OEM_REVISION,
         .creator_id   = ACPI_CREATOR_ID,
@@ -130,7 +130,7 @@ struct acpi_20_xsdt Xsdt = {
 struct acpi_20_rsdp Rsdp = {
     .signature = ACPI_2_0_RSDP_SIGNATURE,
     .oem_id    = ACPI_OEM_ID,
-    .revision  = ACPI_OEM_REVISION, 
+    .revision  = ACPI_2_0_RSDP_REVISION,
     .length    = sizeof(struct acpi_20_rsdp)
 };
 

@@ -57,8 +57,8 @@ int construct_madt(struct acpi_20_madt *madt)
     memset(madt, 0, sizeof(*madt));
     madt->header.signature    = ACPI_2_0_MADT_SIGNATURE;
     madt->header.revision     = ACPI_2_0_MADT_REVISION;
-    strncpy(madt->header.oem_id, "INTEL ", 6);
-    madt->header.oem_table_id = ACPI_OEM_TABLE_ID;
+    strncpy(madt->header.oem_id, ACPI_OEM_ID, 6);
+    strncpy(madt->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
     madt->header.oem_revision = ACPI_OEM_REVISION;
     madt->header.creator_id   = ACPI_CREATOR_ID;
     madt->header.creator_revision = ACPI_CREATOR_REVISION;
@@ -129,8 +129,8 @@ int construct_hpet(struct acpi_20_hpet *hpet)
     memset(hpet, 0, sizeof(*hpet));
     hpet->header.signature    = ACPI_2_0_HPET_SIGNATURE;
     hpet->header.revision     = ACPI_2_0_HPET_REVISION;
-    strncpy(hpet->header.oem_id, "INTEL ", 6);
-    hpet->header.oem_table_id = ACPI_OEM_TABLE_ID;
+    strncpy(hpet->header.oem_id, ACPI_OEM_ID, 6);
+    strncpy(hpet->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
     hpet->header.oem_revision = ACPI_OEM_REVISION;
     hpet->header.creator_id   = ACPI_CREATOR_ID;
     hpet->header.creator_revision = ACPI_CREATOR_REVISION;
@@ -184,12 +184,11 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.signature = ACPI_2_0_TCPA_SIGNATURE;
         tcpa->header.length    = sizeof(*tcpa);
         tcpa->header.revision  = ACPI_2_0_TCPA_REVISION;
-        strncpy(tcpa->header.oem_id, "IBM   ", 6);
-        tcpa->header.oem_table_id = ASCII64(' ', ' ', ' ', ' ',
-                                            ' ', 'x', 'e', 'n');
-        tcpa->header.oem_revision = 1;
-        tcpa->header.creator_id   = ASCII32('I', 'B', 'M', ' ');
-        tcpa->header.creator_revision = 1;
+        strncpy(tcpa->header.oem_id, ACPI_OEM_ID, 6);
+        strncpy(tcpa->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
+        tcpa->header.oem_revision = ACPI_OEM_REVISION;
+        tcpa->header.creator_id   = ACPI_CREATOR_ID;
+        tcpa->header.creator_revision = ACPI_CREATOR_REVISION;
         tcpa->lasa = e820_malloc(
             ACPI_2_0_TCPA_LAML_SIZE, E820_RESERVED, (uint32_t)~0);
         if ( tcpa->lasa )

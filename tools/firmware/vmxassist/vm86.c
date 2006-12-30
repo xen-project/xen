@@ -961,9 +961,9 @@ protected_mode(struct regs *regs)
 
 	/* initialize jump environment to warp back to protected mode */
 	regs->uss = DATA_SELECTOR;
-	regs->uesp = stack_top;
+	regs->uesp = (unsigned long)stack_top;
 	regs->cs = CODE_SELECTOR;
-	regs->eip = (unsigned) switch_to_protected_mode;
+	regs->eip = (unsigned long)switch_to_protected_mode;
 
 	/* this should get us into 32-bit mode */
 }
