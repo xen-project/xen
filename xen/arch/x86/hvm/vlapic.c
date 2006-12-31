@@ -767,7 +767,7 @@ static int vlapic_reset(struct vlapic *vlapic)
     struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
 
-    vlapic_set_reg(vlapic, APIC_ID,  (v->vcpu_id + 1) << 24);
+    vlapic_set_reg(vlapic, APIC_ID,  (v->vcpu_id * 2) << 24);
     vlapic_set_reg(vlapic, APIC_LVR, VLAPIC_VERSION);
 
     for ( i = 0; i < 8; i++ )

@@ -222,7 +222,7 @@ void fill_mp_config_table(struct mp_config_table *mpct, int length)
 void fill_mp_proc_entry(struct mp_proc_entry *mppe, int vcpu_id)
 {
     mppe->type = ENTRY_TYPE_PROCESSOR;
-    mppe->lapic_id = vcpu_id + 1;
+    mppe->lapic_id = LAPIC_ID(vcpu_id);
     mppe->lapic_version = 0x11;
     mppe->cpu_flags = CPU_FLAG_ENABLED;
     if ( vcpu_id == 0 )
