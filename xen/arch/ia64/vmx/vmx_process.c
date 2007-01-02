@@ -212,7 +212,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
             if (callback_irq != 0 && local_events_need_delivery()) {
                 /* change level for para-device callback irq */
                 /* use level irq to send discrete event */
-                if (callback_irq & HVM_PARAM_CALLBACK_IRQ_RID) {
+                if (callback_irq & IA64_CALLBACK_IRQ_RID) {
                     /* case of using Requester-ID as callback irq */
                     /* RID: '<#bus(8)><#dev(5)><#func(3)>' */
                     int dev = (callback_irq >> 3) & 0x1f;

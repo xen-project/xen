@@ -192,7 +192,7 @@ static int get_callback_irq(struct pci_dev *pdev)
 	rid = ((pdev->bus->number & 0xff) << 8) | pdev->devfn;
 	printk(KERN_INFO DRV_NAME ":use Requester-ID(%04x) as callback irq\n",
 	       rid);
-	return rid | HVM_PARAM_CALLBACK_IRQ_RID;
+	return rid | IA64_CALLBACK_IRQ_RID;
 #else /* !__ia64__ */
 	return pdev->irq;
 #endif

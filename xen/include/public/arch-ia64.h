@@ -64,7 +64,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 /* Arch specific callback irq definition */
 /* using Requester-ID(RID) as callback irq */
-#define HVM_PARAM_CALLBACK_IRQ_RID        (1 << 31)
+#define IA64_CALLBACK_IRQ_RID        (1 << 31)
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
