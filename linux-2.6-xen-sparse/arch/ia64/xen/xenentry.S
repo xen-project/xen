@@ -59,12 +59,6 @@ GLOBAL_ENTRY(ia64_switch_to)
 	shr.u r26=r20,IA64_GRANULE_SHIFT
 	cmp.eq p7,p6=r25,in0
 	;;
-#ifdef CONFIG_XEN
-	movl r8=XSI_PSR_IC
-	;;
-	st4 [r8]=r0	// force psr.ic off for hyperprivop(s)
-	;;
-#endif
 	/*
 	 * If we've already mapped this task's page, we can skip doing it again.
 	 */
@@ -72,19 +66,13 @@ GLOBAL_ENTRY(ia64_switch_to)
 (p6)	br.cond.dpnt .map
 	;;
 .done:
+	ld8 sp=[r21]			// load kernel stack pointer of new task
 #ifdef CONFIG_XEN
-	// psr.ic already off
 	// update "current" application register
 	mov r8=IA64_KR_CURRENT
 	mov r9=in0;;
 	XEN_HYPER_SET_KR
-	ld8 sp=[r21]			// load kernel stack pointer of new task
-	movl r27=XSI_PSR_IC
-	mov r8=1
-	;;
-	st4 [r27]=r8			// psr.ic back on
 #else
-	ld8 sp=[r21]			// load kernel stack pointer of new task
 	mov IA64_KR(CURRENT)=in0	// update "current" application register
 #endif
 	mov r8=r13			// return pointer to previously running task
@@ -99,7 +87,10 @@ GLOBAL_ENTRY(ia64_switch_to)
 
 .map:
 #ifdef CONFIG_XEN
-	// psr.ic already off
+    movl r25=XSI_PSR_IC			// clear psr.ic
+    ;;
+    st4 [r25]=r0
+    ;;
 #else
 	rsm psr.ic			// interrupts (psr.i) are already disabled here
 #endif
@@ -132,7 +123,13 @@ GLOBAL_ENTRY(ia64_switch_to)
 #endif
 	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
-#ifndef CONFIG_XEN
+#ifdef CONFIG_XEN
+	mov r9=1
+	movl r8=XSI_PSR_IC
+	;;
+	st4 [r8]=r9
+	;;
+#else    
 	ssm psr.ic			// reenable the psr.ic bit
 	;;
 	srlz.d

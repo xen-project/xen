@@ -1,6 +1,7 @@
 #ifdef XEN
 #include <asm/debugger.h>
 #include <asm/vhpt.h>
+#include <public/arch-ia64.h>
 #endif
 /*
  * arch/ia64/kernel/ivt.S
@@ -1074,18 +1075,26 @@ ENTRY(break_fault)
 #endif
 	movl r18=THIS_CPU(current_psr_ic_addr)
 	;;
-	ld8 r18=[r18]
-	;;
-	ld4 r19=[r18]
+	ld8 r18=[r18]    
 	;;
 	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
 (p7)	br.spnt.many dispatch_privop_fault
 	;;
-	// If vpsr.ic is off, we have a hyperprivop.  A hyperprivop is
-	// hand-coded assembly with psr.ic off which means it can make
-	// no calls, cannot use r1-r15, and it can have no memory accesses
-	// unless they are to pinned addresses!
-	cmp4.eq p7,p0=r0,r19
+	// if (ipsr.cpl == 2 && (iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX)
+	// this is a hyperprivop. A hyperprivop is hand-coded assembly with
+	// psr.ic off which means it can make no calls, cannot use r1-r15,
+	// and it can have no memory accesses unless they are to pinned
+	// addresses!
+	mov r19= cr.ipsr
+	movl r20=HYPERPRIVOP_START
+	mov r21=HYPERPRIVOP_MAX
+	;;
+	sub r20=r17,r20
+	extr.u r19=r19,IA64_PSR_CPL0_BIT,2  // extract cpl field from cr.ipsr
+	;;
+	cmp.gtu p7,p0=r21,r20
+	;;
+	cmp.eq.and p7,p0=2,r19			// ipsr.cpl==2
 (p7)	br.sptk.many fast_hyperprivop
 	;;
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET

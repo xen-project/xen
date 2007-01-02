@@ -57,18 +57,6 @@
 [1:]	movl reg=0;					\
 	.xdata4 ".data.patch.running_on_xen", 1b-.
 
-	.section ".data.patch.brl_xen_rsm_be_i", "a"
-	.previous
-#define BRL_COND_XEN_RSM_BE_I(pr)			\
-[1:](pr)brl.cond.sptk 0;				\
-	.xdata4 ".data.patch.brl_xen_rsm_be_i", 1b-.
-
-	.section ".data.patch.brl_xen_get_psr", "a"
-	.previous
-#define BRL_COND_XEN_GET_PSR(pr)			\
-[1:](pr)brl.cond.sptk 0;				\
-	.xdata4 ".data.patch.brl_xen_get_psr", 1b-.
-
 	.section ".data.patch.brl_xen_ssm_i_0", "a"
 	.previous
 #define BRL_COND_XEN_SSM_I_0(pr)			\
@@ -156,9 +144,9 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	cmp.ne isXen,isRaw=r0,r30
 	;;
 (isRaw)	rsm psr.be | psr.i
-	BRL_COND_XEN_RSM_BE_I(isXen)
-	.global .vdso_rsm_be_i_ret
-.vdso_rsm_be_i_ret:
+(isXen)	st1 [r22]=r20
+(isXen)	XEN_HYPER_RSM_BE
+	;;
 #else
 	rsm psr.be | psr.i			// M2 (5 cyc to srlz.d)
 #endif
@@ -171,9 +159,9 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	lfetch [r18]				// M0|1
 #ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
 (isRaw)	mov r29=psr
-	BRL_COND_XEN_GET_PSR(isXen)
-	.global .vdso_get_psr_ret
-.vdso_get_psr_ret:
+(isXen)	XEN_HYPER_GET_PSR
+	;;
+(isXen)	mov r29=r8
 #else
 	mov r29=psr				// M2 (12 cyc)
 #endif

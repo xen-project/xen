@@ -545,7 +545,8 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 				vcpu_increment_iip(current);
 		} else
 			reflect_interruption(isr, regs, vector);
-	} else if (!PSCB(v, interrupt_collection_enabled)) {
+	} else if ((iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX
+		   && ia64_get_cpl(regs->cr_ipsr) == 2) {
 		if (ia64_hyperprivop(iim, regs))
 			vcpu_increment_iip(current);
 	} else {

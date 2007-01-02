@@ -709,11 +709,23 @@ ENTRY(page_fault)
 	;;
 #endif
 #ifdef CONFIG_XEN
-	br.cond.sptk.many	xen_page_fault
+    
+#define MASK_TO_PEND_OFS    (-1)
+    
+(p15)	movl r14=XSI_PSR_I_ADDR
 	;;
-done_xen_page_fault:
-#endif
+(p15)	ld8 r14=[r14]
+	;;
+(p15)	st1 [r14]=r0,MASK_TO_PEND_OFS		// if (p15) vpsr.i = 1
+	;;		// if (p15) (vcpu->vcpu_info->evtchn_upcall_mask)=0
+(p15)	ld1 r14=[r14]	// if (vcpu->vcpu_info->evtchn_upcall_pending)
+	;;
+(p15)	cmp.ne	p15,p0=r14,r0
+	;;
+(p15)	XEN_HYPER_SSM_I
+#else
 (p15)	ssm psr.i				// restore psr.i
+#endif
 	movl r14=ia64_leave_kernel
 	;;
 	SAVE_REST
@@ -729,25 +741,6 @@ END(page_fault)
 ENTRY(dkey_miss)
 	DBG_FAULT(7)
 	FAULT(7)
-#ifdef CONFIG_XEN
-	// Leaving this code inline above results in an IVT section overflow
-	// There is no particular reason for this code to be here...
-xen_page_fault:
-(p15)	movl r3=XSI_PSR_I_ADDR
-	;;
-(p15)	ld8 r3=[r3]
-	;;
-(p15)	st1 [r3]=r0,-1	// if (p15) vpsr.i = 1
-	mov r14=r0
-	;;
-(p15)	ld1 r14=[r3]				// if (pending_events)
-	adds r3=8,r2				// re-set up second base pointer
-	;;
-(p15)	cmp.ne	p15,p0=r14,r0
-	;;
-	br.cond.sptk.many done_xen_page_fault
-	;;
-#endif
 END(dkey_miss)
 
 	.org ia64_ivt+0x2000
@@ -1170,14 +1163,13 @@ ENTRY(break_fault)
 #ifdef CONFIG_XEN
 (p15)	ld8 r16=[r16]				// vpsr.i
 	;;
-(p15)	st1 [r16]=r0,-1		// if (p15) vpsr.i = 1
-	mov r2=r0
+(p15)	st1 [r16]=r0,MASK_TO_PEND_OFS		// if (p15) vpsr.i = 1
+	;;		// if (p15) (vcpu->vcpu_info->evtchn_upcall_mask)=0
+(p15)	ld1 r2=[r16]	// if (vcpu->vcpu_info->evtchn_upcall_pending)
 	;;
-(p15)	ld1 r2=[r16]				// if (pending_events)
+(p15)	cmp.ne.unc p6,p0=r2,r0
 	;;
-	cmp.ne	p6,p0=r2,r0
-	;;
-(p6)	ssm	psr.i				//   do a real ssm psr.i
+(p6)	XEN_HYPER_SSM_I				//   do a real ssm psr.i
 #else
 (p15)	ssm psr.i				// M2   restore psr.i
 #endif

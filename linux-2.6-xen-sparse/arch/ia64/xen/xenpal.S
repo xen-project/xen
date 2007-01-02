@@ -41,16 +41,16 @@ GLOBAL_ENTRY(xen_pal_call_static)
 #ifdef CONFIG_XEN
 	// this is low priority for paravirtualization, but is called
 	// from the idle loop so confuses privop counting
-	movl r31=XSI_PSR_IC
+	movl r31=XSI_PSR_I_ADDR
 	;;
-(p6)	st4 [r31]=r0
+	ld8 r31=[r31]
+	mov r22=1
 	;;
-(p7)	adds r31=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r31
-(p7)	mov r22=1
+	st1 [r31]=r22
+	;;  
+(p6)	movl r31=XSI_PSR_IC
 	;;
-(p7)	ld8 r31=[r31]
-	;;
-(p7)	st1 [r31]=r22
+(p6)	st4.rel [r31]=r0
 	;;
 	mov r31 = in3
 	mov b7 = loc2

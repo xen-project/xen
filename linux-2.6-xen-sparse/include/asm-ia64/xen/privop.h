@@ -123,8 +123,6 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * that we inline it */
 #define xen_hyper_ssm_i()						\
 ({									\
-	xen_set_virtual_psr_i(0);					\
-	xen_set_virtual_psr_ic(0);					\
 	XEN_HYPER_SSM_I;						\
 })
 
@@ -139,8 +137,12 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 #define xen_ssm_i()							\
 ({									\
 	int old = xen_get_virtual_psr_i();				\
-	xen_set_virtual_psr_i(1);					\
-	if (!old && xen_get_virtual_pend()) xen_hyper_ssm_i();		\
+	if (!old) {							\
+		if (xen_get_virtual_pend())				\
+			xen_hyper_ssm_i();				\
+		else							\
+			xen_set_virtual_psr_i(1);			\
+	}								\
 })
 
 #define xen_ia64_intrin_local_irq_restore(x)				\
