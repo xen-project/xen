@@ -1207,8 +1207,8 @@ IA64FAULT vcpu_set_itc(VCPU * vcpu, u64 val)
 #ifdef DISALLOW_SETTING_ITC_FOR_NOW
 	static int did_print;
 	if (!did_print) {
-		printk("vcpu_set_itc: Setting ar.itc is currently disabled\n");
-		printk("(this message is only displayed one)\n");
+		printk("vcpu_set_itc: Setting ar.itc is currently disabled "
+		       "(this message is only displayed once)\n");
 		did_print = 1;
 	}
 #else
