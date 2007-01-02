@@ -450,8 +450,6 @@ IA64FAULT vcpu_get_psr(VCPU * vcpu, u64 * pval)
 	struct ia64_psr newpsr;
 
 	newpsr = *(struct ia64_psr *)&regs->cr_ipsr;
-	if (newpsr.cpl == 2)
-		newpsr.cpl = 0;
 	if (!vcpu->vcpu_info->evtchn_upcall_mask)
 		newpsr.i = 1;
 	else
@@ -469,6 +467,7 @@ IA64FAULT vcpu_get_psr(VCPU * vcpu, u64 * pval)
 	else
 		newpsr.pp = 0;
 	*pval = *(unsigned long *)&newpsr;
+	*pval &= (MASK(0, 32) | MASK(35, 2));
 	return IA64_NO_FAULT;
 }
 
