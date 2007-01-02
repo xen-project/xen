@@ -52,6 +52,7 @@ def help():
     
 def main(argv):
     opts = gopts
+    opts.reset()
     args = opts.parse(argv)
     
     if len(args) != 2:
