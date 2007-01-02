@@ -637,11 +637,11 @@ def res_security_check(resource, domain_label):
     """
     rtnval = 1
 
-    #build canonical resource name
-    resource = unify_resname(resource)
-
     # if security is on, ask the hypervisor for a decision
     if on():
+        #build canonical resource name
+        resource = unify_resname(resource)
+
         (label, ssidref, policy) = get_res_security_details(resource)
         domac = ['access_control']
         domac.append(['policy', active_policy])
@@ -660,6 +660,8 @@ def res_security_check(resource, domain_label):
 
     # security is off, make sure resource isn't labeled
     else:
+        # Note, we can't canonicalise the resource here, because people using
+        # xm without ACM are free to use relative paths.
         (label, policy) = get_res_label(resource)
         if policy != 'NULL':
             raise ACMError("Security is off, but '"+resource+"' is labeled")
