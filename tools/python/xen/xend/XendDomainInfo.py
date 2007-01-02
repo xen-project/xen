@@ -439,7 +439,7 @@ class XendDomainInfo:
 
     def shutdown(self, reason):
         """Shutdown a domain by signalling this via xenstored."""
-        log.debug('XendDomainInfo.shutdown')
+        log.debug('XendDomainInfo.shutdown(%s)', reason)
         if self.state in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
             raise XendError('Domain cannot be shutdown')
 
