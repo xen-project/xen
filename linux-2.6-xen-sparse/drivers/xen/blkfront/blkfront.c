@@ -306,7 +306,7 @@ static void connect(struct blkfront_info *info)
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
 	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
-			    "sectors", "%llu", &sectors,
+			    "sectors", "%Lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
