@@ -299,7 +299,7 @@ class XendConfig(dict):
             self._sxp_to_xapi_unsupported(sxp_obj)
         elif xapi:
             self.update_with_xenapi_config(xapi)
-            self._add_xapi_unsupported()
+            self._add_xapi_unsupported(xapi)
         elif dominfo:
             # output from xc.domain_getinfo
             self._dominfo_to_xapi(dominfo)
@@ -728,19 +728,22 @@ class XendConfig(dict):
         _set_cfg_if_exists('up_time')
         _set_cfg_if_exists('status') # TODO, deprecated  
 
-    def _add_xapi_unsupported(self):
+    def _add_xapi_unsupported(self, xapi_dict):
         """Updates the configuration object with entries that are not
         officially supported by the Xen API but is required for
         the rest of Xend to function.
         """
 
         # populate image
-        hvm = self['HVM_boot'] != ''
-        self['image']['type'] = hvm and 'hvm' or 'linux'
-        if hvm:
-            self['image']['hvm'] = {}
-            for xapi, cfgapi in XENAPI_HVM_CFG.items():
-                self['image']['hvm'][cfgapi] = self[xapi]
+        if 'image' in xapi_dict:
+            self['image'].update(xapi_dict['image'])
+        else:
+            hvm = self['HVM_boot'] != ''
+            self['image']['type'] = hvm and 'hvm' or 'linux'
+            if hvm:
+                self['image']['hvm'] = {}
+                for xapi, cfgapi in XENAPI_HVM_CFG.items():
+                    self['image']['hvm'][cfgapi] = self[xapi]
             
 
     def _get_old_state_string(self):
