@@ -29,9 +29,15 @@ _install: $(TARGET).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz
 	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-syms-$(XEN_FULLVERSION)
+	[ -d $(DESTDIR)/usr/include/xen/arch-x86 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/arch-x86
+	[ -d $(DESTDIR)/usr/include/xen/hvm ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/hvm
 	[ -d $(DESTDIR)/usr/include/xen/io ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
+	$(INSTALL_DATA) include/public/arch-x86/*.h $(DESTDIR)/usr/include/xen/arch-x86
+	$(INSTALL_DATA) include/public/hvm/*.h $(DESTDIR)/usr/include/xen/hvm
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
