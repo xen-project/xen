@@ -3306,6 +3306,15 @@ int shadow_domctl(struct domain *d,
 
     case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
         shadow_lock(d);
+        if ( sc->mb == 0 && shadow_mode_enabled(d) )
+        {            
+            /* Can't set the allocation to zero unless the domain stops using
+             * shadow pagetables first */
+            SHADOW_ERROR("Can't set shadow allocation to zero, domain %u"
+                         " is still using shadows.\n", d->domain_id);
+            shadow_unlock(d);
+            return -EINVAL;
+        }
         rc = sh_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
         shadow_unlock(d);
         if ( preempted )
