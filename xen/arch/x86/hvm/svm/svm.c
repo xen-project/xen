@@ -2766,9 +2766,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_VINTR:
-	vmcb->vintr.fields.irq = 0;
-	vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
-	break;
+        vmcb->vintr.fields.irq = 0;
+        vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
+        break;
 
     case VMEXIT_INVD:
         svm_vmexit_do_invd(vmcb);
@@ -2841,7 +2841,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_CR8_WRITE:
         svm_cr_access(v, 8, TYPE_MOV_TO_CR, regs);
         break;
-	
+
     case VMEXIT_DR0_WRITE ... VMEXIT_DR7_WRITE:
         svm_dr_access(v, regs);
         break;
