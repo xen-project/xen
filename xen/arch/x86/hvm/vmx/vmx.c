@@ -2404,7 +2404,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_do_extint(regs);
         break;
     case EXIT_REASON_TRIPLE_FAULT:
-        goto exit_and_crash;
+        hvm_triple_fault();
+        break;
     case EXIT_REASON_PENDING_INTERRUPT:
         /* Disable the interrupt window. */
         v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;

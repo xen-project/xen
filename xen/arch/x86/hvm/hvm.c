@@ -269,6 +269,12 @@ void hvm_hlt(unsigned long rflags)
     do_sched_op_compat(SCHEDOP_block, 0);
 }
 
+void hvm_triple_fault(void)
+{
+    gdprintk(XENLOG_INFO, "Triple fault - reset.\n");
+    domain_shutdown(current->domain, SHUTDOWN_reboot);
+}
+
 /*
  * __hvm_copy():
  *  @buf  = hypervisor buffer

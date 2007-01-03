@@ -134,5 +134,6 @@ void hlt_timer_fn(void *data);
 void hvm_do_hypercall(struct cpu_user_regs *pregs);
 
 void hvm_hlt(unsigned long rflags);
+void hvm_triple_fault(void);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */
