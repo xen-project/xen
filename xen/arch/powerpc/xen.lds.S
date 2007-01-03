@@ -17,6 +17,7 @@ PHDRS
 SECTIONS
 {
   . = 0x00400000;
+  PROVIDE(_text = .);
   /* Read-only sections, merged into text segment: */
   .interp         : { *(.interp) } :text
   .hash           : { *(.hash) }
