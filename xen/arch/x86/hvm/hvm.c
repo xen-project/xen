@@ -271,8 +271,10 @@ void hvm_hlt(unsigned long rflags)
 
 void hvm_triple_fault(void)
 {
-    gdprintk(XENLOG_INFO, "Triple fault - reset.\n");
-    domain_shutdown(current->domain, SHUTDOWN_reboot);
+    struct vcpu *v = current;
+    gdprintk(XENLOG_INFO, "Triple fault on VCPU%d - "
+             "invoking HVM system reset.\n", v->vcpu_id);
+    domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
 /*

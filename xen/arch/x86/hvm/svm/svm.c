@@ -2701,23 +2701,14 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
     break;
 
+    case VMEXIT_INTR:
     case VMEXIT_NMI:
-        break;
-
     case VMEXIT_SMI:
-        /*
-         * For asynchronous SMI's, we just need to allow global interrupts 
-         * so that the SMI is taken properly in the context of the host.  The
-         * standard code does a STGI after the VMEXIT which should accomplish 
-         * this task.  Continue as normal and restart the guest.
-         */
+        /* Asynchronous events, handled when we STGI'd after the VMEXIT. */
         break;
 
     case VMEXIT_INIT:
-        /*
-         * Nothing to do, in fact we should never get to this point. 
-         */
-        break;
+        BUG(); /* unreachable */
 
     case VMEXIT_EXCEPTION_BP:
 #ifdef XEN_DEBUGGER
@@ -2778,9 +2769,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 	vmcb->vintr.fields.irq = 0;
 	vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
 	break;
-
-    case VMEXIT_INTR:
-        break;
 
     case VMEXIT_INVD:
         svm_vmexit_do_invd(vmcb);
@@ -2867,8 +2855,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_SHUTDOWN:
-        gdprintk(XENLOG_ERR, "Guest shutdown exit\n");
-        goto exit_and_crash;
+        hvm_triple_fault();
+        break;
 
     default:
     exit_and_crash:
