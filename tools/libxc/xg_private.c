@@ -196,3 +196,15 @@ __attribute__((weak)) int xc_hvm_build(
 {
     return -ENOSYS;
 }
+
+__attribute__((weak)) int xc_get_hvm_param(
+    int handle, domid_t dom, int param, unsigned long *value)
+{
+    return -ENOSYS;
+}
+
+__attribute__((weak)) int xc_set_hvm_param(
+    int handle, domid_t dom, int param, unsigned long value)
+{
+    return -ENOSYS;
+}
