@@ -17,7 +17,8 @@ PHDRS
 SECTIONS
 {
   . = 0xFFFF830000100000;
-  _text = .;			/* Text and read-only data */
+  _start = .;
+  _stext = .;			/* Text and read-only data */
   .text : {
 	*(.text)
 	*(.fixup)
@@ -49,14 +50,16 @@ SECTIONS
 
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .text.init : { *(.text.init) } :text
-  .data.init : { *(.data.init) } :text
+  _sinittext = .;
+  .init.text : { *(.init.text) } :text
+  _einittext = .;
+  .init.data : { *(.init.data) } :text
   . = ALIGN(32);
   __setup_start = .;
-  .setup.init : { *(.setup.init) } :text
+  .init.setup : { *(.init.setup) } :text
   __setup_end = .;
   __initcall_start = .;
-  .initcall.init : { *(.initcall.init) } :text
+  .initcall.init : { *(.initcall1.init) } :text
   __initcall_end = .;
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
@@ -78,8 +81,8 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : {
-	*(.text.exit)
-	*(.data.exit)
+	*(.exit.text)
+	*(.exit.data)
 	*(.exitcall.exit)
 	}
 

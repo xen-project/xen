@@ -14,8 +14,6 @@
 #define SYM_PHYS(sym) (sym - __PAGE_OFFSET)
 
 ENTRY(start)
-ENTRY(stext)
-ENTRY(_stext)
         jmp __start
 
         .org    0x004

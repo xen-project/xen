@@ -150,12 +150,10 @@ static int kexec_get_reserve(xen_kexec_range_t *range)
     return 0;
 }
 
-extern unsigned long _text;
-
 static int kexec_get_xen(xen_kexec_range_t *range)
 {
-    range->start = virt_to_maddr(&_text);
-    range->size = (unsigned long)&_end - (unsigned long)&_text;
+    range->start = virt_to_maddr(_start);
+    range->size = (unsigned long)_end - (unsigned long)_start;
     return 0;
 }
 

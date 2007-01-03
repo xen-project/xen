@@ -12,6 +12,7 @@
 
 #include <xen/config.h>
 #include <xen/symbols.h>
+#include <xen/kernel.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/string.h>
@@ -99,7 +100,7 @@ const char *symbols_lookup(unsigned long addr,
     namebuf[KSYM_NAME_LEN] = 0;
     namebuf[0] = 0;
 
-    if (!is_kernel_text(addr))
+    if (!is_kernel_text(addr) && !is_kernel_inittext(addr))
         return NULL;
 
         /* do a binary search on the sorted symbols_addresses array */
@@ -130,7 +131,8 @@ const char *symbols_lookup(unsigned long addr,
 
     /* if we found no next symbol, we use the end of the section */
     if (!symbol_end)
-        symbol_end = kernel_text_end();
+        symbol_end = is_kernel_inittext(addr) ?
+            (unsigned long)_einittext : (unsigned long)_etext;
 
     *symbolsize = symbol_end - symbols_addresses[low];
     *offset = addr - symbols_addresses[low];

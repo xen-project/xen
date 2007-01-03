@@ -56,6 +56,23 @@
 	1;                                      \
 })
 
+extern char _start[], _end[];
+#define is_kernel(p) ({                         \
+    char *__p = (char *)(unsigned long)(p);     \
+    (__p >= _start) && (__p <= _end);           \
+})
+
+extern char _stext[], _etext[];
+#define is_kernel_text(p) ({                    \
+    char *__p = (char *)(unsigned long)(p);     \
+    (__p >= _stext) && (__p <= _etext);         \
+})
+
+extern char _sinittext[], _einittext[];
+#define is_kernel_inittext(p) ({                \
+    char *__p = (char *)(unsigned long)(p);     \
+    (__p >= _sinittext) && (__p <= _einittext); \
+})
 
 #endif /* _LINUX_KERNEL_H */
 

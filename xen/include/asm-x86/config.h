@@ -84,10 +84,6 @@
 
 #define CONFIG_DMA_BITSIZE 30
 
-#ifndef __ASSEMBLY__
-extern unsigned long _end; /* standard ELF symbol */
-#endif /* __ASSEMBLY__ */
-
 #if defined(__x86_64__)
 
 #define CONFIG_X86_64 1

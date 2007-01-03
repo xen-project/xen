@@ -115,22 +115,6 @@ integer_param("debug_stack_lines", debug_stack_lines);
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 #endif
 
-int is_kernel_text(unsigned long addr)
-{
-    extern char _stext, _etext;
-    if (addr >= (unsigned long) &_stext &&
-        addr <= (unsigned long) &_etext)
-        return 1;
-    return 0;
-
-}
-
-unsigned long kernel_text_end(void)
-{
-    extern char _etext;
-    return (unsigned long) &_etext;
-}
-
 static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
@@ -187,7 +171,7 @@ static void show_trace(struct cpu_user_regs *regs)
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
-        if ( is_kernel_text(addr) )
+        if ( is_kernel_text(addr) || is_kernel_inittext(addr) )
         {
             printk("[<%p>]", _p(addr));
             print_symbol(" %s\n   ", addr);
@@ -316,7 +300,7 @@ void show_stack_overflow(unsigned long esp)
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
-        if ( is_kernel_text(addr) )
+        if ( is_kernel_text(addr) || is_kernel_inittext(addr) )
         {
             printk("%p: [<%p>]", stack, _p(addr));
             print_symbol(" %s\n   ", addr);
