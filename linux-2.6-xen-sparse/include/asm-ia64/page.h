@@ -105,6 +105,7 @@ extern int ia64_pfn_valid (unsigned long pfn);
 #endif
 
 #ifdef CONFIG_FLATMEM
+extern unsigned long max_mapnr;
 # define pfn_valid(pfn)		(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
 # define page_to_pfn(page)	((unsigned long) (page - mem_map))
 # define pfn_to_page(pfn)	(mem_map + (pfn))

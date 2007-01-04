@@ -68,7 +68,6 @@ machine_to_phys_for_dma(unsigned long machine)
 static inline unsigned long
 mfn_to_local_pfn(unsigned long mfn)
 {
-	extern unsigned long max_mapnr;
 	unsigned long pfn = mfn_to_pfn_for_dma(mfn);
 	if (!pfn_valid(pfn))
 		return INVALID_P2M_ENTRY;
