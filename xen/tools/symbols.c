@@ -350,6 +350,14 @@ static void build_initial_tok_table(void)
 	table_cnt = pos;
 }
 
+static void *memmem_pvt(void *h, size_t hlen, void *n, size_t nlen)
+{
+	char *p;
+	for (p = h; (p - (char *)h) <= (hlen - nlen); p++)
+		if (!memcmp(p, n, nlen)) return p;
+	return NULL;
+}
+
 /* replace a given token in all the valid symbols. Use the sampled symbols
  * to update the counts */
 static void compress_symbols(unsigned char *str, int idx)
@@ -363,7 +371,7 @@ static void compress_symbols(unsigned char *str, int idx)
 		p1 = table[i].sym;
 
 		/* find the token on the symbol */
-		p2 = memmem(p1, len, str, 2);
+		p2 = memmem_pvt(p1, len, str, 2);
 		if (!p2) continue;
 
 		/* decrease the counts for this symbol's tokens */
@@ -382,7 +390,7 @@ static void compress_symbols(unsigned char *str, int idx)
 			if (size < 2) break;
 
 			/* find the token on the symbol */
-			p2 = memmem(p1, size, str, 2);
+			p2 = memmem_pvt(p1, size, str, 2);
 
 		} while (p2);
 
