@@ -1439,10 +1439,9 @@ dom0vp_expose_p2m(struct domain* d,
     for (i = 0; i < expose_num_pfn / PTRS_PER_PTE + 1; i++) {
         assign_pte = lookup_noalloc_domain_pte(d, (assign_start_gpfn + i) <<
                                                PAGE_SHIFT);
-        BUG_ON(assign_pte == NULL);
-        if (pte_present(*assign_pte)) {
+        if (assign_pte == NULL || pte_present(*assign_pte))
             continue;
-        }
+
         if (expose_p2m_page(d, (assign_start_gpfn + i) << PAGE_SHIFT,
                             p2m_pte_zero_page) < 0) {
             gdprintk(XENLOG_INFO, "%s failed to assign zero-pte page\n", __func__);
