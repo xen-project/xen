@@ -1051,10 +1051,11 @@ int construct_dom0(struct domain *d,
 	if(initrd_start && initrd_len){
 	    unsigned long offset;
 
-	    pinitrd_start= dom0_size - (PAGE_ALIGN(initrd_len) + 4*1024*1024);
-	    if (pinitrd_start <= pstart_info)
-		panic("%s:enough memory is not assigned to dom0", __func__);
-
+	    /* The next page aligned boundary after the start info.
+	       Note: EFI_PAGE_SHIFT = 12 <= PAGE_SHIFT */
+	    pinitrd_start = pstart_info + PAGE_SIZE;
+	    if (pinitrd_start + initrd_len >= dom0_size)
+		    panic("%s: not enough memory assigned to dom0", __func__);
 	    for (offset = 0; offset < initrd_len; offset += PAGE_SIZE) {
 		struct page_info *p;
 		p = assign_new_domain_page(d, pinitrd_start + offset);
@@ -1109,10 +1110,6 @@ int construct_dom0(struct domain *d,
 	/* Copy the OS image. */
 	loaddomainelfimage(d,image_start);
 
-	/* Copy the initial ramdisk. */
-	//if ( initrd_len != 0 )
-	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
-
 	BUILD_BUG_ON(sizeof(start_info_t) + sizeof(dom0_vga_console_info_t) +
 	             sizeof(struct ia64_boot_param) > PAGE_SIZE);
 
@@ -1161,8 +1158,7 @@ int construct_dom0(struct domain *d,
 	bp->console_info.orig_y = bp->console_info.num_rows == 0 ?
 	                          0 : bp->console_info.num_rows - 1;
 
-	bp->initrd_start = dom0_size -
-	             (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+	bp->initrd_start = pinitrd_start;
 	bp->initrd_size = ia64_boot_param->initrd_size;
 
 	ci = (dom0_vga_console_info_t *)((unsigned char *)si +
