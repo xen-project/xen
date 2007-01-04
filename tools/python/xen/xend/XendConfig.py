@@ -508,8 +508,12 @@ class XendConfig(dict):
                 pci_devs = []
                 for pci_dev in sxp.children(config, 'dev'):
                     pci_dev_info = {}
-                    for opt, val in pci_dev[1:]:
-                        pci_dev_info[opt] = val
+                    for opt_val in pci_dev[1:]:
+                        try:
+                            opt, val = opt_val
+                            pci_dev_info[opt] = val
+                        except TypeError:
+                            pass
                     pci_devs.append(pci_dev_info)
                 
                 cfg['devices'][pci_devs_uuid] = (dev_type,
@@ -572,7 +576,6 @@ class XendConfig(dict):
         if 'security' in cfg and isinstance(cfg['security'], str):
             cfg['security'] = sxp.from_string(cfg['security'])
 
-        # TODO: get states
         old_state = sxp.child_value(sxp_cfg, 'state')
         if old_state:
             for i in range(len(CONFIG_OLD_DOM_STATES)):
@@ -855,14 +858,15 @@ class XendConfig(dict):
             for cls in XendDevices.valid_devices():
                 found = False
                 
-                # figure if there is a device that is running
+                # figure if there is a dev controller is valid and running
                 if domain:
                     try:
                         controller = domain.getDeviceController(cls)
                         configs = controller.configurations()
                         for config in configs:
                             sxpr.append(['device', config])
-                            found = True
+
+                        found = True
                     except:
                         log.exception("dumping sxp from device controllers")
                         pass
@@ -923,11 +927,12 @@ class XendConfig(dict):
             dev_type = sxp.name(config)
             dev_info = {}
 
-            try:
-                for opt, val in config[1:]:
+            for opt_val in config[1:]:
+                try:
+                    opt, val = opt_val
                     dev_info[opt] = val
-            except ValueError:
-                pass # SXP has no options for this device
+                except (TypeError, ValueError): # unpack error
+                    pass
 
             if dev_type == 'vbd':
                 if dev_info.get('dev', '').startswith('ioemu:'):
@@ -996,7 +1001,7 @@ class XendConfig(dict):
                 self['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
 
-            elif dev_type in ('vtpm'):
+            elif dev_type == 'vtpm':
                 if cfg_xenapi.get('type'):
                     dev_info['type'] = cfg_xenapi.get('type')
 
@@ -1019,11 +1024,12 @@ class XendConfig(dict):
             dev_type = sxp.name(config)
             dev_info = {}
 
-            try:
-                for opt, val in config[1:]:
-                    self['devices'][opt] = val
-            except ValueError:
-                pass # SXP has no options for this device
+            for opt_val in config[1:]:
+                try:
+                    opt, val = opt_val
+                    self['devices'][dev_uuid][opt] = val
+                except (TypeError, ValueError):
+                    pass # no value for this config option
             
             return True
 
