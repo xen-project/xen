@@ -226,6 +226,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #endif
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
+        pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
