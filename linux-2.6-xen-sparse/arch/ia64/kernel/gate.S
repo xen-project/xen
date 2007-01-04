@@ -145,7 +145,7 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	;;
 (isRaw)	rsm psr.be | psr.i
 (isXen)	st1 [r22]=r20
-(isXen)	XEN_HYPER_RSM_BE
+(isXen)	rum psr.be
 	;;
 #else
 	rsm psr.be | psr.i			// M2 (5 cyc to srlz.d)
