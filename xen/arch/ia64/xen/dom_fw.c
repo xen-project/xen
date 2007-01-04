@@ -533,6 +533,7 @@ complete_dom0_memmap(struct domain *d,
 		u64 start = md->phys_addr;
 		u64 size = md->num_pages << EFI_PAGE_SHIFT;
 		u64 end = start + size;
+		unsigned long flags;
 
 		switch (md->type) {
 		case EFI_RUNTIME_SERVICES_CODE:
@@ -540,9 +541,19 @@ complete_dom0_memmap(struct domain *d,
 		case EFI_ACPI_RECLAIM_MEMORY:
 		case EFI_ACPI_MEMORY_NVS:
 		case EFI_RESERVED_TYPE:
-			/* Map into dom0 - All these are writable.  */
-			assign_domain_mach_page(d, start, size,
-			                        ASSIGN_writable);
+			/*
+			 * Map into dom0 - We must respect protection
+			 * and cache attributes.  Not all of these pages
+			 * are writable!!!
+			 */
+			flags = ASSIGN_writable;	/* dummy - zero */
+			if (md->attribute & EFI_MEMORY_WP)
+				flags |= ASSIGN_readonly;
+			if (md->attribute & EFI_MEMORY_UC)
+				flags |= ASSIGN_nocache;
+
+			assign_domain_mach_page(d, start, size, flags);
+
 			/* Fall-through.  */
 		case EFI_MEMORY_MAPPED_IO:
 			/* Will be mapped with ioremap.  */
