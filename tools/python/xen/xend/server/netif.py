@@ -150,16 +150,20 @@ class NetifController(DevController):
 
         devid = self.allocateDeviceID()
 
+        # The default type is 'netfront'.
+        if not typ:
+            typ = 'netfront'
+            
         if not mac:
             mac = randomMAC()
 
         back = { 'script' : script,
                  'mac'    : mac,
-                 'handle' : "%i" % devid }
+                 'handle' : "%i" % devid,
+                 'type'   : typ }
 
         if typ == 'ioemu':
             front = {}
-            back['type'] = 'ioemu'
         else:
             front = { 'handle' : "%i" % devid,
                       'mac'    : mac }

@@ -300,7 +300,7 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,ba
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
-          If type is not specified, default is netfront not ioemu device.
+          If type is not specified, default is netfront.
           If mac is not specified a random MAC address is used.
           If not specified then the network backend chooses it's own MAC address.
           If bridge is not specified the first bridge found is used.
