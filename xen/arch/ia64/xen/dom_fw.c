@@ -516,10 +516,10 @@ complete_dom0_memmap(struct domain *d,
 {
 	efi_memory_desc_t *md;
 	u64 addr;
-	int j;
 	void *efi_map_start, *efi_map_end, *p;
 	u64 efi_desc_size;
 	int i;
+	unsigned long dom_mem = maxmem - (d->tot_pages << PAGE_SHIFT);
 
 	/* Walk through all MDT entries.
 	   Copy all interesting entries.  */
@@ -566,26 +566,22 @@ complete_dom0_memmap(struct domain *d,
 		case EFI_LOADER_DATA:
 		case EFI_BOOT_SERVICES_CODE:
 		case EFI_BOOT_SERVICES_DATA:
-			/* Create dom0 MDT entries for conventional memory
-			   below 1MB.  Without this Linux will assume VGA is
-			   present because 0xA0000 will always be either a hole
-			   in the MDT or an I/O region via the passthrough.  */
-
-			end = min(ONE_MB, end);
-
-			/* Avoid firmware and hypercall area.
-			   We know they are 0-based.  */
-			if (end < FW_END_PADDR || start >= ONE_MB)
+			if (!(md->attribute & EFI_MEMORY_WB))
 				break;
-			if (start < FW_END_PADDR)
-				start = FW_END_PADDR;
-			
+
+			start = max(FW_END_PADDR, start);
+			end = min(start + dom_mem, end);
+			if (end <= start)
+				break;
+
 			dom_md->type = EFI_CONVENTIONAL_MEMORY;
 			dom_md->phys_addr = start;
 			dom_md->virt_addr = 0;
 			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
-			dom_md->attribute = md->attribute;
+			dom_md->attribute = EFI_MEMORY_WB;
 			num_mds++;
+
+			dom_mem -= dom_md->num_pages << EFI_PAGE_SHIFT;
 			break;
 
 		case EFI_UNUSABLE_MEMORY:
@@ -604,66 +600,13 @@ complete_dom0_memmap(struct domain *d,
 	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
 	     efi_mdt_cmp, NULL);
 
-	/* find gaps and fill them with conventional memory */
-	i = num_mds;
-	for (j = 0; j < num_mds; j++) {
-		unsigned long end;
-		unsigned long next_start;
-		
-		md = &tables->efi_memmap[j];
-		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
-		
-		if (j + 1 < num_mds) {
-			efi_memory_desc_t* next_md;
-			next_md = &tables->efi_memmap[j + 1];
-			next_start = next_md->phys_addr;
-			
-			/* Have just been sorted.  */
-			BUG_ON(end > next_start);
-			
-			/* No room for memory!  */
-			if (end == next_start)
-				continue;
-			
-			if (next_start > maxmem)
-				next_start = maxmem;
-		}
-		else
-			next_start = maxmem;
-		
-		/* Avoid "legacy" low memory addresses 
-		   and the HYPERCALL area.  */
-		if (end < ONE_MB)
-			end = ONE_MB;
-						      
-		// clip the range and align to PAGE_SIZE
-		next_start = next_start & PAGE_MASK;
-		end = PAGE_ALIGN(end);
-		
-		/* No room for memory.  */
-		if (end >= next_start)
-			continue;
-		
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-		        end, next_start);
-
-		if (next_start >= maxmem)
-			break;
-	}
-	num_mds = i;
-	BUG_ON(num_mds > NUM_MEM_DESCS);
-	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
-	     efi_mdt_cmp, NULL);
-
 	/* setup_guest() @ libxc/xc_linux_build() arranges memory for domU.
 	 * however no one arranges memory for dom0,
 	 * instead we allocate pages manually.
 	 */
 	for (i = 0; i < num_mds; i++) {
 		md = &tables->efi_memmap[i];
-		if (md->phys_addr > maxmem)
-			break;
-		
+
 		if (md->type == EFI_LOADER_DATA ||
 		    md->type == EFI_PAL_CODE ||
 		    md->type == EFI_CONVENTIONAL_MEMORY) {
@@ -675,8 +618,6 @@ complete_dom0_memmap(struct domain *d,
 				/* md->num_pages = 0 is allowed. */
 				continue;
 			}
-			if (end > (max_page << PAGE_SHIFT))
-				end = (max_page << PAGE_SHIFT);
 			
 			for (addr = start; addr < end; addr += PAGE_SIZE)
 				assign_new_domain0_page(d, addr);
