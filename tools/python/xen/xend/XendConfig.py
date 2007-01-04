@@ -859,7 +859,7 @@ class XendConfig(dict):
                 found = False
                 
                 # figure if there is a dev controller is valid and running
-                if domain and domain.getDomid():
+                if domain and domain.getDomid() != None:
                     try:
                         controller = domain.getDeviceController(cls)
                         configs = controller.configurations()
