@@ -103,7 +103,7 @@ class XendNode:
         saved_pifs = self.state_store.load_state('pif')
         if saved_pifs:
             for pif_uuid, pif in saved_pifs.items():
-                if pif['network'] in self.networks:
+                if pif.get('network') in self.networks:
                     network = self.networks[pif['network']]
                     try:
                         self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
