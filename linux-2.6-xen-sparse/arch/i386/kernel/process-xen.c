@@ -168,17 +168,22 @@ void cpu_idle(void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
+			void (*idle)(void);
 
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
 
 			rmb();
+			idle = pm_idle;
+
+			if (!idle)
+				idle = xen_idle;
 
 			if (cpu_is_offline(cpu))
 				play_dead();
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
-			pm_idle();
+			idle();
 		}
 		preempt_enable_no_resched();
 		schedule();
@@ -216,8 +221,6 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 void __devinit select_idle_routine(const struct cpuinfo_x86 *c)
 {
-	if (!pm_idle)
-		pm_idle = xen_idle;
 }
 
 static int __init idle_setup (char *str)

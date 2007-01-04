@@ -182,14 +182,18 @@ void cpu_idle (void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
+			void (*idle)(void);
+
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
 			rmb();
-			
+			idle = pm_idle;
+			if (!idle)
+				idle = xen_idle;
 			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
 			enter_idle();
-			pm_idle();
+			idle();
 			__exit_idle();
 		}
 
@@ -230,8 +234,6 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c) 
 {
-	if (!pm_idle)
-		pm_idle = xen_idle;
 }
 
 static int __init idle_setup (char *str)
