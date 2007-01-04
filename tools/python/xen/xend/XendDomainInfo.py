@@ -914,7 +914,7 @@ class XendDomainInfo:
         return self.info.get('cpu_cap', 0)
 
     def getWeight(self):
-        return self.info['cpu_weight']
+        return self.info.get('cpu_weight', 256)
 
     def setResume(self, state):
         self._resume = state
@@ -1991,7 +1991,7 @@ class XendDomainInfo:
             config['image'] = config.get('uname', '')
             config['io_read_kbs'] = 0.0
             config['io_write_kbs'] = 0.0
-            if config['mode'] == 'r':
+            if config.get('mode', 'r') == 'r':
                 config['mode'] = 'RO'
             else:
                 config['mode'] = 'RW'
