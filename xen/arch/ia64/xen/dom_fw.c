@@ -582,6 +582,7 @@ complete_dom0_memmap(struct domain *d,
 			num_mds++;
 
 			dom_mem -= dom_md->num_pages << EFI_PAGE_SHIFT;
+			d->arch.convmem_end = end;
 			break;
 
 		case EFI_UNUSABLE_MEMORY:
@@ -804,6 +805,7 @@ dom_fw_init(struct domain *d,
 		/* Memory.  */
 		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
 		        FW_END_PADDR, maxmem);
+		d->arch.convmem_end = maxmem;
 		
 		/* Create an entry for IO ports.  */
 		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,

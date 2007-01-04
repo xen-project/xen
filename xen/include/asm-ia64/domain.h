@@ -78,6 +78,9 @@ struct arch_domain {
         };
     };
 
+    /* maximum metaphysical address of conventional memory */
+    u64 convmem_end;
+
     /* Allowed accesses to io ports.  */
     struct rangeset *ioport_caps;
 

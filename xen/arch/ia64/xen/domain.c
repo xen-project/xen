@@ -760,8 +760,9 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		atomic64_set(&d->arch.shadow_fault_count, 0);
 		atomic64_set(&d->arch.shadow_dirty_count, 0);
 
-		d->arch.shadow_bitmap_size = (d->max_pages + BITS_PER_LONG-1) &
-		                             ~(BITS_PER_LONG-1);
+		d->arch.shadow_bitmap_size =
+			((d->arch.convmem_end >> PAGE_SHIFT) +
+			 BITS_PER_LONG - 1) & ~(BITS_PER_LONG - 1);
 		d->arch.shadow_bitmap = xmalloc_array(unsigned long,
 		                   d->arch.shadow_bitmap_size / BITS_PER_LONG);
 		if (d->arch.shadow_bitmap == NULL) {

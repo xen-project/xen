@@ -700,12 +700,12 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
 
     printk("%s: d 0x%p id %d current 0x%p id %d\n",
            __func__, d, d->domain_id, current, current->vcpu_id);
-    if ((mpaddr >> PAGE_SHIFT) < d->max_pages)
+    if (mpaddr < d->arch.convmem_end)
         printk("%s: non-allocated mpa 0x%lx (< 0x%lx)\n", __func__,
-               mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
+               mpaddr, d->arch.convmem_end);
     else
         printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
-               mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
+               mpaddr, d->arch.convmem_end);
 
     if (entry != NULL)
         p2m_entry_set(entry, NULL, __pte(0));
