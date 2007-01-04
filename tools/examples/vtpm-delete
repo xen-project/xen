@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This scripts must be called the following way:
 # vtpm-delete <domain name>

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Usage: block-nbd [bind server ctl_port |unbind node]
 #
