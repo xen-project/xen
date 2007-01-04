@@ -64,7 +64,7 @@ class VfbifController(DevController):
             if config.has_key("vncunused"):
                 args += ["--unused"]
             elif config.has_key("vncdisplay"):
-                args += ["--vncport", "%d" % (5900 + config["vncdisplay"])]
+                args += ["--vncport", "%d" % (5900 + int(config["vncdisplay"]))]
             vnclisten = config.get("vnclisten",
                                    xen.xend.XendRoot.instance().get_vnclisten_address())
             args += [ "--listen", vnclisten ]
