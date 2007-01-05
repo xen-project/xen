@@ -593,10 +593,10 @@ class XendAPI:
         return xen_api_success(self._get_PIF(ref).set_name(name))
 
     def PIF_set_MAC(self, _, ref, mac):
-        return xen_api_success(self._get_PIF(ref).set_mac(name))
+        return xen_api_success(self._get_PIF(ref).set_mac(mac))
 
     def PIF_set_MTU(self, _, ref, mtu):
-        return xen_api_success(self._get_PIF(ref).set_mtu(name))
+        return xen_api_success(self._get_PIF(ref).set_mtu(mtu))
 
     def PIF_create_VLAN(self, _, ref, network, vlan):
         try:
