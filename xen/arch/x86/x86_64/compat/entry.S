@@ -278,8 +278,6 @@ CFIX14:
 
 .section .rodata, "a", @progbits
 
-#define compat_domctl domain_crash_synchronous
-
 ENTRY(compat_hypercall_table)
         .quad compat_set_trap_table     /*  0 */
         .quad do_mmu_update

@@ -53,6 +53,8 @@ struct xen_domctl_createdomain {
  /* Is this an HVM guest (as opposed to a PV guest)? */
 #define _XEN_DOMCTL_CDF_hvm_guest 0
 #define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
+#define XEN_DOMCTL_CDF_WORDSIZE_MASK 255
+#define XEN_DOMCTL_CDF_WORDSIZE_SHIFT 24
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
@@ -391,6 +393,9 @@ struct xen_domctl_real_mode_area {
 };
 typedef struct xen_domctl_real_mode_area xen_domctl_real_mode_area_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_real_mode_area_t);
+
+#define XEN_DOMCTL_set_compat        42
+#define XEN_DOMCTL_set_native        43
 
 struct xen_domctl {
     uint32_t cmd;

@@ -11,6 +11,7 @@
 #include <xen/guest_access.h>
 #include <public/domctl.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/event.h>
 #include <xen/domain_page.h>
 #include <asm/msr.h>
@@ -23,12 +24,21 @@
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <public/hvm/e820.h>
+#ifdef CONFIG_COMPAT
+#include <compat/xen.h>
+#endif
 
-long arch_do_domctl(
+#ifndef COMPAT
+#define _long                long
+#define copy_from_xxx_offset copy_from_guest_offset
+#define copy_to_xxx_offset   copy_to_guest_offset
+#endif
+
+_long arch_do_domctl(
     struct xen_domctl *domctl,
     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
-    long ret = 0;
+    _long ret = 0;
 
     switch ( domctl->cmd )
     {
@@ -40,7 +50,9 @@ long arch_do_domctl(
         d = find_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = shadow_domctl(d, &domctl->u.shadow_op, u_domctl);
+            ret = shadow_domctl(d,
+                                &domctl->u.shadow_op,
+                                guest_handle_cast(u_domctl, void));
             put_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 
@@ -123,12 +135,12 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_getpageframeinfo2:
     {
-#define GPF2_BATCH (PAGE_SIZE / sizeof(long))
+#define GPF2_BATCH (PAGE_SIZE / sizeof(_long))
         int n,j;
         int num = domctl->u.getpageframeinfo2.num;
         domid_t dom = domctl->domain;
         struct domain *d;
-        unsigned long *l_arr;
+        unsigned _long *l_arr;
         ret = -ESRCH;
 
         if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
@@ -148,9 +160,9 @@ long arch_do_domctl(
         {
             int k = ((num-n)>GPF2_BATCH)?GPF2_BATCH:(num-n);
 
-            if ( copy_from_guest_offset(l_arr,
-                                        domctl->u.getpageframeinfo2.array,
-                                        n, k) )
+            if ( copy_from_xxx_offset(l_arr,
+                                      domctl->u.getpageframeinfo2.array,
+                                      n, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -159,13 +171,13 @@ long arch_do_domctl(
             for ( j = 0; j < k; j++ )
             {      
                 struct page_info *page;
-                unsigned long mfn = l_arr[j];
+                unsigned _long mfn = l_arr[j];
 
                 page = mfn_to_page(mfn);
 
                 if ( likely(mfn_valid(mfn) && get_page(page, d)) ) 
                 {
-                    unsigned long type = 0;
+                    unsigned _long type = 0;
 
                     switch( page->u.inuse.type_info & PGT_type_mask )
                     {
@@ -193,8 +205,8 @@ long arch_do_domctl(
 
             }
 
-            if ( copy_to_guest_offset(domctl->u.getpageframeinfo2.array,
-                                      n, l_arr, k) )
+            if ( copy_to_xxx_offset(domctl->u.getpageframeinfo2.array,
+                                    n, l_arr, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -214,7 +226,7 @@ long arch_do_domctl(
         int i;
         struct domain *d = find_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        unsigned long mfn;
+        xen_pfn_t mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -229,8 +241,8 @@ long arch_do_domctl(
             {
                 mfn = page_to_mfn(list_entry(
                     list_ent, struct page_info, list));
-                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                          i, &mfn, 1) )
+                if ( copy_to_xxx_offset(domctl->u.getmemlist.buffer,
+                                        i, &mfn, 1) )
                 {
                     ret = -EFAULT;
                     break;
@@ -289,37 +301,68 @@ long arch_do_domctl(
     return ret;
 }
 
-void arch_getdomaininfo_ctxt(
-    struct vcpu *v, struct vcpu_guest_context *c)
+#ifndef COMPAT
+void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
-    memcpy(c, &v->arch.guest_context, sizeof(*c));
+#ifdef CONFIG_COMPAT
+#define c(fld) (!IS_COMPAT(v->domain) ? (c.nat->fld) : (c.cmp->fld))
+#else
+#define c(fld) (c.nat->fld)
+#endif
+    unsigned long flags;
+
+    if ( !IS_COMPAT(v->domain) )
+        memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
+#ifdef CONFIG_COMPAT
+    else
+    {
+        XLAT_vcpu_guest_context(c.cmp, &v->arch.guest_context);
+    }
+#endif
 
     if ( is_hvm_vcpu(v) )
     {
-        hvm_store_cpu_guest_regs(v, &c->user_regs, c->ctrlreg);
+        if ( !IS_COMPAT(v->domain) )
+            hvm_store_cpu_guest_regs(v, &c.nat->user_regs, c.nat->ctrlreg);
+#ifdef CONFIG_COMPAT
+        else
+        {
+            struct cpu_user_regs user_regs;
+            typeof(c.nat->ctrlreg) ctrlreg;
+            unsigned i;
+
+            hvm_store_cpu_guest_regs(v, &user_regs, ctrlreg);
+            XLAT_cpu_user_regs(&c.cmp->user_regs, &user_regs);
+            for ( i = 0; i < ARRAY_SIZE(c.cmp->ctrlreg); ++i )
+                c.cmp->ctrlreg[i] = ctrlreg[i];
+        }
+#endif
     }
     else
     {
         /* IOPL privileges are virtualised: merge back into returned eflags. */
-        BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
-        c->user_regs.eflags |= v->arch.iopl << 12;
+        BUG_ON((c(user_regs.eflags) & EF_IOPL) != 0);
+        c(user_regs.eflags |= v->arch.iopl << 12);
     }
 
-    c->flags = 0;
+    flags = 0;
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
-        c->flags |= VGCF_i387_valid;
+        flags |= VGCF_i387_valid;
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        c->flags |= VGCF_in_kernel;
+        flags |= VGCF_in_kernel;
+    c(flags = flags);
 
     if ( !IS_COMPAT(v->domain) )
-        c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
+        c.nat->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
 #ifdef CONFIG_COMPAT
     else
-        c->ctrlreg[3] = compat_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
+        c.cmp->ctrlreg[3] = compat_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
 #endif
 
-    c->vm_assist = v->domain->vm_assist;
+    c(vm_assist = v->domain->vm_assist);
+#undef c
 }
+#endif
 
 /*
  * Local variables:

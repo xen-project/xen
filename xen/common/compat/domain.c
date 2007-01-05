@@ -28,7 +28,6 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     case VCPUOP_initialise:
     {
         struct compat_vcpu_guest_context *cmp_ctxt;
-        struct vcpu_guest_context *nat_ctxt;
 
         if ( (cmp_ctxt = xmalloc(struct compat_vcpu_guest_context)) == NULL )
         {
@@ -43,23 +42,13 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        if ( (nat_ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
-        {
-            rc = -ENOMEM;
-            break;
-        }
-
-        memset(nat_ctxt, 0, sizeof(*nat_ctxt));
-        XLAT_vcpu_guest_context(nat_ctxt, cmp_ctxt);
-        xfree(cmp_ctxt);
-
         LOCK_BIGLOCK(d);
         rc = -EEXIST;
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            rc = boot_vcpu(d, vcpuid, nat_ctxt);
+            rc = boot_vcpu(d, vcpuid, cmp_ctxt);
         UNLOCK_BIGLOCK(d);
 
-        xfree(nat_ctxt);
+        xfree(cmp_ctxt);
         break;
     }
 

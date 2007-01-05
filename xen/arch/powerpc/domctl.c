@@ -22,6 +22,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/guest_access.h>
 #include <xen/shadow.h>
 #include <public/xen.h>
@@ -29,10 +30,9 @@
 #include <public/sysctl.h>
 #include <asm/processor.h>
 
-void arch_getdomaininfo_ctxt(struct vcpu *, vcpu_guest_context_t *);
-void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c)
+void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 { 
-    memcpy(&c->user_regs, &v->arch.ctxt, sizeof(struct cpu_user_regs));
+    memcpy(&c.nat->user_regs, &v->arch.ctxt, sizeof(struct cpu_user_regs));
     /* XXX fill in rest of vcpu_guest_context_t */
 }
 

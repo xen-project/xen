@@ -275,7 +275,13 @@ int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-int set_info_guest(struct domain *d, xen_domctl_vcpucontext_t *);
+
+typedef union {
+    struct xen_domctl_vcpucontext *nat;
+    struct compat_domctl_vcpucontext *cmp;
+} xen_domctl_vcpucontext_u __attribute__((__transparent_union__));
+
+int set_info_guest(struct domain *d, xen_domctl_vcpucontext_u);
 
 struct domain *find_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);

@@ -522,14 +522,14 @@ void arch_domain_destroy(struct domain *d)
 	deallocate_rid_range(d);
 }
 
-void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
+void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
-	struct vcpu_extra_regs *er = &c->extra_regs;
+	struct vcpu_extra_regs *er = &c.nat->extra_regs;
 
-	c->user_regs = *vcpu_regs (v);
- 	c->privregs_pfn = get_gpfn_from_mfn(virt_to_maddr(v->arch.privregs) >>
-                                           PAGE_SHIFT);
+	c.nat->user_regs = *vcpu_regs(v);
+ 	c.nat->privregs_pfn = get_gpfn_from_mfn(virt_to_maddr(v->arch.privregs) >>
+                                                PAGE_SHIFT);
 
 	/* Fill extra regs.  */
 	for (i = 0; i < 8; i++) {
@@ -549,12 +549,12 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 	er->iva = v->arch.iva;
 }
 
-int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
+int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
 	
-	*regs = c->user_regs;
+	*regs = c.nat->user_regs;
  	
  	if (!d->arch.is_vti) {
  		/* domain runs at PL2/3 */
@@ -562,9 +562,9 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
  		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
  	}
 
-	if (c->flags & VGCF_EXTRA_REGS) {
+	if (c.nat->flags & VGCF_EXTRA_REGS) {
 		int i;
-		struct vcpu_extra_regs *er = &c->extra_regs;
+		struct vcpu_extra_regs *er = &c.nat->extra_regs;
 
 		for (i = 0; i < 8; i++) {
 			vcpu_set_itr(v, i, er->itrs[i].pte,

@@ -33,8 +33,6 @@
 #include <xen/multicall.h>
 #include <public/sched.h>
 
-extern void arch_getdomaininfo_ctxt(struct vcpu *,
-                                    struct vcpu_guest_context *);
 /* opt_sched: scheduler - default to credit */
 static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);

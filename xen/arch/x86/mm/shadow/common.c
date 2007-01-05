@@ -3260,7 +3260,7 @@ void shadow_mark_dirty(struct domain *d, mfn_t gmfn)
 
 int shadow_domctl(struct domain *d, 
                   xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+                  XEN_GUEST_HANDLE(void) u_domctl)
 {
     int rc, preempted = 0;
 

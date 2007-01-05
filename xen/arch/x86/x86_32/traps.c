@@ -193,7 +193,7 @@ unsigned long do_iret(void)
 
     /*
      * Pop, fix up and restore EFLAGS. We fix up in a local staging area
-     * to avoid firing the BUG_ON(IOPL) check in arch_getdomaininfo_ctxt.
+     * to avoid firing the BUG_ON(IOPL) check in arch_get_info_guest.
      */
     if ( unlikely(__copy_from_user(&eflags, (void __user *)regs->esp, 4)) )
         goto exit_and_crash;

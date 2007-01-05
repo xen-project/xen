@@ -18,14 +18,22 @@
 #include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#ifdef CONFIG_COMPAT
+#include <xen/compat.h>
+#endif
 #include <asm/current.h>
 #include <public/domctl.h>
 #include <acm/acm_hooks.h>
 
-extern long arch_do_domctl(
+#ifndef COMPAT
+typedef long ret_t;
+#define copy_to_xxx_offset copy_to_guest_offset
+#endif
+
+extern ret_t arch_do_domctl(
     struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
-extern void arch_getdomaininfo_ctxt(
-    struct vcpu *, struct vcpu_guest_context *);
+
+#ifndef COMPAT
 
 void cpumask_to_xenctl_cpumap(
     struct xenctl_cpumap *xenctl_cpumap, cpumask_t *cpumask)
@@ -64,6 +72,8 @@ void xenctl_cpumap_to_cpumask(
                     xenctl_cpumap->bitmap,
                     copy_bytes);
 }
+
+#endif /* COMPAT */
 
 static inline int is_free_domid(domid_t dom)
 {
@@ -169,9 +179,9 @@ static unsigned int default_vcpu0_location(void)
     return cpu;
 }
 
-long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
-    long ret = 0;
+    ret_t ret = 0;
     struct xen_domctl curop, *op = &curop;
     void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
     static DEFINE_SPINLOCK(domctl_lock);
@@ -283,10 +293,35 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = domain_create(dom, domcr_flags)) == NULL )
             break;
 
+        ret = 0;
+        switch ( (op->u.createdomain.flags >> XEN_DOMCTL_CDF_WORDSIZE_SHIFT)
+                 & XEN_DOMCTL_CDF_WORDSIZE_MASK )
+        {
+        case 0:
+            if ( !IS_COMPAT(current->domain) )
+                op->u.createdomain.flags |= BITS_PER_LONG
+                                            << XEN_DOMCTL_CDF_WORDSIZE_SHIFT;
+#ifdef CONFIG_COMPAT
+            else
+            {
+                op->u.createdomain.flags |= COMPAT_BITS_PER_LONG
+                                            << XEN_DOMCTL_CDF_WORDSIZE_SHIFT;
+        case COMPAT_BITS_PER_LONG:
+                ret = switch_compat(d);
+            }
+#endif
+            break;
+        case BITS_PER_LONG:
+            break;
+        default:
+            ret = -EINVAL;
+            break;
+        }
+        if ( ret )
+            break;
+
         memcpy(d->handle, op->u.createdomain.handle,
                sizeof(xen_domain_handle_t));
-
-        ret = 0;
 
         op->domain = d->domain_id;
         if ( copy_to_guest(u_domctl, op, 1) )
@@ -446,7 +481,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_getvcpucontext:
     { 
-        struct vcpu_guest_context *c;
+        vcpu_guest_context_u       c;
         struct domain             *d;
         struct vcpu               *v;
 
@@ -466,23 +501,48 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             goto getvcpucontext_out;
 
+#ifdef CONFIG_COMPAT
+        BUILD_BUG_ON(sizeof(struct vcpu_guest_context)
+                     < sizeof(struct compat_vcpu_guest_context));
+#endif
         ret = -ENOMEM;
-        if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
+        if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
             goto getvcpucontext_out;
 
         if ( v != current )
             vcpu_pause(v);
 
-        arch_getdomaininfo_ctxt(v,c);
+        arch_get_info_guest(v, c);
         ret = 0;
 
         if ( v != current )
             vcpu_unpause(v);
 
-        if ( copy_to_guest(op->u.vcpucontext.ctxt, c, 1) )
-            ret = -EFAULT;
+        if ( !IS_COMPAT(v->domain) )
+        {
+#ifndef COMPAT
+            if ( copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1) )
+#else
+            if ( copy_to_guest(compat_handle_cast(op->u.vcpucontext.ctxt,
+                                                  void),
+                               c.nat, 1) )
+#endif
+                ret = -EFAULT;
+        }
+#ifdef CONFIG_COMPAT
+        else
+        {
+#ifndef COMPAT
+            if ( copy_to_guest(guest_handle_cast(op->u.vcpucontext.ctxt, void),
+                               c.cmp, 1) )
+#else
+            if ( copy_to_compat(op->u.vcpucontext.ctxt, c.cmp, 1) )
+#endif
+                ret = -EFAULT;
+        }
+#endif
 
-        xfree(c);
+        xfree(c.nat);
 
         if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
@@ -645,6 +705,16 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
     }
     break;
+
+#ifdef CONFIG_COMPAT
+    case XEN_DOMCTL_set_compat:
+        ret = switch_compat(find_domain_by_id(op->domain));
+        break;
+
+    case XEN_DOMCTL_set_native:
+        ret = switch_native(find_domain_by_id(op->domain));
+        break;
+#endif
 
     default:
         ret = arch_do_domctl(op, u_domctl);

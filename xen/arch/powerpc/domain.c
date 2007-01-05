@@ -150,9 +150,9 @@ void vcpu_destroy(struct vcpu *v)
 {
 }
 
-int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_t *c)
+int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 { 
-    memcpy(&v->arch.ctxt, &c->user_regs, sizeof(c->user_regs));
+    memcpy(&v->arch.ctxt, &c.nat->user_regs, sizeof(c.nat->user_regs));
 
     printk("Domain[%d].%d: initializing\n",
            v->domain->domain_id, v->vcpu_id);

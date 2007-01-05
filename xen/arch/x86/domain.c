@@ -16,6 +16,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
@@ -250,6 +251,69 @@ static void release_compat_l4(struct vcpu *v)
     v->arch.guest_table_user = pagetable_null();
 }
 
+static inline int may_switch_mode(struct domain *d)
+{
+    return 1; /* XXX */
+}
+
+int switch_native(struct domain *d)
+{
+    l1_pgentry_t gdt_l1e;
+    unsigned int vcpuid;
+
+    if ( !d )
+        return -EINVAL;
+    if ( !may_switch_mode(d) )
+        return -EACCES;
+    if ( !IS_COMPAT(d) )
+        return 0;
+
+    clear_bit(_DOMF_compat, &d->domain_flags);
+    release_arg_xlat_area(d);
+
+    /* switch gdt */
+    gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+    for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
+    {
+        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
+                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
+        if (d->vcpu[vcpuid])
+            release_compat_l4(d->vcpu[vcpuid]);
+    }
+
+    return 0;
+}
+
+int switch_compat(struct domain *d)
+{
+    l1_pgentry_t gdt_l1e;
+    unsigned int vcpuid;
+
+    if ( !d )
+        return -EINVAL;
+    if ( compat_disabled )
+        return -ENOSYS;
+    if ( !may_switch_mode(d) )
+        return -EACCES;
+    if ( IS_COMPAT(d) )
+        return 0;
+
+    set_bit(_DOMF_compat, &d->domain_flags);
+
+    /* switch gdt */
+    gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table), PAGE_HYPERVISOR);
+    for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
+    {
+        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
+                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
+        if (d->vcpu[vcpuid]
+            && setup_compat_l4(d->vcpu[vcpuid]) != 0)
+            return -ENOMEM;
+    }
+
+    return 0;
+}
+
 #else
 #define release_arg_xlat_area(d) ((void)0)
 #define setup_compat_l4(v) 0
@@ -416,43 +480,80 @@ void arch_domain_destroy(struct domain *d)
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_set_info_guest(
-    struct vcpu *v, struct vcpu_guest_context *c)
+    struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+#ifdef CONFIG_COMPAT
+#define c(fld) (!IS_COMPAT(d) ? (c.nat->fld) : (c.cmp->fld))
+#else
+#define c(fld) (c.nat->fld)
+#endif
     unsigned long cr3_pfn = INVALID_MFN;
+    unsigned long flags = c(flags);
     int i, rc;
 
     if ( !is_hvm_vcpu(v) )
     {
-        fixup_guest_stack_selector(d, c->user_regs.ss);
-        fixup_guest_stack_selector(d, c->kernel_ss);
-        fixup_guest_code_selector(d, c->user_regs.cs);
-
-        if ( CONFIG_PAGING_LEVELS < 4 || IS_COMPAT(d) )
+        if ( !IS_COMPAT(d) )
         {
-            fixup_guest_code_selector(d, c->event_callback_cs);
-            fixup_guest_code_selector(d, c->failsafe_callback_cs);
+            fixup_guest_stack_selector(d, c.nat->user_regs.ss);
+            fixup_guest_stack_selector(d, c.nat->kernel_ss);
+            fixup_guest_code_selector(d, c.nat->user_regs.cs);
+#ifdef __i386__
+            fixup_guest_code_selector(d, c.nat->event_callback_cs);
+            fixup_guest_code_selector(d, c.nat->failsafe_callback_cs);
+#endif
+
+            for ( i = 0; i < 256; i++ )
+                fixup_guest_code_selector(d, c.nat->trap_ctxt[i].cs);
+
+            /* LDT safety checks. */
+            if ( ((c.nat->ldt_base & (PAGE_SIZE-1)) != 0) ||
+                 (c.nat->ldt_ents > 8192) ||
+                 !array_access_ok(c.nat->ldt_base,
+                                  c.nat->ldt_ents,
+                                  LDT_ENTRY_SIZE) )
+                return -EINVAL;
         }
+#ifdef CONFIG_COMPAT
+        else
+        {
+            fixup_guest_stack_selector(d, c.cmp->user_regs.ss);
+            fixup_guest_stack_selector(d, c.cmp->kernel_ss);
+            fixup_guest_code_selector(d, c.cmp->user_regs.cs);
+            fixup_guest_code_selector(d, c.cmp->event_callback_cs);
+            fixup_guest_code_selector(d, c.cmp->failsafe_callback_cs);
 
-        for ( i = 0; i < 256; i++ )
-            fixup_guest_code_selector(d, c->trap_ctxt[i].cs);
+            for ( i = 0; i < 256; i++ )
+                fixup_guest_code_selector(d, c.cmp->trap_ctxt[i].cs);
 
-        /* LDT safety checks. */
-        if ( ((c->ldt_base & (PAGE_SIZE-1)) != 0) || 
-             (c->ldt_ents > 8192) ||
-             !array_access_ok(c->ldt_base, c->ldt_ents, LDT_ENTRY_SIZE) )
-            return -EINVAL;
+            /* LDT safety checks. */
+            if ( ((c.cmp->ldt_base & (PAGE_SIZE-1)) != 0) ||
+                 (c.cmp->ldt_ents > 8192) ||
+                 !compat_array_access_ok(c.cmp->ldt_base,
+                                         c.cmp->ldt_ents,
+                                         LDT_ENTRY_SIZE) )
+                return -EINVAL;
+        }
+#endif
     }
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    if ( c->flags & VGCF_i387_valid )
+    if ( flags & VGCF_I387_VALID )
         set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( (c->flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
+    if ( (flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
-    memcpy(&v->arch.guest_context, c, sizeof(*c));
+    if ( !IS_COMPAT(v->domain) )
+        memcpy(&v->arch.guest_context, c.nat, sizeof(*c.nat));
+#ifdef CONFIG_COMPAT
+    else
+    {
+        XLAT_vcpu_guest_context(&v->arch.guest_context, c.cmp);
+    }
+#endif
 
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;
@@ -480,19 +581,34 @@ int arch_set_info_guest(
     memset(v->arch.guest_context.debugreg, 0,
            sizeof(v->arch.guest_context.debugreg));
     for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(v, i, c->debugreg[i]);
+        (void)set_debugreg(v, i, c(debugreg[i]));
 
     if ( v->vcpu_id == 0 )
-        d->vm_assist = c->vm_assist;
+        d->vm_assist = c(vm_assist);
 
     if ( !is_hvm_vcpu(v) )
     {
-        if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
+        if ( !IS_COMPAT(d) )
+            rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
+#ifdef CONFIG_COMPAT
+        else
+        {
+            unsigned long gdt_frames[ARRAY_SIZE(c.cmp->gdt_frames)];
+            unsigned int i, n = (c.cmp->gdt_ents + 511) / 512;
+
+            if ( n > ARRAY_SIZE(c.cmp->gdt_frames) )
+                return -EINVAL;
+            for ( i = 0; i < n; ++i )
+                gdt_frames[i] = c.cmp->gdt_frames[i];
+            rc = (int)set_gdt(v, gdt_frames, c.cmp->gdt_ents);
+        }
+#endif
+        if ( rc != 0 )
             return rc;
 
         if ( !IS_COMPAT(d) )
         {
-            cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
+            cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
 
             if ( shadow_mode_refcounts(d)
                  ? !get_page(mfn_to_page(cr3_pfn), d)
@@ -510,7 +626,7 @@ int arch_set_info_guest(
         {
             l4_pgentry_t *l4tab;
 
-            cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c->ctrlreg[3]));
+            cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
 
             if ( shadow_mode_refcounts(d)
                  ? !get_page(mfn_to_page(cr3_pfn), d)
@@ -539,6 +655,7 @@ int arch_set_info_guest(
     update_cr3(v);
 
     return 0;
+#undef c
 }
 
 long

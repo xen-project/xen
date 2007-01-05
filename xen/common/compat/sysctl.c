@@ -40,13 +40,6 @@ static int compat_tb_control(struct compat_sysctl_tbuf_op *cmp_tbc)
 #define xen_sysctl_sched_id            compat_sysctl_sched_id
 #define xen_sysctl_sched_id_t          compat_sysctl_sched_id_t
 
-static void compat_getdomaininfo(struct domain *d, struct compat_domctl_getdomaininfo *ci)
-{
-    struct xen_domctl_getdomaininfo ni;
-
-    getdomaininfo(d, &ni);
-    XLAT_domctl_getdomaininfo(ci, &ni);
-}
 #define xen_sysctl_getdomaininfolist   compat_sysctl_getdomaininfolist
 #define xen_sysctl_getdomaininfolist_t compat_sysctl_getdomaininfolist_t
 #define xen_domctl_getdomaininfo       compat_domctl_getdomaininfo

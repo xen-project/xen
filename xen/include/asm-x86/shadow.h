@@ -192,7 +192,7 @@ int shadow_enable(struct domain *d, u32 mode);
  * manipulate the log-dirty bitmap. */
 int shadow_domctl(struct domain *d, 
                   xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+                  XEN_GUEST_HANDLE(void) u_domctl);
 
 /* Call when destroying a domain */
 void shadow_teardown(struct domain *d);
