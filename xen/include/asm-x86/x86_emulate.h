@@ -154,12 +154,11 @@ struct x86_emulate_ctxt
 #endif
 
 /*
- * x86_emulate_memop: Emulate an instruction that faulted attempting to
- *                    read/write a 'special' memory area.
+ * x86_emulate: Emulate an instruction.
  * Returns -1 on failure, 0 on success.
  */
 int
-x86_emulate_memop(
+x86_emulate(
     struct x86_emulate_ctxt *ctxt,
     struct x86_emulate_ops  *ops);
 

@@ -107,7 +107,7 @@ static uint8_t opcode_table[256] = {
     /* 0x88 - 0x8F */
     ByteOp|DstMem|SrcReg|ModRM|Mov, DstMem|SrcReg|ModRM|Mov,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
-    0, 0, 0, DstMem|SrcNone|ModRM|Mov,
+    0, DstReg|SrcNone|ModRM, 0, DstMem|SrcNone|ModRM|Mov,
     /* 0x90 - 0x9F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xA0 - 0xA7 */
@@ -447,7 +447,7 @@ decode_register(
 }
 
 int
-x86_emulate_memop(
+x86_emulate(
     struct x86_emulate_ctxt *ctxt,
     struct x86_emulate_ops  *ops)
 {
@@ -868,6 +868,9 @@ x86_emulate_memop(
     case 0x88 ... 0x8b: /* mov */
     case 0xc6 ... 0xc7: /* mov (sole member of Grp11) */
         dst.val = src.val;
+        break;
+    case 0x8d: /* lea */
+        dst.val = ea.mem.off;
         break;
     case 0x8f: /* pop (sole member of Grp1a) */
         /* 64-bit mode: POP defaults to a 64-bit operand. */

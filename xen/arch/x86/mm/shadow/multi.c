@@ -2836,7 +2836,7 @@ static int sh_page_fault(struct vcpu *v,
      * it seems very unlikely that any OS grants user access to page tables.
      */
     if ( (regs->error_code & PFEC_user_mode) ||
-         x86_emulate_memop(&emul_ctxt.ctxt, emul_ops) )
+         x86_emulate(&emul_ctxt.ctxt, emul_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));

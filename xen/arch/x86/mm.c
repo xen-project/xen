@@ -3297,7 +3297,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     ptwr_ctxt.ctxt.mode = X86EMUL_MODE_HOST;
     ptwr_ctxt.cr2       = addr;
     ptwr_ctxt.pte       = pte;
-    if ( x86_emulate_memop(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )
+    if ( x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )
         goto bail;
 
     UNLOCK_BIGLOCK(d);

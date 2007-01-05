@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
     *res        = 0x7FFFFFFF;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
          (regs.eflags != 0xa94) ||
@@ -133,7 +133,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     regs.eax    = 0x7FFFFFFF;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (regs.ecx != 0x12345678) ||
          (regs.eax != 0x92345677) ||
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678UL;
 #endif
     regs.eax    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
          (regs.ecx != 0x8000000FUL) ||
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = ~0UL;
     regs.eax    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
          (regs.ecx != 0x92345677UL) ||
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x92345677UL;
     regs.ecx    = 0xAA;
     regs.ebx    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x923456AA) || 
          (regs.eflags != 0x244) ||
@@ -197,7 +197,7 @@ int main(int argc, char **argv)
     regs.eax    = 0xAABBCC77UL;
     regs.ecx    = 0xFF;
     regs.ebx    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x923456AA) || 
          ((regs.eflags&0x240) != 0x200) ||
@@ -213,7 +213,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x12345678) || 
          (regs.eflags != 0x200) ||
@@ -230,7 +230,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x923456AAUL;
     regs.ecx    = 0xDDEEFF00L;
     regs.ebx    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0xDDEEFF00) || 
          (regs.eflags != 0x244) ||
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.esi    = (unsigned long)res + 0;
     regs.edi    = (unsigned long)res + 2;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x44554455) ||
          (regs.eflags != 0x200) ||
@@ -264,7 +264,7 @@ int main(int argc, char **argv)
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x2233445D) ||
          ((regs.eflags&0x201) != 0x201) ||
@@ -279,7 +279,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.eax    = -32;
     regs.edi    = (unsigned long)(res+1);
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x2233445E) ||
          ((regs.eflags&0x201) != 0x201) ||
@@ -299,7 +299,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0xCCCCFFFF;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (res[0] != 0x9999AAAA) ||
          (res[1] != 0xCCCCFFFF) ||
@@ -313,7 +313,7 @@ int main(int argc, char **argv)
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (res[0] != 0x9999AAAA) ||
          (res[1] != 0xCCCCFFFF) ||
@@ -331,7 +331,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
     *res        = 0x82;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x82) ||
          (regs.ecx != 0xFFFFFF82) ||
@@ -347,7 +347,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
     *res        = 0x1234aa82;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x1234aa82) ||
          (regs.ecx != 0xaa82) ||
@@ -363,12 +363,39 @@ int main(int argc, char **argv)
     regs.ecx    = (unsigned long)res;
     regs.eax    = 0x12345678;
     *res        = 0x11111111;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x11116789) ||
          (regs.eax != 0x12341111) ||
          ((regs.eflags&0x240) != 0x200) ||
          (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing dec %%ax...");
+    instr[0] = 0x66; instr[1] = 0x48;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x00000000;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
+         (regs.eax != 0x0000ffff) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lea 8(%%ebp),%%eax...");
+    instr[0] = 0x8d; instr[1] = 0x45; instr[2] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x12345678;
+    regs.ebp    = 0xaaaaaaaa;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
+         (regs.eax != 0xaaaaaab2) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
         goto fail;
     printf("okay\n");
 
