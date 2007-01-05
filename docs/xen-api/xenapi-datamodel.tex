@@ -10575,6 +10575,16 @@ expected parameters are returned.
 \begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
+\subsubsection{NETWORK\_ALREADY\_CONNECTED}
+
+You tried to create a PIF, but the network you tried to attach it to is
+already attached to some other PIF, and so the creation failed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
 \subsubsection{SESSION\_AUTHENTICATION\_FAILED}
 
 The credentials given by the user are incorrect, so access has been denied,
