@@ -616,6 +616,11 @@ x86_emulate(
                 ea.mem.off <<= (sib >> 6) & 3;
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
                     ea.mem.off += insn_fetch_type(int32_t);
+                else if ( (sib_base == 4) && !twobyte && (b == 0x8f) )
+                    /* POP <rm> must have its EA calculated post increment. */
+                    ea.mem.off += _regs.esp +
+                        (((mode == X86EMUL_MODE_PROT64) && (op_bytes == 4))
+                         ? 8 : op_bytes);
                 else
                     ea.mem.off += *(long*)decode_register(sib_base, &_regs, 0);
             }
