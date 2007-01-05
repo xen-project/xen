@@ -96,7 +96,7 @@ typedef l4_pgentry_t root_pgentry_t;
 #define L3_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
 #define L4_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
 
-#define COMPAT_L3_DISALLOW_MASK 0xFFFFF1E6U /* must-be-zero */
+#define COMPAT_L3_DISALLOW_MASK L3_DISALLOW_MASK
 
 #define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
 #define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)

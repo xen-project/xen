@@ -44,6 +44,7 @@ static xen_pfn_t *live_p2m = NULL;
 
 /* Live mapping of system MFN to PFN table. */
 static xen_pfn_t *live_m2p = NULL;
+static unsigned long m2p_mfn0;
 
 /* grep fodder: machine_to_phys */
 
@@ -440,13 +441,23 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** that this check will fail for other L2s.
     */
     if (pt_levels == 3 && type == XEN_DOMCTL_PFINFO_L2TAB) {
+        int hstart;
+        unsigned long he;
 
-/* XXX index of the L2 entry in PAE mode which holds the guest LPT */
-#define PAE_GLPT_L2ENTRY (495)
-        pte = ((const uint64_t*)spage)[PAE_GLPT_L2ENTRY];
+        hstart = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+        he = ((const uint64_t *) spage)[hstart];
 
-        if(((pte >> PAGE_SHIFT) & 0x0fffffff) == live_p2m[pfn])
-            xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+        if ( ((he >> PAGE_SHIFT) & 0x0fffffff) == m2p_mfn0 ) {
+            /* hvirt starts with xen stuff... */
+            xen_start = hstart;
+        } else if ( hvirt_start != 0xf5800000 ) {
+            /* old L2s from before hole was shrunk... */
+            hstart = (0xf5800000 >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+            he = ((const uint64_t *) spage)[hstart];
+
+            if( ((he >> PAGE_SHIFT) & 0x0fffffff) == m2p_mfn0 )
+                xen_start = hstart;
+        }
     }
 
     if (pt_levels == 4 && type == XEN_DOMCTL_PFINFO_L4TAB) {
@@ -549,6 +560,8 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
         ERROR("xc_mmap_foreign_ranges failed (rc = %d)", rc);
         return NULL;
     }
+
+    m2p_mfn0 = entries[0].mfn;
 
     free(extent_start);
     free(entries);
