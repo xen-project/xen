@@ -6,6 +6,7 @@
 #include <xen/lib.h>
 #include <compat/xen.h>
 #include <compat/event_channel.h>
+#include <compat/vcpu.h>
 
 /* In-place translation functons: */
 void xlat_start_info(struct start_info *native,
@@ -15,6 +16,14 @@ void xlat_start_info(struct start_info *native,
 
     BUILD_BUG_ON(sizeof(*native) < sizeof(*compat));
     XLAT_start_info(compat, native);
+}
+
+void xlat_vcpu_runstate_info(struct vcpu_runstate_info *native)
+{
+    struct compat_vcpu_runstate_info *compat = (void *)native;
+
+    BUILD_BUG_ON(sizeof(*native) < sizeof(*compat));
+    XLAT_vcpu_runstate_info(compat, native);
 }
 
 #define xen_dom0_vga_console_info dom0_vga_console_info

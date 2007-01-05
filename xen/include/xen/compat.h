@@ -163,6 +163,8 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...);
 /* In-place translation functons: */
 struct start_info;
 void xlat_start_info(struct start_info *, enum XLAT_start_info_console);
+struct vcpu_runstate_info;
+void xlat_vcpu_runstate_info(struct vcpu_runstate_info *);
 
 #define BITS_PER_GUEST_LONG(d) (!IS_COMPAT(d) ? BITS_PER_LONG : COMPAT_BITS_PER_LONG)
 

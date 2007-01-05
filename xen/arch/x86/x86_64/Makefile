@@ -4,6 +4,7 @@ obj-y += mm.o
 obj-y += traps.o
 
 obj-$(CONFIG_COMPAT) += compat.o
+obj-$(CONFIG_COMPAT) += domain.o
 obj-$(CONFIG_COMPAT) += physdev.o
 
 ifeq ($(CONFIG_COMPAT),y)

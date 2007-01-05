@@ -130,6 +130,10 @@ compat_physdev_op(
     int cmd,
     XEN_GUEST_HANDLE(void) arg);
 
+extern int
+arch_compat_vcpu_op(
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
+
 #endif
 
 #endif /* __ASM_X86_HYPERCALL_H__ */

@@ -40,6 +40,9 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
+#ifdef CONFIG_COMPAT
+#include <compat/vcpu.h>
+#endif
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
@@ -559,16 +562,16 @@ arch_do_vcpu_op(
             break;
 
         rc = 0;
-        v->runstate_guest = area.addr.h;
+        runstate_guest(v) = area.addr.h;
 
         if ( v == current )
         {
-            __copy_to_guest(v->runstate_guest, &v->runstate, 1);
+            __copy_to_guest(runstate_guest(v), &v->runstate, 1);
         }
         else
         {
             vcpu_runstate_get(v, &runstate);
-            __copy_to_guest(v->runstate_guest, &runstate, 1);
+            __copy_to_guest(runstate_guest(v), &runstate, 1);
         }
 
         break;
@@ -970,8 +973,20 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     context_saved(prev);
 
     /* Update per-VCPU guest runstate shared memory area (if registered). */
-    if ( !guest_handle_is_null(next->runstate_guest) )
-        __copy_to_guest(next->runstate_guest, &next->runstate, 1);
+    if ( !guest_handle_is_null(runstate_guest(next)) )
+    {
+        if ( !IS_COMPAT(next->domain) )
+            __copy_to_guest(runstate_guest(next), &next->runstate, 1);
+#ifdef CONFIG_COMPAT
+        else
+        {
+            struct compat_vcpu_runstate_info info;
+
+            XLAT_vcpu_runstate_info(&info, &next->runstate);
+            __copy_to_guest(next->runstate_guest.compat, &info, 1);
+        }
+#endif
+    }
 
     schedule_tail(next);
     BUG();

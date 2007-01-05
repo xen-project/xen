@@ -1,3 +1,4 @@
+obj-y += domain.o
 obj-y += kernel.o
 obj-y += memory.o
 obj-y += xlat.o

@@ -6,6 +6,9 @@
 !	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
+!	cpu_user_regs			arch-@arch@.h
+!	trap_info			arch-@arch@.h
+!	vcpu_guest_context		arch-@arch@.h
 ?	evtchn_alloc_unbound		event_channel.h
 ?	evtchn_bind_interdomain		event_channel.h
 ?	evtchn_bind_ipi			event_channel.h
@@ -23,3 +26,4 @@
 !	memory_map			memory.h
 !	memory_reservation		memory.h
 !	translate_gpfn_list		memory.h
+!	vcpu_runstate_info		vcpu.h

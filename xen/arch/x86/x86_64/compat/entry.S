@@ -284,7 +284,6 @@ CFIX14:
 #define compat_multicall domain_crash_synchronous
 #define compat_set_timer_op domain_crash_synchronous
 #define compat_grant_table_op domain_crash_synchronous
-#define compat_vcpu_op domain_crash_synchronous
 #define compat_acm_op domain_crash_synchronous
 #define compat_arch_sched_op domain_crash_synchronous
 #define compat_xenoprof_op domain_crash_synchronous

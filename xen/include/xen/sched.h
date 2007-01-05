@@ -18,6 +18,11 @@
 #include <xen/xenoprof.h>
 #include <xen/irq.h>
 
+#ifdef CONFIG_COMPAT
+#include <compat/vcpu.h>
+DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
+#endif
+
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
 
@@ -82,7 +87,16 @@ struct vcpu
     void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;
+#ifndef CONFIG_COMPAT
+# define runstate_guest(v) ((v)->runstate_guest)
     XEN_GUEST_HANDLE(vcpu_runstate_info_t) runstate_guest; /* guest address */
+#else
+# define runstate_guest(v) ((v)->runstate_guest.native)
+    union {
+        XEN_GUEST_HANDLE(vcpu_runstate_info_t) native;
+        XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t) compat;
+    } runstate_guest; /* guest address */
+#endif
 
     unsigned long    vcpu_flags;
 
