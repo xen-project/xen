@@ -85,9 +85,15 @@ static uint8_t opcode_table[256] = {
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x40 - 0x4F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x50 - 0x5F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
+    ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x60 - 0x6F */
     0, 0, 0, DstReg|SrcMem32|ModRM|Mov /* movsxd (x86/64) */,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -864,8 +870,8 @@ x86_emulate_memop(
         dst.val = src.val;
         break;
     case 0x8f: /* pop (sole member of Grp1a) */
-        /* 64-bit mode: POP always pops a 64-bit operand. */
-        if ( mode == X86EMUL_MODE_PROT64 )
+        /* 64-bit mode: POP defaults to a 64-bit operand. */
+        if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
             dst.bytes = 8;
         if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
                              &dst.val, dst.bytes, ctxt)) != 0 )
@@ -940,8 +946,8 @@ x86_emulate_memop(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 6: /* push */
-            /* 64-bit mode: PUSH always pushes a 64-bit operand. */
-            if ( mode == X86EMUL_MODE_PROT64 )
+            /* 64-bit mode: PUSH defaults to a 64-bit operand. */
+            if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
             {
                 dst.bytes = 8;
                 if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
@@ -1011,6 +1017,37 @@ x86_emulate_memop(
     }
     switch ( b )
     {
+    case 0x40 ... 0x4f: /* inc/dec reg */
+        dst.type  = OP_REG;
+        dst.reg   = decode_register(b&7, &_regs, 0);
+        dst.bytes = op_bytes;
+        dst.orig_val = dst.val = *dst.reg;
+        if ( b & 8 )
+            emulate_1op("dec", dst, _regs.eflags);
+        else
+            emulate_1op("inc", dst, _regs.eflags);
+        break;
+    case 0x50 ... 0x57: /* push reg */
+        dst.type  = OP_MEM;
+        dst.bytes = op_bytes;
+        if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
+            dst.bytes = 8;
+        dst.val = *(unsigned long *)decode_register(b&7, &_regs, 0);
+        register_address_increment(_regs.esp, -dst.bytes);
+        dst.mem.seg = x86_seg_ss;
+        dst.mem.off = truncate_ea(_regs.esp);
+        break;
+    case 0x58 ... 0x5f: /* pop reg */
+        dst.type  = OP_REG;
+        dst.reg   = decode_register(b&7, &_regs, 0);
+        dst.bytes = op_bytes;
+        if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
+            dst.bytes = 8;
+        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+                             &dst.val, dst.bytes, ctxt)) != 0 )
+            goto done;
+        register_address_increment(_regs.esp, dst.bytes);
+        break;
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
         /* Source EA is not encoded via ModRM. */
         dst.type  = OP_REG;
