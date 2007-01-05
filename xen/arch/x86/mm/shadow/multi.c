@@ -2106,7 +2106,6 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
             shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
             sh_unmap_domain_page(l3e);
         }
-        shadow_free(d, mmfn);
         sh_unmap_domain_page(l4e);
     }
 #elif CONFIG_PAGING_LEVELS == 3

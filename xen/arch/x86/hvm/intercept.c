@@ -182,7 +182,7 @@ int hvm_buffered_io_intercept(ioreq_t *p)
     spin_lock(buffered_io_lock);
 
     if ( buffered_iopage->write_pointer - buffered_iopage->read_pointer ==
-         (unsigned long)IOREQ_BUFFER_SLOT_NUM ) {
+         (unsigned int)IOREQ_BUFFER_SLOT_NUM ) {
         /* the queue is full.
          * send the iopacket through the normal path.
          * NOTE: The arithimetic operation could handle the situation for

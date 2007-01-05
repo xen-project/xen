@@ -313,7 +313,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_xenoprof_op
         .quad do_event_channel_op
         .quad compat_physdev_op
-        .quad compat_ni_hypercall
+        .quad do_hvm_op
         .quad compat_sysctl             /* 35 */
         .quad compat_domctl
         .quad compat_kexec_op
@@ -356,7 +356,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 2 /* compat_xenoprof_op       */
         .byte 2 /* compat_event_channel_op  */
         .byte 2 /* compat_physdev_op        */
-        .byte 0 /* compat_ni_hypercall      */
+        .byte 2 /* do_hvm_op                */
         .byte 1 /* compat_sysctl            */  /* 35 */
         .byte 1 /* compat_domctl            */
         .byte 2 /* compat_kexec_op          */

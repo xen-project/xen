@@ -1395,7 +1395,11 @@ void domain_relinquish_resources(struct domain *d)
 #ifdef CONFIG_COMPAT
         if ( IS_COMPAT(d) )
         {
-            pfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
+            if ( is_hvm_vcpu(v) )
+                pfn = pagetable_get_pfn(v->arch.guest_table);
+            else
+                pfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
+
             if ( pfn != 0 )
             {
                 if ( shadow_mode_refcounts(d) )
