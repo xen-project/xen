@@ -1084,10 +1084,10 @@ x86_emulate(
         if ( !(rex_prefix & 1) )
             break; /* nop */
     case 0x91 ... 0x97: /* xchg reg,%%rax */
-        src.type = OP_REG;
+        src.type = dst.type = OP_REG;
+        src.bytes = dst.bytes = op_bytes;
         src.reg  = (unsigned long *)&_regs.eax;
         src.val  = *src.reg;
-        dst.type = OP_REG;
         dst.reg  = decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         dst.val  = dst.orig_val = *dst.reg;
