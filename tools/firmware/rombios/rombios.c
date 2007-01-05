@@ -1435,10 +1435,17 @@ void
 copy_e820_table()
 {
   Bit8u nr_entries = read_byte(0x9000, 0x1e8);
+  Bit32u base_mem;
   if (nr_entries > 32)
   	nr_entries = 32;
   write_word(0xe000, 0x8, nr_entries);
   memcpyb(0xe000, 0x10, 0x9000, 0x2d0, nr_entries * 0x14);
+  /* Report the proper base memory size at address 0x0413: otherwise
+   * non-e820 code will clobber things if BASE_MEM_IN_K is bigger than
+   * the first e820 entry.  Get the size by reading the second 64bit 
+   * field of the first e820 slot. */ 
+  base_mem = read_dword(0x9000, 0x2d0 + 8);
+  write_word(0x40, 0x13, base_mem >> 10);
 }
 #endif /* HVMASSIST */
 
