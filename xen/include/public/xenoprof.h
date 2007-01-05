@@ -74,8 +74,10 @@ struct xenoprof_buf {
     uint64_t lost_samples;
     struct event_log event_log[1];
 };
+#ifndef __XEN__
 typedef struct xenoprof_buf xenoprof_buf_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_buf_t);
+#endif
 
 struct xenoprof_init {
     int32_t  num_events;

@@ -38,3 +38,5 @@
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
 !	vcpu_runstate_info		vcpu.h
+?	xenoprof_init			xenoprof.h
+?	xenoprof_passive		xenoprof.h
