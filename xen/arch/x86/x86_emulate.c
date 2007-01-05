@@ -19,15 +19,6 @@
 #endif
 #include <asm-x86/x86_emulate.h>
 
-/*
- * Opcode effective-address decode tables.
- * Note that we only emulate instructions that have at least one memory
- * operand (excluding implicit stack references). We assume that stack
- * references and instruction fetches will never occur in special memory
- * areas that require emulation. So, for example, 'mov <imm>,<reg>' need
- * not be handled.
- */
-
 /* Operand sizes: 8-bit operands or specified/overridden size. */
 #define ByteOp      (1<<0) /* 8-bit operands. */
 /* Destination operand type. */
