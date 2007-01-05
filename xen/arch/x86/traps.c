@@ -382,7 +382,7 @@ static int do_guest_trap(
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
 
-    if ( unlikely(null_trap_bounce(tb)) )
+    if ( unlikely(null_trap_bounce(v, tb)) )
         gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] in "
                  "domain %d on VCPU %d [ec=%04x]\n",
                  trapstr(trapnr), trapnr, v->domain->domain_id, v->vcpu_id,
@@ -673,7 +673,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
-    if ( unlikely(null_trap_bounce(tb)) )
+    if ( unlikely(null_trap_bounce(v, tb)) )
     {
         printk("Unhandled page fault in domain %d on VCPU %d (ec=%04X)\n",
                v->domain->domain_id, v->vcpu_id, error_code);
@@ -1785,6 +1785,13 @@ void set_tss_desc(unsigned int n, void *addr)
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
+#ifdef CONFIG_COMPAT
+    _set_tssldt_desc(
+        compat_gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)addr,
+        offsetof(struct tss_struct, __cacheline_filler) - 1,
+        11);
+#endif
 }
 
 void __init trap_init(void)
@@ -1859,7 +1866,7 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
         if ( cur.address == 0 )
             break;
 
-        fixup_guest_code_selector(cur.cs);
+        fixup_guest_code_selector(current->domain, cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
 

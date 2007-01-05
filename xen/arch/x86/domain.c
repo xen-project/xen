@@ -283,17 +283,18 @@ int arch_set_info_guest(
 
     if ( !is_hvm_vcpu(v) )
     {
-        fixup_guest_stack_selector(c->user_regs.ss);
-        fixup_guest_stack_selector(c->kernel_ss);
-        fixup_guest_code_selector(c->user_regs.cs);
+        fixup_guest_stack_selector(d, c->user_regs.ss);
+        fixup_guest_stack_selector(d, c->kernel_ss);
+        fixup_guest_code_selector(d, c->user_regs.cs);
 
-#ifdef __i386__
-        fixup_guest_code_selector(c->event_callback_cs);
-        fixup_guest_code_selector(c->failsafe_callback_cs);
-#endif
+        if ( CONFIG_PAGING_LEVELS < 4 || IS_COMPAT(d) )
+        {
+            fixup_guest_code_selector(d, c->event_callback_cs);
+            fixup_guest_code_selector(d, c->failsafe_callback_cs);
+        }
 
         for ( i = 0; i < 256; i++ )
-            fixup_guest_code_selector(c->trap_ctxt[i].cs);
+            fixup_guest_code_selector(d, c->trap_ctxt[i].cs);
 
         /* LDT safety checks. */
         if ( ((c->ldt_base & (PAGE_SIZE-1)) != 0) || 
@@ -489,27 +490,30 @@ static void load_segments(struct vcpu *n)
             all_segs_okay &= loadsegment(gs, nctxt->user_regs.gs);
     }
 
-    /* This can only be non-zero if selector is NULL. */
-    if ( nctxt->fs_base )
-        wrmsr(MSR_FS_BASE,
-              nctxt->fs_base,
-              nctxt->fs_base>>32);
+    if ( !IS_COMPAT(n->domain) )
+    {
+        /* This can only be non-zero if selector is NULL. */
+        if ( nctxt->fs_base )
+            wrmsr(MSR_FS_BASE,
+                  nctxt->fs_base,
+                  nctxt->fs_base>>32);
 
-    /* Most kernels have non-zero GS base, so don't bother testing. */
-    /* (This is also a serialising instruction, avoiding AMD erratum #88.) */
-    wrmsr(MSR_SHADOW_GS_BASE,
-          nctxt->gs_base_kernel,
-          nctxt->gs_base_kernel>>32);
+        /* Most kernels have non-zero GS base, so don't bother testing. */
+        /* (This is also a serialising instruction, avoiding AMD erratum #88.) */
+        wrmsr(MSR_SHADOW_GS_BASE,
+              nctxt->gs_base_kernel,
+              nctxt->gs_base_kernel>>32);
 
-    /* This can only be non-zero if selector is NULL. */
-    if ( nctxt->gs_base_user )
-        wrmsr(MSR_GS_BASE,
-              nctxt->gs_base_user,
-              nctxt->gs_base_user>>32);
+        /* This can only be non-zero if selector is NULL. */
+        if ( nctxt->gs_base_user )
+            wrmsr(MSR_GS_BASE,
+                  nctxt->gs_base_user,
+                  nctxt->gs_base_user>>32);
 
-    /* If in kernel mode then switch the GS bases around. */
-    if ( n->arch.flags & TF_kernel_mode )
-        __asm__ __volatile__ ( "swapgs" );
+        /* If in kernel mode then switch the GS bases around. */
+        if ( (n->arch.flags & TF_kernel_mode) )
+            __asm__ __volatile__ ( "swapgs" );
+    }
 
     if ( unlikely(!all_segs_okay) )
     {
@@ -519,6 +523,55 @@ static void load_segments(struct vcpu *n)
             (unsigned long *)regs->rsp :
             (unsigned long *)nctxt->kernel_sp;
         unsigned long cs_and_mask, rflags;
+
+        if ( IS_COMPAT(n->domain) )
+        {
+            unsigned int *esp = ring_1(regs) ?
+                                (unsigned int *)regs->rsp :
+                                (unsigned int *)nctxt->kernel_sp;
+            unsigned int cs_and_mask, eflags;
+            int ret = 0;
+
+            /* CS longword also contains full evtchn_upcall_mask. */
+            cs_and_mask = (unsigned short)regs->cs |
+                ((unsigned int)n->vcpu_info->evtchn_upcall_mask << 16);
+            /* Fold upcall mask into RFLAGS.IF. */
+            eflags  = regs->_eflags & ~X86_EFLAGS_IF;
+            eflags |= !n->vcpu_info->evtchn_upcall_mask << 9;
+
+            if ( !ring_1(regs) )
+            {
+                ret  = put_user(regs->ss,       esp-1);
+                ret |= put_user(regs->_esp,     esp-2);
+                esp -= 2;
+            }
+
+            if ( ret |
+                 put_user(eflags,              esp-1) |
+                 put_user(cs_and_mask,         esp-2) |
+                 put_user(regs->_eip,          esp-3) |
+                 put_user(nctxt->user_regs.gs, esp-4) |
+                 put_user(nctxt->user_regs.fs, esp-5) |
+                 put_user(nctxt->user_regs.es, esp-6) |
+                 put_user(nctxt->user_regs.ds, esp-7) )
+            {
+                gdprintk(XENLOG_ERR, "Error while creating compat "
+                         "failsafe callback frame.\n");
+                domain_crash(n->domain);
+            }
+
+            if ( test_bit(_VGCF_failsafe_disables_events,
+                          &n->arch.guest_context.flags) )
+                n->vcpu_info->evtchn_upcall_mask = 1;
+
+            regs->entry_vector  = TRAP_syscall;
+            regs->_eflags      &= 0xFFFCBEFFUL;
+            regs->ss            = FLAT_COMPAT_KERNEL_SS;
+            regs->_esp          = (unsigned long)(esp-7);
+            regs->cs            = FLAT_COMPAT_KERNEL_CS;
+            regs->_eip          = nctxt->failsafe_callback_eip;
+            return;
+        }
 
         if ( !(n->arch.flags & TF_kernel_mode) )
             toggle_guest_mode(n);
@@ -581,7 +634,7 @@ static void save_segments(struct vcpu *v)
     if ( regs->es )
         dirty_segment_mask |= DIRTY_ES;
 
-    if ( regs->fs )
+    if ( regs->fs || IS_COMPAT(v->domain) )
     {
         dirty_segment_mask |= DIRTY_FS;
         ctxt->fs_base = 0; /* != 0 selector kills fs_base */
@@ -591,7 +644,7 @@ static void save_segments(struct vcpu *v)
         dirty_segment_mask |= DIRTY_FS_BASE;
     }
 
-    if ( regs->gs )
+    if ( regs->gs || IS_COMPAT(v->domain) )
     {
         dirty_segment_mask |= DIRTY_GS;
         ctxt->gs_base_user = 0; /* != 0 selector kills gs_base_user */
@@ -725,6 +778,23 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     else
     {
         __context_switch();
+
+#ifdef CONFIG_COMPAT
+        if ( is_idle_vcpu(prev)
+             || IS_COMPAT(prev->domain) != IS_COMPAT(next->domain) )
+        {
+            uint32_t efer_lo, efer_hi;
+
+            local_flush_tlb_one(GDT_VIRT_START(next) + FIRST_RESERVED_GDT_BYTE);
+
+            rdmsr(MSR_EFER, efer_lo, efer_hi);
+            if ( !IS_COMPAT(next->domain) == !(efer_lo & EFER_SCE) )
+            {
+                efer_lo ^= EFER_SCE;
+                wrmsr(MSR_EFER, efer_lo, efer_hi);
+            }
+        }
+#endif
 
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
@@ -938,6 +1008,10 @@ void domain_relinquish_resources(struct domain *d)
                 put_page(mfn_to_page(pfn));
             else
                 put_page_and_type(mfn_to_page(pfn));
+#ifdef __x86_64__
+            if ( pfn == pagetable_get_pfn(v->arch.guest_table_user) )
+                v->arch.guest_table_user = pagetable_null();
+#endif
             v->arch.guest_table = pagetable_null();
         }
 

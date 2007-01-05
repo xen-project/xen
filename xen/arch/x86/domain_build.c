@@ -319,10 +319,38 @@ int construct_dom0(struct domain *d,
 
     nr_pages = compute_dom0_nr_pages();
 
-    if ( (rc = parseelfimage(&dsi)) != 0 )
-        return rc;
+    rc = parseelfimage(&dsi);
+#ifdef CONFIG_COMPAT
+    if ( rc == -ENOSYS
+         && (rc = parseelf32image(&dsi)) == 0 )
+    {
+        l1_pgentry_t gdt_l1e;
 
-    xen_pae  = (CONFIG_PAGING_LEVELS == 3);
+        set_bit(_DOMF_compat, &d->domain_flags);
+
+        if ( nr_pages != (unsigned int)nr_pages )
+            nr_pages = UINT_MAX;
+
+        /*
+         * Map compatibility Xen segments into every VCPU's GDT. See
+         * arch_domain_create() for further comments.
+         */
+        gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table),
+                                PAGE_HYPERVISOR);
+        for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+            d->arch.mm_perdomain_pt[((i << GDT_LDT_VCPU_SHIFT) +
+                                     FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
+        local_flush_tlb_one(GDT_LDT_VIRT_START + FIRST_RESERVED_GDT_BYTE);
+    }
+#endif
+    if ( rc != 0)
+    {
+        if ( rc == -ENOSYS )
+            printk("DOM0 image is not a Xen-compatible Elf image.\n");
+       return rc;
+    }
+
+    xen_pae  = (CONFIG_PAGING_LEVELS == 3) || IS_COMPAT(d);
     if (dsi.pae_kernel == PAEKERN_bimodal)
         dom0_pae = xen_pae; 
     else
@@ -338,7 +366,13 @@ int construct_dom0(struct domain *d,
             dsi.pae_kernel == PAEKERN_bimodal) )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
-    if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+        p = xen_elf32note_string(&dsi, XEN_ELFNOTE_FEATURES);
+    else
+#endif
+        p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES);
+    if ( p != NULL )
     {
         parse_features(p,
                        dom0_features_supported,
@@ -590,6 +624,12 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
+    if ( IS_COMPAT(d) )
+    {
+        v->arch.guest_context.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
+        v->arch.guest_context.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
+    }
+
     /* WARNING: The new domain must have its 'processor' field filled in! */
     maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
     l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
@@ -599,6 +639,8 @@ int construct_dom0(struct domain *d,
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
+    if ( IS_COMPAT(d) )
+        v->arch.guest_table_user = v->arch.guest_table;
 
     l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_spfn;
@@ -711,10 +753,20 @@ int construct_dom0(struct domain *d,
     write_ptbase(v);
 
     /* Copy the OS image and free temporary buffer. */
-    (void)loadelfimage(&dsi);
-
-    hypercall_page =
-        xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &hypercall_page_defined);
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+    {
+        (void)loadelf32image(&dsi);
+        hypercall_page =
+            xen_elf32note_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &hypercall_page_defined);
+    }
+    else
+#endif
+    {
+        (void)loadelfimage(&dsi);
+        hypercall_page =
+            xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &hypercall_page_defined);
+    }
     if ( hypercall_page_defined )
     {
         if ( (hypercall_page < dsi.v_start) || (hypercall_page >= v_end) )
@@ -747,7 +799,7 @@ int construct_dom0(struct domain *d,
     si->mfn_list     = vphysmap_start;
     sprintf(si->magic, "xen-%i.%i-x86_%d%s",
             xen_major_version(), xen_minor_version(),
-            BITS_PER_LONG, xen_pae ? "p" : "");
+            !IS_COMPAT(d) ? BITS_PER_LONG : 32, xen_pae ? "p" : "");
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
@@ -819,9 +871,11 @@ int construct_dom0(struct domain *d,
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
     regs = &v->arch.guest_context.user_regs;
-    regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
-    regs->ss = FLAT_KERNEL_SS;
-    regs->cs = FLAT_KERNEL_CS;
+    regs->ds = regs->es = regs->fs = regs->gs = !IS_COMPAT(d)
+                                                ? FLAT_KERNEL_DS
+                                                : FLAT_COMPAT_KERNEL_DS;
+    regs->ss = !IS_COMPAT(d) ? FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS;
+    regs->cs = !IS_COMPAT(d) ? FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS;
     regs->eip = dsi.v_kernentry;
     regs->esp = vstack_end;
     regs->esi = vstartinfo_start;
@@ -906,12 +960,27 @@ int elf_sanity_check(const Elf_Ehdr *ehdr)
          (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
          (ehdr->e_type != ET_EXEC) )
     {
-        printk("DOM0 image is not a Xen-compatible Elf image.\n");
         return 0;
     }
 
     return 1;
 }
+
+#ifdef CONFIG_COMPAT
+int elf32_sanity_check(const Elf32_Ehdr *ehdr)
+{
+    if ( !IS_ELF(*ehdr) ||
+         (ehdr->e_ident[EI_CLASS] != ELFCLASS32) ||
+         (ehdr->e_machine != EM_386) ||
+         (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
+         (ehdr->e_type != ET_EXEC) )
+    {
+        return 0;
+    }
+
+    return 1;
+}
+#endif
 
 /*
  * Local variables:

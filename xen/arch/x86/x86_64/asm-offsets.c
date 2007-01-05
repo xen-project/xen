@@ -58,12 +58,16 @@ void __dummy__(void)
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
     OFFSET(VCPU_event_addr, struct vcpu,
            arch.guest_context.event_callback_eip);
+    OFFSET(VCPU_event_sel, struct vcpu,
+           arch.guest_context.event_callback_cs);
     OFFSET(VCPU_failsafe_addr, struct vcpu,
            arch.guest_context.failsafe_callback_eip);
+    OFFSET(VCPU_failsafe_sel, struct vcpu,
+           arch.guest_context.failsafe_callback_cs);
     OFFSET(VCPU_syscall_addr, struct vcpu,
            arch.guest_context.syscall_callback_eip);
-    OFFSET(VCPU_kernel_sp, struct vcpu,
-           arch.guest_context.kernel_sp);
+    OFFSET(VCPU_kernel_sp, struct vcpu, arch.guest_context.kernel_sp);
+    OFFSET(VCPU_kernel_ss, struct vcpu, arch.guest_context.kernel_ss);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
     OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
     OFFSET(VCPU_flags, struct vcpu, vcpu_flags);

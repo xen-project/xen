@@ -3,6 +3,7 @@ obj-y += bitmap.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += elf.o
+obj-$(CONFIG_COMPAT) += elf32.o
 obj-y += event_channel.o
 obj-y += grant_table.o
 obj-y += kernel.o

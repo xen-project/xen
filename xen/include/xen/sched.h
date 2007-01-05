@@ -422,6 +422,9 @@ extern struct domain *domain_list;
  /* Domain is paused by the hypervisor? */
 #define _DOMF_paused           5
 #define DOMF_paused            (1UL<<_DOMF_paused)
+ /* Domain is a compatibility one? */
+#define _DOMF_compat           6
+#define DOMF_compat            (1UL<<_DOMF_compat)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
@@ -457,6 +460,13 @@ static inline void vcpu_unblock(struct vcpu *v)
 }
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
+
+#ifdef CONFIG_COMPAT
+#define IS_COMPAT(_d)                                       \
+    (test_bit(_DOMF_compat, &(_d)->domain_flags))
+#else
+#define IS_COMPAT(_d) 0
+#endif
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

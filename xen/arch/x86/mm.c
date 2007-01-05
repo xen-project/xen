@@ -433,7 +433,7 @@ static int alloc_segdesc_page(struct page_info *page)
     descs = map_domain_page(page_to_mfn(page));
 
     for ( i = 0; i < 512; i++ )
-        if ( unlikely(!check_descriptor(&descs[i])) )
+        if ( unlikely(!check_descriptor(page_get_owner(page), &descs[i])) )
             goto fail;
 
     unmap_domain_page(descs);
@@ -2835,7 +2835,7 @@ long do_update_descriptor(u64 pa, u64 desc)
     mfn = gmfn_to_mfn(dom, gmfn);
     if ( (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
          !mfn_valid(mfn) ||
-         !check_descriptor(&d) )
+         !check_descriptor(dom, &d) )
     {
         UNLOCK_BIGLOCK(dom);
         return -EINVAL;

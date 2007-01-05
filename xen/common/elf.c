@@ -203,7 +203,7 @@ int parseelfimage(struct domain_setup_info *dsi)
     int h, virt_base_defined, elf_pa_off_defined, virt_entry_defined;
 
     if ( !elf_sanity_check(ehdr) )
-        return -EINVAL;
+        return -ENOSYS;
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum*ehdr->e_phentsize)) > image_len )
     {

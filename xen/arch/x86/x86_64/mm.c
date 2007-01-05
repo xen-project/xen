@@ -231,7 +231,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
-    fixup_guest_stack_selector(ss);
+    fixup_guest_stack_selector(current->domain, ss);
     current->arch.guest_context.kernel_ss = ss;
     current->arch.guest_context.kernel_sp = esp;
     return 0;
@@ -291,7 +291,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 
 
 /* Returns TRUE if given descriptor is valid for GDT or LDT. */
-int check_descriptor(struct desc_struct *d)
+int check_descriptor(const struct domain *dom, struct desc_struct *d)
 {
     u32 a = d->a, b = d->b;
     u16 cs;
@@ -301,8 +301,8 @@ int check_descriptor(struct desc_struct *d)
         goto good;
 
     /* Check and fix up the DPL. */
-    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL << 13) )
-        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL << 13);
+    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL(dom) << 13) )
+        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL(dom) << 13);
 
     /* All code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )
@@ -318,8 +318,8 @@ int check_descriptor(struct desc_struct *d)
 
     /* Validate and fix up the target code selector. */
     cs = a >> 16;
-    fixup_guest_code_selector(cs);
-    if ( !guest_gate_selector_okay(cs) )
+    fixup_guest_code_selector(dom, cs);
+    if ( !guest_gate_selector_okay(dom, cs) )
         goto bad;
     a = d->a = (d->a & 0xffffU) | (cs << 16);
 

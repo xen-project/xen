@@ -87,6 +87,7 @@
 #if defined(__x86_64__)
 
 #define CONFIG_X86_64 1
+#define CONFIG_COMPAT 1
 
 #define asmlinkage
 
@@ -181,13 +182,21 @@
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
 
+#define __HYPERVISOR_COMPAT_VIRT_START 0xF5800000
+#define HYPERVISOR_COMPAT_VIRT_START   \
+    mk_unsigned_long(__HYPERVISOR_COMPAT_VIRT_START)
+#define MACH2PHYS_COMPAT_VIRT_START    HYPERVISOR_COMPAT_VIRT_START
+#define MACH2PHYS_COMPAT_VIRT_END      0xFFE00000
+#define MACH2PHYS_COMPAT_NR_ENTRIES    \
+    ((MACH2PHYS_COMPAT_VIRT_END-MACH2PHYS_COMPAT_VIRT_START)>>2)
+
 #define PGT_base_page_table     PGT_l4_page_table
 
-#define __HYPERVISOR_CS64 0xe010
-#define __HYPERVISOR_CS32 0xe008
+#define __HYPERVISOR_CS64 0xe008
+#define __HYPERVISOR_CS32 0xe038
 #define __HYPERVISOR_CS   __HYPERVISOR_CS64
 #define __HYPERVISOR_DS64 0x0000
-#define __HYPERVISOR_DS32 0xe018
+#define __HYPERVISOR_DS32 0xe010
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
 
 /* For generic assembly code: use macros to define operation/operand sizes. */

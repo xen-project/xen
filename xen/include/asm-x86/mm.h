@@ -244,7 +244,7 @@ unsigned long
 pae_copy_root(struct vcpu *v, l3_pgentry_t *l3tab);
 #endif /* CONFIG_PAGING_LEVELS == 3 */
 
-int check_descriptor(struct desc_struct *d);
+int check_descriptor(const struct domain *, struct desc_struct *d);
 
 /*
  * The MPT (machine->physical mapping table) is an array of word-sized

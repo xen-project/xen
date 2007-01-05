@@ -178,6 +178,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 
 void toggle_guest_mode(struct vcpu *v)
 {
+    if ( IS_COMPAT(v->domain) )
+        return;
     v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
     update_cr3(v);

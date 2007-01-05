@@ -791,6 +791,9 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
 #elif defined(CONFIG_X86_64)
 
     p += sprintf(p, "xen-%d.%d-x86_64 ", major, minor);
+#ifdef CONFIG_COMPAT
+    p += sprintf(p, "xen-%d.%d-x86_32p ", major, minor);
+#endif
     if ( hvm_enabled )
     {
         p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);

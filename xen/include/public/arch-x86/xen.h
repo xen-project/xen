@@ -141,7 +141,17 @@ struct vcpu_guest_context {
 #else
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_eip;
+#ifdef __XEN__
+    union {
+        unsigned long syscall_callback_eip;
+        struct {
+            unsigned int event_callback_cs;    /* compat CS of event cb     */
+            unsigned int failsafe_callback_cs; /* compat CS of failsafe cb  */
+        };
+    };
+#else
     unsigned long syscall_callback_eip;
+#endif
 #endif
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 #ifdef __x86_64__
