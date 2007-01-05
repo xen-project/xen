@@ -108,7 +108,7 @@
 /*
  * Memory layout:
  *  0x0000000000000000 - 0x00007fffffffffff [128TB, 2^47 bytes, PML4:0-255]
- *    Guest-defined use.
+ *    Guest-defined use (see below for compatibility mode guests).
  *  0x0000800000000000 - 0xffff7fffffffffff [16EB]
  *    Inaccessible: current arch only supports 48-bit sign-extended VAs.
  *  0xffff800000000000 - 0xffff803fffffffff [256GB, 2^38 bytes, PML4:256]
@@ -141,6 +141,18 @@
  *    Reserved for future use.
  *  0xffff880000000000 - 0xffffffffffffffff [120TB, PML4:272-511]
  *    Guest-defined use.
+ *
+ * Compatibility guest area layout:
+ *  0x0000000000000000 - 0x00000000f57fffff [3928MB,            PML4:0]
+ *    Guest-defined use.
+ *  0x0000000f58000000 - 0x00000000ffffffff [168MB,             PML4:0]
+ *    Read-only machine-to-phys translation table (GUEST ACCESSIBLE).
+ *  0x0000000000000000 - 0x00000000ffffffff [508GB,             PML4:0]
+ *    Unused.
+ *  0x0000008000000000 - 0x000000ffffffffff [512GB, 2^39 bytes, PML4:1]
+ *    Hypercall argument translation area.
+ *  0x0000010000000000 - 0x00007fffffffffff [127TB, 2^46 bytes, PML4:2-255]
+ *    Reserved for future use.
  */
 
 
@@ -209,6 +221,14 @@
     (COMPAT_L2_PAGETABLE_LAST_XEN_SLOT - COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d) + 1)
 
 #endif
+
+#define COMPAT_ARG_XLAT_VIRT_BASE      (1UL << ROOT_PAGETABLE_SHIFT)
+#define COMPAT_ARG_XLAT_SHIFT          0
+#define COMPAT_ARG_XLAT_PAGES          (1U << COMPAT_ARG_XLAT_SHIFT)
+#define COMPAT_ARG_XLAT_SIZE           (COMPAT_ARG_XLAT_PAGES << PAGE_SHIFT)
+#define COMPAT_ARG_XLAT_VIRT_START(vcpu_id) \
+    (COMPAT_ARG_XLAT_VIRT_BASE + ((unsigned long)(vcpu_id) << \
+                                  (PAGE_SHIFT + COMPAT_ARG_XLAT_SHIFT + 1)))
 
 #define PGT_base_page_table     PGT_l4_page_table
 

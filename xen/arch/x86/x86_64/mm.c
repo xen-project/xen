@@ -28,6 +28,7 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
+#include <asm/hypercall.h>
 #include <asm/msr.h>
 #include <public/memory.h>
 
@@ -406,6 +407,8 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
  bad:
     return 0;
 }
+
+#include "compat/mm.c"
 
 /*
  * Local variables:

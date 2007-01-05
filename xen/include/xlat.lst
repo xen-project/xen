@@ -4,3 +4,9 @@
 ?	dom0_vga_console_info		xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
+!	add_to_physmap			memory.h
+!	foreign_memory_map		memory.h
+!	memory_exchange			memory.h
+!	memory_map			memory.h
+!	memory_reservation		memory.h
+!	translate_gpfn_list		memory.h

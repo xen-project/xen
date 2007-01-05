@@ -158,6 +158,8 @@
 
 extern int compat_disabled;
 
+int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...);
+
 /* In-place translation functons: */
 struct start_info;
 void xlat_start_info(struct start_info *, enum XLAT_start_info_console);

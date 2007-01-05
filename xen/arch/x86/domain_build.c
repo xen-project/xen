@@ -688,7 +688,11 @@ int construct_dom0(struct domain *d,
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
     if ( IS_COMPAT(d) )
+    {
         v->arch.guest_table_user = v->arch.guest_table;
+        if ( setup_arg_xlat_area(v, l4start) < 0 )
+            panic("Not enough RAM for domain 0 hypercall argument translation.\n");
+    }
 
     l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_spfn;

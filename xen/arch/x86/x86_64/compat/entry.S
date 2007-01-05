@@ -282,15 +282,11 @@ CFIX14:
 #define compat_mmu_update domain_crash_synchronous
 #define compat_set_gdt domain_crash_synchronous
 #define compat_platform_op domain_crash_synchronous
-#define compat_update_descriptor domain_crash_synchronous
-#define compat_memory_op domain_crash_synchronous
 #define compat_multicall domain_crash_synchronous
-#define compat_update_va_mapping domain_crash_synchronous
 #define compat_set_timer_op domain_crash_synchronous
 #define compat_event_channel_op_compat domain_crash_synchronous
 #define compat_physdev_op_compat domain_crash_synchronous
 #define compat_grant_table_op domain_crash_synchronous
-#define compat_update_va_mapping_otherdomain domain_crash_synchronous
 #define compat_vcpu_op domain_crash_synchronous
 #define compat_mmuext_op domain_crash_synchronous
 #define compat_acm_op domain_crash_synchronous

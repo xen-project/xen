@@ -329,10 +329,20 @@ int __sync_lazy_execstate(void);
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
+#ifdef CONFIG_COMPAT
+int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void));
+int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE(void));
+#endif
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
 
 int map_ldt_shadow_page(unsigned int);
+
+#ifdef CONFIG_COMPAT
+int setup_arg_xlat_area(struct vcpu *, l4_pgentry_t *);
+#else
+# define setup_arg_xlat_area(vcpu, l4tab) 0
+#endif
 
 #endif /* __ASM_X86_MM_H__ */

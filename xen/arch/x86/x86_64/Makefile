@@ -6,5 +6,6 @@ obj-y += traps.o
 ifeq ($(CONFIG_COMPAT),y)
 # extra dependencies
 entry.o:	compat/entry.S
+mm.o:		compat/mm.c
 traps.o:	compat/traps.c
 endif

@@ -42,9 +42,17 @@ extern long
 do_platform_op(
     XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op);
 
+/*
+ * To allow safe resume of do_memory_op() after preemption, we need to know
+ * at what point in the page list to resume. For this purpose I steal the
+ * high-order bits of the @cmd parameter, which are otherwise unused and zero.
+ */
+#define MEMOP_EXTENT_SHIFT 4 /* cmd[:4] == start_extent */
+#define MEMOP_CMD_MASK     ((1 << MEMOP_EXTENT_SHIFT) - 1)
+
 extern long
 do_memory_op(
-    int cmd,
+    unsigned long cmd,
     XEN_GUEST_HANDLE(void) arg);
 
 extern long
@@ -107,5 +115,14 @@ do_kexec_op(
     unsigned long op,
     int arg1,
     XEN_GUEST_HANDLE(void) arg);
+
+#ifdef CONFIG_COMPAT
+
+extern int
+compat_memory_op(
+    unsigned int cmd,
+    XEN_GUEST_HANDLE(void) arg);
+
+#endif
 
 #endif /* __XEN_HYPERCALL_H__ */

@@ -1147,9 +1147,12 @@ static int alloc_l4_table(struct page_info *page)
     pl4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_pfn(pfn, __PAGE_HYPERVISOR);
     pl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(
-            virt_to_page(page_get_owner(page)->arch.mm_perdomain_l3),
-            __PAGE_HYPERVISOR);
+        l4e_from_page(virt_to_page(d->arch.mm_perdomain_l3),
+                      __PAGE_HYPERVISOR);
+    if ( IS_COMPAT(d) )
+        pl4e[l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
+            l4e_from_page(virt_to_page(d->arch.mm_arg_xlat_l3),
+                          __PAGE_HYPERVISOR);
 
     return 1;
 
@@ -2756,7 +2759,9 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             flush_tlb_mask(d->domain_dirty_cpumask);
             break;
         default:
-            if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
+            if ( unlikely(!IS_COMPAT(d) ?
+                          get_user(vmask, (unsigned long *)bmap_ptr) :
+                          get_user(vmask, (unsigned int *)bmap_ptr)) )
                 rc = -EFAULT;
             pmask = vcpumask_to_pcpumask(d, vmask);
             flush_tlb_mask(pmask);

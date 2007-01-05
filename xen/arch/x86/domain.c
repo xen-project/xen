@@ -128,10 +128,98 @@ void free_vcpu_struct(struct vcpu *v)
 }
 
 #ifdef CONFIG_COMPAT
+
+int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
+{
+    struct domain *d = v->domain;
+    unsigned i;
+    struct page_info *pg;
+
+    if ( !d->arch.mm_arg_xlat_l3 )
+    {
+        pg = alloc_domheap_page(NULL);
+        if ( !pg )
+            return -ENOMEM;
+        d->arch.mm_arg_xlat_l3 = clear_page(page_to_virt(pg));
+    }
+
+    l4tab[l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
+        l4e_from_paddr(__pa(d->arch.mm_arg_xlat_l3), __PAGE_HYPERVISOR);
+
+    for ( i = 0; i < COMPAT_ARG_XLAT_PAGES; ++i )
+    {
+        unsigned long va = COMPAT_ARG_XLAT_VIRT_START(v->vcpu_id) + i * PAGE_SIZE;
+        l2_pgentry_t *l2tab;
+        l1_pgentry_t *l1tab;
+
+        if ( !l3e_get_intpte(d->arch.mm_arg_xlat_l3[l3_table_offset(va)]) )
+        {
+            pg = alloc_domheap_page(NULL);
+            if ( !pg )
+                return -ENOMEM;
+            clear_page(page_to_virt(pg));
+            d->arch.mm_arg_xlat_l3[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR);
+        }
+        l2tab = l3e_to_l2e(d->arch.mm_arg_xlat_l3[l3_table_offset(va)]);
+        if ( !l2e_get_intpte(l2tab[l2_table_offset(va)]) )
+        {
+            pg = alloc_domheap_page(NULL);
+            if ( !pg )
+                return -ENOMEM;
+            clear_page(page_to_virt(pg));
+            l2tab[l2_table_offset(va)] = l2e_from_page(pg, __PAGE_HYPERVISOR);
+        }
+        l1tab = l2e_to_l1e(l2tab[l2_table_offset(va)]);
+        BUG_ON(l1e_get_intpte(l1tab[l1_table_offset(va)]));
+        pg = alloc_domheap_page(NULL);
+        if ( !pg )
+            return -ENOMEM;
+        l1tab[l1_table_offset(va)] = l1e_from_page(pg, PAGE_HYPERVISOR);
+    }
+
+    return 0;
+}
+
+static void release_arg_xlat_area(struct domain *d)
+{
+    if ( d->arch.mm_arg_xlat_l3 )
+    {
+        unsigned l3;
+
+        for ( l3 = 0; l3 < L3_PAGETABLE_ENTRIES; ++l3 )
+        {
+            if ( l3e_get_intpte(d->arch.mm_arg_xlat_l3[l3]) )
+            {
+                l2_pgentry_t *l2tab = l3e_to_l2e(d->arch.mm_arg_xlat_l3[l3]);
+                unsigned l2;
+
+                for ( l2 = 0; l2 < L2_PAGETABLE_ENTRIES; ++l2 )
+                {
+                    if ( l2e_get_intpte(l2tab[l2]) )
+                    {
+                        l1_pgentry_t *l1tab = l2e_to_l1e(l2tab[l2]);
+                        unsigned l1;
+
+                        for ( l1 = 0; l1 < L1_PAGETABLE_ENTRIES; ++l1 )
+                        {
+                            if ( l1e_get_intpte(l1tab[l1]) )
+                                free_domheap_page(l1e_get_page(l1tab[l1]));
+                        }
+                        free_domheap_page(l2e_get_page(l2tab[l2]));
+                    }
+                }
+                free_domheap_page(l3e_get_page(d->arch.mm_arg_xlat_l3[l3]));
+            }
+        }
+        free_domheap_page(virt_to_page(d->arch.mm_arg_xlat_l3));
+    }
+}
+
 static int setup_compat_l4(struct vcpu *v)
 {
     struct page_info *pg = alloc_domheap_page(NULL);
     l4_pgentry_t *l4tab;
+    int rc;
 
     if ( !pg )
         return -ENOMEM;
@@ -143,10 +231,26 @@ static int setup_compat_l4(struct vcpu *v)
     v->arch.guest_table = pagetable_from_page(pg);
     v->arch.guest_table_user = v->arch.guest_table;
 
+    if ( (rc = setup_arg_xlat_area(v, l4tab)) < 0 )
+    {
+        free_domheap_page(pg);
+        return rc;
+    }
+
     return 0;
 }
+
+static void release_compat_l4(struct vcpu *v)
+{
+    free_domheap_page(pagetable_get_page(v->arch.guest_table));
+    v->arch.guest_table = pagetable_null();
+    v->arch.guest_table_user = pagetable_null();
+}
+
 #else
+#define release_arg_xlat_area(d) ((void)0)
 #define setup_compat_l4(v) 0
+#define release_compat_l4(v) ((void)0)
 #endif
 
 int vcpu_initialise(struct vcpu *v)
@@ -192,7 +296,7 @@ int vcpu_initialise(struct vcpu *v)
 void vcpu_destroy(struct vcpu *v)
 {
     if ( IS_COMPAT(v->domain) )
-        free_domheap_page(pagetable_get_page(v->arch.guest_table));
+        release_compat_l4(v);
 }
 
 int arch_domain_create(struct domain *d)
@@ -300,6 +404,9 @@ void arch_domain_destroy(struct domain *d)
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
+
+    if ( IS_COMPAT(d) )
+        release_arg_xlat_area(d);
 
     free_xenheap_page(d->shared_info);
 }
@@ -935,55 +1042,153 @@ unsigned long hypercall_create_continuation(
 
         for ( i = 0; *p != '\0'; i++ )
             mcs->call.args[i] = next_arg(p, args);
+        if ( IS_COMPAT(current->domain) )
+        {
+            for ( ; i < 6; i++ )
+                mcs->call.args[i] = 0;
+        }
     }
     else
     {
         regs       = guest_cpu_user_regs();
-#if defined(__i386__)
         regs->eax  = op;
+        regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
 
-        if ( supervisor_mode_kernel || is_hvm_vcpu(current) )
-            regs->eip &= ~31; /* re-execute entire hypercall entry stub */
+#ifdef __x86_64__
+        if ( !IS_COMPAT(current->domain) )
+        {
+            for ( i = 0; *p != '\0'; i++ )
+            {
+                arg = next_arg(p, args);
+                switch ( i )
+                {
+                case 0: regs->rdi = arg; break;
+                case 1: regs->rsi = arg; break;
+                case 2: regs->rdx = arg; break;
+                case 3: regs->r10 = arg; break;
+                case 4: regs->r8  = arg; break;
+                case 5: regs->r9  = arg; break;
+                }
+            }
+        }
         else
-            regs->eip -= 2;   /* re-execute 'int 0x82' */
-
-        for ( i = 0; *p != '\0'; i++ )
-        {
-            arg = next_arg(p, args);
-            switch ( i )
-            {
-            case 0: regs->ebx = arg; break;
-            case 1: regs->ecx = arg; break;
-            case 2: regs->edx = arg; break;
-            case 3: regs->esi = arg; break;
-            case 4: regs->edi = arg; break;
-            case 5: regs->ebp = arg; break;
-            }
-        }
-#elif defined(__x86_64__)
-        regs->rax  = op;
-        regs->rip -= 2;  /* re-execute 'syscall' */
-
-        for ( i = 0; *p != '\0'; i++ )
-        {
-            arg = next_arg(p, args);
-            switch ( i )
-            {
-            case 0: regs->rdi = arg; break;
-            case 1: regs->rsi = arg; break;
-            case 2: regs->rdx = arg; break;
-            case 3: regs->r10 = arg; break;
-            case 4: regs->r8  = arg; break;
-            case 5: regs->r9  = arg; break;
-            }
-        }
 #endif
+        {
+            if ( supervisor_mode_kernel || is_hvm_vcpu(current) )
+                regs->eip &= ~31; /* re-execute entire hypercall entry stub */
+
+            for ( i = 0; *p != '\0'; i++ )
+            {
+                arg = next_arg(p, args);
+                switch ( i )
+                {
+                case 0: regs->ebx = arg; break;
+                case 1: regs->ecx = arg; break;
+                case 2: regs->edx = arg; break;
+                case 3: regs->esi = arg; break;
+                case 4: regs->edi = arg; break;
+                case 5: regs->ebp = arg; break;
+                }
+            }
+        }
     }
 
     va_end(args);
 
     return op;
 }
+
+#ifdef CONFIG_COMPAT
+int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
+{
+    int rc = 0;
+    struct mc_state *mcs = &this_cpu(mc_state);
+    struct cpu_user_regs *regs;
+    unsigned int i, cval = 0;
+    unsigned long nval = 0;
+    va_list args;
+
+    BUG_ON(*id > 5);
+    BUG_ON(mask & (1U << *id));
+
+    va_start(args, mask);
+
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    {
+        if ( !test_bit(_MCSF_call_preempted, &mcs->flags) )
+            return 0;
+        for ( i = 0; i < 6; ++i, mask >>= 1 )
+        {
+            if ( mask & 1 )
+            {
+                nval = va_arg(args, unsigned long);
+                cval = va_arg(args, unsigned int);
+                if ( cval == nval )
+                    mask &= ~1U;
+                else
+                    BUG_ON(nval == (unsigned int)nval);
+            }
+            else if ( id && *id == i )
+            {
+                *id = mcs->call.args[i];
+                id = NULL;
+            }
+            if ( (mask & 1) && mcs->call.args[i] == nval )
+                ++rc;
+            else
+            {
+                cval = mcs->call.args[i];
+                BUG_ON(mcs->call.args[i] != cval);
+            }
+            mcs->compat_call.args[i] = cval;
+        }
+    }
+    else
+    {
+        regs = guest_cpu_user_regs();
+        for ( i = 0; i < 6; ++i, mask >>= 1 )
+        {
+            unsigned long *reg;
+
+            switch ( i )
+            {
+            case 0: reg = &regs->ebx; break;
+            case 1: reg = &regs->ecx; break;
+            case 2: reg = &regs->edx; break;
+            case 3: reg = &regs->esi; break;
+            case 4: reg = &regs->edi; break;
+            case 5: reg = &regs->ebp; break;
+            default: BUG(); reg = NULL; break;
+            }
+            if ( (mask & 1) )
+            {
+                nval = va_arg(args, unsigned long);
+                cval = va_arg(args, unsigned int);
+                if ( cval == nval )
+                    mask &= ~1U;
+                else
+                    BUG_ON(nval == (unsigned int)nval);
+            }
+            else if ( id && *id == i )
+            {
+                *id = *reg;
+                id = NULL;
+            }
+            if ( (mask & 1) && *reg == nval )
+            {
+                *reg = cval;
+                ++rc;
+            }
+            else
+                BUG_ON(*reg != (unsigned int)*reg);
+        }
+    }
+
+    va_end(args);
+
+    return rc;
+}
+#endif
 
 static void relinquish_memory(struct domain *d, struct list_head *list)
 {
