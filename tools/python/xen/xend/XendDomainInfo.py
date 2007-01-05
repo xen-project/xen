@@ -972,7 +972,12 @@ class XendDomainInfo:
                 self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
                 if xroot.get_enable_dump():
-                    self.dumpCore()
+                    try:
+                        self.dumpCore()
+                    except XendError:
+                        # This error has been logged -- there's nothing more
+                        # we can do in this context.
+                        pass
 
                 restart_reason = 'crash'
                 self._stateSet(DOM_STATE_HALTED)
@@ -1164,7 +1169,10 @@ class XendDomainInfo:
     #
 
     def dumpCore(self, corefile = None):
-        """Create a core dump for this domain.  Nothrow guarantee."""
+        """Create a core dump for this domain.
+
+        @raise: XendError if core dumping failed.
+        """
         
         try:
             if not corefile:
