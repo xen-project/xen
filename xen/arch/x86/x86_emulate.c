@@ -55,35 +55,35 @@ static uint8_t opcode_table[256] = {
     /* 0x00 - 0x07 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x08 - 0x0F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x10 - 0x17 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x18 - 0x1F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x20 - 0x27 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x28 - 0x2F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x30 - 0x37 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x38 - 0x3F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    0, 0, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
     /* 0x40 - 0x4F */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -108,8 +108,11 @@ static uint8_t opcode_table[256] = {
     ByteOp|DstMem|SrcReg|ModRM|Mov, DstMem|SrcReg|ModRM|Mov,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     0, DstReg|SrcNone|ModRM, 0, DstMem|SrcNone|ModRM|Mov,
-    /* 0x90 - 0x9F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x90 - 0x97 */
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    /* 0x98 - 0x9F */
+    0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
@@ -134,10 +137,10 @@ static uint8_t opcode_table[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xF0 - 0xF7 */
     0, 0, 0, 0,
-    0, 0, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
+    0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
     /* 0xF8 - 0xFF */
-    0, 0, 0, 0,
-    0, 0, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
+    ImplicitOps, ImplicitOps, 0, 0,
+    ImplicitOps, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
 };
 
 static uint8_t twobyte_table[256] = {
@@ -488,7 +491,7 @@ x86_emulate(
         return -1;
     }
 
-    /* Legacy prefixes. */
+    /* Prefix bytes. */
     for ( i = 0; i < 8; i++ )
     {
         switch ( b = insn_fetch_type(uint8_t) )
@@ -523,25 +526,26 @@ x86_emulate(
         case 0xf0: /* LOCK */
             lock_prefix = 1;
             break;
+        case 0xf2: /* REPNE/REPNZ */
         case 0xf3: /* REP/REPE/REPZ */
             rep_prefix = 1;
             break;
-        case 0xf2: /* REPNE/REPNZ */
-            break;
+        case 0x40 ... 0x4f: /* REX */
+            if ( mode != X86EMUL_MODE_PROT64 )
+                goto done_prefixes;
+            rex_prefix = b;
+            continue;
         default:
             goto done_prefixes;
         }
+
+        /* Any legacy prefix after a REX prefix nullifies its effect. */
+        rex_prefix = 0;
     }
  done_prefixes:
 
-    /* REX prefix. */
-    if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
-    {
-        rex_prefix = b;
-        if ( b & 8 ) /* REX.W */
-            op_bytes = 8;
-        b = insn_fetch_type(uint8_t);
-    }
+    if ( rex_prefix & 8 ) /* REX.W */
+        op_bytes = 8;
 
     /* Opcode byte(s). */
     d = opcode_table[b];
@@ -570,6 +574,7 @@ x86_emulate(
 
         if ( modrm_mod == 3 )
         {
+            modrm_rm |= (rex_prefix & 1) << 3;
             ea.type = OP_REG;
             ea.reg  = decode_register(
                 modrm_rm, &_regs, (d & ByteOp) && (rex_prefix == 0));
@@ -812,28 +817,52 @@ x86_emulate(
 
     switch ( b )
     {
-    case 0x00 ... 0x05: add: /* add */
+    case 0x04 ... 0x05: /* add imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x00 ... 0x03: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs.eflags);
         break;
-    case 0x08 ... 0x0d: or:  /* or */
+    case 0x0c ... 0x0d: /* or imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x08 ... 0x0b: or:  /* or */
         emulate_2op_SrcV("or", src, dst, _regs.eflags);
         break;
-    case 0x10 ... 0x15: adc: /* adc */
+    case 0x14 ... 0x15: /* adc imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x10 ... 0x13: adc: /* adc */
         emulate_2op_SrcV("adc", src, dst, _regs.eflags);
         break;
-    case 0x18 ... 0x1d: sbb: /* sbb */
+    case 0x1c ... 0x1d: /* sbb imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x18 ... 0x1b: sbb: /* sbb */
         emulate_2op_SrcV("sbb", src, dst, _regs.eflags);
         break;
-    case 0x20 ... 0x25: and: /* and */
+    case 0x24 ... 0x25: /* and imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x20 ... 0x23: and: /* and */
         emulate_2op_SrcV("and", src, dst, _regs.eflags);
         break;
-    case 0x28 ... 0x2d: sub: /* sub */
+    case 0x2c ... 0x2d: /* sub imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x28 ... 0x2b: sub: /* sub */
         emulate_2op_SrcV("sub", src, dst, _regs.eflags);
         break;
-    case 0x30 ... 0x35: xor: /* xor */
+    case 0x34 ... 0x35: /* xor imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x30 ... 0x33: xor: /* xor */
         emulate_2op_SrcV("xor", src, dst, _regs.eflags);
         break;
-    case 0x38 ... 0x3d: cmp: /* cmp */
+    case 0x3c ... 0x3d: /* cmp imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = dst.orig_val = _regs.eax;
+    case 0x38 ... 0x3b: cmp: /* cmp */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         break;
     case 0x63: /* movsxd */
@@ -857,7 +886,7 @@ x86_emulate(
     case 0x84 ... 0x85: test: /* test */
         emulate_2op_SrcV("test", src, dst, _regs.eflags);
         break;
-    case 0x86 ... 0x87: /* xchg */
+    case 0x86 ... 0x87: xchg: /* xchg */
         /* Write back the register source. */
         switch ( dst.bytes )
         {
@@ -1011,6 +1040,8 @@ x86_emulate(
     return (rc == X86EMUL_UNHANDLEABLE) ? -1 : 0;
 
  special_insn:
+    /* Default action: disable writeback. There may be no dest operand. */
+    dst.orig_val = dst.val;
     if ( twobyte )
         goto twobyte_special_insn;
     if ( rep_prefix )
@@ -1027,7 +1058,7 @@ x86_emulate(
     {
     case 0x40 ... 0x4f: /* inc/dec reg */
         dst.type  = OP_REG;
-        dst.reg   = decode_register(b&7, &_regs, 0);
+        dst.reg   = decode_register(b & 7, &_regs, 0);
         dst.bytes = op_bytes;
         dst.orig_val = dst.val = *dst.reg;
         if ( b & 8 )
@@ -1040,14 +1071,16 @@ x86_emulate(
         dst.bytes = op_bytes;
         if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
             dst.bytes = 8;
-        dst.val = *(unsigned long *)decode_register(b&7, &_regs, 0);
+        dst.val = *(unsigned long *)decode_register(
+            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         register_address_increment(_regs.esp, -dst.bytes);
         dst.mem.seg = x86_seg_ss;
         dst.mem.off = truncate_ea(_regs.esp);
         break;
     case 0x58 ... 0x5f: /* pop reg */
         dst.type  = OP_REG;
-        dst.reg   = decode_register(b&7, &_regs, 0);
+        dst.reg   = decode_register(
+            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         dst.bytes = op_bytes;
         if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
             dst.bytes = 8;
@@ -1056,6 +1089,18 @@ x86_emulate(
             goto done;
         register_address_increment(_regs.esp, dst.bytes);
         break;
+    case 0x90: /* nop / xchg %%r8,%%rax */
+        if ( !(rex_prefix & 1) )
+            break; /* nop */
+    case 0x91 ... 0x97: /* xchg reg,%%rax */
+        src.type = OP_REG;
+        src.reg  = (unsigned long *)&_regs.eax;
+        src.val  = *src.reg;
+        dst.type = OP_REG;
+        dst.reg  = decode_register(
+            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        dst.val  = dst.orig_val = *dst.reg;
+        goto xchg;
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
         /* Source EA is not encoded via ModRM. */
         dst.type  = OP_REG;
@@ -1104,6 +1149,21 @@ x86_emulate(
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        break;
+    case 0xf5: /* cmc */
+        _regs.eflags ^= EFLG_CF;
+        break;
+    case 0xf8: /* clc */
+        _regs.eflags &= ~EFLG_CF;
+        break;
+    case 0xf9: /* stc */
+        _regs.eflags |= EFLG_CF;
+        break;
+    case 0xfc: /* cld */
+        _regs.eflags &= ~EFLG_DF;
+        break;
+    case 0xfd: /* std */
+        _regs.eflags |= EFLG_DF;
         break;
     }
     goto writeback;
@@ -1218,8 +1278,6 @@ x86_emulate(
     goto writeback;
 
  twobyte_special_insn:
-    /* Disable writeback. */
-    dst.orig_val = dst.val;
     switch ( b )
     {
     case 0x0d: /* GrpP (prefetch) */
