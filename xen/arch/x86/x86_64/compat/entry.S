@@ -278,7 +278,6 @@ CFIX14:
 
 .section .rodata, "a", @progbits
 
-#define compat_sysctl domain_crash_synchronous
 #define compat_domctl domain_crash_synchronous
 
 ENTRY(compat_hypercall_table)

@@ -21,14 +21,17 @@
 #include <asm/current.h>
 #include <public/sysctl.h>
 
-extern long arch_do_sysctl(
-    struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
-extern void getdomaininfo(
-    struct domain *d, struct xen_domctl_getdomaininfo *info);
+#ifndef COMPAT
+typedef long ret_t;
+#define copy_to_xxx_offset copy_to_guest_offset
+#endif
 
-long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+extern ret_t arch_do_sysctl(
+    struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
+
+ret_t do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
-    long ret = 0;
+    ret_t ret = 0;
     struct xen_sysctl curop, *op = &curop;
     static DEFINE_SPINLOCK(sysctl_lock);
 
@@ -98,8 +101,8 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
             put_domain(d);
 
-            if ( copy_to_guest_offset(op->u.getdomaininfolist.buffer,
-                                      num_domains, &info, 1) )
+            if ( copy_to_xxx_offset(op->u.getdomaininfolist.buffer,
+                                    num_domains, &info, 1) )
             {
                 ret = -EFAULT;
                 break;
@@ -123,7 +126,6 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #ifdef PERF_COUNTERS
     case XEN_SYSCTL_perfc_op:
     {
-        extern int perfc_control(xen_sysctl_perfc_op_t *);
         ret = perfc_control(&op->u.perfc_op);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
