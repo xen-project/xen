@@ -278,7 +278,6 @@ CFIX14:
 
 .section .rodata, "a", @progbits
 
-#define compat_acm_op domain_crash_synchronous
 #define compat_xenoprof_op domain_crash_synchronous
 #define compat_sysctl domain_crash_synchronous
 #define compat_domctl domain_crash_synchronous

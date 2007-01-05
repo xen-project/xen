@@ -42,6 +42,7 @@ version.o: $(BASEDIR)/include/xen/compile.h
 
 ifeq ($(CONFIG_COMPAT),y)
 # extra dependencies
+acm_ops.o: compat/acm_ops.c
 grant_table.o: compat/grant_table.c
 schedule.o: compat/schedule.c
 endif
