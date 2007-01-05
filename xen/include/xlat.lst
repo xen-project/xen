@@ -6,9 +6,9 @@
 !	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
-!	cpu_user_regs			arch-@arch@.h
-!	trap_info			arch-@arch@.h
-!	vcpu_guest_context		arch-@arch@.h
+!	cpu_user_regs			arch-x86/xen-@arch@.h
+!	trap_info			arch-x86/xen.h
+!	vcpu_guest_context		arch-x86/xen.h
 ?	evtchn_alloc_unbound		event_channel.h
 ?	evtchn_bind_interdomain		event_channel.h
 ?	evtchn_bind_ipi			event_channel.h

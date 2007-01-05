@@ -4,6 +4,8 @@ compat-arch-$(CONFIG_X86) := x86_32
 
 headers-y                 := $(shell echo public/*.h | sed -e 's,[^[:space:]]*-[^[:space:]]*,,g' -e 's,public/,compat/,g')
 headers-y                 := $(filter-out %/dom0_ops.h,$(headers-y))
+headers-$(CONFIG_X86)     += compat/arch-x86/xen.h
+headers-$(CONFIG_X86)     += compat/arch-x86/xen-$(compat-arch-y).h
 headers-y                 += compat/arch-$(compat-arch-y).h compat/xlat.h
 
 cppflags-y                := -include public/xen-compat.h
