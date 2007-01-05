@@ -557,8 +557,14 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         xmlChar *string = string_from_value(value_node, "double");
         if (string == NULL)
         {
+#if PERMISSIVE
+            fprintf(stderr,
+                    "Expected a Float from the server, but didn't get one\n");
+            ((double *)value)[slot] = 0.0;
+#else
             server_error(
                 s, "Expected a Float from the server, but didn't get one");
+#endif
         }
         else
         {
