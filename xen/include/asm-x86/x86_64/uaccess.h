@@ -15,6 +15,19 @@
 
 #define array_access_ok(addr, count, size) (__addr_ok(addr))
 
+#ifdef CONFIG_COMPAT
+
+#define __compat_addr_ok(addr) \
+    ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START)
+
+#define compat_access_ok(addr, size) __compat_addr_ok((addr) + (size))
+
+#define compat_array_access_ok(addr,count,size) \
+    (likely((count) < (~0U / (size))) && \
+     compat_access_ok(addr, (count) * (size)))
+
+#endif
+
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\

@@ -48,6 +48,7 @@ _debug:
 .PHONY: _clean
 _clean: delete-unfresh-files
 	$(MAKE) -C tools clean
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C include clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C acm clean
@@ -69,6 +70,7 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/acm_policy.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/asm-$(TARGET_ARCH)/asm-offsets.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $(TARGET)

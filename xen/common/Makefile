@@ -35,5 +35,7 @@ obj-$(xenoprof)    += xenoprof.o
 
 obj-$(CONFIG_XENCOMM) += xencomm.o
 
+subdir-$(CONFIG_COMPAT) += compat
+
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h

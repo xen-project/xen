@@ -11,10 +11,13 @@
 #include <xen/version.h>
 #include <xen/sched.h>
 #include <xen/shadow.h>
+#include <xen/nmi.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
 #include <public/nmi.h>
 #include <public/version.h>
+
+#ifndef COMPAT
 
 int tainted;
 
@@ -116,11 +119,15 @@ void add_taint(unsigned flag)
     tainted |= flag;
 }
 
+# define DO(fn) long do_##fn
+
+#endif
+
 /*
  * Simple hypercalls.
  */
 
-long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
+DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     switch ( cmd )
     {
@@ -230,6 +237,8 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
+#ifndef COMPAT
+
 long register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *v = current;
@@ -260,7 +269,9 @@ long unregister_guest_nmi_callback(void)
     return 0;
 }
 
-long do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE(void) arg)
+#endif
+
+DO(nmi_op)(unsigned int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct xennmi_callback cb;
     long rc = 0;
@@ -284,12 +295,12 @@ long do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
-long do_vm_assist(unsigned int cmd, unsigned int type)
+DO(vm_assist)(unsigned int cmd, unsigned int type)
 {
     return vm_assist(current->domain, cmd, type);
 }
 
-long do_ni_hypercall(void)
+DO(ni_hypercall)(void)
 {
     /* No-op hypercall. */
     return -ENOSYS;

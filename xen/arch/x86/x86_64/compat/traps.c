@@ -1,25 +1,6 @@
 #ifdef CONFIG_COMPAT
 
-#if 0 /* XXX */
 #include <compat/callback.h>
-#else
-struct compat_xen_callback {
-    unsigned int cs;
-    unsigned int eip;
-};
-typedef struct compat_xen_callback xen_callback_compat_t;
-
-struct compat_callback_register {
-    uint16_t type;
-    uint16_t flags;
-    xen_callback_compat_t address;
-};
-
-struct compat_callback_unregister {
-    uint16_t type;
-    uint16_t _unused;
-};
-#endif
 
 void compat_show_guest_stack(struct cpu_user_regs *regs, int debug_stack_lines)
 {

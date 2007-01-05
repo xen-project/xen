@@ -281,28 +281,19 @@ CFIX14:
 #define compat_set_trap_table domain_crash_synchronous
 #define compat_mmu_update domain_crash_synchronous
 #define compat_set_gdt domain_crash_synchronous
-#define compat_stack_switch domain_crash_synchronous
-#define compat_fpu_taskswitch domain_crash_synchronous
-#define compat_arch_sched_op_compat domain_crash_synchronous
 #define compat_platform_op domain_crash_synchronous
-#define compat_set_debugreg domain_crash_synchronous
-#define compat_get_debugreg domain_crash_synchronous
 #define compat_update_descriptor domain_crash_synchronous
 #define compat_memory_op domain_crash_synchronous
 #define compat_multicall domain_crash_synchronous
 #define compat_update_va_mapping domain_crash_synchronous
 #define compat_set_timer_op domain_crash_synchronous
 #define compat_event_channel_op_compat domain_crash_synchronous
-#define compat_xen_version domain_crash_synchronous
-#define compat_console_io domain_crash_synchronous
 #define compat_physdev_op_compat domain_crash_synchronous
 #define compat_grant_table_op domain_crash_synchronous
-#define compat_vm_assist domain_crash_synchronous
 #define compat_update_va_mapping_otherdomain domain_crash_synchronous
 #define compat_vcpu_op domain_crash_synchronous
 #define compat_mmuext_op domain_crash_synchronous
 #define compat_acm_op domain_crash_synchronous
-#define compat_nmi_op domain_crash_synchronous
 #define compat_arch_sched_op domain_crash_synchronous
 #define compat_xenoprof_op domain_crash_synchronous
 #define compat_event_channel_op domain_crash_synchronous
@@ -314,29 +305,29 @@ ENTRY(compat_hypercall_table)
         .quad compat_set_trap_table     /*  0 */
         .quad compat_mmu_update
         .quad compat_set_gdt
-        .quad compat_stack_switch
+        .quad do_stack_switch
         .quad compat_set_callbacks
-        .quad compat_fpu_taskswitch     /*  5 */
-        .quad compat_arch_sched_op_compat
+        .quad do_fpu_taskswitch         /*  5 */
+        .quad do_sched_op_compat
         .quad compat_platform_op
-        .quad compat_set_debugreg
-        .quad compat_get_debugreg
+        .quad do_set_debugreg
+        .quad do_get_debugreg
         .quad compat_update_descriptor  /* 10 */
-        .quad do_ni_hypercall
+        .quad compat_ni_hypercall
         .quad compat_memory_op
         .quad compat_multicall
         .quad compat_update_va_mapping
         .quad compat_set_timer_op       /* 15 */
         .quad compat_event_channel_op_compat
         .quad compat_xen_version
-        .quad compat_console_io
+        .quad do_console_io
         .quad compat_physdev_op_compat
         .quad compat_grant_table_op     /* 20 */
         .quad compat_vm_assist
         .quad compat_update_va_mapping_otherdomain
         .quad compat_iret
         .quad compat_vcpu_op
-        .quad do_ni_hypercall           /* 25 */
+        .quad compat_ni_hypercall       /* 25 */
         .quad compat_mmuext_op
         .quad compat_acm_op
         .quad compat_nmi_op
@@ -345,11 +336,11 @@ ENTRY(compat_hypercall_table)
         .quad compat_xenoprof_op
         .quad compat_event_channel_op
         .quad compat_physdev_op
-        .quad do_ni_hypercall
+        .quad compat_ni_hypercall
         .quad compat_sysctl             /* 35 */
         .quad compat_domctl
         .rept NR_hypercalls-((.-compat_hypercall_table)/8)
-        .quad do_ni_hypercall
+        .quad compat_ni_hypercall
         .endr
 
 ENTRY(compat_hypercall_args_table)
@@ -359,12 +350,12 @@ ENTRY(compat_hypercall_args_table)
         .byte 2 /* compat_stack_switch      */
         .byte 4 /* compat_set_callbacks     */
         .byte 1 /* compat_fpu_taskswitch    */  /*  5 */
-        .byte 2 /* compat_arch_sched_op_compat */
+        .byte 2 /* compat_sched_op_compat   */
         .byte 1 /* compat_platform_op       */
         .byte 2 /* compat_set_debugreg      */
         .byte 1 /* compat_get_debugreg      */
         .byte 4 /* compat_update_descriptor */  /* 10 */
-        .byte 0 /* do_ni_hypercall          */
+        .byte 0 /* compat_ni_hypercall      */
         .byte 2 /* compat_memory_op         */
         .byte 2 /* compat_multicall         */
         .byte 4 /* compat_update_va_mapping */
@@ -378,7 +369,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 5 /* compat_update_va_mapping_otherdomain */
         .byte 0 /* compat_iret              */
         .byte 3 /* compat_vcpu_op           */
-        .byte 0 /* do_ni_hypercall          */  /* 25 */
+        .byte 0 /* compat_ni_hypercall      */  /* 25 */
         .byte 4 /* compat_mmuext_op         */
         .byte 1 /* compat_acm_op            */
         .byte 2 /* compat_nmi_op            */
@@ -387,9 +378,9 @@ ENTRY(compat_hypercall_args_table)
         .byte 2 /* compat_xenoprof_op       */
         .byte 2 /* compat_event_channel_op  */
         .byte 2 /* compat_physdev_op        */
-        .byte 0 /* do_ni_hypercall          */
+        .byte 0 /* compat_ni_hypercall      */
         .byte 1 /* compat_sysctl            */  /* 35 */
         .byte 1 /* compat_domctl            */
         .rept NR_hypercalls-(.-compat_hypercall_args_table)
-        .byte 0 /* do_ni_hypercall          */
+        .byte 0 /* compat_ni_hypercall      */
         .endr
