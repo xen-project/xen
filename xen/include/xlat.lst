@@ -44,6 +44,7 @@
 ?	sysctl_perfc_desc		sysctl.h
 !	sysctl_perfc_op			sysctl.h
 !	sysctl_tbuf_op			sysctl.h
+?	t_buf				trace.h
 !	vcpu_runstate_info		vcpu.h
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h
