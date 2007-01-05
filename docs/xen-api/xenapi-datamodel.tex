@@ -286,6 +286,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_host} & host ref & Currently connected host \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_user} & user ref & Currently connected user \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_active} & int & Timestamp for last time session was active \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: session}
@@ -440,45 +441,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~create}
+\subsubsection{RPC name:~get\_last\_active}
 
 {\bf Overview:} 
-Create a new session instance, and return its handle.
+Get the last\_active field of the given session.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} (session ref) create (session_id s, session record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt session record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-session ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified session instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, session ref self)\end{verbatim}
+\begin{verbatim} int get_last_active (session_id s, session ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -496,11 +465,11 @@ Destroy the specified session instance.
 
  \noindent {\bf Return Type:} 
 {\tt 
-void
+int
 }
 
 
-
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -596,7 +565,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has f
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Return a list of all the tasks known to the system
+Return a list of all the tasks known to the system.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((task ref) Set) get_all (session_id s)\end{verbatim}
@@ -999,70 +968,6 @@ string Set
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new task instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (task ref) create (session_id s, task record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-task ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified task instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, task ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
