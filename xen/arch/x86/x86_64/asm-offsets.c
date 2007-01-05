@@ -135,5 +135,17 @@ void __dummy__(void)
     OFFSET(MULTICALL_result, struct multicall_entry, result);
     BLANK();
 
+#ifdef CONFIG_COMPAT
+    OFFSET(COMPAT_MULTICALL_op, struct compat_multicall_entry, op);
+    OFFSET(COMPAT_MULTICALL_arg0, struct compat_multicall_entry, args[0]);
+    OFFSET(COMPAT_MULTICALL_arg1, struct compat_multicall_entry, args[1]);
+    OFFSET(COMPAT_MULTICALL_arg2, struct compat_multicall_entry, args[2]);
+    OFFSET(COMPAT_MULTICALL_arg3, struct compat_multicall_entry, args[3]);
+    OFFSET(COMPAT_MULTICALL_arg4, struct compat_multicall_entry, args[4]);
+    OFFSET(COMPAT_MULTICALL_arg5, struct compat_multicall_entry, args[5]);
+    OFFSET(COMPAT_MULTICALL_result, struct compat_multicall_entry, result);
+    BLANK();
+#endif
+
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));
 }

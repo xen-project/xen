@@ -13,9 +13,12 @@
 #include <asm/current.h>
 #include <asm/hardirq.h>
 
+#ifndef COMPAT
 DEFINE_PER_CPU(struct mc_state, mc_state);
+typedef long ret_t;
+#endif
 
-long
+ret_t
 do_multicall(
     XEN_GUEST_HANDLE(multicall_entry_t) call_list, unsigned int nr_calls)
 {
