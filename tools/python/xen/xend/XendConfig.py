@@ -1113,15 +1113,19 @@ class XendConfig(dict):
         # configuration
         log.debug("update_with_image_sxp(%s)" % scrub_password(image_sxp))
 
-        kernel_args = sxp.child_value(image_sxp, 'args', '')
+        kernel_args = ""
 
         # attempt to extract extra arguments from SXP config
         arg_ip = sxp.child_value(image_sxp, 'ip')
         if arg_ip and not re.search(r'ip=[^ ]+', kernel_args):
-            kernel_args += ' ip=%s' % arg_ip
+            kernel_args += 'ip=%s ' % arg_ip
         arg_root = sxp.child_value(image_sxp, 'root')
         if arg_root and not re.search(r'root=', kernel_args):
-            kernel_args += ' root=%s' % arg_root
+            kernel_args += 'root=%s ' % arg_root
+
+        # user-specified args must come last: previous releases did this and
+        # some domU kernels rely upon the ordering.
+        kernel_args += sxp.child_value(image_sxp, 'args', '')
 
         if bootloader:
             self['_temp_using_bootloader'] = '1'
