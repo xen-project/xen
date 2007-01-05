@@ -969,6 +969,7 @@ class XendDomainInfo:
 
                 log.warn('Domain has crashed: name=%s id=%d.',
                          self.info['name_label'], self.domid)
+                self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
                 if xroot.get_enable_dump():
                     self.dumpCore()
@@ -988,6 +989,7 @@ class XendDomainInfo:
 
                     log.info('Domain has shutdown: name=%s id=%d reason=%s.',
                              self.info['name_label'], self.domid, reason)
+                    self._writeVm(LAST_SHUTDOWN_REASON, reason)
 
                     self._clearRestart()
 
