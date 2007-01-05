@@ -20,6 +20,13 @@
 ?	evtchn_send			event_channel.h
 ?	evtchn_status			event_channel.h
 ?	evtchn_unmask			event_channel.h
+!	gnttab_copy			grant_table.h
+?	gnttab_dump_table		grant_table.h
+?	gnttab_map_grant_ref		grant_table.h
+!	gnttab_setup_table		grant_table.h
+!	gnttab_transfer			grant_table.h
+?	gnttab_unmap_grant_ref		grant_table.h
+?	grant_entry			grant_table.h
 !	add_to_physmap			memory.h
 !	foreign_memory_map		memory.h
 !	memory_exchange			memory.h

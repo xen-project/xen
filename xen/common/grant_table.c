@@ -1048,6 +1048,10 @@ do_grant_table_op(
     return rc;
 }
 
+#ifdef CONFIG_COMPAT
+#include "compat/grant_table.c"
+#endif
+
 int 
 grant_table_create(
     struct domain *d)
