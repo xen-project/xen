@@ -22,6 +22,10 @@
 #include <xen/version.h>
 #include <public/elfnote.h>
 
+#ifndef COMPAT
+
+typedef long ret_t;
+
 DEFINE_PER_CPU (crash_note_t, crash_notes);
 cpumask_t crash_saved_cpus;
 
@@ -143,21 +147,25 @@ static __init int register_crashdump_trigger(void)
 }
 __initcall(register_crashdump_trigger);
 
-static int kexec_get_reserve(xen_kexec_range_t *range)
+#define kexec_get(x)      kexec_get_##x
+
+#endif
+
+static int kexec_get(reserve)(xen_kexec_range_t *range)
 {
     range->start = kexec_crash_area.start;
     range->size = kexec_crash_area.size;
     return 0;
 }
 
-static int kexec_get_xen(xen_kexec_range_t *range)
+static int kexec_get(xen)(xen_kexec_range_t *range)
 {
     range->start = virt_to_maddr(_start);
     range->size = (unsigned long)_end - (unsigned long)_start;
     return 0;
 }
 
-static int kexec_get_cpu(xen_kexec_range_t *range)
+static int kexec_get(cpu)(xen_kexec_range_t *range)
 {
     if ( range->nr < 0 || range->nr >= num_present_cpus() )
         return -EINVAL;
@@ -167,7 +175,7 @@ static int kexec_get_cpu(xen_kexec_range_t *range)
     return 0;
 }
 
-static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
+static int kexec_get(range)(XEN_GUEST_HANDLE(void) uarg)
 {
     xen_kexec_range_t range;
     int ret = -EINVAL;
@@ -178,13 +186,13 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
     switch ( range.range )
     {
     case KEXEC_RANGE_MA_CRASH:
-        ret = kexec_get_reserve(&range);
+        ret = kexec_get(reserve)(&range);
         break;
     case KEXEC_RANGE_MA_XEN:
-        ret = kexec_get_xen(&range);
+        ret = kexec_get(xen)(&range);
         break;
     case KEXEC_RANGE_MA_CPU:
-        ret = kexec_get_cpu(&range);
+        ret = kexec_get(cpu)(&range);
         break;
     }
 
@@ -193,6 +201,8 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+#ifndef COMPAT
 
 static int kexec_load_get_bits(int type, int *base, int *bit)
 {
@@ -211,6 +221,8 @@ static int kexec_load_get_bits(int type, int *base, int *bit)
     }
     return 0;
 }
+
+#endif
 
 static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 {
@@ -234,7 +246,11 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
         BUG_ON(test_bit((base + !pos), &kexec_flags)); /* must be free */
 
+#ifndef COMPAT
         memcpy(image, &load.image, sizeof(*image));
+#else
+        XLAT_kexec_image(image, &load.image);
+#endif
 
         if ( !(ret = machine_kexec_load(load.type, base + !pos, image)) )
         {
@@ -258,6 +274,8 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+#ifndef COMPAT
 
 static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
 {
@@ -292,7 +310,9 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     return -EINVAL; /* never reached */
 }
 
-long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+#endif
+
+ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 {
     unsigned long flags;
     int ret = -EINVAL;
@@ -303,7 +323,7 @@ long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
-        ret = kexec_get_range(uarg);
+        ret = kexec_get(range)(uarg);
         break;
     case KEXEC_CMD_kexec_load:
     case KEXEC_CMD_kexec_unload:
@@ -321,6 +341,10 @@ long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+#if defined(CONFIG_COMPAT) && !defined(COMPAT)
+#include "compat/kexec.c"
+#endif
 
 /*
  * Local variables:

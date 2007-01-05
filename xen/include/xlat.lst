@@ -32,6 +32,8 @@
 !	gnttab_transfer			grant_table.h
 ?	gnttab_unmap_grant_ref		grant_table.h
 ?	grant_entry			grant_table.h
+?	kexec_exec			kexec.h
+!	kexec_image			kexec.h
 !	add_to_physmap			memory.h
 !	foreign_memory_map		memory.h
 !	memory_exchange			memory.h

@@ -316,6 +316,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_ni_hypercall
         .quad compat_sysctl             /* 35 */
         .quad compat_domctl
+        .quad compat_kexec_op
         .rept NR_hypercalls-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall
         .endr
@@ -358,6 +359,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .byte 1 /* compat_sysctl            */  /* 35 */
         .byte 1 /* compat_domctl            */
+        .byte 2 /* compat_kexec_op          */
         .rept NR_hypercalls-(.-compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .endr
