@@ -408,7 +408,9 @@ struct vcpu_info {
     struct arch_vcpu_info arch;
     struct vcpu_time_info time;
 }; /* 64 bytes (x86) */
+#ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
+#endif
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
@@ -466,7 +468,9 @@ struct shared_info {
     struct arch_shared_info arch;
 
 };
+#ifndef __XEN__
 typedef struct shared_info shared_info_t;
+#endif
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):

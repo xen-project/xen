@@ -58,6 +58,7 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 #include <asm/msr.h>
+#include <asm/shared.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/vpt.h>
 
@@ -665,7 +666,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     struct trap_bounce *tb = &v->arch.trap_bounce;
 
     v->arch.guest_context.ctrlreg[2] = addr;
-    v->vcpu_info->arch.cr2           = addr;
+    arch_set_cr2(v, addr);
 
     /* Re-set error_code.user flag appropriately for the guest. */
     error_code &= ~PFEC_user_mode;
@@ -1390,7 +1391,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 2: /* Write CR2 */
             v->arch.guest_context.ctrlreg[2] = *reg;
-            v->vcpu_info->arch.cr2           = *reg;
+            arch_set_cr2(v, *reg);
             break;
 
         case 3: /* Write CR3 */
@@ -1601,7 +1602,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
     if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
         return;
 
-    set_bit(reason_idx, &d->shared_info->arch.nmi_reason);
+    set_bit(reason_idx, nmi_reason(d));
 
     if ( test_and_set_bit(_VCPUF_nmi_pending, &v->vcpu_flags) )
         raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */

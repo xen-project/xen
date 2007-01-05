@@ -162,6 +162,12 @@ extern int compat_disabled;
 struct start_info;
 void xlat_start_info(struct start_info *, enum XLAT_start_info_console);
 
+#define BITS_PER_GUEST_LONG(d) (!IS_COMPAT(d) ? BITS_PER_LONG : COMPAT_BITS_PER_LONG)
+
+#else
+
+#define BITS_PER_GUEST_LONG(d) BITS_PER_LONG
+
 #endif
 
 #endif /* __XEN_COMPAT_H__ */

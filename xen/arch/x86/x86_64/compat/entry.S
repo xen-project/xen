@@ -69,9 +69,9 @@ compat_test_all_events:
         jc    compat_process_nmi
 compat_test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
-        testb $0xFF,VCPUINFO_upcall_mask(%rax)
+        testb $0xFF,COMPAT_VCPUINFO_upcall_mask(%rax)
         jnz   compat_restore_all_guest
-        testb $0xFF,VCPUINFO_upcall_pending(%rax)
+        testb $0xFF,COMPAT_VCPUINFO_upcall_pending(%rax)
         jz    compat_restore_all_guest
 /*compat_process_guest_events:*/
         sti
@@ -189,10 +189,10 @@ CFLT4:  mov   UREGS_ss+8(%rsp),%fs
         movb  TRAPBOUNCE_flags(%rdx),%cl
         subl  $3*4,%esi
         movq  VCPU_vcpu_info(%rbx),%rax
-        pushq VCPUINFO_upcall_mask(%rax)
+        pushq COMPAT_VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
         setnz %ch                       # TBF_INTERRUPT -> set upcall mask
-        orb   %ch,VCPUINFO_upcall_mask(%rax)
+        orb   %ch,COMPAT_VCPUINFO_upcall_mask(%rax)
         popq  %rax
         shll  $16,%eax                  # Bits 16-23: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS

@@ -17,6 +17,7 @@
 #include <asm/msr.h>
 #include <asm/page.h>
 #include <asm/shadow.h>
+#include <asm/shared.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 
@@ -52,7 +53,7 @@ void show_registers(struct cpu_user_regs *regs)
         if ( guest_mode(regs) )
         {
             context = "guest";
-            fault_crs[2] = current->vcpu_info->arch.cr2;
+            fault_crs[2] = arch_get_cr2(current);
         }
         else
         {
@@ -234,7 +235,7 @@ unsigned long do_iret(void)
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    current->vcpu_info->evtchn_upcall_mask = !(iret_saved.rflags & EF_IE);
+    vcpu_info(current, evtchn_upcall_mask) = !(iret_saved.rflags & EF_IE);
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;

@@ -118,7 +118,7 @@ unsigned int compat_iret(void)
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    current->vcpu_info->evtchn_upcall_mask = !(eflags & X86_EFLAGS_IF);
+    vcpu_info(current, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);
 
     /*
      * The hypercall exit path will overwrite EAX with this return

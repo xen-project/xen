@@ -277,10 +277,11 @@ static long do_block(void)
 
 static long do_poll(struct sched_poll *sched_poll)
 {
-    struct vcpu  *v = current;
-    evtchn_port_t port;
-    long          rc = 0;
-    unsigned int  i;
+    struct vcpu   *v = current;
+    struct domain *d = v->domain;
+    evtchn_port_t  port;
+    long           rc = 0;
+    unsigned int   i;
 
     /* Fairly arbitrary limit. */
     if ( sched_poll->nr_ports > 128 )
@@ -292,7 +293,7 @@ static long do_poll(struct sched_poll *sched_poll)
     /* These operations must occur in order. */
     set_bit(_VCPUF_blocked, &v->vcpu_flags);
     set_bit(_VCPUF_polling, &v->vcpu_flags);
-    set_bit(_DOMF_polling, &v->domain->domain_flags);
+    set_bit(_DOMF_polling, &d->domain_flags);
 
     /* Check for events /after/ setting flags: avoids wakeup waiting race. */
     for ( i = 0; i < sched_poll->nr_ports; i++ )
@@ -302,18 +303,18 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = -EINVAL;
-        if ( port >= MAX_EVTCHNS )
+        if ( port >= MAX_EVTCHNS(d) )
             goto out;
 
         rc = 0;
-        if ( test_bit(port, v->domain->shared_info->evtchn_pending) )
+        if ( test_bit(port, shared_info_addr(d, evtchn_pending)) )
             goto out;
     }
 
     if ( sched_poll->timeout != 0 )
         set_timer(&v->poll_timer, sched_poll->timeout);
 
-    TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
+    TRACE_2D(TRC_SCHED_BLOCK, d->domain_id, v->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
 
     return 0;

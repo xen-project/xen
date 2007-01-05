@@ -36,6 +36,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/shadow.h>
+#include <asm/shared.h>
 #include "private.h"
 
 
@@ -2917,7 +2918,7 @@ sh_alloc_log_dirty_bitmap(struct domain *d)
 {
     ASSERT(d->arch.shadow.dirty_bitmap == NULL);
     d->arch.shadow.dirty_bitmap_size =
-        (d->shared_info->arch.max_pfn + (BITS_PER_LONG - 1)) &
+        (arch_get_max_pfn(d) + (BITS_PER_LONG - 1)) &
         ~(BITS_PER_LONG - 1);
     d->arch.shadow.dirty_bitmap =
         xmalloc_array(unsigned long,

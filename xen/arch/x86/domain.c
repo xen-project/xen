@@ -534,10 +534,10 @@ static void load_segments(struct vcpu *n)
 
             /* CS longword also contains full evtchn_upcall_mask. */
             cs_and_mask = (unsigned short)regs->cs |
-                ((unsigned int)n->vcpu_info->evtchn_upcall_mask << 16);
+                ((unsigned int)vcpu_info(n, evtchn_upcall_mask) << 16);
             /* Fold upcall mask into RFLAGS.IF. */
             eflags  = regs->_eflags & ~X86_EFLAGS_IF;
-            eflags |= !n->vcpu_info->evtchn_upcall_mask << 9;
+            eflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
 
             if ( !ring_1(regs) )
             {
@@ -562,7 +562,7 @@ static void load_segments(struct vcpu *n)
 
             if ( test_bit(_VGCF_failsafe_disables_events,
                           &n->arch.guest_context.flags) )
-                n->vcpu_info->evtchn_upcall_mask = 1;
+                vcpu_info(n, evtchn_upcall_mask) = 1;
 
             regs->entry_vector  = TRAP_syscall;
             regs->_eflags      &= 0xFFFCBEFFUL;
@@ -580,11 +580,11 @@ static void load_segments(struct vcpu *n)
 
         /* CS longword also contains full evtchn_upcall_mask. */
         cs_and_mask = (unsigned long)regs->cs |
-            ((unsigned long)n->vcpu_info->evtchn_upcall_mask << 32);
+            ((unsigned long)vcpu_info(n, evtchn_upcall_mask) << 32);
 
         /* Fold upcall mask into RFLAGS.IF. */
         rflags  = regs->rflags & ~X86_EFLAGS_IF;
-        rflags |= !n->vcpu_info->evtchn_upcall_mask << 9;
+        rflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
 
         if ( put_user(regs->ss,            rsp- 1) |
              put_user(regs->rsp,           rsp- 2) |
@@ -605,7 +605,7 @@ static void load_segments(struct vcpu *n)
 
         if ( test_bit(_VGCF_failsafe_disables_events,
                       &n->arch.guest_context.flags) )
-            n->vcpu_info->evtchn_upcall_mask = 1;
+            vcpu_info(n, evtchn_upcall_mask) = 1;
 
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= ~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|

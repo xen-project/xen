@@ -23,6 +23,7 @@
 #include <xen/event.h>
 #include <xen/irq.h>
 #include <xen/iocap.h>
+#include <xen/compat.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
 
@@ -33,7 +34,7 @@
 #define bucket_from_port(d,p) \
     ((d)->evtchn[(p)/EVTCHNS_PER_BUCKET])
 #define port_is_valid(d,p)    \
-    (((p) >= 0) && ((p) < MAX_EVTCHNS) && \
+    (((p) >= 0) && ((p) < MAX_EVTCHNS(d)) && \
      (bucket_from_port(d,p) != NULL))
 #define evtchn_from_port(d,p) \
     (&(bucket_from_port(d,p))[(p)&(EVTCHNS_PER_BUCKET-1)])
@@ -82,7 +83,7 @@ static int get_free_port(struct domain *d)
         if ( evtchn_from_port(d, port)->state == ECS_FREE )
             return port;
 
-    if ( port == MAX_EVTCHNS )
+    if ( port == MAX_EVTCHNS(d) )
         return -ENOSPC;
 
     chn = xmalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
@@ -517,12 +518,12 @@ void evtchn_set_pending(struct vcpu *v, int port)
      * others may require explicit memory barriers.
      */
 
-    if ( test_and_set_bit(port, s->evtchn_pending) )
+    if ( test_and_set_bit(port, __shared_info_addr(d, s, evtchn_pending)) )
         return;
 
-    if ( !test_bit        (port, s->evtchn_mask) &&
-         !test_and_set_bit(port / BITS_PER_LONG,
-                           &v->vcpu_info->evtchn_pending_sel) )
+    if ( !test_bit        (port, __shared_info_addr(d, s, evtchn_mask)) &&
+         !test_and_set_bit(port / BITS_PER_GUEST_LONG(d),
+                           vcpu_info_addr(v, evtchn_pending_sel)) )
     {
         vcpu_mark_events_pending(v);
     }
@@ -720,10 +721,10 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
      * These operations must happen in strict order. Based on
      * include/xen/event.h:evtchn_set_pending(). 
      */
-    if ( test_and_clear_bit(port, s->evtchn_mask) &&
-         test_bit          (port, s->evtchn_pending) &&
-         !test_and_set_bit (port / BITS_PER_LONG,
-                            &v->vcpu_info->evtchn_pending_sel) )
+    if ( test_and_clear_bit(port, __shared_info_addr(d, s, evtchn_mask)) &&
+         test_bit          (port, __shared_info_addr(d, s, evtchn_pending)) &&
+         !test_and_set_bit (port / BITS_PER_GUEST_LONG(d),
+                            vcpu_info_addr(v, evtchn_pending_sel)) )
     {
         vcpu_mark_events_pending(v);
     }

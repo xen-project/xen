@@ -16,6 +16,9 @@
 #include <asm/current.h>
 #include <public/nmi.h>
 #include <public/version.h>
+#ifdef CONFIG_X86
+#include <asm/shared.h>
+#endif
 
 #ifndef COMPAT
 
@@ -253,7 +256,7 @@ long register_guest_nmi_callback(unsigned long address)
      * If no handler was registered we can 'lose the NMI edge'. Re-assert it
      * now.
      */
-    if ( d->shared_info->arch.nmi_reason != 0 )
+    if ( arch_get_nmi_reason(d) != 0 )
         set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
 #endif
 

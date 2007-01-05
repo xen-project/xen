@@ -328,6 +328,7 @@ int construct_dom0(struct domain *d,
         l1_pgentry_t gdt_l1e;
 
         set_bit(_DOMF_compat, &d->domain_flags);
+        v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
 
         if ( nr_pages != (unsigned int)nr_pages )
             nr_pages = UINT_MAX;
@@ -730,7 +731,7 @@ int construct_dom0(struct domain *d,
 
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+        shared_info(d, vcpu_info[i].evtchn_upcall_mask) = 1;
 
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();
@@ -738,6 +739,8 @@ int construct_dom0(struct domain *d,
         opt_dom0_max_vcpus = num_online_cpus();
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
+    if ( opt_dom0_max_vcpus > BITS_PER_GUEST_LONG(d) )
+        opt_dom0_max_vcpus = BITS_PER_GUEST_LONG(d);
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
 
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )

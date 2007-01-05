@@ -6,6 +6,7 @@
 #include <xen/types.h>
 #include <xen/spinlock.h>
 #include <xen/smp.h>
+#include <xen/shared.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/vcpu.h>
@@ -23,9 +24,15 @@ extern rwlock_t domlist_lock;
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
 
-#define MAX_EVTCHNS        NR_EVENT_CHANNELS
+#ifndef CONFIG_COMPAT
+#define MAX_EVTCHNS(d)     NR_EVENT_CHANNELS
+#else
+#define MAX_EVTCHNS(d)     (!IS_COMPAT(d) ? \
+                            NR_EVENT_CHANNELS : \
+                            sizeof(unsigned int) * sizeof(unsigned int) * 64)
+#endif
 #define EVTCHNS_PER_BUCKET 128
-#define NR_EVTCHN_BUCKETS  (MAX_EVTCHNS / EVTCHNS_PER_BUCKET)
+#define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
 
 struct evtchn
 {

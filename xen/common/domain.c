@@ -90,7 +90,7 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
+    v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
     spin_lock_init(&v->pause_lock);
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
