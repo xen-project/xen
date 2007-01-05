@@ -823,7 +823,7 @@ def preprocess_ioports(vals):
         if len(d) == 1:
             d.append(d[0])
         # Components are in hex: add hex specifier.
-        hexd = map(lambda v: '0x'+v, d)
+        hexd = ['0x' + x for x in d]
         ioports.append(hexd)
     vals.ioports = ioports
         
@@ -1176,6 +1176,7 @@ def config_security_check(config, verbose):
         try:
             domain_label = security.ssidref2label(security.NULL_SSIDREF)
         except:
+            import traceback
             traceback.print_exc(limit=1)
             return 0
         domain_policy = 'NULL'
