@@ -454,7 +454,7 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps)
 	case 'K': case 'k':
 		ret <<= 10;
 	case 'B': case 'b':
-		s++;
+		s1++;
 		break;
 	default:
 		ret <<= 10; /* default to kB */
