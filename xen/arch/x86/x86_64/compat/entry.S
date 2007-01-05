@@ -278,8 +278,6 @@ CFIX14:
 
 .section .rodata, "a", @progbits
 
-#define compat_set_trap_table domain_crash_synchronous
-#define compat_set_gdt domain_crash_synchronous
 #define compat_platform_op domain_crash_synchronous
 #define compat_multicall domain_crash_synchronous
 #define compat_set_timer_op domain_crash_synchronous

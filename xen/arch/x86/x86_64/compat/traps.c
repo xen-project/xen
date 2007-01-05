@@ -1,6 +1,8 @@
 #ifdef CONFIG_COMPAT
 
+#include <xen/event.h>
 #include <compat/callback.h>
+#include <compat/arch-x86_32.h>
 
 void compat_show_guest_stack(struct cpu_user_regs *regs, int debug_stack_lines)
 {
@@ -250,6 +252,49 @@ long compat_set_callbacks(unsigned long event_selector,
     compat_register_guest_callback(&failsafe);
 
     return 0;
+}
+
+DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
+
+int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
+{
+    struct compat_trap_info cur;
+    struct trap_info *dst = current->arch.guest_context.trap_ctxt;
+    long rc = 0;
+
+    /* If no table is presented then clear the entire virtual IDT. */
+    if ( guest_handle_is_null(traps) )
+    {
+        memset(dst, 0, 256 * sizeof(*dst));
+        return 0;
+    }
+
+    for ( ; ; )
+    {
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, "h", traps);
+            break;
+        }
+
+        if ( copy_from_guest(&cur, traps, 1) )
+        {
+            rc = -EFAULT;
+            break;
+        }
+
+        if ( cur.address == 0 )
+            break;
+
+        fixup_guest_code_selector(current->domain, cur.cs);
+
+        XLAT_trap_info(dst + cur.vector, &cur);
+
+        guest_handle_add_offset(traps, 1);
+    }
+
+    return rc;
 }
 
 #endif /* CONFIG_COMPAT */

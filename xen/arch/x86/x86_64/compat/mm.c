@@ -4,6 +4,39 @@
 #include <compat/memory.h>
 #include <compat/xen.h>
 
+int compat_set_gdt(XEN_GUEST_HANDLE(uint) frame_list, unsigned int entries)
+{
+    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned long frames[16];
+    long ret;
+
+    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
+    if ( entries > FIRST_RESERVED_GDT_ENTRY )
+        return -EINVAL;
+
+    if ( !guest_handle_okay(frame_list, nr_pages) )
+        return -EFAULT;
+
+    for ( i = 0; i < nr_pages; ++i )
+    {
+        unsigned int frame;
+
+        if ( __copy_from_guest(&frame, frame_list, 1) )
+            return -EFAULT;
+        frames[i] = frame;
+        guest_handle_add_offset(frame_list, 1);
+    }
+
+    LOCK_BIGLOCK(current->domain);
+
+    if ( (ret = set_gdt(current, frames, entries)) == 0 )
+        local_flush_tlb();
+
+    UNLOCK_BIGLOCK(current->domain);
+
+    return ret;
+}
+
 int compat_update_descriptor(u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi)
 {
     return do_update_descriptor(pa_lo | ((u64)pa_hi << 32),
