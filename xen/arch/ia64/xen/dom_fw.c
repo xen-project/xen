@@ -549,7 +549,8 @@ complete_dom0_memmap(struct domain *d,
 			flags = ASSIGN_writable;	/* dummy - zero */
 			if (md->attribute & EFI_MEMORY_WP)
 				flags |= ASSIGN_readonly;
-			if (md->attribute & EFI_MEMORY_UC)
+			if ((md->attribute & EFI_MEMORY_UC) &&
+			    !(md->attribute & EFI_MEMORY_WB))
 				flags |= ASSIGN_nocache;
 
 			assign_domain_mach_page(d, start, size, flags);
