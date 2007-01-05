@@ -67,6 +67,14 @@
  * It is also true for all vcpus of translated PV domains. */
 #define shadow_vcpu_mode_translate(_v) ((_v)->arch.shadow.translate_enabled)
 
+/*
+ * 32on64 support
+ */
+#ifdef __x86_64__
+#define pv_32bit_guest(_v) (!is_hvm_vcpu(_v) && IS_COMPAT((_v)->domain))
+#else
+#define pv_32bit_guest(_v) (!is_hvm_vcpu(_v))
+#endif
 
 /******************************************************************************
  * With shadow pagetables, the different kinds of address start 

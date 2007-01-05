@@ -1422,7 +1422,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 }
 #endif
 
-#if CONFIG_PAGING_LEVELS == 3 && GUEST_PAGING_LEVELS == 3
+#if (CONFIG_PAGING_LEVELS == 3 || defined(CONFIG_COMPAT)) && GUEST_PAGING_LEVELS == 3
 // For 3-on-3 PV guests, we need to make sure the xen mappings are in
 // place, which means that we need to populate the l2h entry in the l3
 // table.
@@ -1432,12 +1432,20 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v,
 {
     struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
+#if CONFIG_PAGING_LEVELS == 3
     int i;
+#else
+
+    if ( !pv_32bit_guest(v) )
+        return;
+#endif
 
     sl2e = sh_map_domain_page(sl2hmfn);
     ASSERT(sl2e != NULL);
     ASSERT(sizeof (l2_pgentry_t) == sizeof (shadow_l2e_t));
     
+#if CONFIG_PAGING_LEVELS == 3
+
     /* Copy the common Xen mappings from the idle domain */
     memcpy(&sl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
@@ -1478,6 +1486,15 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v,
         }
         sh_unmap_domain_page(p2m);
     }
+
+#else
+
+    /* Copy the common Xen mappings from the idle domain */
+    memcpy(&sl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+           &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*sl2e));
+
+#endif
     
     sh_unmap_domain_page(sl2e);
 }
@@ -1660,6 +1677,19 @@ sh_make_monitor_table(struct vcpu *v)
             l4e = sh_map_domain_page(m4mfn);
             l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
             sh_unmap_domain_page(l4e);
+            if ( pv_32bit_guest(v) )
+            {
+                // Install a monitor l2 table in slot 3 of the l3 table.
+                // This is used for all Xen entries.
+                mfn_t m2mfn;
+                l3_pgentry_t *l3e;
+                m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+                mfn_to_page(m2mfn)->shadow_flags = 2;
+                l3e = sh_map_domain_page(m3mfn);
+                l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
+                sh_install_xen_entries_in_l2h(v, m2mfn);
+                sh_unmap_domain_page(l3e);
+            }
         }
 #endif /* SHADOW_PAGING_LEVELS < 4 */
         return m4mfn;
@@ -2067,7 +2097,16 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
     {
         l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
         ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-        shadow_free(d, _mfn(l4e_get_pfn(l4e[0])));
+        mmfn = _mfn(l4e_get_pfn(l4e[0]));
+        if ( pv_32bit_guest(v) )
+        {
+            /* Need to destroy the l2 monitor page in slot 3 too */
+            l3_pgentry_t *l3e = sh_map_domain_page(mmfn);
+            ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
+            shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
+            sh_unmap_domain_page(l3e);
+        }
+        shadow_free(d, mmfn);
         sh_unmap_domain_page(l4e);
     }
 #elif CONFIG_PAGING_LEVELS == 3
@@ -3044,12 +3083,15 @@ sh_update_linear_entries(struct vcpu *v)
 
 #elif (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS == 3)
 
-    /* This case only exists in HVM.  To give ourselves a linear map of the 
-     * shadows, we need to extend a PAE shadow to 4 levels.  We do this by 
-     * having a monitor l3 in slot 0 of the monitor l4 table, and 
-     * copying the PAE l3 entries into it.  Then, by having the monitor l4e
-     * for shadow pagetables also point to the monitor l4, we can use it
-     * to access the shadows. */
+    /* PV: XXX
+     *
+     * HVM: To give ourselves a linear map of the  shadows, we need to
+     * extend a PAE shadow to 4 levels.  We do this by  having a monitor
+     * l3 in slot 0 of the monitor l4 table, and  copying the PAE l3
+     * entries into it.  Then, by having the monitor l4e for shadow
+     * pagetables also point to the monitor l4, we can use it to access
+     * the shadows.
+     */
 
     if ( shadow_mode_external(d) )
     {
@@ -3092,6 +3134,8 @@ sh_update_linear_entries(struct vcpu *v)
         if ( v != current ) 
             sh_unmap_domain_page(ml3e);
     }
+    else
+        domain_crash(d); /* XXX */
 
 #elif CONFIG_PAGING_LEVELS == 3
 
@@ -3404,7 +3448,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
                    (unsigned long)pagetable_get_pfn(v->arch.guest_table));
 
 #if GUEST_PAGING_LEVELS == 4
-    if ( !(v->arch.flags & TF_kernel_mode) )
+    if ( !(v->arch.flags & TF_kernel_mode) && !IS_COMPAT(v->domain) )
         gmfn = pagetable_get_mfn(v->arch.guest_table_user);
     else
 #endif

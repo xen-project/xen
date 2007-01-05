@@ -2443,9 +2443,10 @@ static void sh_update_paging_modes(struct vcpu *v)
         /// PV guest
         ///
 #if CONFIG_PAGING_LEVELS == 4
-        /* When 32-on-64 PV guests are supported, they must choose 
-         * a different mode here */
-        v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,4,4);
+        if ( pv_32bit_guest(v) )
+            v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
+        else
+            v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,4,4);
 #elif CONFIG_PAGING_LEVELS == 3
         v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
 #elif CONFIG_PAGING_LEVELS == 2
