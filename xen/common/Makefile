@@ -39,3 +39,8 @@ subdir-$(CONFIG_COMPAT) += compat
 
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h
+
+ifeq ($(CONFIG_COMPAT),y)
+# extra dependencies
+schedule.o: compat/schedule.c
+endif

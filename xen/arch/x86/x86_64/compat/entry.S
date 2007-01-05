@@ -279,10 +279,8 @@ CFIX14:
 .section .rodata, "a", @progbits
 
 #define compat_platform_op domain_crash_synchronous
-#define compat_set_timer_op domain_crash_synchronous
 #define compat_grant_table_op domain_crash_synchronous
 #define compat_acm_op domain_crash_synchronous
-#define compat_arch_sched_op domain_crash_synchronous
 #define compat_xenoprof_op domain_crash_synchronous
 #define compat_sysctl domain_crash_synchronous
 #define compat_domctl domain_crash_synchronous
@@ -317,7 +315,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_mmuext_op
         .quad compat_acm_op
         .quad compat_nmi_op
-        .quad compat_arch_sched_op
+        .quad compat_sched_op
         .quad compat_callback_op        /* 30 */
         .quad compat_xenoprof_op
         .quad do_event_channel_op
@@ -359,7 +357,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 4 /* compat_mmuext_op         */
         .byte 1 /* compat_acm_op            */
         .byte 2 /* compat_nmi_op            */
-        .byte 2 /* compat_arch_sched_op     */
+        .byte 2 /* compat_sched_op          */
         .byte 2 /* compat_callback_op       */  /* 30 */
         .byte 2 /* compat_xenoprof_op       */
         .byte 2 /* compat_event_channel_op  */

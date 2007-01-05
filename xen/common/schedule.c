@@ -13,6 +13,7 @@
  *
  */
 
+#ifndef COMPAT
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -366,9 +367,13 @@ long do_sched_op_compat(int cmd, unsigned long arg)
     return ret;
 }
 
-long do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+typedef long ret_t;
+
+#endif /* !COMPAT */
+
+ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    long ret = 0;
+    ret_t ret = 0;
 
     switch ( cmd )
     {
@@ -444,6 +449,8 @@ long do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     return ret;
 }
+
+#ifndef COMPAT
 
 /* Per-domain one-shot-timer hypercall. */
 long do_set_timer_op(s_time_t timeout)
@@ -735,6 +742,12 @@ void dump_runq(unsigned char key)
 
     local_irq_restore(flags);
 }
+
+#ifdef CONFIG_COMPAT
+#include "compat/schedule.c"
+#endif
+
+#endif /* !COMPAT */
 
 /*
  * Local variables:
