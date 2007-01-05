@@ -123,4 +123,13 @@ do_set_callbacks(
 
 #endif
 
+#ifdef CONFIG_COMPAT
+
+extern int
+compat_physdev_op(
+    int cmd,
+    XEN_GUEST_HANDLE(void) arg);
+
+#endif
+
 #endif /* __ASM_X86_HYPERCALL_H__ */

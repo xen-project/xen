@@ -283,15 +283,11 @@ CFIX14:
 #define compat_platform_op domain_crash_synchronous
 #define compat_multicall domain_crash_synchronous
 #define compat_set_timer_op domain_crash_synchronous
-#define compat_event_channel_op_compat domain_crash_synchronous
-#define compat_physdev_op_compat domain_crash_synchronous
 #define compat_grant_table_op domain_crash_synchronous
 #define compat_vcpu_op domain_crash_synchronous
 #define compat_acm_op domain_crash_synchronous
 #define compat_arch_sched_op domain_crash_synchronous
 #define compat_xenoprof_op domain_crash_synchronous
-#define compat_event_channel_op domain_crash_synchronous
-#define compat_physdev_op domain_crash_synchronous
 #define compat_sysctl domain_crash_synchronous
 #define compat_domctl domain_crash_synchronous
 
@@ -312,7 +308,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_multicall
         .quad compat_update_va_mapping
         .quad compat_set_timer_op       /* 15 */
-        .quad compat_event_channel_op_compat
+        .quad do_event_channel_op_compat
         .quad compat_xen_version
         .quad do_console_io
         .quad compat_physdev_op_compat
@@ -328,7 +324,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_arch_sched_op
         .quad compat_callback_op        /* 30 */
         .quad compat_xenoprof_op
-        .quad compat_event_channel_op
+        .quad do_event_channel_op
         .quad compat_physdev_op
         .quad compat_ni_hypercall
         .quad compat_sysctl             /* 35 */

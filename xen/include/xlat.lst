@@ -6,6 +6,17 @@
 !	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
+?	evtchn_alloc_unbound		event_channel.h
+?	evtchn_bind_interdomain		event_channel.h
+?	evtchn_bind_ipi			event_channel.h
+?	evtchn_bind_pirq		event_channel.h
+?	evtchn_bind_vcpu		event_channel.h
+?	evtchn_bind_virq		event_channel.h
+?	evtchn_close			event_channel.h
+?	evtchn_op			event_channel.h
+?	evtchn_send			event_channel.h
+?	evtchn_status			event_channel.h
+?	evtchn_unmask			event_channel.h
 !	add_to_physmap			memory.h
 !	foreign_memory_map		memory.h
 !	memory_exchange			memory.h
