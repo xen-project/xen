@@ -4,7 +4,7 @@ compat-arch-$(CONFIG_X86) := x86_32
 
 headers-y                 := $(shell echo public/*.h | sed -e 's,[^[:space:]]*-[^[:space:]]*,,g' -e 's,public/,compat/,g')
 headers-y                 := $(filter-out %/dom0_ops.h,$(headers-y))
-headers-y                 += compat/arch-$(compat-arch-y).h
+headers-y                 += compat/arch-$(compat-arch-y).h compat/xlat.h
 
 cppflags-y                := -include public/xen-compat.h
 cppflags-$(CONFIG_X86)    += -m32
@@ -51,6 +51,13 @@ compat/%.c: public/%.h Makefile
 	    -e 's,^[[:space:]]*#[[:space:]]*define[[:space:]]\+\([[:lower:]_]*_guest_handle\),#define hide_\1,' \
 	    -e 's,XEN_GUEST_HANDLE\(_[[:xdigit:]]\+\)\?,COMPAT_HANDLE,g' \
 	    >$@.new
+	mv -f $@.new $@
+
+compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tools/get-fields.sh Makefile
+	grep -v '^[[:space:]]*#' xlat.lst | \
+	while read what name hdr; do \
+		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$(echo compat/$$hdr | sed 's,@arch@,$(compat-arch-y),g') || exit $$?; \
+	done >$@.new
 	mv -f $@.new $@
 
 clean::

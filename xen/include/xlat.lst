@@ -1,0 +1,5 @@
+# First column indicator:
+# ! - needs translation
+# ? - needs checking
+?	dom0_vga_console_info		xen.h
+!	start_info			xen.h

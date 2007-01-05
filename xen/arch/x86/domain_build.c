@@ -19,6 +19,7 @@
 #include <xen/version.h>
 #include <xen/iocap.h>
 #include <xen/bitops.h>
+#include <xen/compat.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -847,6 +848,11 @@ int construct_dom0(struct domain *d,
         si->console.dom0.info_off  = sizeof(struct start_info);
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
+
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+        xlat_start_info(si, XLAT_start_info_console_dom0);
+#endif
 
     /* Reinstate the caller's page tables. */
     write_ptbase(current);
