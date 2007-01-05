@@ -127,6 +127,28 @@ void free_vcpu_struct(struct vcpu *v)
     xfree(v);
 }
 
+#ifdef CONFIG_COMPAT
+static int setup_compat_l4(struct vcpu *v)
+{
+    struct page_info *pg = alloc_domheap_page(NULL);
+    l4_pgentry_t *l4tab;
+
+    if ( !pg )
+        return -ENOMEM;
+    l4tab = copy_page(page_to_virt(pg), idle_pg_table);
+    l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
+        l4e_from_page(pg, __PAGE_HYPERVISOR);
+    l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
+        l4e_from_paddr(__pa(v->domain->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
+    v->arch.guest_table = pagetable_from_page(pg);
+    v->arch.guest_table_user = v->arch.guest_table;
+
+    return 0;
+}
+#else
+#define setup_compat_l4(v) 0
+#endif
+
 int vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -161,11 +183,16 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
+    if ( IS_COMPAT(d) && (rc = setup_compat_l4(v)) != 0 )
+        return rc;
+
     return 0;
 }
 
 void vcpu_destroy(struct vcpu *v)
 {
+    if ( IS_COMPAT(v->domain) )
+        free_domheap_page(pagetable_get_page(v->arch.guest_table));
 }
 
 int arch_domain_create(struct domain *d)
@@ -218,6 +245,10 @@ int arch_domain_create(struct domain *d)
                             __PAGE_HYPERVISOR);
 
 #endif /* __x86_64__ */
+
+#ifdef CONFIG_COMPAT
+    HYPERVISOR_COMPAT_VIRT_START(d) = __HYPERVISOR_COMPAT_VIRT_START;
+#endif
 
     shadow_domain_init(d);
 
@@ -349,18 +380,41 @@ int arch_set_info_guest(
         if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
             return rc;
 
-        cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
-
-        if ( shadow_mode_refcounts(d)
-             ? !get_page(mfn_to_page(cr3_pfn), d)
-             : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                  PGT_base_page_table) )
+        if ( !IS_COMPAT(d) )
         {
-            destroy_gdt(v);
-            return -EINVAL;
-        }
+            cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
 
-        v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
+            if ( shadow_mode_refcounts(d)
+                 ? !get_page(mfn_to_page(cr3_pfn), d)
+                 : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                      PGT_base_page_table) )
+            {
+                destroy_gdt(v);
+                return -EINVAL;
+            }
+
+            v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
+        }
+#ifdef CONFIG_COMPAT
+        else
+        {
+            l4_pgentry_t *l4tab;
+
+            cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c->ctrlreg[3]));
+
+            if ( shadow_mode_refcounts(d)
+                 ? !get_page(mfn_to_page(cr3_pfn), d)
+                 : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                    PGT_l3_page_table) )
+            {
+                destroy_gdt(v);
+                return -EINVAL;
+            }
+
+            l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
+            *l4tab = l4e_from_pfn(cr3_pfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+        }
+#endif
     }    
 
     if ( v->vcpu_id == 0 )

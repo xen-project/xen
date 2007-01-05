@@ -18,7 +18,7 @@
 #ifdef CONFIG_COMPAT
 
 #define __compat_addr_ok(addr) \
-    ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START)
+    ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(current->domain))
 
 #define compat_access_ok(addr, size) __compat_addr_ok((addr) + (size))
 

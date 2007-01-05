@@ -311,7 +311,12 @@ void arch_getdomaininfo_ctxt(
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
         c->flags |= VGCF_in_kernel;
 
-    c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
+    if ( !IS_COMPAT(v->domain) )
+        c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
+#ifdef CONFIG_COMPAT
+    else
+        c->ctrlreg[3] = compat_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
+#endif
 
     c->vm_assist = v->domain->vm_assist;
 }

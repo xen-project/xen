@@ -27,7 +27,7 @@ CHECK_TYPE(capabilities_info);
 #define xen_platform_parameters compat_platform_parameters
 #define xen_platform_parameters_t compat_platform_parameters_t
 #undef HYPERVISOR_VIRT_START
-#define HYPERVISOR_VIRT_START HYPERVISOR_COMPAT_VIRT_START
+#define HYPERVISOR_VIRT_START HYPERVISOR_COMPAT_VIRT_START(current->domain)
 
 #define xen_changeset_info compat_changeset_info
 #define xen_changeset_info_t compat_changeset_info_t

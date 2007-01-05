@@ -206,6 +206,7 @@ typedef struct { u32 pfn; } pagetable_t;
 typedef struct { u64 pfn; } pagetable_t;
 #endif
 #define pagetable_get_paddr(x)  ((paddr_t)(x).pfn << PAGE_SHIFT)
+#define pagetable_get_page(x)   mfn_to_page((x).pfn)
 #define pagetable_get_pfn(x)    ((x).pfn)
 #define pagetable_is_null(x)    ((x).pfn == 0)
 #define pagetable_from_pfn(pfn) ((pagetable_t) { (pfn) })
@@ -287,6 +288,10 @@ extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES*L2_PAGETABLE_ENTRI
 #else
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES];
+#ifdef CONFIG_COMPAT
+extern l2_pgentry_t  *compat_idle_pg_table_l2;
+extern unsigned int   m2p_compat_vstart;
+#endif
 #endif
 void paging_init(void);
 void setup_idle_pagetable(void);

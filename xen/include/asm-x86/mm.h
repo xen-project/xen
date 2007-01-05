@@ -257,7 +257,16 @@ int check_descriptor(const struct domain *, struct desc_struct *d);
 #define INVALID_M2P_ENTRY        (~0UL)
 #define VALID_M2P(_e)            (!((_e) & (1UL<<(BITS_PER_LONG-1))))
 
+#ifdef CONFIG_COMPAT
+#define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
+#define set_gpfn_from_mfn(mfn, pfn) \
+    ((void)(compat_disabled || \
+            (mfn) >= (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 || \
+            (compat_machine_to_phys_mapping[(mfn)] = (unsigned int)(pfn))), \
+     machine_to_phys_mapping[(mfn)] = (pfn))
+#else
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
+#endif
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 

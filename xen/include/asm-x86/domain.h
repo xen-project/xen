@@ -98,6 +98,10 @@ struct arch_domain
     struct mapcache mapcache;
 #endif
 
+#ifdef CONFIG_COMPAT
+    unsigned int hv_compat_vstart;
+#endif
+
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
 

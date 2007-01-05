@@ -129,7 +129,11 @@
  *    Page-frame information array.
  *  0xffff828800000000 - 0xffff828bffffffff [16GB,  2^34 bytes, PML4:261]
  *    ioremap()/fixmap area.
- *  0xffff828c00000000 - 0xffff82ffffffffff [464GB,             PML4:261]
+ *  0xffff828c00000000 - 0xffff828c3fffffff [1GB,   2^30 bytes, PML4:261]
+ *    Compatibility machine-to-phys translation table.
+ *  0xffff828c40000000 - 0xffff828c7fffffff [1GB,   2^30 bytes, PML4:261]
+ *    High read-only compatibility machine-to-phys translation table.
+ *  0xffff828c80000000 - 0xffff82ffffffffff [462GB,             PML4:261]
  *    Reserved for future use.
  *  0xffff830000000000 - 0xffff83ffffffffff [1TB,   2^40 bytes, PML4:262-263]
  *    1:1 direct mapping of all physical memory. Xen and its heap live here.
@@ -178,17 +182,33 @@
 /* Slot 261: ioremap()/fixmap area (16GB). */
 #define IOREMAP_VIRT_START      (FRAMETABLE_VIRT_END)
 #define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + (16UL<<30))
+/* Slot 261: compatibility machine-to-phys conversion table (1GB). */
+#define RDWR_COMPAT_MPT_VIRT_START IOREMAP_VIRT_END
+#define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + (1UL << 30))
+/* Slot 261: high read-only compatibility machine-to-phys conversion table (1GB). */
+#define HIRO_COMPAT_MPT_VIRT_START RDWR_COMPAT_MPT_VIRT_END
+#define HIRO_COMPAT_MPT_VIRT_END (HIRO_COMPAT_MPT_VIRT_START + (1UL << 30))
 /* Slot 262-263: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
 
+#ifndef __ASSEMBLY__
+
+/* This is not a fixed value, just a lower limit. */
 #define __HYPERVISOR_COMPAT_VIRT_START 0xF5800000
-#define HYPERVISOR_COMPAT_VIRT_START   \
-    mk_unsigned_long(__HYPERVISOR_COMPAT_VIRT_START)
+#define HYPERVISOR_COMPAT_VIRT_START(d) ((d)->arch.hv_compat_vstart)
 #define MACH2PHYS_COMPAT_VIRT_START    HYPERVISOR_COMPAT_VIRT_START
 #define MACH2PHYS_COMPAT_VIRT_END      0xFFE00000
-#define MACH2PHYS_COMPAT_NR_ENTRIES    \
-    ((MACH2PHYS_COMPAT_VIRT_END-MACH2PHYS_COMPAT_VIRT_START)>>2)
+#define MACH2PHYS_COMPAT_NR_ENTRIES(d) \
+    ((MACH2PHYS_COMPAT_VIRT_END-MACH2PHYS_COMPAT_VIRT_START(d))>>2)
+
+#define COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d) \
+    l2_table_offset(HYPERVISOR_COMPAT_VIRT_START(d))
+#define COMPAT_L2_PAGETABLE_LAST_XEN_SLOT  l2_table_offset(~0U)
+#define COMPAT_L2_PAGETABLE_XEN_SLOTS(d) \
+    (COMPAT_L2_PAGETABLE_LAST_XEN_SLOT - COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d) + 1)
+
+#endif
 
 #define PGT_base_page_table     PGT_l4_page_table
 
