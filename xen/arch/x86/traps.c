@@ -123,6 +123,12 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     if ( is_hvm_vcpu(current) )
         return;
 
+    if ( IS_COMPAT(container_of(regs, struct cpu_info, guest_cpu_user_regs)->current_vcpu->domain) )
+    {
+        compat_show_guest_stack(regs, debug_stack_lines);
+        return;
+    }
+
     if ( vm86_mode(regs) )
     {
         stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));

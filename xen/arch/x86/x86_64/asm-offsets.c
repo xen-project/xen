@@ -53,6 +53,7 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(VCPU_processor, struct vcpu, processor);
+    OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);
     OFFSET(VCPU_trap_bounce, struct vcpu, arch.trap_bounce);
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
@@ -87,6 +88,10 @@ void __dummy__(void)
     OFFSET(VCPU_vmx_cr2, struct vcpu, arch.hvm_vmx.cpu_cr2);
     BLANK();
 
+    OFFSET(DOMAIN_domain_flags, struct domain, domain_flags);
+    DEFINE(_DOMF_compat, _DOMF_compat);
+    BLANK();
+
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
     OFFSET(VMCB_tsc_offset, struct vmcb_struct, tsc_offset);
     BLANK();
@@ -95,6 +100,7 @@ void __dummy__(void)
     OFFSET(VCPUINFO_upcall_mask, vcpu_info_t, evtchn_upcall_mask);
     BLANK();
 
+    OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
     BLANK();
 

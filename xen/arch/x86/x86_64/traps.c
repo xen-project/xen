@@ -246,6 +246,7 @@ unsigned long do_iret(void)
 }
 
 asmlinkage void syscall_enter(void);
+asmlinkage void compat_hypercall(void);
 void __init percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
@@ -257,6 +258,11 @@ void __init percpu_traps_init(void)
         set_intr_gate(TRAP_double_fault, &double_fault);
         idt_table[TRAP_double_fault].a |= 1UL << 32; /* IST1 */
         idt_table[TRAP_nmi].a          |= 2UL << 32; /* IST2 */
+
+#ifdef CONFIG_COMPAT
+        /* The hypercall entry vector is only accessible from ring 1. */
+        _set_gate(idt_table+HYPERCALL_VECTOR, 15, 1, &compat_hypercall);
+#endif
     }
 
     stack_bottom = (char *)get_stack_bottom();
@@ -503,12 +509,16 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
     *(u16 *)(p+ 9) = 0x050f;  /* syscall */
 }
 
+#include "compat/traps.c"
+
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
     if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
-    else
+    else if ( !IS_COMPAT(d) )
         hypercall_page_initialise_ring3_kernel(hypercall_page);
+    else
+        hypercall_page_initialise_ring1_kernel(hypercall_page);
 }
 
 /*
