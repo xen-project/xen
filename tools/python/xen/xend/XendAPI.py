@@ -543,14 +543,14 @@ class XendAPI:
         try:
             node = XendNode.instance()
             if host_uuid != node.uuid:
-                return xen_api_error([HOST_HANDLE_INVALID, host_uuid])
+                return xen_api_error(['HOST_HANDLE_INVALID', host_uuid])
 
             elif _is_valid_ref(network_uuid, node.is_valid_network):
                 network = node.get_network(network_uuid)
                 return xen_api_success(node.PIF_create(name, mtu, vlan, mac,
                                                        network))
             else:
-                return xen_api_error([NETWORK_HANDLE_INVALID, network_uuid])
+                return xen_api_error(['NETWORK_HANDLE_INVALID', network_uuid])
         except NetworkAlreadyConnected, exn:
             return xen_api_error(['NETWORK_ALREADY_CONNECTED',
                                   network_uuid, exn.pif_uuid])
@@ -604,7 +604,7 @@ class XendAPI:
                 return xen_api_success(XendNode.instance().PIF_create_VLAN(
                     ref, network, vlan))
             else:
-                return xen_api_error([NETWORK_HANDLE_INVALID, network])
+                return xen_api_error(['NETWORK_HANDLE_INVALID', network])
         except NetworkAlreadyConnected, exn:
             return xen_api_error(['NETWORK_ALREADY_CONNECTED',
                                   network, exn.pif_uuid])
