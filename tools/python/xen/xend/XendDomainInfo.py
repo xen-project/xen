@@ -511,7 +511,7 @@ class XendDomainInfo:
         # look up uuid of the device
         dev_control =  self.getDeviceController(deviceClass)
         dev_sxpr = dev_control.sxpr(devid)
-        dev_uuid = sxp.child_value(sxpr, 'uuid')
+        dev_uuid = sxp.child_value(dev_sxpr, 'uuid')
         if not dev_uuid:
             return False
 
