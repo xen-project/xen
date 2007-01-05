@@ -279,6 +279,11 @@ int check_descriptor(const struct domain *, struct desc_struct *d);
 
 #define INVALID_MFN             (~0UL)
 
+#ifdef CONFIG_COMPAT
+#define compat_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
+#define compat_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))
+#endif
+
 #ifdef MEMORY_GUARD
 void memguard_init(void);
 void memguard_guard_range(void *p, unsigned long l);

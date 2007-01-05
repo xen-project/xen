@@ -1055,6 +1055,20 @@ void domain_relinquish_resources(struct domain *d)
     {
         /* Drop ref to guest_table (from new_guest_cr3(), svm/vmx cr3 handling,
          * or sh_update_paging_modes()) */
+#ifdef CONFIG_COMPAT
+        if ( IS_COMPAT(d) )
+        {
+            pfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
+            if ( pfn != 0 )
+            {
+                if ( shadow_mode_refcounts(d) )
+                    put_page(mfn_to_page(pfn));
+                else
+                    put_page_and_type(mfn_to_page(pfn));
+            }
+            continue;
+        }
+#endif
         pfn = pagetable_get_pfn(v->arch.guest_table);
         if ( pfn != 0 )
         {

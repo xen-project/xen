@@ -113,12 +113,19 @@
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)
+#define _SEGMENT_WR      ( 1<< 9) /* Writeable (data) or Readable (code)
+                                     segment */
 #define _SEGMENT_EC      ( 1<<10) /* Expand-down or Conforming segment */
 #define _SEGMENT_CODE    ( 1<<11) /* Code (vs data) segment for non-system
                                      segments */
 #define _SEGMENT_S       ( 1<<12) /* System descriptor (yes iff S==0) */
 #define _SEGMENT_DPL     ( 3<<13) /* Descriptor Privilege Level */
 #define _SEGMENT_P       ( 1<<15) /* Segment Present */
+#ifdef __x86_64
+#define _SEGMENT_L       ( 1<<21) /* 64-bit segment */
+#else
+#define _SEGMENT_L       0
+#endif
 #define _SEGMENT_DB      ( 1<<22) /* 16- or 32-bit segment */
 #define _SEGMENT_G       ( 1<<23) /* Granularity */
 

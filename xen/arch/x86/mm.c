@@ -1765,6 +1765,33 @@ int new_guest_cr3(unsigned long mfn)
     if ( is_hvm_domain(d) && !hvm_paging_enabled(v) )
         return 0;
 
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+    {
+        l4_pgentry_t l4e = l4e_from_pfn(mfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+
+        if ( shadow_mode_refcounts(d) )
+        {
+            okay = get_page_from_pagenr(mfn, d);
+            old_base_mfn = l4e_get_pfn(l4e);
+            if ( okay && old_base_mfn )
+                put_page(mfn_to_page(old_base_mfn));
+        }
+        else
+            okay = mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
+                                l4e, 0);
+        if ( unlikely(!okay) )
+        {
+            MEM_LOG("Error while installing new compat baseptr %lx", mfn);
+            return 0;
+        }
+
+        invalidate_shadow_ldt(v);
+        write_ptbase(v);
+
+        return 1;
+    }
+#endif
     if ( shadow_mode_refcounts(d) )
     {
         okay = get_page_from_pagenr(mfn, d);
@@ -3204,7 +3231,7 @@ static int ptwr_emulated_update(
     nl1e = l1e_from_intpte(val);
     if ( unlikely(!get_page_from_l1e(gl1e_to_ml1e(d, nl1e), d)) )
     {
-        if ( (CONFIG_PAGING_LEVELS == 3) &&
+        if ( (CONFIG_PAGING_LEVELS == 3 || IS_COMPAT(d)) &&
              (bytes == 4) &&
              !do_cmpxchg &&
              (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
@@ -3347,7 +3374,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         goto bail;
 
     ptwr_ctxt.ctxt.regs = guest_cpu_user_regs();
-    ptwr_ctxt.ctxt.mode = X86EMUL_MODE_HOST;
+    ptwr_ctxt.ctxt.mode = !IS_COMPAT(d) ? X86EMUL_MODE_HOST : X86EMUL_MODE_PROT32;
     ptwr_ctxt.cr2       = addr;
     ptwr_ctxt.pte       = pte;
     if ( x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )

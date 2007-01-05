@@ -83,7 +83,7 @@ do {									\
 	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
 	case 4: __get_user_asm(x,ptr,retval,"l","","=r",errret);break;	\
 	case 8: __get_user_u64(x,ptr,retval,errret);break;		\
-	default: (x) = __get_user_bad();				\
+	default: __get_user_bad();					\
 	}								\
 } while (0)
 
