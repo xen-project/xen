@@ -2,6 +2,8 @@
 # ! - needs translation
 # ? - needs checking
 ?	dom0_vga_console_info		xen.h
+?	mmu_update			xen.h
+!	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
 !	add_to_physmap			memory.h

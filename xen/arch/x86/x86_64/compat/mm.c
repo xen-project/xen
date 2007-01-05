@@ -1,6 +1,8 @@
 #ifdef CONFIG_COMPAT
 
+#include <xen/event.h>
 #include <compat/memory.h>
+#include <compat/xen.h>
 
 int compat_update_descriptor(u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi)
 {
@@ -135,6 +137,152 @@ int compat_update_va_mapping_otherdomain(unsigned long va, u32 lo, u32 hi,
 {
     return do_update_va_mapping_otherdomain(va, lo | ((u64)hi << 32), flags, domid);
 }
+
+DEFINE_XEN_GUEST_HANDLE(mmuext_op_compat_t);
+
+int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
+                     unsigned int count,
+                     XEN_GUEST_HANDLE(uint) pdone,
+                     unsigned int foreigndom)
+{
+    unsigned int i, preempt_mask;
+    int rc = 0;
+    XEN_GUEST_HANDLE(mmuext_op_t) nat_ops;
+
+    preempt_mask = count & MMU_UPDATE_PREEMPTED;
+    count ^= preempt_mask;
+
+    if ( unlikely(!guest_handle_okay(cmp_uops, count)) )
+        return -EFAULT;
+
+    set_xen_guest_handle(nat_ops, (void *)COMPAT_ARG_XLAT_VIRT_START(current->vcpu_id));
+
+    for ( ; count; count -= i )
+    {
+        mmuext_op_t *nat_op = nat_ops.p;
+        unsigned int limit;
+        int err;
+
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_mmuext_op, "hihi",
+                cmp_uops, count | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+            break;
+        }
+
+        limit = COMPAT_ARG_XLAT_SIZE / sizeof(*nat_op);
+
+        for ( i = 0; i < min(limit, count); ++i )
+        {
+            mmuext_op_compat_t cmp_op;
+            enum XLAT_mmuext_op_arg1 arg1;
+            enum XLAT_mmuext_op_arg2 arg2;
+
+            if ( unlikely(__copy_from_guest(&cmp_op, cmp_uops, 1) != 0) )
+            {
+                rc = -EFAULT;
+                break;
+            }
+
+            switch ( cmp_op.cmd )
+            {
+            case MMUEXT_PIN_L1_TABLE:
+            case MMUEXT_PIN_L2_TABLE:
+            case MMUEXT_PIN_L3_TABLE:
+            case MMUEXT_PIN_L4_TABLE:
+            case MMUEXT_UNPIN_TABLE:
+            case MMUEXT_NEW_BASEPTR:
+                arg1 = XLAT_mmuext_op_arg1_mfn;
+                break;
+            default:
+                arg1 = XLAT_mmuext_op_arg1_linear_addr;
+                break;
+            case MMUEXT_NEW_USER_BASEPTR:
+                rc = -EINVAL;
+            case MMUEXT_TLB_FLUSH_LOCAL:
+            case MMUEXT_TLB_FLUSH_MULTI:
+            case MMUEXT_TLB_FLUSH_ALL:
+            case MMUEXT_FLUSH_CACHE:
+                arg1 = -1;
+                break;
+            }
+
+            if ( rc )
+                break;
+
+            switch ( cmp_op.cmd )
+            {
+            case MMUEXT_SET_LDT:
+                arg2 = XLAT_mmuext_op_arg2_nr_ents;
+                break;
+            case MMUEXT_TLB_FLUSH_MULTI:
+            case MMUEXT_INVLPG_MULTI:
+                arg2 = XLAT_mmuext_op_arg2_vcpumask;
+                break;
+            default:
+                arg2 = -1;
+                break;
+            }
+
+#define XLAT_mmuext_op_HNDL_arg2_vcpumask(_d_, _s_) \
+            do \
+            { \
+                unsigned int vcpumask; \
+                if ( i < --limit ) \
+                { \
+                    (_d_)->arg2.vcpumask.p = (void *)(nat_ops.p + limit); \
+                    if ( copy_from_compat(&vcpumask, (_s_)->arg2.vcpumask, 1) == 0 ) \
+                        *(unsigned long *)(_d_)->arg2.vcpumask.p = vcpumask; \
+                    else \
+                        rc = -EFAULT; \
+                } \
+            } while(0)
+            XLAT_mmuext_op(nat_op, &cmp_op);
+#undef XLAT_mmuext_op_HNDL_arg2_vcpumask
+
+            if ( rc || i >= limit )
+                break;
+
+            guest_handle_add_offset(cmp_uops, 1);
+            ++nat_op;
+        }
+
+        err = do_mmuext_op(nat_ops, i | preempt_mask, pdone, foreigndom);
+
+        if ( err )
+        {
+            BUILD_BUG_ON(__HYPERVISOR_mmuext_op <= 0);
+            if ( err == __HYPERVISOR_mmuext_op )
+            {
+                struct cpu_user_regs *regs = guest_cpu_user_regs();
+                unsigned int left = regs->ecx & ~MMU_UPDATE_PREEMPTED;
+
+                BUG_ON(!(regs->ecx & MMU_UPDATE_PREEMPTED));
+                BUG_ON(left > count);
+                guest_handle_add_offset(nat_ops, count - left);
+                BUG_ON(left + i < count);
+                guest_handle_add_offset(cmp_uops, (signed int)(count - left - i));
+                left = 1;
+                BUG_ON(!hypercall_xlat_continuation(&left, 0x01, nat_ops, cmp_uops));
+                BUG_ON(left != regs->ecx);
+                regs->ecx += count - i;
+            }
+            else
+                BUG_ON(rc > 0);
+            rc = err;
+        }
+
+        if ( rc )
+            break;
+
+        /* Force do_mmuext_op() to not start counting from zero again. */
+        preempt_mask = MMU_UPDATE_PREEMPTED;
+    }
+
+    return rc;
+}
+
 #endif /* CONFIG_COMPAT */
 
 /*

@@ -279,7 +279,6 @@ CFIX14:
 .section .rodata, "a", @progbits
 
 #define compat_set_trap_table domain_crash_synchronous
-#define compat_mmu_update domain_crash_synchronous
 #define compat_set_gdt domain_crash_synchronous
 #define compat_platform_op domain_crash_synchronous
 #define compat_multicall domain_crash_synchronous
@@ -288,7 +287,6 @@ CFIX14:
 #define compat_physdev_op_compat domain_crash_synchronous
 #define compat_grant_table_op domain_crash_synchronous
 #define compat_vcpu_op domain_crash_synchronous
-#define compat_mmuext_op domain_crash_synchronous
 #define compat_acm_op domain_crash_synchronous
 #define compat_arch_sched_op domain_crash_synchronous
 #define compat_xenoprof_op domain_crash_synchronous
@@ -299,7 +297,7 @@ CFIX14:
 
 ENTRY(compat_hypercall_table)
         .quad compat_set_trap_table     /*  0 */
-        .quad compat_mmu_update
+        .quad do_mmu_update
         .quad compat_set_gdt
         .quad do_stack_switch
         .quad compat_set_callbacks

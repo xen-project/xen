@@ -106,6 +106,7 @@
 #include <asm/ldt.h>
 #include <asm/x86_emulate.h>
 #include <asm/e820.h>
+#include <asm/hypercall.h>
 #include <public/memory.h>
 
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
@@ -118,13 +119,6 @@
 #if !defined(NDEBUG) || defined(CONFIG_X86_PAE)
 #define PTE_UPDATE_WITH_CMPXCHG
 #endif
-
-/*
- * Both do_mmuext_op() and do_mmu_update():
- * We steal the m.s.b. of the @count parameter to indicate whether this
- * invocation of do_mmu_update() is resuming a previously preempted call.
- */
-#define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
 
 /* Used to defer flushing of memory structures. */
 struct percpu_mm_info {
@@ -2033,6 +2027,8 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_PIN_L4_TABLE:
+            if ( IS_COMPAT(FOREIGNDOM) )
+                break;
             type = PGT_l4_page_table;
 
         pin_page:
@@ -2096,7 +2092,11 @@ int do_mmuext_op(
         
 #ifdef __x86_64__
         case MMUEXT_NEW_USER_BASEPTR:
-            okay = 1;
+            if ( IS_COMPAT(FOREIGNDOM) )
+            {
+                okay = 0;
+                break;
+            }
             if (likely(mfn != 0))
             {
                 if ( shadow_mode_refcounts(d) )

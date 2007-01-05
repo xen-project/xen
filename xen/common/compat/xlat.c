@@ -21,6 +21,10 @@ void xlat_start_info(struct start_info *native,
 CHECK_dom0_vga_console_info;
 #undef dom0_vga_console_info
 
+#define xen_mmu_update mmu_update
+CHECK_mmu_update;
+#undef xen_mmu_update
+
 #define xen_vcpu_time_info vcpu_time_info
 CHECK_vcpu_time_info;
 #undef xen_vcpu_time_info
