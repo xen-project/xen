@@ -49,6 +49,12 @@ static struct {
 	int close; /* close on unbind_from_irqhandler()? */
 } evtchns[MAX_EVTCHN];
 
+int irq_to_evtchn_port(int irq)
+{
+	return irq;
+}
+EXPORT_SYMBOL(irq_to_evtchn_port);
+
 void mask_evtchn(int port)
 {
 	shared_info_t *s = shared_info_area;
