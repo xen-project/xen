@@ -111,8 +111,14 @@ static uint8_t opcode_table[256] = {
     /* 0xA8 - 0xAF */
     0, 0, ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
-    /* 0xB0 - 0xBF */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0xB0 - 0xB7 */
+    ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
+    ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
+    ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
+    ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
+    /* 0xB8 - 0xBF */
+    DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
+    DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM, 0, 0,
     0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
@@ -905,6 +911,19 @@ x86_emulate(
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         register_address_increment(_regs.esp, dst.bytes);
+        break;
+    case 0xb0 ... 0xb7: /* mov imm8,r8 */
+        dst.reg = decode_register(
+            (b & 7) | ((rex_prefix & 1) << 3), &_regs, (rex_prefix == 0));
+        dst.val = src.val;
+        break;
+    case 0xb8 ... 0xbf: /* mov imm{16,32,64},r{16,32,64} */
+        if ( dst.bytes == 8 ) /* Fetch more bytes to obtain imm64 */
+            src.val = ((uint32_t)src.val |
+                       ((uint64_t)insn_fetch_type(uint32_t) << 32));
+        dst.reg = decode_register(
+            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        dst.val = src.val;
         break;
     case 0xc0 ... 0xc1: grp2: /* Grp2 */
         switch ( modrm_reg & 7 )
