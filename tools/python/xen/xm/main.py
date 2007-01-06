@@ -130,7 +130,7 @@ SUBCOMMAND_HELP = {
     'log'         : ('', 'Print Xend log'),
     'rename'      : ('<Domain> <NewDomainName>', 'Rename a domain.'),
     'sched-sedf'  : ('<Domain> [options]', 'Get/set EDF parameters.'),
-    'sched-credit': ('-d <Domain> [-w[=WEIGHT]|-c[=CAP]]',
+    'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
@@ -717,6 +717,10 @@ def parse_sedf_info(info):
         'weight'   : get_info('weight',        int,   -1),
         }
 
+def domid_match(domid, info):
+    return domid is None or domid == info['name'] or \
+           domid == str(info['domid'])
+
 def xm_brief_list(doms):
     print '%-40s %3s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
@@ -1091,10 +1095,6 @@ def xm_sched_sedf(args):
         print( ("%(name)-32s %(domid)3d %(period)9.1f %(slice)9.1f" +
                 " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
-    def domid_match(domid, info):
-        return domid is None or domid == info['name'] or \
-               domid == str(info['domid'])
-
     # we want to just display current info if no parameters are passed
     if len(args) == 0:
         domid = None
@@ -1174,27 +1174,43 @@ def xm_sched_credit(args):
         err(opterr)
         usage('sched-credit')
 
-    domain = None
+    domid = None
     weight = None
     cap = None
 
     for o, a in opts:
         if o == "-d":
-            domain = a
+            domid = a
         elif o == "-w":
             weight = int(a)
         elif o == "-c":
             cap = int(a);
 
-    if domain is None:
-        # place holder for system-wide scheduler parameters
-        err("No domain given.")
-        usage('sched-credit')
+    doms = filter(lambda x : domid_match(domid, x),
+                  [parse_doms_info(dom)
+                  for dom in getDomains(None, 'running')])
 
     if weight is None and cap is None:
-        print server.xend.domain.sched_credit_get(domain)
+        # print header if we aren't setting any parameters
+        print '%-33s %-2s %-6s %-4s' % ('Name','ID','Weight','Cap')
+        
+        for d in doms:
+            try:
+                info = server.xend.domain.sched_credit_get(d['domid'])
+            except xmlrpclib.Fault:
+                # domain does not support sched-credit?
+                info = {'weight': -1, 'cap': -1}
+            
+            info['name']  = d['name']
+            info['domid'] = int(d['domid'])
+            print( ("%(name)-32s %(domid)3d %(weight)6d %(cap)4d") % info)
     else:
-        result = server.xend.domain.sched_credit_set(domain, weight, cap)
+        if domid is None:
+            # place holder for system-wide scheduler parameters
+            err("No domain given.")
+            usage('sched-credit')
+        
+        result = server.xend.domain.sched_credit_set(domid, weight, cap)
         if result != 0:
             err(str(result))
 
