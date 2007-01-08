@@ -168,6 +168,8 @@ static int get_bios_disk(char *boot_device, int index) {
             return 0x02;            /* hard drive */
         case 'd':
             return 0x03;            /* cdrom */
+        case 'n':
+            return 0x04;            /* network */
         }
     }
     return 0x00;                /* no device */
