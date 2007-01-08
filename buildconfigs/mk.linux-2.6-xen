@@ -32,7 +32,8 @@ $(LINUX_SRCDIR)/.valid-src: ref-linux-$(LINUX_VER)/.valid-ref
           LINUX_ARCH=$(LINUX_ARCH) bash ./mkbuildtree ../$(LINUX_SRCDIR) )
 	# Patch kernel Makefile to set EXTRAVERSION
 	( cd $(LINUX_SRCDIR) ; \
-	  sed -e 's,^EXTRAVERSION.*,&$$(XENGUEST)\nXENGUEST := $$(shell [ -r $$(objtree)/.xenguest ] \&\& cat $$(objtree)/.xenguest),' Makefile >Mk.tmp ; \
+	  sed -e 's,^EXTRAVERSION.*,&$$(XENGUEST),' \
+	      -e 's,^KERNELRELEASE,XENGUEST := $$(shell [ -r $$(objtree)/.xenguest ] \&\& cat $$(objtree)/.xenguest)\n&,' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	touch $@
 
