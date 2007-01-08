@@ -300,7 +300,7 @@ int parseelfimage(struct domain_setup_info *dsi)
     if ( dsi->__elfnote_section )
     {
         p = xen_elfnote_string(dsi, XEN_ELFNOTE_PAE_MODE);
-        if ( p != NULL && strncmp(p, "bimodal", 7) == 0 )
+        if ( p != NULL && strstr(p, "bimodal") != NULL )
             dsi->pae_kernel = PAEKERN_bimodal;
         else if ( p != NULL && strncmp(p, "yes", 3) == 0 )
             dsi->pae_kernel = PAEKERN_extended_cr3;
