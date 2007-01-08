@@ -110,7 +110,7 @@ static int hvm_translate_linear_addr(
     unsigned long limit, addr = offset;
     uint32_t last_byte;
 
-    if ( sh_ctxt->ctxt.mode != X86EMUL_MODE_PROT64 )
+    if ( sh_ctxt->ctxt.address_bytes != 8 )
     {
         /*
          * COMPATIBILITY MODE: Apply segment checks and add base.
@@ -407,7 +407,7 @@ struct x86_emulate_ops *shadow_init_emulation(
 
     if ( !is_hvm_vcpu(v) )
     {
-        sh_ctxt->ctxt.mode = X86EMUL_MODE_HOST;
+        sh_ctxt->ctxt.address_bytes = sizeof(long);
         return &pv_shadow_emulator_ops;
     }
 
@@ -417,13 +417,11 @@ struct x86_emulate_ops *shadow_init_emulation(
 
     /* Work out the emulation mode. */
     if ( hvm_long_mode_enabled(v) )
-        sh_ctxt->ctxt.mode = creg->attr.fields.l ?
-            X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32;
+        sh_ctxt->ctxt.address_bytes = creg->attr.fields.l ? 8 : 4;
     else if ( regs->eflags & X86_EFLAGS_VM )
-        sh_ctxt->ctxt.mode = X86EMUL_MODE_REAL;
+        sh_ctxt->ctxt.address_bytes = 2;
     else
-        sh_ctxt->ctxt.mode = creg->attr.fields.db ?
-            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16;
+        sh_ctxt->ctxt.address_bytes = creg->attr.fields.db ? 4 : 2;
 
     /* Attempt to prefetch whole instruction. */
     sh_ctxt->insn_buf_bytes =

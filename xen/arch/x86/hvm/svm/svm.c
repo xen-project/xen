@@ -483,14 +483,12 @@ static int svm_guest_x86_mode(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     if ( vmcb->efer & EFER_LMA )
-        return (vmcb->cs.attr.fields.l ?
-                X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32);
+        return (vmcb->cs.attr.fields.l ? 8 : 4);
 
     if ( svm_realmode(v) )
-        return X86EMUL_MODE_REAL;
+        return 2;
 
-    return (vmcb->cs.attr.fields.db ?
-            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16);
+    return (vmcb->cs.attr.fields.db ? 4 : 2);
 }
 
 void svm_update_host_cr3(struct vcpu *v)

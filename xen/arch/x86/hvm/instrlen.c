@@ -201,7 +201,7 @@ static uint8_t twobyte_table[256] = {
    if ( inst_copy_from_guest(&_x, pc, 1) != 1 ) {                       \
        gdprintk(XENLOG_WARNING,                                         \
                 "Cannot read from address %lx (eip %lx, mode %d)\n",    \
-                pc, org_pc, mode);                                      \
+                pc, org_pc, address_bytes);                             \
        return -1;                                                       \
    }                                                                    \
    pc += 1;                                                             \
@@ -218,30 +218,20 @@ static uint8_t twobyte_table[256] = {
  * EXTERNAL this routine calculates the length of the current instruction
  * pointed to by org_pc.  The guest state is _not_ changed by this routine.
  */
-int hvm_instruction_length(unsigned long org_pc, int mode)
+int hvm_instruction_length(unsigned long org_pc, int address_bytes)
 {
     uint8_t b, d, twobyte = 0, rex_prefix = 0, modrm_reg = 0;
     unsigned int op_default, op_bytes, ad_default, ad_bytes, tmp;
     int length = 0;
     unsigned long pc = org_pc;
 
-    switch ( mode )
+    op_bytes = op_default = ad_bytes = ad_default = address_bytes;
+    if ( op_bytes == 8 )
     {
-    case X86EMUL_MODE_REAL:
-    case X86EMUL_MODE_PROT16:
-        op_bytes = op_default = ad_bytes = ad_default = 2;
-        break;
-    case X86EMUL_MODE_PROT32:
-        op_bytes = op_default = ad_bytes = ad_default = 4;
-        break;
-#ifdef __x86_64__
-    case X86EMUL_MODE_PROT64:
         op_bytes = op_default = 4;
-        ad_bytes = ad_default = 8;
-        break;
-#endif
-    default:
+#ifndef __x86_64__
         return -1;
+#endif
     }
 
     /* Legacy prefixes. */
@@ -253,7 +243,7 @@ int hvm_instruction_length(unsigned long org_pc, int mode)
             op_bytes = op_default ^ 6;      /* switch between 2/4 bytes */
             break;
         case 0x67: /* address-size override */
-            if ( mode == X86EMUL_MODE_PROT64 )
+            if ( ad_default == 8 )
                 ad_bytes = ad_default ^ 12; /* switch between 4/8 bytes */
             else
                 ad_bytes = ad_default ^ 6;  /* switch between 2/4 bytes */
@@ -270,7 +260,7 @@ int hvm_instruction_length(unsigned long org_pc, int mode)
             break;
 #ifdef __x86_64__
         case 0x40 ... 0x4f:
-            if ( mode == X86EMUL_MODE_PROT64 )
+            if ( ad_default == 8 )
             {
                 rex_prefix = b;
                 continue;
@@ -434,7 +424,7 @@ done:
 
 cannot_emulate:
     gdprintk(XENLOG_WARNING,
-            "Cannot emulate %02x at address %lx (%lx, mode %d)\n",
-            b, pc - 1, org_pc, mode);
+            "Cannot emulate %02x at address %lx (%lx, addr_bytes %d)\n",
+            b, pc - 1, org_pc, address_bytes);
     return -1;
 }

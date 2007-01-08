@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     int rc;
 
     ctxt.regs = &regs;
-    ctxt.mode = X86EMUL_MODE_PROT32;
+    ctxt.address_bytes = 4;
 
     res = mmap((void *)0x100000, 0x1000, PROT_READ|PROT_WRITE,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);

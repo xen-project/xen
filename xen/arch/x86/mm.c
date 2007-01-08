@@ -3379,9 +3379,9 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         goto bail;
 
     ptwr_ctxt.ctxt.regs = guest_cpu_user_regs();
-    ptwr_ctxt.ctxt.mode = !IS_COMPAT(d) ? X86EMUL_MODE_HOST : X86EMUL_MODE_PROT32;
-    ptwr_ctxt.cr2       = addr;
-    ptwr_ctxt.pte       = pte;
+    ptwr_ctxt.ctxt.address_bytes = IS_COMPAT(d) ? 4 : sizeof(long);
+    ptwr_ctxt.cr2 = addr;
+    ptwr_ctxt.pte = pte;
     if ( x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )
         goto bail;
 

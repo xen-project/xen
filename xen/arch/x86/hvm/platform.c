@@ -352,7 +352,7 @@ static int reg_mem(unsigned char size, unsigned char *opcode,
     return DECODE_success;
 }
 
-static int mmio_decode(int mode, unsigned char *opcode,
+static int mmio_decode(int address_bytes, unsigned char *opcode,
                        struct hvm_io_op *mmio_op,
                        unsigned char *ad_size, unsigned char *op_size,
                        unsigned char *seg_sel)
@@ -368,9 +368,9 @@ static int mmio_decode(int mode, unsigned char *opcode,
 
     opcode = check_prefix(opcode, mmio_op, ad_size, op_size, seg_sel, &rex);
 
-    switch ( mode ) {
-    case X86EMUL_MODE_REAL: /* meaning is reversed */
-    case X86EMUL_MODE_PROT16:
+    switch ( address_bytes )
+    {
+    case 2:
         if ( *op_size == WORD )
             *op_size = LONG;
         else if ( *op_size == LONG )
@@ -384,14 +384,14 @@ static int mmio_decode(int mode, unsigned char *opcode,
         else if ( *ad_size == 0 )
             *ad_size = WORD;
         break;
-    case X86EMUL_MODE_PROT32:
+    case 4:
         if ( *op_size == 0 )
             *op_size = LONG;
         if ( *ad_size == 0 )
             *ad_size = LONG;
         break;
 #ifdef __x86_64__
-    case X86EMUL_MODE_PROT64:
+    case 8:
         if ( *op_size == 0 )
             *op_size = rex & 0x8 ? QUAD : LONG;
         if ( *ad_size == 0 )
@@ -907,7 +907,7 @@ void handle_mmio(unsigned long gpa)
     struct hvm_io_op *mmio_op;
     struct cpu_user_regs *regs;
     unsigned char inst[MAX_INST_LEN], ad_size, op_size, seg_sel;
-    int i, mode, df, inst_len;
+    int i, address_bytes, df, inst_len;
     struct vcpu *v = current;
 
     mmio_op = &v->arch.hvm_vcpu.io_op;
@@ -919,9 +919,9 @@ void handle_mmio(unsigned long gpa)
 
     df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
-    mode = hvm_guest_x86_mode(v);
+    address_bytes = hvm_guest_x86_mode(v);
     inst_addr = hvm_get_segment_base(v, x86_seg_cs) + regs->eip;
-    inst_len = hvm_instruction_length(inst_addr, mode);
+    inst_len = hvm_instruction_length(inst_addr, address_bytes);
     if ( inst_len <= 0 )
     {
         printk("handle_mmio: failed to get instruction length\n");
@@ -934,8 +934,8 @@ void handle_mmio(unsigned long gpa)
         domain_crash_synchronous();
     }
 
-    if ( mmio_decode(mode, inst, mmio_op, &ad_size, &op_size, &seg_sel)
-         == DECODE_failure ) {
+    if ( mmio_decode(address_bytes, inst, mmio_op, &ad_size,
+                     &op_size, &seg_sel) == DECODE_failure ) {
         printk("handle_mmio: failed to decode instruction\n");
         printk("mmio opcode: gpa 0x%lx, len %d:", gpa, inst_len);
         for ( i = 0; i < inst_len; i++ )

@@ -391,10 +391,10 @@ do{ __asm__ __volatile__ (                                              \
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
 ({ unsigned long _x, _eip = _truncate_ea(_regs.eip, def_ad_bytes);      \
+   if ( !mode_64bit() ) _eip = (uint32_t)_eip; /* ignore upper dword */ \
    rc = ops->insn_fetch(x86_seg_cs, _eip, &_x, (_size), ctxt);          \
-   if ( rc != 0 )                                                       \
-       goto done;                                                       \
-   _register_address_increment(_regs.eip, (_size), def_ad_bytes);       \
+   if ( rc ) goto done;                                                 \
+   _regs.eip += (_size); /* real hardware doesn't truncate */           \
    _x;                                                                  \
 })
 #define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
@@ -406,13 +406,15 @@ do{ __asm__ __volatile__ (                                              \
 })
 #define truncate_ea(ea) _truncate_ea((ea), ad_bytes)
 
+#define mode_64bit() (def_ad_bytes == 8)
+
 /* Update address held in a register, based on addressing mode. */
 #define _register_address_increment(reg, inc, byte_width)               \
 do {                                                                    \
     int _inc = (inc); /* signed type ensures sign extension to long */  \
     if ( (byte_width) == sizeof(unsigned long) )                        \
         (reg) += _inc;                                                  \
-    else if ( mode == X86EMUL_MODE_PROT64 )                             \
+    else if ( mode_64bit() )                                            \
         (reg) = ((reg) + _inc) & ((1UL << ((byte_width) << 3)) - 1);    \
     else                                                                \
         (reg) = ((reg) & ~((1UL << ((byte_width) << 3)) - 1)) |         \
@@ -424,7 +426,7 @@ do {                                                                    \
 #define jmp_rel(rel)                                                    \
 do {                                                                    \
     _regs.eip += (int)(rel);                                            \
-    if ( mode != X86EMUL_MODE_PROT64 )                                  \
+    if ( !mode_64bit() )                                                \
         _regs.eip = ((op_bytes == 2)                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
 } while (0)
@@ -521,7 +523,6 @@ x86_emulate(
     unsigned int lock_prefix = 0, rep_prefix = 0, i;
     int rc = 0;
     struct operand src, dst;
-    int mode = ctxt->mode;
 
     /* Data operand effective address (usually computed from ModRM). */
     struct operand ea;
@@ -531,26 +532,14 @@ x86_emulate(
     ea.mem.seg = x86_seg_ds;
     ea.mem.off = 0;
 
-    switch ( mode )
+    op_bytes = ad_bytes = def_ad_bytes = ctxt->address_bytes;
+    if ( op_bytes == 8 )
     {
-    case X86EMUL_MODE_REAL:
-    case X86EMUL_MODE_PROT16:
-        op_bytes = def_ad_bytes = 2;
-        break;
-    case X86EMUL_MODE_PROT32:
-        op_bytes = def_ad_bytes = 4;
-        break;
-#ifdef __x86_64__
-    case X86EMUL_MODE_PROT64:
         op_bytes = 4;
-        def_ad_bytes = 8;
-        break;
-#endif
-    default:
+#ifndef __x86_64__
         return -1;
+#endif
     }
-
-    ad_bytes = def_ad_bytes;
 
     /* Prefix bytes. */
     for ( i = 0; i < 8; i++ )
@@ -561,7 +550,7 @@ x86_emulate(
             op_bytes ^= 6;      /* switch between 2/4 bytes */
             break;
         case 0x67: /* address-size override */
-            if ( mode == X86EMUL_MODE_PROT64 )
+            if ( mode_64bit() )
                 ad_bytes ^= 12; /* switch between 4/8 bytes */
             else
                 ad_bytes ^= 6;  /* switch between 2/4 bytes */
@@ -592,7 +581,7 @@ x86_emulate(
             rep_prefix = 1;
             break;
         case 0x40 ... 0x4f: /* REX */
-            if ( mode != X86EMUL_MODE_PROT64 )
+            if ( !mode_64bit() )
                 goto done_prefixes;
             rex_prefix = b;
             continue;
@@ -685,8 +674,7 @@ x86_emulate(
                 else if ( (sib_base == 4) && !twobyte && (b == 0x8f) )
                     /* POP <rm> must have its EA calculated post increment. */
                     ea.mem.off += _regs.esp +
-                        (((mode == X86EMUL_MODE_PROT64) && (op_bytes == 4))
-                         ? 8 : op_bytes);
+                        ((mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes);
                 else
                     ea.mem.off += *(long*)decode_register(sib_base, &_regs, 0);
             }
@@ -701,7 +689,7 @@ x86_emulate(
                 if ( (modrm_rm & 7) != 5 )
                     break;
                 ea.mem.off = insn_fetch_type(int32_t);
-                if ( mode != X86EMUL_MODE_PROT64 )
+                if ( !mode_64bit() )
                     break;
                 /* Relative to RIP of next instruction. Argh! */
                 ea.mem.off += _regs.eip;
@@ -935,7 +923,7 @@ x86_emulate(
         break;
 
     case 0x63: /* movsxd */
-        if ( mode != X86EMUL_MODE_PROT64 )
+        if ( !mode_64bit() )
             goto cannot_emulate;
         dst.val = (int32_t)src.val;
         break;
@@ -983,7 +971,7 @@ x86_emulate(
 
     case 0x8f: /* pop (sole member of Grp1a) */
         /* 64-bit mode: POP defaults to a 64-bit operand. */
-        if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
+        if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
         if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
                              &dst.val, dst.bytes, ctxt)) != 0 )
@@ -1079,7 +1067,7 @@ x86_emulate(
             break;
         case 6: /* push */
             /* 64-bit mode: PUSH defaults to a 64-bit operand. */
-            if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
+            if ( mode_64bit() && (dst.bytes == 4) )
             {
                 dst.bytes = 8;
                 if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
@@ -1168,7 +1156,7 @@ x86_emulate(
     case 0x50 ... 0x57: /* push reg */
         dst.type  = OP_MEM;
         dst.bytes = op_bytes;
-        if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
+        if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
         dst.val = *(unsigned long *)decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
@@ -1182,7 +1170,7 @@ x86_emulate(
         dst.reg   = decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         dst.bytes = op_bytes;
-        if ( (mode == X86EMUL_MODE_PROT64) && (dst.bytes == 4) )
+        if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
         if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
                              &dst.val, dst.bytes, ctxt)) != 0 )
@@ -1278,8 +1266,7 @@ x86_emulate(
         break;
 
     case 0xeb: /* jmp (near) */
-        jmp_rel(insn_fetch_bytes(
-            (mode == X86EMUL_MODE_PROT64) ? 4 : op_bytes));
+        jmp_rel(insn_fetch_bytes(mode_64bit() ? 4 : op_bytes));
         break;
 
     case 0xf5: /* cmc */
@@ -1401,8 +1388,7 @@ x86_emulate(
         break;
 
     case 0x80 ... 0x8f: /* jcc (near) */ {
-        int rel = insn_fetch_bytes(
-            (mode == X86EMUL_MODE_PROT64) ? 4 : op_bytes);
+        int rel = insn_fetch_bytes(mode_64bit() ? 4 : op_bytes);
         if ( test_cc(b, _regs.eflags) )
             jmp_rel(rel);
         break;

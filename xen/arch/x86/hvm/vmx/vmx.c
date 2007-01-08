@@ -695,14 +695,12 @@ static int vmx_guest_x86_mode(struct vcpu *v)
     cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
 
     if ( vmx_long_mode_enabled(v) )
-        return ((cs_ar_bytes & (1u<<13)) ?
-                X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32);
+        return ((cs_ar_bytes & (1u<<13)) ? 8 : 4);
 
     if ( vmx_realmode(v) )
-        return X86EMUL_MODE_REAL;
+        return 2;
 
-    return ((cs_ar_bytes & (1u<<14)) ?
-            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16);
+    return ((cs_ar_bytes & (1u<<14)) ? 4 : 2);
 }
 
 static int vmx_pae_enabled(struct vcpu *v)

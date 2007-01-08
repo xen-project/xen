@@ -134,24 +134,11 @@ struct cpu_user_regs;
 struct x86_emulate_ctxt
 {
     /* Register state before/after emulation. */
-    struct cpu_user_regs   *regs;
+    struct cpu_user_regs *regs;
 
-    /* Emulated execution mode, represented by an X86EMUL_MODE value. */
-    int                     mode;
+    /* Default address size in current execution mode (2, 4, or 8). */
+    int                   address_bytes;
 };
-
-/* Execution mode, passed to the emulator. */
-#define X86EMUL_MODE_REAL     0 /* Real mode.             */
-#define X86EMUL_MODE_PROT16   2 /* 16-bit protected mode. */
-#define X86EMUL_MODE_PROT32   4 /* 32-bit protected mode. */
-#define X86EMUL_MODE_PROT64   8 /* 64-bit (long) mode.    */
-
-/* Host execution mode. */
-#if defined(__i386__)
-#define X86EMUL_MODE_HOST X86EMUL_MODE_PROT32
-#elif defined(__x86_64__)
-#define X86EMUL_MODE_HOST X86EMUL_MODE_PROT64
-#endif
 
 /*
  * x86_emulate: Emulate an instruction.
