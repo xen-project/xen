@@ -206,6 +206,7 @@
 ^xen/ddb/.*$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
+^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
 ^xen/include/public/public$
 ^xen/include/xen/.*\.new$
