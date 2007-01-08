@@ -353,7 +353,7 @@ static void build_initial_tok_table(void)
 static void *memmem_pvt(void *h, size_t hlen, void *n, size_t nlen)
 {
 	char *p;
-	for (p = h; (p - (char *)h) <= (hlen - nlen); p++)
+	for (p = h; (p - (char *)h) <= (long)(hlen - nlen); p++)
 		if (!memcmp(p, n, nlen)) return p;
 	return NULL;
 }
