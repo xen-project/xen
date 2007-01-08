@@ -20,6 +20,7 @@
 ^\.config$
 ^TAGS$
 ^tags$
+^build.*$
 ^dist/.*$
 ^docs/.*\.aux$
 ^docs/.*\.dvi$
