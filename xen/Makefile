@@ -14,8 +14,8 @@ default: build
 .PHONY: dist
 dist: install
 
-.PHONY: build install clean distclean cscope TAGS tags
-build install debug clean distclean cscope TAGS tags::
+.PHONY: build install clean distclean cscope TAGS tags MAP
+build install debug clean distclean cscope TAGS tags MAP::
 	$(MAKE) -f Rules.mk _$@
 
 .PHONY: _build
@@ -160,9 +160,9 @@ _cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
 
-.PHONY: MAP
-MAP:
-	$(NM) -n $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
+.PHONY: _MAP
+_MAP:
+	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
 .PHONY: FORCE
 FORCE:
