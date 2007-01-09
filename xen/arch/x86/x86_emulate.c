@@ -1174,25 +1174,47 @@ x86_emulate(
     {
     case 0x27: /* daa */ {
         uint8_t al = _regs.eax;
-        unsigned long tmp;
+        unsigned long eflags = _regs.eflags;
         fail_if(mode_64bit());
-        __asm__ __volatile__ (
-            _PRE_EFLAGS("0","4","2") "daa; " _POST_EFLAGS("0","4","2")
-            : "=m" (_regs.eflags), "=a" (al), "=&r" (tmp)
-            : "a" (al), "i" (EFLAGS_MASK) );
-        *(uint8_t *)_regs.eax = al;
+        _regs.eflags &= ~(EFLG_CF|EFLG_AF);
+        if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
+        {
+            *(uint8_t *)&_regs.eax += 6;
+            _regs.eflags |= EFLG_AF;
+        }
+        if ( (al > 0x99) || (eflags & EFLG_CF) )
+        {
+            *(uint8_t *)&_regs.eax += 0x60;
+            _regs.eflags |= EFLG_CF;
+        }
+        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
+        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
         break;
     }
 
     case 0x2f: /* das */ {
         uint8_t al = _regs.eax;
-        unsigned long tmp;
+        unsigned long eflags = _regs.eflags;
         fail_if(mode_64bit());
-        __asm__ __volatile__ (
-            _PRE_EFLAGS("0","4","2") "das; " _POST_EFLAGS("0","4","2")
-            : "=m" (_regs.eflags), "=a" (al), "=&r" (tmp)
-            : "a" (al), "i" (EFLAGS_MASK) );
-        *(uint8_t *)_regs.eax = al;
+        _regs.eflags &= ~(EFLG_CF|EFLG_AF);
+        if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
+        {
+            _regs.eflags |= EFLG_AF;
+            if ( (al < 6) || (eflags & EFLG_CF) )
+                _regs.eflags |= EFLG_CF;
+            *(uint8_t *)&_regs.eax -= 6;
+        }
+        if ( (al > 0x99) || (eflags & EFLG_CF) )
+        {
+            *(uint8_t *)&_regs.eax -= 0x60;
+            _regs.eflags |= EFLG_CF;
+        }
+        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
+        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
         break;
     }
 

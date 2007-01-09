@@ -15,6 +15,15 @@ typedef int64_t            s64;
 #include <asm-x86/x86_emulate.h>
 #include <sys/mman.h>
 
+/* EFLAGS bit definitions. */
+#define EFLG_OF (1<<11)
+#define EFLG_DF (1<<10)
+#define EFLG_SF (1<<7)
+#define EFLG_ZF (1<<6)
+#define EFLG_AF (1<<4)
+#define EFLG_PF (1<<2)
+#define EFLG_CF (1<<0)
+
 static int read(
     unsigned int seg,
     unsigned long offset,
@@ -98,8 +107,8 @@ int main(int argc, char **argv)
     struct x86_emulate_ctxt ctxt;
     struct cpu_user_regs regs;
     char instr[20] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
-    unsigned int *res;
-    int rc;
+    unsigned int *res, bcdres_native, bcdres_emul;
+    int rc, i;
 
     ctxt.regs = &regs;
     ctxt.address_bytes = 4;
@@ -397,6 +406,60 @@ int main(int argc, char **argv)
          ((regs.eflags&0x240) != 0x200) ||
          (regs.eip != (unsigned long)&instr[3]) )
         goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing daa/das (all inputs)...");
+    /* Bits 0-7: AL; Bit 8: EFLG_AF; Bit 9: EFLG_CF; Bit 10: DAA vs. DAS. */
+    for ( i = 0; i < 0x800; i++ )
+    {
+        regs.eflags  = (i & 0x200) ? EFLG_CF : 0;
+        regs.eflags |= (i & 0x100) ? EFLG_AF : 0;
+        if ( i & 0x400 )
+            __asm__ (
+                "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; das; "
+                "pushf; popl %1"
+                : "=a" (bcdres_native), "=r" (regs.eflags)
+                : "0" (i & 0xff), "1" (regs.eflags) );
+        else
+            __asm__ (
+                "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; daa; "
+                "pushf; popl %1"
+                : "=a" (bcdres_native), "=r" (regs.eflags)
+                : "0" (i & 0xff), "1" (regs.eflags) );
+        bcdres_native |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
+        bcdres_native |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
+
+        instr[0] = (i & 0x400) ? 0x2f: 0x27; /* daa/das */
+        regs.eflags  = (i & 0x200) ? EFLG_CF : 0;
+        regs.eflags |= (i & 0x100) ? EFLG_AF : 0;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.eax    = (unsigned char)i;
+        rc = x86_emulate(&ctxt, &emulops);
+        bcdres_emul  = regs.eax;
+        bcdres_emul |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
+        if ( (rc != 0) || (regs.eax > 255) ||
+             (regs.eip != (unsigned long)&instr[1]) )
+            goto fail;
+
+        if ( bcdres_emul != bcdres_native )
+        {
+            printf("%s:    AL=%02x %s %s\n"
+                   "Output: AL=%02x %s %s\n"
+                   "Emul.:  AL=%02x %s %s\n",
+                   (i & 0x400) ? "DAS" : "DAA",
+                   (unsigned char)i,
+                   (i & 0x200) ? "CF" : "  ",
+                   (i & 0x100) ? "AF" : "  ",
+                   (unsigned char)bcdres_native,
+                   (bcdres_native & 0x200) ? "CF" : "  ",
+                   (bcdres_native & 0x100) ? "AF" : "  ",
+                   (unsigned char)bcdres_emul,
+                   (bcdres_emul & 0x200) ? "CF" : "  ",
+                   (bcdres_emul & 0x100) ? "AF" : "  ");
+            goto fail;
+        }
+    }
     printf("okay\n");
 
     return 0;
