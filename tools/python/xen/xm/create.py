@@ -765,7 +765,12 @@ def make_config(vals):
     if vals.bootloader:
         if vals.bootloader == "pygrub":
             vals.bootloader = osdep.pygrub_path
-        config_image = run_bootloader(vals, config_image)
+
+        # if a kernel is specified, we're using the bootloader
+        # non-interactively, and need to let xend run it so we preserve the
+        # real kernel choice.
+        if not vals.kernel:
+            config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
             config.append(['bootloader_args', vals.bootargs])
