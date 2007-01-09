@@ -1655,12 +1655,15 @@ make_fl1_shadow(struct vcpu *v, gfn_t gfn)
 mfn_t
 sh_make_monitor_table(struct vcpu *v)
 {
+    struct domain *d = v->domain;
 
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
     
+    /* Guarantee we can get the memory we need */
+    shadow_prealloc(d, SHADOW_MAX_ORDER);
+
 #if CONFIG_PAGING_LEVELS == 4    
     {
-        struct domain *d = v->domain;
         mfn_t m4mfn;
         m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
         sh_install_xen_entries_in_l4(v, m4mfn, m4mfn);
@@ -1698,7 +1701,6 @@ sh_make_monitor_table(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 3
 
     {
-        struct domain *d = v->domain;
         mfn_t m3mfn, m2mfn; 
         l3_pgentry_t *l3e;
         l2_pgentry_t *l2e;
@@ -1732,7 +1734,6 @@ sh_make_monitor_table(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 2
 
     {
-        struct domain *d = v->domain;
         mfn_t m2mfn;
         m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
         sh_install_xen_entries_in_l2(v, m2mfn, m2mfn);
@@ -2095,17 +2096,19 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
 #if (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS != 4)
     /* Need to destroy the l3 monitor page in slot 0 too */
     {
+        mfn_t m3mfn;
         l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
         ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-        mmfn = _mfn(l4e_get_pfn(l4e[0]));
+        m3mfn = _mfn(l4e_get_pfn(l4e[0]));
         if ( pv_32bit_guest(v) )
         {
             /* Need to destroy the l2 monitor page in slot 3 too */
-            l3_pgentry_t *l3e = sh_map_domain_page(mmfn);
+            l3_pgentry_t *l3e = sh_map_domain_page(m3mfn);
             ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
             shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
             sh_unmap_domain_page(l3e);
         }
+        shadow_free(d, m3mfn);
         sh_unmap_domain_page(l4e);
     }
 #elif CONFIG_PAGING_LEVELS == 3
