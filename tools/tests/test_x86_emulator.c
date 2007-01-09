@@ -106,9 +106,12 @@ int main(int argc, char **argv)
 {
     struct x86_emulate_ctxt ctxt;
     struct cpu_user_regs regs;
-    char instr[20] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
-    unsigned int *res, bcdres_native, bcdres_emul;
-    int rc, i;
+    char *instr;
+    unsigned int *res;
+    int rc;
+#ifndef __x86_64__
+    unsigned int i, bcdres_native, bcdres_emul;
+#endif
 
     ctxt.regs = &regs;
     ctxt.address_bytes = 4;
@@ -120,6 +123,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "mmap to low address failed\n");
         exit(1);
     }
+    instr = (char *)res + 0x100;
 
     printf("%-40s", "Testing addl %%ecx,(%%eax)...");
     instr[0] = 0x01; instr[1] = 0x08;
@@ -409,6 +413,7 @@ int main(int argc, char **argv)
     printf("okay\n");
 
     printf("%-40s", "Testing daa/das (all inputs)...");
+#ifndef __x86_64__
     /* Bits 0-7: AL; Bit 8: EFLG_AF; Bit 9: EFLG_CF; Bit 10: DAA vs. DAS. */
     for ( i = 0; i < 0x800; i++ )
     {
@@ -426,6 +431,9 @@ int main(int argc, char **argv)
                 "pushf; popl %1"
                 : "=a" (bcdres_native), "=r" (regs.eflags)
                 : "0" (i & 0xff), "1" (regs.eflags) );
+        bcdres_native |= (regs.eflags & EFLG_PF) ? 0x1000 : 0;
+        bcdres_native |= (regs.eflags & EFLG_ZF) ? 0x800 : 0;
+        bcdres_native |= (regs.eflags & EFLG_SF) ? 0x400 : 0;
         bcdres_native |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
         bcdres_native |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
 
@@ -436,6 +444,9 @@ int main(int argc, char **argv)
         regs.eax    = (unsigned char)i;
         rc = x86_emulate(&ctxt, &emulops);
         bcdres_emul  = regs.eax;
+        bcdres_emul |= (regs.eflags & EFLG_PF) ? 0x1000 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_ZF) ? 0x800 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_SF) ? 0x400 : 0;
         bcdres_emul |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
         bcdres_emul |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
         if ( (rc != 0) || (regs.eax > 255) ||
@@ -445,8 +456,8 @@ int main(int argc, char **argv)
         if ( bcdres_emul != bcdres_native )
         {
             printf("%s:    AL=%02x %s %s\n"
-                   "Output: AL=%02x %s %s\n"
-                   "Emul.:  AL=%02x %s %s\n",
+                   "Output: AL=%02x %s %s %s %s %s\n"
+                   "Emul.:  AL=%02x %s %s %s %s %s\n",
                    (i & 0x400) ? "DAS" : "DAA",
                    (unsigned char)i,
                    (i & 0x200) ? "CF" : "  ",
@@ -454,13 +465,22 @@ int main(int argc, char **argv)
                    (unsigned char)bcdres_native,
                    (bcdres_native & 0x200) ? "CF" : "  ",
                    (bcdres_native & 0x100) ? "AF" : "  ",
+                   (bcdres_native & 0x1000) ? "PF" : "  ",
+                   (bcdres_native & 0x800) ? "ZF" : "  ",
+                   (bcdres_native & 0x400) ? "SF" : "  ",
                    (unsigned char)bcdres_emul,
                    (bcdres_emul & 0x200) ? "CF" : "  ",
-                   (bcdres_emul & 0x100) ? "AF" : "  ");
+                   (bcdres_emul & 0x100) ? "AF" : "  ",
+                   (bcdres_emul & 0x1000) ? "PF" : "  ",
+                   (bcdres_emul & 0x800) ? "ZF" : "  ",
+                   (bcdres_emul & 0x400) ? "SF" : "  ");
             goto fail;
         }
     }
     printf("okay\n");
+#else
+    printf("skipped\n");
+#endif
 
     return 0;
 
