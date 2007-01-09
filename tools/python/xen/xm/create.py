@@ -719,8 +719,11 @@ def run_bootloader(vals, config_image):
              "--entry= directly.")
         vals.bootargs = "--entry=%s" %(vals.bootentry,)
 
+    kernel = sxp.child_value(config_image, 'kernel')
+    ramdisk = sxp.child_value(config_image, 'ramdisk')
+    args = sxp.child_value(config_image, 'args')
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.bootargs, config_image)
+                      vals.bootargs, kernel, ramdisk, args)
 
 def make_config(vals):
     """Create the domain configuration.
