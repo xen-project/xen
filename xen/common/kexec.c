@@ -26,7 +26,15 @@
 
 typedef long ret_t;
 
-DEFINE_PER_CPU (crash_note_t, crash_notes);
+#define ELFNOTE_ALIGN(_n_) (((_n_)+3)&~3)
+#define ELFNOTE_NAME(_n_) ((void*)(_n_) + sizeof(*(_n_)))
+#define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + ELFNOTE_ALIGN((_n_)->namesz))
+#define ELFNOTE_NEXT(_n_) (ELFNOTE_DESC(_n_) + ELFNOTE_ALIGN((_n_)->descsz))
+
+DEFINE_PER_CPU(void *, crash_notes);
+
+Elf_Note *xen_crash_note;
+
 cpumask_t crash_saved_cpus;
 
 xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
@@ -70,39 +78,28 @@ static void one_cpu_only(void)
 void kexec_crash_save_cpu(void)
 {
     int cpu = smp_processor_id();
-    crash_note_t *cntp;
+    Elf_Note *note = per_cpu(crash_notes, cpu);
+    ELF_Prstatus *prstatus;
+    crash_xen_core_t *xencore;
 
     if ( cpu_test_and_set(cpu, crash_saved_cpus) )
         return;
 
-    cntp = &per_cpu(crash_notes, cpu);
-    elf_core_save_regs(&cntp->core.desc.desc.pr_reg,
-                       &cntp->xen_regs.desc.desc);
+    prstatus = ELFNOTE_DESC(note);
 
-    /* Set up crash "CORE" note. */
-    setup_crash_note(cntp, core, CORE_STR, CORE_STR_LEN, NT_PRSTATUS);
+    note = ELFNOTE_NEXT(note);
+    xencore = ELFNOTE_DESC(note);
 
-    /* Set up crash note "Xen", XEN_ELFNOTE_CRASH_REGS. */
-    setup_crash_note(cntp, xen_regs, XEN_STR, XEN_STR_LEN,
-                     XEN_ELFNOTE_CRASH_REGS);
+    elf_core_save_regs(&prstatus->pr_reg, xencore);
 }
 
 /* Set up the single Xen-specific-info crash note. */
 crash_xen_info_t *kexec_crash_save_info(void)
 {
     int cpu = smp_processor_id();
-    crash_note_t *cntp;
-    crash_xen_info_t *info;
+    crash_xen_info_t *info = ELFNOTE_DESC(xen_crash_note);
 
     BUG_ON(!cpu_test_and_set(cpu, crash_saved_cpus));
-
-    cntp = &per_cpu(crash_notes, cpu);
-
-    /* Set up crash note "Xen", XEN_ELFNOTE_CRASH_INFO. */
-    setup_crash_note(cntp, xen_info, XEN_STR, XEN_STR_LEN,
-                     XEN_ELFNOTE_CRASH_INFO);
-
-    info = &cntp->xen_info.desc.desc;
 
     info->xen_major_version = xen_major_version();
     info->xen_minor_version = xen_minor_version();
@@ -147,6 +144,14 @@ static __init int register_crashdump_trigger(void)
 }
 __initcall(register_crashdump_trigger);
 
+static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
+{
+    strcpy(ELFNOTE_NAME(n), name);
+    n->namesz = strlen(name);
+    n->descsz = descsz;
+    n->type = type;
+}
+
 #define kexec_get(x)      kexec_get_##x
 
 #endif
@@ -167,11 +172,44 @@ static int kexec_get(xen)(xen_kexec_range_t *range)
 
 static int kexec_get(cpu)(xen_kexec_range_t *range)
 {
-    if ( range->nr < 0 || range->nr >= num_present_cpus() )
+    int nr = range->nr;
+    int nr_bytes = sizeof(Elf_Note) * 2
+        + ELFNOTE_ALIGN(sizeof(ELF_Prstatus))
+        + ELFNOTE_ALIGN(sizeof(crash_xen_core_t));
+
+    if ( nr < 0 || nr >= num_present_cpus() )
         return -EINVAL;
 
-    range->start = __pa((unsigned long)&per_cpu(crash_notes, range->nr));
-    range->size = sizeof(crash_note_t);
+    /* The Xen info note is included in CPU0's range. */
+    if ( nr == 0 )
+        nr_bytes += sizeof(Elf_Note) + ELFNOTE_ALIGN(sizeof(crash_xen_info_t));
+
+    if ( per_cpu(crash_notes, nr) == NULL )
+    {
+        Elf_Note *note;
+
+        note = per_cpu(crash_notes, nr) = xmalloc_bytes(nr_bytes);
+
+        if ( note == NULL )
+            return -ENOMEM;
+
+        /* Setup CORE note. */
+        setup_note(note, "CORE", NT_PRSTATUS, sizeof(ELF_Prstatus));
+
+        /* Setup Xen CORE note. */
+        note = ELFNOTE_NEXT(note);
+        setup_note(note, "Xen", XEN_ELFNOTE_CRASH_REGS, sizeof(crash_xen_core_t));
+
+        if (nr == 0)
+        {
+            /* Setup system wide Xen info note. */
+            xen_crash_note = note = ELFNOTE_NEXT(note);
+            setup_note(note, "Xen", XEN_ELFNOTE_CRASH_INFO, sizeof(crash_xen_info_t));
+        }
+    }
+
+    range->start = __pa((unsigned long)per_cpu(crash_notes, nr));
+    range->size = nr_bytes;
     return 0;
 }
 
