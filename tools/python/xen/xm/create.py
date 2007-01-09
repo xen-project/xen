@@ -28,6 +28,7 @@ import xmlrpclib
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
+from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
@@ -759,6 +760,8 @@ def make_config(vals):
 
     config_image = configure_image(vals)
     if vals.bootloader:
+        if vals.bootloader == "pygrub":
+            vals.bootloader = osdep.pygrub_path
         config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
