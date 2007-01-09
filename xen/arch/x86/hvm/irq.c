@@ -135,7 +135,8 @@ void hvm_set_callback_irq_level(void)
     if ( gsi == 0 )
         goto out;
 
-    if ( local_events_need_delivery() )
+    /* NB. Do not check the evtchn_upcall_mask. It is not used in HVM mode. */
+    if ( vcpu_info(v, evtchn_upcall_pending) )
     {
         if ( !__test_and_set_bit(0, &hvm_irq->callback_irq_wire) &&
              (hvm_irq->gsi_assert_count[gsi]++ == 0) )

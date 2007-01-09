@@ -233,8 +233,7 @@ static int setup_guest(int xc_handle,
              SCRATCH_PFN)) == NULL) )
         goto error_out;
     memset(shared_info, 0, PAGE_SIZE);
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+    /* NB. evtchn_upcall_mask is unused: leave as zero. */
     memset(&shared_info->evtchn_mask[0], 0xff,
            sizeof(shared_info->evtchn_mask));
     munmap(shared_info, PAGE_SIZE);
