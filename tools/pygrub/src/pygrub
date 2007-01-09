@@ -431,19 +431,56 @@ def get_entry_idx(cf, entry):
 
     return None
 
+def run_grub(file, isconfig, entry):
+    global g
+
+    def run_main(scr, *args):
+        global sel
+        global g
+        sel = g.run()
+
+    g = Grub(file, isconfig)
+    if interactive:
+        curses.wrapper(run_main)
+    else:
+        sel = g.cf.default
+
+    # set the entry to boot as requested
+    if entry is not None:
+        idx = get_entry_idx(g.cf, entry)
+        if idx is not None and idx > 0 and idx < len(g.cf.images):
+           sel = idx
+
+    if sel == -1:
+        print "No kernel image selected!"
+        sys.exit(1)
+
+    img = g.cf.images[sel]
+
+    grubcfg["kernel"] = img.kernel[1]
+    grubcfg["ramdisk"] = img.initrd[1]
+    grubcfg["args"] = img.args[1]
+
+    print "Going to boot %s" %(img.title)
+    print "  kernel: %s" % grubcfg["kernel"]
+    if img.initrd:
+        print "  initrd: %s" % grubcfg["ramdisk"]
+
+    if isconfig:
+        print "  args: %s" % grubcfg["args"]
+        sys.exit(0)
+        
+    return grubcfg
+
 if __name__ == "__main__":
     sel = None
     
-    def run_main(scr, *args):
-        global sel
-        sel = g.run()
-
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [--output=] [--entry=] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qh::',
-                                   ["quiet", "help", "output=", "entry=",
+                                   ["quiet", "help", "output=", "entry=", "kernel=", "ramdisk=", "args=",
                                     "isconfig"])
     except getopt.GetoptError:
         usage()
@@ -458,6 +495,14 @@ if __name__ == "__main__":
     entry = None
     interactive = True
     isconfig = False
+
+    # what was passed in
+    incfg = { "kernel": None, "ramdisk": None, "args": None };
+    # what grub chose
+    chosencfg = { "kernel": None, "ramdisk": None, "args": None };
+    # what to boot
+    bootcfg = { "kernel": None, "ramdisk": None, "args": None };
+
     for o, a in opts:
         if o in ("-q", "--quiet"):
             interactive = False
@@ -466,6 +511,12 @@ if __name__ == "__main__":
             sys.exit()
         elif o in ("--output",):
             output = a
+        elif o in ("--kernel",):
+            incfg["kernel"] = a
+        elif o in ("--ramdisk",):
+            incfg["ramdisk"] = a
+        elif o in ("--args",):
+            incfg["args"] = a
         elif o in ("--entry",):
             entry = a
             # specifying the entry to boot implies non-interactive
@@ -473,37 +524,17 @@ if __name__ == "__main__":
         elif o in ("--isconfig",):
             isconfig = True
 
+
     if output is None or output == "-":
         fd = sys.stdout.fileno()
     else:
         fd = os.open(output, os.O_WRONLY)
 
-    g = Grub(file, isconfig)
-    if interactive:
-        curses.wrapper(run_main)
+    if not incfg["kernel"]:
+        chosencfg = run_grub(file, isconfig, entry)
     else:
-        sel = g.cf.default
-
-    # set the entry to boot as requested
-    if entry is not None:
-        idx = get_entry_idx(g.cf, entry)
-        if idx is not None and idx > 0 and idx < len(g.cf.images):
-            sel = idx
-
-    if sel == -1:
-        print "No kernel image selected!"
-        sys.exit(1)
-
-    img = g.cf.images[sel]
-    print "Going to boot %s" %(img.title)
-    print "  kernel: %s" %(img.kernel[1],)
-    if img.initrd:
-        print "  initrd: %s" %(img.initrd[1],)
-
-    if isconfig:
-        print "  args: %s" %(img.args,)
-        sys.exit(0)
-        
+        chosencfg = incfg
+     
     offset = 0
     if is_disk_image(file):
         offset = get_active_offset(file)
@@ -513,23 +544,26 @@ if __name__ == "__main__":
     # read the kernel and initrd onto the hostfs
     fs = fsimage.open(file, offset)
 
-    kernel = fs.open_file(img.kernel[1],).read()
-    (tfd, fn) = tempfile.mkstemp(prefix="boot_kernel.",
+    data = fs.open_file(chosencfg["kernel"]).read()
+    (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
         dir="/var/run/xend/boot")
-    os.write(tfd, kernel)
+    os.write(tfd, data)
     os.close(tfd)
-    sxp = "linux (kernel %s)" %(fn,)
 
-    if img.initrd:
-        initrd = fs.open_file(img.initrd[1],).read()
-        (tfd, fn) = tempfile.mkstemp(prefix="boot_ramdisk.",
+    if chosencfg["ramdisk"]:
+        data = fs.open_file(chosencfg["ramdisk"],).read()
+        (tfd, bootcfg["ramdisk"]) = tempfile.mkstemp(prefix="boot_ramdisk.",
             dir="/var/run/xend/boot")
-        os.write(tfd, initrd)
+        os.write(tfd, data)
         os.close(tfd)
-        sxp += "(ramdisk %s)" %(fn,)
     else:
         initrd = None
-    sxp += "(args '%s')" %(img.args,)
+
+    sxp = "linux (kernel %s)" % bootcfg["kernel"]
+    if bootcfg["ramdisk"]:
+        sxp += "(ramdisk %s)" % bootcfg["ramdisk"]
+    if chosencfg["args"]:
+        sxp += "(args \"%s\")" % chosencfg["args"]
 
     sys.stdout.flush()
     os.write(fd, sxp)
