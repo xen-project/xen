@@ -31,21 +31,21 @@ typedef long ret_t;
 #define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + ELFNOTE_ALIGN((_n_)->namesz))
 #define ELFNOTE_NEXT(_n_) (ELFNOTE_DESC(_n_) + ELFNOTE_ALIGN((_n_)->descsz))
 
-DEFINE_PER_CPU(void *, crash_notes);
+static DEFINE_PER_CPU(void *, crash_notes);
 
-Elf_Note *xen_crash_note;
+static Elf_Note *xen_crash_note;
 
-cpumask_t crash_saved_cpus;
+static cpumask_t crash_saved_cpus;
 
-xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
+static xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
 
 #define KEXEC_FLAG_DEFAULT_POS   (KEXEC_IMAGE_NR + 0)
 #define KEXEC_FLAG_CRASH_POS     (KEXEC_IMAGE_NR + 1)
 #define KEXEC_FLAG_IN_PROGRESS   (KEXEC_IMAGE_NR + 2)
 
-unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
+static unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
 
-spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
 
 xen_kexec_reserve_t kexec_crash_area;
 
