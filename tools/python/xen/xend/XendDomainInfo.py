@@ -37,7 +37,7 @@ from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
 
-from xen.xend import balloon, sxp, uuid, image, arch
+from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendRoot, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
@@ -1575,7 +1575,7 @@ class XendDomainInfo:
         else:
             # Boot using bootloader
             if not blexec or blexec == 'pygrub':
-                blexec = '/usr/bin/pygrub'
+                blexec = osdep.pygrub_path
 
             blcfg = None
             for (devtype, devinfo) in self.info.all_devices_sxpr():
