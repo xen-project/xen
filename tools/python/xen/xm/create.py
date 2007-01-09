@@ -990,8 +990,6 @@ def preprocess_vnc(vals):
             vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
-    if not vals.kernel and not vals.bootloader:
-        err("No kernel specified")
     preprocess_disk(vals)
     preprocess_pci(vals)
     preprocess_ioports(vals)
