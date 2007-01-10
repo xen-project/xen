@@ -1854,7 +1854,7 @@ static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
 }
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
- 
+
 asmlinkage void do_nmi(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
