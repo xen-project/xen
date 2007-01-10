@@ -15,7 +15,9 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#ifdef XEN
 #include <xen/lib.h>
+#endif
 
 
 /**
@@ -38,7 +40,11 @@ int get_option (char **str, int *pint)
 
 	if (!cur || !(*cur))
 		return 0;
+#ifndef XEN
 	*pint = simple_strtol (cur, str, 0);
+#else
+	*pint = simple_strtol (cur, (const char**)str, 0);
+#endif
 	if (cur == *str)
 		return 0;
 	if (**str == ',') {
@@ -96,7 +102,11 @@ char *get_options(const char *str, int nints, int *ints)
 
 unsigned long long memparse (char *ptr, char **retptr)
 {
+#ifndef XEN
 	unsigned long long ret = simple_strtoull (ptr, retptr, 0);
+#else
+	unsigned long long ret = simple_strtoull (ptr, (const char**)retptr, 0);
+#endif
 
 	switch (**retptr) {
 	case 'G':
