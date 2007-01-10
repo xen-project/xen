@@ -9,8 +9,13 @@
 #include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/smpboot.h>
+#include <asm/hypercall.h>
 #include <public/xen.h>
 #include <public/physdev.h>
+
+#ifndef COMPAT
+typedef long ret_t;
+#endif
 
 int
 ioapic_guest_read(
@@ -19,10 +24,10 @@ int
 ioapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
 
-long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     int irq;
-    long ret;
+    ret_t ret;
 
     switch ( cmd )
     {
@@ -129,7 +134,11 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
              (set_iobitmap.nr_ports > 65536) )
             break;
         ret = 0;
+#ifndef COMPAT
         current->arch.iobmp       = set_iobitmap.bitmap;
+#else
+        guest_from_compat_handle(current->arch.iobmp, set_iobitmap.bitmap);
+#endif
         current->arch.iobmp_limit = set_iobitmap.nr_ports;
         break;
     }

@@ -44,17 +44,45 @@
 # OF THIS SOFTWARE.
 # --------------------------------------------------------------------
 
+import gettext
 import xmlrpclib
 
 import xen.util.xmlrpclib2
 
 
+translation = gettext.translation('xen-xm', fallback = True)
+
 class Failure(Exception):
     def __init__(self, details):
-        self.details = details
+        try:
+            # If this failure is MESSAGE_PARAMETER_COUNT_MISMATCH, then we
+            # correct the return values here, to account for the fact that we
+            # transparently add the session handle as the first argument.
+            if details[0] == 'MESSAGE_PARAMETER_COUNT_MISMATCH':
+                details[2] = str(int(details[2]) - 1)
+                details[3] = str(int(details[3]) - 1)
+
+            self.details = details
+        except Exception, exn:
+            self.details = ['INTERNAL_ERROR', 'Client-side: ' + str(exn)]
 
     def __str__(self):
-        return "Xen-API failure: %s" % str(self.details)
+        try:
+            return translation.ugettext(self.details[0]) % self._details_map()
+        except TypeError, exn:
+            return "Message database broken: %s.\nXen-API failure: %s" % \
+                   (exn, str(self.details))
+        except Exception, exn:
+            import sys
+            print >>sys.stderr, exn
+            return "Xen-API failure: %s" % str(self.details)
+
+    def _details_map(self):
+        return dict([(str(i), self.details[i])
+                     for i in range(len(self.details))])
+
+
+_RECONNECT_AND_RETRY = (lambda _ : ())
 
 
 class Session(xen.util.xmlrpclib2.ServerProxy):
@@ -80,6 +108,8 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
                                                  encoding, verbose,
                                                  allow_none)
         self._session = None
+        self.last_login_method = None
+        self.last_login_params = None
 
 
     def xenapi_request(self, methodname, params):
@@ -87,13 +117,31 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
             self._login(methodname, params)
             return None
         else:
-            full_params = (self._session,) + params
-            return _parse_result(getattr(self, methodname)(*full_params))
+            retry_count = 0
+            while retry_count < 3:
+                full_params = (self._session,) + params
+                result = _parse_result(getattr(self, methodname)(*full_params))
+                if result == _RECONNECT_AND_RETRY:
+                    retry_count += 1
+                    if self.last_login_method:
+                        self._login(self.last_login_method,
+                                    self.last_login_params)
+                    else:
+                        raise xmlrpclib.Fault(401, 'You must log in')
+                else:
+                    return result
+            raise xmlrpclib.Fault(
+                500, 'Tried 3 times to get a valid session, but failed')
 
 
     def _login(self, method, params):
-        self._session = _parse_result(
-            getattr(self, 'session.%s' % method)(*params))
+        result = _parse_result(getattr(self, 'session.%s' % method)(*params))
+        if result == _RECONNECT_AND_RETRY:
+            raise xmlrpclib.Fault(
+                500, 'Received SESSION_INVALID when logging in')
+        self._session = result
+        self.last_login_method = method
+        self.last_login_params = params
 
 
     def __getattr__(self, name):
@@ -106,7 +154,7 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
 
 
 def _parse_result(result):
-    if 'Status' not in result:
+    if type(result) != dict or 'Status' not in result:
         raise xmlrpclib.Fault(500, 'Missing Status in response from server')
     if result['Status'] == 'Success':
         if 'Value' in result:
@@ -116,7 +164,10 @@ def _parse_result(result):
                                   'Missing Value in response from server')
     else:
         if 'ErrorDescription' in result:
-            raise Failure(result['ErrorDescription'])
+            if result['ErrorDescription'][0] == 'SESSION_INVALID':
+                return _RECONNECT_AND_RETRY
+            else:
+                raise Failure(result['ErrorDescription'])
         else:
             raise xmlrpclib.Fault(
                 500, 'Missing ErrorDescription in response from server')
@@ -127,10 +178,18 @@ class _Dispatcher:
     def __init__(self, send, name):
         self.__send = send
         self.__name = name
+
+    def __repr__(self):
+        if self.__name:
+            return '<XenAPI._Dispatcher for %s>' % self.__name
+        else:
+            return '<XenAPI._Dispatcher>'
+
     def __getattr__(self, name):
         if self.__name is None:
             return _Dispatcher(self.__send, name)
         else:
             return _Dispatcher(self.__send, "%s.%s" % (self.__name, name))
+
     def __call__(self, *args):
         return self.__send(self.__name, args)

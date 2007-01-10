@@ -595,6 +595,7 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
         return 0;
     }
 
+#ifndef __x86_64__//temp
     if (strstr(xen_caps, "xen-3.0-x86_32p")) {
         if (dsi->pae_kernel == PAEKERN_bimodal) {
             dsi->pae_kernel = PAEKERN_extended_cr3;
@@ -612,6 +613,7 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
             return 0;
         }
     }
+#endif
 
     return 1;
 }
@@ -1079,7 +1081,7 @@ static int setup_guest(int xc_handle,
 static int xc_linux_build_internal(int xc_handle,
                                    uint32_t domid,
                                    unsigned int mem_mb,
-                                   char *image,
+                                   const char *image,
                                    unsigned long image_size,
                                    struct initrd_info *initrd,
                                    const char *cmdline,

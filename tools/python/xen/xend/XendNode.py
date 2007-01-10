@@ -19,34 +19,181 @@
 import os
 import socket
 import xen.lowlevel.xc
+
+from xen.util import Brctl
+
 from xen.xend import uuid
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, NetworkAlreadyConnected
+from xen.xend.XendRoot import instance as xendroot
 from xen.xend.XendStorageRepository import XendStorageRepository
+from xen.xend.XendLogging import log
+from xen.xend.XendPIF import *
+from xen.xend.XendNetwork import *
+from xen.xend.XendStateStore import XendStateStore
 
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
     
     def __init__(self):
-        self.xc = xen.lowlevel.xc.xc()
-        self.uuid = uuid.createString()
-        self.cpus = {}
-        self.name = socket.gethostname()
-        self.desc = ""
-        self.sr = XendStorageRepository()
+        """Initalises the state of all host specific objects such as
+
+        * Host
+        * Host_CPU
+        * PIF
+        * Network
+        * Storage Repository
+        """
         
+        self.xc = xen.lowlevel.xc.xc()
+        self.state_store = XendStateStore(xendroot().get_xend_state_path())
+
+        # load host state from XML file
+        saved_host = self.state_store.load_state('host')
+        if saved_host and len(saved_host.keys()) == 1:
+            self.uuid = saved_host.keys()[0]
+            host = saved_host[self.uuid]
+            self.name = host.get('name_label', socket.gethostname())
+            self.desc = host.get('name_description', '')
+            self.cpus = {}
+        else:
+            self.uuid = uuid.createString()
+            self.name = socket.gethostname()
+            self.desc = ''
+            self.cpus = {}
+            
+        # load CPU UUIDs
+        saved_cpus = self.state_store.load_state('cpu')
+        for cpu_uuid, cpu in saved_cpus.items():
+            self.cpus[cpu_uuid] = cpu
+
+        # verify we have enough cpus here
         physinfo = self.physinfo_dict()
         cpu_count = physinfo['nr_cpus']
         cpu_features = physinfo['hw_caps']
-        
-        for i in range(cpu_count):
-            # construct uuid by appending extra bit on the host.
-            # since CPUs belong to a host.
-            cpu_uuid = self.uuid + '-%04d' % i
-            cpu_info = {'uuid': cpu_uuid,
-                        'host': self.uuid,
-                        'number': i,
-                        'features': cpu_features}
-            self.cpus[cpu_uuid] = cpu_info
+
+        # If the number of CPUs don't match, we should just reinitialise 
+        # the CPU UUIDs.
+        if cpu_count != len(self.cpus):
+            self.cpus = {}
+            for i in range(cpu_count):
+                cpu_uuid = uuid.createString()
+                cpu_info = {'uuid': cpu_uuid,
+                            'host': self.uuid,
+                            'number': i,
+                            'features': cpu_features}
+                self.cpus[cpu_uuid] = cpu_info
+
+        self.pifs = {}
+        self.networks = {}
+
+        # initialise networks
+        saved_networks = self.state_store.load_state('network')
+        if saved_networks:
+            for net_uuid, network in saved_networks.items():
+                self.network_create(network.get('name_label'),
+                                    network.get('name_description', ''),
+                                    network.get('default_gateway', ''),
+                                    network.get('default_netmask', ''),
+                                    False, net_uuid)
+        else:
+            gateway, netmask = linux_get_default_network()
+            self.network_create('net0', '', gateway, netmask, False)
+
+        # initialise PIFs
+        saved_pifs = self.state_store.load_state('pif')
+        if saved_pifs:
+            for pif_uuid, pif in saved_pifs.items():
+                if pif.get('network') in self.networks:
+                    network = self.networks[pif['network']]
+                    try:
+                        self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
+                                        pif['MAC'], network, False, pif_uuid)
+                    except NetworkAlreadyConnected, exn:
+                        log.error('Cannot load saved PIF %s, as network %s ' +
+                                  'is already connected to PIF %s',
+                                  pif_uuid, pif['network'], exn.pif_uuid)
+        else:
+            for name, mtu, mac in linux_get_phy_ifaces():
+                network = self.networks.values()[0]
+                self.PIF_create(name, mtu, '', mac, network, False)
+
+        # initialise storage
+        saved_sr = self.state_store.load_state('sr')
+        if saved_sr and len(saved_sr) == 1:
+            sr_uuid = saved_sr.keys()[0]
+            self.sr = XendStorageRepository(sr_uuid)
+        else:
+            sr_uuid = uuid.createString()
+            self.sr = XendStorageRepository(sr_uuid)
+
+
+    def network_create(self, name_label, name_description,
+                       default_gateway, default_netmask, persist = True,
+                       net_uuid = None):
+        if net_uuid is None:
+            net_uuid = uuid.createString()
+        self.networks[net_uuid] = XendNetwork(net_uuid, name_label,
+                                              name_description,
+                                              default_gateway,
+                                              default_netmask)
+        if persist:
+            self.save_networks()
+        return net_uuid
+
+
+    def network_destroy(self, net_uuid):
+        del self.networks[net_uuid]
+        self.save_networks()
+
+
+    def PIF_create(self, name, mtu, vlan, mac, network, persist = True,
+                   pif_uuid = None):
+        for pif in self.pifs.values():
+            if pif.network == network:
+                raise NetworkAlreadyConnected(pif.uuid)
+
+        if pif_uuid is None:
+            pif_uuid = uuid.createString()
+        self.pifs[pif_uuid] = XendPIF(pif_uuid, name, mtu, vlan, mac, network,
+                                      self)
+        if persist:
+            self.save_PIFs()
+            self.refreshBridges()
+        return pif_uuid
+
+
+    def PIF_create_VLAN(self, pif_uuid, network_uuid, vlan):
+        pif = self.pifs[pif_uuid]
+        network = self.networks[network_uuid]
+        return self.PIF_create(pif.name, pif.mtu, vlan, pif.mac, network)
+
+
+    def PIF_destroy(self, pif_uuid):
+        del self.pifs[pif_uuid]
+        self.save_PIFs()
+
+
+    def save(self):
+        # save state
+        host_record = {self.uuid: {'name_label':self.name,
+                                   'name_description':self.desc}}
+        self.state_store.save_state('host',host_record)
+        self.state_store.save_state('cpu', self.cpus)
+        self.save_PIFs()
+        self.save_networks()
+
+        sr_record = {self.sr.uuid: self.sr.get_record()}
+        self.state_store.save_state('sr', sr_record)
+
+    def save_PIFs(self):
+        pif_records = dict([(k, v.get_record(transient = False))
+                            for k, v in self.pifs.items()])
+        self.state_store.save_state('pif', pif_records)
+
+    def save_networks(self):
+        net_records = dict([(k, v.get_record(transient = False))
+                            for k, v in self.networks.items()])
+        self.state_store.save_state('network', net_records)
 
     def shutdown(self):
         return 0
@@ -56,7 +203,8 @@ class XendNode:
 
     def notify(self, _):
         return 0
-    
+
+        
     #
     # Ref validation
     #
@@ -66,6 +214,9 @@ class XendNode:
 
     def is_valid_cpu(self, cpu_ref):
         return (cpu_ref in self.cpus)
+
+    def is_valid_network(self, network_ref):
+        return (network_ref in self.networks)
 
     #
     # Storage Repo
@@ -100,6 +251,9 @@ class XendNode:
     def set_description(self, new_desc):
         self.desc = new_desc
 
+    def get_uuid(self):
+        return self.uuid
+
     #
     # Host CPU Functions
     #
@@ -133,7 +287,42 @@ class XendNode:
     def get_host_cpu_load(self, host_cpu_ref):
         return 0.0
 
+
+    #
+    # Network Functions
+    #
     
+    def get_network_refs(self):
+        return self.networks.keys()
+
+    def get_network(self, network_ref):
+        return self.networks[network_ref]
+
+    def bridge_to_network(self, bridge):
+        """
+        Determine which network a particular bridge is attached to.
+
+        @param bridge The name of the bridge.  If empty, the default bridge
+        will be used instead (the first one in the list returned by brctl
+        show); this is the behaviour of the vif-bridge script.
+        @return The XendNetwork instance to which this bridge is attached.
+        @raise Exception if the interface is not connected to a network.
+        """
+        if not bridge:
+            rc, bridge = commands.getstatusoutput(
+                'brctl show | cut -d "\n" -f 2 | cut -f 1')
+            if rc != 0 or not bridge:
+                raise Exception(
+                    'Could not find default bridge, and none was specified')
+
+        bridges = Brctl.get_state()
+        if bridge not in bridges:
+            raise Exception('Bridge %s is not up' % bridge)
+        for pif in self.pifs.values():
+            if pif.interface_name() in bridges[bridge]:
+                return pif.network
+        raise Exception('Bridge %s is not connected to a network' % bridge)
+
 
     #
     # Getting host information.
@@ -210,7 +399,12 @@ class XendNode:
         return dict(self.physinfo())
     def info_dict(self):
         return dict(self.info())
-    
+
+
+    def refreshBridges(self):
+        for pif in self.pifs.values():
+            pif.refresh(Brctl.get_state())
+
 
 def instance():
     global inst
@@ -218,5 +412,5 @@ def instance():
         inst
     except:
         inst = XendNode()
+        inst.save()
     return inst
-

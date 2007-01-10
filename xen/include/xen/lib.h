@@ -74,15 +74,15 @@ extern int vscnprintf(char *buf, size_t size, const char *fmt, va_list args)
     __attribute__ ((format (printf, 3, 0)));
 
 long simple_strtol(
-    const char *cp,char **endp, unsigned int base);
+    const char *cp,const char **endp, unsigned int base);
 unsigned long simple_strtoul(
-    const char *cp,char **endp, unsigned int base);
+    const char *cp,const char **endp, unsigned int base);
 long long simple_strtoll(
-    const char *cp,char **endp, unsigned int base);
+    const char *cp,const char **endp, unsigned int base);
 unsigned long long simple_strtoull(
-    const char *cp,char **endp, unsigned int base);
+    const char *cp,const char **endp, unsigned int base);
 
-unsigned long long parse_size_and_unit(const char *s, char **ps);
+unsigned long long parse_size_and_unit(const char *s, const char **ps);
 
 #define TAINT_UNSAFE_SMP                (1<<0)
 #define TAINT_MACHINE_CHECK             (1<<1)

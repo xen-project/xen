@@ -85,15 +85,16 @@ void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
 
     spin_lock(&hvm_irq->lock);
 
     if ( !__test_and_set_bit(isa_irq, &hvm_irq->isa_irq) &&
-         (hvm_irq->gsi_assert_count[isa_irq]++ == 0) )
+         (hvm_irq->gsi_assert_count[gsi]++ == 0) )
     {
-        vioapic_irq_positive_edge(d, isa_irq);
+        vioapic_irq_positive_edge(d, gsi);
         vpic_irq_positive_edge(d, isa_irq);
     }
 
@@ -104,13 +105,14 @@ void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
 
     spin_lock(&hvm_irq->lock);
 
     if ( __test_and_clear_bit(isa_irq, &hvm_irq->isa_irq) &&
-         (--hvm_irq->gsi_assert_count[isa_irq] == 0) )
+         (--hvm_irq->gsi_assert_count[gsi] == 0) )
         vpic_irq_negative_edge(d, isa_irq);
 
     spin_unlock(&hvm_irq->lock);
@@ -133,7 +135,8 @@ void hvm_set_callback_irq_level(void)
     if ( gsi == 0 )
         goto out;
 
-    if ( local_events_need_delivery() )
+    /* NB. Do not check the evtchn_upcall_mask. It is not used in HVM mode. */
+    if ( vcpu_info(v, evtchn_upcall_pending) )
     {
         if ( !__test_and_set_bit(0, &hvm_irq->callback_irq_wire) &&
              (hvm_irq->gsi_assert_count[gsi]++ == 0) )
@@ -224,4 +227,56 @@ void hvm_set_callback_gsi(struct domain *d, unsigned int gsi)
 
     dprintk(XENLOG_G_INFO, "Dom%u callback GSI changed %u -> %u\n",
             d->domain_id, old_gsi, gsi);
+}
+
+int cpu_has_pending_irq(struct vcpu *v)
+{
+    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
+
+    /* APIC */
+    if ( vlapic_has_interrupt(v) != -1 )
+        return 1;
+
+    /* PIC */
+    if ( !vlapic_accept_pic_intr(v) )
+        return 0;
+
+    return plat->irq.vpic[0].int_output;
+}
+
+int cpu_get_interrupt(struct vcpu *v, int *type)
+{
+    int vector;
+
+    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
+        return vector;
+
+    if ( (v->vcpu_id == 0) &&
+         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
+        return vector;
+
+    return -1;
+}
+
+int get_isa_irq_vector(struct vcpu *v, int isa_irq, int type)
+{
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
+
+    if ( type == APIC_DM_EXTINT )
+        return (v->domain->arch.hvm_domain.irq.vpic[isa_irq >> 3].irq_base
+                + (isa_irq & 7));
+
+    return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
+}
+
+int is_isa_irq_masked(struct vcpu *v, int isa_irq)
+{
+    unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
+
+    if ( is_lvtt(v, isa_irq) )
+        return !is_lvtt_enabled(v);
+
+    return ((v->domain->arch.hvm_domain.irq.vpic[isa_irq >> 3].imr &
+             (1 << (isa_irq & 7))) &&
+            domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
 }

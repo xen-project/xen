@@ -48,7 +48,7 @@ from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendRoot, XendAPI
+from xen.xend import XendNode, XendRoot, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
@@ -100,6 +100,8 @@ class XendServers:
         signal.signal(signal.SIGHUP, self.reloadConfig)
 
         while True:
+            XendNode.instance().refreshBridges()
+
             threads = []
             for server in self.servers:
                 if server.ready:
@@ -198,16 +200,18 @@ def _loadConfig(servers, root, reload):
 
                 if len(addrport) == 1:
                     if addrport[0] == 'unix':
-                        servers.add(XMLRPCServer(auth,
+                        servers.add(XMLRPCServer(auth, True,
                                                  path = XEN_API_SOCKET,
                                                  hosts_allowed = allowed))
                     else:
                         servers.add(
-                            XMLRPCServer(auth, True, '', int(addrport[0]),
+                            XMLRPCServer(auth, True, True, '',
+                                         int(addrport[0]),
                                          hosts_allowed = allowed))
                 else:
                     addr, port = addrport
-                    servers.add(XMLRPCServer(auth, True, addr, int(port),
+                    servers.add(XMLRPCServer(auth, True, True, addr,
+                                             int(port),
                                              hosts_allowed = allowed))
         except ValueError, exn:
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
@@ -215,10 +219,10 @@ def _loadConfig(servers, root, reload):
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
 
     if xroot.get_xend_tcp_xmlrpc_server():
-        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, True))
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, True))
 
     if xroot.get_xend_unix_xmlrpc_server():
-        servers.add(XMLRPCServer(XendAPI.AUTH_PAM))
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False))
 
 
 def create():

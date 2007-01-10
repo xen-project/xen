@@ -14,8 +14,6 @@
 #define SYM_PHYS(sym) (sym - __PAGE_OFFSET)
 
 ENTRY(start)
-ENTRY(stext)
-ENTRY(_stext)
         jmp __start
 
         .org    0x004
@@ -226,14 +224,33 @@ high_start:
         .align PAGE_SIZE, 0
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* unused */
-        .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 code, compatibility */
-        .quad 0x00af9a000000ffff     /* 0xe010 ring 0 code, 64-bit mode   */
-        .quad 0x00cf92000000ffff     /* 0xe018 ring 0 data                */
+        .quad 0x00af9a000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
+        .quad 0x00cf92000000ffff     /* 0xe010 ring 0 data                */
+        .quad 0x0000000000000000     /* reserved                          */
         .quad 0x00cffa000000ffff     /* 0xe023 ring 3 code, compatibility */
         .quad 0x00cff2000000ffff     /* 0xe02b ring 3 data                */
         .quad 0x00affa000000ffff     /* 0xe033 ring 3 code, 64-bit mode   */
-        .quad 0x0000000000000000     /* unused                            */
+        .quad 0x00cf9a000000ffff     /* 0xe038 ring 0 code, compatibility */
+        .org gdt_table - FIRST_RESERVED_GDT_BYTE + __TSS(0) * 8
         .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
+
+#ifdef CONFIG_COMPAT
+        .align PAGE_SIZE, 0
+/* NB. Even rings != 0 get access to the full 4Gb, as only the            */
+/*     (compatibility) machine->physical mapping table lives there.       */
+ENTRY(compat_gdt_table)
+        .quad 0x0000000000000000     /* unused */
+        .quad 0x00af9a000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
+        .quad 0x00cf92000000ffff     /* 0xe010 ring 0 data                */
+        .quad 0x00cfba000000ffff     /* 0xe019 ring 1 code, compatibility */
+        .quad 0x00cfb2000000ffff     /* 0xe021 ring 1 data                */
+        .quad 0x00cffa000000ffff     /* 0xe02b ring 3 code, compatibility */
+        .quad 0x00cff2000000ffff     /* 0xe033 ring 3 data                */
+        .quad 0x00cf9a000000ffff     /* 0xe038 ring 0 code, compatibility */
+        .org compat_gdt_table - FIRST_RESERVED_GDT_BYTE + __TSS(0) * 8
+        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
+# undef LIMIT
+#endif
 
 /* Initial PML4 -- level-4 page table. */
         .align PAGE_SIZE, 0

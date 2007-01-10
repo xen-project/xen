@@ -6,9 +6,6 @@
 
 #define KSYM_NAME_LEN 127
 
-extern int is_kernel_text(unsigned long addr);
-extern unsigned long kernel_text_end(void);
-
 /* Lookup an address. */
 const char *symbols_lookup(unsigned long addr,
                            unsigned long *symbolsize,
@@ -16,7 +13,7 @@ const char *symbols_lookup(unsigned long addr,
                            char *namebuf);
 
 /* Replace "%s" in format with address, if found */
-extern void __print_symbol(const char *fmt, unsigned long address);
+void __print_symbol(const char *fmt, unsigned long address);
 
 /* This macro allows us to keep printk typechecking */
 static void __check_printsym_format(const char *fmt, ...)

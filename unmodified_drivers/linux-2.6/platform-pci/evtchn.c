@@ -43,11 +43,17 @@
 void *shared_info_area;
 
 #define MAX_EVTCHN 256
-static struct
-{
+static struct {
 	irqreturn_t(*handler) (int, void *, struct pt_regs *);
 	void *dev_id;
+	int close; /* close on unbind_from_irqhandler()? */
 } evtchns[MAX_EVTCHN];
+
+int irq_to_evtchn_port(int irq)
+{
+	return irq;
+}
+EXPORT_SYMBOL(irq_to_evtchn_port);
 
 void mask_evtchn(int port)
 {
@@ -94,22 +100,48 @@ void unmask_evtchn(int port)
 }
 EXPORT_SYMBOL(unmask_evtchn);
 
-int
-bind_evtchn_to_irqhandler(unsigned int evtchn,
-			  irqreturn_t(*handler) (int, void *,
-						 struct pt_regs *),
-			  unsigned long irqflags, const char *devname,
-			  void *dev_id)
+int bind_listening_port_to_irqhandler(
+	unsigned int remote_domain,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id)
 {
-	if (evtchn >= MAX_EVTCHN)
-		return -EINVAL;
-	evtchns[evtchn].handler = handler;
-	evtchns[evtchn].dev_id = dev_id;
-	unmask_evtchn(evtchn);
-	return evtchn;
-}
+	struct evtchn_alloc_unbound alloc_unbound;
+	int err;
 
-EXPORT_SYMBOL(bind_evtchn_to_irqhandler);
+	alloc_unbound.dom        = DOMID_SELF;
+	alloc_unbound.remote_dom = remote_domain;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+					  &alloc_unbound);
+	if (err)
+		return err;
+
+	evtchns[alloc_unbound.port].handler = handler;
+	evtchns[alloc_unbound.port].dev_id  = dev_id;
+	evtchns[alloc_unbound.port].close   = 1;
+	unmask_evtchn(alloc_unbound.port);
+	return alloc_unbound.port;
+}
+EXPORT_SYMBOL(bind_listening_port_to_irqhandler);
+
+int bind_caller_port_to_irqhandler(
+	unsigned int caller_port,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id)
+{
+	if (caller_port >= MAX_EVTCHN)
+		return -EINVAL;
+	evtchns[caller_port].handler = handler;
+	evtchns[caller_port].dev_id  = dev_id;
+	evtchns[caller_port].close   = 0;
+	unmask_evtchn(caller_port);
+	return caller_port;
+}
+EXPORT_SYMBOL(bind_caller_port_to_irqhandler);
 
 void unbind_from_irqhandler(unsigned int evtchn, void *dev_id)
 {
@@ -118,8 +150,12 @@ void unbind_from_irqhandler(unsigned int evtchn, void *dev_id)
 
 	mask_evtchn(evtchn);
 	evtchns[evtchn].handler = NULL;
-}
 
+	if (evtchns[evtchn].close) {
+		struct evtchn_close close = { .port = evtchn };
+		HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+	}
+}
 EXPORT_SYMBOL(unbind_from_irqhandler);
 
 void notify_remote_via_irq(int irq)
@@ -127,7 +163,6 @@ void notify_remote_via_irq(int irq)
 	int evtchn = irq;
 	notify_remote_via_evtchn(evtchn);
 }
-
 EXPORT_SYMBOL(notify_remote_via_irq);
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)

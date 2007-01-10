@@ -134,6 +134,7 @@ int loglevel;
 #endif
 
 #ifdef MAPCACHE
+#include <pthread.h>
 static pthread_mutex_t mapcache_mutex;
 #define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
 #define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)

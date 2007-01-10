@@ -19,6 +19,7 @@
 #include <xen/version.h>
 #include <xen/iocap.h>
 #include <xen/bitops.h>
+#include <xen/compat.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -55,12 +56,12 @@ static long dom0_nrpages, dom0_min_nrpages, dom0_max_nrpages = LONG_MAX;
  *  If +ve: The specified amount is an absolute value.
  *  If -ve: The specified amount is subtracted from total available memory.
  */
-static long parse_amt(char *s, char **ps)
+static long parse_amt(const char *s, const char **ps)
 {
     long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
     return (*s == '-') ? -pages : pages;
 }
-static void parse_dom0_mem(char *s)
+static void parse_dom0_mem(const char *s)
 {
     do {
         if ( !strncmp(s, "min:", 4) )
@@ -90,9 +91,11 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT)
 #elif defined(__x86_64__)
-/* Allow ring-3 access in long mode as guest cannot use ring 1. */
+/* Allow ring-3 access in long mode as guest cannot use ring 1 ... */
 #define BASE_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L1_PROT (BASE_PROT|_PAGE_GUEST_KERNEL)
+/* ... except for compatibility mode guests. */
+#define COMPAT_L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (BASE_PROT|_PAGE_DIRTY)
 #define L3_PROT (BASE_PROT|_PAGE_DIRTY)
 #define L4_PROT (BASE_PROT|_PAGE_DIRTY)
@@ -152,7 +155,8 @@ static unsigned long compute_dom0_nr_pages(void)
 static void process_dom0_ioports_disable(void)
 {
     unsigned long io_from, io_to;
-    char *t, *u, *s = opt_dom0_ioports_disable;
+    char *t, *s = opt_dom0_ioports_disable;
+    const char *u;
 
     if ( *s == '\0' )
         return;
@@ -260,8 +264,8 @@ int construct_dom0(struct domain *d,
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
     const char *p;
-    unsigned long hypercall_page;
-    int hypercall_page_defined;
+    unsigned long long value;
+    int value_defined;
 #if defined(__i386__)
     char *image_start  = (char *)_image_start;  /* use lowmem mappings */
     char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
@@ -318,10 +322,40 @@ int construct_dom0(struct domain *d,
 
     nr_pages = compute_dom0_nr_pages();
 
-    if ( (rc = parseelfimage(&dsi)) != 0 )
-        return rc;
+    rc = parseelfimage(&dsi);
+#ifdef CONFIG_COMPAT
+    if ( rc == -ENOSYS
+         && !compat_disabled
+         && (rc = parseelf32image(&dsi)) == 0 )
+    {
+        l1_pgentry_t gdt_l1e;
 
-    xen_pae  = (CONFIG_PAGING_LEVELS == 3);
+        set_bit(_DOMF_compat, &d->domain_flags);
+        v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
+
+        if ( nr_pages != (unsigned int)nr_pages )
+            nr_pages = UINT_MAX;
+
+        /*
+         * Map compatibility Xen segments into every VCPU's GDT. See
+         * arch_domain_create() for further comments.
+         */
+        gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table),
+                                PAGE_HYPERVISOR);
+        for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+            d->arch.mm_perdomain_pt[((i << GDT_LDT_VCPU_SHIFT) +
+                                     FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
+        local_flush_tlb_one(GDT_LDT_VIRT_START + FIRST_RESERVED_GDT_BYTE);
+    }
+#endif
+    if ( rc != 0)
+    {
+        if ( rc == -ENOSYS )
+            printk("DOM0 image is not a Xen-compatible Elf image.\n");
+       return rc;
+    }
+
+    xen_pae  = (CONFIG_PAGING_LEVELS == 3) || IS_COMPAT(d);
     if (dsi.pae_kernel == PAEKERN_bimodal)
         dom0_pae = xen_pae; 
     else
@@ -337,7 +371,40 @@ int construct_dom0(struct domain *d,
             dsi.pae_kernel == PAEKERN_bimodal) )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
-    if ( (p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES)) != NULL )
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+    {
+        value = xen_elf32note_numeric(&dsi, XEN_ELFNOTE_HV_START_LOW, &value_defined);
+        p = xen_elf32note_string(&dsi, XEN_ELFNOTE_FEATURES);
+    }
+    else
+#endif
+    {
+        value = xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HV_START_LOW, &value_defined);
+        p = xen_elfnote_string(&dsi, XEN_ELFNOTE_FEATURES);
+    }
+    if ( value_defined )
+    {
+#if CONFIG_PAGING_LEVELS < 4
+        unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
+#else
+        unsigned long mask = !IS_COMPAT(d)
+                             ? (1UL << L4_PAGETABLE_SHIFT) - 1
+                             : (1UL << L2_PAGETABLE_SHIFT) - 1;
+#endif
+
+        value = (value + mask) & ~mask;
+#ifdef CONFIG_COMPAT
+        HYPERVISOR_COMPAT_VIRT_START(d) = max_t(unsigned int, m2p_compat_vstart, value);
+        if ( value > (!IS_COMPAT(d) ?
+                      HYPERVISOR_VIRT_START :
+                      __HYPERVISOR_COMPAT_VIRT_START) )
+#else
+        if ( value > HYPERVISOR_VIRT_START )
+#endif
+            panic("Domain 0 expects too high a hypervisor start address.\n");
+    }
+    if ( p != NULL )
     {
         parse_features(p,
                        dom0_features_supported,
@@ -363,7 +430,9 @@ int construct_dom0(struct domain *d,
     vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
-    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
+    vphysmap_end     = vphysmap_start + (nr_pages * (!IS_COMPAT(d) ?
+                                                     sizeof(unsigned long) :
+                                                     sizeof(unsigned int)));
     vstartinfo_start = round_pgup(vphysmap_end);
     vstartinfo_end   = (vstartinfo_start +
                         sizeof(struct start_info) +
@@ -392,7 +461,9 @@ int construct_dom0(struct domain *d,
        ((_l) & ~((1UL<<(_s))-1))) >> (_s))
         if ( (1 + /* # L4 */
               NR(dsi.v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
-              NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) + /* # L2 */
+              (!IS_COMPAT(d) ?
+               NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) : /* # L2 */
+               4) + /* # compat L2 */
               NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
              <= nr_pt_pages )
             break;
@@ -582,22 +653,46 @@ int construct_dom0(struct domain *d,
 #elif defined(__x86_64__)
 
     /* Overlap with Xen protected area? */
-    if ( (dsi.v_start < HYPERVISOR_VIRT_END) &&
-         (v_end > HYPERVISOR_VIRT_START) )
+    if ( !IS_COMPAT(d) ?
+         ((dsi.v_start < HYPERVISOR_VIRT_END) &&
+          (v_end > HYPERVISOR_VIRT_START)) :
+         (v_end > HYPERVISOR_COMPAT_VIRT_START(d)) )
     {
         printk("DOM0 image overlaps with Xen private area.\n");
         return -EINVAL;
     }
 
+    if ( IS_COMPAT(d) )
+    {
+        v->arch.guest_context.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
+        v->arch.guest_context.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
+    }
+
     /* WARNING: The new domain must have its 'processor' field filled in! */
-    maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
-    l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+    if ( !IS_COMPAT(d) )
+    {
+        maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
+        l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+    }
+    else
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            panic("Not enough RAM for domain 0 PML4.\n");
+        l4start = l4tab = page_to_virt(page);
+    }
     memcpy(l4tab, idle_pg_table, PAGE_SIZE);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
+    if ( IS_COMPAT(d) )
+    {
+        v->arch.guest_table_user = v->arch.guest_table;
+        if ( setup_arg_xlat_area(v, l4start) < 0 )
+            panic("Not enough RAM for domain 0 hypercall argument translation.\n");
+    }
 
     l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_spfn;
@@ -634,7 +729,7 @@ int construct_dom0(struct domain *d,
             *l2tab = l2e_from_paddr(__pa(l1start), L2_PROT);
             l2tab++;
         }
-        *l1tab = l1e_from_pfn(mfn, L1_PROT);
+        *l1tab = l1e_from_pfn(mfn, !IS_COMPAT(d) ? L1_PROT : COMPAT_L1_PROT);
         l1tab++;
 
         page = mfn_to_page(mfn);
@@ -644,6 +739,30 @@ int construct_dom0(struct domain *d,
 
         mfn++;
     }
+
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+    {
+        /* Ensure the first four L3 entries are all populated. */
+        for ( i = 0, l3tab = l3start; i < 4; ++i, ++l3tab )
+        {
+            if ( !l3e_get_intpte(*l3tab) )
+            {
+                maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l2_page_table;
+                l2tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+                clear_page(l2tab);
+                *l3tab = l3e_from_paddr(__pa(l2tab), L3_PROT);
+            }
+            if ( i == 3 )
+                l3e_get_page(*l3tab)->u.inuse.type_info |= PGT_pae_xen_l2;
+        }
+        /* Install read-only guest visible MPT mapping. */
+        l2tab = l3e_to_l2e(l3start[3]);
+        memcpy(&l2tab[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+               &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+               COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2tab));
+    }
+#endif
 
     /* Pages that are part of page tables must be read only. */
     l4tab = l4start + l4_table_offset(vpt_start);
@@ -663,7 +782,8 @@ int construct_dom0(struct domain *d,
         page->u.inuse.type_info |= PGT_validated | 1;
 
         /* Top-level p.t. is pinned. */
-        if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l4_page_table )
+        if ( (page->u.inuse.type_info & PGT_type_mask) ==
+             (!IS_COMPAT(d) ? PGT_l4_page_table : PGT_l3_page_table) )
         {
             page->count_info        += 1;
             page->u.inuse.type_info += 1 | PGT_pinned;
@@ -686,7 +806,7 @@ int construct_dom0(struct domain *d,
 
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+        shared_info(d, vcpu_info[i].evtchn_upcall_mask) = 1;
 
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();
@@ -694,6 +814,8 @@ int construct_dom0(struct domain *d,
         opt_dom0_max_vcpus = num_online_cpus();
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
+    if ( opt_dom0_max_vcpus > BITS_PER_GUEST_LONG(d) )
+        opt_dom0_max_vcpus = BITS_PER_GUEST_LONG(d);
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
 
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )
@@ -710,20 +832,30 @@ int construct_dom0(struct domain *d,
     write_ptbase(v);
 
     /* Copy the OS image and free temporary buffer. */
-    (void)loadelfimage(&dsi);
-
-    hypercall_page =
-        xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &hypercall_page_defined);
-    if ( hypercall_page_defined )
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
     {
-        if ( (hypercall_page < dsi.v_start) || (hypercall_page >= v_end) )
+        (void)loadelf32image(&dsi);
+        value =
+            xen_elf32note_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &value_defined);
+    }
+    else
+#endif
+    {
+        (void)loadelfimage(&dsi);
+        value =
+            xen_elfnote_numeric(&dsi, XEN_ELFNOTE_HYPERCALL_PAGE, &value_defined);
+    }
+    if ( value_defined )
+    {
+        if ( (value < dsi.v_start) || (value >= v_end) )
         {
             write_ptbase(current);
             local_irq_enable();
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
             return -1;
         }
-        hypercall_page_initialise(d, (void *)hypercall_page);
+        hypercall_page_initialise(d, (void *)(unsigned long)value);
     }
 
     /* Copy the initial ramdisk. */
@@ -741,12 +873,12 @@ int construct_dom0(struct domain *d,
     si->shared_info = virt_to_maddr(d->shared_info);
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
-    si->pt_base      = vpt_start;
+    si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!IS_COMPAT(d);
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
     sprintf(si->magic, "xen-%i.%i-x86_%d%s",
             xen_major_version(), xen_minor_version(),
-            BITS_PER_LONG, xen_pae ? "p" : "");
+            !IS_COMPAT(d) ? BITS_PER_LONG : 32, xen_pae ? "p" : "");
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
@@ -757,7 +889,10 @@ int construct_dom0(struct domain *d,
         if ( pfn > REVERSE_START )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
-        ((unsigned long *)vphysmap_start)[pfn] = mfn;
+        if ( !IS_COMPAT(d) )
+            ((unsigned long *)vphysmap_start)[pfn] = mfn;
+        else
+            ((unsigned int *)vphysmap_start)[pfn] = mfn;
         set_gpfn_from_mfn(mfn, pfn);
     }
     while ( pfn < nr_pages )
@@ -770,7 +905,10 @@ int construct_dom0(struct domain *d,
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
-            ((unsigned long *)vphysmap_start)[pfn] = mfn;
+            if ( !IS_COMPAT(d) )
+                ((unsigned long *)vphysmap_start)[pfn] = mfn;
+            else
+                ((unsigned int *)vphysmap_start)[pfn] = mfn;
             set_gpfn_from_mfn(mfn, pfn);
 #undef pfn
             page++; pfn++;
@@ -795,6 +933,11 @@ int construct_dom0(struct domain *d,
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
 
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+        xlat_start_info(si, XLAT_start_info_console_dom0);
+#endif
+
     /* Reinstate the caller's page tables. */
     write_ptbase(current);
     local_irq_enable();
@@ -818,16 +961,18 @@ int construct_dom0(struct domain *d,
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
     regs = &v->arch.guest_context.user_regs;
-    regs->ds = regs->es = regs->fs = regs->gs = FLAT_KERNEL_DS;
-    regs->ss = FLAT_KERNEL_SS;
-    regs->cs = FLAT_KERNEL_CS;
+    regs->ds = regs->es = regs->fs = regs->gs = !IS_COMPAT(d)
+                                                ? FLAT_KERNEL_DS
+                                                : FLAT_COMPAT_KERNEL_DS;
+    regs->ss = !IS_COMPAT(d) ? FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS;
+    regs->cs = !IS_COMPAT(d) ? FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS;
     regs->eip = dsi.v_kernentry;
     regs->esp = vstack_end;
     regs->esi = vstartinfo_start;
     regs->eflags = X86_EFLAGS_IF;
 
     if ( opt_dom0_shadow )
-        if ( shadow_test_enable(d) == 0 ) 
+        if ( shadow_enable(d, SHM2_enable) == 0 ) 
             shadow_update_paging_modes(v);
 
     if ( supervisor_mode_kernel )
@@ -892,7 +1037,7 @@ int construct_dom0(struct domain *d,
     return 0;
 }
 
-int elf_sanity_check(Elf_Ehdr *ehdr)
+int elf_sanity_check(const Elf_Ehdr *ehdr)
 {
     if ( !IS_ELF(*ehdr) ||
 #if defined(__i386__)
@@ -905,12 +1050,27 @@ int elf_sanity_check(Elf_Ehdr *ehdr)
          (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
          (ehdr->e_type != ET_EXEC) )
     {
-        printk("DOM0 image is not a Xen-compatible Elf image.\n");
         return 0;
     }
 
     return 1;
 }
+
+#ifdef CONFIG_COMPAT
+int elf32_sanity_check(const Elf32_Ehdr *ehdr)
+{
+    if ( !IS_ELF(*ehdr) ||
+         (ehdr->e_ident[EI_CLASS] != ELFCLASS32) ||
+         (ehdr->e_machine != EM_386) ||
+         (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
+         (ehdr->e_type != ET_EXEC) )
+    {
+        return 0;
+    }
+
+    return 1;
+}
+#endif
 
 /*
  * Local variables:

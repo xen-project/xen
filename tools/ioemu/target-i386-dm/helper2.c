@@ -498,6 +498,8 @@ void handle_buffered_io(void *opaque)
 
 void cpu_handle_ioreq(void *opaque)
 {
+    extern int vm_running;
+    extern int shutdown_requested;
     CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
@@ -516,6 +518,25 @@ void cpu_handle_ioreq(void *opaque)
         }
 
         wmb(); /* Update ioreq contents /then/ update state. */
+
+	/*
+         * We do this before we send the response so that the tools
+         * have the opportunity to pick up on the reset before the
+         * guest resumes and does a hlt with interrupts disabled which
+         * causes Xen to powerdown the domain.
+         */
+        if (vm_running) {
+            if (shutdown_requested) {
+		fprintf(logfile, "shutdown requested in cpu_handle_ioreq\n");
+		destroy_hvm_domain();
+	    }
+	    if (reset_requested) {
+		fprintf(logfile, "reset requested in cpu_handle_ioreq.\n");
+		qemu_system_reset();
+		reset_requested = 0;
+	    }
+	}
+
         req->state = STATE_IORESP_READY;
         xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
     }

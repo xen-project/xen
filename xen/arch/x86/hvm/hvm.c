@@ -82,56 +82,23 @@ u64 hvm_get_guest_time(struct vcpu *v)
     return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
-void hvm_freeze_time(struct vcpu *v)
-{
-    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    if ( pt->enabled && pt->first_injected
-            && (v->vcpu_id == pt->bind_vcpu)
-            && !v->arch.hvm_vcpu.guest_time ) {
-        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
-        if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
-        {
-            stop_timer(&pt->timer);
-            rtc_freeze(v);
-        }
-    }
-}
-
 void hvm_migrate_timers(struct vcpu *v)
 {
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
-
-    if ( pt->enabled )
-    {
-        migrate_timer(&pt->timer, v->processor);
-    }
-    migrate_timer(&vcpu_vlapic(v)->vlapic_timer, v->processor);
-    migrate_timer(&vpmt->timer, v->processor);
+    pit_migrate_timers(v);
     rtc_migrate_timers(v);
+    hpet_migrate_timers(v);
+    pmtimer_migrate_timers(v);
+    if ( vcpu_vlapic(v)->pt.enabled )
+        migrate_timer(&vcpu_vlapic(v)->pt.timer, v->processor);
 }
 
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
 
     hvm_stts(v);
 
-    /* Pick up the elapsed PIT ticks and re-enable pit_timer. */
-    if ( pt->enabled && (v->vcpu_id == pt->bind_vcpu) && pt->first_injected )
-    {
-        if ( v->arch.hvm_vcpu.guest_time )
-        {
-            hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-            v->arch.hvm_vcpu.guest_time = 0;
-        }
-        pickup_deactive_ticks(pt);
-    }
-
-    /* Re-enable the RTC timer if needed */
-    rtc_thaw(v);
+    pt_thaw_time(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
@@ -182,9 +149,10 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
-    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
+    pit_deinit(d);
     rtc_deinit(d);
     pmtimer_deinit(d);
+    hpet_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -196,7 +164,6 @@ void hvm_domain_destroy(struct domain *d)
 
 int hvm_vcpu_initialise(struct vcpu *v)
 {
-    struct hvm_domain *platform;
     int rc;
 
     if ( (rc = vlapic_init(v)) != 0 )
@@ -214,16 +181,14 @@ int hvm_vcpu_initialise(struct vcpu *v)
         get_vio(v->domain, v->vcpu_id)->vp_eport =
             v->arch.hvm_vcpu.xen_port;
 
+    INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
+
     if ( v->vcpu_id != 0 )
         return 0;
 
-    /* XXX Below should happen in hvm_domain_initialise(). */
-    platform = &v->domain->arch.hvm_domain;
-
-    init_timer(&platform->pl_time.periodic_tm.timer,
-               pt_timer_fn, v, v->processor);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
+    hpet_init(v);
 
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
@@ -238,20 +203,6 @@ void hvm_vcpu_destroy(struct vcpu *v)
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
-}
-
-int cpu_get_interrupt(struct vcpu *v, int *type)
-{
-    int vector;
-
-    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
-        return vector;
-
-    if ( (v->vcpu_id == 0) &&
-         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
-        return vector;
-
-    return -1;
 }
 
 static void hvm_vcpu_down(void)
@@ -316,6 +267,14 @@ void hvm_hlt(unsigned long rflags)
         return hvm_vcpu_down();
 
     do_sched_op_compat(SCHEDOP_block, 0);
+}
+
+void hvm_triple_fault(void)
+{
+    struct vcpu *v = current;
+    gdprintk(XENLOG_INFO, "Triple fault on VCPU%d - "
+             "invoking HVM system reset.\n", v->vcpu_id);
+    domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
 /*
@@ -400,6 +359,46 @@ void hvm_print_line(struct vcpu *v, const char c)
         hd->pbuf_idx = 0;
     }
     spin_unlock(&hd->pbuf_lock);
+}
+
+void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
+                                   unsigned int *ecx, unsigned int *edx)
+{
+    if ( !cpuid_hypervisor_leaves(input, eax, ebx, ecx, edx) )
+    {
+        cpuid(input, eax, ebx, ecx, edx);
+
+        if ( input == 0x00000001 )
+        {
+            struct vcpu *v = current;
+
+            clear_bit(X86_FEATURE_MWAIT & 31, ecx);
+
+            if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
+                clear_bit(X86_FEATURE_APIC & 31, edx);
+
+#if CONFIG_PAGING_LEVELS >= 3
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+#endif
+                clear_bit(X86_FEATURE_PAE & 31, edx);
+            clear_bit(X86_FEATURE_PSE36 & 31, edx);
+        }
+        else if ( input == 0x80000001 )
+        {
+#if CONFIG_PAGING_LEVELS >= 3
+            struct vcpu *v = current;
+            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
+#endif
+                clear_bit(X86_FEATURE_NX & 31, edx);
+#ifdef __i386__
+            /* Mask feature for Intel ia32e or AMD long mode. */
+            clear_bit(X86_FEATURE_LAHF_LM & 31, ecx);
+
+            clear_bit(X86_FEATURE_LM & 31, edx);
+            clear_bit(X86_FEATURE_SYSCALL & 31, edx);
+#endif
+        }
+    }
 }
 
 typedef unsigned long hvm_hypercall_t(

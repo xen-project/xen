@@ -23,6 +23,7 @@
  */
 
 #define ADDR (*(volatile long *) addr)
+#define CONST_ADDR (*(const volatile long *) addr)
 
 /**
  * set_bit - Atomically set a bit in memory
@@ -253,7 +254,7 @@ static __inline__ int variable_test_bit(int nr, const volatile void * addr)
 	__asm__ __volatile__(
 		"btl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit)
-		:"m" (ADDR),"dIr" (nr));
+		:"m" (CONST_ADDR),"dIr" (nr));
 	return oldbit;
 }
 
@@ -288,7 +289,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_first_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(*(unsigned long *)addr)) : \
+  (__scanbit(*(const unsigned long *)addr)) : \
   __find_first_bit(addr,size)))
 
 /**
@@ -299,7 +300,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_next_bit(addr,size,off) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  ((off) + (__scanbit((*(unsigned long *)addr) >> (off)))) : \
+  ((off) + (__scanbit((*(const unsigned long *)addr) >> (off)))) : \
   __find_next_bit(addr,size,off)))
 
 /**
@@ -312,7 +313,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_first_zero_bit(addr,size) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  (__scanbit(~*(unsigned long *)addr)) : \
+  (__scanbit(~*(const unsigned long *)addr)) : \
   __find_first_zero_bit(addr,size)))
 
 /**
@@ -323,7 +324,7 @@ static inline unsigned int __scanbit(unsigned long val)
  */
 #define find_next_zero_bit(addr,size,off) \
 ((__builtin_constant_p(size) && (size) <= BITS_PER_LONG ? \
-  ((off)+(__scanbit(~(((*(unsigned long *)addr)) >> (off))))) : \
+  ((off)+(__scanbit(~(((*(const unsigned long *)addr)) >> (off))))) : \
   __find_next_zero_bit(addr,size,off)))
 
 

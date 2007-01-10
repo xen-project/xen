@@ -35,6 +35,31 @@
               "r8",  "r9",  "r10", "r11" );                  \
     } while ( 0 )
 
+#define compat_multicall_call(_call)                              \
+    do {                                                          \
+        __asm__ __volatile__ (                                    \
+            "    movl  "STR(COMPAT_MULTICALL_op)"(%0),%%eax; "    \
+            "    leaq  compat_hypercall_table(%%rip),%%rdi; "     \
+            "    cmpl  $("STR(NR_hypercalls)"),%%eax; "           \
+            "    jae   2f; "                                      \
+            "    movq  (%%rdi,%%rax,8),%%rax; "                   \
+            "    movl  "STR(COMPAT_MULTICALL_arg0)"(%0),%%edi; "  \
+            "    movl  "STR(COMPAT_MULTICALL_arg1)"(%0),%%esi; "  \
+            "    movl  "STR(COMPAT_MULTICALL_arg2)"(%0),%%edx; "  \
+            "    movl  "STR(COMPAT_MULTICALL_arg3)"(%0),%%ecx; "  \
+            "    movl  "STR(COMPAT_MULTICALL_arg4)"(%0),%%r8d; "  \
+            "    callq *%%rax; "                                  \
+            "1:  movl  %%eax,"STR(COMPAT_MULTICALL_result)"(%0)\n"\
+            ".section .fixup,\"ax\"\n"                            \
+            "2:  movl  $-"STR(ENOSYS)",%%eax\n"                   \
+            "    jmp   1b\n"                                      \
+            ".previous\n"                                         \
+            : : "b" (_call)                                       \
+              /* all the caller-saves registers */                \
+            : "rax", "rcx", "rdx", "rsi", "rdi",                  \
+              "r8",  "r9",  "r10", "r11" );                       \
+    } while ( 0 )
+
 #else
 
 #define do_multicall_call(_call)                             \

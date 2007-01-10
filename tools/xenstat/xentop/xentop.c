@@ -49,6 +49,13 @@
 
 #define KEY_ESCAPE '\x1B'
 
+#ifdef HOST_SunOS
+/* Old curses library on Solaris takes non-const strings. */
+#define curses_str_t char *
+#else
+#define curses_str_t const char *
+#endif
+
 /*
  * Function prototypes
  */
@@ -269,7 +276,7 @@ static void print(const char *fmt, ...)
 	if (!batch) {
 		if((current_row() < lines()-1)) {
 			va_start(args, fmt);
-			vwprintw(stdscr, (char *)fmt, args);
+			vwprintw(stdscr, (curses_str_t)fmt, args);
 			va_end(args);
 		}
 	} else {
@@ -283,7 +290,7 @@ static void print(const char *fmt, ...)
 static void attr_addstr(int attr, const char *str)
 {
 	attron(attr);
-	addstr((char *)str);
+	addstr((curses_str_t)str);
 	attroff(attr);
 }
 

@@ -35,6 +35,8 @@
 fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,    \
     errno, strerror(errno))
 
+static PyObject *acm_error_obj;
+
 /* generic shared function */
 void * __getssid(int domid, uint32_t *buflen)
 {
@@ -80,28 +82,26 @@ static PyObject *policy(PyObject * self, PyObject * args)
 {
     /* out */
     char *policyreference;
-    PyObject *ret = NULL;
+    PyObject *ret;
     void *ssid_buffer;
     uint32_t buf_len;
 
     if (!PyArg_ParseTuple(args, "", NULL)) {
-    goto out1;
+        return NULL;
     }
     ssid_buffer =  __getssid(0, &buf_len);
-    if (ssid_buffer == NULL) {
-        goto out1;
-    } else if (buf_len < sizeof(struct acm_ssid_buffer)) {
-        goto out2;
-    } else {
+    if (ssid_buffer == NULL || buf_len < sizeof(struct acm_ssid_buffer)) {
+        free(ssid_buffer);
+        return PyErr_SetFromErrno(acm_error_obj);
+    }
+    else {
         struct acm_ssid_buffer *ssid = (struct acm_ssid_buffer *)ssid_buffer;
         policyreference = (char *)(ssid_buffer + ssid->policy_reference_offset
                        + sizeof (struct acm_policy_reference_buffer));
+        ret = Py_BuildValue("s", policyreference);
+        free(ssid_buffer);
+        return ret;
     }
-    ret = Py_BuildValue("s", policyreference);
- out2:
-    free(ssid_buffer);
- out1:
-    return ret;
 }
 
 
@@ -213,5 +213,8 @@ static PyMethodDef acmMethods[] = {
 /* inits */
 PyMODINIT_FUNC initacm(void)
 {
-    Py_InitModule("acm", acmMethods);
+    PyObject *m = Py_InitModule("acm", acmMethods);
+    acm_error_obj = PyErr_NewException("acm.Error", PyExc_RuntimeError, NULL);
+    Py_INCREF(acm_error_obj);
+    PyModule_AddObject(m, "Error", acm_error_obj);
 }

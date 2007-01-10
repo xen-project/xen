@@ -67,7 +67,7 @@ typedef l3_pgentry_t root_pgentry_t;
 
 /* misc */
 #define is_guest_l1_slot(s)    (1)
-#define is_guest_l2_slot(t,s)                                              \
+#define is_guest_l2_slot(d,t,s)                                            \
     ( !((t) & PGT_pae_xen_l2) ||                                           \
       ((s) < (L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES - 1))) )
 #define is_guest_l3_slot(s)    (1)

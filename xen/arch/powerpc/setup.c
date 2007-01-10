@@ -91,19 +91,6 @@ static struct domain *idle_domain;
 
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
-int is_kernel_text(unsigned long addr)
-{
-    if (addr >= (unsigned long) &_start &&
-        addr <= (unsigned long) &_etext)
-        return 1;
-    return 0;
-}
-
-unsigned long kernel_text_end(void)
-{
-    return (unsigned long) &_etext;
-}
-
 static void __init do_initcalls(void)
 {
     initcall_t *call;

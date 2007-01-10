@@ -198,12 +198,12 @@ enum xen_cpu_feature
     /**
      *  AMD 3DNow! extensions
      */
-    XEN_CPU_FEATURE_3DNOWEXT,
+    XEN_CPU_FEATURE_THREEDNOWEXT,
 
     /**
      *  3DNow!
      */
-    XEN_CPU_FEATURE_3DNOW,
+    XEN_CPU_FEATURE_THREEDNOW,
 
     /**
      *  CPU in recovery mode

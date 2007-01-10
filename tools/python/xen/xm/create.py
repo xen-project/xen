@@ -28,6 +28,7 @@ import xmlrpclib
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
+from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
@@ -300,7 +301,7 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,ba
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
-          If type is not specified, default is netfront not ioemu device.
+          If type is not specified, default is netfront.
           If mac is not specified a random MAC address is used.
           If not specified then the network backend chooses it's own MAC address.
           If bridge is not specified the first bridge found is used.
@@ -718,8 +719,11 @@ def run_bootloader(vals, config_image):
              "--entry= directly.")
         vals.bootargs = "--entry=%s" %(vals.bootentry,)
 
+    kernel = sxp.child_value(config_image, 'kernel')
+    ramdisk = sxp.child_value(config_image, 'ramdisk')
+    args = sxp.child_value(config_image, 'args')
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.bootargs, config_image)
+                      vals.bootargs, kernel, ramdisk, args)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -759,7 +763,14 @@ def make_config(vals):
 
     config_image = configure_image(vals)
     if vals.bootloader:
-        config_image = run_bootloader(vals, config_image)
+        if vals.bootloader == "pygrub":
+            vals.bootloader = osdep.pygrub_path
+
+        # if a kernel is specified, we're using the bootloader
+        # non-interactively, and need to let xend run it so we preserve the
+        # real kernel choice.
+        if not vals.kernel:
+            config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
             config.append(['bootloader_args', vals.bootargs])
@@ -823,7 +834,7 @@ def preprocess_ioports(vals):
         if len(d) == 1:
             d.append(d[0])
         # Components are in hex: add hex specifier.
-        hexd = map(lambda v: '0x'+v, d)
+        hexd = ['0x' + x for x in d]
         ioports.append(hexd)
     vals.ioports = ioports
         
@@ -990,8 +1001,6 @@ def preprocess_vnc(vals):
             vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
-    if not vals.kernel and not vals.bootloader:
-        err("No kernel specified")
     preprocess_disk(vals)
     preprocess_pci(vals)
     preprocess_ioports(vals)
@@ -1176,6 +1185,7 @@ def config_security_check(config, verbose):
         try:
             domain_label = security.ssidref2label(security.NULL_SSIDREF)
         except:
+            import traceback
             traceback.print_exc(limit=1)
             return 0
         domain_policy = 'NULL'

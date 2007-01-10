@@ -27,7 +27,65 @@
 #include <xen/errno.h>
 #include <xen/time.h>
 #include <xen/timer.h>
+#include <xen/list.h>
 #include <asm/hvm/vpic.h>
+
+
+#define HPET_TIMER_NUM     3    /* 3 timers supported now */
+struct HPET {
+    uint64_t capability;        /* capabilities */
+    uint64_t res0;              /* reserved */
+    uint64_t config;            /* configuration */
+    uint64_t res1;              /* reserved */
+    uint64_t isr;               /* interrupt status reg */
+    uint64_t res2[25];          /* reserved */
+    uint64_t mc64;              /* main counter */
+    uint64_t res3;              /* reserved */
+    struct {                    /* timers */
+        uint64_t config;        /* configuration/cap */
+        uint64_t cmp;           /* comparator */
+        uint64_t hpet_fsb[2];   /* FSB route, not supported now */
+    } timers[HPET_TIMER_NUM];
+};
+
+struct HPETState;
+struct HPET_timer_fn_info {
+    struct HPETState       *hs;
+    unsigned int    tn;
+};
+
+typedef struct HPETState {
+    struct HPET     hpet;
+    struct vcpu     *vcpu;
+    uint64_t        tsc_freq;
+    uint64_t        mc_offset;
+    uint64_t        period[HPET_TIMER_NUM];
+    struct timer timers[HPET_TIMER_NUM];
+    struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 
+} HPETState;
+
+
+/*
+ * Abstract layer of periodic time, one short time.
+ */
+typedef void time_cb(struct vcpu *v, void *opaque);
+
+struct periodic_time {
+    struct list_head list;
+    char enabled;
+    char one_shot;              /* one shot time */
+    u8 irq;
+    struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
+    u32 pending_intr_nr;        /* the couner for pending timer interrupts */
+    u64 period;                 /* frequency in ns */
+    u64 period_cycles;          /* frequency in cpu cycles */
+    s_time_t scheduled;         /* scheduled timer interrupt */
+    u64 last_plt_gtime;         /* platform time when last IRQ is injected */
+    struct timer timer;         /* ac_timer */
+    time_cb *cb;
+    void *priv;                 /* ponit back to platform time source */
+};
+
 
 #define PIT_FREQ 1193181
 #define PIT_BASE 0x40
@@ -47,8 +105,7 @@ typedef struct PITChannelState {
     u8 gate; /* timer start */
     s64 count_load_time;
     /* irq handling */
-    struct vcpu      *vcpu;
-    struct periodic_time *pt;
+    struct periodic_time pt;
 } PITChannelState;
 
 typedef struct PITState {
@@ -66,10 +123,7 @@ typedef struct RTCState {
     int64_t next_second_time;
     struct timer second_timer;
     struct timer second_timer2;
-    struct timer pie_timer;
-    int period;
-    s_time_t next_pie;
-    struct vcpu      *vcpu;
+    struct periodic_time pt;
 } RTCState;
 
 #define FREQUENCE_PMTIMER  3579545
@@ -82,58 +136,41 @@ typedef struct PMTState {
     struct vcpu *vcpu;
 } PMTState;
 
-/*
- * Abstract layer of periodic time, one short time.
- */
-typedef void time_cb(struct vcpu *v, void *opaque);
-
-struct periodic_time {
-    char enabled;               /* enabled */
-    char one_shot;              /* one shot time */
-    char irq;
-    char first_injected;        /* flag to prevent shadow window */
-    u32 bind_vcpu;              /* vcpu timer interrupt delivers to */
-    u32 pending_intr_nr;        /* the couner for pending timer interrupts */
-    u32 period;                 /* frequency in ns */
-    u64 period_cycles;          /* frequency in cpu cycles */
-    s_time_t scheduled;         /* scheduled timer interrupt */
-    u64 last_plt_gtime;         /* platform time when last IRQ is injected */
-    struct timer timer;         /* ac_timer */
-    time_cb *cb;
-    void *priv;                 /* ponit back to platform time source */
-};
-
 struct pl_time {    /* platform time */
-    struct periodic_time periodic_tm;
-    struct PITState      vpit;
-    struct RTCState      vrtc;
-    struct PMTState      vpmt;
+    struct PITState  vpit;
+    struct RTCState  vrtc;
+    struct HPETState vhpet;
+    struct PMTState  vpmt;
 };
-
-extern u64 hvm_get_guest_time(struct vcpu *v);
-static inline int64_t hvm_get_clock(struct vcpu *v)
-{
-    return hvm_get_guest_time(v);
-}
 
 #define ticks_per_sec(v) (v->domain->arch.hvm_domain.tsc_frequency)
 
-/* to hook the ioreq packet to get the PIT initialization info */
-extern void hvm_hooks_assist(struct vcpu *v);
-extern void pickup_deactive_ticks(struct periodic_time *vpit);
-extern struct periodic_time *create_periodic_time(
-    u32 period, char irq, char one_shot, time_cb *cb, void *data);
-extern void destroy_periodic_time(struct periodic_time *pt);
+void pt_freeze_time(struct vcpu *v);
+void pt_thaw_time(struct vcpu *v);
+void pt_timer_fn(void *data);
+void pt_update_irq(struct vcpu *v);
+struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type);
+void pt_intr_post(struct vcpu *v, int vector, int type);
+void pt_reset(struct vcpu *v);
+void create_periodic_time(struct periodic_time *pt, uint64_t period,
+                          uint8_t irq, char one_shot, time_cb *cb, void *data);
+void destroy_periodic_time(struct periodic_time *pt);
+
 int pv_pit_handler(int port, int data, int write);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
+void pit_stop_channel0_irq(PITState * pit);
+void pit_migrate_timers(struct vcpu *v);
+void pit_deinit(struct domain *d);
 void rtc_init(struct vcpu *v, int base, int irq);
-void rtc_deinit(struct domain *d);
-void rtc_freeze(struct vcpu *v);
-void rtc_thaw(struct vcpu *v);
 void rtc_migrate_timers(struct vcpu *v);
+void rtc_deinit(struct domain *d);
+int is_rtc_periodic_irq(void *opaque);
 void pmtimer_init(struct vcpu *v, int base);
+void pmtimer_migrate_timers(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);
-void pt_timer_fn(void *data);
-void pit_time_fired(struct vcpu *v, void *priv);
+
+void hpet_migrate_timers(struct vcpu *v);
+void hpet_init(struct vcpu *v);
+void hpet_deinit(struct domain *d);
 
 #endif /* __ASM_X86_HVM_VPT_H__ */

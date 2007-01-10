@@ -17,6 +17,7 @@
 #include <asm/msr.h>
 #include <asm/page.h>
 #include <asm/shadow.h>
+#include <asm/shared.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 
@@ -52,7 +53,7 @@ void show_registers(struct cpu_user_regs *regs)
         if ( guest_mode(regs) )
         {
             context = "guest";
-            fault_crs[2] = current->vcpu_info->arch.cr2;
+            fault_crs[2] = arch_get_cr2(current);
         }
         else
         {
@@ -178,6 +179,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 
 void toggle_guest_mode(struct vcpu *v)
 {
+    if ( IS_COMPAT(v->domain) )
+        return;
     v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
     update_cr3(v);
@@ -232,7 +235,7 @@ unsigned long do_iret(void)
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    current->vcpu_info->evtchn_upcall_mask = !(iret_saved.rflags & EF_IE);
+    vcpu_info(current, evtchn_upcall_mask) = !(iret_saved.rflags & EF_IE);
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;
@@ -244,6 +247,7 @@ unsigned long do_iret(void)
 }
 
 asmlinkage void syscall_enter(void);
+asmlinkage void compat_hypercall(void);
 void __init percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
@@ -255,6 +259,11 @@ void __init percpu_traps_init(void)
         set_intr_gate(TRAP_double_fault, &double_fault);
         idt_table[TRAP_double_fault].a |= 1UL << 32; /* IST1 */
         idt_table[TRAP_nmi].a          |= 2UL << 32; /* IST2 */
+
+#ifdef CONFIG_COMPAT
+        /* The hypercall entry vector is only accessible from ring 1. */
+        _set_gate(idt_table+HYPERCALL_VECTOR, 15, 1, &compat_hypercall);
+#endif
     }
 
     stack_bottom = (char *)get_stack_bottom();
@@ -501,12 +510,16 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
     *(u16 *)(p+ 9) = 0x050f;  /* syscall */
 }
 
+#include "compat/traps.c"
+
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
     if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
-    else
+    else if ( !IS_COMPAT(d) )
         hypercall_page_initialise_ring3_kernel(hypercall_page);
+    else
+        hypercall_page_initialise_ring1_kernel(hypercall_page);
 }
 
 /*

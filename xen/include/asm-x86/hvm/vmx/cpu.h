@@ -32,21 +32,14 @@ struct arch_state_struct {
 #define VMX_MF_32       1
 #define VMX_MF_64       2
 
-#define CPUID_LEAF_0x1        0x1
-#define CPUID_LEAF_0x4        0x4
-#define CPUID_LEAF_0x6        0x6
-#define CPUID_LEAF_0x9        0x9
-#define CPUID_LEAF_0xA        0xA
-#define CPUID_LEAF_0x80000001 0x80000001
-
 #define NUM_CORES_RESET_MASK                 0x00003FFF
 #define NUM_THREADS_RESET_MASK               0xFF00FFFF
 
 #define VMX_VCPU_CPUID_L1_ECX_RESERVED_18    0x00040000
 #define VMX_VCPU_CPUID_L1_ECX_RESERVED_6     0x00000040
 
-#define VMX_VCPU_CPUID_L1_ECX_RESERVED             \
-            ( VMX_VCPU_CPUID_L1_ECX_RESERVED_18  | \
-              VMX_VCPU_CPUID_L1_ECX_RESERVED_6   )
+#define VMX_VCPU_CPUID_L1_ECX_RESERVED              \
+            ( VMX_VCPU_CPUID_L1_ECX_RESERVED_18 |   \
+              VMX_VCPU_CPUID_L1_ECX_RESERVED_6 )
 
 #endif /* __ASM_X86_HVM_VMX_CPU_H__ */

@@ -46,6 +46,7 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
+#include <asm/hvm/vpt.h>
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
@@ -276,6 +277,12 @@ static void vmx_restore_host_msrs(void)
     }
 }
 
+static void vmx_save_guest_msrs(struct vcpu *v)
+{
+    /* MSR_SHADOW_GS_BASE may have been changed by swapgs instruction. */
+    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
+}
+
 static void vmx_restore_guest_msrs(struct vcpu *v)
 {
     struct vmx_msr_state *guest_msr_state, *host_msr_state;
@@ -307,6 +314,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
 
 #define vmx_save_host_msrs()        ((void)0)
 #define vmx_restore_host_msrs()     ((void)0)
+#define vmx_save_guest_msrs(v)      ((void)0)
 #define vmx_restore_guest_msrs(v)   ((void)0)
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
@@ -372,12 +380,7 @@ static inline void vmx_restore_dr(struct vcpu *v)
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
-    hvm_freeze_time(v);
-
-    /* NB. MSR_SHADOW_GS_BASE may be changed by swapgs instrucion in guest,
-     * so we must save it. */
-    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
-
+    vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
 }
@@ -692,14 +695,12 @@ static int vmx_guest_x86_mode(struct vcpu *v)
     cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
 
     if ( vmx_long_mode_enabled(v) )
-        return ((cs_ar_bytes & (1u<<13)) ?
-                X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32);
+        return ((cs_ar_bytes & (1u<<13)) ? 8 : 4);
 
     if ( vmx_realmode(v) )
-        return X86EMUL_MODE_REAL;
+        return 2;
 
-    return ((cs_ar_bytes & (1u<<14)) ?
-            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16);
+    return ((cs_ar_bytes & (1u<<14)) ? 4 : 2);
 }
 
 static int vmx_pae_enabled(struct vcpu *v)
@@ -899,24 +900,14 @@ static void vmx_do_no_device_fault(void)
     }
 }
 
-#define bitmaskof(idx) (1U << ((idx)&31))
+#define bitmaskof(idx)  (1U << ((idx) & 31))
 static void vmx_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int input = (unsigned int)regs->eax;
     unsigned int count = (unsigned int)regs->ecx;
     unsigned int eax, ebx, ecx, edx;
-    unsigned long eip;
-    struct vcpu *v = current;
 
-    eip = __vmread(GUEST_RIP);
-
-    HVM_DBG_LOG(DBG_LEVEL_3, "(eax) 0x%08lx, (ebx) 0x%08lx, "
-                "(ecx) 0x%08lx, (edx) 0x%08lx, (esi) 0x%08lx, (edi) 0x%08lx",
-                (unsigned long)regs->eax, (unsigned long)regs->ebx,
-                (unsigned long)regs->ecx, (unsigned long)regs->edx,
-                (unsigned long)regs->esi, (unsigned long)regs->edi);
-
-    if ( input == CPUID_LEAF_0x4 )
+    if ( input == 0x00000004 )
     {
         cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
         eax &= NUM_CORES_RESET_MASK;
@@ -929,6 +920,7 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
          */
         u64 value = ((u64)regs->edx << 32) | (u32)regs->ecx;
         unsigned long mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
+        struct vcpu *v = current;
         char *p;
 
         gdprintk(XENLOG_INFO, "Input address is 0x%"PRIx64".\n", value);
@@ -946,72 +938,37 @@ static void vmx_do_cpuid(struct cpu_user_regs *regs)
         unmap_domain_page(p);
 
         gdprintk(XENLOG_INFO, "Output value is 0x%"PRIx64".\n", value);
-        ecx = (u32)(value >>  0);
+        ecx = (u32)value;
         edx = (u32)(value >> 32);
-    }
-    else if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
-    {
-        cpuid(input, &eax, &ebx, &ecx, &edx);
+    } else {
+        hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
 
-        if ( input == CPUID_LEAF_0x1 )
+        if ( input == 0x00000001 )
         {
             /* Mask off reserved bits. */
             ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED;
 
-            if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
-                clear_bit(X86_FEATURE_APIC, &edx);
-
-#if CONFIG_PAGING_LEVELS >= 3
-            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-                clear_bit(X86_FEATURE_PAE, &edx);
-            clear_bit(X86_FEATURE_PSE36, &edx);
-
             ebx &= NUM_THREADS_RESET_MASK;
 
             /* Unsupportable for virtualised CPUs. */
-            ecx &= ~(bitmaskof(X86_FEATURE_VMXE)  |
-                     bitmaskof(X86_FEATURE_EST)   |
-                     bitmaskof(X86_FEATURE_TM2)   |
-                     bitmaskof(X86_FEATURE_CID)   |
-                     bitmaskof(X86_FEATURE_MWAIT) );
+            ecx &= ~(bitmaskof(X86_FEATURE_VMXE) |
+                     bitmaskof(X86_FEATURE_EST)  |
+                     bitmaskof(X86_FEATURE_TM2)  |
+                     bitmaskof(X86_FEATURE_CID));
 
-            edx &= ~( bitmaskof(X86_FEATURE_HT)   |
-                     bitmaskof(X86_FEATURE_ACPI)  |
-                     bitmaskof(X86_FEATURE_ACC) );
+            edx &= ~(bitmaskof(X86_FEATURE_HT)   |
+                     bitmaskof(X86_FEATURE_ACPI) |
+                     bitmaskof(X86_FEATURE_ACC));
         }
-        else if (  ( input == CPUID_LEAF_0x6 )
-                || ( input == CPUID_LEAF_0x9 )
-                || ( input == CPUID_LEAF_0xA ))
-        {
+
+        if ( input == 0x00000006 || input == 0x00000009 || input == 0x0000000A )
             eax = ebx = ecx = edx = 0x0;
-        }
-        else if ( input == CPUID_LEAF_0x80000001 )
-        {
-#if CONFIG_PAGING_LEVELS >= 3
-            if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_PAE_ENABLED] )
-#endif
-                clear_bit(X86_FEATURE_NX & 31, &edx);
-#ifdef __i386__
-            clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
-
-            clear_bit(X86_FEATURE_LM & 31, &edx);
-            clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
-#endif
-        }
     }
 
-    regs->eax = (unsigned long) eax;
-    regs->ebx = (unsigned long) ebx;
-    regs->ecx = (unsigned long) ecx;
-    regs->edx = (unsigned long) edx;
-
-    HVM_DBG_LOG(DBG_LEVEL_3, "eip@%lx, input: 0x%lx, "
-                "output: eax = 0x%08lx, ebx = 0x%08lx, "
-                "ecx = 0x%08lx, edx = 0x%08lx",
-                (unsigned long)eip, (unsigned long)input,
-                (unsigned long)eax, (unsigned long)ebx,
-                (unsigned long)ecx, (unsigned long)edx);
+    regs->eax = (unsigned long)eax;
+    regs->ebx = (unsigned long)ebx;
+    regs->ecx = (unsigned long)ecx;
+    regs->edx = (unsigned long)edx;
 }
 
 #define CASE_GET_REG_P(REG, reg)    \
@@ -2116,13 +2073,7 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
-        {
-            struct periodic_time *pt =
-                &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
-            if ( pt->enabled && pt->first_injected
-                    && v->vcpu_id == pt->bind_vcpu )
-                pt->first_injected = 0;
-        }
+        pt_reset(v);
         hvm_set_guest_time(v, msr_content);
         break;
     case MSR_IA32_SYSENTER_CS:
@@ -2451,7 +2402,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_do_extint(regs);
         break;
     case EXIT_REASON_TRIPLE_FAULT:
-        goto exit_and_crash;
+        hvm_triple_fault();
+        break;
     case EXIT_REASON_PENDING_INTERRUPT:
         /* Disable the interrupt window. */
         v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;

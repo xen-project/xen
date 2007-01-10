@@ -44,6 +44,7 @@ static xen_pfn_t *live_p2m = NULL;
 
 /* Live mapping of system MFN to PFN table. */
 static xen_pfn_t *live_m2p = NULL;
+static unsigned long m2p_mfn0;
 
 /* grep fodder: machine_to_phys */
 
@@ -80,7 +81,7 @@ static xen_pfn_t *live_m2p = NULL;
 #define BITMAP_SIZE   ((max_pfn + BITS_PER_LONG - 1) / 8)
 
 #define BITMAP_ENTRY(_nr,_bmap) \
-   ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
+   ((volatile unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
 
 #define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
 
@@ -112,7 +113,7 @@ static inline unsigned int hweight32(unsigned int w)
 static inline int count_bits ( int nr, volatile void *addr)
 {
     int i, count = 0;
-    unsigned long *p = (unsigned long *)addr;
+    volatile unsigned long *p = (volatile unsigned long *)addr;
     /* We know that the array is padded to unsigned long. */
     for( i = 0; i < (nr / (sizeof(unsigned long)*8)); i++, p++ )
         count += hweight32(*p);
@@ -440,13 +441,23 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** that this check will fail for other L2s.
     */
     if (pt_levels == 3 && type == XEN_DOMCTL_PFINFO_L2TAB) {
+        int hstart;
+        unsigned long he;
 
-/* XXX index of the L2 entry in PAE mode which holds the guest LPT */
-#define PAE_GLPT_L2ENTRY (495)
-        pte = ((uint64_t*)spage)[PAE_GLPT_L2ENTRY];
+        hstart = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+        he = ((const uint64_t *) spage)[hstart];
 
-        if(((pte >> PAGE_SHIFT) & 0x0fffffff) == live_p2m[pfn])
-            xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+        if ( ((he >> PAGE_SHIFT) & 0x0fffffff) == m2p_mfn0 ) {
+            /* hvirt starts with xen stuff... */
+            xen_start = hstart;
+        } else if ( hvirt_start != 0xf5800000 ) {
+            /* old L2s from before hole was shrunk... */
+            hstart = (0xf5800000 >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+            he = ((const uint64_t *) spage)[hstart];
+
+            if( ((he >> PAGE_SHIFT) & 0x0fffffff) == m2p_mfn0 )
+                xen_start = hstart;
+        }
     }
 
     if (pt_levels == 4 && type == XEN_DOMCTL_PFINFO_L4TAB) {
@@ -464,9 +475,9 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
         unsigned long pfn, mfn;
 
         if (pt_levels == 2)
-            pte = ((uint32_t*)spage)[i];
+            pte = ((const uint32_t*)spage)[i];
         else
-            pte = ((uint64_t*)spage)[i];
+            pte = ((const uint64_t*)spage)[i];
 
         if (i >= xen_start && i < xen_end)
             pte = 0;
@@ -549,6 +560,8 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
         ERROR("xc_mmap_foreign_ranges failed (rc = %d)", rc);
         return NULL;
     }
+
+    m2p_mfn0 = entries[0].mfn;
 
     free(extent_start);
     free(entries);
@@ -915,14 +928,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                 if(!is_mapped(pfn_type[batch])) {
 
-                    /* not currently in pusedo-physical map -- set bit
-                       in to_fix that we must send this page in last_iter
-                       unless its sent sooner anyhow */
+                    /*
+                    ** not currently in psuedo-physical map -- set bit
+                    ** in to_fix since we must send this page in last_iter
+                    ** unless its sent sooner anyhow, or it never enters
+                    ** pseudo-physical map (e.g. for ballooned down domains)
+                    */
 
                     set_bit(n, to_fix);
-                    if( (iter > 1) && IS_REAL_PFN(n) )
-                        DPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
-                                iter, n, pfn_type[batch]);
                     continue;
                 }
 
@@ -1052,7 +1065,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             DPRINTF("(of which %ld were fixups)\n", needed_to_fix  );
         }
 
-        if (last_iter && debug){
+        if (last_iter && debug) {
             int minusone = -1;
             memset(to_send, 0xff, BITMAP_SIZE);
             debug = 0;
@@ -1068,17 +1081,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             continue;
         }
 
-        if (last_iter) break;
+        if (last_iter)
+            break;
 
         if (live) {
-
-
-            if(
-                ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
+            if (((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
                 (iter >= max_iters) ||
                 (sent_this_iter+skip_this_iter < 50) ||
-                (total_sent > max_pfn*max_factor) ) {
-
+                (total_sent > max_pfn*max_factor)) {
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
@@ -1106,8 +1116,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
 
         }
-
-
     } /* end of while 1 */
 
     DPRINTF("All memory is saved\n");
@@ -1159,7 +1167,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Canonicalise each GDT frame number. */
-    for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
+    for ( i = 0; (512*i) < ctxt.gdt_ents; i++ ) {
         if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
             ERROR("GDT frame is not in range of pseudophys map");
             goto out;

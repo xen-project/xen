@@ -203,7 +203,7 @@ class Daemon:
 
                 if not osdep.xend_autorestart:
                     self.run(os.fdopen(w, 'w'))
-                    break
+                    os._exit(0)
 
                 pid = self.fork_pid()
                 if pid:

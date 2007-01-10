@@ -445,19 +445,3 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
     *type = APIC_DM_EXTINT;
     return vector;
 }
-
-int is_periodic_irq(struct vcpu *v, int irq, int type)
-{
-    int vec;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    if ( pt->irq != 0 )
-        return 0;
-
-    if ( type == APIC_DM_EXTINT )
-        vec = v->domain->arch.hvm_domain.irq.vpic[0].irq_base;
-    else
-        vec = domain_vioapic(v->domain)->redirtbl[0].fields.vector;
-
-    return (irq == vec);
-}

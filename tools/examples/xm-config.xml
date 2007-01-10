@@ -36,8 +36,10 @@ most useful for experimenting with the Xen-API preview in Xen 3.0.4.
        The username and password attributes will be used to log in if Xen-API
        is being used.
     -->
+  <!--
   <server type='Xen-API'
           uri='http://localhost:9363/'
           username='me'
           password='mypassword' />
+   -->
 </xm>

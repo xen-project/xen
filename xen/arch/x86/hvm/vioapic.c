@@ -341,7 +341,7 @@ static void vioapic_deliver(struct vioapic *vioapic, int irq)
     {
 #ifdef IRQ0_SPECIAL_ROUTING
         /* Force round-robin to pick VCPU 0 */
-        if ( irq == 0 )
+        if ( irq == hvm_isa_irq_to_gsi(0) )
         {
             v = vioapic_domain(vioapic)->vcpu[0];
             target = v ? vcpu_vlapic(v) : NULL;
@@ -374,7 +374,7 @@ static void vioapic_deliver(struct vioapic *vioapic, int irq)
             deliver_bitmask &= ~(1 << bit);
 #ifdef IRQ0_SPECIAL_ROUTING
             /* Do not deliver timer interrupts to VCPU != 0 */
-            if ( (irq == 0) && (bit != 0) )
+            if ( irq == hvm_isa_irq_to_gsi(0) )
                 v = vioapic_domain(vioapic)->vcpu[0];
             else
 #endif

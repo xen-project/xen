@@ -7,6 +7,9 @@
 #include <xen/config.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
+#ifdef CONFIG_COMPAT
+#include <compat/xen.h>
+#endif
 #include <asm/fixmap.h>
 #include <asm/hardirq.h>
 
@@ -53,17 +56,22 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(VCPU_processor, struct vcpu, processor);
+    OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);
     OFFSET(VCPU_trap_bounce, struct vcpu, arch.trap_bounce);
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
     OFFSET(VCPU_event_addr, struct vcpu,
            arch.guest_context.event_callback_eip);
+    OFFSET(VCPU_event_sel, struct vcpu,
+           arch.guest_context.event_callback_cs);
     OFFSET(VCPU_failsafe_addr, struct vcpu,
            arch.guest_context.failsafe_callback_eip);
+    OFFSET(VCPU_failsafe_sel, struct vcpu,
+           arch.guest_context.failsafe_callback_cs);
     OFFSET(VCPU_syscall_addr, struct vcpu,
            arch.guest_context.syscall_callback_eip);
-    OFFSET(VCPU_kernel_sp, struct vcpu,
-           arch.guest_context.kernel_sp);
+    OFFSET(VCPU_kernel_sp, struct vcpu, arch.guest_context.kernel_sp);
+    OFFSET(VCPU_kernel_ss, struct vcpu, arch.guest_context.kernel_ss);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
     OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
     OFFSET(VCPU_flags, struct vcpu, vcpu_flags);
@@ -83,14 +91,25 @@ void __dummy__(void)
     OFFSET(VCPU_vmx_cr2, struct vcpu, arch.hvm_vmx.cpu_cr2);
     BLANK();
 
+    OFFSET(DOMAIN_domain_flags, struct domain, domain_flags);
+    DEFINE(_DOMF_compat, _DOMF_compat);
+    BLANK();
+
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
     OFFSET(VMCB_tsc_offset, struct vmcb_struct, tsc_offset);
     BLANK();
 
-    OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);
-    OFFSET(VCPUINFO_upcall_mask, vcpu_info_t, evtchn_upcall_mask);
+    OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);
+    OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);
     BLANK();
 
+#ifdef CONFIG_COMPAT
+    OFFSET(COMPAT_VCPUINFO_upcall_pending, struct compat_vcpu_info, evtchn_upcall_pending);
+    OFFSET(COMPAT_VCPUINFO_upcall_mask, struct compat_vcpu_info, evtchn_upcall_mask);
+    BLANK();
+#endif
+
+    OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
     BLANK();
 
@@ -115,6 +134,18 @@ void __dummy__(void)
     OFFSET(MULTICALL_arg5, struct multicall_entry, args[5]);
     OFFSET(MULTICALL_result, struct multicall_entry, result);
     BLANK();
+
+#ifdef CONFIG_COMPAT
+    OFFSET(COMPAT_MULTICALL_op, struct compat_multicall_entry, op);
+    OFFSET(COMPAT_MULTICALL_arg0, struct compat_multicall_entry, args[0]);
+    OFFSET(COMPAT_MULTICALL_arg1, struct compat_multicall_entry, args[1]);
+    OFFSET(COMPAT_MULTICALL_arg2, struct compat_multicall_entry, args[2]);
+    OFFSET(COMPAT_MULTICALL_arg3, struct compat_multicall_entry, args[3]);
+    OFFSET(COMPAT_MULTICALL_arg4, struct compat_multicall_entry, args[4]);
+    OFFSET(COMPAT_MULTICALL_arg5, struct compat_multicall_entry, args[5]);
+    OFFSET(COMPAT_MULTICALL_result, struct compat_multicall_entry, result);
+    BLANK();
+#endif
 
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));
 }

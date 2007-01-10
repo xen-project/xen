@@ -373,11 +373,18 @@ static void server_error_2(xen_session *session, const char *error_string,
 }
 
 
-static bool is_container_node(xmlNode *n, char *type)
+static bool is_node(xmlNode *n, char *type)
 {
     return
         n->type == XML_ELEMENT_NODE &&
-        0 == strcmp((char *)n->name, type) &&
+        0 == strcmp((char *)n->name, type);
+}
+
+
+static bool is_container_node(xmlNode *n, char *type)
+{
+    return
+        is_node(n, type) &&
         n->children != NULL &&
         n->children == n->last &&
         n->children->type == XML_ELEMENT_NODE;
@@ -390,13 +397,30 @@ static bool is_container_node(xmlNode *n, char *type)
  */
 static xmlChar *string_from_value(xmlNode *n, char *type)
 {
-    return
-        is_container_node(n, "value") &&
-        0 == strcmp((char *)n->children->name, type) ?
-          (n->children->children == NULL ?
-             xmlStrdup(BAD_CAST("")) :
-             xmlNodeGetContent(n->children->children)) :
-          NULL;
+    /*
+      <value><type>XYZ</type></value> is normal, but the XML-RPC spec also
+      allows <value>XYZ</value> where XYZ is to be interpreted as a string.
+    */
+
+    if (is_container_node(n, "value") &&
+        0 == strcmp((char *)n->children->name, type))
+    {
+        return
+            n->children->children == NULL ?
+                xmlStrdup(BAD_CAST("")) :
+                xmlNodeGetContent(n->children->children);
+    }
+    else if (0 == strcmp(type, "string") && is_node(n, "value"))
+    {
+        return
+            n->children == NULL ?
+                xmlStrdup(BAD_CAST("")) :
+                xmlNodeGetContent(n->children);
+    }
+    else
+    {
+        return NULL;
+    }
 }
 
 
@@ -557,8 +581,14 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         xmlChar *string = string_from_value(value_node, "double");
         if (string == NULL)
         {
+#if PERMISSIVE
+            fprintf(stderr,
+                    "Expected a Float from the server, but didn't get one\n");
+            ((double *)value)[slot] = 0.0;
+#else
             server_error(
                 s, "Expected a Float from the server, but didn't get one");
+#endif
         }
         else
         {

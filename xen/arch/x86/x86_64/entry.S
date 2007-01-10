@@ -324,7 +324,16 @@ domain_crash_synchronous:
         GET_GUEST_REGS(%rax)
         movq  %rax,%rsp
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
+#ifdef CONFIG_COMPAT
+        movq  CPUINFO_current_vcpu(%rax),%rax
+        movq  VCPU_domain(%rax),%rax
+        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
+        setnc %al
+        leal  (%rax,%rax,2),%eax
+        orb   %al,UREGS_cs(%rsp)
+#else
         orb   $3,UREGS_cs(%rsp)
+#endif
         # printk(domain_crash_synchronous_string)
         leaq  domain_crash_synchronous_string(%rip),%rdi
         xorl  %eax,%eax
@@ -336,8 +345,15 @@ domain_crash_synchronous:
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
         testb $3,UREGS_cs(%rsp)
-        jnz   test_all_events
-        jmp   restore_all_xen
+        jz    restore_all_xen
+#ifndef CONFIG_COMPAT
+        jmp   test_all_events
+#else
+        movq  VCPU_domain(%rbx),%rax
+        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
+        jnc   test_all_events
+        jmp   compat_test_all_events
+#endif
 
         ALIGN
 /* No special register assumptions. */
@@ -355,6 +371,11 @@ handle_exception:
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         leaq  VCPU_trap_bounce(%rbx),%rdx
+#ifdef CONFIG_COMPAT
+        movq  VCPU_domain(%rbx),%rax
+        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
+        jc    compat_post_handle_exception
+#endif
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
         call  create_bounce_frame
@@ -612,3 +633,7 @@ ENTRY(hypercall_args_table)
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
+
+#ifdef CONFIG_COMPAT
+#include "compat/entry.S"
+#endif

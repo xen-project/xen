@@ -63,8 +63,7 @@ asmlinkage void svm_intr_assist(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct hvm_domain *plat=&v->domain->arch.hvm_domain;
-    struct periodic_time *pt = &plat->pl_time.periodic_tm;
+    struct periodic_time *pt;
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
     int re_injecting = 0;
@@ -76,26 +75,6 @@ asmlinkage void svm_intr_assist(void)
         v->arch.hvm_svm.saved_irq_vector = vmcb->exitintinfo.fields.vector;
         vmcb->exitintinfo.bytes = 0;
         re_injecting = 1;
-    }
-
-    /*
-     * If event requires injecting then do not inject int.
-     */
-    if ( unlikely(v->arch.hvm_svm.inject_event) )
-    {
-        v->arch.hvm_svm.inject_event = 0;
-        return;
-    }
-
-    /*
-     * Create a 'fake' virtual interrupt on to intercept as soon
-     * as the guest _can_ take interrupts.
-     */
-    if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )
-    {
-        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
-        svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
-        return;
     }
 
     /* Previous interrupt still pending? */
@@ -115,16 +94,25 @@ asmlinkage void svm_intr_assist(void)
     /* Now let's check for newer interrrupts  */
     else
     {
-        if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr )
-        {
-            hvm_isa_irq_deassert(current->domain, pt->irq);
-            hvm_isa_irq_assert(current->domain, pt->irq);
-        }
+        pt_update_irq(v);
 
         hvm_set_callback_irq_level();
 
         if ( cpu_has_pending_irq(v) )
+        {
+            /*
+             * Create a 'fake' virtual interrupt on to intercept as soon
+             * as the guest _can_ take interrupts.  Do not obtain the next
+             * interrupt from the vlapic/pic if unable to inject.
+             */
+            if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )  
+            {
+                vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+                svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
+                return;
+            }
             intr_vector = cpu_get_interrupt(v, &intr_type);
+        }
     }
 
     /* have we got an interrupt to inject? */
@@ -137,8 +125,7 @@ asmlinkage void svm_intr_assist(void)
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
         /* Re-injecting a PIT interruptt? */
-        if ( re_injecting && pt->enabled && 
-             is_periodic_irq(v, intr_vector, intr_type) )
+        if ( re_injecting && (pt = is_pt_irq(v, intr_vector, intr_type)) )
             ++pt->pending_intr_nr;
         /* let's inject this interrupt */
         TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
@@ -154,7 +141,7 @@ asmlinkage void svm_intr_assist(void)
         break;
     }
 
-    hvm_interrupt_post(v, intr_vector, intr_type);
+    pt_intr_post(v, intr_vector, intr_type);
 }
 
 /*

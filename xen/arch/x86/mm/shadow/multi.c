@@ -227,7 +227,7 @@ guest_supports_nx(struct vcpu *v)
 static inline int 
 guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 {
-    ASSERT(!guest_op || shadow_lock_is_acquired(v->domain));
+    ASSERT(!guest_op || shadow_locked_by_me(v->domain));
 
     perfc_incrc(shadow_guest_walk);
     memset(gw, 0, sizeof(*gw));
@@ -243,7 +243,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
     gw->l3mfn = vcpu_gfn_to_mfn(v, guest_l4e_get_gfn(*gw->l4e));
     if ( !mfn_valid(gw->l3mfn) ) return 1;
     /* This mfn is a pagetable: make sure the guest can't write to it. */
-    if ( guest_op && shadow_remove_write_access(v, gw->l3mfn, 3, va) != 0 )
+    if ( guest_op && sh_remove_write_access(v, gw->l3mfn, 3, va) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask); 
     gw->l3e = ((guest_l3e_t *)sh_map_domain_page(gw->l3mfn))
         + guest_l3_table_offset(va);
@@ -257,7 +257,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
     gw->l2mfn = vcpu_gfn_to_mfn(v, guest_l3e_get_gfn(*gw->l3e));
     if ( !mfn_valid(gw->l2mfn) ) return 1;
     /* This mfn is a pagetable: make sure the guest can't write to it. */
-    if ( guest_op && shadow_remove_write_access(v, gw->l2mfn, 2, va) != 0 )
+    if ( guest_op && sh_remove_write_access(v, gw->l2mfn, 2, va) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask); 
     gw->l2e = ((guest_l2e_t *)sh_map_domain_page(gw->l2mfn))
         + guest_l2_table_offset(va);
@@ -299,7 +299,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
         if ( !mfn_valid(gw->l1mfn) ) return 1;
         /* This mfn is a pagetable: make sure the guest can't write to it. */
         if ( guest_op 
-             && shadow_remove_write_access(v, gw->l1mfn, 1, va) != 0 )
+             && sh_remove_write_access(v, gw->l1mfn, 1, va) != 0 )
             flush_tlb_mask(v->domain->domain_dirty_cpumask); 
         gw->l1e = ((guest_l1e_t *)sh_map_domain_page(gw->l1mfn))
             + guest_l1_table_offset(va);
@@ -442,7 +442,7 @@ static u32 guest_set_ad_bits(struct vcpu *v,
 
     ASSERT(ep && !(((unsigned long)ep) & ((sizeof *ep) - 1)));
     ASSERT(level <= GUEST_PAGING_LEVELS);
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
 
     flags = guest_l1e_get_flags(*ep);
 
@@ -492,7 +492,7 @@ static u32 guest_set_ad_bits(struct vcpu *v,
         u32 shflags = mfn_to_page(gmfn)->shadow_flags & SHF_page_type_mask;
         /* More than one type bit set in shadow-flags? */
         if ( shflags & ~(1UL << find_first_set_bit(shflags)) )
-            res = __shadow_validate_guest_entry(v, gmfn, ep, sizeof(*ep));
+            res = sh_validate_guest_entry(v, gmfn, ep, sizeof (*ep));
     }
 
     /* We should never need to flush the TLB or recopy PAE entries */
@@ -851,9 +851,7 @@ static inline void safe_write_entry(void *dst, void *src)
      * then writing the high word before the low word. */
     BUILD_BUG_ON(sizeof (shadow_l1e_t) != 2 * sizeof (unsigned long));
     d[0] = 0;
-    wmb();
     d[1] = s[1];
-    wmb();
     d[0] = s[0];
 #else
     /* In 32-bit and 64-bit, sizeof(pte) == sizeof(ulong) == 1 word,
@@ -1422,7 +1420,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 }
 #endif
 
-#if CONFIG_PAGING_LEVELS == 3 && GUEST_PAGING_LEVELS == 3
+#if (CONFIG_PAGING_LEVELS == 3 || defined(CONFIG_COMPAT)) && GUEST_PAGING_LEVELS == 3
 // For 3-on-3 PV guests, we need to make sure the xen mappings are in
 // place, which means that we need to populate the l2h entry in the l3
 // table.
@@ -1432,12 +1430,20 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v,
 {
     struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
+#if CONFIG_PAGING_LEVELS == 3
     int i;
+#else
+
+    if ( !pv_32bit_guest(v) )
+        return;
+#endif
 
     sl2e = sh_map_domain_page(sl2hmfn);
     ASSERT(sl2e != NULL);
     ASSERT(sizeof (l2_pgentry_t) == sizeof (shadow_l2e_t));
     
+#if CONFIG_PAGING_LEVELS == 3
+
     /* Copy the common Xen mappings from the idle domain */
     memcpy(&sl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
@@ -1478,6 +1484,15 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v,
         }
         sh_unmap_domain_page(p2m);
     }
+
+#else
+
+    /* Copy the common Xen mappings from the idle domain */
+    memcpy(&sl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+           &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*sl2e));
+
+#endif
     
     sh_unmap_domain_page(sl2e);
 }
@@ -1638,12 +1653,15 @@ make_fl1_shadow(struct vcpu *v, gfn_t gfn)
 mfn_t
 sh_make_monitor_table(struct vcpu *v)
 {
+    struct domain *d = v->domain;
 
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
     
+    /* Guarantee we can get the memory we need */
+    shadow_prealloc(d, SHADOW_MAX_ORDER);
+
 #if CONFIG_PAGING_LEVELS == 4    
     {
-        struct domain *d = v->domain;
         mfn_t m4mfn;
         m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
         sh_install_xen_entries_in_l4(v, m4mfn, m4mfn);
@@ -1660,6 +1678,19 @@ sh_make_monitor_table(struct vcpu *v)
             l4e = sh_map_domain_page(m4mfn);
             l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
             sh_unmap_domain_page(l4e);
+            if ( pv_32bit_guest(v) )
+            {
+                // Install a monitor l2 table in slot 3 of the l3 table.
+                // This is used for all Xen entries.
+                mfn_t m2mfn;
+                l3_pgentry_t *l3e;
+                m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
+                mfn_to_page(m2mfn)->shadow_flags = 2;
+                l3e = sh_map_domain_page(m3mfn);
+                l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
+                sh_install_xen_entries_in_l2h(v, m2mfn);
+                sh_unmap_domain_page(l3e);
+            }
         }
 #endif /* SHADOW_PAGING_LEVELS < 4 */
         return m4mfn;
@@ -1668,7 +1699,6 @@ sh_make_monitor_table(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 3
 
     {
-        struct domain *d = v->domain;
         mfn_t m3mfn, m2mfn; 
         l3_pgentry_t *l3e;
         l2_pgentry_t *l2e;
@@ -1702,7 +1732,6 @@ sh_make_monitor_table(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 2
 
     {
-        struct domain *d = v->domain;
         mfn_t m2mfn;
         m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
         sh_install_xen_entries_in_l2(v, m2mfn, m2mfn);
@@ -2065,9 +2094,19 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
 #if (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS != 4)
     /* Need to destroy the l3 monitor page in slot 0 too */
     {
+        mfn_t m3mfn;
         l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
         ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-        shadow_free(d, _mfn(l4e_get_pfn(l4e[0])));
+        m3mfn = _mfn(l4e_get_pfn(l4e[0]));
+        if ( pv_32bit_guest(v) )
+        {
+            /* Need to destroy the l2 monitor page in slot 3 too */
+            l3_pgentry_t *l3e = sh_map_domain_page(m3mfn);
+            ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
+            shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
+            sh_unmap_domain_page(l3e);
+        }
+        shadow_free(d, m3mfn);
         sh_unmap_domain_page(l4e);
     }
 #elif CONFIG_PAGING_LEVELS == 3
@@ -2645,17 +2684,26 @@ static int sh_page_fault(struct vcpu *v,
         else
         {
             /* This should be exceptionally rare: another vcpu has fixed
-             * the tables between the fault and our reading the l1e.
-             * Fall through to the normal fault handing logic */
+             * the tables between the fault and our reading the l1e. 
+             * Retry and let the hardware give us the right fault next time. */
             perfc_incrc(shadow_fault_fast_fail);
-            SHADOW_PRINTK("fast path false alarm!\n");
-            /* Don't pass the reserved-bit bit: if we look at the fault 
-             * below and decide to pass it to the guest, the reserved-bit
-             * bit won't make sense there. */
-            regs->error_code &= ~PFEC_reserved_bit;
+            SHADOW_PRINTK("fast path false alarm!\n");            
+            return EXCRET_fault_fixed;
         }
     }
 #endif /* SHOPT_FAST_FAULT_PATH */
+
+    /* Detect if this page fault happened while we were already in Xen
+     * doing a shadow operation.  If that happens, the only thing we can
+     * do is let Xen's normal fault handlers try to fix it.  In any case, 
+     * a diagnostic trace of the fault will be more useful than 
+     * a BUG() when we try to take the lock again. */
+    if ( unlikely(shadow_locked_by_me(d)) )
+    {
+        SHADOW_ERROR("Recursive shadow fault: lock was taken by %s\n",
+                     d->arch.shadow.locker_function);
+        return 0;
+    }
 
     shadow_lock(d);
     
@@ -2827,7 +2875,7 @@ static int sh_page_fault(struct vcpu *v,
      * it seems very unlikely that any OS grants user access to page tables.
      */
     if ( (regs->error_code & PFEC_user_mode) ||
-         x86_emulate_memop(&emul_ctxt.ctxt, emul_ops) )
+         x86_emulate(&emul_ctxt.ctxt, emul_ops) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
@@ -2835,7 +2883,7 @@ static int sh_page_fault(struct vcpu *v,
         /* If this is actually a page table, then we have a bug, and need 
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
-        shadow_remove_all_shadows(v, gmfn);
+        sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
     }
 
     /* Emulator has changed the user registers: write back */
@@ -3035,12 +3083,15 @@ sh_update_linear_entries(struct vcpu *v)
 
 #elif (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS == 3)
 
-    /* This case only exists in HVM.  To give ourselves a linear map of the 
-     * shadows, we need to extend a PAE shadow to 4 levels.  We do this by 
-     * having a monitor l3 in slot 0 of the monitor l4 table, and 
-     * copying the PAE l3 entries into it.  Then, by having the monitor l4e
-     * for shadow pagetables also point to the monitor l4, we can use it
-     * to access the shadows. */
+    /* PV: XXX
+     *
+     * HVM: To give ourselves a linear map of the  shadows, we need to
+     * extend a PAE shadow to 4 levels.  We do this by  having a monitor
+     * l3 in slot 0 of the monitor l4 table, and  copying the PAE l3
+     * entries into it.  Then, by having the monitor l4e for shadow
+     * pagetables also point to the monitor l4, we can use it to access
+     * the shadows.
+     */
 
     if ( shadow_mode_external(d) )
     {
@@ -3068,7 +3119,7 @@ sh_update_linear_entries(struct vcpu *v)
             sh_unmap_domain_page(ml4e);
         }
 
-        /* Shadow l3 tables are made up by update_cr3 */
+        /* Shadow l3 tables are made up by sh_update_cr3 */
         sl3e = v->arch.shadow.l3table;
 
         for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
@@ -3083,6 +3134,8 @@ sh_update_linear_entries(struct vcpu *v)
         if ( v != current ) 
             sh_unmap_domain_page(ml3e);
     }
+    else
+        domain_crash(d); /* XXX */
 
 #elif CONFIG_PAGING_LEVELS == 3
 
@@ -3106,7 +3159,7 @@ sh_update_linear_entries(struct vcpu *v)
         int unmap_l2e = 0;
 
 #if GUEST_PAGING_LEVELS == 2
-        /* Shadow l3 tables were built by update_cr3 */
+        /* Shadow l3 tables were built by sh_update_cr3 */
         if ( shadow_mode_external(d) )
             shadow_l3e = (shadow_l3e_t *)&v->arch.shadow.l3table;
         else
@@ -3329,12 +3382,16 @@ sh_set_toplevel_shadow(struct vcpu *v,
 
 
 static void
-sh_update_cr3(struct vcpu *v)
+sh_update_cr3(struct vcpu *v, int do_locking)
 /* Updates vcpu->arch.cr3 after the guest has changed CR3.
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
- * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works,
- * and read vcpu->arch.hvm_vcpu.hw_cr3 afterwards.
+ * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works;
+ * this function will call hvm_update_guest_cr3() to tell them where the 
+ * shadow tables are.
+ * If do_locking != 0, assume we are being called from outside the 
+ * shadow code, and must take and release the shadow lock; otherwise 
+ * that is the caller's responsibility.
  */
 {
     struct domain *d = v->domain;
@@ -3343,7 +3400,16 @@ sh_update_cr3(struct vcpu *v)
     u32 guest_idx=0;
 #endif
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    /* Don't do anything on an uninitialised vcpu */
+    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    {
+        ASSERT(v->arch.cr3 == 0);
+        return;
+    }
+
+    if ( do_locking ) shadow_lock(v->domain);
+
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(v->arch.shadow.mode);
 
     ////
@@ -3382,17 +3448,12 @@ sh_update_cr3(struct vcpu *v)
                    (unsigned long)pagetable_get_pfn(v->arch.guest_table));
 
 #if GUEST_PAGING_LEVELS == 4
-    if ( !(v->arch.flags & TF_kernel_mode) )
+    if ( !(v->arch.flags & TF_kernel_mode) && !IS_COMPAT(v->domain) )
         gmfn = pagetable_get_mfn(v->arch.guest_table_user);
     else
 #endif
         gmfn = pagetable_get_mfn(v->arch.guest_table);
 
-    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-    {
-        ASSERT(v->arch.cr3 == 0);
-        return;
-    }
 
     ////
     //// vcpu->arch.guest_vtable
@@ -3454,7 +3515,7 @@ sh_update_cr3(struct vcpu *v)
      * replace the old shadow pagetable(s), so that we can safely use the 
      * (old) shadow linear maps in the writeable mapping heuristics. */
 #if GUEST_PAGING_LEVELS == 2
-    if ( shadow_remove_write_access(v, gmfn, 2, 0) != 0 )
+    if ( sh_remove_write_access(v, gmfn, 2, 0) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask); 
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l2_shadow);
 #elif GUEST_PAGING_LEVELS == 3
@@ -3472,7 +3533,7 @@ sh_update_cr3(struct vcpu *v)
             {
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
                 gl2mfn = vcpu_gfn_to_mfn(v, gl2gfn);
-                flush |= shadow_remove_write_access(v, gl2mfn, 2, 0); 
+                flush |= sh_remove_write_access(v, gl2mfn, 2, 0); 
             }
         }
         if ( flush ) 
@@ -3494,7 +3555,7 @@ sh_update_cr3(struct vcpu *v)
         }
     }
 #elif GUEST_PAGING_LEVELS == 4
-    if ( shadow_remove_write_access(v, gmfn, 4, 0) != 0 )
+    if ( sh_remove_write_access(v, gmfn, 4, 0) != 0 )
         flush_tlb_mask(v->domain->domain_dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
 #else
@@ -3570,6 +3631,9 @@ sh_update_cr3(struct vcpu *v)
 
     /* Fix up the linear pagetable mappings */
     sh_update_linear_entries(v);
+
+    /* Release the lock, if we took it (otherwise it's the caller's problem) */
+    if ( do_locking ) shadow_unlock(v->domain);
 }
 
 
@@ -3625,7 +3689,8 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 }
 #endif
 
-int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
+int sh_rm_write_access_from_l1(struct vcpu *v, mfn_t sl1mfn,
+                               mfn_t readonly_mfn)
 /* Excises all writeable mappings to readonly_mfn from this l1 shadow table */
 {
     shadow_l1e_t *sl1e;
@@ -3656,7 +3721,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn)
 }
 
 
-int sh_remove_all_mappings(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
+int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
 /* Excises all mappings to guest frame from this shadow l1 table */
 {
     shadow_l1e_t *sl1e;
@@ -3827,24 +3892,56 @@ static inline void * emulate_map_dest(struct vcpu *v,
     return NULL;
 }
 
+static int safe_not_to_verify_write(mfn_t gmfn, void *dst, void *src, 
+                                    int bytes)
+{
+#if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
+    struct page_info *pg = mfn_to_page(gmfn);
+    if ( !(pg->shadow_flags & SHF_32) 
+         && bytes == 4 
+         && ((unsigned long)dst & 3) == 0 )
+    {
+        /* Not shadowed 32-bit: aligned 64-bit writes that leave the
+         * present bit unset are safe to ignore. */
+        if ( (*(u64*)src & _PAGE_PRESENT) == 0 
+             && (*(u64*)dst & _PAGE_PRESENT) == 0 )
+            return 1;
+    }
+    else if ( !(pg->shadow_flags & (SHF_PAE|SHF_64)) 
+              && bytes == 8 
+              && ((unsigned long)dst & 7) == 0 )
+    {
+        /* Not shadowed PAE/64-bit: aligned 32-bit writes that leave the
+         * present bit unset are safe to ignore. */
+        if ( (*(u32*)src & _PAGE_PRESENT) == 0 
+             && (*(u32*)dst & _PAGE_PRESENT) == 0 )
+            return 1;        
+    }
+#endif
+    return 0;
+}
+
+
 int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
                       u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
     mfn_t mfn;
     void *addr;
+    int skip;
 
     if ( vaddr & (bytes-1) )
         return X86EMUL_UNHANDLEABLE;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
 
+    skip = safe_not_to_verify_write(mfn, addr, src, bytes);
     memcpy(addr, src, bytes);
-    shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+    if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
@@ -3863,9 +3960,9 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     mfn_t mfn;
     void *addr;
     unsigned long prev;
-    int rv = X86EMUL_CONTINUE;
+    int rv = X86EMUL_CONTINUE, skip;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(bytes <= sizeof(unsigned long));
 
     if ( vaddr & (bytes-1) )
@@ -3873,6 +3970,8 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
         return X86EMUL_PROPAGATE_FAULT;
+
+    skip = safe_not_to_verify_write(mfn, &new, &old, bytes);
 
     switch ( bytes )
     {
@@ -3886,7 +3985,9 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     }
 
     if ( prev == old )
-        shadow_validate_guest_pt_write(v, mfn, addr, bytes);
+    {
+        if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
+    }
     else
         rv = X86EMUL_CMPXCHG_FAILED;
 
@@ -3912,9 +4013,9 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     mfn_t mfn;
     void *addr;
     u64 old, new, prev;
-    int rv = X86EMUL_CONTINUE;
+    int rv = X86EMUL_CONTINUE, skip;
 
-    ASSERT(shadow_lock_is_acquired(v->domain));
+    ASSERT(shadow_locked_by_me(v->domain));
 
     if ( vaddr & 7 )
         return X86EMUL_UNHANDLEABLE;
@@ -3924,10 +4025,13 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
+    skip = safe_not_to_verify_write(mfn, &new, &old, 8);
     prev = cmpxchg(((u64 *)addr), old, new);
 
     if ( prev == old )
-        shadow_validate_guest_pt_write(v, mfn, addr, 8);
+    {
+        if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, 8);
+    }
     else
         rv = X86EMUL_CMPXCHG_FAILED;
 

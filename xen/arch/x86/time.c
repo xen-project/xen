@@ -41,7 +41,7 @@ boolean_param("hpet_force", opt_hpet_force);
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 unsigned long hpet_address;
 DEFINE_SPINLOCK(rtc_lock);
-unsigned long volatile jiffies;
+volatile unsigned long jiffies;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static DEFINE_SPINLOCK(wc_lock);
 
@@ -148,7 +148,7 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     ASSERT(local_irq_is_enabled());
 
     /* Update jiffies counter. */
-    (*(unsigned long *)&jiffies)++;
+    (*(volatile unsigned long *)&jiffies)++;
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
@@ -676,7 +676,7 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
     struct vcpu_time_info *u;
 
     t = &this_cpu(cpu_time);
-    u = &v->vcpu_info->time;
+    u = &vcpu_info(v, time);
 
     version_update_begin(&u->version);
 
@@ -690,7 +690,7 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
 
 void update_vcpu_system_time(struct vcpu *v)
 {
-    if ( v->vcpu_info->time.tsc_timestamp !=
+    if ( vcpu_info(v, time.tsc_timestamp) !=
          this_cpu(cpu_time).local_tsc_stamp )
         __update_vcpu_system_time(v);
 }
@@ -698,10 +698,10 @@ void update_vcpu_system_time(struct vcpu *v)
 void update_domain_wallclock_time(struct domain *d)
 {
     spin_lock(&wc_lock);
-    version_update_begin(&d->shared_info->wc_version);
-    d->shared_info->wc_sec  = wc_sec + d->time_offset_seconds;
-    d->shared_info->wc_nsec = wc_nsec;
-    version_update_end(&d->shared_info->wc_version);
+    version_update_begin(&shared_info(d, wc_version));
+    shared_info(d, wc_sec)  = wc_sec + d->time_offset_seconds;
+    shared_info(d, wc_nsec) = wc_nsec;
+    version_update_end(&shared_info(d, wc_version));
     spin_unlock(&wc_lock);
 }
 

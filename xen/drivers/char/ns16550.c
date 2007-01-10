@@ -300,7 +300,7 @@ static int parse_parity_char(int c)
         return;                              \
     } while ( 0 )
 
-static void ns16550_parse_port_config(struct ns16550 *uart, char *conf)
+static void ns16550_parse_port_config(struct ns16550 *uart, const char *conf)
 {
     int baud;
 

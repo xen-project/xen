@@ -146,7 +146,7 @@ struct domain_setup_info
      * You should use the xen_elfnote_* accessors below in order to
      * pickup the correct one and retain backwards compatibility.
      */
-    void *__elfnote_section, *__elfnote_section_end;
+    const void *__elfnote_section, *__elfnote_section_end;
     const char *__xen_guest_string;
 };
 
@@ -162,14 +162,14 @@ typedef int (*loadimagefunc)(const char *image, unsigned long image_size,
  * in the note is returned and *defined is set to non-zero. If no such
  * note is found then *defined is set to 0 and 0 is returned.
  */
-extern unsigned long long xen_elfnote_numeric(struct domain_setup_info *dsi,
+extern unsigned long long xen_elfnote_numeric(const struct domain_setup_info *dsi,
 					      int type, int *defined);
 
 /*
  * If an ELF note of the given type is found then the string contained
  * in the value is returned, otherwise NULL is returned.
  */
-extern const char * xen_elfnote_string(struct domain_setup_info *dsi,
+extern const char * xen_elfnote_string(const struct domain_setup_info *dsi,
 				       int type);
 
 struct load_funcs

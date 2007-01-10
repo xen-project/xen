@@ -51,7 +51,7 @@ integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 static unsigned int opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
 
-int elf_sanity_check(Elf_Ehdr *ehdr)
+int elf_sanity_check(const Elf_Ehdr *ehdr)
 {
     if (IS_ELF(*ehdr))
         /* we are happy with either */

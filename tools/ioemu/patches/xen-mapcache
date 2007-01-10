@@ -15,83 +15,14 @@ Signed-off-by: Jun Nakajima <jun.nakajima@intel.com>
 Signed-off-by: Dexuan Cui <dexuan.cui@intel.com>
 Signed-off-by: Keir Fraser <keir@xensource.com>
 
-diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/target-i386-dm/cpu.h
---- a/tools/ioemu/target-i386-dm/cpu.h	Thu Dec 07 10:54:43 2006 +0000
-+++ b/tools/ioemu/target-i386-dm/cpu.h	Thu Dec 07 11:12:52 2006 +0000
-@@ -25,7 +25,8 @@
- #ifdef TARGET_X86_64
- #define TARGET_LONG_BITS 64
- #else
--#define TARGET_LONG_BITS 32
-+/* #define TARGET_LONG_BITS 32 */
-+#define TARGET_LONG_BITS 64 /* for Qemu map cache */
- #endif
- 
- /* target supports implicit self modifying code */
-diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/target-i386-dm/exec-dm.c
---- a/tools/ioemu/target-i386-dm/exec-dm.c	Thu Dec 07 10:54:43 2006 +0000
-+++ b/tools/ioemu/target-i386-dm/exec-dm.c	Thu Dec 07 11:12:52 2006 +0000
-@@ -36,6 +36,7 @@
- 
- #include "cpu.h"
- #include "exec-all.h"
-+#include "vl.h"
- 
- //#define DEBUG_TB_INVALIDATE
- //#define DEBUG_FLUSH
-@@ -426,6 +427,12 @@ static inline int paddr_is_ram(target_ph
- #endif
- }
- 
-+#if defined(__i386__) || defined(__x86_64__)
-+#define phys_ram_addr(x) (qemu_map_cache(x))
-+#elif defined(__ia64__)
-+#define phys_ram_addr(x) (phys_ram_base + (x))
-+#endif
-+
- void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
-                             int len, int is_write)
- {
-@@ -438,7 +445,7 @@ void cpu_physical_memory_rw(target_phys_
-         l = TARGET_PAGE_SIZE - (addr & ~TARGET_PAGE_MASK); 
-         if (l > len)
-             l = len;
--	
-+
-         io_index = iomem_index(addr);
-         if (is_write) {
-             if (io_index) {
-@@ -460,9 +467,10 @@ void cpu_physical_memory_rw(target_phys_
-                 }
-             } else if (paddr_is_ram(addr)) {
-                 /* Reading from RAM */
--                memcpy(phys_ram_base + addr, buf, l);
-+                ptr = phys_ram_addr(addr);
-+                memcpy(ptr, buf, l);
- #ifdef __ia64__
--                sync_icache((unsigned long)(phys_ram_base + addr), l);
-+                sync_icache(ptr, l);
- #endif 
-             }
-         } else {
-@@ -485,7 +493,8 @@ void cpu_physical_memory_rw(target_phys_
-                 }
-             } else if (paddr_is_ram(addr)) {
-                 /* Reading from RAM */
--                memcpy(buf, phys_ram_base + addr, l);
-+                ptr = phys_ram_addr(addr);
-+                memcpy(buf, ptr, l);
-             } else {
-                 /* Neither RAM nor known MMIO space */
-                 memset(buf, 0xff, len); 
-diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.c
---- a/tools/ioemu/vl.c	Thu Dec 07 10:54:43 2006 +0000
-+++ b/tools/ioemu/vl.c	Thu Dec 07 11:12:52 2006 +0000
-@@ -5807,6 +5807,92 @@ int set_mm_mapping(int xc_handle, uint32
- 
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-12-20 15:21:55.000000000 +0000
++++ ioemu/vl.c	2006-12-20 15:21:56.000000000 +0000
+@@ -5808,6 +5808,91 @@
      return 0;
  }
-+
+ 
 +#if defined(__i386__) || defined(__x86_64__)
 +static struct map_cache *mapcache_entry;
 +static unsigned long nr_buckets;
@@ -104,8 +35,8 @@ diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.c
 +    if (nr_pages < max_pages)
 +        max_pages = nr_pages;
 +
-+    nr_buckets = (max_pages << PAGE_SHIFT) >> MCACHE_BUCKET_SHIFT;
-+
++    nr_buckets   = max_pages + (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1;
++    nr_buckets >>= (MCACHE_BUCKET_SHIFT - PAGE_SHIFT);
 +    fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx\n", nr_buckets);
 +
 +    mapcache_entry = malloc(nr_buckets * sizeof(struct map_cache));
@@ -141,8 +72,7 @@ diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.c
 +
 +    entry = &mapcache_entry[address_index % nr_buckets];
 +
-+    if (entry->vaddr_base == NULL || entry->paddr_index != address_index)
-+    { 
++    if (entry->vaddr_base == NULL || entry->paddr_index != address_index) {
 +        /* We need to remap a bucket. */
 +        uint8_t *vaddr_base;
 +        unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
@@ -177,10 +107,11 @@ diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.c
 +    return last_address_vaddr + address_offset;
 +}
 +#endif
- 
++
  int main(int argc, char **argv)
  {
-@@ -6130,6 +6216,7 @@ int main(int argc, char **argv)
+ #ifdef CONFIG_GDBSTUB
+@@ -6130,6 +6215,7 @@
                  break;
              case QEMU_OPTION_m:
                  ram_size = atol(optarg) * 1024 * 1024;
@@ -188,90 +119,195 @@ diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.c
                  if (ram_size <= 0)
                      help();
  #ifndef CONFIG_DM
-@@ -6400,50 +6487,41 @@ int main(int argc, char **argv)
+@@ -6404,50 +6490,41 @@
          shared_page_nr = nr_pages - 1;
  #endif
  
-+#if defined(__i386__) || defined(__x86_64__)
-+
-+    if ( qemu_map_cache_init(tmp_nr_pages) )
-+    {
-+        fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
-+        exit(-1);
-+    }
-+
-+    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-+                                       PROT_READ|PROT_WRITE, shared_page_nr);
-+    if (shared_page == NULL) {
-+        fprintf(logfile, "map shared IO page returned error %d\n", errno);
-+        exit(-1);
-+    }
-+
-+    fprintf(logfile, "shared page at pfn:%lx\n", shared_page_nr);
-+
-+    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-+                                            PROT_READ|PROT_WRITE,
-+                                            shared_page_nr - 2);
-+    if (buffered_io_page == NULL) {
-+        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
-+        exit(-1);
-+    }
-+
-+    fprintf(logfile, "buffered io page at pfn:%lx\n", shared_page_nr - 2);
-+
-+#elif defined(__ia64__)
-+
-     page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
-     if (page_array == NULL) {
-         fprintf(logfile, "malloc returned error %d\n", errno);
-         exit(-1);
-     }
- 
--#if defined(__i386__) || defined(__x86_64__)
+-    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
+-    if (page_array == NULL) {
+-        fprintf(logfile, "malloc returned error %d\n", errno);
+-        exit(-1);
+-    }
+-
+ #if defined(__i386__) || defined(__x86_64__)
 -    for ( i = 0; i < tmp_nr_pages; i++)
 -        page_array[i] = i;
--
+ 
 -    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
 -                                         PROT_READ|PROT_WRITE, page_array,
 -                                         tmp_nr_pages);
 -    if (phys_ram_base == NULL) {
 -        fprintf(logfile, "batch map guest memory returned error %d\n", errno);
--        exit(-1);
--    }
--
--    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
++    if ( qemu_map_cache_init(tmp_nr_pages) )
++    {
++        fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
+         exit(-1);
+     }
+ 
+     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 -                                       PROT_READ|PROT_WRITE,
 -                                       page_array[shared_page_nr]);
--    if (shared_page == NULL) {
--        fprintf(logfile, "map shared IO page returned error %d\n", errno);
--        exit(-1);
--    }
--
++                                       PROT_READ|PROT_WRITE, shared_page_nr);
+     if (shared_page == NULL) {
+         fprintf(logfile, "map shared IO page returned error %d\n", errno);
+         exit(-1);
+     }
+ 
 -    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
 -            shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
--
--    buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
--                                            PROT_READ|PROT_WRITE,
++    fprintf(logfile, "shared page at pfn:%lx\n", shared_page_nr);
+ 
+     buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                             PROT_READ|PROT_WRITE,
 -                                            page_array[shared_page_nr - 2]);
--    if (buffered_io_page == NULL) {
--        fprintf(logfile, "map buffered IO page returned error %d\n", errno);
--        exit(-1);
--    }
--
++                                            shared_page_nr - 2);
+     if (buffered_io_page == NULL) {
+         fprintf(logfile, "map buffered IO page returned error %d\n", errno);
+         exit(-1);
+     }
+ 
 -    fprintf(logfile, "buffered io page at pfn:%lx, mfn: %"PRIx64"\n",
 -            shared_page_nr - 2, (uint64_t)(page_array[shared_page_nr - 2]));
 -
 -    free(page_array);
--
--#elif defined(__ia64__)
++    fprintf(logfile, "buffered io page at pfn:%lx\n", shared_page_nr - 2);
+ 
+ #elif defined(__ia64__)
 -  
-     if (xc_ia64_get_pfn_list(xc_handle, domid, page_array,
-                              IO_PAGE_START >> PAGE_SHIFT, 3) != 3) {
-         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
-diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.h
---- a/tools/ioemu/vl.h	Thu Dec 07 10:54:43 2006 +0000
-+++ b/tools/ioemu/vl.h	Thu Dec 07 11:12:52 2006 +0000
-@@ -156,6 +156,26 @@ extern void *shared_vram;
++
++    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
++    if (page_array == NULL) {
++        fprintf(logfile, "malloc returned error %d\n", errno);
++        exit(-1);
++    }
++
+     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                        PROT_READ|PROT_WRITE,
+                                        IO_PAGE_START >> PAGE_SHIFT);
+Index: ioemu/target-i386-dm/exec-dm.c
+===================================================================
+--- ioemu.orig/target-i386-dm/exec-dm.c	2006-12-20 15:21:42.000000000 +0000
++++ ioemu/target-i386-dm/exec-dm.c	2006-12-21 11:32:29.000000000 +0000
+@@ -36,6 +36,7 @@
+ 
+ #include "cpu.h"
+ #include "exec-all.h"
++#include "vl.h"
+ 
+ //#define DEBUG_TB_INVALIDATE
+ //#define DEBUG_FLUSH
+@@ -127,10 +128,29 @@
+ FILE *logfile;
+ int loglevel;
+ 
++
++#if defined(__i386__) || defined(__x86_64__)
++#define MAPCACHE
++#endif
++
++#ifdef MAPCACHE
++#include <pthread.h>
++static pthread_mutex_t mapcache_mutex;
++#define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
++#define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)
++#else 
++#define mapcache_lock() ( (void)0 )
++#define mapcache_unlock() ( (void)0 )
++#endif
++
++
+ void cpu_exec_init(CPUState *env)
+ {
+     CPUState **penv;
+     int cpu_index;
++#ifdef MAPCACHE
++    pthread_mutexattr_t mxattr; 
++#endif
+ 
+     env->next_cpu = NULL;
+     penv = &first_cpu;
+@@ -144,6 +164,14 @@
+ 
+     /* alloc dirty bits array */
+     phys_ram_dirty = qemu_malloc(phys_ram_size >> TARGET_PAGE_BITS);
++
++#ifdef MAPCACHE
++    /* setup memory access mutex to protect mapcache */
++    pthread_mutexattr_init(&mxattr); 
++    pthread_mutexattr_settype(&mxattr, PTHREAD_MUTEX_RECURSIVE);
++    pthread_mutex_init(&mapcache_mutex, &mxattr); 
++    pthread_mutexattr_destroy(&mxattr); 
++#endif
+ }
+ 
+ /* enable or disable low levels log */
+@@ -426,19 +454,27 @@
+ #endif
+ }
+ 
++#if defined(__i386__) || defined(__x86_64__)
++#define phys_ram_addr(x) (qemu_map_cache(x))
++#elif defined(__ia64__)
++#define phys_ram_addr(x) (phys_ram_base + (x))
++#endif
++
+ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
+                             int len, int is_write)
+ {
+     int l, io_index;
+     uint8_t *ptr;
+     uint32_t val;
+-    
++
++    mapcache_lock();
++
+     while (len > 0) {
+         /* How much can we copy before the next page boundary? */
+         l = TARGET_PAGE_SIZE - (addr & ~TARGET_PAGE_MASK); 
+         if (l > len)
+             l = len;
+-	
++
+         io_index = iomem_index(addr);
+         if (is_write) {
+             if (io_index) {
+@@ -460,9 +496,10 @@
+                 }
+             } else if (paddr_is_ram(addr)) {
+                 /* Reading from RAM */
+-                memcpy(phys_ram_base + addr, buf, l);
++                ptr = phys_ram_addr(addr);
++                memcpy(ptr, buf, l);
+ #ifdef __ia64__
+-                sync_icache((unsigned long)(phys_ram_base + addr), l);
++                sync_icache(ptr, l);
+ #endif 
+             }
+         } else {
+@@ -485,7 +522,8 @@
+                 }
+             } else if (paddr_is_ram(addr)) {
+                 /* Reading from RAM */
+-                memcpy(buf, phys_ram_base + addr, l);
++                ptr = phys_ram_addr(addr);
++                memcpy(buf, ptr, l);
+             } else {
+                 /* Neither RAM nor known MMIO space */
+                 memset(buf, 0xff, len); 
+@@ -495,6 +533,8 @@
+         buf += l;
+         addr += l;
+     }
++
++    mapcache_unlock();
+ }
+ #endif
+ 
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-12-20 15:21:55.000000000 +0000
++++ ioemu/vl.h	2006-12-20 15:21:56.000000000 +0000
+@@ -156,6 +156,26 @@
  
  extern FILE *logfile;
  
@@ -298,3 +334,17 @@ diff -r 3f0ca90351e2 -r 67a06a9b7b1d tools/ioemu/vl.h
  extern int xc_handle;
  extern int domid;
  
+Index: ioemu/target-i386-dm/cpu.h
+===================================================================
+--- ioemu.orig/target-i386-dm/cpu.h	2006-12-20 15:21:45.000000000 +0000
++++ ioemu/target-i386-dm/cpu.h	2006-12-20 15:21:56.000000000 +0000
+@@ -25,7 +25,8 @@
+ #ifdef TARGET_X86_64
+ #define TARGET_LONG_BITS 64
+ #else
+-#define TARGET_LONG_BITS 32
++/* #define TARGET_LONG_BITS 32 */
++#define TARGET_LONG_BITS 64 /* for Qemu map cache */
+ #endif
+ 
+ /* target supports implicit self modifying code */

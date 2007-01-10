@@ -47,8 +47,8 @@ EXPORT_SYMBOL(swiotlb);
  */
 #define IO_TLB_SHIFT 11
 
-/* Width of DMA addresses in the IO TLB. 30 bits is a b44 limitation. */
-#define DEFAULT_IO_TLB_DMA_BITS 30
+/* Width of DMA addresses. 30 bits is a b44 limitation. */
+#define DEFAULT_DMA_BITS 30
 
 static int swiotlb_force;
 static char *iotlb_virt_start;
@@ -98,14 +98,14 @@ static struct phys_addr {
  */
 static DEFINE_SPINLOCK(io_tlb_lock);
 
-static unsigned int io_tlb_dma_bits = DEFAULT_IO_TLB_DMA_BITS;
+unsigned int dma_bits = DEFAULT_DMA_BITS;
 static int __init
-setup_io_tlb_bits(char *str)
+setup_dma_bits(char *str)
 {
-	io_tlb_dma_bits = simple_strtoul(str, NULL, 0);
+	dma_bits = simple_strtoul(str, NULL, 0);
 	return 0;
 }
-__setup("swiotlb_bits=", setup_io_tlb_bits);
+__setup("dma_bits=", setup_dma_bits);
 
 static int __init
 setup_io_tlb_npages(char *str)
@@ -167,7 +167,7 @@ swiotlb_init_with_default_size (size_t default_size)
 		int rc = xen_create_contiguous_region(
 			(unsigned long)iotlb_virt_start + (i << IO_TLB_SHIFT),
 			get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
-			io_tlb_dma_bits);
+			dma_bits);
 		BUG_ON(rc);
 	}
 
@@ -197,7 +197,7 @@ swiotlb_init_with_default_size (size_t default_size)
 	       bytes >> 20,
 	       (unsigned long)iotlb_virt_start,
 	       (unsigned long)iotlb_virt_start + bytes,
-	       io_tlb_dma_bits);
+	       dma_bits);
 }
 
 void
@@ -665,7 +665,7 @@ swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 int
 swiotlb_dma_supported (struct device *hwdev, u64 mask)
 {
-	return (mask >= ((1UL << io_tlb_dma_bits) - 1));
+	return (mask >= ((1UL << dma_bits) - 1));
 }
 
 EXPORT_SYMBOL(swiotlb_init);

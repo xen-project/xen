@@ -121,7 +121,7 @@ int xencons_ring_init(void)
 	    !xen_start_info->console.domU.evtchn)
 		return -ENODEV;
 
-	irq = bind_evtchn_to_irqhandler(
+	irq = bind_caller_port_to_irqhandler(
 		xen_start_info->console.domU.evtchn,
 		handle_input, 0, "xencons", NULL);
 	if (irq < 0) {

@@ -193,7 +193,7 @@ unsigned long do_iret(void)
 
     /*
      * Pop, fix up and restore EFLAGS. We fix up in a local staging area
-     * to avoid firing the BUG_ON(IOPL) check in arch_getdomaininfo_ctxt.
+     * to avoid firing the BUG_ON(IOPL) check in arch_get_info_guest.
      */
     if ( unlikely(__copy_from_user(&eflags, (void __user *)regs->esp, 4)) )
         goto exit_and_crash;
@@ -296,7 +296,7 @@ void init_int80_direct_trap(struct vcpu *v)
      * switch to the Xen stack and we need to swap back to the guest
      * kernel stack before passing control to the system call entry point.
      */
-    if ( TI_GET_IF(ti) || !guest_gate_selector_okay(ti->cs) ||
+    if ( TI_GET_IF(ti) || !guest_gate_selector_okay(v->domain, ti->cs) ||
          supervisor_mode_kernel )
     {
         v->arch.int80_desc.a = v->arch.int80_desc.b = 0;
@@ -326,7 +326,7 @@ static long register_guest_callback(struct callback_register *reg)
     long ret = 0;
     struct vcpu *v = current;
 
-    fixup_guest_code_selector(reg->address.cs);
+    fixup_guest_code_selector(v->domain, reg->address.cs);
 
     switch ( reg->type )
     {

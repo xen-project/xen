@@ -53,8 +53,17 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 
     *hvirt_start = xen_params.virt_start;
 
+    /*
+     * XXX For now, 32bit dom0's can only save/restore 32bit domUs
+     * on 64bit hypervisors, so no need to check which type of domain
+     * we're dealing with.
+     */
     if (strstr(xen_caps, "xen-3.0-x86_64"))
+#if defined(__i386__)
+        *pt_levels = 3;
+#else
         *pt_levels = 4;
+#endif
     else if (strstr(xen_caps, "xen-3.0-x86_32p"))
         *pt_levels = 3;
     else if (strstr(xen_caps, "xen-3.0-x86_32"))
@@ -100,12 +109,6 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 
 /* Number of entries in the pfn_to_mfn_frame_list_list */
 #define P2M_FLL_ENTRIES (((max_pfn)+(fpp*fpp)-1)/(fpp*fpp))
-
-/* Current guests allow 8MB 'slack' in their P2M */
-#define NR_SLACK_ENTRIES   ((8 * 1024 * 1024) / PAGE_SIZE)
-
-/* Is the given PFN within the 'slack' region at the top of the P2M? */
-#define IS_REAL_PFN(_pfn)  ((max_pfn - (_pfn)) > NR_SLACK_ENTRIES)
 
 /* Returns TRUE if the PFN is currently mapped */
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))

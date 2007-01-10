@@ -9,6 +9,8 @@
 #ifndef __ASM_EVENT_H__
 #define __ASM_EVENT_H__
 
+#include <xen/shared.h>
+
 static inline void vcpu_kick(struct vcpu *v)
 {
     /*
@@ -28,7 +30,7 @@ static inline void vcpu_kick(struct vcpu *v)
 
 static inline void vcpu_mark_events_pending(struct vcpu *v)
 {
-    if ( !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
+    if ( !test_and_set_bit(0, &vcpu_info(v, evtchn_upcall_pending)) )
         vcpu_kick(v);
 }
 
@@ -36,23 +38,23 @@ static inline int local_events_need_delivery(void)
 {
     struct vcpu *v = current;
     /* Note: Bitwise operations result in fast code with no branches. */
-    return (!!v->vcpu_info->evtchn_upcall_pending &
-             !v->vcpu_info->evtchn_upcall_mask);
+    return (!!vcpu_info(v, evtchn_upcall_pending) &
+             !vcpu_info(v, evtchn_upcall_mask));
 }
 
 static inline int local_event_delivery_is_enabled(void)
 {
-    return !current->vcpu_info->evtchn_upcall_mask;
+    return !vcpu_info(current, evtchn_upcall_mask);
 }
 
 static inline void local_event_delivery_disable(void)
 {
-    current->vcpu_info->evtchn_upcall_mask = 1;
+    vcpu_info(current, evtchn_upcall_mask) = 1;
 }
 
 static inline void local_event_delivery_enable(void)
 {
-    current->vcpu_info->evtchn_upcall_mask = 0;
+    vcpu_info(current, evtchn_upcall_mask) = 0;
 }
 
 /* No arch specific virq definition now. Default to global. */

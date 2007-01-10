@@ -18,31 +18,76 @@
 
 #define LDT_ENTRY_SIZE 8
 
+#if defined(__x86_64__)
+
+#define FLAT_COMPAT_RING1_CS 0xe019  /* GDT index 259 */
+#define FLAT_COMPAT_RING1_DS 0xe021  /* GDT index 260 */
+#define FLAT_COMPAT_RING1_SS 0xe021  /* GDT index 260 */
+#define FLAT_COMPAT_RING3_CS 0xe02b  /* GDT index 261 */
+#define FLAT_COMPAT_RING3_DS 0xe033  /* GDT index 262 */
+#define FLAT_COMPAT_RING3_SS 0xe033  /* GDT index 262 */
+
+#define FLAT_COMPAT_KERNEL_DS FLAT_COMPAT_RING1_DS
+#define FLAT_COMPAT_KERNEL_CS FLAT_COMPAT_RING1_CS
+#define FLAT_COMPAT_KERNEL_SS FLAT_COMPAT_RING1_SS
+#define FLAT_COMPAT_USER_DS   FLAT_COMPAT_RING3_DS
+#define FLAT_COMPAT_USER_CS   FLAT_COMPAT_RING3_CS
+#define FLAT_COMPAT_USER_SS   FLAT_COMPAT_RING3_SS
+
+#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 2)
+
+#define __TSS(n) (((n)<<2) + __FIRST_TSS_ENTRY)
+#define __LDT(n) (((n)<<2) + __FIRST_LDT_ENTRY)
+
+#elif defined(__i386__)
+
+#define FLAT_COMPAT_KERNEL_CS FLAT_KERNEL_CS
+#define FLAT_COMPAT_KERNEL_DS FLAT_KERNEL_DS
+#define FLAT_COMPAT_KERNEL_SS FLAT_KERNEL_SS
+#define FLAT_COMPAT_USER_CS   FLAT_USER_CS
+#define FLAT_COMPAT_USER_DS   FLAT_USER_DS
+#define FLAT_COMPAT_USER_SS   FLAT_USER_SS
+
+#define __DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
+
+#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 1)
+
+#define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
+#define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
+
+#endif
+
+#ifndef __ASSEMBLY__
+
 #define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
 
 #if defined(__x86_64__)
-#define GUEST_KERNEL_RPL 3
+#define GUEST_KERNEL_RPL(d) (!IS_COMPAT(d) ? 3 : 1)
 #elif defined(__i386__)
-#define GUEST_KERNEL_RPL 1
+#define GUEST_KERNEL_RPL(d) ((void)(d), 1)
 #endif
 
 /* Fix up the RPL of a guest segment selector. */
-#define __fixup_guest_selector(sel)                             \
-    ((sel) = (((sel) & 3) >= GUEST_KERNEL_RPL) ? (sel) :        \
-     (((sel) & ~3) | GUEST_KERNEL_RPL))
+#define __fixup_guest_selector(d, sel)                             \
+({                                                                 \
+    uint16_t _rpl = GUEST_KERNEL_RPL(d);                           \
+    (sel) = (((sel) & 3) >= _rpl) ? (sel) : (((sel) & ~3) | _rpl); \
+})
 
 /* Stack selectors don't need fixing up if the kernel runs in ring 0. */
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
-#define fixup_guest_stack_selector(ss) ((void)0)
+#define fixup_guest_stack_selector(d, ss) ((void)0)
 #else
-#define fixup_guest_stack_selector(ss) __fixup_guest_selector(ss)
+#define fixup_guest_stack_selector(d, ss) __fixup_guest_selector(d, ss)
 #endif
 
 /*
  * Code selectors are always fixed up. It allows the Xen exit stub to detect
  * return to guest context, even when the guest kernel runs in ring 0.
  */
-#define fixup_guest_code_selector(cs)  __fixup_guest_selector(cs)
+#define fixup_guest_code_selector(d, cs)  __fixup_guest_selector(d, cs)
 
 /*
  * We need this function because enforcing the correct guest kernel RPL is
@@ -57,19 +102,30 @@
  * DPL < CPL then they'll be cleared automatically. If SS RPL or DPL differs
  * from CS RPL then we'll #GP.
  */
-#define guest_gate_selector_okay(sel)                                   \
+#define guest_gate_selector_okay(d, sel)                                \
     ((((sel)>>3) < FIRST_RESERVED_GDT_ENTRY) || /* Guest seg? */        \
-     ((sel) == FLAT_KERNEL_CS) ||               /* Xen default seg? */  \
+     ((sel) == (!IS_COMPAT(d) ?                                         \
+                FLAT_KERNEL_CS :                /* Xen default seg? */  \
+                FLAT_COMPAT_KERNEL_CS)) ||      /* Xen default compat seg? */  \
      ((sel) & 4))                               /* LDT seg? */
+
+#endif /* __ASSEMBLY__ */
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)
+#define _SEGMENT_WR      ( 1<< 9) /* Writeable (data) or Readable (code)
+                                     segment */
 #define _SEGMENT_EC      ( 1<<10) /* Expand-down or Conforming segment */
 #define _SEGMENT_CODE    ( 1<<11) /* Code (vs data) segment for non-system
                                      segments */
 #define _SEGMENT_S       ( 1<<12) /* System descriptor (yes iff S==0) */
 #define _SEGMENT_DPL     ( 3<<13) /* Descriptor Privilege Level */
 #define _SEGMENT_P       ( 1<<15) /* Segment Present */
+#ifdef __x86_64
+#define _SEGMENT_L       ( 1<<21) /* 64-bit segment */
+#else
+#define _SEGMENT_L       0
+#endif
 #define _SEGMENT_DB      ( 1<<22) /* 16- or 32-bit segment */
 #define _SEGMENT_G       ( 1<<23) /* Granularity */
 
@@ -80,12 +136,6 @@ struct desc_struct {
 };
 
 #if defined(__x86_64__)
-
-#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
-#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 2)
-
-#define __TSS(n) (((n)<<2) + __FIRST_TSS_ENTRY)
-#define __LDT(n) (((n)<<2) + __FIRST_LDT_ENTRY)
 
 typedef struct {
     u64 a, b;
@@ -118,14 +168,6 @@ do {                                                     \
 
 #elif defined(__i386__)
 
-#define __DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
-
-#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
-#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 1)
-
-#define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
-#define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
-
 typedef struct desc_struct idt_entry_t;
 
 #define _set_gate(gate_addr,type,dpl,addr) \
@@ -155,6 +197,11 @@ __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
 #endif
 
 extern struct desc_struct gdt_table[];
+#ifdef CONFIG_COMPAT
+extern struct desc_struct compat_gdt_table[];
+#else
+# define compat_gdt_table gdt_table
+#endif
 
 struct Xgt_desc_struct {
     unsigned short size;

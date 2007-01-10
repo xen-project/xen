@@ -222,7 +222,7 @@ void fill_mp_config_table(struct mp_config_table *mpct, int length)
 void fill_mp_proc_entry(struct mp_proc_entry *mppe, int vcpu_id)
 {
     mppe->type = ENTRY_TYPE_PROCESSOR;
-    mppe->lapic_id = vcpu_id + 1;
+    mppe->lapic_id = LAPIC_ID(vcpu_id);
     mppe->lapic_version = 0x11;
     mppe->cpu_flags = CPU_FLAG_ENABLED;
     if ( vcpu_id == 0 )
@@ -373,7 +373,7 @@ void create_mp_tables(void)
     {
         if ( i == 2 ) continue; /* skip the slave PIC connection */
         fill_mp_io_intr_entry((struct mp_io_intr_entry *)p, 
-                              BUS_ID_ISA, i, IOAPIC_ID, i);
+                              BUS_ID_ISA, i, IOAPIC_ID, (i == 0) ? 2 : i);
         p += sizeof(struct mp_io_intr_entry);
     }
 

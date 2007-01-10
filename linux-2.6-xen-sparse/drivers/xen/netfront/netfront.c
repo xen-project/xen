@@ -153,7 +153,7 @@ struct netfront_info {
 	spinlock_t   tx_lock;
 	spinlock_t   rx_lock;
 
-	unsigned int evtchn, irq;
+	unsigned int irq;
 	unsigned int copying_receiver;
 
 	/* Receive-ring batched refills. */
@@ -244,12 +244,8 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 static int setup_device(struct xenbus_device *, struct netfront_info *);
 static struct net_device *create_netdev(struct xenbus_device *);
 
-static void netfront_closing(struct xenbus_device *);
-
 static void end_access(int, void *);
 static void netif_disconnect_backend(struct netfront_info *);
-static int open_netdev(struct netfront_info *);
-static void close_netdev(struct netfront_info *);
 
 static int network_connect(struct net_device *);
 static void network_tx_buf_gc(struct net_device *);
@@ -293,9 +289,20 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	info = netdev_priv(netdev);
 	dev->dev.driver_data = info;
 
-	err = open_netdev(info);
-	if (err)
+	err = register_netdev(info->netdev);
+	if (err) {
+		printk(KERN_WARNING "%s: register_netdev err=%d\n",
+		       __FUNCTION__, err);
 		goto fail;
+	}
+
+	err = xennet_sysfs_addif(info->netdev);
+	if (err) {
+		unregister_netdev(info->netdev);
+		printk(KERN_WARNING "%s: add sysfs failed err=%d\n",
+		       __FUNCTION__, err);
+		goto fail;
+	}
 
 	return 0;
 
@@ -305,6 +312,24 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	return err;
 }
 
+static int __devexit netfront_remove(struct xenbus_device *dev)
+{
+	struct netfront_info *info = dev->dev.driver_data;
+
+	DPRINTK("%s\n", dev->nodename);
+
+	netif_disconnect_backend(info);
+
+	del_timer_sync(&info->rx_refill_timer);
+
+	xennet_sysfs_delif(info->netdev);
+
+	unregister_netdev(info->netdev);
+
+	free_netdev(info->netdev);
+
+	return 0;
+}
 
 /**
  * We are reconnecting to the backend, due to a suspend/resume, or a backend
@@ -383,7 +408,8 @@ again:
 		goto abort_transaction;
 	}
 	err = xenbus_printf(xbt, dev->nodename,
-			    "event-channel", "%u", info->evtchn);
+			    "event-channel", "%u",
+			    irq_to_evtchn_port(info->irq));
 	if (err) {
 		message = "writing event-channel";
 		goto abort_transaction;
@@ -488,17 +514,15 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	}
 	info->rx_ring_ref = err;
 
-	err = xenbus_alloc_evtchn(dev, &info->evtchn);
-	if (err)
-		goto fail;
-
 	memcpy(netdev->dev_addr, info->mac, ETH_ALEN);
-	err = bind_evtchn_to_irqhandler(info->evtchn, netif_int,
-					SA_SAMPLE_RANDOM, netdev->name,
-					netdev);
+
+	err = bind_listening_port_to_irqhandler(
+		dev->otherend_id, netif_int, SA_SAMPLE_RANDOM, netdev->name,
+		netdev);
 	if (err < 0)
 		goto fail;
 	info->irq = err;
+
 	return 0;
 
  fail:
@@ -534,9 +558,7 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		if (dev->state == XenbusStateClosed)
-			break;
-		netfront_closing(dev);
+		xenbus_frontend_closed(dev);
 		break;
 	}
 }
@@ -1995,70 +2017,6 @@ inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 }
 
 
-/* ** Close down ** */
-
-
-/**
- * Handle the change of state of the backend to Closing.  We must delete our
- * device-layer structures now, to ensure that writes are flushed through to
- * the backend.  Once is this done, we can switch to Closed in
- * acknowledgement.
- */
-static void netfront_closing(struct xenbus_device *dev)
-{
-	struct netfront_info *info = dev->dev.driver_data;
-
-	DPRINTK("%s\n", dev->nodename);
-
-	close_netdev(info);
-	xenbus_frontend_closed(dev);
-}
-
-
-static int __devexit netfront_remove(struct xenbus_device *dev)
-{
-	struct netfront_info *info = dev->dev.driver_data;
-
-	DPRINTK("%s\n", dev->nodename);
-
-	netif_disconnect_backend(info);
-	free_netdev(info->netdev);
-
-	return 0;
-}
-
-
-static int open_netdev(struct netfront_info *info)
-{
-	int err;
-	
-	err = register_netdev(info->netdev);
-	if (err) {
-		printk(KERN_WARNING "%s: register_netdev err=%d\n",
-		       __FUNCTION__, err);
-		return err;
-	}
-
-	err = xennet_sysfs_addif(info->netdev);
-	if (err) {
-		unregister_netdev(info->netdev);
-		printk(KERN_WARNING "%s: add sysfs failed err=%d\n",
-		       __FUNCTION__, err);
-		return err;
-	}
-
-	return 0;
-}
-
-static void close_netdev(struct netfront_info *info)
-{
-	del_timer_sync(&info->rx_refill_timer);
-
-	xennet_sysfs_delif(info->netdev);
-	unregister_netdev(info->netdev);
-}
-
-
 static void netif_disconnect_backend(struct netfront_info *info)
 {
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
@@ -2070,7 +2028,7 @@ static void netif_disconnect_backend(struct netfront_info *info)
 
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info->netdev);
-	info->evtchn = info->irq = 0;
+	info->irq = 0;
 
 	end_access(info->tx_ring_ref, info->tx.sring);
 	end_access(info->rx_ring_ref, info->rx.sring);

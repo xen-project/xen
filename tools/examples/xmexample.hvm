@@ -29,7 +29,7 @@ memory = 128
 
 # Shadow pagetable memory for the domain, in MB.
 # Should be at least 2KB per MB of domain memory, plus a few MB per vcpu.
-shadow_memory = 8
+# shadow_memory = 8
 
 # A name for your domain. All domains must have different names.
 name = "ExampleHVMDomain"
@@ -116,7 +116,7 @@ disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
 device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
 
 #-----------------------------------------------------------------------------
-# boot on floppy (a), hard disk (c) or CD-ROM (d) 
+# boot on floppy (a), hard disk (c), Network (n) or CD-ROM (d) 
 # default: hard disk, cd-rom, floppy
 #boot="cda"
 

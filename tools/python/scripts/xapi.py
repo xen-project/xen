@@ -41,6 +41,7 @@ VBD_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(VDI)-8s '\
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
     'host-set-name': ('', 'Set host name'),
+    'pif-list': ('', 'List all PIFs'),
     'sr-list':   ('', 'List all SRs'),
     'vbd-list':  ('', 'List all VBDs'),
     'vbd-create': ('<domname> <pycfg> [opts]',
@@ -63,6 +64,15 @@ COMMANDS = {
 }
 
 OPTIONS = {
+    'sr-list': [(('-l', '--long'),
+                 {'action':'store_true',
+                  'help':'List all properties of SR'})
+               ],
+
+    'vdi-list': [(('-l', '--long'),
+                  {'action':'store_true',
+                   'help':'List all properties of VDI'})
+               ],        
     'vm-list': [(('-l', '--long'),
                  {'action':'store_true',
                   'help':'List all properties of VMs'})
@@ -145,7 +155,7 @@ _session = None
 def _connect(*args):
     global _server, _session, _initialised
     if not _initialised:
-        _server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')
+        _server = ServerProxy('httpu:///var/run/xend/xen-api.sock')
         login = raw_input("Login: ")
         password = getpass()
         creds = (login, password)
@@ -361,29 +371,53 @@ def xapi_vbd_list(*args):
         print VBD_LIST_FORMAT % vbd_struct
 
 def xapi_vdi_list(*args):
+    opts, args = parse_args('vdi-list', args, set_defaults = True)
+    is_long = opts and opts.long
+
     server, session = _connect()
     vdis = execute(server.VDI.get_all, session)
 
-    print VDI_LIST_FORMAT % {'name_label': 'VDI Label',
-                             'uuid' : 'UUID',
-                             'virtual_size': 'Sectors',
-                             'sector_size': 'Sector Size'}
-    
-    for vdi in vdis:
-        vdi_struct = execute(server.VDI.get_record, session, vdi)
-        print VDI_LIST_FORMAT % vdi_struct
+    if not is_long:
+        print VDI_LIST_FORMAT % {'name_label': 'VDI Label',
+                                 'uuid' : 'UUID',
+                                 'virtual_size': 'Sectors',
+                                 'sector_size': 'Sector Size'}
+        
+        for vdi in vdis:
+            vdi_struct = execute(server.VDI.get_record, session, vdi)
+            print VDI_LIST_FORMAT % vdi_struct
+
+    else:
+
+        for vdi in vdis:
+            vdi_struct = execute(server.VDI.get_record, session, vdi)
+            pprint(vdi_struct)
 
 def xapi_sr_list(*args):
+    opts, args = parse_args('sr-list', args, set_defaults = True)
+    is_long = opts and opts.long
+    
     server, session = _connect()
     srs = execute(server.SR.get_all, session)
-    print SR_LIST_FORMAT % {'name_label': 'SR Label',
-                            'uuid' : 'UUID',
-                            'physical_size': 'Size',
-                            'type': 'Type'}
-    for sr in srs:
-        sr_struct = execute(server.SR.get_record, session, sr)
-        sr_struct['physical_size'] = int(sr_struct['physical_size'])/MB
-        print SR_LIST_FORMAT % sr_struct
+    if not is_long:
+        print SR_LIST_FORMAT % {'name_label': 'SR Label',
+                                'uuid' : 'UUID',
+                                'physical_size': 'Size (MB)',
+                                'type': 'Type'}
+        
+        for sr in srs:
+            sr_struct = execute(server.SR.get_record, session, sr)
+            sr_struct['physical_size'] = int(sr_struct['physical_size'])/MB
+            print SR_LIST_FORMAT % sr_struct
+    else:
+        for sr in srs:
+            sr_struct = execute(server.SR.get_record, session, sr)        
+            pprint(sr_struct)
+
+def xapi_sr_rename(*args):
+    server, session = _connect()
+    sr = execute(server.SR.get_by_name_label, session, args[0])
+    execute(server.SR.set_name_label, session, sr[0], args[1])
 
 def xapi_vdi_create(*args):
     opts, args = parse_args('vdi-create', args)
@@ -421,10 +455,11 @@ def xapi_vdi_rename(*args):
     if len(args) < 2:
         raise OptionError('Not enough arguments')
 
-    vdi_uuid = args[0]
+    vdi_uuid = execute(server.VDI.get_by_name_label, session, args[0])
     vdi_name = args[1]
-    print 'Renaming VDI %s to %s' % (vdi_uuid, vdi_name)
-    result = execute(server.VDI.set_name_label, session, vdi_uuid, vdi_name)
+    
+    print 'Renaming VDI %s to %s' % (vdi_uuid[0], vdi_name)
+    result = execute(server.VDI.set_name_label, session, vdi_uuid[0], vdi_name)
     print 'Done.'
 
 
@@ -447,6 +482,14 @@ def xapi_vtpm_create(*args):
     vtpm_rec = execute(server.VTPM.get_record, session, vtpm_uuid)
     print "Has vtpm record '%s'" % vtpm_rec
 
+
+def xapi_pif_list(*args):
+    server, session = _connect()
+    pif_uuids = execute(server.PIF.get_all, session)
+    for pif_uuid in pif_uuids:
+        pif = execute(server.PIF.get_record, session, pif_uuid)
+        print pif
+    
 
 #
 # Command Line Utils
@@ -517,10 +560,12 @@ def usage(command = None, print_usage = True):
             print
             print 'Subcommands:'
             print
-        sorted_commands = sorted(COMMANDS.keys())
-        for command  in sorted_commands:
-            args, description = COMMANDS[command]
-            print '%-16s  %-40s' % (command, description)
+
+        for func in sorted(globals().keys()):
+            if func.startswith('xapi_'):
+                command = func[5:].replace('_', '-')
+                args, description = COMMANDS.get(command, ('', ''))
+                print '%-16s  %-40s' % (command, description)
         print
     else:
         parse_args(command, ['-h'])
@@ -549,7 +594,7 @@ def main(args):
     try:
         subcmd_func(*args[1:])
     except XenAPIError, e:
-        print 'Error: %s' % str(e.args[1])
+        print 'Error: %s' % str(e.args[0])
         sys.exit(2)
     except OptionError, e:
         print 'Error: %s' % e

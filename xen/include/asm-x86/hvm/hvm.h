@@ -185,7 +185,7 @@ hvm_guest_x86_mode(struct vcpu *v)
     return hvm_funcs.guest_x86_mode(v);
 }
 
-int hvm_instruction_length(unsigned long pc, int mode);
+int hvm_instruction_length(unsigned long pc, int address_bytes);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
@@ -219,9 +219,11 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     hvm_funcs.get_segment_register(v, seg, reg);
 }
 
+void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
+                                   unsigned int *ecx, unsigned int *edx);
 void hvm_stts(struct vcpu *v);
 void hvm_set_guest_time(struct vcpu *v, u64 gtime);
-void hvm_freeze_time(struct vcpu *v);
+u64 hvm_get_guest_time(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 

@@ -35,6 +35,7 @@ struct hvm_vcpu {
     struct vlapic       vlapic;
     s64                 cache_tsc_offset;
     u64                 guest_time;
+    struct list_head    tm_list;
 
     /* For AP startup */
     unsigned long       init_sipi_sipi_state;

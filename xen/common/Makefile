@@ -3,6 +3,7 @@ obj-y += bitmap.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += elf.o
+obj-$(CONFIG_COMPAT) += elf32.o
 obj-y += event_channel.o
 obj-y += grant_table.o
 obj-y += kernel.o
@@ -34,5 +35,16 @@ obj-$(xenoprof)    += xenoprof.o
 
 obj-$(CONFIG_XENCOMM) += xencomm.o
 
+subdir-$(CONFIG_COMPAT) += compat
+
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h
+
+ifeq ($(CONFIG_COMPAT),y)
+# extra dependencies
+acm_ops.o: compat/acm_ops.c
+grant_table.o: compat/grant_table.c
+kexec.o: compat/kexec.c
+schedule.o: compat/schedule.c
+xenoprof.o: compat/xenoprof.c
+endif

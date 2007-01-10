@@ -31,13 +31,15 @@
 #include <xen/event.h>
 
 
+extern struct hvm_mmio_handler hpet_mmio_handler;
 extern struct hvm_mmio_handler vlapic_mmio_handler;
 extern struct hvm_mmio_handler vioapic_mmio_handler;
 
-#define HVM_MMIO_HANDLER_NR 2
+#define HVM_MMIO_HANDLER_NR 3
 
 static struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
 {
+    &hpet_mmio_handler,
     &vlapic_mmio_handler,
     &vioapic_mmio_handler
 };
@@ -180,7 +182,7 @@ int hvm_buffered_io_intercept(ioreq_t *p)
     spin_lock(buffered_io_lock);
 
     if ( buffered_iopage->write_pointer - buffered_iopage->read_pointer ==
-         (unsigned long)IOREQ_BUFFER_SLOT_NUM ) {
+         (unsigned int)IOREQ_BUFFER_SLOT_NUM ) {
         /* the queue is full.
          * send the iopacket through the normal path.
          * NOTE: The arithimetic operation could handle the situation for
@@ -263,98 +265,6 @@ int register_io_handler(
 
     return 1;
 }
-
-static __inline__ void missed_ticks(struct periodic_time *pt)
-{
-    s_time_t missed_ticks;
-
-    missed_ticks = NOW() - pt->scheduled;
-    if ( missed_ticks > 0 ) {
-        missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
-        if ( missed_ticks > 1000 ) {
-            /* TODO: Adjust guest time togther */
-            pt->pending_intr_nr++;
-        }
-        else {
-            pt->pending_intr_nr += missed_ticks;
-        }
-        pt->scheduled += missed_ticks * pt->period;
-    }
-}
-
-/* hook function for the platform periodic time */
-void pt_timer_fn(void *data)
-{
-    struct vcpu *v = data;
-    struct periodic_time *pt = &v->domain->arch.hvm_domain.pl_time.periodic_tm;
-
-    pt->pending_intr_nr++;
-    pt->scheduled += pt->period;
-
-    /* Pick up missed timer ticks. */
-    missed_ticks(pt);
-
-    /* No need to run the timer while a VCPU is descheduled. */
-    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
-        set_timer(&pt->timer, pt->scheduled);
-
-    vcpu_kick(v);
-}
-
-/* pick up missed timer ticks at deactive time */
-void pickup_deactive_ticks(struct periodic_time *pt)
-{
-    if ( !active_timer(&(pt->timer)) ) {
-        missed_ticks(pt);
-        set_timer(&pt->timer, pt->scheduled);
-    }
-}
-
-/*
- * period: fire frequency in ns.
- */
-struct periodic_time * create_periodic_time(
-        u32 period, 
-        char irq,
-        char one_shot,
-        time_cb *cb,
-        void *data)
-{
-    struct periodic_time *pt = &(current->domain->arch.hvm_domain.pl_time.periodic_tm);
-    if ( pt->enabled ) {
-        stop_timer (&pt->timer);
-        pt->enabled = 0;
-    }
-    pt->bind_vcpu = 0; /* timer interrupt delivered to BSP by default */
-    pt->pending_intr_nr = 0;
-    pt->first_injected = 0;
-    if (period < 900000) { /* < 0.9 ms */
-        printk("HVM_PlatformTime: program too small period %u\n",period);
-        period = 900000;   /* force to 0.9ms */
-    }
-    pt->period = period;
-    pt->irq = irq;
-    pt->period_cycles = (u64)period * cpu_khz / 1000000L;
-    pt->one_shot = one_shot;
-    if ( one_shot ) {
-        printk("HVM_PL: No support for one shot platform time yet\n");
-    }
-    pt->scheduled = NOW() + period;
-    set_timer (&pt->timer,pt->scheduled);
-    pt->enabled = 1;
-    pt->cb = cb;
-    pt->priv = data;
-    return pt;
-}
-
-void destroy_periodic_time(struct periodic_time *pt)
-{
-    if ( pt->enabled ) {
-        stop_timer(&pt->timer);
-        pt->enabled = 0;
-    }
-}
-
 /*
  * Local variables:
  * mode: C

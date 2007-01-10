@@ -11,8 +11,6 @@
         .text
 
 ENTRY(start)
-ENTRY(stext)
-ENTRY(_stext)
         jmp __start
 
         .align 4

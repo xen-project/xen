@@ -91,17 +91,11 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long eflags;
     struct vcpu *v = current;
-    struct hvm_domain *plat=&v->domain->arch.hvm_domain;
-    struct periodic_time *pt = &plat->pl_time.periodic_tm;
     unsigned int idtv_info_field;
     unsigned long inst_len;
     int    has_ext_irq;
 
-    if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr )
-    {
-        hvm_isa_irq_deassert(current->domain, pt->irq);
-        hvm_isa_irq_assert(current->domain, pt->irq);
-    }
+    pt_update_irq(v);
 
     hvm_set_callback_irq_level();
 
@@ -181,8 +175,8 @@ asmlinkage void vmx_intr_assist(void)
         BUG();
         break;
     }
-    
-    hvm_interrupt_post(v, highest_vector, intr_type);
+
+    pt_intr_post(v, highest_vector, intr_type);
 }
 
 /*

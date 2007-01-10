@@ -56,6 +56,7 @@ struct ioreq {
     uint8_t dir:1;          /*  1=read, 0=write             */
     uint8_t df:1;
     uint8_t type;           /* I/O type                     */
+    uint8_t _pad0[6];
     uint64_t io_count;      /* How many IO done on a vcpu   */
 };
 typedef struct ioreq ioreq_t;
@@ -74,8 +75,8 @@ typedef struct shared_iopage shared_iopage_t;
 
 #define IOREQ_BUFFER_SLOT_NUM     80
 struct buffered_iopage {
-    unsigned long   read_pointer;
-    unsigned long   write_pointer;
+    unsigned int    read_pointer;
+    unsigned int    write_pointer;
     ioreq_t         ioreq[IOREQ_BUFFER_SLOT_NUM];
 };            /* sizeof this structure must be in one page */
 typedef struct buffered_iopage buffered_iopage_t;

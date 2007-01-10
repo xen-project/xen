@@ -41,7 +41,7 @@ XEN_API_CPU_FEATURE = [
     'CMOV', 'PAT', 'PSE36', 'PN', 'CLFLSH', 'DTES',
     'ACPI', 'MMX', 'FXCR', 'XMM', 'XMM2', 'SELFSNOOP',
     'HT', 'ACC', 'IA64', 'SYSCALL', 'MP', 'NX', 'MMXEXT',
-    'LM', '3DNOWEXT', '3DNOW', 'RECOVERY', 'LONGRUN',
+    'LM', 'THREEDNOWEXT', 'THREEDNOW', 'RECOVERY', 'LONGRUN',
     'LRTI', 'CXMMX', 'K6_MTRR', 'CYRIX_ARR', 'CENTAUR_MCR',
     'K8', 'K7', 'P3', 'P4', 'CONSTANT_TSC', 'FXSAVE_LEAK',
     'XMM3', 'MWAIT', 'DSCPL', 'EST', 'TM2', 'CID', 'CX16',
@@ -73,3 +73,4 @@ XEN_API_BOOT_TYPE = [
 XEN_API_VBD_MODE = ['RO', 'RW']
 XEN_API_VDI_TYPE = ['system', 'user', 'ephemeral']
 XEN_API_DRIVER_TYPE = ['ioemu', 'paravirtualised']
+XEN_API_VBD_TYPE = ['CD', 'Disk']

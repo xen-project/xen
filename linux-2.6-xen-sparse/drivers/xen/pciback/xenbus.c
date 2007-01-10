@@ -71,7 +71,6 @@ static int pciback_do_attach(struct pciback_device *pdev, int gnt_ref,
 			     int remote_evtchn)
 {
 	int err = 0;
-	int evtchn;
 	struct vm_struct *area;
 
 	dev_dbg(&pdev->xdev->dev,
@@ -86,12 +85,9 @@ static int pciback_do_attach(struct pciback_device *pdev, int gnt_ref,
 	pdev->sh_area = area;
 	pdev->sh_info = area->addr;
 
-	err = xenbus_bind_evtchn(pdev->xdev, remote_evtchn, &evtchn);
-	if (err)
-		goto out;
-
-	err = bind_evtchn_to_irqhandler(evtchn, pciback_handle_event,
-					SA_SAMPLE_RANDOM, "pciback", pdev);
+	err = bind_interdomain_evtchn_to_irqhandler(
+		pdev->xdev->otherend_id, remote_evtchn, pciback_handle_event,
+		SA_SAMPLE_RANDOM, "pciback", pdev);
 	if (err < 0) {
 		xenbus_dev_fatal(pdev->xdev, err,
 				 "Error binding event channel to IRQ");

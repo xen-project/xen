@@ -25,6 +25,7 @@
 #include <xen/kexec.h>
 #include <xen/sched.h>
 #include <public/xen.h>
+#include <asm/shared.h>
 #include <asm/hvm/hvm.h>
 
 static atomic_t waiting_for_crash_ipi;
@@ -103,7 +104,7 @@ void machine_crash_shutdown(void)
 
     info = kexec_crash_save_info();
     info->dom0_pfn_to_mfn_frame_list_list =
-        dom0->shared_info->arch.pfn_to_mfn_frame_list_list;
+        arch_get_pfn_to_mfn_frame_list_list(dom0);
 }
 
 /*

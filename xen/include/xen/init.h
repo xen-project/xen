@@ -4,6 +4,25 @@
 #include <xen/config.h>
 #include <asm/init.h>
 
+/*
+ * Mark functions and data as being only used at initialization
+ * or exit time.
+ */
+#define __init       \
+    __attribute__ ((__section__ (".init.text")))
+#define __exit       \
+    __attribute_used__ __attribute__ ((__section__(".exit.text")))
+#define __initdata   \
+    __attribute__ ((__section__ (".init.data")))
+#define __exitdata   \
+    __attribute_used__ __attribute__ ((__section__ (".exit.data")))
+#define __initsetup  \
+    __attribute_used__ __attribute__ ((__section__ (".init.setup")))
+#define __init_call  \
+    __attribute_used__ __attribute__ ((__section__ (".initcall1.init")))
+#define __exit_call  \
+    __attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
+
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)
  * as `initialization' functions. The kernel can take this

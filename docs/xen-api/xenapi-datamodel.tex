@@ -184,8 +184,8 @@ The following enumeration types are used:
 \hspace{0.5cm}{\tt NX} &  Execute Disable  \\
 \hspace{0.5cm}{\tt MMXEXT} &  AMD MMX extensions  \\
 \hspace{0.5cm}{\tt LM} &  Long Mode (x86-64)  \\
-\hspace{0.5cm}{\tt 3DNOWEXT} &  AMD 3DNow! extensions  \\
-\hspace{0.5cm}{\tt 3DNOW} &  3DNow!  \\
+\hspace{0.5cm}{\tt THREEDNOWEXT} &  AMD 3DNow! extensions  \\
+\hspace{0.5cm}{\tt THREEDNOW} &  3DNow!  \\
 \hspace{0.5cm}{\tt RECOVERY} &  CPU in recovery mode  \\
 \hspace{0.5cm}{\tt LONGRUN} &  Longrun power control  \\
 \hspace{0.5cm}{\tt LRTI} &  LongRun table interface  \\
@@ -244,18 +244,6 @@ The following enumeration types are used:
 \vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
-{\tt enum boot\_type} & \\
-\hline
-\hspace{0.5cm}{\tt bios} & boot an HVM guest using an emulated BIOS \\
-\hspace{0.5cm}{\tt grub} & boot from inside the machine using grub \\
-\hspace{0.5cm}{\tt kernel\_external} & boot from an external kernel \\
-\hspace{0.5cm}{\tt kernel\_internal} & boot from a kernel inside the guest filesystem \\
-\hline
-\end{longtable}
-
-\vspace{1cm}
-\begin{longtable}{|ll|}
-\hline
 {\tt enum vbd\_mode} & \\
 \hline
 \hspace{0.5cm}{\tt RO} & disk is mounted read-only \\
@@ -298,6 +286,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_host} & host ref & Currently connected host \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt this\_user} & user ref & Currently connected user \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_active} & int & Timestamp for last time session was active \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: session}
@@ -452,45 +441,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~create}
+\subsubsection{RPC name:~get\_last\_active}
 
 {\bf Overview:} 
-Create a new session instance, and return its handle.
+Get the last\_active field of the given session.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} (session ref) create (session_id s, session record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt session record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-session ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified session instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, session ref self)\end{verbatim}
+\begin{verbatim} int get_last_active (session_id s, session ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -508,11 +465,11 @@ Destroy the specified session instance.
 
  \noindent {\bf Return Type:} 
 {\tt 
-void
+int
 }
 
 
-
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -608,7 +565,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has f
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Return a list of all the tasks known to the system
+Return a list of all the tasks known to the system.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((task ref) Set) get_all (session_id s)\end{verbatim}
@@ -1014,70 +971,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new task instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (task ref) create (session_id s, task record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-task ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified task instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, task ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
@@ -1182,7 +1075,34 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VM} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual machine (or 'guest')}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual machine (or 'guest').
+
+VM booting is controlled by setting one of the two mutually exclusive
+groups: "PV", and "HVM".  If HVM.boot is the empty string, then paravirtual
+domain building and booting will be used; otherwise the VM will be loaded
+as an HVM domain, and booted using an emulated BIOS.
+
+When paravirtual booting is in use, the PV/bootloader field indicates the
+bootloader to use.  It may be "pygrub", in which case the platform's
+default installation of pygrub will be used, or a full path within the
+control domain to some other bootloader.  The other fields, PV/kernel,
+PV/ramdisk, PV/args and PV/bootloader\_args will be passed to the
+bootloader unmodified, and interpretation of those fields is then specific
+to the bootloader itself, including the possibility that the bootloader
+will ignore some or all of those given values.
+
+If the bootloader is pygrub, then the menu.lst is parsed if present in the
+guest's filesystem, otherwise the specified kernel and ramdisk are used, or
+an autodetected kernel is used if nothing is specified and autodetection is
+possible.  PV/args is appended to the kernel command line, no matter which
+mechanism is used for finding the kernel.
+
+If PV/bootloader is empty but PV/kernel is specified, then the kernel and
+ramdisk values will be treated as paths within the control domain.  If both
+PV/bootloader and PV/kernel are empty, then the behaviour is as if
+PV/bootloader was specified as "pygrub".
+
+When using HVM booting, HVM/boot specifies the order of the boot devices}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -1215,18 +1135,17 @@ $\mathit{RO}_\mathit{run}$ &  {\tt consoles} & (console ref) Set & virtual conso
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
-$\mathit{RW}$ &  {\tt bios/boot} & string & device to boot the guest from \\
+$\mathit{RW}$ &  {\tt PV/bootloader} & string & name of or path to bootloader \\
+$\mathit{RW}$ &  {\tt PV/kernel} & string & path to the kernel \\
+$\mathit{RW}$ &  {\tt PV/ramdisk} & string & path to the initrd \\
+$\mathit{RW}$ &  {\tt PV/args} & string & kernel command-line arguments \\
+$\mathit{RW}$ &  {\tt PV/bootloader\_args} & string & miscellaneous arguments for the bootloader \\
+$\mathit{RW}$ &  {\tt HVM/boot} & string & device boot order \\
 $\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
 $\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
 $\mathit{RW}$ &  {\tt platform/localtime} & bool & set RTC to local time \\
 $\mathit{RW}$ &  {\tt platform/clock\_offset} & bool & timeshift applied to guest's clock \\
 $\mathit{RW}$ &  {\tt platform/enable\_audio} & bool & emulate audio \\
-$\mathit{RW}$ &  {\tt builder} & string & domain builder to use \\
-$\mathit{RW}$ &  {\tt boot\_method} & boot\_type & select how this machine should boot \\
-$\mathit{RW}$ &  {\tt kernel/kernel} & string & path to kernel e.g. /boot/vmlinuz \\
-$\mathit{RW}$ &  {\tt kernel/initrd} & string & path to the initrd e.g. /boot/initrd.img \\
-$\mathit{RW}$ &  {\tt kernel/args} & string & extra kernel command-line arguments \\
-$\mathit{RW}$ &  {\tt grub/cmdline} & string & grub command-line \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt tools\_version} & (string $\rightarrow$ string) Map & versions of installed paravirtualised drivers \\
 $\mathit{RW}$ &  {\tt otherConfig} & (string $\rightarrow$ string) Map & additional configuration \\
@@ -1265,8 +1184,10 @@ VM ref
 
 The ID of the newly created VM.
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~start}
 
 {\bf Overview:} 
@@ -1299,8 +1220,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~pause}
 
 {\bf Overview:} 
@@ -1331,8 +1254,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~unpause}
 
 {\bf Overview:} 
@@ -1349,7 +1274,7 @@ Resume the specified VM. This can only be called when the specified VM is in the
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & vm & The VM to pause \\ \hline 
+{\tt VM ref } & vm & The VM to unpause \\ \hline 
 
 \end{tabular}
 
@@ -1363,14 +1288,18 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~clean\_shutdown}
 
 {\bf Overview:} 
 Attempt to cleanly shutdown the specified VM. (Note: this may not be supported---e.g. if a guest agent is not installed).
 
 Once shutdown has been completed perform poweroff action specified in guest configuration.
+
+This can only be called when the specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void clean_shutdown (session_id s, VM ref vm)\end{verbatim}
@@ -1397,14 +1326,18 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~clean\_reboot}
 
 {\bf Overview:} 
 Attempt to cleanly shutdown the specified VM (Note: this may not be supported---e.g. if a guest agent is not installed).
 
 Once shutdown has been completed perform reboot action specified in guest configuration.
+
+This can only be called when the specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void clean_reboot (session_id s, VM ref vm)\end{verbatim}
@@ -1431,8 +1364,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~hard\_shutdown}
 
 {\bf Overview:} 
@@ -1500,7 +1435,7 @@ void
 \subsubsection{RPC name:~suspend}
 
 {\bf Overview:} 
-Suspend the specified VM to disk.
+Suspend the specified VM to disk.  This can only be called when the specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void suspend (session_id s, VM ref vm)\end{verbatim}
@@ -1527,12 +1462,14 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~resume}
 
 {\bf Overview:} 
-Awaken the specified VM and resume it.
+Awaken the specified VM and resume it.  This can only be called when the specified VM is in the Suspended state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void resume (session_id s, VM ref vm, bool start_paused)\end{verbatim}
@@ -1561,8 +1498,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -2601,7 +2540,7 @@ void
 \subsubsection{RPC name:~add\_VCPUs\_features\_force\_on}
 
 {\bf Overview:} 
-set add message derived from field VCPUs/features/force\_on of object VM
+Add the given value to the VCPUs/features/force\_on field of the given VM.  If the value is already in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void add_VCPUs_features_force_on (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -2635,7 +2574,7 @@ void
 \subsubsection{RPC name:~remove\_VCPUs\_features\_force\_on}
 
 {\bf Overview:} 
-set remove message derived from field VCPUs/features/force\_on of object VM
+Remove the given value from the VCPUs/features/force\_on field of the given VM.  If the value is not in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void remove_VCPUs_features_force_on (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -2735,7 +2674,7 @@ void
 \subsubsection{RPC name:~add\_VCPUs\_features\_force\_off}
 
 {\bf Overview:} 
-set add message derived from field VCPUs/features/force\_off of object VM
+Add the given value to the VCPUs/features/force\_off field of the given VM.  If the value is already in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void add_VCPUs_features_force_off (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -2769,7 +2708,7 @@ void
 \subsubsection{RPC name:~remove\_VCPUs\_features\_force\_off}
 
 {\bf Overview:} 
-set remove message derived from field VCPUs/features/force\_off of object VM
+Remove the given value from the VCPUs/features/force\_off field of the given VM.  If the value is not in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void remove_VCPUs_features_force_off (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -3192,13 +3131,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_bios\_boot}
+\subsubsection{RPC name:~get\_PV\_bootloader}
 
 {\bf Overview:} 
-Get the bios/boot field of the given VM.
+Get the PV/bootloader field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_bios_boot (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} string get_PV_bootloader (session_id s, VM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3224,13 +3163,343 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_bios\_boot}
+\subsubsection{RPC name:~set\_PV\_bootloader}
 
 {\bf Overview:} 
-Set the bios/boot field of the given VM.
+Set the PV/bootloader field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_bios_boot (session_id s, VM ref self, string value)\end{verbatim}
+\begin{verbatim} void set_PV_bootloader (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_kernel}
+
+{\bf Overview:} 
+Get the PV/kernel field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_kernel (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_kernel}
+
+{\bf Overview:} 
+Set the PV/kernel field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_kernel (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_ramdisk}
+
+{\bf Overview:} 
+Get the PV/ramdisk field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_ramdisk (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_ramdisk}
+
+{\bf Overview:} 
+Set the PV/ramdisk field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_ramdisk (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_args}
+
+{\bf Overview:} 
+Get the PV/args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_args (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_args}
+
+{\bf Overview:} 
+Set the PV/args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_args (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_bootloader\_args}
+
+{\bf Overview:} 
+Get the PV/bootloader\_args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_PV_bootloader_args (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PV\_bootloader\_args}
+
+{\bf Overview:} 
+Set the PV/bootloader\_args field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PV_bootloader_args (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_HVM\_boot}
+
+{\bf Overview:} 
+Get the HVM/boot field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_HVM_boot (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_HVM\_boot}
+
+{\bf Overview:} 
+Set the HVM/boot field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_HVM_boot (session_id s, VM ref self, string value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3573,402 +3842,6 @@ Set the platform/enable\_audio field of the given VM.
 {\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_builder}
-
-{\bf Overview:} 
-Get the builder field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_builder (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_builder}
-
-{\bf Overview:} 
-Set the builder field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_builder (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_boot\_method}
-
-{\bf Overview:} 
-Get the boot\_method field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (boot_type) get_boot_method (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-boot\_type
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_boot\_method}
-
-{\bf Overview:} 
-Set the boot\_method field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_boot_method (session_id s, VM ref self, boot_type value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt boot\_type } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_kernel\_kernel}
-
-{\bf Overview:} 
-Get the kernel/kernel field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_kernel_kernel (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_kernel\_kernel}
-
-{\bf Overview:} 
-Set the kernel/kernel field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_kernel_kernel (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_kernel\_initrd}
-
-{\bf Overview:} 
-Get the kernel/initrd field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_kernel_initrd (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_kernel\_initrd}
-
-{\bf Overview:} 
-Set the kernel/initrd field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_kernel_initrd (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_kernel\_args}
-
-{\bf Overview:} 
-Get the kernel/args field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_kernel_args (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_kernel\_args}
-
-{\bf Overview:} 
-Set the kernel/args field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_kernel_args (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_grub\_cmdline}
-
-{\bf Overview:} 
-Get the grub/cmdline field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_grub_cmdline (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_grub\_cmdline}
-
-{\bf Overview:} 
-Set the grub/cmdline field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_grub_cmdline (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
 
 \end{tabular}
 
@@ -10480,6 +10353,239 @@ all fields from the object
 \vspace{0.3cm}
 
 \vspace{1cm}
+\newpage
+\section{Error Handling}
+When a low-level transport error occurs, or a request is malformed at the HTTP
+or XML-RPC level, the server may send an XML-RPC Fault response, or the client
+may simulate the same.  The client must be prepared to handle these errors,
+though they may be treated as fatal.  On the wire, these are transmitted in a
+form similar to this:
+
+\begin{verbatim}
+    <methodResponse>
+      <fault>
+        <value>
+          <struct>
+            <member>
+                <name>faultCode</name>
+                <value><int>-1</int></value>
+              </member>
+              <member>
+                <name>faultString</name>
+                <value><string>Malformed request</string></value>
+            </member>
+          </struct>
+        </value>
+      </fault>
+    </methodResponse>
+\end{verbatim}
+
+All other failures are reported with a more structured error response, to
+allow better automatic response to failures, proper internationalisation of
+any error message, and easier debugging.  On the wire, these are transmitted
+like this:
+
+\begin{verbatim}
+    <struct>
+      <member>
+        <name>Status</name>
+        <value>Failure</value>
+      </member>
+      <member>
+        <name>ErrorDescription</name>
+        <value>
+          <array>
+            <data>
+              <value>MAP_DUPLICATE_KEY</value>
+              <value>Customer</value>
+              <value>eSpeil Inc.</value>
+              <value>eSpeil Incorporated</value>
+            </data>
+          </array>
+        </value>
+      </member>
+    </struct>
+\end{verbatim}
+
+Note that {\tt ErrorDescription} value is an array of string values. The
+first element of the array is an error code; the remainder of the array are
+strings representing error parameters relating to that code.  In this case,
+the client has attempted to add the mapping {\tt Customer $\rightarrow$
+eSpiel Incorporated} to a Map, but it already contains the mapping
+{\tt Customer $\rightarrow$ eSpiel Inc.}, and so the request has failed.
+
+Each possible error code is documented in the following section.
+
+\subsection{Error Codes}
+
+\subsubsection{HOST\_CPU\_HANDLE\_INVALID}
+
+You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
+deleted.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HOST_CPU_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{HOST\_HANDLE\_INVALID}
+
+You gave an invalid host handle.  The host may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{INTERNAL\_ERROR}
+
+The server failed to handle your request, due to an internal error.  The
+given message may give details useful for debugging the problem.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MAP\_DUPLICATE\_KEY}
+
+You tried to add a key-value pair to a map, but that key is already there. 
+The key, current value, and the new value that you tried to set are all
+echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MESSAGE\_METHOD\_UNKNOWN}
+
+You tried to call a method that does not exist.  The method name that you
+used is echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
+
+You tried to call a method with the incorrect number of parameters.  The
+fully-qualified method name that you used, and the number of received and
+expected parameters are returned.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{NETWORK\_ALREADY\_CONNECTED}
+
+You tried to create a PIF, but the network you tried to attach it to is
+already attached to some other PIF, and so the creation failed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_AUTHENTICATION\_FAILED}
+
+The credentials given by the user are incorrect, so access has been denied,
+and you have not been issued a session handle.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_INVALID}
+
+You gave an invalid session handle.  It may have been invalidated by a
+server restart, or timed out.  You should get a new session handle, using
+one of the session.login\_ calls.  This error does not invalidate the
+current connection.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SR\_HANDLE\_INVALID}
+
+You gave an invalid SR handle.  The SR may have recently been deleted.  The
+handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SR_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VBD\_HANDLE\_INVALID}
+
+You gave an invalid VBD handle.  The VBD may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VBD_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VDI\_HANDLE\_INVALID}
+
+You gave an invalid VDI handle.  The VDI may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VDI_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VIF\_HANDLE\_INVALID}
+
+You gave an invalid VIF handle.  The VIF may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VIF_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_BAD\_POWER\_STATE}
+
+You attempted an operation on a VM that was not in an appropriate power
+state at the time; for example, you attempted to start a VM that was
+already running.  The parameters returned are the VM's UUID, and the
+expected and actual VM state at the time of the call.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_HANDLE\_INVALID}
+
+You gave an invalid VM handle.  The VM may have recently been deleted.  The
+handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VTPM\_HANDLE\_INVALID}
+
+You gave an invalid VTPM handle.  The VTPM may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VTPM_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+
+
+\newpage
 \section{DTD}
 General notes:
 \begin{itemize}

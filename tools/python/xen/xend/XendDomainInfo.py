@@ -37,7 +37,7 @@ from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
 
-from xen.xend import balloon, sxp, uuid, image, arch
+from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendRoot, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
@@ -81,18 +81,39 @@ log = logging.getLogger("xend.XendDomainInfo")
 
 def create(config):
     """Creates and start a VM using the supplied configuration. 
-    (called from XMLRPCServer directly)
 
     @param config: A configuration object involving lists of tuples.
     @type  config: list of lists, eg ['vm', ['image', 'xen.gz']]
 
     @rtype:  XendDomainInfo
-    @return: A up and running XendDomainInfo instance
+    @return: An up and running XendDomainInfo instance
     @raise VmError: Invalid configuration or failure to start.
     """
 
     log.debug("XendDomainInfo.create(%s)", scrub_password(config))
     vm = XendDomainInfo(XendConfig.XendConfig(sxp_obj = config))
+    try:
+        vm.start()
+    except:
+        log.exception('Domain construction failed')
+        vm.destroy()
+        raise
+
+    return vm
+
+def create_from_dict(config_dict):
+    """Creates and start a VM using the supplied configuration. 
+
+    @param config_dict: An configuration dictionary.
+
+    @rtype:  XendDomainInfo
+    @return: An up and running XendDomainInfo instance
+    @raise VmError: Invalid configuration or failure to start.
+    """
+
+    log.debug("XendDomainInfo.create_from_dict(%s)",
+              scrub_password(config_dict))
+    vm = XendDomainInfo(XendConfig.XendConfig(xapi = config_dict))
     try:
         vm.start()
     except:
@@ -418,7 +439,7 @@ class XendDomainInfo:
 
     def shutdown(self, reason):
         """Shutdown a domain by signalling this via xenstored."""
-        log.debug('XendDomainInfo.shutdown')
+        log.debug('XendDomainInfo.shutdown(%s)', reason)
         if self.state in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
             raise XendError('Domain cannot be shutdown')
 
@@ -490,7 +511,7 @@ class XendDomainInfo:
         # look up uuid of the device
         dev_control =  self.getDeviceController(deviceClass)
         dev_sxpr = dev_control.sxpr(devid)
-        dev_uuid = sxp.child_value(sxpr, 'uuid')
+        dev_uuid = sxp.child_value(dev_sxpr, 'uuid')
         if not dev_uuid:
             return False
 
@@ -893,7 +914,7 @@ class XendDomainInfo:
         return self.info.get('cpu_cap', 0)
 
     def getWeight(self):
-        return self.info['cpu_weight']
+        return self.info.get('cpu_weight', 256)
 
     def setResume(self, state):
         self._resume = state
@@ -948,9 +969,15 @@ class XendDomainInfo:
 
                 log.warn('Domain has crashed: name=%s id=%d.',
                          self.info['name_label'], self.domid)
+                self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
                 if xroot.get_enable_dump():
-                    self.dumpCore()
+                    try:
+                        self.dumpCore()
+                    except XendError:
+                        # This error has been logged -- there's nothing more
+                        # we can do in this context.
+                        pass
 
                 restart_reason = 'crash'
                 self._stateSet(DOM_STATE_HALTED)
@@ -967,6 +994,7 @@ class XendDomainInfo:
 
                     log.info('Domain has shutdown: name=%s id=%d reason=%s.',
                              self.info['name_label'], self.domid, reason)
+                    self._writeVm(LAST_SHUTDOWN_REASON, reason)
 
                     self._clearRestart()
 
@@ -1051,12 +1079,6 @@ class XendDomainInfo:
         """
         from xen.xend import XendDomain
         
-        config = self.sxpr()
-
-        if self._infoIsSet('cpus') and len(self.info['cpus']) != 0:
-            config.append(['cpus', reduce(lambda x, y: str(x) + "," + str(y),
-                                          self.info['cpus'])])
-
         if self._readVm(RESTART_IN_PROGRESS):
             log.error('Xend failed during restart of domain %s.  '
                       'Refusing to restart to avoid loops.',
@@ -1097,7 +1119,8 @@ class XendDomainInfo:
 
             new_dom = None
             try:
-                new_dom = XendDomain.instance().domain_create(config)
+                new_dom = XendDomain.instance().domain_create_from_dict(
+                    self.info)
                 new_dom.unpause()
                 rst_cnt = self._readVm('xend/restart_count')
                 rst_cnt = int(rst_cnt) + 1
@@ -1146,7 +1169,10 @@ class XendDomainInfo:
     #
 
     def dumpCore(self, corefile = None):
-        """Create a core dump for this domain.  Nothrow guarantee."""
+        """Create a core dump for this domain.
+
+        @raise: XendError if core dumping failed.
+        """
         
         try:
             if not corefile:
@@ -1539,6 +1565,8 @@ class XendDomainInfo:
         if boot:
             # HVM booting.
             self.info['image']['type'] = 'hvm'
+            if not 'devices' in self.info['image']:
+                self.info['image']['devices'] = {}
             self.info['image']['devices']['boot'] = boot
         elif not blexec and kernel:
             # Boot from dom0.  Nothing left to do -- the kernel and ramdisk
@@ -1547,7 +1575,7 @@ class XendDomainInfo:
         else:
             # Boot using bootloader
             if not blexec or blexec == 'pygrub':
-                blexec = '/usr/bin/pygrub'
+                blexec = osdep.pygrub_path
 
             blcfg = None
             for (devtype, devinfo) in self.info.all_devices_sxpr():
@@ -1598,7 +1626,7 @@ class XendDomainInfo:
                 log.error(msg)
                 raise VmError(msg)
         
-            self.info.update_with_image_sxp(blcfg)
+            self.info.update_with_image_sxp(blcfg, True)
 
 
     # 
@@ -1831,8 +1859,7 @@ class XendDomainInfo:
         return self.info.get('memory_dynamic_max', 0)
     def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_min', 0)
-    
-    
+
     def get_vcpus_policy(self):
         sched_id = xc.sched_id_get()
         if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
@@ -1847,8 +1874,6 @@ class XendDomainInfo:
         return XEN_API_VM_POWER_STATE[self.state]
     def get_platform_std_vga(self):
         return self.info.get('platform_std_vga', False)    
-    def get_platform_keymap(self):
-        return ''
     def get_platform_serial(self):
         return self.info.get('platform_serial', '')
     def get_platform_localtime(self):
@@ -1952,8 +1977,19 @@ class XendDomainInfo:
                     config['device'] = 'eth%d' % devid
                 else:
                     config['device'] = ''
-                    
-            config['network'] = '' # Invalid for Xend
+
+            if not config.has_key('network'):
+                try:
+                    config['network'] = \
+                        XendNode.instance().bridge_to_network(
+                        config.get('bridge')).uuid
+                except Exception:
+                    log.exception('bridge_to_network')
+                    # Ignore this for now -- it may happen if the device
+                    # has been specified using the legacy methods, but at
+                    # some point we're going to have to figure out how to
+                    # handle that properly.
+
             config['MTU'] = 1500 # TODO
             config['io_read_kbs'] = 0.0
             config['io_write_kbs'] = 0.0
@@ -1965,7 +2001,7 @@ class XendDomainInfo:
             config['image'] = config.get('uname', '')
             config['io_read_kbs'] = 0.0
             config['io_write_kbs'] = 0.0
-            if config['mode'] == 'r':
+            if config.get('mode', 'r') == 'r':
                 config['mode'] = 'RO'
             else:
                 config['mode'] = 'RW'

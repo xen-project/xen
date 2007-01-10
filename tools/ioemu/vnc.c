@@ -54,12 +54,12 @@ typedef struct Buffer
 {
     size_t capacity;
     size_t offset;
-    char *buffer;
+    uint8_t *buffer;
 } Buffer;
 
 typedef struct VncState VncState;
 
-typedef int VncReadEvent(VncState *vs, char *data, size_t len);
+typedef int VncReadEvent(VncState *vs, uint8_t *data, size_t len);
 
 typedef void VncWritePixels(VncState *vs, void *data, int size);
 
@@ -90,7 +90,7 @@ struct VncState
     uint64_t *update_row;	/* outstanding updates */
     int has_update;		/* there's outstanding updates in the
 				 * visible area */
-    char *old_data;
+    uint8_t *old_data;
     int depth; /* internal VNC frame buffer byte per pixel */
     int has_resize;
     int has_hextile;
@@ -140,7 +140,7 @@ static void _vnc_update_client(void *opaque);
 static void vnc_update_client(void *opaque);
 static void vnc_client_read(void *opaque);
 static void framebuffer_set_updated(VncState *vs, int x, int y, int w, int h);
-static int make_challenge(char *random, int size);
+static int make_challenge(unsigned char *random, int size);
 static void set_seed(unsigned int *seedp);
 static void get_random(int len, unsigned char *buf);
 
@@ -330,7 +330,7 @@ static void vnc_write_pixels_generic(VncState *vs, void *pixels1, int size)
 static void send_framebuffer_update_raw(VncState *vs, int x, int y, int w, int h)
 {
     int i;
-    char *row;
+    uint8_t *row;
 
     vnc_framebuffer_update(vs, x, y, w, h, 0);
 
@@ -394,9 +394,9 @@ static void send_framebuffer_update(VncState *vs, int x, int y, int w, int h)
 static void vnc_copy(DisplayState *ds, int src_x, int src_y, int dst_x, int dst_y, int w, int h)
 {
     int src, dst;
-    char *src_row;
-    char *dst_row;
-    char *old_row;
+    uint8_t *src_row;
+    uint8_t *dst_row;
+    uint8_t *old_row;
     int y = 0;
     int pitch = ds->linesize;
     VncState *vs = ds->opaque;
@@ -465,8 +465,8 @@ static void _vnc_update_client(void *opaque)
     VncState *vs = opaque;
     int64_t now;
     int y;
-    char *row;
-    char *old_row;
+    uint8_t *row;
+    uint8_t *old_row;
     uint64_t width_mask;
     int n_rectangles;
     int saved_offset;
@@ -491,7 +491,7 @@ static void _vnc_update_client(void *opaque)
     for (y = 0; y < vs->ds->height; y++) {
 	if (vs->dirty_row[y] & width_mask) {
 	    int x;
-	    char *ptr, *old_ptr;
+	    uint8_t *ptr, *old_ptr;
 
 	    ptr = row;
 	    old_ptr = old_row;
@@ -654,7 +654,7 @@ static int buffer_empty(Buffer *buffer)
     return buffer->offset == 0;
 }
 
-static char *buffer_end(Buffer *buffer)
+static uint8_t *buffer_end(Buffer *buffer)
 {
     return buffer->buffer + buffer->offset;
 }
@@ -778,7 +778,7 @@ static void vnc_write_u32(VncState *vs, uint32_t value)
 
 static void vnc_write_u16(VncState *vs, uint16_t value)
 {
-    char buf[2];
+    uint8_t buf[2];
 
     buf[0] = (value >> 8) & 0xFF;
     buf[1] = value & 0xFF;
@@ -788,7 +788,7 @@ static void vnc_write_u16(VncState *vs, uint16_t value)
 
 static void vnc_write_u8(VncState *vs, uint8_t value)
 {
-    vnc_write(vs, (char *)&value, 1);
+    vnc_write(vs, &value, 1);
 }
 
 static void vnc_flush(VncState *vs)
@@ -797,23 +797,23 @@ static void vnc_flush(VncState *vs)
 	vnc_client_write(vs);
 }
 
-static uint8_t read_u8(char *data, size_t offset)
+static uint8_t read_u8(uint8_t *data, size_t offset)
 {
     return data[offset];
 }
 
-static uint16_t read_u16(char *data, size_t offset)
+static uint16_t read_u16(uint8_t *data, size_t offset)
 {
     return ((data[offset] & 0xFF) << 8) | (data[offset + 1] & 0xFF);
 }
 
-static int32_t read_s32(char *data, size_t offset)
+static int32_t read_s32(uint8_t *data, size_t offset)
 {
     return (int32_t)((data[offset] << 24) | (data[offset + 1] << 16) |
 		     (data[offset + 2] << 8) | data[offset + 3]);
 }
 
-static uint32_t read_u32(char *data, size_t offset)
+static uint32_t read_u32(uint8_t *data, size_t offset)
 {
     return ((data[offset] << 24) | (data[offset + 1] << 16) |
 	    (data[offset + 2] << 8) | data[offset + 3]);
@@ -1115,11 +1115,10 @@ static void set_pixel_format(VncState *vs,
     vga_hw_update();
 }
 
-static int protocol_client_msg(VncState *vs, char *data, size_t len)
+static int protocol_client_msg(VncState *vs, uint8_t *data, size_t len)
 {
     int i;
     uint16_t limit;
-    int64_t now;
 
     switch (data[0]) {
     case 0:
@@ -1188,7 +1187,7 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
 		return 8 + v;
 	}
 
-	client_cut_text(vs, read_u32(data, 4), data + 8);
+	client_cut_text(vs, read_u32(data, 4), (char *)(data + 8));
 	break;
     default:
 	printf("Msg: %d\n", data[0]);
@@ -1200,7 +1199,7 @@ static int protocol_client_msg(VncState *vs, char *data, size_t len)
     return 0;
 }
 
-static int protocol_client_init(VncState *vs, char *data, size_t len)
+static int protocol_client_init(VncState *vs, uint8_t *data, size_t len)
 {
     size_t l;
     char pad[3] = { 0, 0, 0 };
@@ -1261,7 +1260,7 @@ static int protocol_client_init(VncState *vs, char *data, size_t len)
     return 0;
 }
 
-static int protocol_response(VncState *vs, char *client_response, size_t len)
+static int protocol_response(VncState *vs, uint8_t *client_response, size_t len)
 {
     extern char vncpasswd[64];
     extern unsigned char challenge[AUTHCHALLENGESIZE];
@@ -1299,7 +1298,7 @@ static int protocol_response(VncState *vs, char *client_response, size_t len)
     return 0;
 }
 
-static int protocol_version(VncState *vs, char *version, size_t len)
+static int protocol_version(VncState *vs, uint8_t *version, size_t len)
 {
     extern char vncpasswd[64];
     extern unsigned char challenge[AUTHCHALLENGESIZE];
@@ -1318,7 +1317,7 @@ static int protocol_version(VncState *vs, char *version, size_t len)
 
 
     support = 0;
-    if (maj = 3) {
+    if (maj == 3) {
 	if (min == 3 || min ==4) {
 	    support = 1;
 	}
@@ -1468,7 +1467,7 @@ int vnc_start_viewer(int port)
 
 unsigned int seed;
 
-static int make_challenge(char *random, int size)
+static int make_challenge(unsigned char *random, int size)
 {
  
     set_seed(&seed);

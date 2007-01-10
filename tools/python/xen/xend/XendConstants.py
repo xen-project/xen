@@ -80,6 +80,7 @@ ZOMBIE_PREFIX = 'Zombie-'
 MINIMUM_RESTART_TIME = 20
 
 RESTART_IN_PROGRESS = 'xend/restart_in_progress'
+LAST_SHUTDOWN_REASON = 'xend/last_shutdown_reason'
 
 #
 # Device migration stages (eg. XendDomainInfo, XendCheckpoint, server.tpmif)

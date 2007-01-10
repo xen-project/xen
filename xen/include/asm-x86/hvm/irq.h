@@ -61,7 +61,8 @@ struct hvm_irq {
     /*
      * Number of wires asserting each GSI.
      * 
-     * GSIs 0-15 are the ISA IRQs. ISA devices map directly into this space.
+     * GSIs 0-15 are the ISA IRQs. ISA devices map directly into this space
+     * except ISA IRQ 0, which is connected to GSI 2.
      * PCI links map into this space via the PCI-ISA bridge.
      * 
      * GSIs 16+ are used only be PCI devices. The mapping from PCI device to
@@ -87,6 +88,8 @@ struct hvm_irq {
 #define hvm_pci_intx_link(dev, intx) \
     (((dev) + (intx)) & 3)
 
+#define hvm_isa_irq_to_gsi(isa_irq) ((isa_irq) ? : 2)
+
 /* Modify state of a PCI INTx wire. */
 void hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx);
@@ -103,5 +106,10 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 
 void hvm_set_callback_irq_level(void);
 void hvm_set_callback_gsi(struct domain *d, unsigned int gsi);
+
+int cpu_get_interrupt(struct vcpu *v, int *type);
+int cpu_has_pending_irq(struct vcpu *v);
+int get_isa_irq_vector(struct vcpu *vcpu, int irq, int type);
+int is_isa_irq_masked(struct vcpu *v, int isa_irq);
 
 #endif /* __ASM_X86_HVM_IRQ_H__ */

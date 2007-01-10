@@ -55,6 +55,14 @@ void pmtimer_init(struct vcpu *v, int base)
     register_portio_handler(v->domain, base, 4, handle_pmt_io);
 }
 
+void pmtimer_migrate_timers(struct vcpu *v)
+{
+    struct PMTState *vpmt = &v->domain->arch.hvm_domain.pl_time.vpmt;
+
+    if (vpmt->vcpu == v)
+        migrate_timer(&vpmt->timer, v->processor);
+}
+
 void pmtimer_deinit(struct domain *d)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;

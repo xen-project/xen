@@ -446,8 +446,10 @@ static struct notifier_block xenstore_notifier;
 
 static int __init balloon_init(void)
 {
+#ifdef CONFIG_X86
 	unsigned long pfn;
 	struct page *page;
+#endif
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -476,13 +478,15 @@ static int __init balloon_init(void)
 	balloon_pde->write_proc = balloon_write;
 #endif
 	balloon_sysfs_init();
-    
+
+#ifdef CONFIG_X86
 	/* Initialise the balloon with excess memory space. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
 		page = pfn_to_page(pfn);
 		if (!PageReserved(page))
 			balloon_append(page);
 	}
+#endif
 
 	target_watch.callback = watch_target;
 	xenstore_notifier.notifier_call = balloon_init_watcher;

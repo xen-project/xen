@@ -13,7 +13,7 @@ static void CONCAT(send_hextile_tile_, NAME)(VncState *vs,
                                              uint32_t *last_fg32,
                                              int *has_bg, int *has_fg)
 {
-    char *row = (vs->ds->data + y * vs->ds->linesize + x * vs->depth);
+    uint8_t *row = (vs->ds->data + y * vs->ds->linesize + x * vs->depth);
     pixel_t *irow = (pixel_t *)row;
     int j, i;
     pixel_t *last_bg = (pixel_t *)last_bg32;
@@ -119,7 +119,7 @@ static void CONCAT(send_hextile_tile_, NAME)(VncState *vs,
 	for (j = 0; j < h; j++) {
 	    int has_color = 0;
 	    int min_x = -1;
-	    pixel_t color;
+	    pixel_t color = 0;
 
 	    for (i = 0; i < w; i++) {
 		if (!has_color) {

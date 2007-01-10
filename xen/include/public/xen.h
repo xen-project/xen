@@ -29,10 +29,8 @@
 
 #include "xen-compat.h"
 
-#if defined(__i386__)
-#include "arch-x86_32.h"
-#elif defined(__x86_64__)
-#include "arch-x86_64.h"
+#if defined(__i386__) || defined(__x86_64__)
+#include "arch-x86/xen.h"
 #elif defined(__ia64__)
 #include "arch-ia64.h"
 #elif defined(__powerpc__)
@@ -410,7 +408,9 @@ struct vcpu_info {
     struct arch_vcpu_info arch;
     struct vcpu_time_info time;
 }; /* 64 bytes (x86) */
+#ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
+#endif
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
@@ -468,7 +468,9 @@ struct shared_info {
     struct arch_shared_info arch;
 
 };
+#ifndef __XEN__
 typedef struct shared_info shared_info_t;
+#endif
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):

@@ -47,15 +47,13 @@
 #define DFPRINTF(_f, _a...) ((void)0)
 #endif
 
-#define QCOW_NONSPARSE_FILE 0x00
-#define QCOW_SPARSE_FILE 0x02
 #define MAX_NAME_LEN 1000
 
 void help(void)
 {
 	fprintf(stderr, "Qcow-utils: v1.0.0\n");
 	fprintf(stderr, 
-		"usage: qcow-create [-h help] [-p reserve] <SIZE(MB)> <FILENAME> "
+		"usage: qcow-create [-h help] [-r reserve] <SIZE(MB)> <FILENAME> "
 		"[<BACKING_FILENAME>]\n"); 
 	exit(-1);
 }
@@ -63,12 +61,12 @@ void help(void)
 int main(int argc, char *argv[])
 {
 	int ret = -1, c, backed = 0;
-	int flags =  QCOW_SPARSE_FILE;
+	int sparse =  1;
 	uint64_t size;
 	char filename[MAX_NAME_LEN], bfilename[MAX_NAME_LEN];
 
         for(;;) {
-                c = getopt(argc, argv, "hp");
+                c = getopt(argc, argv, "hr");
                 if (c == -1)
                         break;
                 switch(c) {
@@ -76,9 +74,12 @@ int main(int argc, char *argv[])
                         help();
                         exit(0);
                         break;
-                case 'p':
-			flags = QCOW_NONSPARSE_FILE;
+                case 'r':
+			sparse = 0;
 			break;
+		default:
+			fprintf(stderr, "Unknown option\n");
+			help();
 		}
 	}
 
@@ -96,6 +97,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (optind != argc) {
+		/*Backing file argument*/
 		backed = 1;
 		if (snprintf(bfilename, MAX_NAME_LEN, "%s",argv[optind++]) >=
 			MAX_NAME_LEN) {
@@ -106,12 +108,14 @@ int main(int argc, char *argv[])
 
 	DFPRINTF("Creating file size %llu, name %s\n",(long long unsigned)size, filename);
 	if (!backed)
-		ret = qcow_create(filename,size,NULL,flags);
+		ret = qcow_create(filename,size,NULL,sparse);
 	else
-		ret = qcow_create(filename,size,bfilename,flags);
+		ret = qcow_create(filename,size,bfilename,sparse);
 
-	if (ret < 0) DPRINTF("Unable to create QCOW file\n");
-	else DPRINTF("QCOW file successfully created\n");
+	if (ret < 0)
+		DPRINTF("Unable to create QCOW file\n");
+	else
+		DPRINTF("QCOW file successfully created\n");
 
 	return 0;
 }

@@ -57,8 +57,8 @@ int construct_madt(struct acpi_20_madt *madt)
     memset(madt, 0, sizeof(*madt));
     madt->header.signature    = ACPI_2_0_MADT_SIGNATURE;
     madt->header.revision     = ACPI_2_0_MADT_REVISION;
-    strncpy(madt->header.oem_id, "INTEL ", 6);
-    madt->header.oem_table_id = ACPI_OEM_TABLE_ID;
+    strncpy(madt->header.oem_id, ACPI_OEM_ID, 6);
+    strncpy(madt->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
     madt->header.oem_revision = ACPI_OEM_REVISION;
     madt->header.creator_id   = ACPI_CREATOR_ID;
     madt->header.creator_revision = ACPI_CREATOR_REVISION;
@@ -69,16 +69,28 @@ int construct_madt(struct acpi_20_madt *madt)
     intsrcovr = (struct acpi_20_madt_intsrcovr *)(madt + 1);
     for ( i = 0; i < 16; i++ )
     {
-        if ( !(PCI_ISA_IRQ_MASK & (1U << i)) )
-            continue;
-
-        /* PCI: active-low level-triggered */
         memset(intsrcovr, 0, sizeof(*intsrcovr));
         intsrcovr->type   = ACPI_INTERRUPT_SOURCE_OVERRIDE;
         intsrcovr->length = sizeof(*intsrcovr);
         intsrcovr->source = i;
-        intsrcovr->gsi    = i;
-        intsrcovr->flags  = 0xf;
+
+        if ( i == 0 )
+        {
+            /* ISA IRQ0 routed to IOAPIC GSI 2. */
+            intsrcovr->gsi    = 2;
+            intsrcovr->flags  = 0x0;
+        }
+        else if ( PCI_ISA_IRQ_MASK & (1U << i) )
+        {
+            /* PCI: active-low level-triggered. */
+            intsrcovr->gsi    = i;
+            intsrcovr->flags  = 0xf;
+        }
+        else
+        {
+            /* No need for a INT source override structure. */
+            continue;
+        }
 
         offset += sizeof(*intsrcovr);
         intsrcovr++;
@@ -98,7 +110,7 @@ int construct_madt(struct acpi_20_madt *madt)
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
         lapic->length  = sizeof(*lapic);
-        lapic->acpi_processor_id = lapic->apic_id = i + 1;
+        lapic->acpi_processor_id = lapic->apic_id = LAPIC_ID(i);
         lapic->flags   = ACPI_LOCAL_APIC_ENABLED;
         offset += sizeof(*lapic);
         lapic++;
@@ -110,10 +122,33 @@ int construct_madt(struct acpi_20_madt *madt)
     return align16(offset);
 }
 
+int construct_hpet(struct acpi_20_hpet *hpet)
+{
+    int offset;
+
+    memset(hpet, 0, sizeof(*hpet));
+    hpet->header.signature    = ACPI_2_0_HPET_SIGNATURE;
+    hpet->header.revision     = ACPI_2_0_HPET_REVISION;
+    strncpy(hpet->header.oem_id, ACPI_OEM_ID, 6);
+    strncpy(hpet->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
+    hpet->header.oem_revision = ACPI_OEM_REVISION;
+    hpet->header.creator_id   = ACPI_CREATOR_ID;
+    hpet->header.creator_revision = ACPI_CREATOR_REVISION;
+    hpet->timer_block_id      = 0x8086a201;
+    hpet->addr.address        = ACPI_HPET_ADDRESS;
+    offset = sizeof(*hpet);
+
+    hpet->header.length = offset;
+    set_checksum(hpet, offsetof(struct acpi_header, checksum), offset);
+
+    return offset;
+}
+
 int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
 {
     int offset = 0, nr_tables = 0;
     struct acpi_20_madt *madt;
+    struct acpi_20_hpet *hpet;
     struct acpi_20_tcpa *tcpa;
     static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
     uint16_t *tis_hdr;
@@ -125,6 +160,11 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         offset += construct_madt(madt);
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
+
+    /* HPET. */
+    hpet = (struct acpi_20_hpet *)&buf[offset];
+    offset += construct_hpet(hpet);
+    table_ptrs[nr_tables++] = (unsigned long)hpet;
 
     /* TPM TCPA and SSDT. */
     tis_hdr = (uint16_t *)0xFED40F00;
@@ -144,12 +184,11 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.signature = ACPI_2_0_TCPA_SIGNATURE;
         tcpa->header.length    = sizeof(*tcpa);
         tcpa->header.revision  = ACPI_2_0_TCPA_REVISION;
-        strncpy(tcpa->header.oem_id, "IBM   ", 6);
-        tcpa->header.oem_table_id = ASCII64(' ', ' ', ' ', ' ',
-                                            ' ', 'x', 'e', 'n');
-        tcpa->header.oem_revision = 1;
-        tcpa->header.creator_id   = ASCII32('I', 'B', 'M', ' ');
-        tcpa->header.creator_revision = 1;
+        strncpy(tcpa->header.oem_id, ACPI_OEM_ID, 6);
+        strncpy(tcpa->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
+        tcpa->header.oem_revision = ACPI_OEM_REVISION;
+        tcpa->header.creator_id   = ACPI_CREATOR_ID;
+        tcpa->header.creator_revision = ACPI_CREATOR_REVISION;
         tcpa->lasa = e820_malloc(
             ACPI_2_0_TCPA_LAML_SIZE, E820_RESERVED, (uint32_t)~0);
         if ( tcpa->lasa )

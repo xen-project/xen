@@ -8,6 +8,13 @@
 #include <public/physdev.h>
 #include <xen/types.h>
 
+/*
+ * Both do_mmuext_op() and do_mmu_update():
+ * We steal the m.s.b. of the @count parameter to indicate whether this
+ * invocation of do_mmu_update() is resuming a previously preempted call.
+ */
+#define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
+
 extern long
 do_event_channel_op_compat(
     XEN_GUEST_HANDLE(evtchn_op_t) uop);
@@ -113,6 +120,19 @@ do_set_callbacks(
     unsigned long event_address,
     unsigned long failsafe_selector,
     unsigned long failsafe_address);
+
+#endif
+
+#ifdef CONFIG_COMPAT
+
+extern int
+compat_physdev_op(
+    int cmd,
+    XEN_GUEST_HANDLE(void) arg);
+
+extern int
+arch_compat_vcpu_op(
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
 
 #endif
 

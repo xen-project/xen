@@ -52,22 +52,34 @@
  * The IRQ argument passed to the callback handler is the same as returned
  * from the bind call. It may not correspond to a Linux IRQ number.
  * Returns IRQ or negative errno.
- * UNBIND: Takes IRQ to unbind from; automatically closes the event channel.
  */
-extern int bind_evtchn_to_irqhandler(
-	unsigned int evtchn,
+int bind_caller_port_to_irqhandler(
+	unsigned int caller_port,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags,
 	const char *devname,
 	void *dev_id);
-extern int bind_virq_to_irqhandler(
+int bind_listening_port_to_irqhandler(
+	unsigned int remote_domain,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
+int bind_interdomain_evtchn_to_irqhandler(
+	unsigned int remote_domain,
+	unsigned int remote_port,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
+int bind_virq_to_irqhandler(
 	unsigned int virq,
 	unsigned int cpu,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags,
 	const char *devname,
 	void *dev_id);
-extern int bind_ipi_to_irqhandler(
+int bind_ipi_to_irqhandler(
 	unsigned int ipi,
 	unsigned int cpu,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
@@ -77,21 +89,21 @@ extern int bind_ipi_to_irqhandler(
 
 /*
  * Common unbind function for all event sources. Takes IRQ to unbind from.
- * Automatically closes the underlying event channel (even for bindings
- * made with bind_evtchn_to_irqhandler()).
+ * Automatically closes the underlying event channel (except for bindings
+ * made with bind_caller_port_to_irqhandler()).
  */
-extern void unbind_from_irqhandler(unsigned int irq, void *dev_id);
+void unbind_from_irqhandler(unsigned int irq, void *dev_id);
 
-extern void irq_resume(void);
+void irq_resume(void);
 
 /* Entry point for notifications into Linux subsystems. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
-extern void evtchn_device_upcall(int port);
+void evtchn_device_upcall(int port);
 
-extern void mask_evtchn(int port);
-extern void unmask_evtchn(int port);
+void mask_evtchn(int port);
+void unmask_evtchn(int port);
 
 static inline void clear_evtchn(int port)
 {
@@ -106,9 +118,10 @@ static inline void notify_remote_via_evtchn(int port)
 }
 
 /*
- * Unlike notify_remote_via_evtchn(), this is safe to use across
- * save/restore. Notifications on a broken connection are silently dropped.
+ * Use these to access the event channel underlying the IRQ handle returned
+ * by bind_*_to_irqhandler().
  */
-extern void notify_remote_via_irq(int irq);
+void notify_remote_via_irq(int irq);
+int irq_to_evtchn_port(int irq);
 
 #endif /* __ASM_EVTCHN_H__ */

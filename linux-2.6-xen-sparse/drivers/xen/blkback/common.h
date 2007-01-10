@@ -65,7 +65,6 @@ typedef struct blkif_st {
 	domid_t           domid;
 	unsigned int      handle;
 	/* Physical parameters of the comms window. */
-	unsigned int      evtchn;
 	unsigned int      irq;
 	/* Comms information. */
 	blkif_back_ring_t blk_ring;

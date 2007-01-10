@@ -15,6 +15,7 @@
  *
  */
 
+#ifndef COMPAT
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
@@ -28,6 +29,10 @@
 #include <xen/guest_access.h>
 #include <acm/acm_hooks.h>
 
+typedef long ret_t;
+
+#endif /* !COMPAT */
+
 #ifndef ACM_SECURITY
 
 
@@ -40,6 +45,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 #else
 
 
+#ifndef COMPAT
 int acm_authorize_acm_ops(struct domain *d)
 {
     /* currently, policy management functions are restricted to privileged domains */
@@ -47,11 +53,12 @@ int acm_authorize_acm_ops(struct domain *d)
         return -EPERM;
     return 0;
 }
+#endif
 
 
-long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    long rc = -EFAULT;
+    ret_t rc = -EFAULT;
 
     if (acm_authorize_acm_ops(current->domain))
         return -EPERM;
@@ -217,6 +224,10 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
+#endif
+
+#if defined(CONFIG_COMPAT) && !defined(COMPAT)
+#include "compat/acm_ops.c"
 #endif
 
 /*

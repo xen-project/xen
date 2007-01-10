@@ -15,11 +15,16 @@
 # Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
+import inspect
+import os
+import string
+import sys
+import traceback
+
 from xen.xend import XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging
 
 from xen.xend.XendAuthSessions import instance as auth_manager
-from xen.xend.XendAuthSessions import session_required
 from xen.xend.XendError import *
 from xen.xend.XendClient import ERROR_INVALID_DOMAIN
 from xen.xend.XendLogging import log
@@ -30,13 +35,19 @@ from xen.util.xmlrpclib2 import stringify
 AUTH_NONE = 'none'
 AUTH_PAM = 'pam'
 
+argcounts = {}
+
 # ------------------------------------------
 # Utility Methods for Xen API Implementation
 # ------------------------------------------
 
 def xen_api_success(value):
     """Wraps a return value in XenAPI format."""
-    return {"Status": "Success", "Value": stringify(value)}
+    if value is None:
+        s = ''
+    else:
+        s = stringify(value)
+    return {"Status": "Success", "Value": s}
 
 def xen_api_success_void():
     """Return success, but caller expects no return value."""
@@ -44,7 +55,16 @@ def xen_api_success_void():
 
 def xen_api_error(error):
     """Wraps an error value in XenAPI format."""
-    return {"Status": "Error", "ErrorDescription": error}
+    if type(error) == tuple:
+        error = list(error)
+    if type(error) != list:
+        error = [error]
+    if len(error) == 0:
+        error = ['INTERNAL_ERROR', 'Empty list given to xen_api_error']
+
+    return { "Status": "Failure",
+             "ErrorDescription": [str(x) for x in error] }
+
 
 def xen_api_todo():
     """Temporary method to make sure we track down all the TODOs"""
@@ -68,186 +88,164 @@ def trace(func, api_name = ''):
     trace_func.api = api_name
     return trace_func
 
-def valid_host(func):
-    """Decorator to verify if host_ref is valid before calling
-    method.
 
-    @param func: function with params: (self, session, host_ref)
+def catch_typeerror(func):
+    """Decorator to catch any TypeErrors and translate them into Xen-API
+    errors.
+
+    @param func: function with params: (self, ...)
+    @rtype: callable object
+    """
+    def f(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except TypeError, exn:
+            #log.exception('catch_typeerror')
+            if hasattr(func, 'api') and func.api in argcounts:
+                # Assume that if the exception was thrown inside this
+                # file, then it is due to an invalid call from the client,
+                # but if it was thrown elsewhere, then it's an internal
+                # error (which will be handled further up).
+                tb = sys.exc_info()[2]
+                try:
+                    sourcefile = traceback.extract_tb(tb)[-1][0]
+                    if sourcefile == inspect.getsourcefile(XendAPI):
+                        return xen_api_error(
+                            ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                             func.api, argcounts[func.api],
+                             len(args) + len(kwargs)])
+                finally:
+                    del tb
+            raise
+
+    return f
+
+
+def session_required(func):
+    """Decorator to verify if session is valid before calling method.
+
+    @param func: function with params: (self, session, ...)
     @rtype: callable object
     """    
-    def check_host_ref(self, session, host_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(host_ref) == type(str()) and xennode.is_valid_host(host_ref):
-            return func(self, session, host_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_HOST_INVALID}
-
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_host_ref.api = func.api
-        
-    return check_host_ref
-
-def valid_host_cpu(func):
-    """Decorator to verify if host_cpu_ref is valid before calling
-    method.
-
-    @param func: function with params: (self, session, host_cpu_ref)
-    @rtype: callable object
-    """    
-    def check_host_cpu_ref(self, session, host_cpu_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(host_cpu_ref) == type(str()) and \
-               xennode.is_valid_cpu(host_cpu_ref):
-            return func(self, session, host_cpu_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_HOST_CPU_INVALID}
-        
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_host_cpu_ref.api = func.api
-        
-    return check_host_cpu_ref
-
-def valid_vm(func):
-    """Decorator to verify if vm_ref is valid before calling
-    method.
-
-    @param func: function with params: (self, session, vm_ref)
-    @rtype: callable object
-    """    
-    def check_vm_ref(self, session, *args, **kwargs):
-        if len(args) == 0:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VM_INVALID}
-
-        vm_ref = args[0]
-        xendom = XendDomain.instance()
-        if type(vm_ref) == type(str()) and \
-               xendom.is_valid_vm(vm_ref):
+    def check_session(self, session, *args, **kwargs):
+        if auth_manager().is_session_valid(session):
             return func(self, session, *args, **kwargs)
         else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VM_INVALID}
+            return xen_api_error(['SESSION_INVALID', session])
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vm_ref.api = func.api
-        
-    return check_vm_ref
+    return check_session
 
-def valid_vbd(func):
-    """Decorator to verify if vbd_ref is valid before calling
-    method.
 
-    @param func: function with params: (self, session, vbd_ref)
+def _is_valid_ref(ref, validator):
+    return type(ref) == str and validator(ref)
+
+def _check_ref(validator, errcode, func, api, session, ref, *args, **kwargs):
+    if _is_valid_ref(ref, validator):
+        return func(api, session, ref, *args, **kwargs)
+    else:
+        return xen_api_error([errcode, ref])
+
+
+def valid_host(func):
+    """Decorator to verify if host_ref is valid before calling method.
+
+    @param func: function with params: (self, session, host_ref, ...)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().is_valid_host,
+                      'HOST_HANDLE_INVALID', func, *args, **kwargs)
+
+def valid_host_cpu(func):
+    """Decorator to verify if host_cpu_ref is valid before calling method.
+
+    @param func: function with params: (self, session, host_cpu_ref, ...)
     @rtype: callable object
     """    
-    def check_vbd_ref(self, session, vbd_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vbd_ref) == type(str()) and \
-               xendom.is_valid_dev('vbd', vbd_ref):
-            return func(self, session, vbd_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VBD_INVALID}
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().is_valid_cpu,
+                      'HOST_CPU_HANDLE_INVALID', func, *args, **kwargs)
 
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vbd_ref.api = func.api
-        
-    return check_vbd_ref
+def valid_vm(func):
+    """Decorator to verify if vm_ref is valid before calling method.
+
+    @param func: function with params: (self, session, vm_ref, ...)
+    @rtype: callable object
+    """    
+    return lambda *args, **kwargs: \
+           _check_ref(XendDomain.instance().is_valid_vm,
+                      'VM_HANDLE_INVALID', func, *args, **kwargs)
+
+def valid_network(func):
+    """Decorator to verify if network_ref is valid before calling method.
+
+    @param func: function with params: (self, session, network_ref, ...)
+    @rtype: callable object
+    """    
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().is_valid_network,
+                      'NETWORK_HANDLE_INVALID', func, *args, **kwargs)
+
+def valid_vbd(func):
+    """Decorator to verify if vbd_ref is valid before calling method.
+
+    @param func: function with params: (self, session, vbd_ref, ...)
+    @rtype: callable object
+    """    
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vbd', r),
+                      'VBD_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vif(func):
-    """Decorator to verify if vif_ref is valid before calling
-    method.
+    """Decorator to verify if vif_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vif_ref)
+    @param func: function with params: (self, session, vif_ref, ...)
     @rtype: callable object
     """
-    def check_vif_ref(self, session, vif_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vif_ref) == type(str()) and \
-               xendom.is_valid_dev('vif', vif_ref):
-            return func(self, session, vif_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VIF_INVALID}
-
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vif_ref.api = func.api
-        
-    return check_vif_ref
-
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vif', r),
+                      'VIF_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vdi(func):
-    """Decorator to verify if vdi_ref is valid before calling
-    method.
+    """Decorator to verify if vdi_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vdi_ref)
+    @param func: function with params: (self, session, vdi_ref, ...)
     @rtype: callable object
     """
-    def check_vdi_ref(self, session, vdi_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(vdi_ref) == type(str()) and \
-               xennode.get_sr().is_valid_vdi(vdi_ref):
-            return func(self, session, vdi_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VDI_INVALID}
-
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vdi_ref.api = func.api
-        
-    return check_vdi_ref
+    return lambda *args, **kwargs: \
+           _check_ref(XendNode.instance().get_sr().is_valid_vdi,
+                      'VDI_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vtpm(func):
-    """Decorator to verify if vtpm_ref is valid before calling
-    method.
+    """Decorator to verify if vtpm_ref is valid before calling method.
 
-    @param func: function with params: (self, session, vtpm_ref)
+    @param func: function with params: (self, session, vtpm_ref, ...)
     @rtype: callable object
     """
-    def check_vtpm_ref(self, session, vtpm_ref, *args, **kwargs):
-        xendom = XendDomain.instance()
-        if type(vtpm_ref) == type(str()) and \
-               xendom.is_valid_dev('vtpm', vtpm_ref):
-            return func(self, session, vtpm_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_VTPM_INVALID}
-
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_vtpm_ref.api = func.api
-
-    return check_vtpm_ref
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vtpm', r),
+                      'VTPM_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_sr(func):
+    """Decorator to verify if sr_ref is valid before calling method.
+
+    @param func: function with params: (self, session, sr_ref, ...)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendNode.instance().get_sr().uuid == r,
+                      'SR_HANDLE_INVALID', func, *args, **kwargs)
+
+def valid_pif(func):
     """Decorator to verify if sr_ref is valid before calling
     method.
 
     @param func: function with params: (self, session, sr_ref)
     @rtype: callable object
     """
-    def check_sr_ref(self, session, sr_ref, *args, **kwargs):
-        xennode = XendNode.instance()
-        if type(sr_ref) == type(str()) and \
-               xennode.get_sr().uuid == sr_ref:
-            return func(self, session, sr_ref, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_SR_INVALID}
-
-    # make sure we keep the 'api' attribute
-    if hasattr(func, 'api'):
-        check_sr_ref.api = func.api
-        
-    return check_sr_ref
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: r in XendNode.instance().pifs,
+                      'PIF_HANDLE_INVALID', func, *args, **kwargs)
 
 # -----------------------------
 # Bridge to Legacy XM API calls
@@ -263,10 +261,14 @@ def do_vm_func(fn_name, vm_ref, *args, **kwargs):
     @param *args: more arguments
     @type *args: tuple
     """
-    xendom = XendDomain.instance()
-    fn = getattr(xendom, fn_name)
-    xendom.do_legacy_api_with_uuid(fn, vm_ref, *args, **kwargs)
-    return xen_api_success_void()
+    try:
+        xendom = XendDomain.instance()
+        fn = getattr(xendom, fn_name)
+        xendom.do_legacy_api_with_uuid(fn, vm_ref, *args, **kwargs)
+        return xen_api_success_void()
+    except VMBadState, exn:
+        return xen_api_error(['VM_BAD_POWER_STATE', vm_ref, exn.expected,
+                              exn.actual])
 
 
 class XendAPI:
@@ -274,7 +276,7 @@ class XendAPI:
     used via XMLRPCServer.
 
     All methods that need a valid session are marked with
-    a L{XendAuthManager.session_required} decorator that will
+    a L{session_required} decorator that will
     transparently perform the required session authentication.
 
     We need to support Python <2.4, so we use the old decorator syntax.
@@ -284,109 +286,13 @@ class XendAPI:
     """
 
     def __init__(self, auth):
-        """Initialised Xen API wrapper by making sure all functions
-        have the correct validation decorators such as L{valid_host}
-        and L{session_required}.
-        """
         self.auth = auth
-
-        classes = {
-            'session': (session_required,),
-            'host': (valid_host, session_required),
-            'host_cpu': (valid_host_cpu, session_required),
-            'VM': (valid_vm, session_required),
-            'VBD': (valid_vbd, session_required),
-            'VIF': (valid_vif, session_required),
-            'VDI': (valid_vdi, session_required),
-            'VTPM':(valid_vtpm, session_required),
-            'SR':  (valid_sr, session_required)}
-        
-        # Cheat methods
-        # -------------
-        # Methods that have a trivial implementation for all classes.
-        # 1. get_by_uuid == getting by ref, so just return uuid for
-        #    all get_by_uuid() methods.
-        
-        for cls in classes.keys():
-            get_by_uuid = '%s_get_by_uuid' % cls
-            get_uuid = '%s_get_uuid' % cls
-            setattr(XendAPI, get_by_uuid,
-                    lambda s, sess, obj_ref: xen_api_success(obj_ref))
-            setattr(XendAPI, get_uuid,
-                    lambda s, sess, obj_ref: xen_api_success(obj_ref))
-
-        # 2. get_record is just getting all the attributes, so provide
-        #    a fake template implementation.
-        # 
-        # TODO: ...
-
-
-        # Wrapping validators around XMLRPC calls
-        # ---------------------------------------
-        
-        for cls, validators in classes.items():
-            ro_attrs = getattr(self, '%s_attr_ro' % cls, [])
-            rw_attrs = getattr(self, '%s_attr_rw' % cls, [])
-            methods  = getattr(self, '%s_methods' % cls, [])
-            funcs    = getattr(self, '%s_funcs' % cls, [])
-
-            # wrap validators around readable class attributes
-            for attr_name in ro_attrs + rw_attrs + self.Base_attr_ro:
-                getter_name = '%s_get_%s' % (cls, attr_name)
-                try:
-                    getter = getattr(XendAPI, getter_name)
-                    for validator in validators:
-                        getter = validator(getter)
-                    getter.api = '%s.get_%s' % (cls, attr_name)
-                    setattr(XendAPI, getter_name, getter)
-                except AttributeError:
-                    pass
-                    #log.warn("API call: %s not found" % getter_name)
-
-            # wrap validators around writable class attrributes
-            for attr_name in rw_attrs + self.Base_attr_rw:
-                setter_name = '%s_set_%s' % (cls, attr_name)
-                try:
-                    setter = getattr(XendAPI, setter_name)
-                    for validator in validators:
-                        setter = validator(setter)
-                    setter.api = '%s.set_%s' % (cls, attr_name)
-                    setattr(XendAPI, setter_name, setter)
-                except AttributeError:
-                    pass
-                    #log.warn("API call: %s not found" % setter_name)
-
-            # wrap validators around methods
-            for method_name in methods + self.Base_methods:
-                method_full_name = '%s_%s' % (cls, method_name)
-
-                try:
-                    method = getattr(XendAPI, method_full_name)
-                    for validator in validators:
-                        method = validator(method)
-                    method.api = '%s.%s' % (cls, method_name)
-                    setattr(XendAPI, method_full_name, method)
-                except AttributeError:
-                    pass
-                    #log.warn('API call: %s not found' % method_full_name)
-
-            # wrap validators around class functions
-            for func_name in funcs + self.Base_funcs:
-                func_full_name = '%s_%s' % (cls, func_name)
-                try:
-                    method = getattr(XendAPI, func_full_name)
-                    method = session_required(method)
-                    method.api = '%s.%s' % (cls, func_name)
-                    setattr(XendAPI, func_full_name, method)
-                except AttributeError:
-                    pass
-                    #log.warn('API call: %s not found' % func_full_name)
 
 
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
-    Base_methods = ['destroy', 'get_record']
-    Base_funcs   = ['create', 'get_by_uuid', 'get_all']
+    Base_methods = ['destroy', 'get_by_uuid', 'get_record']
+    Base_funcs   = ['create', 'get_all']
 
     # Xen API: Class Session
     # ----------------------------------------------------------------
@@ -396,14 +302,20 @@ class XendAPI:
     session_methods = ['logout']
     # session_funcs = ['login_with_password']    
 
-    def session_login_with_password(self, username, password):
+    def session_login_with_password(self, *args):
+        if len(args) != 2:
+            return xen_api_error(
+                ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                 'session.login_with_password', 2, len(args)])
+        username = args[0]
+        password = args[1]
         try:
             session = (self.auth == AUTH_NONE and
                        auth_manager().login_unconditionally(username) or
                        auth_manager().login_with_password(username, password))
             return xen_api_success(session)
         except XendError, e:
-            return xen_api_error(XEND_ERROR_AUTHENTICATION_FAILED)
+            return xen_api_error(['SESSION_AUTHENTICATION_FAILED'])
     session_login_with_password.api = 'session.login_with_password'
 
 
@@ -425,7 +337,7 @@ class XendAPI:
         user = auth_manager().get_user(session)
         if user:
             return xen_api_success(user)
-        return xen_api_error(XEND_ERROR_SESSION_INVALID)
+        return xen_api_error(['SESSION_INVALID', session])
 
 
     # Xen API: Class User
@@ -548,17 +460,155 @@ class XendAPI:
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
 
-    # Xen API: Class Network
+    # Xen API: Class network
     # ----------------------------------------------------------------
-    # TODO: NOT IMPLEMENTED
 
-    Network_attr_ro = ['VIFs']
-    Network_attr_rw = ['name_label',
+    network_attr_ro = ['VIFs', 'PIFs']
+    network_attr_rw = ['name_label',
                        'name_description',
-                       'NIC',
-                       'VLAN',
                        'default_gateway',
                        'default_netmask']
+
+    def network_create(self, _, name_label, name_description,
+                       default_gateway, default_netmask):
+        return xen_api_success(
+            XendNode.instance().network_create(name_label, name_description,
+                                               default_gateway,
+                                               default_netmask))
+
+    def network_destroy(self, _, ref):
+        return xen_api_success(XendNode.instance().network_destroy(ref))
+
+    def _get_network(self, ref):
+        return XendNode.instance().get_network(ref)
+
+    def network_get_all(self, _):
+        return xen_api_success(XendNode.instance().get_network_refs())
+
+    def network_get_record(self, _, ref):
+        return xen_api_success(
+            XendNode.instance().get_network(ref).get_record())
+
+    def network_get_name_label(self, _, ref):
+        return xen_api_success(self._get_network(ref).name_label)
+
+    def network_get_name_description(self, _, ref):
+        return xen_api_success(self._get_network(ref).name_description)
+
+    def network_get_default_gateway(self, _, ref):
+        return xen_api_success(self._get_network(ref).default_gateway)
+
+    def network_get_default_netmask(self, _, ref):
+        return xen_api_success(self._get_network(ref).default_netmask)
+
+    def network_get_VIFs(self, _, ref):
+        return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
+
+    def network_get_PIFs(self, session, ref):
+        return xen_api_success(self._get_network(ref).get_PIF_UUIDs())
+
+    def network_set_name_label(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_name_label(val))
+
+    def network_set_name_description(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_name_description(val))
+
+    def network_set_default_gateway(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_default_gateway(val))
+
+    def network_set_default_netmask(self, _, ref, val):
+        return xen_api_success(self._get_network(ref).set_default_netmask(val))
+
+
+    # Xen API: Class PIF
+    # ----------------------------------------------------------------
+
+    PIF_attr_ro = ['io_read_kbs',
+                   'io_write_kbs']
+    PIF_attr_rw = ['name',
+                   'network',
+                   'host',
+                   'MAC',
+                   'MTU',
+                   'VLAN']
+
+    PIF_attr_inst = PIF_attr_rw
+
+    PIF_methods = ['create_VLAN']
+
+    def _get_PIF(self, ref):
+        return XendNode.instance().pifs[ref]
+
+    def PIF_create(self, _, name, network_uuid, host_uuid, mac, mtu, vlan):
+        try:
+            node = XendNode.instance()
+            if host_uuid != node.uuid:
+                return xen_api_error(['HOST_HANDLE_INVALID', host_uuid])
+
+            elif _is_valid_ref(network_uuid, node.is_valid_network):
+                network = node.get_network(network_uuid)
+                return xen_api_success(node.PIF_create(name, mtu, vlan, mac,
+                                                       network))
+            else:
+                return xen_api_error(['NETWORK_HANDLE_INVALID', network_uuid])
+        except NetworkAlreadyConnected, exn:
+            return xen_api_error(['NETWORK_ALREADY_CONNECTED',
+                                  network_uuid, exn.pif_uuid])
+
+    def PIF_destroy(self, _, ref):
+        return xen_api_success(XendNode.instance().PIF_destroy(ref))
+
+    # object methods
+    def PIF_get_record(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).get_record())
+
+    def PIF_get_all(self, _):
+        return xen_api_success(XendNode.instance().pifs.keys())
+
+    def PIF_get_name(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).name)
+
+    def PIF_get_network(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).network.uuid)
+
+    def PIF_get_host(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).host.uuid)
+
+    def PIF_get_MAC(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).mac)
+
+    def PIF_get_MTU(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).mtu)
+
+    def PIF_get_VLAN(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).vlan)
+
+    def PIF_get_io_read_kbs(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).get_io_read_kbs())
+
+    def PIF_get_io_write_kbs(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).get_io_write_kbs())
+    
+    def PIF_set_name(self, _, ref, name):
+        return xen_api_success(self._get_PIF(ref).set_name(name))
+
+    def PIF_set_MAC(self, _, ref, mac):
+        return xen_api_success(self._get_PIF(ref).set_mac(mac))
+
+    def PIF_set_MTU(self, _, ref, mtu):
+        return xen_api_success(self._get_PIF(ref).set_mtu(mtu))
+
+    def PIF_create_VLAN(self, _, ref, network, vlan):
+        try:
+            if _is_valid_ref(network, XendNode.instance().is_valid_network):
+                return xen_api_success(XendNode.instance().PIF_create_VLAN(
+                    ref, network, vlan))
+            else:
+                return xen_api_error(['NETWORK_HANDLE_INVALID', network])
+        except NetworkAlreadyConnected, exn:
+            return xen_api_error(['NETWORK_ALREADY_CONNECTED',
+                                  network, exn.pif_uuid])
+
 
     # Xen API: Class VM
     # ----------------------------------------------------------------        
@@ -833,55 +883,55 @@ class XendAPI:
         dom.setName(label)
         return xen_api_success_void()
     
-    def VM_set_name_description(self, session, vm_ref):
+    def VM_set_name_description(self, session, vm_ref, desc):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_user_version(self, session, vm_ref):
+    def VM_set_user_version(self, session, vm_ref, ver):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_is_a_template(self, session, vm_ref):
+    def VM_set_is_a_template(self, session, vm_ref, is_template):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_memory_dynamic_max(self, session, vm_ref):
+    def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_memory_dynamic_min(self, session, vm_ref):
+    def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_policy(self, session, vm_ref):
+    def VM_set_VCPUs_policy(self, session, vm_ref, policy):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_params(self, session, vm_ref):
+    def VM_set_VCPUs_params(self, session, vm_ref, params):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_features_force_on(self, session, vm_ref):
+    def VM_set_VCPUs_features_force_on(self, session, vm_ref, features):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_VCPUs_features_force_off(self, session, vm_ref):
+    def VM_set_VCPUs_features_force_off(self, session, vm_ref, features):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_shutdown(self, session, vm_ref):
+    def VM_set_actions_after_shutdown(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_reboot(self, session, vm_ref):
+    def VM_set_actions_after_reboot(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_suspend(self, session, vm_ref):
+    def VM_set_actions_after_suspend(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_actions_after_crash(self, session, vm_ref):
+    def VM_set_actions_after_crash(self, session, vm_ref, action):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success_void()
 
@@ -905,27 +955,27 @@ class XendAPI:
 
     def VM_set_platform_std_VGA(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_serial(self, session, vm_ref):
+    def VM_set_platform_serial(self, session, vm_ref, serial):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_localtime(self, session, vm_ref):
+    def VM_set_platform_localtime(self, session, vm_ref, localtime):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_clock_offset(self, session, vm_ref):
+    def VM_set_platform_clock_offset(self, session, vm_ref, clock_offset):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
-    def VM_set_platform_enable_audio(self, session, vm_ref):
+    def VM_set_platform_enable_audio(self, session, vm_ref, enable_audio):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
     def VM_set_otherConfig(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success_void()
+        return xen_api_todo()
     
     # class methods
     def VM_get_all(self, session):
@@ -937,7 +987,7 @@ class XendAPI:
         dom = xendom.domain_lookup_nr(label)
         if dom:
             return xen_api_success([dom.get_uuid()])
-        return xen_api_error(XEND_ERROR_VM_INVALID)
+        return xen_api_success([])
     
     def VM_create(self, session, vm_struct):
         xendom = XendDomain.instance()
@@ -949,7 +999,7 @@ class XendAPI:
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         if not xeninfo:
-            return xen_api_error(XEND_ERROR_VM_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vm_ref])
         
         record = {
             'uuid': xeninfo.get_uuid(),
@@ -1051,10 +1101,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VBD_INVALID)
+            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
         cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VBD_INVALID)
+            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
 
         valid_vbd_keys = self.VBD_attr_ro + self.VBD_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
@@ -1073,7 +1123,7 @@ class XendAPI:
     def VBD_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
         if not xendom.is_valid_vm(vbd_struct['VM']):
-            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vbd_struct['VM']])
         
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
         vbd_ref = ''
@@ -1087,7 +1137,7 @@ class XendAPI:
                 sr = XendNode.instance().get_sr()
                 vdi_image = sr.xen_api_get_by_uuid(vdi_ref)
                 if not vdi_image:
-                    return xen_api_error(XEND_ERROR_VDI_INVALID)
+                    return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
                 vdi_image = vdi_image.qcow_path
                 vbd_ref = dom.create_vbd_with_vdi(vbd_struct, vdi_image)
         except XendError:
@@ -1137,10 +1187,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VIF_INVALID)
+            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
         cfg = vm.get_dev_xenapi_config('vif', vif_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VIF_INVALID)
+            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
         
         valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
@@ -1164,7 +1214,7 @@ class XendAPI:
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
-            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vif_struct['VM']])
 
 
     # Xen API: Class VDI
@@ -1185,74 +1235,54 @@ class XendAPI:
 
     VDI_methods = ['snapshot']
     VDI_funcs = ['get_by_name_label']
+
+    def _get_VDI(self, ref):
+        return XendNode.instance().get_sr().xen_api_get_by_uuid(ref)
     
     def VDI_get_VBDs(self, session, vdi_ref):
         return xen_api_todo()
     
     def VDI_get_physical_utilisation(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.get_physical_utilisation())        
+        return xen_api_success(self._get_VDI(vdi_ref).
+                               get_physical_utilisation())        
     
     def VDI_get_sector_size(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.sector_size)        
+        return xen_api_success(self._get_VDI(vdi_ref).sector_size)        
     
     def VDI_get_type(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.type)
+        return xen_api_success(self._get_VDI(vdi_ref).type)
     
     def VDI_get_parent(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.parent)        
+        return xen_api_success(self._get_VDI(vdi_ref).parent)        
     
     def VDI_get_children(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.children)        
+        return xen_api_success(self._get_VDI(vdi_ref).children)        
     
     def VDI_get_name_label(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.name_label)
+        return xen_api_success(self._get_VDI(vdi_ref).name_label)
 
     def VDI_get_name_description(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.name_description)
+        return xen_api_success(self._get_VDI(vdi_ref).name_description)
 
     def VDI_get_SR(self, session, vdi_ref):
         sr = XendNode.instance().get_sr()
         return xen_api_success(sr.uuid)
 
     def VDI_get_virtual_size(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.virtual_size)
+        return xen_api_success(self._get_VDI(vdi_ref).virtual_size)
 
     def VDI_get_sharable(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.sharable)
+        return xen_api_success(self._get_VDI(vdi_ref).sharable)
 
     def VDI_get_read_only(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        return xen_api_success(image.sharable)        
+        return xen_api_success(self._get_VDI(vdi_ref).read_only)        
 
     def VDI_set_name_label(self, session, vdi_ref, value):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        image.name_label = value
+        self._get_VDI(vdi_ref).name_label = value
         return xen_api_success_void()
 
     def VDI_set_name_description(self, session, vdi_ref, value):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
-        image.name_description = value
+        self._get_VDI(vdi_ref).name_description = value
         return xen_api_success_void()
 
     def VDI_set_SR(self, session, vdi_ref, value):
@@ -1262,9 +1292,12 @@ class XendAPI:
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
     def VDI_set_sharable(self, session, vdi_ref, value):
-        return xen_api_todo()
+        self._get_VDI(vdi_ref).sharable = bool(value)
+        return xen_api_success_void()
+    
     def VDI_set_read_only(self, session, vdi_ref, value):
-        return xen_api_todo()
+        self._get_VDI(vdi_ref).read_only = bool(value)
+        return xen_api_success_void()
 
     # Object Methods
     def VDI_snapshot(self, session, vdi_ref):
@@ -1278,31 +1311,28 @@ class XendAPI:
     def VDI_get_record(self, session, vdi_ref):
         sr = XendNode.instance().get_sr()
         image = sr.xen_api_get_by_uuid(vdi_ref)
-        if image:
-            return xen_api_success({
-                'uuid': vdi_ref,
-                'name_label': image.name_label,
-                'name_description': image.name_description,
-                'SR': sr.uuid,
-                'VBDs': [], # TODO
-                'virtual_size': image.virtual_size,
-                'physical_utilisation': image.physical_utilisation,
-                'sector_size': image.sector_size,
-                'type': image.type,
-                'parent': image.parent,
-                'children': image.children,
-                'sharable': image.sharable,
-                'read_only': image.read_only,
-                })
-
-        return xen_api_error(XEND_ERROR_VDI_INVALID)
+        return xen_api_success({
+            'uuid': vdi_ref,
+            'name_label': image.name_label,
+            'name_description': image.name_description,
+            'SR': sr.uuid,
+            'VBDs': [], # TODO
+            'virtual_size': image.virtual_size,
+            'physical_utilisation': image.physical_utilisation,
+            'sector_size': image.sector_size,
+            'type': image.type,
+            'parent': image.parent,
+            'children': image.children,
+            'sharable': image.sharable,
+            'read_only': image.read_only,
+            })
 
     # Class Functions    
     def VDI_create(self, session, vdi_struct):
         sr = XendNode.instance().get_sr()
         sr_ref = vdi_struct['SR']
         if sr.uuid != sr_ref:
-            return xen_api_error(XEND_ERROR_SR_INVALID)
+            return xen_api_error(['SR_HANDLE_INVALID', vdi_struct['SR']])
 
         vdi_uuid = sr.create_image(vdi_struct)
         return xen_api_success(vdi_uuid)
@@ -1315,9 +1345,8 @@ class XendAPI:
         sr = XendNode.instance().get_sr()
         image_uuid = sr.xen_api_get_by_name_label(name)
         if image_uuid:
-            return xen_api_success(image_uuid)
-        
-        return xen_api_error(XEND_ERROR_VDI_INVALID)
+            return xen_api_success([image_uuid])
+        return xen_api_success([])
 
 
     # Xen API: Class VTPM
@@ -1336,10 +1365,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         valid_vtpm_keys = self.VTPM_attr_ro + self.VTPM_attr_rw + \
                           self.Base_attr_ro + self.Base_attr_rw
         for k in cfg.keys():
@@ -1353,10 +1382,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         if cfg.has_key('instance'):
             instance = cfg['instance']
         else:
@@ -1367,10 +1396,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         if cfg.has_key('type'):
             driver = cfg['type']
         else:
@@ -1381,10 +1410,10 @@ class XendAPI:
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(XEND_ERROR_VTPM_INVALID)
+            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         if cfg.has_key('backend'):
             backend = cfg['backend']
         else:
@@ -1407,7 +1436,7 @@ class XendAPI:
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
-            return xen_api_error(XEND_ERROR_DOMAIN_INVALID)
+            return xen_api_error(['VM_HANDLE_INVALID', vtpm_struct['VM']])
 
 
     # Xen API: Class SR
@@ -1439,7 +1468,7 @@ class XendAPI:
     def SR_get_by_name_label(self, session, label):
         sr = XendNode.instance().get_sr()
         if sr.name_label != label:
-            return xen_api_error(XEND_ERROR_SR_INVALID)
+            return xen_api_success([])
         return xen_api_success([sr.uuid])
 
     def SR_create(self, session):
@@ -1457,60 +1486,142 @@ class XendAPI:
     
     def SR_get_record(self, session, sr_ref):
         sr = XendNode.instance().get_sr()
-        return xen_api_success({
-            'uuid': sr.uuid,
-            'name_label': sr.name_label,
-            'name_description': sr.name_description,
-            'VDIs': sr.list_images(),
-            'virtual_allocation': sr.used_space_bytes(),
-            'physical_utilisation': sr.used_space_bytes(),
-            'physical_size': sr.total_space_bytes(),
-            'type': sr.type,
-            'location': sr.location
-            })
+        return xen_api_success(sr.get_record())
 
     # Attribute acceess
-    def SR_get_VDIs(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.list_images())
 
-    def SR_get_virtual_allocation(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()        
-        return sr.used_space_bytes()
+    def _get_SR_func(self, _, func):
+        return xen_api_success(getattr(XendNode.instance().get_sr(), func)())
 
-    def SR_get_physical_utilisation(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()        
-        return sr.used_space_bytes()
+    def _get_SR_attr(self, _, attr):
+        return xen_api_success(getattr(XendNode.instance().get_sr(), attr))
 
-    def SR_get_physical_size(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()        
-        return sr.total_space_bytes()
+    def SR_get_VDIs(self, _, ref):
+        return self._get_SR_func(ref, 'list_images')
+
+    def SR_get_virtual_allocation(self, _, ref):
+        return self._get_SR_func(ref, 'virtual_allocation')
+
+    def SR_get_physical_utilisation(self, _, ref):
+        return self._get_SR_func(ref, 'used_space_bytes')
+
+    def SR_get_physical_size(self, _, ref):
+        return self._get_SR_func(ref, 'total_space_bytes')
     
-    def SR_get_type(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.type)
+    def SR_get_type(self, _, ref):
+        return self._get_SR_attr(ref, 'type')
 
-    def SR_get_location(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.location)
+    def SR_get_location(self, _, ref):
+        return self._get_SR_attr(ref, 'location')
 
-    def SR_get_name_label(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.name_label)      
+    def SR_get_name_label(self, _, ref):
+        return self._get_SR_attr(ref, 'name_label')
     
-    def SR_get_name_description(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.name_description)        
+    def SR_get_name_description(self, _, ref):
+        return self._get_SR_attr(ref, 'name_description')
 
     def SR_set_name_label(self, session, sr_ref, value):
         sr = XendNode.instance().get_sr()
         sr.name_label = value
+        XendNode.instance().save()
         return xen_api_success_void()
     
     def SR_set_name_description(self, session, sr_ref, value):
         sr = XendNode.instance().get_sr()
         sr.name_description = value
+        XendNode.instance().save()        
         return xen_api_success_void()
+
+
+def _decorate():
+    """Initialise Xen API wrapper by making sure all functions
+    have the correct validation decorators such as L{valid_host}
+    and L{session_required}.
+    """
+
+    global_validators = [session_required, catch_typeerror]
+    classes = {
+        'session' : None,
+        'host'    : valid_host,
+        'host_cpu': valid_host_cpu,
+        'network' : valid_network,
+        'VM'      : valid_vm,
+        'VBD'     : valid_vbd,
+        'VIF'     : valid_vif,
+        'VDI'     : valid_vdi,
+        'VTPM'    : valid_vtpm,
+        'SR'      : valid_sr,
+        'PIF'     : valid_pif
+        }
+
+    # Cheat methods
+    # -------------
+    # Methods that have a trivial implementation for all classes.
+    # 1. get_by_uuid == getting by ref, so just return uuid for
+    #    all get_by_uuid() methods.
+
+    for cls in classes.keys():
+        get_by_uuid = '%s_get_by_uuid' % cls
+        get_uuid = '%s_get_uuid' % cls
+        def _get_by_uuid(_1, _2, ref):
+            return xen_api_success(ref)
+
+        def _get_uuid(_1, _2, ref):
+            return xen_api_success(ref)
+
+        setattr(XendAPI, get_by_uuid, _get_by_uuid)
+        setattr(XendAPI, get_uuid,    _get_uuid)
+
+    # 2. get_record is just getting all the attributes, so provide
+    #    a fake template implementation.
+    # 
+    # TODO: ...
+
+
+    # Wrapping validators around XMLRPC calls
+    # ---------------------------------------
+
+    for cls, validator in classes.items():
+        def doit(n, takes_instance):
+            n_ = n.replace('.', '_')
+            try:
+                f = getattr(XendAPI, n_)
+                argcounts[n] = f.func_code.co_argcount - 1
+
+                validators = takes_instance and validator and [validator] \
+                             or []
+                validators += global_validators
+                for v in validators:
+                    f = v(f)
+                    f.api = n
+                setattr(XendAPI, n_, f)
+            except AttributeError:
+                log.warn("API call: %s not found" % n)
+
+
+        ro_attrs = getattr(XendAPI, '%s_attr_ro' % cls, [])
+        rw_attrs = getattr(XendAPI, '%s_attr_rw' % cls, [])
+        methods  = getattr(XendAPI, '%s_methods' % cls, [])
+        funcs    = getattr(XendAPI, '%s_funcs'   % cls, [])
+
+        # wrap validators around readable class attributes
+        for attr_name in ro_attrs + rw_attrs + XendAPI.Base_attr_ro:
+            doit('%s.get_%s' % (cls, attr_name), True)
+
+        # wrap validators around writable class attrributes
+        for attr_name in rw_attrs + XendAPI.Base_attr_rw:
+            doit('%s.set_%s' % (cls, attr_name), True)
+
+        # wrap validators around methods
+        for method_name in methods + XendAPI.Base_methods:
+            doit('%s.%s' % (cls, method_name), True)
+
+        # wrap validators around class functions
+        for func_name in funcs + XendAPI.Base_funcs:
+            doit('%s.%s' % (cls, func_name), False)
+
+_decorate()
+
 
 #   
 # Auto generate some stubs based on XendAPI introspection

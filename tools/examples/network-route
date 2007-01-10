@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #============================================================================
 # Default Xen network start/stop script.
 # Xend calls a network script when it starts.

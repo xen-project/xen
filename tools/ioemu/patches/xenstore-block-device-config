@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-08 02:02:36.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-08 02:02:37.000000000 +0000
+--- ioemu.orig/Makefile.target	2006-12-20 15:21:51.000000000 +0000
++++ ioemu/Makefile.target	2006-12-20 15:21:53.000000000 +0000
 @@ -359,6 +359,7 @@
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
  VL_OBJS+= usb-uhci.o
@@ -13,7 +13,7 @@ Index: ioemu/Makefile.target
 Index: ioemu/xenstore.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/xenstore.c	2006-12-08 02:02:37.000000000 +0000
++++ ioemu/xenstore.c	2006-12-20 15:21:53.000000000 +0000
 @@ -0,0 +1,187 @@
 +/*
 + * This file is subject to the terms and conditions of the GNU General
@@ -204,8 +204,8 @@ Index: ioemu/xenstore.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-08 02:02:37.000000000 +0000
-+++ ioemu/vl.c	2006-12-08 02:02:37.000000000 +0000
+--- ioemu.orig/vl.c	2006-12-20 15:21:52.000000000 +0000
++++ ioemu/vl.c	2006-12-20 15:21:53.000000000 +0000
 @@ -5256,9 +5256,11 @@
             "Standard options:\n"
             "-M machine      select emulated machine (-M ? for list)\n"
@@ -359,7 +359,7 @@ Index: ioemu/vl.c
  
      setvbuf(stdout, NULL, _IOLBF, 0);
      
-@@ -6441,6 +6472,7 @@
+@@ -6433,6 +6464,7 @@
  
  #endif /* !CONFIG_DM */
  
@@ -367,7 +367,7 @@ Index: ioemu/vl.c
      /* we always create the cdrom drive, even if no disk is there */
      bdrv_init();
      if (cdrom_index >= 0) {
-@@ -6467,6 +6499,7 @@
+@@ -6459,6 +6491,7 @@
              }
          }
      }
@@ -375,7 +375,7 @@ Index: ioemu/vl.c
  
      /* we always create at least one floppy disk */
      fd_table[0] = bdrv_new("fda");
-@@ -6545,6 +6578,8 @@
+@@ -6537,6 +6570,8 @@
          }
      }
  
@@ -386,8 +386,8 @@ Index: ioemu/vl.c
                    kernel_filename, kernel_cmdline, initrd_filename,
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-12-08 02:02:35.000000000 +0000
-+++ ioemu/monitor.c	2006-12-08 02:02:37.000000000 +0000
+--- ioemu.orig/monitor.c	2006-12-20 15:21:47.000000000 +0000
++++ ioemu/monitor.c	2006-12-20 15:21:53.000000000 +0000
 @@ -24,6 +24,7 @@
  #include "vl.h"
  #include "disas.h"
@@ -416,8 +416,8 @@ Index: ioemu/monitor.c
      int i;
 Index: ioemu/block.c
 ===================================================================
---- ioemu.orig/block.c	2006-12-08 02:02:06.000000000 +0000
-+++ ioemu/block.c	2006-12-08 02:02:37.000000000 +0000
+--- ioemu.orig/block.c	2006-12-20 15:21:31.000000000 +0000
++++ ioemu/block.c	2006-12-20 15:21:53.000000000 +0000
 @@ -758,6 +758,7 @@
  static void raw_close(BlockDriverState *bs)
  {
@@ -428,8 +428,8 @@ Index: ioemu/block.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 02:02:37.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 02:02:37.000000000 +0000
+--- ioemu.orig/vl.h	2006-12-20 15:21:52.000000000 +0000
++++ ioemu/vl.h	2006-12-20 15:21:53.000000000 +0000
 @@ -1191,6 +1191,8 @@
  void term_print_help(void);
  void monitor_readline(const char *prompt, int is_password,
@@ -455,8 +455,8 @@ Index: ioemu/vl.h
  extern char domain_name[];
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2006-12-08 02:02:35.000000000 +0000
-+++ ioemu/hw/ide.c	2006-12-08 02:02:37.000000000 +0000
+--- ioemu.orig/hw/ide.c	2006-12-20 15:21:49.000000000 +0000
++++ ioemu/hw/ide.c	2006-12-20 15:21:53.000000000 +0000
 @@ -1158,6 +1158,7 @@
          } else {
              ide_atapi_cmd_error(s, SENSE_NOT_READY, 

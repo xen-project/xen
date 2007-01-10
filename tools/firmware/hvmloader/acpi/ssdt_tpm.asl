@@ -17,7 +17,7 @@
 
 //*  SSDT for TPM TIS Interface for Xen with Qemu device model
 
-DefinitionBlock ("SSDT_TPM.aml", "SSDT", 1, "IBM","xen", 2006)
+DefinitionBlock ("SSDT_TPM.aml", "SSDT", 2, "Xen", "HVM", 0)
 {
     Device (TPM) {
         Name (_HID, EisaId ("PNP0C31"))

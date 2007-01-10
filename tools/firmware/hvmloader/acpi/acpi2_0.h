@@ -50,17 +50,18 @@ struct acpi_header {
     uint8_t  revision;
     uint8_t  checksum;
     uint8_t  oem_id[6];
-    uint64_t oem_table_id;
+    uint8_t  oem_table_id[8];
     uint32_t oem_revision;
     uint32_t creator_id;
     uint32_t creator_revision;
 };
 
-#define ACPI_OEM_ID             {'I','N','T','E','L',' '}
-#define ACPI_OEM_TABLE_ID       ASCII32(' ','T','B','D')
-#define ACPI_OEM_REVISION       0x00000002
-#define ACPI_CREATOR_ID         0x00       /* TBD */
-#define ACPI_CREATOR_REVISION   0x00000002
+#define ACPI_OEM_ID             "Xen"
+#define ACPI_OEM_TABLE_ID       "HVM"
+#define ACPI_OEM_REVISION       0
+
+#define ACPI_CREATOR_ID         ASCII32('H','V','M','L') /* HVMLoader */
+#define ACPI_CREATOR_REVISION   0
 
 /*
  * ACPI 2.0 Generic Address Space definition.
@@ -121,7 +122,6 @@ struct acpi_20_rsdt {
     struct acpi_header header;
     uint32_t entry[1];
 };
-#define ACPI_2_0_RSDT_REVISION 0x01
 
 /*
  * Extended System Description Table (XSDT).
@@ -130,7 +130,6 @@ struct acpi_20_xsdt {
     struct acpi_header header;
     uint64_t entry[1];
 };
-#define ACPI_2_0_XSDT_REVISION 0x01
 
 /*
  * TCG Hardware Interface Table (TCPA)
@@ -141,8 +140,6 @@ struct acpi_20_tcpa {
     uint32_t laml;
     uint64_t lasa;
 };
-
-#define ACPI_2_0_TCPA_REVISION 0x02
 #define ACPI_2_0_TCPA_LAML_SIZE (64*1024)
 
 /*
@@ -202,7 +199,6 @@ struct acpi_20_fadt {
     struct acpi_20_generic_address x_gpe0_blk;
     struct acpi_20_generic_address x_gpe1_blk;
 };
-#define ACPI_2_0_FADT_REVISION 0x03
 
 /*
  * FADT Boot Architecture Flags.
@@ -254,7 +250,19 @@ struct acpi_20_madt {
     uint32_t flags;
 };
 
-#define ACPI_2_0_MADT_REVISION 0x01
+
+/*
+ * HPET Description Table
+ */
+struct acpi_20_hpet {
+    struct acpi_header header;
+    uint32_t           timer_block_id;
+    struct acpi_20_generic_address addr;
+    uint8_t            hpet_number;
+    uint16_t           min_tick;
+    uint8_t            page_protect;
+};
+#define ACPI_HPET_ADDRESS 0xFED00000UL
 
 /*
  * Multiple APIC Flags.
@@ -325,6 +333,18 @@ struct acpi_20_madt_intsrcovr {
 #define ACPI_2_0_RSDT_SIGNATURE ASCII32('R','S','D','T')
 #define ACPI_2_0_XSDT_SIGNATURE ASCII32('X','S','D','T')
 #define ACPI_2_0_TCPA_SIGNATURE ASCII32('T','C','P','A')
+#define ACPI_2_0_HPET_SIGNATURE ASCII32('H','P','E','T')
+
+/*
+ * Table revision numbers.
+ */
+#define ACPI_2_0_RSDP_REVISION 0x02
+#define ACPI_2_0_FADT_REVISION 0x04
+#define ACPI_2_0_MADT_REVISION 0x02
+#define ACPI_2_0_RSDT_REVISION 0x01
+#define ACPI_2_0_XSDT_REVISION 0x01
+#define ACPI_2_0_TCPA_REVISION 0x02
+#define ACPI_2_0_HPET_REVISION 0x01
 
 #pragma pack ()
 

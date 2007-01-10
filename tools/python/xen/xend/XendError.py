@@ -32,6 +32,17 @@ class XendError(Fault):
     def __str__(self):
         return self.value
 
+class VMBadState(XendError):
+    def __init__(self, value, expected, actual):
+        XendError.__init__(self, value)
+        self.expected = expected
+        self.actual = actual
+
+class NetworkAlreadyConnected(XendError):
+    def __init__(self, pif_uuid):
+        XendError.__init__(self, 'Network already connected')
+        self.pif_uuid = pif_uuid
+
 class VmError(XendError):
     """Vm construction error."""
     pass

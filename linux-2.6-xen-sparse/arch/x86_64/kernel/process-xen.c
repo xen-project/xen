@@ -119,8 +119,26 @@ void exit_idle(void)
 	__exit_idle();
 }
 
-/* XXX XEN doesn't use default_idle(), poll_idle(). Use xen_idle() instead. */
-void xen_idle(void)
+/*
+ * On SMP it's slightly faster (but much more power-consuming!)
+ * to poll the ->need_resched flag instead of waiting for the
+ * cross-CPU IPI to arrive. Use this option with caution.
+ */
+static void poll_idle(void)
+{
+	local_irq_enable();
+
+	asm volatile(
+		"2:"
+		"testl %0,%1;"
+		"rep; nop;"
+		"je 2b;"
+		: :
+		"i" (_TIF_NEED_RESCHED),
+		"m" (current_thread_info()->flags));
+}
+
+static void xen_idle(void)
 {
 	local_irq_disable();
 
@@ -164,14 +182,18 @@ void cpu_idle (void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
+			void (*idle)(void);
+
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
 			rmb();
-			
+			idle = pm_idle;
+			if (!idle)
+				idle = xen_idle;
 			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
 			enter_idle();
-			xen_idle();
+			idle();
 			__exit_idle();
 		}
 
@@ -210,9 +232,22 @@ void cpu_idle_wait(void)
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
-/* XXX XEN doesn't use mwait_idle(), select_idle_routine(), idle_setup(). */
-/* Always use xen_idle() instead. */
-void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c) {}
+void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c) 
+{
+}
+
+static int __init idle_setup (char *str)
+{
+	if (!strncmp(str, "poll", 4)) {
+		printk("using polling idle threads.\n");
+		pm_idle = poll_idle;
+	}
+
+	boot_option_idle_override = 1;
+	return 1;
+}
+
+__setup("idle=", idle_setup);
 
 /* Prints also some state that isn't saved in the pt_regs */ 
 void __show_regs(struct pt_regs * regs)

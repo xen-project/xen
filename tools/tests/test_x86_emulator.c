@@ -15,7 +15,14 @@ typedef int64_t            s64;
 #include <asm-x86/x86_emulate.h>
 #include <sys/mman.h>
 
-#define PFEC_write_access (1U<<1)
+/* EFLAGS bit definitions. */
+#define EFLG_OF (1<<11)
+#define EFLG_DF (1<<10)
+#define EFLG_SF (1<<7)
+#define EFLG_ZF (1<<6)
+#define EFLG_AF (1<<4)
+#define EFLG_PF (1<<2)
+#define EFLG_CF (1<<0)
 
 static int read(
     unsigned int seg,
@@ -99,12 +106,15 @@ int main(int argc, char **argv)
 {
     struct x86_emulate_ctxt ctxt;
     struct cpu_user_regs regs;
-    char instr[20] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
+    char *instr;
     unsigned int *res;
     int rc;
+#ifndef __x86_64__
+    unsigned int i, bcdres_native, bcdres_emul;
+#endif
 
     ctxt.regs = &regs;
-    ctxt.mode = X86EMUL_MODE_PROT32;
+    ctxt.address_bytes = 4;
 
     res = mmap((void *)0x100000, 0x1000, PROT_READ|PROT_WRITE,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
@@ -113,18 +123,33 @@ int main(int argc, char **argv)
         fprintf(stderr, "mmap to low address failed\n");
         exit(1);
     }
+    instr = (char *)res + 0x100;
 
     printf("%-40s", "Testing addl %%ecx,(%%eax)...");
     instr[0] = 0x01; instr[1] = 0x08;
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
-    regs.error_code = PFEC_write_access;
     regs.eax    = (unsigned long)res;
     *res        = 0x7FFFFFFF;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
+         (regs.eflags != 0xa94) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing addl %%ecx,%%eax...");
+    instr[0] = 0x01; instr[1] = 0xc8;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x12345678;
+    regs.eax    = 0x7FFFFFFF;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) || 
+         (regs.ecx != 0x12345678) ||
+         (regs.eax != 0x92345677) ||
          (regs.eflags != 0xa94) ||
          (regs.eip != (unsigned long)&instr[2]) )
         goto fail;
@@ -140,8 +165,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678UL;
 #endif
     regs.eax    = (unsigned long)res;
-    regs.error_code = 0;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
          (regs.ecx != 0x8000000FUL) ||
@@ -155,8 +179,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = ~0UL;
     regs.eax    = (unsigned long)res;
-    regs.error_code = 0;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x92345677) || 
          (regs.ecx != 0x92345677UL) ||
@@ -171,8 +194,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x92345677UL;
     regs.ecx    = 0xAA;
     regs.ebx    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x923456AA) || 
          (regs.eflags != 0x244) ||
@@ -188,8 +210,7 @@ int main(int argc, char **argv)
     regs.eax    = 0xAABBCC77UL;
     regs.ecx    = 0xFF;
     regs.ebx    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x923456AA) || 
          ((regs.eflags&0x240) != 0x200) ||
@@ -205,8 +226,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x12345678) || 
          (regs.eflags != 0x200) ||
@@ -223,8 +243,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x923456AAUL;
     regs.ecx    = 0xDDEEFF00L;
     regs.ebx    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0xDDEEFF00) || 
          (regs.eflags != 0x244) ||
@@ -241,8 +260,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.esi    = (unsigned long)res + 0;
     regs.edi    = (unsigned long)res + 2;
-    regs.error_code = 0; /* read fault */
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (*res != 0x44554455) ||
          (regs.eflags != 0x200) ||
@@ -259,9 +277,8 @@ int main(int argc, char **argv)
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
-    if ( (rc != 0) || 
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
          (*res != 0x2233445D) ||
          ((regs.eflags&0x201) != 0x201) ||
          (regs.eip != (unsigned long)&instr[4]) )
@@ -275,9 +292,8 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.eax    = -32;
     regs.edi    = (unsigned long)(res+1);
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
-    if ( (rc != 0) || 
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
          (*res != 0x2233445E) ||
          ((regs.eflags&0x201) != 0x201) ||
          (regs.eip != (unsigned long)&instr[3]) )
@@ -296,9 +312,8 @@ int main(int argc, char **argv)
     regs.ecx    = 0xCCCCFFFF;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
-    if ( (rc != 0) || 
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
          (res[0] != 0x9999AAAA) ||
          (res[1] != 0xCCCCFFFF) ||
          ((regs.eflags&0x240) != 0x240) ||
@@ -311,8 +326,7 @@ int main(int argc, char **argv)
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)res;
-    regs.error_code = PFEC_write_access;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) || 
          (res[0] != 0x9999AAAA) ||
          (res[1] != 0xCCCCFFFF) ||
@@ -330,8 +344,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
     *res        = 0x82;
-    regs.error_code = 0;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x82) ||
          (regs.ecx != 0xFFFFFF82) ||
@@ -347,8 +360,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     regs.eax    = (unsigned long)res;
     *res        = 0x1234aa82;
-    regs.error_code = 0;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x1234aa82) ||
          (regs.ecx != 0xaa82) ||
@@ -364,8 +376,7 @@ int main(int argc, char **argv)
     regs.ecx    = (unsigned long)res;
     regs.eax    = 0x12345678;
     *res        = 0x11111111;
-    regs.error_code = 0;
-    rc = x86_emulate_memop(&ctxt, &emulops);
+    rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != 0) ||
          (*res != 0x11116789) ||
          (regs.eax != 0x12341111) ||
@@ -373,6 +384,103 @@ int main(int argc, char **argv)
          (regs.eip != (unsigned long)&instr[4]) )
         goto fail;
     printf("okay\n");
+
+    printf("%-40s", "Testing dec %%ax...");
+    instr[0] = 0x66; instr[1] = 0x48;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x00000000;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
+         (regs.eax != 0x0000ffff) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing lea 8(%%ebp),%%eax...");
+    instr[0] = 0x8d; instr[1] = 0x45; instr[2] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x12345678;
+    regs.ebp    = 0xaaaaaaaa;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != 0) ||
+         (regs.eax != 0xaaaaaab2) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing daa/das (all inputs)...");
+#ifndef __x86_64__
+    /* Bits 0-7: AL; Bit 8: EFLG_AF; Bit 9: EFLG_CF; Bit 10: DAA vs. DAS. */
+    for ( i = 0; i < 0x800; i++ )
+    {
+        regs.eflags  = (i & 0x200) ? EFLG_CF : 0;
+        regs.eflags |= (i & 0x100) ? EFLG_AF : 0;
+        if ( i & 0x400 )
+            __asm__ (
+                "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; das; "
+                "pushf; popl %1"
+                : "=a" (bcdres_native), "=r" (regs.eflags)
+                : "0" (i & 0xff), "1" (regs.eflags) );
+        else
+            __asm__ (
+                "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; daa; "
+                "pushf; popl %1"
+                : "=a" (bcdres_native), "=r" (regs.eflags)
+                : "0" (i & 0xff), "1" (regs.eflags) );
+        bcdres_native |= (regs.eflags & EFLG_PF) ? 0x1000 : 0;
+        bcdres_native |= (regs.eflags & EFLG_ZF) ? 0x800 : 0;
+        bcdres_native |= (regs.eflags & EFLG_SF) ? 0x400 : 0;
+        bcdres_native |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
+        bcdres_native |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
+
+        instr[0] = (i & 0x400) ? 0x2f: 0x27; /* daa/das */
+        regs.eflags  = (i & 0x200) ? EFLG_CF : 0;
+        regs.eflags |= (i & 0x100) ? EFLG_AF : 0;
+        regs.eip    = (unsigned long)&instr[0];
+        regs.eax    = (unsigned char)i;
+        rc = x86_emulate(&ctxt, &emulops);
+        bcdres_emul  = regs.eax;
+        bcdres_emul |= (regs.eflags & EFLG_PF) ? 0x1000 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_ZF) ? 0x800 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_SF) ? 0x400 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_CF) ? 0x200 : 0;
+        bcdres_emul |= (regs.eflags & EFLG_AF) ? 0x100 : 0;
+        if ( (rc != 0) || (regs.eax > 255) ||
+             (regs.eip != (unsigned long)&instr[1]) )
+            goto fail;
+
+        if ( bcdres_emul != bcdres_native )
+        {
+            printf("%s:    AL=%02x %s %s\n"
+                   "Output: AL=%02x %s %s %s %s %s\n"
+                   "Emul.:  AL=%02x %s %s %s %s %s\n",
+                   (i & 0x400) ? "DAS" : "DAA",
+                   (unsigned char)i,
+                   (i & 0x200) ? "CF" : "  ",
+                   (i & 0x100) ? "AF" : "  ",
+                   (unsigned char)bcdres_native,
+                   (bcdres_native & 0x200) ? "CF" : "  ",
+                   (bcdres_native & 0x100) ? "AF" : "  ",
+                   (bcdres_native & 0x1000) ? "PF" : "  ",
+                   (bcdres_native & 0x800) ? "ZF" : "  ",
+                   (bcdres_native & 0x400) ? "SF" : "  ",
+                   (unsigned char)bcdres_emul,
+                   (bcdres_emul & 0x200) ? "CF" : "  ",
+                   (bcdres_emul & 0x100) ? "AF" : "  ",
+                   (bcdres_emul & 0x1000) ? "PF" : "  ",
+                   (bcdres_emul & 0x800) ? "ZF" : "  ",
+                   (bcdres_emul & 0x400) ? "SF" : "  ");
+            goto fail;
+        }
+    }
+    printf("okay\n");
+#else
+    printf("skipped\n");
+#endif
 
     return 0;
 

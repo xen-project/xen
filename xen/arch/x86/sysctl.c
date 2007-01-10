@@ -25,10 +25,14 @@
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
 
-long arch_do_sysctl(
+#ifndef COMPAT
+typedef long ret_t;
+#endif
+
+ret_t arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
-    long ret = 0;
+    ret_t ret = 0;
 
     switch ( sysctl->cmd )
     {

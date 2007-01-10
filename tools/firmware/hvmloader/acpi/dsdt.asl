@@ -17,7 +17,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
+DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 {
     Name (\PMBS, 0x0C00)
     Name (\PMLN, 0x08)
@@ -278,6 +278,22 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
                     Decrement(Local0) 
                     Store(Local0, PIRD) 
                 }
+            }
+
+            Device(HPET) {
+                Name(_HID,  EISAID("PNP0103"))
+                Name(_UID, 0)
+                Name(_CRS, ResourceTemplate() {
+                    DWordMemory(
+                        ResourceConsumer, PosDecode, MinFixed, MaxFixed,
+                        NonCacheable, ReadWrite,
+                        0x00000000,
+                        0xFED00000,
+                        0xFED003FF,
+                        0x00000000,
+                        0x00000400 /* 1K memory: FED00000 - FED003FF */
+                    )
+                })
             }
 
             Method(_PRT,0) {

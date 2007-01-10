@@ -11,6 +11,8 @@ XEN_OS              ?= $(shell uname -s)
 
 CONFIG_$(XEN_OS) := y
 
+SHELL     ?= /bin/sh
+
 # Tools to run on system hosting the build
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer

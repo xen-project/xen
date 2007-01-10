@@ -203,7 +203,7 @@ index b07db5c..f595947 100644
 +		if (str < end)
 +			*str = '\0';
 +		else
-+			*end = '\0';
++			end[-1] = '\0';
 +	}
 +	/* the trailing null byte doesn't count towards the total */
  	return str-buf;

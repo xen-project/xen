@@ -61,10 +61,10 @@ SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl4mfn);
 
 extern int
-SHADOW_INTERNAL_NAME(sh_remove_write_access, SHADOW_LEVELS, GUEST_LEVELS)
+SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t readonly_mfn);
 extern int
-SHADOW_INTERNAL_NAME(sh_remove_all_mappings, SHADOW_LEVELS, GUEST_LEVELS)
+SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn);
 
 extern void

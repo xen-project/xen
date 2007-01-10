@@ -29,20 +29,8 @@
 #include <xen/domain_page.h>
 #include <asm/flushtlb.h>
 
-/* How to make sure a page is not referred to in a shadow PT */
-/* This will need to be a for_each_vcpu if we go to per-vcpu shadows */ 
-#define shadow_drop_references(_d, _p)                      \
-    shadow_remove_all_mappings((_d)->vcpu[0], _mfn(page_to_mfn(_p)))
-#define shadow_sync_and_drop_references(_d, _p)             \
-    shadow_remove_all_mappings((_d)->vcpu[0], _mfn(page_to_mfn(_p)))
-
-/* How to add and remove entries in the p2m mapping. */
-#define guest_physmap_add_page(_d, _p, _m)                  \
-    shadow_guest_physmap_add_page((_d), (_p), (_m))
-#define guest_physmap_remove_page(_d, _p, _m   )            \
-    shadow_guest_physmap_remove_page((_d), (_p), (_m))
-
-/* Shadow PT operation mode : shadow-mode variable in arch_domain. */
+/*****************************************************************************
+ * Macros to tell which shadow paging mode a domain is in */
 
 #define SHM2_shift 10
 /* We're in one of the shadow modes */
@@ -64,106 +52,32 @@
 #define shadow_mode_external(_d)  ((_d)->arch.shadow.mode & SHM2_external)
 
 /* Xen traps & emulates all reads of all page table pages:
- * not yet supported
- */
+ * not yet supported */
 #define shadow_mode_trap_reads(_d) ({ (void)(_d); 0; })
 
-// How do we tell that we have a 32-bit PV guest in a 64-bit Xen?
-#ifdef __x86_64__
-#define pv_32bit_guest(_v) 0 // not yet supported
-#else
-#define pv_32bit_guest(_v) !is_hvm_vcpu(v)
-#endif
 
-/* The shadow lock.
+/******************************************************************************
+ * The equivalent for a particular vcpu of a shadowed domain. */
+
+/* Is this vcpu using the P2M table to translate between GFNs and MFNs?
  *
- * This lock is per-domain.  It is intended to allow us to make atomic
- * updates to the software TLB that the shadow tables provide.
- * 
- * Specifically, it protects:
- *   - all changes to shadow page table pages
- *   - the shadow hash table
- *   - the shadow page allocator 
- *   - all changes to guest page table pages; if/when the notion of
- *     out-of-sync pages is added to this code, then the shadow lock is
- *     protecting all guest page table pages which are not listed as
- *     currently as both guest-writable and out-of-sync...
- *     XXX -- need to think about this relative to writable page tables.
- *   - all changes to the page_info->tlbflush_timestamp
- *   - the page_info->count fields on shadow pages
- *   - the shadow dirty bit array and count
- *   - XXX
+ * This is true of translated HVM domains on a vcpu which has paging
+ * enabled.  (HVM vcpus with paging disabled are using the p2m table as
+ * its paging table, so no translation occurs in this case.)
+ * It is also true for all vcpus of translated PV domains. */
+#define shadow_vcpu_mode_translate(_v) ((_v)->arch.shadow.translate_enabled)
+
+/*
+ * 32on64 support
  */
-#ifndef CONFIG_SMP
-#error shadow.h currently requires CONFIG_SMP
-#endif
-
-#define shadow_lock_init(_d)                            \
-    do {                                                \
-        spin_lock_init(&(_d)->arch.shadow.lock);        \
-        (_d)->arch.shadow.locker = -1;                  \
-        (_d)->arch.shadow.locker_function = "nobody";   \
-    } while (0)
-
-#define shadow_lock_is_acquired(_d)                     \
-    (current->processor == (_d)->arch.shadow.locker)
-
-#define shadow_lock(_d)                                                 \
-    do {                                                                \
-        if ( unlikely((_d)->arch.shadow.locker == current->processor) ) \
-        {                                                               \
-            printk("Error: shadow lock held by %s\n",                   \
-                   (_d)->arch.shadow.locker_function);                  \
-            BUG();                                                      \
-        }                                                               \
-        spin_lock(&(_d)->arch.shadow.lock);                             \
-        ASSERT((_d)->arch.shadow.locker == -1);                         \
-        (_d)->arch.shadow.locker = current->processor;                  \
-        (_d)->arch.shadow.locker_function = __func__;                   \
-    } while (0)
-
-#define shadow_unlock(_d)                                       \
-    do {                                                        \
-        ASSERT((_d)->arch.shadow.locker == current->processor); \
-        (_d)->arch.shadow.locker = -1;                          \
-        (_d)->arch.shadow.locker_function = "nobody";           \
-        spin_unlock(&(_d)->arch.shadow.lock);                   \
-    } while (0)
-
-/* 
- * Levels of self-test and paranoia
- * XXX should go in config files somewhere?  
- */
-#define SHADOW_AUDIT_HASH           0x01  /* Check current hash bucket */
-#define SHADOW_AUDIT_HASH_FULL      0x02  /* Check every hash bucket */
-#define SHADOW_AUDIT_ENTRIES        0x04  /* Check this walk's shadows */
-#define SHADOW_AUDIT_ENTRIES_FULL   0x08  /* Check every shadow */
-#define SHADOW_AUDIT_ENTRIES_MFNS   0x10  /* Check gfn-mfn map in shadows */
-#define SHADOW_AUDIT_P2M            0x20  /* Check the p2m table */
-
-#ifdef NDEBUG
-#define SHADOW_AUDIT                   0
-#define SHADOW_AUDIT_ENABLE            0
+#ifdef __x86_64__
+#define pv_32bit_guest(_v) (!is_hvm_vcpu(_v) && IS_COMPAT((_v)->domain))
 #else
-#define SHADOW_AUDIT                0x15  /* Basic audit of all except p2m. */
-#define SHADOW_AUDIT_ENABLE         shadow_audit_enable
-extern int shadow_audit_enable;
+#define pv_32bit_guest(_v) (!is_hvm_vcpu(_v))
 #endif
 
-/* 
- * Levels of optimization
- * XXX should go in config files somewhere?  
- */
-#define SHOPT_WRITABLE_HEURISTIC  0x01  /* Guess at RW PTEs via linear maps */
-#define SHOPT_EARLY_UNSHADOW      0x02  /* Unshadow l1s on fork or exit */
-#define SHOPT_FAST_FAULT_PATH     0x04  /* Fast-path MMIO and not-present */
-#define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
-#define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
-
-#define SHADOW_OPTIMIZATIONS      0x1f
-
-
-/* With shadow pagetables, the different kinds of address start 
+/******************************************************************************
+ * With shadow pagetables, the different kinds of address start 
  * to get get confusing.
  * 
  * Virtual addresses are what they usually are: the addresses that are used 
@@ -213,38 +127,16 @@ static inline _type _name##_x(_name##_t n) { return n; }
 #endif
 
 TYPE_SAFE(unsigned long,mfn)
+
+/* Macro for printk formats: use as printk("%"SH_PRI_mfn"\n", mfn_x(foo)); */
 #define SH_PRI_mfn "05lx"
 
-static inline mfn_t
-pagetable_get_mfn(pagetable_t pt)
-{
-    return _mfn(pagetable_get_pfn(pt));
-}
 
-static inline pagetable_t
-pagetable_from_mfn(mfn_t mfn)
-{
-    return pagetable_from_pfn(mfn_x(mfn));
-}
-
-static inline int
-shadow_vcpu_mode_translate(struct vcpu *v)
-{
-    // Returns true if this VCPU needs to be using the P2M table to translate
-    // between GFNs and MFNs.
-    //
-    // This is true of translated HVM domains on a vcpu which has paging
-    // enabled.  (HVM vcpu's with paging disabled are using the p2m table as
-    // its paging table, so no translation occurs in this case.)
-    //
-    // It is also true for translated PV domains.
-    //
-    return v->arch.shadow.translate_enabled;
-}
-
-
-/**************************************************************************/
-/* Mode-specific entry points into the shadow code */
+/*****************************************************************************
+ * Mode-specific entry points into the shadow code.  
+ *
+ * These shouldn't be used directly by callers; rather use the functions
+ * below which will indirect through this table as appropriate. */
 
 struct sh_emulate_ctxt;
 struct shadow_paging_mode {
@@ -253,7 +145,7 @@ struct shadow_paging_mode {
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
     paddr_t       (*gva_to_gpa            )(struct vcpu *v, unsigned long va);
     unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va);
-    void          (*update_cr3            )(struct vcpu *v);
+    void          (*update_cr3            )(struct vcpu *v, int do_locking);
     int           (*map_and_validate_gl1e )(struct vcpu *v, mfn_t gmfn,
                                             void *new_guest_entry, u32 size);
     int           (*map_and_validate_gl2e )(struct vcpu *v, mfn_t gmfn,
@@ -285,35 +177,30 @@ struct shadow_paging_mode {
                                             unsigned long *gl1mfn);
     void          (*guest_get_eff_l1e     )(struct vcpu *v, unsigned long va,
                                             void *eff_l1e);
-#if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
-#endif
     /* For outsiders to tell what mode we're in */
     unsigned int shadow_levels;
     unsigned int guest_levels;
 };
 
-static inline int shadow_guest_paging_levels(struct vcpu *v)
-{
-    ASSERT(v->arch.shadow.mode != NULL);
-    return v->arch.shadow.mode->guest_levels;
-}
 
-/**************************************************************************/
-/* Entry points into the shadow code */
+/*****************************************************************************
+ * Entry points into the shadow code */
 
-/* Enable arbitrary shadow mode. */
+/* Set up the shadow-specific parts of a domain struct at start of day.
+ * Called for  every domain from arch_domain_create() */
+void shadow_domain_init(struct domain *d);
+
+/* Enable an arbitrary shadow mode.  Call once at domain creation. */
 int shadow_enable(struct domain *d, u32 mode);
 
-/* Turning on shadow test mode */
-int shadow_test_enable(struct domain *d);
-
-/* Handler for shadow control ops: enabling and disabling shadow modes, 
- * and log-dirty bitmap ops all happen through here. */
+/* Handler for shadow control ops: operations from user-space to enable
+ * and disable ephemeral shadow modes (test mode and log-dirty mode) and
+ * manipulate the log-dirty bitmap. */
 int shadow_domctl(struct domain *d, 
-                   xen_domctl_shadow_op_t *sc,
-                   XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+                  xen_domctl_shadow_op_t *sc,
+                  XEN_GUEST_HANDLE(void) u_domctl);
 
 /* Call when destroying a domain */
 void shadow_teardown(struct domain *d);
@@ -321,164 +208,94 @@ void shadow_teardown(struct domain *d);
 /* Call once all of the references to the domain have gone away */
 void shadow_final_teardown(struct domain *d);
 
-
-/* Mark a page as dirty in the bitmap */
-void sh_do_mark_dirty(struct domain *d, mfn_t gmfn);
+/* Mark a page as dirty in the log-dirty bitmap: called when Xen 
+ * makes changes to guest memory on its behalf. */
+void shadow_mark_dirty(struct domain *d, mfn_t gmfn);
+/* Cleaner version so we don't pepper shadow_mode tests all over the place */
 static inline void mark_dirty(struct domain *d, unsigned long gmfn)
 {
-    if ( likely(!shadow_mode_log_dirty(d)) )
-        return;
-
-    shadow_lock(d);
-    sh_do_mark_dirty(d, _mfn(gmfn));
-    shadow_unlock(d);
-}
-
-/* Internal version, for when the shadow lock is already held */
-static inline void sh_mark_dirty(struct domain *d, mfn_t gmfn)
-{
-    ASSERT(shadow_lock_is_acquired(d));
     if ( unlikely(shadow_mode_log_dirty(d)) )
-        sh_do_mark_dirty(d, gmfn);
+        shadow_mark_dirty(d, _mfn(gmfn));
 }
 
-static inline int
-shadow_fault(unsigned long va, struct cpu_user_regs *regs)
-/* Called from pagefault handler in Xen, and from the HVM trap handlers
+/* Handle page-faults caused by the shadow pagetable mechanisms.
+ * Called from pagefault handler in Xen, and from the HVM trap handlers
  * for pagefaults.  Returns 1 if this fault was an artefact of the
  * shadow code (and the guest should retry) or 0 if it is not (and the
  * fault should be handled elsewhere or passed to the guest). */
+static inline int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     perfc_incrc(shadow_fault);
     return v->arch.shadow.mode->page_fault(v, va, regs);
 }
 
-static inline int
-shadow_invlpg(struct vcpu *v, unsigned long va)
-/* Called when the guest requests an invlpg.  Returns 1 if the invlpg
- * instruction should be issued on the hardware, or 0 if it's safe not
- * to do so. */
+/* Handle invlpg requests on shadowed vcpus. 
+ * Returns 1 if the invlpg instruction should be issued on the hardware, 
+ * or 0 if it's safe not to do so. */
+static inline int shadow_invlpg(struct vcpu *v, unsigned long va)
 {
     return v->arch.shadow.mode->invlpg(v, va);
 }
 
-static inline paddr_t
-shadow_gva_to_gpa(struct vcpu *v, unsigned long va)
-/* Called to translate a guest virtual address to what the *guest*
- * pagetables would map it to. */
+/* Translate a guest virtual address to the physical address that the
+ * *guest* pagetables would map it to. */
+static inline paddr_t shadow_gva_to_gpa(struct vcpu *v, unsigned long va)
 {
     if ( unlikely(!shadow_vcpu_mode_translate(v)) )
         return (paddr_t) va;
     return v->arch.shadow.mode->gva_to_gpa(v, va);
 }
 
-static inline unsigned long
-shadow_gva_to_gfn(struct vcpu *v, unsigned long va)
-/* Called to translate a guest virtual address to what the *guest*
- * pagetables would map it to. */
+/* Translate a guest virtual address to the frame number that the
+ * *guest* pagetables would map it to. */
+static inline unsigned long shadow_gva_to_gfn(struct vcpu *v, unsigned long va)
 {
     if ( unlikely(!shadow_vcpu_mode_translate(v)) )
         return va >> PAGE_SHIFT;
     return v->arch.shadow.mode->gva_to_gfn(v, va);
 }
 
-static inline void
-shadow_update_cr3(struct vcpu *v)
-/* Updates all the things that are derived from the guest's CR3. 
- * Called when the guest changes CR3. */
+/* Update all the things that are derived from the guest's CR3.  
+ * Called when the guest changes CR3; the caller can then use v->arch.cr3 
+ * as the value to load into the host CR3 to schedule this vcpu */
+static inline void shadow_update_cr3(struct vcpu *v)
 {
-    shadow_lock(v->domain);
-    v->arch.shadow.mode->update_cr3(v);
-    shadow_unlock(v->domain);
+    v->arch.shadow.mode->update_cr3(v, 1);
 }
 
-
-/* Should be called after CR3 is updated.
- * Updates vcpu->arch.cr3 and, for HVM guests, vcpu->arch.hvm_vcpu.cpu_cr3.
- * 
- * Also updates other state derived from CR3 (vcpu->arch.guest_vtable,
- * shadow_vtable, etc).
- *
- * Uses values found in vcpu->arch.(guest_table and guest_table_user), and
- * for HVM guests, arch.monitor_table and hvm's guest CR3.
- *
- * Update ref counts to shadow tables appropriately.
- */
-static inline void update_cr3(struct vcpu *v)
-{
-    unsigned long cr3_mfn=0;
-
-    if ( shadow_mode_enabled(v->domain) )
-    {
-        shadow_update_cr3(v);
-        return;
-    }
-
-#if CONFIG_PAGING_LEVELS == 4
-    if ( !(v->arch.flags & TF_kernel_mode) )
-        cr3_mfn = pagetable_get_pfn(v->arch.guest_table_user);
-    else
-#endif
-        cr3_mfn = pagetable_get_pfn(v->arch.guest_table);
-
-    make_cr3(v, cr3_mfn);
-}
-
-extern void sh_update_paging_modes(struct vcpu *v);
-
-/* Should be called to initialise paging structures if the paging mode
+/* Update all the things that are derived from the guest's CR0/CR3/CR4.
+ * Called to initialize paging structures if the paging mode
  * has changed, and when bringing up a VCPU for the first time. */
-static inline void shadow_update_paging_modes(struct vcpu *v)
-{
-    ASSERT(shadow_mode_enabled(v->domain));
-    shadow_lock(v->domain);
-    sh_update_paging_modes(v);
-    shadow_unlock(v->domain);
-}
+void shadow_update_paging_modes(struct vcpu *v);
 
-static inline void
-shadow_detach_old_tables(struct vcpu *v)
-{
-    if ( v->arch.shadow.mode )
-        v->arch.shadow.mode->detach_old_tables(v);
-}
 
-static inline mfn_t
-shadow_make_monitor_table(struct vcpu *v)
-{
-    return v->arch.shadow.mode->make_monitor_table(v);
-}
+/*****************************************************************************
+ * Access to the guest pagetables */
 
-static inline void
-shadow_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
-{
-    v->arch.shadow.mode->destroy_monitor_table(v, mmfn);
-}
-
+/* Get a mapping of a PV guest's l1e for this virtual address. */
 static inline void *
 guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
 {
-    if ( likely(!shadow_mode_translate(v->domain)) )
-    {
-        l2_pgentry_t l2e;
-        ASSERT(!shadow_mode_external(v->domain));
-        /* Find this l1e and its enclosing l1mfn in the linear map */
-        if ( __copy_from_user(&l2e, 
-                              &__linear_l2_table[l2_linear_offset(addr)],
-                              sizeof(l2_pgentry_t)) != 0 )
-            return NULL;
-        /* Check flags that it will be safe to read the l1e */
-        if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) 
-             != _PAGE_PRESENT )
-            return NULL;
-        *gl1mfn = l2e_get_pfn(l2e);
-        return &__linear_l1_table[l1_linear_offset(addr)];
-    }
+    l2_pgentry_t l2e;
 
-    return v->arch.shadow.mode->guest_map_l1e(v, addr, gl1mfn);
+    if ( unlikely(shadow_mode_translate(v->domain)) )
+        return v->arch.shadow.mode->guest_map_l1e(v, addr, gl1mfn);
+
+    /* Find this l1e and its enclosing l1mfn in the linear map */
+    if ( __copy_from_user(&l2e, 
+                          &__linear_l2_table[l2_linear_offset(addr)],
+                          sizeof(l2_pgentry_t)) != 0 )
+        return NULL;
+    /* Check flags that it will be safe to read the l1e */
+    if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) 
+         != _PAGE_PRESENT )
+        return NULL;
+    *gl1mfn = l2e_get_pfn(l2e);
+    return &__linear_l1_table[l1_linear_offset(addr)];
 }
 
+/* Pull down the mapping we got from guest_map_l1e() */
 static inline void
 guest_unmap_l1e(struct vcpu *v, void *p)
 {
@@ -486,6 +303,7 @@ guest_unmap_l1e(struct vcpu *v, void *p)
         unmap_domain_page(p);
 }
 
+/* Read the guest's l1e that maps this address. */
 static inline void
 guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
 {
@@ -502,6 +320,8 @@ guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
     v->arch.shadow.mode->guest_get_eff_l1e(v, addr, eff_l1e);
 }
 
+/* Read the guest's l1e that maps this address, from the kernel-mode
+ * pagetables. */
 static inline void
 guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
 {
@@ -517,81 +337,35 @@ guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
     TOGGLE_MODE();
 }
 
+/* Write a new value into the guest pagetable, and update the shadows 
+ * appropriately.  Returns 0 if we page-faulted, 1 for success. */
+int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
+                             intpte_t new, mfn_t gmfn);
 
-/* Validate a pagetable change from the guest and update the shadows. */
-extern int shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn,
-                                        void *new_guest_entry);
-extern int __shadow_validate_guest_entry(struct vcpu *v, mfn_t gmfn, 
-                                         void *entry, u32 size);
+/* Cmpxchg a new value into the guest pagetable, and update the shadows 
+ * appropriately. Returns 0 if we page-faulted, 1 if not.
+ * N.B. caller should check the value of "old" to see if the
+ * cmpxchg itself was successful. */
+int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
+                               intpte_t *old, intpte_t new, mfn_t gmfn);
 
-/* Update the shadows in response to a pagetable write from a HVM guest */
-extern void shadow_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn, 
-                                            void *entry, u32 size);
-
-/* Remove all writeable mappings of a guest frame from the shadows.
- * Returns non-zero if we need to flush TLBs. 
- * level and fault_addr desribe how we found this to be a pagetable;
- * level==0 means we have some other reason for revoking write access. */
-extern int shadow_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
-                                       unsigned int level,
-                                       unsigned long fault_addr);
-
-/* Remove all mappings of the guest mfn from the shadows. 
- * Returns non-zero if we need to flush TLBs. */
-extern int shadow_remove_all_mappings(struct vcpu *v, mfn_t target_mfn);
-
-/* Remove all mappings from the shadows. */
-extern void shadow_blow_tables(struct domain *d);
-
-void
-shadow_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn);
-/* This is a HVM page that we thing is no longer a pagetable.
- * Unshadow it, and recursively unshadow pages that reference it. */
+/* Remove all mappings of the guest page from the shadows. 
+ * This is called from common code.  It does not flush TLBs. */
+int sh_remove_all_mappings(struct vcpu *v, mfn_t target_mfn);
+static inline void 
+shadow_drop_references(struct domain *d, struct page_info *p)
+{
+    /* See the comment about locking in sh_remove_all_mappings */
+    sh_remove_all_mappings(d->vcpu[0], _mfn(page_to_mfn(p)));
+}
 
 /* Remove all shadows of the guest mfn. */
-extern void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
+void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all);
 static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
 {
-    int was_locked = shadow_lock_is_acquired(v->domain);
-    if ( !was_locked )
-        shadow_lock(v->domain);
-    sh_remove_shadows(v, gmfn, 0, 1);
-    if ( !was_locked )
-        shadow_unlock(v->domain);
+    /* See the comment about locking in sh_remove_shadows */
+    sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
 }
-
-/* Add a page to a domain */
-void
-shadow_guest_physmap_add_page(struct domain *d, unsigned long gfn,
-                               unsigned long mfn);
-
-/* Remove a page from a domain */
-void
-shadow_guest_physmap_remove_page(struct domain *d, unsigned long gfn,
-                                  unsigned long mfn);
-
-/* 
- * Allocation of shadow pages 
- */
-
-/* Return the minumum acceptable number of shadow pages a domain needs */
-unsigned int shadow_min_acceptable_pages(struct domain *d);
-
-/* Set the pool of shadow pages to the required number of MB.
- * Input will be rounded up to at least min_acceptable_shadow_pages().
- * Returns 0 for success, 1 for failure. */
-unsigned int shadow_set_allocation(struct domain *d, 
-                                    unsigned int megabytes,
-                                    int *preempted);
-
-/* Return the size of the shadow pool, rounded up to the nearest MB */
-static inline unsigned int shadow_get_allocation(struct domain *d)
-{
-    unsigned int pg = d->arch.shadow.total_pages;
-    return ((pg >> (20 - PAGE_SHIFT))
-            + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
-}
-
 
 /**************************************************************************/
 /* Guest physmap (p2m) support 
@@ -601,8 +375,19 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
  * guests, so we steal the address space that would have normally
  * been used by the read-only MPT map.
  */
-
 #define phys_to_machine_mapping ((l1_pgentry_t *)RO_MPT_VIRT_START)
+
+/* Add a page to a domain's p2m table */
+void shadow_guest_physmap_add_page(struct domain *d, unsigned long gfn,
+                                   unsigned long mfn);
+
+/* Remove a page from a domain's p2m table */
+void shadow_guest_physmap_remove_page(struct domain *d, unsigned long gfn,
+                                      unsigned long mfn);
+
+/* Aliases, called from common code. */
+#define guest_physmap_add_page    shadow_guest_physmap_add_page
+#define guest_physmap_remove_page shadow_guest_physmap_remove_page
 
 /* Read the current domain's P2M table. */
 static inline mfn_t sh_gfn_to_mfn_current(unsigned long gfn)
@@ -626,8 +411,8 @@ static inline mfn_t sh_gfn_to_mfn_current(unsigned long gfn)
     return _mfn(INVALID_MFN);
 }
 
-/* Walk another domain's P2M table, mapping pages as we go */
-extern mfn_t sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
+/* Read another domain's P2M table, mapping pages as we go */
+mfn_t sh_gfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 
 /* General conversion function from gfn to mfn */
 static inline mfn_t
@@ -665,6 +450,7 @@ mmio_space(paddr_t gpa)
     return !mfn_valid(mfn_x(sh_gfn_to_mfn_current(gfn)));
 }
 
+/* Translate the frame number held in an l1e from guest to machine */
 static inline l1_pgentry_t
 gl1e_to_ml1e(struct domain *d, l1_pgentry_t l1e)
 {
@@ -684,4 +470,3 @@ gl1e_to_ml1e(struct domain *d, l1_pgentry_t l1e)
  * indent-tabs-mode: nil
  * End:
  */
-      

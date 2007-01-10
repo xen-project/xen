@@ -105,11 +105,13 @@ In the case where {\tt Status} is set to {\tt Failure} then
 the struct contains a second element named {\tt ErrorDescription}:
 \begin{itemize}
 \item The element of the struct named {\tt ErrorDescription} contains
-an array of string values. The first element of the array is an XML-RPC 32-bit {\tt i4} and represents an error code;
-the remainder of the array are strings representing error parameters relating to that code.
+an array of string values. The first element of the array is an error code;
+the remainder of the array are strings representing error parameters relating
+to that code.
 \end{itemize}
 
-For example, an XML-RPC return value from the {\tt Host.ListAllVMs} function above
+For example, an XML-RPC return value from the {\tt host.get\_resident\_VMs}
+function above
 may look like this:
 \begin{verbatim}
     <struct>
@@ -122,9 +124,9 @@ may look like this:
           <value>
             <array>
                <data>
-                 <value>vm-id-1</value>
-                 <value>vm-id-2</value>
-                 <value>vm-id-3</value>
+                 <value>81547a35-205c-a551-c577-00b982c5fe00</value>
+                 <value>61c85a22-05da-b8a2-2e55-06b0847da503</value>
+                 <value>1d401ec4-3c17-35a6-fc79-cee6bd9811fe</value>
                </data>
             </array>
          </value>
@@ -147,16 +149,16 @@ We ought to support at least
 The XML-RPC interface is session-based; before you can make arbitrary RPC calls
 you must login and initiate a session. For example:
 \begin{verbatim}
-   session_id    Session.login_with_password(string uname, string pwd)
+   session_id    session.login_with_password(string uname, string pwd)
 \end{verbatim}
 Where {\tt uname} and {\tt password} refer to your username and password
 respectively, as defined by the Xen administrator.
-The {\tt session\_id} returned by {\tt Session.Login} is passed to subequent
-RPC calls as an authentication token.
+The {\tt session\_id} returned by {\tt session.login_with_password} is passed
+to subequent RPC calls as an authentication token.
 
-A session can be terminated with the {\tt Session.Logout} function:
+A session can be terminated with the {\tt session.logout} function:
 \begin{verbatim}
-   void          Session.Logout(session_id session)
+   void          session.logout(session_id session)
 \end{verbatim}
 
 \subsection{Synchronous and Asynchronous invocation}
@@ -214,10 +216,12 @@ Create a python object referencing the remote server:
 >>> xen = xmlrpclib.Server("http://test:4464")
 \end{verbatim}
 
-Acquire a session token by logging in with a username and password (error-handling ommitted for brevity; the session token is pointed to by the key {\tt 'Value'} in the returned dictionary)
+Acquire a session token by logging in with a username and password
+(error-handling ommitted for brevity; the session token is pointed to by the
+key {\tt 'Value'} in the returned dictionary)
 
 \begin{verbatim}
->>> session = xen.Session.do_login_with_password("user", "passwd")['Value']
+>>> session = session.login_with_password("user", "passwd")['Value']
 \end{verbatim}
 
 When serialised, this call looks like the following:
@@ -225,7 +229,7 @@ When serialised, this call looks like the following:
 \begin{verbatim}
 <?xml version='1.0'?>
 <methodCall>
-  <methodName>Session.do_login_with_password</methodName>
+  <methodName>session.login_with_password</methodName>
   <params>
     <param>
       <value><string>user</string></value>
@@ -237,27 +241,34 @@ When serialised, this call looks like the following:
 </methodCall>
 \end{verbatim}
 
-Next, the user may acquire a list of all the VMs known to the host: (Note the call takes the session token as the only parameter)
+Next, the user may acquire a list of all the VMs known to the host: (Note the
+call takes the session token as the only parameter)
 
 \begin{verbatim}
->>> all_vms = xen.VM.do_list(session)['Value']
+>>> all_vms = host.get_resident_VMs(session)['Value']
 >>> all_vms
 ['b7b92d9e-d442-4710-92a5-ab039fd7d89b', '23e1e837-abbf-4675-b077-d4007989b0cc',
   '2045dbc0-0734-4eea-9cb2-b8218c6b5bf2', '3202ae18-a046-4c32-9fda-e32e9631866e']
 \end{verbatim}
 
-Note the VM references are internally UUIDs. Once a reference to a VM has been acquired a lifecycle operation may be invoked:
+The VM references here are UUIDs, though they may not be that simple in the
+future, and you should treat them as opaque strings.  Once a reference to a VM
+has been acquired a lifecycle operation may be invoked:
 
 \begin{verbatim}
->>> xen.VM.do_start(session, all_vms[3], False)
-{'Status': 'Failure', 'ErrorDescription': 'Operation not implemented'}
+>>> xen.VM.start(session, all_vms[3], False)
+{'Status': 'Failure', 'ErrorDescription': ['VM_BAD_POWER_STATE', 'Halted', 'Running']}
 \end{verbatim}
 
-In this case the {\tt start} message has not been implemented and an error response has been returned. Currently these high-level errors are returned as structured data (rather than as XMLRPC faults), allowing for internationalised errors in future. Finally, here are some examples of using accessors for object fields:
+In this case the {\tt start} message has been rejected, because the VM is
+already running, and so an error response has been returned.  These high-level
+errors are returned as structured data (rather than as XML-RPC faults),
+allowing them to be internationalised.  Finally, here are some examples of
+using accessors for object fields:
 
 \begin{verbatim}
->>> xen.VM.getname_label(session, all_vms[3])['Value']
+>>> xen.VM.get_name_label(session, all_vms[3])['Value']
 'SMP'
->>> xen.VM.getname_description(session, all_vms[3])['Value']
+>>> xen.VM.get_name_description(session, all_vms[3])['Value']
 'Debian for Xen'
 \end{verbatim}

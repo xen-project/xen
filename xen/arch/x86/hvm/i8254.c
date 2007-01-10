@@ -81,7 +81,7 @@ static int pit_get_count(PITChannelState *s)
     uint64_t d;
     int  counter;
 
-    d = muldiv64(hvm_get_clock(s->vcpu) - s->count_load_time, PIT_FREQ, ticks_per_sec(s->vcpu));
+    d = muldiv64(hvm_get_guest_time(s->pt.vcpu) - s->count_load_time, PIT_FREQ, ticks_per_sec(s->pt.vcpu));
     switch(s->mode) {
     case 0:
     case 1:
@@ -106,7 +106,7 @@ static int pit_get_out1(PITChannelState *s, int64_t current_time)
     uint64_t d;
     int out;
 
-    d = muldiv64(current_time - s->count_load_time, PIT_FREQ, ticks_per_sec(s->vcpu));
+    d = muldiv64(current_time - s->count_load_time, PIT_FREQ, ticks_per_sec(s->pt.vcpu));
     switch(s->mode) {
     default:
     case 0:
@@ -153,7 +153,7 @@ void pit_set_gate(PITState *pit, int channel, int val)
     case 5:
         if (s->gate < val) {
             /* restart counting on rising edge */
-            s->count_load_time = hvm_get_clock(s->vcpu);
+            s->count_load_time = hvm_get_guest_time(s->pt.vcpu);
 //            pit_irq_timer_update(s, s->count_load_time);
         }
         break;
@@ -161,7 +161,7 @@ void pit_set_gate(PITState *pit, int channel, int val)
     case 3:
         if (s->gate < val) {
             /* restart counting on rising edge */
-            s->count_load_time = hvm_get_clock(s->vcpu);
+            s->count_load_time = hvm_get_guest_time(s->pt.vcpu);
 //            pit_irq_timer_update(s, s->count_load_time);
         }
         /* XXX: disable/enable counting */
@@ -179,7 +179,7 @@ int pit_get_gate(PITState *pit, int channel)
 void pit_time_fired(struct vcpu *v, void *priv)
 {
     PITChannelState *s = priv;
-    s->count_load_time = hvm_get_clock(v);
+    s->count_load_time = hvm_get_guest_time(v);
 }
 
 static inline void pit_load_count(PITChannelState *s, int val)
@@ -190,7 +190,7 @@ static inline void pit_load_count(PITChannelState *s, int val)
 
     if (val == 0)
         val = 0x10000;
-    s->count_load_time = hvm_get_clock(s->vcpu);
+    s->count_load_time = hvm_get_guest_time(s->pt.vcpu);
     s->count = val;
     period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
 
@@ -209,16 +209,17 @@ static inline void pit_load_count(PITChannelState *s, int val)
     switch (s->mode) {
         case 2:
             /* create periodic time */
-            s->pt = create_periodic_time (period, 0, 0, pit_time_fired, s);
+            create_periodic_time(&s->pt, period, 0, 0, pit_time_fired, s);
             break;
         case 1:
             /* create one shot time */
-            s->pt = create_periodic_time (period, 0, 1, pit_time_fired, s);
+            create_periodic_time(&s->pt, period, 0, 1, pit_time_fired, s);
 #ifdef DEBUG_PIT
             printk("HVM_PIT: create one shot time.\n");
 #endif
             break;
         default:
+            destroy_periodic_time(&s->pt);
             break;
     }
 }
@@ -253,7 +254,7 @@ static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
                     if (!(val & 0x10) && !s->status_latched) {
                         /* status latch */
                         /* XXX: add BCD and null count */
-                        s->status =  (pit_get_out1(s, hvm_get_clock(s->vcpu)) << 7) |
+                        s->status =  (pit_get_out1(s, hvm_get_guest_time(s->pt.vcpu)) << 7) |
                             (s->rw_mode << 4) |
                             (s->mode << 1) |
                             s->bcd;
@@ -351,6 +352,12 @@ static uint32_t pit_ioport_read(void *opaque, uint32_t addr)
     return ret;
 }
 
+void pit_stop_channel0_irq(PITState * pit)
+{
+    PITChannelState *s = &pit->channels[0];
+    destroy_periodic_time(&s->pt);
+}
+
 static void pit_reset(void *opaque)
 {
     PITState *pit = opaque;
@@ -359,10 +366,7 @@ static void pit_reset(void *opaque)
 
     for(i = 0;i < 3; i++) {
         s = &pit->channels[i];
-        if ( s -> pt ) {
-            destroy_periodic_time (s->pt);
-            s->pt = NULL;
-        }
+        destroy_periodic_time(&s->pt);
         s->mode = 0xff; /* the init mode */
         s->gate = (i != 2);
         pit_load_count(s, 0);
@@ -375,10 +379,11 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     PITChannelState *s;
 
     s = &pit->channels[0];
+    s->pt.vcpu = v;
     /* the timer 0 is connected to an IRQ */
-    s->vcpu = v;
-    s++; s->vcpu = v;
-    s++; s->vcpu = v;
+    init_timer(&s->pt.timer, pt_timer_fn, &s->pt, v->processor);
+    s++; s->pt.vcpu = v;
+    s++; s->pt.vcpu = v;
 
     register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
     /* register the speaker port */
@@ -389,6 +394,25 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
 #endif
     pit_reset(pit);
     return;
+}
+
+void pit_migrate_timers(struct vcpu *v)
+{
+    PITState *pit = &v->domain->arch.hvm_domain.pl_time.vpit;
+    PITChannelState *s;
+
+    s = &pit->channels[0];
+    if ( s->pt.vcpu == v && s->pt.enabled )
+        migrate_timer(&s->pt.timer, v->processor);
+}
+
+void pit_deinit(struct domain *d)
+{
+    PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
+    PITChannelState *s;
+
+    s = &pit->channels[0];
+    kill_timer(&s->pt.timer);
 }
 
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */  
@@ -426,7 +450,8 @@ static void speaker_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
 {
     PITState *pit = opaque;
-    int out = pit_get_out(pit, 2, hvm_get_clock(pit->channels[2].vcpu));
+    int out = pit_get_out(pit, 2,
+                          hvm_get_guest_time(pit->channels[2].pt.vcpu));
     /* Refresh clock toggles at about 15us. We approximate as 2^14ns. */
     unsigned int refresh_clock = ((unsigned int)NOW() >> 14) & 1;
     return ((pit->speaker_data_on << 1) | pit_get_gate(pit, 2) |

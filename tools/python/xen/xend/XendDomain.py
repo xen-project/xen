@@ -36,6 +36,7 @@ from xen.xend import XendRoot, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
+from xen.xend.XendError import VMBadState
 from xen.xend.XendLogging import log
 from xen.xend.XendAPIConstants import XEN_API_VM_POWER_STATE
 from xen.xend.XendConstants import XS_VMROOT
@@ -376,7 +377,7 @@ class XendDomain:
             dom0.setVCpuCount(target)
 
 
-    def _refresh(self):
+    def _refresh(self, refresh_shutdown = True):
         """Refresh the domain list. Needs to be called when
         either xenstore has changed or when a method requires
         up to date information (like uptime, cputime stats).
@@ -392,7 +393,7 @@ class XendDomain:
         for dom in running:
             domid = dom['domid']
             if domid in self.domains:
-                self.domains[domid].update(dom)
+                self.domains[domid].update(dom, refresh_shutdown)
             elif domid not in self.domains and dom['dying'] != 1:
                 try:
                     new_dom = XendDomainInfo.recreate(dom, False)
@@ -494,7 +495,7 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
-            self._refresh()
+            self._refresh(refresh_shutdown = False)
             dom = self.domain_lookup_nr(domid)
             if not dom:
                 raise XendError("No domain named '%s'." % str(domid))
@@ -600,6 +601,16 @@ class XendDomain:
             for d in self.managed_domains.keys():
                 if d not in result:
                     result.append(d)
+            return result
+        finally:
+            self.domains_lock.release()
+
+    def get_all_vms(self):
+        self.domains_lock.acquire()
+        try:
+            result = self.domains.values()
+            result += [x for x in self.managed_domains.values() if
+                       x not in result]
             return result
         finally:
             self.domains_lock.release()
@@ -720,7 +731,7 @@ class XendDomain:
         
         self.domains_lock.acquire()
         try:
-            self._refresh()
+            self._refresh(refresh_shutdown = False)
             
             # active domains
             active_domains = self.domains.values()
@@ -782,7 +793,9 @@ class XendDomain:
                 raise XendError("Cannot save privileged domain %s" % domname)
 
             if dominfo.state != DOM_STATE_RUNNING:
-                raise XendError("Cannot suspend domain that is not running.")
+                raise VMBadState("Domain is not running",
+                                 POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                                 POWER_STATE_NAMES[dominfo.state])
 
             dom_uuid = dominfo.get_uuid()
 
@@ -869,6 +882,26 @@ class XendDomain:
             self.domains_lock.release()
 
 
+    def domain_create_from_dict(self, config_dict):
+        """Create a domain from a configuration dictionary.
+
+        @param config_dict: configuration
+        @rtype: XendDomainInfo
+        """
+        self.domains_lock.acquire()
+        try:
+            self._refresh()
+
+            dominfo = XendDomainInfo.create_from_dict(config_dict)
+            self._add_domain(dominfo)
+            self.domain_sched_credit_set(dominfo.getDomid(),
+                                         dominfo.getWeight(),
+                                         dominfo.getCap())
+            return dominfo
+        finally:
+            self.domains_lock.release()
+
+
     def domain_new(self, config):
         """Create a domain from a configuration but do not start it.
         
@@ -912,7 +945,9 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
 
             if dominfo.state != DOM_STATE_HALTED:
-                raise XendError("Domain is already running")
+                raise VMBadState("Domain is already running",
+                                 POWER_STATE_NAMES[DOM_STATE_HALTED],
+                                 POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
             self._add_domain(dominfo)
@@ -940,7 +975,9 @@ class XendDomain:
                     raise XendInvalidDomain(str(domid))
 
                 if dominfo.state != DOM_STATE_HALTED:
-                    raise XendError("Domain is still running")
+                    raise VMBadState("Domain is still running",
+                                     POWER_STATE_NAMES[DOM_STATE_HALTED],
+                                     POWER_STATE_NAMES[dominfo.state])
 
                 log.info("Domain %s (%s) deleted." %
                          (dominfo.getName(), dominfo.info.get('uuid')))

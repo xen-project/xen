@@ -130,16 +130,3 @@ def instance():
         inst = XendAuthSessions()
         inst.init()
     return inst
-
-# Handy Authentication Decorators
-# -------------------------------
-def session_required(func):
-    def check_session(self, session, *args, **kwargs):
-        if instance().is_session_valid(session):
-            return func(self, session, *args, **kwargs)
-        else:
-            return {'Status': 'Failure',
-                    'ErrorDescription': XEND_ERROR_SESSION_INVALID}
-    return check_session
-
-

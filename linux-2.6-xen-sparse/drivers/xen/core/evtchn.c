@@ -61,7 +61,14 @@ static int evtchn_to_irq[NR_EVENT_CHANNELS] = {
 static u32 irq_info[NR_IRQS];
 
 /* Binding types. */
-enum { IRQT_UNBOUND, IRQT_PIRQ, IRQT_VIRQ, IRQT_IPI, IRQT_EVTCHN };
+enum {
+	IRQT_UNBOUND,
+	IRQT_PIRQ,
+	IRQT_VIRQ,
+	IRQT_IPI,
+	IRQT_LOCAL_PORT,
+	IRQT_CALLER_PORT
+};
 
 /* Constructor for packed IRQ information. */
 static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
@@ -208,38 +215,51 @@ void force_evtchn_callback(void)
 /* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
 EXPORT_SYMBOL(force_evtchn_callback);
 
+static DEFINE_PER_CPU(unsigned int, upcall_count) = { 0 };
+
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
 	unsigned long  l1, l2;
-	unsigned int   l1i, l2i, port;
+	unsigned int   l1i, l2i, port, count;
 	int            irq, cpu = smp_processor_id();
 	shared_info_t *s = HYPERVISOR_shared_info;
 	vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
-	vcpu_info->evtchn_upcall_pending = 0;
+	do {
+		/* Avoid a callback storm when we reenable delivery. */
+		vcpu_info->evtchn_upcall_pending = 0;
+
+		/* Nested invocations bail immediately. */
+		if (unlikely(per_cpu(upcall_count, cpu)++))
+			return;
 
 #ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
-	/* Clear master pending flag /before/ clearing selector flag. */
-	rmb();
+		/* Clear master flag /before/ clearing selector flag. */
+		rmb();
 #endif
-	l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
-	while (l1 != 0) {
-		l1i = __ffs(l1);
-		l1 &= ~(1UL << l1i);
+		l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
+		while (l1 != 0) {
+			l1i = __ffs(l1);
+			l1 &= ~(1UL << l1i);
 
-		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
-			l2i = __ffs(l2);
+			while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
+				l2i = __ffs(l2);
 
-			port = (l1i * BITS_PER_LONG) + l2i;
-			if ((irq = evtchn_to_irq[port]) != -1)
-				do_IRQ(irq, regs);
-			else {
-				exit_idle();
-				evtchn_device_upcall(port);
+				port = (l1i * BITS_PER_LONG) + l2i;
+				if ((irq = evtchn_to_irq[port]) != -1)
+					do_IRQ(irq, regs);
+				else {
+					exit_idle();
+					evtchn_device_upcall(port);
+				}
 			}
 		}
-	}
+
+		/* If there were nested callbacks then we have more to do. */
+		count = per_cpu(upcall_count, cpu);
+		per_cpu(upcall_count, cpu) = 0;
+	} while (unlikely(count != 1));
 }
 
 static int find_unbound_irq(void)
@@ -262,18 +282,18 @@ static int find_unbound_irq(void)
 	return -ENOSPC;
 }
 
-static int bind_evtchn_to_irq(unsigned int evtchn)
+static int bind_caller_port_to_irq(unsigned int caller_port)
 {
 	int irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
-	if ((irq = evtchn_to_irq[evtchn]) == -1) {
+	if ((irq = evtchn_to_irq[caller_port]) == -1) {
 		if ((irq = find_unbound_irq()) < 0)
 			goto out;
 
-		evtchn_to_irq[evtchn] = irq;
-		irq_info[irq] = mk_irq_info(IRQT_EVTCHN, 0, evtchn);
+		evtchn_to_irq[caller_port] = irq;
+		irq_info[irq] = mk_irq_info(IRQT_CALLER_PORT, 0, caller_port);
 	}
 
 	irq_bindcount[irq]++;
@@ -281,6 +301,59 @@ static int bind_evtchn_to_irq(unsigned int evtchn)
  out:
 	spin_unlock(&irq_mapping_update_lock);
 	return irq;
+}
+
+static int bind_local_port_to_irq(unsigned int local_port)
+{
+	int irq;
+
+	spin_lock(&irq_mapping_update_lock);
+
+	BUG_ON(evtchn_to_irq[local_port] != -1);
+
+	if ((irq = find_unbound_irq()) < 0) {
+		struct evtchn_close close = { .port = local_port };
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
+			BUG();
+		goto out;
+	}
+
+	evtchn_to_irq[local_port] = irq;
+	irq_info[irq] = mk_irq_info(IRQT_LOCAL_PORT, 0, local_port);
+	irq_bindcount[irq]++;
+
+ out:
+	spin_unlock(&irq_mapping_update_lock);
+	return irq;
+}
+
+static int bind_listening_port_to_irq(unsigned int remote_domain)
+{
+	struct evtchn_alloc_unbound alloc_unbound;
+	int err;
+
+	alloc_unbound.dom        = DOMID_SELF;
+	alloc_unbound.remote_dom = remote_domain;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+					  &alloc_unbound);
+
+	return err ? : bind_local_port_to_irq(alloc_unbound.port);
+}
+
+static int bind_interdomain_evtchn_to_irq(unsigned int remote_domain,
+					  unsigned int remote_port)
+{
+	struct evtchn_bind_interdomain bind_interdomain;
+	int err;
+
+	bind_interdomain.remote_dom  = remote_domain;
+	bind_interdomain.remote_port = remote_port;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+					  &bind_interdomain);
+
+	return err ? : bind_local_port_to_irq(bind_interdomain.local_port);
 }
 
 static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
@@ -357,7 +430,8 @@ static void unbind_from_irq(unsigned int irq)
 
 	if ((--irq_bindcount[irq] == 0) && VALID_EVTCHN(evtchn)) {
 		close.port = evtchn;
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
+		if ((type_from_irq(irq) != IRQT_CALLER_PORT) &&
+		    HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
 			BUG();
 
 		switch (type_from_irq(irq)) {
@@ -383,17 +457,16 @@ static void unbind_from_irq(unsigned int irq)
 	spin_unlock(&irq_mapping_update_lock);
 }
 
-int bind_evtchn_to_irqhandler(
-	unsigned int evtchn,
+int bind_caller_port_to_irqhandler(
+	unsigned int caller_port,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags,
 	const char *devname,
 	void *dev_id)
 {
-	unsigned int irq;
-	int retval;
+	int irq, retval;
 
-	irq = bind_evtchn_to_irq(evtchn);
+	irq = bind_caller_port_to_irq(caller_port);
 	if (irq < 0)
 		return irq;
 
@@ -405,7 +478,54 @@ int bind_evtchn_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL_GPL(bind_evtchn_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_caller_port_to_irqhandler);
+
+int bind_listening_port_to_irqhandler(
+	unsigned int remote_domain,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id)
+{
+	int irq, retval;
+
+	irq = bind_listening_port_to_irq(remote_domain);
+	if (irq < 0)
+		return irq;
+
+	retval = request_irq(irq, handler, irqflags, devname, dev_id);
+	if (retval != 0) {
+		unbind_from_irq(irq);
+		return retval;
+	}
+
+	return irq;
+}
+EXPORT_SYMBOL_GPL(bind_listening_port_to_irqhandler);
+
+int bind_interdomain_evtchn_to_irqhandler(
+	unsigned int remote_domain,
+	unsigned int remote_port,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id)
+{
+	int irq, retval;
+
+	irq = bind_interdomain_evtchn_to_irq(remote_domain, remote_port);
+	if (irq < 0)
+		return irq;
+
+	retval = request_irq(irq, handler, irqflags, devname, dev_id);
+	if (retval != 0) {
+		unbind_from_irq(irq);
+		return retval;
+	}
+
+	return irq;
+}
+EXPORT_SYMBOL_GPL(bind_interdomain_evtchn_to_irqhandler);
 
 int bind_virq_to_irqhandler(
 	unsigned int virq,
@@ -415,8 +535,7 @@ int bind_virq_to_irqhandler(
 	const char *devname,
 	void *dev_id)
 {
-	unsigned int irq;
-	int retval;
+	int irq, retval;
 
 	irq = bind_virq_to_irq(virq, cpu);
 	if (irq < 0)
@@ -440,8 +559,7 @@ int bind_ipi_to_irqhandler(
 	const char *devname,
 	void *dev_id)
 {
-	unsigned int irq;
-	int retval;
+	int irq, retval;
 
 	irq = bind_ipi_to_irq(ipi, cpu);
 	if (irq < 0)
@@ -715,6 +833,12 @@ void notify_remote_via_irq(int irq)
 		notify_remote_via_evtchn(evtchn);
 }
 EXPORT_SYMBOL_GPL(notify_remote_via_irq);
+
+int irq_to_evtchn_port(int irq)
+{
+	return evtchn_from_irq(irq);
+}
+EXPORT_SYMBOL_GPL(irq_to_evtchn_port);
 
 void mask_evtchn(int port)
 {

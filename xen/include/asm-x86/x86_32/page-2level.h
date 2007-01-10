@@ -42,7 +42,7 @@ typedef l2_pgentry_t root_pgentry_t;
 
 /* misc */
 #define is_guest_l1_slot(_s)    (1)
-#define is_guest_l2_slot(_t,_s) ((_s) < L2_PAGETABLE_FIRST_XEN_SLOT)
+#define is_guest_l2_slot(_d, _t,_s) ((_s) < L2_PAGETABLE_FIRST_XEN_SLOT)
 
 /*
  * PTE pfn and flags:
