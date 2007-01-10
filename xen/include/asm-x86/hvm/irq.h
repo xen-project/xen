@@ -43,9 +43,17 @@ struct hvm_irq {
      */
     DECLARE_BITMAP(isa_irq, 16);
 
-    /* Virtual interrupt wire and GSI link for paravirtual platform driver. */
-    DECLARE_BITMAP(callback_irq_wire, 1);
-    unsigned int callback_gsi;
+    /* Virtual interrupt and via-link for paravirtual platform driver. */
+    unsigned int callback_via_asserted;
+    enum {
+        HVMIRQ_callback_none,
+        HVMIRQ_callback_gsi,
+        HVMIRQ_callback_pci_intx
+    } callback_via_type;
+    union {
+        unsigned int gsi;
+        struct { uint8_t dev, intx; } pci;
+    } callback_via;
 
     /*
      * PCI-ISA interrupt router.
@@ -105,7 +113,7 @@ void hvm_isa_irq_deassert(
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 
 void hvm_set_callback_irq_level(void);
-void hvm_set_callback_gsi(struct domain *d, unsigned int gsi);
+void hvm_set_callback_via(struct domain *d, uint64_t via);
 
 int cpu_get_interrupt(struct vcpu *v, int *type);
 int cpu_has_pending_irq(struct vcpu *v);

@@ -800,7 +800,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
-                hvm_set_callback_gsi(d, a.value);
+                hvm_set_callback_via(d, a.value);
                 break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;

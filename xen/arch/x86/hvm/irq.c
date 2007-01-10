@@ -25,7 +25,7 @@
 #include <xen/sched.h>
 #include <asm/hvm/domain.h>
 
-void hvm_pci_intx_assert(
+static void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -33,10 +33,8 @@ void hvm_pci_intx_assert(
 
     ASSERT((device <= 31) && (intx <= 3));
 
-    spin_lock(&hvm_irq->lock);
-
     if ( __test_and_set_bit(device*4 + intx, &hvm_irq->pci_intx) )
-        goto out;
+        return;
 
     gsi = hvm_pci_intx_gsi(device, intx);
     if ( hvm_irq->gsi_assert_count[gsi]++ == 0 )
@@ -50,12 +48,19 @@ void hvm_pci_intx_assert(
         vioapic_irq_positive_edge(d, isa_irq);
         vpic_irq_positive_edge(d, isa_irq);
     }
+}
 
- out:
+void hvm_pci_intx_assert(
+    struct domain *d, unsigned int device, unsigned int intx)
+{
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+
+    spin_lock(&hvm_irq->lock);
+    __hvm_pci_intx_assert(d, device, intx);
     spin_unlock(&hvm_irq->lock);
 }
 
-void hvm_pci_intx_deassert(
+static void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
@@ -63,10 +68,8 @@ void hvm_pci_intx_deassert(
 
     ASSERT((device <= 31) && (intx <= 3));
 
-    spin_lock(&hvm_irq->lock);
-
     if ( !__test_and_clear_bit(device*4 + intx, &hvm_irq->pci_intx) )
-        goto out;
+        return;
 
     gsi = hvm_pci_intx_gsi(device, intx);
     --hvm_irq->gsi_assert_count[gsi];
@@ -76,8 +79,15 @@ void hvm_pci_intx_deassert(
     if ( (--hvm_irq->pci_link_assert_count[link] == 0) && isa_irq &&
          (--hvm_irq->gsi_assert_count[isa_irq] == 0) )
         vpic_irq_negative_edge(d, isa_irq);
+}
 
- out:
+void hvm_pci_intx_deassert(
+    struct domain *d, unsigned int device, unsigned int intx)
+{
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+
+    spin_lock(&hvm_irq->lock);
+    __hvm_pci_intx_deassert(d, device, intx);
     spin_unlock(&hvm_irq->lock);
 }
 
@@ -123,37 +133,47 @@ void hvm_set_callback_irq_level(void)
     struct vcpu *v = current;
     struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    unsigned int gsi = hvm_irq->callback_gsi;
+    unsigned int gsi, pdev, pintx, asserted;
 
     /* Fast lock-free tests. */
-    if ( (v->vcpu_id != 0) || (gsi == 0) )
+    if ( (v->vcpu_id != 0) ||
+         (hvm_irq->callback_via_type == HVMIRQ_callback_none) )
         return;
 
     spin_lock(&hvm_irq->lock);
 
-    gsi = hvm_irq->callback_gsi;
-    if ( gsi == 0 )
-        goto out;
-
     /* NB. Do not check the evtchn_upcall_mask. It is not used in HVM mode. */
-    if ( vcpu_info(v, evtchn_upcall_pending) )
+    asserted = !!vcpu_info(v, evtchn_upcall_pending);
+    if ( hvm_irq->callback_via_asserted == asserted )
+        goto out;
+    hvm_irq->callback_via_asserted = asserted;
+
+    /* Callback status has changed. Update the callback via. */
+    switch ( hvm_irq->callback_via_type )
     {
-        if ( !__test_and_set_bit(0, &hvm_irq->callback_irq_wire) &&
-             (hvm_irq->gsi_assert_count[gsi]++ == 0) )
+    case HVMIRQ_callback_gsi:
+        gsi = hvm_irq->callback_via.gsi;
+        if ( asserted && (hvm_irq->gsi_assert_count[gsi]++ == 0) )
         {
             vioapic_irq_positive_edge(d, gsi);
             if ( gsi <= 15 )
                 vpic_irq_positive_edge(d, gsi);
         }
-    }
-    else
-    {
-        if ( __test_and_clear_bit(0, &hvm_irq->callback_irq_wire) &&
-             (--hvm_irq->gsi_assert_count[gsi] == 0) )
+        else if ( !asserted && (--hvm_irq->gsi_assert_count[gsi] == 0) )
         {
             if ( gsi <= 15 )
                 vpic_irq_negative_edge(d, gsi);
         }
+        break;
+    case HVMIRQ_callback_pci_intx:
+        pdev  = hvm_irq->callback_via.pci.dev;
+        pintx = hvm_irq->callback_via.pci.intx;
+        if ( asserted )
+            __hvm_pci_intx_assert(d, pdev, pintx);
+        else
+            __hvm_pci_intx_deassert(d, pdev, pintx);
+    default:
+        break;
     }
 
  out:
@@ -193,40 +213,79 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
             d->domain_id, link, old_isa_irq, isa_irq);
 }
 
-void hvm_set_callback_gsi(struct domain *d, unsigned int gsi)
+void hvm_set_callback_via(struct domain *d, uint64_t via)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    unsigned int old_gsi;
+    unsigned int gsi=0, pdev=0, pintx=0;
+    uint8_t via_type;
 
-    if ( gsi >= ARRAY_SIZE(hvm_irq->gsi_assert_count) )
-        gsi = 0;
+    via_type = (uint8_t)(via >> 56) + 1;
+    if ( ((via_type == HVMIRQ_callback_gsi) && (via == 0)) ||
+         (via_type > HVMIRQ_callback_pci_intx) )
+        via_type = HVMIRQ_callback_none;
 
     spin_lock(&hvm_irq->lock);
 
-    old_gsi = hvm_irq->callback_gsi;
-    if ( old_gsi == gsi )
-        goto out;
-    hvm_irq->callback_gsi = gsi;
-
-    if ( !test_bit(0, &hvm_irq->callback_irq_wire) )
-        goto out;
-
-    if ( old_gsi && (--hvm_irq->gsi_assert_count[old_gsi] == 0) )
-        if ( old_gsi <= 15 )
-            vpic_irq_negative_edge(d, old_gsi);
-
-    if ( gsi && (hvm_irq->gsi_assert_count[gsi]++ == 0) )
+    /* Tear down old callback via. */
+    if ( hvm_irq->callback_via_asserted )
     {
-        vioapic_irq_positive_edge(d, gsi);
-        if ( gsi <= 15 )
-            vpic_irq_positive_edge(d, gsi);
+        switch ( hvm_irq->callback_via_type )
+        {
+        case HVMIRQ_callback_gsi:
+            gsi = hvm_irq->callback_via.gsi;
+            if ( (--hvm_irq->gsi_assert_count[gsi] == 0) && (gsi <= 15) )
+                vpic_irq_negative_edge(d, gsi);
+            break;
+        case HVMIRQ_callback_pci_intx:
+            pdev  = hvm_irq->callback_via.pci.dev;
+            pintx = hvm_irq->callback_via.pci.intx;
+            __hvm_pci_intx_deassert(d, pdev, pintx);
+            break;
+        default:
+            break;
+        }
     }
 
- out:
+    /* Set up new callback via. */
+    switch ( hvm_irq->callback_via_type = via_type )
+    {
+    case HVMIRQ_callback_gsi:
+        gsi = hvm_irq->callback_via.gsi = (uint8_t)via;
+        if ( (gsi == 0) || (gsi >= ARRAY_SIZE(hvm_irq->gsi_assert_count)) )
+            hvm_irq->callback_via_type = HVMIRQ_callback_none;
+        else if ( hvm_irq->callback_via_asserted &&
+                  (hvm_irq->gsi_assert_count[gsi]++ == 0) )
+        {
+            vioapic_irq_positive_edge(d, gsi);
+            if ( gsi <= 15 )
+                vpic_irq_positive_edge(d, gsi);
+        }
+        break;
+    case HVMIRQ_callback_pci_intx:
+        pdev  = hvm_irq->callback_via.pci.dev  = (uint8_t)(via >> 11) & 31;
+        pintx = hvm_irq->callback_via.pci.intx = (uint8_t)via & 3;
+        if ( hvm_irq->callback_via_asserted )
+             __hvm_pci_intx_assert(d, pdev, pintx);
+        break;
+    default:
+        break;
+    }
+
     spin_unlock(&hvm_irq->lock);
 
-    dprintk(XENLOG_G_INFO, "Dom%u callback GSI changed %u -> %u\n",
-            d->domain_id, old_gsi, gsi);
+    dprintk(XENLOG_G_INFO, "Dom%u callback via changed to ", d->domain_id);
+    switch ( via_type )
+    {
+    case HVMIRQ_callback_gsi:
+        printk("GSI %u\n", gsi);
+        break;
+    case HVMIRQ_callback_pci_intx:
+        printk("PCI INTx Dev 0x%02x Int%c\n", pdev, 'A' + pintx);
+        break;
+    default:
+        printk("None\n");
+        break;
+    }
 }
 
 int cpu_has_pending_irq(struct vcpu *v)
