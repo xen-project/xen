@@ -94,9 +94,6 @@ const char *symbols_lookup(unsigned long addr,
     unsigned long i, low, high, mid;
     unsigned long symbol_end = 0;
 
-    /* This kernel should never had been booted. */
-    BUG_ON(!symbols_addresses);
-
     namebuf[KSYM_NAME_LEN] = 0;
     namebuf[0] = 0;
 
