@@ -4,7 +4,6 @@ NOTE: DO NOT commit changes to these files!   If a file
 needs to be changed, move it to ../linux-xen and follow
 the instructions in the README there.
 
-cmdline.c		-> linux/lib/cmdline.c
 efi_stub.S		-> linux/arch/ia64/kernel/efi_stub.S
 extable.c		-> linux/arch/ia64/mm/extable.c
 hpsim.S			-> linux/arch/ia64/hp/sim/hpsim.S

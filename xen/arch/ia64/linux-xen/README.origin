@@ -5,6 +5,7 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
+cmdline.c		-> linux/lib/cmdline.c
 efi.c			-> linux/arch/ia64/kernel/efi.c
 entry.h			-> linux/arch/ia64/kernel/entry.h
 entry.S			-> linux/arch/ia64/kernel/entry.S
