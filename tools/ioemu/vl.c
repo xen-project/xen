@@ -6464,10 +6464,6 @@ int main(int argc, char **argv)
     }
 
 #if defined (__ia64__)
-    /* ram_size passed from xend has added on GFW memory,
-       so we must subtract it here */
-    ram_size -= 16 * MEM_M;
-
     if (ram_size > MMIO_START)
         ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
 #endif

@@ -591,6 +591,9 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         extra_pages = 1024 + 3
         return mem_kb + extra_pages * page_kb
 
+    def getRequiredInitialReservation(self):
+        return self.vm.getMemoryTarget()
+
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # Explicit shadow memory is not a concept 
         return 0
