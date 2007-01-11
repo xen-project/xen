@@ -1020,10 +1020,11 @@ class XendConfig(dict):
         @return: Returns True if succesfully found and updated a device conf
         """
         if dev_uuid in self['devices']:
-            config = sxp.child0(cfg_sxp)
-            dev_type = sxp.name(config)
-            dev_info = {}
-
+            if sxp.child0(cfg_sxp) == 'device':            
+                config = sxp.child0(cfg_sxp)
+            else:
+                config = cfg_sxp
+                
             for opt_val in config[1:]:
                 try:
                     opt, val = opt_val
