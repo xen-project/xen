@@ -107,7 +107,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x98 - 0x9F */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
@@ -230,7 +230,8 @@ struct operand {
 #define EFLG_CF (1<<0)
 
 /* Exception definitions. */
-#define EXC_DE 0
+#define EXC_DE  0
+#define EXC_GP 13
 
 /*
  * Instruction emulation:
@@ -394,11 +395,13 @@ do{ __asm__ __volatile__ (                                              \
 
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
-({ unsigned long _x, _eip = _truncate_ea(_regs.eip, def_ad_bytes);      \
+({ unsigned long _x, _eip = _regs.eip;                                  \
    if ( !mode_64bit() ) _eip = (uint32_t)_eip; /* ignore upper dword */ \
+   _regs.eip += (_size); /* real hardware doesn't truncate */           \
+   generate_exception_if((uint8_t)(_regs.eip - ctxt->regs->eip) > 15,   \
+                         EXC_GP);                                       \
    rc = ops->insn_fetch(x86_seg_cs, _eip, &_x, (_size), ctxt);          \
    if ( rc ) goto done;                                                 \
-   _regs.eip += (_size); /* real hardware doesn't truncate */           \
    _x;                                                                  \
 })
 #define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
@@ -540,8 +543,8 @@ x86_emulate(
 
     uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    unsigned int op_bytes, ad_bytes, def_ad_bytes;
-    unsigned int lock_prefix = 0, rep_prefix = 0, i;
+    unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
+    unsigned int lock_prefix = 0, rep_prefix = 0;
     int rc = 0;
     struct operand src, dst;
 
@@ -553,28 +556,25 @@ x86_emulate(
     ea.mem.seg = x86_seg_ds;
     ea.mem.off = 0;
 
-    op_bytes = ad_bytes = def_ad_bytes = ctxt->address_bytes;
+    op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->address_bytes;
     if ( op_bytes == 8 )
     {
-        op_bytes = 4;
+        op_bytes = def_op_bytes = 4;
 #ifndef __x86_64__
         return -1;
 #endif
     }
 
     /* Prefix bytes. */
-    for ( i = 0; i < 8; i++ )
+    for ( ; ; )
     {
         switch ( b = insn_fetch_type(uint8_t) )
         {
         case 0x66: /* operand-size override */
-            op_bytes ^= 6;      /* switch between 2/4 bytes */
+            op_bytes = def_op_bytes ^ 6;
             break;
         case 0x67: /* address-size override */
-            if ( mode_64bit() )
-                ad_bytes ^= 12; /* switch between 4/8 bytes */
-            else
-                ad_bytes ^= 6;  /* switch between 2/4 bytes */
+            ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
             break;
         case 0x2e: /* CS override */
             ea.mem.seg = x86_seg_cs;
@@ -1287,6 +1287,14 @@ x86_emulate(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         dst.val  = dst.orig_val = *dst.reg;
         goto xchg;
+
+    case 0x9e: /* sahf */
+        *(uint8_t *)_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
+        break;
+
+    case 0x9f: /* lahf */
+        ((uint8_t *)&_regs.eax)[1] = (_regs.eflags & 0xd7) | 0x02;
+        break;
 
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
         /* Source EA is not encoded via ModRM. */
