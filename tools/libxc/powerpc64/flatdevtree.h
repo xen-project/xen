@@ -40,7 +40,7 @@ struct boot_param_header {
 	/* version 2 fields below */
 	u32 boot_cpuid_phys;    /* Physical CPU id we're booting on */
 	/* version 3 fields below */
-	u32 dt_strings_size;    /* size of the DT strings block */
+	u32 size_dt_strings;    /* size of the DT strings block */
 };
 
 struct ft_cxt {
