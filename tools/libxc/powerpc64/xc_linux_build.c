@@ -187,9 +187,9 @@ out:
 }
 
 static unsigned long create_start_info(
-	void *devtree, start_info_t *start_info,
+    void *devtree, start_info_t *start_info,
         unsigned int console_evtchn, unsigned int store_evtchn,
-	unsigned long nr_pages, unsigned long rma_pages)
+    unsigned long nr_pages, unsigned long rma_pages)
 {
     unsigned long start_info_addr;
     uint64_t rma_top;
@@ -260,8 +260,8 @@ int xc_linux_build(int xc_handle,
 
     rma_pages = get_rma_pages(devtree);
     if (rma_pages == 0) {
-	    rc = -1;
-	    goto out;
+        rc = -1;
+        goto out;
     }
 
     if (get_rma_page_array(xc_handle, domid, &page_array, rma_pages)) {
