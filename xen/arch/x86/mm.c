@@ -1376,7 +1376,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current);
 
-        if ( unlikely(!get_page_from_l2e(nl2e, pfn, current->domain)) )
+        if ( unlikely(!get_page_from_l2e(nl2e, pfn, d)) )
             return 0;
 
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current)) )
@@ -1439,7 +1439,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         if (!l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current);
 
-        if ( unlikely(!get_page_from_l3e(nl3e, pfn, current->domain)) )
+        if ( unlikely(!get_page_from_l3e(nl3e, pfn, d)) )
             return 0;
 
         if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current)) )
