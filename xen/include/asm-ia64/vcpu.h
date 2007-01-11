@@ -23,6 +23,8 @@ extern u64 cycle_to_ns(u64 cycle);
 
 #define SPURIOUS_VECTOR 0xf
 
+extern void dorfirfi(void);
+
 /* general registers */
 extern u64 vcpu_get_gr(VCPU * vcpu, unsigned long reg);
 extern IA64FAULT vcpu_get_gr_nat(VCPU * vcpu, unsigned long reg, u64 * val);

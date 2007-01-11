@@ -134,6 +134,11 @@ void reflect_event(struct pt_regs *regs)
 	if (!event_pending(v))
 		return;
 
+	// can't inject event, when XEN is emulating rfi 
+	// and both PSCB(v, ifs) and regs->ifs are valid
+	if (regs->cr_iip == *(unsigned long *)dorfirfi)
+		return;
+
 	if (!PSCB(v, interrupt_collection_enabled))
 		printk("psr.ic off, delivering event, ipsr=%lx,iip=%lx,"
 		       "isr=%lx,viip=0x%lx\n",

@@ -1326,7 +1326,6 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 	u64 int_enable, regspsr = 0;
 	u64 ifs;
 	REGS *regs = vcpu_regs(vcpu);
-	extern void dorfirfi(void);
 
 	psr.i64 = PSCB(vcpu, ipsr);
 	if (psr.ia64_psr.cpl < 3)
@@ -1350,18 +1349,24 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 		return IA64_ILLOP_FAULT;
 	}
 	PSCB(vcpu, incomplete_regframe) = 0;	// is this necessary?
+
 	ifs = PSCB(vcpu, ifs);
-	//if ((ifs & regs->cr_ifs & 0x8000000000000000L) && ifs != regs->cr_ifs) {
-	//if ((ifs & 0x8000000000000000L) && ifs != regs->cr_ifs) {
-	if (ifs & regs->cr_ifs & 0x8000000000000000L) {
-		// TODO: validate PSCB(vcpu,iip)
-		// TODO: PSCB(vcpu,ipsr) = psr;
-		PSCB(vcpu, ipsr) = psr.i64;
-		// now set up the trampoline
-		regs->cr_iip = *(unsigned long *)dorfirfi; // function pointer!!
-		__asm__ __volatile("mov %0=psr;;":"=r"(regspsr)::"memory");
-		regs->cr_ipsr =
-		    regspsr & ~(IA64_PSR_I | IA64_PSR_IC | IA64_PSR_BN);
+	if (ifs > 0x8000000000000000UL) {
+		if (regs->cr_ifs > 0x8000000000000000UL) {
+			// TODO: validate PSCB(vcpu,iip)
+			// TODO: PSCB(vcpu,ipsr) = psr;
+			PSCB(vcpu, ipsr) = psr.i64;
+			// now set up the trampoline
+			regs->cr_iip = *(unsigned long *)dorfirfi; // func ptr!
+			__asm__ __volatile("mov %0=psr;;":"=r"(regspsr)
+			                   ::"memory");
+			regs->cr_ipsr = regspsr & ~(IA64_PSR_I | IA64_PSR_IC |
+			                            IA64_PSR_BN);
+		} else {
+			regs->cr_ifs = ifs;
+			regs->cr_ipsr = psr.i64;
+			regs->cr_iip = PSCB(vcpu, iip);
+		}
 	} else {
 		regs->cr_ipsr = psr.i64;
 		regs->cr_iip = PSCB(vcpu, iip);
