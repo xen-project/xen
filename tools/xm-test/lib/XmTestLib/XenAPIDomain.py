@@ -26,7 +26,7 @@ from xen.util.xmlrpclib2 import ServerProxy
 from types import DictType
 
 
-class XenManagedConfig:
+class XenAPIConfig:
     """An object to help create a VM configuration usable via Xen-API"""
     def __init__(self):
         self.opts = {}
@@ -36,9 +36,9 @@ class XenManagedConfig:
                                         'memory_static_min' ,
                                         'memory_dynamic_min',
                                         'memory_dynamic_max' ],
-                           'kernel' : 'kernel_kernel',
-                           'ramdisk': 'kernel_initrd',
-                           'root'   : 'kernel_args'}
+                           'kernel' : 'PV_kernel',
+                           'ramdisk': 'PV_ramdisk',
+                           'root'   : 'PV_args'}
 
     def setOpt(self, name, value):
         """Set an option in the config"""
@@ -69,7 +69,7 @@ class XenManagedConfig:
         return self.opts
 
 
-class XenManagedDomain(XenDomain):
+class XenAPIDomain(XenDomain):
 
     def __init__(self, name=None, config=None):
         if name:
@@ -81,12 +81,11 @@ class XenManagedDomain(XenDomain):
         self.console = None
         self.netEnv = "bridge"
 
-        self.server, self.session = xapi._connect()
-        server = self.server
+        self.session = xapi.connect()
+        session = self.session
         try:
-            self.vm_uuid = xapi.execute(server.VM.create, self.session,
-                                        self.config.getOpts())
-            xapi._VMuuids.append(self.vm_uuid)
+            self.vm_uuid = session.xenapi.VM.create(self.config.getOpts())
+            addXAPIDomain(self.vm_uuid)
         except:
             raise DomainError("Could not create VM config file for "
                               "managed domain.")
@@ -96,15 +95,17 @@ class XenManagedDomain(XenDomain):
 
     def start(self, noConsole=False, startpaused=False):
         #start the VM
-        server = self.server
+        session = self.session
         if self.vm_uuid:
             try:
-                xapi.execute(server.VM.start, self.session, self.vm_uuid,
-                             startpaused)
+                session.xenapi.VM.start(self.vm_uuid, startpaused)
             except:
                 raise DomainError("Could not start domain")
         else:
-            raise DomainError("VM has not UUID - VM config does not exist?")
+            raise DomainError("VM has no UUID - does VM config exist?")
+
+        if startpaused:
+           return
 
         if self.getDomainType() == "HVM":
            waitForBoot()
@@ -120,20 +121,18 @@ class XenManagedDomain(XenDomain):
 
     def stop(self):
         if self.vm_uuid:
-            server = self.server
-            xapi.execute(server.VM.hard_shutdown, self.session, self.vm_uuid)
+            self.session.xenapi.VM.hard_shutdown(self.vm_uuid)
         else:
-            raise DomainError("VM has not UUID - VM config does not exist?")
+            raise DomainError("VM has no UUID - does VM config exist?")
 
     def destroy(self):
         #Stop VM first.
         self.stop()
         if self.vm_uuid:
-            server = self.server
-            xapi.execute(server.VM.destroy, self.session, self.vm_uuid)
-            xapi._VMuuids.remove(self.vm_uuid)
+            self.session.xenapi.VM.destroy(self.vm_uuid)
+            delXAPIDomain(self.vm_uuid)
         else:
-            raise DomainError("VM has not UUID - VM config does not exist?")
+            raise DomainError("VM has no UUID - does VM config exist?")
 
     def get_uuid(self):
         return self.vm_uuid
@@ -154,7 +153,7 @@ class XenManagedDomain(XenDomain):
         raise DomainError("No support for getDevice().")
 
 
-class XmTestManagedDomain(XenManagedDomain):
+class XmTestAPIDomain(XenAPIDomain):
 
     """Create a new managed xm-test domain
     @param name: The requested domain name
@@ -163,7 +162,7 @@ class XmTestManagedDomain(XenManagedDomain):
     """
     def __init__(self, name=None, extraConfig=None,
                  baseConfig=arch.configDefaults):
-        config = XenManagedConfig()
+        config = XenAPIConfig()
         config.setOpts(baseConfig)
         if extraConfig:
             config.setOpts(extraConfig)
@@ -173,5 +172,5 @@ class XmTestManagedDomain(XenManagedDomain):
         elif not config.getOpt("name_label"):
             config.setOpt("name_label", getUniqueName())
 
-        XenManagedDomain.__init__(self, config.getOpt("name_label"),
-                                  config=config)
+        XenAPIDomain.__init__(self, config.getOpt("name_label"),
+                              config=config)
