@@ -85,9 +85,11 @@ static uint8_t opcode_table[256] = {
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
-    /* 0x60 - 0x6F */
+    /* 0x60 - 0x67 */
     0, 0, 0, DstReg|SrcMem32|ModRM|Mov /* movsxd (x86/64) */,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0,
+    /* 0x68 - 0x6F */
+    ImplicitOps|Mov, 0, ImplicitOps|Mov, 0, 0, 0, 0, 0,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -125,7 +127,8 @@ static uint8_t opcode_table[256] = {
     DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
     DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
     /* 0xC0 - 0xC7 */
-    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM, 0, 0,
+    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
+    ImplicitOps, ImplicitOps,
     0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
     0, 0, 0, 0, 0, 0, 0, 0,
@@ -138,7 +141,7 @@ static uint8_t opcode_table[256] = {
     /* 0xE0 - 0xE7 */
     0, 0, 0, ImplicitOps, 0, 0, 0, 0,
     /* 0xE8 - 0xEF */
-    0, ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0,
     /* 0xF0 - 0xF7 */
     0, 0, 0, 0,
     0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
@@ -1110,6 +1113,20 @@ x86_emulate(
         case 1: /* dec */
             emulate_1op("dec", dst, _regs.eflags);
             break;
+        case 2: /* call (near) */
+        case 3: /* jmp (near) */
+            if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
+            {
+                dst.bytes = op_bytes = 8;
+                if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
+                                     &dst.val, 8, ctxt)) != 0 )
+                    goto done;
+            }
+            src.val = _regs.eip;
+            _regs.eip = dst.val;
+            if ( (modrm_reg & 7) == 2 )
+                goto push; /* call */
+            break;
         case 6: /* push */
             /* 64-bit mode: PUSH defaults to a 64-bit operand. */
             if ( mode_64bit() && (dst.bytes == 4) )
@@ -1264,16 +1281,9 @@ x86_emulate(
         break;
 
     case 0x50 ... 0x57: /* push reg */
-        dst.type  = OP_MEM;
-        dst.bytes = op_bytes;
-        if ( mode_64bit() && (dst.bytes == 4) )
-            dst.bytes = 8;
-        dst.val = *(unsigned long *)decode_register(
+        src.val = *(unsigned long *)decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
-        register_address_increment(_regs.esp, -dst.bytes);
-        dst.mem.seg = x86_seg_ss;
-        dst.mem.off = truncate_ea(_regs.esp);
-        break;
+        goto push;
 
     case 0x58 ... 0x5f: /* pop reg */
         dst.type  = OP_REG;
@@ -1286,6 +1296,26 @@ x86_emulate(
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         register_address_increment(_regs.esp, dst.bytes);
+        break;
+
+    case 0x68: /* push imm{16,32,64} */
+        src.val = ((op_bytes == 2)
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
+        goto push;
+
+    case 0x6a: /* push imm8 */
+        src.val = insn_fetch_type(int8_t);
+    push:
+        d |= Mov; /* force writeback */
+        dst.type  = OP_MEM;
+        dst.bytes = op_bytes;
+        if ( mode_64bit() && (dst.bytes == 4) )
+            dst.bytes = 8;
+        dst.val = src.val;
+        register_address_increment(_regs.esp, -dst.bytes);
+        dst.mem.seg = x86_seg_ss;
+        dst.mem.off = truncate_ea(_regs.esp);
         break;
 
     case 0x70 ... 0x7f: /* jcc (short) */ {
@@ -1371,6 +1401,18 @@ x86_emulate(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
 
+    case 0xc2: /* ret imm16 (near) */
+    case 0xc3: /* ret (near) */ {
+        int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
+        op_bytes = mode_64bit() ? 8 : op_bytes;
+        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+                             &dst.val, op_bytes, ctxt)) != 0 )
+            goto done;
+        _regs.eip = dst.val;
+        register_address_increment(_regs.esp, op_bytes + offset);
+        break;
+    }
+
     case 0xd4: /* aam */ {
         unsigned int base = insn_fetch_type(uint8_t);
         uint8_t al = _regs.eax;
@@ -1418,12 +1460,26 @@ x86_emulate(
         break;
     }
 
-    case 0xe9: /* jmp (short) */
-        jmp_rel(insn_fetch_type(int8_t));
-        break;
+    case 0xe8: /* call (near) */ {
+        int rel = (((op_bytes == 2) && !mode_64bit())
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
+        op_bytes = mode_64bit() ? 8 : op_bytes;
+        src.val = _regs.eip;
+        jmp_rel(rel);
+        goto push;
+    }
 
-    case 0xeb: /* jmp (near) */
-        jmp_rel(insn_fetch_bytes(mode_64bit() ? 4 : op_bytes));
+    case 0xe9: /* jmp (near) */ {
+        int rel = (((op_bytes == 2) && !mode_64bit())
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
+        jmp_rel(rel);
+        break;
+    }
+
+    case 0xeb: /* jmp (short) */
+        jmp_rel(insn_fetch_type(int8_t));
         break;
 
     case 0xf5: /* cmc */
@@ -1550,7 +1606,9 @@ x86_emulate(
         break;
 
     case 0x80 ... 0x8f: /* jcc (near) */ {
-        int rel = insn_fetch_bytes(mode_64bit() ? 4 : op_bytes);
+        int rel = (((op_bytes == 2) && !mode_64bit())
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
         if ( test_cc(b, _regs.eflags) )
             jmp_rel(rel);
         break;
