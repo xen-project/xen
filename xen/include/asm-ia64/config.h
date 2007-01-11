@@ -52,6 +52,9 @@
 
 #define CONFIG_VGA 1
 
+
+#define NR_hypercalls 64
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?
@@ -107,9 +110,6 @@ extern char _end[]; /* standard ELF symbol */
 // xen/include/asm/config.h
 //#define HZ 1000
 // FIXME SMP: leave SMP for a later time
-
-#define NR_hypercalls 64
-
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h
 // Natural boundary upon TR size to define xenheap space

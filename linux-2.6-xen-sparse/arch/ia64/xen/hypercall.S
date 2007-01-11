@@ -306,4 +306,11 @@ GLOBAL_ENTRY(xen_ssm_i_1)
 	brl.cond.sptk	.vdso_ssm_i_1_ret
 	;; 
 END(xen_ssm_i_1)
+
+GLOBAL_ENTRY(__hypercall)
+	mov r2=r37
+	break 0x1000
+	br.ret.sptk.many b0
+	;; 
+END(__hypercall)
 #endif

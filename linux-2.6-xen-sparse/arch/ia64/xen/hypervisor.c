@@ -49,6 +49,8 @@ static int p2m_expose_init(void);
 #define p2m_expose_init() (-ENOSYS)
 #endif
 
+EXPORT_SYMBOL(__hypercall);
+
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
 //XXX discontigmem/sparsemem

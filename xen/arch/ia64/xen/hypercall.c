@@ -17,6 +17,7 @@
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
 #include <asm/fpswa.h>	/* FOR struct fpswa_ret_t */
 
+#include <asm/vmx_vcpu.h>
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
 #include <public/domctl.h>
@@ -32,94 +33,14 @@
 #include <xen/event.h>
 #include <xen/perfc.h>
 
-static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
-static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
-
-const hypercall_t ia64_hypercall_table[NR_hypercalls] =
-{
-	(hypercall_t)do_ni_hypercall,		/* do_set_trap_table *//*  0 */
-	(hypercall_t)do_ni_hypercall,		/* do_mmu_update */
-	(hypercall_t)do_ni_hypercall,		/* do_set_gdt */
-	(hypercall_t)do_ni_hypercall,		/* do_stack_switch */
-	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
-	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch *//*  5 */
-	(hypercall_t)do_sched_op_compat,
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
-	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
-	(hypercall_t)do_ni_hypercall,		/* do_update_descriptor * 10 */
-	(hypercall_t)do_ni_hypercall,		/* do_ni_hypercall */
-	(hypercall_t)do_memory_op,
-	(hypercall_t)do_multicall,
-	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
-	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */  /* 15 */
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_xen_version,
-	(hypercall_t)do_console_io,
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_grant_table_op,				       /* 20 */
-	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
-	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_othe */
-	(hypercall_t)do_ni_hypercall,		/* (x86 only) */
-	(hypercall_t)do_ni_hypercall,		/* do_vcpu_op */
-	(hypercall_t)do_ni_hypercall,		/* (x86_64 only) */    /* 25 */
-	(hypercall_t)do_ni_hypercall,		/* do_mmuext_op */
-	(hypercall_t)do_ni_hypercall,		/* do_acm_op */
-	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
-	(hypercall_t)do_sched_op,
-	(hypercall_t)do_callback_op,		/*  */                 /* 30 */
-	(hypercall_t)do_xenoprof_op,		/*  */
-	(hypercall_t)do_event_channel_op,
-	(hypercall_t)do_physdev_op,
-	(hypercall_t)do_hvm_op,			/*  */
-	(hypercall_t)do_sysctl,			/*  */                  /* 35 */
-	(hypercall_t)do_domctl,			/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */                 /* 40 */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */                 /* 45 */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_ni_hypercall,		/*  */
-	(hypercall_t)do_dom0vp_op,              /* dom0vp_op */
-	(hypercall_t)do_ni_hypercall,		/* arch_1 */
-	(hypercall_t)do_ni_hypercall,		/* arch_2 */           /* 50 */
-	(hypercall_t)do_ni_hypercall,		/* arch_3 */
-	(hypercall_t)do_ni_hypercall,		/* arch_4 */
-	(hypercall_t)do_ni_hypercall,		/* arch_5 */
-	(hypercall_t)do_ni_hypercall,		/* arch_6 */
-	(hypercall_t)do_ni_hypercall,		/* arch_7 */           /* 55 */
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall,                                  /* 60 */
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall,
-	(hypercall_t)do_ni_hypercall
-};
+extern long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
+extern long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 
 static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
 	uint32_t cmd = (uint32_t)regs->r2;
-
-	if (cmd < NR_hypercalls) {
-		perfc_incra(hypercalls, cmd);
-		regs->r8 = (*ia64_hypercall_table[cmd])(
-			regs->r14,
-			regs->r15,
-			regs->r16,
-			regs->r17,
-			regs->r18,
-			regs->r19);
-	} else
-		regs->r8 = -ENOSYS;
-	
+	printk("Warning %s should not be called %d\n", __FUNCTION__, cmd);
 	return IA64_NO_FAULT;
 }
 
@@ -129,13 +50,20 @@ xen_fast_hypercall (struct pt_regs *regs)
 	uint32_t cmd = (uint32_t)regs->r2;
 	switch (cmd) {
 	case __HYPERVISOR_ia64_fast_eoi:
-		regs->r8 = pirq_guest_eoi(current->domain, regs->r14);
+		printk("Warning %s should not be called %d\n",
+		       __FUNCTION__, cmd);
 		break;
 	default:
 		regs->r8 = -ENOSYS;
 	}
 	return IA64_NO_FAULT;
 }
+
+long do_pirq_guest_eoi(int pirq)
+{
+	return pirq_guest_eoi(current->domain, pirq);
+}
+    
 
 static void
 fw_hypercall_ipi (struct pt_regs *regs)
@@ -320,42 +248,42 @@ unsigned long hypercall_create_continuation(
     va_list args;
 
     va_start(args, format);
-    if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
-	panic("PREEMPT happen in multicall\n");	// Not support yet
-    } else {
-	vcpu_set_gr(v, 2, op, 0);
-	for ( i = 0; *p != '\0'; i++) {
-            switch ( *p++ )
-            {
-            case 'i':
-                arg = (unsigned long)va_arg(args, unsigned int);
-                break;
-            case 'l':
-                arg = (unsigned long)va_arg(args, unsigned long);
-                break;
-            case 'h':
-                arg = (unsigned long)va_arg(args, void *);
-                break;
-            default:
-                arg = 0;
-                BUG();
-            }
-	    switch (i) {
-	    case 0: vcpu_set_gr(v, 14, arg, 0);
-		    break;
-	    case 1: vcpu_set_gr(v, 15, arg, 0);
-		    break;
-	    case 2: vcpu_set_gr(v, 16, arg, 0);
-		    break;
-	    case 3: vcpu_set_gr(v, 17, arg, 0);
-		    break;
-	    case 4: vcpu_set_gr(v, 18, arg, 0);
-		    break;
-	    default: panic("Too many args for hypercall continuation\n");
-		    break;
-	    }
-	}
+    if (test_bit(_MCSF_in_multicall, &mcs->flags))
+        panic("PREEMPT happen in multicall\n");	// Not support yet
+
+    vcpu_set_gr(v, 15, op, 0);
+
+    for (i = 0; *p != '\0'; i++) {
+        switch ( *p++ )
+        {
+        case 'i':
+            arg = (unsigned long)va_arg(args, unsigned int);
+            break;
+        case 'l':
+            arg = (unsigned long)va_arg(args, unsigned long);
+            break;
+        case 'h':
+            arg = (unsigned long)va_arg(args, void *);
+            break;
+        default:
+            arg = 0;
+            BUG();
+        }
+        vcpu_set_gr(v, 16 + i, arg, 0);
     }
+    
+    if (i >= 6)
+        panic("Too many args for hypercall continuation\n");
+
+    // Clean other argument to 0
+    while (i < 6) {
+        vcpu_set_gr(v, 16 + i, 0, 0);
+        i++;
+    }
+
+    // re-execute break;
+    vcpu_decrement_iip(v);
+    
     v->arch.hypercall_continuation = 1;
     va_end(args);
     return op;
@@ -369,7 +297,7 @@ extern int
 iosapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
 
-static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     int irq;
     long ret;
@@ -524,7 +452,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 /* First time to add callback to xen/ia64, so let's just stick to
  * the newer callback interface.
  */
-static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     long ret;
 

@@ -56,6 +56,7 @@ void foo(void)
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 
 	DEFINE(IA64_VCPU_DOMAIN_OFFSET, offsetof (struct vcpu, domain));
+	DEFINE(IA64_VCPU_HYPERCALL_CONTINUATION_OFS, offsetof (struct vcpu, arch.hypercall_continuation));
 	DEFINE(IA64_VCPU_META_RR0_OFFSET, offsetof (struct vcpu, arch.metaphysical_rr0));
 	DEFINE(IA64_VCPU_META_SAVED_RR0_OFFSET, offsetof (struct vcpu, arch.metaphysical_saved_rr0));
 	DEFINE(IA64_VCPU_BREAKIMM_OFFSET, offsetof (struct vcpu, arch.breakimm));

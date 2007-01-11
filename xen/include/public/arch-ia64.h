@@ -463,7 +463,7 @@ struct xen_ia64_boot_param {
 #define HYPERPRIVOP_MAX			(0x19)
 
 /* Fast and light hypercalls.  */
-#define __HYPERVISOR_ia64_fast_eoi	0x0200
+#define __HYPERVISOR_ia64_fast_eoi	__HYPERVISOR_arch_1
 
 /* Xencomm macros.  */
 #define XENCOMM_INLINE_MASK 0xf800000000000000UL

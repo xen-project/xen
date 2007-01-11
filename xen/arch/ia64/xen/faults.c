@@ -83,8 +83,8 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 		check_bad_nested_interruption(isr, regs, vector);
 	PSCB(v, unat) = regs->ar_unat;	// not sure if this is really needed?
 	PSCB(v, precover_ifs) = regs->cr_ifs;
-	vcpu_bsw0(v);
 	PSCB(v, ipsr) = vcpu_get_ipsr_int_state(v, regs->cr_ipsr);
+	vcpu_bsw0(v);
 	PSCB(v, isr) = isr;
 	PSCB(v, iip) = regs->cr_iip;
 	PSCB(v, ifs) = 0;
@@ -120,24 +120,29 @@ void reflect_extint(struct pt_regs *regs)
 	reflect_interruption(isr, regs, IA64_EXTINT_VECTOR);
 }
 
-void reflect_event(struct pt_regs *regs)
+void reflect_event(void)
 {
-	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
 	struct vcpu *v = current;
+	struct pt_regs *regs;
+	unsigned long isr;
+
+	if (!event_pending(v))
+		return;
 
 	/* Sanity check */
-	if (is_idle_vcpu(v) || !user_mode(regs)) {
+	if (is_idle_vcpu(v)) {
 		//printk("WARN: invocation to reflect_event in nested xen\n");
 		return;
 	}
 
-	if (!event_pending(v))
-		return;
+	regs = vcpu_regs(v);
 
 	// can't inject event, when XEN is emulating rfi 
 	// and both PSCB(v, ifs) and regs->ifs are valid
 	if (regs->cr_iip == *(unsigned long *)dorfirfi)
 		return;
+
+	isr = regs->cr_ipsr & IA64_PSR_RI;
 
 	if (!PSCB(v, interrupt_collection_enabled))
 		printk("psr.ic off, delivering event, ipsr=%lx,iip=%lx,"
@@ -145,8 +150,8 @@ void reflect_event(struct pt_regs *regs)
 		       regs->cr_ipsr, regs->cr_iip, isr, PSCB(v, iip));
 	PSCB(v, unat) = regs->ar_unat;	// not sure if this is really needed?
 	PSCB(v, precover_ifs) = regs->cr_ifs;
-	vcpu_bsw0(v);
 	PSCB(v, ipsr) = vcpu_get_ipsr_int_state(v, regs->cr_ipsr);
+	vcpu_bsw0(v);
 	PSCB(v, isr) = isr;
 	PSCB(v, iip) = regs->cr_iip;
 	PSCB(v, ifs) = 0;
