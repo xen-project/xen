@@ -109,7 +109,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x98 - 0x9F */
-    0, 0, 0, 0, 0, 0, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, 0, 0, 0, 0, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
@@ -139,7 +139,7 @@ static uint8_t opcode_table[256] = {
     /* 0xD8 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xE7 */
-    0, 0, 0, ImplicitOps, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps, 0, 0, 0, 0,
     /* 0xE8 - 0xEF */
     ImplicitOps, ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0,
     /* 0xF0 - 0xF7 */
@@ -1339,6 +1339,30 @@ x86_emulate(
         dst.val  = *dst.reg;
         goto xchg;
 
+    case 0x98: /* cbw/cwde/cdqe */
+        switch ( op_bytes )
+        {
+        case 2: *(int16_t *)&_regs.eax = (int8_t)_regs.eax; break; /* cbw */
+        case 4: _regs.eax = (uint32_t)(int16_t)_regs.eax; break; /* cwde */
+        case 8: _regs.eax = (int32_t)_regs.eax; break; /* cdqe */
+        }
+        break;
+
+    case 0x99: /* cwd/cdq/cqo */
+        switch ( op_bytes )
+        {
+        case 2:
+            *(int16_t *)&_regs.edx = ((int16_t)_regs.eax < 0) ? -1 : 0;
+            break;
+        case 4:
+            _regs.edx = (uint32_t)(((int32_t)_regs.eax < 0) ? -1 : 0);
+            break;
+        case 8:
+            _regs.edx = (_regs.eax < 0) ? -1 : 0;
+            break;
+        }
+        break;
+
     case 0x9e: /* sahf */
         *(uint8_t *)_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
         break;
@@ -1449,6 +1473,31 @@ x86_emulate(
                              &al, 1, ctxt)) != 0 )
             goto done;
         *(uint8_t *)&_regs.eax = al;
+        break;
+    }
+
+    case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
+        int rel = insn_fetch_type(int8_t);
+        int do_jmp = !(_regs.eflags & EFLG_ZF); /* loopnz */
+        if ( b == 0xe1 )
+            do_jmp = !do_jmp; /* loopz */
+        else if ( b == 0xe2 )
+            do_jmp = 1; /* loop */
+        switch ( ad_bytes )
+        {
+        case 2:
+            do_jmp &= --(*(uint16_t *)&_regs.ecx) != 0;
+            break;
+        case 4:
+            do_jmp &= --(*(uint32_t *)&_regs.ecx) != 0;
+            _regs.ecx = (uint32_t)_regs.ecx; /* zero extend in x86/64 mode */
+            break;
+        default: /* case 8: */
+            do_jmp &= --_regs.ecx != 0;
+            break;
+        }
+        if ( do_jmp )
+            jmp_rel(rel);
         break;
     }
 
