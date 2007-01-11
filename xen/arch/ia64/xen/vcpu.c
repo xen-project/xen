@@ -695,6 +695,20 @@ IA64FAULT vcpu_increment_iip(VCPU * vcpu)
 	return IA64_NO_FAULT;
 }
 
+IA64FAULT vcpu_decrement_iip(VCPU * vcpu)
+{
+	REGS *regs = vcpu_regs(vcpu);
+	struct ia64_psr *ipsr = (struct ia64_psr *)&regs->cr_ipsr;
+
+	if (ipsr->ri == 0) {
+		ipsr->ri = 2;
+		regs->cr_iip -= 16;
+	} else
+		ipsr->ri--;
+
+	return IA64_NO_FAULT;
+}
+
 IA64FAULT vcpu_set_ifa(VCPU * vcpu, u64 val)
 {
 	PSCB(vcpu, ifa) = val;

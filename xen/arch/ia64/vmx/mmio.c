@@ -362,7 +362,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
             temp += post_update;
 	vcpu_set_gr(vcpu,inst.M15.r3,temp,0);
 
-	vmx_vcpu_increment_iip(vcpu);
+	vcpu_increment_iip(vcpu);
 	return;
     }
     // Floating-point Load Pair + Imm ldfp8 M12
@@ -382,9 +382,9 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         vcpu_set_fpreg(vcpu,inst.M12.f2,&v);
         padr += 8;
         vcpu_set_gr(vcpu,inst.M12.r3,padr,0);
-        vmx_vcpu_increment_iip(vcpu);
+        vcpu_increment_iip(vcpu);
         return;
-    }					
+    }
     else{
         panic_domain
 	  (NULL,"This memory access instr can't be emulated: %lx pc=%lx\n ",
@@ -420,5 +420,5 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 */
         }
     }
-    vmx_vcpu_increment_iip(vcpu);
+    vcpu_increment_iip(vcpu);
 }

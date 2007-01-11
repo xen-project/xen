@@ -93,7 +93,7 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         if (vector == IA64_FP_FAULT_VECTOR) {
             status = handle_fpu_swa(1, regs, isr);
             if (!status) {
-                vmx_vcpu_increment_iip(vcpu);
+                vcpu_increment_iip(vcpu);
                 return;
             } else if (IA64_RETRY == status)
                 return;
@@ -104,7 +104,7 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
             if (!status)
                 return;
             else if (IA64_RETRY == status) {
-                vmx_vcpu_decrement_iip(vcpu);
+                vcpu_decrement_iip(vcpu);
                 return;
             }
         }
@@ -143,16 +143,16 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
             /* Allow hypercalls only when cpl = 0.  */
             if (iim == d->arch.breakimm) {
                 ia64_hypercall(regs);
-                vmx_vcpu_increment_iip(v);
+                vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
             else if(iim == DOMN_PAL_REQUEST){
                 pal_emul(v);
-                vmx_vcpu_increment_iip(v);
+                vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }else if(iim == DOMN_SAL_REQUEST){
                 sal_emul(v);
-                vmx_vcpu_increment_iip(v);
+                vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
         }
