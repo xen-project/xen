@@ -65,9 +65,7 @@
 
         ALIGN
 ENTRY(vmx_asm_vmexit_handler)
-        /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
-        call vmx_trace_vmexit
         movq %rsp,%rdi
         call vmx_vmexit_handler
         jmp vmx_asm_do_vmentry
