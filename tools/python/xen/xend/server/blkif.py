@@ -101,6 +101,7 @@ class BlkifController(DevController):
             self.writeBackend(devid,
                               'type', new_back['type'],
                               'params', new_back['params'])
+            return new_back.get('uuid')
         else:
             raise VmError('Refusing to reconfigure device %s:%d to %s' %
                           (self.deviceClass, devid, config))
