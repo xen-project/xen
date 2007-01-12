@@ -51,7 +51,7 @@ static int no_timer_check;
 int disable_timer_pin_1 __initdata;
 
 #ifndef CONFIG_XEN
-int timer_over_8254 __initdata = 1;
+int timer_over_8254 __initdata = 0;
 
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
@@ -321,6 +321,18 @@ __setup("enable_8254_timer", setup_enable_8254_timer);
 #include <linux/pci_ids.h>
 #include <linux/pci.h>
 
+
+#ifdef CONFIG_ACPI
+
+static int nvidia_hpet_detected __initdata;
+
+static int __init nvidia_hpet_check(unsigned long phys, unsigned long size)
+{
+	nvidia_hpet_detected = 1;
+	return 0;
+}
+#endif
+
 /* Temporary Hack. Nvidia and VIA boards currently only work with IO-APIC
    off. Check for an Nvidia or VIA PCI bridge and turn it off.
    Use pci direct infrastructure because this runs before the PCI subsystem. 
@@ -360,18 +372,26 @@ void __init check_ioapic(void)
 					     force_iommu) &&
 					    !iommu_aperture_allowed) {
 						printk(KERN_INFO
-    "Looks like a VIA chipset. Disabling IOMMU. Overwrite with \"iommu=allowed\"\n");
+    "Looks like a VIA chipset. Disabling IOMMU. Override with \"iommu=allowed\"\n");
 						iommu_aperture_disabled = 1;
 					}
 #endif
 					return;
 				case PCI_VENDOR_ID_NVIDIA:
 #ifdef CONFIG_ACPI
-					/* All timer overrides on Nvidia
-				           seem to be wrong. Skip them. */
-					acpi_skip_timer_override = 1;
-					printk(KERN_INFO 
-	     "Nvidia board detected. Ignoring ACPI timer override.\n");
+					/*
+					 * All timer overrides on Nvidia are
+					 * wrong unless HPET is enabled.
+					 */
+					nvidia_hpet_detected = 0;
+					acpi_table_parse(ACPI_HPET,
+							nvidia_hpet_check);
+					if (nvidia_hpet_detected == 0) {
+						acpi_skip_timer_override = 1;
+						printk(KERN_INFO "Nvidia board "
+						    "detected. Ignoring ACPI "
+						    "timer override.\n");
+					}
 #endif
 					/* RED-PEN skip them on mptables too? */
 					return;
@@ -1849,6 +1869,8 @@ static inline void unlock_ExtINT_logic(void)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
+int timer_uses_ioapic_pin_0;
+
 /*
  * This code may look a bit paranoid, but it's supposed to cooperate with
  * a wide range of boards and BIOS bugs.  Fortunately only the timer IRQ
@@ -1886,6 +1908,9 @@ static inline void check_timer(void)
 	pin2  = ioapic_i8259.pin;
 	apic2 = ioapic_i8259.apic;
 
+	if (pin1 == 0)
+		timer_uses_ioapic_pin_0 = 1;
+
 	apic_printk(APIC_VERBOSE,KERN_INFO "..TIMER: vector=0x%02X apic1=%d pin1=%d apic2=%d pin2=%d\n",
 		vector, apic1, pin1, apic2, pin2);
 
@@ -1920,7 +1945,7 @@ static inline void check_timer(void)
 		 */
 		setup_ExtINT_IRQ0_pin(apic2, pin2, vector);
 		if (timer_irq_works()) {
-			printk("works.\n");
+			apic_printk(APIC_VERBOSE," works.\n");
 			nmi_watchdog_default();
 			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
@@ -1932,7 +1957,7 @@ static inline void check_timer(void)
 		 */
 		clear_IO_APIC_pin(apic2, pin2);
 	}
-	printk(" failed.\n");
+	apic_printk(APIC_VERBOSE," failed.\n");
 
 	if (nmi_watchdog == NMI_IO_APIC) {
 		printk(KERN_WARNING "timer doesn't work through the IO-APIC - disabling NMI Watchdog!\n");
@@ -1947,7 +1972,7 @@ static inline void check_timer(void)
 	enable_8259A_irq(0);
 
 	if (timer_irq_works()) {
-		apic_printk(APIC_QUIET, " works.\n");
+		apic_printk(APIC_VERBOSE," works.\n");
 		return;
 	}
 	apic_write(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_FIXED | vector);
@@ -1970,6 +1995,7 @@ static inline void check_timer(void)
 }
 #else
 #define check_timer() ((void)0)
+int timer_uses_ioapic_pin_0 = 0;
 #endif /* !CONFIG_XEN */
 
 static int __init notimercheck(char *s)

@@ -86,8 +86,3 @@ dig_setup (char **cmdline_p)
 	xen_start_info->console.domU.evtchn = 0;
 #endif
 }
-
-void __init
-dig_irq_init (void)
-{
-}

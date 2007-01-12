@@ -1361,7 +1361,7 @@ static void netif_idx_release(u16 pending_idx)
 static void netif_page_release(struct page *page)
 {
 	/* Ready for next use. */
-	set_page_count(page, 1);
+	init_page_count(page);
 
 	netif_idx_release(page->index);
 }

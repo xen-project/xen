@@ -1,0 +1,27 @@
+diff -pruN ../orig-linux-2.6.17/net/core/dev.c ./net/core/dev.c
+--- ../orig-linux-2.6.17/net/core/dev.c	2007-01-08 15:25:03.000000000 +0000
++++ ./net/core/dev.c	2007-01-08 15:27:22.000000000 +0000
+@@ -1160,11 +1160,6 @@ int skb_checksum_help(struct sk_buff *sk
+ 		goto out_set_summed;
+ 
+ 	if (unlikely(skb_shinfo(skb)->gso_size)) {
+-		static int warned;
+-
+-		WARN_ON(!warned);
+-		warned = 1;
+-
+ 		/* Let GSO fix up the checksum. */
+ 		goto out_set_summed;
+ 	}
+@@ -1214,11 +1209,6 @@ struct sk_buff *skb_gso_segment(struct s
+ 	__skb_pull(skb, skb->mac_len);
+ 
+ 	if (unlikely(skb->ip_summed != CHECKSUM_HW)) {
+-		static int warned;
+-
+-		WARN_ON(!warned);
+-		warned = 1;
+-
+ 		if (skb_header_cloned(skb) &&
+ 		    (err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC)))
+ 			return ERR_PTR(err);

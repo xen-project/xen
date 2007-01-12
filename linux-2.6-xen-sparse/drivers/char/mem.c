@@ -27,6 +27,7 @@
 #include <linux/crash_dump.h>
 #include <linux/backing-dev.h>
 #include <linux/bootmem.h>
+#include <linux/pipe_fs_i.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -88,21 +89,15 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 }
 
 #ifndef ARCH_HAS_VALID_PHYS_ADDR_RANGE
-static inline int valid_phys_addr_range(unsigned long addr, size_t *count)
+static inline int valid_phys_addr_range(unsigned long addr, size_t count)
 {
-	unsigned long end_mem;
-
-	end_mem = __pa(high_memory);
-	if (addr >= end_mem)
+	if (addr + count > __pa(high_memory))
 		return 0;
-
-	if (*count > end_mem - addr)
-		*count = end_mem - addr;
 
 	return 1;
 }
 
-static inline int valid_mmap_phys_addr_range(unsigned long addr, size_t *size)
+static inline int valid_mmap_phys_addr_range(unsigned long addr, size_t size)
 {
 	return 1;
 }
@@ -120,7 +115,7 @@ static ssize_t read_mem(struct file * file, char __user * buf,
 	ssize_t read, sz;
 	char *ptr;
 
-	if (!valid_phys_addr_range(p, &count))
+	if (!valid_phys_addr_range(p, count))
 		return -EFAULT;
 	read = 0;
 #ifdef __ARCH_HAS_NO_PAGE_ZERO_MAPPED
@@ -178,7 +173,7 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	unsigned long copied;
 	void *ptr;
 
-	if (!valid_phys_addr_range(p, &count))
+	if (!valid_phys_addr_range(p, count))
 		return -EFAULT;
 
 	written = 0;
@@ -217,11 +212,9 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 
 		copied = copy_from_user(ptr, buf, sz);
 		if (copied) {
-			ssize_t ret;
-
-			ret = written + (sz - copied);
-			if (ret)
-				return ret;
+			written += sz - copied;
+			if (written)
+				break;
 			return -EFAULT;
 		}
 		buf += sz;
@@ -253,7 +246,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
 
-	if (!valid_mmap_phys_addr_range(vma->vm_pgoff << PAGE_SHIFT, &size))
+	if (!valid_mmap_phys_addr_range(vma->vm_pgoff << PAGE_SHIFT, size))
 		return -EINVAL;
 
 	vma->vm_page_prot = phys_mem_access_prot(file, vma->vm_pgoff,
@@ -458,11 +451,9 @@ do_write_kmem(void *p, unsigned long realp, const char __user * buf,
 
 		copied = copy_from_user(ptr, buf, sz);
 		if (copied) {
-			ssize_t ret;
-
-			ret = written + (sz - copied);
-			if (ret)
-				return ret;
+			written += sz - copied;
+			if (written)
+				break;
 			return -EFAULT;
 		}
 		buf += sz;
@@ -516,11 +507,10 @@ static ssize_t write_kmem(struct file * file, const char __user * buf,
 			if (len) {
 				written = copy_from_user(kbuf, buf, len);
 				if (written) {
-					ssize_t ret;
-
+					if (wrote + virtr)
+						break;
 					free_page((unsigned long)kbuf);
-					ret = wrote + virtr + (len - written);
-					return ret ? ret : -EFAULT;
+					return -EFAULT;
 				}
 			}
 			len = vwrite(kbuf, (char *)p, len);
@@ -565,8 +555,11 @@ static ssize_t write_port(struct file * file, const char __user * buf,
 		return -EFAULT;
 	while (count-- > 0 && i < 65536) {
 		char c;
-		if (__get_user(c, tmp)) 
+		if (__get_user(c, tmp)) {
+			if (tmp > buf)
+				break;
 			return -EFAULT; 
+		}
 		outb(c,i);
 		i++;
 		tmp++;
@@ -586,6 +579,18 @@ static ssize_t write_null(struct file * file, const char __user * buf,
 			  size_t count, loff_t *ppos)
 {
 	return count;
+}
+
+static int pipe_to_null(struct pipe_inode_info *info, struct pipe_buffer *buf,
+			struct splice_desc *sd)
+{
+	return sd->len;
+}
+
+static ssize_t splice_write_null(struct pipe_inode_info *pipe,struct file *out,
+				 loff_t *ppos, size_t len, unsigned int flags)
+{
+	return splice_from_pipe(pipe, out, ppos, len, flags, pipe_to_null);
 }
 
 #ifdef CONFIG_MMU
@@ -799,6 +804,7 @@ static struct file_operations null_fops = {
 	.llseek		= null_lseek,
 	.read		= read_null,
 	.write		= write_null,
+	.splice_write	= splice_write_null,
 };
 
 #if defined(CONFIG_ISA) || !defined(__mc68000__)
@@ -913,7 +919,7 @@ static const struct {
 	unsigned int		minor;
 	char			*name;
 	umode_t			mode;
-	struct file_operations	*fops;
+	const struct file_operations	*fops;
 } devlist[] = { /* list of minor devices */
 	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops},
 	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops},

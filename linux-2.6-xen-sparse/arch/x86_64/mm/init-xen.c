@@ -185,7 +185,7 @@ void show_mem(void)
 	show_free_areas();
 	printk(KERN_INFO "Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 
-	for_each_pgdat(pgdat) {
+	for_each_online_pgdat(pgdat) {
                for (i = 0; i < pgdat->node_spanned_pages; ++i) {
 			page = pfn_to_page(pgdat->node_start_pfn + i);
 			total++;
@@ -207,7 +207,7 @@ void show_mem(void)
 
 int after_bootmem;
 
-static void *spp_getpage(void)
+static __init void *spp_getpage(void)
 { 
 	void *ptr;
 	if (after_bootmem)
@@ -230,7 +230,7 @@ static inline pud_t *pud_offset_u(unsigned long address)
 	return pud + pud_index(address);
 }
 
-static void set_pte_phys(unsigned long vaddr,
+static __init void set_pte_phys(unsigned long vaddr,
 			 unsigned long phys, pgprot_t prot, int user_mode)
 {
 	pgd_t *pgd;
@@ -345,7 +345,8 @@ static void set_pte_phys_ma(unsigned long vaddr,
 #define SET_FIXMAP_USER   1
 
 /* NOTE: this is meant to be run only at boot */
-void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
+void __init 
+__set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 {
 	unsigned long address = __fix_to_virt(idx);
 
@@ -437,6 +438,18 @@ static inline int make_readonly(unsigned long paddr)
 		readonly = 1;
 
 	return readonly;
+}
+
+/* Must run before zap_low_mappings */
+__init void *early_ioremap(unsigned long addr, unsigned long size)
+{
+	return ioremap(addr, size);
+}
+
+/* To avoid virtual aliases later */
+__init void early_iounmap(void *addr, unsigned long size)
+{
+	iounmap(addr);
 }
 
 static void __meminit
@@ -686,7 +699,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 		pud_t *pud;
 
 		if (after_bootmem) {
-			pud = pud_offset_k(pgd, __PAGE_OFFSET);
+			pud = pud_offset_k(pgd, start & PGDIR_MASK);
 			make_page_readonly(pud, XENFEAT_writable_page_tables);
 			pud_phys = __pa(pud);
 		} else {
@@ -869,19 +882,50 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 
 /*
  * Memory hotplug specific functions
- * These are only for non-NUMA machines right now.
  */
-#ifdef CONFIG_MEMORY_HOTPLUG
+#if defined(CONFIG_ACPI_HOTPLUG_MEMORY) || defined(CONFIG_ACPI_HOTPLUG_MEMORY_MODULE)
 
 void online_page(struct page *page)
 {
 	ClearPageReserved(page);
-	set_page_count(page, 1);
+	init_page_count(page);
 	__free_page(page);
 	totalram_pages++;
 	num_physpages++;
 }
 
+#ifndef CONFIG_MEMORY_HOTPLUG
+/*
+ * Memory Hotadd without sparsemem. The mem_maps have been allocated in advance,
+ * just online the pages.
+ */
+int __add_pages(struct zone *z, unsigned long start_pfn, unsigned long nr_pages)
+{
+	int err = -EIO;
+	unsigned long pfn;
+	unsigned long total = 0, mem = 0;
+	for (pfn = start_pfn; pfn < start_pfn + nr_pages; pfn++) {
+		if (pfn_valid(pfn)) {
+			online_page(pfn_to_page(pfn));
+			err = 0;
+			mem++;
+		}
+		total++;
+	}
+	if (!err) {
+		z->spanned_pages += total;
+		z->present_pages += mem;
+		z->zone_pgdat->node_spanned_pages += total;
+		z->zone_pgdat->node_present_pages += mem;
+	}
+	return err;
+}
+#endif
+
+/*
+ * Memory is added always to NORMAL zone. This means you will never get
+ * additional DMA/DMA32 memory.
+ */
 int add_memory(u64 start, u64 size)
 {
 	struct pglist_data *pgdat = NODE_DATA(0);
@@ -949,7 +993,7 @@ void __init mem_init(void)
 	/* XEN: init and count pages outside initial allocation. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
 		ClearPageReserved(pfn_to_page(pfn));
-		set_page_count(pfn_to_page(pfn), 1);
+		init_page_count(pfn_to_page(pfn));
 		totalram_pages++;
 	}
 	reservedpages = end_pfn - totalram_pages - e820_hole_size(0, end_pfn);
@@ -1001,7 +1045,7 @@ void free_initmem(void)
 	addr = (unsigned long)(&__init_begin);
 	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
+		init_page_count(virt_to_page(addr));
 		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
 		make_page_writable(
 			__va(__pa(addr)), XENFEAT_writable_page_tables);
@@ -1049,7 +1093,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
-		set_page_count(virt_to_page(start), 1);
+		init_page_count(virt_to_page(start));
 		free_page(start);
 		totalram_pages++;
 	}

@@ -799,6 +799,7 @@ config PROC_KCORE
 config PROC_VMCORE
         bool "/proc/vmcore support (EXPERIMENTAL)"
         depends on PROC_FS && EXPERIMENTAL && CRASH_DUMP
+	default y
         help
         Exports the dump image of crashed kernel in ELF format.
 
@@ -842,6 +843,12 @@ config HUGETLBFS
 	bool "HugeTLB file system support"
 	depends X86 || IA64 || PPC64 || SPARC64 || SUPERH || BROKEN
 	depends !XEN
+	help
+	  hugetlbfs is a filesystem backing for HugeTLB pages, based on
+	  ramfs. For architectures that support it, say Y here and read
+	  <file:Documentation/vm/hugetlbpage.txt> for details.
+
+	  If unsure, say N.
 
 config HUGETLB_PAGE
 	def_bool HUGETLBFS
@@ -860,21 +867,9 @@ config RAMFS
 	  To compile this as a module, choose M here: the module will be called
 	  ramfs.
 
-config RELAYFS_FS
-	tristate "Relayfs file system support"
-	---help---
-	  Relayfs is a high-speed data relay filesystem designed to provide
-	  an efficient mechanism for tools and facilities to relay large
-	  amounts of data from kernel space to user space.
-
-	  To compile this code as a module, choose M here: the module will be
-	  called relayfs.
-
-	  If unsure, say N.
-
 config CONFIGFS_FS
 	tristate "Userspace-driven configuration filesystem (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on SYSFS && EXPERIMENTAL
 	help
 	  configfs is a ram-based filesystem that provides the converse
 	  of sysfs's functionality. Where sysfs is a filesystem-based
@@ -1568,6 +1563,7 @@ config RPCSEC_GSS_SPKM3
 	select CRYPTO
 	select CRYPTO_MD5
 	select CRYPTO_DES
+	select CRYPTO_CAST5
 	help
 	  Provides for secure RPC calls by means of a gss-api
 	  mechanism based on the SPKM3 public-key mechanism.

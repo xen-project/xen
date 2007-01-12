@@ -79,9 +79,6 @@ NEXT_PAGE(level3_user_pgt)
 NEXT_PAGE(level2_kernel_pgt)
 	.fill	512,8,0
 
-NEXT_PAGE(empty_zero_page)
-	.skip PAGE_SIZE
-
 NEXT_PAGE(hypercall_page)
 	.fill	512,8,0
 
@@ -92,7 +89,7 @@ NEXT_PAGE(hypercall_page)
 	.align 16
 	.globl cpu_gdt_descr
 cpu_gdt_descr:
-	.word	gdt_end-cpu_gdt_table
+	.word	gdt_end-cpu_gdt_table-1
 gdt:
 	.quad	cpu_gdt_table
 #ifdef CONFIG_SMP
@@ -133,6 +130,11 @@ gdt_end:
 
 	/* zero the remaining page */
 	.fill PAGE_SIZE / 8 - GDT_ENTRIES,8,0
+
+	.section .bss.page_aligned, "aw", @nobits
+	.align PAGE_SIZE
+ENTRY(empty_zero_page)
+	.skip PAGE_SIZE
 
 #ifdef CONFIG_XEN_COMPAT_030002
 /*

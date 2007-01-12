@@ -112,6 +112,14 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
 	BUG();
 }
 
+void skb_truesize_bug(struct sk_buff *skb)
+{
+	printk(KERN_ERR "SKB BUG: Invalid truesize (%u) "
+	       "len=%u, sizeof(sk_buff)=%Zd\n",
+	       skb->truesize, skb->len, sizeof(struct sk_buff));
+}
+EXPORT_SYMBOL(skb_truesize_bug);
+
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
  *	'private' fields and also do memory statistics to find all the
  *	[BEEP] leaks.
@@ -150,7 +158,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 
 	/* Get the DATA. Size must match skb_add_mtu(). */
 	size = SKB_DATA_ALIGN(size);
-	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
+	data = ____kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
 	if (!data)
 		goto nodata;
 
@@ -261,22 +269,17 @@ nodata:
 }
 
 
-static void skb_drop_list(struct sk_buff **listp)
+static void skb_drop_fraglist(struct sk_buff *skb)
 {
-	struct sk_buff *list = *listp;
+	struct sk_buff *list = skb_shinfo(skb)->frag_list;
 
-	*listp = NULL;
+	skb_shinfo(skb)->frag_list = NULL;
 
 	do {
 		struct sk_buff *this = list;
 		list = list->next;
 		kfree_skb(this);
 	} while (list);
-}
-
-static inline void skb_drop_fraglist(struct sk_buff *skb)
-{
-	skb_drop_list(&skb_shinfo(skb)->frag_list);
 }
 
 static void skb_clone_fraglist(struct sk_buff *skb)
@@ -377,6 +380,24 @@ void __kfree_skb(struct sk_buff *skb)
 #endif
 
 	kfree_skbmem(skb);
+}
+
+/**
+ *	kfree_skb - free an sk_buff
+ *	@skb: buffer to free
+ *
+ *	Drop a reference to the buffer and free it if the usage count has
+ *	hit zero.
+ */
+void kfree_skb(struct sk_buff *skb)
+{
+	if (unlikely(!skb))
+		return;
+	if (likely(atomic_read(&skb->users) == 1))
+		smp_rmb();
+	else if (likely(!atomic_dec_and_test(&skb->users)))
+		return;
+	__kfree_skb(skb);
 }
 
 /**
@@ -609,7 +630,6 @@ struct sk_buff *pskb_copy(struct sk_buff *skb, gfp_t gfp_mask)
 	n->csum	     = skb->csum;
 	n->ip_summed = skb->ip_summed;
 
-	n->truesize += skb->data_len;
 	n->data_len  = skb->data_len;
 	n->len	     = skb->len;
 
@@ -804,86 +824,49 @@ struct sk_buff *skb_pad(struct sk_buff *skb, int pad)
 	return nskb;
 }	
  
-/* Trims skb to length len. It can change skb pointers.
+/* Trims skb to length len. It can change skb pointers, if "realloc" is 1.
+ * If realloc==0 and trimming is impossible without change of data,
+ * it is BUG().
  */
 
-int ___pskb_trim(struct sk_buff *skb, unsigned int len)
+int ___pskb_trim(struct sk_buff *skb, unsigned int len, int realloc)
 {
-	struct sk_buff **fragp;
-	struct sk_buff *frag;
 	int offset = skb_headlen(skb);
 	int nfrags = skb_shinfo(skb)->nr_frags;
 	int i;
-	int err;
 
-	if (skb_cloned(skb) &&
-	    unlikely((err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC))))
-		return err;
-
-	i = 0;
-	if (offset >= len)
-		goto drop_pages;
-
-	for (; i < nfrags; i++) {
+	for (i = 0; i < nfrags; i++) {
 		int end = offset + skb_shinfo(skb)->frags[i].size;
-
-		if (end < len) {
-			offset = end;
-			continue;
+		if (end > len) {
+			if (skb_cloned(skb)) {
+				BUG_ON(!realloc);
+				if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+					return -ENOMEM;
+			}
+			if (len <= offset) {
+				put_page(skb_shinfo(skb)->frags[i].page);
+				skb_shinfo(skb)->nr_frags--;
+			} else {
+				skb_shinfo(skb)->frags[i].size = len - offset;
+			}
 		}
-
-		skb_shinfo(skb)->frags[i++].size = len - offset;
-
-drop_pages:
-		skb_shinfo(skb)->nr_frags = i;
-
-		for (; i < nfrags; i++)
-			put_page(skb_shinfo(skb)->frags[i].page);
-
-		if (skb_shinfo(skb)->frag_list)
-			skb_drop_fraglist(skb);
-		goto done;
+		offset = end;
 	}
 
-	for (fragp = &skb_shinfo(skb)->frag_list; (frag = *fragp);
-	     fragp = &frag->next) {
-		int end = offset + frag->len;
-
-		if (skb_shared(frag)) {
-			struct sk_buff *nfrag;
-
-			nfrag = skb_clone(frag, GFP_ATOMIC);
-			if (unlikely(!nfrag))
-				return -ENOMEM;
-
-			nfrag->next = frag->next;
-			kfree_skb(frag);
-			frag = nfrag;
-			*fragp = frag;
-		}
-
-		if (end < len) {
-			offset = end;
-			continue;
-		}
-
-		if (end > len &&
-		    unlikely((err = pskb_trim(frag, len - offset))))
-			return err;
-
-		if (frag->next)
-			skb_drop_list(&frag->next);
-		break;
-	}
-
-done:
-	if (len > skb_headlen(skb)) {
+	if (offset < len) {
 		skb->data_len -= skb->len - len;
 		skb->len       = len;
 	} else {
-		skb->len       = len;
-		skb->data_len  = 0;
-		skb->tail      = skb->data + len;
+		if (len <= skb_headlen(skb)) {
+			skb->len      = len;
+			skb->data_len = 0;
+			skb->tail     = skb->data + len;
+			if (skb_shinfo(skb)->frag_list && !skb_cloned(skb))
+				skb_drop_fraglist(skb);
+		} else {
+			skb->data_len -= skb->len - len;
+			skb->len       = len;
+		}
 	}
 
 	return 0;
@@ -1970,6 +1953,29 @@ err:
 
 EXPORT_SYMBOL_GPL(skb_segment);
 
+/**
+ *	skb_pull_rcsum - pull skb and update receive checksum
+ *	@skb: buffer to update
+ *	@start: start of data before pull
+ *	@len: length of data pulled
+ *
+ *	This function performs an skb_pull on the packet and updates
+ *	update the CHECKSUM_HW checksum.  It should be used on receive
+ *	path processing instead of skb_pull unless you know that the
+ *	checksum difference is zero (e.g., a valid IP header) or you
+ *	are setting ip_summed to CHECKSUM_NONE.
+ */
+unsigned char *skb_pull_rcsum(struct sk_buff *skb, unsigned int len)
+{
+	BUG_ON(len > skb->len);
+	skb->len -= len;
+	BUG_ON(skb->len < skb->data_len);
+	skb_postpull_rcsum(skb, skb->data, len);
+	return skb->data += len;
+}
+
+EXPORT_SYMBOL_GPL(skb_pull_rcsum);
+
 void __init skb_init(void)
 {
 	skbuff_head_cache = kmem_cache_create("skbuff_head_cache",
@@ -1992,6 +1998,7 @@ void __init skb_init(void)
 
 EXPORT_SYMBOL(___pskb_trim);
 EXPORT_SYMBOL(__kfree_skb);
+EXPORT_SYMBOL(kfree_skb);
 EXPORT_SYMBOL(__pskb_pull_tail);
 EXPORT_SYMBOL(__alloc_skb);
 EXPORT_SYMBOL(pskb_copy);

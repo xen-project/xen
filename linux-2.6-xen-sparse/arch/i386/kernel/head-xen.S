@@ -7,6 +7,7 @@
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/page.h>
+#include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/xen.h>
@@ -92,6 +93,7 @@ ENTRY(empty_zero_page)
 /*
  * The Global Descriptor Table contains 28 quadwords, per-CPU.
  */
+	.align L1_CACHE_BYTES
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */

@@ -78,6 +78,12 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 		*addrp = __pa_symbol(&_end);
 		return 1;
 	}
+
+	if (last >= ebda_addr && addr < ebda_addr + ebda_size) {
+		*addrp = ebda_addr + ebda_size;
+		return 1;
+	}
+
 	/* XXX ramdisk image here? */ 
 #else
 	if (last < (table_end<<PAGE_SHIFT)) {
@@ -89,7 +95,12 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 } 
 
 #ifndef CONFIG_XEN
-int __init e820_mapped(unsigned long start, unsigned long end, unsigned type) 
+/*
+ * This function checks if any part of the range <start,end> is mapped
+ * with type.
+ */
+int __meminit
+e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 { 
 	int i;
 	for (i = 0; i < e820.nr_map; i++) { 
@@ -103,6 +114,35 @@ int __init e820_mapped(unsigned long start, unsigned long end, unsigned type)
 	return 0;
 }
 #endif
+
+/*
+ * This function checks if the entire range <start,end> is mapped with type.
+ *
+ * Note: this function only works correct if the e820 table is sorted and
+ * not-overlapping, which is the case
+ */
+int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
+{
+	int i;
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+		if (type && ei->type != type)
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->addr <= start)
+			start = ei->addr + ei->size;
+		/* if start is now at or beyond end, we're done, full coverage */
+		if (start >= end)
+			return 1; /* we're done */
+	}
+	return 0;
+}
 
 /* 
  * Find a free area in a specific range. 
@@ -119,7 +159,7 @@ unsigned long __init find_e820_area(unsigned long start, unsigned long end, unsi
 			addr = start;
 		if (addr > ei->addr + ei->size) 
 			continue; 
-		while (bad_addr(&addr, size) && addr+size < ei->addr + ei->size)
+		while (bad_addr(&addr, size) && addr+size <= ei->addr+ei->size)
 			;
 		last = addr + size;
 		if (last > ei->addr + ei->size)

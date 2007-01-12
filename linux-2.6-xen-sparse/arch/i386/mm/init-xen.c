@@ -313,7 +313,7 @@ static void __init permanent_kmaps_init(pgd_t *pgd_base)
 
 static void __meminit free_new_highpage(struct page *page, int pfn)
 {
-	set_page_count(page, 1);
+	init_page_count(page);
 	if (pfn < xen_start_info->nr_pages)
 		__free_page(page);
 	totalhigh_pages++;
@@ -664,7 +664,7 @@ void __init mem_init(void)
 	/* XEN: init and count low-mem pages outside initial allocation. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
 		ClearPageReserved(pfn_to_page(pfn));
-		set_page_count(pfn_to_page(pfn), 1);
+		init_page_count(pfn_to_page(pfn));
 		totalram_pages++;
 	}
 
@@ -721,6 +721,7 @@ void __init mem_init(void)
  * Specifically, in the case of x86, we will always add
  * memory to the highmem for now.
  */
+#ifdef CONFIG_MEMORY_HOTPLUG
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 int add_memory(u64 start, u64 size)
 {
@@ -736,6 +737,7 @@ int remove_memory(u64 start, u64 size)
 {
 	return -EINVAL;
 }
+#endif
 #endif
 
 kmem_cache_t *pgd_cache;
@@ -795,21 +797,6 @@ static int noinline do_test_wp_bit(void)
 	return flag;
 }
 
-void free_initmem(void)
-{
-	unsigned long addr;
-
-	addr = (unsigned long)(&__init_begin);
-	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		memset((void *)addr, 0xcc, PAGE_SIZE);
-		free_page(addr);
-		totalram_pages++;
-	}
-	printk (KERN_INFO "Freeing unused kernel memory: %dk freed\n", (__init_end - __init_begin) >> 10);
-}
-
 #ifdef CONFIG_DEBUG_RODATA
 
 extern char __start_rodata, __end_rodata;
@@ -833,17 +820,31 @@ void mark_rodata_ro(void)
 }
 #endif
 
+void free_init_pages(char *what, unsigned long begin, unsigned long end)
+{
+	unsigned long addr;
+
+	for (addr = begin; addr < end; addr += PAGE_SIZE) {
+		ClearPageReserved(virt_to_page(addr));
+		init_page_count(virt_to_page(addr));
+		memset((void *)addr, 0xcc, PAGE_SIZE);
+		free_page(addr);
+		totalram_pages++;
+	}
+	printk(KERN_INFO "Freeing %s: %ldk freed\n", what, (end - begin) >> 10);
+}
+
+void free_initmem(void)
+{
+	free_init_pages("unused kernel memory",
+			(unsigned long)(&__init_begin),
+			(unsigned long)(&__init_end));
+}
 
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (start < end)
-		printk (KERN_INFO "Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
-	for (; start < end; start += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(start));
-		set_page_count(virt_to_page(start), 1);
-		free_page(start);
-		totalram_pages++;
-	}
+	free_init_pages("initrd memory", start, end);
 }
 #endif
+

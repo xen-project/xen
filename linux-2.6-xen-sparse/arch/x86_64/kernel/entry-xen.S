@@ -868,7 +868,7 @@ ENTRY(failsafe_callback)
 	movq (%rsp),%rcx
 	movq 8(%rsp),%r11
 	addq $0x30,%rsp
-	movq $-9999,%rdi	/* better code? */
+	movq $11,%rdi	/* SIGSEGV */
 	jmp do_exit			
 1:	/* Segment mismatch => Category 1 (Bad segment). Retry the IRET. */
 	movq (%rsp),%rcx

@@ -6,7 +6,6 @@
 #include <asm/page.h>
 #include <linux/config.h>
 #include <linux/compiler.h>
-#include <asm/smp_alt.h>
 
 /*
  * Your basic SMP spinlocks, allowing only a single CPU anywhere
@@ -23,9 +22,8 @@
 		(*(volatile signed char *)(&(x)->slock) <= 0)
 
 #define __raw_spin_lock_string \
-	"\n1:\n" \
-	LOCK \
-	"decb %0\n\t" \
+	"\n1:\t" \
+	"lock ; decb %0\n\t" \
 	"jns 3f\n" \
 	"2:\t" \
 	"rep;nop\n\t" \
@@ -35,67 +33,52 @@
 	"3:\n\t"
 
 #define __raw_spin_lock_string_flags \
-	"\n1:\n" \
-	LOCK \
-	"decb %0\n\t" \
-	"jns 4f\n\t" \
+	"\n1:\t" \
+	"lock ; decb %0\n\t" \
+	"jns 5f\n" \
 	"2:\t" \
 	"testl $0x200, %1\n\t" \
-	"jz 3f\n\t" \
-	"#sti\n\t" \
+	"jz 4f\n\t" \
+	"#sti\n" \
 	"3:\t" \
 	"rep;nop\n\t" \
 	"cmpb $0, %0\n\t" \
 	"jle 3b\n\t" \
 	"#cli\n\t" \
 	"jmp 1b\n" \
-	"4:\n\t"
+	"4:\t" \
+	"rep;nop\n\t" \
+	"cmpb $0, %0\n\t" \
+	"jg 1b\n\t" \
+	"jmp 4b\n" \
+	"5:\n\t"
+
+#define __raw_spin_lock_string_up \
+	"\n\tdecb %0"
 
 static inline void __raw_spin_lock(raw_spinlock_t *lock)
 {
-	__asm__ __volatile__(
-		__raw_spin_lock_string
-		:"=m" (lock->slock) : : "memory");
+	alternative_smp(
+		__raw_spin_lock_string,
+		__raw_spin_lock_string_up,
+		"=m" (lock->slock) : : "memory");
 }
 
 static inline void __raw_spin_lock_flags(raw_spinlock_t *lock, unsigned long flags)
 {
-	__asm__ __volatile__(
-		__raw_spin_lock_string_flags
-		:"=m" (lock->slock) : "r" (flags) : "memory");
+	alternative_smp(
+		__raw_spin_lock_string_flags,
+		__raw_spin_lock_string_up,
+		"=m" (lock->slock) : "r" (flags) : "memory");
 }
 
 static inline int __raw_spin_trylock(raw_spinlock_t *lock)
 {
 	char oldval;
-#ifdef CONFIG_SMP_ALTERNATIVES
-	__asm__ __volatile__(
-		"1:movb %1,%b0\n"
-		"movb $0,%1\n"
-		"2:"
-		".section __smp_alternatives,\"a\"\n"
-		".long 1b\n"
-		".long 3f\n"
-		".previous\n"
-		".section __smp_replacements,\"a\"\n"
-		"3: .byte 2b - 1b\n"
-		".byte 5f-4f\n"
-		".byte 0\n"
-		".byte 6f-5f\n"
-		".byte -1\n"
-		"4: xchgb %b0,%1\n"
-		"5: movb %1,%b0\n"
-		"movb $0,%1\n"
-		"6:\n"
-		".previous\n"
-		:"=q" (oldval), "=m" (lock->slock)
-		:"0" (0) : "memory");
-#else
 	__asm__ __volatile__(
 		"xchgb %b0,%1"
 		:"=q" (oldval), "=m" (lock->slock)
 		:"0" (0) : "memory");
-#endif
 	return oldval > 0;
 }
 
@@ -205,12 +188,12 @@ static inline int __raw_write_trylock(raw_rwlock_t *lock)
 
 static inline void __raw_read_unlock(raw_rwlock_t *rw)
 {
-	asm volatile(LOCK "incl %0" :"=m" (rw->lock) : : "memory");
+	asm volatile(LOCK_PREFIX "incl %0" :"=m" (rw->lock) : : "memory");
 }
 
 static inline void __raw_write_unlock(raw_rwlock_t *rw)
 {
-	asm volatile(LOCK "addl $" RW_LOCK_BIAS_STR ", %0"
+	asm volatile(LOCK_PREFIX "addl $" RW_LOCK_BIAS_STR ", %0"
 				 : "=m" (rw->lock) : : "memory");
 }
 

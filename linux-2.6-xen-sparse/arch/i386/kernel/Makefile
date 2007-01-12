@@ -6,8 +6,8 @@ extra-y := head.o init_task.o vmlinux.lds
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		ptrace.o time.o ioport.o ldt.o setup.o i8259.o sys_i386.o \
-		pci-dma.o i386_ksyms.o i387.o dmi_scan.o bootflag.o \
-		quirks.o i8237.o topology.o
+		pci-dma.o i386_ksyms.o i387.o bootflag.o \
+		quirks.o i8237.o topology.o alternative.o
 
 obj-y				+= cpu/
 obj-y				+= timers/
@@ -37,7 +37,6 @@ obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
 obj-$(CONFIG_DOUBLEFAULT) 	+= doublefault.o
 obj-$(CONFIG_VM86)		+= vm86.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-obj-$(CONFIG_SMP_ALTERNATIVES)	+= smpalts.o
 
 EXTRA_AFLAGS   := -traditional
 

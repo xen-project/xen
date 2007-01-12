@@ -331,7 +331,7 @@ static inline int pte_dirty(pte_t pte)		{ return __pte_val(pte) & _PAGE_DIRTY; }
 static inline int pte_young(pte_t pte)		{ return __pte_val(pte) & _PAGE_ACCESSED; }
 static inline int pte_write(pte_t pte)		{ return __pte_val(pte) & _PAGE_RW; }
 static inline int pte_file(pte_t pte)		{ return __pte_val(pte) & _PAGE_FILE; }
-static inline int pte_huge(pte_t pte)		{ return (__pte_val(pte) & __LARGE_PTE) == __LARGE_PTE; }
+static inline int pte_huge(pte_t pte)		{ return __pte_val(pte) & _PAGE_PSE; }
 
 static inline pte_t pte_rdprotect(pte_t pte)	{ __pte_val(pte) &= ~_PAGE_USER; return pte; }
 static inline pte_t pte_exprotect(pte_t pte)	{ __pte_val(pte) &= ~_PAGE_USER; return pte; }
@@ -343,7 +343,7 @@ static inline pte_t pte_mkexec(pte_t pte)	{ __pte_val(pte) |= _PAGE_USER; return
 static inline pte_t pte_mkdirty(pte_t pte)	{ __pte_val(pte) |= _PAGE_DIRTY; return pte; }
 static inline pte_t pte_mkyoung(pte_t pte)	{ __pte_val(pte) |= _PAGE_ACCESSED; return pte; }
 static inline pte_t pte_mkwrite(pte_t pte)	{ __pte_val(pte) |= _PAGE_RW; return pte; }
-static inline pte_t pte_mkhuge(pte_t pte)	{ __pte_val(pte) |= __LARGE_PTE; return pte; }
+static inline pte_t pte_mkhuge(pte_t pte)	{ __pte_val(pte) |= _PAGE_PSE; return pte; }
 
 struct vm_area_struct;
 
@@ -506,6 +506,10 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define __swp_entry(type, offset)	((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
+
+extern spinlock_t pgd_lock;
+extern struct page *pgd_list;
+void vmalloc_sync_all(void);
 
 #endif /* !__ASSEMBLY__ */
 

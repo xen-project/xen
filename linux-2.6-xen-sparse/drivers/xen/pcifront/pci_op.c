@@ -43,7 +43,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	struct xen_pci_op *active_op = &pdev->sh_info->op;
 	unsigned long irq_flags;
 	evtchn_port_t port = pdev->evtchn;
-	nsec_t ns, ns_timeout;
+	s64 ns, ns_timeout;
 	struct timeval tv;
 
 	spin_lock_irqsave(&pdev->sh_info_lock, irq_flags);
@@ -62,7 +62,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	 * timeout in the past). 1s difference gives plenty of slack for error.
 	 */
 	do_gettimeofday(&tv);
-	ns_timeout = timeval_to_ns(&tv) + 2 * (nsec_t)NSEC_PER_SEC;
+	ns_timeout = timeval_to_ns(&tv) + 2 * (s64)NSEC_PER_SEC;
 
 	clear_evtchn(port);
 

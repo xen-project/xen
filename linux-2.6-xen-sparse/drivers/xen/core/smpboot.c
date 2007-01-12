@@ -26,10 +26,6 @@
 #include <xen/cpu_hotplug.h>
 #include <xen/xenbus.h>
 
-#ifdef CONFIG_SMP_ALTERNATIVES
-#include <asm/smp_alt.h>
-#endif
-
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
@@ -84,7 +80,8 @@ void __init prefill_possible_map(void)
 {
 	int i, rc;
 
-	if (!cpus_empty(cpu_possible_map))
+	for_each_possible_cpu(i)
+	    if (i != smp_processor_id())
 		return;
 
 	for (i = 0; i < NR_CPUS; i++) {
@@ -351,7 +348,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	prefill_possible_map();
 	cpu_present_map  = cpumask_of_cpu(0);
 	cpu_online_map   = cpumask_of_cpu(0);
 }
@@ -396,10 +392,8 @@ void __cpu_die(unsigned int cpu)
 
 	xen_smp_intr_exit(cpu);
 
-#ifdef CONFIG_SMP_ALTERNATIVES
 	if (num_online_cpus() == 1)
-		unprepare_for_smp();
-#endif
+		alternatives_smp_switch(0);
 }
 
 #else /* !CONFIG_HOTPLUG_CPU */
@@ -424,10 +418,8 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (rc)
 		return rc;
 
-#ifdef CONFIG_SMP_ALTERNATIVES
 	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
+		alternatives_smp_switch(1);
 
 	/* This must be done before setting cpu_online_map */
 	set_cpu_sibling_map(cpu);

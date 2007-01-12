@@ -57,8 +57,7 @@
 		       [pda_pcurrent] "i" (offsetof(struct x8664_pda, pcurrent))   \
 		     : "memory", "cc" __EXTRA_CLOBBER)
     
-
-extern void load_gs_index(unsigned);
+extern void load_gs_index(unsigned); 
 
 /*
  * Load a segment. Fall back on loading the zero
@@ -79,12 +78,6 @@ extern void load_gs_index(unsigned);
 		".quad 1b,3b\n"			\
 		".previous"			\
 		: :"r" (value), "r" (0))
-
-#define set_debug(value,register) \
-                __asm__("movq %0,%%db" #register  \
-		: /* no output */ \
-		:"r" ((unsigned long) value))
-
 
 #ifdef __KERNEL__
 struct alt_instr { 

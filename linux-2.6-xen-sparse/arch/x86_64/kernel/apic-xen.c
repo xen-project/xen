@@ -194,5 +194,5 @@ int __init APIC_init_uniprocessor (void)
 			setup_IO_APIC();
 #endif
 
-	return 0;
+	return 1;
 }

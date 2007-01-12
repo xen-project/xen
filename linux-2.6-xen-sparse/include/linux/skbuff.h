@@ -287,7 +287,6 @@ struct sk_buff {
 
 	void			(*destructor)(struct sk_buff *skb);
 #ifdef CONFIG_NETFILTER
-	__u32			nfmark;
 	struct nf_conntrack	*nfct;
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	struct sk_buff		*nfct_reasm;
@@ -295,6 +294,7 @@ struct sk_buff {
 #ifdef CONFIG_BRIDGE_NETFILTER
 	struct nf_bridge_info	*nf_bridge;
 #endif
+	__u32			nfmark;
 #endif /* CONFIG_NETFILTER */
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
@@ -321,6 +321,7 @@ struct sk_buff {
 
 #include <asm/system.h>
 
+extern void kfree_skb(struct sk_buff *skb);
 extern void	       __kfree_skb(struct sk_buff *skb);
 extern struct sk_buff *__alloc_skb(unsigned int size,
 				   gfp_t priority, int fclone);
@@ -361,6 +362,13 @@ extern void	      skb_over_panic(struct sk_buff *skb, int len,
 				     void *here);
 extern void	      skb_under_panic(struct sk_buff *skb, int len,
 				      void *here);
+extern void	      skb_truesize_bug(struct sk_buff *skb);
+
+static inline void skb_truesize_check(struct sk_buff *skb)
+{
+	if (unlikely((int)skb->truesize < sizeof(struct sk_buff) + skb->len))
+		skb_truesize_bug(skb);
+}
 
 extern int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
 			int getfrag(void *from, char *to, int offset,
@@ -420,22 +428,6 @@ static inline struct sk_buff *skb_get(struct sk_buff *skb)
  * If users == 1, we are the only owner and are can avoid redundant
  * atomic change.
  */
-
-/**
- *	kfree_skb - free an sk_buff
- *	@skb: buffer to free
- *
- *	Drop a reference to the buffer and free it if the usage count has
- *	hit zero.
- */
-static inline void kfree_skb(struct sk_buff *skb)
-{
-	if (likely(atomic_read(&skb->users) == 1))
-		smp_rmb();
-	else if (likely(!atomic_dec_and_test(&skb->users)))
-		return;
-	__kfree_skb(skb);
-}
 
 /**
  *	skb_cloned - is the buffer a clone
@@ -974,16 +966,34 @@ static inline void skb_reserve(struct sk_buff *skb, int len)
 #define NET_IP_ALIGN	2
 #endif
 
-extern int ___pskb_trim(struct sk_buff *skb, unsigned int len);
+/*
+ * The networking layer reserves some headroom in skb data (via
+ * dev_alloc_skb). This is used to avoid having to reallocate skb data when
+ * the header has to grow. In the default case, if the header has to grow
+ * 16 bytes or less we avoid the reallocation.
+ *
+ * Unfortunately this headroom changes the DMA alignment of the resulting
+ * network packet. As for NET_IP_ALIGN, this unaligned DMA is expensive
+ * on some architectures. An architecture can override this value,
+ * perhaps setting it to a cacheline in size (since that will maintain
+ * cacheline alignment of the DMA). It must be a power of 2.
+ *
+ * Various parts of the networking layer expect at least 16 bytes of
+ * headroom, you should not reduce this.
+ */
+#ifndef NET_SKB_PAD
+#define NET_SKB_PAD	16
+#endif
+
+extern int ___pskb_trim(struct sk_buff *skb, unsigned int len, int realloc);
 
 static inline void __skb_trim(struct sk_buff *skb, unsigned int len)
 {
-	if (unlikely(skb->data_len)) {
-		WARN_ON(1);
-		return;
-	}
-	skb->len  = len;
-	skb->tail = skb->data + len;
+	if (!skb->data_len) {
+		skb->len  = len;
+		skb->tail = skb->data + len;
+	} else
+		___pskb_trim(skb, len, 0);
 }
 
 /**
@@ -993,7 +1003,6 @@ static inline void __skb_trim(struct sk_buff *skb, unsigned int len)
  *
  *	Cut the length of a buffer down by removing data from the tail. If
  *	the buffer is already under the length specified it is not modified.
- *	The skb must be linear.
  */
 static inline void skb_trim(struct sk_buff *skb, unsigned int len)
 {
@@ -1004,10 +1013,12 @@ static inline void skb_trim(struct sk_buff *skb, unsigned int len)
 
 static inline int __pskb_trim(struct sk_buff *skb, unsigned int len)
 {
-	if (skb->data_len)
-		return ___pskb_trim(skb, len);
-	__skb_trim(skb, len);
-	return 0;
+	if (!skb->data_len) {
+		skb->len  = len;
+		skb->tail = skb->data+len;
+		return 0;
+	}
+	return ___pskb_trim(skb, len, 1);
 }
 
 static inline int pskb_trim(struct sk_buff *skb, unsigned int len)
@@ -1063,9 +1074,9 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      gfp_t gfp_mask)
 {
-	struct sk_buff *skb = alloc_skb(length + 16, gfp_mask);
+	struct sk_buff *skb = alloc_skb(length + NET_SKB_PAD, gfp_mask);
 	if (likely(skb))
-		skb_reserve(skb, 16);
+		skb_reserve(skb, NET_SKB_PAD);
 	return skb;
 }
 #else
@@ -1103,13 +1114,15 @@ static inline struct sk_buff *dev_alloc_skb(unsigned int length)
  */
 static inline int skb_cow(struct sk_buff *skb, unsigned int headroom)
 {
-	int delta = (headroom > 16 ? headroom : 16) - skb_headroom(skb);
+	int delta = (headroom > NET_SKB_PAD ? headroom : NET_SKB_PAD) -
+			skb_headroom(skb);
 
 	if (delta < 0)
 		delta = 0;
 
 	if (delta || skb_cloned(skb))
-		return pskb_expand_head(skb, (delta + 15) & ~15, 0, GFP_ATOMIC);
+		return pskb_expand_head(skb, (delta + (NET_SKB_PAD-1)) &
+				~(NET_SKB_PAD-1), 0, GFP_ATOMIC);
 	return 0;
 }
 
@@ -1208,11 +1221,13 @@ static inline int skb_linearize_cow(struct sk_buff *skb)
  */
 
 static inline void skb_postpull_rcsum(struct sk_buff *skb,
-					 const void *start, int len)
+				      const void *start, unsigned int len)
 {
 	if (skb->ip_summed == CHECKSUM_HW)
 		skb->csum = csum_sub(skb->csum, csum_partial(start, len, 0));
 }
+
+unsigned char *skb_pull_rcsum(struct sk_buff *skb, unsigned int len);
 
 /**
  *	pskb_trim_rcsum - trim received skb and update checksum
@@ -1386,16 +1401,6 @@ static inline void nf_conntrack_put_reasm(struct sk_buff *skb)
 		kfree_skb(skb);
 }
 #endif
-static inline void nf_reset(struct sk_buff *skb)
-{
-	nf_conntrack_put(skb->nfct);
-	skb->nfct = NULL;
-#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
-	nf_conntrack_put_reasm(skb->nfct_reasm);
-	skb->nfct_reasm = NULL;
-#endif
-}
-
 #ifdef CONFIG_BRIDGE_NETFILTER
 static inline void nf_bridge_put(struct nf_bridge_info *nf_bridge)
 {
@@ -1408,6 +1413,20 @@ static inline void nf_bridge_get(struct nf_bridge_info *nf_bridge)
 		atomic_inc(&nf_bridge->use);
 }
 #endif /* CONFIG_BRIDGE_NETFILTER */
+static inline void nf_reset(struct sk_buff *skb)
+{
+	nf_conntrack_put(skb->nfct);
+	skb->nfct = NULL;
+#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+	nf_conntrack_put_reasm(skb->nfct_reasm);
+	skb->nfct_reasm = NULL;
+#endif
+#ifdef CONFIG_BRIDGE_NETFILTER
+	nf_bridge_put(skb->nf_bridge);
+	skb->nf_bridge = NULL;
+#endif
+}
+
 #else /* CONFIG_NETFILTER */
 static inline void nf_reset(struct sk_buff *skb) {}
 #endif /* CONFIG_NETFILTER */

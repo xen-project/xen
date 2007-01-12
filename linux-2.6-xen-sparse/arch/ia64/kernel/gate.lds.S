@@ -82,6 +82,7 @@ SECTIONS
 	*(.dynbss)
 	*(.bss .bss.* .gnu.linkonce.b.*)
 	*(__ex_table)
+	*(__mca_table)
   }
 }
 

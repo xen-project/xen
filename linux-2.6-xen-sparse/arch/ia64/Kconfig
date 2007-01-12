@@ -34,11 +34,19 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_FIND_NEXT_BIT
+	bool
+	default y
+
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
 
 config TIME_INTERPOLATION
+	bool
+	default y
+
+config DMI
 	bool
 	default y
 
@@ -290,9 +298,6 @@ config HOTPLUG_CPU
 	  can be controlled through /sys/devices/system/cpu/cpu#.
 	  Say N if you want to disable CPU hotplug.
 
-config ARCH_ENABLE_MEMORY_HOTPLUG
-	def_bool y
-
 config SCHED_SMT
 	bool "SMT scheduler support"
 	depends on SMP
@@ -301,6 +306,25 @@ config SCHED_SMT
 	  Improves the CPU scheduler's decision making when dealing with
 	  Intel IA64 chips with MultiThreading at a cost of slightly increased
 	  overhead in some places. If unsure say N here.
+
+config PERMIT_BSP_REMOVE
+	bool "Support removal of Bootstrap Processor"
+	depends on HOTPLUG_CPU
+	default n
+	---help---
+	Say Y here if your platform SAL will support removal of BSP with HOTPLUG_CPU
+	support. 
+
+config FORCE_CPEI_RETARGET
+	bool "Force assumption that CPEI can be re-targetted"
+	depends on PERMIT_BSP_REMOVE
+	default n
+	---help---
+	Say Y if you need to force the assumption that CPEI can be re-targetted to
+	any cpu in the system. This hint is available via ACPI 3.0 specifications.
+	Tiger4 systems are capable of re-directing CPEI to any CPU other than BSP.
+	This option it useful to enable this feature on older BIOS's as well.
+	You can also enable this by using boot command line option force_cpei=1.
 
 config PREEMPT
 	bool "Preemptible Kernel"
@@ -346,6 +370,16 @@ config NUMA
 	  Say Y to compile the kernel to support NUMA (Non-Uniform Memory
 	  Access).  This option is for configuring high-end multiprocessor
 	  server systems.  If in doubt, say N.
+
+config NODES_SHIFT
+	int "Max num nodes shift(3-10)"
+	range 3 10
+	default "8"
+	depends on NEED_MULTIPLE_NODES
+	help
+	  This option specifies the maximum number of nodes in your SSI system.
+	  MAX_NUMNODES will be 2^(This value).
+	  If in doubt, use the default.
 
 # VIRTUAL_MEM_MAP and FLAT_NODE_MEM_MAP are functionally equivalent.
 # VIRTUAL_MEM_MAP has been retained for historical reasons.
@@ -406,6 +440,8 @@ config IA64_PALINFO
 
 config SGI_SN
 	def_bool y if (IA64_SGI_SN2 || IA64_GENERIC)
+
+source "drivers/sn/Kconfig"
 
 source "drivers/firmware/Kconfig"
 

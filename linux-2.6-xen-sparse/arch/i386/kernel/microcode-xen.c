@@ -32,6 +32,7 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
+#include <linux/mutex.h>
 #include <linux/syscalls.h>
 
 #include <asm/msr.h>
@@ -49,7 +50,7 @@ MODULE_LICENSE("GPL");
 #define DEFAULT_UCODE_TOTALSIZE (DEFAULT_UCODE_DATASIZE + MC_HEADER_SIZE) /* 2048 bytes */
 
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
-static DECLARE_MUTEX(microcode_sem);
+static DEFINE_MUTEX(microcode_mutex);
 				
 static int microcode_open (struct inode *unused1, struct file *unused2)
 {
@@ -90,37 +91,20 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 		return -EINVAL;
 	}
 
-	down(&microcode_sem);
+	mutex_lock(&microcode_mutex);
 
 	ret = do_microcode_update(buf, len);
 	if (!ret)
 		ret = (ssize_t)len;
 
-	up(&microcode_sem);
+	mutex_unlock(&microcode_mutex);
 
 	return ret;
-}
-
-static int microcode_ioctl (struct inode *inode, struct file *file, 
-		unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-		/* 
-		 *  XXX: will be removed after microcode_ctl 
-		 *  is updated to ignore failure of this ioctl()
-		 */
-		case MICROCODE_IOCFREE:
-			return 0;
-		default:
-			return -EINVAL;
-	}
-	return -EINVAL;
 }
 
 static struct file_operations microcode_fops = {
 	.owner		= THIS_MODULE,
 	.write		= microcode_write,
-	.ioctl		= microcode_ioctl,
 	.open		= microcode_open,
 };
 
@@ -151,7 +135,6 @@ static int __init microcode_init (void)
 static void __exit microcode_exit (void)
 {
 	misc_deregister(&microcode_dev);
-	printk(KERN_INFO "IA-32 Microcode Update Driver v" MICROCODE_VERSION " unregistered\n");
 }
 
 module_init(microcode_init)

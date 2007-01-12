@@ -107,11 +107,11 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 }
 
 #ifndef CONFIG_XEN
-static void __init MP_processor_info (struct mpc_config_processor *m)
+static void __cpuinit MP_processor_info (struct mpc_config_processor *m)
 {
 	int cpu;
 	unsigned char ver;
-	static int found_bsp=0;
+	cpumask_t tmp_map;
 
 	if (!(m->mpc_cpuflag & CPU_ENABLED)) {
 		disabled_cpus++;
@@ -134,8 +134,10 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 		return;
 	}
 
-	cpu = num_processors++;
-	
+	num_processors++;
+	cpus_complement(tmp_map, cpu_present_map);
+	cpu = first_cpu(tmp_map);
+
 #if MAX_APICS < 255	
 	if ((int)m->mpc_apicid > MAX_APICS) {
 		printk(KERN_ERR "Processor #%d INVALID. (Max ID: %d).\n",
@@ -161,12 +163,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
  		 * entry is BSP, and so on.
  		 */
 		cpu = 0;
-
- 		bios_cpu_apicid[0] = m->mpc_apicid;
- 		x86_cpu_to_apicid[0] = m->mpc_apicid;
- 		found_bsp = 1;
- 	} else
-		cpu = num_processors - found_bsp;
+ 	}
 	bios_cpu_apicid[cpu] = m->mpc_apicid;
 	x86_cpu_to_apicid[cpu] = m->mpc_apicid;
 
@@ -697,7 +694,7 @@ void __init mp_register_lapic_address (
 }
 
 
-void __init mp_register_lapic (
+void __cpuinit mp_register_lapic (
 	u8			id, 
 	u8			enabled)
 {
@@ -981,7 +978,17 @@ int mp_register_gsi(u32 gsi, int triggering, int polarity)
 		 */
 		int irq = gsi;
 		if (gsi < MAX_GSI_NUM) {
-			if (gsi > 15)
+			/*
+			 * Retain the VIA chipset work-around (gsi > 15), but
+			 * avoid a problem where the 8254 timer (IRQ0) is setup
+			 * via an override (so it's not on pin 0 of the ioapic),
+			 * and at the same time, the pin 0 interrupt is a PCI
+			 * type.  The gsi > 15 test could cause these two pins
+			 * to be shared as IRQ0, and they are not shareable.
+			 * So test for this condition, and if necessary, avoid
+			 * the pin collision.
+			 */
+			if (gsi > 15 || (gsi == 0 && !timer_uses_ioapic_pin_0))
 				gsi = pci_irq++;
 			/*
 			 * Don't assign IRQ used by ACPI SCI

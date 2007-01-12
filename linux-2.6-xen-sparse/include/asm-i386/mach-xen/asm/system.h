@@ -3,12 +3,11 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/bitops.h>
-#include <asm/synch_bitops.h>
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
+#include <linux/bitops.h> /* for LOCK_PREFIX */
+#include <asm/synch_bitops.h>
 #include <asm/hypervisor.h>
-#include <asm/smp_alt.h>
 
 #ifdef __KERNEL__
 
@@ -279,19 +278,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK "cmpxchgb %b1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK "cmpxchgw %w1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -344,7 +343,7 @@ static inline unsigned long long __cmpxchg64(volatile void *ptr, unsigned long l
 				      unsigned long long new)
 {
 	unsigned long long prev;
-	__asm__ __volatile__(LOCK "cmpxchg8b %3"
+	__asm__ __volatile__(LOCK_PREFIX "cmpxchg8b %3"
 			     : "=A"(prev)
 			     : "b"((unsigned long)new),
 			       "c"((unsigned long)(new >> 32)),
@@ -360,67 +359,6 @@ static inline unsigned long long __cmpxchg64(volatile void *ptr, unsigned long l
 
 #endif
     
-#ifdef __KERNEL__
-struct alt_instr { 
-	__u8 *instr; 		/* original instruction */
-	__u8 *replacement;
-	__u8  cpuid;		/* cpuid bit set for replacement */
-	__u8  instrlen;		/* length of original instruction */
-	__u8  replacementlen; 	/* length of new instruction, <= instrlen */ 
-	__u8  pad;
-}; 
-#endif
-
-/* 
- * Alternative instructions for different CPU types or capabilities.
- * 
- * This allows to use optimized instructions even on generic binary
- * kernels.
- * 
- * length of oldinstr must be longer or equal the length of newinstr
- * It can be padded with nops as needed.
- * 
- * For non barrier like inlines please define new variants
- * without volatile and memory clobber.
- */
-#define alternative(oldinstr, newinstr, feature) 	\
-	asm volatile ("661:\n\t" oldinstr "\n662:\n" 		     \
-		      ".section .altinstructions,\"a\"\n"     	     \
-		      "  .align 4\n"				       \
-		      "  .long 661b\n"            /* label */          \
-		      "  .long 663f\n"		  /* new instruction */ 	\
-		      "  .byte %c0\n"             /* feature bit */    \
-		      "  .byte 662b-661b\n"       /* sourcelen */      \
-		      "  .byte 664f-663f\n"       /* replacementlen */ \
-		      ".previous\n"						\
-		      ".section .altinstr_replacement,\"ax\"\n"			\
-		      "663:\n\t" newinstr "\n664:\n"   /* replacement */    \
-		      ".previous" :: "i" (feature) : "memory")  
-
-/*
- * Alternative inline assembly with input.
- * 
- * Pecularities:
- * No memory clobber here. 
- * Argument numbers start with 1.
- * Best is to use constraints that are fixed size (like (%1) ... "r")
- * If you use variable sized constraints like "m" or "g" in the 
- * replacement maake sure to pad to the worst case length.
- */
-#define alternative_input(oldinstr, newinstr, feature, input...)		\
-	asm volatile ("661:\n\t" oldinstr "\n662:\n"				\
-		      ".section .altinstructions,\"a\"\n"			\
-		      "  .align 4\n"						\
-		      "  .long 661b\n"            /* label */			\
-		      "  .long 663f\n"		  /* new instruction */ 	\
-		      "  .byte %c0\n"             /* feature bit */		\
-		      "  .byte 662b-661b\n"       /* sourcelen */		\
-		      "  .byte 664f-663f\n"       /* replacementlen */ 		\
-		      ".previous\n"						\
-		      ".section .altinstr_replacement,\"ax\"\n"			\
-		      "663:\n\t" newinstr "\n664:\n"   /* replacement */ 	\
-		      ".previous" :: "i" (feature), ##input)
-
 /*
  * Force strict CPU ordering.
  * And yes, this is required on UP too when we're talking
@@ -511,55 +449,11 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_wmb()	wmb()
-#if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
-#define smp_alt_mb(instr)                                           \
-__asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-                     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673:.byte 6668b-6667b\n"                     \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 6671f-6670f\n"                          \
-                     ".byte 0\n"                                    \
-		     ".byte %c0\n"                                  \
-		     "6669:lock;addl $0,0(%%esp)\n"                 \
-		     "6670:" instr "\n"                             \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     :                                              \
-		     : "i" (X86_FEATURE_XMM2)                       \
-		     : "memory")
-#define smp_rmb() smp_alt_mb("lfence")
-#define smp_mb()  smp_alt_mb("mfence")
-#define set_mb(var, value) do {                                     \
-unsigned long __set_mb_temp;                                        \
-__asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-		     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673: .byte 6668b-6667b\n"                    \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 0\n"                                    \
-		     ".byte 6671f-6670f\n"                          \
-		     ".byte -1\n"                                   \
-		     "6669: xchg %1, %0\n"                          \
-		     "6670:movl %1, %0\n"                           \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     : "=m" (var), "=r" (__set_mb_temp)             \
-		     : "1" (value)                                  \
-		     : "memory"); } while (0)
-#else
-#define smp_rmb()	rmb()
 #define smp_mb()	mb()
-#define set_mb(var, value) do { (void) xchg(&var, value); } while (0)
-#endif
+#define smp_rmb()	rmb()
+#define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
+#define set_mb(var, value) do { (void) xchg(&var, value); } while (0)
 #else
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()
@@ -677,5 +571,8 @@ static inline void sched_cacheflush(void)
 }
 
 extern unsigned long arch_align_stack(unsigned long sp);
+extern void free_init_pages(char *what, unsigned long begin, unsigned long end);
+
+void default_idle(void);
 
 #endif

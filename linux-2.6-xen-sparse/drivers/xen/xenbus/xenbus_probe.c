@@ -68,7 +68,7 @@ static unsigned long xen_store_mfn;
 
 extern struct mutex xenwatch_mutex;
 
-static struct notifier_block *xenstore_chain;
+static ATOMIC_NOTIFIER_HEAD(xenstore_chain);
 
 static void wait_for_devices(struct xenbus_driver *xendrv);
 
@@ -748,7 +748,7 @@ int register_xenstore_notifier(struct notifier_block *nb)
 	if (xenstored_ready > 0)
 		ret = nb->notifier_call(nb, 0, NULL);
 	else
-		notifier_chain_register(&xenstore_chain, nb);
+		atomic_notifier_chain_register(&xenstore_chain, nb);
 
 	return ret;
 }
@@ -756,7 +756,7 @@ EXPORT_SYMBOL_GPL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
-	notifier_chain_unregister(&xenstore_chain, nb);
+	atomic_notifier_chain_unregister(&xenstore_chain, nb);
 }
 EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 
@@ -771,7 +771,7 @@ void xenbus_probe(void *unused)
 	xenbus_backend_probe_and_watch();
 
 	/* Notify others that xenstore is up */
-	notifier_call_chain(&xenstore_chain, 0, NULL);
+	atomic_notifier_call_chain(&xenstore_chain, 0, NULL);
 }
 
 

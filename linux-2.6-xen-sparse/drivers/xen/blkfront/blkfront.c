@@ -272,13 +272,13 @@ static void backend_changed(struct xenbus_device *dev,
 		if (bd == NULL)
 			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
 
-		down(&bd->bd_sem);
+		mutex_lock(&bd->bd_mutex);
 		if (info->users > 0)
 			xenbus_dev_error(dev, -EBUSY,
 					 "Device in use; refusing to close");
 		else
 			blkfront_closing(dev);
-		up(&bd->bd_sem);
+		mutex_unlock(&bd->bd_mutex);
 		bdput(bd);
 		break;
 	}

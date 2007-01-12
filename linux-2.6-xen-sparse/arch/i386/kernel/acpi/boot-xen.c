@@ -671,10 +671,10 @@ unsigned long __init acpi_find_rsdp(void)
 	unsigned long rsdp_phys = 0;
 
 	if (efi_enabled) {
-		if (efi.acpi20)
-			return __pa(efi.acpi20);
-		else if (efi.acpi)
-			return __pa(efi.acpi);
+		if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
+			return efi.acpi20;
+		else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
+			return efi.acpi;
 	}
 	/*
 	 * Scan memory looking for the RSDP signature. First search EBDA (low
@@ -695,6 +695,9 @@ unsigned long __init acpi_find_rsdp(void)
 static int __init acpi_parse_madt_lapic_entries(void)
 {
 	int count;
+
+	if (!cpu_has_apic)
+		return -ENODEV;
 
 	/* 
 	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
@@ -753,6 +756,9 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	if (acpi_disabled || acpi_noirq) {
 		return -ENODEV;
 	}
+
+	if (!cpu_has_apic)
+		return -ENODEV;
 
 	/*
 	 * if "noapic" boot option, don't look for IO-APICs

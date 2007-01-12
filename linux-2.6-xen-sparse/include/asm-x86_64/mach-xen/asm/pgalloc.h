@@ -102,6 +102,32 @@ static inline void pud_free(pud_t *pud)
 	free_page((unsigned long)pud);
 }
 
+static inline void pgd_list_add(pgd_t *pgd)
+{
+	struct page *page = virt_to_page(pgd);
+
+	spin_lock(&pgd_lock);
+	page->index = (pgoff_t)pgd_list;
+	if (pgd_list)
+		pgd_list->private = (unsigned long)&page->index;
+	pgd_list = page;
+	page->private = (unsigned long)&pgd_list;
+	spin_unlock(&pgd_lock);
+}
+
+static inline void pgd_list_del(pgd_t *pgd)
+{
+	struct page *next, **pprev, *page = virt_to_page(pgd);
+
+	spin_lock(&pgd_lock);
+	next = (struct page *)page->index;
+	pprev = (struct page **)page->private;
+	*pprev = next;
+	if (next)
+		next->private = (unsigned long)pprev;
+	spin_unlock(&pgd_lock);
+}
+
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
         /*
@@ -109,9 +135,9 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
          */
         unsigned boundary;
 	pgd_t *pgd = (pgd_t *)__get_free_pages(GFP_KERNEL|__GFP_REPEAT, 1);
-
 	if (!pgd)
 		return NULL;
+	pgd_list_add(pgd);
 	/*
 	 * Copy kernel pointers in from init.
 	 * Could keep a freelist or slab cache of those because the kernel
@@ -155,6 +181,7 @@ static inline void pgd_free(pgd_t *pgd)
 			       0));
 	}
 
+	pgd_list_del(pgd);
 	free_pages((unsigned long)pgd, 1);
 }
 

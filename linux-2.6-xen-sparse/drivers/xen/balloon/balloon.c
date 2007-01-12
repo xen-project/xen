@@ -229,7 +229,7 @@ static int increase_reservation(unsigned long nr_pages)
 
 		/* Relinquish the page back to the allocator. */
 		ClearPageReserved(page);
-		set_page_count(page, 1);
+		init_page_count(page);
 		__free_page(page);
 	}
 
