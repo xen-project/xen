@@ -292,7 +292,8 @@ gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,dis
           For type=vnc, connect an external vncviewer.  The server will listen
           on ADDR (default 127.0.0.1) on port N+5900.  N defaults to the
           domain id.  If vncunused=1, the server will try to find an arbitrary
-          unused port above 5900.
+          unused port above 5900.  vncpasswd overrides the XenD configured
+          default password.
           For type=sdl, a viewer will be started automatically using the
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.""")
