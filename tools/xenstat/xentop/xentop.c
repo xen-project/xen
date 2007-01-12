@@ -1067,9 +1067,9 @@ int main(int argc, char **argv)
 				gettimeofday(&curtime, NULL);
 				top();
 				oldtime = curtime;
-				sleep(delay);
 				if ((!loop) && !(--iterations))
 					break;
+				sleep(delay);
 			} while (1);
 	}
 
