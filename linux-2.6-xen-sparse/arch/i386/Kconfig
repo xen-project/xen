@@ -594,7 +594,7 @@ config HAVE_ARCH_EARLY_PFN_TO_NID
 
 config HIGHPTE
 	bool "Allocate 3rd-level pagetables from highmem"
-	depends on (HIGHMEM4G || HIGHMEM64G) && !X86_XEN
+	depends on HIGHMEM4G || HIGHMEM64G
 	help
 	  The VM uses one page table entry for each page of physical memory.
 	  For systems with a lot of RAM, this can be wasteful of precious
