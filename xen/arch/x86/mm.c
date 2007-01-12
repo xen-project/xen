@@ -3182,7 +3182,7 @@ static int ptwr_emulated_update(
     unsigned int do_cmpxchg,
     struct ptwr_emulate_ctxt *ptwr_ctxt)
 {
-    unsigned long gmfn, mfn;
+    unsigned long mfn;
     struct page_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
@@ -3222,8 +3222,7 @@ static int ptwr_emulated_update(
     }
 
     pte  = ptwr_ctxt->pte;
-    gmfn = l1e_get_pfn(pte);
-    mfn  = gmfn_to_mfn(d, gmfn);
+    mfn  = l1e_get_pfn(pte);
     page = mfn_to_page(mfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
