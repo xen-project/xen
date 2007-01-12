@@ -7,7 +7,7 @@ include $(XEN_ROOT)/Config.mk
 # Set TARGET_ARCH
 override TARGET_ARCH     := $(XEN_TARGET_ARCH)
 
-XEN_INTERFACE_VERSION := 0x00030203
+XEN_INTERFACE_VERSION := 0x00030204
 
 # NB. '-Wcast-qual' is nasty, so I omitted it.
 CFLAGS := -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format

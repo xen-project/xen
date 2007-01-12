@@ -184,14 +184,6 @@ HYPERVISOR_set_timer_op(
 }
 
 static inline int
-HYPERVISOR_dom0_op(
-	dom0_op_t *dom0_op)
-{
-	dom0_op->interface_version = DOM0_INTERFACE_VERSION;
-	return _hypercall1(int, dom0_op, dom0_op);
-}
-
-static inline int
 HYPERVISOR_set_debugreg(
 	int reg, unsigned long value)
 {

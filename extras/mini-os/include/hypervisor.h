@@ -15,7 +15,6 @@
 
 #include <types.h>
 #include <xen/xen.h>
-#include <xen/dom0_ops.h>
 #if defined(__i386__)
 #include <hypercall-x86_32.h>
 #elif defined(__x86_64__)
