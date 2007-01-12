@@ -486,7 +486,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #endif
     }
 
-    if ( kexec_crash_area.size > 0 )
+    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0)
     {
         unsigned long kdump_start, kdump_size, k;
 
