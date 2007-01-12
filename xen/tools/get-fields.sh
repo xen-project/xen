@@ -111,7 +111,7 @@ for line in sys.stdin.readlines():
 			case "$token" in
 			struct|union)
 				test $level != 2 || fields=" "
-				if [ $level == 1 ]
+				if [ $level = 1 ]
 				then
 					kind=$token
 					if [ $kind = union ]
@@ -126,7 +126,7 @@ for line in sys.stdin.readlines():
 				;;
 			"}")
 				level=$(expr $level - 1) id=
-				if [ $level == 1 -a $kind = union ]
+				if [ $level = 1 -a $kind = union ]
 				then
 					echo " \\"
 					echo -n "$1}"
@@ -148,7 +148,7 @@ for line in sys.stdin.readlines():
 				arrlvl=$(expr $arrlvl - 1)
 				;;
 			COMPAT_HANDLE\(*\))
-				if [ $level == 2 -a -z "$id" ]
+				if [ $level = 2 -a -z "$id" ]
 				then
 					type=${token#COMPAT_HANDLE?}
 					type=${type%?}
@@ -156,7 +156,7 @@ for line in sys.stdin.readlines():
 				fi
 				;;
 			compat_domain_handle_t)
-				if [ $level == 2 -a -z "$id" ]
+				if [ $level = 2 -a -z "$id" ]
 				then
 					array_type=$token
 				fi
@@ -165,7 +165,7 @@ for line in sys.stdin.readlines():
 				id=$token
 				;;
 			[\,\;])
-				if [ $level == 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 				then
 					if [ $kind = union ]
 					then
@@ -257,7 +257,7 @@ build_body() {
 			arrlvl=$(expr $arrlvl - 1)
 			;;
 		COMPAT_HANDLE\(*\))
-			if [ $level == 2 -a -z "$id" ]
+			if [ $level = 2 -a -z "$id" ]
 			then
 				type=${token#COMPAT_HANDLE?}
 				type=${type%?}
@@ -265,7 +265,7 @@ build_body() {
 			fi
 			;;
 		compat_domain_handle_t)
-			if [ $level == 2 -a -z "$id" ]
+			if [ $level = 2 -a -z "$id" ]
 			then
 				array_type=$token
 			fi
@@ -279,7 +279,7 @@ build_body() {
 			fi
 			;;
 		[\,\;])
-			if [ $level == 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+			if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 			then
 				if [ -z "$array" -a -z "$array_type" ]
 				then
@@ -352,7 +352,7 @@ check_field() {
 				id=$token
 				;;
 			[\,\;])
-				if [ $level == 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 				then
 					check_field $1 $2 $3.$id "$fields"
 					test "$token" != ";" || fields= id=
@@ -372,11 +372,11 @@ build_check() {
 	do
 		case "$token" in
 		struct|union)
-			if [ $level == 1 ]
+			if [ $level = 1 ]
 			then
 				kind=$token
 				echo -n "    CHECK_SIZE_($kind, $1)"
-			elif [ $level == 2 ]
+			elif [ $level = 2 ]
 			then
 				fields=" "
 			fi
@@ -397,7 +397,7 @@ build_check() {
 			test $level != 2 -o $arrlvl != 1 || id=$token
 			;;
 		[\,\;])
-			if [ $level == 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
+			if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 			then
 				check_field $kind $1 $id "$fields"
 				test "$token" != ";" || fields= id=
