@@ -287,10 +287,9 @@ struct mapped_regs {
              */
             unsigned char *interrupt_mask_addr;
             int pending_interruption;
-            int incomplete_regframe; // see SDM vol2 6.8
             unsigned char vpsr_pp;
-            unsigned char reserved5_2[7];
-            unsigned long reserved5_1[3];
+            unsigned char reserved5_2[3];
+            unsigned long reserved5_1[4];
             int metaphysical_mode; // 1 = use metaphys mapping, 0 = use virtual
             int banknum; // 0 or 1, which virtual register bank is active
             unsigned long rrs[8]; // region registers

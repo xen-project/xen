@@ -88,7 +88,6 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 	PSCB(v, isr) = isr;
 	PSCB(v, iip) = regs->cr_iip;
 	PSCB(v, ifs) = 0;
-	PSCB(v, incomplete_regframe) = 0;
 
 	regs->cr_iip = ((unsigned long)PSCBX(v, iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
@@ -155,7 +154,6 @@ void reflect_event(void)
 	PSCB(v, isr) = isr;
 	PSCB(v, iip) = regs->cr_iip;
 	PSCB(v, ifs) = 0;
-	PSCB(v, incomplete_regframe) = 0;
 
 	regs->cr_iip = v->arch.event_callback_ip;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
@@ -185,7 +183,6 @@ static int handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
 {
 	if (!PSCB(v, interrupt_collection_enabled)) {
 		PSCB(v, ifs) = regs->cr_ifs;
-		PSCB(v, incomplete_regframe) = 1;
 		regs->cr_ifs = 0;
 		perfc_incrc(lazy_cover);
 		return 1;	// retry same instruction with cr.ifs off

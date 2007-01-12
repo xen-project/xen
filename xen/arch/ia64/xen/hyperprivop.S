@@ -192,7 +192,6 @@ END(fast_hyperprivop)
 //	and isr.ri to cr.isr.ri (all other bits zero)
 //  - cover and set shared_mem precover_ifs to cr.ifs
 //		^^^ MISSED THIS FOR fast_break??
-//  - set shared_mem ifs and incomplete_regframe to 0
 //  - set shared_mem interrupt_delivery_enabled to 0
 //  - set shared_mem interrupt_collection_enabled to 0
 //  - set r31 to SHAREDINFO_ADDR
@@ -272,11 +271,9 @@ ENTRY(hyper_ssm_i)
 	st1 [r22]=r20
 	st4 [r18]=r0
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -459,11 +456,9 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	st1 [r22]=r20;;
 	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -645,11 +640,9 @@ ENTRY(fast_reflect)
 	st1 [r24]=r22
 	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 	cover ;;
 	mov r24=cr.ifs;;
-	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1082,8 +1075,6 @@ ENTRY(hyper_rfi)
 just_do_rfi:
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	mov cr.iip=r22;;
-	adds r20=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r20]=r0 ;;
 	adds r20=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	dep r20=0,r20,38,25;; // ensure ifs has no reserved bits set
@@ -1259,20 +1250,16 @@ ENTRY(rfi_with_interrupt)
 	st1 [r22]=r20
 	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 #if 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r22=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r22]=r0 ;;
 	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r22]=r0 ;;
 	adds r22=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r22]=r20 ;;
 	// leave cr.ifs alone for later rfi
 #else
-	adds r22=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r22]=r0 ;;
 	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r22];;
 	st8 [r22]=r0 ;;
@@ -1334,13 +1321,9 @@ ENTRY(hyper_cover)
 	mov r25=cr.iip;;
 	// skip test for vpsr.ic.. it's a prerequisite for hyperprivops
 	cover ;;
-	adds r20=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	mov r30=cr.ifs;;
-	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18
-	ld4 r21=[r20] ;;
-	cmp.eq p6,p7=r21,r0 ;;
-(p6)	st8 [r22]=r30;;
-(p7)	st4 [r20]=r0;;
+	mov r30=cr.ifs
+	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18;;
+	st8 [r22]=r30;;
 	mov cr.ifs=r0;;
 	// adjust return address to skip over break instruction
 	extr.u r26=r24,41,2 ;;

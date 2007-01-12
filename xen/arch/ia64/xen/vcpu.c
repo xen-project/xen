@@ -613,7 +613,6 @@ IA64FAULT vcpu_get_ifs(VCPU * vcpu, u64 * pval)
 	//PSCB(vcpu,ifs) = PSCB(vcpu)->regs.cr_ifs;
 	//*pval = PSCB(vcpu,regs).cr_ifs;
 	*pval = PSCB(vcpu, ifs);
-	PSCB(vcpu, incomplete_regframe) = 0;
 	return IA64_NO_FAULT;
 }
 
@@ -1362,7 +1361,6 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
 		return IA64_ILLOP_FAULT;
 	}
-	PSCB(vcpu, incomplete_regframe) = 0;	// is this necessary?
 
 	ifs = PSCB(vcpu, ifs);
 	if (ifs > 0x8000000000000000UL) {
@@ -1397,10 +1395,7 @@ IA64FAULT vcpu_cover(VCPU * vcpu)
 	REGS *regs = vcpu_regs(vcpu);
 
 	if (!PSCB(vcpu, interrupt_collection_enabled)) {
-		if (!PSCB(vcpu, incomplete_regframe))
-			PSCB(vcpu, ifs) = regs->cr_ifs;
-		else
-			PSCB(vcpu, incomplete_regframe) = 0;
+		PSCB(vcpu, ifs) = regs->cr_ifs;
 	}
 	regs->cr_ifs = 0;
 	return IA64_NO_FAULT;
