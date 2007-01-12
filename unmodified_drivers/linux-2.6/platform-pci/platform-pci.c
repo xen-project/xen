@@ -250,10 +250,10 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if ((ret = init_xen_info()))
 		goto out;
 
-	if ((ret = request_irq(pdev->irq, evtchn_interrupt, SA_SHIRQ,
-			       "xen-platform-pci", pdev))) {
+	if ((ret = request_irq(pdev->irq, evtchn_interrupt,
+			       SA_SHIRQ | SA_SAMPLE_RANDOM,
+			       "xen-platform-pci", pdev)))
 		goto out;
-	}
 
 	if ((ret = set_callback_via(callback_via)))
 		goto out;
