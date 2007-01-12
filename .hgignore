@@ -142,6 +142,8 @@
 ^tools/python/build/.*$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
+^tools/tests/blowfish\.bin$
+^tools/tests/blowfish\.h$
 ^tools/tests/test_x86_emulator$
 ^tools/vnet/Make.local$
 ^tools/vnet/build/.*$

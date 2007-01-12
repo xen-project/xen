@@ -15,6 +15,10 @@ typedef int64_t            s64;
 #include <asm-x86/x86_emulate.h>
 #include <sys/mman.h>
 
+#include "blowfish.h"
+
+#define MMAP_SZ 16384
+
 /* EFLAGS bit definitions. */
 #define EFLG_OF (1<<11)
 #define EFLG_DF (1<<10)
@@ -107,16 +111,16 @@ int main(int argc, char **argv)
     struct x86_emulate_ctxt ctxt;
     struct cpu_user_regs regs;
     char *instr;
-    unsigned int *res;
+    unsigned int *res, i;
     int rc;
 #ifndef __x86_64__
-    unsigned int i, bcdres_native, bcdres_emul;
+    unsigned int bcdres_native, bcdres_emul;
 #endif
 
     ctxt.regs = &regs;
     ctxt.address_bytes = 4;
 
-    res = mmap((void *)0x100000, 0x1000, PROT_READ|PROT_WRITE,
+    res = mmap((void *)0x100000, MMAP_SZ, PROT_READ|PROT_WRITE,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
     if ( res == MAP_FAILED )
     {
@@ -481,6 +485,39 @@ int main(int argc, char **argv)
 #else
     printf("skipped\n");
 #endif
+
+    printf("Testing blowfish code sequence");
+    memcpy(res, blowfish_code, sizeof(blowfish_code));
+    regs.eax = 2;
+    regs.edx = 1;
+    regs.eip = (unsigned long)res;
+    regs.esp = (unsigned long)res + MMAP_SZ - 4;
+    *(uint32_t *)(unsigned long)regs.esp = 0x12345678;
+    regs.eflags = 2;
+    i = 0;
+    while ( (uint32_t)regs.eip != 0x12345678 )
+    {
+        if ( (i++ & 8191) == 0 )
+            printf(".");
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != 0 )
+            goto fail;
+    }
+    if ( (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
+         (regs.eax != 2) || (regs.edx != 1) )
+        goto fail;
+    printf("okay\n");
+
+#ifndef __x86_64__
+    printf("%-40s", "Testing blowfish native execution...");    
+    asm volatile (
+        "call 0x100000"
+        : "=a" (regs.eax), "=d" (regs.edx)
+        : "0" (2), "1" (1) : "ecx" );
+    if ( (regs.eax != 2) || (regs.edx != 1) )
+        goto fail;
+    printf("okay\n");
+#endif    
 
     return 0;
 
