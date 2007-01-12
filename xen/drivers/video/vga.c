@@ -557,7 +557,7 @@ static int vga_load_font(const struct font_desc *font, unsigned rows)
 
 static int vgacon_enabled = 0;
 static int vgacon_keep    = 0;
-static int vgacon_lines   = 25;
+static int vgacon_lines   = 50;
 static const struct font_desc *font;
 
 static int xpos, ypos;
@@ -606,12 +606,9 @@ void vga_init(void)
     case 60:
         font = &font_vga_8x8;
         break;
-    default:
-        vgacon_lines = 25;
-        break;
     }
 
-    if ( (font != NULL) && (vga_load_font(font, vgacon_lines) < 0) )
+    if ( (font == NULL) || (vga_load_font(font, vgacon_lines) < 0) )
     {
         vgacon_lines = 25;
         font = NULL;
