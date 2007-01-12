@@ -2181,14 +2181,6 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 	else
 		vhpt_insert(vaddr, pte, PAGE_SHIFT << 2);
 #endif
-	if (IorD & 0x4)		/* don't place in 1-entry TLB */
-		return;
-	if (IorD & 0x1) {
-		vcpu_set_tr_entry(&PSCBX(vcpu, itlb), mp_pte, ps << 2, vaddr);
-	}
-	if (IorD & 0x2) {
-		vcpu_set_tr_entry(&PSCBX(vcpu, dtlb), mp_pte, ps << 2, vaddr);
-	}
 }
 
 IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
@@ -2215,6 +2207,7 @@ IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 		vcpu_flush_tlb_vhpt_range(ifa, logps);
 		goto again;
 	}
+	vcpu_set_tr_entry(&PSCBX(vcpu, dtlb), pte, itir, ifa);
 	return IA64_NO_FAULT;
 }
 
@@ -2241,6 +2234,7 @@ IA64FAULT vcpu_itc_i(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)
 		vcpu_flush_tlb_vhpt_range(ifa, logps);
 		goto again;
 	}
+	vcpu_set_tr_entry(&PSCBX(vcpu, itlb), pte, itir, ifa);
 	return IA64_NO_FAULT;
 }
 

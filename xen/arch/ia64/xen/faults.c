@@ -215,8 +215,8 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 		unsigned long m_pteval;
 		m_pteval = translate_domain_pte(pteval, address, itir,
 		                                &logps, &entry);
-		vcpu_itc_no_srlz(current, (is_data ? 2 : 1) | 4,
-		                 address, m_pteval, pteval, logps, &entry);
+		vcpu_itc_no_srlz(current, is_data ? 2 : 1, address,
+		                 m_pteval, pteval, logps, &entry);
 		if ((fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) ||
 		    p2m_entry_retry(&entry)) {
 			/* dtlb has been purged in-between.  This dtlb was
