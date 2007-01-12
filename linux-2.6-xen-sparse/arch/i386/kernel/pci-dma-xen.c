@@ -161,6 +161,8 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
 	unsigned int order = get_order(size);
 	unsigned long vstart;
+	u64 mask;
+
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
@@ -183,9 +185,14 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	vstart = __get_free_pages(gfp, order);
 	ret = (void *)vstart;
 
+	if (dev != NULL && dev->coherent_dma_mask)
+		mask = dev->coherent_dma_mask;
+	else
+		mask = 0xffffffff;
+
 	if (ret != NULL) {
 		if (xen_create_contiguous_region(vstart, order,
-						 dma_bits) != 0) {
+						 fls64(mask)) != 0) {
 			free_pages(vstart, order);
 			return NULL;
 		}
