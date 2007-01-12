@@ -258,12 +258,13 @@ static void __vcpu_flush_vtlb_all(void *vcpu)
 	vcpu_flush_vtlb_all((struct vcpu*)vcpu);
 }
 
-void domain_flush_vtlb_all (void)
+// caller must incremented reference count to d somehow.
+void domain_flush_vtlb_all(struct domain* d)
 {
 	int cpu = smp_processor_id ();
 	struct vcpu *v;
 
-	for_each_vcpu (current->domain, v) {
+	for_each_vcpu(d, v) {
 		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
 			continue;
 

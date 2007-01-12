@@ -972,7 +972,7 @@ ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
         // clear pte
         old_pte = ptep_get_and_clear(mm, mpaddr, pte);
     }
-    domain_flush_vtlb_all();
+    domain_flush_vtlb_all(d);
     return 0;
 }
 
@@ -1730,7 +1730,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
 #ifndef CONFIG_XEN_IA64_TLB_TRACK
     //XXX sledgehammer.
     //    flush finer range.
-    domain_flush_vtlb_all();
+    domain_flush_vtlb_all(d);
     put_page(page);
 #else
     switch (tlb_track_search_and_remove(d->arch.tlb_track,
@@ -1749,7 +1749,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          * queue the page and flush vTLB only once.
          * I.e. The caller must call dfree_flush() explicitly.
          */
-        domain_flush_vtlb_all();
+        domain_flush_vtlb_all(d);
         put_page(page);
         break;
     case TLB_TRACK_NOT_FOUND:
@@ -1783,7 +1783,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          * So we abondaned to track virtual addresses.
          * full vTLB flush is necessary.
          */
-        domain_flush_vtlb_all();
+        domain_flush_vtlb_all(d);
         put_page(page);
         break;
     case TLB_TRACK_AGAIN:
