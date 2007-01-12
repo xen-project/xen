@@ -647,6 +647,8 @@ swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
 				    sg->dma_length, dir);
 }
 
+#ifdef CONFIG_HIGHMEM
+
 dma_addr_t
 swiotlb_map_page(struct device *hwdev, struct page *page,
 		 unsigned long offset, size_t size,
@@ -680,6 +682,8 @@ swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
 		unmap_single(hwdev, bus_to_virt(dma_address), size, direction);
 }
 
+#endif
+
 int
 swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 {
@@ -707,7 +711,5 @@ EXPORT_SYMBOL(swiotlb_sync_single_for_cpu);
 EXPORT_SYMBOL(swiotlb_sync_single_for_device);
 EXPORT_SYMBOL(swiotlb_sync_sg_for_cpu);
 EXPORT_SYMBOL(swiotlb_sync_sg_for_device);
-EXPORT_SYMBOL(swiotlb_map_page);
-EXPORT_SYMBOL(swiotlb_unmap_page);
 EXPORT_SYMBOL(swiotlb_dma_mapping_error);
 EXPORT_SYMBOL(swiotlb_dma_supported);

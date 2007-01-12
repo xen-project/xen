@@ -94,13 +94,7 @@ dma_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 }
 EXPORT_SYMBOL(dma_unmap_sg);
 
-/*
- * XXX This file is also used by xenLinux/ia64. 
- * "defined(__i386__) || defined (__x86_64__)" means "!defined(__ia64__)".
- * This #if work around should be removed once this file is merbed back into
- * i386' pci-dma or is moved to drivers/xen/core.
- */
-#if defined(__i386__) || defined(__x86_64__)
+#ifdef CONFIG_HIGHMEM
 dma_addr_t
 dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	     size_t size, enum dma_data_direction direction)
@@ -130,7 +124,7 @@ dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 		swiotlb_unmap_page(dev, dma_address, size, direction);
 }
 EXPORT_SYMBOL(dma_unmap_page);
-#endif /* defined(__i386__) || defined(__x86_64__) */
+#endif /* CONFIG_HIGHMEM */
 
 int
 dma_mapping_error(dma_addr_t dma_addr)
