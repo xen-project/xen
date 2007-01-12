@@ -45,9 +45,9 @@
 #define DEBUG(_f, _a...)    ((void)0)
 #endif
 
-
 static struct xenstore_domain_interface *xenstore_buf;
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
+static DECLARE_WAIT_QUEUE_HEAD(watch_queue);
 struct xenbus_req_info 
 {
     int in_use:1;
@@ -71,6 +71,34 @@ static void memcpy_from_ring(const void *Ring,
     memcpy(dest, ring + off, c1);
     memcpy(dest + c1, ring, c2);
 }
+
+static inline void wait_for_watch(void)
+{
+    DEFINE_WAIT(w);
+    add_waiter(w,watch_queue);
+    schedule();
+    wake(current);
+}
+
+char* xenbus_wait_for_value(const char* path,const char* value)
+{
+    for(;;)
+    {
+        char *res, *msg;
+        int r;
+
+        msg = xenbus_read(XBT_NIL, path, &res);
+        if(msg) return msg;
+
+        r = strcmp(value,res);
+        free(res);
+
+        if(r==0) break;
+        else wait_for_watch();
+    }
+    return NULL;
+}
+
 
 static void xenbus_thread_func(void *ign)
 {
@@ -101,13 +129,35 @@ static void xenbus_thread_func(void *ign)
                 break;
 
             DEBUG("Message is good.\n");
-            req_info[msg.req_id].reply = malloc(sizeof(msg) + msg.len);
-            memcpy_from_ring(xenstore_buf->rsp,
+
+            if(msg.type == XS_WATCH_EVENT)
+            {
+                char* payload = (char*)malloc(sizeof(msg) + msg.len);
+                char *path,*token;
+
+                memcpy_from_ring(xenstore_buf->rsp,
+                    payload,
+                    MASK_XENSTORE_IDX(xenstore_buf->rsp_cons),
+                    msg.len + sizeof(msg));
+
+                path = payload + sizeof(msg);
+                token = path + strlen(path) + 1;
+
+                xenstore_buf->rsp_cons += msg.len + sizeof(msg);
+                free(payload);
+                wake_up(&watch_queue);
+            }
+
+            else
+            {
+                req_info[msg.req_id].reply = malloc(sizeof(msg) + msg.len);
+                memcpy_from_ring(xenstore_buf->rsp,
                     req_info[msg.req_id].reply,
                     MASK_XENSTORE_IDX(xenstore_buf->rsp_cons),
                     msg.len + sizeof(msg));
-            wake_up(&req_info[msg.req_id].waitq);
-            xenstore_buf->rsp_cons += msg.len + sizeof(msg);
+                xenstore_buf->rsp_cons += msg.len + sizeof(msg);
+                wake_up(&req_info[msg.req_id].waitq);
+            }
         }
     }
 }
@@ -381,9 +431,29 @@ char *xenbus_write(xenbus_transaction_t xbt, const char *path, const char *value
     struct xsd_sockmsg *rep;
     rep = xenbus_msg_reply(XS_WRITE, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(rep);
-    if (msg)
-	return msg;
+    if (msg) return msg;
     free(rep);
+    return NULL;
+}
+
+char* xenbus_watch_path( xenbus_transaction_t xbt, const char *path)
+{
+	/* in the future one could have multiple watch queues, and use
+	 * the token for demuxing. For now the token is 0. */
+
+    struct xsd_sockmsg *rep;
+
+    struct write_req req[] = { 
+        {path, strlen(path) + 1},
+        {"0",2 },
+    };
+
+    rep = xenbus_msg_reply(XS_WATCH, xbt, req, ARRAY_SIZE(req));
+
+    char *msg = errmsg(rep);
+    if (msg) return msg;
+    free(rep);
+
     return NULL;
 }
 
