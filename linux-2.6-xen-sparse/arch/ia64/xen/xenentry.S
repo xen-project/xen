@@ -412,7 +412,16 @@ ENTRY(ia64_leave_syscall)
 (pUStk) add r14=IA64_TASK_THREAD_ON_USTACK_OFFSET,r13
 	;;
 	ld8 r26=[r2],PT(B0)-PT(AR_PFS)	// M0|1 load ar.pfs
+#ifdef CONFIG_XEN
+(pKStk)	mov r21=r8
+(pKStk)	XEN_HYPER_GET_PSR
+	;;
+(pKStk)	mov r22=r8
+(pKStk)	mov r8=r21
+	;;
+#else    
 (pKStk)	mov r22=psr			// M2   read PSR now that interrupts are disabled
+#endif
 	nop 0
 	;;
 	ld8 r21=[r2],PT(AR_RNAT)-PT(B0) // M0|1 load b0
@@ -642,7 +651,16 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	adds r16=PT(CR_IPSR)+16,r12
 	adds r17=PT(CR_IIP)+16,r12
 
+#ifdef CONFIG_XEN    
+(pKStk)	mov r29=r8
+(pKStk)	XEN_HYPER_GET_PSR
+	;;
+(pKStk)	mov r22=r8
+(pKStk)	mov r8=r29
+	;;
+#else
 (pKStk)	mov r22=psr		// M2 read PSR now that interrupts are disabled
+#endif
 	nop.i 0
 	nop.i 0
 	;;

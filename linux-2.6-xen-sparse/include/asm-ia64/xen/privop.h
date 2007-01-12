@@ -182,6 +182,7 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * be properly handled by Xen, some are frequent enough that we use
  * hyperprivops for performance. */
 
+extern unsigned long xen_get_psr(void);
 extern unsigned long xen_get_ivr(void);
 extern unsigned long xen_get_tpr(void);
 extern void xen_set_itm(unsigned long);
@@ -201,6 +202,11 @@ extern void xen_ptcga(unsigned long addr, unsigned long size);
 	__u64 ia64_intri_res;						\
 									\
 	switch(regnum) {						\
+	case _IA64_REG_PSR:						\
+		ia64_intri_res = (is_running_on_xen()) ?			\
+			xen_get_psr() :					\
+			__ia64_getreg(regnum);				\
+		break;							\
 	case _IA64_REG_CR_IVR:						\
 		ia64_intri_res = (is_running_on_xen()) ?			\
 			xen_get_ivr() :					\

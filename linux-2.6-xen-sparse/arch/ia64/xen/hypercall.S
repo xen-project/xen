@@ -8,6 +8,19 @@
 #include <asm/processor.h>
 #include <asm/asmmacro.h>
 
+GLOBAL_ENTRY(xen_get_psr)
+	movl r8=running_on_xen;;
+	ld4 r8=[r8];;
+	cmp.eq p7,p0=r8,r0;;
+(p7)	mov r8=psr;;
+(p7)	br.ret.sptk.many rp
+	;;
+	XEN_HYPER_GET_PSR
+	;;
+	br.ret.sptk.many rp
+	;;
+END(xen_get_psr)
+
 GLOBAL_ENTRY(xen_get_ivr)
 	movl r8=running_on_xen;;
 	ld4 r8=[r8];;

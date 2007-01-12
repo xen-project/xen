@@ -140,6 +140,11 @@ GLOBAL_ENTRY(fast_hyperprivop)
 (p7)	br.sptk.many hyper_get_rr
 	;;
 
+	// HYPERPRIVOP_GET_PSR?
+	cmp.eq p7,p6=HYPERPRIVOP_GET_PSR,r17
+(p7)	br.sptk.many hyper_get_psr
+	;;
+
 	// HYPERPRIVOP_PTC_GA?
 	cmp.eq p7,p6=HYPERPRIVOP_PTC_GA,r17
 (p7)	br.sptk.many hyper_ptc_ga
@@ -1460,6 +1465,53 @@ ENTRY(hyper_set_itm)
 	;;
 END(hyper_set_itm)
 
+ENTRY(hyper_get_psr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_PSR);;
+	ld4 r21=[r20];;
+	adds r21=1,r21;;
+	st4 [r20]=r21;;
+#endif
+	mov r24=cr.ipsr
+	movl r8=0x18ffffffff;;
+	// only return PSR{36:35,31:0}
+	and r8=r8,r24
+	// set vpsr.ic
+	ld4 r21=[r18];;
+	dep r8=r21,r8,IA64_PSR_IC_BIT,1
+	// set vpsr.pp
+	adds r20=XSI_VPSR_PP_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld1 r21=[r20];;
+	dep r8=r21,r8,IA64_PSR_PP_BIT,1
+	// set vpsr.dt
+	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld4 r21=[r20];;
+	cmp.ne p6,p0=r21,r0
+	;;
+(p6)	dep.z r8=r8,IA64_PSR_DT_BIT,1
+	// set vpsr.i
+	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20];;
+	ld1 r21=[r20];;
+	dep r8=r21,r8,IA64_PSR_I_BIT,1
+	;;
+	mov r25=cr.iip
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_psr)
+
+    
 ENTRY(hyper_get_rr)
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_RR);;

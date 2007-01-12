@@ -33,7 +33,16 @@ GLOBAL_ENTRY(xen_pal_call_static)
 	mov loc4=ar.rsc			// save RSE configuration
 	;;
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
+#ifdef CONFIG_XEN
+	mov r9 = r8
+	XEN_HYPER_GET_PSR
+	;;
+	mov loc3 = r8
+	mov r8 = r9
+	;;
+#else    
 	mov loc3 = psr
+#endif    
 	mov loc0 = rp
 	.body
 	mov r30 = in2
