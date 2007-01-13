@@ -853,7 +853,7 @@ x86_emulate(
         {
             /*
              * EA       += BitOffset DIV op_bytes*8
-             * BitOffset = BitOffset MOD op_byte*8
+             * BitOffset = BitOffset MOD op_bytes*8
              * DIV truncates towards negative infinity.
              * MOD always produces a positive result.
              */

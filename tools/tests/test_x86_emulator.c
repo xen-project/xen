@@ -511,7 +511,7 @@ int main(int argc, char **argv)
 #ifndef __x86_64__
     printf("%-40s", "Testing blowfish native execution...");    
     asm volatile (
-        "call 0x100000"
+        "movl $0x100000,%%ecx; call *%%ecx"
         : "=a" (regs.eax), "=d" (regs.edx)
         : "0" (2), "1" (1) : "ecx" );
     if ( (regs.eax != 2) || (regs.edx != 1) )
