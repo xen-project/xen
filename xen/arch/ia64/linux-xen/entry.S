@@ -1472,6 +1472,15 @@ GLOBAL_ENTRY(unw_init_running)
 END(unw_init_running)
 
 #ifdef XEN
+GLOBAL_ENTRY(ia64_do_multicall_call)
+	movl r2=ia64_hypercall_table;;
+	shladd r2=r38,3,r2;;
+	ld8 r2=[r2];;
+	mov b6=r2
+	br.sptk.many b6;;
+END(ia64_do_multicall_call)
+
+    
 	.rodata
 	.align 8
 	.globl ia64_hypercall_table
