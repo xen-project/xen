@@ -168,8 +168,11 @@ static uint8_t opcode_table[256] = {
 static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x0F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
-    /* 0x10 - 0x1F */
-    0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x10 - 0x17 */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x18 - 0x1F */
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     /* 0x20 - 0x2F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x30 - 0x3F */
@@ -2052,6 +2055,7 @@ x86_emulate(
     {
     case 0x0d: /* GrpP (prefetch) */
     case 0x18: /* Grp16 (prefetch/nop) */
+    case 0x19 ... 0x1f: /* nop (amd-defined) */
         break;
 
     case 0x80 ... 0x8f: /* jcc (near) */ {
