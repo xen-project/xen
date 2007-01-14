@@ -219,7 +219,8 @@ static uint8_t twobyte_table[256] = {
     0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xB8 - 0xBF */
     0, 0, DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
-    0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
+    DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0,
     0, 0, 0, ImplicitOps|ModRM,
@@ -322,7 +323,8 @@ do{ unsigned long _tmp;                                                    \
             _op"w %"_wx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _wy ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : _wy ((_src).val), "i" (EFLAGS_MASK),                         \
+              "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     case 4:                                                                \
         __asm__ __volatile__ (                                             \
@@ -330,7 +332,8 @@ do{ unsigned long _tmp;                                                    \
             _op"l %"_lx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _ly ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : _ly ((_src).val), "i" (EFLAGS_MASK),                         \
+              "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     case 8:                                                                \
         __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy);           \
@@ -347,7 +350,8 @@ do{ unsigned long _tmp;                                                    \
             _op"b %"_bx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _by ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : _by ((_src).val), "i" (EFLAGS_MASK),                         \
+              "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     default:                                                               \
         __emulate_2op_nobyte(_op,_src,_dst,_eflags,_wx,_wy,_lx,_ly,_qx,_qy);\
@@ -378,7 +382,7 @@ do{ unsigned long _tmp;                                                    \
             _op"b %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 2:                                                                \
         __asm__ __volatile__ (                                             \
@@ -386,7 +390,7 @@ do{ unsigned long _tmp;                                                    \
             _op"w %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 4:                                                                \
         __asm__ __volatile__ (                                             \
@@ -394,7 +398,7 @@ do{ unsigned long _tmp;                                                    \
             _op"l %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 8:                                                                \
         __emulate_1op_8byte(_op, _dst, _eflags);                           \
@@ -410,7 +414,8 @@ do{ __asm__ __volatile__ (                                              \
         _op"q %"_qx"3,%1; "                                             \
         _POST_EFLAGS("0","4","2")                                       \
         : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)               \
-        : _qy ((_src).val), "i" (EFLAGS_MASK) );                        \
+        : _qy ((_src).val), "i" (EFLAGS_MASK),                          \
+          "m" (_eflags), "m" ((_dst).val) );                            \
 } while (0)
 #define __emulate_1op_8byte(_op, _dst, _eflags)                         \
 do{ __asm__ __volatile__ (                                              \
@@ -418,7 +423,7 @@ do{ __asm__ __volatile__ (                                              \
         _op"q %1; "                                                     \
         _POST_EFLAGS("0","3","2")                                       \
         : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)               \
-        : "i" (EFLAGS_MASK) );                                          \
+        : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );         \
 } while (0)
 #elif defined(__i386__)
 #define __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy)
@@ -1097,7 +1102,9 @@ x86_emulate(
             /* arpl */
             uint16_t src_val = dst.val;
             dst = src;
-            if ( (src_val & 3) > (dst.val & 3) )
+            _regs.eflags &= ~EFLG_ZF;
+            _regs.eflags |= ((src_val & 3) > (dst.val & 3)) ? EFLG_ZF : 0;
+            if ( _regs.eflags & EFLG_ZF )
                 dst.val  = (dst.val & ~3) | (src_val & 3);
             else
                 dst.type = OP_NONE;
@@ -1661,8 +1668,10 @@ x86_emulate(
     case 0x61: /* popa */ {
         int i;
         unsigned long dummy_esp, *regs[] = {
-            &_regs.edi, &_regs.esi, &_regs.ebp, &dummy_esp,
-            &_regs.ebx, &_regs.edx, &_regs.ecx, &_regs.eax };
+            (unsigned long *)&_regs.edi, (unsigned long *)&_regs.esi,
+            (unsigned long *)&_regs.ebp, (unsigned long *)&dummy_esp,
+            (unsigned long *)&_regs.ebx, (unsigned long *)&_regs.edx,
+            (unsigned long *)&_regs.ecx, (unsigned long *)&_regs.eax };
         generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
             if ( (rc = ops->read(x86_seg_ss,
@@ -2007,6 +2016,26 @@ x86_emulate(
         dst.bytes = op_bytes;
         dst.val   = (uint8_t)src.val;
         break;
+
+    case 0xbc: /* bsf */ {
+        int zf;
+        asm ( "bsf %2,%0; setc %b1"
+              : "=r" (dst.val), "=q" (zf)
+              : "r" (src.val), "1" (0) );
+        _regs.eflags &= ~EFLG_ZF;
+        _regs.eflags |= zf ? EFLG_ZF : 0;
+        break;
+    }
+
+    case 0xbd: /* bsr */ {
+        int zf;
+        asm ( "bsr %2,%0; setc %b1"
+              : "=r" (dst.val), "=q" (zf)
+              : "r" (src.val), "1" (0) );
+        _regs.eflags &= ~EFLG_ZF;
+        _regs.eflags |= zf ? EFLG_ZF : 0;
+        break;
+    }
 
     case 0xb7: /* movzx rm16,r{16,32,64} */
         dst.val = (uint16_t)src.val;
