@@ -3,7 +3,21 @@
  * 
  * Generic x86 (32-bit and 64-bit) instruction decoder and emulator.
  * 
- * Copyright (c) 2005 Keir Fraser
+ * Copyright (c) 2005-2007 Keir Fraser
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef __XEN__
@@ -89,7 +103,9 @@ static uint8_t opcode_table[256] = {
     0, 0, 0, DstReg|SrcMem32|ModRM|Mov /* movsxd (x86/64) */,
     0, 0, 0, 0,
     /* 0x68 - 0x6F */
-    ImplicitOps|Mov, 0, ImplicitOps|Mov, 0, 0, 0, 0, 0,
+    ImplicitOps|Mov, DstMem|SrcImm|ModRM|Mov,
+    ImplicitOps|Mov, DstMem|SrcImmByte|ModRM|Mov,
+    0, 0, 0, 0,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -194,7 +210,7 @@ static uint8_t twobyte_table[256] = {
     /* 0xA0 - 0xA7 */
     0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0, 
     /* 0xA8 - 0xAF */
-    0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0,
+    0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     0, DstBitBase|SrcReg|ModRM,
@@ -466,6 +482,92 @@ do {                                                                    \
         _regs.eip = ((op_bytes == 2)                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
 } while (0)
+
+/*
+ * Unsigned multiplication with double-word result.
+ * IN:  Multiplicand=m[0], Multiplier=m[1]
+ * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
+ */
+static int mul_dbl(unsigned long m[2])
+{
+    int rc;
+    asm ( "mul %4; seto %b2"
+          : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
+          : "0" (m[0]), "1" (m[1]), "2" (0) );
+    return rc;
+}
+
+/*
+ * Signed multiplication with double-word result.
+ * IN:  Multiplicand=m[0], Multiplier=m[1]
+ * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
+ */
+static int imul_dbl(unsigned long m[2])
+{
+    int rc;
+    asm ( "imul %4; seto %b2"
+          : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
+          : "0" (m[0]), "1" (m[1]), "2" (0) );
+    return rc;
+}
+
+/*
+ * Unsigned division of double-word dividend.
+ * IN:  Dividend=u[1]:u[0], Divisor=v
+ * OUT: Return 1: #DE
+ *      Return 0: Quotient=u[0], Remainder=u[1]
+ */
+static int div_dbl(unsigned long u[2], unsigned long v)
+{
+    if ( (v == 0) || (u[1] > v) || ((u[1] == v) && (u[0] != 0)) )
+        return 1;
+    asm ( "div %4"
+          : "=a" (u[0]), "=d" (u[1])
+          : "0" (u[0]), "1" (u[1]), "r" (v) );
+    return 0;
+}
+
+/*
+ * Signed division of double-word dividend.
+ * IN:  Dividend=u[1]:u[0], Divisor=v
+ * OUT: Return 1: #DE
+ *      Return 0: Quotient=u[0], Remainder=u[1]
+ * NB. We don't use idiv directly as it's moderately hard to work out
+ *     ahead of time whether it will #DE, which we cannot allow to happen.
+ */
+static int idiv_dbl(unsigned long u[2], unsigned long v)
+{
+    int negu = (long)u[1] < 0, negv = (long)v < 0;
+
+    /* u = abs(u) */
+    if ( negu )
+    {
+        u[1] = ~u[1];
+        if ( (u[0] = -u[0]) == 0 )
+            u[1]++;
+    }
+
+    /* abs(u) / abs(v) */
+    if ( div_dbl(u, negv ? -v : v) )
+        return 1;
+
+    /* Remainder has same sign as dividend. It cannot overflow. */
+    if ( negu )
+        u[1] = -u[1];
+
+    /* Quotient is overflowed if sign bit is set. */
+    if ( negu ^ negv )
+    {
+        if ( (long)u[0] >= 0 )
+            u[0] = -u[0];
+        else if ( (u[0] << 1) != 0 ) /* == 0x80...0 is okay */
+            return 1;
+    }
+    else if ( (long)u[0] < 0 )
+        return 1;
+
+    return 0;
+}
 
 static int
 test_cc(
@@ -969,6 +1071,39 @@ x86_emulate(
         dst.val = (int32_t)src.val;
         break;
 
+    case 0x69: /* imul imm16/32 */
+    case 0x6b: /* imul imm8 */ {
+        unsigned long reg = *(long *)decode_register(modrm_reg, &_regs, 0);
+        _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+        switch ( dst.bytes )
+        {
+        case 2:
+            dst.val = ((uint32_t)(int16_t)src.val *
+                       (uint32_t)(int16_t)reg);
+            if ( (int16_t)dst.val != (uint32_t)dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#ifdef __x86_64__
+        case 4:
+            dst.val = ((uint64_t)(int32_t)src.val *
+                       (uint64_t)(int32_t)reg);
+            if ( (int32_t)dst.val != dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#endif
+        default: {
+            unsigned long m[2] = { src.val, reg };
+            if ( imul_dbl(m) )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            dst.val = m[0];
+            break;
+        }
+        }
+        dst.type = OP_REG;
+        dst.reg  = decode_register(modrm_reg, &_regs, 0);
+        break;
+    }
+
     case 0x80 ... 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
@@ -1097,6 +1232,183 @@ x86_emulate(
         case 3: /* neg */
             emulate_1op("neg", dst, _regs.eflags);
             break;
+        case 4: /* mul */
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            dst.val  = *dst.reg;
+            _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+            switch ( src.bytes )
+            {
+            case 1:
+                dst.val *= src.val;
+                if ( (uint8_t)dst.val != (uint16_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                break;
+            case 2:
+                dst.val *= src.val;
+                if ( (uint16_t)dst.val != (uint32_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                *(uint16_t *)&_regs.edx = dst.val >> 16;
+                break;
+#ifdef __x86_64__
+            case 4:
+                dst.val *= src.val;
+                if ( (uint32_t)dst.val != dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = (uint32_t)(dst.val >> 32);
+                break;
+#endif
+            default: {
+                unsigned long m[2] = { src.val, dst.val };
+                if ( mul_dbl(m) )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = m[1];
+                dst.val  = m[0];
+                break;
+            }
+            }
+            break;
+        case 5: /* imul */
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            dst.val  = *dst.reg;
+            _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+            switch ( src.bytes )
+            {
+            case 1:
+                dst.val = ((uint16_t)(int8_t)src.val *
+                           (uint16_t)(int8_t)dst.val);
+                if ( (int8_t)dst.val != (uint16_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                break;
+            case 2:
+                dst.val = ((uint32_t)(int16_t)src.val *
+                           (uint32_t)(int16_t)dst.val);
+                if ( (int16_t)dst.val != (uint32_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                *(uint16_t *)&_regs.edx = dst.val >> 16;
+                break;
+#ifdef __x86_64__
+            case 4:
+                dst.val = ((uint64_t)(int32_t)src.val *
+                           (uint64_t)(int32_t)dst.val);
+                if ( (int32_t)dst.val != dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = (uint32_t)(dst.val >> 32);
+                break;
+#endif
+            default: {
+                unsigned long m[2] = { src.val, dst.val };
+                if ( imul_dbl(m) )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = m[1];
+                dst.val  = m[0];
+                break;
+            }
+            }
+            break;
+        case 6: /* div */ {
+            unsigned long u[2], v;
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            switch ( src.bytes )
+            {
+            case 1:
+                u[0] = (uint16_t)_regs.eax;
+                u[1] = 0;
+                v    = (uint8_t)src.val;
+                generate_exception_if(
+                    div_dbl(u, v) || ((uint8_t)u[0] != (uint16_t)u[0]),
+                    EXC_DE);
+                dst.val = (uint8_t)u[0];
+                ((uint8_t *)&_regs.eax)[1] = u[1];
+                break;
+            case 2:
+                u[0] = ((uint32_t)_regs.edx << 16) | (uint16_t)_regs.eax;
+                u[1] = 0;
+                v    = (uint16_t)src.val;
+                generate_exception_if(
+                    div_dbl(u, v) || ((uint16_t)u[0] != (uint32_t)u[0]),
+                    EXC_DE);
+                dst.val = (uint16_t)u[0];
+                *(uint16_t *)&_regs.edx = u[1];
+                break;
+#ifdef __x86_64__
+            case 4:
+                u[0] = (_regs.edx << 32) | (uint32_t)_regs.eax;
+                u[1] = 0;
+                v    = (uint32_t)src.val;
+                generate_exception_if(
+                    div_dbl(u, v) || ((uint32_t)u[0] != u[0]),
+                    EXC_DE);
+                dst.val   = (uint32_t)u[0];
+                _regs.edx = (uint32_t)u[1];
+                break;
+#endif
+            default:
+                u[0] = _regs.eax;
+                u[1] = _regs.edx;
+                v    = src.val;
+                generate_exception_if(div_dbl(u, v), EXC_DE);
+                dst.val   = u[0];
+                _regs.edx = u[1];
+                break;
+            }
+            break;
+        }
+        case 7: /* idiv */ {
+            unsigned long u[2], v;
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            switch ( src.bytes )
+            {
+            case 1:
+                u[0] = (int16_t)_regs.eax;
+                u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
+                v    = (int8_t)src.val;
+                generate_exception_if(
+                    idiv_dbl(u, v) || ((int8_t)u[0] != (int16_t)u[0]),
+                    EXC_DE);
+                dst.val = (int8_t)u[0];
+                ((int8_t *)&_regs.eax)[1] = u[1];
+                break;
+            case 2:
+                u[0] = (int32_t)((_regs.edx << 16) | (uint16_t)_regs.eax);
+                u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
+                v    = (int16_t)src.val;
+                generate_exception_if(
+                    idiv_dbl(u, v) || ((int16_t)u[0] != (int32_t)u[0]),
+                    EXC_DE);
+                dst.val = (int16_t)u[0];
+                *(int16_t *)&_regs.edx = u[1];
+                break;
+#ifdef __x86_64__
+            case 4:
+                u[0] = (_regs.edx << 32) | (uint32_t)_regs.eax;
+                u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
+                v    = (int32_t)src.val;
+                generate_exception_if(
+                    idiv_dbl(u, v) || ((int32_t)u[0] != u[0]),
+                    EXC_DE);
+                dst.val   = (int32_t)u[0];
+                _regs.edx = (uint32_t)u[1];
+                break;
+#endif
+            default:
+                u[0] = _regs.eax;
+                u[1] = _regs.edx;
+                v    = src.val;
+                generate_exception_if(idiv_dbl(u, v), EXC_DE);
+                dst.val   = u[0];
+                _regs.edx = u[1];
+                break;
+            }
+            break;
+        }
         default:
             goto cannot_emulate;
         }
@@ -1596,6 +1908,34 @@ x86_emulate(
 
     case 0xab: bts: /* bts */
         emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
+        break;
+
+    case 0xaf: /* imul */
+        _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+        switch ( dst.bytes )
+        {
+        case 2:
+            dst.val = ((uint32_t)(int16_t)src.val *
+                       (uint32_t)(int16_t)dst.val);
+            if ( (int16_t)dst.val != (uint32_t)dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#ifdef __x86_64__
+        case 4:
+            dst.val = ((uint64_t)(int32_t)src.val *
+                       (uint64_t)(int32_t)dst.val);
+            if ( (int32_t)dst.val != dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#endif
+        default: {
+            unsigned long m[2] = { src.val, dst.val };
+            if ( imul_dbl(m) )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            dst.val = m[0];
+            break;
+        }
+        }
         break;
 
     case 0xb6: /* movzx rm8,r{16,32,64} */

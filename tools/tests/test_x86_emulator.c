@@ -501,7 +501,10 @@ int main(int argc, char **argv)
             printf(".");
         rc = x86_emulate(&ctxt, &emulops);
         if ( rc != 0 )
-            goto fail;
+        {
+            printf("failed at %%eip == %08x\n", (unsigned int)regs.eip);
+            return 1;
+        }
     }
     if ( (regs.esp != ((unsigned long)res + MMAP_SZ)) ||
          (regs.eax != 2) || (regs.edx != 1) )

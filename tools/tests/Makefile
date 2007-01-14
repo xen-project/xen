@@ -7,6 +7,7 @@ TARGET := test_x86_emulator
 .PHONY: all
 all: $(TARGET)
 
+.PHONY: blowfish.bin
 blowfish.bin:
 	make -f blowfish.mk all
 
