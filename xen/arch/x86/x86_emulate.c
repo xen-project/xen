@@ -2019,7 +2019,7 @@ x86_emulate(
 
     case 0xbc: /* bsf */ {
         int zf;
-        asm ( "bsf %2,%0; setc %b1"
+        asm ( "bsf %2,%0; setz %b1"
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val), "1" (0) );
         _regs.eflags &= ~EFLG_ZF;
@@ -2029,7 +2029,7 @@ x86_emulate(
 
     case 0xbd: /* bsr */ {
         int zf;
-        asm ( "bsr %2,%0; setc %b1"
+        asm ( "bsr %2,%0; setz %b1"
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val), "1" (0) );
         _regs.eflags &= ~EFLG_ZF;
