@@ -58,7 +58,7 @@
 ^docs/xen-api/xenapi-datamodel-graph.eps$
 ^extras/mini-os/h/hypervisor-ifs$
 ^extras/mini-os/h/xen-public$
-^extras/mini-os/mini-os\..*$
+^extras/mini-os/mini-os.*$
 ^install/.*$
 ^linux-[^/]*-native/.*$
 ^linux-[^/]*-xen/.*$
