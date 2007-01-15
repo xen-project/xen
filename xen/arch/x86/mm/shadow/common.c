@@ -416,14 +416,9 @@ struct x86_emulate_ops *shadow_init_emulation(
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
 
     /* Work out the emulation mode. */
-    if ( hvm_long_mode_enabled(v) )
+    if ( hvm_long_mode_enabled(v) && creg->attr.fields.l )
     {
-        sh_ctxt->ctxt.addr_size = creg->attr.fields.l ? 64 : 32;
-        if ( (sh_ctxt->ctxt.sp_size = sh_ctxt->ctxt.addr_size) != 64 )
-        {
-            sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
-            sh_ctxt->ctxt.sp_size = sreg->attr.fields.db ? 32 : 16;
-        }
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
     }
     else if ( regs->eflags & X86_EFLAGS_VM )
     {

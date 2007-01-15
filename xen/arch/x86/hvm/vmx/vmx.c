@@ -491,8 +491,7 @@ static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
     ASSERT(v == current);
 
 #ifdef __x86_64__
-    if ( vmx_long_mode_enabled(v) &&
-         (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
+    if ( vmx_long_mode_enabled(v) && (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
         long_mode = 1;
 #endif
 
@@ -667,8 +666,8 @@ static int vmx_guest_x86_mode(struct vcpu *v)
 
     cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
 
-    if ( vmx_long_mode_enabled(v) )
-        return ((cs_ar_bytes & (1u<<13)) ? 8 : 4);
+    if ( vmx_long_mode_enabled(v) && (cs_ar_bytes & (1u<<13)) )
+        return 8;
 
     if ( vmx_realmode(v) )
         return 2;
