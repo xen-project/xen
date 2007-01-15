@@ -252,7 +252,7 @@ static int kick_secondary_cpus(int maxcpus)
             cpu_set(i, cpu_sibling_map[cpuid]);
 
         /* For now everything is single core */
-        cpu_set(0, cpu_core_map[cpuid]);
+        cpu_set(cpuid, cpu_core_map[cpuid]);
 
         numa_set_node(cpuid, 0);
         numa_add_cpu(cpuid);
