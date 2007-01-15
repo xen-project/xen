@@ -150,8 +150,11 @@ struct x86_emulate_ctxt
     /* Register state before/after emulation. */
     struct cpu_user_regs *regs;
 
-    /* Default address size in current execution mode (2, 4, or 8). */
-    int                   address_bytes;
+    /* Default address size in current execution mode (16, 32, or 64). */
+    unsigned int addr_size;
+
+    /* Stack pointer width in bits (16, 32 or 64). */
+    unsigned int sp_size;
 };
 
 /*

@@ -110,7 +110,7 @@ static int hvm_translate_linear_addr(
     unsigned long limit, addr = offset;
     uint32_t last_byte;
 
-    if ( sh_ctxt->ctxt.address_bytes != 8 )
+    if ( sh_ctxt->ctxt.addr_size != 64 )
     {
         /*
          * COMPATIBILITY MODE: Apply segment checks and add base.
@@ -399,7 +399,7 @@ static struct x86_emulate_ops pv_shadow_emulator_ops = {
 struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
 {
-    struct segment_register *creg;
+    struct segment_register *creg, *sreg;
     struct vcpu *v = current;
     unsigned long addr;
 
@@ -407,7 +407,7 @@ struct x86_emulate_ops *shadow_init_emulation(
 
     if ( !is_hvm_vcpu(v) )
     {
-        sh_ctxt->ctxt.address_bytes = sizeof(long);
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = BITS_PER_LONG;
         return &pv_shadow_emulator_ops;
     }
 
@@ -417,11 +417,24 @@ struct x86_emulate_ops *shadow_init_emulation(
 
     /* Work out the emulation mode. */
     if ( hvm_long_mode_enabled(v) )
-        sh_ctxt->ctxt.address_bytes = creg->attr.fields.l ? 8 : 4;
+    {
+        sh_ctxt->ctxt.addr_size = creg->attr.fields.l ? 64 : 32;
+        if ( (sh_ctxt->ctxt.sp_size = sh_ctxt->ctxt.addr_size) != 64 )
+        {
+            sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
+            sh_ctxt->ctxt.sp_size = sreg->attr.fields.db ? 32 : 16;
+        }
+    }
     else if ( regs->eflags & X86_EFLAGS_VM )
-        sh_ctxt->ctxt.address_bytes = 2;
+    {
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 16;
+    }
     else
-        sh_ctxt->ctxt.address_bytes = creg->attr.fields.db ? 4 : 2;
+    {
+        sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
+        sh_ctxt->ctxt.addr_size = creg->attr.fields.db ? 32 : 16;
+        sh_ctxt->ctxt.sp_size   = sreg->attr.fields.db ? 32 : 16;
+    }
 
     /* Attempt to prefetch whole instruction. */
     sh_ctxt->insn_buf_bytes =
