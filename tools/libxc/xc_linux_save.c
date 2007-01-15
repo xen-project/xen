@@ -660,13 +660,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-   /* cheesy sanity check */
-    if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
-        ERROR("Invalid state record -- pfn count out of range: %lu",
-            (info.max_memkb >> (PAGE_SHIFT - 10)));
-        goto out;
-     }
-
     /* Map the shared info frame */
     if(!(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                             PROT_READ, shared_info_frame))) {
