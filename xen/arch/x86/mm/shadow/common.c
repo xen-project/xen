@@ -1303,6 +1303,9 @@ shadow_alloc_p2m_table(struct domain *d)
     if ( !shadow_set_p2m_entry(d, gfn, mfn) )
         goto error;
 
+    /* Build a p2m map that matches the m2p entries for this domain's
+     * allocated pages.  Skip any pages that have an explicitly invalid
+     * or obviously bogus m2p entry. */
     for ( entry = d->page_list.next;
           entry != &d->page_list;
           entry = entry->next )
@@ -1318,6 +1321,8 @@ shadow_alloc_p2m_table(struct domain *d)
             (gfn != 0x55555555L)
 #endif
              && gfn != INVALID_M2P_ENTRY
+             && (gfn < 
+                 (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof (l1_pgentry_t))
              && !shadow_set_p2m_entry(d, gfn, mfn) )
             goto error;
     }

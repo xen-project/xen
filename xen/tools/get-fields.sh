@@ -1,6 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 test -n "$1" -a -n "$2" -a -n "$3"
 set -ef
+
+SED=sed
+[ -x /usr/xpg4/bin/sed ] && SED=/usr/xpg4/bin/sed
 
 get_fields() {
 	local level=1 aggr=0 name= fields=
@@ -90,11 +93,15 @@ handle_field() {
 		then
 			echo -n "$1(_d_)->$3 = (_s_)->$3;"
 		else
-			echo -n "$1XLAT_${2}_HNDL_$(echo $3 | sed 's,\.,_,g')(_d_, _s_);"
+			echo -n "$1XLAT_${2}_HNDL_$(echo $3 | $SED 's,\.,_,g')(_d_, _s_);"
 		fi
-	elif [ -z "$(echo "$5" | sed 's,[^{}],,g')" ]
+	elif [ -z "$(echo "$5" | $SED 's,[^{}],,g')" ]
 	then
-		local tag=$(echo "$5" | sed 's,[[:space:]]*\(struct\|union\)[[:space:]]\+\(compat_\)\?\([[:alnum:]_]\+\)[[:space:]].*,\3,')
+		local tag=$(echo "$5" | python -c '
+import re,sys
+for line in sys.stdin.readlines():
+    print re.subn(r"\s*(struct|union)\s+(compat_)?(\w+)\s.*", r"\3", line)[0].rstrip()
+')
 		echo " \\"
 		echo -n "${1}XLAT_$tag(&(_d_)->$3, &(_s_)->$3);"
 	else
@@ -104,13 +111,13 @@ handle_field() {
 			case "$token" in
 			struct|union)
 				test $level != 2 || fields=" "
-				if [ $level == 1 ]
+				if [ $level = 1 ]
 				then
 					kind=$token
 					if [ $kind = union ]
 					then
 						echo " \\"
-						echo -n "${1}switch ($(echo $3 | sed 's,\.,_,g')) {"
+						echo -n "${1}switch ($(echo $3 | $SED 's,\.,_,g')) {"
 					fi
 				fi
 				;;
@@ -119,7 +126,7 @@ handle_field() {
 				;;
 			"}")
 				level=$(expr $level - 1) id=
-				if [ $level == 1 -a $kind = union ]
+				if [ $level = 1 -a $kind = union ]
 				then
 					echo " \\"
 					echo -n "$1}"
@@ -141,7 +148,7 @@ handle_field() {
 				arrlvl=$(expr $arrlvl - 1)
 				;;
 			COMPAT_HANDLE\(*\))
-				if [ $level == 2 -a -z "$id" ]
+				if [ $level = 2 -a -z "$id" ]
 				then
 					type=${token#COMPAT_HANDLE?}
 					type=${type%?}
@@ -149,7 +156,7 @@ handle_field() {
 				fi
 				;;
 			compat_domain_handle_t)
-				if [ $level == 2 -a -z "$id" ]
+				if [ $level = 2 -a -z "$id" ]
 				then
 					array_type=$token
 				fi
@@ -158,12 +165,12 @@ handle_field() {
 				id=$token
 				;;
 			[\,\;])
-				if [ $level == 2 -a -n "$(echo $id | sed 's,^_pad[[:digit:]]*,,')" ]
+				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 				then
 					if [ $kind = union ]
 					then
 						echo " \\"
-						echo -n "${1}case XLAT_${2}_$(echo $3.$id | sed 's,\.,_,g'):"
+						echo -n "${1}case XLAT_${2}_$(echo $3.$id | $SED 's,\.,_,g'):"
 						handle_field "$1    " $2 $3.$id "$type" "$fields"
 					elif [ -z "$array" -a -z "$array_type" ]
 					then
@@ -202,7 +209,7 @@ copy_array() {
 }
 
 handle_array() {
-	local i="i$(echo $4 | sed 's,[^;], ,g' | wc -w)"
+	local i="i$(echo $4 | $SED 's,[^;], ,g' | wc -w | $SED 's,[[:space:]]*,,g')"
 	echo " \\"
 	echo "$1{ \\"
 	echo "$1    unsigned int $i; \\"
@@ -250,7 +257,7 @@ build_body() {
 			arrlvl=$(expr $arrlvl - 1)
 			;;
 		COMPAT_HANDLE\(*\))
-			if [ $level == 2 -a -z "$id" ]
+			if [ $level = 2 -a -z "$id" ]
 			then
 				type=${token#COMPAT_HANDLE?}
 				type=${type%?}
@@ -258,7 +265,7 @@ build_body() {
 			fi
 			;;
 		compat_domain_handle_t)
-			if [ $level == 2 -a -z "$id" ]
+			if [ $level = 2 -a -z "$id" ]
 			then
 				array_type=$token
 			fi
@@ -272,7 +279,7 @@ build_body() {
 			fi
 			;;
 		[\,\;])
-			if [ $level == 2 -a -n "$(echo $id | sed 's,^_pad[[:digit:]]*,,')" ]
+			if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 			then
 				if [ -z "$array" -a -z "$array_type" ]
 				then
@@ -300,10 +307,10 @@ build_body() {
 }
 
 check_field() {
-	if [ -z "$(echo "$4" | sed 's,[^{}],,g')" ]
+	if [ -z "$(echo "$4" | $SED 's,[^{}],,g')" ]
 	then
 		echo "; \\"
-		local n=$(echo $3 | sed 's,[^.], ,g' | wc -w)
+		local n=$(echo $3 | $SED 's,[^.], ,g' | wc -w | $SED 's,[[:space:]]*,,g')
 		if [ -n "$4" ]
 		then
 			for n in $4
@@ -325,7 +332,7 @@ check_field() {
 		then
 			echo -n "    CHECK_FIELD_($1, $2, $3)"
 		else
-			echo -n "    CHECK_SUBFIELD_${n}_($1, $2, $(echo $3 | sed 's!\.!, !g'))"
+			echo -n "    CHECK_SUBFIELD_${n}_($1, $2, $(echo $3 | $SED 's!\.!, !g'))"
 		fi
 	else
 		local level=1 fields= id= token
@@ -345,7 +352,7 @@ check_field() {
 				id=$token
 				;;
 			[\,\;])
-				if [ $level == 2 -a -n "$(echo $id | sed 's,^_pad[[:digit:]]*,,')" ]
+				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 				then
 					check_field $1 $2 $3.$id "$fields"
 					test "$token" != ";" || fields= id=
@@ -365,11 +372,11 @@ build_check() {
 	do
 		case "$token" in
 		struct|union)
-			if [ $level == 1 ]
+			if [ $level = 1 ]
 			then
 				kind=$token
 				echo -n "    CHECK_SIZE_($kind, $1)"
-			elif [ $level == 2 ]
+			elif [ $level = 2 ]
 			then
 				fields=" "
 			fi
@@ -390,7 +397,7 @@ build_check() {
 			test $level != 2 -o $arrlvl != 1 || id=$token
 			;;
 		[\,\;])
-			if [ $level == 2 -a -n "$(echo $id | sed 's,^_pad[[:digit:]]*,,')" ]
+			if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
 			then
 				check_field $kind $1 $id "$fields"
 				test "$token" != ";" || fields= id=
@@ -402,7 +409,7 @@ build_check() {
 	echo ""
 }
 
-fields="$(get_fields $(echo $2 | sed 's,^compat_xen,compat_,') "$(sed -e 's,^[[:space:]]#.*,,' -e 's!\([]\[,;:{}]\)! \1 !g' $3)")"
+fields="$(get_fields $(echo $2 | $SED 's,^compat_xen,compat_,') "$($SED -e 's,^[[:space:]]#.*,,' -e 's!\([]\[,;:{}]\)! \1 !g' $3)")"
 if [ -z "$fields" ]
 then
 	echo "Fields of '$2' not found in '$3'" >&2

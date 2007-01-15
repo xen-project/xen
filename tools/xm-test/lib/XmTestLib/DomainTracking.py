@@ -20,9 +20,11 @@
 
 import atexit
 import Test
+import xapi
 
 # Tracking of managed domains
 _managedDomains = []
+_VMuuids = []
 registered = 0
 
 def addManagedDomain(name):
@@ -36,8 +38,24 @@ def delManagedDomain(name):
     if name in _managedDomains:
         del _managedDomains[_managedDomains.index(name)]
 
+def addXAPIDomain(uuid):
+    global registered
+    _VMuuids.append(uuid)
+    if not registered:
+        atexit.register(destroyManagedDomains)
+        registered = 1
+
+def delXAPIDomain(uuid):
+    _VMuuids.remove(uuid)
+
 def destroyManagedDomains():
     if len(_managedDomains) > 0:
         for m in _managedDomains:
             Test.traceCommand("xm destroy %s" % m)
             Test.traceCommand("xm delete %s" % m)
+    if len(_VMuuids) > 0:
+        for uuid in _VMuuids:
+            Test.traceCommand("xm destroy %s" % uuid)
+            Test.traceCommand("xm delete %s" % uuid)
+
+

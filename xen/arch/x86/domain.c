@@ -1047,7 +1047,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     local_irq_disable();
 
-    if ( is_hvm_vcpu(prev) )
+    if ( is_hvm_vcpu(prev) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
         pt_freeze_time(prev);
 
     set_current(next);

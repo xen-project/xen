@@ -826,7 +826,7 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
     if ( (l2e_get_flags(l2e) & _PAGE_PRESENT) && 
          (l2e_get_pfn(l2e) != pfn) )
-        put_page_and_type(mfn_to_page(l2e_get_pfn(l2e)));
+        put_page_and_type(l2e_get_page(l2e));
 }
 
 
@@ -835,7 +835,7 @@ static void put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn)
 {
     if ( (l3e_get_flags(l3e) & _PAGE_PRESENT) && 
          (l3e_get_pfn(l3e) != pfn) )
-        put_page_and_type(mfn_to_page(l3e_get_pfn(l3e)));
+        put_page_and_type(l3e_get_page(l3e));
 }
 #endif
 
@@ -844,7 +844,7 @@ static void put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn)
 {
     if ( (l4e_get_flags(l4e) & _PAGE_PRESENT) && 
          (l4e_get_pfn(l4e) != pfn) )
-        put_page_and_type(mfn_to_page(l4e_get_pfn(l4e)));
+        put_page_and_type(l4e_get_page(l4e));
 }
 #endif
 
@@ -1376,7 +1376,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current);
 
-        if ( unlikely(!get_page_from_l2e(nl2e, pfn, current->domain)) )
+        if ( unlikely(!get_page_from_l2e(nl2e, pfn, d)) )
             return 0;
 
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, current)) )
@@ -1439,7 +1439,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         if (!l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current);
 
-        if ( unlikely(!get_page_from_l3e(nl3e, pfn, current->domain)) )
+        if ( unlikely(!get_page_from_l3e(nl3e, pfn, d)) )
             return 0;
 
         if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, current)) )
@@ -3182,7 +3182,7 @@ static int ptwr_emulated_update(
     unsigned int do_cmpxchg,
     struct ptwr_emulate_ctxt *ptwr_ctxt)
 {
-    unsigned long gmfn, mfn;
+    unsigned long mfn;
     struct page_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
@@ -3222,8 +3222,7 @@ static int ptwr_emulated_update(
     }
 
     pte  = ptwr_ctxt->pte;
-    gmfn = l1e_get_pfn(pte);
-    mfn  = gmfn_to_mfn(d, gmfn);
+    mfn  = l1e_get_pfn(pte);
     page = mfn_to_page(mfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
@@ -3354,7 +3353,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
                        struct cpu_user_regs *regs)
 {
     struct domain *d = v->domain;
-    unsigned long     pfn;
     struct page_info *page;
     l1_pgentry_t      pte;
     struct ptwr_emulate_ctxt ptwr_ctxt;
@@ -3368,8 +3366,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     guest_get_eff_l1e(v, addr, &pte);
     if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
         goto bail;
-    pfn  = l1e_get_pfn(pte);
-    page = mfn_to_page(pfn);
+    page = l1e_get_page(pte);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||

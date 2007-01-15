@@ -7,7 +7,7 @@ include $(XEN_ROOT)/Config.mk
 # Set TARGET_ARCH
 override TARGET_ARCH     := $(XEN_TARGET_ARCH)
 
-XEN_INTERFACE_VERSION := 0x00030203
+XEN_INTERFACE_VERSION := 0x00030204
 
 # NB. '-Wcast-qual' is nasty, so I omitted it.
 CFLAGS := -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format
@@ -17,7 +17,13 @@ CFLAGS += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
 ASFLAGS = -D__ASSEMBLY__
 
 LDLIBS =  -L. -lminios
-LDFLAGS := -N -T minios-$(TARGET_ARCH).lds
+LDFLAGS_FINAL := -N -T minios-$(TARGET_ARCH).lds
+LDFLAGS :=
+
+# Prefix for global API names. All other symbols are localised before
+# linking with EXTRA_OBJS.
+GLOBAL_PREFIX := xenos_
+EXTRA_OBJS =
 
 # For possible special source directories.
 EXTRA_SRC =
@@ -110,18 +116,16 @@ endif
 links:	$(ARCH_LINKS)
 	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
 
-libminios.a: links $(OBJS) $(HEAD)
-	$(AR) r libminios.a $(HEAD) $(OBJS)
-
-$(TARGET): libminios.a $(HEAD)
-	$(LD) $(LDFLAGS) $(HEAD) $(LDLIBS) -o $@.elf
-	gzip -f -9 -c $@.elf >$@.gz
+$(TARGET): links $(OBJS) $(HEAD)
+	$(LD) -r $(LDFLAGS) $(HEAD) $(OBJS) -o $@.o
+	$(OBJCOPY) -w -G $(GLOBAL_PREFIX)* -G _start $@.o $@.o
+	$(LD) $(LDFLAGS) $(LDFLAGS_FINAL) $@.o $(EXTRA_OBJS) -o $@
+	gzip -f -9 -c $@ >$@.gz
 
 .PHONY: clean
 clean:
 	find . -type f -name '*.o' | xargs rm -f
-	rm -f *.o *~ core $(TARGET).elf $(TARGET).raw $(TARGET) $(TARGET).gz
-	rm -f libminios.a
+	rm -f *.o *~ core $(TARGET) $(TARGET).gz
 	find . -type l | xargs rm -f
 	rm -f tags TAGS
 

@@ -1121,7 +1121,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     unsigned long *reg, eip = regs->eip, res;
-    u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, rex = 0;
+    u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, lock = 0, rex = 0;
     enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
     unsigned int port, i, data_sel, ar, data, rc;
     unsigned int op_bytes, op_default, ad_bytes, ad_default;
@@ -1184,6 +1184,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             data_sel = regs->ss;
             continue;
         case 0xf0: /* LOCK */
+            lock = 1;
             continue;
         case 0xf2: /* REPNE/REPNZ */
         case 0xf3: /* REP/REPE/REPZ */
@@ -1210,6 +1211,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     if ( opcode == 0x0f )
         goto twobyte_opcode;
     
+    if ( lock )
+        goto fail;
+
     /* Input/Output String instructions. */
     if ( (opcode >= 0x6c) && (opcode <= 0x6f) )
     {
@@ -1472,6 +1476,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     /* Privileged (ring 0) instructions. */
     opcode = insn_fetch(u8, code_base, eip, code_limit);
+    if ( lock && (opcode & ~3) != 0x20 )
+        goto fail;
     switch ( opcode )
     {
     case 0x06: /* CLTS */
@@ -1490,7 +1496,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x20: /* MOV CR?,<reg> */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
-        modrm_reg |= (opcode >> 3) & 7;
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         switch ( modrm_reg )
@@ -1530,7 +1536,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x21: /* MOV DR?,<reg> */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
-        modrm_reg |= (opcode >> 3) & 7;
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         if ( (res = do_get_debugreg(modrm_reg)) > (unsigned long)-256 )
@@ -1540,7 +1546,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x22: /* MOV <reg>,CR? */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
-        modrm_reg |= (opcode >> 3) & 7;
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         switch ( modrm_reg )
@@ -1588,7 +1594,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x23: /* MOV <reg>,DR? */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
-        modrm_reg |= (opcode >> 3) & 7;
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         if ( do_set_debugreg(modrm_reg, *reg) != 0 )
@@ -1854,7 +1860,7 @@ static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
 }
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
- 
+
 asmlinkage void do_nmi(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();

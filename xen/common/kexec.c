@@ -51,19 +51,9 @@ xen_kexec_reserve_t kexec_crash_area;
 
 static void __init parse_crashkernel(const char *str)
 {
-    unsigned long start, size;
-
-    size = parse_size_and_unit(str, &str);
+    kexec_crash_area.size = parse_size_and_unit(str, &str);
     if ( *str == '@' )
-        start = parse_size_and_unit(str+1, NULL);
-    else
-        start = 0;
-
-    if ( start && size )
-    {
-        kexec_crash_area.start = start;
-        kexec_crash_area.size = size;
-    }
+        kexec_crash_area.start = parse_size_and_unit(str+1, NULL);
 }
 custom_param("crashkernel", parse_crashkernel);
 
@@ -158,8 +148,12 @@ static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 
 static int kexec_get(reserve)(xen_kexec_range_t *range)
 {
-    range->start = kexec_crash_area.start;
-    range->size = kexec_crash_area.size;
+    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0) {
+        range->start = kexec_crash_area.start;
+        range->size = kexec_crash_area.size;
+    }
+    else
+        range->start = range->size = 0;
     return 0;
 }
 

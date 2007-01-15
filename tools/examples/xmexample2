@@ -102,6 +102,40 @@ disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
          'phy:sda6,sda6,r' ]
 
 #----------------------------------------------------------------------------
+# Define frame buffer device.
+#
+# By default, no frame buffer device is configured.
+#
+# To create one using the SDL backend and sensible defaults:
+#
+# vfb = [ 'type=sdl' ]
+#
+# This uses environment variables XAUTHORITY and DISPLAY.  You
+# can override that:
+#
+# vfb = [ 'type=sdl,xauthority=/home/bozo/.Xauthority,display=:1' ]
+#
+# To create one using the VNC backend and sensible defaults:
+#
+# vfb = [ 'type=vnc' ]
+#
+# The backend listens on 127.0.0.1 port 5900+N by default, where N is
+# the domain ID.  You can override both address and N:
+#
+# vfb = [ 'type=vnc,vnclisten=127.0.0.1,vncdisplay=%d' % vmid ]
+#
+# Or you can bind the first unused port above 5900:
+#
+# vfb = [ 'type=vnc,vnclisten=0.0.0.0,vnunused=1' ]
+#
+# You can override the password:
+#
+# vfb = [ 'type=vnc,vncpasswd=MYPASSWD' ]
+#
+# Empty password disables authentication.  Defaults to the vncpasswd
+# configured in xend-config.sxp.
+
+#----------------------------------------------------------------------------
 # Define to which TPM instance the user domain should communicate.
 # The vtpm entry is of the form 'instance=INSTANCE,backend=DOM'
 # where INSTANCE indicates the instance number of the TPM the VM

@@ -48,8 +48,7 @@ def is_disk_image(file):
         return True
     return False
 
-SECTOR_SIZE=512
-def get_active_offset(file):
+def get_active_partition(file):
     """Find the offset for the start of the first active partition "
     "in the disk image file."""
 
@@ -58,22 +57,56 @@ def get_active_offset(file):
     for poff in (446, 462, 478, 494): # partition offsets
         # active partition has 0x80 as the first byte
         if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
-            return struct.unpack("<L",
-                                 buf[poff+8:poff+12])[0] * SECTOR_SIZE
+            return buf[poff:poff+16]
 
     # if there's not a partition marked as active, fall back to
     # the first partition
-    P1 = 446
-    return struct.unpack("<L", buf[P1+8:P1+12])[0] * SECTOR_SIZE
+    return buf[446:446+16]
 
-def open_fs(file):
-    offset = 0
-    if is_disk_image(file):
-        offset = get_active_offset(file)
-        if offset == -1:
-            raise RuntimeError, "Unable to find active partition on disk"
+SECTOR_SIZE=512
+DK_LABEL_LOC=1
+DKL_MAGIC=0xdabe
+V_ROOT=0x2
 
-    return fsimage.open(file, offset)
+def get_solaris_slice(file, offset):
+    """Find the root slice in a Solaris VTOC."""
+
+    fd = os.open(file, os.O_RDONLY)
+    os.lseek(fd, offset + (DK_LABEL_LOC * SECTOR_SIZE), 0)
+    buf = os.read(fd, 512)
+    if struct.unpack("<H", buf[508:510])[0] != DKL_MAGIC:
+        raise RuntimeError, "Invalid disklabel magic"
+
+    nslices = struct.unpack("<H", buf[30:32])[0]
+
+    for i in range(nslices):
+        sliceoff = 72 + 12 * i
+        slicetag = struct.unpack("<H", buf[sliceoff:sliceoff+2])[0]
+        slicesect = struct.unpack("<L", buf[sliceoff+4:sliceoff+8])[0]
+        if slicetag == V_ROOT:
+            return slicesect * SECTOR_SIZE
+
+    raise RuntimeError, "No root slice found"      
+
+FDISK_PART_SOLARIS=0xbf
+FDISK_PART_SOLARIS_OLD=0x82
+
+def get_fs_offset(file):
+    if not is_disk_image(file):
+        return 0
+
+    partbuf = get_active_partition(file)
+    if len(partbuf) == 0:
+        raise RuntimeError, "Unable to find active partition on disk"
+
+    offset = struct.unpack("<L", partbuf[8:12])[0] * SECTOR_SIZE
+
+    type = struct.unpack("<B", partbuf[4:5])[0]
+
+    if type == FDISK_PART_SOLARIS or type == FDISK_PART_SOLARIS_OLD:
+        offset += get_solaris_slice(file, offset)
+
+    return offset
 
 class GrubLineEditor(curses.textpad.Textbox):
     def __init__(self, screen, startx, starty, line = ""):
@@ -571,7 +604,7 @@ if __name__ == "__main__":
         print "  args: %s" % chosencfg["args"]
         sys.exit(0)
 
-    fs = open_fs(file)
+    fs = fsimage.open(file, get_fs_offset(file))
 
     chosencfg = sniff_solaris(fs, incfg)
 

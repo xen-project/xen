@@ -42,7 +42,7 @@ extern int is_profiled(struct domain *d);
 extern size_t strlcpy(char *dest, const char *src, size_t size);
 
 
-int nmi_callback(struct cpu_user_regs *regs, int cpu)
+static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
 	int xen_mode, ovf;
 

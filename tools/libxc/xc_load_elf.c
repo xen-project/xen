@@ -406,17 +406,19 @@ static int parseelfimage(const char *image,
     }
 
     /*
-     * A "bimodal" ELF note indicates the kernel will adjust to the
-     * current paging mode, including handling extended cr3 syntax.
-     * If we have ELF notes then PAE=yes implies that we must support
-     * the extended cr3 syntax. Otherwise we need to find the
-     * [extended-cr3] syntax in the __xen_guest string.
+     * A "bimodal" ELF note indicates the kernel will adjust to the current
+     * paging mode, including handling extended cr3 syntax.  If we have ELF
+     * notes then PAE=yes implies that we must support the extended cr3 syntax.
+     * Otherwise we need to find the [extended-cr3] syntax in the __xen_guest
+     * string. We use strstr() to look for "bimodal" to allow guests to use
+     * "yes,bimodal" or "no,bimodal" for compatibility reasons.
      */
+
     dsi->pae_kernel = PAEKERN_no;
     if ( dsi->__elfnote_section )
     {
         p = xen_elfnote_string(dsi, XEN_ELFNOTE_PAE_MODE);
-        if ( p != NULL && strncmp(p, "bimodal", 7) == 0 )
+        if ( p != NULL && strstr(p, "bimodal") != NULL )
             dsi->pae_kernel = PAEKERN_bimodal;
         else if ( p != NULL && strncmp(p, "yes", 3) == 0 )
             dsi->pae_kernel = PAEKERN_extended_cr3;

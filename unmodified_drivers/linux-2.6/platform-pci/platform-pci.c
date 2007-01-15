@@ -179,7 +179,7 @@ static int get_hypercall_stubs(void)
 #define get_hypercall_stubs()	(0)
 #endif
 
-static int get_callback_irq(struct pci_dev *pdev)
+static uint64_t get_callback_via(struct pci_dev *pdev)
 {
 #ifdef __ia64__
 	int irq, rid;
@@ -194,16 +194,24 @@ static int get_callback_irq(struct pci_dev *pdev)
 	       rid);
 	return rid | IA64_CALLBACK_IRQ_RID;
 #else /* !__ia64__ */
-	return pdev->irq;
+	if (pdev->irq < 16)
+		return pdev->irq; /* ISA IRQ */
+	/* We don't know the GSI. Specify the PCI INTx line instead. */
+	return (((uint64_t)0x01 << 56) | /* PCI INTx identifier */
+		((uint64_t)pci_domain_nr(pdev->bus) << 32) |
+		((uint64_t)pdev->bus->number << 16) |
+		((uint64_t)(pdev->devfn & 0xff) << 8) |
+		((uint64_t)(pdev->pin - 1) & 3));
 #endif
 }
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
-	int i, ret, callback_irq;
+	int i, ret;
 	long ioaddr, iolen;
 	long mmio_addr, mmio_len;
+	uint64_t callback_via;
 
 	i = pci_enable_device(pdev);
 	if (i)
@@ -215,9 +223,9 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	mmio_addr = pci_resource_start(pdev, 1);
 	mmio_len = pci_resource_len(pdev, 1);
 
-	callback_irq = get_callback_irq(pdev);
+	callback_via = get_callback_via(pdev);
 
-	if (mmio_addr == 0 || ioaddr == 0 || callback_irq == 0) {
+	if (mmio_addr == 0 || ioaddr == 0 || callback_via == 0) {
 		printk(KERN_WARNING DRV_NAME ":no resources found\n");
 		return -ENOENT;
 	}
@@ -247,12 +255,12 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if ((ret = init_xen_info()))
 		goto out;
 
-	if ((ret = request_irq(pdev->irq, evtchn_interrupt, SA_SHIRQ,
-			       "xen-platform-pci", pdev))) {
+	if ((ret = request_irq(pdev->irq, evtchn_interrupt,
+			       SA_SHIRQ | SA_SAMPLE_RANDOM,
+			       "xen-platform-pci", pdev)))
 		goto out;
-	}
 
-	if ((ret = set_callback_irq(callback_irq)))
+	if ((ret = set_callback_via(callback_via)))
 		goto out;
 
  out:
@@ -302,7 +310,7 @@ static void __exit platform_pci_module_cleanup(void)
 {
 	printk(KERN_INFO DRV_NAME ":Do platform module cleanup\n");
 	/* disable hypervisor for callback irq */
-	set_callback_irq(0);
+	set_callback_via(0);
 	if (pci_device_registered)
 		pci_unregister_driver(&platform_driver);
 }

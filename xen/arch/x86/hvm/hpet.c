@@ -356,8 +356,6 @@ static void hpet_timer_fn(void *opaque)
         }
         set_timer(&h->timers[tn], NOW() + hpet_tick_to_ns(h, h->period[tn]));
     }
-
-    vcpu_kick(h->vcpu);    
 }
 
 void hpet_migrate_timers(struct vcpu *v)

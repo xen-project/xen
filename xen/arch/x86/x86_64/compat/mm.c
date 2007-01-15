@@ -1,6 +1,7 @@
 #ifdef CONFIG_COMPAT
 
 #include <xen/event.h>
+#include <xen/multicall.h>
 #include <compat/memory.h>
 #include <compat/xen.h>
 
@@ -289,20 +290,27 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
             if ( err == __HYPERVISOR_mmuext_op )
             {
                 struct cpu_user_regs *regs = guest_cpu_user_regs();
-                unsigned int left = regs->ecx & ~MMU_UPDATE_PREEMPTED;
+                struct mc_state *mcs = &this_cpu(mc_state);
+                unsigned int arg1 = !test_bit(_MCSF_in_multicall, &mcs->flags)
+                                    ? regs->ecx
+                                    : mcs->call.args[1];
+                unsigned int left = arg1 & ~MMU_UPDATE_PREEMPTED;
 
-                BUG_ON(!(regs->ecx & MMU_UPDATE_PREEMPTED));
+                BUG_ON(left == arg1);
                 BUG_ON(left > count);
                 guest_handle_add_offset(nat_ops, count - left);
                 BUG_ON(left + i < count);
                 guest_handle_add_offset(cmp_uops, (signed int)(count - left - i));
                 left = 1;
                 BUG_ON(!hypercall_xlat_continuation(&left, 0x01, nat_ops, cmp_uops));
-                BUG_ON(left != regs->ecx);
-                regs->ecx += count - i;
+                BUG_ON(left != arg1);
+                if (!test_bit(_MCSF_in_multicall, &mcs->flags))
+                    regs->_ecx += count - i;
+                else
+                    mcs->compat_call.args[1] += count - i;
             }
             else
-                BUG_ON(rc > 0);
+                BUG_ON(err > 0);
             rc = err;
         }
 

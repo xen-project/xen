@@ -9,7 +9,6 @@ device_bind.patch
 fix-hz-suspend.patch
 fix-ide-cd-pio-mode.patch
 i386-mach-io-check-nmi.patch
-ipv6-no-autoconf.patch
 net-csum.patch
 net-gso-0-base.patch
 net-gso-1-check-dodgy.patch

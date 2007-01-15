@@ -225,7 +225,7 @@ static void dump_fault_path(unsigned long address)
 	p += (address >> 30) * 2;
 	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
 	if (p[0] & 1) {
-		mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+		mfn  = (p[0] >> PAGE_SHIFT) | (p[1] << 20);
 		page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 		p  = (unsigned long *)__va(page);
 		address &= 0x3fffffff;
@@ -234,7 +234,7 @@ static void dump_fault_path(unsigned long address)
 		       page, p[1], p[0]);
 #ifndef CONFIG_HIGHPTE
 		if (p[0] & 1) {
-			mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+			mfn  = (p[0] >> PAGE_SHIFT) | (p[1] << 20);
 			page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 			p  = (unsigned long *) __va(page);
 			address &= 0x001fffff;

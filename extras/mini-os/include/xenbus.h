@@ -12,6 +12,9 @@ void init_xenbus(void);
    set to a malloc'd copy of the value. */
 char *xenbus_read(xenbus_transaction_t xbt, const char *path, char **value);
 
+char *xenbus_watch_path(xenbus_transaction_t xbt, const char *path);
+char* xenbus_wait_for_value(const char*,const char*);
+
 /* Associates a value with a path.  Returns a malloc'd error string on
    failure. */
 char *xenbus_write(xenbus_transaction_t xbt, const char *path, const char *value);
