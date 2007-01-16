@@ -74,7 +74,7 @@ void fsi_close_fsimage(fsi_t *fsi)
 	pthread_mutex_lock(&fsi_lock);
         fsi->f_plugin->fp_ops->fpo_umount(fsi);
         (void) close(fsi->f_fd);
-	fsip_fs_free(fsi);
+	free(fsi);
 	pthread_mutex_unlock(&fsi_lock);
 }
 
