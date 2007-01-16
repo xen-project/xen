@@ -3944,7 +3944,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
 
     sh_unmap_domain_page(addr);
@@ -3996,7 +3996,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
                   vaddr, prev, old, new, *(unsigned long *)addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
 
     sh_unmap_domain_page(addr);

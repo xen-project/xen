@@ -427,6 +427,11 @@ extern int sh_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
 #undef mfn_valid
 #define mfn_valid(_mfn) (mfn_x(_mfn) < max_page)
 
+#if GUEST_PAGING_LEVELS >= 3
+# define is_lo_pte(_vaddr) (((_vaddr)&0x4)==0)
+#else
+# define is_lo_pte(_vaddr) (1)
+#endif
 
 static inline int
 sh_mfn_is_a_page_table(mfn_t gmfn)
