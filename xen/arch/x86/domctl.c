@@ -322,8 +322,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
     if ( is_hvm_vcpu(v) )
     {
-        if ( !IS_COMPAT(v->domain) )
+        if ( !IS_COMPAT(v->domain) ) {
             hvm_store_cpu_guest_regs(v, &c.nat->user_regs, c.nat->ctrlreg);
+            hvm_save_cpu_context(v, &c.nat->hvmcpu_ctxt);
+        }
 #ifdef CONFIG_COMPAT
         else
         {
