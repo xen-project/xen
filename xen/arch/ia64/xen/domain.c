@@ -305,24 +305,14 @@ void hlt_timer_fn(void *data)
 
 void relinquish_vcpu_resources(struct vcpu *v)
 {
-    if (HAS_PERVCPU_VHPT(v->domain))
-        pervcpu_vhpt_free(v);
-    if (v->arch.privregs != NULL) {
-        // this might be called by arch_do_domctl() with XEN_DOMCTL_arch_setup()
-        // for domVTi.
-        if (!(atomic_read(&v->domain->refcnt) & DOMAIN_DESTROYED)) {
-            unsigned long i;
-            for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
-                guest_physmap_remove_page(v->domain,
-                    IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
-                    virt_to_maddr(v->arch.privregs + i));
-        }
-
-        free_xenheap_pages(v->arch.privregs,
-                           get_order_from_shift(XMAPPEDREGS_SHIFT));
-        v->arch.privregs = NULL;
-    }
-    kill_timer(&v->arch.hlt_timer);
+	if (HAS_PERVCPU_VHPT(v->domain))
+		pervcpu_vhpt_free(v);
+	if (v->arch.privregs != NULL) {
+		free_xenheap_pages(v->arch.privregs,
+		                   get_order_from_shift(XMAPPEDREGS_SHIFT));
+		v->arch.privregs = NULL;
+	}
+	kill_timer(&v->arch.hlt_timer);
 }
 
 struct vcpu *alloc_vcpu_struct(void)
@@ -361,36 +351,8 @@ void free_vcpu_struct(struct vcpu *v)
 int vcpu_initialise(struct vcpu *v)
 {
 	struct domain *d = v->domain;
-	int rc, order, i;
 
 	if (!is_idle_domain(d)) {
-	    if (!d->arch.is_vti) {
-		if (HAS_PERVCPU_VHPT(d))
-			if ((rc = pervcpu_vhpt_alloc(v)) != 0)
-				return rc;
-
-		/* Create privregs page only if not VTi. */
-		order = get_order_from_shift(XMAPPEDREGS_SHIFT);
-		v->arch.privregs = alloc_xenheap_pages(order);
-		BUG_ON(v->arch.privregs == NULL);
-		memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
-		for (i = 0; i < (1 << order); i++)
-		    share_xen_page_with_guest(virt_to_page(v->arch.privregs) +
-		                              i, d, XENSHARE_writable);
-		/*
-		 * XXX IA64_XMAPPEDREGS_PADDR
-		 * assign these pages into guest pseudo physical address
-		 * space for dom0 to map this page by gmfn.
-		 * this is necessary for domain save, restore and dump-core.
-		 */
-		for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
-		    assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
-                                      virt_to_maddr(v->arch.privregs + i));
-
-		tlbflush_update_time(&v->arch.tlbflush_timestamp,
-		                     tlbflush_current_time());
-	    }
-
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
 	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
@@ -416,6 +378,41 @@ int vcpu_initialise(struct vcpu *v)
 	if (!VMX_DOMAIN(v))
 		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v,
 		           first_cpu(cpu_online_map));
+
+	return 0;
+}
+
+int vcpu_late_initialise(struct vcpu *v)
+{
+	struct domain *d = v->domain;
+	int rc, order, i;
+
+	if (HAS_PERVCPU_VHPT(d)) {
+		rc = pervcpu_vhpt_alloc(v);
+		if (rc != 0)
+			return rc;
+	}
+
+	/* Create privregs page. */
+	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
+	v->arch.privregs = alloc_xenheap_pages(order);
+	BUG_ON(v->arch.privregs == NULL);
+	memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
+	for (i = 0; i < (1 << order); i++)
+		share_xen_page_with_guest(virt_to_page(v->arch.privregs) + i,
+		                          d, XENSHARE_writable);
+	/*
+	 * XXX IA64_XMAPPEDREGS_PADDR
+	 * assign these pages into guest pseudo physical address
+	 * space for dom0 to map this page by gmfn.
+	 * this is necessary for domain save, restore and dump-core.
+	 */
+	for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
+		assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
+		                   virt_to_maddr(v->arch.privregs + i));
+
+	tlbflush_update_time(&v->arch.tlbflush_timestamp,
+	                     tlbflush_current_time());
 
 	return 0;
 }
@@ -553,6 +550,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
+	int rc;
 	
 	*regs = c.nat->user_regs;
  	
@@ -582,16 +580,25 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		v->arch.event_callback_ip = er->event_callback_ip;
 		v->arch.dcr = er->dcr;
 		v->arch.iva = er->iva;
-  	}
-	
-  	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
- 		return 0;
- 	if (d->arch.is_vti)
- 		vmx_final_setup_guest(v);
-	
- 	/* This overrides some registers.  */
-  	vcpu_init_regs(v);
-  
+	}
+
+	if (test_bit(_VCPUF_initialised, &v->vcpu_flags))
+		return 0;
+
+	if (d->arch.is_vti)
+		vmx_final_setup_guest(v);
+	else {
+		rc = vcpu_late_initialise(v);
+		if (rc != 0)
+			return rc;
+		VCPU(v, interrupt_mask_addr) = 
+			(unsigned char *) d->arch.shared_info_va +
+			INT_ENABLE_OFFSET(v);
+	}
+
+	/* This overrides some registers. */
+	vcpu_init_regs(v);
+
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 	return 0;
@@ -683,7 +690,6 @@ domain_set_shared_info_va (unsigned long va)
 {
 	struct vcpu *v = current;
 	struct domain *d = v->domain;
-	struct vcpu *v1;
 
 	/* Check virtual address:
 	   must belong to region 7,
@@ -699,10 +705,8 @@ domain_set_shared_info_va (unsigned long va)
 	printk ("Domain set shared_info_va to 0x%016lx\n", va);
 	d->arch.shared_info_va = va;
 
-	for_each_vcpu (d, v1) {
-		VCPU(v1, interrupt_mask_addr) = 
-			(unsigned char *)va + INT_ENABLE_OFFSET(v1);
-	}
+	VCPU(v, interrupt_mask_addr) = (unsigned char *)va +
+	                               INT_ENABLE_OFFSET(v);
 
 	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)(va + XSI_PSR_IC_OFS);
 
@@ -1106,7 +1110,7 @@ int construct_dom0(struct domain *d,
 	printk ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
 	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
-		printk ("Cannot allocate dom0 vcpu %d\n", i);
+		panic("Cannot allocate dom0 vcpu %d\n", i);
 
 	/* Copy the OS image. */
 	loaddomainelfimage(d,image_start);
