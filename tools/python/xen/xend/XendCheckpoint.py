@@ -147,18 +147,20 @@ def restore(xd, fd, dominfo = None, paused = False):
     assert store_port
     assert console_port
 
+    nr_pfns = (dominfo.getMemoryTarget() + 3) / 4 
+
     try:
         l = read_exact(fd, sizeof_unsigned_long,
                        "not a valid guest state file: pfn count read")
-        nr_pfns = unpack("L", l)[0]    # native sizeof long
-        if nr_pfns > 16*1024*1024:     # XXX 
+        max_pfn = unpack("L", l)[0]    # native sizeof long
+        if max_pfn > 16*1024*1024:     # XXX 
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 
         balloon.free(xc.pages_to_kib(nr_pfns))
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
-                        fd, dominfo.getDomid(), nr_pfns,
+                        fd, dominfo.getDomid(), max_pfn,
                         store_port, console_port])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
