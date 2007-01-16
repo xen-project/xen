@@ -1104,7 +1104,8 @@ ENTRY(break_fault)
 	adds r23=IA64_VCPU_BREAKIMM_OFFSET,r22
 	;;
 	ld4 r23=[r23];;
-	cmp4.eq p6,p7=r23,r17			// Xen-reserved breakimm?
+	cmp4.eq p6,p0=r23,r17;;			// Xen-reserved breakimm?
+	cmp.eq.and p6,p0=2,r19        
 (p6)	br.spnt.many fast_hypercall
 	;;
 	br.sptk.many fast_break_reflect
