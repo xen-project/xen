@@ -1336,8 +1336,7 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 {
 	// TODO: Only allowed for current vcpu
 	PSR psr;
-	u64 int_enable, regspsr = 0;
-	u64 ifs;
+	u64 int_enable, ifs;
 	REGS *regs = vcpu_regs(vcpu);
 
 	psr.i64 = PSCB(vcpu, ipsr);
@@ -1363,26 +1362,11 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 	}
 
 	ifs = PSCB(vcpu, ifs);
-	if (ifs > 0x8000000000000000UL) {
-		if (regs->cr_ifs > 0x8000000000000000UL) {
-			// TODO: validate PSCB(vcpu,iip)
-			// TODO: PSCB(vcpu,ipsr) = psr;
-			PSCB(vcpu, ipsr) = psr.i64;
-			// now set up the trampoline
-			regs->cr_iip = *(unsigned long *)dorfirfi; // func ptr!
-			__asm__ __volatile("mov %0=psr;;":"=r"(regspsr)
-			                   ::"memory");
-			regs->cr_ipsr = regspsr & ~(IA64_PSR_I | IA64_PSR_IC |
-			                            IA64_PSR_BN);
-		} else {
-			regs->cr_ifs = ifs;
-			regs->cr_ipsr = psr.i64;
-			regs->cr_iip = PSCB(vcpu, iip);
-		}
-	} else {
-		regs->cr_ipsr = psr.i64;
-		regs->cr_iip = PSCB(vcpu, iip);
-	}
+	if (ifs & 0x8000000000000000UL) 
+		regs->cr_ifs = ifs;
+
+	regs->cr_ipsr = psr.i64;
+	regs->cr_iip = PSCB(vcpu, iip);
 	PSCB(vcpu, interrupt_collection_enabled) = 1;
 	vcpu_bsw1(vcpu);
 	vcpu->vcpu_info->evtchn_upcall_mask = !int_enable;

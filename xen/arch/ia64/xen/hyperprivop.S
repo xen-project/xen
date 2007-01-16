@@ -81,9 +81,6 @@
 //	r19 == vpsr.ic
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
-#ifndef FAST_HYPERPRIVOPS // see beginning of file
-	br.sptk.many dispatch_break_fault ;;
-#endif
 	// HYPERPRIVOP_SSM_I?
 	// assumes domain interrupts pending, so just do it
 	cmp.eq p7,p6=HYPERPRIVOP_SSM_I,r17
@@ -102,7 +99,9 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=HYPERPRIVOP_RFI,r17
 (p7)	br.sptk.many hyper_rfi
 	;;
-
+#ifndef FAST_HYPERPRIVOPS // see beginning of file
+	br.sptk.many dispatch_break_fault ;;
+#endif
 	// if event enabled and there are pending events
 	cmp.ne p7,p0=r20,r0
 	;;
@@ -1010,10 +1009,22 @@ page_not_present:
 #endif
 END(fast_tlb_miss_reflect)
 
+ENTRY(slow_vcpu_rfi)
+	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18;;
+	ld8 r22=[r22];;
+	tbit.z p6,p0=r22,63
+(p6)	br.spnt.few dispatch_break_fault ;;
+	// if vips is valid, discard current register frame
+	// don't need dorfirfi any more
+	alloc r22=ar.pfs,0,0,0,0
+	br.spnt.few dispatch_break_fault
+	;;
+END(slow_vcpu_rfi)    
+
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
 #ifndef FAST_RFI
-	br.spnt.few dispatch_break_fault ;;
+	br.spnt.few slow_vcpu_rfi ;;
 #endif
 	// if no interrupts pending, proceed
 	mov r30=r0
@@ -1027,7 +1038,7 @@ ENTRY(hyper_rfi)
 	// r30 determines whether we might deliver an immediate extint
 #ifndef RFI_TO_INTERRUPT // see beginning of file
 	cmp.ne p6,p0=r30,r0
-(p6)	br.cond.spnt.few dispatch_break_fault ;;
+(p6)	br.cond.spnt.few slow_vcpu_rfi ;;
 #endif
 1:
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1035,25 +1046,25 @@ ENTRY(hyper_rfi)
 	extr.u r22=r21,IA64_PSR_BE_BIT,1 ;;
 	// if turning on psr.be, give up for now and do it the slow way
 	cmp.ne p7,p0=r22,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if (!(vpsr.dt && vpsr.rt && vpsr.it)), do it the slow way
 	movl r20=(IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT);;
 	and r22=r20,r21
 	;;
 	cmp.ne p7,p0=r22,r20
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if was in metaphys mode, do it the slow way (FIXME later?)
 	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.ne p7,p0=r20,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if domain hasn't already done virtual bank switch
 	//  do it the slow way (FIXME later?)
 #if 0
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.eq p7,p0=r20,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 #endif
 	// validate vcr.iip, if in Xen range, do it the slow way
 	adds r20=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1062,7 +1073,7 @@ ENTRY(hyper_rfi)
 	movl r24=HYPERVISOR_VIRT_END;;
 	cmp.ltu p0,p7=r22,r23 ;;	// if !(iip<low) &&
 (p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 
 1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT

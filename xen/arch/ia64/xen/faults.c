@@ -136,11 +136,6 @@ void reflect_event(void)
 
 	regs = vcpu_regs(v);
 
-	// can't inject event, when XEN is emulating rfi 
-	// and both PSCB(v, ifs) and regs->ifs are valid
-	if (regs->cr_iip == *(unsigned long *)dorfirfi)
-		return;
-
 	isr = regs->cr_ipsr & IA64_PSR_RI;
 
 	if (!PSCB(v, interrupt_collection_enabled))
