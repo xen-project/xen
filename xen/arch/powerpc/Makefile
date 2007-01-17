@@ -64,7 +64,7 @@ CFLAGS += $(PPC_C_WARNINGS)
 # objects into a single ELF segment and to not link in any additional
 # objects that gcc would normally like to
 #
-OMAGIC = -N -nodefaultlibs -nostartfiles
+OMAGIC = -nodefaultlibs -nostartfiles
 
 firmware: of_handler/built_in.o $(TARGET_SUBARCH)/memcpy.o of-devtree.o
 	$(CC) $(CFLAGS) $(OMAGIC) -e __ofh_start -Wl,-Ttext,0x0 $^ -o $@

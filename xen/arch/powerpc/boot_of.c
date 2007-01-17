@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  *          Hollis Blanchard <hollisb@us.ibm.com>
@@ -1341,7 +1341,7 @@ multiboot_info_t __init *boot_of_init(
             __func__,
             r3, r4, vec, r6, r7, orig_msr);
 
-    if ((vec >= (ulong)_start) && (vec <= (ulong)_end)) {
+    if (is_kernel(vec)) {
         of_panic("Hmm.. OF[0x%lx] seems to have stepped on our image "
                 "that ranges: %p .. %p.\n",
                 vec, _start, _end);
