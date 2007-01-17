@@ -1,7 +1,6 @@
 #ifndef _ASM_IO_H
 #define _ASM_IO_H
 
-#include <linux/config.h>
 #include <asm/fixmap.h>
 
 /*

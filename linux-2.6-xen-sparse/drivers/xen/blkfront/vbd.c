@@ -136,7 +136,6 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		return NULL;
 	}
 
-	devfs_mk_dir(ptr->type->devname);
 	major_info[index] = ptr;
 	return ptr;
 }

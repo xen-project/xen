@@ -79,6 +79,7 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 		memset(bitmap, 0xff, IO_BITMAP_BYTES);
 		t->io_bitmap_ptr = bitmap;
+		set_thread_flag(TIF_IO_BITMAP);
 
 		set_iobitmap.bitmap   = (char *)bitmap;
 		set_iobitmap.nr_ports = IO_BITMAP_BITS;

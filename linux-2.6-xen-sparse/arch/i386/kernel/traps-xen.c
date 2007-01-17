@@ -11,7 +11,6 @@
  * 'Traps.c' handles hardware traps and faults after we have saved some
  * state in 'asm.s'.
  */
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -28,6 +27,7 @@
 #include <linux/utsname.h>
 #include <linux/kprobes.h>
 #include <linux/kexec.h>
+#include <linux/unwind.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -47,7 +47,7 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/nmi.h>
-
+#include <asm/unwind.h>
 #include <asm/smp.h>
 #include <asm/arch_hooks.h>
 #include <asm/kdebug.h>
@@ -98,6 +98,11 @@ asmlinkage void fixup_4gb_segment(void);
 asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
+#ifdef CONFIG_STACK_UNWIND
+static int call_trace = 1;
+#else
+#define call_trace (-1)
+#endif
 ATOMIC_NOTIFIER_HEAD(i386die_chain);
 
 int register_die_notifier(struct notifier_block *nb)
@@ -105,13 +110,13 @@ int register_die_notifier(struct notifier_block *nb)
 	vmalloc_sync_all();
 	return atomic_notifier_chain_register(&i386die_chain, nb);
 }
-EXPORT_SYMBOL(register_die_notifier);
+EXPORT_SYMBOL(register_die_notifier); /* used modular by kdb */
 
 int unregister_die_notifier(struct notifier_block *nb)
 {
 	return atomic_notifier_chain_unregister(&i386die_chain, nb);
 }
-EXPORT_SYMBOL(unregister_die_notifier);
+EXPORT_SYMBOL(unregister_die_notifier); /* used modular by kdb */
 
 static inline int valid_stack_ptr(struct thread_info *tinfo, void *p)
 {
@@ -120,28 +125,13 @@ static inline int valid_stack_ptr(struct thread_info *tinfo, void *p)
 }
 
 /*
- * Print CONFIG_STACK_BACKTRACE_COLS address/symbol entries per line.
+ * Print one address/symbol entries per line.
  */
-static inline int print_addr_and_symbol(unsigned long addr, char *log_lvl,
-					int printed)
+static inline void print_addr_and_symbol(unsigned long addr, char *log_lvl)
 {
-	if (!printed)
-		printk(log_lvl);
-
-#if CONFIG_STACK_BACKTRACE_COLS == 1
 	printk(" [<%08lx>] ", addr);
-#else
-	printk(" <%08lx> ", addr);
-#endif
-	print_symbol("%s", addr);
 
-	printed = (printed + 1) % CONFIG_STACK_BACKTRACE_COLS;
-	if (printed)
-		printk(" ");
-	else
-		printk("\n");
-
-	return printed;
+	print_symbol("%s\n", addr);
 }
 
 static inline unsigned long print_context_stack(struct thread_info *tinfo,
@@ -149,34 +139,80 @@ static inline unsigned long print_context_stack(struct thread_info *tinfo,
 				char *log_lvl)
 {
 	unsigned long addr;
-	int printed = 0; /* nr of entries already printed on current line */
 
 #ifdef	CONFIG_FRAME_POINTER
 	while (valid_stack_ptr(tinfo, (void *)ebp)) {
 		addr = *(unsigned long *)(ebp + 4);
-		printed = print_addr_and_symbol(addr, log_lvl, printed);
+		print_addr_and_symbol(addr, log_lvl);
+		/*
+		 * break out of recursive entries (such as
+		 * end_of_stack_stop_unwind_function):
+	 	 */
+		if (ebp == *(unsigned long *)ebp)
+			break;
 		ebp = *(unsigned long *)ebp;
 	}
 #else
 	while (valid_stack_ptr(tinfo, stack)) {
 		addr = *stack++;
 		if (__kernel_text_address(addr))
-			printed = print_addr_and_symbol(addr, log_lvl, printed);
+			print_addr_and_symbol(addr, log_lvl);
 	}
 #endif
-	if (printed)
-		printk("\n");
-
 	return ebp;
 }
 
-static void show_trace_log_lvl(struct task_struct *task,
+static asmlinkage int
+show_trace_unwind(struct unwind_frame_info *info, void *log_lvl)
+{
+	int n = 0;
+
+	while (unwind(info) == 0 && UNW_PC(info)) {
+		n++;
+		print_addr_and_symbol(UNW_PC(info), log_lvl);
+		if (arch_unw_user_mode(info))
+			break;
+	}
+	return n;
+}
+
+static void show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 			       unsigned long *stack, char *log_lvl)
 {
 	unsigned long ebp;
 
 	if (!task)
 		task = current;
+
+	if (call_trace >= 0) {
+		int unw_ret = 0;
+		struct unwind_frame_info info;
+
+		if (regs) {
+			if (unwind_init_frame_info(&info, task, regs) == 0)
+				unw_ret = show_trace_unwind(&info, log_lvl);
+		} else if (task == current)
+			unw_ret = unwind_init_running(&info, show_trace_unwind, log_lvl);
+		else {
+			if (unwind_init_blocked(&info, task) == 0)
+				unw_ret = show_trace_unwind(&info, log_lvl);
+		}
+		if (unw_ret > 0) {
+			if (call_trace == 1 && !arch_unw_user_mode(&info)) {
+				print_symbol("DWARF2 unwinder stuck at %s\n",
+					     UNW_PC(&info));
+				if (UNW_SP(&info) >= PAGE_OFFSET) {
+					printk("Leftover inexact backtrace:\n");
+					stack = (void *)UNW_SP(&info);
+				} else
+					printk("Full inexact backtrace again:\n");
+			} else if (call_trace >= 1)
+				return;
+			else
+				printk("Full inexact backtrace again:\n");
+		} else
+			printk("Inexact backtrace:\n");
+	}
 
 	if (task == current) {
 		/* Grab ebp right from our regs */
@@ -198,13 +234,13 @@ static void show_trace_log_lvl(struct task_struct *task,
 	}
 }
 
-void show_trace(struct task_struct *task, unsigned long * stack)
+void show_trace(struct task_struct *task, struct pt_regs *regs, unsigned long * stack)
 {
-	show_trace_log_lvl(task, stack, "");
+	show_trace_log_lvl(task, regs, stack, "");
 }
 
-static void show_stack_log_lvl(struct task_struct *task, unsigned long *esp,
-			       char *log_lvl)
+static void show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
+			       unsigned long *esp, char *log_lvl)
 {
 	unsigned long *stack;
 	int i;
@@ -225,13 +261,13 @@ static void show_stack_log_lvl(struct task_struct *task, unsigned long *esp,
 		printk("%08lx ", *stack++);
 	}
 	printk("\n%sCall Trace:\n", log_lvl);
-	show_trace_log_lvl(task, esp, log_lvl);
+	show_trace_log_lvl(task, regs, esp, log_lvl);
 }
 
 void show_stack(struct task_struct *task, unsigned long *esp)
 {
 	printk("       ");
-	show_stack_log_lvl(task, esp, "");
+	show_stack_log_lvl(task, NULL, esp, "");
 }
 
 /*
@@ -241,7 +277,7 @@ void dump_stack(void)
 {
 	unsigned long stack;
 
-	show_trace(current, &stack);
+	show_trace(current, NULL, &stack);
 }
 
 EXPORT_SYMBOL(dump_stack);
@@ -274,8 +310,9 @@ void show_registers(struct pt_regs *regs)
 		regs->esi, regs->edi, regs->ebp, esp);
 	printk(KERN_EMERG "ds: %04x   es: %04x   ss: %04x\n",
 		regs->xds & 0xffff, regs->xes & 0xffff, ss);
-	printk(KERN_EMERG "Process %s (pid: %d, threadinfo=%p task=%p)",
-		current->comm, current->pid, current_thread_info(), current);
+	printk(KERN_EMERG "Process %.*s (pid: %d, ti=%p task=%p task.ti=%p)",
+		TASK_COMM_LEN, current->comm, current->pid,
+		current_thread_info(), current, current->thread_info);
 	/*
 	 * When in-kernel, we also print out the stack and code at the
 	 * time of the fault..
@@ -284,7 +321,7 @@ void show_registers(struct pt_regs *regs)
 		u8 __user *eip;
 
 		printk("\n" KERN_EMERG "Stack: ");
-		show_stack_log_lvl(NULL, (unsigned long *)esp, KERN_EMERG);
+		show_stack_log_lvl(NULL, regs, (unsigned long *)esp, KERN_EMERG);
 
 		printk(KERN_EMERG "Code: ");
 
@@ -307,35 +344,35 @@ void show_registers(struct pt_regs *regs)
 
 static void handle_BUG(struct pt_regs *regs)
 {
+	unsigned long eip = regs->eip;
 	unsigned short ud2;
-	unsigned short line;
-	char *file;
-	char c;
-	unsigned long eip;
-
-	eip = regs->eip;
 
 	if (eip < PAGE_OFFSET)
-		goto no_bug;
+		return;
 	if (__get_user(ud2, (unsigned short __user *)eip))
-		goto no_bug;
+		return;
 	if (ud2 != 0x0b0f)
-		goto no_bug;
-	if (__get_user(line, (unsigned short __user *)(eip + 2)))
-		goto bug;
-	if (__get_user(file, (char * __user *)(eip + 4)) ||
-		(unsigned long)file < PAGE_OFFSET || __get_user(c, file))
-		file = "<bad filename>";
+		return;
 
 	printk(KERN_EMERG "------------[ cut here ]------------\n");
-	printk(KERN_EMERG "kernel BUG at %s:%d!\n", file, line);
 
-no_bug:
-	return;
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+	do {
+		unsigned short line;
+		char *file;
+		char c;
 
-	/* Here we know it was a BUG but file-n-line is unavailable */
-bug:
-	printk(KERN_EMERG "Kernel BUG\n");
+		if (__get_user(line, (unsigned short __user *)(eip + 2)))
+			break;
+		if (__get_user(file, (char * __user *)(eip + 4)) ||
+		    (unsigned long)file < PAGE_OFFSET || __get_user(c, file))
+			file = "<bad filename>";
+
+		printk(KERN_EMERG "kernel BUG at %s:%d!\n", file, line);
+		return;
+	} while (0);
+#endif
+	printk(KERN_EMERG "Kernel BUG at [verbose debug info unavailable]\n");
 }
 
 /* This is gone through when something in the kernel
@@ -425,11 +462,9 @@ void die(const char * str, struct pt_regs * regs, long err)
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
-	if (panic_on_oops) {
-		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
-		ssleep(5);
+	if (panic_on_oops)
 		panic("Fatal exception");
-	}
+
 	oops_exit();
 	do_exit(SIGSEGV);
 }
@@ -1133,3 +1168,19 @@ static int __init kstack_setup(char *s)
 	return 1;
 }
 __setup("kstack=", kstack_setup);
+
+#ifdef CONFIG_STACK_UNWIND
+static int __init call_trace_setup(char *s)
+{
+	if (strcmp(s, "old") == 0)
+		call_trace = -1;
+	else if (strcmp(s, "both") == 0)
+		call_trace = 0;
+	else if (strcmp(s, "newfallback") == 0)
+		call_trace = 1;
+	else if (strcmp(s, "new") == 2)
+		call_trace = 2;
+	return 1;
+}
+__setup("call_trace=", call_trace_setup);
+#endif

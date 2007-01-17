@@ -285,7 +285,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		cpu_clear(cpu, cpu_possible_map);
 	}
 
-	for_each_cpu (cpu) {
+	for_each_possible_cpu (cpu) {
 		if (cpu == 0)
 			continue;
 
@@ -392,10 +392,8 @@ void __cpu_die(unsigned int cpu)
 
 	xen_smp_intr_exit(cpu);
 
-#if defined(__i386__)
 	if (num_online_cpus() == 1)
 		alternatives_smp_switch(0);
-#endif
 }
 
 #else /* !CONFIG_HOTPLUG_CPU */
@@ -420,10 +418,8 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (rc)
 		return rc;
 
-#if defined(__i386__)
 	if (num_online_cpus() == 1)
 		alternatives_smp_switch(1);
-#endif
 
 	/* This must be done before setting cpu_online_map */
 	set_cpu_sibling_map(cpu);

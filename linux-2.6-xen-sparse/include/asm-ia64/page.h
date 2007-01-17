@@ -7,7 +7,7 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
-#include <linux/config.h>
+# ifdef __KERNEL__
 
 #include <asm/intrinsics.h>
 #include <asm/types.h>
@@ -65,7 +65,6 @@
 # define __pa(x)		((x) - PAGE_OFFSET)
 # define __va(x)		((x) + PAGE_OFFSET)
 #else /* !__ASSEMBLY */
-# ifdef __KERNEL__
 #  define STRICT_MM_TYPECHECKS
 
 extern void clear_page (void *page);
@@ -177,7 +176,6 @@ get_order (unsigned long size)
 	return order;
 }
 
-# endif /* __KERNEL__ */
 #endif /* !__ASSEMBLY__ */
 
 #ifdef STRICT_MM_TYPECHECKS
@@ -280,4 +278,5 @@ extern struct address_space xen_ia64_foreign_dummy_mapping;
 #endif /* CONFIG_XEN */
 #endif /* __ASSEMBLY__ */
 
+# endif /* __KERNEL__ */
 #endif /* _ASM_IA64_PAGE_H */

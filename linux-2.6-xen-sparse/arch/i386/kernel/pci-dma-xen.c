@@ -21,6 +21,8 @@
 #include <asm/bug.h>
 
 #ifdef __x86_64__
+#include <asm/proto.h>
+
 int iommu_merge __read_mostly = 0;
 EXPORT_SYMBOL(iommu_merge);
 
@@ -32,10 +34,28 @@ EXPORT_SYMBOL(bad_dma_address);
 int iommu_bio_merge __read_mostly = 0;
 EXPORT_SYMBOL(iommu_bio_merge);
 
+int force_iommu __read_mostly= 0;
+
 __init int iommu_setup(char *p)
 {
     return 1;
 }
+
+void __init pci_iommu_alloc(void)
+{
+#ifdef CONFIG_SWIOTLB
+	pci_swiotlb_init();
+#endif
+}
+
+static int __init pci_iommu_init(void)
+{
+	no_iommu_init();
+	return 0;
+}
+
+/* Must execute after PCI subsystem */
+fs_initcall(pci_iommu_init);
 #endif
 
 struct dma_coherent_mem {

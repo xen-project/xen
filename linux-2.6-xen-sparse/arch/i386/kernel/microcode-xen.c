@@ -43,7 +43,10 @@ MODULE_DESCRIPTION("Intel CPU (IA-32) Microcode Update Driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
 MODULE_LICENSE("GPL");
 
-#define MICROCODE_VERSION 	"1.14-xen"
+static int verbose;
+module_param(verbose, int, 0644);
+
+#define MICROCODE_VERSION 	"1.14a-xen"
 
 #define DEFAULT_UCODE_DATASIZE 	(2000) 	  /* 2000 bytes */
 #define MC_HEADER_SIZE		(sizeof (microcode_header_t))  	  /* 48 bytes */
@@ -111,7 +114,6 @@ static struct file_operations microcode_fops = {
 static struct miscdevice microcode_dev = {
 	.minor		= MICROCODE_MINOR,
 	.name		= "microcode",
-	.devfs_name	= "cpu/microcode",
 	.fops		= &microcode_fops,
 };
 

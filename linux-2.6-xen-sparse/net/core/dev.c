@@ -76,7 +76,6 @@
 #include <asm/system.h>
 #include <linux/bitops.h>
 #include <linux/capability.h>
-#include <linux/config.h>
 #include <linux/cpu.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -116,6 +115,9 @@
 #include <asm/current.h>
 #include <linux/err.h>
 #include <linux/audit.h>
+#include <linux/dmaengine.h>
+#include <linux/err.h>
+#include <linux/ctype.h>
 
 #ifdef CONFIG_XEN
 #include <net/ip.h>
@@ -154,6 +156,12 @@
 static DEFINE_SPINLOCK(ptype_lock);
 static struct list_head ptype_base[16];	/* 16 way hashed list */
 static struct list_head ptype_all;		/* Taps */
+
+#ifdef CONFIG_NET_DMA
+static struct dma_client *net_dma_client;
+static unsigned int net_dma_count;
+static spinlock_t net_dma_event_lock;
+#endif
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtnl
@@ -229,7 +237,7 @@ extern void netdev_unregister_sysfs(struct net_device *);
  *	For efficiency
  */
 
-int netdev_nit;
+static int netdev_nit;
 
 /*
  *	Add a protocol ID to the list. Now that the input handler is
@@ -632,14 +640,22 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
  *	@name: name string
  *
  *	Network device names need to be valid file names to
- *	to allow sysfs to work
+ *	to allow sysfs to work.  We also disallow any kind of
+ *	whitespace.
  */
 int dev_valid_name(const char *name)
 {
-	return !(*name == '\0' 
-		 || !strcmp(name, ".")
-		 || !strcmp(name, "..")
-		 || strchr(name, '/'));
+	if (*name == '\0')
+		return 0;
+	if (!strcmp(name, ".") || !strcmp(name, ".."))
+		return 0;
+
+	while (*name) {
+		if (*name == '/' || isspace(*name))
+			return 0;
+		name++;
+	}
+	return 1;
 }
 
 /**
@@ -1256,7 +1272,6 @@ void netdev_rx_csum_fault(struct net_device *dev)
 EXPORT_SYMBOL(netdev_rx_csum_fault);
 #endif
 
-#ifdef CONFIG_HIGHMEM
 /* Actually, we should eliminate this check as soon as we know, that:
  * 1. IOMMU is present and allows to map all the memory.
  * 2. No high memory really exists on this machine.
@@ -1264,6 +1279,7 @@ EXPORT_SYMBOL(netdev_rx_csum_fault);
 
 static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 {
+#ifdef CONFIG_HIGHMEM
 	int i;
 
 	if (dev->features & NETIF_F_HIGHDMA)
@@ -1273,11 +1289,9 @@ static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 		if (PageHighMem(skb_shinfo(skb)->frags[i].page))
 			return 1;
 
+#endif
 	return 0;
 }
-#else
-#define illegal_highdma(dev, skb)	(0)
-#endif
 
 struct dev_gso_cb {
 	void (*destructor)(struct sk_buff *skb);
@@ -1328,6 +1342,7 @@ static int dev_gso_segment(struct sk_buff *skb)
 	skb->next = segs;
 	DEV_GSO_CB(skb)->destructor = skb->destructor;
 	skb->destructor = dev_gso_skb_destructor;
+
 	return 0;
 }
 
@@ -1663,26 +1678,10 @@ static inline struct net_device *skb_bond(struct sk_buff *skb)
 	struct net_device *dev = skb->dev;
 
 	if (dev->master) {
-		/*
-		 * On bonding slaves other than the currently active
-		 * slave, suppress duplicates except for 802.3ad
-		 * ETH_P_SLOW and alb non-mcast/bcast.
-		 */
-		if (dev->priv_flags & IFF_SLAVE_INACTIVE) {
-			if (dev->master->priv_flags & IFF_MASTER_ALB) {
-				if (skb->pkt_type != PACKET_BROADCAST &&
-				    skb->pkt_type != PACKET_MULTICAST)
-					goto keep;
-			}
-
-			if (dev->master->priv_flags & IFF_MASTER_8023AD &&
-			    skb->protocol == __constant_htons(ETH_P_SLOW))
-				goto keep;
-		
+		if (skb_bond_should_drop(skb)) {
 			kfree_skb(skb);
 			return NULL;
 		}
-keep:
 		skb->dev = dev->master;
 	}
 
@@ -1789,7 +1788,7 @@ static int ing_filter(struct sk_buff *skb)
 	if (dev->qdisc_ingress) {
 		__u32 ttl = (__u32) G_TC_RTTL(skb->tc_verd);
 		if (MAX_RED_LOOP < ttl++) {
-			printk("Redir loop detected Dropping packet (%s->%s)\n",
+			printk(KERN_WARNING "Redir loop detected Dropping packet (%s->%s)\n",
 				skb->input_dev->name, skb->dev->name);
 			return TC_ACT_SHOT;
 		}
@@ -2000,6 +1999,19 @@ static void net_rx_action(struct softirq_action *h)
 		}
 	}
 out:
+#ifdef CONFIG_NET_DMA
+	/*
+	 * There may not be any more sk_buffs coming right now, so push
+	 * any pending DMA copies to hardware
+	 */
+	if (net_dma_client) {
+		struct dma_chan *chan;
+		rcu_read_lock();
+		list_for_each_entry_rcu(chan, &net_dma_client->channels, client_node)
+			dma_async_memcpy_issue_pending(chan);
+		rcu_read_unlock();
+	}
+#endif
 	local_irq_enable();
 	return;
 
@@ -2984,7 +2996,7 @@ int register_netdevice(struct net_device *dev)
 	/* Fix illegal SG+CSUM combinations. */
 	if ((dev->features & NETIF_F_SG) &&
 	    !(dev->features & NETIF_F_ALL_CSUM)) {
-		printk("%s: Dropping NETIF_F_SG since no checksum feature.\n",
+		printk(KERN_NOTICE "%s: Dropping NETIF_F_SG since no checksum feature.\n",
 		       dev->name);
 		dev->features &= ~NETIF_F_SG;
 	}
@@ -2992,7 +3004,7 @@ int register_netdevice(struct net_device *dev)
 	/* TSO requires that SG is present as well. */
 	if ((dev->features & NETIF_F_TSO) &&
 	    !(dev->features & NETIF_F_SG)) {
-		printk("%s: Dropping NETIF_F_TSO since no SG feature.\n",
+		printk(KERN_NOTICE "%s: Dropping NETIF_F_TSO since no SG feature.\n",
 		       dev->name);
 		dev->features &= ~NETIF_F_TSO;
 	}
@@ -3174,7 +3186,7 @@ static void netdev_wait_allrefs(struct net_device *dev)
 static DEFINE_MUTEX(net_todo_run_mutex);
 void netdev_run_todo(void)
 {
-	struct list_head list = LIST_HEAD_INIT(list);
+	struct list_head list;
 
 	/* Need to guard against multiple cpu's getting out of order. */
 	mutex_lock(&net_todo_run_mutex);
@@ -3189,9 +3201,9 @@ void netdev_run_todo(void)
 
 	/* Snapshot list, allow later requests */
 	spin_lock(&net_todo_list_lock);
-	list_splice_init(&net_todo_list, &list);
+	list_replace_init(&net_todo_list, &list);
 	spin_unlock(&net_todo_list_lock);
-		
+
 	while (!list_empty(&list)) {
 		struct net_device *dev
 			= list_entry(list.next, struct net_device, todo_list);
@@ -3452,6 +3464,83 @@ static int dev_cpu_callback(struct notifier_block *nfb,
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
+#ifdef CONFIG_NET_DMA
+/**
+ * net_dma_rebalance -
+ * This is called when the number of channels allocated to the net_dma_client
+ * changes.  The net_dma_client tries to have one DMA channel per CPU.
+ */
+static void net_dma_rebalance(void)
+{
+	unsigned int cpu, i, n;
+	struct dma_chan *chan;
+
+	if (net_dma_count == 0) {
+		for_each_online_cpu(cpu)
+			rcu_assign_pointer(per_cpu(softnet_data, cpu).net_dma, NULL);
+		return;
+	}
+
+	i = 0;
+	cpu = first_cpu(cpu_online_map);
+
+	rcu_read_lock();
+	list_for_each_entry(chan, &net_dma_client->channels, client_node) {
+		n = ((num_online_cpus() / net_dma_count)
+		   + (i < (num_online_cpus() % net_dma_count) ? 1 : 0));
+
+		while(n) {
+			per_cpu(softnet_data, cpu).net_dma = chan;
+			cpu = next_cpu(cpu, cpu_online_map);
+			n--;
+		}
+		i++;
+	}
+	rcu_read_unlock();
+}
+
+/**
+ * netdev_dma_event - event callback for the net_dma_client
+ * @client: should always be net_dma_client
+ * @chan: DMA channel for the event
+ * @event: event type
+ */
+static void netdev_dma_event(struct dma_client *client, struct dma_chan *chan,
+	enum dma_event event)
+{
+	spin_lock(&net_dma_event_lock);
+	switch (event) {
+	case DMA_RESOURCE_ADDED:
+		net_dma_count++;
+		net_dma_rebalance();
+		break;
+	case DMA_RESOURCE_REMOVED:
+		net_dma_count--;
+		net_dma_rebalance();
+		break;
+	default:
+		break;
+	}
+	spin_unlock(&net_dma_event_lock);
+}
+
+/**
+ * netdev_dma_regiser - register the networking subsystem as a DMA client
+ */
+static int __init netdev_dma_register(void)
+{
+	spin_lock_init(&net_dma_event_lock);
+	net_dma_client = dma_async_client_register(netdev_dma_event);
+	if (net_dma_client == NULL)
+		return -ENOMEM;
+
+	dma_async_client_chan_request(net_dma_client, num_online_cpus());
+	return 0;
+}
+
+#else
+static int __init netdev_dma_register(void) { return -ENODEV; }
+#endif /* CONFIG_NET_DMA */
 
 /*
  *	Initialize the DEV module. At boot time this walks the device list and
@@ -3504,6 +3593,8 @@ static int __init net_dev_init(void)
 		queue->backlog_dev.poll = process_backlog;
 		atomic_set(&queue->backlog_dev.refcnt, 1);
 	}
+
+	netdev_dma_register();
 
 	dev_boot_phase = 0;
 

@@ -47,6 +47,7 @@
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
 #include <linux/module.h>
+#include <linux/delayacct.h>
 #include <linux/init.h>
 
 #include <asm/pgalloc.h>
@@ -126,7 +127,7 @@ static void free_pte_range(struct mmu_gather *tlb, pmd_t *pmd)
 	pmd_clear(pmd);
 	pte_lock_deinit(page);
 	pte_free_tlb(tlb, page);
-	dec_page_state(nr_page_table_pages);
+	dec_zone_page_state(page, NR_PAGETABLE);
 	tlb->mm->nr_ptes--;
 }
 
@@ -311,7 +312,7 @@ int __pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 		pte_free(new);
 	} else {
 		mm->nr_ptes++;
-		inc_page_state(nr_page_table_pages);
+		inc_zone_page_state(new, NR_PAGETABLE);
 		pmd_populate(mm, pmd, new);
 	}
 	spin_unlock(&mm->page_table_lock);
@@ -435,7 +436,9 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	/* pte contains position in swap or file, so copy. */
 	if (unlikely(!pte_present(pte))) {
 		if (!pte_file(pte)) {
-			swap_duplicate(pte_to_swp_entry(pte));
+			swp_entry_t entry = pte_to_swp_entry(pte);
+
+			swap_duplicate(entry);
 			/* make sure dst_mm is on swapoff's mmlist. */
 			if (unlikely(list_empty(&dst_mm->mmlist))) {
 				spin_lock(&mmlist_lock);
@@ -443,6 +446,16 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 					list_add(&dst_mm->mmlist,
 						 &src_mm->mmlist);
 				spin_unlock(&mmlist_lock);
+			}
+			if (is_write_migration_entry(entry) &&
+					is_cow_mapping(vm_flags)) {
+				/*
+				 * COW mappings require pages in both parent
+				 * and child to be set to read.
+				 */
+				make_migration_entry_read(&entry);
+				pte = swp_entry_to_pte(entry);
+				set_pte_at(src_mm, addr, src_pte, pte);
 			}
 		}
 		goto out_set_pte;
@@ -492,7 +505,7 @@ again:
 		return -ENOMEM;
 	src_pte = pte_offset_map_nested(src_pmd, addr);
 	src_ptl = pte_lockptr(src_mm, src_pmd);
-	spin_lock(src_ptl);
+	spin_lock_nested(src_ptl, SINGLE_DEPTH_NESTING);
 
 	do {
 		/*
@@ -1563,25 +1576,60 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 {
 	struct page *old_page, *new_page;
 	pte_t entry;
-	int ret = VM_FAULT_MINOR;
+	int reuse, ret = VM_FAULT_MINOR;
 
 	old_page = vm_normal_page(vma, address, orig_pte);
 	if (!old_page)
 		goto gotten;
 
-	if (PageAnon(old_page) && !TestSetPageLocked(old_page)) {
-		int reuse = can_share_swap_page(old_page);
-		unlock_page(old_page);
-		if (reuse) {
-			flush_cache_page(vma, address, pte_pfn(orig_pte));
-			entry = pte_mkyoung(orig_pte);
-			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
-			ptep_set_access_flags(vma, address, page_table, entry, 1);
-			update_mmu_cache(vma, address, entry);
-			lazy_mmu_prot_update(entry);
-			ret |= VM_FAULT_WRITE;
-			goto unlock;
+	if (unlikely((vma->vm_flags & (VM_SHARED|VM_WRITE)) ==
+				(VM_SHARED|VM_WRITE))) {
+		if (vma->vm_ops && vma->vm_ops->page_mkwrite) {
+			/*
+			 * Notify the address space that the page is about to
+			 * become writable so that it can prohibit this or wait
+			 * for the page to get into an appropriate state.
+			 *
+			 * We do this without the lock held, so that it can
+			 * sleep if it needs to.
+			 */
+			page_cache_get(old_page);
+			pte_unmap_unlock(page_table, ptl);
+
+			if (vma->vm_ops->page_mkwrite(vma, old_page) < 0)
+				goto unwritable_page;
+
+			page_cache_release(old_page);
+
+			/*
+			 * Since we dropped the lock we need to revalidate
+			 * the PTE as someone else may have changed it.  If
+			 * they did, we just return, as we can count on the
+			 * MMU to tell us if they didn't also make it writable.
+			 */
+			page_table = pte_offset_map_lock(mm, pmd, address,
+							 &ptl);
+			if (!pte_same(*page_table, orig_pte))
+				goto unlock;
 		}
+
+		reuse = 1;
+	} else if (PageAnon(old_page) && !TestSetPageLocked(old_page)) {
+		reuse = can_share_swap_page(old_page);
+		unlock_page(old_page);
+	} else {
+		reuse = 0;
+	}
+
+	if (reuse) {
+		flush_cache_page(vma, address, pte_pfn(orig_pte));
+		entry = pte_mkyoung(orig_pte);
+		entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+		ptep_set_access_flags(vma, address, page_table, entry, 1);
+		update_mmu_cache(vma, address, entry);
+		lazy_mmu_prot_update(entry);
+		ret |= VM_FAULT_WRITE;
+		goto unlock;
 	}
 
 	/*
@@ -1620,9 +1668,9 @@ gotten:
 		flush_cache_page(vma, address, pte_pfn(orig_pte));
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+		lazy_mmu_prot_update(entry);
 		ptep_establish(vma, address, page_table, entry);
 		update_mmu_cache(vma, address, entry);
-		lazy_mmu_prot_update(entry);
 		lru_cache_add_active(new_page);
 		page_add_new_anon_rmap(new_page, vma, address);
 
@@ -1641,6 +1689,10 @@ oom:
 	if (old_page)
 		page_cache_release(old_page);
 	return VM_FAULT_OOM;
+
+unwritable_page:
+	page_cache_release(old_page);
+	return VM_FAULT_SIGBUS;
 }
 
 /*
@@ -1920,7 +1972,7 @@ int vmtruncate_range(struct inode *inode, loff_t offset, loff_t end)
 
 	return 0;
 }
-EXPORT_SYMBOL(vmtruncate_range);
+EXPORT_UNUSED_SYMBOL(vmtruncate_range);  /*  June 2006  */
 
 /* 
  * Primitive swap readahead code. We simply read an aligned block of
@@ -1997,7 +2049,11 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		goto out;
 
 	entry = pte_to_swp_entry(orig_pte);
-again:
+	if (is_migration_entry(entry)) {
+		migration_entry_wait(mm, pmd, address);
+		goto out;
+	}
+	delayacct_set_flag(DELAYACCT_PF_SWAPIN);
 	page = lookup_swap_cache(entry);
 	if (!page) {
  		swapin_readahead(entry, address, vma);
@@ -2010,23 +2066,19 @@ again:
 			page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
 			if (likely(pte_same(*page_table, orig_pte)))
 				ret = VM_FAULT_OOM;
+			delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
 			goto unlock;
 		}
 
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
-		inc_page_state(pgmajfault);
+		count_vm_event(PGMAJFAULT);
 		grab_swap_token();
 	}
 
+	delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
 	mark_page_accessed(page);
 	lock_page(page);
-	if (!PageSwapCache(page)) {
-		/* Page migration has occured */
-		unlock_page(page);
-		page_cache_release(page);
-		goto again;
-	}
 
 	/*
 	 * Back out if somebody else already faulted in this pte.
@@ -2192,18 +2244,31 @@ retry:
 	/*
 	 * Should we do an early C-O-W break?
 	 */
-	if (write_access && !(vma->vm_flags & VM_SHARED)) {
-		struct page *page;
+	if (write_access) {
+		if (!(vma->vm_flags & VM_SHARED)) {
+			struct page *page;
 
-		if (unlikely(anon_vma_prepare(vma)))
-			goto oom;
-		page = alloc_page_vma(GFP_HIGHUSER, vma, address);
-		if (!page)
-			goto oom;
-		copy_user_highpage(page, new_page, address);
-		page_cache_release(new_page);
-		new_page = page;
-		anon = 1;
+			if (unlikely(anon_vma_prepare(vma)))
+				goto oom;
+			page = alloc_page_vma(GFP_HIGHUSER, vma, address);
+			if (!page)
+				goto oom;
+			copy_user_highpage(page, new_page, address);
+			page_cache_release(new_page);
+			new_page = page;
+			anon = 1;
+
+		} else {
+			/* if the page will be shareable, see if the backing
+			 * address space wants to know that the page is about
+			 * to become writable */
+			if (vma->vm_ops->page_mkwrite &&
+			    vma->vm_ops->page_mkwrite(vma, new_page) < 0
+			    ) {
+				page_cache_release(new_page);
+				return VM_FAULT_SIGBUS;
+			}
+		}
 	}
 
 	page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
@@ -2381,7 +2446,7 @@ int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	__set_current_state(TASK_RUNNING);
 
-	inc_page_state(pgfault);
+	count_vm_event(PGFAULT);
 
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		return hugetlb_fault(mm, vma, address, write_access);

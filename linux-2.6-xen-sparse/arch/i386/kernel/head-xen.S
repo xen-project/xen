@@ -1,7 +1,6 @@
 
 
 .text
-#include <linux/config.h>
 #include <linux/elfnote.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
@@ -62,7 +61,8 @@ ENTRY(startup_32)
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-	call start_kernel
+	pushl %eax		# fake return address
+	jmp start_kernel
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.

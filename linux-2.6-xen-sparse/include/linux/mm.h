@@ -7,7 +7,6 @@
 
 #ifdef __KERNEL__
 
-#include <linux/config.h>
 #include <linux/gfp.h>
 #include <linux/list.h>
 #include <linux/mmzone.h>
@@ -15,6 +14,7 @@
 #include <linux/prio_tree.h>
 #include <linux/fs.h>
 #include <linux/mutex.h>
+#include <linux/debug_locks.h>
 
 struct mempolicy;
 struct anon_vma;
@@ -37,7 +37,6 @@ extern int sysctl_legacy_va_layout;
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
-#include <asm/atomic.h>
 
 #define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + (n))
 
@@ -146,7 +145,6 @@ extern unsigned int kobjsize(const void *objp);
 
 #define VM_GROWSDOWN	0x00000100	/* general info on the segment */
 #define VM_GROWSUP	0x00000200
-#define VM_SHM		0x00000000	/* Means nothing: delete it later */
 #define VM_PFNMAP	0x00000400	/* Page-ranges managed without "struct page", just pure PFN */
 #define VM_DENYWRITE	0x00000800	/* ETXTBSY on write attempts.. */
 
@@ -203,10 +201,16 @@ struct vm_operations_struct {
 	void (*close)(struct vm_area_struct * area);
 	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int *type);
 	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, pgprot_t prot, unsigned long pgoff, int nonblock);
+
+	/* notification that a previously read-only page is about to become
+	 * writable, if an error is returned it will cause a SIGBUS */
+	int (*page_mkwrite)(struct vm_area_struct *vma, struct page *page);
 #ifdef CONFIG_NUMA
 	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
 	struct mempolicy *(*get_policy)(struct vm_area_struct *vma,
 					unsigned long addr);
+	int (*migrate)(struct vm_area_struct *vma, const nodemask_t *from,
+		const nodemask_t *to, unsigned long flags);
 #endif
 };
 
@@ -335,6 +339,7 @@ static inline void init_page_count(struct page *page)
 }
 
 void put_page(struct page *page);
+void put_pages_list(struct list_head *pages);
 
 void split_page(struct page *page, unsigned int order);
 
@@ -469,10 +474,13 @@ static inline unsigned long page_zonenum(struct page *page)
 struct zone;
 extern struct zone *zone_table[];
 
+static inline int page_zone_id(struct page *page)
+{
+	return (page->flags >> ZONETABLE_PGSHIFT) & ZONETABLE_MASK;
+}
 static inline struct zone *page_zone(struct page *page)
 {
-	return zone_table[(page->flags >> ZONETABLE_PGSHIFT) &
-			ZONETABLE_MASK];
+	return zone_table[page_zone_id(page)];
 }
 
 static inline unsigned long page_to_nid(struct page *page)
@@ -510,6 +518,11 @@ static inline void set_page_links(struct page *page, unsigned long zone,
 	set_page_node(page, node);
 	set_page_section(page, pfn_to_section_nr(pfn));
 }
+
+/*
+ * Some inline functions in vmstat.h depend on page_zone()
+ */
+#include <linux/vmstat.h>
 
 #ifndef CONFIG_DISCONTIGMEM
 /* The array of struct pages - for discontigmem use pgdat->lmem_map */
@@ -1038,8 +1051,8 @@ static inline void
 kernel_map_pages(struct page *page, int numpages, int enable)
 {
 	if (!PageHighMem(page) && !enable)
-		mutex_debug_check_no_locks_freed(page_address(page),
-						 numpages * PAGE_SIZE);
+		debug_check_no_locks_freed(page_address(page),
+					   numpages * PAGE_SIZE);
 }
 #endif
 
@@ -1067,6 +1080,8 @@ void drop_slab(void);
 #else
 extern int randomize_va_space;
 #endif
+
+const char *arch_vma_name(struct vm_area_struct *vma);
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

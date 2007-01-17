@@ -50,6 +50,7 @@
 #include <linux/bootmem.h>
 #include <linux/sysrq.h>
 #include <linux/screen_info.h>
+#include <linux/vt.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>

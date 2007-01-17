@@ -1,0 +1,30 @@
+diff -pruN ../orig-linux-2.6.18/arch/i386/kernel/entry.S ./arch/i386/kernel/entry.S
+--- ../orig-linux-2.6.18/arch/i386/kernel/entry.S	2006-09-20 04:42:06.000000000 +0100
++++ ./arch/i386/kernel/entry.S	2007-01-12 18:12:31.000000000 +0000
+@@ -269,7 +269,7 @@ ENTRY(sysenter_entry)
+ 	CFI_STARTPROC simple
+ 	CFI_DEF_CFA esp, 0
+ 	CFI_REGISTER esp, ebp
+-	movl TSS_sysenter_esp0(%esp),%esp
++	movl SYSENTER_stack_esp0(%esp),%esp
+ sysenter_past_esp:
+ 	/*
+ 	 * No need to follow this irqs on/off section: the syscall
+@@ -689,7 +689,7 @@ device_not_available_emulate:
+  * that sets up the real kernel stack. Check here, since we can't
+  * allow the wrong stack to be used.
+  *
+- * "TSS_sysenter_esp0+12" is because the NMI/debug handler will have
++ * "SYSENTER_stack_esp0+12" is because the NMI/debug handler will have
+  * already pushed 3 words if it hits on the sysenter instruction:
+  * eflags, cs and eip.
+  *
+@@ -701,7 +701,7 @@ device_not_available_emulate:
+ 	cmpw $__KERNEL_CS,4(%esp);		\
+ 	jne ok;					\
+ label:						\
+-	movl TSS_sysenter_esp0+offset(%esp),%esp;	\
++	movl SYSENTER_stack_esp0+offset(%esp),%esp;	\
+ 	pushfl;					\
+ 	pushl $__KERNEL_CS;			\
+ 	pushl $sysenter_past_esp

@@ -8,14 +8,13 @@
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Vijay Chander <vijay@engr.sgi.com>
  */
-#include <linux/config.h>
 
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/kdev_t.h>
 #include <linux/string.h>
-#include <linux/tty.h>
+#include <linux/screen_info.h>
 #include <linux/console.h>
 #include <linux/timex.h>
 #include <linux/sched.h>

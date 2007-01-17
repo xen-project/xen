@@ -12,6 +12,7 @@ typedef struct {
 	int size;
 	struct semaphore sem;
 	void *ldt;
+	void *vdso;
 #ifdef CONFIG_XEN
 	int has_foreign_mappings;
 #endif

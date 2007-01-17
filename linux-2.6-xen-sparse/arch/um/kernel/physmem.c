@@ -69,7 +69,7 @@ static void insert_phys_mapping(struct phys_desc *desc)
 		panic("Physical remapping for %p already present",
 		      desc->virt);
 
-	rb_link_node(&desc->rb, (*n)->rb_parent, n);
+	rb_link_node(&desc->rb, rb_parent(*n), n);
 	rb_insert_color(&desc->rb, &phys_mappings);
 }
 
@@ -319,7 +319,7 @@ void map_memory(unsigned long virt, unsigned long phys, unsigned long len,
 	}
 }
 
-extern int __syscall_stub_start, __binary_start;
+extern int __syscall_stub_start;
 
 void setup_physmem(unsigned long start, unsigned long reserve_end,
 		   unsigned long len, unsigned long long highmem)

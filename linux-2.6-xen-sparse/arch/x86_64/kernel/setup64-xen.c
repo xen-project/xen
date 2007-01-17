@@ -3,13 +3,11 @@
  * Copyright (C) 1995  Linus Torvalds
  * Copyright 2001, 2002, 2003 SuSE Labs / Andi Kleen.
  * See setup.c for older changelog.
- * $Id: setup64.c,v 1.12 2002/03/21 10:09:17 ak Exp $
  *
  * Jun Nakajima <jun.nakajima@intel.com> 
  *   Modified for Xen
  *
  */ 
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -38,6 +36,7 @@ char x86_boot_params[BOOT_PARAM_SIZE] __initdata = {0,};
 cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 
 struct x8664_pda *_cpu_pda[NR_CPUS] __read_mostly;
+EXPORT_SYMBOL(_cpu_pda);
 struct x8664_pda boot_cpu_pda[NR_CPUS] __cacheline_aligned;
 
 #ifndef CONFIG_X86_NO_IDT
@@ -47,6 +46,7 @@ struct desc_ptr idt_descr = { 256 * 16 - 1, (unsigned long) idt_table };
 char boot_cpu_stack[IRQSTACKSIZE] __attribute__((section(".bss.page_aligned")));
 
 unsigned long __supported_pte_mask __read_mostly = ~0UL;
+EXPORT_SYMBOL(__supported_pte_mask);
 static int do_not_nx __cpuinitdata = 0;
 
 /* noexec=on|off
@@ -246,6 +246,7 @@ void __cpuinit cpu_init (void)
 	int cpu = stack_smp_processor_id();
 #ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *t = &per_cpu(init_tss, cpu);
+	struct orig_ist *orig_ist = &per_cpu(orig_ist, cpu);
 	unsigned long v; 
 	char *estacks = NULL; 
 	unsigned i;
@@ -319,7 +320,7 @@ void __cpuinit cpu_init (void)
 			estacks += EXCEPTION_STKSZ;
 			break;
 		}
-		t->ist[v] = (unsigned long)estacks;
+		orig_ist->ist[v] = t->ist[v] = (unsigned long)estacks;
 	}
 
 	t->io_bitmap_base = offsetof(struct tss_struct, io_bitmap);

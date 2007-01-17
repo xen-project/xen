@@ -8,7 +8,6 @@
  *  Shared /dev/zero mmaping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
  */
 
-#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -20,7 +19,6 @@
 #include <linux/tty.h>
 #include <linux/capability.h>
 #include <linux/smp_lock.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/ptrace.h>
 #include <linux/device.h>
 #include <linux/highmem.h>
@@ -97,7 +95,7 @@ static inline int valid_phys_addr_range(unsigned long addr, size_t count)
 	return 1;
 }
 
-static inline int valid_mmap_phys_addr_range(unsigned long addr, size_t size)
+static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 {
 	return 1;
 }
@@ -246,7 +244,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
 
-	if (!valid_mmap_phys_addr_range(vma->vm_pgoff << PAGE_SHIFT, size))
+	if (!valid_mmap_phys_addr_range(vma->vm_pgoff, size))
 		return -EINVAL;
 
 	vma->vm_page_prot = phys_mem_access_prot(file, vma->vm_pgoff,
@@ -781,7 +779,7 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_oldmem	open_mem
 
 #ifndef ARCH_HAS_DEV_MEM
-static struct file_operations mem_fops = {
+static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
 	.write		= write_mem,
@@ -792,7 +790,7 @@ static struct file_operations mem_fops = {
 extern struct file_operations mem_fops;
 #endif
 
-static struct file_operations kmem_fops = {
+static const struct file_operations kmem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_kmem,
 	.write		= write_kmem,
@@ -800,7 +798,7 @@ static struct file_operations kmem_fops = {
 	.open		= open_kmem,
 };
 
-static struct file_operations null_fops = {
+static const struct file_operations null_fops = {
 	.llseek		= null_lseek,
 	.read		= read_null,
 	.write		= write_null,
@@ -808,7 +806,7 @@ static struct file_operations null_fops = {
 };
 
 #if defined(CONFIG_ISA) || !defined(__mc68000__)
-static struct file_operations port_fops = {
+static const struct file_operations port_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_port,
 	.write		= write_port,
@@ -816,7 +814,7 @@ static struct file_operations port_fops = {
 };
 #endif
 
-static struct file_operations zero_fops = {
+static const struct file_operations zero_fops = {
 	.llseek		= zero_lseek,
 	.read		= read_zero,
 	.write		= write_zero,
@@ -827,14 +825,14 @@ static struct backing_dev_info zero_bdi = {
 	.capabilities	= BDI_CAP_MAP_COPY,
 };
 
-static struct file_operations full_fops = {
+static const struct file_operations full_fops = {
 	.llseek		= full_lseek,
 	.read		= read_full,
 	.write		= write_full,
 };
 
 #ifdef CONFIG_CRASH_DUMP
-static struct file_operations oldmem_fops = {
+static const struct file_operations oldmem_fops = {
 	.read	= read_oldmem,
 	.open	= open_oldmem,
 };
@@ -861,7 +859,7 @@ static ssize_t kmsg_write(struct file * file, const char __user * buf,
 	return ret;
 }
 
-static struct file_operations kmsg_fops = {
+static const struct file_operations kmsg_fops = {
 	.write =	kmsg_write,
 };
 
@@ -911,7 +909,7 @@ static int memory_open(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-static struct file_operations memory_fops = {
+static const struct file_operations memory_fops = {
 	.open		= memory_open,	/* just a selector for the real open */
 };
 
@@ -947,13 +945,10 @@ static int __init chr_dev_init(void)
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 
 	mem_class = class_create(THIS_MODULE, "mem");
-	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
+	for (i = 0; i < ARRAY_SIZE(devlist); i++)
 		class_device_create(mem_class, NULL,
 					MKDEV(MEM_MAJOR, devlist[i].minor),
 					NULL, devlist[i].name);
-		devfs_mk_cdev(MKDEV(MEM_MAJOR, devlist[i].minor),
-				S_IFCHR | devlist[i].mode, devlist[i].name);
-	}
 	
 	return 0;
 }

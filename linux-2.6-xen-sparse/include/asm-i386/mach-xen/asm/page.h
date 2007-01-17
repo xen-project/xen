@@ -22,7 +22,6 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -172,6 +171,8 @@ static inline unsigned long pgd_val(pgd_t x)
 
 #ifndef __ASSEMBLY__
 
+struct vm_area_struct;
+
 /*
  * This much address space is reserved for vmalloc() and iomap()
  * as well as fixmap mappings.
@@ -218,9 +219,10 @@ extern int page_is_ram(unsigned long pagenr);
 
 #define __HAVE_ARCH_GATE_AREA 1
 
-#endif /* __KERNEL__ */
-
 #include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
+
+#define __HAVE_ARCH_GATE_AREA 1
+#endif /* __KERNEL__ */
 
 #endif /* _I386_PAGE_H */

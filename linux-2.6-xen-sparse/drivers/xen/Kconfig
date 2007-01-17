@@ -266,11 +266,6 @@ config XEN_DEVMEM
 	bool
 	default y
 
-config XEN_SKBUFF
-	bool
-	default y
-	depends on NET
-
 config XEN_REBOOT
 	bool
 	default y

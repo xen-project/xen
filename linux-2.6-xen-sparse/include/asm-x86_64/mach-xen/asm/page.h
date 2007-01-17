@@ -1,7 +1,6 @@
 #ifndef _X86_64_PAGE_H
 #define _X86_64_PAGE_H
 
-#include <linux/config.h>
 /* #include <linux/string.h> */
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
@@ -49,7 +48,7 @@
 #define EXCEPTION_STACK_ORDER 0
 #define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
 
-#define DEBUG_STACK_ORDER EXCEPTION_STACK_ORDER
+#define DEBUG_STACK_ORDER (EXCEPTION_STACK_ORDER + 1)
 #define DEBUG_STKSZ (PAGE_SIZE << DEBUG_STACK_ORDER)
 
 #define IRQSTACK_ORDER 2
@@ -202,9 +201,9 @@ static inline pgd_t __pgd(unsigned long x)
 
 #define __HAVE_ARCH_GATE_AREA 1	
 
-#endif /* __KERNEL__ */
-
 #include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
+
+#endif /* __KERNEL__ */
 
 #endif /* _X86_64_PAGE_H */

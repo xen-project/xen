@@ -1,7 +1,6 @@
 #ifndef _I386_PGTABLE_H
 #define _I386_PGTABLE_H
 
-#include <linux/config.h>
 #include <asm/hypervisor.h>
 
 /*

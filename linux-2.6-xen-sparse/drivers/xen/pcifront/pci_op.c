@@ -239,17 +239,17 @@ static void free_root_bus_devs(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
 
-	spin_lock(&pci_bus_lock);
+	down_write(&pci_bus_sem);
 	while (!list_empty(&bus->devices)) {
 		dev = container_of(bus->devices.next, struct pci_dev, bus_list);
-		spin_unlock(&pci_bus_lock);
+		up_write(&pci_bus_sem);
 
 		dev_dbg(&dev->dev, "removing device\n");
 		pci_remove_bus_device(dev);
 
-		spin_lock(&pci_bus_lock);
+		down_write(&pci_bus_sem);
 	}
-	spin_unlock(&pci_bus_lock);
+	up_write(&pci_bus_sem);
 }
 
 void pcifront_free_roots(struct pcifront_device *pdev)

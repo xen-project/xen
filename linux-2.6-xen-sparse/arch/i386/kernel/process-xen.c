@@ -28,7 +28,6 @@
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
-#include <linux/config.h>
 #include <linux/utsname.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
@@ -124,10 +123,10 @@ static void xen_idle(void)
 	if (need_resched())
 		local_irq_enable();
 	else {
-		clear_thread_flag(TIF_POLLING_NRFLAG);
+		current_thread_info()->status &= ~TS_POLLING;
 		smp_mb__after_clear_bit();
 		safe_halt();
-		set_thread_flag(TIF_POLLING_NRFLAG);
+		current_thread_info()->status |= TS_POLLING;
 	}
 }
 #ifdef CONFIG_APM_MODULE
@@ -162,7 +161,7 @@ void cpu_idle(void)
 {
 	int cpu = smp_processor_id();
 
-	set_thread_flag(TIF_POLLING_NRFLAG);
+	current_thread_info()->status |= TS_POLLING;
 
 	/* endless idle loop with no priority at all */
 	while (1) {
@@ -262,7 +261,7 @@ void show_regs(struct pt_regs * regs)
 	cr3 = read_cr3();
 	cr4 = read_cr4_safe();
 	printk("CR0: %08lx CR2: %08lx CR3: %08lx CR4: %08lx\n", cr0, cr2, cr3, cr4);
-	show_trace(NULL, &regs->esp);
+	show_trace(NULL, regs, &regs->esp);
 }
 
 /*
@@ -310,15 +309,15 @@ EXPORT_SYMBOL(kernel_thread);
  */
 void exit_thread(void)
 {
-	struct task_struct *tsk = current;
-	struct thread_struct *t = &tsk->thread;
-
 	/* The process may have allocated an io port bitmap... nuke it. */
-	if (unlikely(NULL != t->io_bitmap_ptr)) {
+	if (unlikely(test_thread_flag(TIF_IO_BITMAP))) {
+		struct task_struct *tsk = current;
+		struct thread_struct *t = &tsk->thread;
 		struct physdev_set_iobitmap set_iobitmap = { 0 };
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
+		clear_thread_flag(TIF_IO_BITMAP);
 	}
 }
 
@@ -328,6 +327,7 @@ void flush_thread(void)
 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
+	clear_tsk_thread_flag(tsk, TIF_DEBUG);
 	/*
 	 * Forget coprocessor state..
 	 */
@@ -372,7 +372,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	savesegment(gs,p->thread.gs);
 
 	tsk = current;
-	if (unlikely(NULL != tsk->thread.io_bitmap_ptr)) {
+	if (unlikely(test_tsk_thread_flag(tsk, TIF_IO_BITMAP))) {
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!p->thread.io_bitmap_ptr) {
 			p->thread.io_bitmap_max = 0;
@@ -380,6 +380,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		}
 		memcpy(p->thread.io_bitmap_ptr, tsk->thread.io_bitmap_ptr,
 			IO_BITMAP_BYTES);
+		set_tsk_thread_flag(p, TIF_IO_BITMAP);
 	}
 
 	/*
@@ -474,6 +475,23 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	elf_core_copy_regs(regs, &ptregs);
 
 	return 1;
+}
+
+static noinline void __switch_to_xtra(struct task_struct *next_p)
+{
+	struct thread_struct *next;
+
+	next = &next_p->thread;
+
+	if (test_tsk_thread_flag(next_p, TIF_DEBUG)) {
+		set_debugreg(next->debugreg[0], 0);
+		set_debugreg(next->debugreg[1], 1);
+		set_debugreg(next->debugreg[2], 2);
+		set_debugreg(next->debugreg[3], 3);
+		/* no 4 and 5 */
+		set_debugreg(next->debugreg[6], 6);
+		set_debugreg(next->debugreg[7], 7);
+	}
 }
 
 /*
@@ -617,17 +635,10 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		loadsegment(gs, next->gs);
 
 	/*
-	 * Now maybe reload the debug registers
+	 * Now maybe handle debug registers
 	 */
-	if (unlikely(next->debugreg[7])) {
-		set_debugreg(next->debugreg[0], 0);
-		set_debugreg(next->debugreg[1], 1);
-		set_debugreg(next->debugreg[2], 2);
-		set_debugreg(next->debugreg[3], 3);
-		/* no 4 and 5 */
-		set_debugreg(next->debugreg[6], 6);
-		set_debugreg(next->debugreg[7], 7);
-	}
+	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW))
+		__switch_to_xtra(next_p);
 
 	disable_tsc(prev_p, next_p);
 

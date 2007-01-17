@@ -134,8 +134,8 @@ static int vdma_get_dma_residue(unsigned int dummy)
 
 static int fd_request_irq(void)
 {
-	return request_irq(FLOPPY_IRQ, floppy_hardint,SA_INTERRUPT,
-					   "floppy", NULL);
+	return request_irq(FLOPPY_IRQ, floppy_hardint,
+			   IRQF_DISABLED, "floppy", NULL);
 }
 
 #if 0

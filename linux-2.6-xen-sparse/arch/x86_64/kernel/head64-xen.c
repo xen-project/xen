@@ -3,8 +3,6 @@
  *
  *  Copyright (C) 2000 Andrea Arcangeli <andrea@suse.de> SuSE
  *
- *  $Id: head64.c,v 1.22 2001/07/06 14:28:20 ak Exp $
- *
  *  Jun Nakajima <jun.nakajima@intel.com>
  *	Modified for Xen.
  */
@@ -129,6 +127,11 @@ void __init x86_64_start_kernel(char * real_mode_data)
 		set_intr_gate(i, early_idt_handler);
 	asm volatile("lidt %0" :: "m" (idt_descr));
 #endif
+
+	/*
+	 * This must be called really, really early:
+	 */
+	lockdep_init();
 
  	for (i = 0; i < NR_CPUS; i++)
  		cpu_pda(i) = &boot_cpu_pda[i];

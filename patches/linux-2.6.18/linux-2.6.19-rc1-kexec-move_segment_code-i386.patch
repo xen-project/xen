@@ -1,0 +1,151 @@
+diff -pruN ../orig-linux-2.6.18/arch/i386/kernel/machine_kexec.c ./arch/i386/kernel/machine_kexec.c
+--- ../orig-linux-2.6.18/arch/i386/kernel/machine_kexec.c	2007-01-12 16:03:23.000000000 +0000
++++ ./arch/i386/kernel/machine_kexec.c	2007-01-12 16:03:37.000000000 +0000
+@@ -28,48 +28,6 @@ static u32 kexec_pmd1[1024] PAGE_ALIGNED
+ static u32 kexec_pte0[1024] PAGE_ALIGNED;
+ static u32 kexec_pte1[1024] PAGE_ALIGNED;
+ 
+-static void set_idt(void *newidt, __u16 limit)
+-{
+-	struct Xgt_desc_struct curidt;
+-
+-	/* ia32 supports unaliged loads & stores */
+-	curidt.size    = limit;
+-	curidt.address = (unsigned long)newidt;
+-
+-	load_idt(&curidt);
+-};
+-
+-
+-static void set_gdt(void *newgdt, __u16 limit)
+-{
+-	struct Xgt_desc_struct curgdt;
+-
+-	/* ia32 supports unaligned loads & stores */
+-	curgdt.size    = limit;
+-	curgdt.address = (unsigned long)newgdt;
+-
+-	load_gdt(&curgdt);
+-};
+-
+-static void load_segments(void)
+-{
+-#define __STR(X) #X
+-#define STR(X) __STR(X)
+-
+-	__asm__ __volatile__ (
+-		"\tljmp $"STR(__KERNEL_CS)",$1f\n"
+-		"\t1:\n"
+-		"\tmovl $"STR(__KERNEL_DS)",%%eax\n"
+-		"\tmovl %%eax,%%ds\n"
+-		"\tmovl %%eax,%%es\n"
+-		"\tmovl %%eax,%%fs\n"
+-		"\tmovl %%eax,%%gs\n"
+-		"\tmovl %%eax,%%ss\n"
+-		::: "eax", "memory");
+-#undef STR
+-#undef __STR
+-}
+-
+ /*
+  * A architecture hook called to validate the
+  * proposed image and prepare the control pages
+@@ -126,23 +84,6 @@ NORET_TYPE void machine_kexec(struct kim
+ 	page_list[PA_PTE_1] = __pa(kexec_pte1);
+ 	page_list[VA_PTE_1] = (unsigned long)kexec_pte1;
+ 
+-	/* The segment registers are funny things, they have both a
+-	 * visible and an invisible part.  Whenever the visible part is
+-	 * set to a specific selector, the invisible part is loaded
+-	 * with from a table in memory.  At no other time is the
+-	 * descriptor table in memory accessed.
+-	 *
+-	 * I take advantage of this here by force loading the
+-	 * segments, before I zap the gdt with an invalid value.
+-	 */
+-	load_segments();
+-	/* The gdt & idt are now invalid.
+-	 * If you want to load them you must set up your own idt & gdt.
+-	 */
+-	set_gdt(phys_to_virt(0),0);
+-	set_idt(phys_to_virt(0),0);
+-
+-	/* now call it */
+ 	relocate_kernel((unsigned long)image->head, (unsigned long)page_list,
+ 			image->start, cpu_has_pae);
+ }
+diff -pruN ../orig-linux-2.6.18/arch/i386/kernel/relocate_kernel.S ./arch/i386/kernel/relocate_kernel.S
+--- ../orig-linux-2.6.18/arch/i386/kernel/relocate_kernel.S	2007-01-12 16:03:23.000000000 +0000
++++ ./arch/i386/kernel/relocate_kernel.S	2007-01-12 16:03:37.000000000 +0000
+@@ -154,14 +154,45 @@ relocate_new_kernel:
+ 	movl	PTR(PA_PGD)(%ebp), %eax
+ 	movl	%eax, %cr3
+ 
++	/* setup idt */
++	movl	%edi, %eax
++	addl	$(idt_48 - relocate_kernel), %eax
++	lidtl	(%eax)
++
++	/* setup gdt */
++	movl	%edi, %eax
++	addl	$(gdt - relocate_kernel), %eax
++	movl	%edi, %esi
++	addl	$((gdt_48 - relocate_kernel) + 2), %esi
++	movl	%eax, (%esi)
++	
++	movl	%edi, %eax
++	addl	$(gdt_48 - relocate_kernel), %eax
++	lgdtl	(%eax)
++
++	/* setup data segment registers */
++	mov	$(gdt_ds - gdt), %eax
++	mov	%eax, %ds
++	mov	%eax, %es
++	mov	%eax, %fs
++	mov	%eax, %gs
++	mov	%eax, %ss
++	
+ 	/* setup a new stack at the end of the physical control page */
+ 	lea	4096(%edi), %esp
+ 
+-	/* jump to identity mapped page */
+-	movl    %edi, %eax
+-	addl    $(identity_mapped - relocate_kernel), %eax
+-	pushl   %eax
+-	ret
++	/* load new code segment and jump to identity mapped page */
++	movl	%edi, %esi
++	xorl	%eax, %eax
++	pushl	%eax
++	pushl	%esi
++	pushl	%eax
++	movl	$(gdt_cs - gdt), %eax
++	pushl	%eax	
++	movl	%edi, %eax
++	addl	$(identity_mapped - relocate_kernel),%eax
++	pushl	%eax
++	iretl
+ 
+ identity_mapped:
+ 	/* store the start address on the stack */
+@@ -250,3 +281,20 @@ identity_mapped:
+ 	xorl    %edi, %edi
+ 	xorl    %ebp, %ebp
+ 	ret
++
++	.align	16
++gdt:
++	.quad	0x0000000000000000	/* NULL descriptor */
++gdt_cs:	
++	.quad	0x00cf9a000000ffff	/* kernel 4GB code at 0x00000000 */
++gdt_ds:
++	.quad	0x00cf92000000ffff	/* kernel 4GB data at 0x00000000 */
++gdt_end:
++	
++gdt_48:
++	.word	gdt_end - gdt - 1	/* limit */
++	.long	0			/* base - filled in by code above */
++
++idt_48:
++	.word	0			/* limit */
++	.long	0			/* base */

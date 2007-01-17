@@ -47,11 +47,6 @@
 #define NR_IPIS			4
 #endif /* CONFIG_XEN */
 
-/*
- * IRQ line status macro IRQ_PER_CPU is used
- */
-#define ARCH_HAS_IRQ_PER_CPU
-
 static __inline__ int
 irq_canonicalize (int irq)
 {

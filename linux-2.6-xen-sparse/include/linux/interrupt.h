@@ -2,37 +2,67 @@
 #ifndef _LINUX_INTERRUPT_H
 #define _LINUX_INTERRUPT_H
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/linkage.h>
 #include <linux/bitops.h>
 #include <linux/preempt.h>
 #include <linux/cpumask.h>
+#include <linux/irqreturn.h>
 #include <linux/hardirq.h>
 #include <linux/sched.h>
+#include <linux/irqflags.h>
 #include <asm/atomic.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
 /*
- * For 2.4.x compatibility, 2.4.x can use
- *
- *	typedef void irqreturn_t;
- *	#define IRQ_NONE
- *	#define IRQ_HANDLED
- *	#define IRQ_RETVAL(x)
- *
- * To mix old-style and new-style irq handler returns.
- *
- * IRQ_NONE means we didn't handle it.
- * IRQ_HANDLED means that we did have a valid interrupt and handled it.
- * IRQ_RETVAL(x) selects on the two depending on x being non-zero (for handled)
+ * These correspond to the IORESOURCE_IRQ_* defines in
+ * linux/ioport.h to select the interrupt line behaviour.  When
+ * requesting an interrupt without specifying a IRQF_TRIGGER, the
+ * setting should be assumed to be "as already configured", which
+ * may be as per machine or firmware initialisation.
  */
-typedef int irqreturn_t;
+#define IRQF_TRIGGER_NONE	0x00000000
+#define IRQF_TRIGGER_RISING	0x00000001
+#define IRQF_TRIGGER_FALLING	0x00000002
+#define IRQF_TRIGGER_HIGH	0x00000004
+#define IRQF_TRIGGER_LOW	0x00000008
+#define IRQF_TRIGGER_MASK	(IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW | \
+				 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)
+#define IRQF_TRIGGER_PROBE	0x00000010
 
-#define IRQ_NONE	(0)
-#define IRQ_HANDLED	(1)
-#define IRQ_RETVAL(x)	((x) != 0)
+/*
+ * These flags used only by the kernel as part of the
+ * irq handling routines.
+ *
+ * IRQF_DISABLED - keep irqs disabled when calling the action handler
+ * IRQF_SAMPLE_RANDOM - irq is used to feed the random generator
+ * IRQF_SHARED - allow sharing the irq among several devices
+ * IRQF_PROBE_SHARED - set by callers when they expect sharing mismatches to occur
+ * IRQF_TIMER - Flag to mark this interrupt as timer interrupt
+ */
+#define IRQF_DISABLED		0x00000020
+#define IRQF_SAMPLE_RANDOM	0x00000040
+#define IRQF_SHARED		0x00000080
+#define IRQF_PROBE_SHARED	0x00000100
+#define IRQF_TIMER		0x00000200
+#define IRQF_PERCPU		0x00000400
+
+/*
+ * Migration helpers. Scheduled for removal in 1/2007
+ * Do not use for new code !
+ */
+#define SA_INTERRUPT		IRQF_DISABLED
+#define SA_SAMPLE_RANDOM	IRQF_SAMPLE_RANDOM
+#define SA_SHIRQ		IRQF_SHARED
+#define SA_PROBEIRQ		IRQF_PROBE_SHARED
+#define SA_PERCPU		IRQF_PERCPU
+
+#define SA_TRIGGER_LOW		IRQF_TRIGGER_LOW
+#define SA_TRIGGER_HIGH		IRQF_TRIGGER_HIGH
+#define SA_TRIGGER_FALLING	IRQF_TRIGGER_FALLING
+#define SA_TRIGGER_RISING	IRQF_TRIGGER_RISING
+#define SA_TRIGGER_MASK		IRQF_TRIGGER_MASK
 
 struct irqaction {
 	irqreturn_t (*handler)(int, void *, struct pt_regs *);
@@ -51,12 +81,90 @@ extern int request_irq(unsigned int,
 		       unsigned long, const char *, void *);
 extern void free_irq(unsigned int, void *);
 
+/*
+ * On lockdep we dont want to enable hardirqs in hardirq
+ * context. Use local_irq_enable_in_hardirq() to annotate
+ * kernel code that has to do this nevertheless (pretty much
+ * the only valid case is for old/broken hardware that is
+ * insanely slow).
+ *
+ * NOTE: in theory this might break fragile code that relies
+ * on hardirq delivery - in practice we dont seem to have such
+ * places left. So the only effect should be slightly increased
+ * irqs-off latencies.
+ */
+#ifdef CONFIG_LOCKDEP
+# define local_irq_enable_in_hardirq()	do { } while (0)
+#else
+# define local_irq_enable_in_hardirq()	local_irq_enable()
+#endif
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 extern void disable_irq_nosync(unsigned int irq);
 extern void disable_irq(unsigned int irq);
 extern void enable_irq(unsigned int irq);
+
+/*
+ * Special lockdep variants of irq disabling/enabling.
+ * These should be used for locking constructs that
+ * know that a particular irq context which is disabled,
+ * and which is the only irq-context user of a lock,
+ * that it's safe to take the lock in the irq-disabled
+ * section without disabling hardirqs.
+ *
+ * On !CONFIG_LOCKDEP they are equivalent to the normal
+ * irq disable/enable methods.
+ */
+static inline void disable_irq_nosync_lockdep(unsigned int irq)
+{
+	disable_irq_nosync(irq);
+#ifdef CONFIG_LOCKDEP
+	local_irq_disable();
 #endif
+}
+
+static inline void disable_irq_lockdep(unsigned int irq)
+{
+	disable_irq(irq);
+#ifdef CONFIG_LOCKDEP
+	local_irq_disable();
+#endif
+}
+
+static inline void enable_irq_lockdep(unsigned int irq)
+{
+#ifdef CONFIG_LOCKDEP
+	local_irq_enable();
+#endif
+	enable_irq(irq);
+}
+
+/* IRQ wakeup (PM) control: */
+extern int set_irq_wake(unsigned int irq, unsigned int on);
+
+static inline int enable_irq_wake(unsigned int irq)
+{
+	return set_irq_wake(irq, 1);
+}
+
+static inline int disable_irq_wake(unsigned int irq)
+{
+	return set_irq_wake(irq, 0);
+}
+
+#else /* !CONFIG_GENERIC_HARDIRQS */
+/*
+ * NOTE: non-genirq architectures, if they want to support the lock
+ * validator need to define the methods below in their asm/irq.h
+ * files, under an #ifdef CONFIG_LOCKDEP section.
+ */
+# ifndef CONFIG_LOCKDEP
+#  define disable_irq_nosync_lockdep(irq)	disable_irq_nosync(irq)
+#  define disable_irq_lockdep(irq)		disable_irq(irq)
+#  define enable_irq_lockdep(irq)		enable_irq(irq)
+# endif
+
+#endif /* CONFIG_GENERIC_HARDIRQS */
 
 #ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
 int irq_ignore_unhandled(unsigned int irq);
@@ -98,13 +206,11 @@ static inline void __deprecated save_and_cli(unsigned long *x)
 #define save_and_cli(x)	save_and_cli(&x)
 #endif /* CONFIG_SMP */
 
-/* SoftIRQ primitives.  */
-#define local_bh_disable() \
-		do { add_preempt_count(SOFTIRQ_OFFSET); barrier(); } while (0)
-#define __local_bh_enable() \
-		do { barrier(); sub_preempt_count(SOFTIRQ_OFFSET); } while (0)
-
+extern void local_bh_disable(void);
+extern void __local_bh_enable(void);
+extern void _local_bh_enable(void);
 extern void local_bh_enable(void);
+extern void local_bh_enable_ip(unsigned long ip);
 
 /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
    frequency threaded job scheduling. For almost all the purposes

@@ -1,0 +1,12 @@
+diff -pruN ../orig-linux-2.6.18/fs/proc/proc_misc.c ./fs/proc/proc_misc.c
+--- ../orig-linux-2.6.18/fs/proc/proc_misc.c	2006-09-20 04:42:06.000000000 +0100
++++ ./fs/proc/proc_misc.c	2007-01-12 18:18:36.000000000 +0000
+@@ -471,7 +471,7 @@ static int show_stat(struct seq_file *p,
+ 		(unsigned long long)cputime64_to_clock_t(irq),
+ 		(unsigned long long)cputime64_to_clock_t(softirq),
+ 		(unsigned long long)cputime64_to_clock_t(steal));
+-	for_each_online_cpu(i) {
++	for_each_possible_cpu(i) {
+ 
+ 		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
+ 		user = kstat_cpu(i).cpustat.user;

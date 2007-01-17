@@ -31,7 +31,6 @@
  *	pNonSys:	!pSys
  */
 
-#include <linux/config.h>
 
 #include <asm/asmmacro.h>
 #include <asm/cache.h>
@@ -1590,7 +1589,7 @@ sys_call_table:
 	data8 sys_keyctl
 	data8 sys_ioprio_set
 	data8 sys_ioprio_get			// 1275
-	data8 sys_ni_syscall
+	data8 sys_move_pages
 	data8 sys_inotify_init
 	data8 sys_inotify_add_watch
 	data8 sys_inotify_rm_watch
@@ -1612,8 +1611,8 @@ sys_call_table:
 	data8 sys_ni_syscall			// 1295 reserved for ppoll
 	data8 sys_unshare
 	data8 sys_splice
-	data8 sys_set_robust_list
-	data8 sys_get_robust_list
+	data8 sys_ni_syscall			// reserved for set_robust_list
+	data8 sys_ni_syscall			// reserved for get_robust_list
 	data8 sys_sync_file_range		// 1300
 	data8 sys_tee
 	data8 sys_vmsplice

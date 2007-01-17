@@ -52,7 +52,6 @@
 #include <linux/gfp.h>
 #include <linux/poll.h>
 #include <asm/tlbflush.h>
-#include <linux/devfs_fs_kernel.h>
 
 #define MAX_TAP_DEV 256     /*the maximum number of tapdisk ring devices    */
 #define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
@@ -413,8 +412,6 @@ found:
 		class_device_create(xen_class, NULL,
 				    MKDEV(blktap_major, minor), NULL,
 				    "blktap%d", minor);
-		devfs_mk_cdev(MKDEV(blktap_major, minor),
-			S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", minor);
 	}
 
 out:
@@ -1448,7 +1445,7 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static int __init blkif_init(void)
 {
-	int i,ret,blktap_dir;
+	int i, ret;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -1470,9 +1467,8 @@ static int __init blkif_init(void)
 
 	/* Dynamically allocate a major for this device */
 	ret = register_chrdev(0, "blktap", &blktap_fops);
-	blktap_dir = devfs_mk_dir(NULL, "xen", 0, NULL);
 
-	if ( (ret < 0)||(blktap_dir < 0) ) {
+	if (ret < 0) {
 		WPRINTK("Couldn't register /dev/xen/blktap\n");
 		return -ENOMEM;
 	}	
@@ -1481,12 +1477,6 @@ static int __init blkif_init(void)
 
 	/* tapfds[0] is always NULL */
 	blktap_next_minor++;
-
-	ret = devfs_mk_cdev(MKDEV(blktap_major, i),
-			    S_IFCHR|S_IRUGO|S_IWUSR, "xen/blktap%d", i);
-
-	if(ret != 0)
-		return -ENOMEM;
 
 	DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
 

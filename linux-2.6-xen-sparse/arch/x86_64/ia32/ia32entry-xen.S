@@ -13,6 +13,7 @@
 #include <asm/thread_info.h>	
 #include <asm/segment.h>
 #include <asm/vsyscall32.h>
+#include <asm/irqflags.h>
 #include <linux/linkage.h>
 
 #define __XEN_X86_64 1
@@ -92,6 +93,10 @@ ENTRY(ia32_sysenter_target)
 	__swapgs 
 	movq	%gs:pda_kernelstack, %rsp
 	addq	$(PDA_STACKOFFSET),%rsp
+	/*
+	 * No need to follow this irqs on/off section: the syscall
+	 * disabled irqs, here we enable it straight after entry:
+	 */
 	XEN_UNBLOCK_EVENTS(%r11)	
 	__sti
  	movl	%ebp,%ebp		/* zero extension */
@@ -116,7 +121,7 @@ ENTRY(ia32_sysenter_target)
 	pushq	%rax
 	CFI_ADJUST_CFA_OFFSET 8
 	cld
-	SAVE_ARGS 0,0,1
+	SAVE_ARGS 0,0,0
  	/* no need to do an access_ok check here because rbp has been
  	   32bit zero extended */ 
 1:	movl	(%rbp),%r9d
@@ -137,6 +142,7 @@ sysenter_do_call:
 	GET_THREAD_INFO(%r10)
 	XEN_BLOCK_EVENTS(%r11)	
 	__cli
+	TRACE_IRQS_OFF
 	testl	$_TIF_ALLWORK_MASK,threadinfo_flags(%r10)
 	jnz	int_ret_from_sys_call
 	andl    $~TS_COMPAT,threadinfo_status(%r10)
@@ -151,6 +157,7 @@ sysenter_do_call:
 	CFI_REGISTER rsp,rcx
 	movl	$VSYSCALL32_SYSEXIT,%edx	/* User %eip */
 	CFI_REGISTER rip,rdx
+	TRACE_IRQS_ON
 	__swapgs
 	XEN_UNBLOCK_EVENTS(%r11)		
 	__sti		/* sti only takes effect after the next instruction */
@@ -175,6 +182,7 @@ sysenter_tracesys:
 	.previous
 	jmp	sysenter_do_call
 	CFI_ENDPROC
+ENDPROC(ia32_sysenter_target)
 
 /*
  * 32bit SYSCALL instruction entry.
@@ -198,13 +206,17 @@ sysenter_tracesys:
  */ 	
 ENTRY(ia32_cstar_target)
 	CFI_STARTPROC32	simple
-	CFI_DEF_CFA	rsp,0
+	CFI_DEF_CFA	rsp,PDA_STACKOFFSET
 	CFI_REGISTER	rip,rcx
 	/*CFI_REGISTER	rflags,r11*/
 	__swapgs
 	movl	%esp,%r8d
 	CFI_REGISTER	rsp,r8
 	movq	%gs:pda_kernelstack,%rsp
+	/*
+	 * No need to follow this irqs on/off section: the syscall
+	 * disabled irqs and here we enable it straight after entry:
+	 */
 	XEN_UNBLOCK_EVENTS(%r11)	
 	__sti
 	SAVE_ARGS 8,1,1
@@ -241,6 +253,7 @@ cstar_do_call:
 	GET_THREAD_INFO(%r10)
 	XEN_BLOCK_EVENTS(%r11)		
 	__cli
+	TRACE_IRQS_OFF
 	testl $_TIF_ALLWORK_MASK,threadinfo_flags(%r10)
 	jnz  int_ret_from_sys_call
 	andl $~TS_COMPAT,threadinfo_status(%r10)
@@ -249,6 +262,7 @@ cstar_do_call:
 	CFI_REGISTER rip,rcx
 	movl EFLAGS-ARGOFFSET(%rsp),%r11d	
 	/*CFI_REGISTER rflags,r11*/
+	TRACE_IRQS_ON
 	movl RSP-ARGOFFSET(%rsp),%esp
 	CFI_RESTORE rsp
 	__swapgs
@@ -271,6 +285,7 @@ cstar_tracesys:
 	.quad 1b,ia32_badarg
 	.previous
 	jmp cstar_do_call
+END(ia32_cstar_target)
 				
 ia32_badarg:
 	movq $-EFAULT,%rax
@@ -307,6 +322,10 @@ ENTRY(ia32_syscall)
 	/*CFI_REL_OFFSET	cs,CS-RIP*/
 	CFI_REL_OFFSET	rip,RIP-RIP
 	__swapgs
+	/*
+	 * No need to follow this irqs on/off section: the syscall
+	 * disabled irqs and here we enable it straight after entry:
+	 */
 	XEN_UNBLOCK_EVENTS(%r11)
 	__sti
 	movq (%rsp),%rcx
@@ -341,15 +360,12 @@ ia32_tracesys:
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	jmp ia32_do_syscall
+END(ia32_syscall)
 
 ia32_badsys:
 	movq $0,ORIG_RAX-ARGOFFSET(%rsp)
 	movq $-ENOSYS,RAX-ARGOFFSET(%rsp)
 	jmp int_ret_from_sys_call
-
-ni_syscall:
-	movq %rax,%rdi
-	jmp  sys32_ni_syscall			
 
 quiet_ni_syscall:
 	movq $-ENOSYS,%rax
@@ -397,10 +413,10 @@ ENTRY(ia32_ptregs_common)
 	RESTORE_REST
 	jmp  ia32_sysret	/* misbalances the return cache */
 	CFI_ENDPROC
+END(ia32_ptregs_common)
 
 	.section .rodata,"a"
 	.align 8
-	.globl ia32_sys_call_table
 ia32_sys_call_table:
 	.quad sys_restart_syscall
 	.quad sys_exit
@@ -723,4 +739,5 @@ ia32_sys_call_table:
 	.quad sys_sync_file_range
 	.quad sys_tee
 	.quad compat_sys_vmsplice
+	.quad compat_sys_move_pages
 ia32_syscall_end:		
