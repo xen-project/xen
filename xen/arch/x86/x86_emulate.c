@@ -1156,7 +1156,9 @@ x86_emulate(
         break;
     }
 
-    case 0x80 ... 0x83: /* Grp1 */
+    case 0x82: /* Grp1 (x86/32 only) */
+        generate_exception_if(mode_64bit(), EXC_UD);
+    case 0x80: case 0x81: case 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
         case 0: goto add;
@@ -1477,7 +1479,7 @@ x86_emulate(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 2: /* call (near) */
-        case 3: /* jmp (near) */
+        case 4: /* jmp (near) */
             if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
@@ -2049,12 +2051,13 @@ x86_emulate(
         break;
 
     case 0xba: /* Grp8 */
-        switch ( modrm_reg & 3 )
+        switch ( modrm_reg & 7 )
         {
-        case 0: goto bt;
-        case 1: goto bts;
-        case 2: goto btr;
-        case 3: goto btc;
+        case 4: goto bt;
+        case 5: goto bts;
+        case 6: goto btr;
+        case 7: goto btc;
+        default: generate_exception_if(1, EXC_UD);
         }
         break;
 
@@ -2103,6 +2106,7 @@ x86_emulate(
 #if defined(__i386__)
     {
         unsigned long old_lo, old_hi;
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &old_lo, 4, ctxt)) ||
              (rc = ops->read(ea.mem.seg, ea.mem.off+4, &old_hi, 4, ctxt)) )
             goto done;
@@ -2129,6 +2133,7 @@ x86_emulate(
 #elif defined(__x86_64__)
     {
         unsigned long old, new;
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &old, 8, ctxt)) != 0 )
             goto done;
         if ( ((uint32_t)(old>>0) != (uint32_t)_regs.eax) ||
