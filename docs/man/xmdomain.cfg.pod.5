@@ -135,6 +135,55 @@ one will be randomly chosen by xen with the 00:16:3e vendor id prefix.
 
 =back
 
+=item B<vfb>
+
+A virtual frame buffer stanza in the form:
+
+    vfb = [ "stanza" ]
+
+The stanza specifies a set of I<name = value> options separated by
+commas, in the form: "name1=value1, name2=value2, ..."
+
+B<OPTIONS>
+
+=over 4
+
+=item I<type>
+
+There are currently two valid options: I<vnc> starts a VNC server that
+lets you connect an external VNC viewer, and I<sdl> starts an internal
+viewer.
+
+=item I<vncdisplay>
+
+The VNC display number to use, defaults to the domain ID.  The
+VNC server listens on port 5900 + display number.
+
+=item I<vnclisten>
+
+The listening address for the VNC server, default 127.0.0.1.
+
+=item I<vncunused>
+
+If non-zero, the VNC server listens on the first unused port above
+5900.
+
+=item I<vncpasswd>
+
+Overrides the XenD configured default password.
+
+=item I<display>
+
+Display to use for the internal viewer, defaults to environment
+variable I<DISPLAY>.
+
+=item I<xauthority>
+
+Authority file to use for the internal viewer, defaults to environment
+variable I<XAUTHORITY>.
+
+=back
+
 =back
 
 =head1 ADDITIONAL OPTIONS
