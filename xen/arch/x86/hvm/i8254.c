@@ -182,11 +182,9 @@ void pit_time_fired(struct vcpu *v, void *priv)
     s->count_load_time = hvm_get_guest_time(v);
 }
 
-static inline void pit_load_count(PITChannelState *s, int val)
+static inline void pit_load_count(PITChannelState *s, int channel, int val)
 {
     u32 period;
-    PITChannelState *ch0 =
-        &current->domain->arch.hvm_domain.pl_time.vpit.channels[0];
 
     if (val == 0)
         val = 0x10000;
@@ -194,7 +192,7 @@ static inline void pit_load_count(PITChannelState *s, int val)
     s->count = val;
     period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
 
-    if (s != ch0)
+    if (channel != 0)
         return;
 
 #ifdef DEBUG_PIT
@@ -282,17 +280,17 @@ static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         switch(s->write_state) {
         default:
         case RW_STATE_LSB:
-            pit_load_count(s, val);
+            pit_load_count(s, addr, val);
             break;
         case RW_STATE_MSB:
-            pit_load_count(s, val << 8);
+            pit_load_count(s, addr, val << 8);
             break;
         case RW_STATE_WORD0:
             s->write_latch = val;
             s->write_state = RW_STATE_WORD1;
             break;
         case RW_STATE_WORD1:
-            pit_load_count(s, s->write_latch | (val << 8));
+            pit_load_count(s, addr, s->write_latch | (val << 8));
             s->write_state = RW_STATE_WORD0;
             break;
         }
@@ -369,7 +367,7 @@ static void pit_reset(void *opaque)
         destroy_periodic_time(&s->pt);
         s->mode = 0xff; /* the init mode */
         s->gate = (i != 2);
-        pit_load_count(s, 0);
+        pit_load_count(s, i, 0);
     }
 }
 
