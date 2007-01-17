@@ -1768,25 +1768,14 @@ int new_guest_cr3(unsigned long mfn)
     int okay;
     unsigned long old_base_mfn;
 
-    if ( is_hvm_domain(d) && !hvm_paging_enabled(v) )
-        return 0;
-
 #ifdef CONFIG_COMPAT
     if ( IS_COMPAT(d) )
     {
-        l4_pgentry_t l4e = l4e_from_pfn(
-            mfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
-
-        if ( shadow_mode_refcounts(d) )
-        {
-            okay = get_page_from_pagenr(mfn, d);
-            old_base_mfn = l4e_get_pfn(l4e);
-            if ( okay && old_base_mfn )
-                put_page(mfn_to_page(old_base_mfn));
-        }
-        else
-            okay = mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
-                                l4e, 0);
+        okay = shadow_mode_refcounts(d)
+            ? 0 /* Old code was broken, but what should it be? */
+            : mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
+                           l4e_from_pfn(mfn, (_PAGE_PRESENT|_PAGE_RW|
+                                              _PAGE_USER|_PAGE_ACCESSED)), 0);
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
@@ -1799,39 +1788,13 @@ int new_guest_cr3(unsigned long mfn)
         return 1;
     }
 #endif
-    if ( shadow_mode_refcounts(d) )
+    okay = shadow_mode_refcounts(d)
+        ? get_page_from_pagenr(mfn, d)
+        : get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
+    if ( unlikely(!okay) )
     {
-        okay = get_page_from_pagenr(mfn, d);
-        if ( unlikely(!okay) )
-        {
-            MEM_LOG("Error while installing new baseptr %lx", mfn);
-            return 0;
-        }
-    }
-    else
-    {
-        okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
-        if ( unlikely(!okay) )
-        {
-            /* Switch to idle pagetable: this VCPU has no active p.t. now. */
-            MEM_LOG("New baseptr %lx: slow path via idle pagetables", mfn);
-            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = pagetable_null();
-            update_cr3(v);
-            write_cr3(__pa(idle_pg_table));
-            if ( old_base_mfn != 0 )
-                put_page_and_type(mfn_to_page(old_base_mfn));
-
-            /* Retry the validation with no active p.t. for this VCPU. */
-            okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
-            if ( !okay )
-            {
-                /* Failure here is unrecoverable: the VCPU has no pagetable! */
-                MEM_LOG("Fatal error while installing new baseptr %lx", mfn);
-                domain_crash(d);
-                return 0;
-            }
-        }
+        MEM_LOG("Error while installing new baseptr %lx", mfn);
+        return 0;
     }
 
     invalidate_shadow_ldt(v);
@@ -1839,7 +1802,7 @@ int new_guest_cr3(unsigned long mfn)
     old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
 
     v->arch.guest_table = pagetable_from_pfn(mfn);
-    update_cr3(v); /* update shadow_table and cr3 fields of vcpu struct */
+    update_cr3(v);
 
     write_ptbase(v);
 
