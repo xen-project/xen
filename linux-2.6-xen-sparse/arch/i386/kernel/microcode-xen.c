@@ -85,7 +85,7 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 {
 	ssize_t ret;
 
-	if (len < DEFAULT_UCODE_TOTALSIZE) {
+	if (len < MC_HEADER_SIZE) {
 		printk(KERN_ERR "microcode: not enough data\n"); 
 		return -EINVAL;
 	}
