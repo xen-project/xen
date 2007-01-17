@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
