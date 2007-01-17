@@ -126,6 +126,7 @@ XENAPI_CFG_TYPES = {
     'memory_dynamic_min': int,
     'memory_dynamic_max': int,
     'memory_actual': int,
+    'cpus': list,
     'vcpus_policy': str,
     'vcpus_params': str,
     'vcpus_number': int,
