@@ -104,6 +104,12 @@ class XendOptions:
     """Default xend management state storage."""
     xend_state_path_default = '/var/lib/xend/state'
 
+    """Default type of backend network interfaces"""
+    netback_type = osdep.netback_type
+
+    """Default script to configure a backend network interface"""
+    vif_script = osdep.vif_script
+
     def __init__(self):
         self.configure()
 
@@ -228,7 +234,7 @@ class XendOptions:
         return self.get_config_bool('enable-dump', 'no')
 
     def get_vif_script(self):
-        return self.get_config_string('vif-script', 'vif-bridge')
+        return self.get_config_string('vif-script', self.vif_script)
 
     def get_dom0_min_mem(self):
         return self.get_config_int('dom0-min-mem', self.dom0_min_mem_default)

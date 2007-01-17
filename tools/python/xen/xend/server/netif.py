@@ -150,9 +150,8 @@ class NetifController(DevController):
 
         devid = self.allocateDeviceID()
 
-        # The default type is 'netfront'.
         if not typ:
-            typ = 'netfront'
+            typ = xoptions.netback_type
             
         if not mac:
             mac = randomMAC()
