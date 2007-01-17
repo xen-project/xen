@@ -154,6 +154,15 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 #define l3_disallow_mask(d) L3_DISALLOW_MASK
 #endif
 
+static void queue_deferred_ops(struct domain *d, unsigned int ops)
+{
+    if ( d == current->domain )
+        this_cpu(percpu_mm_info).deferred_ops |= ops;
+    else
+        BUG_ON(!test_bit(_DOMF_paused, &d->domain_flags) ||
+               !cpus_empty(d->domain_dirty_cpumask));
+}
+
 void __init init_frametable(void)
 {
     unsigned long nr_pages, page_step, i, mfn;
@@ -416,8 +425,7 @@ void invalidate_shadow_ldt(struct vcpu *v)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    ASSERT(v->processor == smp_processor_id());
-    this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
+    queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
 }
 
 
@@ -945,7 +953,8 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
     }
 #else
     memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-           &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           &compat_idle_pg_table_l2[
+               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
            COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*pl2e));
 #endif
     unmap_domain_page(pl2e);
@@ -1561,7 +1570,7 @@ void free_page_type(struct page_info *page, unsigned long type)
          * (e.g., update_va_mapping()) or we could end up modifying a page
          * that is no longer a page table (and hence screw up ref counts).
          */
-        this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
+        queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
 
         if ( unlikely(shadow_mode_enabled(owner)) )
         {
@@ -1765,7 +1774,8 @@ int new_guest_cr3(unsigned long mfn)
 #ifdef CONFIG_COMPAT
     if ( IS_COMPAT(d) )
     {
-        l4_pgentry_t l4e = l4e_from_pfn(mfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+        l4_pgentry_t l4e = l4e_from_pfn(
+            mfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
 
         if ( shadow_mode_refcounts(d) )
         {
@@ -1819,8 +1829,6 @@ int new_guest_cr3(unsigned long mfn)
                 /* Failure here is unrecoverable: the VCPU has no pagetable! */
                 MEM_LOG("Fatal error while installing new baseptr %lx", mfn);
                 domain_crash(d);
-                ASSERT(v->processor == smp_processor_id());
-                this_cpu(percpu_mm_info).deferred_ops = 0;
                 return 0;
             }
         }
