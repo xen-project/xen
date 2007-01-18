@@ -24,10 +24,10 @@ import os
 import random
 import re
 
-from xen.xend import XendRoot
+from xen.xend import XendOptions
 from xen.xend.server.DevController import DevController
 
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 def randomMAC():
     """Generate a random MAC address.
@@ -138,8 +138,8 @@ class NetifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
-        script = os.path.join(xroot.network_script_dir,
-                              config.get('script', xroot.get_vif_script()))
+        script = os.path.join(xoptions.network_script_dir,
+                              config.get('script', xoptions.get_vif_script()))
         typ     = config.get('type')
         bridge  = config.get('bridge')
         mac     = config.get('mac')
@@ -190,7 +190,7 @@ class NetifController(DevController):
         (script, ip, bridge, mac, typ, vifname, rate, uuid) = devinfo
 
         if script:
-            network_script_dir = xroot.network_script_dir + os.sep
+            network_script_dir = xoptions.network_script_dir + os.sep
             result['script'] = script.replace(network_script_dir, "")
         if ip:
             result['ip'] = ip

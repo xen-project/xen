@@ -48,7 +48,7 @@ from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendNode, XendRoot, XendAPI
+from xen.xend import XendNode, XendOptions, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
@@ -57,7 +57,7 @@ from xen.web.SrvDir import SrvDir
 from SrvRoot import SrvRoot
 from XMLRPCServer import XMLRPCServer
 
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 
 class XendServers:
@@ -165,7 +165,7 @@ class XendServers:
                 log.info("Restarting all XML-RPC and Xen-API servers...")
                 self.cleaningUp = False
                 self.reloadingConfig = False
-                xroot.set_config()
+                xoptions.set_config()
                 new_servers = [x for x in self.servers
                                if isinstance(x, HttpServer)]
                 self.servers = new_servers
@@ -174,16 +174,16 @@ class XendServers:
                 break
 
 def _loadConfig(servers, root, reload):
-    if not reload and xroot.get_xend_http_server():
+    if not reload and xoptions.get_xend_http_server():
         servers.add(HttpServer(root,
-                               xroot.get_xend_address(),
-                               xroot.get_xend_port()))
-    if not reload and xroot.get_xend_unix_server():
-        path = xroot.get_xend_unix_path()
+                               xoptions.get_xend_address(),
+                               xoptions.get_xend_port()))
+    if not reload and xoptions.get_xend_unix_server():
+        path = xoptions.get_xend_unix_path()
         log.info('unix path=' + path)
         servers.add(UnixHttpServer(root, path))
 
-    api_cfg = xroot.get_xen_api_server()
+    api_cfg = xoptions.get_xen_api_server()
     if api_cfg:
         try:
             addrs = [(str(x[0]).split(':'),
@@ -218,10 +218,10 @@ def _loadConfig(servers, root, reload):
         except TypeError, exn:
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
 
-    if xroot.get_xend_tcp_xmlrpc_server():
+    if xoptions.get_xend_tcp_xmlrpc_server():
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, True))
 
-    if xroot.get_xend_unix_xmlrpc_server():
+    if xoptions.get_xend_unix_xmlrpc_server():
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False))
 
 

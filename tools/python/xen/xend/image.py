@@ -461,14 +461,14 @@ class HVMImageHandler(ImageHandler):
             vnclisten = imageConfig.get('vnclisten')
 
             if not(vnclisten):
-                vnclisten = (xen.xend.XendRoot.instance().
+                vnclisten = (xen.xend.XendOptions.instance().
                              get_vnclisten_address())
             if vnclisten:
                 ret += ['-vnclisten', vnclisten]
 
             vncpasswd = vncpasswd_vmconfig
             if vncpasswd is None:
-                vncpasswd = (xen.xend.XendRoot.instance().
+                vncpasswd = (xen.xend.XendOptions.instance().
                              get_vncpasswd_default())
                 if vncpasswd is None:
                     raise VmError('vncpasswd is not set up in ' +

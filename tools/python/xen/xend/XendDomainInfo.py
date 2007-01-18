@@ -38,7 +38,7 @@ from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
-from xen.xend import XendRoot, XendNode, XendConfig
+from xen.xend import XendOptions, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
 from xen.xend.XendBootloader import bootloader
@@ -54,7 +54,7 @@ MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
 
 xc = xen.lowlevel.xc.xc()
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
@@ -739,7 +739,7 @@ class XendDomainInfo:
             'domid':              str(self.domid),
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
-            'console/limit':      str(xroot.get_console_limit() * 1024),
+            'console/limit':      str(xoptions.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_static_min'] * 1024)
             }
 
@@ -976,7 +976,7 @@ class XendDomainInfo:
                          self.info['name_label'], self.domid)
                 self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
-                if xroot.get_enable_dump():
+                if xoptions.get_enable_dump():
                     try:
                         self.dumpCore()
                     except XendError:
