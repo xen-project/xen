@@ -1682,9 +1682,18 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 	// note: architecturally, iha is optionally set for alt faults but
 	// xenlinux depends on it so should document it as part of PV interface
 	vcpu_thash(vcpu, address, iha);
-	if (!(rr & RR_VE_MASK) || !(pta & IA64_PTA_VE))
+	if (!(rr & RR_VE_MASK) || !(pta & IA64_PTA_VE)) {
+		REGS *regs = vcpu_regs(vcpu);
+		// NOTE: This is specific code for linux kernel
+		// We assume region 7 is identity mapped
+		if (region == 7 && ia64_psr(regs)->cpl == 2) {
+			pte.val = address & _PAGE_PPN_MASK;
+			pte.val = pte.val | pgprot_val(PAGE_KERNEL);
+			goto out;
+		}
 		return is_data ? IA64_ALT_DATA_TLB_VECTOR :
 			IA64_ALT_INST_TLB_VECTOR;
+	}
 
 	/* avoid recursively walking (short format) VHPT */
 	if (((address ^ pta) & ((itir_mask(pta) << 3) >> 3)) == 0)
@@ -1704,6 +1713,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		return is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
 
 	/* found mapping in guest VHPT! */
+out:
 	*itir = rr & RR_PS_MASK;
 	*pteval = pte.val;
 	perfc_incrc(vhpt_translate);
