@@ -951,7 +951,7 @@ static PyObject *pyxc_prose_build(XcObject *self,
     int unused;
 
     static char *kwd_list[] = { "dom", "store_evtchn",
-                                "console_evtchn", "image",
+                                "console_evtchn", "image", "memsize",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
                                 "features", "arch_args", NULL };

@@ -260,13 +260,9 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         return max(maxmem_kb / 64, shadow_mem_kb)
 
 
-class PPC_ProseImageHandler(LinuxImageHandler):
+class PPC_ProseImageHandler(PPC_LinuxImageHandler):
 
     ostype = "prose"
-
-    def configure(self, imageConfig, deviceConfig):
-        LinuxImageHandler.configure(self, imageConfig, deviceConfig)
-        self.imageConfig = imageConfig
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
