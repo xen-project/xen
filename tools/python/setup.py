@@ -30,12 +30,23 @@ xs = Extension("xs",
                libraries          = libraries,
                sources            = [ "xen/lowlevel/xs/xs.c" ])
 
+scf = Extension("scf",
+               extra_compile_args = extra_compile_args,
+               include_dirs       = include_dirs + [ "xen/lowlevel/scf" ],
+               library_dirs       = library_dirs,
+               libraries          = libraries,
+               sources            = [ "xen/lowlevel/scf/scf.c" ])
+             
 acm = Extension("acm",
                extra_compile_args = extra_compile_args,
                include_dirs       = include_dirs + [ "xen/lowlevel/acm" ],
                library_dirs       = library_dirs,
                libraries          = libraries,
                sources            = [ "xen/lowlevel/acm/acm.c" ])
+
+modules = [ xc, xs, acm ]
+if os.uname()[0] == 'SunOS':
+    modules.append(scf)
 
 setup(name            = 'xen',
       version         = '3.0',
@@ -56,7 +67,7 @@ setup(name            = 'xen',
                          'xen.xm.tests'
                          ],
       ext_package = "xen.lowlevel",
-      ext_modules = [ xc, xs, acm ]
+      ext_modules = modules
       )
 
 os.chdir('logging')

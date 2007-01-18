@@ -24,7 +24,7 @@ from xen.web import protocol, tcp, unix
 
 from xen.xend import sxp
 from xen.xend import XendDomain
-from xen.xend import XendRoot
+from xen.xend import XendOptions
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 
@@ -114,15 +114,15 @@ class RelocationProtocol(protocol.Protocol):
 
 
 def listenRelocation():
-    xroot = XendRoot.instance()
-    if xroot.get_xend_unix_server():
+    xoptions = XendOptions.instance()
+    if xoptions.get_xend_unix_server():
         path = '/var/lib/xend/relocation-socket'
         unix.UnixListener(path, RelocationProtocol)
-    if xroot.get_xend_relocation_server():
-        port = xroot.get_xend_relocation_port()
-        interface = xroot.get_xend_relocation_address()
+    if xoptions.get_xend_relocation_server():
+        port = xoptions.get_xend_relocation_port()
+        interface = xoptions.get_xend_relocation_address()
 
-        hosts_allow = xroot.get_xend_relocation_hosts_allow()
+        hosts_allow = xoptions.get_xend_relocation_hosts_allow()
         if hosts_allow == '':
             hosts_allow = None
         else:

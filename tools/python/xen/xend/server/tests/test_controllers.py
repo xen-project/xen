@@ -2,9 +2,9 @@ import os
 import re
 import unittest
 
-import xen.xend.XendRoot
+import xen.xend.XendOptions
 
-xen.xend.XendRoot.XendRoot.config_default = '/dev/null'
+xen.xend.XendOptions.XendOptions.config_default = '/dev/null'
 
 from xen.xend.server import netif
 
@@ -13,7 +13,7 @@ FAKE_DOMID = 42
 FAKE_DEVID = 63
 
 
-xroot = xen.xend.XendRoot.instance()
+xoptions = xen.xend.XendOptions.instance()
 
 
 class test_controllers(unittest.TestCase):
@@ -36,8 +36,8 @@ class test_controllers(unittest.TestCase):
 
         self.assertEqual(backdets['handle'], str(FAKE_DEVID))
         self.assertEqual(backdets['script'],
-                         os.path.join(xroot.network_script_dir,
-                                      xroot.get_vif_script()))
+                         os.path.join(xoptions.network_script_dir,
+                                      xoptions.get_vif_script()))
         self.assertValidMac(backdets['mac'], expectedMac)
 
         self.assertEqual(frontdets['handle'], str(FAKE_DEVID))

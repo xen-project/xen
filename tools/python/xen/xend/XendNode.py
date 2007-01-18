@@ -24,7 +24,7 @@ from xen.util import Brctl
 
 from xen.xend import uuid
 from xen.xend.XendError import XendError, NetworkAlreadyConnected
-from xen.xend.XendRoot import instance as xendroot
+from xen.xend.XendOptions import instance as xendoptions
 from xen.xend.XendStorageRepository import XendStorageRepository
 from xen.xend.XendLogging import log
 from xen.xend.XendPIF import *
@@ -45,7 +45,7 @@ class XendNode:
         """
         
         self.xc = xen.lowlevel.xc.xc()
-        self.state_store = XendStateStore(xendroot().get_xend_state_path())
+        self.state_store = XendStateStore(xendoptions().get_xend_state_path())
 
         # load host state from XML file
         saved_host = self.state_store.load_state('host')

@@ -24,7 +24,7 @@ import types
 from encode import *
 from xen.xend import sxp
 
-from xen.xend import XendRoot
+from xen.xend import XendOptions
 
 DEBUG = 0
 
@@ -34,7 +34,7 @@ HTTP_ACCEPTED                        = 202
 HTTP_NO_CONTENT                      = 204
 
 
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 
 class XendError(RuntimeError):
@@ -218,7 +218,7 @@ class UnixXendClientProtocol(HttpXendClientProtocol):
 
     def __init__(self, path=None):
         if path is None:
-            path = xroot.get_xend_unix_path()
+            path = xoptions.get_xend_unix_path()
         self.path = path
 
     def makeConnection(self, _):

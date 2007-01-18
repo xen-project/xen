@@ -179,21 +179,24 @@ class XMLRPCServer:
         # Custom runloop so we can cleanup when exiting.
         # -----------------------------------------------------------------
         try:
-            self.server.socket.settimeout(1.0)
             while self.running:
                 self.server.handle_request()
         finally:
-            self.cleanup()
+            self.shutdown()
 
     def cleanup(self):
-        log.debug("XMLRPCServer.cleanup()")
+        log.debug('XMLRPCServer.cleanup()')
         try:
-            self.server.socket.close()
+            if hasattr(self, 'server'):
+                # shutdown socket explicitly to allow reuse
+                self.server.socket.shutdown(socket.SHUT_RDWR)
+                self.server.socket.close()
         except Exception, exn:
             log.exception(exn)
             pass
 
     def shutdown(self):
         self.running = False
-        self.ready = False
-
+        if self.ready:
+            self.ready = False
+            self.cleanup()

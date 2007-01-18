@@ -121,6 +121,133 @@ extern unsigned int opt_hvm_debug_level;
 #define TRACE_VMEXIT(index, value)                              \
     current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
 
+/* save/restore support */
+
+//#define HVM_DEBUG_SUSPEND
+
+extern int hvm_register_savevm(struct domain *d,
+                    const char *idstr,
+                    int instance_id,
+                    int version_id,
+                    SaveStateHandler *save_state,
+                    LoadStateHandler *load_state,
+                    void *opaque);
+
+static inline void hvm_ctxt_seek(hvm_domain_context_t *h, unsigned int pos)
+{
+    h->cur = pos;
+}
+
+static inline uint32_t hvm_ctxt_tell(hvm_domain_context_t *h)
+{
+    return h->cur;
+}
+
+static inline int hvm_ctxt_end(hvm_domain_context_t *h)
+{
+    return (h->cur >= h->size || h->cur >= HVM_CTXT_SIZE);
+}
+
+static inline void hvm_put_byte(hvm_domain_context_t *h, unsigned int i)
+{
+    if (h->cur >= HVM_CTXT_SIZE) {
+        h->cur++;
+        return;
+    }
+    h->data[h->cur++] = (char)i;
+}
+
+static inline void hvm_put_8u(hvm_domain_context_t *h, uint8_t b)
+{
+    hvm_put_byte(h, b);
+}
+
+static inline void hvm_put_16u(hvm_domain_context_t *h, uint16_t b)
+{
+    hvm_put_8u(h, b >> 8);
+    hvm_put_8u(h, b);
+}
+
+static inline void hvm_put_32u(hvm_domain_context_t *h, uint32_t b)
+{
+    hvm_put_16u(h, b >> 16);
+    hvm_put_16u(h, b);
+}
+
+static inline void hvm_put_64u(hvm_domain_context_t *h, uint64_t b)
+{
+    hvm_put_32u(h, b >> 32);
+    hvm_put_32u(h, b);
+}
+
+static inline void hvm_put_buffer(hvm_domain_context_t *h, const char *buf, int len)
+{
+    memcpy(&h->data[h->cur], buf, len);
+    h->cur += len;
+}
+
+
+static inline char hvm_get_byte(hvm_domain_context_t *h)
+{
+    if (h->cur >= HVM_CTXT_SIZE) {
+        printk("hvm_get_byte overflow.\n");
+        return -1;
+    }
+
+    if (h->cur >= h->size) {
+        printk("hvm_get_byte exceed data area.\n");
+        return -1;
+    }
+
+    return h->data[h->cur++];
+}
+
+static inline uint8_t hvm_get_8u(hvm_domain_context_t *h)
+{
+    return hvm_get_byte(h);
+}
+
+static inline uint16_t hvm_get_16u(hvm_domain_context_t *h)
+{
+    uint16_t v;
+    v =  hvm_get_8u(h) << 8;
+    v |= hvm_get_8u(h);
+
+    return v;
+}
+
+static inline uint32_t hvm_get_32u(hvm_domain_context_t *h)
+{
+    uint32_t v;
+    v =  hvm_get_16u(h) << 16;
+    v |= hvm_get_16u(h);
+
+    return v;
+}
+
+static inline uint64_t hvm_get_64u(hvm_domain_context_t *h)
+{
+    uint64_t v;
+    v =  (uint64_t)hvm_get_32u(h) << 32;
+    v |= hvm_get_32u(h);
+
+    return v;
+}
+
+static inline void hvm_get_buffer(hvm_domain_context_t *h, char *buf, int len)
+{
+    memcpy(buf, &h->data[h->cur], len);
+    h->cur += len;
+}
+
+extern int hvm_save(struct vcpu*, hvm_domain_context_t *h);
+extern int hvm_load(struct vcpu*, hvm_domain_context_t *h);
+
+extern int arch_sethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
+extern int arch_gethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
+
+extern void shpage_init(struct domain *d, shared_iopage_t *sp);
+
 extern int hvm_enabled;
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);

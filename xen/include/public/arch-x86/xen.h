@@ -109,6 +109,70 @@ DEFINE_XEN_GUEST_HANDLE(trap_info_t);
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
+ * World vmcs state
+ */
+struct vmcs_data {
+    uint64_t  eip;        /* execution pointer */
+    uint64_t  esp;        /* stack pointer */
+    uint64_t  eflags;     /* flags register */
+    uint64_t  cr0;
+    uint64_t  cr3;        /* page table directory */
+    uint64_t  cr4;
+    uint32_t  idtr_limit; /* idt */
+    uint64_t  idtr_base;
+    uint32_t  gdtr_limit; /* gdt */
+    uint64_t  gdtr_base;
+    uint32_t  cs_sel;     /* cs selector */
+    uint32_t  cs_limit;
+    uint64_t  cs_base;
+    uint32_t  cs_arbytes;
+    uint32_t  ds_sel;     /* ds selector */
+    uint32_t  ds_limit;
+    uint64_t  ds_base;
+    uint32_t  ds_arbytes;
+    uint32_t  es_sel;     /* es selector */
+    uint32_t  es_limit;
+    uint64_t  es_base;
+    uint32_t  es_arbytes;
+    uint32_t  ss_sel;     /* ss selector */
+    uint32_t  ss_limit;
+    uint64_t  ss_base;
+    uint32_t  ss_arbytes;
+    uint32_t  fs_sel;     /* fs selector */
+    uint32_t  fs_limit;
+    uint64_t  fs_base;
+    uint32_t  fs_arbytes;
+    uint32_t  gs_sel;     /* gs selector */
+    uint32_t  gs_limit;
+    uint64_t  gs_base;
+    uint32_t  gs_arbytes;
+    uint32_t  tr_sel;     /* task selector */
+    uint32_t  tr_limit;
+    uint64_t  tr_base;
+    uint32_t  tr_arbytes;
+    uint32_t  ldtr_sel;   /* ldtr selector */
+    uint32_t  ldtr_limit;
+    uint64_t  ldtr_base;
+    uint32_t  ldtr_arbytes;
+    uint32_t  sysenter_cs;
+    uint64_t  sysenter_esp;
+    uint64_t  sysenter_eip;
+    /* msr for em64t */
+    uint64_t shadow_gs;
+    uint64_t flags;
+    /* same size as VMX_MSR_COUNT */
+    uint64_t msr_items[6];
+    uint64_t vmxassist_enabled;
+};
+typedef struct vmcs_data vmcs_data_t;
+
+struct hvmcpu_context {
+    uint32_t valid;
+    struct vmcs_data data;
+    uint64_t gtime;
+};
+
+/*
  * The following is all CPU context. Note that the fpu_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
@@ -154,6 +218,7 @@ struct vcpu_guest_context {
 #endif
 #endif
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
+    struct hvmcpu_context hvmcpu_ctxt;      /* whole vmcs region */
 #ifdef __x86_64__
     /* Segment base addresses. */
     uint64_t      fs_base;

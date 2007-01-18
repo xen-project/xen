@@ -56,7 +56,9 @@ static void *syscall_page;
 
 int __init sysenter_setup(void)
 {
-	syscall_page = (void *)get_zeroed_page(GFP_ATOMIC);
+	void *page = (void *)get_zeroed_page(GFP_ATOMIC);
+
+	syscall_page = page;
 
 #ifdef CONFIG_XEN
 	if (boot_cpu_has(X86_FEATURE_SEP)) {
@@ -70,16 +72,16 @@ int __init sysenter_setup(void)
 	}
 #endif
 
-	if (boot_cpu_has(X86_FEATURE_SEP)) {
-		memcpy(syscall_page,
-		       &vsyscall_sysenter_start,
-		       &vsyscall_sysenter_end - &vsyscall_sysenter_start);
+	if (!boot_cpu_has(X86_FEATURE_SEP)) {
+		memcpy(page,
+		       &vsyscall_int80_start,
+		       &vsyscall_int80_end - &vsyscall_int80_start);
 		return 0;
 	}
 
-	memcpy(syscall_page,
-	       &vsyscall_int80_start,
-	       &vsyscall_int80_end - &vsyscall_int80_start);
+	memcpy(page,
+	       &vsyscall_sysenter_start,
+	       &vsyscall_sysenter_end - &vsyscall_sysenter_start);
 
 	return 0;
 }

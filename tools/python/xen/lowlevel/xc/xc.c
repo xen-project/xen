@@ -160,6 +160,20 @@ static PyObject *pyxc_domain_destroy(XcObject *self, PyObject *args)
     return dom_op(self, args, xc_domain_destroy);
 }
 
+static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
+{
+    uint32_t dom, reason;
+
+    if (!PyArg_ParseTuple(args, "ii", &dom, &reason))
+      return NULL;
+
+    if (xc_domain_shutdown(self->xc_handle, dom, reason) != 0)
+        return pyxc_error_to_exception();
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
 
 static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
                                        PyObject *args,
@@ -1027,6 +1041,14 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Destroy a domain.\n"
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_shutdown", 
+      (PyCFunction)pyxc_domain_shutdown,
+      METH_VARARGS, "\n"
+      "Shutdown a domain.\n"
+      " dom       [int, 0]:      Domain identifier to use.\n"
+      " reason     [int, 0]:      Reason for shutdown.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vcpu_setaffinity", 

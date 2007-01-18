@@ -207,11 +207,11 @@ static inline void pit_load_count(PITChannelState *s, int channel, int val)
     switch (s->mode) {
         case 2:
             /* create periodic time */
-            create_periodic_time(&s->pt, period, 0, 0, pit_time_fired, s);
+            create_periodic_time(current, &s->pt, period, 0, 0, pit_time_fired, s);
             break;
         case 1:
             /* create one shot time */
-            create_periodic_time(&s->pt, period, 0, 1, pit_time_fired, s);
+            create_periodic_time(current, &s->pt, period, 0, 1, pit_time_fired, s);
 #ifdef DEBUG_PIT
             printk("HVM_PIT: create one shot time.\n");
 #endif
@@ -356,6 +356,154 @@ void pit_stop_channel0_irq(PITState * pit)
     destroy_periodic_time(&s->pt);
 }
 
+#ifdef HVM_DEBUG_SUSPEND
+static void pit_info(PITState *pit)
+{
+    PITChannelState *s;
+    int i;
+
+    for(i = 0; i < 3; i++) {
+        printk("*****pit channel %d's state:*****\n", i);
+        s = &pit->channels[i];
+        printk("pit 0x%x.\n", s->count);
+        printk("pit 0x%x.\n", s->latched_count);
+        printk("pit 0x%x.\n", s->count_latched);
+        printk("pit 0x%x.\n", s->status_latched);
+        printk("pit 0x%x.\n", s->status);
+        printk("pit 0x%x.\n", s->read_state);
+        printk("pit 0x%x.\n", s->write_state);
+        printk("pit 0x%x.\n", s->write_latch);
+        printk("pit 0x%x.\n", s->rw_mode);
+        printk("pit 0x%x.\n", s->mode);
+        printk("pit 0x%x.\n", s->bcd);
+        printk("pit 0x%x.\n", s->gate);
+        printk("pit %"PRId64"\n", s->count_load_time);
+
+        if (s->pt) {
+            struct periodic_time *pt = s->pt;
+            printk("pit channel %d has a periodic timer:\n", i);
+            printk("pt %d.\n", pt->enabled);
+            printk("pt %d.\n", pt->one_shot);
+            printk("pt %d.\n", pt->irq);
+            printk("pt %d.\n", pt->first_injected);
+
+            printk("pt %d.\n", pt->pending_intr_nr);
+            printk("pt %d.\n", pt->period);
+            printk("pt %"PRId64"\n", pt->period_cycles);
+            printk("pt %"PRId64"\n", pt->last_plt_gtime);
+        }
+    }
+
+}
+#else
+static void pit_info(PITState *pit)
+{
+}
+#endif
+
+static void pit_save(hvm_domain_context_t *h, void *opaque)
+{
+    struct domain *d = opaque;
+    PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
+    PITChannelState *s;
+    struct periodic_time *pt;
+    int i, pti = -1;
+    
+    pit_info(pit);
+
+    for(i = 0; i < 3; i++) {
+        s = &pit->channels[i];
+        hvm_put_32u(h, s->count);
+        hvm_put_16u(h, s->latched_count);
+        hvm_put_8u(h, s->count_latched);
+        hvm_put_8u(h, s->status_latched);
+        hvm_put_8u(h, s->status);
+        hvm_put_8u(h, s->read_state);
+        hvm_put_8u(h, s->write_state);
+        hvm_put_8u(h, s->write_latch);
+        hvm_put_8u(h, s->rw_mode);
+        hvm_put_8u(h, s->mode);
+        hvm_put_8u(h, s->bcd);
+        hvm_put_8u(h, s->gate);
+        hvm_put_64u(h, s->count_load_time);
+
+        if (s->pt.enabled && pti == -1)
+            pti = i;
+    }
+
+    pt = &pit->channels[pti].pt;
+
+    /* save the vcpu for pt */
+    hvm_put_32u(h, pt->vcpu->vcpu_id);
+
+    /* save guest time */
+    hvm_put_8u(h, pti);
+    hvm_put_32u(h, pt->pending_intr_nr);
+    hvm_put_64u(h, pt->last_plt_gtime);
+
+}
+
+static int pit_load(hvm_domain_context_t *h, void *opaque, int version_id)
+{
+    struct domain *d = opaque;
+    PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
+    PITChannelState *s;
+    int i, pti, vcpu_id;
+    u32 period;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    for(i = 0; i < 3; i++) {
+        s = &pit->channels[i];
+        s->count = hvm_get_32u(h);
+        s->latched_count = hvm_get_16u(h);
+        s->count_latched = hvm_get_8u(h);
+        s->status_latched = hvm_get_8u(h);
+        s->status = hvm_get_8u(h);
+        s->read_state = hvm_get_8u(h);
+        s->write_state = hvm_get_8u(h);
+        s->write_latch = hvm_get_8u(h);
+        s->rw_mode = hvm_get_8u(h);
+        s->mode = hvm_get_8u(h);
+        s->bcd = hvm_get_8u(h);
+        s->gate = hvm_get_8u(h);
+        s->count_load_time = hvm_get_64u(h);
+    }
+
+    vcpu_id = hvm_get_32u(h);
+
+    pti = hvm_get_8u(h);
+    if ( pti < 0 || pti > 2) {
+        printk("pit load get a wrong channel %d when HVM resume.\n", pti);
+        return -EINVAL;
+    }
+
+    s = &pit->channels[pti];
+    period = DIV_ROUND((s->count * 1000000000ULL), PIT_FREQ);
+
+    printk("recreate periodic timer %d in mode %d, freq=%d.\n", pti, s->mode, period);
+    switch (s->mode) {
+        case 2:
+            /* create periodic time */
+            create_periodic_time(d->vcpu[vcpu_id], &s->pt, period, 0, 0, pit_time_fired, s);
+            break;
+        case 1:
+            /* create one shot time */
+            create_periodic_time(d->vcpu[vcpu_id], &s->pt, period, 0, 1, pit_time_fired, s);
+            break;
+        default:
+            printk("pit mode %"PRId8" should not use periodic timer!\n", s->mode);
+            return -EINVAL;
+    }
+    s->pt.pending_intr_nr = hvm_get_32u(h);
+    s->pt.last_plt_gtime = hvm_get_64u(h);
+
+    pit_info(pit);
+
+    return 0;
+}
+
 static void pit_reset(void *opaque)
 {
     PITState *pit = opaque;
@@ -383,6 +531,7 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     s++; s->pt.vcpu = v;
     s++; s->pt.vcpu = v;
 
+    hvm_register_savevm(v->domain, "xen_hvm_i8254", PIT_BASE, 1, pit_save, pit_load, v->domain);
     register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
     /* register the speaker port */
     register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);

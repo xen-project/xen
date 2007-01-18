@@ -3,9 +3,9 @@ import os.path
 import tempfile
 import unittest
 
-import xen.xend.XendRoot
+import xen.xend.XendOptions
 
-xen.xend.XendRoot.XendRoot.config_default = '/dev/null'
+xen.xend.XendOptions.XendOptions.config_default = '/dev/null'
 
 import xen.xm.create
 

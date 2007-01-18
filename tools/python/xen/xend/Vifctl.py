@@ -20,7 +20,7 @@
 """
 import os
 
-import XendRoot
+import XendOptions
 
 
 def network(op):
@@ -30,7 +30,7 @@ def network(op):
     """
     if op not in ['start', 'stop']:
         raise ValueError('Invalid operation: ' + op)
-    script = XendRoot.instance().get_network_script()
+    script = XendOptions.instance().get_network_script()
     if script:
         script.insert(1, op)
         os.spawnv(os.P_WAIT, script[0], script)

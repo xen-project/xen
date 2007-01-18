@@ -152,7 +152,7 @@ void pt_update_irq(struct vcpu *v);
 struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type);
 void pt_intr_post(struct vcpu *v, int vector, int type);
 void pt_reset(struct vcpu *v);
-void create_periodic_time(struct periodic_time *pt, uint64_t period,
+void create_periodic_time(struct vcpu *v, struct periodic_time *pt, uint64_t period,
                           uint8_t irq, char one_shot, time_cb *cb, void *data);
 void destroy_periodic_time(struct periodic_time *pt);
 

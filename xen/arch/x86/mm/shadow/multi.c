@@ -1627,7 +1627,7 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         default: /* Do nothing */ break;
         }
     }
-    
+
     shadow_promote(v, gmfn, shadow_type);
     set_shadow_status(v, gmfn, shadow_type, smfn);
 

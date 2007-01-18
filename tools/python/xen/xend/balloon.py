@@ -22,7 +22,7 @@ import time
 import xen.lowlevel.xc
 
 import XendDomain
-import XendRoot
+import XendOptions
 from XendLogging import log
 from XendError import VmError
 
@@ -107,11 +107,11 @@ def free(need_mem):
     # usage, so we recheck the required alloc each time around the loop, but
     # track the last used value so that we don't trigger too many watches.
 
-    xroot = XendRoot.instance()
+    xoptions = XendOptions.instance()
     xc = xen.lowlevel.xc.xc()
 
     try:
-        dom0_min_mem = xroot.get_dom0_min_mem() * 1024
+        dom0_min_mem = xoptions.get_dom0_min_mem() * 1024
 
         retries = 0
         sleep_time = SLEEP_TIME_GROWTH

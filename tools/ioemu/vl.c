@@ -4441,6 +4441,11 @@ int qemu_loadvm(const char *filename)
         qemu_fseek(f, cur_pos + record_len, SEEK_SET);
     }
     fclose(f);
+
+    /* del tmp file */
+    if (unlink(filename) == -1)
+        fprintf(stderr, "delete tmp qemu state file failed.\n");
+
     ret = 0;
  the_end:
     if (saved_vm_running)
@@ -5027,6 +5032,7 @@ typedef struct QEMUResetEntry {
 static QEMUResetEntry *first_reset_entry;
 int reset_requested;
 int shutdown_requested;
+int suspend_requested;
 static int powerdown_requested;
 
 void qemu_register_reset(QEMUResetHandler *func, void *opaque)
@@ -5806,6 +5812,14 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
     }
 
     return 0;
+}
+
+void suspend(int sig)
+{
+   fprintf(logfile, "suspend sig handler called with requested=%d!\n", suspend_requested);
+    if (sig != SIGUSR1)
+        fprintf(logfile, "suspend signal dismatch, get sig=%d!\n", sig);
+    suspend_requested = 1;
 }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -6714,6 +6728,26 @@ int main(int argc, char **argv)
             vm_start();
         }
     }
+
+    /* register signal for the suspend request when save */
+    {
+        struct sigaction act;
+        sigset_t set;
+        act.sa_handler = suspend;
+        act.sa_flags = SA_RESTART;
+        sigemptyset(&act.sa_mask);
+
+        sigaction(SIGUSR1, &act, NULL);
+
+        /* control panel mask some signals when spawn qemu, need unmask here*/
+        sigemptyset(&set);
+        sigaddset(&set, SIGUSR1);
+        sigaddset(&set, SIGTERM);
+        if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
+            fprintf(stderr, "unblock signal fail, possible issue for HVM save!\n");
+
+    }
+
     main_loop();
     quit_timers();
     return 0;

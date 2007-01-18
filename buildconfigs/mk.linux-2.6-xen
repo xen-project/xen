@@ -9,6 +9,10 @@ LINUX_DIR    = build-linux-$(LINUX_VER)-$(EXTRAVERSION)_$(XEN_TARGET_ARCH)
 IMAGE_TARGET ?= vmlinuz
 INSTALL_BOOT_PATH ?= $(DESTDIR)
 
+ifeq ($(XEN_TARGET_ARCH),ia64)
+INSTALL_BOOT_PATH := $(DESTDIR)/boot
+endif
+
 LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 
 include buildconfigs/Rules.mk
