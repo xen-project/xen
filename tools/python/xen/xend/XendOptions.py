@@ -312,7 +312,7 @@ class XendOptionsFile(XendOptions):
             raise XendError("invalid xend config %s: expected int: %s" % (name, v))
 
     def get_config_string(self, name, val=None):
-        return self.get_config_value(self, name, val)
+        return self.get_config_value(name, val)
 
     def get_xen_api_server(self):
         """Get the Xen-API server configuration.
