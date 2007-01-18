@@ -149,11 +149,19 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
+    HVMStateEntry *se, *dse;
     pit_deinit(d);
     rtc_deinit(d);
     pmtimer_deinit(d);
     hpet_deinit(d);
 
+    se = d->arch.hvm_domain.first_se;
+    while (se) {
+        dse = se;
+        se = se->next;
+        xfree(dse);
+    }
+ 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
             (void *)d->arch.hvm_domain.shared_page_va);

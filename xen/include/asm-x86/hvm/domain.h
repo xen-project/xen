@@ -27,6 +27,20 @@
 #include <asm/hvm/io.h>
 #include <public/hvm/params.h>
 
+typedef void SaveStateHandler(hvm_domain_context_t *h, void *opaque);
+typedef int LoadStateHandler(hvm_domain_context_t *h, void *opaque, int version_id);
+
+#define HVM_SE_IDSTR_LEN 32
+typedef struct HVMStateEntry {
+    char idstr[HVM_SE_IDSTR_LEN];
+    int instance_id;
+    int version_id;
+    SaveStateHandler *save_state;
+    LoadStateHandler *load_state;
+    void *opaque;
+    struct HVMStateEntry *next;
+} HVMStateEntry;
+
 struct hvm_domain {
     unsigned long          shared_page_va;
     unsigned long          buffered_io_va;
@@ -44,6 +58,9 @@ struct hvm_domain {
     spinlock_t             pbuf_lock;
 
     uint64_t               params[HVM_NR_PARAMS];
+
+    struct hvm_domain_context *hvm_ctxt;
+    HVMStateEntry *first_se;
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */
