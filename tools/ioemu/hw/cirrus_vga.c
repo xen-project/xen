@@ -3010,11 +3010,44 @@ static CPUWriteMemoryFunc *cirrus_mmio_write[3] = {
     cirrus_mmio_writel,
 };
 
+void cirrus_stop_acc(CirrusVGAState *s)
+{
+    if (s->map_addr){
+        int error;
+        s->map_addr = 0;
+        error = unset_vram_mapping(s->cirrus_lfb_addr,
+                s->cirrus_lfb_end);
+        fprintf(stderr, "cirrus_stop_acc:unset_vram_mapping.\n");
+
+        munmap(s->vram_ptr, VGA_RAM_SIZE);
+    }
+}
+
+void cirrus_restart_acc(CirrusVGAState *s)
+{
+    if (s->cirrus_lfb_addr && s->cirrus_lfb_end) {
+        void *vram_pointer, *old_vram;
+        fprintf(stderr, "cirrus_vga_load:re-enable vga acc.lfb_addr=0x%lx, lfb_end=0x%lx.\n",
+                s->cirrus_lfb_addr, s->cirrus_lfb_end);
+        vram_pointer = set_vram_mapping(s->cirrus_lfb_addr ,s->cirrus_lfb_end);
+        if (!vram_pointer){
+            fprintf(stderr, "cirrus_vga_load:NULL vram_pointer\n");
+        } else {
+            old_vram = vga_update_vram((VGAState *)s, vram_pointer,
+                    VGA_RAM_SIZE);
+            qemu_free(old_vram);
+            s->map_addr = s->cirrus_lfb_addr;
+            s->map_end = s->cirrus_lfb_end;
+        }
+    }
+}
+
 /* load/save state */
 
 static void cirrus_vga_save(QEMUFile *f, void *opaque)
 {
     CirrusVGAState *s = opaque;
+    uint8_t vga_acc;
 
     qemu_put_be32s(f, &s->latch);
     qemu_put_8s(f, &s->sr_index);
@@ -3049,11 +3082,20 @@ static void cirrus_vga_save(QEMUFile *f, void *opaque)
     qemu_put_be32s(f, &s->hw_cursor_y);
     /* XXX: we do not save the bitblt state - we assume we do not save
        the state when the blitter is active */
+
+    vga_acc = (!!s->map_addr);
+    qemu_put_8s(f, &vga_acc);
+    qemu_put_be64s(f, (uint64_t*)&s->cirrus_lfb_addr);
+    qemu_put_be64s(f, (uint64_t*)&s->cirrus_lfb_end);
+    qemu_put_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
+    if (vga_acc)
+        cirrus_stop_acc(s);
 }
 
 static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
 {
     CirrusVGAState *s = opaque;
+    uint8_t vga_acc = 0;
 
     if (version_id != 1)
         return -EINVAL;
@@ -3091,6 +3133,14 @@ static int cirrus_vga_load(QEMUFile *f, void *opaque, int version_id)
 
     qemu_get_be32s(f, &s->hw_cursor_x);
     qemu_get_be32s(f, &s->hw_cursor_y);
+
+    qemu_get_8s(f, &vga_acc);
+    qemu_get_be64s(f, (uint64_t*)&s->cirrus_lfb_addr);
+    qemu_get_be64s(f, (uint64_t*)&s->cirrus_lfb_end);
+    qemu_get_buffer(f, s->vram_ptr, VGA_RAM_SIZE); 
+    if (vga_acc){
+        cirrus_restart_acc(s);
+    }
 
     /* force refresh */
     s->graphic_mode = -1;
@@ -3296,6 +3346,8 @@ void pci_cirrus_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
     vga_common_init((VGAState *)s, 
                     ds, vga_ram_base, vga_ram_offset, vga_ram_size);
     cirrus_init_common(s, device_id, 1);
+
+    register_savevm("cirrus_vga_pci", 0, 1, generic_pci_save, generic_pci_load, d);
 
     /* setup memory space */
     /* memory #0 LFB */

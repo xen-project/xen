@@ -546,6 +546,7 @@ int main_loop(void)
 {
     extern int vm_running;
     extern int shutdown_requested;
+    extern int suspend_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
 
@@ -563,12 +564,24 @@ int main_loop(void)
                 qemu_system_reset();
                 reset_requested = 0;
             }
+            if (suspend_requested) {
+                fprintf(logfile, "device model received suspend signal!\n");
+                break;
+            }
         }
 
         /* Wait up to 10 msec. */
         main_loop_wait(10);
     }
-    destroy_hvm_domain();
+    if (!suspend_requested)
+        destroy_hvm_domain();
+    else {
+        char qemu_file[20];
+        sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
+        if (qemu_savevm(qemu_file) < 0)
+            fprintf(stderr, "qemu save fail.\n");
+    }
+
     return 0;
 }
 

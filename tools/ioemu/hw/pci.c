@@ -63,6 +63,7 @@ void generic_pci_save(QEMUFile* f, void *opaque)
     qemu_put_buffer(f, s->config, 256);
 }
 
+void pci_update_mappings(PCIDevice *d);
 int generic_pci_load(QEMUFile* f, void *opaque, int version_id)
 {
     PCIDevice* s=(PCIDevice*)opaque;
@@ -71,6 +72,7 @@ int generic_pci_load(QEMUFile* f, void *opaque, int version_id)
         return -EINVAL;
 
     qemu_get_buffer(f, s->config, 256);
+    pci_update_mappings(s);
     return 0;
 }
 
