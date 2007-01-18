@@ -215,6 +215,7 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 #ifdef CONFIG_X86_F00F_BUG
 	case FIX_F00F_IDT:
 #endif
+	case FIX_VDSO:
 		set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
 		break;
 	default:

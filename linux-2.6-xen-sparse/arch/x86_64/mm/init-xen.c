@@ -351,7 +351,7 @@ __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 		return;
 	}
 	switch (idx) {
-	case VSYSCALL_FIRST_PAGE:
+	case VSYSCALL_LAST_PAGE ... VSYSCALL_FIRST_PAGE:
 		set_pte_phys(address, phys, prot, SET_FIXMAP_KERNEL);
 		break;
 	default:
