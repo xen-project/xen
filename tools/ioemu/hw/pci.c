@@ -40,6 +40,8 @@ target_phys_addr_t pci_mem_base;
 static int pci_irq_index;
 static PCIBus *first_bus;
 
+static void pci_update_mappings(PCIDevice *d);
+
 PCIBus *pci_register_bus(pci_set_irq_fn set_irq, void *pic, int devfn_min)
 {
     PCIBus *bus;
@@ -63,7 +65,6 @@ void generic_pci_save(QEMUFile* f, void *opaque)
     qemu_put_buffer(f, s->config, 256);
 }
 
-void pci_update_mappings(PCIDevice *d);
 int generic_pci_load(QEMUFile* f, void *opaque, int version_id)
 {
     PCIDevice* s=(PCIDevice*)opaque;
