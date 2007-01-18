@@ -2184,10 +2184,11 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     expected_count = (page->count_info & PGC_allocated) ? 1 : 0;
     if ( (page->count_info & PGC_count_mask) != expected_count )
     {
-        /* Don't complain if we're in HVM and there's one extra mapping: 
-         * The qemu helper process has an untyped mapping of this dom's RAM */
+        /* Don't complain if we're in HVM and there are some extra mappings: 
+         * The qemu helper process has an untyped mapping of this dom's RAM 
+         * and the HVM restore program takes another. */
         if ( !(shadow_mode_external(v->domain)
-               && (page->count_info & PGC_count_mask) <= 3 /* vmx restore add one extra mapping*/
+               && (page->count_info & PGC_count_mask) <= 3
                && (page->u.inuse.type_info & PGT_count_mask) == 0) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx: "

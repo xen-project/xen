@@ -1627,14 +1627,6 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
         default: /* Do nothing */ break;
         }
     }
-    
-    {
-        struct page_info *page = mfn_to_page(gmfn);
-        /* XXX: add it to emulate a touched page */
-        if ((page->u.inuse.type_info & PGT_type_mask) == PGT_none){
-            page->u.inuse.type_info |= (PGT_writable_page | PGT_validated);
-        }
-    }
 
     shadow_promote(v, gmfn, shadow_type);
     set_shadow_status(v, gmfn, shadow_type, smfn);
