@@ -410,10 +410,6 @@ static void vmx_store_cpu_guest_regs(
         regs->eflags = __vmread(GUEST_RFLAGS);
         regs->ss = __vmread(GUEST_SS_SELECTOR);
         regs->cs = __vmread(GUEST_CS_SELECTOR);
-        regs->ds = __vmread(GUEST_DS_SELECTOR);
-        regs->es = __vmread(GUEST_ES_SELECTOR);
-        regs->gs = __vmread(GUEST_GS_SELECTOR);
-        regs->fs = __vmread(GUEST_FS_SELECTOR);
         regs->eip = __vmread(GUEST_RIP);
         regs->esp = __vmread(GUEST_RSP);
     }
@@ -429,62 +425,39 @@ static void vmx_store_cpu_guest_regs(
     vmx_vmcs_exit(v);
 }
 
-/*
- * The VMX spec (section 4.3.1.2, Checks on Guest Segment
- * Registers) says that virtual-8086 mode guests' segment
- * base-address fields in the VMCS must be equal to their
- * corresponding segment selector field shifted right by
- * four bits upon vmentry.
- *
- * This function (called only for VM86-mode guests) fixes
- * the bases to be consistent with the selectors in regs
- * if they're not already.  Without this, we can fail the
- * vmentry check mentioned above.
- */
-static void fixup_vm86_seg_bases(struct cpu_user_regs *regs)
+static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     unsigned long base;
 
-    base = __vmread(GUEST_ES_BASE);
-    if (regs->es << 4 != base)
-        __vmwrite(GUEST_ES_BASE, regs->es << 4);
-    base = __vmread(GUEST_CS_BASE);
-    if (regs->cs << 4 != base)
-        __vmwrite(GUEST_CS_BASE, regs->cs << 4);
-    base = __vmread(GUEST_SS_BASE);
-    if (regs->ss << 4 != base)
-        __vmwrite(GUEST_SS_BASE, regs->ss << 4);
-    base = __vmread(GUEST_DS_BASE);
-    if (regs->ds << 4 != base)
-        __vmwrite(GUEST_DS_BASE, regs->ds << 4);
-    base = __vmread(GUEST_FS_BASE);
-    if (regs->fs << 4 != base)
-        __vmwrite(GUEST_FS_BASE, regs->fs << 4);
-    base = __vmread(GUEST_GS_BASE);
-    if (regs->gs << 4 != base)
-        __vmwrite(GUEST_GS_BASE, regs->gs << 4);
-}
-
-static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
-{
     vmx_vmcs_enter(v);
 
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
-    __vmwrite(GUEST_DS_SELECTOR, regs->ds);
-    __vmwrite(GUEST_ES_SELECTOR, regs->es);
-    __vmwrite(GUEST_GS_SELECTOR, regs->gs);
-    __vmwrite(GUEST_FS_SELECTOR, regs->fs);
-
     __vmwrite(GUEST_RSP, regs->esp);
 
     /* NB. Bit 1 of RFLAGS must be set for VMENTRY to succeed. */
     __vmwrite(GUEST_RFLAGS, regs->eflags | 2UL);
-    if (regs->eflags & EF_TF)
+
+    if ( regs->eflags & EF_TF )
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    if (regs->eflags & EF_VM)
-        fixup_vm86_seg_bases(regs);
+
+    if ( regs->eflags & EF_VM )
+    {
+        /*
+         * The VMX spec (section 4.3.1.2, Checks on Guest Segment
+         * Registers) says that virtual-8086 mode guests' segment
+         * base-address fields in the VMCS must be equal to their
+         * corresponding segment selector field shifted right by
+         * four bits upon vmentry.
+         */
+        base = __vmread(GUEST_CS_BASE);
+        if ( (regs->cs << 4) != base )
+            __vmwrite(GUEST_CS_BASE, regs->cs << 4);
+        base = __vmread(GUEST_SS_BASE);
+        if ( (regs->ss << 4) != base )
+            __vmwrite(GUEST_SS_BASE, regs->ss << 4);
+    }
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
@@ -518,8 +491,7 @@ static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
     ASSERT(v == current);
 
 #ifdef __x86_64__
-    if ( vmx_long_mode_enabled(v) &&
-         (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
+    if ( vmx_long_mode_enabled(v) && (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
         long_mode = 1;
 #endif
 
@@ -694,8 +666,8 @@ static int vmx_guest_x86_mode(struct vcpu *v)
 
     cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
 
-    if ( vmx_long_mode_enabled(v) )
-        return ((cs_ar_bytes & (1u<<13)) ? 8 : 4);
+    if ( vmx_long_mode_enabled(v) && (cs_ar_bytes & (1u<<13)) )
+        return 8;
 
     if ( vmx_realmode(v) )
         return 2;
@@ -2251,47 +2223,54 @@ static void vmx_reflect_exception(struct vcpu *v)
     }
 }
 
+static void vmx_failed_vmentry(unsigned int exit_reason)
+{
+    unsigned int failed_vmentry_reason = (uint16_t)exit_reason;
+    unsigned long exit_qualification;
+
+    exit_qualification = __vmread(EXIT_QUALIFICATION);
+    printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
+    switch ( failed_vmentry_reason )
+    {
+    case EXIT_REASON_INVALID_GUEST_STATE:
+        printk("caused by invalid guest state (%ld).\n", exit_qualification);
+        break;
+    case EXIT_REASON_MSR_LOADING:
+        printk("caused by MSR entry %ld loading.\n", exit_qualification);
+        break;
+    case EXIT_REASON_MACHINE_CHECK:
+        printk("caused by machine check.\n");
+        break;
+    default:
+        printk("reason not known yet!");
+        break;
+    }
+
+    printk("************* VMCS Area **************\n");
+    vmcs_dump_vcpu();
+    printk("**************************************\n");
+
+    domain_crash(current->domain);
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
 
+    TRACE_3D(TRC_VMX_VMEXIT + v->vcpu_id, 0, 0, 0);
+
     exit_reason = __vmread(VM_EXIT_REASON);
 
     perfc_incra(vmexits, exit_reason);
+    TRACE_VMEXIT(0, exit_reason);
 
     if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
         local_irq_enable();
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
-    {
-        unsigned int failed_vmentry_reason = exit_reason & 0xFFFF;
-
-        exit_qualification = __vmread(EXIT_QUALIFICATION);
-        printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
-        switch ( failed_vmentry_reason ) {
-        case EXIT_REASON_INVALID_GUEST_STATE:
-            printk("caused by invalid guest state (%ld).\n", exit_qualification);
-            break;
-        case EXIT_REASON_MSR_LOADING:
-            printk("caused by MSR entry %ld loading.\n", exit_qualification);
-            break;
-        case EXIT_REASON_MACHINE_CHECK:
-            printk("caused by machine check.\n");
-            break;
-        default:
-            printk("reason not known yet!");
-            break;
-        }
-
-        printk("************* VMCS Area **************\n");
-        vmcs_dump_vcpu();
-        printk("**************************************\n");
-        goto exit_and_crash;
-    }
-
-    TRACE_VMEXIT(0, exit_reason);
+        return vmx_failed_vmentry(exit_reason);
 
     switch ( exit_reason )
     {
@@ -2517,11 +2496,6 @@ asmlinkage void vmx_trace_vmentry(void)
     TRACE_VMEXIT(2, 0);
     TRACE_VMEXIT(3, 0);
     TRACE_VMEXIT(4, 0);
-}
-
-asmlinkage void vmx_trace_vmexit (void)
-{
-    TRACE_3D(TRC_VMX_VMEXIT + current->vcpu_id, 0, 0, 0);
 }
 
 /*

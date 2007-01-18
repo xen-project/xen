@@ -129,5 +129,6 @@ struct page *kmap_atomic_to_page(void *ptr)
 EXPORT_SYMBOL(kmap);
 EXPORT_SYMBOL(kunmap);
 EXPORT_SYMBOL(kmap_atomic);
+EXPORT_SYMBOL(kmap_atomic_pte);
 EXPORT_SYMBOL(kunmap_atomic);
 EXPORT_SYMBOL(kmap_atomic_to_page);

@@ -10,7 +10,6 @@
   
 #include <xen/types.h>
 #include <xen/kexec.h>
-#include <asm/fixmap.h>
 
 typedef void (*relocate_new_kernel_t)(
                 unsigned long indirection_page,

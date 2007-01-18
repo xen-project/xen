@@ -1,5 +1,5 @@
 VERSION {
-	libfsimage.so.1.1 {
+	libfsimage.so.1.0 {
 		global:
 			fsi_open_fsimage;
 			fsi_close_fsimage;
@@ -10,7 +10,6 @@ VERSION {
 			fsi_pread_file;
 	
 			fsip_fs_set_data;
-			fsip_fs_free;
 			fsip_file_alloc;
 			fsip_file_free;
 			fsip_fs;

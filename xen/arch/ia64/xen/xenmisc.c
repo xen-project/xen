@@ -77,7 +77,7 @@ void console_print(char *msg)
 // called from unaligned.c
 ////////////////////////////////////
 
-void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+void die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
 	if (user_mode(regs))
 		return;
@@ -88,7 +88,7 @@ void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ (
 	domain_crash_synchronous();
 }
 
-void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
 	if (vmx_user_mode(regs))
 		return;

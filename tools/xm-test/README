@@ -207,6 +207,49 @@ dedicated machine.  As such, the library automatically destroys any
 running DomUs on the system to provide each test with a "clean slate".
 
 
+Testing the XML-RPC and Xen-API interfaces of xend
+==================================================
+
+The xm-test suite can be used to test xm's interface with xend using
+either XML-RPC or the Xen-API. In order to use either one of these modes,
+xm needs to be configured using its configuration file
+'/etc/xen/xm-config.xml'.
+Note: The current default configuration after a fresh install of the xen
+sources currently is to use the XML-RPC interface for communication with xend.
+
+Example content for the xm-config.xml for using the Xen-API looks as
+follows:
+
+<xm>
+  <server type='Xen-API'
+          uri='http://localhost:9363/'
+          username='me'
+          password='mypassword' />
+</xm>
+
+This configuration makes xm talk to xend using port 9363. For this to
+work, also xend needs to be configured to listen to port 9363. Therefore
+The following line must be in /etc/xen/xend-config.sxp.
+
+(xen-api-server (( 127.0.0.1:9363 none )))
+
+To communicate via the legacy XML-RPC interface, the file
+'/etc/xen/xm-config.xml' may simply have the following content or
+may be complete remove from the /etc/xen directory.
+
+<xm>
+</xm>
+
+A few tests have been written for the xm-test suite that test the
+Xen-API interface directly without relying on 'xm'. These tests can be
+found in the grouptest 'xapi' and for them to work properly, xm must have
+been configured to use the Xen-API following the instructions above. To
+run these test, the following command line can be invoked:
+
+   # ./runtest.sh -g xapi <logfile>
+
+
+
 Extending
 =========
 

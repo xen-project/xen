@@ -5,7 +5,6 @@ linux-2.6.19-rc1-kexec-move_segment_code-x86_64.patch
 blktap-aio-16_03_06.patch
 fix-ide-cd-pio-mode.patch
 i386-mach-io-check-nmi.patch
-ipv6-no-autoconf.patch
 net-csum.patch
 net-gso-5-rcv-mss.patch
 net-gso-6-linear-segmentation.patch

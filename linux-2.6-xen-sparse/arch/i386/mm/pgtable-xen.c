@@ -239,23 +239,41 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 
 #ifdef CONFIG_HIGHPTE
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT|__GFP_ZERO, 0);
+	if (pte && PageHighMem(pte)) {
+		struct mmuext_op op;
+
+		kmap_flush_unused();
+		op.cmd = MMUEXT_PIN_L1_TABLE;
+		op.arg1.mfn = pfn_to_mfn(page_to_pfn(pte));
+		BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+	}
 #else
 	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+#endif
 	if (pte) {
 		SetPageForeign(pte, pte_free);
 		init_page_count(pte);
 	}
-#endif
 	return pte;
 }
 
 void pte_free(struct page *pte)
 {
-	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
+	unsigned long pfn = page_to_pfn(pte);
 
-	if (!pte_write(*virt_to_ptep(va)))
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
+	if (!PageHighMem(pte)) {
+		unsigned long va = (unsigned long)__va(pfn << PAGE_SHIFT);
+
+		if (!pte_write(*virt_to_ptep(va)))
+			BUG_ON(HYPERVISOR_update_va_mapping(
+			       va, pfn_pte(pfn, PAGE_KERNEL), 0));
+	} else {
+		struct mmuext_op op;
+
+		op.cmd = MMUEXT_UNPIN_TABLE;
+		op.arg1.mfn = pfn_to_mfn(pfn);
+		BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+	}
 
 	ClearPageForeign(pte);
 	init_page_count(pte);

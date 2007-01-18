@@ -150,6 +150,7 @@ AC_CONFIG_FILES([
     tests/vcpu-pin/Makefile
     tests/vcpu-disable/Makefile
     tests/vtpm/Makefile
+    tests/xapi/Makefile
     tests/enforce_dom0_cpus/Makefile
     lib/XmTestReport/xmtest.py
     lib/XmTestLib/config.py

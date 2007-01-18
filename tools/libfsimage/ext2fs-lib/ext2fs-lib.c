@@ -58,9 +58,11 @@ ext2lib_umount(fsi_t *fsi)
 {
 	ext2_filsys *fs = fsip_fs_data(fsi);
 	if (ext2fs_close(*fs) != 0) {
+		free(fs);
 		errno = EINVAL;
 		return (-1);
 	}
+	free(fs);
 	return (0);
 }
 

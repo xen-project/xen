@@ -24,7 +24,9 @@ VTPMDB="/etc/xen/vtpm.db"
 
 #In the vtpm-impl file some commands should be defined:
 #      vtpm_create, vtpm_setup, vtpm_start, etc. (see below)
-if [ -r "$dir/vtpm-impl" ]; then
+if [ -r "$dir/vtpm-impl.alt" ]; then
+	. "$dir/vtpm-impl.alt"
+elif [ -r "$dir/vtpm-impl" ]; then
 	. "$dir/vtpm-impl"
 else
 	function vtpm_create () {

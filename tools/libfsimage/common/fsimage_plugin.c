@@ -40,13 +40,6 @@ fsip_fs_set_data(fsi_t *fsi, void *data)
 	fsi->f_data = data;
 }
 
-void
-fsip_fs_free(fsi_t *fsi)
-{
-	free(fsi->f_data);
-	free(fsi);
-}
-
 fsi_file_t *
 fsip_file_alloc(fsi_t *fsi, void *data)
 {
@@ -64,7 +57,6 @@ fsip_file_alloc(fsi_t *fsi, void *data)
 void
 fsip_file_free(fsi_file_t *ffi)
 {
-	free(ffi->ff_data);
 	free(ffi);
 }
 

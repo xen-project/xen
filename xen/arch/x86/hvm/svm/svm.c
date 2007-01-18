@@ -482,8 +482,8 @@ static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( vmcb->efer & EFER_LMA )
-        return (vmcb->cs.attr.fields.l ? 8 : 4);
+    if ( (vmcb->efer & EFER_LMA) && vmcb->cs.attr.fields.l )
+        return 8;
 
     if ( svm_realmode(v) )
         return 2;

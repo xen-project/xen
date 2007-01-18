@@ -29,31 +29,7 @@
         andq $~7,reg;            \
         movq (reg),reg;
 
-/*
- * At VMExit time the processor saves the guest selectors, rsp, rip, 
- * and rflags. Therefore we don't save them, but simply decrement 
- * the kernel stack pointer to make it consistent with the stack frame 
- * at usual interruption time. The rflags of the host is not saved by VMX, 
- * and we set it to the fixed value.
- *
- * We also need the room, especially because orig_eax field is used 
- * by do_IRQ(). Compared the cpu_user_regs, we skip pushing for the following:
- *   (10) u64 gs;                 
- *   (9)  u64 fs;
- *   (8)  u64 ds;
- *   (7)  u64 es;
- *               <- get_stack_bottom() (= HOST_ESP)
- *   (6)  u64 ss;
- *   (5)  u64 rsp;
- *   (4)  u64 rflags;
- *   (3)  u64 cs;
- *   (2)  u64 rip;
- * (2/1)  u32 entry_vector;
- * (1/1)  u32 error_code;
- */
-#define NR_SKIPPED_REGS 6 /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS                  \
-        subq $(NR_SKIPPED_REGS*8), %rsp;        \
         pushq %rdi;                             \
         pushq %rsi;                             \
         pushq %rdx;                             \
@@ -85,14 +61,11 @@
         popq %rcx;                              \
         popq %rdx;                              \
         popq %rsi;                              \
-        popq %rdi;                              \
-        addq $(NR_SKIPPED_REGS*8), %rsp;
+        popq %rdi
 
         ALIGN
 ENTRY(vmx_asm_vmexit_handler)
-        /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
-        call vmx_trace_vmexit
         movq %rsp,%rdi
         call vmx_vmexit_handler
         jmp vmx_asm_do_vmentry

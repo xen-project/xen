@@ -29,6 +29,7 @@ from Test import *
 from config import *
 from Console import *
 from XenDevice import *
+from DomainTracking import *
 from acm import *
 
 
@@ -147,7 +148,7 @@ class DomainError(Exception):
 
 class XenDomain:
 
-    def __init__(self, name=None, config=None):
+    def __init__(self, name=None, config=None, isManaged=False):
         """Create a domain object.
         @param config: String filename of config file
         """
@@ -162,6 +163,10 @@ class XenDomain:
         self.devices = {}
         self.netEnv = "bridge"
 
+        if os.getenv("XM_MANAGED_DOMAINS"):
+            isManaged = True
+        self.isManaged = isManaged
+
         # Set domain type, either PV for ParaVirt domU or HVM for
         # FullVirt domain
         if ENABLE_HVM_SUPPORT:
@@ -171,7 +176,17 @@ class XenDomain:
 
     def start(self, noConsole=False):
 
-        ret, output = traceCommand("xm create %s" % self.config)
+        if not self.isManaged:
+            ret, output = traceCommand("xm create %s" % self.config)
+        else:
+            ret, output = traceCommand("xm new %s" % self.config)
+            if ret != 0:
+                _ret, output = traceCommand("xm delete " +
+                                            self.config.getOpt("name"))
+            else:
+                ret, output = traceCommand("xm start " +
+                                           self.config.getOpt("name"))
+                addManagedDomain(self.config.getOpt("name"))
 
         if ret != 0:
             raise DomainError("Failed to create domain",
@@ -218,6 +233,10 @@ class XenDomain:
             self.closeConsole()
 
         ret, output = traceCommand(prog + cmd + self.config.getOpt("name"))
+        if self.isManaged:
+            ret, output = traceCommand(prog + " delete " +
+                                       self.config.getOpt("name"))
+            delManagedDomain(self.config.getOpt("name"))
 
         return ret
 
@@ -296,7 +315,7 @@ class XenDomain:
 class XmTestDomain(XenDomain):
 
     def __init__(self, name=None, extraConfig=None,
-                 baseConfig=arch.configDefaults):
+                 baseConfig=arch.configDefaults, isManaged=False):
         """Create a new xm-test domain
         @param name: The requested domain name
         @param extraConfig: Additional configuration options
@@ -312,7 +331,8 @@ class XmTestDomain(XenDomain):
         elif not config.getOpt("name"):
             config.setOpt("name", getUniqueName())
 
-        XenDomain.__init__(self, config.getOpt("name"), config=config)
+        XenDomain.__init__(self, config.getOpt("name"), config=config,
+                           isManaged=isManaged)
 
     def minSafeMem(self):
         return arch.minSafeMem

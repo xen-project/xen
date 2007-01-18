@@ -163,6 +163,18 @@ void _arch_exit_mmap(struct mm_struct *mm)
         mm_unpin(mm);
 }
 
+struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	struct page *pte;
+
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+	if (pte) {
+		SetPageForeign(pte, pte_free);
+		init_page_count(pte);
+	}
+	return pte;
+}
+
 void pte_free(struct page *pte)
 {
 	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
@@ -170,6 +182,10 @@ void pte_free(struct page *pte)
 	if (!pte_write(*virt_to_ptep(va)))
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
+
+	ClearPageForeign(pte);
+	init_page_count(pte);
+
 	__free_page(pte);
 }
 #endif	/* CONFIG_XEN */

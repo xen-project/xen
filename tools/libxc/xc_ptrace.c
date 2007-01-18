@@ -166,14 +166,11 @@ static unsigned long           *page_array = NULL;
  * tables.
  *
  */
-static unsigned long
-to_ma(int cpu,
-      unsigned long in_addr)
+static uint64_t
+to_ma(int cpu, uint64_t maddr)
 {
-    unsigned long maddr = in_addr;
-
     if ( current_is_hvm && paging_enabled(&ctxt[cpu]) )
-        maddr = page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
+        maddr = (uint64_t)page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
     return maddr;
 }
 
@@ -225,7 +222,8 @@ map_domain_va_pae(
     void *guest_va,
     int perm)
 {
-    unsigned long l3e, l2e, l1e, l2p, l1p, p, va = (unsigned long)guest_va;
+    uint64_t l3e, l2e, l1e, l2p, l1p, p;
+    unsigned long va = (unsigned long)guest_va;
     uint64_t *l3, *l2, *l1;
     static void *v[MAX_VIRT_CPUS];
 
@@ -380,12 +378,12 @@ map_domain_va(
 
     if (!paging_enabled(&ctxt[cpu])) {
         static void * v;
-        unsigned long page;
+        uint64_t page;
 
         if ( v != NULL )
             munmap(v, PAGE_SIZE);
 
-        page = to_ma(cpu, page_array[va >> PAGE_SHIFT]);
+        page = to_ma(cpu, va);
 
         v = xc_map_foreign_range( xc_handle, current_domid, PAGE_SIZE,
                 perm, page >> PAGE_SHIFT);

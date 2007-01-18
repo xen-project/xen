@@ -3,7 +3,21 @@
  * 
  * Generic x86 (32-bit and 64-bit) instruction decoder and emulator.
  * 
- * Copyright (c) 2005 Keir Fraser
+ * Copyright (c) 2005-2007 Keir Fraser
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef __XEN__
@@ -33,9 +47,8 @@
 #define SrcReg      (1<<3) /* Register operand. */
 #define SrcMem      (2<<3) /* Memory operand. */
 #define SrcMem16    (3<<3) /* Memory operand (16-bit). */
-#define SrcMem32    (4<<3) /* Memory operand (32-bit). */
-#define SrcImm      (5<<3) /* Immediate operand. */
-#define SrcImmByte  (6<<3) /* 8-bit sign-extended immediate operand. */
+#define SrcImm      (4<<3) /* Immediate operand. */
+#define SrcImmByte  (5<<3) /* 8-bit sign-extended immediate operand. */
 #define SrcMask     (7<<3)
 /* Generic ModRM decode. */
 #define ModRM       (1<<6)
@@ -62,19 +75,19 @@ static uint8_t opcode_table[256] = {
     /* 0x20 - 0x27 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
     /* 0x28 - 0x2F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
     /* 0x30 - 0x37 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
     /* 0x38 - 0x3F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, 0,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
     /* 0x40 - 0x4F */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -85,9 +98,13 @@ static uint8_t opcode_table[256] = {
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
-    /* 0x60 - 0x6F */
-    0, 0, 0, DstReg|SrcMem32|ModRM|Mov /* movsxd (x86/64) */,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x60 - 0x67 */
+    ImplicitOps, ImplicitOps, DstReg|SrcMem|ModRM, DstReg|SrcMem16|ModRM|Mov,
+    0, 0, 0, 0,
+    /* 0x68 - 0x6F */
+    ImplicitOps|Mov, DstMem|SrcImm|ModRM|Mov,
+    ImplicitOps|Mov, DstMem|SrcImmByte|ModRM|Mov,
+    0, 0, 0, 0,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -107,13 +124,14 @@ static uint8_t opcode_table[256] = {
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x98 - 0x9F */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, 0, 0, 0, 0, ImplicitOps, ImplicitOps,
     /* 0xA0 - 0xA7 */
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
     /* 0xA8 - 0xAF */
-    0, 0, ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|DstReg|SrcImm, DstReg|SrcImm,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov, 0, 0,
     /* 0xB0 - 0xB7 */
     ByteOp|DstReg|SrcImm|Mov, ByteOp|DstReg|SrcImm|Mov,
@@ -124,20 +142,21 @@ static uint8_t opcode_table[256] = {
     DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
     DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov, DstReg|SrcImm|Mov,
     /* 0xC0 - 0xC7 */
-    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM, 0, 0,
+    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
+    ImplicitOps, ImplicitOps,
     0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xD0 - 0xD7 */
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
-    0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD8 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xE7 */
-    0, 0, 0, ImplicitOps, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps, 0, 0, 0, 0,
     /* 0xE8 - 0xEF */
-    0, ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0,
     /* 0xF0 - 0xF7 */
     0, 0, 0, 0,
     0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
@@ -149,8 +168,11 @@ static uint8_t opcode_table[256] = {
 static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x0F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
-    /* 0x10 - 0x1F */
-    0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x10 - 0x17 */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x18 - 0x1F */
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     /* 0x20 - 0x2F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x30 - 0x3F */
@@ -177,24 +199,34 @@ static uint8_t twobyte_table[256] = {
     /* 0x88 - 0x8F */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
-    /* 0x90 - 0x9F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x90 - 0x97 */
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    /* 0x98 - 0x9F */
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
+    ByteOp|DstMem|SrcNone|ModRM|Mov, ByteOp|DstMem|SrcNone|ModRM|Mov,
     /* 0xA0 - 0xA7 */
     0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0, 
     /* 0xA8 - 0xAF */
-    0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, 0,
+    0, 0, 0, DstBitBase|SrcReg|ModRM, 0, 0, 0, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     0, DstBitBase|SrcReg|ModRM,
     0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xB8 - 0xBF */
     0, 0, DstBitBase|SrcImmByte|ModRM, DstBitBase|SrcReg|ModRM,
-    0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
+    DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0,
     0, 0, 0, ImplicitOps|ModRM,
     /* 0xC8 - 0xCF */
-    0, 0, 0, 0, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xD0 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xEF */
@@ -205,7 +237,7 @@ static uint8_t twobyte_table[256] = {
 
 /* Type, address-of, and value of an instruction's operand. */
 struct operand {
-    enum { OP_REG, OP_MEM, OP_IMM } type;
+    enum { OP_REG, OP_MEM, OP_IMM, OP_NONE } type;
     unsigned int  bytes;
     unsigned long val, orig_val;
     union {
@@ -227,6 +259,12 @@ struct operand {
 #define EFLG_AF (1<<4)
 #define EFLG_PF (1<<2)
 #define EFLG_CF (1<<0)
+
+/* Exception definitions. */
+#define EXC_DE  0
+#define EXC_BR  5
+#define EXC_UD  6
+#define EXC_GP 13
 
 /*
  * Instruction emulation:
@@ -285,7 +323,8 @@ do{ unsigned long _tmp;                                                    \
             _op"w %"_wx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _wy ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : _wy ((_src).val), "i" (EFLAGS_MASK),                         \
+              "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     case 4:                                                                \
         __asm__ __volatile__ (                                             \
@@ -293,7 +332,8 @@ do{ unsigned long _tmp;                                                    \
             _op"l %"_lx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _ly ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : _ly ((_src).val), "i" (EFLAGS_MASK),                         \
+              "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     case 8:                                                                \
         __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy);           \
@@ -310,7 +350,8 @@ do{ unsigned long _tmp;                                                    \
             _op"b %"_bx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : _by ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : _by ((_src).val), "i" (EFLAGS_MASK),                         \
+              "m" (_eflags), "m" ((_dst).val) );                           \
         break;                                                             \
     default:                                                               \
         __emulate_2op_nobyte(_op,_src,_dst,_eflags,_wx,_wy,_lx,_ly,_qx,_qy);\
@@ -341,7 +382,7 @@ do{ unsigned long _tmp;                                                    \
             _op"b %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 2:                                                                \
         __asm__ __volatile__ (                                             \
@@ -349,7 +390,7 @@ do{ unsigned long _tmp;                                                    \
             _op"w %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 4:                                                                \
         __asm__ __volatile__ (                                             \
@@ -357,7 +398,7 @@ do{ unsigned long _tmp;                                                    \
             _op"l %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
             : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );        \
         break;                                                             \
     case 8:                                                                \
         __emulate_1op_8byte(_op, _dst, _eflags);                           \
@@ -373,7 +414,8 @@ do{ __asm__ __volatile__ (                                              \
         _op"q %"_qx"3,%1; "                                             \
         _POST_EFLAGS("0","4","2")                                       \
         : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)               \
-        : _qy ((_src).val), "i" (EFLAGS_MASK) );                        \
+        : _qy ((_src).val), "i" (EFLAGS_MASK),                          \
+          "m" (_eflags), "m" ((_dst).val) );                            \
 } while (0)
 #define __emulate_1op_8byte(_op, _dst, _eflags)                         \
 do{ __asm__ __volatile__ (                                              \
@@ -381,7 +423,7 @@ do{ __asm__ __volatile__ (                                              \
         _op"q %1; "                                                     \
         _POST_EFLAGS("0","3","2")                                       \
         : "=m" (_eflags), "=m" ((_dst).val), "=&r" (_tmp)               \
-        : "i" (EFLAGS_MASK) );                                          \
+        : "i" (EFLAGS_MASK), "m" (_eflags), "m" ((_dst).val) );         \
 } while (0)
 #elif defined(__i386__)
 #define __emulate_2op_8byte(_op, _src, _dst, _eflags, _qx, _qy)
@@ -390,38 +432,69 @@ do{ __asm__ __volatile__ (                                              \
 
 /* Fetch next part of the instruction being emulated. */
 #define insn_fetch_bytes(_size)                                         \
-({ unsigned long _x, _eip = _truncate_ea(_regs.eip, def_ad_bytes);      \
+({ unsigned long _x, _eip = _regs.eip;                                  \
    if ( !mode_64bit() ) _eip = (uint32_t)_eip; /* ignore upper dword */ \
+   _regs.eip += (_size); /* real hardware doesn't truncate */           \
+   generate_exception_if((uint8_t)(_regs.eip - ctxt->regs->eip) > 15,   \
+                         EXC_GP);                                       \
    rc = ops->insn_fetch(x86_seg_cs, _eip, &_x, (_size), ctxt);          \
    if ( rc ) goto done;                                                 \
-   _regs.eip += (_size); /* real hardware doesn't truncate */           \
    _x;                                                                  \
 })
 #define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
 
-#define _truncate_ea(ea, byte_width)                    \
-({  unsigned long __ea = (ea);                          \
-    (((byte_width) == sizeof(unsigned long)) ? __ea :   \
-     (__ea & ((1UL << ((byte_width) << 3)) - 1)));      \
+#define _truncate_ea(ea, byte_width)            \
+({  unsigned long __ea = (ea);                  \
+    unsigned int _width = (byte_width);         \
+    ((_width == sizeof(unsigned long)) ? __ea : \
+     (__ea & ((1UL << (_width << 3)) - 1)));    \
 })
 #define truncate_ea(ea) _truncate_ea((ea), ad_bytes)
 
 #define mode_64bit() (def_ad_bytes == 8)
 
+#define fail_if(p)                              \
+do {                                            \
+    rc = (p) ? X86EMUL_UNHANDLEABLE : 0;        \
+    if ( rc ) goto done;                        \
+} while (0)
+
+/* In future we will be able to generate arbitrary exceptions. */
+#define generate_exception_if(p, e) fail_if(p)
+
+/* Given byte has even parity (even number of 1s)? */
+static int even_parity(uint8_t v)
+{
+    __asm__ ( "test %%al,%%al; setp %%al"
+              : "=a" (v) : "0" (v) );
+    return v;
+}
+
 /* Update address held in a register, based on addressing mode. */
 #define _register_address_increment(reg, inc, byte_width)               \
 do {                                                                    \
     int _inc = (inc); /* signed type ensures sign extension to long */  \
-    if ( (byte_width) == sizeof(unsigned long) )                        \
+    unsigned int _width = (byte_width);                                 \
+    if ( _width == sizeof(unsigned long) )                              \
         (reg) += _inc;                                                  \
     else if ( mode_64bit() )                                            \
-        (reg) = ((reg) + _inc) & ((1UL << ((byte_width) << 3)) - 1);    \
+        (reg) = ((reg) + _inc) & ((1UL << (_width << 3)) - 1);          \
     else                                                                \
-        (reg) = ((reg) & ~((1UL << ((byte_width) << 3)) - 1)) |         \
-                (((reg) + _inc) & ((1UL << ((byte_width) << 3)) - 1));  \
+        (reg) = ((reg) & ~((1UL << (_width << 3)) - 1)) |               \
+                (((reg) + _inc) & ((1UL << (_width << 3)) - 1));        \
 } while (0)
 #define register_address_increment(reg, inc) \
     _register_address_increment((reg), (inc), ad_bytes)
+
+#define sp_pre_dec(dec) ({                                              \
+    _register_address_increment(_regs.esp, -(dec), ctxt->sp_size/8);    \
+    _truncate_ea(_regs.esp, ctxt->sp_size/8);                           \
+})
+#define sp_post_inc(inc) ({                                             \
+    unsigned long __esp = _truncate_ea(_regs.esp, ctxt->sp_size/8);     \
+    _register_address_increment(_regs.esp, (inc), ctxt->sp_size/8);     \
+    __esp;                                                              \
+})
 
 #define jmp_rel(rel)                                                    \
 do {                                                                    \
@@ -430,6 +503,92 @@ do {                                                                    \
         _regs.eip = ((op_bytes == 2)                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
 } while (0)
+
+/*
+ * Unsigned multiplication with double-word result.
+ * IN:  Multiplicand=m[0], Multiplier=m[1]
+ * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
+ */
+static int mul_dbl(unsigned long m[2])
+{
+    int rc;
+    asm ( "mul %4; seto %b2"
+          : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
+          : "0" (m[0]), "1" (m[1]), "2" (0) );
+    return rc;
+}
+
+/*
+ * Signed multiplication with double-word result.
+ * IN:  Multiplicand=m[0], Multiplier=m[1]
+ * OUT: Return CF/OF (overflow status); Result=m[1]:m[0]
+ */
+static int imul_dbl(unsigned long m[2])
+{
+    int rc;
+    asm ( "imul %4; seto %b2"
+          : "=a" (m[0]), "=d" (m[1]), "=q" (rc)
+          : "0" (m[0]), "1" (m[1]), "2" (0) );
+    return rc;
+}
+
+/*
+ * Unsigned division of double-word dividend.
+ * IN:  Dividend=u[1]:u[0], Divisor=v
+ * OUT: Return 1: #DE
+ *      Return 0: Quotient=u[0], Remainder=u[1]
+ */
+static int div_dbl(unsigned long u[2], unsigned long v)
+{
+    if ( (v == 0) || (u[1] > v) || ((u[1] == v) && (u[0] != 0)) )
+        return 1;
+    asm ( "div %4"
+          : "=a" (u[0]), "=d" (u[1])
+          : "0" (u[0]), "1" (u[1]), "r" (v) );
+    return 0;
+}
+
+/*
+ * Signed division of double-word dividend.
+ * IN:  Dividend=u[1]:u[0], Divisor=v
+ * OUT: Return 1: #DE
+ *      Return 0: Quotient=u[0], Remainder=u[1]
+ * NB. We don't use idiv directly as it's moderately hard to work out
+ *     ahead of time whether it will #DE, which we cannot allow to happen.
+ */
+static int idiv_dbl(unsigned long u[2], unsigned long v)
+{
+    int negu = (long)u[1] < 0, negv = (long)v < 0;
+
+    /* u = abs(u) */
+    if ( negu )
+    {
+        u[1] = ~u[1];
+        if ( (u[0] = -u[0]) == 0 )
+            u[1]++;
+    }
+
+    /* abs(u) / abs(v) */
+    if ( div_dbl(u, negv ? -v : v) )
+        return 1;
+
+    /* Remainder has same sign as dividend. It cannot overflow. */
+    if ( negu )
+        u[1] = -u[1];
+
+    /* Quotient is overflowed if sign bit is set. */
+    if ( negu ^ negv )
+    {
+        if ( (long)u[0] >= 0 )
+            u[0] = -u[0];
+        else if ( (u[0] << 1) != 0 ) /* == 0x80...0 is okay */
+            return 1;
+    }
+    else if ( (long)u[0] < 0 )
+        return 1;
+
+    return 0;
+}
 
 static int
 test_cc(
@@ -519,8 +678,8 @@ x86_emulate(
 
     uint8_t b, d, sib, sib_index, sib_base, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    unsigned int op_bytes, ad_bytes, def_ad_bytes;
-    unsigned int lock_prefix = 0, rep_prefix = 0, i;
+    unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
+    unsigned int lock_prefix = 0, rep_prefix = 0;
     int rc = 0;
     struct operand src, dst;
 
@@ -532,28 +691,25 @@ x86_emulate(
     ea.mem.seg = x86_seg_ds;
     ea.mem.off = 0;
 
-    op_bytes = ad_bytes = def_ad_bytes = ctxt->address_bytes;
+    op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->addr_size/8;
     if ( op_bytes == 8 )
     {
-        op_bytes = 4;
+        op_bytes = def_op_bytes = 4;
 #ifndef __x86_64__
         return -1;
 #endif
     }
 
     /* Prefix bytes. */
-    for ( i = 0; i < 8; i++ )
+    for ( ; ; )
     {
         switch ( b = insn_fetch_type(uint8_t) )
         {
         case 0x66: /* operand-size override */
-            op_bytes ^= 6;      /* switch between 2/4 bytes */
+            op_bytes = def_op_bytes ^ 6;
             break;
         case 0x67: /* address-size override */
-            if ( mode_64bit() )
-                ad_bytes ^= 12; /* switch between 4/8 bytes */
-            else
-                ad_bytes ^= 6;  /* switch between 2/4 bytes */
+            ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
             break;
         case 0x2e: /* CS override */
             ea.mem.seg = x86_seg_cs;
@@ -613,6 +769,9 @@ x86_emulate(
         if ( d == 0 )
             goto cannot_emulate;
     }
+
+    /* Lock prefix is allowed only on RMW instructions. */
+    generate_exception_if((d & Mov) && lock_prefix, EXC_GP);
 
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
@@ -746,9 +905,6 @@ x86_emulate(
     case SrcMem16:
         ea.bytes = 2;
         goto srcmem_common;
-    case SrcMem32:
-        ea.bytes = 4;
-        goto srcmem_common;
     case SrcMem:
         ea.bytes = (d & ByteOp) ? 1 : op_bytes;
     srcmem_common:
@@ -817,7 +973,7 @@ x86_emulate(
         {
             /*
              * EA       += BitOffset DIV op_bytes*8
-             * BitOffset = BitOffset MOD op_byte*8
+             * BitOffset = BitOffset MOD op_bytes*8
              * DIV truncates towards negative infinity.
              * MOD always produces a positive result.
              */
@@ -853,13 +1009,18 @@ x86_emulate(
             case 8: dst.val = *(uint64_t *)dst.reg; break;
             }
         }
-        else if ( !(d & Mov) && /* optimisation - avoid slow emulated read */
-                  (rc = ops->read(dst.mem.seg, dst.mem.off,
-                                  &dst.val, dst.bytes, ctxt)) )
-            goto done;
+        else if ( !(d & Mov) ) /* optimisation - avoid slow emulated read */
+        {
+            if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
+                                 &dst.val, dst.bytes, ctxt)) )
+                goto done;
+            dst.orig_val = dst.val;
+        }
         break;
     }
-    dst.orig_val = dst.val;
+
+    /* LOCK prefix allowed only on instructions with memory destination. */
+    generate_exception_if(lock_prefix && (dst.type != OP_MEM), EXC_GP);
 
     if ( twobyte )
         goto twobyte_insn;
@@ -868,67 +1029,136 @@ x86_emulate(
     {
     case 0x04 ... 0x05: /* add imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x00 ... 0x03: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs.eflags);
         break;
 
     case 0x0c ... 0x0d: /* or imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x08 ... 0x0b: or:  /* or */
         emulate_2op_SrcV("or", src, dst, _regs.eflags);
         break;
 
     case 0x14 ... 0x15: /* adc imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x10 ... 0x13: adc: /* adc */
         emulate_2op_SrcV("adc", src, dst, _regs.eflags);
         break;
 
     case 0x1c ... 0x1d: /* sbb imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x18 ... 0x1b: sbb: /* sbb */
         emulate_2op_SrcV("sbb", src, dst, _regs.eflags);
         break;
 
     case 0x24 ... 0x25: /* and imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x20 ... 0x23: and: /* and */
         emulate_2op_SrcV("and", src, dst, _regs.eflags);
         break;
 
     case 0x2c ... 0x2d: /* sub imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x28 ... 0x2b: sub: /* sub */
         emulate_2op_SrcV("sub", src, dst, _regs.eflags);
         break;
 
     case 0x34 ... 0x35: /* xor imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x30 ... 0x33: xor: /* xor */
         emulate_2op_SrcV("xor", src, dst, _regs.eflags);
         break;
 
     case 0x3c ... 0x3d: /* cmp imm,%%eax */
         dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = dst.orig_val = _regs.eax;
+        dst.val = _regs.eax;
     case 0x38 ... 0x3b: cmp: /* cmp */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         break;
 
-    case 0x63: /* movsxd */
-        if ( !mode_64bit() )
-            goto cannot_emulate;
-        dst.val = (int32_t)src.val;
+    case 0x62: /* bound */ {
+        unsigned long src_val2;
+        int lb, ub, idx;
+        generate_exception_if(mode_64bit() || (src.type != OP_MEM), EXC_UD);
+        if ( (rc = ops->read(src.mem.seg, src.mem.off + op_bytes,
+                             &src_val2, op_bytes, ctxt)) )
+            goto done;
+        ub  = (op_bytes == 2) ? (int16_t)src_val2 : (int32_t)src_val2;
+        lb  = (op_bytes == 2) ? (int16_t)src.val  : (int32_t)src.val;
+        idx = (op_bytes == 2) ? (int16_t)dst.val  : (int32_t)dst.val;
+        generate_exception_if((idx < lb) || (idx > ub), EXC_BR);
+        dst.type = OP_NONE;
+        break;
+    }
+
+    case 0x63: /* movsxd (x86/64) / arpl (x86/32) */
+        if ( mode_64bit() )
+        {
+            /* movsxd */
+            if ( src.type == OP_REG )
+                src.val = *(int32_t *)src.reg;
+            else if ( (rc = ops->read(src.mem.seg, src.mem.off,
+                                      &src.val, 4, ctxt)) )
+                goto done;
+            dst.val = (int32_t)src.val;
+        }
+        else
+        {
+            /* arpl */
+            uint16_t src_val = dst.val;
+            dst = src;
+            _regs.eflags &= ~EFLG_ZF;
+            _regs.eflags |= ((src_val & 3) > (dst.val & 3)) ? EFLG_ZF : 0;
+            if ( _regs.eflags & EFLG_ZF )
+                dst.val  = (dst.val & ~3) | (src_val & 3);
+            else
+                dst.type = OP_NONE;
+        }
         break;
 
-    case 0x80 ... 0x83: /* Grp1 */
+    case 0x69: /* imul imm16/32 */
+    case 0x6b: /* imul imm8 */ {
+        unsigned long reg = *(long *)decode_register(modrm_reg, &_regs, 0);
+        _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+        switch ( dst.bytes )
+        {
+        case 2:
+            dst.val = ((uint32_t)(int16_t)src.val *
+                       (uint32_t)(int16_t)reg);
+            if ( (int16_t)dst.val != (uint32_t)dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#ifdef __x86_64__
+        case 4:
+            dst.val = ((uint64_t)(int32_t)src.val *
+                       (uint64_t)(int32_t)reg);
+            if ( (int32_t)dst.val != dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#endif
+        default: {
+            unsigned long m[2] = { src.val, reg };
+            if ( imul_dbl(m) )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            dst.val = m[0];
+            break;
+        }
+        }
+        dst.type = OP_REG;
+        dst.reg  = decode_register(modrm_reg, &_regs, 0);
+        break;
+    }
+
+    case 0x82: /* Grp1 (x86/32 only) */
+        generate_exception_if(mode_64bit(), EXC_UD);
+    case 0x80: case 0x81: case 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
         case 0: goto add;
@@ -942,6 +1172,9 @@ x86_emulate(
         }
         break;
 
+    case 0xa8 ... 0xa9: /* test imm,%%eax */
+        dst.reg = (unsigned long *)&_regs.eax;
+        dst.val = _regs.eax;
     case 0x84 ... 0x85: test: /* test */
         emulate_2op_SrcV("test", src, dst, _regs.eflags);
         break;
@@ -960,8 +1193,9 @@ x86_emulate(
         lock_prefix = 1;
         break;
 
-    case 0x88 ... 0x8b: /* mov */
     case 0xc6 ... 0xc7: /* mov (sole member of Grp11) */
+        generate_exception_if((modrm_reg & 7) != 0, EXC_UD);
+    case 0x88 ... 0x8b: /* mov */
         dst.val = src.val;
         break;
 
@@ -970,13 +1204,13 @@ x86_emulate(
         break;
 
     case 0x8f: /* pop (sole member of Grp1a) */
+        generate_exception_if((modrm_reg & 7) != 0, EXC_UD);
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
-        register_address_increment(_regs.esp, dst.bytes);
         break;
 
     case 0xb0 ... 0xb7: /* mov imm8,r8 */
@@ -1051,12 +1285,191 @@ x86_emulate(
         case 3: /* neg */
             emulate_1op("neg", dst, _regs.eflags);
             break;
+        case 4: /* mul */
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            dst.val  = *dst.reg;
+            _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+            switch ( src.bytes )
+            {
+            case 1:
+                dst.val *= src.val;
+                if ( (uint8_t)dst.val != (uint16_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                break;
+            case 2:
+                dst.val *= src.val;
+                if ( (uint16_t)dst.val != (uint32_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                *(uint16_t *)&_regs.edx = dst.val >> 16;
+                break;
+#ifdef __x86_64__
+            case 4:
+                dst.val *= src.val;
+                if ( (uint32_t)dst.val != dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = (uint32_t)(dst.val >> 32);
+                break;
+#endif
+            default: {
+                unsigned long m[2] = { src.val, dst.val };
+                if ( mul_dbl(m) )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = m[1];
+                dst.val  = m[0];
+                break;
+            }
+            }
+            break;
+        case 5: /* imul */
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            dst.val  = *dst.reg;
+            _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+            switch ( src.bytes )
+            {
+            case 1:
+                dst.val = ((uint16_t)(int8_t)src.val *
+                           (uint16_t)(int8_t)dst.val);
+                if ( (int8_t)dst.val != (uint16_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                break;
+            case 2:
+                dst.val = ((uint32_t)(int16_t)src.val *
+                           (uint32_t)(int16_t)dst.val);
+                if ( (int16_t)dst.val != (uint32_t)dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                *(uint16_t *)&_regs.edx = dst.val >> 16;
+                break;
+#ifdef __x86_64__
+            case 4:
+                dst.val = ((uint64_t)(int32_t)src.val *
+                           (uint64_t)(int32_t)dst.val);
+                if ( (int32_t)dst.val != dst.val )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = (uint32_t)(dst.val >> 32);
+                break;
+#endif
+            default: {
+                unsigned long m[2] = { src.val, dst.val };
+                if ( imul_dbl(m) )
+                    _regs.eflags |= EFLG_OF|EFLG_CF;
+                _regs.edx = m[1];
+                dst.val  = m[0];
+                break;
+            }
+            }
+            break;
+        case 6: /* div */ {
+            unsigned long u[2], v;
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            switch ( src.bytes )
+            {
+            case 1:
+                u[0] = (uint16_t)_regs.eax;
+                u[1] = 0;
+                v    = (uint8_t)src.val;
+                generate_exception_if(
+                    div_dbl(u, v) || ((uint8_t)u[0] != (uint16_t)u[0]),
+                    EXC_DE);
+                dst.val = (uint8_t)u[0];
+                ((uint8_t *)&_regs.eax)[1] = u[1];
+                break;
+            case 2:
+                u[0] = ((uint32_t)_regs.edx << 16) | (uint16_t)_regs.eax;
+                u[1] = 0;
+                v    = (uint16_t)src.val;
+                generate_exception_if(
+                    div_dbl(u, v) || ((uint16_t)u[0] != (uint32_t)u[0]),
+                    EXC_DE);
+                dst.val = (uint16_t)u[0];
+                *(uint16_t *)&_regs.edx = u[1];
+                break;
+#ifdef __x86_64__
+            case 4:
+                u[0] = (_regs.edx << 32) | (uint32_t)_regs.eax;
+                u[1] = 0;
+                v    = (uint32_t)src.val;
+                generate_exception_if(
+                    div_dbl(u, v) || ((uint32_t)u[0] != u[0]),
+                    EXC_DE);
+                dst.val   = (uint32_t)u[0];
+                _regs.edx = (uint32_t)u[1];
+                break;
+#endif
+            default:
+                u[0] = _regs.eax;
+                u[1] = _regs.edx;
+                v    = src.val;
+                generate_exception_if(div_dbl(u, v), EXC_DE);
+                dst.val   = u[0];
+                _regs.edx = u[1];
+                break;
+            }
+            break;
+        }
+        case 7: /* idiv */ {
+            unsigned long u[2], v;
+            src = dst;
+            dst.type = OP_REG;
+            dst.reg  = (unsigned long *)&_regs.eax;
+            switch ( src.bytes )
+            {
+            case 1:
+                u[0] = (int16_t)_regs.eax;
+                u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
+                v    = (int8_t)src.val;
+                generate_exception_if(
+                    idiv_dbl(u, v) || ((int8_t)u[0] != (int16_t)u[0]),
+                    EXC_DE);
+                dst.val = (int8_t)u[0];
+                ((int8_t *)&_regs.eax)[1] = u[1];
+                break;
+            case 2:
+                u[0] = (int32_t)((_regs.edx << 16) | (uint16_t)_regs.eax);
+                u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
+                v    = (int16_t)src.val;
+                generate_exception_if(
+                    idiv_dbl(u, v) || ((int16_t)u[0] != (int32_t)u[0]),
+                    EXC_DE);
+                dst.val = (int16_t)u[0];
+                *(int16_t *)&_regs.edx = u[1];
+                break;
+#ifdef __x86_64__
+            case 4:
+                u[0] = (_regs.edx << 32) | (uint32_t)_regs.eax;
+                u[1] = ((long)u[0] < 0) ? ~0UL : 0UL;
+                v    = (int32_t)src.val;
+                generate_exception_if(
+                    idiv_dbl(u, v) || ((int32_t)u[0] != u[0]),
+                    EXC_DE);
+                dst.val   = (int32_t)u[0];
+                _regs.edx = (uint32_t)u[1];
+                break;
+#endif
+            default:
+                u[0] = _regs.eax;
+                u[1] = _regs.edx;
+                v    = src.val;
+                generate_exception_if(idiv_dbl(u, v), EXC_DE);
+                dst.val   = u[0];
+                _regs.edx = u[1];
+                break;
+            }
+            break;
+        }
         default:
             goto cannot_emulate;
         }
         break;
 
-    case 0xfe ... 0xff: /* Grp4/Grp5 */
+    case 0xfe: /* Grp4 */
+        generate_exception_if((modrm_reg & 7) >= 2, EXC_UD);
+    case 0xff: /* Grp5 */
         switch ( modrm_reg & 7 )
         {
         case 0: /* inc */
@@ -1064,6 +1477,20 @@ x86_emulate(
             break;
         case 1: /* dec */
             emulate_1op("dec", dst, _regs.eflags);
+            break;
+        case 2: /* call (near) */
+        case 4: /* jmp (near) */
+            if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
+            {
+                dst.bytes = op_bytes = 8;
+                if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
+                                     &dst.val, 8, ctxt)) != 0 )
+                    goto done;
+            }
+            src.val = _regs.eip;
+            _regs.eip = dst.val;
+            if ( (modrm_reg & 7) == 2 )
+                goto push; /* call */
             break;
         case 6: /* push */
             /* 64-bit mode: PUSH defaults to a 64-bit operand. */
@@ -1074,12 +1501,13 @@ x86_emulate(
                                      &dst.val, 8, ctxt)) != 0 )
                     goto done;
             }
-            register_address_increment(_regs.esp, -dst.bytes);
-            if ( (rc = ops->write(x86_seg_ss, truncate_ea(_regs.esp),
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
                                   dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
-            dst.val = dst.orig_val; /* skanky: disable writeback */
+            dst.type = OP_NONE;
             break;
+        case 7:
+            generate_exception_if(1, EXC_UD);
         default:
             goto cannot_emulate;
         }
@@ -1087,33 +1515,32 @@ x86_emulate(
     }
 
  writeback:
-    if ( (d & Mov) || (dst.orig_val != dst.val) )
+    switch ( dst.type )
     {
-        switch ( dst.type )
+    case OP_REG:
+        /* The 4-byte case *is* correct: in 64-bit mode we zero-extend. */
+        switch ( dst.bytes )
         {
-        case OP_REG:
-            /* The 4-byte case *is* correct: in 64-bit mode we zero-extend. */
-            switch ( dst.bytes )
-            {
-            case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
-            case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
-            case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
-            case 8: *dst.reg = dst.val; break;
-            }
-            break;
-        case OP_MEM:
-            if ( lock_prefix )
-                rc = ops->cmpxchg(
-                    dst.mem.seg, dst.mem.off, dst.orig_val,
-                    dst.val, dst.bytes, ctxt);
-            else
-                rc = ops->write(
-                    dst.mem.seg, dst.mem.off, dst.val, dst.bytes, ctxt);
-            if ( rc != 0 )
-                goto done;
-        default:
-            break;
+        case 1: *(uint8_t  *)dst.reg = (uint8_t)dst.val; break;
+        case 2: *(uint16_t *)dst.reg = (uint16_t)dst.val; break;
+        case 4: *dst.reg = (uint32_t)dst.val; break; /* 64b: zero-ext */
+        case 8: *dst.reg = dst.val; break;
         }
+        break;
+    case OP_MEM:
+        if ( !(d & Mov) && (dst.orig_val == dst.val) )
+            /* nothing to do */;
+        else if ( lock_prefix )
+            rc = ops->cmpxchg(
+                dst.mem.seg, dst.mem.off, dst.orig_val,
+                dst.val, dst.bytes, ctxt);
+        else
+            rc = ops->write(
+                dst.mem.seg, dst.mem.off, dst.val, dst.bytes, ctxt);
+        if ( rc != 0 )
+            goto done;
+    default:
+        break;
     }
 
     /* Commit shadow register state. */
@@ -1123,8 +1550,13 @@ x86_emulate(
     return (rc == X86EMUL_UNHANDLEABLE) ? -1 : 0;
 
  special_insn:
-    /* Default action: disable writeback. There may be no dest operand. */
-    dst.orig_val = dst.val;
+    dst.type = OP_NONE;
+
+    /*
+     * The only implicit-operands instruction allowed a LOCK prefix is
+     * CMPXCHG{8,16}B.
+     */
+    generate_exception_if(lock_prefix && (b != 0xc7), EXC_GP);
 
     if ( twobyte )
         goto twobyte_special_insn;
@@ -1142,11 +1574,70 @@ x86_emulate(
 
     switch ( b )
     {
+    case 0x27: /* daa */ {
+        uint8_t al = _regs.eax;
+        unsigned long eflags = _regs.eflags;
+        generate_exception_if(mode_64bit(), EXC_UD);
+        _regs.eflags &= ~(EFLG_CF|EFLG_AF);
+        if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
+        {
+            *(uint8_t *)&_regs.eax += 6;
+            _regs.eflags |= EFLG_AF;
+        }
+        if ( (al > 0x99) || (eflags & EFLG_CF) )
+        {
+            *(uint8_t *)&_regs.eax += 0x60;
+            _regs.eflags |= EFLG_CF;
+        }
+        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
+        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        break;
+    }
+
+    case 0x2f: /* das */ {
+        uint8_t al = _regs.eax;
+        unsigned long eflags = _regs.eflags;
+        generate_exception_if(mode_64bit(), EXC_UD);
+        _regs.eflags &= ~(EFLG_CF|EFLG_AF);
+        if ( ((al & 0x0f) > 9) || (eflags & EFLG_AF) )
+        {
+            _regs.eflags |= EFLG_AF;
+            if ( (al < 6) || (eflags & EFLG_CF) )
+                _regs.eflags |= EFLG_CF;
+            *(uint8_t *)&_regs.eax -= 6;
+        }
+        if ( (al > 0x99) || (eflags & EFLG_CF) )
+        {
+            *(uint8_t *)&_regs.eax -= 0x60;
+            _regs.eflags |= EFLG_CF;
+        }
+        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
+        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        break;
+    }
+
+    case 0x37: /* aaa */
+    case 0x3f: /* aas */
+        generate_exception_if(mode_64bit(), EXC_UD);
+        _regs.eflags &= ~EFLG_CF;
+        if ( ((uint8_t)_regs.eax > 9) || (_regs.eflags & EFLG_AF) )
+        {
+            ((uint8_t *)&_regs.eax)[0] += (b == 0x37) ? 6 : -6;
+            ((uint8_t *)&_regs.eax)[1] += (b == 0x37) ? 1 : -1;
+            _regs.eflags |= EFLG_CF | EFLG_AF;
+        }
+        ((uint8_t *)&_regs.eax)[0] &= 0x0f;
+        break;
+
     case 0x40 ... 0x4f: /* inc/dec reg */
         dst.type  = OP_REG;
         dst.reg   = decode_register(b & 7, &_regs, 0);
         dst.bytes = op_bytes;
-        dst.orig_val = dst.val = *dst.reg;
+        dst.val   = *dst.reg;
         if ( b & 8 )
             emulate_1op("dec", dst, _regs.eflags);
         else
@@ -1154,16 +1645,9 @@ x86_emulate(
         break;
 
     case 0x50 ... 0x57: /* push reg */
-        dst.type  = OP_MEM;
-        dst.bytes = op_bytes;
-        if ( mode_64bit() && (dst.bytes == 4) )
-            dst.bytes = 8;
-        dst.val = *(unsigned long *)decode_register(
+        src.val = *(unsigned long *)decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
-        register_address_increment(_regs.esp, -dst.bytes);
-        dst.mem.seg = x86_seg_ss;
-        dst.mem.off = truncate_ea(_regs.esp);
-        break;
+        goto push;
 
     case 0x58 ... 0x5f: /* pop reg */
         dst.type  = OP_REG;
@@ -1172,10 +1656,56 @@ x86_emulate(
         dst.bytes = op_bytes;
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
-        register_address_increment(_regs.esp, dst.bytes);
+        break;
+
+    case 0x60: /* pusha */ {
+        int i;
+        unsigned long regs[] = {
+            _regs.eax, _regs.ecx, _regs.edx, _regs.ebx,
+            _regs.esp, _regs.ebp, _regs.esi, _regs.edi };
+        generate_exception_if(mode_64bit(), EXC_UD);
+        for ( i = 0; i < 8; i++ )
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
+                                  regs[i], op_bytes, ctxt)) != 0 )
+            goto done;
+        break;
+    }
+
+    case 0x61: /* popa */ {
+        int i;
+        unsigned long dummy_esp, *regs[] = {
+            (unsigned long *)&_regs.edi, (unsigned long *)&_regs.esi,
+            (unsigned long *)&_regs.ebp, (unsigned long *)&dummy_esp,
+            (unsigned long *)&_regs.ebx, (unsigned long *)&_regs.edx,
+            (unsigned long *)&_regs.ecx, (unsigned long *)&_regs.eax };
+        generate_exception_if(mode_64bit(), EXC_UD);
+        for ( i = 0; i < 8; i++ )
+            if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
+                                 regs[i], op_bytes, ctxt)) != 0 )
+            goto done;
+        break;
+    }
+
+    case 0x68: /* push imm{16,32,64} */
+        src.val = ((op_bytes == 2)
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
+        goto push;
+
+    case 0x6a: /* push imm8 */
+        src.val = insn_fetch_type(int8_t);
+    push:
+        d |= Mov; /* force writeback */
+        dst.type  = OP_MEM;
+        dst.bytes = op_bytes;
+        if ( mode_64bit() && (dst.bytes == 4) )
+            dst.bytes = 8;
+        dst.val = src.val;
+        dst.mem.seg = x86_seg_ss;
+        dst.mem.off = sp_pre_dec(dst.bytes);
         break;
 
     case 0x70 ... 0x7f: /* jcc (short) */ {
@@ -1196,8 +1726,40 @@ x86_emulate(
         src.val  = *src.reg;
         dst.reg  = decode_register(
             (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
-        dst.val  = dst.orig_val = *dst.reg;
+        dst.val  = *dst.reg;
         goto xchg;
+
+    case 0x98: /* cbw/cwde/cdqe */
+        switch ( op_bytes )
+        {
+        case 2: *(int16_t *)&_regs.eax = (int8_t)_regs.eax; break; /* cbw */
+        case 4: _regs.eax = (uint32_t)(int16_t)_regs.eax; break; /* cwde */
+        case 8: _regs.eax = (int32_t)_regs.eax; break; /* cdqe */
+        }
+        break;
+
+    case 0x99: /* cwd/cdq/cqo */
+        switch ( op_bytes )
+        {
+        case 2:
+            *(int16_t *)&_regs.edx = ((int16_t)_regs.eax < 0) ? -1 : 0;
+            break;
+        case 4:
+            _regs.edx = (uint32_t)(((int32_t)_regs.eax < 0) ? -1 : 0);
+            break;
+        case 8:
+            _regs.edx = (_regs.eax < 0) ? -1 : 0;
+            break;
+        }
+        break;
+
+    case 0x9e: /* sahf */
+        *(uint8_t *)_regs.eflags = (((uint8_t *)&_regs.eax)[1] & 0xd7) | 0x02;
+        break;
+
+    case 0x9f: /* lahf */
+        ((uint8_t *)&_regs.eax)[1] = (_regs.eflags & 0xd7) | 0x02;
+        break;
 
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
         /* Source EA is not encoded via ModRM. */
@@ -1253,6 +1815,81 @@ x86_emulate(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
 
+    case 0xc2: /* ret imm16 (near) */
+    case 0xc3: /* ret (near) */ {
+        int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
+        op_bytes = mode_64bit() ? 8 : op_bytes;
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
+                             &dst.val, op_bytes, ctxt)) != 0 )
+            goto done;
+        _regs.eip = dst.val;
+        break;
+    }
+
+    case 0xd4: /* aam */ {
+        unsigned int base = insn_fetch_type(uint8_t);
+        uint8_t al = _regs.eax;
+        generate_exception_if(mode_64bit(), EXC_UD);
+        generate_exception_if(base == 0, EXC_DE);
+        *(uint16_t *)&_regs.eax = ((al / base) << 8) | (al % base);
+        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
+        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        break;
+    }
+
+    case 0xd5: /* aad */ {
+        unsigned int base = insn_fetch_type(uint8_t);
+        uint16_t ax = _regs.eax;
+        generate_exception_if(mode_64bit(), EXC_UD);
+        *(uint16_t *)&_regs.eax = (uint8_t)(ax + ((ax >> 8) * base));
+        _regs.eflags &= ~(EFLG_SF|EFLG_ZF|EFLG_PF);
+        _regs.eflags |= ((uint8_t)_regs.eax == 0) ? EFLG_ZF : 0;
+        _regs.eflags |= (( int8_t)_regs.eax <  0) ? EFLG_SF : 0;
+        _regs.eflags |= even_parity(_regs.eax) ? EFLG_PF : 0;
+        break;
+    }
+
+    case 0xd6: /* salc */
+        generate_exception_if(mode_64bit(), EXC_UD);
+        *(uint8_t *)&_regs.eax = (_regs.eflags & EFLG_CF) ? 0xff : 0x00;
+        break;
+
+    case 0xd7: /* xlat */ {
+        unsigned long al = (uint8_t)_regs.eax;
+        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.ebx + al),
+                             &al, 1, ctxt)) != 0 )
+            goto done;
+        *(uint8_t *)&_regs.eax = al;
+        break;
+    }
+
+    case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
+        int rel = insn_fetch_type(int8_t);
+        int do_jmp = !(_regs.eflags & EFLG_ZF); /* loopnz */
+        if ( b == 0xe1 )
+            do_jmp = !do_jmp; /* loopz */
+        else if ( b == 0xe2 )
+            do_jmp = 1; /* loop */
+        switch ( ad_bytes )
+        {
+        case 2:
+            do_jmp &= --(*(uint16_t *)&_regs.ecx) != 0;
+            break;
+        case 4:
+            do_jmp &= --(*(uint32_t *)&_regs.ecx) != 0;
+            _regs.ecx = (uint32_t)_regs.ecx; /* zero extend in x86/64 mode */
+            break;
+        default: /* case 8: */
+            do_jmp &= --_regs.ecx != 0;
+            break;
+        }
+        if ( do_jmp )
+            jmp_rel(rel);
+        break;
+    }
+
     case 0xe3: /* jcxz/jecxz (short) */ {
         int rel = insn_fetch_type(int8_t);
         if ( (ad_bytes == 2) ? !(uint16_t)_regs.ecx :
@@ -1261,12 +1898,26 @@ x86_emulate(
         break;
     }
 
-    case 0xe9: /* jmp (short) */
-        jmp_rel(insn_fetch_type(int8_t));
-        break;
+    case 0xe8: /* call (near) */ {
+        int rel = (((op_bytes == 2) && !mode_64bit())
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
+        op_bytes = mode_64bit() ? 8 : op_bytes;
+        src.val = _regs.eip;
+        jmp_rel(rel);
+        goto push;
+    }
 
-    case 0xeb: /* jmp (near) */
-        jmp_rel(insn_fetch_bytes(mode_64bit() ? 4 : op_bytes));
+    case 0xe9: /* jmp (near) */ {
+        int rel = (((op_bytes == 2) && !mode_64bit())
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
+        jmp_rel(rel);
+        break;
+    }
+
+    case 0xeb: /* jmp (short) */
+        jmp_rel(insn_fetch_type(int8_t));
         break;
 
     case 0xf5: /* cmc */
@@ -1294,9 +1945,14 @@ x86_emulate(
  twobyte_insn:
     switch ( b )
     {
-    case 0x40 ... 0x4f: /* cmov */
-        dst.val = dst.orig_val = src.val;
-        d = (d & ~Mov) | (test_cc(b, _regs.eflags) ? Mov : 0);
+    case 0x40 ... 0x4f: /* cmovcc */
+        dst.val = src.val;
+        if ( !test_cc(b, _regs.eflags) )
+            dst.type = OP_NONE;
+        break;
+
+    case 0x90 ... 0x9f: /* setcc */
+        dst.val = test_cc(b, _regs.eflags);
         break;
 
     case 0xb0 ... 0xb1: /* cmpxchg */
@@ -1331,12 +1987,60 @@ x86_emulate(
         emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
         break;
 
+    case 0xaf: /* imul */
+        _regs.eflags &= ~(EFLG_OF|EFLG_CF);
+        switch ( dst.bytes )
+        {
+        case 2:
+            dst.val = ((uint32_t)(int16_t)src.val *
+                       (uint32_t)(int16_t)dst.val);
+            if ( (int16_t)dst.val != (uint32_t)dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#ifdef __x86_64__
+        case 4:
+            dst.val = ((uint64_t)(int32_t)src.val *
+                       (uint64_t)(int32_t)dst.val);
+            if ( (int32_t)dst.val != dst.val )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            break;
+#endif
+        default: {
+            unsigned long m[2] = { src.val, dst.val };
+            if ( imul_dbl(m) )
+                _regs.eflags |= EFLG_OF|EFLG_CF;
+            dst.val = m[0];
+            break;
+        }
+        }
+        break;
+
     case 0xb6: /* movzx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
         dst.reg   = decode_register(modrm_reg, &_regs, 0);
         dst.bytes = op_bytes;
         dst.val   = (uint8_t)src.val;
         break;
+
+    case 0xbc: /* bsf */ {
+        int zf;
+        asm ( "bsf %2,%0; setz %b1"
+              : "=r" (dst.val), "=q" (zf)
+              : "r" (src.val), "1" (0) );
+        _regs.eflags &= ~EFLG_ZF;
+        _regs.eflags |= zf ? EFLG_ZF : 0;
+        break;
+    }
+
+    case 0xbd: /* bsr */ {
+        int zf;
+        asm ( "bsr %2,%0; setz %b1"
+              : "=r" (dst.val), "=q" (zf)
+              : "r" (src.val), "1" (0) );
+        _regs.eflags &= ~EFLG_ZF;
+        _regs.eflags |= zf ? EFLG_ZF : 0;
+        break;
+    }
 
     case 0xb7: /* movzx rm16,r{16,32,64} */
         dst.val = (uint16_t)src.val;
@@ -1347,12 +2051,13 @@ x86_emulate(
         break;
 
     case 0xba: /* Grp8 */
-        switch ( modrm_reg & 3 )
+        switch ( modrm_reg & 7 )
         {
-        case 0: goto bt;
-        case 1: goto bts;
-        case 2: goto btr;
-        case 3: goto btc;
+        case 4: goto bt;
+        case 5: goto bts;
+        case 6: goto btr;
+        case 7: goto btc;
+        default: generate_exception_if(1, EXC_UD);
         }
         break;
 
@@ -1385,10 +2090,13 @@ x86_emulate(
     {
     case 0x0d: /* GrpP (prefetch) */
     case 0x18: /* Grp16 (prefetch/nop) */
+    case 0x19 ... 0x1f: /* nop (amd-defined) */
         break;
 
     case 0x80 ... 0x8f: /* jcc (near) */ {
-        int rel = insn_fetch_bytes(mode_64bit() ? 4 : op_bytes);
+        int rel = (((op_bytes == 2) && !mode_64bit())
+                   ? (int32_t)insn_fetch_type(int16_t)
+                   : insn_fetch_type(int32_t));
         if ( test_cc(b, _regs.eflags) )
             jmp_rel(rel);
         break;
@@ -1398,6 +2106,7 @@ x86_emulate(
 #if defined(__i386__)
     {
         unsigned long old_lo, old_hi;
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &old_lo, 4, ctxt)) ||
              (rc = ops->read(ea.mem.seg, ea.mem.off+4, &old_hi, 4, ctxt)) )
             goto done;
@@ -1424,6 +2133,7 @@ x86_emulate(
 #elif defined(__x86_64__)
     {
         unsigned long old, new;
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &old, 8, ctxt)) != 0 )
             goto done;
         if ( ((uint32_t)(old>>0) != (uint32_t)_regs.eax) ||
@@ -1444,6 +2154,37 @@ x86_emulate(
         break;
     }
 #endif
+
+    case 0xc8 ... 0xcf: /* bswap */
+        dst.type  = OP_REG;
+        dst.reg   = decode_register(b & 7, &_regs, 0);
+        dst.val = *dst.reg;
+        switch ( dst.bytes = op_bytes )
+        {
+        case 2:
+            dst.val = (((dst.val & 0x00FFUL) << 8) |
+                       ((dst.val & 0xFF00UL) >> 8));
+            break;
+        case 4:
+            dst.val = (((dst.val & 0x000000FFUL) << 24) |
+                       ((dst.val & 0x0000FF00UL) <<  8) |
+                       ((dst.val & 0x00FF0000UL) >>  8) |
+                       ((dst.val & 0xFF000000UL) >> 24));
+            break;
+#ifdef __x86_64__
+        case 8:
+            dst.val = (((dst.val & 0x00000000000000FFUL) << 56) |
+                       ((dst.val & 0x000000000000FF00UL) << 40) |
+                       ((dst.val & 0x0000000000FF0000UL) << 24) |
+                       ((dst.val & 0x00000000FF000000UL) <<  8) |
+                       ((dst.val & 0x000000FF00000000UL) >>  8) |
+                       ((dst.val & 0x0000FF0000000000UL) >> 24) |
+                       ((dst.val & 0x00FF000000000000UL) >> 40) |
+                       ((dst.val & 0xFF00000000000000UL) >> 56));
+            break;
+#endif
+        }
+        break;
     }
     goto writeback;
 

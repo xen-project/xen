@@ -377,7 +377,7 @@ class XendDomain:
             dom0.setVCpuCount(target)
 
 
-    def _refresh(self):
+    def _refresh(self, refresh_shutdown = True):
         """Refresh the domain list. Needs to be called when
         either xenstore has changed or when a method requires
         up to date information (like uptime, cputime stats).
@@ -393,7 +393,7 @@ class XendDomain:
         for dom in running:
             domid = dom['domid']
             if domid in self.domains:
-                self.domains[domid].update(dom)
+                self.domains[domid].update(dom, refresh_shutdown)
             elif domid not in self.domains and dom['dying'] != 1:
                 try:
                     new_dom = XendDomainInfo.recreate(dom, False)
@@ -495,7 +495,7 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
-            self._refresh()
+            self._refresh(refresh_shutdown = False)
             dom = self.domain_lookup_nr(domid)
             if not dom:
                 raise XendError("No domain named '%s'." % str(domid))
@@ -731,7 +731,7 @@ class XendDomain:
         
         self.domains_lock.acquire()
         try:
-            self._refresh()
+            self._refresh(refresh_shutdown = False)
             
             # active domains
             active_domains = self.domains.values()

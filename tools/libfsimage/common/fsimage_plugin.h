@@ -50,11 +50,10 @@ typedef fsi_plugin_ops_t *
     (*fsi_plugin_init_t)(int, fsi_plugin_t *, const char **);
 
 void fsip_fs_set_data(fsi_t *, void *);
-void fsip_fs_free(fsi_t *);
 fsi_file_t *fsip_file_alloc(fsi_t *, void *);
 void fsip_file_free(fsi_file_t *);
-fsi_t * fsip_fs(fsi_file_t *ffi);
-uint64_t fsip_fs_offset(fsi_t *fsi);
+fsi_t *fsip_fs(fsi_file_t *);
+uint64_t fsip_fs_offset(fsi_t *);
 void *fsip_fs_data(fsi_t *);
 void *fsip_file_data(fsi_file_t *);
 

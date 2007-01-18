@@ -29,8 +29,13 @@ _xend_autorestart = {
     "SunOS": False,
 }
 
+_pygrub_path = {
+    "SunOS": "/usr/lib/xen/bin/pygrub"
+}
+
 def _get(var, default=None):
     return var.get(os.uname()[0], default)
 
 scripts_dir = _get(_scripts_dir, "/etc/xen/scripts")
 xend_autorestart = _get(_xend_autorestart)
+pygrub_path = _get(_pygrub_path, "/usr/bin/pygrub")

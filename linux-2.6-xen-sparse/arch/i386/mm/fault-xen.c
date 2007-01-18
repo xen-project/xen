@@ -262,16 +262,19 @@ static void dump_fault_path(unsigned long address)
 	p += (address >> 30) * 2;
 	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
 	if (p[0] & 1) {
-		mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+		mfn  = (p[0] >> PAGE_SHIFT) | (p[1] << 20);
 		page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 		p  = (unsigned long *)__va(page);
 		address &= 0x3fffffff;
 		p += (address >> 21) * 2;
 		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", 
 		       page, p[1], p[0]);
-#ifndef CONFIG_HIGHPTE
+		mfn  = (p[0] >> PAGE_SHIFT) | (p[1] << 20);
+#ifdef CONFIG_HIGHPTE
+		if (mfn_to_pfn(mfn) >= highstart_pfn)
+			return;
+#endif
 		if (p[0] & 1) {
-			mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
 			page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 			p  = (unsigned long *) __va(page);
 			address &= 0x001fffff;
@@ -279,7 +282,6 @@ static void dump_fault_path(unsigned long address)
 			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n",
 			       page, p[1], p[0]);
 		}
-#endif
 	}
 }
 #else
@@ -294,11 +296,14 @@ static void dump_fault_path(unsigned long address)
 		       machine_to_phys(page));
 	/*
 	 * We must not directly access the pte in the highpte
-	 * case, the page table might be allocated in highmem.
+	 * case if the page table is located in highmem.
 	 * And lets rather not kmap-atomic the pte, just in case
 	 * it's allocated already.
 	 */
-#ifndef CONFIG_HIGHPTE
+#ifdef CONFIG_HIGHPTE
+	if ((page >> PAGE_SHIFT) >= highstart_pfn)
+		return;
+#endif
 	if ((page & 1) && oops_may_print()) {
 		page &= PAGE_MASK;
 		address &= 0x003ff000;
@@ -307,7 +312,6 @@ static void dump_fault_path(unsigned long address)
 		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n", page,
 		       machine_to_phys(page));
 	}
-#endif
 }
 #endif
 

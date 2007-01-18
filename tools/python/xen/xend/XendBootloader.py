@@ -53,6 +53,12 @@ def bootloader(blexec, disk, quiet = False, blargs = '', kernel = '',
     child = os.fork()
     if (not child):
         args = [ blexec ]
+        if kernel:
+            args.append("--kernel=%s" % kernel)
+        if ramdisk:
+            args.append("--ramdisk=%s" % ramdisk)
+        if kernel_args:
+            args.append("--args=%s" % kernel_args)
         if quiet:
             args.append("-q")
         args.append("--output=%s" % fifo)

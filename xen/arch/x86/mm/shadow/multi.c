@@ -851,9 +851,7 @@ static inline void safe_write_entry(void *dst, void *src)
      * then writing the high word before the low word. */
     BUILD_BUG_ON(sizeof (shadow_l1e_t) != 2 * sizeof (unsigned long));
     d[0] = 0;
-    wmb();
     d[1] = s[1];
-    wmb();
     d[0] = s[0];
 #else
     /* In 32-bit and 64-bit, sizeof(pte) == sizeof(ulong) == 1 word,
@@ -3946,7 +3944,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     if ( !skip ) sh_validate_guest_pt_write(v, mfn, addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
 
     sh_unmap_domain_page(addr);
@@ -3998,7 +3996,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
                   vaddr, prev, old, new, *(unsigned long *)addr, bytes);
 
     /* If we are writing zeros to this page, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
 
     sh_unmap_domain_page(addr);

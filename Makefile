@@ -2,18 +2,15 @@
 # Grand Unified Makefile for Xen.
 #
 
-# Export target architecture overrides to Xen and Linux sub-trees.
-ifneq ($(XEN_TARGET_ARCH),)
-SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
-export XEN_TARGET_ARCH SUBARCH XEN_SYSTYPE
-endif
-
 # Default target must appear before any include lines
 .PHONY: all
 all: dist
 
 export XEN_ROOT=$(CURDIR)
 include Config.mk
+
+SUBARCH := $(subst x86_32,i386,$(XEN_TARGET_ARCH))
+export XEN_TARGET_ARCH SUBARCH XEN_SYSTYPE
 include buildconfigs/Rules.mk
 
 ifeq ($(XEN_TARGET_X86_PAE),y)

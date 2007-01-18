@@ -37,7 +37,7 @@ from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
 
-from xen.xend import balloon, sxp, uuid, image, arch
+from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendRoot, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
@@ -496,7 +496,7 @@ class XendDomainInfo:
         self._waitForDevice(dev_type, devid)
         return self.getDeviceController(dev_type).sxpr(devid)
 
-    def device_configure(self, dev_config, devid = None):
+    def device_configure(self, dev_sxp, devid = None):
         """Configure an existing device.
         
         @param dev_config: device configuration
@@ -506,19 +506,24 @@ class XendDomainInfo:
         @return: Returns True if successfully updated device
         @rtype: boolean
         """
-        deviceClass = sxp.name(dev_config)
-        
-        # look up uuid of the device
-        dev_control =  self.getDeviceController(deviceClass)
-        dev_sxpr = dev_control.sxpr(devid)
-        dev_uuid = sxp.child_value(dev_sxpr, 'uuid')
-        if not dev_uuid:
-            return False
 
-        self.info.device_update(dev_uuid, dev_config)
-        dev_config_dict = self.info['devices'].get(dev_uuid)
-        if dev_config_dict:
-            dev_control.reconfigureDevice(devid, dev_config_dict[1])
+        # convert device sxp to a dict
+        dev_class = sxp.name(dev_sxp)
+        dev_config = {}
+        for opt_val in dev_sxp[1:]:
+            try:
+                dev_config[opt_val[0]] = opt_val[1]
+            except IndexError:
+                pass
+
+        # use DevController.reconfigureDevice to change device config
+        dev_control = self.getDeviceController(dev_class)
+        dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
+
+        # update XendConfig with new device info
+        if dev_uuid:
+            self.info.device_update(dev_uuid, dev_sxp)
+            
         return True
 
     def waitForDevices(self):
@@ -1575,7 +1580,7 @@ class XendDomainInfo:
         else:
             # Boot using bootloader
             if not blexec or blexec == 'pygrub':
-                blexec = '/usr/bin/pygrub'
+                blexec = osdep.pygrub_path
 
             blcfg = None
             for (devtype, devinfo) in self.info.all_devices_sxpr():

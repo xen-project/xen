@@ -309,6 +309,13 @@ static uint32_t ioapic_get_delivery_bitmask(
     return mask;
 }
 
+static inline int pit_channel0_enabled(void)
+{
+    PITState *pit = &current->domain->arch.hvm_domain.pl_time.vpit;
+    struct periodic_time *pt = &pit->channels[0].pt;
+    return pt->enabled;
+}
+
 static void vioapic_deliver(struct vioapic *vioapic, int irq)
 {
     uint16_t dest = vioapic->redirtbl[irq].fields.dest_id;
@@ -341,7 +348,7 @@ static void vioapic_deliver(struct vioapic *vioapic, int irq)
     {
 #ifdef IRQ0_SPECIAL_ROUTING
         /* Force round-robin to pick VCPU 0 */
-        if ( irq == hvm_isa_irq_to_gsi(0) )
+        if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
         {
             v = vioapic_domain(vioapic)->vcpu[0];
             target = v ? vcpu_vlapic(v) : NULL;
@@ -374,7 +381,7 @@ static void vioapic_deliver(struct vioapic *vioapic, int irq)
             deliver_bitmask &= ~(1 << bit);
 #ifdef IRQ0_SPECIAL_ROUTING
             /* Do not deliver timer interrupts to VCPU != 0 */
-            if ( irq == hvm_isa_irq_to_gsi(0) )
+            if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
                 v = vioapic_domain(vioapic)->vcpu[0];
             else
 #endif

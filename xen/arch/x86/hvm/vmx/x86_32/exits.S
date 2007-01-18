@@ -29,35 +29,7 @@
         andl $~3,reg;            \
         movl (reg),reg;
 
-/*
- * At VMExit time the processor saves the guest selectors, esp, eip, 
- * and eflags. Therefore we don't save them, but simply decrement 
- * the kernel stack pointer to make it consistent with the stack frame 
- * at usual interruption time. The eflags of the host is not saved by VMX, 
- * and we set it to the fixed value.
- *
- * We also need the room, especially because orig_eax field is used 
- * by do_IRQ(). Compared the cpu_user_regs, we skip pushing for the following:
- *   (10) u32 gs;                 
- *   (9)  u32 fs;
- *   (8)  u32 ds;
- *   (7)  u32 es;
- *               <- get_stack_bottom() (= HOST_ESP)
- *   (6)  u32 ss;
- *   (5)  u32 esp;
- *   (4)  u32 eflags;
- *   (3)  u32 cs;
- *   (2)  u32 eip;
- * (2/1)  u16 entry_vector;
- * (1/1)  u16 error_code;
- * However, get_stack_bottom() actually returns 20 bytes before the real
- * bottom of the stack to allow space for:
- * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
- */
-
-#define NR_SKIPPED_REGS 6 /* See the above explanation */
 #define HVM_SAVE_ALL_NOSEGREGS                                              \
-        subl $(NR_SKIPPED_REGS*4), %esp;                                    \
         movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \
         pushl %eax;                                                         \
         pushl %ebp;                                                         \
@@ -74,14 +46,11 @@
         popl %esi;                              \
         popl %edi;                              \
         popl %ebp;                              \
-        popl %eax;                              \
-        addl $(NR_SKIPPED_REGS*4), %esp
+        popl %eax
 
         ALIGN
 ENTRY(vmx_asm_vmexit_handler)
-        /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
-        call vmx_trace_vmexit
         movl %esp,%eax
         push %eax
         call vmx_vmexit_handler

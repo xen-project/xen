@@ -411,6 +411,23 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("WARNING: Buggy e820 map detected and fixed "
                "(truncated length fields).\n");
 
+    /* Ensure that all E820 RAM regions are page-aligned and -sized. */
+    for ( i = 0; i < e820_raw_nr; i++ )
+    {
+        uint64_t s, e;
+        if ( e820_raw[i].type != E820_RAM )
+            continue;
+        s = PFN_UP(e820_raw[i].addr);
+        e = PFN_DOWN(e820_raw[i].addr + e820_raw[i].size);
+        e820_raw[i].size = 0; /* discarded later */
+        if ( s < e )
+        {
+            e820_raw[i].addr = s << PAGE_SHIFT;
+            e820_raw[i].size = (e - s) << PAGE_SHIFT;
+        }
+    }
+
+    /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = init_e820(e820_raw, &e820_raw_nr);
 
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
@@ -423,7 +440,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             printk("Not enough memory to stash the DOM0 kernel image.\n");
             for ( ; ; ) ;
         }
-        
+
         if ( (e820.map[i].type == E820_RAM) &&
              (e820.map[i].size >= modules_length) &&
              ((e820.map[i].addr + e820.map[i].size) >=
@@ -474,10 +491,10 @@ void __init __start_xen(multiboot_info_t *mbi)
             start = PFN_UP(e820.map[i].addr);
             end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
             /* Clip the range to exclude what the bootstrapper initialised. */
-            if ( end < init_mapped )
-                continue;
             if ( start < init_mapped )
                 start = init_mapped;
+            if ( end <= start )
+                continue;
             /* Request the mapping. */
             map_pages_to_xen(
                 PAGE_OFFSET + (start << PAGE_SHIFT),
@@ -486,7 +503,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #endif
     }
 
-    if ( kexec_crash_area.size > 0 )
+    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0)
     {
         unsigned long kdump_start, kdump_size, k;
 
