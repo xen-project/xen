@@ -499,7 +499,9 @@ static void hvmirq_info(struct hvm_irq *hvm_irq)
     for (i = 0; i < BITS_TO_LONGS(1); i++)
         printk("hvmirq callback_irq_wire[%d]:0x%lx.\n", i, hvm_irq->callback_irq_wire[i]);
 
-    printk("hvmirq callback_gsi:0x%x.\n", hvm_irq->callback_gsi);
+    printk("hvmirq callback_via_type:0x%x.\n", hvm_irq->callback_via_type);
+    printk("hvmirq callback_via:0x%x.\n", hvm_irq->callback_via.gsi);
+    
 
     for (i = 0; i < 4; i++)
         printk("hvmirq pci_link_route[%d]:0x%"PRIx8".\n", i, hvm_irq->pci_link_route[i]);
@@ -507,7 +509,7 @@ static void hvmirq_info(struct hvm_irq *hvm_irq)
     for (i = 0; i < 4; i++)
         printk("hvmirq pci_link_assert_count[%d]:0x%"PRIx8".\n", i, hvm_irq->pci_link_assert_count[i]);
 
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < VIOAPIC_NUM_PINS; i++)
         printk("hvmirq gsi_assert_count[%d]:0x%"PRIx8".\n", i, hvm_irq->gsi_assert_count[i]);
 
     printk("hvmirq round_robin_prev_vcpu:0x%"PRIx8".\n", hvm_irq->round_robin_prev_vcpu);
@@ -542,8 +544,9 @@ static void ioapic_save(hvm_domain_context_t *h, void *opaque)
     /* save hvm irq state */
     hvm_put_buffer(h, (char*)hvm_irq->pci_intx, 16);
     hvm_put_buffer(h, (char*)hvm_irq->isa_irq, 2);
-    hvm_put_buffer(h, (char*)hvm_irq->callback_irq_wire, 1);
-    hvm_put_32u(h, hvm_irq->callback_gsi);
+    hvm_put_32u(h, hvm_irq->callback_via_asserted);
+    hvm_put_32u(h, hvm_irq->callback_via_type);
+    hvm_put_32u(h, hvm_irq->callback_via.gsi);
 
     for (i = 0; i < 4; i++)
         hvm_put_8u(h, hvm_irq->pci_link_route[i]);
@@ -579,8 +582,9 @@ static int ioapic_load(hvm_domain_context_t *h, void *opaque, int version_id)
     /* restore irq state */
     hvm_get_buffer(h, (char*)hvm_irq->pci_intx, 16);
     hvm_get_buffer(h, (char*)hvm_irq->isa_irq, 2);
-    hvm_get_buffer(h, (char*)hvm_irq->callback_irq_wire, 1);
-    hvm_irq->callback_gsi = hvm_get_32u(h);
+    hvm_irq->callback_via_asserted = hvm_get_32u(h);
+    hvm_irq->callback_via_type = hvm_get_32u(h);
+    hvm_irq->callback_via.gsi = hvm_get_32u(h);
 
     for (i = 0; i < 4; i++)
         hvm_irq->pci_link_route[i] = hvm_get_8u(h);
