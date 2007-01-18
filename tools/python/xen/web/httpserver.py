@@ -294,8 +294,6 @@ class HttpServer:
 
     backlog = 5
 
-    closed = False
-
     def __init__(self, root, interface, port=8080):
         self.root = root
         self.interface = interface
@@ -303,6 +301,7 @@ class HttpServer:
         # ready indicates when we are ready to begin accept connections
         # it should be set after a successful bind
         self.ready = False
+        self.closed = False
 
     def run(self):
         self.bind()
@@ -316,7 +315,6 @@ class HttpServer:
 
     def stop(self):
         self.close()
-
 
     def bind(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -334,7 +332,10 @@ class HttpServer:
 
     def close(self):
         self.closed = True
+        self.ready = False
         try:
+            # shutdown socket explicitly to allow reuse
+            self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()
         except:
             pass
@@ -344,6 +345,9 @@ class HttpServer:
 
     def getResource(self, req):
         return self.root.getRequestResource(req)
+
+    def shutdown(self):
+        self.close()
 
 
 class UnixHttpServer(HttpServer):
