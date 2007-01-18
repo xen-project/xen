@@ -210,7 +210,11 @@ int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
     hvm_put_32u(h, HVM_FILE_VERSION);
 
     /* save xen changeset */
-    chgset = strrchr(XEN_CHANGESET, ' ') + 1;
+    chgset = strrchr(XEN_CHANGESET, ' ');
+    if ( chgset )
+        chgset++;
+    else
+        chgset = XEN_CHANGESET;
 
     len = strlen(chgset);
     hvm_put_8u(h, len);
@@ -303,7 +307,11 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
     }
 
     /* check xen change set */
-    cur_chgset = strrchr(XEN_CHANGESET, ' ') + 1;
+    cur_chgset = strrchr(XEN_CHANGESET, ' ');
+    if ( cur_chgset )
+        cur_chgset++;
+    else
+        cur_chgset = XEN_CHANGESET;
 
     len = hvm_get_8u(h);
     if (len > 20) { /*typical length is 18 -- "revision number:changeset id" */
@@ -316,6 +324,11 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
     if (strncmp(cur_chgset, chgset, len + 1))
         printk("warnings: try to restore hvm guest(%s) on a different changeset %s.\n",
                 chgset, cur_chgset);
+
+
+    if ( !strcmp(cur_chgset, "unavailable") )
+        printk("warnings: try to restore hvm guest when changeset is unavailable.\n");
+
 
     /* check cpuid */
     cpuid(1, &eax, &ebx, &ecx, &edx);
