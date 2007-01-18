@@ -741,7 +741,7 @@ static int setup_guest(int xc_handle,
         /*
          * Enable shadow translate mode. This must happen after
          * populate physmap because the p2m reservation is based on
-         * the domains current memory allocation.
+         * the domain's current memory allocation.
          */
         if ( xc_shadow_control(xc_handle, dom,
                            XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE,

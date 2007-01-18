@@ -249,14 +249,14 @@ static int find_matching_ucodes (void)
 		}
 
 		total_size = get_totalsize(&mc_header);
-		if ((cursor + total_size > user_buffer_size) || (total_size < DEFAULT_UCODE_TOTALSIZE)) {
+		if (cursor + total_size > user_buffer_size) {
 			printk(KERN_ERR "microcode: error! Bad data in microcode data file\n");
 			error = -EINVAL;
 			goto out;
 		}
 
 		data_size = get_datasize(&mc_header);
-		if ((data_size + MC_HEADER_SIZE > total_size) || (data_size < DEFAULT_UCODE_DATASIZE)) {
+		if (data_size + MC_HEADER_SIZE > total_size) {
 			printk(KERN_ERR "microcode: error! Bad data in microcode data file\n");
 			error = -EINVAL;
 			goto out;
@@ -458,11 +458,6 @@ out:
 int microcode_update(XEN_GUEST_HANDLE(void) buf, unsigned long len)
 {
 	int ret;
-
-	if (len < DEFAULT_UCODE_TOTALSIZE) {
-		printk(KERN_ERR "microcode: not enough data\n");
-		return -EINVAL;
-	}
 
 	if (len != (typeof(user_buffer_size))len) {
 		printk(KERN_ERR "microcode: too much data\n");

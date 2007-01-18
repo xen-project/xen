@@ -12,7 +12,7 @@
 #include "xg_private.h"
 #include "xg_save_restore.h"
 
-/* max mfn of the whole machine */
+/* max mfn of the current host machine */
 static unsigned long max_mfn;
 
 /* virtual starting address of the hypervisor */
@@ -29,6 +29,9 @@ static xen_pfn_t *live_p2m = NULL;
 
 /* A table mapping each PFN to its new MFN. */
 static xen_pfn_t *p2m = NULL;
+
+/* A table of P2M mappings in the current region */
+static xen_pfn_t *p2m_batch = NULL;
 
 
 static ssize_t
@@ -57,46 +60,78 @@ read_exact(int fd, void *buf, size_t count)
 ** This function inverts that operation, replacing the pfn values with
 ** the (now known) appropriate mfn values.
 */
-static int uncanonicalize_pagetable(unsigned long type, void *page)
+static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, 
+                                    unsigned long type, void *page)
 {
     int i, pte_last;
     unsigned long pfn;
     uint64_t pte;
+    int nr_mfns = 0; 
 
     pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
 
-    /* Now iterate through the page table, uncanonicalizing each PTE */
+    /* First pass: work out how many (if any) MFNs we need to alloc */
+    for(i = 0; i < pte_last; i++) {
+        
+        if(pt_levels == 2)
+            pte = ((uint32_t *)page)[i];
+        else
+            pte = ((uint64_t *)page)[i];
+        
+        /* XXX SMH: below needs fixing for PROT_NONE etc */
+        if(!(pte & _PAGE_PRESENT))
+            continue; 
+        
+        pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
+        
+        if(pfn >= max_pfn) {
+            /* This "page table page" is probably not one; bail. */
+            ERROR("Frame number in type %lu page table is out of range: "
+                  "i=%d pfn=0x%lx max_pfn=%lu",
+                  type >> 28, i, pfn, max_pfn);
+            return 0;
+        }
+        
+        if(p2m[pfn] == INVALID_P2M_ENTRY) {
+            /* Have a 'valid' PFN without a matching MFN - need to alloc */
+            p2m_batch[nr_mfns++] = pfn; 
+        }
+    }
+    
+    
+    /* Alllocate the requistite number of mfns */
+    if (nr_mfns && xc_domain_memory_populate_physmap(
+            xc_handle, dom, nr_mfns, 0, 0, p2m_batch) != 0) { 
+        ERROR("Failed to allocate memory for batch.!\n"); 
+        errno = ENOMEM;
+        return 0; 
+    }
+    
+    /* Second pass: uncanonicalize each present PTE */
+    nr_mfns = 0;
     for(i = 0; i < pte_last; i++) {
 
         if(pt_levels == 2)
             pte = ((uint32_t *)page)[i];
         else
             pte = ((uint64_t *)page)[i];
+        
+        /* XXX SMH: below needs fixing for PROT_NONE etc */
+        if(!(pte & _PAGE_PRESENT))
+            continue;
+        
+        pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
+        
+        if(p2m[pfn] == INVALID_P2M_ENTRY)
+            p2m[pfn] = p2m_batch[nr_mfns++];
 
-        if(pte & _PAGE_PRESENT) {
+        pte &= 0xffffff0000000fffULL;
+        pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
 
-            pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
-
-            if(pfn >= max_pfn) {
-                /* This "page table page" is probably not one; bail. */
-                ERROR("Frame number in type %lu page table is out of range: "
-                    "i=%d pfn=0x%lx max_pfn=%lu",
-                    type >> 28, i, pfn, max_pfn);
-                return 0;
-            }
-
-
-            pte &= 0xffffff0000000fffULL;
-            pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
-
-            if(pt_levels == 2)
-                ((uint32_t *)page)[i] = (uint32_t)pte;
-            else
-                ((uint64_t *)page)[i] = (uint64_t)pte;
-
-
-
-        }
+        if(pt_levels == 2)
+            ((uint32_t *)page)[i] = (uint32_t)pte;
+        else
+            ((uint64_t *)page)[i] = (uint64_t)pte;
     }
 
     return 1;
@@ -140,6 +175,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
 
+    /* Our mapping of the current region (batch) */
     char *region_base;
 
     xc_mmu_t *mmu = NULL;
@@ -244,8 +280,10 @@ int xc_linux_restore(int xc_handle, int io_fd,
     p2m        = calloc(max_pfn, sizeof(xen_pfn_t));
     pfn_type   = calloc(max_pfn, sizeof(unsigned long));
     region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
+    p2m_batch  = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
 
-    if ((p2m == NULL) || (pfn_type == NULL) || (region_mfn == NULL)) {
+    if ((p2m == NULL) || (pfn_type == NULL) ||
+        (region_mfn == NULL) || (p2m_batch == NULL)) {
         ERROR("memory alloc failed");
         errno = ENOMEM;
         goto out;
@@ -253,6 +291,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     if (lock_pages(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
         ERROR("Could not lock region_mfn");
+        goto out;
+    }
+
+    if (lock_pages(p2m_batch, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
+        ERROR("Could not lock p2m_batch");
         goto out;
     }
 
@@ -270,17 +313,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
+    /* Mark all PFNs as invalid; we allocate on demand */
     for ( pfn = 0; pfn < max_pfn; pfn++ )
-        p2m[pfn] = pfn;
-
-    if (xc_domain_memory_populate_physmap(xc_handle, dom, max_pfn,
-                                          0, 0, p2m) != 0) {
-        ERROR("Failed to increase reservation by %lx KB", PFN_TO_KB(max_pfn));
-        errno = ENOMEM;
-        goto out;
-    }
-
-    DPRINTF("Increased domain reservation by %lx KB\n", PFN_TO_KB(max_pfn));
+        p2m[pfn] = INVALID_P2M_ENTRY;
 
     if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) {
         ERROR("Could not initialise for MMU updates");
@@ -298,7 +333,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     n = 0;
     while (1) {
 
-        int j;
+        int j, nr_mfns = 0; 
 
         this_pc = (n * 100) / max_pfn;
         if ( (this_pc - prev_pc) >= 5 )
@@ -333,6 +368,33 @@ int xc_linux_restore(int xc_handle, int io_fd,
             goto out;
         }
 
+        /* First pass for this batch: work out how much memory to alloc */
+        nr_mfns = 0; 
+        for ( i = 0; i < j; i++ )
+        {
+            unsigned long pfn, pagetype;
+            pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+            pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+
+            if ( (pagetype != XEN_DOMCTL_PFINFO_XTAB) && 
+                 (p2m[pfn] == INVALID_P2M_ENTRY) )
+            {
+                /* Have a live PFN which hasn't had an MFN allocated */
+                p2m_batch[nr_mfns++] = pfn; 
+            }
+        } 
+
+
+        /* Now allocate a bunch of mfns for this batch */
+        if (nr_mfns && xc_domain_memory_populate_physmap(
+                xc_handle, dom, nr_mfns, 0, 0, p2m_batch) != 0) { 
+            ERROR("Failed to allocate memory for batch.!\n"); 
+            errno = ENOMEM;
+            goto out;
+        }
+
+        /* Second pass for this batch: update p2m[] and region_mfn[] */
+        nr_mfns = 0; 
         for ( i = 0; i < j; i++ )
         {
             unsigned long pfn, pagetype;
@@ -340,13 +402,23 @@ int xc_linux_restore(int xc_handle, int io_fd,
             pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
             if ( pagetype == XEN_DOMCTL_PFINFO_XTAB)
-                region_mfn[i] = 0; /* we know map will fail, but don't care */
-            else
-                region_mfn[i] = p2m[pfn];
-        }
+                region_mfn[i] = ~0UL; /* map will fail but we don't care */
+            else 
+            {
+                if (p2m[pfn] == INVALID_P2M_ENTRY) {
+                    /* We just allocated a new mfn above; update p2m */
+                    p2m[pfn] = p2m_batch[nr_mfns++]; 
+                }
 
+                /* setup region_mfn[] for batch map */
+                region_mfn[i] = p2m[pfn]; 
+            }
+        } 
+
+        /* Map relevant mfns */
         region_base = xc_map_foreign_batch(
             xc_handle, dom, PROT_WRITE, region_mfn, j);
+
         if ( region_base == NULL )
         {
             ERROR("map batch failed");
@@ -401,7 +473,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
                     pae_extended_cr3 ||
                     (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
-                    if (!uncanonicalize_pagetable(pagetype, page)) {
+                    if (!uncanonicalize_pagetable(xc_handle, dom, 
+                                                  pagetype, page)) {
                         /*
                         ** Failing to uncanonicalize a page table can be ok
                         ** under live migration since the pages type may have
@@ -411,10 +484,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
                                 pagetype >> 28, pfn, mfn);
                         nraces++;
                         continue;
-                    }
-
+                    } 
                 }
-
             }
             else if ( pagetype != XEN_DOMCTL_PFINFO_NOTAB )
             {
@@ -486,7 +557,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         */
 
         int j, k;
-
+        
         /* First pass: find all L3TABs current in > 4G mfns and get new mfns */
         for ( i = 0; i < max_pfn; i++ )
         {
@@ -555,7 +626,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 }
 
                 for(k = 0; k < j; k++) {
-                    if(!uncanonicalize_pagetable(XEN_DOMCTL_PFINFO_L1TAB,
+                    if(!uncanonicalize_pagetable(xc_handle, dom, 
+                                                 XEN_DOMCTL_PFINFO_L1TAB,
                                                  region_base + k*PAGE_SIZE)) {
                         ERROR("failed uncanonicalize pt!");
                         goto out;
@@ -631,7 +703,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     {
         unsigned int count;
         unsigned long *pfntab;
-        int rc;
+        int nr_frees, rc;
 
         if (!read_exact(io_fd, &count, sizeof(count))) {
             ERROR("Error when reading pfn count");
@@ -648,29 +720,30 @@ int xc_linux_restore(int xc_handle, int io_fd,
             goto out;
         }
 
+        nr_frees = 0; 
         for (i = 0; i < count; i++) {
 
             unsigned long pfn = pfntab[i];
 
-            if(pfn > max_pfn)
-                /* shouldn't happen - continue optimistically */
-                continue;
-
-            pfntab[i] = p2m[pfn];
-            p2m[pfn]  = INVALID_P2M_ENTRY; // not in pseudo-physical map
+            if(p2m[pfn] != INVALID_P2M_ENTRY) {
+                /* pfn is not in physmap now, but was at some point during 
+                   the save/migration process - need to free it */
+                pfntab[nr_frees++] = p2m[pfn];
+                p2m[pfn]  = INVALID_P2M_ENTRY; // not in pseudo-physical map
+            }
         }
 
-        if (count > 0) {
+        if (nr_frees > 0) {
 
             struct xen_memory_reservation reservation = {
-                .nr_extents   = count,
+                .nr_extents   = nr_frees,
                 .extent_order = 0,
                 .domid        = dom
             };
             set_xen_guest_handle(reservation.extent_start, pfntab);
 
             if ((rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
-                                   &reservation)) != count) {
+                                   &reservation)) != nr_frees) {
                 ERROR("Could not decrease reservation : %d", rc);
                 goto out;
             } else
@@ -791,6 +864,6 @@ int xc_linux_restore(int xc_handle, int io_fd,
     free(pfn_type);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
-
+    
     return rc;
 }

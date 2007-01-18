@@ -443,10 +443,11 @@ do{ __asm__ __volatile__ (                                              \
 })
 #define insn_fetch_type(_type) ((_type)insn_fetch_bytes(sizeof(_type)))
 
-#define _truncate_ea(ea, byte_width)                    \
-({  unsigned long __ea = (ea);                          \
-    (((byte_width) == sizeof(unsigned long)) ? __ea :   \
-     (__ea & ((1UL << ((byte_width) << 3)) - 1)));      \
+#define _truncate_ea(ea, byte_width)            \
+({  unsigned long __ea = (ea);                  \
+    unsigned int _width = (byte_width);         \
+    ((_width == sizeof(unsigned long)) ? __ea : \
+     (__ea & ((1UL << (_width << 3)) - 1)));    \
 })
 #define truncate_ea(ea) _truncate_ea((ea), ad_bytes)
 
@@ -473,16 +474,27 @@ static int even_parity(uint8_t v)
 #define _register_address_increment(reg, inc, byte_width)               \
 do {                                                                    \
     int _inc = (inc); /* signed type ensures sign extension to long */  \
-    if ( (byte_width) == sizeof(unsigned long) )                        \
+    unsigned int _width = (byte_width);                                 \
+    if ( _width == sizeof(unsigned long) )                              \
         (reg) += _inc;                                                  \
     else if ( mode_64bit() )                                            \
-        (reg) = ((reg) + _inc) & ((1UL << ((byte_width) << 3)) - 1);    \
+        (reg) = ((reg) + _inc) & ((1UL << (_width << 3)) - 1);          \
     else                                                                \
-        (reg) = ((reg) & ~((1UL << ((byte_width) << 3)) - 1)) |         \
-                (((reg) + _inc) & ((1UL << ((byte_width) << 3)) - 1));  \
+        (reg) = ((reg) & ~((1UL << (_width << 3)) - 1)) |               \
+                (((reg) + _inc) & ((1UL << (_width << 3)) - 1));        \
 } while (0)
 #define register_address_increment(reg, inc) \
     _register_address_increment((reg), (inc), ad_bytes)
+
+#define sp_pre_dec(dec) ({                                              \
+    _register_address_increment(_regs.esp, -(dec), ctxt->sp_size/8);    \
+    _truncate_ea(_regs.esp, ctxt->sp_size/8);                           \
+})
+#define sp_post_inc(inc) ({                                             \
+    unsigned long __esp = _truncate_ea(_regs.esp, ctxt->sp_size/8);     \
+    _register_address_increment(_regs.esp, (inc), ctxt->sp_size/8);     \
+    __esp;                                                              \
+})
 
 #define jmp_rel(rel)                                                    \
 do {                                                                    \
@@ -679,7 +691,7 @@ x86_emulate(
     ea.mem.seg = x86_seg_ds;
     ea.mem.off = 0;
 
-    op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->address_bytes;
+    op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->addr_size/8;
     if ( op_bytes == 8 )
     {
         op_bytes = def_op_bytes = 4;
@@ -1144,7 +1156,9 @@ x86_emulate(
         break;
     }
 
-    case 0x80 ... 0x83: /* Grp1 */
+    case 0x82: /* Grp1 (x86/32 only) */
+        generate_exception_if(mode_64bit(), EXC_UD);
+    case 0x80: case 0x81: case 0x83: /* Grp1 */
         switch ( modrm_reg & 7 )
         {
         case 0: goto add;
@@ -1194,10 +1208,9 @@ x86_emulate(
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
-        register_address_increment(_regs.esp, dst.bytes);
         break;
 
     case 0xb0 ... 0xb7: /* mov imm8,r8 */
@@ -1466,7 +1479,7 @@ x86_emulate(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 2: /* call (near) */
-        case 3: /* jmp (near) */
+        case 4: /* jmp (near) */
             if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
@@ -1488,8 +1501,7 @@ x86_emulate(
                                      &dst.val, 8, ctxt)) != 0 )
                     goto done;
             }
-            register_address_increment(_regs.esp, -dst.bytes);
-            if ( (rc = ops->write(x86_seg_ss, truncate_ea(_regs.esp),
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
                                   dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
             dst.type = OP_NONE;
@@ -1644,10 +1656,9 @@ x86_emulate(
         dst.bytes = op_bytes;
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
-        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(dst.bytes),
                              &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
-        register_address_increment(_regs.esp, dst.bytes);
         break;
 
     case 0x60: /* pusha */ {
@@ -1657,11 +1668,9 @@ x86_emulate(
             _regs.esp, _regs.ebp, _regs.esi, _regs.edi };
         generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
-            if ( (rc = ops->write(x86_seg_ss,
-                                  truncate_ea(_regs.esp-(i+1)*op_bytes),
+            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                   regs[i], op_bytes, ctxt)) != 0 )
             goto done;
-        register_address_increment(_regs.esp, -8*op_bytes);
         break;
     }
 
@@ -1674,11 +1683,9 @@ x86_emulate(
             (unsigned long *)&_regs.ecx, (unsigned long *)&_regs.eax };
         generate_exception_if(mode_64bit(), EXC_UD);
         for ( i = 0; i < 8; i++ )
-            if ( (rc = ops->read(x86_seg_ss,
-                                 truncate_ea(_regs.esp+i*op_bytes),
+            if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes),
                                  regs[i], op_bytes, ctxt)) != 0 )
             goto done;
-        register_address_increment(_regs.esp, 8*op_bytes);
         break;
     }
 
@@ -1697,9 +1704,8 @@ x86_emulate(
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
         dst.val = src.val;
-        register_address_increment(_regs.esp, -dst.bytes);
         dst.mem.seg = x86_seg_ss;
-        dst.mem.off = truncate_ea(_regs.esp);
+        dst.mem.off = sp_pre_dec(dst.bytes);
         break;
 
     case 0x70 ... 0x7f: /* jcc (short) */ {
@@ -1813,11 +1819,10 @@ x86_emulate(
     case 0xc3: /* ret (near) */ {
         int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
         op_bytes = mode_64bit() ? 8 : op_bytes;
-        if ( (rc = ops->read(x86_seg_ss, truncate_ea(_regs.esp),
+        if ( (rc = ops->read(x86_seg_ss, sp_post_inc(op_bytes + offset),
                              &dst.val, op_bytes, ctxt)) != 0 )
             goto done;
         _regs.eip = dst.val;
-        register_address_increment(_regs.esp, op_bytes + offset);
         break;
     }
 
@@ -2019,7 +2024,7 @@ x86_emulate(
 
     case 0xbc: /* bsf */ {
         int zf;
-        asm ( "bsf %2,%0; setc %b1"
+        asm ( "bsf %2,%0; setz %b1"
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val), "1" (0) );
         _regs.eflags &= ~EFLG_ZF;
@@ -2029,7 +2034,7 @@ x86_emulate(
 
     case 0xbd: /* bsr */ {
         int zf;
-        asm ( "bsr %2,%0; setc %b1"
+        asm ( "bsr %2,%0; setz %b1"
               : "=r" (dst.val), "=q" (zf)
               : "r" (src.val), "1" (0) );
         _regs.eflags &= ~EFLG_ZF;
@@ -2046,12 +2051,13 @@ x86_emulate(
         break;
 
     case 0xba: /* Grp8 */
-        switch ( modrm_reg & 3 )
+        switch ( modrm_reg & 7 )
         {
-        case 0: goto bt;
-        case 1: goto bts;
-        case 2: goto btr;
-        case 3: goto btc;
+        case 4: goto bt;
+        case 5: goto bts;
+        case 6: goto btr;
+        case 7: goto btc;
+        default: generate_exception_if(1, EXC_UD);
         }
         break;
 
@@ -2100,6 +2106,7 @@ x86_emulate(
 #if defined(__i386__)
     {
         unsigned long old_lo, old_hi;
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off+0, &old_lo, 4, ctxt)) ||
              (rc = ops->read(ea.mem.seg, ea.mem.off+4, &old_hi, 4, ctxt)) )
             goto done;
@@ -2126,6 +2133,7 @@ x86_emulate(
 #elif defined(__x86_64__)
     {
         unsigned long old, new;
+        generate_exception_if((modrm_reg & 7) != 1, EXC_UD);
         if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &old, 8, ctxt)) != 0 )
             goto done;
         if ( ((uint32_t)(old>>0) != (uint32_t)_regs.eax) ||

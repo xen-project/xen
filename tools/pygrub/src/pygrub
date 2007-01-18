@@ -405,6 +405,9 @@ class Grub:
             c = self.screen.getch()
             if mytime != -1:
                 mytime += 1
+                if mytime >= int(timeout):
+                    self.isdone = True
+                    break
 
             # handle keypresses
             if c == ord('c'):

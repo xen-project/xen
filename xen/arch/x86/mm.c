@@ -3236,15 +3236,14 @@ static int ptwr_emulated_update(
     if ( unlikely(!get_page_from_l1e(gl1e_to_ml1e(d, nl1e), d)) )
     {
         if ( (CONFIG_PAGING_LEVELS == 3 || IS_COMPAT(d)) &&
-             (bytes == 4) &&
-             !do_cmpxchg &&
+             (bytes == 4) && (addr & 4) && !do_cmpxchg &&
              (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
         {
             /*
-             * If this is a half-write to a PAE PTE then we assume that the
-             * guest has simply got the two writes the wrong way round. We
-             * zap the PRESENT bit on the assumption the bottom half will be
-             * written immediately after we return to the guest.
+             * If this is an upper-half write to a PAE PTE then we assume that
+             * the guest has simply got the two writes the wrong way round. We
+             * zap the PRESENT bit on the assumption that the bottom half will
+             * be written immediately after we return to the guest.
              */
             MEM_LOG("ptwr_emulate: fixing up invalid PAE PTE %"PRIpte,
                     l1e_get_intpte(nl1e));
@@ -3375,8 +3374,9 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
          (page_get_owner(page) != d) )
         goto bail;
 
-    ptwr_ctxt.ctxt.regs = guest_cpu_user_regs();
-    ptwr_ctxt.ctxt.address_bytes = IS_COMPAT(d) ? 4 : sizeof(long);
+    ptwr_ctxt.ctxt.regs = regs;
+    ptwr_ctxt.ctxt.addr_size = ptwr_ctxt.ctxt.sp_size =
+        IS_COMPAT(d) ? 32 : BITS_PER_LONG;
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
     if ( x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )

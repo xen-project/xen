@@ -193,6 +193,7 @@ fsig_mount(fsi_t *fsi, const char *path)
 static int
 fsig_umount(fsi_t *fsi)
 {
+	free(fsi->f_data);
 	return (0);
 }
 
@@ -250,6 +251,7 @@ fsig_read(fsi_file_t *ffi, void *buf, size_t nbytes)
 static int
 fsig_close(fsi_file_t *ffi)
 {
+	free(ffi->ff_data);
 	fsip_file_free(ffi);
 	return (0);
 }

@@ -118,7 +118,8 @@ int main(int argc, char **argv)
 #endif
 
     ctxt.regs = &regs;
-    ctxt.address_bytes = 4;
+    ctxt.addr_size = 32;
+    ctxt.sp_size   = 32;
 
     res = mmap((void *)0x100000, MMAP_SZ, PROT_READ|PROT_WRITE,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);

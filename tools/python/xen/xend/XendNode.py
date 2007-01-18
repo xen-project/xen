@@ -365,14 +365,24 @@ class XendNode:
 
         return [[k, info[k]] for k in ITEM_ORDER]
 
+    def xenschedinfo(self):
+        sched_id = self.xc.sched_id_get()
+        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
+            return 'sedf'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
+            return 'credit'
+        else:
+            return 'unknown'
 
     def xeninfo(self):
         info = self.xc.xeninfo()
+        info['xen_scheduler'] = self.xenschedinfo()
 
         ITEM_ORDER = ['xen_major',
                       'xen_minor',
                       'xen_extra',
                       'xen_caps',
+                      'xen_scheduler',
                       'xen_pagesize',
                       'platform_params',
                       'xen_changeset',
