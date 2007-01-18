@@ -377,11 +377,12 @@ class HVMImageHandler(ImageHandler):
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
-                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
+                   'localtime', 'serial', 'stdvga', 'isa',
                    'acpi', 'usb', 'usbdevice', 'keymap' ]
-        ret = []
         hvmDeviceConfig = imageConfig['hvm']['devices']
-        
+
+        ret = ['-vcpus', str(self.vm.getVCpuCount())]
+
         for a in dmargs:
             v = hvmDeviceConfig.get(a)
 

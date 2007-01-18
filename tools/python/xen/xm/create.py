@@ -190,6 +190,10 @@ gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
 
+gopts.var('vcpu_avail', val='VCPUS',
+          fn=set_long, default=None,
+          use="Bitmask for virtual CPUs to make available immediately.")
+
 gopts.var('cpu_cap', val='CAP',
           fn=set_int, default=None,
           use="""Set the maximum amount of cpu.
@@ -740,7 +744,7 @@ def make_config(vals):
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
                    'restart', 'on_poweroff',
-                   'on_reboot', 'on_crash', 'vcpus', 'features',
+                   'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop'])
 
     if vals.uuid is not None:

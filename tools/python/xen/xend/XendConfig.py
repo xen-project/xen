@@ -78,6 +78,25 @@ def scrub_password(data):
     else:
         return data
 
+#
+# CPU fields:
+#
+# vcpus_number -- the maximum number of vcpus that this domain may ever have.
+#                 aka XendDomainInfo.getVCpuCount().
+# vcpus        -- the legacy configuration name for above.
+# max_vcpu_id  -- vcpus_number - 1.  This is given to us by Xen.
+#
+# cpus         -- the list of pCPUs available to each vCPU.
+#
+#   vcpu_avail:  a bitmap telling the guest domain whether it may use each of
+#                its VCPUs.  This is translated to
+#                <dompath>/cpu/<id>/availability = {online,offline} for use
+#                by the guest domain.
+# online_vpcus -- the number of VCPUs currently up, as reported by Xen.  This
+#                 is changed by changing vcpu_avail, and waiting for the
+#                 domain to respond.
+#
+
 
 # Mapping from XendConfig configuration keys to the old
 # legacy configuration keys that map directly.
@@ -185,7 +204,7 @@ LEGACY_CFG_TYPES = {
     'uuid':          str,
     'name':          str,
     'vcpus':         int,
-    'vcpu_avail':    int,
+    'vcpu_avail':    long,
     'memory':        int,
     'shadow_memory': int,
     'maxmem':        int,
@@ -355,9 +374,6 @@ class XendConfig(dict):
             'cpu_weight': 256,
             'cpu_cap': 0,
             'vcpus_number': 1,
-            'online_vcpus': 1,
-            'max_vcpu_id': 0,
-            'vcpu_avail': 1,
             'console_refs': [],
             'vif_refs': [],
             'vbd_refs': [],
@@ -389,7 +405,7 @@ class XendConfig(dict):
                                       event)
 
     def _vcpus_sanity_check(self):
-        if self.get('vcpus_number') != None:
+        if 'vcpus_number' in self and 'vcpu_avail' not in self:
             self['vcpu_avail'] = (1 << self['vcpus_number']) - 1
 
     def _uuid_sanity_check(self):
@@ -405,7 +421,7 @@ class XendConfig(dict):
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
         self['online_vcpus'] = dominfo['online_vcpus']
-        self['max_vcpu_id'] = dominfo['max_vcpu_id']
+        self['vcpus_number'] = dominfo['max_vcpu_id'] + 1
         self['memory_dynamic_min'] = (dominfo['mem_kb'] + 1023)/1024
         self['memory_dynamic_max'] = (dominfo['maxmem_kb'] + 1023)/1024
         self['cpu_time'] = dominfo['cpu_time']/1e9
@@ -636,9 +652,6 @@ class XendConfig(dict):
         self['memory_dynamic_max'] = self['memory_static_max']
         self['memory_dynamic_min'] = self['memory_static_min']
 
-        # make sure max_vcpu_id is set correctly
-        self['max_vcpu_id'] = self['vcpus_number'] - 1
-
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
         
@@ -720,13 +733,11 @@ class XendConfig(dict):
         _set_cfg_if_exists('on_xend_stop')
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
-        _set_cfg_if_exists('max_vcpu_id') # needed for vcpuDomDetails
         _set_cfg_if_exists('cpu_weight')
         _set_cfg_if_exists('cpu_cap')
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')
-        _set_cfg_if_exists('online_vcpus')
         _set_cfg_if_exists('cpu_time')
         _set_cfg_if_exists('shutdown_reason')
         _set_cfg_if_exists('up_time')

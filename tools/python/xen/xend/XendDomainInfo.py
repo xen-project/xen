@@ -60,25 +60,6 @@ log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
 
 
-#
-# There are a number of CPU-related fields:
-#
-#   vcpus:       the number of virtual CPUs this domain is configured to use.
-#   vcpu_avail:  a bitmap telling the guest domain whether it may use each of
-#                its VCPUs.  This is translated to
-#                <dompath>/cpu/<id>/availability = {online,offline} for use
-#                by the guest domain.
-#   cpumap:      a list of bitmaps, one for each VCPU, giving the physical
-#                CPUs that that VCPU may use.
-#   cpu:         a configuration setting requesting that VCPU 0 is pinned to
-#                the specified physical CPU.
-#
-# vcpus and vcpu_avail settings persist with the VM (i.e. they are persistent
-# across save, restore, migrate, and restart).  The other settings are only
-# specific to the domain, so are lost when the VM moves.
-#
-
-
 def create(config):
     """Creates and start a VM using the supplied configuration. 
 
@@ -624,7 +605,7 @@ class XendDomainInfo:
                     ['name',       self.info['name_label']],
                     ['vcpu_count', self.info['vcpus_number']]]
 
-            for i in range(0, self.info['max_vcpu_id']+1):
+            for i in range(0, self.info['vcpus_number']):
                 info = xc.vcpu_getinfo(self.domid, i)
 
                 sxpr.append(['vcpu',
@@ -908,8 +889,9 @@ class XendDomainInfo:
                 self._writeDom(self._vcpuDomDetails())
         else:
             self.info['vcpus_number'] = vcpus
-            self.info['online_vcpus'] = vcpus
             xen.xend.XendDomain.instance().managed_config_save(self)
+        log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
+                 vcpus)
 
     def getLabel(self):
         return security.get_security_info(self.info, 'label')
@@ -1394,7 +1376,7 @@ class XendDomainInfo:
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
             if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
-                for v in range(0, self.info['max_vcpu_id']+1):
+                for v in range(0, self.info['vcpus_number']):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
             # Use architecture- and image-specific calculations to determine
@@ -2052,8 +2034,8 @@ class XendDomainInfo:
         # TODO: spec says that key is int, however, python does not allow
         #       non-string keys to dictionaries.
         vcpu_util = {}
-        if 'max_vcpu_id' in self.info and self.domid != None:
-            for i in range(0, self.info['max_vcpu_id']+1):
+        if 'vcpus_number' in self.info and self.domid != None:
+            for i in range(0, self.info['vcpus_number']):
                 info = xc.vcpu_getinfo(self.domid, i)
                 vcpu_util[str(i)] = info['cpu_time']/1000000000.0
                 
