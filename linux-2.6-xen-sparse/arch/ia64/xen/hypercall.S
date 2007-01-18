@@ -9,267 +9,109 @@
 #include <asm/asmmacro.h>
 
 GLOBAL_ENTRY(xen_get_psr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=psr;;
-(p7)	br.ret.sptk.many rp
-	;;
 	XEN_HYPER_GET_PSR
-	;;
 	br.ret.sptk.many rp
-	;;
+    ;;
 END(xen_get_psr)
 
 GLOBAL_ENTRY(xen_get_ivr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=cr.ivr;;
-(p7)	br.ret.sptk.many rp
-	;;
 	XEN_HYPER_GET_IVR
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_get_ivr)
 
 GLOBAL_ENTRY(xen_get_tpr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=cr.tpr;;
-(p7)	br.ret.sptk.many rp
-	;;
 	XEN_HYPER_GET_TPR
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_get_tpr)
 
 GLOBAL_ENTRY(xen_set_tpr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov cr.tpr=r32;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_SET_TPR
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_set_tpr)
 
 GLOBAL_ENTRY(xen_eoi)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov cr.eoi=r0;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_EOI
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_eoi)
 
 GLOBAL_ENTRY(xen_thash)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	thash r8=r32;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_THASH
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_thash)
 
 GLOBAL_ENTRY(xen_set_itm)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov cr.itm=r32;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_SET_ITM
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_set_itm)
 
 GLOBAL_ENTRY(xen_ptcga)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	ptc.ga r32,r33;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
 	mov r9=r33
-	;;
 	XEN_HYPER_PTC_GA
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_ptcga)
 
 GLOBAL_ENTRY(xen_get_rr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=rr[r32];;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_GET_RR
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_get_rr)
 
 GLOBAL_ENTRY(xen_set_rr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov rr[r32]=r33;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
 	mov r9=r33
-	;;
 	XEN_HYPER_SET_RR
-	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_set_rr)
 
 GLOBAL_ENTRY(xen_set_kr)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.ne p7,p0=r8,r0;;
-(p7)	br.cond.spnt.few 1f;
-	;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar0=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar1=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar2=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar3=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar4=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar5=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar6=r9
-(p7)	br.ret.sptk.many rp;;
-	cmp.eq p7,p0=r8,r0
-	adds r8=-1,r8;;
-(p7)	mov ar7=r9
-(p7)	br.ret.sptk.many rp;;
-
-1:	mov r8=r32
+	mov r8=r32
 	mov r9=r33
-	;;
 	XEN_HYPER_SET_KR
-	;;
 	br.ret.sptk.many rp
 END(xen_set_kr)
 
 GLOBAL_ENTRY(xen_fc)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	fc r32;;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_FC
-	;;
 	br.ret.sptk.many rp
 END(xen_fc)
 
 GLOBAL_ENTRY(xen_get_cpuid)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=cpuid[r32];;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_GET_CPUID
-	;;
 	br.ret.sptk.many rp
 END(xen_get_cpuid)
 
 GLOBAL_ENTRY(xen_get_pmd)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=pmd[r32];;
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_GET_PMD
-	;;
 	br.ret.sptk.many rp
 END(xen_get_pmd)
 
 #ifdef CONFIG_IA32_SUPPORT
 GLOBAL_ENTRY(xen_get_eflag)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov r8=ar24;;
-(p7)	br.ret.sptk.many rp
-	;;
-	mov r8=r32
-	;;
 	XEN_HYPER_GET_EFLAG
-	;;
 	br.ret.sptk.many rp
 END(xen_get_eflag)
 	
 // some bits aren't set if pl!=0, see SDM vol1 3.1.8
 GLOBAL_ENTRY(xen_set_eflag)
-	movl r8=running_on_xen;;
-	ld4 r8=[r8];;
-	cmp.eq p7,p0=r8,r0;;
-(p7)	mov ar24=r32
-(p7)	br.ret.sptk.many rp
-	;;
 	mov r8=r32
-	;;
 	XEN_HYPER_SET_EFLAG
-	;;
 	br.ret.sptk.many rp
 END(xen_set_eflag)
 #endif
