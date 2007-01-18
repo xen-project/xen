@@ -292,11 +292,9 @@ ENTRY(hyper_ssm_i)
 	// OK, now all set to go except for switch to virtual bank0
 	mov r30=r2
 	mov r29=r3
-	mov r28=r4
 	;;
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
-	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	bsw.1;;
 	// FIXME?: ar.unat is not really handled correctly,
 	// but may not matter if the OS is NaT-clean
@@ -316,11 +314,9 @@ ENTRY(hyper_ssm_i)
 	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
-	mov r31=r4
 	bsw.0 ;;
 	mov r2=r30
 	mov r3=r29
-	mov r4=r28
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
@@ -477,14 +473,12 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	// OK, now all set to go except for switch to virtual bank0
 	mov r30=r2
 	mov r29=r3
-	mov r27=r4
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
 	;;
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18
-	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
@@ -516,13 +510,11 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	ld8 r22=[r2],16;
 	ld8 r23=[r3],16;;
 #endif
-	mov r31=r4
 	;;
 	bsw.0 ;;
 	mov r24=ar.unat;
 	mov r2=r30
 	mov r3=r29
-	mov r4=r27
 #ifdef HANDLE_AR_UNAT
 	mov ar.unat=r28;
 #endif
@@ -665,10 +657,8 @@ ENTRY(fast_reflect)
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
-	mov r27=r4
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18
-	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
@@ -700,7 +690,6 @@ ENTRY(fast_reflect)
 	ld8 r22=[r2],16;
 	ld8 r23=[r3],16;;
 #endif
-	mov r31=r4
 	;;
 	bsw.0 ;;
 	mov r24=ar.unat;
@@ -709,7 +698,6 @@ ENTRY(fast_reflect)
 #ifdef HANDLE_AR_UNAT
 	mov ar.unat=r28;
 #endif
-	mov r4=r27
 	;;
 	adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1311,13 +1299,8 @@ ENTRY(rfi_with_interrupt)
 	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
-	movl r31=XSI_IPSR;;
 	bsw.0 ;;
 	mov r2=r30; mov r3=r29;;
-#else
-	bsw.1;;
-	movl r31=XSI_IPSR;;
-	bsw.0 ;;
 #endif
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;

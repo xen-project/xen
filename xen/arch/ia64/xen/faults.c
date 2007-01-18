@@ -91,7 +91,6 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 
 	regs->cr_iip = ((unsigned long)PSCBX(v, iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-	regs->r31 = current->domain->arch.shared_info_va + XSI_IPSR_OFS;
 
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v, interrupt_collection_enabled) = 0;
@@ -152,7 +151,6 @@ void reflect_event(void)
 
 	regs->cr_iip = v->arch.event_callback_ip;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-	regs->r31 = current->domain->arch.shared_info_va + XSI_IPSR_OFS;
 
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v, interrupt_collection_enabled) = 0;
@@ -263,8 +261,6 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 		    ((unsigned long)PSCBX(current, iva) + fault) & ~0xffUL;
 		regs->cr_ipsr =
 		    (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-		// NOTE: nested trap must NOT pass PSCB address
-		//regs->r31 = (unsigned long) &PSCB(current);
 		perfc_incra(slow_reflect, fault >> 8);
 		return;
 	}
