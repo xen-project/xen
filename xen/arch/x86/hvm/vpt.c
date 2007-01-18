@@ -195,7 +195,7 @@ void pt_reset(struct vcpu *v)
     }
 }
 
-void create_periodic_time(struct periodic_time *pt, uint64_t period,
+void create_periodic_time(struct vcpu *v, struct periodic_time *pt, uint64_t period,
                           uint8_t irq, char one_shot, time_cb *cb, void *data)
 {
     destroy_periodic_time(pt);
@@ -209,7 +209,7 @@ void create_periodic_time(struct periodic_time *pt, uint64_t period,
         period = 900000; /* force to 0.9ms */
     }
     pt->period = period;
-    pt->vcpu = current;
+    pt->vcpu = v;
     pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
     pt->irq = irq;
     pt->period_cycles = (u64)period * cpu_khz / 1000000L;
@@ -218,7 +218,7 @@ void create_periodic_time(struct periodic_time *pt, uint64_t period,
     pt->cb = cb;
     pt->priv = data;
 
-    list_add(&pt->list, &current->arch.hvm_vcpu.tm_list);
+    list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
     set_timer(&pt->timer, pt->scheduled);
 }
 

@@ -386,6 +386,65 @@ int arch_sethvm_ctxt(
     return hvm_load(v, c);
 }
 
+#ifdef HVM_DEBUG_SUSPEND
+static void shpage_info(shared_iopage_t *sh)
+{
+
+    vcpu_iodata_t *p = &sh->vcpu_iodata[0];
+    ioreq_t *req = &p->vp_ioreq;
+    printk("*****sharepage_info******!\n");
+    printk("vp_eport=%d\n", p->vp_eport);
+    printk("io packet: "
+                     "state:%x, pvalid: %x, dir:%x, port: %"PRIx64", "
+                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+                     req->state, req->data_is_ptr, req->dir, req->addr,
+                     req->data, req->count, req->size);
+}
+#else
+static void shpage_info(shared_iopage_t *sh)
+{
+}
+#endif
+
+static void shpage_save(hvm_domain_context_t *h, void *opaque)
+{
+    /* XXX:no action required for shpage save/restore, since it's in guest memory
+     * keep it for debug purpose only */
+
+#if 0
+    struct shared_iopage *s = opaque;
+    /* XXX:smp */
+    struct ioreq *req = &s->vcpu_iodata[0].vp_ioreq;
+    
+    shpage_info(s);
+
+    hvm_put_buffer(h, (char*)req, sizeof(struct ioreq));
+#endif
+}
+
+static int shpage_load(hvm_domain_context_t *h, void *opaque, int version_id)
+{
+    struct shared_iopage *s = opaque;
+#if 0
+    /* XXX:smp */
+    struct ioreq *req = &s->vcpu_iodata[0].vp_ioreq;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    hvm_get_buffer(h, (char*)req, sizeof(struct ioreq));
+
+
+#endif
+    shpage_info(s);
+    return 0;
+}
+
+void shpage_init(struct domain *d, shared_iopage_t *sp)
+{
+    hvm_register_savevm(d, "xen_hvm_shpage", 0x10, 1, shpage_save, shpage_load, sp);
+}
+
 int hvm_buffered_io_intercept(ioreq_t *p)
 {
     struct vcpu *v = current;

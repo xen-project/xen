@@ -378,6 +378,87 @@ static int vpic_intercept_elcr_io(ioreq_t *p)
     return 1;
 }
 
+#ifdef HVM_DEBUG_SUSPEND
+static void vpic_info(struct vpic *s)
+{
+    printk("*****pic state:*****\n");
+    printk("pic 0x%x.\n", s->irr);
+    printk("pic 0x%x.\n", s->imr);
+    printk("pic 0x%x.\n", s->isr);
+    printk("pic 0x%x.\n", s->irq_base);
+    printk("pic 0x%x.\n", s->init_state);
+    printk("pic 0x%x.\n", s->priority_add);
+    printk("pic 0x%x.\n", s->readsel_isr);
+    printk("pic 0x%x.\n", s->poll);
+    printk("pic 0x%x.\n", s->auto_eoi);
+    printk("pic 0x%x.\n", s->rotate_on_auto_eoi);
+    printk("pic 0x%x.\n", s->special_fully_nested_mode);
+    printk("pic 0x%x.\n", s->special_mask_mode);
+    printk("pic 0x%x.\n", s->elcr);
+    printk("pic 0x%x.\n", s->int_output);
+    printk("pic 0x%x.\n", s->is_master);
+}
+#else
+static void vpic_info(struct vpic *s)
+{
+}
+#endif
+
+static void vpic_save(hvm_domain_context_t *h, void *opaque)
+{
+    struct vpic *s = opaque;
+    
+    vpic_info(s);
+
+    hvm_put_8u(h, s->irr);
+    hvm_put_8u(h, s->imr);
+    hvm_put_8u(h, s->isr);
+    hvm_put_8u(h, s->irq_base);
+    hvm_put_8u(h, s->init_state);
+    hvm_put_8u(h, s->priority_add);
+    hvm_put_8u(h, s->readsel_isr);
+
+    hvm_put_8u(h, s->poll);
+    hvm_put_8u(h, s->auto_eoi);
+
+    hvm_put_8u(h, s->rotate_on_auto_eoi);
+    hvm_put_8u(h, s->special_fully_nested_mode);
+    hvm_put_8u(h, s->special_mask_mode);
+
+    hvm_put_8u(h, s->elcr);
+    hvm_put_8u(h, s->int_output);
+}
+
+static int vpic_load(hvm_domain_context_t *h, void *opaque, int version_id)
+{
+    struct vpic *s = opaque;
+    
+    if (version_id != 1)
+        return -EINVAL;
+
+    s->irr = hvm_get_8u(h);
+    s->imr = hvm_get_8u(h);
+    s->isr = hvm_get_8u(h);
+    s->irq_base = hvm_get_8u(h);
+    s->init_state = hvm_get_8u(h);
+    s->priority_add = hvm_get_8u(h);
+    s->readsel_isr = hvm_get_8u(h);
+
+    s->poll = hvm_get_8u(h);
+    s->auto_eoi = hvm_get_8u(h);
+
+    s->rotate_on_auto_eoi = hvm_get_8u(h);
+    s->special_fully_nested_mode = hvm_get_8u(h);
+    s->special_mask_mode = hvm_get_8u(h);
+
+    s->elcr = hvm_get_8u(h);
+    s->int_output = hvm_get_8u(h);
+
+    vpic_info(s);
+
+    return 0;
+}
+
 void vpic_init(struct domain *d)
 {
     struct vpic *vpic;
@@ -387,12 +468,14 @@ void vpic_init(struct domain *d)
     memset(vpic, 0, sizeof(*vpic));
     vpic->is_master = 1;
     vpic->elcr      = 1 << 2;
+    hvm_register_savevm(d, "xen_hvm_i8259", 0x20, 1, vpic_save, vpic_load, vpic);
     register_portio_handler(d, 0x20, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0x4d0, 1, vpic_intercept_elcr_io);
 
     /* Slave PIC. */
     vpic++;
     memset(vpic, 0, sizeof(*vpic));
+    hvm_register_savevm(d, "xen_hvm_i8259", 0xa0, 1, vpic_save, vpic_load, vpic);
     register_portio_handler(d, 0xa0, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0x4d1, 1, vpic_intercept_elcr_io);
 }

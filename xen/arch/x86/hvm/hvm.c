@@ -197,6 +197,9 @@ int hvm_vcpu_initialise(struct vcpu *v)
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
     hpet_init(v);
+ 
+    /* init hvm sharepage */
+    shpage_init(v->domain, get_sp(v->domain));
 
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);

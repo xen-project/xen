@@ -246,6 +246,8 @@ extern int hvm_load(struct vcpu*, hvm_domain_context_t *h);
 extern int arch_sethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
 extern int arch_gethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
 
+extern void shpage_init(struct domain *d, shared_iopage_t *sp);
+
 extern int hvm_enabled;
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
