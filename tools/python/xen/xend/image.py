@@ -173,7 +173,7 @@ class ImageHandler:
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
 
-    def createDeviceModel(self):
+    def createDeviceModel(self, restore = False):
         """Create device model for the domain (define in subclass if needed)."""
         pass
     
@@ -478,7 +478,7 @@ class HVMImageHandler(ImageHandler):
 
         return ret
 
-    def createDeviceModel(self):
+    def createDeviceModel(self, restore = False):
         if self.pid:
             return
         # Execute device model.
@@ -487,6 +487,8 @@ class HVMImageHandler(ImageHandler):
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
                   "-m", "%s" % (self.getRequiredInitialReservation() / 1024)])
         args = args + self.dmargs
+        if restore:
+            args = args + ([ "-loadvm", "/tmp/xen.qemu-dm.%d" % self.vm.getDomid() ])
         env = dict(os.environ)
         if self.display:
             env['DISPLAY'] = self.display
@@ -505,12 +507,16 @@ class HVMImageHandler(ImageHandler):
         self.register_reboot_feature_watch()
         self.pid = self.vm.gatherDom(('image/device-model-pid', int))
 
-    def destroy(self):
+    def destroy(self, suspend = False):
         self.unregister_shutdown_watch()
         self.unregister_reboot_feature_watch();
         if self.pid:
             try:
-                os.kill(self.pid, signal.SIGKILL)
+                sig = signal.SIGKILL
+                if suspend:
+                    log.info("use sigusr1 to signal qemu %d", self.pid)
+                    sig = signal.SIGUSR1
+                os.kill(self.pid, sig)
             except OSError, exn:
                 log.exception(exn)
             try:

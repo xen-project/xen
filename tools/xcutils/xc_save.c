@@ -51,7 +51,10 @@ main(int argc, char **argv)
     max_f = atoi(argv[4]);
     flags = atoi(argv[5]);
 
-    ret = xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags, &suspend);
+    if (flags & XCFLAGS_HVM)
+        ret = xc_hvm_save(xc_fd, io_fd, domid, maxit, max_f, flags, &suspend);
+    else 
+        ret = xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags, &suspend);
 
     xc_interface_close(xc_fd);
 

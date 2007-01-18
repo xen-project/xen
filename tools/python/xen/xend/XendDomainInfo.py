@@ -451,6 +451,16 @@ class XendDomainInfo:
         self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
 
+        ## shutdown hypercall for hvm domain desides xenstore write
+        image_cfg = self.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+        if hvm:
+            for code in DOMAIN_SHUTDOWN_REASONS.keys():
+                if DOMAIN_SHUTDOWN_REASONS[code] == reason:
+                    break
+            xc.domain_shutdown(self.domid, code)
+
+
     def pause(self):
         """Pause domain
         
@@ -1228,8 +1238,11 @@ class XendDomainInfo:
         if self.image:
             self.image.createDeviceModel()
 
-    def _releaseDevices(self):
+    def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""
+        if suspend and self.image:
+            self.image.destroy(suspend)
+            return
 
         while True:
             t = xstransact("%s/device" % self.dompath)
@@ -1395,6 +1408,7 @@ class XendDomainInfo:
                 self.info['shadow_memory'] * 1024,
                 self.info['memory_static_max'] * 1024)
 
+            log.debug("_initDomain:shadow_memory=0x%x, memory_static_max=0x%x, memory_static_min=0x%x.", self.info['shadow_memory'], self.info['memory_static_max'], self.info['memory_static_min'],)
             # Round shadow up to a multiple of a MiB, as shadow_mem_control
             # takes MiB and we must not round down and end up under-providing.
             shadow = ((shadow + 1023) / 1024) * 1024
@@ -1494,6 +1508,16 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
+        image_cfg = self.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+        if hvm:
+            self.image = image.create(self,
+                    self.info,
+                    self.info['image'],
+                    self.info['devices'])
+            if self.image:
+                self.image.createDeviceModel(True)
+                self.image.register_shutdown_watch()
         self._storeDomDetails()
         self._registerWatches()
         self.refreshShutdown()
