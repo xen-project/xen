@@ -163,13 +163,17 @@ struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type)
 void pt_intr_post(struct vcpu *v, int vector, int type)
 {
     struct periodic_time *pt = is_pt_irq(v, vector, type);
+    unsigned long long gtime;
 
     if ( pt == NULL )
         return;
 
     pt->pending_intr_nr--;
     pt->last_plt_gtime += pt->period_cycles;
-    hvm_set_guest_time(pt->vcpu, pt->last_plt_gtime);
+
+    gtime = hvm_get_guest_time(pt->vcpu);
+    if (gtime < pt->last_plt_gtime)
+        hvm_set_guest_time(pt->vcpu, pt->last_plt_gtime);
 
     if ( pt->cb != NULL )
         pt->cb(pt->vcpu, pt->priv);
