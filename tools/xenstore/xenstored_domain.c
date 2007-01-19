@@ -395,6 +395,43 @@ void do_release(struct connection *conn, const char *domid_str)
 	send_ack(conn, XS_RELEASE);
 }
 
+void do_resume(struct connection *conn, const char *domid_str)
+{
+	struct domain *domain;
+	unsigned int domid;
+
+	if (!domid_str) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	domid = atoi(domid_str);
+	if (!domid) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	if (conn->id != 0) {
+		send_error(conn, EACCES);
+		return;
+	}
+
+	domain = find_domain_by_domid(domid);
+	if (!domain) {
+		send_error(conn, ENOENT);
+		return;
+	}
+
+	if (!domain->conn) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	domain->shutdown = 0;
+	
+	send_ack(conn, XS_RESUME);
+}
+
 void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
 	char *path;

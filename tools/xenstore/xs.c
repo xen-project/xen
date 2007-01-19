@@ -719,6 +719,12 @@ bool xs_release_domain(struct xs_handle *h, unsigned int domid)
 	return xs_bool(single_with_domid(h, XS_RELEASE, domid));
 }
 
+/* clear the shutdown bit for the given domain */
+bool xs_resume_domain(struct xs_handle *h, unsigned int domid)
+{
+	return xs_bool(single_with_domid(h, XS_RESUME, domid));
+}
+
 char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 {
 	char domid_str[MAX_STRLEN(domid)];
