@@ -506,14 +506,6 @@ int set_info_guest(struct domain *d,
     if ( rc == 0 )
         rc = arch_set_info_guest(v, c);
 
-    /*XXX: hvm smp guest restore support */
-    if ( rc == 0 &&
-            v->vcpu_id != 0 &&
-            is_hvm_vcpu(v) &&
-            test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) ) {
-        vcpu_wake(v);
-    }
-
     domain_unpause(d);
 
     xfree(c.nat);

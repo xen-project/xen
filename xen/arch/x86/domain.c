@@ -573,7 +573,6 @@ int arch_set_info_guest(
     else
     {
         hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
-        hvm_load_cpu_context(v, &v->arch.guest_context.hvmcpu_ctxt);
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )

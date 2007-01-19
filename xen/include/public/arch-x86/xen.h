@@ -218,7 +218,6 @@ struct vcpu_guest_context {
 #endif
 #endif
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
-    struct hvmcpu_context hvmcpu_ctxt;      /* whole vmcs region */
 #ifdef __x86_64__
     /* Segment base addresses. */
     uint64_t      fs_base;
