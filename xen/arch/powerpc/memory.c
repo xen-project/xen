@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2006
+ * Copyright IBM Corp. 2006, 2007
  *
  * Authors: Dan Poff <poff@us.ibm.com>
  *          Jimi Xenidis <jimix@watson.ibm.com>
@@ -25,7 +25,7 @@
 #include "oftree.h"
 #include "rtas.h"
 
-#undef DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define DBG(fmt...) printk(fmt)
 #else
@@ -42,8 +42,6 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 unsigned long xenheap_phys_end;
 static uint nr_pages;
 static ulong xenheap_size;
-static ulong save_start;
-static ulong save_end;
 
 struct membuf {
     ulong start;
@@ -51,30 +49,6 @@ struct membuf {
 };
 
 typedef void (*walk_mem_fn)(struct membuf *, uint);
-
-static ulong free_xenheap(ulong start, ulong end)
-{
-    start = ALIGN_UP(start, PAGE_SIZE);
-    end = ALIGN_DOWN(end, PAGE_SIZE);
-
-    DBG("%s: 0x%lx - 0x%lx\n", __func__, start, end);
-
-    /* need to do this better */
-    if (save_start <= end && save_start >= start) {
-        DBG("%s:     Go around the saved area: 0x%lx - 0x%lx\n",
-               __func__, save_start, save_end);
-        init_xenheap_pages(start, ALIGN_DOWN(save_start, PAGE_SIZE));
-        xenheap_size += ALIGN_DOWN(save_start, PAGE_SIZE) - start;
-
-        init_xenheap_pages(ALIGN_UP(save_end, PAGE_SIZE), end);
-        xenheap_size += end - ALIGN_UP(save_end, PAGE_SIZE);
-    } else {
-        init_xenheap_pages(start, end);
-        xenheap_size += end - start;
-    }
-
-    return ALIGN_UP(end, PAGE_SIZE);
-}
 
 static void set_max_page(struct membuf *mb, uint entries)
 {
@@ -113,6 +87,7 @@ static void heap_init(struct membuf *mb, uint entries)
             start_blk = xenheap_phys_end;
         }
 
+        DBG("boot free: %016lx - %016lx\n", start_blk, end_blk);
         init_boot_pages(start_blk, end_blk);
         total_pages += (end_blk - start_blk) >> PAGE_SHIFT;
     }
@@ -141,72 +116,31 @@ static void ofd_walk_mem(void *m, walk_mem_fn fn)
     }
 }
 
-static void setup_xenheap(module_t *mod, int mcount)
-{
-    int i;
-    ulong freemem;
-
-    freemem = ALIGN_UP((ulong)_end, PAGE_SIZE);
-
-    for (i = 0; i < mcount; i++) {
-        u32 s;
-
-        if (mod[i].mod_end == mod[i].mod_start)
-            continue;
-
-        s = ALIGN_DOWN(mod[i].mod_start, PAGE_SIZE);
-
-        if (mod[i].mod_start > (ulong)_start &&
-            mod[i].mod_start < (ulong)_end) {
-            /* mod was linked in */
-            continue;
-        }
-
-        if (s < freemem) 
-            panic("module addresses must assend\n");
-
-        free_xenheap(freemem, s);
-        freemem = ALIGN_UP(mod[i].mod_end, PAGE_SIZE);
-        
-    }
-
-    /* the rest of the xenheap, starting at the end of modules */
-    free_xenheap(freemem, xenheap_phys_end);
-}
-
 void memory_init(module_t *mod, int mcount)
 {
     ulong eomem;
-    ulong heap_start;
+    ulong bitmap_start = ~0UL;
+    ulong bitmap_end;
+    ulong bitmap_size;
     ulong xh_pages;
+    ulong start;
+    ulong end;
+    int pos;
 
     /* lets find out how much memory there is and set max_page */
     max_page = 0;
     printk("Physical RAM map:\n");
     ofd_walk_mem((void *)oftree, set_max_page);
     eomem = max_page << PAGE_SHIFT;
-
-    if (eomem == 0){
+    if (eomem == 0) {
         panic("ofd_walk_mem() failed\n");
     }
 
-    /* find the portion of memory we need to keep safe */
-    save_start = oftree;
-    save_end = oftree_end;
-    if (rtas_base) {
-        if (save_start > rtas_base)
-            save_start = rtas_base;
-        if (save_end < rtas_end)
-            save_end = rtas_end;
-    }
-
-    /* minimum heap has to reach to the end of all Xen required memory */
-    xh_pages = ALIGN_UP(save_end, PAGE_SIZE) >> PAGE_SHIFT;
-    xh_pages += opt_xenheap_megabytes << (20 - PAGE_SHIFT);
+    xh_pages = opt_xenheap_megabytes << (20 - PAGE_SHIFT);
 
     /* While we are allocating HTABS from The Xen Heap we need it to
      * be larger */
-    xh_pages  += nr_pages >> 5;
+    xh_pages += nr_pages >> 5;
 
     xenheap_phys_end = xh_pages << PAGE_SHIFT;
     printk("End of Xen Area: %luMiB (%luKiB)\n",
@@ -214,17 +148,20 @@ void memory_init(module_t *mod, int mcount)
 
     printk("End of RAM: %luMiB (%luKiB)\n", eomem >> 20, eomem >> 10);
 
-    /* Architecturally the first 4 pages are exception hendlers, we
-     * will also be copying down some code there */
-    heap_start = 4 << PAGE_SHIFT;
-    if (oftree < (ulong)_start)
-        heap_start = ALIGN_UP(oftree_end, PAGE_SIZE);
-
-    heap_start = init_boot_allocator(heap_start);
-    if (heap_start > (ulong)_start) {
-        panic("space below _start (%p) is not enough memory "
-              "for heap (0x%lx)\n", _start, heap_start);
+    /* The boot allocator requires one bit per page. Find a spot for it. */
+    bitmap_size = max_page / 8;
+    pos = boot_of_mem_avail(0, &start, &end);
+    while (pos >= 0) {
+        if (end - start >= bitmap_size) {
+            bitmap_start = start;
+            bitmap_end = init_boot_allocator(bitmap_start);
+            printk("boot allocator @ %lx - %lx\n", bitmap_start, bitmap_end);
+            break;
+        }
+        pos = boot_of_mem_avail(pos, &start, &end);
     }
+    if (bitmap_start == ~0UL)
+        panic("Couldn't find 0x%lx bytes for boot allocator.", bitmap_size);
 
     /* allow everything else to be allocated */
     total_pages = 0;
@@ -242,12 +179,39 @@ void memory_init(module_t *mod, int mcount)
 
     numa_initmem_init(0, max_page);
 
+    /* Domain heap gets all the unclaimed memory. */
     end_boot_allocator();
 
-    /* Add memory between the beginning of the heap and the beginning
-     * of our text */
-    free_xenheap(heap_start, (ulong)_start);
-    setup_xenheap(mod, mcount);
+    /* Create initial xen heap by finding non-reserved memory. */
+    pos = boot_of_mem_avail(0, &start, &end);
+    while (pos >= 0) {
+        if (end == ~0UL)
+            end = xenheap_phys_end;
+
+        /* Problem: the bitmap itself is not reserved. */
+        if ((start >= bitmap_start) && (start < bitmap_end)) {
+            /* Start is inside bitmap. */
+            start = bitmap_end;
+        }
+        if ((end > bitmap_start) && (end <= bitmap_end)) {
+            /* End is inside bitmap. */
+            end = bitmap_start;
+        }
+        if ((start < bitmap_start) && (end > bitmap_end)) {
+            /* Range encompasses bitmap. First free low part, then high. */
+            xenheap_size += bitmap_start - start;
+            DBG("xenheap: %016lx - %016lx\n", start, bitmap_start);
+            init_xenheap_pages(start, bitmap_start);
+            start = bitmap_end;
+        }
+
+        xenheap_size += end - start;
+        DBG("xenheap: %016lx - %016lx\n", start, end);
+        init_xenheap_pages(start, end);
+
+        pos = boot_of_mem_avail(pos, &start, &end);
+    }
+
     printk("Xen Heap: %luMiB (%luKiB)\n",
            xenheap_size >> 20, xenheap_size >> 10);
 

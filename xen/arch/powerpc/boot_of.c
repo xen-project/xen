@@ -43,6 +43,14 @@ static ulong of_msr;
 static int of_out;
 static ulong eomem;
 
+/* Track memory during early boot with a limited per-page bitmap. We need an
+ * allocator to tell us where we can place RTAS, our copy of the device tree.
+ * We could examine the "available" properties in memory nodes, but we
+ * apparently can't depend on firmware to update those when we call "claim". So
+ * we need to track it ourselves.
+ * We can't dynamically allocate the bitmap, because we would need something
+ * to tell us where it's safe to allocate...
+ */
 #define MEM_AVAILABLE_PAGES ((32 << 20) >> PAGE_SHIFT)
 static DECLARE_BITMAP(mem_available_pages, MEM_AVAILABLE_PAGES);
 
@@ -530,6 +538,37 @@ static ulong boot_of_alloc(ulong size)
 
         pos = pos + i;
     }
+}
+
+int boot_of_mem_avail(int pos, ulong *startpage, ulong *endpage)
+{
+    ulong freebit;
+    ulong usedbit;
+
+    if (pos >= MEM_AVAILABLE_PAGES)
+        /* Stop iterating. */
+        return -1;
+
+    /* Find first free page. */
+    freebit = find_next_zero_bit(mem_available_pages, MEM_AVAILABLE_PAGES, pos);
+    if (freebit >= MEM_AVAILABLE_PAGES) {
+        /* We know everything after MEM_AVAILABLE_PAGES is still free. */
+        *startpage = MEM_AVAILABLE_PAGES << PAGE_SHIFT;
+        *endpage = ~0UL;
+        return freebit;
+    }
+    *startpage = freebit << PAGE_SHIFT;
+
+    /* Now find first used page after that. */
+    usedbit = find_next_bit(mem_available_pages, MEM_AVAILABLE_PAGES, freebit);
+    if (usedbit >= MEM_AVAILABLE_PAGES) {
+        /* We know everything after MEM_AVAILABLE_PAGES is still free. */
+        *endpage = ~0UL;
+        return usedbit;
+    }
+
+    *endpage = usedbit << PAGE_SHIFT;
+    return usedbit;
 }
 
 static ulong boot_of_mem_init(void)
