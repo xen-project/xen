@@ -160,13 +160,15 @@ int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
 void xs_suspend(void);
 void xs_resume(void);
+void xs_suspend_cancel(void);
 
 /* Used by xenbus_dev to borrow kernel's store connection. */
 void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg);
 
-/* Called from xen core code. */
+/* Prepare for domain suspend: then resume or cancel the suspend. */
 void xenbus_suspend(void);
 void xenbus_resume(void);
+void xenbus_suspend_cancel(void);
 
 #define XENBUS_IS_ERR_READ(str) ({			\
 	if (!IS_ERR(str) && strlen(str) == 0) {		\

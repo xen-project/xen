@@ -736,6 +736,11 @@ void xenbus_resume(void)
 }
 EXPORT_SYMBOL_GPL(xenbus_resume);
 
+void xenbus_suspend_cancel(void)
+{
+	xs_suspend_cancel();
+}
+EXPORT_SYMBOL_GPL(xenbus_suspend_cancel);
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
 int xenstored_ready = 0;
