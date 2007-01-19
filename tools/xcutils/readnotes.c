@@ -13,7 +13,7 @@
 
 #include <xen/elfnote.h>
 
-#define ELFNOTE_NAME(_n_) ((void*)(_n_) + sizeof(*(_n_)))
+#define ELFNOTE_NAME(_n_) ((char*)(_n_) + sizeof(*(_n_)))
 #define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + (((_n_)->n_namesz+3)&~3))
 #define ELFNOTE_NEXT(_n_) (ELFNOTE_DESC(_n_) + (((_n_)->n_descsz+3)&~3))
 
