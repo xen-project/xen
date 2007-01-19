@@ -173,6 +173,8 @@ int switch_native(struct domain *);
 
 #else
 
+#define compat_handle_is_null(hnd) 0
+
 #define BITS_PER_GUEST_LONG(d) BITS_PER_LONG
 
 #endif

@@ -602,12 +602,13 @@ int xc_vcpu_setcontext(int xc_handle,
     domctl.u.vcpucontext.vcpu = vcpu;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (rc = lock_pages(ctxt, sizeof(*ctxt))) != 0 )
+    if ( (ctxt != NULL) && ((rc = lock_pages(ctxt, sizeof(*ctxt))) != 0) )
         return rc;
 
     rc = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(ctxt, sizeof(*ctxt));
+    if ( ctxt != NULL )
+        unlock_pages(ctxt, sizeof(*ctxt));
 
     return rc;
 

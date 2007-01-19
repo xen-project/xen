@@ -50,6 +50,8 @@ DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
 
+static void vcpu_destroy_pagetables(struct vcpu *v);
+
 static void continue_idle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(idle_loop);
@@ -656,6 +658,13 @@ int arch_set_info_guest(
 
     return 0;
 #undef c
+}
+
+int arch_vcpu_reset(struct vcpu *v)
+{
+    destroy_gdt(v);
+    vcpu_destroy_pagetables(v);
+    return 0;
 }
 
 long
@@ -1380,63 +1389,73 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
+static void vcpu_destroy_pagetables(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned long pfn;
+
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(d) )
+    {
+        if ( is_hvm_vcpu(v) )
+            pfn = pagetable_get_pfn(v->arch.guest_table);
+        else
+            pfn = l4e_get_pfn(*(l4_pgentry_t *)
+                              __va(pagetable_get_paddr(v->arch.guest_table)));
+
+        if ( pfn != 0 )
+        {
+            if ( shadow_mode_refcounts(d) )
+                put_page(mfn_to_page(pfn));
+            else
+                put_page_and_type(mfn_to_page(pfn));
+        }
+
+        v->arch.guest_table = pagetable_null();
+        v->arch.cr3 = 0;
+        return;
+    }
+#endif
+
+    pfn = pagetable_get_pfn(v->arch.guest_table);
+    if ( pfn != 0 )
+    {
+        if ( shadow_mode_refcounts(d) )
+            put_page(mfn_to_page(pfn));
+        else
+            put_page_and_type(mfn_to_page(pfn));
+#ifdef __x86_64__
+        if ( pfn == pagetable_get_pfn(v->arch.guest_table_user) )
+            v->arch.guest_table_user = pagetable_null();
+#endif
+        v->arch.guest_table = pagetable_null();
+    }
+
+#ifdef __x86_64__
+    /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
+    pfn = pagetable_get_pfn(v->arch.guest_table_user);
+    if ( pfn != 0 )
+    {
+        if ( shadow_mode_refcounts(d) )
+            put_page(mfn_to_page(pfn));
+        else
+            put_page_and_type(mfn_to_page(pfn));
+        v->arch.guest_table_user = pagetable_null();
+    }
+#endif
+
+    v->arch.cr3 = 0;
+}
+
 void domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
-    unsigned long pfn;
 
     BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
     /* Drop the in-use references to page-table bases. */
     for_each_vcpu ( d, v )
-    {
-        /* Drop ref to guest_table (from new_guest_cr3(), svm/vmx cr3 handling,
-         * or sh_update_paging_modes()) */
-#ifdef CONFIG_COMPAT
-        if ( IS_COMPAT(d) )
-        {
-            if ( is_hvm_vcpu(v) )
-                pfn = pagetable_get_pfn(v->arch.guest_table);
-            else
-                pfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
-
-            if ( pfn != 0 )
-            {
-                if ( shadow_mode_refcounts(d) )
-                    put_page(mfn_to_page(pfn));
-                else
-                    put_page_and_type(mfn_to_page(pfn));
-            }
-            continue;
-        }
-#endif
-        pfn = pagetable_get_pfn(v->arch.guest_table);
-        if ( pfn != 0 )
-        {
-            if ( shadow_mode_refcounts(d) )
-                put_page(mfn_to_page(pfn));
-            else
-                put_page_and_type(mfn_to_page(pfn));
-#ifdef __x86_64__
-            if ( pfn == pagetable_get_pfn(v->arch.guest_table_user) )
-                v->arch.guest_table_user = pagetable_null();
-#endif
-            v->arch.guest_table = pagetable_null();
-        }
-
-#ifdef __x86_64__
-        /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
-        pfn = pagetable_get_pfn(v->arch.guest_table_user);
-        if ( pfn != 0 )
-        {
-            if ( shadow_mode_refcounts(d) )
-                put_page(mfn_to_page(pfn));
-            else
-                put_page_and_type(mfn_to_page(pfn));
-            v->arch.guest_table_user = pagetable_null();
-        }
-#endif
-    }
+        vcpu_destroy_pagetables(v);
 
     /* Tear down shadow mode stuff. */
     shadow_teardown(d);

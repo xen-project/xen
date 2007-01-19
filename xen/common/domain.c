@@ -5,6 +5,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/compat.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -467,7 +468,12 @@ int set_info_guest(struct domain *d,
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
         return -EINVAL;
-    
+
+    if ( IS_COMPAT(v->domain)
+         ? compat_handle_is_null(vcpucontext.cmp->ctxt)
+         : guest_handle_is_null(vcpucontext.nat->ctxt) )
+        return vcpu_reset(v);
+
 #ifdef CONFIG_COMPAT
     BUILD_BUG_ON(sizeof(struct vcpu_guest_context)
                  < sizeof(struct compat_vcpu_guest_context));
@@ -520,6 +526,36 @@ int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 
     return arch_set_info_guest(v, ctxt);
 }
+
+int vcpu_reset(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    int rc;
+
+    domain_pause(d);
+    LOCK_BIGLOCK(d);
+
+    rc = arch_vcpu_reset(v);
+    if ( rc != 0 )
+        goto out;
+
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+    clear_bit(_VCPUF_nmi_masked, &v->vcpu_flags);
+    clear_bit(_VCPUF_polling, &v->vcpu_flags);
+
+ out:
+    UNLOCK_BIGLOCK(v->domain);
+    domain_unpause(d);
+
+    return rc;
+}
+
 
 long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 {
