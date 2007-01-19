@@ -18,6 +18,7 @@
 #include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/bitmap.h>
 #ifdef CONFIG_COMPAT
 #include <xen/compat.h>
 #endif
@@ -40,16 +41,17 @@ void cpumask_to_xenctl_cpumap(
 {
     unsigned int guest_bytes, copy_bytes, i;
     uint8_t zero = 0;
+    uint8_t bytemap[(NR_CPUS + 7) / 8];
 
     if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
         return;
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, (NR_CPUS + 7) / 8);
+    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
 
-    copy_to_guest(xenctl_cpumap->bitmap,
-                  (uint8_t *)cpus_addr(*cpumask),
-                  copy_bytes);
+    bitmap_long_to_byte(bytemap, cpus_addr(*cpumask), NR_CPUS);
+
+    copy_to_guest(xenctl_cpumap->bitmap, &bytemap[0], copy_bytes);
 
     for ( i = copy_bytes; i < guest_bytes; i++ )
         copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1);
@@ -59,18 +61,19 @@ void xenctl_cpumap_to_cpumask(
     cpumask_t *cpumask, struct xenctl_cpumap *xenctl_cpumap)
 {
     unsigned int guest_bytes, copy_bytes;
+    uint8_t bytemap[(NR_CPUS + 7) / 8];
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, (NR_CPUS + 7) / 8);
+    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
 
     cpus_clear(*cpumask);
 
     if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
         return;
 
-    copy_from_guest((uint8_t *)cpus_addr(*cpumask),
-                    xenctl_cpumap->bitmap,
-                    copy_bytes);
+    copy_from_guest(&bytemap[0], xenctl_cpumap->bitmap, copy_bytes);
+
+    bitmap_byte_to_long(cpus_addr(*cpumask), bytemap, NR_CPUS);
 }
 
 #endif /* COMPAT */
