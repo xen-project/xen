@@ -102,7 +102,7 @@ static unsigned long long xen_guest_numeric(struct domain_setup_info *dsi,
 /*
  * Interface to the Xen ELF notes.
  */
-#define ELFNOTE_NAME(_n_)   ((const void*)(_n_) + sizeof(*(_n_)))
+#define ELFNOTE_NAME(_n_)   ((const char*)(_n_) + sizeof(*(_n_)))
 #define ELFNOTE_DESC(_n_)   (ELFNOTE_NAME(_n_) + (((_n_)->namesz+3)&~3))
 #define ELFNOTE_NEXT(_n_)   (ELFNOTE_DESC(_n_) + (((_n_)->descsz+3)&~3))
 
@@ -115,7 +115,7 @@ static int is_xen_elfnote_section(const char *image, const Elf_Shdr *shdr)
 
     for ( note = (const Elf_Note *)(image + shdr->sh_offset);
           note < (const Elf_Note *)(image + shdr->sh_offset + shdr->sh_size);
-          note = ELFNOTE_NEXT(note) )
+          note = (const Elf_Note *)ELFNOTE_NEXT(note) )
     {
         if ( !strncmp(ELFNOTE_NAME(note), "Xen", 4) )
             return 1;
@@ -134,7 +134,7 @@ static const Elf_Note *xen_elfnote_lookup(
 
     for ( note = (const Elf_Note *)dsi->__elfnote_section;
           note < (const Elf_Note *)dsi->__elfnote_section_end;
-          note = ELFNOTE_NEXT(note) )
+          note = (const Elf_Note *)ELFNOTE_NEXT(note) )
     {
         if ( strncmp(ELFNOTE_NAME(note), "Xen", 4) )
             continue;
@@ -227,9 +227,9 @@ int parseelfimage(struct domain_setup_info *dsi)
             image + ehdr->e_shoff + (h*ehdr->e_shentsize));
         if ( !is_xen_elfnote_section(image, shdr) )
             continue;
-        dsi->__elfnote_section = (const void *)image + shdr->sh_offset;
+        dsi->__elfnote_section = (const char *)image + shdr->sh_offset;
         dsi->__elfnote_section_end =
-            (const void *)image + shdr->sh_offset + shdr->sh_size;
+            (const char *)image + shdr->sh_offset + shdr->sh_size;
         break;
     }
 

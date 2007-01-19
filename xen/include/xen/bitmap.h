@@ -251,6 +251,9 @@ static inline void bitmap_shift_left(unsigned long *dst,
 		__bitmap_shift_left(dst, src, n, nbits);
 }
 
+void bitmap_long_to_byte(uint8_t *bp, const unsigned long *lp, int nbits);
+void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __XEN_BITMAP_H */

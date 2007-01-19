@@ -103,7 +103,7 @@ char* xenbus_wait_for_value(const char* path,const char* value)
 static void xenbus_thread_func(void *ign)
 {
     struct xsd_sockmsg msg;
-    unsigned prod;
+    unsigned prod = 0;
 
     for (;;) 
     {
