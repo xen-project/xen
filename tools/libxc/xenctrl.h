@@ -360,9 +360,9 @@ int xc_domain_hvm_setcontext(int xc_handle,
  * @return 0 on success, -1 on failure
  */
 int xc_vcpu_getcontext(int xc_handle,
-                               uint32_t domid,
-                               uint32_t vcpu,
-                               vcpu_guest_context_t *ctxt);
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt);
 
 typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
 int xc_vcpu_getinfo(int xc_handle,

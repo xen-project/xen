@@ -89,16 +89,6 @@ int xc_domain_shutdown(int xc_handle,
 }
 
 
-int xc_domain_resume(int xc_handle,
-                      uint32_t domid)
-{
-    DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_resumedomain;
-    domctl.domain = (domid_t)domid;
-    return do_domctl(xc_handle, &domctl);
-}
-
-
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
@@ -293,9 +283,9 @@ int xc_domain_hvm_setcontext(int xc_handle,
 }
 
 int xc_vcpu_getcontext(int xc_handle,
-                               uint32_t domid,
-                               uint32_t vcpu,
-                               vcpu_guest_context_t *ctxt)
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt)
 {
     int rc;
     DECLARE_DOMCTL;
@@ -611,7 +601,6 @@ int xc_vcpu_setcontext(int xc_handle,
         unlock_pages(ctxt, sizeof(*ctxt));
 
     return rc;
-
 }
 
 int xc_domain_irq_permission(int xc_handle,
