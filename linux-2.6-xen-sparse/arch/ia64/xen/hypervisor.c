@@ -25,7 +25,10 @@
 #include <linux/bootmem.h>
 #include <linux/module.h>
 #include <linux/vmalloc.h>
+#include <linux/efi.h>
 #include <asm/page.h>
+#include <asm/pgalloc.h>
+#include <asm/meminit.h>
 #include <asm/hypervisor.h>
 #include <asm/hypercall.h>
 #include <xen/interface/memory.h>
@@ -46,6 +49,8 @@ static int p2m_expose_init(void);
 #define p2m_expose_init() (-ENOSYS)
 #endif
 
+EXPORT_SYMBOL(__hypercall);
+
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
 //XXX discontigmem/sparsemem
@@ -56,13 +61,90 @@ static int p2m_expose_init(void);
  */
 unsigned long *contiguous_bitmap;
 
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+/* Following logic is stolen from create_mem_map_table() for virtual memmap */
+static int
+create_contiguous_bitmap(u64 start, u64 end, void *arg)
+{
+	unsigned long address, start_page, end_page;
+	unsigned long bitmap_start, bitmap_end;
+	unsigned char *bitmap;
+	int node;
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	bitmap_start = (unsigned long)contiguous_bitmap +
+	               ((__pa(start) >> PAGE_SHIFT) >> 3);
+	bitmap_end = (unsigned long)contiguous_bitmap +
+	             (((__pa(end) >> PAGE_SHIFT) + 2 * BITS_PER_LONG) >> 3);
+
+	start_page = bitmap_start & PAGE_MASK;
+	end_page = PAGE_ALIGN(bitmap_end);
+	node = paddr_to_nid(__pa(start));
+
+	bitmap = alloc_bootmem_pages_node(NODE_DATA(node),
+	                                  end_page - start_page);
+	BUG_ON(!bitmap);
+	memset(bitmap, 0, end_page - start_page);
+
+	for (address = start_page; address < end_page; address += PAGE_SIZE) {
+		pgd = pgd_offset_k(address);
+		if (pgd_none(*pgd))
+			pgd_populate(&init_mm, pgd,
+			             alloc_bootmem_pages_node(NODE_DATA(node),
+			                                      PAGE_SIZE));
+		pud = pud_offset(pgd, address);
+
+		if (pud_none(*pud))
+			pud_populate(&init_mm, pud,
+			             alloc_bootmem_pages_node(NODE_DATA(node),
+			                                      PAGE_SIZE));
+		pmd = pmd_offset(pud, address);
+
+		if (pmd_none(*pmd))
+			pmd_populate_kernel(&init_mm, pmd,
+			                    alloc_bootmem_pages_node
+			                    (NODE_DATA(node), PAGE_SIZE));
+		pte = pte_offset_kernel(pmd, address);
+
+		if (pte_none(*pte))
+			set_pte(pte,
+			        pfn_pte(__pa(bitmap + (address - start_page))
+			                >> PAGE_SHIFT, PAGE_KERNEL));
+	}
+	return 0;
+}
+#endif
+
+static void
+__contiguous_bitmap_init(unsigned long size)
+{
+	contiguous_bitmap = alloc_bootmem_pages(size);
+	BUG_ON(!contiguous_bitmap);
+	memset(contiguous_bitmap, 0, size);
+}
+
 void
 contiguous_bitmap_init(unsigned long end_pfn)
 {
 	unsigned long size = (end_pfn + 2 * BITS_PER_LONG) >> 3;
-	contiguous_bitmap = alloc_bootmem_low_pages(size);
-	BUG_ON(!contiguous_bitmap);
-	memset(contiguous_bitmap, 0, size);
+#ifndef CONFIG_VIRTUAL_MEM_MAP
+	__contiguous_bitmap_init(size);
+#else
+	unsigned long max_gap = 0;
+
+	efi_memmap_walk(find_largest_hole, (u64*)&max_gap);
+	if (max_gap < LARGE_GAP) {
+		__contiguous_bitmap_init(size);
+	} else {
+		unsigned long map_size = PAGE_ALIGN(size);
+		vmalloc_end -= map_size;
+		contiguous_bitmap = (unsigned long*)vmalloc_end;
+		efi_memmap_walk(create_contiguous_bitmap, NULL);
+	}
+#endif
 }
 
 #if 0

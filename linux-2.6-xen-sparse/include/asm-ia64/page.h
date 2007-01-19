@@ -119,6 +119,7 @@ extern struct page *vmem_map;
 #endif
 
 #ifdef CONFIG_FLATMEM
+extern unsigned long max_mapnr;
 # define pfn_valid(pfn)		(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
 #elif defined(CONFIG_DISCONTIGMEM)
 extern unsigned long min_low_pfn;

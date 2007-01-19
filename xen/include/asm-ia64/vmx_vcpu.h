@@ -115,8 +115,6 @@ extern void memwrite_v(VCPU * vcpu, thash_data_t * vtlb, u64 * src, u64 * dest,
                        size_t s);
 extern void memwrite_p(VCPU * vcpu, u64 * src, u64 * dest, size_t s);
 extern void vcpu_load_kernel_regs(VCPU * vcpu);
-extern IA64FAULT vmx_vcpu_increment_iip(VCPU * vcpu);
-extern IA64FAULT vmx_vcpu_decrement_iip(VCPU * vcpu);
 extern void vmx_switch_rr7(unsigned long, shared_info_t *, void *, void *,
                            void *);
 

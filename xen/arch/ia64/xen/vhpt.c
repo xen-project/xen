@@ -21,9 +21,6 @@
 #include <asm/vcpumask.h>
 #include <asm/vmmu.h>
 
-/* Defined in tlb.c  */
-extern void ia64_global_tlb_purge(u64 start, u64 end, u64 nbits);
-
 extern long running_on_sim;
 
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
@@ -261,12 +258,13 @@ static void __vcpu_flush_vtlb_all(void *vcpu)
 	vcpu_flush_vtlb_all((struct vcpu*)vcpu);
 }
 
-void domain_flush_vtlb_all (void)
+// caller must incremented reference count to d somehow.
+void domain_flush_vtlb_all(struct domain* d)
 {
 	int cpu = smp_processor_id ();
 	struct vcpu *v;
 
-	for_each_vcpu (current->domain, v) {
+	for_each_vcpu(d, v) {
 		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
 			continue;
 
@@ -364,7 +362,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 	// ptc.ga has release semantics.
 
 	/* ptc.ga  */
-	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
+	platform_global_tlb_purge(vadr, vadr + addr_range, PAGE_SHIFT);
 	perfc_incrc(domain_flush_vtlb_range);
 }
 
@@ -442,7 +440,8 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 		perfc_incrc(domain_flush_vtlb_local);
 	} else {
 		/* ptc.ga has release semantics. */
-		ia64_global_tlb_purge(vaddr, vaddr + PAGE_SIZE, PAGE_SHIFT);
+		platform_global_tlb_purge(vaddr, vaddr + PAGE_SIZE,
+		                          PAGE_SHIFT);
 		perfc_incrc(domain_flush_vtlb_global);
 	}
 

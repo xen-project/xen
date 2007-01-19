@@ -256,6 +256,7 @@ class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
 
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
+    allow_address_reuse = True
 
     def __init__(self, addr, allowed, xenapi, logRequests = 1):
         mkdir.parents(os.path.dirname(addr), stat.S_IRWXU, True)

@@ -8,8 +8,9 @@
 // manufactured from component pieces
 
 // defined in linux/arch/ia64/defconfig
-//#define	CONFIG_IA64_GENERIC
-#define	CONFIG_IA64_HP_SIM
+#define	CONFIG_IA64_GENERIC
+#define CONFIG_HZ	32
+
 #define	CONFIG_IA64_L1_CACHE_SHIFT 7
 // needed by include/asm-ia64/page.h
 #define	CONFIG_IA64_PAGE_SIZE_16KB	// 4KB doesn't work?!?
@@ -50,6 +51,9 @@
 #endif
 
 #define CONFIG_VGA 1
+
+
+#define NR_hypercalls 64
 
 #ifndef __ASSEMBLY__
 
@@ -106,9 +110,6 @@ extern char _end[]; /* standard ELF symbol */
 // xen/include/asm/config.h
 //#define HZ 1000
 // FIXME SMP: leave SMP for a later time
-
-#define NR_hypercalls 64
-
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h
 // Natural boundary upon TR size to define xenheap space
@@ -144,14 +145,6 @@ extern int smp_num_siblings;
 
 // avoid redefining task_struct in asm/current.h
 #define task_struct vcpu
-
-// linux/include/asm-ia64/machvec.h (linux/arch/ia64/lib/io.c)
-#define platform_inb	__ia64_inb
-#define platform_inw	__ia64_inw
-#define platform_inl	__ia64_inl
-#define platform_outb	__ia64_outb
-#define platform_outw	__ia64_outw
-#define platform_outl	__ia64_outl
 
 #include <xen/cache.h>
 #ifndef CONFIG_SMP
@@ -206,6 +199,16 @@ void sort_main_extable(void);
 // Deprivated linux inf and put here for short time compatibility
 #define kmalloc(s, t) xmalloc_bytes((s))
 #define kfree(s) xfree((s))
+#define kzalloc(size, flags) 				\
+({							\
+	unsigned char *mem;				\
+	mem = (unsigned char *)xmalloc_bytes(size);	\
+	if (mem)					\
+		memset(mem, 0, size);			\
+	(void *)mem;					\
+})
+#define kcalloc(n, size, flags)		kzalloc(n * size, flags)
+#define alloc_bootmem_node(pg, size)	xmalloc_bytes(size)
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")

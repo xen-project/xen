@@ -76,7 +76,9 @@ static void *syscall_page;
 
 int __init sysenter_setup(void)
 {
-	syscall_page = (void *)get_zeroed_page(GFP_ATOMIC);
+	void *page = (void *)get_zeroed_page(GFP_ATOMIC);
+
+	syscall_page = page;
 
 #ifdef CONFIG_XEN
 	if (boot_cpu_has(X86_FEATURE_SEP)) {

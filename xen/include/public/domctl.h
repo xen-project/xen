@@ -386,6 +386,21 @@ struct xen_domctl_settimeoffset {
 };
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
+ 
+#define HVM_CTXT_SIZE        6144
+typedef struct hvm_domain_context {
+    uint32_t cur;
+    uint32_t size;
+    uint8_t data[HVM_CTXT_SIZE];
+} hvm_domain_context_t;
+DEFINE_XEN_GUEST_HANDLE(hvm_domain_context_t);
+
+#define XEN_DOMCTL_gethvmcontext   33
+#define XEN_DOMCTL_sethvmcontext   34
+typedef struct xen_domctl_hvmcontext {
+    XEN_GUEST_HANDLE(hvm_domain_context_t) ctxt;  /* IN/OUT */
+} xen_domctl_hvmcontext_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
 
 #define XEN_DOMCTL_real_mode_area     26
 struct xen_domctl_real_mode_area {
@@ -423,6 +438,7 @@ struct xen_domctl {
         struct xen_domctl_arch_setup        arch_setup;
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_real_mode_area    real_mode_area;
+        struct xen_domctl_hvmcontext        hvmcontext;
         uint8_t                             pad[128];
     } u;
 };

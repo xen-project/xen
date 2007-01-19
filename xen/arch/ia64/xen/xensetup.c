@@ -249,6 +249,7 @@ void start_kernel(void)
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long md_end, relo_start, relo_end, relo_size = 0;
     struct domain *idle_domain;
+    struct vcpu *dom0_vcpu0;
     efi_memory_desc_t *kern_md, *last_md, *md;
 #ifdef CONFIG_SMP
     int i;
@@ -503,8 +504,11 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0);
-    if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
+    if (dom0 == NULL)
         panic("Error creating domain 0\n");
+    dom0_vcpu0 = alloc_vcpu(dom0, 0, 0);
+    if (dom0_vcpu0 == NULL || vcpu_late_initialise(dom0_vcpu0) != 0)
+        panic("Cannot allocate dom0 vcpu 0\n");
 
     dom0->is_privileged = 1;
 

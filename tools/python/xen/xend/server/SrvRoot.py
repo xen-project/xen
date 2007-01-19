@@ -25,7 +25,7 @@ class SrvRoot(SrvDir):
     """Server sub-components. Each entry is (name, class), where
     'name' is the entry name and  'class' is the name of its class.
     """
-    #todo Get this list from the XendRoot config.
+    #todo Get this list from the XendOptions config.
     subdirs = [
         ('node',    'SrvNode'       ),
         ('domain',  'SrvDomainDir'  ),

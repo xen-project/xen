@@ -11,7 +11,6 @@
  *
  */
 #include <asm/config.h>
-#include <linux/kernel.h>
 
 /* Define HV space hierarchy.
    VMM memory space is protected by CPL for paravirtualized domains and

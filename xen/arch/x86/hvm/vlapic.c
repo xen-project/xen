@@ -659,7 +659,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         uint64_t period = APIC_BUS_CYCLE_NS * (uint32_t)val * vlapic->timer_divisor;
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
-        create_periodic_time(&vlapic->pt, period, vlapic->pt.irq,
+        create_periodic_time(current, &vlapic->pt, period, vlapic->pt.irq,
                              vlapic_lvtt_period(vlapic), NULL, vlapic);
 
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
@@ -795,6 +795,77 @@ static int vlapic_reset(struct vlapic *vlapic)
     return 1;
 }
 
+#ifdef HVM_DEBUG_SUSPEND
+static void lapic_info(struct vlapic *s)
+{
+    printk("*****lapic state:*****\n");
+    printk("lapic 0x%"PRIx64".\n", s->apic_base_msr);
+    printk("lapic 0x%x.\n", s->disabled);
+    printk("lapic 0x%x.\n", s->timer_divisor);
+    printk("lapic 0x%x.\n", s->timer_pending_count);
+}
+#else
+static void lapic_info(struct vlapic *s)
+{
+}
+#endif
+
+static void lapic_save(hvm_domain_context_t *h, void *opaque)
+{
+    struct vlapic *s = opaque;
+
+    lapic_info(s);
+
+    hvm_put_64u(h, s->apic_base_msr);
+    hvm_put_32u(h, s->disabled);
+    hvm_put_32u(h, s->timer_divisor);
+
+    /*XXX: need this?*/
+    hvm_put_32u(h, s->timer_pending_count);
+
+    hvm_put_buffer(h, (char*)s->regs, 0x3f0);
+
+}
+
+static int lapic_load(hvm_domain_context_t *h, void *opaque, int version_id)
+{
+    struct vlapic *s = opaque;
+    struct vcpu *v = vlapic_vcpu(s);
+    unsigned long tmict;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    s->apic_base_msr = hvm_get_64u(h);
+    s->disabled = hvm_get_32u(h);
+    s->timer_divisor = hvm_get_32u(h);
+
+    /*XXX: need this?*/
+    s->timer_pending_count = hvm_get_32u(h);
+
+    hvm_get_buffer(h, (char*)s->regs, 0x3f0);
+
+    /* rearm the actiemr if needed */
+    tmict = vlapic_get_reg(s, APIC_TMICT);
+    if (tmict > 0) {
+        uint64_t period = APIC_BUS_CYCLE_NS * (uint32_t)tmict * s->timer_divisor;
+
+        create_periodic_time(v, &s->pt, period, s->pt.irq,
+                             vlapic_lvtt_period(s), NULL, s);
+
+        printk("lapic_load to rearm the actimer:"
+                    "bus cycle is %uns, "
+                    "saved tmict count %lu, period %"PRIu64"ns\n",
+                    APIC_BUS_CYCLE_NS, tmict, period);
+
+    }
+
+
+    lapic_info(s);
+
+    return 0;
+}
+
 int vlapic_init(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -813,6 +884,7 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
     memset(vlapic->regs, 0, PAGE_SIZE);
 
+    hvm_register_savevm(v->domain, "xen_hvm_lapic", v->vcpu_id, 1, lapic_save, lapic_load, vlapic);
     vlapic_reset(vlapic);
 
     vlapic->apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;

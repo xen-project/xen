@@ -235,6 +235,50 @@ int xc_domain_getinfolist(int xc_handle,
     return ret;
 }
 
+/* get info from hvm guest for save */
+int xc_domain_hvm_getcontext(int xc_handle,
+                             uint32_t domid,
+                             hvm_domain_context_t *hvm_ctxt)
+{
+    int rc;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_gethvmcontext;
+    domctl.domain = (domid_t)domid;
+    set_xen_guest_handle(domctl.u.hvmcontext.ctxt, hvm_ctxt);
+
+    if ( (rc = mlock(hvm_ctxt, sizeof(*hvm_ctxt))) != 0 )
+        return rc;
+
+    rc = do_domctl(xc_handle, &domctl);
+
+    safe_munlock(hvm_ctxt, sizeof(*hvm_ctxt));
+
+    return rc;
+}
+
+/* set info to hvm guest for restore */
+int xc_domain_hvm_setcontext(int xc_handle,
+                             uint32_t domid,
+                             hvm_domain_context_t *hvm_ctxt)
+{
+    int rc;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_sethvmcontext;
+    domctl.domain = domid;
+    set_xen_guest_handle(domctl.u.hvmcontext.ctxt, hvm_ctxt);
+
+    if ( (rc = mlock(hvm_ctxt, sizeof(*hvm_ctxt))) != 0 )
+        return rc;
+
+    rc = do_domctl(xc_handle, &domctl);
+
+    safe_munlock(hvm_ctxt, sizeof(*hvm_ctxt));
+
+    return rc;
+}
+
 int xc_vcpu_getcontext(int xc_handle,
                                uint32_t domid,
                                uint32_t vcpu,

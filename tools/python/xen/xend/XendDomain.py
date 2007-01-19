@@ -32,7 +32,7 @@ import threading
 import xen.lowlevel.xc
 
 
-from xen.xend import XendRoot, XendCheckpoint, XendDomainInfo
+from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
@@ -51,7 +51,7 @@ from xen.util import mkdir, security
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
-xroot = XendRoot.instance() 
+xoptions = XendOptions.instance() 
 
 __all__ = [ "XendDomain" ]
 
@@ -214,7 +214,7 @@ class XendDomain:
         @rtype: String
         @return: Path.
         """
-        dom_path = xroot.get_xend_domains_path()
+        dom_path = xoptions.get_xend_domains_path()
         if domuuid:
             dom_path = os.path.join(dom_path, domuuid)
         return dom_path
@@ -361,7 +361,7 @@ class XendDomain:
 
     def _setDom0CPUCount(self):
         """Sets the number of VCPUs dom0 has. Retreived from the
-        Xend configuration, L{XendRoot}.
+        Xend configuration, L{XendOptions}.
 
         @requires: Expects to be protected by domains_lock.
         @rtype: None
@@ -369,7 +369,7 @@ class XendDomain:
         dom0 = self.privilegedDomain()
 
         # get max number of vcpus to use for dom0 from config
-        target = int(xroot.get_dom0_vcpus())
+        target = int(xoptions.get_dom0_vcpus())
         log.debug("number of vcpus to use is %d", target)
    
         # target == 0 means use all processors
@@ -1164,7 +1164,7 @@ class XendDomain:
             dominfo.checkLiveMigrateMemory()
 
         if port == 0:
-            port = xroot.get_xend_relocation_port()
+            port = xoptions.get_xend_relocation_port()
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((dst, port))

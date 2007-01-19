@@ -103,16 +103,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     ret = -EINVAL;
                     break;
                 }
-                if (!d->arch.is_vti) {
-                    struct vcpu *v;
-                    for_each_vcpu(d, v) {
-                        BUG_ON(v->arch.privregs == NULL);
-                        free_domheap_pages(virt_to_page(v->arch.privregs),
-                                      get_order_from_shift(XMAPPEDREGS_SHIFT));
-                        v->arch.privregs = NULL;
-                        relinquish_vcpu_resources(v);
-                    }
-                }
                 d->arch.is_vti = 1;
                 vmx_setup_platform(d);
             }
@@ -226,6 +216,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #endif
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
+        pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);

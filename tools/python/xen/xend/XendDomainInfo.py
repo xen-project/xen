@@ -38,7 +38,7 @@ from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
-from xen.xend import XendRoot, XendNode, XendConfig
+from xen.xend import XendOptions, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
 from xen.xend.XendBootloader import bootloader
@@ -54,29 +54,10 @@ MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
 
 xc = xen.lowlevel.xc.xc()
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
-
-
-#
-# There are a number of CPU-related fields:
-#
-#   vcpus:       the number of virtual CPUs this domain is configured to use.
-#   vcpu_avail:  a bitmap telling the guest domain whether it may use each of
-#                its VCPUs.  This is translated to
-#                <dompath>/cpu/<id>/availability = {online,offline} for use
-#                by the guest domain.
-#   cpumap:      a list of bitmaps, one for each VCPU, giving the physical
-#                CPUs that that VCPU may use.
-#   cpu:         a configuration setting requesting that VCPU 0 is pinned to
-#                the specified physical CPU.
-#
-# vcpus and vcpu_avail settings persist with the VM (i.e. they are persistent
-# across save, restore, migrate, and restart).  The other settings are only
-# specific to the domain, so are lost when the VM moves.
-#
 
 
 def create(config):
@@ -451,6 +432,16 @@ class XendDomainInfo:
         self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
 
+        ## shutdown hypercall for hvm domain desides xenstore write
+        image_cfg = self.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+        if hvm:
+            for code in DOMAIN_SHUTDOWN_REASONS.keys():
+                if DOMAIN_SHUTDOWN_REASONS[code] == reason:
+                    break
+            xc.domain_shutdown(self.domid, code)
+
+
     def pause(self):
         """Pause domain
         
@@ -614,7 +605,7 @@ class XendDomainInfo:
                     ['name',       self.info['name_label']],
                     ['vcpu_count', self.info['vcpus_number']]]
 
-            for i in range(0, self.info['max_vcpu_id']+1):
+            for i in range(0, self.info['vcpus_number']):
                 info = xc.vcpu_getinfo(self.domid, i)
 
                 sxpr.append(['vcpu',
@@ -739,7 +730,7 @@ class XendDomainInfo:
             'domid':              str(self.domid),
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
-            'console/limit':      str(xroot.get_console_limit() * 1024),
+            'console/limit':      str(xoptions.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_static_min'] * 1024)
             }
 
@@ -898,8 +889,9 @@ class XendDomainInfo:
                 self._writeDom(self._vcpuDomDetails())
         else:
             self.info['vcpus_number'] = vcpus
-            self.info['online_vcpus'] = vcpus
             xen.xend.XendDomain.instance().managed_config_save(self)
+        log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
+                 vcpus)
 
     def getLabel(self):
         return security.get_security_info(self.info, 'label')
@@ -976,7 +968,7 @@ class XendDomainInfo:
                          self.info['name_label'], self.domid)
                 self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
-                if xroot.get_enable_dump():
+                if xoptions.get_enable_dump():
                     try:
                         self.dumpCore()
                     except XendError:
@@ -1228,8 +1220,11 @@ class XendDomainInfo:
         if self.image:
             self.image.createDeviceModel()
 
-    def _releaseDevices(self):
+    def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""
+        if suspend and self.image:
+            self.image.destroy(suspend)
+            return
 
         while True:
             t = xstransact("%s/device" % self.dompath)
@@ -1381,7 +1376,7 @@ class XendDomainInfo:
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
             if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
-                for v in range(0, self.info['max_vcpu_id']+1):
+                for v in range(0, self.info['vcpus_number']):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
             # Use architecture- and image-specific calculations to determine
@@ -1395,6 +1390,7 @@ class XendDomainInfo:
                 self.info['shadow_memory'] * 1024,
                 self.info['memory_static_max'] * 1024)
 
+            log.debug("_initDomain:shadow_memory=0x%x, memory_static_max=0x%x, memory_static_min=0x%x.", self.info['shadow_memory'], self.info['memory_static_max'], self.info['memory_static_min'],)
             # Round shadow up to a multiple of a MiB, as shadow_mem_control
             # takes MiB and we must not round down and end up under-providing.
             shadow = ((shadow + 1023) / 1024) * 1024
@@ -1494,6 +1490,16 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
+        image_cfg = self.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+        if hvm:
+            self.image = image.create(self,
+                    self.info,
+                    self.info['image'],
+                    self.info['devices'])
+            if self.image:
+                self.image.createDeviceModel(True)
+                self.image.register_shutdown_watch()
         self._storeDomDetails()
         self._registerWatches()
         self.refreshShutdown()
@@ -2028,8 +2034,8 @@ class XendDomainInfo:
         # TODO: spec says that key is int, however, python does not allow
         #       non-string keys to dictionaries.
         vcpu_util = {}
-        if 'max_vcpu_id' in self.info and self.domid != None:
-            for i in range(0, self.info['max_vcpu_id']+1):
+        if 'vcpus_number' in self.info and self.domid != None:
+            for i in range(0, self.info['vcpus_number']):
                 info = xc.vcpu_getinfo(self.domid, i)
                 vcpu_util[str(i)] = info['cpu_time']/1000000000.0
                 

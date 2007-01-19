@@ -256,28 +256,6 @@ GLOBAL_ENTRY(__get_domain_bundle)
 	;;
 END(__get_domain_bundle)
 
-GLOBAL_ENTRY(dorfirfi)
-	// Read current vcpu shared info
-	movl r16=THIS_CPU(current_psr_ic_addr)
-	;;
-	ld8 r19 = [r16]
-	;;
-	add r16 = XSI_IIP_OFS - XSI_PSR_IC_OFS, r19
-	add r17 = XSI_IPSR_OFS - XSI_PSR_IC_OFS, r19
-	add r18 = XSI_IFS_OFS - XSI_PSR_IC_OFS, r19
-	;;
-	ld8 r16 = [r16]
-	ld8 r17 = [r17]
-	ld8 r18 = [r18]
-	;;
-	mov cr.iip=r16
-	mov cr.ipsr=r17
-	mov cr.ifs=r18
-	;;
-	rfi
-	;;
-END(dorfirfi)
-
 /* derived from linux/arch/ia64/hp/sim/boot/boot_head.S */
 GLOBAL_ENTRY(pal_emulator_static)
 	mov r8=-1

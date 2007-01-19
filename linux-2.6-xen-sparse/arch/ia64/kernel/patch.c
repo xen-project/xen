@@ -236,13 +236,9 @@ patch_brl_symaddr(unsigned long start, unsigned long end,
 static void
 patch_brl_in_vdso(void)
 {
-	EXTERN_PATCHLIST(xen_rsm_be_i);
-	EXTERN_PATCHLIST(xen_get_psr);
 	EXTERN_PATCHLIST(xen_ssm_i_0);
 	EXTERN_PATCHLIST(xen_ssm_i_1);
 
-	PATCH_BRL_SYMADDR(xen_rsm_be_i);
-	PATCH_BRL_SYMADDR(xen_get_psr);
 	PATCH_BRL_SYMADDR(xen_ssm_i_0);
 	PATCH_BRL_SYMADDR(xen_ssm_i_1);
 }

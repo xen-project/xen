@@ -45,12 +45,10 @@
 #define	XEN_HYPER_GET_PMD		break HYPERPRIVOP_GET_PMD
 #define	XEN_HYPER_GET_EFLAG		break HYPERPRIVOP_GET_EFLAG
 #define	XEN_HYPER_SET_EFLAG		break HYPERPRIVOP_SET_EFLAG
-#define	XEN_HYPER_RSM_BE		break HYPERPRIVOP_RSM_BE
 #define	XEN_HYPER_GET_PSR		break HYPERPRIVOP_GET_PSR
 
 #define XSI_IFS			(XSI_BASE + XSI_IFS_OFS)
 #define XSI_PRECOVER_IFS	(XSI_BASE + XSI_PRECOVER_IFS_OFS)
-#define XSI_INCOMPL_REGFR	(XSI_BASE + XSI_INCOMPL_REGFR_OFS)
 #define XSI_IFA			(XSI_BASE + XSI_IFA_OFS)
 #define XSI_ISR			(XSI_BASE + XSI_ISR_OFS)
 #define XSI_IIM			(XSI_BASE + XSI_IIM_OFS)
@@ -123,8 +121,6 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * that we inline it */
 #define xen_hyper_ssm_i()						\
 ({									\
-	xen_set_virtual_psr_i(0);					\
-	xen_set_virtual_psr_ic(0);					\
 	XEN_HYPER_SSM_I;						\
 })
 
@@ -139,8 +135,12 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 #define xen_ssm_i()							\
 ({									\
 	int old = xen_get_virtual_psr_i();				\
-	xen_set_virtual_psr_i(1);					\
-	if (!old && xen_get_virtual_pend()) xen_hyper_ssm_i();		\
+	if (!old) {							\
+		if (xen_get_virtual_pend())				\
+			xen_hyper_ssm_i();				\
+		else							\
+			xen_set_virtual_psr_i(1);			\
+	}								\
 })
 
 #define xen_ia64_intrin_local_irq_restore(x)				\
@@ -182,6 +182,7 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * be properly handled by Xen, some are frequent enough that we use
  * hyperprivops for performance. */
 
+extern unsigned long xen_get_psr(void);
 extern unsigned long xen_get_ivr(void);
 extern unsigned long xen_get_tpr(void);
 extern void xen_set_itm(unsigned long);
@@ -201,6 +202,11 @@ extern void xen_ptcga(unsigned long addr, unsigned long size);
 	__u64 ia64_intri_res;						\
 									\
 	switch(regnum) {						\
+	case _IA64_REG_PSR:						\
+		ia64_intri_res = (is_running_on_xen()) ?			\
+			xen_get_psr() :					\
+			__ia64_getreg(regnum);				\
+		break;							\
 	case _IA64_REG_CR_IVR:						\
 		ia64_intri_res = (is_running_on_xen()) ?			\
 			xen_get_ivr() :					\

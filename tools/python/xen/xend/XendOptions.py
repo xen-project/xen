@@ -20,7 +20,7 @@
 Creates the servers and handles configuration.
 
 Other classes get config variables by importing this module,
-using instance() to get a XendRoot instance, and then
+using instance() to get a XendOptions instance, and then
 the config functions (e.g. get_xend_port()) to get
 configured values.
 """
@@ -33,14 +33,11 @@ import sys
 from xen.xend import sxp, osdep, XendLogging
 from xen.xend.XendError import XendError
 
-class XendRoot:
-    """Root of the management classes."""
+if os.uname()[0] == 'SunOS':
+    from xen.lowlevel import scf
 
-    """Default path to the config file."""
-    config_default = "/etc/xen/xend-config.sxp"
-
-    """Environment variable used to override config_default."""
-    config_var     = "XEND_CONFIG"
+class XendOptions:
+    """Configuration options."""
 
     """Where network control scripts live."""
     network_script_dir = osdep.scripts_dir
@@ -75,10 +72,10 @@ class XendRoot:
     xend_relocation_address_default = ''
 
     """Default port xend serves HTTP at. """
-    xend_port_default         = '8000'
+    xend_port_default         = 8000
 
     """Default port xend serves relocation at. """
-    xend_relocation_port_default = '8002'
+    xend_relocation_port_default = 8002
 
     xend_relocation_hosts_allow_default = ''
 
@@ -92,9 +89,9 @@ class XendRoot:
     """Default path the unix-domain server listens at."""
     xend_unix_path_default = '/var/lib/xend/xend-socket'
 
-    dom0_min_mem_default = '0'
+    dom0_min_mem_default = 0
 
-    dom0_vcpus_default = '0'
+    dom0_vcpus_default = 0
 
     vncpasswd_default = None
 
@@ -107,16 +104,17 @@ class XendRoot:
     """Default xend management state storage."""
     xend_state_path_default = '/var/lib/xend/state'
 
-    components = {}
+    """Default type of backend network interfaces"""
+    netback_type = osdep.netback_type
+
+    """Default script to configure a backend network interface"""
+    vif_script = osdep.vif_script
 
     def __init__(self):
-        self.config_path = None
-        self.config = None
         self.configure()
 
-
     def _logError(self, fmt, *args):
-        """Logging function to log to stderr. We use this for XendRoot log
+        """Logging function to log to stderr. We use this for XendOptions log
         messages because they may be logged before the logger has been
         configured.  Other components can safely use the logger.
         """
@@ -125,81 +123,25 @@ class XendRoot:
 
     def configure(self):
         self.set_config()
-        XendLogging.init(self.get_config_value("logfile",
+        XendLogging.init(self.get_config_string("logfile",
                                                self.logfile_default),
-                         self.get_config_value("loglevel",
+                         self.get_config_string("loglevel",
                                                self.loglevel_default))
 
-
     def set_config(self):
-        """If the config file exists, read it. If not, ignore it.
-
-        The config file is a sequence of sxp forms.
-        """
-        self.config_path = os.getenv(self.config_var, self.config_default)
-        if os.path.exists(self.config_path):
-            try:
-                fin = file(self.config_path, 'rb')
-                try:
-                    config = sxp.parse(fin)
-                finally:
-                    fin.close()
-                if config is None:
-                    config = ['xend-config']
-                else:
-                    config.insert(0, 'xend-config')
-                self.config = config
-            except Exception, ex:
-                self._logError('Reading config file %s: %s',
-                               self.config_path, str(ex))
-                raise
-        else:
-            self._logError('Config file does not exist: %s',
-                           self.config_path)
-            self.config = ['xend-config']
-
-    def get_config(self, name=None):
-        """Get the configuration element with the given name, or
-        the whole configuration if no name is given.
-
-        @param name: element name (optional)
-        @return: config or none
-        """
-        if name is None:
-            val = self.config
-        else:
-            val = sxp.child(self.config, name)
-        return val
-
-    def get_config_value(self, name, val=None):
-        """Get the value of an atomic configuration element.
-
-        @param name: element name
-        @param val:  default value (optional, defaults to None)
-        @return: value
-        """
-        return sxp.child_value(self.config, name, val=val)
+        raise NotImplementedError()
 
     def get_config_bool(self, name, val=None):
-        v = string.lower(str(self.get_config_value(name, val)))
-        if v in ['yes', 'y', '1', 'on',  'true',  't']:
-            return True
-        if v in ['no',  'n', '0', 'off', 'false', 'f']:
-            return False
-        raise XendError("invalid xend config %s: expected bool: %s" % (name, v))
-
+        raise NotImplementedError()
+         
     def get_config_int(self, name, val=None):
-        v = self.get_config_value(name, val)
-        try:
-            return int(v)
-        except Exception:
-            raise XendError("invalid xend config %s: expected int: %s" % (name, v))
+        raise NotImplementedError()
+
+    def get_config_string(self, name, val=None):
+        raise NotImplementedError()
 
     def get_xen_api_server(self):
-        """Get the Xen-API server configuration.
-        """
-        return self.get_config_value('xen-api-server',
-                                     self.xen_api_server_default)
+        raise NotImplementedError()
 
     def get_xend_http_server(self):
         """Get the flag indicating whether xend should run an http server.
@@ -232,7 +174,7 @@ class XendRoot:
                                    self.xend_relocation_port_default)
 
     def get_xend_relocation_hosts_allow(self):
-        return self.get_config_value("xend-relocation-hosts-allow",
+        return self.get_config_string("xend-relocation-hosts-allow",
                                      self.xend_relocation_hosts_allow_default)
 
     def get_xend_address(self):
@@ -241,7 +183,7 @@ class XendRoot:
         If this is set to 'localhost' only the localhost will be able to connect
         to the HTTP port.
         """
-        return self.get_config_value('xend-address', self.xend_address_default)
+        return self.get_config_string('xend-address', self.xend_address_default)
 
     def get_xend_relocation_address(self):
         """Get the address xend listens at for its relocation server port.
@@ -249,7 +191,7 @@ class XendRoot:
         If this is set to 'localhost' only the localhost will be able to connect
         to the relocation port.
         """
-        return self.get_config_value('xend-relocation-address', self.xend_relocation_address_default)
+        return self.get_config_string('xend-relocation-address', self.xend_relocation_address_default)
 
     def get_xend_unix_server(self):
         """Get the flag indicating whether xend should run a unix-domain server.
@@ -259,23 +201,23 @@ class XendRoot:
     def get_xend_unix_path(self):
         """Get the path the xend unix-domain server listens at.
         """
-        return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
+        return self.get_config_string("xend-unix-path", self.xend_unix_path_default)
 
     def get_xend_domains_path(self):
         """ Get the path for persistent domain configuration storage
         """
-        return self.get_config_value("xend-domains-path", self.xend_domains_path_default)
+        return self.get_config_string("xend-domains-path", self.xend_domains_path_default)
 
     def get_xend_state_path(self):
         """ Get the path for persistent domain configuration storage
         """
-        return self.get_config_value("xend-state-path", self.xend_state_path_default)    
+        return self.get_config_string("xend-state-path", self.xend_state_path_default)    
 
     def get_network_script(self):
         """@return the script used to alter the network configuration when
         Xend starts and stops, or None if no such script is specified."""
         
-        s = self.get_config_value('network-script')
+        s = self.get_config_string('network-script')
 
         if s:
             result = s.split(" ")
@@ -286,13 +228,13 @@ class XendRoot:
 
     def get_external_migration_tool(self):
         """@return the name of the tool to handle virtual TPM migration."""
-        return self.get_config_value('external-migration-tool', self.external_migration_tool_default)
+        return self.get_config_string('external-migration-tool', self.external_migration_tool_default)
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')
 
     def get_vif_script(self):
-        return self.get_config_value('vif-script', 'vif-bridge')
+        return self.get_config_string('vif-script', self.vif_script)
 
     def get_dom0_min_mem(self):
         return self.get_config_int('dom0-min-mem', self.dom0_min_mem_default)
@@ -304,19 +246,128 @@ class XendRoot:
         return self.get_config_int('console-limit', 1024)
 
     def get_vnclisten_address(self):
-        return self.get_config_value('vnc-listen', self.xend_vnc_listen_default)
+        return self.get_config_string('vnc-listen', self.xend_vnc_listen_default)
 
     def get_vncpasswd_default(self):
-        return self.get_config_value('vncpasswd',
+        return self.get_config_string('vncpasswd',
                                      self.vncpasswd_default)
 
+class XendOptionsFile(XendOptions):
+
+    """Default path to the config file."""
+    config_default = "/etc/xen/xend-config.sxp"
+
+    """Environment variable used to override config_default."""
+    config_var     = "XEND_CONFIG"
+
+    def set_config(self):
+        """If the config file exists, read it. If not, ignore it.
+
+        The config file is a sequence of sxp forms.
+        """
+        self.config_path = os.getenv(self.config_var, self.config_default)
+        if os.path.exists(self.config_path):
+            try:
+                fin = file(self.config_path, 'rb')
+                try:
+                    config = sxp.parse(fin)
+                finally:
+                    fin.close()
+                if config is None:
+                    config = ['xend-config']
+                else:
+                    config.insert(0, 'xend-config')
+                self.config = config
+            except Exception, ex:
+                self._logError('Reading config file %s: %s',
+                               self.config_path, str(ex))
+                raise
+        else:
+            self._logError('Config file does not exist: %s',
+                           self.config_path)
+            self.config = ['xend-config']
+
+    def get_config_value(self, name, val=None):
+        """Get the value of an atomic configuration element.
+
+        @param name: element name
+        @param val:  default value (optional, defaults to None)
+        @return: value
+        """
+        return sxp.child_value(self.config, name, val=val)
+
+    def get_config_bool(self, name, val=None):
+        v = string.lower(str(self.get_config_value(name, val)))
+        if v in ['yes', 'y', '1', 'on',  'true',  't']:
+            return True
+        if v in ['no',  'n', '0', 'off', 'false', 'f']:
+            return False
+        raise XendError("invalid xend config %s: expected bool: %s" % (name, v))
+
+    def get_config_int(self, name, val=None):
+        v = self.get_config_value(name, val)
+        try:
+            return int(v)
+        except Exception:
+            raise XendError("invalid xend config %s: expected int: %s" % (name, v))
+
+    def get_config_string(self, name, val=None):
+        return self.get_config_value(name, val)
+
+    def get_xen_api_server(self):
+        """Get the Xen-API server configuration.
+        """
+        return self.get_config_value('xen-api-server',
+                                     self.xen_api_server_default)
+
+if os.uname()[0] == 'SunOS':
+    class XendOptionsSMF(XendOptions):
+
+        def set_config(self):
+            pass
+
+        def get_config_bool(self, name, val=None):
+            try:
+                return scf.get_bool(name)
+            except scf.error, e:
+                if e[0] == scf.SCF_ERROR_NOT_FOUND:
+                    return val
+                else:
+                    raise XendError("option %s: %s:%s" % (name, e[1], e[2]))
+
+        def get_config_int(self, name, val=None):
+            try:
+                return scf.get_int(name)
+            except scf.error, e:
+                if e[0] == scf.SCF_ERROR_NOT_FOUND:
+                    return val
+                else:
+                    raise XendError("option %s: %s:%s" % (name, e[1], e[2]))
+
+        def get_config_string(self, name, val=None):
+            try:
+                return scf.get_string(name)
+            except scf.error, e:
+                if e[0] == scf.SCF_ERROR_NOT_FOUND:
+                    return val
+                else:
+                    raise XendError("option %s: %s:%s" % (name, e[1], e[2]))
+
+        def get_xen_api_server(self):
+            # When the new server is a supported configuration, we should
+            # expand this.
+            return [["unix"]]
+
 def instance():
-    """Get an instance of XendRoot.
+    """Get an instance of XendOptions.
     Use this instead of the constructor.
     """
     global inst
     try:
         inst
     except:
-        inst = XendRoot()
+        if os.uname()[0] == 'SunOS':
+            inst = XendOptionsSMF()
+        else:
+            inst = XendOptionsFile()
     return inst

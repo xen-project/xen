@@ -1568,7 +1568,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 #endif
 
     if ( status == IA64_NO_FAULT && cause !=EVENT_RFI ) {
-        vmx_vcpu_increment_iip(vcpu);
+        vcpu_increment_iip(vcpu);
     }
 
     recover_if_physical_mode(vcpu);

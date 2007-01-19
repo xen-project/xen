@@ -37,10 +37,10 @@
 # define FAST_BREAK
 # undef FAST_ACCESS_REFLECT 	//XXX TODO fast_access_reflect
                             	//    doesn't support dom0 vp yet.
-//# define FAST_RFI
+# define FAST_RFI
 // TODO: Since we use callback to deliver interrupt, 
 //       FAST_SSM_I needs to be rewritten.
-//# define FAST_SSM_I
+# define FAST_SSM_I
 # define FAST_PTC_GA
 # undef RFI_TO_INTERRUPT // not working yet
 #endif
@@ -81,9 +81,6 @@
 //	r19 == vpsr.ic
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
-#ifndef FAST_HYPERPRIVOPS // see beginning of file
-	br.sptk.many dispatch_break_fault ;;
-#endif
 	// HYPERPRIVOP_SSM_I?
 	// assumes domain interrupts pending, so just do it
 	cmp.eq p7,p6=HYPERPRIVOP_SSM_I,r17
@@ -102,7 +99,9 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=HYPERPRIVOP_RFI,r17
 (p7)	br.sptk.many hyper_rfi
 	;;
-
+#ifndef FAST_HYPERPRIVOPS // see beginning of file
+	br.sptk.many dispatch_break_fault ;;
+#endif
 	// if event enabled and there are pending events
 	cmp.ne p7,p0=r20,r0
 	;;
@@ -138,6 +137,11 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	// HYPERPRIVOP_GET_RR?
 	cmp.eq p7,p6=HYPERPRIVOP_GET_RR,r17
 (p7)	br.sptk.many hyper_get_rr
+	;;
+
+	// HYPERPRIVOP_GET_PSR?
+	cmp.eq p7,p6=HYPERPRIVOP_GET_PSR,r17
+(p7)	br.sptk.many hyper_get_psr
 	;;
 
 	// HYPERPRIVOP_PTC_GA?
@@ -192,7 +196,6 @@ END(fast_hyperprivop)
 //	and isr.ri to cr.isr.ri (all other bits zero)
 //  - cover and set shared_mem precover_ifs to cr.ifs
 //		^^^ MISSED THIS FOR fast_break??
-//  - set shared_mem ifs and incomplete_regframe to 0
 //  - set shared_mem interrupt_delivery_enabled to 0
 //  - set shared_mem interrupt_collection_enabled to 0
 //  - set r31 to SHAREDINFO_ADDR
@@ -272,32 +275,26 @@ ENTRY(hyper_ssm_i)
 	st1 [r22]=r20
 	st4 [r18]=r0
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r20 ;;
 	// leave cr.ifs alone for later rfi
-	// set iip to go to domain IVA break instruction vector
+	// set iip to go to event callback handler
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r22=[r22];;
-	adds r22=IA64_VCPU_IVA_OFFSET,r22;;
-	ld8 r23=[r22];;
-	movl r24=0x3000;;
-	add r24=r24,r23;;
+	adds r22=IA64_VCPU_EVENT_CALLBACK_IP_OFFSET,r22;;
+	ld8 r24=[r22];;
 	mov cr.iip=r24;;
 	// OK, now all set to go except for switch to virtual bank0
 	mov r30=r2
 	mov r29=r3
-	mov r28=r4
 	;;
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
-	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	bsw.1;;
 	// FIXME?: ar.unat is not really handled correctly,
 	// but may not matter if the OS is NaT-clean
@@ -317,11 +314,9 @@ ENTRY(hyper_ssm_i)
 	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
-	mov r31=r4
 	bsw.0 ;;
 	mov r2=r30
 	mov r3=r29
-	mov r4=r28
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
@@ -461,11 +456,9 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	st1 [r22]=r20;;
 	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -480,14 +473,12 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	// OK, now all set to go except for switch to virtual bank0
 	mov r30=r2
 	mov r29=r3
-	mov r27=r4
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
 	;;
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18
-	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
@@ -519,13 +510,11 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	ld8 r22=[r2],16;
 	ld8 r23=[r3],16;;
 #endif
-	mov r31=r4
 	;;
 	bsw.0 ;;
 	mov r24=ar.unat;
 	mov r2=r30
 	mov r3=r29
-	mov r4=r27
 #ifdef HANDLE_AR_UNAT
 	mov ar.unat=r28;
 #endif
@@ -647,11 +636,9 @@ ENTRY(fast_reflect)
 	st1 [r24]=r22
 	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 	cover ;;
 	mov r24=cr.ifs;;
-	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -670,10 +657,8 @@ ENTRY(fast_reflect)
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
-	mov r27=r4
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18
-	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
@@ -705,7 +690,6 @@ ENTRY(fast_reflect)
 	ld8 r22=[r2],16;
 	ld8 r23=[r3],16;;
 #endif
-	mov r31=r4
 	;;
 	bsw.0 ;;
 	mov r24=ar.unat;
@@ -714,7 +698,6 @@ ENTRY(fast_reflect)
 #ifdef HANDLE_AR_UNAT
 	mov ar.unat=r28;
 #endif
-	mov r4=r27
 	;;
 	adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1014,10 +997,22 @@ page_not_present:
 #endif
 END(fast_tlb_miss_reflect)
 
+ENTRY(slow_vcpu_rfi)
+	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18;;
+	ld8 r22=[r22];;
+	tbit.z p6,p0=r22,63
+(p6)	br.spnt.few dispatch_break_fault ;;
+	// if vips is valid, discard current register frame
+	// don't need dorfirfi any more
+	alloc r22=ar.pfs,0,0,0,0
+	br.spnt.few dispatch_break_fault
+	;;
+END(slow_vcpu_rfi)    
+
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
 #ifndef FAST_RFI
-	br.spnt.few dispatch_break_fault ;;
+	br.spnt.few slow_vcpu_rfi ;;
 #endif
 	// if no interrupts pending, proceed
 	mov r30=r0
@@ -1027,33 +1022,37 @@ ENTRY(hyper_rfi)
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r20];;		// r21 = vcr.ipsr
 	extr.u r22=r21,IA64_PSR_I_BIT,1 ;;
-	mov r30=r22	
+	mov r30=r22;;
 	// r30 determines whether we might deliver an immediate extint
+#ifndef RFI_TO_INTERRUPT // see beginning of file
+	cmp.ne p6,p0=r30,r0
+(p6)	br.cond.spnt.few slow_vcpu_rfi ;;
+#endif
 1:
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r20];;		// r21 = vcr.ipsr
 	extr.u r22=r21,IA64_PSR_BE_BIT,1 ;;
 	// if turning on psr.be, give up for now and do it the slow way
 	cmp.ne p7,p0=r22,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if (!(vpsr.dt && vpsr.rt && vpsr.it)), do it the slow way
 	movl r20=(IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT);;
 	and r22=r20,r21
 	;;
 	cmp.ne p7,p0=r22,r20
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if was in metaphys mode, do it the slow way (FIXME later?)
 	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.ne p7,p0=r20,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 	// if domain hasn't already done virtual bank switch
 	//  do it the slow way (FIXME later?)
 #if 0
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.eq p7,p0=r20,r0
-(p7)	br.spnt.few dispatch_break_fault ;;
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 #endif
 	// validate vcr.iip, if in Xen range, do it the slow way
 	adds r20=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1062,11 +1061,7 @@ ENTRY(hyper_rfi)
 	movl r24=HYPERVISOR_VIRT_END;;
 	cmp.ltu p0,p7=r22,r23 ;;	// if !(iip<low) &&
 (p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
-(p7)	br.spnt.few dispatch_break_fault ;;
-#ifndef RFI_TO_INTERRUPT // see beginning of file
-	cmp.ne p6,p0=r30,r0
-(p6)	br.cond.spnt.few dispatch_break_fault ;;
-#endif
+(p7)	br.spnt.few slow_vcpu_rfi ;;
 
 1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -1084,8 +1079,6 @@ ENTRY(hyper_rfi)
 just_do_rfi:
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	mov cr.iip=r22;;
-	adds r20=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r20]=r0 ;;
 	adds r20=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	dep r20=0,r20,38,25;; // ensure ifs has no reserved bits set
@@ -1261,20 +1254,16 @@ ENTRY(rfi_with_interrupt)
 	st1 [r22]=r20
 	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
-	// set shared_mem ifs and incomplete_regframe to 0
+	// set shared_mem ifs to 0
 #if 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r22=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r22]=r0 ;;
 	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r22]=r0 ;;
 	adds r22=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r22]=r20 ;;
 	// leave cr.ifs alone for later rfi
 #else
-	adds r22=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r22]=r0 ;;
 	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r22];;
 	st8 [r22]=r0 ;;
@@ -1310,13 +1299,8 @@ ENTRY(rfi_with_interrupt)
 	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
-	movl r31=XSI_IPSR;;
 	bsw.0 ;;
 	mov r2=r30; mov r3=r29;;
-#else
-	bsw.1;;
-	movl r31=XSI_IPSR;;
-	bsw.0 ;;
 #endif
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
@@ -1336,13 +1320,9 @@ ENTRY(hyper_cover)
 	mov r25=cr.iip;;
 	// skip test for vpsr.ic.. it's a prerequisite for hyperprivops
 	cover ;;
-	adds r20=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	mov r30=cr.ifs;;
-	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18
-	ld4 r21=[r20] ;;
-	cmp.eq p6,p7=r21,r0 ;;
-(p6)	st8 [r22]=r30;;
-(p7)	st4 [r20]=r0;;
+	mov r30=cr.ifs
+	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18;;
+	st8 [r22]=r30;;
 	mov cr.ifs=r0;;
 	// adjust return address to skip over break instruction
 	extr.u r26=r24,41,2 ;;
@@ -1479,6 +1459,53 @@ ENTRY(hyper_set_itm)
 	;;
 END(hyper_set_itm)
 
+ENTRY(hyper_get_psr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_PSR);;
+	ld4 r21=[r20];;
+	adds r21=1,r21;;
+	st4 [r20]=r21;;
+#endif
+	mov r24=cr.ipsr
+	movl r8=0x18ffffffff;;
+	// only return PSR{36:35,31:0}
+	and r8=r8,r24
+	// set vpsr.ic
+	ld4 r21=[r18];;
+	dep r8=r21,r8,IA64_PSR_IC_BIT,1
+	// set vpsr.pp
+	adds r20=XSI_VPSR_PP_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld1 r21=[r20];;
+	dep r8=r21,r8,IA64_PSR_PP_BIT,1
+	// set vpsr.dt
+	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld4 r21=[r20];;
+	cmp.ne p6,p0=r21,r0
+	;;
+(p6)	dep.z r8=r8,IA64_PSR_DT_BIT,1
+	// set vpsr.i
+	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20];;
+	ld1 r21=[r20];;
+	dep r8=r21,r8,IA64_PSR_I_BIT,1
+	;;
+	mov r25=cr.iip
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_psr)
+
+    
 ENTRY(hyper_get_rr)
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_GET_RR);;

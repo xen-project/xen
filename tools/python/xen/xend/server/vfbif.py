@@ -52,7 +52,7 @@ class VfbifController(DevController):
             if config.has_key("vncpasswd"):
                 passwd = config["vncpasswd"]
             else:
-                passwd = xen.xend.XendRoot.instance().get_vncpasswd_default()
+                passwd = xen.xend.XendOptions.instance().get_vncpasswd_default()
             if passwd:
                 self.vm.storeVm("vncpasswd", passwd)
                 log.debug("Stored a VNC password for vfb access")
@@ -66,7 +66,7 @@ class VfbifController(DevController):
             elif config.has_key("vncdisplay"):
                 args += ["--vncport", "%d" % (5900 + int(config["vncdisplay"]))]
             vnclisten = config.get("vnclisten",
-                                   xen.xend.XendRoot.instance().get_vnclisten_address())
+                                   xen.xend.XendOptions.instance().get_vnclisten_address())
             args += [ "--listen", vnclisten ]
             spawn_detached(args[0], args + std_args, os.environ)
         elif t == "sdl":

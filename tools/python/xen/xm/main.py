@@ -693,12 +693,15 @@ def parse_doms_info(info):
         up_time = time.time() - start_time
 
     return {
-        'domid'    : get_info('domid',        str,   ''),
-        'name'     : get_info('name',         str,   '??'),
+        'domid'    : get_info('domid',              str,   ''),
+        'name'     : get_info('name',               str,   '??'),
         'mem'      : get_info('memory_dynamic_min', int,   0),
-        'vcpus'    : get_info('online_vcpus',        int,   0),
-        'state'    : get_info('state',        str,    ''),
-        'cpu_time' : get_info('cpu_time',     float, 0),
+        'state'    : get_info('state',              str,   ''),
+        'cpu_time' : get_info('cpu_time',           float, 0.0),
+        # VCPUs is the number online when the VM is up, or the number
+        # configured otherwise.
+        'vcpus'    : get_info('online_vcpus', int,
+                              get_info('vcpus', int, 0)),
         'up_time'  : up_time,
         'seclabel' : security.get_security_printlabel(info),
         }

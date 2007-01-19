@@ -215,6 +215,39 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_sethvmcontext:
+    { 
+        struct hvm_domain_context *c;
+        struct domain             *d;
+        struct vcpu               *v;
+
+        ret = -ESRCH;
+        if ( (d = find_domain_by_id(op->domain)) == NULL )
+            break;
+
+        ret = -ENOMEM;
+        if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
+            goto sethvmcontext_out;
+
+        v = d->vcpu[0];
+        
+        ret = -EFAULT;
+
+#ifndef CONFIG_COMPAT
+        if ( copy_from_guest(c, op->u.hvmcontext.ctxt, 1) != 0 )
+            goto sethvmcontext_out;
+
+        ret = arch_sethvm_ctxt(v, c);
+#endif
+
+        xfree(c);
+
+    sethvmcontext_out:
+        put_domain(d);
+
+    }
+    break;
+
     case XEN_DOMCTL_pausedomain:
     {
         struct domain *d = find_domain_by_id(op->domain);
@@ -549,6 +582,46 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     getvcpucontext_out:
         put_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_gethvmcontext:
+    { 
+        struct hvm_domain_context *c;
+        struct domain             *d;
+        struct vcpu               *v;
+
+        ret = -ESRCH;
+        if ( (d = find_domain_by_id(op->domain)) == NULL )
+            break;
+
+        ret = -ENOMEM;
+        if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
+            goto gethvmcontext_out;
+
+        v = d->vcpu[0];
+
+        ret = -ENODATA;
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            goto gethvmcontext_out;
+        
+        ret = 0;
+        if (arch_gethvm_ctxt(v, c) == -1)
+            ret = -EFAULT;
+
+#ifndef CONFIG_COMPAT
+        if ( copy_to_guest(op->u.hvmcontext.ctxt, c, 1) )
+            ret = -EFAULT;
+
+        xfree(c);
+#endif
+
+        if ( copy_to_guest(u_domctl, op, 1) )
+            ret = -EFAULT;
+
+    gethvmcontext_out:
+        put_domain(d);
+
     }
     break;
 

@@ -6,9 +6,14 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#ifdef XEN
+#include <linux/ioport.h>
+#endif
 
 #include <asm/io.h>
+#ifndef XEN
 #include <asm/scatterlist.h>
+#endif
 
 /*
  * Can be used to override the logic in pci_scan_bus for skipping already-configured bus
@@ -55,7 +60,9 @@ pcibios_penalize_isa_irq (int irq, int active)
 #define HAVE_ARCH_PCI_MWI 1
 extern int pcibios_prep_mwi (struct pci_dev *);
 
+#ifndef XEN
 #include <asm-generic/pci-dma-compat.h>
+#endif
 
 /* pci_unmap_{single,page} is not a nop, thus... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
@@ -107,6 +114,7 @@ extern int pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 #define HAVE_PCI_LEGACY
 extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
 				      struct vm_area_struct *vma);
+#ifndef XEN
 extern ssize_t pci_read_legacy_io(struct kobject *kobj, char *buf, loff_t off,
 				  size_t count);
 extern ssize_t pci_write_legacy_io(struct kobject *kobj, char *buf, loff_t off,
@@ -114,6 +122,7 @@ extern ssize_t pci_write_legacy_io(struct kobject *kobj, char *buf, loff_t off,
 extern int pci_mmap_legacy_mem(struct kobject *kobj,
 			       struct bin_attribute *attr,
 			       struct vm_area_struct *vma);
+#endif
 
 #define pci_get_legacy_mem platform_pci_get_legacy_mem
 #define pci_legacy_read platform_pci_legacy_read
@@ -155,6 +164,21 @@ extern void pcibios_resource_to_bus(struct pci_dev *dev,
 
 extern void pcibios_bus_to_resource(struct pci_dev *dev,
 		struct resource *res, struct pci_bus_region *region);
+
+#ifndef XEN
+static inline struct resource *
+pcibios_select_root(struct pci_dev *pdev, struct resource *res)
+{
+	struct resource *root = NULL;
+
+	if (res->flags & IORESOURCE_IO)
+		root = &ioport_resource;
+	if (res->flags & IORESOURCE_MEM)
+		root = &iomem_resource;
+
+	return root;
+}
+#endif
 
 #define pcibios_scan_all_fns(a, b)	0
 

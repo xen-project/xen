@@ -49,14 +49,6 @@ SECTIONS
 				    *(.data.patch.running_on_xen)
 				    __end_gate_running_on_xen_patchlist = .;
 
-				    __start_gate_brl_xen_rsm_be_i_patchlist = .;
-				    *(.data.patch.brl_xen_rsm_be_i)
-				    __end_gate_brl_xen_rsm_be_i_patchlist = .;
-
-				    __start_gate_brl_xen_get_psr_patchlist = .;
-				    *(.data.patch.brl_xen_get_psr)
-				    __end_gate_brl_xen_get_psr_patchlist = .;
-
 				    __start_gate_brl_xen_ssm_i_0_patchlist = .;
 				    *(.data.patch.brl_xen_ssm_i_0)
 				    __end_gate_brl_xen_ssm_i_0_patchlist = .;

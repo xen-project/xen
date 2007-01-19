@@ -20,7 +20,7 @@
 
 """Support for virtual TPM interfaces."""
 
-from xen.xend import XendRoot
+from xen.xend import XendOptions
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
 from xen.xend.XendConstants import DEV_MIGRATE_TEST, VTPM_DELETE_SCRIPT
@@ -29,7 +29,7 @@ from xen.xend.server.DevController import DevController
 import os
 import re
 
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 def destroy_vtpmstate(name):
     if os.path.exists(VTPM_DELETE_SCRIPT):
@@ -88,7 +88,7 @@ class TPMifController(DevController):
     def migrate(self, deviceConfig, network, dst, step, domName):
         """@see DevContoller.migrate"""
         if network:
-            tool = xroot.get_external_migration_tool()
+            tool = xoptions.get_external_migration_tool()
             if tool != '':
                 log.info("Request to network-migrate device to %s. step=%d.",
                          dst, step)
@@ -116,7 +116,7 @@ class TPMifController(DevController):
     def recover_migrate(self, deviceConfig, network, dst, step, domName):
         """@see DevContoller.recover_migrate"""
         if network:
-            tool = xroot.get_external_migration_tool()
+            tool = xoptions.get_external_migration_tool()
             if tool != '':
                 log.info("Request to recover network-migrated device. last good step=%d.",
                          step)

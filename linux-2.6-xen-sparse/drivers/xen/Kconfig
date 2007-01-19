@@ -238,14 +238,6 @@ config XEN_COMPAT_030002
 
 endmenu
 
-config HAVE_ARCH_ALLOC_SKB
-	bool
-	default y
-
-config HAVE_ARCH_DEV_ALLOC_SKB
-	bool
-	default y
-
 config HAVE_IRQ_IGNORE_UNHANDLED
 	bool
 	default y

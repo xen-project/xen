@@ -76,10 +76,18 @@ EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
 #ifdef CONFIG_XEN
+static void
+xen_panic_hypercall(struct unw_frame_info *info, void *arg)
+{
+	current->thread.ksp = (__u64)info->sw - 16;
+	HYPERVISOR_shutdown(SHUTDOWN_crash);
+	/* we're never actually going to get here... */
+}
+
 static int
 xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	HYPERVISOR_shutdown(SHUTDOWN_crash);
+	unw_init_running(xen_panic_hypercall, NULL);
 	/* we're never actually going to get here... */
 	return NOTIFY_DONE;
 }

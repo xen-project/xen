@@ -454,6 +454,31 @@ tlb_track_search_and_remove(struct tlb_track* tlb_track,
             continue;
 
         if (pte_pfn(entry->pte_val) == mfn) {
+            /*
+             * PARANOIA
+             * We're here after zapping p2m entry.  However another pCPU
+             * may update the same p2m entry entry the same mfn at the
+             * same time in theory.  In such a case, we can't determine
+             * whether this entry is for us or for the racy p2m update.
+             * Such a guest domain's racy behaviour doesn't make sense,
+             * but is allowed.  Go the very pessimistic way.  Leave this
+             * entry to be found later and do full flush at this time.
+             *
+             * NOTE: Updating tlb tracking hash is protected by spin lock and
+             *       setting _PAGE_TLB_INSERTED and_PAGE_TLB_INSERTED_MANY bits
+             *       is serialized by the same spin lock.
+             *       See tlb_track_insert_or_dirty().
+             */
+            pte_t current_pte = *ptep;
+            if (unlikely(pte_pfn(current_pte) == mfn &&
+                         pte_tlb_tracking(current_pte) &&
+                         pte_tlb_inserted(current_pte))) {
+                BUG_ON(pte_tlb_inserted_many(current_pte));
+                spin_unlock(&tlb_track->hash_lock);
+                perfc_incrc(tlb_track_sar_many);
+                return TLB_TRACK_MANY;
+            }
+
             list_del(&entry->list);
             spin_unlock(&tlb_track->hash_lock);
             *entryp = entry;
