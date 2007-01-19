@@ -305,6 +305,20 @@ HYPERVISOR_nmi_op(
 	return _hypercall2(int, nmi_op, op, arg);
 }
 
+static inline int
+HYPERVISOR_sysctl(
+	unsigned long op)
+{
+	return _hypercall1(int, sysctl, op);
+}
+
+static inline int
+HYPERVISOR_domctl(
+	unsigned long op)
+{
+	return _hypercall1(int, domctl, op);
+}
+
 #endif /* __HYPERCALL_X86_64_H__ */
 
 /*
