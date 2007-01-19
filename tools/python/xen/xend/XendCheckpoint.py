@@ -175,29 +175,24 @@ def restore(xd, fd, dominfo = None, paused = False):
     nr_pfns = (dominfo.getMemoryTarget() + 3) / 4 
 
     # if hvm, pass mem size to calculate the store_mfn
-    hvm  = 0
-    apic = 0
-    pae  = 0
     image_cfg = dominfo.info.get('image', {})
-    hvm  = image_cfg.has_key('hvm')
-    if hvm:
-        # the 'memory' in config has been removed
+    is_hvm  = image_cfg.has_key('hvm')
+    if is_hvm:
         hvm  = dominfo.info['memory_static_min']
         apic = dominfo.info['image']['hvm'].get('apic', 0)
         pae  = dominfo.info['image']['hvm'].get('pae',  0)
         log.info("restore hvm domain %d, mem=%d, apic=%d, pae=%d",
                  dominfo.domid, hvm, apic, pae)
+    else:
+        hvm  = 0
+        apic = 0
+        pae  = 0
 
     try:
-        if hvm:
-            l = read_exact(fd, sizeof_unsigned_int,
-                           "not a valid hvm guest state file: pfn count read")
-            nr_pfns = unpack("I", l)[0]    # native sizeof int
-        else: 
-            l = read_exact(fd, sizeof_unsigned_long,
-                           "not a valid guest state file: pfn count read")
-
+        l = read_exact(fd, sizeof_unsigned_long,
+                       "not a valid guest state file: pfn count read")
         max_pfn = unpack("L", l)[0]    # native sizeof long
+
         if max_pfn > 16*1024*1024:     # XXX 
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
@@ -207,7 +202,6 @@ def restore(xd, fd, dominfo = None, paused = False):
                   "nr_pfns=0x%x.", dominfo.info['shadow_memory'],
                   dominfo.info['memory_static_max'],
                   dominfo.info['memory_static_min'], nr_pfns)
-
 
         balloon.free(xc.pages_to_kib(nr_pfns) + shadow * 1024)
 
@@ -231,7 +225,7 @@ def restore(xd, fd, dominfo = None, paused = False):
             dominfo.unpause()
 
          # get qemu state and create a tmp file for dm restore
-        if hvm:
+        if is_hvm:
             qemu_signature = read_exact(fd, len(QEMU_SIGNATURE),
                                         "invalid device model signature read")
             if qemu_signature != QEMU_SIGNATURE:
