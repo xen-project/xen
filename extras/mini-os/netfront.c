@@ -327,7 +327,6 @@ done:
     printk("backend at %s\n",backend);
     printk("mac is %s\n",mac);
 
-    char *res;
     char path[256];
     sprintf(path,"%s/state",backend);
 
@@ -336,7 +335,6 @@ done:
     xenbus_wait_for_value(path,"4");
 
     //free(backend);
-    free(res);
 
     printk("**************************\n");
 
