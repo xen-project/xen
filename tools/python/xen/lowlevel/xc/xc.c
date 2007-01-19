@@ -174,6 +174,10 @@ static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
     return zero;
 }
 
+static PyObject *pyxc_domain_resume(XcObject *self, PyObject *args)
+{
+    return dom_op(self, args, xc_domain_resume);
+}
 
 static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
                                        PyObject *args,
@@ -1041,6 +1045,13 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Destroy a domain.\n"
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+    
+    { "domain_resume", 
+      (PyCFunction)pyxc_domain_resume, 
+      METH_VARARGS, "\n"
+      "Resume execution of a suspended domain.\n"
+      " dom [int]: Identifier of domain to be resumed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_shutdown", 

@@ -286,6 +286,23 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_resumedomain:
+    {
+        struct domain *d = find_domain_by_id(op->domain);
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        if ( d != NULL )
+        {
+            ret = 0;
+            if ( test_and_clear_bit(_DOMF_shutdown, &d->domain_flags) )
+                for_each_vcpu ( d, v )
+                    vcpu_wake(v);
+            put_domain(d);
+        }
+    }
+    break;
+
     case XEN_DOMCTL_createdomain:
     {
         struct domain *d;

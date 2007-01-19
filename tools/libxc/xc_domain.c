@@ -89,6 +89,16 @@ int xc_domain_shutdown(int xc_handle,
 }
 
 
+int xc_domain_resume(int xc_handle,
+                      uint32_t domid)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_resumedomain;
+    domctl.domain = (domid_t)domid;
+    return do_domctl(xc_handle, &domctl);
+}
+
+
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,

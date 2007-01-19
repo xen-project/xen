@@ -1539,6 +1539,15 @@ class XendDomainInfo:
         self.cleanupDomain()
 
 
+    def resumeDomain(self):
+        log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
+
+        try:
+            if self.domid is not None:
+                xc.domain_resume(self.domid)
+        except:
+            log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
+
     #
     # Channels for xenstore and console
     # 

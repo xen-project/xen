@@ -236,6 +236,18 @@ int xc_domain_unpause(int xc_handle,
 int xc_domain_destroy(int xc_handle,
                       uint32_t domid);
 
+
+/**
+ * This function resumes a suspended domain. The domain should have
+ * been previously suspended.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain id to resume
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_resume(int xc_handle,
+                      uint32_t domid);
+
 /**
  * This function will shutdown a domain. This is intended for use in
  * fully-virtualized domains where this operation is analogous to the

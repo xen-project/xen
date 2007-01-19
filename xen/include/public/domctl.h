@@ -63,6 +63,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
 #define XEN_DOMCTL_destroydomain      2
 #define XEN_DOMCTL_pausedomain        3
 #define XEN_DOMCTL_unpausedomain      4
+#define XEN_DOMCTL_resumedomain      27
 
 #define XEN_DOMCTL_getdomaininfo      5
 struct xen_domctl_getdomaininfo {
