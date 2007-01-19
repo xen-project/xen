@@ -478,6 +478,24 @@ static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
     return PyInt_FromLong(port);
 }
 
+static PyObject *pyxc_evtchn_reset(XcObject *self,
+				   PyObject *args,
+				   PyObject *kwds)
+{
+    uint32_t dom;
+
+    static char *kwd_list[] = { "dom", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
+        return NULL;
+
+    if ( xc_evtchn_reset(self->xc_handle, dom) < 0 )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
                                                 PyObject *args,
                                                 PyObject *kwds)
@@ -1201,6 +1219,12 @@ static PyMethodDef pyxc_methods[] = {
       " dom        [int]: Domain whose port space to allocate from.\n"
       " remote_dom [int]: Remote domain to accept connections from.\n\n"
       "Returns: [int] Unbound event-channel port.\n" },
+
+    { "evtchn_reset", 
+      (PyCFunction)pyxc_evtchn_reset,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Reset all connections.\n"
+      " dom [int]: Domain to reset.\n" },
 
     { "physdev_pci_access_modify",
       (PyCFunction)pyxc_physdev_pci_access_modify,

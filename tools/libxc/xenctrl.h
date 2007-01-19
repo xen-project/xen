@@ -432,6 +432,9 @@ int xc_evtchn_alloc_unbound(int xc_handle,
                             uint32_t dom,
                             uint32_t remote_dom);
 
+int xc_evtchn_reset(int xc_handle,
+                    uint32_t dom);
+
 int xc_physdev_pci_access_modify(int xc_handle,
                                  uint32_t domid,
                                  int bus,
