@@ -24,7 +24,6 @@
 #include <xen/percpu.h>
 #include <xen/multicall.h>
 #include <asm/debugger.h>
-#include <asm/hvm/support.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
 #ifdef CONFIG_COMPAT
