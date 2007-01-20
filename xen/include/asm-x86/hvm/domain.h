@@ -26,6 +26,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/io.h>
 #include <public/hvm/params.h>
+#include <public/hvm/save.h>
 
 typedef void SaveStateHandler(hvm_domain_context_t *h, void *opaque);
 typedef int LoadStateHandler(hvm_domain_context_t *h, void *opaque, int version_id);
@@ -50,7 +51,11 @@ struct hvm_domain {
 
     struct hvm_io_handler  io_handler;
 
-    struct hvm_irq         irq;
+    /* Lock protects access to irq, vpic and vioapic. */
+    spinlock_t             irq_lock;
+    struct hvm_hw_irq      irq;
+    struct hvm_hw_vpic     vpic[2]; /* 0=master; 1=slave */
+    struct hvm_hw_vioapic  vioapic;
 
     /* hvm_print_line() logging. */
     char                   pbuf[80];

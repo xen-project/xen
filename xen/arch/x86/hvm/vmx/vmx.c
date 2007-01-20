@@ -2309,7 +2309,7 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
         msr_content = __vmread(GUEST_SYSENTER_EIP);
         break;
     case MSR_IA32_APICBASE:
-        msr_content = vcpu_vlapic(v)->apic_base_msr;
+        msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
     default:
         if ( long_mode_do_msr_read(regs) )

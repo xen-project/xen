@@ -28,7 +28,7 @@
 static void __hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi, link, isa_irq;
 
     ASSERT((device <= 31) && (intx <= 3));
@@ -53,17 +53,15 @@ static void __hvm_pci_intx_assert(
 void hvm_pci_intx_assert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
     __hvm_pci_intx_assert(d, device, intx);
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
 static void __hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi, link, isa_irq;
 
     ASSERT((device <= 31) && (intx <= 3));
@@ -84,22 +82,20 @@ static void __hvm_pci_intx_deassert(
 void hvm_pci_intx_deassert(
     struct domain *d, unsigned int device, unsigned int intx)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
     __hvm_pci_intx_deassert(d, device, intx);
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
 void hvm_isa_irq_assert(
     struct domain *d, unsigned int isa_irq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
 
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
 
     if ( !__test_and_set_bit(isa_irq, &hvm_irq->isa_irq) &&
          (hvm_irq->gsi_assert_count[gsi]++ == 0) )
@@ -108,31 +104,31 @@ void hvm_isa_irq_assert(
         vpic_irq_positive_edge(d, isa_irq);
     }
 
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
 void hvm_isa_irq_deassert(
     struct domain *d, unsigned int isa_irq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     ASSERT(isa_irq <= 15);
 
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
 
     if ( __test_and_clear_bit(isa_irq, &hvm_irq->isa_irq) &&
          (--hvm_irq->gsi_assert_count[gsi] == 0) )
         vpic_irq_negative_edge(d, isa_irq);
 
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
 void hvm_set_callback_irq_level(void)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi, pdev, pintx, asserted;
 
     /* Fast lock-free tests. */
@@ -140,7 +136,7 @@ void hvm_set_callback_irq_level(void)
          (hvm_irq->callback_via_type == HVMIRQ_callback_none) )
         return;
 
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
 
     /* NB. Do not check the evtchn_upcall_mask. It is not used in HVM mode. */
     asserted = !!vcpu_info(v, evtchn_upcall_pending);
@@ -177,17 +173,17 @@ void hvm_set_callback_irq_level(void)
     }
 
  out:
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     u8 old_isa_irq;
 
     ASSERT((link <= 3) && (isa_irq <= 15));
 
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
 
     old_isa_irq = hvm_irq->pci_link_route[link];
     if ( old_isa_irq == isa_irq )
@@ -207,7 +203,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
     }
 
  out:
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 
     dprintk(XENLOG_G_INFO, "Dom%u PCI link %u changed %u -> %u\n",
             d->domain_id, link, old_isa_irq, isa_irq);
@@ -215,7 +211,7 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
 
 void hvm_set_callback_via(struct domain *d, uint64_t via)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi=0, pdev=0, pintx=0;
     uint8_t via_type;
 
@@ -224,7 +220,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
          (via_type > HVMIRQ_callback_pci_intx) )
         via_type = HVMIRQ_callback_none;
 
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
 
     /* Tear down old callback via. */
     if ( hvm_irq->callback_via_asserted )
@@ -271,7 +267,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
         break;
     }
 
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 
     dprintk(XENLOG_G_INFO, "Dom%u callback via changed to ", d->domain_id);
     switch ( via_type )
@@ -300,7 +296,7 @@ int cpu_has_pending_irq(struct vcpu *v)
     if ( !vlapic_accept_pic_intr(v) )
         return 0;
 
-    return plat->irq.vpic[0].int_output;
+    return plat->vpic[0].int_output;
 }
 
 int cpu_get_interrupt(struct vcpu *v, int *type)
@@ -322,7 +318,7 @@ int get_isa_irq_vector(struct vcpu *v, int isa_irq, int type)
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     if ( type == APIC_DM_EXTINT )
-        return (v->domain->arch.hvm_domain.irq.vpic[isa_irq >> 3].irq_base
+        return (v->domain->arch.hvm_domain.vpic[isa_irq >> 3].irq_base
                 + (isa_irq & 7));
 
     return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
@@ -335,7 +331,7 @@ int is_isa_irq_masked(struct vcpu *v, int isa_irq)
     if ( is_lvtt(v, isa_irq) )
         return !is_lvtt_enabled(v);
 
-    return ((v->domain->arch.hvm_domain.irq.vpic[isa_irq >> 3].imr &
+    return ((v->domain->arch.hvm_domain.vpic[isa_irq >> 3].imr &
              (1 << (isa_irq & 7))) &&
             domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
 }

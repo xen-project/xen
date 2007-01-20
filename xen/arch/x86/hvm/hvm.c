@@ -135,7 +135,7 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
-    spin_lock_init(&d->arch.hvm_domain.irq.lock);
+    spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
     rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
     if ( rc != 0 )

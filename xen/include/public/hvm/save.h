@@ -84,7 +84,6 @@ struct hvm_hw_cpu {
     uint64_t idtr_base;
     uint64_t gdtr_base;
 
-
     uint32_t cs_arbytes;
     uint32_t ds_arbytes;
     uint32_t es_arbytes;
@@ -137,5 +136,182 @@ struct hvm_hw_pit {
 };
 
 
+/*
+ * PIC
+ */
+#define HVM_SAVE_TYPE_PIC 3
+struct hvm_hw_vpic {
+    /* IR line bitmasks. */
+    uint8_t irr;
+    uint8_t imr;
+    uint8_t isr;
+
+    /* Line IRx maps to IRQ irq_base+x */
+    uint8_t irq_base;
+
+    /*
+     * Where are we in ICW2-4 initialisation (0 means no init in progress)?
+     * Bits 0-1 (=x): Next write at A=1 sets ICW(x+1).
+     * Bit 2: ICW1.IC4  (1 == ICW4 included in init sequence)
+     * Bit 3: ICW1.SNGL (0 == ICW3 included in init sequence)
+     */
+    uint8_t init_state:4;
+
+    /* IR line with highest priority. */
+    uint8_t priority_add:4;
+
+    /* Reads from A=0 obtain ISR or IRR? */
+    uint8_t readsel_isr:1;
+
+    /* Reads perform a polling read? */
+    uint8_t poll:1;
+
+    /* Automatically clear IRQs from the ISR during INTA? */
+    uint8_t auto_eoi:1;
+
+    /* Automatically rotate IRQ priorities during AEOI? */
+    uint8_t rotate_on_auto_eoi:1;
+
+    /* Exclude slave inputs when considering in-service IRQs? */
+    uint8_t special_fully_nested_mode:1;
+
+    /* Special mask mode excludes masked IRs from AEOI and priority checks. */
+    uint8_t special_mask_mode:1;
+
+    /* Is this a master PIC or slave PIC? (NB. This is not programmable.) */
+    uint8_t is_master:1;
+
+    /* Edge/trigger selection. */
+    uint8_t elcr;
+
+    /* Virtual INT output. */
+    uint8_t int_output;
+};
+
+
+/*
+ * IO-APIC
+ */
+#define HVM_SAVE_TYPE_IOAPIC 4
+
+#ifdef __ia64__
+#define VIOAPIC_IS_IOSAPIC 1
+#define VIOAPIC_NUM_PINS  24
+#else
+#define VIOAPIC_NUM_PINS  48 /* 16 ISA IRQs, 32 non-legacy PCI IRQS. */
+#endif
+
+struct hvm_hw_vioapic {
+    uint64_t base_address;
+    uint32_t ioregsel;
+    uint32_t id;
+    union vioapic_redir_entry
+    {
+        uint64_t bits;
+        struct {
+            uint8_t vector;
+            uint8_t delivery_mode:3;
+            uint8_t dest_mode:1;
+            uint8_t delivery_status:1;
+            uint8_t polarity:1;
+            uint8_t remote_irr:1;
+            uint8_t trig_mode:1;
+            uint8_t mask:1;
+            uint8_t reserve:7;
+#if !VIOAPIC_IS_IOSAPIC
+            uint8_t reserved[4];
+            uint8_t dest_id;
+#else
+            uint8_t reserved[3];
+            uint16_t dest_id;
+#endif
+        } fields;
+    } redirtbl[VIOAPIC_NUM_PINS];
+};
+
+
+/*
+ * IRQ
+ */
+#define HVM_SAVE_TYPE_IRQ 5
+struct hvm_hw_irq {
+    /*
+     * Virtual interrupt wires for a single PCI bus.
+     * Indexed by: device*4 + INTx#.
+     */
+    DECLARE_BITMAP(pci_intx, 32*4);
+
+    /*
+     * Virtual interrupt wires for ISA devices.
+     * Indexed by ISA IRQ (assumes no ISA-device IRQ sharing).
+     */
+    DECLARE_BITMAP(isa_irq, 16);
+
+    /* Virtual interrupt and via-link for paravirtual platform driver. */
+    uint32_t callback_via_asserted;
+    union {
+        enum {
+            HVMIRQ_callback_none,
+            HVMIRQ_callback_gsi,
+            HVMIRQ_callback_pci_intx
+        } callback_via_type;
+        uint32_t pad; /* So the next field will be aligned */
+    };
+    union {
+        uint32_t gsi;
+        struct { uint8_t dev, intx; } pci;
+    } callback_via;
+
+    /*
+     * PCI-ISA interrupt router.
+     * Each PCI <device:INTx#> is 'wire-ORed' into one of four links using
+     * the traditional 'barber's pole' mapping ((device + INTx#) & 3).
+     * The router provides a programmable mapping from each link to a GSI.
+     */
+    u8 pci_link_route[4];
+
+    /* Number of INTx wires asserting each PCI-ISA link. */
+    u8 pci_link_assert_count[4];
+
+    /*
+     * Number of wires asserting each GSI.
+     * 
+     * GSIs 0-15 are the ISA IRQs. ISA devices map directly into this space
+     * except ISA IRQ 0, which is connected to GSI 2.
+     * PCI links map into this space via the PCI-ISA bridge.
+     * 
+     * GSIs 16+ are used only be PCI devices. The mapping from PCI device to
+     * GSI is as follows: ((device*4 + device/8 + INTx#) & 31) + 16
+     */
+    u8 gsi_assert_count[VIOAPIC_NUM_PINS];
+
+    /*
+     * GSIs map onto PIC/IO-APIC in the usual way:
+     *  0-7:  Master 8259 PIC, IO-APIC pins 0-7
+     *  8-15: Slave  8259 PIC, IO-APIC pins 8-15
+     *  16+ : IO-APIC pins 16+
+     */
+
+    /* Last VCPU that was delivered a LowestPrio interrupt. */
+    u8 round_robin_prev_vcpu;
+};
+
+
+/*
+ * LAPIC
+ */
+#define HVM_SAVE_TYPE_LAPIC 6
+struct hvm_hw_lapic {
+    uint64_t             apic_base_msr;
+    uint32_t             disabled; /* VLAPIC_xx_DISABLED */
+    uint32_t             timer_divisor;
+};
+
+#define HVM_SAVE_TYPE_LAPIC_REGS 7
+
+struct hvm_hw_lapic_regs {
+    /* A 4k page of register state */
+    uint8_t  data[0x400];
+};
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_H__ */
