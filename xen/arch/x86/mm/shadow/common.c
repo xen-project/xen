@@ -2569,12 +2569,15 @@ static void sh_update_paging_modes(struct vcpu *v)
                 /* Need to make a new monitor table for the new mode */
                 mfn_t new_mfn, old_mfn;
 
-                if ( v != current ) 
+                if ( v != current && vcpu_runnable(v) ) 
                 {
                     SHADOW_ERROR("Some third party (d=%u v=%u) is changing "
-                                  "this HVM vcpu's (d=%u v=%u) paging mode!\n",
-                                  current->domain->domain_id, current->vcpu_id,
-                                  v->domain->domain_id, v->vcpu_id);
+                                 "this HVM vcpu's (d=%u v=%u) paging mode "
+                                 "while it is running.\n",
+                                 current->domain->domain_id, current->vcpu_id,
+                                 v->domain->domain_id, v->vcpu_id);
+                    /* It's not safe to do that because we can't change
+                     * the host CR£ for a running domain */
                     domain_crash(v->domain);
                     return;
                 }
@@ -2590,7 +2593,8 @@ static void sh_update_paging_modes(struct vcpu *v)
                  * pull it down!  Switch CR3, and warn the HVM code that
                  * its host cr3 has changed. */
                 make_cr3(v, mfn_x(new_mfn));
-                write_ptbase(v);
+                if ( v == current )
+                    write_ptbase(v);
                 hvm_update_host_cr3(v);
                 old_mode->destroy_monitor_table(v, old_mfn);
             }
