@@ -672,6 +672,27 @@ static int suspend_dev(struct device *dev, void *data)
 	return 0;
 }
 
+static int suspend_cancel_dev(struct device *dev, void *data)
+{
+	int err = 0;
+	struct xenbus_driver *drv;
+	struct xenbus_device *xdev;
+
+	DPRINTK("");
+
+	if (dev->driver == NULL)
+		return 0;
+	drv = to_xenbus_driver(dev->driver);
+	xdev = container_of(dev, struct xenbus_device, dev);
+	if (drv->suspend_cancel)
+		err = drv->suspend_cancel(xdev);
+	if (err)
+		printk(KERN_WARNING
+		       "xenbus: suspend_cancel %s failed: %i\n",
+		       dev->bus_id, err);
+	return 0;
+}
+
 static int resume_dev(struct device *dev, void *data)
 {
 	int err;
@@ -736,6 +757,13 @@ void xenbus_resume(void)
 }
 EXPORT_SYMBOL_GPL(xenbus_resume);
 
+void xenbus_suspend_cancel(void)
+{
+	xs_suspend_cancel();
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_cancel_dev);
+	xenbus_backend_resume(suspend_cancel_dev);
+}
+EXPORT_SYMBOL_GPL(xenbus_suspend_cancel);
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
 int xenstored_ready = 0;

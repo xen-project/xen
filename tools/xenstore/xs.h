@@ -133,6 +133,11 @@ bool xs_introduce_domain(struct xs_handle *h,
 			 unsigned int domid,
 			 unsigned long mfn,
                          unsigned int eventchn); 
+/* Resume a domain.
+ * Clear the shutdown flag for this domain in the store.
+ */
+bool xs_resume_domain(struct xs_handle *h, unsigned int domid);
+
 /* Release a domain.
  * Tells the store domain to release the memory page to the domain.
  */

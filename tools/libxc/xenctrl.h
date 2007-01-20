@@ -360,9 +360,9 @@ int xc_domain_hvm_setcontext(int xc_handle,
  * @return 0 on success, -1 on failure
  */
 int xc_vcpu_getcontext(int xc_handle,
-                               uint32_t domid,
-                               uint32_t vcpu,
-                               vcpu_guest_context_t *ctxt);
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt);
 
 typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
 int xc_vcpu_getinfo(int xc_handle,
@@ -431,6 +431,9 @@ int xc_sched_credit_domain_get(int xc_handle,
 int xc_evtchn_alloc_unbound(int xc_handle,
                             uint32_t dom,
                             uint32_t remote_dom);
+
+int xc_evtchn_reset(int xc_handle,
+                    uint32_t dom);
 
 int xc_physdev_pci_access_modify(int xc_handle,
                                  uint32_t domid,

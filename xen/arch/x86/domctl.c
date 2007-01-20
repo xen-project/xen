@@ -326,7 +326,6 @@ _long arch_do_domctl(
     }
     break;
 
-
     case XEN_DOMCTL_gethvmcontext:
     { 
         struct hvm_domain_context *c;

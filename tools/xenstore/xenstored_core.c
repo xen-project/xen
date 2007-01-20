@@ -164,6 +164,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_WATCH_EVENT: return "WATCH_EVENT";
 	case XS_ERROR: return "ERROR";
 	case XS_IS_DOMAIN_INTRODUCED: return "XS_IS_DOMAIN_INTRODUCED";
+	case XS_RESUME: return "RESUME";
 	default:
 		return "**UNKNOWN**";
 	}
@@ -1265,6 +1266,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	case XS_GET_DOMAIN_PATH:
 		do_get_domain_path(conn, onearg(in));
+		break;
+
+	case XS_RESUME:
+		do_resume(conn, onearg(in));
 		break;
 
 	default:

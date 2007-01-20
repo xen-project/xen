@@ -343,13 +343,14 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		fire_watches(conn, "@introduceDomain", false);
 	}
 	else {
-		/* Check that the given details match the ones we have
-		   previously recorded. */
-		if (port != domain->remote_port ||
-		    mfn != domain->mfn) {
-			send_error(conn, EINVAL);
-			return;
-		}
+		int rc;
+
+		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
+		if (domain->port)
+			xc_evtchn_unbind(xce_handle, domain->port);
+		rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
+		domain->port = (rc == -1) ? 0 : rc;
+		domain->remote_port = port;
 	}
 
 	send_ack(conn, XS_INTRODUCE);
@@ -393,6 +394,43 @@ void do_release(struct connection *conn, const char *domid_str)
 	fire_watches(conn, "@releaseDomain", false);
 
 	send_ack(conn, XS_RELEASE);
+}
+
+void do_resume(struct connection *conn, const char *domid_str)
+{
+	struct domain *domain;
+	unsigned int domid;
+
+	if (!domid_str) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	domid = atoi(domid_str);
+	if (!domid) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	if (conn->id != 0) {
+		send_error(conn, EACCES);
+		return;
+	}
+
+	domain = find_domain_by_domid(domid);
+	if (!domain) {
+		send_error(conn, ENOENT);
+		return;
+	}
+
+	if (!domain->conn) {
+		send_error(conn, EINVAL);
+		return;
+	}
+
+	domain->shutdown = 0;
+	
+	send_ack(conn, XS_RESUME);
 }
 
 void do_get_domain_path(struct connection *conn, const char *domid_str)

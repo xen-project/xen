@@ -45,7 +45,7 @@ from xen.xend.XendBootloader import bootloader
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.xenstore.xstransact import xstransact, complete
-from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
+from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, ResumeDomain
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
@@ -1545,6 +1545,7 @@ class XendDomainInfo:
         try:
             if self.domid is not None:
                 xc.domain_resume(self.domid)
+                ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
 
