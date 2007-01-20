@@ -358,6 +358,8 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
         instance_id = hvm_get_32u(h);
         version_id = hvm_get_32u(h);
 
+        printk("HVM S/R Loading \"%s\" instance %#x\n", idstr, instance_id);
+
         rec_len = hvm_get_32u(h);
         rec_pos = hvm_ctxt_tell(h);
 

@@ -312,7 +312,7 @@ static uint32_t ioapic_get_delivery_bitmask(
 static inline int pit_channel0_enabled(void)
 {
     PITState *pit = &current->domain->arch.hvm_domain.pl_time.vpit;
-    struct periodic_time *pt = &pit->channels[0].pt;
+    struct periodic_time *pt = &pit->pt[0];
     return pt->enabled;
 }
 

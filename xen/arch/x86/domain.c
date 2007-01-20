@@ -329,9 +329,6 @@ int vcpu_initialise(struct vcpu *v)
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
-    /* This should move to arch_domain_create(). */
-    if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
-        pit_init(v, cpu_khz);
 
     if ( is_hvm_domain(d) )
     {
@@ -340,6 +337,10 @@ int vcpu_initialise(struct vcpu *v)
     }
     else
     {
+        /* PV guests get an emulated PIT too for video BIOSes to use. */
+        if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
+            pit_init(v, cpu_khz);
+
         v->arch.schedule_tail = continue_nonidle_domain;
         v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
         v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;

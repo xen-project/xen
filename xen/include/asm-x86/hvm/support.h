@@ -186,7 +186,6 @@ static inline void hvm_put_buffer(hvm_domain_context_t *h, const char *buf, int 
     h->cur += len;
 }
 
-
 static inline char hvm_get_byte(hvm_domain_context_t *h)
 {
     if (h->cur >= HVM_CTXT_SIZE) {
@@ -239,6 +238,12 @@ static inline void hvm_get_buffer(hvm_domain_context_t *h, char *buf, int len)
     memcpy(buf, &h->data[h->cur], len);
     h->cur += len;
 }
+
+#define hvm_put_struct(_h, _p) \
+    hvm_put_buffer((_h), (char *)(_p), sizeof(*(_p)))
+#define hvm_get_struct(_h, _p) \
+    hvm_get_buffer((_h), (char *)(_p), sizeof(*(_p)))
+
 
 extern int hvm_save(struct vcpu*, hvm_domain_context_t *h);
 extern int hvm_load(struct vcpu*, hvm_domain_context_t *h);

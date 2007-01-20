@@ -29,7 +29,7 @@
 #include <xen/timer.h>
 #include <xen/list.h>
 #include <asm/hvm/vpic.h>
-
+#include <public/hvm/save.h>
 
 #define HPET_TIMER_NUM     3    /* 3 timers supported now */
 struct HPET {
@@ -90,27 +90,11 @@ struct periodic_time {
 #define PIT_FREQ 1193181
 #define PIT_BASE 0x40
 
-typedef struct PITChannelState {
-    int count; /* can be 65536 */
-    u16 latched_count;
-    u8 count_latched;
-    u8 status_latched;
-    u8 status;
-    u8 read_state;
-    u8 write_state;
-    u8 write_latch;
-    u8 rw_mode;
-    u8 mode;
-    u8 bcd; /* not supported */
-    u8 gate; /* timer start */
-    s64 count_load_time;
-    /* irq handling */
-    struct periodic_time pt;
-} PITChannelState;
-
 typedef struct PITState {
-    PITChannelState channels[3];
-    int speaker_data_on;
+    /* Hardware state */
+    struct hvm_hw_pit hw;
+    /* irq handling */
+    struct periodic_time pt[3];
 } PITState;
 
 #define RTC_SIZE 14
