@@ -39,7 +39,20 @@
  * Internal mechanisms should be kept in Xen-private headers.
  */
 
+/* 
+ * Save/restore header
+ */
 
+#define HVM_SAVE_TYPE_HEADER 0
+
+#define HVM_FILE_MAGIC   0x54381286
+#define HVM_FILE_VERSION 0x00000001
+
+struct hvm_save_header {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t cpuid;
+};
 
 /*
  * Processor

@@ -157,9 +157,6 @@ static inline void hvm_mmio_access(struct vcpu *v,
     }
 }
 
-/* save/restore support */
-#define HVM_FILE_MAGIC   0x54381286
-#define HVM_FILE_VERSION 0x00000001
 
 int hvm_register_savevm(struct domain *d,
                     const char *idstr,
@@ -199,6 +196,7 @@ int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
     uint32_t eax, ebx, ecx, edx;
     HVMStateEntry *se;
     char *chgset;
+    struct hvm_save_header hdr;
 
     if (!is_hvm_vcpu(v)) {
         printk("hvm_save only for hvm guest!\n");
@@ -206,8 +204,12 @@ int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
     }
 
     memset(h, 0, sizeof(hvm_domain_context_t));
-    hvm_put_32u(h, HVM_FILE_MAGIC);
-    hvm_put_32u(h, HVM_FILE_VERSION);
+
+    hdr.magic = HVM_FILE_MAGIC;
+    hdr.version = HVM_FILE_VERSION;
+    cpuid(1, &eax, &ebx, &ecx, &edx);
+    hdr.cpuid = eax;
+    hvm_put_struct(h, &hdr);
 
     /* save xen changeset */
     chgset = strrchr(XEN_CHANGESET, ' ');
@@ -219,10 +221,6 @@ int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
     len = strlen(chgset);
     hvm_put_8u(h, len);
     hvm_put_buffer(h, chgset, len);
-
-    /* save cpuid */
-    cpuid(1, &eax, &ebx, &ecx, &edx);
-    hvm_put_32u(h, eax);
 
     for(se = v->domain->arch.hvm_domain.first_se; se != NULL; se = se->next) {
         /* ID string */
@@ -274,13 +272,14 @@ static HVMStateEntry *find_se(struct domain *d, const char *idstr, int instance_
 
 int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
 {
-    uint32_t len, rec_len, rec_pos, magic, instance_id, version_id;
+    uint32_t len, rec_len, rec_pos, instance_id, version_id;
     uint32_t eax, ebx, ecx, edx;
     HVMStateEntry *se;
     char idstr[HVM_SE_IDSTR_LEN];
     xen_changeset_info_t chgset;
     char *cur_chgset;
     int ret;
+    struct hvm_save_header hdr;
 
     if (!is_hvm_vcpu(v)) {
         printk("hvm_load only for hvm guest!\n");
@@ -294,17 +293,27 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
 
     hvm_ctxt_seek(h, 0);
 
-    magic = hvm_get_32u(h);
-    if (magic != HVM_FILE_MAGIC) {
+    hvm_get_struct(h, &hdr);
+
+    if (hdr.magic != HVM_FILE_MAGIC) {
         printk("HVM restore magic dismatch!\n");
         return -1;
     }
 
-    magic = hvm_get_32u(h);
-    if (magic != HVM_FILE_VERSION) {
+    if (hdr.version != HVM_FILE_VERSION) {
         printk("HVM restore version dismatch!\n");
         return -1;
     }
+
+    /* check cpuid */
+    cpuid(1, &eax, &ebx, &ecx, &edx);
+    /*TODO: need difine how big difference is acceptable */
+    if (hdr.cpuid != eax)
+        printk("warnings: try to restore hvm guest(0x%"PRIx32") "
+               "on a different type processor(0x%"PRIx32").\n",
+                hdr.cpuid,
+                eax);
+
 
     /* check xen change set */
     cur_chgset = strrchr(XEN_CHANGESET, ' ');
@@ -329,16 +338,6 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
     if ( !strcmp(cur_chgset, "unavailable") )
         printk("warnings: try to restore hvm guest when changeset is unavailable.\n");
 
-
-    /* check cpuid */
-    cpuid(1, &eax, &ebx, &ecx, &edx);
-    ebx = hvm_get_32u(h);
-    /*TODO: need difine how big difference is acceptable */
-    if (ebx != eax)
-        printk("warnings: try to restore hvm guest(0x%"PRIx32") "
-               "on a different type processor(0x%"PRIx32").\n",
-                ebx,
-                eax);
 
     while(1) {
         if (hvm_ctxt_end(h)) {
