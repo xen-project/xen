@@ -47,6 +47,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/vpt.h>
+#include <public/hvm/save.h>
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
@@ -364,7 +365,7 @@ static inline void __restore_debug_registers(struct vcpu *v)
 }
 
 static int __get_instruction_length(void);
-int vmx_vmcs_save(struct vcpu *v, struct vmcs_data *c)
+int vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     unsigned long inst_len;
 
@@ -443,7 +444,7 @@ int vmx_vmcs_save(struct vcpu *v, struct vmcs_data *c)
     return 1;
 }
 
-int vmx_vmcs_restore(struct vcpu *v, struct vmcs_data *c)
+int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     unsigned long mfn, old_base_mfn;
 
@@ -590,9 +591,8 @@ static void dump_msr_state(struct vmx_msr_state *m)
 }
 #endif
         
-void vmx_save_cpu_state(struct vcpu *v, struct hvmcpu_context *ctxt)
+void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
-    struct vmcs_data *data = &ctxt->data;
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
     unsigned long guest_flags = guest_state->flags;
     int i = 0;
@@ -603,14 +603,15 @@ void vmx_save_cpu_state(struct vcpu *v, struct hvmcpu_context *ctxt)
     data->flags = guest_flags;
     for (i = 0; i < VMX_MSR_COUNT; i++)
         data->msr_items[i] = guest_state->msrs[i];
-
+    
+    data->tsc = hvm_get_guest_time(v);
+    
     dump_msr_state(guest_state);
 }
 
-void vmx_load_cpu_state(struct vcpu *v, struct hvmcpu_context *ctxt)
+void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     int i = 0;
-    struct vmcs_data *data = &ctxt->data;
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
@@ -625,35 +626,42 @@ void vmx_load_cpu_state(struct vcpu *v, struct hvmcpu_context *ctxt)
 
     v->arch.hvm_vmx.vmxassist_enabled = data->vmxassist_enabled;
 
+    hvm_set_guest_time(v, data->tsc);
+
     dump_msr_state(guest_state);
 }
 
-void vmx_save_vmcs_ctxt(struct vcpu *v, struct hvmcpu_context *ctxt)
+
+void vmx_save_vmcs_ctxt(hvm_domain_context_t *h, void *opaque)
 {
-    struct vmcs_data *data = &ctxt->data;
+    struct vcpu *v = opaque;
+    struct hvm_hw_cpu ctxt;
 
-    vmx_save_cpu_state(v, ctxt);
-
+    vmx_save_cpu_state(v, &ctxt);
     vmx_vmcs_enter(v);
-
-    vmx_vmcs_save(v, data);
-
+    vmx_vmcs_save(v, &ctxt);
     vmx_vmcs_exit(v);
 
+    hvm_put_struct(h, &ctxt);
 }
 
-void vmx_load_vmcs_ctxt(struct vcpu *v, struct hvmcpu_context *ctxt)
+int vmx_load_vmcs_ctxt(hvm_domain_context_t *h, void *opaque, int version)
 {
-    vmx_load_cpu_state(v, ctxt);
+    struct vcpu *v = opaque;
+    struct hvm_hw_cpu ctxt;
 
-    if (vmx_vmcs_restore(v, &ctxt->data)) {
+    if (version != 1)
+        return -EINVAL;
+
+    hvm_get_struct(h, &ctxt);
+    vmx_load_cpu_state(v, &ctxt);
+    if (vmx_vmcs_restore(v, &ctxt)) {
         printk("vmx_vmcs restore failed!\n");
         domain_crash(v->domain);
+        return -EINVAL;
     }
 
-    /* only load vmcs once */
-    ctxt->valid = 0;
-
+    return 0;
 }
 
 /*

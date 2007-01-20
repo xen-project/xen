@@ -174,6 +174,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
+    hvm_register_savevm(v->domain, "xen_hvm_cpu", v->vcpu_id, 1,
+                        hvm_funcs.save_cpu_ctxt, hvm_funcs.load_cpu_ctxt, 
+                        (void *)v);
+
     if ( (rc = vlapic_init(v)) != 0 )
         return rc;
 

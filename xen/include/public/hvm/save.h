@@ -107,6 +107,9 @@ struct hvm_hw_cpu {
     /* same size as VMX_MSR_COUNT */
     uint64_t msr_items[6];
     uint64_t vmxassist_enabled;
+
+    /* guest's idea of what rdtsc() would return */
+    uint64_t tsc;
 };
 
 
