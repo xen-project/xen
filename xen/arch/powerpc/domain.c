@@ -105,13 +105,13 @@ void arch_domain_destroy(struct domain *d)
 
 static void machine_fail(const char *s)
 {
-    printk("%s failed, manual powercycle required!\n", s);
+    printk("%s failed, manual powercycle required!\n"
+           "  spinning....\n", s);
     for (;;)
         sleep();
 }
 void machine_halt(void)
 {
-    printk("machine_halt called: spinning....\n");
     console_start_sync();
     printk("%s called\n", __func__);
     rtas_halt();
@@ -121,7 +121,6 @@ void machine_halt(void)
 
 void machine_restart(char * __unused)
 {
-    printk("machine_restart called: spinning....\n");
     console_start_sync();
     printk("%s called\n", __func__);
     rtas_reboot();
