@@ -142,7 +142,41 @@ static void free_page_array(xen_pfn_t *page_array)
     free(page_array);
 }
 
+static int check_memory_config(int rma_log, unsigned int mem_mb)
+{
+    u64 mem_kb = (mem_mb << 10);
+    u64 rma_kb = (1 << rma_log) >> 10;
 
+    switch(rma_log)
+    {
+        case 26:
+        case 27:
+        case 28:
+        case 30:
+        case 34:
+        case 38:
+            if (mem_kb < rma_kb) {
+                DPRINTF("Domain memory must be at least %dMB\n", 
+                        (1 << rma_log)>>20);
+                break;
+            }
+
+            if (mem_kb % (16 << 10)) {
+                DPRINTF("Domain memory %dMB must be a multiple of 16MB\n",
+                        mem_mb);
+                       
+                break;
+            }
+
+            /* rma_log and mem_mb OK */
+            return 0;
+
+        default:
+            DPRINTF("Invalid rma_log (%d)\n", rma_log);
+    }
+
+    return 1;
+}
 
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
@@ -168,6 +202,9 @@ int xc_linux_build(int xc_handle,
     unsigned long start_info_addr;
     unsigned long rma_pages;
     unsigned long shadow_mb;
+    u32 remaining_kb;
+    u32 extent_order;
+    u64 nr_extents;
     int rma_log = 26;  /* 64MB RMA */
     int rc = 0;
     int op;
@@ -180,6 +217,37 @@ int xc_linux_build(int xc_handle,
 
     rma_pages = (1 << rma_log) >> PAGE_SHIFT;
     if (rma_pages == 0) {
+        rc = -1;
+        goto out;
+    }
+
+    /* validate rma_log and domain memory config */
+    if (check_memory_config(rma_log, mem_mb)) {
+        rc = -1;
+        goto out;
+    }
+    
+    /* alloc RMA */
+    if (xc_alloc_real_mode_area(xc_handle, domid, rma_log)) {
+        rc = -1;
+        goto out;
+    }
+
+    /* subtract already allocated RMA to determine remaining KB to alloc */
+    remaining_kb = (nr_pages - rma_pages) * (PAGE_SIZE / 1024);
+    DPRINTF("totalmem - RMA = %dKB\n", remaining_kb);
+
+    /* to allocate in 16MB chunks, we need to determine the order of 
+     * the number of PAGE_SIZE pages contained in 16MB. */
+    extent_order = 24 - 12; /* extent_order = log2((1 << 24) - (1 << 12)) */
+    nr_extents = (remaining_kb / (PAGE_SIZE/1024)) >> extent_order;
+    DPRINTF("allocating memory in %llu chunks of %luMB\n", nr_extents,
+            (((1 << extent_order) >> 10) * PAGE_SIZE) >> 10);
+
+    /* now allocate the remaining memory as large-order allocations */
+    DPRINTF("increase_reservation(%u, %llu, %u)\n", domid, nr_extents, extent_order);
+    if (xc_domain_memory_increase_reservation(xc_handle, domid, nr_extents, 
+                                              extent_order, 0, NULL)) {
         rc = -1;
         goto out;
     }
