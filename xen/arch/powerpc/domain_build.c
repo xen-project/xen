@@ -26,6 +26,7 @@
 #include <xen/ctype.h>
 #include <xen/iocap.h>
 #include <xen/shadow.h>
+#include <xen/domain.h>
 #include <xen/version.h>
 #include <asm/processor.h>
 #include <asm/papr.h>
@@ -120,6 +121,7 @@ int construct_dom0(struct domain *d,
     ulong msr;
     ulong pc;
     ulong r2;
+    int vcpu;
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -209,6 +211,27 @@ int construct_dom0(struct domain *d,
 
     /* put stack below everything */
     v->arch.ctxt.gprs[1] = dst - STACK_FRAME_OVERHEAD;
+
+    /* startup secondary processors */
+    if ( opt_dom0_max_vcpus == 0 )
+        opt_dom0_max_vcpus = num_online_cpus();
+    if ( opt_dom0_max_vcpus > num_online_cpus() )
+        opt_dom0_max_vcpus = num_online_cpus();
+    if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
+        opt_dom0_max_vcpus = MAX_VIRT_CPUS;
+#ifdef BITS_PER_GUEST_LONG
+    if ( opt_dom0_max_vcpus > BITS_PER_GUEST_LONG(d) )
+        opt_dom0_max_vcpus = BITS_PER_GUEST_LONG(d);
+#endif
+    printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
+
+    for (vcpu = 1; vcpu < opt_dom0_max_vcpus; vcpu++) {
+        if (NULL == alloc_vcpu(dom0, vcpu, vcpu))
+            panic("Error creating domain 0 vcpu %d\n", vcpu);
+        /* for now we pin Dom0 VCPUs to their coresponding CPUs */
+        if (cpu_isset(vcpu, cpu_online_map))
+            dom0->vcpu[vcpu]->cpu_affinity = cpumask_of_cpu(vcpu);
+    }
 
     /* copy relative to Xen */
     dst += rma;
