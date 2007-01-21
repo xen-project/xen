@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- * Copyright (C) IBM Corporation 2006
+ * Copyright IBM Corporation 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
  */
 
 #include <stdio.h>
@@ -36,6 +37,7 @@
 #include "flatdevtree_env.h"
 #include "flatdevtree.h"
 #include "utils.h"
+#include "mk_flatdevtree.h"
 
 #define INITRD_ADDR (24UL << 20)
 #define DEVTREE_ADDR (16UL << 20)
@@ -78,85 +80,6 @@ static int init_boot_vcpu(
     return rc;
 }
 
-static int load_devtree(
-    int xc_handle,
-    int domid,
-    xen_pfn_t *page_array,
-    void *devtree,
-    unsigned long devtree_addr,
-    uint64_t initrd_base,
-    unsigned long initrd_len,
-    start_info_t *start_info __attribute__((unused)),
-    unsigned long start_info_addr)
-{
-    uint32_t si[4] = {0, start_info_addr, 0, 0x1000};
-    struct boot_param_header *header;
-    void *chosen;
-    void *xen;
-    uint64_t initrd_end = initrd_base + initrd_len;
-    unsigned int devtree_size;
-    int rc = 0;
-
-    DPRINTF("adding initrd props\n");
-
-    chosen = ft_find_node(devtree, "/chosen");
-    if (chosen == NULL) {
-        DPRINTF("couldn't find /chosen\n");
-        return -1;
-    }
-
-    xen = ft_find_node(devtree, "/xen");
-    if (xen == NULL) {
-        DPRINTF("couldn't find /xen\n");
-        return -1;
-    }
-
-    /* initrd-start */
-    rc = ft_set_prop(&devtree, chosen, "linux,initrd-start",
-            &initrd_base, sizeof(initrd_base));
-    if (rc < 0) {
-        DPRINTF("couldn't set /chosen/linux,initrd-start\n");
-        return rc;
-    }
-
-    /* initrd-end */
-    rc = ft_set_prop(&devtree, chosen, "linux,initrd-end",
-            &initrd_end, sizeof(initrd_end));
-    if (rc < 0) {
-        DPRINTF("couldn't set /chosen/linux,initrd-end\n");
-        return rc;
-    }
-
-    rc = ft_set_rsvmap(devtree, 1, initrd_base, initrd_len);
-    if (rc < 0) {
-        DPRINTF("couldn't set initrd reservation\n");
-        return ~0UL;
-    }
-
-    /* start-info (XXX being removed soon) */
-    rc = ft_set_prop(&devtree, xen, "start-info", si, sizeof(si));
-    if (rc < 0) {
-        DPRINTF("couldn't set /xen/start-info\n");
-        return rc;
-    }
-
-    header = devtree;
-    devtree_size = header->totalsize;
-    {
-        static const char dtb[] = "/tmp/xc_domU.dtb";
-        int dfd = creat(dtb, 0666);
-        if (dfd != -1) {
-            write(dfd, devtree, devtree_size);
-            close(dfd);
-        } else
-            DPRINTF("could not open(\"%s\")\n", dtb);
-    }
-
-    DPRINTF("copying device tree to 0x%lx[0x%x]\n", DEVTREE_ADDR, devtree_size);
-    return install_image(xc_handle, domid, page_array, devtree, DEVTREE_ADDR,
-                       devtree_size);
-}
-
 static int load_initrd(
     int xc_handle,
     int domid,
@@ -187,13 +110,14 @@ out:
 }
 
 static unsigned long create_start_info(
-    void *devtree, start_info_t *start_info,
-        unsigned int console_evtchn, unsigned int store_evtchn,
-    unsigned long nr_pages, unsigned long rma_pages)
+        start_info_t *start_info,
+        unsigned int console_evtchn,
+        unsigned int store_evtchn,
+        unsigned long nr_pages,
+        unsigned long rma_pages)
 {
     unsigned long start_info_addr;
     uint64_t rma_top;
-    int rc;
 
     memset(start_info, 0, sizeof(*start_info));
     snprintf(start_info->magic, sizeof(start_info->magic),
@@ -209,13 +133,6 @@ static unsigned long create_start_info(
     start_info->console.domU.mfn = (rma_top >> PAGE_SHIFT) - 3;
     start_info->console.domU.evtchn = console_evtchn;
     start_info_addr = rma_top - 4*PAGE_SIZE;
-
-    rc = ft_set_rsvmap(devtree, 0, start_info_addr, 4*PAGE_SIZE);
-    if (rc < 0) {
-        DPRINTF("couldn't set start_info reservation\n");
-        return ~0UL;
-    }
-
 
     return start_info_addr;
 }
@@ -238,8 +155,7 @@ int xc_linux_build(int xc_handle,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
                    unsigned int console_evtchn,
-                   unsigned long *console_mfn,
-                   void *devtree)
+                   unsigned long *console_mfn)
 {
     start_info_t start_info;
     struct domain_setup_info dsi;
@@ -251,14 +167,18 @@ int xc_linux_build(int xc_handle,
     unsigned long initrd_len = 0;
     unsigned long start_info_addr;
     unsigned long rma_pages;
+    unsigned long shadow_mb;
+    int rma_log = 26;  /* 64MB RMA */
     int rc = 0;
+    int op;
+    struct ft_cxt devtree;
 
     DPRINTF("%s\n", __func__);
 
     nr_pages = mem_mb << (20 - PAGE_SHIFT);
     DPRINTF("nr_pages 0x%lx\n", nr_pages);
 
-    rma_pages = get_rma_pages(devtree);
+    rma_pages = (1 << rma_log) >> PAGE_SHIFT;
     if (rma_pages == 0) {
         rc = -1;
         goto out;
@@ -285,8 +205,25 @@ int xc_linux_build(int xc_handle,
         }
     }
 
+    /* fetch the current shadow_memory value for this domain */
+    op = XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION;
+    if (xc_shadow_control(xc_handle, domid, op, NULL, 0, 
+                          &shadow_mb, 0, NULL) < 0 ) {
+        rc = -1;
+        goto out;
+    }
+
+    /* build the devtree here */
+    DPRINTF("constructing devtree\n");
+    if (make_devtree(&devtree, domid, mem_mb, (rma_pages*PAGE_SIZE), shadow_mb,
+                     initrd_base, initrd_len, cmdline) < 0) {
+        DPRINTF("failed to create flattened device tree\n");
+        rc = -1;
+        goto out;
+    }
+    
     /* start_info stuff: about to be removed  */
-    start_info_addr = create_start_info(devtree, &start_info, console_evtchn,
+    start_info_addr = create_start_info(&start_info, console_evtchn,
                                         store_evtchn, nr_pages, rma_pages);
     *console_mfn = page_array[start_info.console.domU.mfn];
     *store_mfn = page_array[start_info.store_mfn];
@@ -296,16 +233,15 @@ int xc_linux_build(int xc_handle,
         goto out;
     }
 
-    if (devtree) {
-        DPRINTF("loading flattened device tree\n");
-        devtree_addr = DEVTREE_ADDR;
-        if (load_devtree(xc_handle, domid, page_array, devtree, devtree_addr,
-                         initrd_base, initrd_len, &start_info,
-                         start_info_addr)) {
-            DPRINTF("couldn't load flattened device tree.\n");
-            rc = -1;
-            goto out;
-        }
+    devtree_addr = DEVTREE_ADDR;
+    DPRINTF("loading flattened device tree to 0x%lx[0x%x]\n",
+            devtree_addr, devtree.bph->totalsize);
+
+    if (install_image(xc_handle, domid, page_array, (void *)devtree.bph,
+                      devtree_addr, devtree.bph->totalsize)) {
+        DPRINTF("couldn't load flattened device tree.\n");
+        rc = -1;
+        goto out;
     }
 
     if (init_boot_vcpu(xc_handle, domid, &dsi, devtree_addr, kern_addr)) {
@@ -314,6 +250,7 @@ int xc_linux_build(int xc_handle,
     }
 
 out:
+    free_devtree(&devtree);
     free_page_array(page_array);
     return rc;
 }

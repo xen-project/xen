@@ -239,8 +239,6 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
 
-        devtree = FlatDeviceTree.build(self)
-
         return xc.linux_build(domid          = self.vm.getDomid(),
                               memsize        = mem_mb,
                               image          = self.kernel,
@@ -248,8 +246,7 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
                               console_evtchn = console_evtchn,
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk,
-                              features       = self.vm.getFeatures(),
-                              arch_args      = devtree.to_bin())
+                              features       = self.vm.getFeatures())
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         """@param shadow_mem_kb The configured shadow memory, in KiB.
