@@ -1,5 +1,28 @@
 #include "xc_private.h"
 
+
+#if defined(__i386__) || defined(__x86_64__)
+static int modify_returncode(int xc_handle, uint32_t domid)
+{
+    vcpu_guest_context_t ctxt;
+    int rc;
+
+    if ( (rc = xc_vcpu_getcontext(xc_handle, domid, 0, &ctxt)) != 0 )
+        return rc;
+    ctxt.user_regs.eax = 1;
+    if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt)) != 0 )
+        return rc;
+
+    return 0;
+}
+#else
+static int modify_returncode(int xc_handle, uint32_t domid)
+{
+    return 0;
+}
+#endif
+
+
 /*
  * Resume execution of a domain after suspend shutdown.
  * This can happen in one of two ways:
@@ -13,7 +36,6 @@
  */
 int xc_domain_resume(int xc_handle, uint32_t domid)
 {
-    vcpu_guest_context_t ctxt;
     DECLARE_DOMCTL;
     int rc;
 
@@ -21,13 +43,8 @@ int xc_domain_resume(int xc_handle, uint32_t domid)
      * Set hypercall return code to indicate that suspend is cancelled
      * (rather than resuming in a new domain context).
      */
-#if defined(__i386__) || defined(__x86_64__)
-    if ( (rc = xc_vcpu_getcontext(xc_handle, domid, 0, &ctxt)) != 0 )
+    if ( (rc = modify_returncode(xc_handle, domid)) != 0 )
         return rc;
-    ctxt.user_regs.eax = 1;
-    if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt)) != 0 )
-        return rc;
-#endif
 
     domctl.cmd = XEN_DOMCTL_resumedomain;
     domctl.domain = domid;
