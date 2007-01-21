@@ -47,7 +47,8 @@ EXPORT_SYMBOL(swiotlb);
  */
 #define IO_TLB_SHIFT 11
 
-static int swiotlb_force;
+int swiotlb_force;
+
 static char *iotlb_virt_start;
 static unsigned long iotlb_nslabs;
 
