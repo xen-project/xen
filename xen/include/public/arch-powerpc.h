@@ -77,8 +77,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 typedef uint64_t xen_ulong_t;
 
-/* User-accessible registers: need to be saved/restored for every nested Xen
- * invocation. */
+/* User-accessible registers: nost of these need to be saved/restored
+ * for every nested Xen invocation. */
 struct cpu_user_regs
 {
     uint64_t gprs[32];
@@ -88,10 +88,13 @@ struct cpu_user_regs
     uint64_t srr1;
     uint64_t pc;
     uint64_t msr;
-    uint64_t fpscr;
+    uint64_t fpscr;             /* XXX Is this necessary */
     uint64_t xer;
-    uint64_t hid4;
+    uint64_t hid4;              /* debug only */
+    uint64_t dar;               /* debug only */
+    uint32_t dsisr;             /* debug only */
     uint32_t cr;
+    uint32_t __pad;             /* good spot for another 32bit reg */
     uint32_t entry_vector;
 };
 typedef struct cpu_user_regs cpu_user_regs_t;

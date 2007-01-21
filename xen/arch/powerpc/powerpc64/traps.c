@@ -41,7 +41,15 @@ void show_registers(struct cpu_user_regs *regs)
            regs->pc, regs->msr,
            regs->lr, regs->ctr,
            regs->srr0, regs->srr1);
-    for (i=0; i<32; i+=4) {
+
+    /* These come in handy for debugging but are not always saved, so
+     * what is "actually" in the register should be good */
+    printk("dar %016lx dsisr %08x *** saved\n"
+           "dar %016lx dsisr %08x *** actual\n",
+           regs->dar, regs->dsisr,
+           mfdar(), mfdsisr());
+
+    for (i = 0; i < 32; i += 4) {
         printk("r%02i: %016lx %016lx %016lx %016lx\n", i,
             regs->gprs[i], regs->gprs[i+1], regs->gprs[i+2], regs->gprs[i+3]);
     }

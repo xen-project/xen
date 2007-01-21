@@ -373,9 +373,15 @@ ex_machcheck_continued:
  * a better way, but this works for now. */
 ex_program_continued:
     SAVE_GPRS r14, r31, r1              /* save all the non-volatiles */
-    /* save hid4 for debug */
+
+    /* save these for debug, no needed for restore */
     mfspr r14, SPRN_HID4
     std r14, UREGS_hid4(r1)
+    mfdar r14
+    std r14, UREGS_dar(r1)
+    mfdsisr r14
+    stw r14, UREGS_dsisr(r1)
+
     mr r14, r0
     EXCEPTION_SAVE_STATE r1
     mr r4, r14

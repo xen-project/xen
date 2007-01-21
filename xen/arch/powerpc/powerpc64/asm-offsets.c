@@ -48,6 +48,8 @@ void __dummy__(void)
     OFFSET(UREGS_ctr, struct cpu_user_regs, ctr);
     OFFSET(UREGS_xer, struct cpu_user_regs, xer);
     OFFSET(UREGS_hid4, struct cpu_user_regs, hid4);
+    OFFSET(UREGS_dar, struct cpu_user_regs, dar);
+    OFFSET(UREGS_dsisr, struct cpu_user_regs, dsisr);
     OFFSET(UREGS_cr, struct cpu_user_regs, cr);
     OFFSET(UREGS_fpscr, struct cpu_user_regs, fpscr);
     DEFINE(UREGS_sizeof, sizeof(struct cpu_user_regs));
