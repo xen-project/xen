@@ -525,8 +525,7 @@ void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits)
     for (i = 0, b = 0; nbits > 0; i++, b += sizeof(l)) {
         l = 0;
         for (j = 0; (j < sizeof(l)) && (nbits > 0); j++) {
-            l <<= 8;
-            l |= bp[b+j];
+            l |= (uint64_t)bp[b+j] << (j*8);
             nbits -= 8;
         }
         lp[i] = l;
