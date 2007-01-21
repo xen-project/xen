@@ -173,6 +173,13 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     return 0;
 }
 
+int arch_vcpu_reset(struct vcpu *v)
+{
+    panic("%s: called for Dom%d[%d]\n",
+          __func__, v->domain->domain_id, v->vcpu_id);
+    return 0;
+}
+
 void dump_pageframe_info(struct domain *d)
 {
     struct page_info *page;
