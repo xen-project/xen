@@ -38,8 +38,6 @@
 #include <xen/keyhandler.h>
 
 extern int svm_dbg_on;
-extern int asidpool_assign_next(
-    struct vmcb_struct *vmcb, int retire_current, int oldcore, int newcore);
 
 #define GUEST_SEGMENT_LIMIT 0xffffffff
 
@@ -92,8 +90,9 @@ static int construct_vmcb(struct vcpu *v)
     struct vmcb_struct *vmcb = arch_svm->vmcb;
     svm_segment_attributes_t attrib;
 
-    /* Always flush the TLB on VMRUN. */
+    /* Always flush the TLB on VMRUN. All guests share a single ASID (1). */
     vmcb->tlb_control = 1;
+    vmcb->guest_asid  = 1;
 
     /* SVM intercepts. */
     vmcb->general1_intercepts = 
@@ -240,10 +239,7 @@ void svm_destroy_vmcb(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
 
     if ( arch_svm->vmcb != NULL )
-    {
-        asidpool_retire(arch_svm->vmcb, arch_svm->asid_core);
         free_vmcb(arch_svm->vmcb);
-    }
 
     if ( arch_svm->iopm != NULL )
     {
@@ -264,16 +260,10 @@ void svm_destroy_vmcb(struct vcpu *v)
 
 void svm_do_launch(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int core = smp_processor_id();
-
     hvm_stts(v);
 
     /* current core is the one we intend to perform the VMRUN on */
-    v->arch.hvm_svm.launch_core = v->arch.hvm_svm.asid_core = core;
-    clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    if ( !asidpool_assign_next(vmcb, 0, core, core) )
-        BUG();
+    v->arch.hvm_svm.launch_core = smp_processor_id();
 
     v->arch.schedule_tail = arch_svm_do_resume;
 }

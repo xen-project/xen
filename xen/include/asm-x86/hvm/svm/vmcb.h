@@ -457,7 +457,6 @@ struct arch_svm_struct {
     u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
     int                 saved_irq_vector;
     u32                 launch_core;
-    u32                 asid_core;
     
     unsigned long       flags;      /* VMCB flags */
     unsigned long       cpu_shadow_cr0; /* Guest value for CR0 */
@@ -476,17 +475,6 @@ int  svm_create_vmcb(struct vcpu *v);
 void svm_destroy_vmcb(struct vcpu *v);
 
 void setup_vmcb_dump(void);
-
-#define VMCB_USE_HOST_ENV       1
-#define VMCB_USE_SEPARATE_ENV   0
-
-enum {
-    ARCH_SVM_VMCB_LOADED = 0,
-    ARCH_SVM_VMCB_ASSIGN_ASID
-};
-
-#define VMCB_EFLAGS_RESERVED_0          0xffc08028 /* bitmap for 0 */
-#define VMCB_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
 
 /* These bits in the CR4 are owned by the host */
 #if CONFIG_PAGING_LEVELS >= 3

@@ -74,108 +74,6 @@ static void *root_vmcb[NR_CPUS] __read_mostly;
 /* physical address of above for host VMSAVE/VMLOAD */
 u64 root_vmcb_pa[NR_CPUS] __read_mostly;
 
-
-/* ASID API */
-enum {
-    ASID_AVAILABLE = 0,
-    ASID_INUSE,
-    ASID_RETIRED
-};
-#define   INITIAL_ASID      0
-#define   ASID_MAX          64
- 
-struct asid_pool {
-    spinlock_t asid_lock;
-    u32 asid[ASID_MAX];
-};
-
-static DEFINE_PER_CPU(struct asid_pool, asid_pool);
-
-
-/*
- * Initializes the POOL of ASID used by the guests per core.
- */
-void asidpool_init(int core)
-{
-    int i;
-
-    spin_lock_init(&per_cpu(asid_pool,core).asid_lock);
-
-    /* Host ASID is always in use */
-    per_cpu(asid_pool,core).asid[INITIAL_ASID] = ASID_INUSE;
-    for ( i = 1; i < ASID_MAX; i++ )
-        per_cpu(asid_pool,core).asid[i] = ASID_AVAILABLE;
-}
-
-
-/* internal function to get the next available ASID */
-static int asidpool_fetch_next(struct vmcb_struct *vmcb, int core)
-{
-    int i;  
-    for ( i = 1; i < ASID_MAX; i++ )
-    {
-        if ( per_cpu(asid_pool,core).asid[i] == ASID_AVAILABLE )
-        {
-            vmcb->guest_asid = i;
-            per_cpu(asid_pool,core).asid[i] = ASID_INUSE;
-            return i;
-        }
-    }
-    return -1;
-}
-
-
-/*
- * This functions assigns on the passed VMCB, the next
- * available ASID number. If none are available, the
- * TLB flush flag is set, and all retireds ASID
- * are made available. 
- *
- *  Returns: 1 -- sucess;
- *           0 -- failure -- no more ASID numbers 
- *                           available.
- */
-int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
-                          int oldcore, int newcore )
-{
-    int i;
-    int res = 1;
-    static unsigned long cnt=0;
-
-    spin_lock(&per_cpu(asid_pool,oldcore).asid_lock);
-    if( retire_current && vmcb->guest_asid ) {
-        per_cpu(asid_pool,oldcore).asid[vmcb->guest_asid & (ASID_MAX-1)] = 
-            ASID_RETIRED;
-    }
-    spin_unlock(&per_cpu(asid_pool,oldcore).asid_lock);
-    spin_lock(&per_cpu(asid_pool,newcore).asid_lock);
-    if( asidpool_fetch_next( vmcb, newcore ) < 0 ) {
-        if (svm_dbg_on)
-            printk( "SVM: tlb(%ld)\n", cnt++ );
-        /* FLUSH the TLB and all retired slots are made available */ 
-        vmcb->tlb_control = 1;
-        for( i = 1; i < ASID_MAX; i++ ) {
-            if( per_cpu(asid_pool,newcore).asid[i] == ASID_RETIRED ) {
-                per_cpu(asid_pool,newcore).asid[i] = ASID_AVAILABLE;
-            }
-        }
-        /* Get the First slot available */ 
-        res = asidpool_fetch_next( vmcb, newcore ) > 0;
-    }
-    spin_unlock(&per_cpu(asid_pool,newcore).asid_lock);
-    return res;
-}
-
-void asidpool_retire( struct vmcb_struct *vmcb, int core )
-{
-    spin_lock(&per_cpu(asid_pool,core).asid_lock);
-    if( vmcb->guest_asid ) {
-        per_cpu(asid_pool,core).asid[vmcb->guest_asid & (ASID_MAX-1)] = 
-            ASID_RETIRED;
-    }
-    spin_unlock(&per_cpu(asid_pool,core).asid_lock);
-}
-
 static inline void svm_inject_exception(struct vcpu *v, int trap, 
                                         int ev, int error_code)
 {
@@ -851,7 +749,6 @@ int start_svm(void)
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
-    asidpool_init( cpu );    
     printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
 
     /* Initialize the HSA for this core */
@@ -920,28 +817,11 @@ void arch_svm_do_resume(struct vcpu *v)
 
 static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
 {
-    struct vcpu *v = current;
-    unsigned long eip;
-    int result;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
-
-//#if HVM_DEBUG
-    eip = vmcb->rip;
     HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                 "svm_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
-                va, eip, (unsigned long)regs->error_code);
-//#endif
-
-    result = shadow_fault(va, regs); 
-
-    if( result ) {
-        /* Let's make sure that the Guest TLB is flushed */
-        set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    }
-
-    return result;
+                va, (unsigned long)current->arch.hvm_svm.vmcb->rip,
+                (unsigned long)regs->error_code);
+    return shadow_fault(va, regs); 
 }
 
 
@@ -1578,8 +1458,6 @@ static int svm_set_cr0(unsigned long value)
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                     (unsigned long) (mfn << PAGE_SHIFT));
-
-        set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
 
     if ( !((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled )
@@ -1600,7 +1478,6 @@ static int svm_set_cr0(unsigned long value)
             return 0;
         }
         shadow_update_paging_modes(v);
-        set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
@@ -1611,7 +1488,6 @@ static int svm_set_cr0(unsigned long value)
         }
         /* we should take care of this kind of situation */
         shadow_update_paging_modes(v);
-        set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
 
     return 1;
@@ -1702,7 +1578,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             v->arch.hvm_svm.cpu_cr3 = value;
             break;
         }
-        set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
 
         /* We make a new one if the shadow does not exist. */
         if (value == v->arch.hvm_svm.cpu_cr3) 
@@ -1795,10 +1670,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
          * all TLB entries except global entries.
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
-        {
-            set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
             shadow_update_paging_modes(v);
-        }
         break;
 
     case 8:
@@ -2140,8 +2012,6 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
         __update_guest_eip (vmcb, inst_len);
     }
 
-    /* Overkill, we may not this */
-    set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     shadow_invlpg(v, g_vaddr);
 }
 
@@ -2891,31 +2761,6 @@ asmlinkage void svm_load_cr2(void)
 
     local_irq_disable();
     asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
-}
-
-asmlinkage void svm_asid(void)
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    /*
-     * if need to assign new asid, or if switching cores,
-     * retire asid for the old core, and assign a new asid to the current core.
-     */
-    if ( test_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags ) ||
-         ( v->arch.hvm_svm.asid_core != v->arch.hvm_svm.launch_core )) {
-        /* recycle asid */
-        if ( !asidpool_assign_next(vmcb, 1,
-                                   v->arch.hvm_svm.asid_core,
-                                   v->arch.hvm_svm.launch_core) )
-        {
-            /* If we get here, we have a major problem */
-            domain_crash_synchronous();
-        }
-
-        v->arch.hvm_svm.asid_core = v->arch.hvm_svm.launch_core;
-        clear_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags );
-    }
 }
   
 /*
