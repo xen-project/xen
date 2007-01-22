@@ -40,6 +40,13 @@
 #define gfp_t unsigned
 #endif
 
+#if defined (_LINUX_NOTIFIER_H) && !defined ATOMIC_NOTIFIER_HEAD
+#define ATOMIC_NOTIFIER_HEAD(name) struct notifier_block *name
+#define atomic_notifier_chain_register(chain,nb) notifier_chain_register(chain,nb)
+#define atomic_notifier_chain_unregister(chain,nb) notifier_chain_unregister(chain,nb)
+#define atomic_notifier_call_chain(chain,val,v) notifier_call_chain(chain,val,v)
+#endif
+
 #if defined(_LINUX_FS_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 #define nonseekable_open(inode, filp) /* Nothing to do */
 #endif
@@ -67,6 +74,10 @@ void *kzalloc(size_t size, int flags);
 #if defined(_LINUX_KERNEL_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
 extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
        __attribute__ ((format (printf, 2, 3)));
+#endif
+
+#if defined(_I386_PAGE_H) && defined(CONFIG_X86_PAE)
+#define __supported_pte_mask ~0ULL
 #endif
 
 #endif

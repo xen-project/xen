@@ -272,13 +272,21 @@ static void backend_changed(struct xenbus_device *dev,
 		if (bd == NULL)
 			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
+		down(&bd->bd_sem);
+#else
 		mutex_lock(&bd->bd_mutex);
+#endif
 		if (info->users > 0)
 			xenbus_dev_error(dev, -EBUSY,
 					 "Device in use; refusing to close");
 		else
 			blkfront_closing(dev);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
+		up(&bd->bd_sem);
+#else
 		mutex_unlock(&bd->bd_mutex);
+#endif
 		bdput(bd);
 		break;
 	}
