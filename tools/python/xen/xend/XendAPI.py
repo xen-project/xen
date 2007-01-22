@@ -1149,23 +1149,26 @@ class XendAPI:
     # attributes (rw)
     def VBD_get_VM(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref, 'VM'))
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd',
+                                                               vbd_ref, 'VM'))
     
     def VBD_get_VDI(self, session, vbd_ref):
-        return xen_api_todo()
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd',
+                                                               vbd_ref, 'VDI'))
     
     def VBD_get_device(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
-                                                      'device'))
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                               'device'))
     def VBD_get_mode(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
-                                                      'mode'))
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                               'mode'))
     def VBD_get_driver(self, session, vbd_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property('vbd', vbd_ref,
-                                                      'driver'))
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                               'driver'))
 
     # Xen API: Class VIF
     # ----------------------------------------------------------------
@@ -1422,7 +1425,8 @@ class XendAPI:
 
     def VTPM_get_VM(self, session, vtpm_ref):
         xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property('vtpm', vtpm_ref, 'VM'))
+        return xen_api_success(xendom.get_dev_property_by_uuid('vtpm',
+                                                              vtpm_ref, 'VM'))
 
     # class methods
     def VTPM_create(self, session, vtpm_struct):
