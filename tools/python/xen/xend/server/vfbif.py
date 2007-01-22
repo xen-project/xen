@@ -14,7 +14,7 @@ def spawn_detached(path, args, env):
         os.waitpid(p, 0)
         
 CONFIG_ENTRIES = ['type', 'vncdisplay', 'vnclisten', 'vncpasswd', 'vncunused',
-                  'display', 'xauthority']
+                  'display', 'xauthority', 'keymap' ]
 
 class VfbifController(DevController):
     """Virtual frame buffer controller. Handles all vfb devices for a domain.
@@ -68,6 +68,8 @@ class VfbifController(DevController):
             vnclisten = config.get("vnclisten",
                                    xen.xend.XendOptions.instance().get_vnclisten_address())
             args += [ "--listen", vnclisten ]
+            if config.has_key("keymap"):
+                args += ["-k", "%s" % config["keymap"]]
             spawn_detached(args[0], args + std_args, os.environ)
         elif t == "sdl":
             args = [xen.util.auxbin.pathTo("xen-sdlfb")]

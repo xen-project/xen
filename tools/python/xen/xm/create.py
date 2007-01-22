@@ -594,6 +594,9 @@ def configure_vfbs(config_devs, vals):
                           'xauthority', 'type', 'vncpasswd' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
+        for n in iter(dir(vals)):
+            if n == "keymap":
+               config.append(['keymap',vals.keymap])
         if not d.has_key("display") and os.environ.has_key("DISPLAY"):
             config.append(["display", os.environ['DISPLAY']])
         if not d.has_key("xauthority"):
