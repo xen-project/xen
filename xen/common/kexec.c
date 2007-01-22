@@ -26,11 +26,6 @@
 
 typedef long ret_t;
 
-#define ELFNOTE_ALIGN(_n_) (((_n_)+3)&~3)
-#define ELFNOTE_NAME(_n_) ((char*)(_n_) + sizeof(*(_n_)))
-#define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + ELFNOTE_ALIGN((_n_)->namesz))
-#define ELFNOTE_NEXT(_n_) ((Elf_Note *)(ELFNOTE_DESC(_n_) + ELFNOTE_ALIGN((_n_)->descsz)))
-
 static DEFINE_PER_CPU(void *, crash_notes);
 
 static Elf_Note *xen_crash_note;

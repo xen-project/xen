@@ -517,6 +517,11 @@ typedef struct {
 #define AuxInfo		Aux64Info
 #endif
 
+#define ELFNOTE_ALIGN(_n_) (((_n_)+3)&~3)
+#define ELFNOTE_NAME(_n_) ((char*)(_n_) + sizeof(*(_n_)))
+#define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + ELFNOTE_ALIGN((_n_)->namesz))
+#define ELFNOTE_NEXT(_n_) ((Elf_Note *)(ELFNOTE_DESC(_n_) + ELFNOTE_ALIGN((_n_)->descsz)))
+
 struct domain_setup_info;
 extern int loadelfimage(struct domain_setup_info *);
 extern int parseelfimage(struct domain_setup_info *);
