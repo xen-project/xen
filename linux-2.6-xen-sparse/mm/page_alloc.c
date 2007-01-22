@@ -154,7 +154,11 @@ static void bad_page(struct page *page)
 			1 << PG_slab    |
 			1 << PG_swapcache |
 			1 << PG_writeback |
-			1 << PG_buddy );
+			1 << PG_buddy	|
+#ifdef CONFIG_X86_XEN
+			1 << PG_pinned	|
+#endif
+			1 << PG_foreign );
 	set_page_count(page, 0);
 	reset_page_mapcount(page);
 	page->mapping = NULL;
@@ -389,7 +393,11 @@ static inline int free_pages_check(struct page *page)
 			1 << PG_swapcache |
 			1 << PG_writeback |
 			1 << PG_reserved |
-			1 << PG_buddy ))))
+			1 << PG_buddy	|
+#ifdef CONFIG_X86_XEN
+			1 << PG_pinned	|
+#endif
+			1 << PG_foreign ))))
 		bad_page(page);
 	if (PageDirty(page))
 		__ClearPageDirty(page);
@@ -539,7 +547,11 @@ static int prep_new_page(struct page *page, int order, gfp_t gfp_flags)
 			1 << PG_swapcache |
 			1 << PG_writeback |
 			1 << PG_reserved |
-			1 << PG_buddy ))))
+			1 << PG_buddy	|
+#ifdef CONFIG_X86_XEN
+			1 << PG_pinned	|
+#endif
+			1 << PG_foreign ))))
 		bad_page(page);
 
 	/*

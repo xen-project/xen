@@ -25,6 +25,9 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 
+/* Is this pagetable pinned? */
+#define PG_pinned	PG_arch_1
+
 struct mm_struct;
 struct vm_area_struct;
 

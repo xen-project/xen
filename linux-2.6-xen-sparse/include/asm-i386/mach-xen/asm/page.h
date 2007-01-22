@@ -28,13 +28,12 @@
 #include <asm/bug.h>
 #include <xen/interface/xen.h>
 #include <xen/features.h>
-#include <xen/foreign_page.h>
 
-#define arch_free_page(_page,_order)			\
-({	int foreign = PageForeign(_page);		\
-	if (foreign)					\
-		(PageForeignDestructor(_page))(_page);	\
-	foreign;					\
+#define arch_free_page(_page,_order)		\
+({	int foreign = PageForeign(_page);	\
+	if (foreign)				\
+		PageForeignDestructor(_page);	\
+	foreign;				\
 })
 #define HAVE_ARCH_FREE_PAGE
 
