@@ -99,12 +99,6 @@ static unsigned long long xen_guest_numeric(struct domain_setup_info *dsi,
     return value;
 }
 
-/*
- * Interface to the Xen ELF notes.
- */
-#define ELFNOTE_NAME(_n_)   ((const char*)(_n_) + sizeof(*(_n_)))
-#define ELFNOTE_DESC(_n_)   (ELFNOTE_NAME(_n_) + (((_n_)->namesz+3)&~3))
-#define ELFNOTE_NEXT(_n_)   (ELFNOTE_DESC(_n_) + (((_n_)->descsz+3)&~3))
 
 static int is_xen_elfnote_section(const char *image, const Elf_Shdr *shdr)
 {
@@ -115,7 +109,7 @@ static int is_xen_elfnote_section(const char *image, const Elf_Shdr *shdr)
 
     for ( note = (const Elf_Note *)(image + shdr->sh_offset);
           note < (const Elf_Note *)(image + shdr->sh_offset + shdr->sh_size);
-          note = (const Elf_Note *)ELFNOTE_NEXT(note) )
+          note = ELFNOTE_NEXT(note) )
     {
         if ( !strncmp(ELFNOTE_NAME(note), "Xen", 4) )
             return 1;
@@ -134,7 +128,7 @@ static const Elf_Note *xen_elfnote_lookup(
 
     for ( note = (const Elf_Note *)dsi->__elfnote_section;
           note < (const Elf_Note *)dsi->__elfnote_section_end;
-          note = (const Elf_Note *)ELFNOTE_NEXT(note) )
+          note = ELFNOTE_NEXT(note) )
     {
         if ( strncmp(ELFNOTE_NAME(note), "Xen", 4) )
             continue;
