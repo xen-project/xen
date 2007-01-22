@@ -14,6 +14,9 @@ install: build
 	if [ ! -d "$(DESTDIR)/var/vtpm/fifos" ]; \
 		then mkdir -p $(DESTDIR)/var/vtpm/fifos; \
 	fi
+	if [ ! -d "$(DESTDIR)/var/vtpm/socks" ]; \
+		then mkdir -p $(DESTDIR)/var/vtpm/socks; \
+	fi
 	$(INSTALL_PROG) $(BIN) $(TOOLS_INSTALL_DIR)
 
 .PHONY: clean

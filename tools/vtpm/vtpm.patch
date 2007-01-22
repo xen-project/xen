@@ -1,14 +1,14 @@
 diff -uprN tpm_emulator/AUTHORS vtpm/AUTHORS
---- tpm_emulator/AUTHORS	2006-07-24 14:35:35.000000000 -0700
-+++ vtpm/AUTHORS	2006-07-24 14:35:35.000000000 -0700
+--- tpm_emulator/AUTHORS	2006-12-08 12:51:29.000000000 -0800
++++ vtpm/AUTHORS	2006-12-13 16:38:52.000000000 -0800
 @@ -1,3 +1,3 @@
  Mario Strasser <mast@gmx.net>
  Heiko Stamer <stamer@gaos.org> [DAA]
 -INTEL Corp <> [Dropped to Ring3]
 +INTEL Corp <> [VTPM Extensions]
 diff -uprN tpm_emulator/ChangeLog vtpm/ChangeLog
---- tpm_emulator/ChangeLog	2006-07-24 14:35:35.000000000 -0700
-+++ vtpm/ChangeLog	2006-07-24 14:35:35.000000000 -0700
+--- tpm_emulator/ChangeLog	2006-12-08 12:51:29.000000000 -0800
++++ vtpm/ChangeLog	2006-12-13 16:38:52.000000000 -0800
 @@ -1,5 +1,6 @@
  ????-??-?? Intel Corp
  	* Moved module out of kernel to run as a ring 3 app
@@ -17,9 +17,9 @@ diff -uprN tpm_emulator/ChangeLog vtpm/ChangeLog
  2006-06-23  Mario Strasser <mast@gmx.net>
  	* tpm_startup.c: behaviour of ST_CLEAR and storage of
 diff -uprN tpm_emulator/linux_module.h vtpm/linux_module.h
---- tpm_emulator/linux_module.h	2006-07-24 14:35:35.000000000 -0700
-+++ vtpm/linux_module.h	2006-07-24 14:35:35.000000000 -0700
-@@ -44,18 +44,21 @@
+--- tpm_emulator/linux_module.h	2006-12-08 12:51:29.000000000 -0800
++++ vtpm/linux_module.h	2007-01-09 14:49:06.000000000 -0800
+@@ -44,18 +44,26 @@
  #define TPM_DEVICE_NAME   "tpm"
  #define TPM_MODULE_NAME   "tpm_emulator"
  
@@ -31,8 +31,13 @@ diff -uprN tpm_emulator/linux_module.h vtpm/linux_module.h
 -                        __FILE__, __LINE__, ## __VA_ARGS__)
 +#define debug(fmt, ...) printf("TPMD[%d]: %s:%d: Debug: " fmt "\n", \
 +                        dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define debug_nostop(fmt, ...) printf("TPMD[%d]: %s:%d: Debug: " fmt, \
++                        dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define debug_more(fmt, ...) printf( fmt, ## __VA_ARGS__ )
  #else
  #define debug(fmt, ...) 
++#define debug_nostop(fmt, ...) 
++#define debug_more(fmt, ...)
  #endif
 -#define info(fmt, ...)  printf("TPMD: %s:%d: Info: " fmt "\n", \
 -                        __FILE__, __LINE__, ## __VA_ARGS__)
@@ -50,8 +55,8 @@ diff -uprN tpm_emulator/linux_module.h vtpm/linux_module.h
  /* memory allocation */
  
 diff -uprN tpm_emulator/Makefile vtpm/Makefile
---- tpm_emulator/Makefile	2006-07-24 14:35:35.000000000 -0700
-+++ vtpm/Makefile	2006-07-24 14:35:35.000000000 -0700
+--- tpm_emulator/Makefile	2006-12-08 12:51:29.000000000 -0800
++++ vtpm/Makefile	2006-12-13 16:38:52.000000000 -0800
 @@ -7,7 +7,7 @@
  COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
  
@@ -83,9 +88,46 @@ diff -uprN tpm_emulator/Makefile vtpm/Makefile
  
  .PHONY: all install clean dist gmp version
 +
+diff -uprN tpm_emulator/tpm/tpm_capability.c vtpm/tpm/tpm_capability.c
+--- tpm_emulator/tpm/tpm_capability.c	2006-06-23 03:37:07.000000000 -0700
++++ vtpm/tpm/tpm_capability.c	2007-01-10 10:00:49.000000000 -0800
+@@ -136,8 +136,18 @@ static TPM_RESULT cap_property(UINT32 su
+ 
+     case TPM_CAP_PROP_TIS_TIMEOUT:
+       debug("[TPM_CAP_PROP_TIS_TIMEOUT]");
+-      /* TODO: TPM_CAP_PROP_TIS_TIMEOUT */
+-      return TPM_FAIL;
++      /* TODO: TPM_CAP_PROP_TIS_TIMEOUT: Measure these values and determine correct ones */
++      UINT32 len = *respSize = 16;
++      BYTE *ptr = *resp = tpm_malloc(*respSize);
++      if (ptr == NULL || 
++          tpm_marshal_UINT32(&ptr, &len, 200000) ||
++          tpm_marshal_UINT32(&ptr, &len, 200000) ||
++          tpm_marshal_UINT32(&ptr, &len, 200000) ||
++          tpm_marshal_UINT32(&ptr, &len, 200000)) {
++        tpm_free(*resp);
++        return TPM_FAIL;
++      }
++      return TPM_SUCCESS;
+ 
+     case TPM_CAP_PROP_STARTUP_EFFECT:
+       debug("[TPM_CAP_PROP_STARTUP_EFFECT]");
+@@ -190,7 +200,11 @@ static TPM_RESULT cap_property(UINT32 su
+ 
+     case TPM_CAP_PROP_DURATION:
+       debug("[TPM_CAP_PROP_DURATION]");
+-      /* TODO: TPM_CAP_PROP_DURATION */
++      /* TODO: TPM_CAP_PROP_DURATION: Measure these values and return accurate ones */
++      BYTE dur[]= {0x0,0x0,0x0,0xc,0x0,0x7,0xa1,0x20,0x0,0x1e,0x84,0x80,0x11,0xe1,0xa3,0x0}; 
++      *respSize = 16;
++      *resp = tpm_malloc(*respSize);
++      memcpy(*resp,dur,16); 
+       return TPM_FAIL;
+ 
+     case TPM_CAP_PROP_ACTIVE_COUNTER:
 diff -uprN tpm_emulator/tpm/tpm_data.c vtpm/tpm/tpm_data.c
---- tpm_emulator/tpm/tpm_data.c	2006-07-24 14:35:35.000000000 -0700
-+++ vtpm/tpm/tpm_data.c	2006-07-24 14:35:35.000000000 -0700
+--- tpm_emulator/tpm/tpm_data.c	2006-12-08 12:51:29.000000000 -0800
++++ vtpm/tpm/tpm_data.c	2006-12-13 16:38:52.000000000 -0800
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -371,10 +413,15 @@ diff -uprN tpm_emulator/tpm/tpm_data.c vtpm/tpm/tpm_data.c
  
  #else
 diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
---- tpm_emulator/tpmd.c	2006-07-24 14:35:35.000000000 -0700
-+++ vtpm/tpmd.c	2006-07-24 14:35:35.000000000 -0700
-@@ -23,13 +23,27 @@
+--- tpm_emulator/tpmd.c	2006-12-08 12:51:29.000000000 -0800
++++ vtpm/tpmd.c	2007-01-09 14:48:56.000000000 -0800
+@@ -21,12 +21,24 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
  #include <sys/time.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <errno.h>
  
  #include "tpm_emulator.h"
 +#include "vtpm_manager.h"
@@ -384,61 +431,115 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 +#ifdef VTPM_MULTI_VM
 + #define DEV_BE "/dev/vtpm"
 +#else
-+ #define GUEST_RX_FIFO_D "/var/vtpm/fifos/tpm_cmd_to_%d.fifo"
-+ #define GUEST_TX_FIFO "/var/vtpm/fifos/tpm_rsp_from_all.fifo"
-+#endif
++ #define PVM_RX_FIFO_D "/var/vtpm/fifos/tpm_cmd_to_%d.fifo"
++ #define PVM_TX_FIFO "/var/vtpm/fifos/tpm_rsp_from_all.fifo"
  
++ #define HVM_RX_FIFO_D "/var/vtpm/socks/%d.socket"
++#endif
++
 + int dmi_id;
 +						
  #define BUFFER_SIZE 2048
  
-+static uint8_t ctrl_msg[] = { 0, 0, 0, 0,   // destination
-+                              1, 193,       // VTPM_TAG
-+                              0, 0, 0, 10,  // Size
-+                              0, 0, 0, 0};  // TPM_SUCCESS
-+                            
-+
  static int devurandom=0;
-+
- 	  
- void get_random_bytes(void *buf, int nbytes) {
-   
-@@ -52,18 +66,26 @@ uint64_t tpm_get_ticks(void)
+@@ -38,7 +50,7 @@ void get_random_bytes(void *buf, int nby
+   }
+ 
+   if (read(devurandom, buf, nbytes) != nbytes) {
+-      printf("Can't get random number.\n");
++      error("Can't get random number.\n");
+       exit(-1);
+   }
+ }
+@@ -52,105 +64,182 @@ uint64_t tpm_get_ticks(void)
  
  int main(int argc, char **argv)
  {
 -  uint8_t in[BUFFER_SIZE], *out;
-+  uint8_t in[BUFFER_SIZE], *out, *addressed_out;
++  uint8_t type, in[BUFFER_SIZE], *out, *addressed_out;
++  char *vtpm_rx_file=NULL;
    uint32_t out_size;
    int in_size, written;
 -  int i;
 -  struct stat file_info;
--
--  int tpm_tx_fh=-1, tpm_rx_fh=-1;
 +  int i, guest_id=-1;
+ 
+-  int tpm_tx_fh=-1, tpm_rx_fh=-1;
++#ifndef VTPM_MULTI_VM
++  int sockfd = -1;
++  struct sockaddr_un addr;
++  struct sockaddr_un client_addr;
++  unsigned int client_length;
++
++#endif
 + 
 +  int vtpm_tx_fh=-1, vtpm_rx_fh=-1;
 +#ifdef VTPM_MULTI_VM
    if (argc < 2) {
-     printf("Usage: tpmd clear|save|deactivated\n" );
+-    printf("Usage: tpmd clear|save|deactivated\n" );
++    error("Usage: tpmd clear|save|deactivated\n" );
 +#else
-+  if (argc < 3) {
-+    printf("Usage: tpmd clear|save|deactivated vtpmid\n" );
++  if (argc < 4) {
++    error("Usage: tpmd clear|save|deactivated pvm|hvm vtpmid\n" );
 +#endif
  	  return -1;
    }
  
 +#ifndef VTPM_MULTI_VM
-+  dmi_id = atoi(argv[2]);
++  /* setup type of vm */
++  if (!strcmp(argv[2], "pvm")) {
++    type = VTPM_TYPE_PVM; // Get commands from vTPM Manager through fifo
++  } else if (!strcmp(argv[2], "hvm")) {
++    type = VTPM_TYPE_HVM; // Get commands from qemu via socket
++  } else {
++    error("invalid vTPM type '%s'.\n", argv[2]);
++  }
++
++  dmi_id = atoi(argv[3]);
++
++  if (type == VTPM_TYPE_PVM) {
++    vtpm_rx_file = malloc(10 + strlen(PVM_RX_FIFO_D));
++    sprintf(vtpm_rx_file, PVM_RX_FIFO_D, (uint32_t) dmi_id);
++  } else {
++    vtpm_rx_file = malloc(10 + strlen(HVM_RX_FIFO_D));
++    sprintf(vtpm_rx_file, HVM_RX_FIFO_D, (uint32_t) dmi_id);
++
++    if ( (sockfd = socket(PF_UNIX,SOCK_STREAM,0)) < 0) {
++          error("Unable to create socket. errno = %d\n", errno);
++      exit (-1);
++    }
++
++    memset(&addr, 0, sizeof(addr));
++    addr.sun_family = AF_UNIX;
++    strcpy(addr.sun_path,vtpm_rx_file );
++    unlink(addr.sun_path);
++  }
++#endif
++
++#ifdef VTPM_MULTI_VM
++  info("Initializing tpm state: %s\n", argv[1]);
++#else
++  info("Initializing tpm state: %s, type: %s, id: %d\n", argv[1], argv[2], dmi_id);
 +#endif
 +
    /* initialize TPM emulator */
    if (!strcmp(argv[1], "clear")) {
-     printf("Initializing tpm: %s\n", argv[1]);
-@@ -80,46 +102,30 @@ int main(int argc, char **argv)
+-    printf("Initializing tpm: %s\n", argv[1]);
+     tpm_emulator_init(1);
+-  } else if (!strcmp(argv[1], "save")) { 
+-    printf("Initializing tpm: %s\n", argv[1]);
++  } else if (!strcmp(argv[1], "save")) {
+     tpm_emulator_init(2);
+   } else if (!strcmp(argv[1], "deactivated")) {
+-    printf("Initializing tpm: %s\n", argv[1]);
+     tpm_emulator_init(3);
+   } else {
+-    printf("invalid startup mode '%s'; must be 'clear', "
++    error("invalid startup mode '%s'; must be 'clear', "
+       "'save' (default) or 'deactivated", argv[1]);
      return -1;
    }
- 
+-
 -  if ( stat(TPM_RX_FNAME, &file_info) == -1) {
 -    if ( mkfifo(TPM_RX_FNAME, S_IWUSR | S_IRUSR ) ) {
 -      printf("Failed to create fifo %s.\n", TPM_RX_FNAME);
@@ -453,8 +554,6 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 -    }
 -  }
 -
-+  char *guest_rx_file = malloc(10 + strlen(GUEST_RX_FIFO_D));
-+  sprintf(guest_rx_file, GUEST_RX_FIFO_D, (uint32_t) dmi_id);
 +  
    while (1) {
  abort_command:
@@ -462,15 +561,33 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 -      tpm_rx_fh = open(TPM_RX_FNAME, O_RDONLY);
 +    if (vtpm_rx_fh < 0) {
 +#ifdef VTPM_MUTLI_VM
-+	  vtpm_rx_fh = open(DEV_BE, O_RDWR);
++      vtpm_rx_fh = open(DEV_BE, O_RDWR);
 +#else
-+      vtpm_rx_fh = open(guest_rx_file, O_RDONLY);
++      if (type == VTPM_TYPE_PVM) {
++        vtpm_rx_fh = open(vtpm_rx_file, O_RDONLY);
++      } else {
++        if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
++          error("Unable to bind(). errno = %d\n", errno);
++          exit (-1);
++        }
++
++        if (listen(sockfd, 10) <0) {
++          error("Unable to listen(). errno = %d\n", errno);
++          exit (-1);
++        }
++
++        memset(&client_addr, 0, sizeof(client_addr));
++        client_length = sizeof(client_addr);
++
++        vtpm_rx_fh = vtpm_tx_fh = accept(sockfd, &client_addr, &client_length);
++      }
 +#endif
      }
      
 -    if (tpm_rx_fh < 0) {
+-      printf("ERROR: failed to open devices to listen to guest.\n");
 +    if (vtpm_rx_fh < 0) {
-       printf("ERROR: failed to open devices to listen to guest.\n");
++      error("Failed to open devices to listen to guest.\n");
        return -1;
      }
      
@@ -486,7 +603,8 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 -    in_size = read(tpm_rx_fh, in, BUFFER_SIZE);
 +    in_size = read(vtpm_rx_fh, in, BUFFER_SIZE);
      if (in_size < 6) { // Magic size of minium TPM command
-       printf("Recv[%d] to small: 0x", in_size);
+-      printf("Recv[%d] to small: 0x", in_size);
++      info("Recv incomplete command of %d bytes.", in_size);
        if (in_size <= 0) {
 -          close(tpm_rx_fh);
 -          tpm_rx_fh = -1;
@@ -495,8 +613,13 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
            goto abort_command;
        }
      } else { 
-@@ -129,28 +135,73 @@ abort_command:
-       printf("\n");
+-      printf("Recv[%d]: 0x", in_size);
++      debug_nostop("Recv[%d]: 0x", in_size);
+       for (i=0; i< in_size; i++) 
+-        printf("%x ", in[i]);
+-      printf("\n");
++        debug_more("%x ", in[i]);
++      debug_more("\n");
      }
  
 -    
@@ -504,71 +627,56 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 -        printf("ERROR: Handler Failed.\n");
 +    if (guest_id == -1) {
 +        guest_id = *((uint32_t *) in);
-+        *((uint32_t *) ctrl_msg) = *((uint32_t *) in);
 +    } else {
 +        if (guest_id != *((uint32_t *) in) ) {
-+            printf("WARNING: More than one guest attached\n");
++            error("WARNING: More than one guest attached\n");
 +        }
++    }
++
++    if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++      vtpm_tx_fh = open(DEV_BE, O_RDWR);
++      vtpm_rx_fh = vtpm_tx_fh;
++#else
++      if (type == VTPM_TYPE_PVM) {
++        vtpm_tx_fh = open(PVM_TX_FIFO, O_WRONLY);
++      } // No need to open the other direction for HVM
++#endif
++    }
++
++    if (vtpm_tx_fh < 0) {
++      error("Failed to open devices to respond to guest.\n");
++      return -1;
++    }
++
++    // Handle the command, but skip the domain id header    
++    if (tpm_handle_command(in + sizeof(uint32_t), in_size - sizeof(uint32_t), &out, &out_size) != 0) { 
++      error("Handler Failed.\n");
      }
  
 -    written = write(tpm_tx_fh, out, out_size);
-+    if (vtpm_tx_fh < 0) {
-+#ifdef VTPM_MUTLI_VM
-+	  vtpm_tx_fh = open(DEV_BE, O_RDWR);
-+	  vtpm_rx_fh = vtpm_tx_fh;
-+#else
-+      vtpm_tx_fh = open(GUEST_TX_FIFO, O_WRONLY);
-+#endif
-+    }
++    addressed_out = (uint8_t *) tpm_malloc(sizeof(uint32_t) + out_size);
++    *(uint32_t *) addressed_out = *(uint32_t *) in;
++    memcpy(addressed_out + sizeof(uint32_t), out, out_size);
++
++    written = write(vtpm_tx_fh, addressed_out, out_size + sizeof(uint32_t));
  
 -    if (written != out_size ) {
 -      printf("ERROR: Part of response not written %d/%d.\nAttempt: ", written, out_size);
--    } else {
++    if (written != out_size + sizeof(uint32_t)) {
++      error("Part of response not written %d/%d.\n", written, out_size);
+     } else {
 -      printf("Sent[%Zu]: ", out_size);
-+    if (vtpm_tx_fh < 0) {
-+      printf("ERROR: failed to open devices to respond to guest.\n");
-+      return -1;
-+    }
-+    
-+    // Handle command, but we need to skip the identifier
-+    if (  BE16_TO_CPU( ((uint16_t *) in)[2] ) == VTPM_TAG_REQ ) { // Control message from xend
-+      // This DM doesn't really care about ctrl messages. Just ACK the message
-+      written = write(vtpm_tx_fh, ctrl_msg, sizeof(ctrl_msg));
-+
-+      if (written != sizeof(ctrl_msg)) {
-+        printf("ERROR: Part of response not written %d/%Zu.\n", written, sizeof(ctrl_msg));
-+      } else {
-+        printf("Send Ctrl Message confermation\n");
-+      }
-+    } else { // Message from Guest
-+      if (tpm_handle_command(in + sizeof(uint32_t), in_size - sizeof(uint32_t), &out, &out_size) != 0) { 
-+        printf("ERROR: Handler Failed.\n");
-+      }
-+
-+      addressed_out = (uint8_t *) tpm_malloc(sizeof(uint32_t) + out_size);
-+      *(uint32_t *) addressed_out = *(uint32_t *) in;
-+      memcpy(addressed_out + sizeof(uint32_t), out, out_size);
-+
-+      written = write(vtpm_tx_fh, addressed_out, out_size + sizeof(uint32_t));
-+
-+      if (written != out_size + sizeof(uint32_t)) {
-+        printf("ERROR: Part of response not written %d/%d.\n", written, out_size);
-+        for (i=0; i< out_size+ sizeof(uint32_t); i++)
-+          printf("%x ", addressed_out[i]);
-+        printf("\n");
-+      } else {
-+        printf("Sent[%Zu]: ", out_size + sizeof(uint32_t));
-+        for (i=0; i< out_size+ sizeof(uint32_t); i++)
-+          printf("%x ", addressed_out[i]);
-+        printf("\n");
-+      }
-+      tpm_free(out);
-+      tpm_free(addressed_out);
++      debug_nostop("Sent[%Zu]: ", out_size + sizeof(uint32_t));
++      for (i=0; i< out_size+ sizeof(uint32_t); i++)
++        debug_more("%x ", addressed_out[i]);
++      debug_more("\n");
      }
 -    for (i=0; i< out_size; i++)
 -      printf("%x ", out[i]);
 -    printf("\n");
--    tpm_free(out);
+     tpm_free(out);
++    tpm_free(addressed_out);
  
    } // loop
  
@@ -579,19 +687,7 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 +  close(vtpm_tx_fh);
 +#ifndef VTPM_MUTLI_VM
 +  close(vtpm_rx_fh);
-+  free (guest_rx_file);
++  free (vtpm_rx_file);
 +#endif
  
  }
-Binary files tpm_emulator/tpm_emulator and vtpm/tpm_emulator differ
-diff -uprN tpm_emulator/tpm_version.h vtpm/tpm_version.h
---- tpm_emulator/tpm_version.h	2006-07-24 14:35:41.000000000 -0700
-+++ vtpm/tpm_version.h	2006-07-24 14:35:35.000000000 -0700
-@@ -2,5 +2,5 @@
- #define _TPM_VERSION_H_
- #define VERSION_MAJOR 0
- #define VERSION_MINOR 4
--#define VERSION_BUILD 1153776940
-+#define VERSION_BUILD 1153776935
- #endif /* _TPM_VERSION_H_ */
-Binary files tpm_emulator/vtpmd and vtpm/vtpmd differ
