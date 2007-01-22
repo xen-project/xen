@@ -1064,9 +1064,9 @@ static PyMethodDef pyxc_methods[] = {
       "Destroy a domain.\n"
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
-    
+
     { "domain_resume", 
-      (PyCFunction)pyxc_domain_resume, 
+      (PyCFunction)pyxc_domain_resume,
       METH_VARARGS, "\n"
       "Resume execution of a suspended domain.\n"
       " dom [int]: Identifier of domain to be resumed.\n\n"

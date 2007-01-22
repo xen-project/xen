@@ -1580,6 +1580,16 @@ class XendDomainInfo:
             log.exception("Exception in alloc_unbound(%d)", self.domid)
             raise
 
+    def _resetChannels(self):
+        """Reset all event channels in the domain.
+        """
+        try:
+            return xc.evtchn_reset(dom=self.domid)
+        except:
+            log.exception("Exception in evtcnh_reset(%d)", self.domid)
+            raise
+
+
     #
     # Bootloader configuration
     #
@@ -1727,6 +1737,25 @@ class XendDomainInfo:
             test = 0
             diff = time.time() - start
             for i in self.getDeviceController('vbd').deviceIDs():
+                test = 1
+                log.info("Dev %s still active, looping...", i)
+                time.sleep(0.1)
+                
+            if test == 0:
+                break
+            if diff >= MIGRATE_TIMEOUT:
+                log.info("Dev still active but hit max loop timeout")
+                break
+
+    def testvifsComplete(self):
+        """ In case vifs are released and then created for the same
+        domain, we need to wait the device shut down.
+        """
+        start = time.time()
+        while True:
+            test = 0
+            diff = time.time() - start
+            for i in self.getDeviceController('vif').deviceIDs():
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)

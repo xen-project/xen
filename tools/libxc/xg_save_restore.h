@@ -34,11 +34,10 @@
 **
 ** Returns 1 on success, 0 on failure.
 */
-static int get_platform_info(int xc_handle, uint32_t dom,
-                             /* OUT */ unsigned long *max_mfn,
-                             /* OUT */ unsigned long *hvirt_start,
-                             /* OUT */ unsigned int *pt_levels)
-
+static inline int get_platform_info(int xc_handle, uint32_t dom,
+                                    /* OUT */ unsigned long *max_mfn,
+                                    /* OUT */ unsigned long *hvirt_start,
+                                    /* OUT */ unsigned int *pt_levels)
 {
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
