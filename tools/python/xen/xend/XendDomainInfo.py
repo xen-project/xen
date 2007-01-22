@@ -41,7 +41,7 @@ from xen.xend import balloon, sxp, uuid, image, arch, osdep
 from xen.xend import XendOptions, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
-from xen.xend.XendBootloader import bootloader
+from xen.xend.XendBootloader import bootloader, bootloader_tidy
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.xenstore.xstransact import xstransact, complete
@@ -101,7 +101,6 @@ def create_from_dict(config_dict):
         log.exception('Domain construction failed')
         vm.destroy()
         raise
-
     return vm
 
 def recreate(info, priv):
@@ -187,6 +186,11 @@ def recreate(info, priv):
 
     vm._registerWatches()
     vm.refreshShutdown(xeninfo)
+
+    # register the domain in the list 
+    from xen.xend import XendDomain
+    XendDomain.instance().add_domain(vm)
+
     return vm
 
 
@@ -1338,6 +1342,9 @@ class XendDomainInfo:
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus_number']))
 
+        # register the domain in the list 
+        from xen.xend import XendDomain
+        XendDomain.instance().add_domain(self)
 
     def _introduceDomain(self):
         assert self.domid is not None
@@ -1436,6 +1443,7 @@ class XendDomainInfo:
         try:
             self.unwatchShutdown()
             self._releaseDevices()
+            bootloader_tidy(self)
 
             if self.image:
                 try:
@@ -1536,6 +1544,9 @@ class XendDomainInfo:
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
+        from xen.xend import XendDomain
+        XendDomain.instance().remove_domain(self)
+
         self.cleanupDomain()
 
 
@@ -1631,7 +1642,7 @@ class XendDomainInfo:
                     fn = BOOTLOADER_LOOPBACK_DEVICE
 
                 try:
-                    blcfg = bootloader(blexec, fn, True,
+                    blcfg = bootloader(blexec, fn, self, False,
                                        bootloader_args, kernel, ramdisk, args)
                 finally:
                     if mounted:

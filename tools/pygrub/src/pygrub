@@ -201,7 +201,9 @@ class Grub:
             enable_cursor(False)
             self.entry_win = curses.newwin(10, 74, 2, 1)
             self.text_win = curses.newwin(10, 70, 12, 5)
-            
+            curses.def_prog_mode()
+        
+        curses.reset_prog_mode()
         self.screen.clear()
         self.screen.refresh()
 
@@ -549,11 +551,12 @@ if __name__ == "__main__":
     sel = None
     
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qh::',
-                                   ["quiet", "help", "output=", "entry=", "kernel=", "ramdisk=", "args=",
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qih::',
+                                   ["quiet", "interactive", "help", "output=",
+                                    "entry=", "kernel=", "ramdisk=", "args=",
                                     "isconfig"])
     except getopt.GetoptError:
         usage()
@@ -579,6 +582,8 @@ if __name__ == "__main__":
     for o, a in opts:
         if o in ("-q", "--quiet"):
             interactive = False
+        elif o in ("-i", "--interactive"):
+            interactive = True
         elif o in ("-h", "--help"):
             usage()
             sys.exit()

@@ -24,6 +24,7 @@ import os.path
 import sys
 import socket
 import re
+import time
 import xmlrpclib
 
 from xen.xend import sxp
@@ -709,26 +710,6 @@ def configure_hvm(config_image, vals):
             config_image.append([a, vals.__dict__[a]])
     config_image.append(['vncpasswd', vals.vncpasswd])
 
-def run_bootloader(vals, config_image):
-    if not os.access(vals.bootloader, os.F_OK):
-        err("Bootloader '%s' does not exist" % vals.bootloader)
-    if not os.access(vals.bootloader, os.X_OK):
-        err("Bootloader '%s' isn't executable" % vals.bootloader)
-    if len(vals.disk) < 1:
-        err("No disks configured and boot loader requested")
-    (uname, dev, mode, backend) = vals.disk[0]
-    file = blkif.blkdev_uname_to_file(uname)
-
-    if vals.bootentry:
-        warn("The bootentry option is deprecated.  Use bootargs and pass "
-             "--entry= directly.")
-        vals.bootargs = "--entry=%s" %(vals.bootentry,)
-
-    kernel = sxp.child_value(config_image, 'kernel')
-    ramdisk = sxp.child_value(config_image, 'ramdisk')
-    args = sxp.child_value(config_image, 'args')
-    return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.bootargs, kernel, ramdisk, args)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -771,14 +752,11 @@ def make_config(vals):
         if vals.bootloader == "pygrub":
             vals.bootloader = osdep.pygrub_path
 
-        # if a kernel is specified, we're using the bootloader
-        # non-interactively, and need to let xend run it so we preserve the
-        # real kernel choice.
-        if not vals.kernel:
-            config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
             config.append(['bootloader_args', vals.bootargs])
+        else: 
+            config.append(['bootloader_args', '-q'])        
     config.append(['image', config_image])
 
     config_devs = []
@@ -1266,9 +1244,28 @@ def main(argv):
         if not create_security_check(config):
             raise security.ACMError('Security Configuration prevents domain from starting')
         else:
-            dom = make_domain(opts, config)
             if opts.vals.console_autoconnect:
-                console.execConsole(dom)        
-             
+                cpid = os.fork() 
+                if cpid != 0:
+                    for i in range(10):
+                        # Catch failure of the create process 
+                        time.sleep(1)
+                        (p, rv) = os.waitpid(cpid, os.WNOHANG)
+                        if os.WIFEXITED(rv):
+                            if os.WEXITSTATUS(rv) != 0:
+                                sys.exit(os.WEXITSTATUS(rv))
+                        try:
+                            # Acquire the console of the created dom
+                            name = sxp.child_value(config, 'name', -1)
+                            dom = server.xend.domain(name)
+                            domid = int(sxp.child_value(dom, 'domid', '-1'))
+                            console.execConsole(domid)
+                        except:
+                            pass
+                    print("Could not start console\n");
+                    sys.exit(0)
+            dom = make_domain(opts, config)
+
+
 if __name__ == '__main__':
     main(sys.argv)

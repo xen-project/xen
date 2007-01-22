@@ -115,7 +115,6 @@ class XendDomain:
                 
                 dom0info['name'] = DOM0_NAME
                 dom0 = XendDomainInfo.recreate(dom0info, True)
-                self._add_domain(dom0)
             except IndexError:
                 raise XendError('Unable to find Domain 0')
             
@@ -172,7 +171,6 @@ class XendDomain:
                 if dom['domid'] != DOM0_ID:
                     try:
                         new_dom = XendDomainInfo.recreate(dom, False)
-                        self._add_domain(new_dom)
                     except Exception:
                         log.exception("Failed to create reference to running "
                                       "domain id: %d" % dom['domid'])
@@ -397,7 +395,6 @@ class XendDomain:
             elif domid not in self.domains and dom['dying'] != 1:
                 try:
                     new_dom = XendDomainInfo.recreate(dom, False)
-                    self._add_domain(new_dom)                    
                 except VmError:
                     log.exception("Unable to recreate domain")
                     try:
@@ -416,10 +413,10 @@ class XendDomain:
         running_domids = [d['domid'] for d in running if d['dying'] != 1]
         for domid, dom in self.domains.items():
             if domid not in running_domids and domid != DOM0_ID:
-                self._remove_domain(dom, domid)
+                self.remove_domain(dom, domid)
 
 
-    def _add_domain(self, info):
+    def add_domain(self, info):
         """Add a domain to the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
@@ -434,7 +431,7 @@ class XendDomain:
         if info.get_uuid() in self.managed_domains:
             self._managed_domain_register(info)
 
-    def _remove_domain(self, info, domid = None):
+    def remove_domain(self, info, domid = None):
         """Remove the domain from the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
@@ -473,7 +470,6 @@ class XendDomain:
         try:
             security.refresh_ssidref(config)
             dominfo = XendDomainInfo.restore(config)
-            self._add_domain(dominfo)
             return dominfo
         finally:
             self.domains_lock.release()
@@ -848,7 +844,6 @@ class XendDomain:
                                            os.open(chkpath, os.O_RDONLY),
                                            dominfo,
                                            paused = start_paused)
-                    self._add_domain(dominfo)
                     os.unlink(chkpath)
                 except OSError, ex:
                     raise XendError("Failed to read stored checkpoint file")
@@ -873,7 +868,6 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create(config)
-            self._add_domain(dominfo)
             self.domain_sched_credit_set(dominfo.getDomid(),
                                          dominfo.getWeight(),
                                          dominfo.getCap())
@@ -893,7 +887,6 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create_from_dict(config_dict)
-            self._add_domain(dominfo)
             self.domain_sched_credit_set(dominfo.getDomid(),
                                          dominfo.getWeight(),
                                          dominfo.getCap())
@@ -950,7 +943,6 @@ class XendDomain:
                                  POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
-            self._add_domain(dominfo)
         finally:
             self.domains_lock.release()
         dominfo.waitForDevices()
@@ -983,7 +975,7 @@ class XendDomain:
                          (dominfo.getName(), dominfo.info.get('uuid')))
 
                 self._managed_domain_unregister(dominfo)
-                self._remove_domain(dominfo)
+                self.remove_domain(dominfo)
                 XendDevices.destroy_device_state(dominfo)
             except Exception, ex:
                 raise XendError(str(ex))
