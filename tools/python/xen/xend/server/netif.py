@@ -147,6 +147,7 @@ class NetifController(DevController):
         rate    = config.get('rate')
         uuid    = config.get('uuid')
         ipaddr  = config.get('ip')
+        model   = config.get('model')
 
         devid = self.allocateDeviceID()
 
@@ -176,6 +177,8 @@ class NetifController(DevController):
             back['rate'] = parseRate(rate)
         if uuid:
             back['uuid'] = uuid
+        if model:
+            back['model'] = model
 
         return (devid, back, front)
 
@@ -185,8 +188,9 @@ class NetifController(DevController):
 
         result = DevController.getDeviceConfiguration(self, devid)
         devinfo =  self.readBackend(devid, 'script', 'ip', 'bridge',
-                                    'mac', 'type', 'vifname', 'rate', 'uuid')
-        (script, ip, bridge, mac, typ, vifname, rate, uuid) = devinfo
+                                    'mac', 'type', 'vifname', 'rate',
+                                    'uuid', 'model')
+        (script, ip, bridge, mac, typ, vifname, rate, uuid, model) = devinfo
 
         if script:
             network_script_dir = xoptions.network_script_dir + os.sep
@@ -205,6 +209,8 @@ class NetifController(DevController):
             result['rate'] = formatRate(rate)
         if uuid:
             result['uuid'] = uuid
-
+        if model:
+            result['model'] = model
+            
         return result
 
