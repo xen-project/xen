@@ -1,7 +1,7 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += -I$(XEN_LIBXC) -I$(XEN_XENSTORE) -I$(XEN_ROOT)/linux-2.6-xen-sparse/include
+CFLAGS += -I$(XEN_LIBXC) -I$(XEN_XENSTORE) -I$(XEN_ROOT)/linux-2.6-xen-sparse/include -I$(XEN_ROOT)/tools/ioemu
 LDFLAGS += -L$(XEN_LIBXC) -L$(XEN_XENSTORE)
 
 INSTALL         = install
