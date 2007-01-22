@@ -400,14 +400,20 @@ class Grub:
                                    %(int(timeout) - mytime))
             else:
                 self.screen.addstr(20, 5, " " * 80)
-
             self.fill_entry_list()
+
             c = self.screen.getch()
-            if mytime != -1:
-                mytime += 1
-                if mytime >= int(timeout):
-                    self.isdone = True
-                    break
+            if c == -1:
+                # Timed out waiting for a keypress
+                if mytime != -1:
+                    mytime += 1
+                    if mytime >= int(timeout):
+                        self.isdone = True
+                        break
+            else:
+                # received a keypress: stop the timer
+                mytime = -1
+                self.screen.timeout(-1)
 
             # handle keypresses
             if c == ord('c'):
@@ -432,10 +438,8 @@ class Grub:
                 self.isdone = True
                 break
             elif c == curses.KEY_UP:
-                mytime = -1
                 self.selected_image -= 1
             elif c == curses.KEY_DOWN:
-                mytime = -1
                 self.selected_image += 1
 #            elif c in (ord('q'), 27): # 27 == esc
 #                self.selected_image = -1
