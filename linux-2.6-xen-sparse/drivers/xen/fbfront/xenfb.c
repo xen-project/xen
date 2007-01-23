@@ -27,6 +27,7 @@
 #include <asm/hypervisor.h>
 #include <xen/evtchn.h>
 #include <xen/interface/io/fbif.h>
+#include <xen/interface/io/protocols.h>
 #include <xen/xenbus.h>
 #include <linux/kthread.h>
 
@@ -479,7 +480,7 @@ static int __devinit xenfb_probe(struct xenbus_device *dev,
 		goto error_nomem;
 
 	/* set up shared page */
-	info->page = (void *)__get_free_page(GFP_KERNEL);
+	info->page = (void *)__get_free_page(GFP_KERNEL | __GFP_ZERO);
 	if (!info->page)
 		goto error_nomem;
 
@@ -638,6 +639,10 @@ static int xenfb_connect_backend(struct xenbus_device *dev,
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "event-channel", "%u",
 			    irq_to_evtchn_port(info->irq));
+	if (ret)
+		goto error_xenbus;
+	ret = xenbus_printf(xbt, dev->nodename, "protocol", "%s",
+			    XEN_IO_PROTO_ABI_NATIVE);
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "feature-update", "1");
