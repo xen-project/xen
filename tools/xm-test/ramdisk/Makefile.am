@@ -14,7 +14,7 @@
 
 INITRD ?= http://xm-test.xensource.com/ramdisks
 
-BR_ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
+BR_ARCH ?= $(shell uname -m | sed -e 's/i.86/i386/' -e 's/ppc\(64\)*/powerpc/' -e 's/x86_64/i386/')
 
 @MK@ifdef BR_SNAPSHOT
 @MK@  BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
