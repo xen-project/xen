@@ -612,9 +612,9 @@ static void set_affinity_irq(unsigned irq, cpumask_t dest)
 }
 #endif
 
-static int resend_irq_on_evtchn(unsigned int i)
+int resend_irq_on_evtchn(unsigned int irq)
 {
-	int masked, evtchn = evtchn_from_irq(i);
+	int masked, evtchn = evtchn_from_irq(irq);
 	shared_info_t *s = HYPERVISOR_shared_info;
 
 	if (!VALID_EVTCHN(evtchn))
