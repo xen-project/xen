@@ -84,6 +84,7 @@
 #include <xen/event.h>
 #include <xen/softirq.h>
 #include <asm/xenmca.h>
+#include <linux/shutdown.h>
 #endif
 
 #if defined(IA64_MCA_DEBUG_INFO)
@@ -685,6 +686,7 @@ fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_sta
 static spinlock_t init_dump_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t show_stack_lock = SPIN_LOCK_UNLOCKED;
 static atomic_t num_stopped_cpus = ATOMIC_INIT(0);
+extern void show_stack (struct task_struct *, unsigned long *);
 
 #define CPU_FLUSH_RETRY_MAX 5
 static void
@@ -773,6 +775,8 @@ init_handler_platform (pal_min_state_area_t *ms,
 	spin_unlock(&show_stack_lock);
 
 	if (spin_trylock(&init_dump_lock)) {
+		struct domain *d;
+		struct vcpu *v;
 #ifdef CONFIG_SMP
 		int other_cpus = num_online_cpus() - 1;
 		int wait = 1000 * other_cpus;
@@ -782,7 +786,19 @@ init_handler_platform (pal_min_state_area_t *ms,
 		if (other_cpus && wait < 0)
 			printk("timeout %d\n", atomic_read(&num_stopped_cpus));
 #endif
-		unw_init_running(try_crashdump, pt);
+		if (opt_noreboot) {
+			/* this route is for dump routine */
+			unw_init_running(try_crashdump, pt);
+		} else {
+			for_each_domain(d) {
+				for_each_vcpu(d, v) {
+					printk("Backtrace of current vcpu "
+					       "(vcpu_id %d of domid %d)\n",
+					       v->vcpu_id, d->domain_id);
+					show_stack(v, NULL);
+				}
+			}
+		}
 	}
 	unw_init_running(freeze_cpu_osinit, NULL);
 #else /* XEN */
