@@ -120,7 +120,7 @@ void memory_init(module_t *mod, int mcount)
 {
     ulong eomem;
     ulong bitmap_start = ~0UL;
-    ulong bitmap_end;
+    ulong bitmap_end = 0;
     ulong bitmap_size;
     ulong xh_pages;
     ulong start;
