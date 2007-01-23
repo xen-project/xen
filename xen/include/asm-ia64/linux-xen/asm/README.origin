@@ -18,6 +18,7 @@ meminit.h		-> linux/include/asm-ia64/meminit.h
 numa.h			-> linux/include/asm-ia64/numa.h
 page.h			-> linux/include/asm-ia64/page.h
 pal.h			-> linux/include/asm-ia64/pal.h
+percpu.h		-> linux/include/asm-ia64/percpu.h
 pgalloc.h		-> linux/include/asm-ia64/pgalloc.h
 pgtable.h		-> linux/include/asm-ia64/pgtable.h
 processor.h		-> linux/include/asm-ia64/processor.h
