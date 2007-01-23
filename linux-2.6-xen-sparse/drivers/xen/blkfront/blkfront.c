@@ -44,6 +44,7 @@
 #include <xen/evtchn.h>
 #include <xen/xenbus.h>
 #include <xen/interface/grant_table.h>
+#include <xen/interface/io/protocols.h>
 #include <xen/gnttab.h>
 #include <asm/hypervisor.h>
 #include <asm/maddr.h>
@@ -178,6 +179,12 @@ again:
 			    irq_to_evtchn_port(info->irq));
 	if (err) {
 		message = "writing event-channel";
+		goto abort_transaction;
+	}
+	err = xenbus_printf(xbt, dev->nodename, "protocol", "%s",
+			    XEN_IO_PROTO_ABI_NATIVE);
+	if (err) {
+		message = "writing protocol";
 		goto abort_transaction;
 	}
 
