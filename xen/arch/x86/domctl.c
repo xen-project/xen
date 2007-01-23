@@ -311,12 +311,16 @@ _long arch_do_domctl(
         
         ret = -EFAULT;
 
-#ifndef CONFIG_COMPAT
+#ifndef COMPAT
         if ( copy_from_guest(c, domctl->u.hvmcontext.ctxt, 1) != 0 )
+#else
+        if ( copy_from_guest(c,
+                             compat_handle_cast(domctl->u.hvmcontext.ctxt, void),
+                             1) != 0 )
+#endif
             goto sethvmcontext_out;
 
         ret = arch_sethvm_ctxt(v, c);
-#endif
 
         xfree(c);
 
@@ -350,12 +354,16 @@ _long arch_do_domctl(
         if (arch_gethvm_ctxt(v, c) == -1)
             ret = -EFAULT;
 
-#ifndef CONFIG_COMPAT
+#ifndef COMPAT
         if ( copy_to_guest(domctl->u.hvmcontext.ctxt, c, 1) )
+#else
+        if ( copy_to_guest(compat_handle_cast(domctl->u.hvmcontext.ctxt,
+                                              void),
+                           c, 1) )
             ret = -EFAULT;
+#endif
 
         xfree(c);
-#endif
 
         if ( copy_to_guest(u_domctl, domctl, 1) )
             ret = -EFAULT;
