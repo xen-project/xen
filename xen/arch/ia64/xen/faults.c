@@ -92,6 +92,9 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 	regs->cr_iip = ((unsigned long)PSCBX(v, iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 
+	if (PSCB(v, hpsr_dfh))
+		regs->cr_ipsr |= IA64_PSR_DFH;  
+	PSCB(v, vpsr_dfh) = 0;
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v, interrupt_collection_enabled) = 0;
 
@@ -152,6 +155,9 @@ void reflect_event(void)
 	regs->cr_iip = v->arch.event_callback_ip;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 
+	if (PSCB(v, hpsr_dfh))
+		regs->cr_ipsr |= IA64_PSR_DFH;
+	PSCB(v, vpsr_dfh) = 0;
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v, interrupt_collection_enabled) = 0;
 }
@@ -261,6 +267,10 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 		    ((unsigned long)PSCBX(current, iva) + fault) & ~0xffUL;
 		regs->cr_ipsr =
 		    (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+
+		if (PSCB(current, hpsr_dfh))
+			regs->cr_ipsr |= IA64_PSR_DFH;  
+		PSCB(current, vpsr_dfh) = 0;
 		perfc_incra(slow_reflect, fault >> 8);
 		return;
 	}
@@ -608,6 +618,16 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		vector = IA64_GENEX_VECTOR;
 		break;
 	case 25:
+		if (PSCB(v, hpsr_dfh)) {
+			PSCB(v, hpsr_dfh) = 0;
+			PSCB(v, hpsr_mfh) = 1;
+			if (__ia64_per_cpu_var(fp_owner) != v)
+				__ia64_load_fpu(v->arch._thread.fph);
+		}
+		if (!PSCB(v, vpsr_dfh)) {
+			regs->cr_ipsr &= ~IA64_PSR_DFH;
+			return;
+		}
 		vector = IA64_DISABLED_FPREG_VECTOR;
 		break;
 	case 26:

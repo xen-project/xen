@@ -79,36 +79,56 @@ static u64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000,0x1400,0x1800,
 
 
 void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
-                              u64 vector, REGS *regs)
+                              u64 vec, REGS *regs)
 {
-    u64 status;
+    u64 status, vector;
     VCPU *vcpu = current;
     u64 vpsr = VCPU(vcpu, vpsr);
-    vector=vec2off[vector];
+    
+    vector = vec2off[vec];
     if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
         panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
     }
-    else{ // handle fpswa emulation
+
+    switch (vec) {
+
+    case 25:	// IA64_DISABLED_FPREG_VECTOR
+
+        if (FP_PSR(vcpu) & IA64_PSR_DFH) {
+            FP_PSR(vcpu) = IA64_PSR_MFH;
+            if (__ia64_per_cpu_var(fp_owner) != vcpu)
+                __ia64_load_fpu(vcpu->arch._thread.fph);
+        }
+        if (!(VCPU(vcpu, vpsr) & IA64_PSR_DFH)) {
+            regs->cr_ipsr &= ~IA64_PSR_DFH;
+            return;
+        }
+
+        break;       
+        
+    case 32:	// IA64_FP_FAULT_VECTOR
+        // handle fpswa emulation
         // fp fault
-        if (vector == IA64_FP_FAULT_VECTOR) {
-            status = handle_fpu_swa(1, regs, isr);
-            if (!status) {
-                vcpu_increment_iip(vcpu);
-                return;
-            } else if (IA64_RETRY == status)
-                return;
-        }
+        status = handle_fpu_swa(1, regs, isr);
+        if (!status) {
+            vcpu_increment_iip(vcpu);
+            return;
+        } else if (IA64_RETRY == status)
+            return;
+        break;
+
+    case 33:	// IA64_FP_TRAP_VECTOR
         //fp trap
-        else if (vector == IA64_FP_TRAP_VECTOR) {
-            status = handle_fpu_swa(0, regs, isr);
-            if (!status)
-                return;
-            else if (IA64_RETRY == status) {
-                vcpu_decrement_iip(vcpu);
-                return;
-            }
+        status = handle_fpu_swa(0, regs, isr);
+        if (!status)
+            return;
+        else if (IA64_RETRY == status) {
+            vcpu_decrement_iip(vcpu);
+            return;
         }
-    }
+        break;
+    
+    } 
     VCPU(vcpu,isr)=isr;
     VCPU(vcpu,iipa) = regs->cr_iip;
     if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)

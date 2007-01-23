@@ -192,6 +192,13 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     ;;   
     st8 [r17]=r19
     and r20=r20,r28
+    adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
+    ;;
+    ld8 r27=[r27]
+    ;;
+    tbit.nz p8,p0= r27,IA64_PSR_DFH_BIT
+    ;;
+    (p8) dep r20=-1,r20,IA64_PSR_DFH_BIT,1
     ;;
     mov cr.ipsr=r20
     tbit.nz p6,p0=r23,0
@@ -359,6 +366,14 @@ vmx_asm_mov_to_psr_1:
     ;;
     add r20=r19,r20
     mov b0=r24
+    ;;
+    adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
+    ;;
+    ld8 r27=[r27]
+    ;;
+    tbit.nz p8,p0=r27,IA64_PSR_DFH_BIT
+    ;;
+    (p8) dep r20=-1,r20,IA64_PSR_DFH_BIT,1
     ;;
     mov cr.ipsr=r20
     cmp.ne p6,p0=r0,r0

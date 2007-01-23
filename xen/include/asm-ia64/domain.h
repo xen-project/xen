@@ -175,6 +175,7 @@ struct arch_vcpu {
     unsigned long metaphysical_rr4;		// from arch_domain (so is pinned)
     unsigned long metaphysical_saved_rr0;	// from arch_domain (so is pinned)
     unsigned long metaphysical_saved_rr4;	// from arch_domain (so is pinned)
+    unsigned long fp_psr;       // used for lazy float register
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */

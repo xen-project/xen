@@ -141,6 +141,9 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
 
     regs->cr_ipsr = (regs->cr_ipsr & mask ) | ( value & (~mask) );
 
+    if (FP_PSR(vcpu) & IA64_PSR_DFH)
+        regs->cr_ipsr |= IA64_PSR_DFH;
+
     check_mm_mode_switch(vcpu, old_psr, new_psr);
     return ;
 }
