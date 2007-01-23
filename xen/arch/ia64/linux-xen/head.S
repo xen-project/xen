@@ -267,13 +267,8 @@ start_ap:
 	/*
 	 * Switch into virtual mode:
 	 */
-#if defined(XEN) && defined(VALIDATE_VT)
-	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH\
-		  |IA64_PSR_DI)
-#else
 	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN \
 		  |IA64_PSR_DI)
-#endif
 	;;
 	mov cr.ipsr=r16
 	movl r17=1f
@@ -292,11 +287,7 @@ start_ap:
 	;;
 
 	// set IVT entry point---can't access I/O ports without it
-#if defined(XEN) && defined(VALIDATE_VT)
-	movl r3=vmx_ia64_ivt
-#else
 	movl r3=ia64_ivt
-#endif
 	;;
 	mov cr.iva=r3
 	movl r2=FPSR_DEFAULT
@@ -368,15 +359,8 @@ start_ap:
 	
 .load_current:
 	// load the "current" pointer (r13) and ar.k6 with the current task
-#if defined(XEN) && defined(VALIDATE_VT)
-	mov r21=r2
-	;;
-	bsw.1
-	;;
-#else
 	mov IA64_KR(CURRENT)=r2		// virtual address
 	mov IA64_KR(CURRENT_STACK)=r16
-#endif
 	mov r13=r2
 	/*
 	 * Reserve space at the top of the stack for "struct pt_regs".  Kernel

@@ -183,11 +183,7 @@ void sort_main_extable(void);
 #define find_first_set_bit(x)	(ffs(x)-1)	// FIXME: Is this right???
 
 // see drivers/char/console.c
-#ifndef VALIDATE_VT
 #define	OPT_CONSOLE_STR "com1"
-#else
-#define	OPT_CONSOLE_STR "com2"
-#endif
 
 #define __nocast
 

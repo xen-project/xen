@@ -996,12 +996,6 @@ int construct_dom0(struct domain *d,
 	unsigned long bp_mpa;
 	struct ia64_boot_param *bp;
 
-#ifdef VALIDATE_VT
-	unsigned int vmx_dom0 = 0;
-	unsigned long mfn;
-	struct page_info *page = NULL;
-#endif
-
 //printk("construct_dom0: starting\n");
 
 	/* Sanity! */
@@ -1021,23 +1015,6 @@ int construct_dom0(struct domain *d,
 	rc = parseelfimage(&dsi);
 	if ( rc != 0 )
 	    return rc;
-
-#ifdef VALIDATE_VT
-	/* Temp workaround */
-	if (running_on_sim)
-	    dsi.xen_section_string = (char *)1;
-
-	/* Check whether dom0 is vti domain */
-	if ((!vmx_enabled) && !dsi.xen_section_string) {
-	    printk("Lack of hardware support for unmodified vmx dom0\n");
-	    panic("");
-	}
-
-	if (vmx_enabled && !dsi.xen_section_string) {
-	    printk("Dom0 is vmx domain!\n");
-	    vmx_dom0 = 1;
-	}
-#endif
 
 	p_start = dsi.v_start;
 	pkern_start = dsi.v_kernstart;
@@ -1131,14 +1108,6 @@ int construct_dom0(struct domain *d,
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 
 	printk("Dom0: 0x%lx\n", (u64)dom0);
-
-#ifdef VALIDATE_VT
-	/* VMX specific construction for Dom0, if hardware supports VMX
-	 * and Dom0 is unmodified image
-	 */
-	if (vmx_dom0)
-	    vmx_final_setup_guest(v);
-#endif
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
