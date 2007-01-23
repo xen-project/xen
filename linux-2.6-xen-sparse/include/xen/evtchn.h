@@ -108,7 +108,7 @@ void unmask_evtchn(int port);
 static inline void clear_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	synch_clear_bit(port, &s->evtchn_pending[0]);
+	synch_clear_bit(port, s->evtchn_pending);
 }
 
 static inline void notify_remote_via_evtchn(int port)

@@ -60,8 +60,6 @@ static int evtchn_to_irq[NR_EVENT_CHANNELS] = {
 /* Packed IRQ information: binding type, sub-type index, and event channel. */
 static u32 irq_info[NR_IRQS];
 
-static int resend_irq_on_evtchn(unsigned int);
-
 /* Binding types. */
 enum {
 	IRQT_UNBOUND,
@@ -113,7 +111,7 @@ DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]) = {[0 ... NR_IPIS-1] = -1};
 static int irq_bindcount[NR_IRQS];
 
 /* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
-static unsigned long pirq_needs_eoi[NR_PIRQS/sizeof(unsigned long)];
+static DECLARE_BITMAP(pirq_needs_eoi, NR_PIRQS);
 
 #ifdef CONFIG_SMP
 
@@ -614,6 +612,22 @@ static void set_affinity_irq(unsigned irq, cpumask_t dest)
 }
 #endif
 
+static int resend_irq_on_evtchn(unsigned int i)
+{
+	int masked, evtchn = evtchn_from_irq(i);
+	shared_info_t *s = HYPERVISOR_shared_info;
+
+	if (!VALID_EVTCHN(evtchn))
+		return 1;
+
+	masked = synch_test_and_set_bit(evtchn, s->evtchn_mask);
+	synch_set_bit(evtchn, s->evtchn_pending);
+	if (!masked)
+		unmask_evtchn(evtchn);
+
+	return 1;
+}
+
 /*
  * Interface to generic handling in irq.c
  */
@@ -688,7 +702,7 @@ static struct hw_interrupt_type dynirq_type = {
 static inline void pirq_unmask_notify(int pirq)
 {
 	struct physdev_eoi eoi = { .irq = pirq };
-	if (unlikely(test_bit(pirq, &pirq_needs_eoi[0])))
+	if (unlikely(test_bit(pirq, pirq_needs_eoi)))
 		(void)HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi);
 }
 
@@ -697,9 +711,9 @@ static inline void pirq_query_unmask(int pirq)
 	struct physdev_irq_status_query irq_status;
 	irq_status.irq = pirq;
 	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
-	clear_bit(pirq, &pirq_needs_eoi[0]);
+	clear_bit(pirq, pirq_needs_eoi);
 	if (irq_status.flags & XENIRQSTAT_needs_eoi)
-		set_bit(pirq, &pirq_needs_eoi[0]);
+		set_bit(pirq, pirq_needs_eoi);
 }
 
 /*
@@ -824,18 +838,6 @@ int irq_ignore_unhandled(unsigned int irq)
 	return !!(irq_status.flags & XENIRQSTAT_shared);
 }
 
-static int resend_irq_on_evtchn(unsigned int i)
-{
-	int evtchn = evtchn_from_irq(i);
-	shared_info_t *s = HYPERVISOR_shared_info;
-	if (!VALID_EVTCHN(evtchn))
-		return 0;
-	BUG_ON(!synch_test_bit(evtchn, &s->evtchn_mask[0]));
-	synch_set_bit(evtchn, &s->evtchn_pending[0]);
-
-	return 1;
-}
-
 void notify_remote_via_irq(int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
@@ -854,7 +856,7 @@ EXPORT_SYMBOL_GPL(irq_to_evtchn_port);
 void mask_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	synch_set_bit(port, &s->evtchn_mask[0]);
+	synch_set_bit(port, s->evtchn_mask);
 }
 EXPORT_SYMBOL_GPL(mask_evtchn);
 
@@ -873,14 +875,10 @@ void unmask_evtchn(int port)
 		return;
 	}
 
-	synch_clear_bit(port, &s->evtchn_mask[0]);
+	synch_clear_bit(port, s->evtchn_mask);
 
-	/*
-	 * The following is basically the equivalent of 'hw_resend_irq'. Just
-	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
-	 * masked.
-	 */
-	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
+	/* Did we miss an interrupt 'edge'? Re-fire if so. */
+	if (synch_test_bit(port, s->evtchn_pending) &&
 	    !synch_test_and_set_bit(port / BITS_PER_LONG,
 				    &vcpu_info->evtchn_pending_sel))
 		vcpu_info->evtchn_upcall_pending = 1;
