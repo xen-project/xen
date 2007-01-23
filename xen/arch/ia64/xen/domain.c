@@ -585,9 +585,11 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	if (test_bit(_VCPUF_initialised, &v->vcpu_flags))
 		return 0;
 
-	if (d->arch.is_vti)
-		vmx_final_setup_guest(v);
-	else {
+	if (d->arch.is_vti) {
+		rc = vmx_final_setup_guest(v);
+		if (rc != 0)
+			return rc;
+	} else {
 		rc = vcpu_late_initialise(v);
 		if (rc != 0)
 			return rc;

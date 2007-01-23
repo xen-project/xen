@@ -290,7 +290,7 @@ static void vmx_release_assist_channel(struct vcpu *v)
  * Initialize VMX envirenment for guest. Only the 1st vp/vcpu
  * is registered here.
  */
-void
+int
 vmx_final_setup_guest(struct vcpu *v)
 {
 	vpd_t *vpd;
@@ -305,7 +305,8 @@ vmx_final_setup_guest(struct vcpu *v)
 	 * to this solution. Maybe it can be deferred until we know created
 	 * one as vmx domain */
 #ifndef HASH_VHPT
-	init_domain_tlb(v);
+	if (init_domain_tlb(v) != 0)
+		return -1;
 #endif
 	vmx_create_event_channels(v);
 
@@ -322,6 +323,8 @@ vmx_final_setup_guest(struct vcpu *v)
 
 	/* Set up guest 's indicator for VTi domain*/
 	set_bit(ARCH_VMX_DOMAIN, &v->arch.arch_vmx.flags);
+
+	return 0;
 }
 
 void
