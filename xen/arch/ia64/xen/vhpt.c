@@ -177,7 +177,9 @@ pervcpu_vhpt_alloc(struct vcpu *v)
 void
 pervcpu_vhpt_free(struct vcpu *v)
 {
-	free_domheap_pages(v->arch.vhpt_page, VHPT_SIZE_LOG2 - PAGE_SHIFT);
+	if (likely(v->arch.vhpt_page != NULL))
+		free_domheap_pages(v->arch.vhpt_page,
+		                   VHPT_SIZE_LOG2 - PAGE_SHIFT);
 }
 #endif
 
