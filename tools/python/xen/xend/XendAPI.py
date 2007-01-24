@@ -20,6 +20,7 @@ import os
 import string
 import sys
 import traceback
+import threading
 
 from xen.xend import XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging, XendTaskManager
@@ -283,7 +284,7 @@ def do_vm_func(fn_name, vm_ref, *args, **kwargs):
                               exn.actual])
 
 
-class XendAPI:
+class XendAPI(object):
     """Implementation of the Xen-API in Xend. Expects to be
     used via XMLRPCServer.
 
@@ -296,6 +297,119 @@ class XendAPI:
     All XMLRPC accessible methods require an 'api' attribute and
     is set to the XMLRPC function name which the method implements.
     """
+
+    __decorated__ = False
+    __init_lock__ = threading.Lock()
+    
+    def __new__(cls, *args, **kwds):
+        """ Override __new__ to decorate the class only once.
+
+        Lock to make sure the classes are not decorated twice.
+        """
+        cls.__init_lock__.acquire()
+        try:
+            if not cls.__decorated__:
+                cls._decorate()
+                cls.__decorated__ = True
+                
+            return object.__new__(cls, *args, **kwds)
+        finally:
+            cls.__init_lock__.release()
+            
+    def _decorate(cls):
+        """ Decorate all the object methods to have validators
+        and appropriate function attributes.
+
+        This should only be executed once for the duration of the
+        server.
+        """
+        global_validators = [session_required, catch_typeerror]
+        classes = {
+            'session' : None,
+            'host'    : valid_host,
+            'host_cpu': valid_host_cpu,
+            'network' : valid_network,
+            'VM'      : valid_vm,
+            'VBD'     : valid_vbd,
+            'VIF'     : valid_vif,
+            'VDI'     : valid_vdi,
+            'VTPM'    : valid_vtpm,
+            'SR'      : valid_sr,
+            'PIF'     : valid_pif,
+            'task'    : valid_task,
+        }
+
+        # Cheat methods
+        # -------------
+        # Methods that have a trivial implementation for all classes.
+        # 1. get_by_uuid == getting by ref, so just return uuid for
+        #    all get_by_uuid() methods.
+        
+        for api_cls in classes.keys():
+            get_by_uuid = '%s_get_by_uuid' % api_cls
+            get_uuid = '%s_get_uuid' % api_cls
+            def _get_by_uuid(_1, _2, ref):
+                return xen_api_success(ref)
+
+            def _get_uuid(_1, _2, ref):
+                return xen_api_success(ref)
+
+            setattr(cls, get_by_uuid, _get_by_uuid)
+            setattr(cls, get_uuid,    _get_uuid)
+
+        # Wrapping validators around XMLRPC calls
+        # ---------------------------------------
+
+        for api_cls, validator in classes.items():
+            def doit(n, takes_instance, async_support = False,
+                     return_type = None):
+                n_ = n.replace('.', '_')
+                try:
+                    f = getattr(cls, n_)
+                    argcounts[n] = f.func_code.co_argcount - 1
+                    
+                    validators = takes_instance and validator and \
+                                 [validator] or []
+
+                    validators += global_validators
+                    for v in validators:
+                        f = v(f)
+                        f.api = n
+                        f.async = async_support
+                        if return_type:
+                            f.return_type = return_type
+                    
+                    setattr(cls, n_, f)
+                except AttributeError:
+                    log.warn("API call: %s not found" % n)
+
+
+            ro_attrs = getattr(cls, '%s_attr_ro' % api_cls, [])
+            rw_attrs = getattr(cls, '%s_attr_rw' % api_cls, [])
+            methods  = getattr(cls, '%s_methods' % api_cls, [])
+            funcs    = getattr(cls, '%s_funcs'   % api_cls, [])
+
+            # wrap validators around readable class attributes
+            for attr_name in ro_attrs + rw_attrs + cls.Base_attr_ro:
+                doit('%s.get_%s' % (api_cls, attr_name), True,
+                     async_support = False)
+
+            # wrap validators around writable class attrributes
+            for attr_name in rw_attrs + cls.Base_attr_rw:
+                doit('%s.set_%s' % (api_cls, attr_name), True,
+                     async_support = False)
+
+            # wrap validators around methods
+            for method_name, return_type in methods + cls.Base_methods:
+                doit('%s.%s' % (api_cls, method_name), True,
+                     async_support = True)
+
+            # wrap validators around class functions
+            for func_name, return_type in funcs + cls.Base_funcs:
+                doit('%s.%s' % (api_cls, func_name), False, async_support = True,
+                     return_type = return_type)
+
+    _decorate = classmethod(_decorate)
 
     def __init__(self, auth):
         self.auth = auth
@@ -1812,97 +1926,6 @@ class XendAPIAsyncProxy:
                                                 return_type,
                                                 synchronous_method_name)
         return xen_api_success(task_uuid)
-
-def _decorate():
-    """Initialise Xen API wrapper by making sure all functions
-    have the correct validation decorators such as L{valid_host}
-    and L{session_required}.
-    """
-
-    global_validators = [session_required, catch_typeerror]
-    classes = {
-        'session' : None,
-        'host'    : valid_host,
-        'host_cpu': valid_host_cpu,
-        'network' : valid_network,
-        'VM'      : valid_vm,
-        'VBD'     : valid_vbd,
-        'VIF'     : valid_vif,
-        'VDI'     : valid_vdi,
-        'VTPM'    : valid_vtpm,
-        'SR'      : valid_sr,
-        'PIF'     : valid_pif,
-        'task'    : valid_task,
-        }
-
-    # Cheat methods
-    # -------------
-    # Methods that have a trivial implementation for all classes.
-    # 1. get_by_uuid == getting by ref, so just return uuid for
-    #    all get_by_uuid() methods.
-
-    for cls in classes.keys():
-        get_by_uuid = '%s_get_by_uuid' % cls
-        get_uuid = '%s_get_uuid' % cls
-        def _get_by_uuid(_1, _2, ref):
-            return xen_api_success(ref)
-
-        def _get_uuid(_1, _2, ref):
-            return xen_api_success(ref)
-
-        setattr(XendAPI, get_by_uuid, _get_by_uuid)
-        setattr(XendAPI, get_uuid,    _get_uuid)
-
-    # Wrapping validators around XMLRPC calls
-    # ---------------------------------------
-
-    for cls, validator in classes.items():
-        def doit(n, takes_instance, async_support = False, return_type = None):
-            n_ = n.replace('.', '_')
-            try:
-                f = getattr(XendAPI, n_)
-                argcounts[n] = f.func_code.co_argcount - 1
-
-                validators = takes_instance and validator and [validator] \
-                             or []
-                validators += global_validators
-                for v in validators:
-                    f = v(f)
-                    f.api = n
-                    f.async = async_support
-                    if return_type:
-                        f.return_type = return_type
-                    
-                setattr(XendAPI, n_, f)
-            except AttributeError:
-                log.warn("API call: %s not found" % n)
-
-
-        ro_attrs = getattr(XendAPI, '%s_attr_ro' % cls, [])
-        rw_attrs = getattr(XendAPI, '%s_attr_rw' % cls, [])
-        methods  = getattr(XendAPI, '%s_methods' % cls, [])
-        funcs    = getattr(XendAPI, '%s_funcs'   % cls, [])
-
-        # wrap validators around readable class attributes
-        for attr_name in ro_attrs + rw_attrs + XendAPI.Base_attr_ro:
-            doit('%s.get_%s' % (cls, attr_name), True, async_support = False)
-
-        # wrap validators around writable class attrributes
-        for attr_name in rw_attrs + XendAPI.Base_attr_rw:
-            doit('%s.set_%s' % (cls, attr_name), True, async_support = False)
-
-        # wrap validators around methods
-        for method_name, return_type in methods + XendAPI.Base_methods:
-            doit('%s.%s' % (cls, method_name), True, async_support = True)
-
-        # wrap validators around class functions
-        for func_name, return_type in funcs + XendAPI.Base_funcs:
-            doit('%s.%s' % (cls, func_name), False, async_support = True,
-                 return_type = return_type)
-
-
-_decorate()
-
 
 #   
 # Auto generate some stubs based on XendAPI introspection
