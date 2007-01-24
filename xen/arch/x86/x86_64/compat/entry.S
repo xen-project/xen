@@ -276,6 +276,9 @@ CFIX14:
         .quad CFLT14,CFIX14
 .previous
 
+compat_domctl:
+compat_sysctl:
+
 .section .rodata, "a", @progbits
 
 ENTRY(compat_hypercall_table)
@@ -314,8 +317,8 @@ ENTRY(compat_hypercall_table)
         .quad do_event_channel_op
         .quad compat_physdev_op
         .quad do_hvm_op
-        .quad compat_sysctl             /* 35 */
-        .quad compat_domctl
+        .quad do_sysctl                 /* 35 */
+        .quad do_domctl
         .quad compat_kexec_op
         .rept NR_hypercalls-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall

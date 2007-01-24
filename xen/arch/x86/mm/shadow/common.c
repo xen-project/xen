@@ -3191,19 +3191,16 @@ static int shadow_log_dirty_op(
         if ( likely(peek) )
         {
             if ( copy_to_guest_offset(
-                     sc->dirty_bitmap,
-                     i/(8*sizeof(unsigned long)),
-                     d->arch.shadow.dirty_bitmap+(i/(8*sizeof(unsigned long))),
-                     (bytes+sizeof(unsigned long)-1) / sizeof(unsigned long)) )
+                sc->dirty_bitmap, i/8,
+                (uint8_t *)d->arch.shadow.dirty_bitmap + (i/8), bytes) )
             {
-                    rv = -EFAULT;
-                    goto out;
+                rv = -EFAULT;
+                goto out;
             }
         }
 
         if ( clean )
-            memset(d->arch.shadow.dirty_bitmap + (i/(8*sizeof(unsigned long))),
-                   0, bytes);
+            memset((uint8_t *)d->arch.shadow.dirty_bitmap + (i/8), 0, bytes);
     }
 #undef CHUNK
 

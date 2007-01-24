@@ -323,7 +323,8 @@ int xc_shadow_control(int xc_handle,
     domctl.u.shadow_op.pages  = pages;
     domctl.u.shadow_op.mb     = mb ? *mb : 0;
     domctl.u.shadow_op.mode   = mode;
-    set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap, dirty_bitmap);
+    set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
+                         (uint8_t *)dirty_bitmap);
 
     rc = do_domctl(xc_handle, &domctl);
 

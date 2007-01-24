@@ -24,21 +24,12 @@
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <public/hvm/e820.h>
-#ifdef CONFIG_COMPAT
-#include <compat/xen.h>
-#endif
 
-#ifndef COMPAT
-#define _long                long
-#define copy_from_xxx_offset copy_from_guest_offset
-#define copy_to_xxx_offset   copy_to_guest_offset
-#endif
-
-_long arch_do_domctl(
+long arch_do_domctl(
     struct xen_domctl *domctl,
     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
-    _long ret = 0;
+    long ret = 0;
 
     switch ( domctl->cmd )
     {
@@ -135,12 +126,11 @@ _long arch_do_domctl(
 
     case XEN_DOMCTL_getpageframeinfo2:
     {
-#define GPF2_BATCH (PAGE_SIZE / sizeof(_long))
         int n,j;
         int num = domctl->u.getpageframeinfo2.num;
         domid_t dom = domctl->domain;
         struct domain *d;
-        unsigned _long *l_arr;
+        uint32_t *arr32;
         ret = -ESRCH;
 
         if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
@@ -153,16 +143,18 @@ _long arch_do_domctl(
             break;
         }
 
-        l_arr = alloc_xenheap_page();
+        arr32 = alloc_xenheap_page();
  
         ret = 0;
         for ( n = 0; n < num; )
         {
-            int k = ((num-n)>GPF2_BATCH)?GPF2_BATCH:(num-n);
+            int k = PAGE_SIZE / 4;
+            if ( (num - n) < k )
+                k = num - n;
 
-            if ( copy_from_xxx_offset(l_arr,
-                                      domctl->u.getpageframeinfo2.array,
-                                      n, k) )
+            if ( copy_from_guest_offset(arr32,
+                                        domctl->u.getpageframeinfo2.array,
+                                        n, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -171,13 +163,13 @@ _long arch_do_domctl(
             for ( j = 0; j < k; j++ )
             {      
                 struct page_info *page;
-                unsigned _long mfn = l_arr[j];
+                unsigned long mfn = arr32[j];
 
                 page = mfn_to_page(mfn);
 
                 if ( likely(mfn_valid(mfn) && get_page(page, d)) ) 
                 {
-                    unsigned _long type = 0;
+                    unsigned long type = 0;
 
                     switch( page->u.inuse.type_info & PGT_type_mask )
                     {
@@ -197,16 +189,16 @@ _long arch_do_domctl(
 
                     if ( page->u.inuse.type_info & PGT_pinned )
                         type |= XEN_DOMCTL_PFINFO_LPINTAB;
-                    l_arr[j] |= type;
+                    arr32[j] |= type;
                     put_page(page);
                 }
                 else
-                    l_arr[j] |= XEN_DOMCTL_PFINFO_XTAB;
+                    arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
 
             }
 
-            if ( copy_to_xxx_offset(domctl->u.getpageframeinfo2.array,
-                                    n, l_arr, k) )
+            if ( copy_to_guest_offset(domctl->u.getpageframeinfo2.array,
+                                      n, arr32, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -215,7 +207,7 @@ _long arch_do_domctl(
             n += k;
         }
 
-        free_xenheap_page(l_arr);
+        free_xenheap_page(arr32);
 
         put_domain(d);
     }
@@ -226,7 +218,7 @@ _long arch_do_domctl(
         int i;
         struct domain *d = find_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        xen_pfn_t mfn;
+        uint64_t mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -241,8 +233,8 @@ _long arch_do_domctl(
             {
                 mfn = page_to_mfn(list_entry(
                     list_ent, struct page_info, list));
-                if ( copy_to_xxx_offset(domctl->u.getmemlist.buffer,
-                                        i, &mfn, 1) )
+                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                          i, &mfn, 1) )
                 {
                     ret = -EFAULT;
                     break;
@@ -311,13 +303,7 @@ _long arch_do_domctl(
         
         ret = -EFAULT;
 
-#ifndef COMPAT
         if ( copy_from_guest(c, domctl->u.hvmcontext.ctxt, 1) != 0 )
-#else
-        if ( copy_from_guest(c,
-                             compat_handle_cast(domctl->u.hvmcontext.ctxt, void),
-                             1) != 0 )
-#endif
             goto sethvmcontext_out;
 
         ret = arch_sethvm_ctxt(v, c);
@@ -354,14 +340,8 @@ _long arch_do_domctl(
         if (arch_gethvm_ctxt(v, c) == -1)
             ret = -EFAULT;
 
-#ifndef COMPAT
         if ( copy_to_guest(domctl->u.hvmcontext.ctxt, c, 1) )
-#else
-        if ( copy_to_guest(compat_handle_cast(domctl->u.hvmcontext.ctxt,
-                                              void),
-                           c, 1) )
             ret = -EFAULT;
-#endif
 
         xfree(c);
 
@@ -382,7 +362,6 @@ _long arch_do_domctl(
     return ret;
 }
 
-#ifndef COMPAT
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 #ifdef CONFIG_COMPAT
@@ -396,9 +375,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
-    {
         XLAT_vcpu_guest_context(c.cmp, &v->arch.guest_context);
-    }
 #endif
 
     if ( is_hvm_vcpu(v) )
@@ -446,7 +423,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     c(vm_assist = v->domain->vm_assist);
 #undef c
 }
-#endif
 
 /*
  * Local variables:

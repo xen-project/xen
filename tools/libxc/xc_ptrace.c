@@ -153,8 +153,8 @@ online_vcpus_changed(uint64_t cpumap)
 
 /* --------------------- */
 /* XXX application state */
-static long                     nr_pages = 0;
-static unsigned long           *page_array = NULL;
+static long      nr_pages = 0;
+static uint64_t *page_array = NULL;
 
 
 /*
@@ -170,7 +170,7 @@ static uint64_t
 to_ma(int cpu, uint64_t maddr)
 {
     if ( current_is_hvm && paging_enabled(&ctxt[cpu]) )
-        maddr = (uint64_t)page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
+        maddr = page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
     return maddr;
 }
 
@@ -360,7 +360,7 @@ map_domain_va(
         if ( nr_pages > 0 )
             free(page_array);
         nr_pages = npgs;
-        if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+        if ( (page_array = malloc(nr_pages * sizeof(*page_array))) == NULL )
         {
             IPRINTF("Could not allocate memory\n");
             return NULL;

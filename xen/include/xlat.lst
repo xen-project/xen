@@ -10,10 +10,6 @@
 !	trap_info			arch-x86/xen.h
 !	vcpu_guest_context		arch-x86/xen.h
 ?	acm_getdecision			acm_ops.h
-!	ctl_cpumap			domctl.h
-!	domctl_scheduler_op		domctl.h
-!	domctl_shadow_op		domctl.h
-!	domctl_shadow_op_stats		domctl.h
 ?	evtchn_alloc_unbound		event_channel.h
 ?	evtchn_bind_interdomain		event_channel.h
 ?	evtchn_bind_ipi			event_channel.h
@@ -43,9 +39,6 @@
 !	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
-?	sysctl_perfc_desc		sysctl.h
-!	sysctl_perfc_op			sysctl.h
-!	sysctl_tbuf_op			sysctl.h
 ?	t_buf				trace.h
 !	vcpu_runstate_info		vcpu.h
 ?	xenoprof_init			xenoprof.h

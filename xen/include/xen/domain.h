@@ -18,11 +18,7 @@ struct domain *alloc_domain(domid_t domid);
 void free_domain(struct domain *d);
 
 struct xen_domctl_getdomaininfo;
-void getdomaininfo(
-    struct domain *d, struct xen_domctl_getdomaininfo *info);
-struct compat_domctl_getdomaininfo;
-void compat_getdomaininfo(
-    struct domain *d, struct compat_domctl_getdomaininfo *info);
+void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
 
 /*
  * Arch-specifics.

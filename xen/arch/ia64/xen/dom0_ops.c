@@ -43,7 +43,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d = find_domain_by_id(op->domain);
         unsigned long start_page = op->u.getmemlist.start_pfn;
         unsigned long nr_pages = op->u.getmemlist.max_pfns;
-        unsigned long mfn;
+        uint64_t mfn;
 
         if ( d == NULL ) {
             ret = -EINVAL;

@@ -27,9 +27,6 @@
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
-#ifdef CONFIG_COMPAT
-#include <compat/domctl.h>
-#endif
 
 /* Both these structures are protected by the domlist_lock. */
 DEFINE_RWLOCK(domlist_lock);
@@ -449,75 +446,6 @@ void domain_unpause_by_systemcontroller(struct domain *d)
         for_each_vcpu ( d, v )
             vcpu_wake(v);
     }
-}
-
-
-/*
- * set_info_guest is used for final setup, launching, and state modification 
- * of domains other than domain 0. ie. the domains that are being built by 
- * the userspace dom0 domain builder.
- */
-int set_info_guest(struct domain *d,
-                   xen_domctl_vcpucontext_u vcpucontext)
-{
-    int rc = 0;
-    vcpu_guest_context_u c;
-#ifdef CONFIG_COMPAT
-    CHECK_FIELD(domctl_vcpucontext, vcpu);
-#endif
-    unsigned long vcpu = vcpucontext.nat->vcpu;
-    struct vcpu *v;
-
-    if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
-        return -EINVAL;
-
-    if ( IS_COMPAT(v->domain)
-         ? compat_handle_is_null(vcpucontext.cmp->ctxt)
-         : guest_handle_is_null(vcpucontext.nat->ctxt) )
-        return vcpu_reset(v);
-
-#ifdef CONFIG_COMPAT
-    BUILD_BUG_ON(sizeof(struct vcpu_guest_context)
-                 < sizeof(struct compat_vcpu_guest_context));
-#endif
-    if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
-        return -ENOMEM;
-
-    domain_pause(d);
-
-    if ( !IS_COMPAT(v->domain) )
-    {
-        if ( !IS_COMPAT(current->domain)
-             ? copy_from_guest(c.nat, vcpucontext.nat->ctxt, 1)
-#ifndef CONFIG_COMPAT
-             : 0 )
-#else
-             : copy_from_guest(c.nat,
-                               compat_handle_cast(vcpucontext.cmp->ctxt,
-                                                  void),
-                               1) )
-#endif
-            rc = -EFAULT;
-    }
-#ifdef CONFIG_COMPAT
-    else
-    {
-        if ( !IS_COMPAT(current->domain)
-             ? copy_from_guest(c.cmp,
-                               guest_handle_cast(vcpucontext.nat->ctxt, void),
-                               1)
-             : copy_from_compat(c.cmp, vcpucontext.cmp->ctxt, 1) )
-            rc = -EFAULT;
-    }
-#endif
-
-    if ( rc == 0 )
-        rc = arch_set_info_guest(v, c);
-
-    domain_unpause(d);
-
-    xfree(c.nat);
-    return rc;
 }
 
 int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)

@@ -58,7 +58,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
     if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
     {
         PERROR("Could not get domain info");
-        goto out;
+        return rc;
     }
 
     /*

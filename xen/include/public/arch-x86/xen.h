@@ -43,6 +43,12 @@
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 #endif
 
+#if defined(__i386__)
+#include "xen-x86_32.h"
+#elif defined(__x86_64__)
+#include "xen-x86_64.h"
+#endif
+
 #ifndef __ASSEMBLY__
 /* Guest handles for primitive C types. */
 __DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
@@ -55,12 +61,6 @@ DEFINE_XEN_GUEST_HANDLE(void);
 
 typedef unsigned long xen_pfn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
-#endif
-
-#if defined(__i386__)
-#include "xen-x86_32.h"
-#elif defined(__x86_64__)
-#include "xen-x86_64.h"
 #endif
 
 /*

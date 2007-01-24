@@ -552,7 +552,7 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
-int xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
+int xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
                     unsigned long max_pfns);
 
 unsigned long xc_ia64_fpsr_default(void);
@@ -575,7 +575,7 @@ int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 int xc_memory_op(int xc_handle, int cmd, void *arg);
 
 int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
-                          int num, unsigned long *arr);
+                          int num, uint32_t *arr);
 
 
 /* Get current total pages allocated to a domain. */

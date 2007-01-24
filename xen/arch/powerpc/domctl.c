@@ -49,7 +49,7 @@ long arch_do_domctl(struct xen_domctl *domctl,
         int i;
         struct domain *d = find_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        xen_pfn_t mfn;
+        uint64_t mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;

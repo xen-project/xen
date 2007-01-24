@@ -717,7 +717,7 @@ domain_set_shared_info_va (unsigned long va)
 }
 
 /* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
-#define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
+#define SHADOW_COPY_CHUNK 1024
 
 int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 {
@@ -785,7 +785,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 
 	case XEN_DOMCTL_SHADOW_OP_CLEAN:
 	  {
-		int nbr_longs;
+		int nbr_bytes;
 
 		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
 		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
@@ -802,21 +802,21 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		if (sc->pages > d->arch.shadow_bitmap_size)
 			sc->pages = d->arch.shadow_bitmap_size; 
 
-		nbr_longs = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+		nbr_bytes = (sc->pages + 7) / 8;
 
-		for (i = 0; i < nbr_longs; i += SHADOW_COPY_CHUNK) {
-			int size = (nbr_longs - i) > SHADOW_COPY_CHUNK ?
-			           SHADOW_COPY_CHUNK : nbr_longs - i;
+		for (i = 0; i < nbr_bytes; i += SHADOW_COPY_CHUNK) {
+			int size = (nbr_bytes - i) > SHADOW_COPY_CHUNK ?
+			           SHADOW_COPY_CHUNK : nbr_bytes - i;
      
-			if (copy_to_guest_offset(sc->dirty_bitmap, i,
-			                         d->arch.shadow_bitmap + i,
-			                         size)) {
+			if (copy_to_guest_offset(
+                            sc->dirty_bitmap, i,
+                            (uint8_t *)d->arch.shadow_bitmap + i,
+                            size)) {
 				rc = -EFAULT;
 				break;
 			}
 
-			memset(d->arch.shadow_bitmap + i,
-			       0, size * sizeof(unsigned long));
+			memset((uint8_t *)d->arch.shadow_bitmap + i, 0, size);
 		}
 		
 		break;
@@ -838,9 +838,9 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		if (sc->pages > d->arch.shadow_bitmap_size)
 			sc->pages = d->arch.shadow_bitmap_size; 
 
-		size = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
-		if (copy_to_guest(sc->dirty_bitmap, 
-		                  d->arch.shadow_bitmap, size)) {
+		size = (sc->pages + 7) / 8;
+		if (copy_to_guest(sc->dirty_bitmap,
+		                  (uint8_t *)d->arch.shadow_bitmap, size)) {
 			rc = -EFAULT;
 			break;
 		}

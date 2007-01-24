@@ -102,7 +102,7 @@ void unlock_pages(void *addr, size_t len)
 
 /* NB: arr must be locked */
 int xc_get_pfn_type_batch(int xc_handle,
-                          uint32_t dom, int num, unsigned long *arr)
+                          uint32_t dom, int num, uint32_t *arr)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_getpageframeinfo2;
@@ -309,7 +309,7 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 #ifndef __ia64__
 int xc_get_pfn_list(int xc_handle,
                     uint32_t domid,
-                    xen_pfn_t *pfn_buf,
+                    uint64_t *pfn_buf,
                     unsigned long max_pfns)
 {
     DECLARE_DOMCTL;
@@ -320,10 +320,10 @@ int xc_get_pfn_list(int xc_handle,
     set_xen_guest_handle(domctl.u.getmemlist.buffer, pfn_buf);
 
 #ifdef VALGRIND
-    memset(pfn_buf, 0, max_pfns * sizeof(xen_pfn_t));
+    memset(pfn_buf, 0, max_pfns * sizeof(*pfn_buf));
 #endif
 
-    if ( lock_pages(pfn_buf, max_pfns * sizeof(xen_pfn_t)) != 0 )
+    if ( lock_pages(pfn_buf, max_pfns * sizeof(*pfn_buf)) != 0 )
     {
         PERROR("xc_get_pfn_list: pfn_buf lock failed");
         return -1;
@@ -331,22 +331,7 @@ int xc_get_pfn_list(int xc_handle,
 
     ret = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(pfn_buf, max_pfns * sizeof(xen_pfn_t));
-
-#if 0
-#ifdef DEBUG
-    DPRINTF(("Ret for xc_get_pfn_list is %d\n", ret));
-    if (ret >= 0) {
-        int i, j;
-        for (i = 0; i < domctl.u.getmemlist.num_pfns; i += 16) {
-            DPRINTF("0x%x: ", i);
-            for (j = 0; j < 16; j++)
-                DPRINTF("0x%lx ", pfn_buf[i + j]);
-            DPRINTF("\n");
-        }
-    }
-#endif
-#endif
+    unlock_pages(pfn_buf, max_pfns * sizeof(*pfn_buf));
 
     return (ret < 0) ? -1 : domctl.u.getmemlist.num_pfns;
 }

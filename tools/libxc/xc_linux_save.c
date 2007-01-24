@@ -811,8 +811,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     analysis_phase(xc_handle, dom, max_pfn, to_skip, 0);
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
-    pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
+    pfn_type   = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
+    pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
         ERROR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
@@ -976,10 +976,16 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            if (xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type)) {
+            for ( j = 0; j < batch; j++ )
+                ((uint32_t *)pfn_type)[i] = pfn_type[i];
+            if ( xc_get_pfn_type_batch(xc_handle, dom, batch,
+                                       (uint32_t *)pfn_type) )
+            {
                 ERROR("get_pfn_type_batch failed");
                 goto out;
             }
+            for ( j = batch-1; j >= 0; j-- )
+                pfn_type[i] = ((uint32_t *)pfn_type)[i];
 
             for ( j = 0; j < batch; j++ )
             {
