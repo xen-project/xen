@@ -76,7 +76,11 @@ OPTIONS = {
     'vdi-list': [(('-l', '--long'),
                   {'action':'store_true',
                    'help':'List all properties of VDI'})
-               ],        
+                 ],
+    'vif-list': [(('-l', '--long'),
+                  {'action':'store_true',
+                   'help':'List all properties of VIF'})
+                 ],            
     'vm-list': [(('-l', '--long'),
                  {'action':'store_true',
                   'help':'List all properties of VMs'})
@@ -475,19 +479,28 @@ def xapi_vbd_list(args, async = False):
  
 def xapi_vif_list(args, async = False):
     server, session = connect()
+    opts, args = parse_args('vdi-list', args, set_defaults = True)
+    is_long = opts and opts.long
+    
     domname = args[0]
     
     dom_uuid = resolve_vm(server, session, domname)
     vifs = execute(server, 'VM.get_VIFs', (session, dom_uuid))
-    
-    print VIF_LIST_FORMAT % {'name': 'Name',
-                             'device': 'Device',
-                             'uuid' : 'UUID',
-                             'MAC': 'MAC'}
-    
-    for vif in vifs:
-        vif_struct = execute(server, 'VIF.get_record', (session, vif))
-        print VIF_LIST_FORMAT % vif_struct       
+
+    if not is_long:
+        print VIF_LIST_FORMAT % {'name': 'Name',
+                                 'device': 'Device',
+                                 'uuid' : 'UUID',
+                                 'MAC': 'MAC'}
+        
+        for vif in vifs:
+            vif_struct = execute(server, 'VIF.get_record', (session, vif))
+            print VIF_LIST_FORMAT % vif_struct
+    else:
+        for vif in vifs:
+            vif_struct = execute(server, 'VIF.get_record', (session, vif))
+            pprint(vif_struct)
+
 
 def xapi_vdi_list(args, async = False):
     opts, args = parse_args('vdi-list', args, set_defaults = True)
