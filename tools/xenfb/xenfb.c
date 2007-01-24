@@ -362,12 +362,12 @@ static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 		 */
 		uint32_t *ptr32 = NULL;
 		uint32_t *ptr64 = NULL;
-#if defined(__i386_)
-		ptr32 = page->pd;
+#if defined(__i386__)
+		ptr32 = (void*)page->pd;
 		ptr64 = ((void*)page->pd) + 4;
 #elif defined(__x86_64__)
 		ptr32 = ((void*)page->pd) - 4;
-		ptr64 = page->pd;
+		ptr64 = (void*)page->pd;
 #endif
 		if (ptr32) {
 			if (0 == ptr32[1]) {
@@ -383,7 +383,7 @@ static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 		/* 64bit dom0, 32bit domU */
 		mode = 32;
 		pd   = ((void*)page->pd) - 4;
-#elif defined(__i386_)
+#elif defined(__i386__)
 	} else if (0 == strcmp(xenfb->protocol, XEN_IO_PROTO_ABI_X86_64)) {
 		/* 32bit dom0, 64bit domU */
 		mode = 64;
@@ -441,9 +441,6 @@ static int xenfb_bind(struct xenfb_device *dev)
 	if (xenfb_xs_scanf1(xenfb->xsh, dev->otherend, "event-channel", "%u",
 			    &evtchn) < 0)
 		return -1;
-	if (xenfb_xs_scanf1(xenfb->xsh, dev->otherend, "protocol", "%63s",
-			    xenfb->protocol) < 0)
-		xenfb->protocol[0] = '\0';
 
 	dev->port = xc_evtchn_bind_interdomain(xenfb->evt_xch,
 					       dev->otherend_id, evtchn);
@@ -567,6 +564,9 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid)
 		errno = ENOTSUP;
 		goto error;
 	}
+	if (xenfb_xs_scanf1(xsh, xenfb->fb.otherend, "protocol", "%63s",
+			    xenfb->protocol) < 0)
+		xenfb->protocol[0] = '\0';
 	xenfb_xs_printf(xsh, xenfb->fb.nodename, "request-update", "1");
 
 	/* TODO check for permitted ranges */
