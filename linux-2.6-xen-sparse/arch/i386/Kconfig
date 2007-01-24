@@ -16,6 +16,7 @@ config X86_32
 
 config GENERIC_TIME
 	bool
+	depends on !X86_XEN
 	default y
 
 config LOCKDEP_SUPPORT
