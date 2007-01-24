@@ -574,7 +574,8 @@ static void ptc_ga_remote_func (void *varg)
     mpta = ia64_get_pta();
     ia64_set_pta(v->arch.arch_vmx.mpta&(~1));
     ia64_srlz_d();
-    vmx_vcpu_ptc_l(v, REGION_OFFSET(vadr), args->ps);
+    vadr = PAGEALIGN(vadr, args->ps);
+    thash_purge_entries_remote(v, vadr, args->ps);
     VMX(v, vrr[0]) = oldrid; 
     VMX(v, psbits[0]) = oldpsbits;
     ia64_set_rr(0x0,moldrid);

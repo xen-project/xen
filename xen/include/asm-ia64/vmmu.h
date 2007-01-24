@@ -271,6 +271,7 @@ extern thash_data_t *thash_find_next_overlap(thash_cb_t *hcb);
  *
  */
 extern void thash_purge_entries(struct vcpu *v, u64 va, u64 ps);
+extern void thash_purge_entries_remote(struct vcpu *v, u64 va, u64 ps);
 extern void thash_purge_and_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa, int type);
 
 /*
