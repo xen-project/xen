@@ -1577,18 +1577,21 @@ class XendDomainInfo:
         """Create an event channel to the domain.
         """
         try:
-            return xc.evtchn_alloc_unbound(domid=self.domid, remote_dom=0)
+            if self.domid != None:
+                return xc.evtchn_alloc_unbound(domid = self.domid,
+                                               remote_dom = 0)
         except:
-            log.exception("Exception in alloc_unbound(%d)", self.domid)
+            log.exception("Exception in alloc_unbound(%s)", str(self.domid))
             raise
 
     def _resetChannels(self):
         """Reset all event channels in the domain.
         """
         try:
-            return xc.evtchn_reset(dom=self.domid)
+            if self.domid != None:
+                return xc.evtchn_reset(dom = self.domid)
         except:
-            log.exception("Exception in evtcnh_reset(%d)", self.domid)
+            log.exception("Exception in evtcnh_reset(%s)", str(self.domid))
             raise
 
 
