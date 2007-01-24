@@ -170,12 +170,21 @@ _server = None
 _session = None
 def connect(*args):
     global _server, _session, _initialised
+    
     if not _initialised:
-        _server = ServerProxy('http://localhost:9363/')
-        login = raw_input("Login: ")
-        password = getpass()
-        creds = (login, password)
-        _session = execute(_server.session, 'login_with_password', creds)
+        # try without password
+        try:
+            _server = ServerProxy('http://localhost:9363/')
+            _session = execute(_server.session, 'login_with_password',
+                               ('',''))
+        except:
+            login = raw_input("Login: ")
+            password = getpass()
+            creds = (login, password)            
+            _server = ServerProxy('http://localhost:9363/')
+            _session = execute(_server.session, 'login_with_password',
+                               creds)
+
         _initialised = True
     return (_server, _session)
 
@@ -476,6 +485,15 @@ def xapi_vbd_list(args, async = False):
     for vbd in vbds:
         vbd_struct = execute(server, 'VBD.get_record', (session, vbd))
         print VBD_LIST_FORMAT % vbd_struct
+
+def xapi_vbd_stats(args, async = False):
+    server, session = connect()
+    domname = args[0]
+    dom_uuid = resolve_vm(server, session, domname)
+
+    vbds = execute(server, 'VM.get_VBDs', (session, dom_uuid))
+    for vbd_uuid in vbds:
+        print execute(server, 'VBD.get_io_read_kbs', (session, vbd_uuid))
  
 def xapi_vif_list(args, async = False):
     server, session = connect()
