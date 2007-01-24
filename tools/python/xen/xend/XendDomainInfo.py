@@ -1216,8 +1216,10 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
-        for (devclass, config) in self.info.get('devices', {}).values():
-            if devclass in XendDevices.valid_devices():            
+        ordered_refs = self.info.ordered_device_refs()
+        for dev_uuid in ordered_refs:
+            devclass, config = self.info['devices'][dev_uuid]
+            if devclass in XendDevices.valid_devices():
                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
                 dev_uuid = config.get('uuid')
                 devid = self._createDevice(devclass, config)

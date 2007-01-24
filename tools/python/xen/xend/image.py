@@ -325,7 +325,7 @@ class HVMImageHandler(ImageHandler):
             raise VmError("HVM guest support is unavailable: is VT/AMD-V "
                           "supported by your CPU and enabled in your BIOS?")
 
-        self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
+        self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.device_model = imageConfig['hvm'].get('device_model')
         if not self.device_model:
             raise VmError("hvm: missing device model")
@@ -375,11 +375,11 @@ class HVMImageHandler(ImageHandler):
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
-    def parseDeviceModelArgs(self, imageConfig, deviceConfig):
+    def parseDeviceModelArgs(self, vmConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa',
                    'acpi', 'usb', 'usbdevice', 'keymap' ]
-        hvmDeviceConfig = imageConfig['hvm']['devices']
+        hvmDeviceConfig = vmConfig['image']['hvm']['devices']
 
         ret = ['-vcpus', str(self.vm.getVCpuCount())]
 
@@ -410,29 +410,32 @@ class HVMImageHandler(ImageHandler):
         ret = ret + ["-domain-name", str(self.vm.info['name_label'])]
         nics = 0
         
-        for devuuid, (devtype, devinfo) in deviceConfig.items():
-            if devtype == 'vbd':
-                uname = devinfo.get('uname')
-                if uname is not None and 'file:' in uname:
-                    (_, vbdparam) = string.split(uname, ':', 1)
-                    if not os.path.isfile(vbdparam):
-                        raise VmError('Disk image does not exist: %s' %
-                                      vbdparam)
-            if devtype == 'vif':
-                dtype = devinfo.get('type', 'ioemu')
-                if dtype != 'ioemu':
-                    continue
-                nics += 1
-                mac = devinfo.get('mac')
-                if mac == None:
-                    mac = randomMAC()
-                bridge = devinfo.get('bridge', 'xenbr0')
-                model = devinfo.get('model', 'rtl8139')
-                ret.append("-net")
-                ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
-                           (nics, mac, model))
-                ret.append("-net")
-                ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
+        for devuuid in vmConfig['vbd_refs']:
+            devinfo = vmConfig['devices'][devuuid][1]
+            uname = devinfo.get('uname')
+            if uname is not None and 'file:' in uname:
+                (_, vbdparam) = string.split(uname, ':', 1)
+                if not os.path.isfile(vbdparam):
+                    raise VmError('Disk image does not exist: %s' %
+                                  vbdparam)
+
+        for devuuid in vmConfig['vif_refs']:
+            devinfo = vmConfig['devices'][devuuid][1]
+            dtype = devinfo.get('type', 'ioemu')
+            if dtype != 'ioemu':
+                continue
+            nics += 1
+            mac = devinfo.get('mac')
+            if mac is None:
+                mac = randomMAC()
+            bridge = devinfo.get('bridge', 'xenbr0')
+            model = devinfo.get('model', 'rtl8139')
+            ret.append("-net")
+            ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
+                       (nics, mac, model))
+            ret.append("-net")
+            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
+
         return ret
 
     def configVNC(self, imageConfig):

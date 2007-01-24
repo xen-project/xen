@@ -654,19 +654,11 @@ class XendConfig(dict):
 
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
-        
-        self['console_refs'] = []
-        self['vif_refs'] = []
-        self['vbd_refs'] = []
-        self['vtpm_refs'] = []
-        for dev_uuid, (dev_type, dev_info) in self['devices'].items():
-            if dev_type == 'vif':
-                self['vif_refs'].append(dev_uuid)
-            elif dev_type in ('vbd','tap'):
-                self['vbd_refs'].append(dev_uuid)
-            elif dev_type in ('vtpm',):
-                self['vtpm_refs'].append(dev_uuid)
-        
+        self['console_refs'] = cfg.get('console_refs', [])
+        self['vif_refs'] = cfg.get('vif_refs', [])
+        self['vbd_refs'] = cfg.get('vbd_refs', [])
+        self['vtpm_refs'] = cfg.get('vtpm_refs', [])
+
 
     def _sxp_to_xapi_unsupported(self, sxp_cfg):
         """Read in an SXP configuration object and populate
@@ -989,8 +981,8 @@ class XendConfig(dict):
                 
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                self['devices'][dev_uuid] = (dev_type, dev_info)
-                self['vif_refs'].append(dev_uuid)
+                target['devices'][dev_uuid] = (dev_type, dev_info)
+                target['vif_refs'].append(dev_uuid)
                 return dev_uuid
             
             elif dev_type in ('vbd', 'tap'):
@@ -1013,8 +1005,8 @@ class XendConfig(dict):
 
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                self['devices'][dev_uuid] = (dev_type, dev_info)
-                self['vbd_refs'].append(dev_uuid)                
+                target['devices'][dev_uuid] = (dev_type, dev_info)
+                target['vbd_refs'].append(dev_uuid)                
                 return dev_uuid
 
             elif dev_type == 'vtpm':
@@ -1023,8 +1015,8 @@ class XendConfig(dict):
 
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
-                self['devices'][dev_uuid] = (dev_type, dev_info)
-                self['vtpm_refs'].append(dev_uuid)
+                target['devices'][dev_uuid] = (dev_type, dev_info)
+                target['vtpm_refs'].append(dev_uuid)
                 return dev_uuid
 
         return ''
@@ -1073,6 +1065,14 @@ class XendConfig(dict):
 
         return sxpr
 
+    def ordered_device_refs(self):
+        result = (self['console_refs'] +
+                  self['vbd_refs'] +
+                  self['vif_refs'] +
+                  self['vtpm_refs'])
+        result.extend([u for u in self['devices'].keys() if u not in result])
+        return result
+
     def all_devices_sxpr(self):
         """Returns the SXPR for all devices in the current configuration."""
         sxprs = []
@@ -1081,7 +1081,9 @@ class XendConfig(dict):
         if 'devices' not in self:
             return sxprs
         
-        for dev_type, dev_info in self['devices'].values():
+        ordered_refs = self.ordered_device_refs()
+        for dev_uuid in ordered_refs:
+            dev_type, dev_info = self['devices'][dev_uuid]
             if dev_type == 'pci': # special case for pci devices
                 sxpr = [['uuid', dev_info['uuid']]]
                 for pci_dev_info in dev_info['devs']:
