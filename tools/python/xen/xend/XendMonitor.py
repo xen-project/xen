@@ -220,10 +220,11 @@ class XendMonitor(threading.Thread):
         while True:
             self.lock.acquire()
             try:
-            
+                active_domids = set()
                 # Calculate utilisation for VCPUs
                 
                 for domid, cputimes in self._get_cpu_stats().items():
+                    active_domids.add(domid)
                     if domid not in self._domain_vcpus:
                         # if not initialised, save current stats
                         # and skip utilisation calculation
@@ -309,6 +310,19 @@ class XendMonitor(threading.Thread):
 
                     self.pifs_util[pifid] = (rx_util, tx_util)
                     self.pifs[pifid] = stats
+
+                for domid in self.domain_vcpus_util.keys():
+                    if domid not in active_domids:
+                        del self.domain_vcpus_util[domid]
+                        del self.domain_vcpus[domid]
+                for domid in self.domain_vifs_util.keys():
+                    if domid not in active_domids:
+                        del self.domain_vifs_util[domid]
+                        del self.domain_vifs[domid]
+                for domid in self.domain_vbds_util.keys():
+                    if domid not in active_domids:
+                        del self.domain_vbds_util[domid]
+                        del self.domain_vbds[domid]
 
             finally:
                 self.lock.release()
