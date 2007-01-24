@@ -361,6 +361,280 @@ static inline void __restore_debug_registers(struct vcpu *v)
 }
 
 
+int svm_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    c->eip = vmcb->rip;
+
+#ifdef HVM_DEBUG_SUSPEND
+    printk("%s: eip=0x%"PRIx64".\n", 
+           __func__,
+           inst_len, c->eip);
+#endif
+
+    c->esp = vmcb->rsp;
+    c->eflags = vmcb->rflags;
+
+    c->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+    c->cr3 = v->arch.hvm_svm.cpu_cr3;
+    c->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+
+#ifdef HVM_DEBUG_SUSPEND
+    printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
+           __func__,
+           c->cr3,
+           c->cr0,
+           c->cr4);
+#endif
+
+    c->idtr_limit = vmcb->idtr.limit;
+    c->idtr_base  = vmcb->idtr.base;
+
+    c->gdtr_limit = vmcb->gdtr.limit;
+    c->gdtr_base  = vmcb->gdtr.base; 
+
+    c->cs_sel = vmcb->cs.sel;
+    c->cs_limit = vmcb->cs.limit;
+    c->cs_base = vmcb->cs.base;
+    c->cs_arbytes = vmcb->cs.attr.bytes;
+
+    c->ds_sel = vmcb->ds.sel;
+    c->ds_limit = vmcb->ds.limit;
+    c->ds_base = vmcb->ds.base;
+    c->ds_arbytes = vmcb->ds.attr.bytes;
+
+    c->es_sel = vmcb->es.sel;
+    c->es_limit = vmcb->es.limit;
+    c->es_base = vmcb->es.base;
+    c->es_arbytes = vmcb->es.attr.bytes;
+
+    c->ss_sel = vmcb->ss.sel;
+    c->ss_limit = vmcb->ss.limit;
+    c->ss_base = vmcb->ss.base;
+    c->ss_arbytes = vmcb->ss.attr.bytes;
+
+    c->fs_sel = vmcb->fs.sel;
+    c->fs_limit = vmcb->fs.limit;
+    c->fs_base = vmcb->fs.base;
+    c->fs_arbytes = vmcb->fs.attr.bytes;
+
+    c->gs_sel = vmcb->gs.sel;
+    c->gs_limit = vmcb->gs.limit;
+    c->gs_base = vmcb->gs.base;
+    c->gs_arbytes = vmcb->gs.attr.bytes;
+
+    c->tr_sel = vmcb->tr.sel;
+    c->tr_limit = vmcb->tr.limit;
+    c->tr_base = vmcb->tr.base;
+    c->tr_arbytes = vmcb->tr.attr.bytes;
+
+    c->ldtr_sel = vmcb->ldtr.sel;
+    c->ldtr_limit = vmcb->ldtr.limit;
+    c->ldtr_base = vmcb->ldtr.base;
+    c->ldtr_arbytes = vmcb->ldtr.attr.bytes;
+
+    c->sysenter_cs = vmcb->sysenter_cs;
+    c->sysenter_esp = vmcb->sysenter_esp;
+    c->sysenter_eip = vmcb->sysenter_eip;
+
+    return 1;
+}
+
+
+int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
+{
+    unsigned long mfn, old_base_mfn;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    vmcb->rip    = c->eip;
+    vmcb->rsp    = c->esp;
+    vmcb->rflags = c->eflags;
+
+    v->arch.hvm_svm.cpu_shadow_cr0 = c->cr0;
+
+#ifdef HVM_DEBUG_SUSPEND
+    printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
+           __func__,
+            c->cr3,
+            c->cr0,
+            c->cr4);
+#endif
+
+    if (!svm_paging_enabled(v)) {
+        printk("%s: paging not enabled.", __func__);
+        goto skip_cr3;
+    }
+
+    if (c->cr3 == v->arch.hvm_svm.cpu_cr3) {
+        /*
+         * This is simple TLB flush, implying the guest has
+         * removed some translation or changed page attributes.
+         * We simply invalidate the shadow.
+         */
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
+            goto bad_cr3;
+        }
+    } else {
+        /*
+         * If different, make a shadow. Check if the PDBR is valid
+         * first.
+         */
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
+        /* current!=vcpu as not called by arch_vmx_do_launch */
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
+            goto bad_cr3;
+        }
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
+        if (old_base_mfn)
+             put_page(mfn_to_page(old_base_mfn));
+        /*
+         * arch.shadow_table should now hold the next CR3 for shadow
+         */
+        v->arch.hvm_svm.cpu_cr3 = c->cr3;
+    }
+
+ skip_cr3:
+#if defined(__x86_64__) && 0
+    if (vmx_long_mode_enabled(v)) {
+        unsigned long vm_entry_value;
+        vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
+        vm_entry_value |= VM_ENTRY_IA32E_MODE;
+        __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+    }
+#endif
+
+    vmcb->cr4 = c->cr4 | SVM_CR4_HOST_MASK;
+    v->arch.hvm_svm.cpu_shadow_cr4 = c->cr4;
+    
+    vmcb->idtr.limit = c->idtr_limit;
+    vmcb->idtr.base  = c->idtr_base;
+
+    vmcb->gdtr.limit = c->gdtr_limit;
+    vmcb->gdtr.base  = c->gdtr_base;
+
+    vmcb->cs.sel        = c->cs_sel;
+    vmcb->cs.limit      = c->cs_limit;
+    vmcb->cs.base       = c->cs_base;
+    vmcb->cs.attr.bytes = c->cs_arbytes;
+
+    vmcb->ds.sel        = c->ds_sel;
+    vmcb->ds.limit      = c->ds_limit;
+    vmcb->ds.base       = c->ds_base;
+    vmcb->ds.attr.bytes = c->ds_arbytes;
+
+    vmcb->es.sel        = c->es_sel;
+    vmcb->es.limit      = c->es_limit;
+    vmcb->es.base       = c->es_base;
+    vmcb->es.attr.bytes = c->es_arbytes;
+
+    vmcb->ss.sel        = c->ss_sel;
+    vmcb->ss.limit      = c->ss_limit;
+    vmcb->ss.base       = c->ss_base;
+    vmcb->ss.attr.bytes = c->ss_arbytes;
+
+    vmcb->fs.sel        = c->fs_sel;
+    vmcb->fs.limit      = c->fs_limit;
+    vmcb->fs.base       = c->fs_base;
+    vmcb->fs.attr.bytes = c->fs_arbytes;
+
+    vmcb->gs.sel        = c->gs_sel;
+    vmcb->gs.limit      = c->gs_limit;
+    vmcb->gs.base       = c->gs_base;
+    vmcb->gs.attr.bytes = c->gs_arbytes;
+
+    vmcb->tr.sel        = c->tr_sel;
+    vmcb->tr.limit      = c->tr_limit;
+    vmcb->tr.base       = c->tr_base;
+    vmcb->tr.attr.bytes = c->tr_arbytes;
+
+    vmcb->ldtr.sel        = c->ldtr_sel;
+    vmcb->ldtr.limit      = c->ldtr_limit;
+    vmcb->ldtr.base       = c->ldtr_base;
+    vmcb->ldtr.attr.bytes = c->ldtr_arbytes;
+
+    vmcb->sysenter_cs =  c->sysenter_cs;
+    vmcb->sysenter_esp = c->sysenter_esp;
+    vmcb->sysenter_eip = c->sysenter_eip;
+
+    shadow_update_paging_modes(v);
+    return 0;
+ 
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"", c->cr3);
+    return -EINVAL;
+}
+
+        
+void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    data->shadow_gs = vmcb->kerngsbase;
+    /* MSR_LSTAR, MSR_STAR, MSR_CSTAR, MSR_SYSCALL_MASK, MSR_EFER */    
+    data->msr_items[0] = vmcb->lstar;
+    data->msr_items[1] = vmcb->star;
+    data->msr_items[2] = vmcb->cstar;
+    data->msr_items[3] = vmcb->sfmask;
+    data->msr_items[4] = vmcb->efer;
+
+    data->tsc = hvm_get_guest_time(v);
+
+    // dump_msr_state(guest_state);
+}
+
+
+void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    /* MSR_LSTAR, MSR_STAR, MSR_CSTAR, MSR_SYSCALL_MASK, MSR_EFER */
+    vmcb->lstar  = data->msr_items[0];
+    vmcb->star   = data->msr_items[1];
+    vmcb->cstar  = data->msr_items[2];
+    vmcb->sfmask = data->msr_items[3];
+    vmcb->efer   = data->msr_items[4];
+
+    hvm_set_guest_time(v, data->tsc);
+
+    // dump_msr_state(guest_state);
+}
+
+void svm_save_vmcb_ctxt(hvm_domain_context_t *h, void *opaque)
+{
+    struct vcpu *v = opaque;
+    struct hvm_hw_cpu ctxt;
+
+    svm_save_cpu_state(v, &ctxt);
+
+    svm_vmcs_save(v, &ctxt);
+
+    hvm_put_struct(h, &ctxt);
+}
+
+int svm_load_vmcb_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+{
+    struct vcpu *v = opaque;
+    struct hvm_hw_cpu ctxt;
+
+    if (version != 1)
+        return -EINVAL;
+
+    hvm_get_struct(h, &ctxt);
+    svm_load_cpu_state(v, &ctxt);
+    if (svm_vmcb_restore(v, &ctxt)) {
+        printk("svm_vmcb restore failed!\n");
+        domain_crash(v->domain);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+
 static inline void svm_restore_dr(struct vcpu *v)
 {
     if ( unlikely(v->arch.guest_context.debugreg[7] & 0xFF) )
@@ -772,6 +1046,9 @@ int start_svm(void)
 
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
+
+    hvm_funcs.save_cpu_ctxt = svm_save_vmcb_ctxt;
+    hvm_funcs.load_cpu_ctxt = svm_load_vmcb_ctxt;
 
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
