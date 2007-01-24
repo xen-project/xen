@@ -16,7 +16,8 @@ ENTRY(compat_hypercall)
         jae   compat_bad_hypercall
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
-        pushq UREGS_rbx(%rsp); pushq %rcx; pushq %rdx; pushq %rsi; pushq %rdi; pushq UREGS_rbp+5*8(%rsp)
+        pushq UREGS_rbx(%rsp); pushq %rcx; pushq %rdx; pushq %rsi; pushq %rdi
+        pushq UREGS_rbp+5*8(%rsp)
         leaq  compat_hypercall_args_table(%rip),%r10
         movq  $6,%rcx
         subb  (%r10,%rax,1),%cl
@@ -28,11 +29,13 @@ ENTRY(compat_hypercall)
         pushq %rax
         pushq UREGS_rip+8(%rsp)
 #else
-        movl  %eax,%eax
-        movl  %ebp,%r9d
-        movl  %edi,%r8d
-        xchgl  %ecx,%esi
-        movl  UREGS_rbx(%rsp),%edi
+        /* Relocate argument registers and zero-extend to 64 bits. */
+        movl  %eax,%eax              /* Hypercall #  */
+        movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
+        xchgl %ecx,%esi              /* Arg 2, Arg 4 */
+        movl  %edx,%edx              /* Arg 3        */
+        movl  %edi,%r8d              /* Arg 5        */
+        movl  %ebp,%r9d              /* Arg 6        */
 #endif
         leaq  compat_hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
