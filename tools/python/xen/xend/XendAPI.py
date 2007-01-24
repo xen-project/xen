@@ -260,6 +260,17 @@ def valid_task(func):
            _check_ref(XendTaskManager.get_task,
                       'TASK_HANDLE_INVALID', func, *args, **kwargs)
 
+def valid_debug(func):
+    """Decorator to verify if task_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, task_ref)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: r in XendAPI._debug,
+                      'TASK_HANDLE_INVALID', func, *args, **kwargs)
+
 # -----------------------------
 # Bridge to Legacy XM API calls
 # -----------------------------
@@ -300,6 +311,7 @@ class XendAPI(object):
 
     __decorated__ = False
     __init_lock__ = threading.Lock()
+    _debug = {}
     
     def __new__(cls, *args, **kwds):
         """ Override __new__ to decorate the class only once.
@@ -337,6 +349,7 @@ class XendAPI(object):
             'SR'      : valid_sr,
             'PIF'     : valid_pif,
             'task'    : valid_task,
+            'debug'   : valid_debug,
         }
 
         # Cheat methods
@@ -1865,6 +1878,40 @@ class XendAPI(object):
             XendNode.instance().save()        
         return xen_api_success_void()
 
+
+    # Xen API: Class debug
+    # ----------------------------------------------------------------
+
+    debug_methods = [('destroy', None),
+                     ('get_record', 'debug')]
+    debug_funcs = [('wait', None),
+                   ('return_failure', None)]
+    
+    def debug_wait(self, session, wait_secs):
+         import time
+         prog_units = 100/float(wait_secs)
+         for i in range(int(wait_secs)):
+             XendTask.log_progress(prog_units * i, prog_units * (i + 1),
+                                   time.sleep, 1)
+         return xen_api_success_void()
+
+
+    def debug_return_failure(self, session):
+        return xen_api_error(['DEBUG_FAIL', session])
+
+    def debug_create(self, session):
+        debug_uuid = uuid.createString()
+        self._debug[debug_uuid] = None
+        return xen_api_success(debug_uuid)
+
+    def debug_destroy(self, session, debug_ref):
+        del self._debug[debug_ref]
+        return xen_api_success_void()
+
+    def debug_get_record(self, session, debug_ref):
+        return xen_api_success({'uuid': debug_ref})
+
+             
 
 class XendAPIAsyncProxy:
     """ A redirector for Async.Class.function calls to XendAPI

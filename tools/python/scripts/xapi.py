@@ -662,7 +662,7 @@ def xapi_debug_wait(args, async = False):
     if len(args) > 0:
         secs = int(args[0])
     server, session = connect()
-    task_uuid = execute(server, 'Debug.wait', (session, secs), async=async)
+    task_uuid = execute(server, 'debug.wait', (session, secs), async=async)
     print 'Task UUID: %s' % task_uuid
 
 #
