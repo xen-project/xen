@@ -2052,10 +2052,29 @@ class XendDomainInfo:
                     # handle that properly.
 
             config['MTU'] = 1500 # TODO
-            config['io_read_kbs'] = 0.0
-            config['io_write_kbs'] = 0.0
+            
+            if self.state not in (XEN_API_VM_POWER_STATE_HALTED,):
+                xennode = XendNode.instance()
+                rx_bps, tx_bps = xennode.get_vif_util(self.domid, devid)
+                config['io_read_kbs'] = rx_bps/1024
+                config['io_write_kbs'] = tx_bps/1024
+            else:
+                config['io_read_kbs'] = 0.0
+                config['io_write_kbs'] = 0.0                
 
         if dev_class == 'vbd':
+
+            if self.state not in (XEN_API_VM_POWER_STATE_HALTED,):
+                controller = self.getDeviceController(dev_class)
+                devid, _1, _2 = controller.getDeviceDetails(config)
+                xennode = XendNode.instance()
+                rd_blkps, wr_blkps = xennode.get_vbd_util(self.domid, devid)
+                config['io_read_kbs'] = rd_blkps
+                config['io_write_kbs'] = wr_blkps
+            else:
+                config['io_read_kbs'] = 0.0
+                config['io_write_kbs'] = 0.0                
+            
             config['VDI'] = config.get('VDI', '')
             config['device'] = config.get('dev', '')
             if ':' in config['device']:
@@ -2068,8 +2087,7 @@ class XendDomainInfo:
 
             config['driver'] = 'paravirtualised' # TODO
             config['image'] = config.get('uname', '')
-            config['io_read_kbs'] = 0.0
-            config['io_write_kbs'] = 0.0
+
             if config.get('mode', 'r') == 'r':
                 config['mode'] = 'RO'
             else:
@@ -2088,14 +2106,12 @@ class XendDomainInfo:
             raise XendError('Invalid property for device: %s' % field)
 
     def get_vcpus_util(self):
-        # TODO: this returns the total accum cpu time, rather than util
-        # TODO: spec says that key is int, however, python does not allow
-        #       non-string keys to dictionaries.
         vcpu_util = {}
+        xennode = XendNode.instance()
         if 'vcpus_number' in self.info and self.domid != None:
             for i in range(0, self.info['vcpus_number']):
-                info = xc.vcpu_getinfo(self.domid, i)
-                vcpu_util[str(i)] = info['cpu_time']/1000000000.0
+                util = xennode.get_vcpu_util(self.domid, i)
+                vcpu_util[str(i)] = util
                 
         return vcpu_util
 

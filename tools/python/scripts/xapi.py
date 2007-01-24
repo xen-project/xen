@@ -200,6 +200,12 @@ def xapi_host_info(*args):
         print HOST_INFO_FORMAT % ('VMs', len(hostinfo['resident_VMs']))
         print HOST_INFO_FORMAT % ('UUID', host)        
 
+        for host_cpu_uuid in hostinfo['host_CPUs']:
+            host_cpu = execute(server.host_cpu.get_record, session,
+                               host_cpu_uuid)
+            print 'CPU %s Util: %.2f' % (host_cpu['number'],
+                                         float(host_cpu['utilisation']))
+        
 def xapi_host_set_name(*args):
     if len(args) < 1:
         raise OptionError("No hostname specified")

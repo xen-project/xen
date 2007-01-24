@@ -30,6 +30,7 @@ from xen.xend.XendLogging import log
 from xen.xend.XendPIF import *
 from xen.xend.XendNetwork import *
 from xen.xend.XendStateStore import XendStateStore
+from xen.xend.XendMonitor import XendMonitor
 
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
@@ -46,6 +47,8 @@ class XendNode:
         
         self.xc = xen.lowlevel.xc.xc()
         self.state_store = XendStateStore(xendoptions().get_xend_state_path())
+        self.monitor = XendMonitor()
+        self.monitor.start()
 
         # load host state from XML file
         saved_host = self.state_store.load_state('host')
@@ -285,8 +288,16 @@ class XendNode:
             raise XendError('Invalid CPU Reference')        
             
     def get_host_cpu_load(self, host_cpu_ref):
-        return 0.0
+        host_cpu = self.cpus.get(host_cpu_ref)
+        if not host_cpu:
+            return 0.0
 
+        vcpu = int(host_cpu['number'])
+        cpu_loads = self.monitor.get_domain_vcpus_util()
+        if 0 in cpu_loads and vcpu in cpu_loads[0]:
+            return cpu_loads[0][vcpu]
+
+        return 0.0
 
     #
     # Network Functions
@@ -396,6 +407,34 @@ class XendNode:
 
     def xendinfo(self):
         return [['xend_config_format', 3]]
+
+    #
+    # utilisation tracking
+    #
+
+    def get_vcpu_util(self, domid, vcpuid):
+        cpu_loads = self.monitor.get_domain_vcpus_util()
+        if domid in cpu_loads:
+            return cpu_loads[domid].get(vcpuid, 0.0)
+        return 0.0
+
+    def get_vif_util(self, domid, vifid):
+        vif_loads = self.monitor.get_domain_vifs_util()
+        if domid in vif_loads:
+            return vif_loads[domid].get(vifid, (0.0, 0.0))
+        return (0.0, 0.0)
+
+    def get_vbd_util(self, domid, vbdid):
+        vbd_loads = self.monitor.get_domain_vbds_util()
+        if domid in vbd_loads:
+            return vbd_loads[domid].get(vbdid, (0.0, 0.0))
+        return (0.0, 0.0)
+
+    def get_pif_util(self, pifid):
+        pifs_util = self.monitor.get_pifs_util()
+        if pifid in pifs_util:
+            return pifs_util[pifid]
+        return (0.0, 0.0)
 
     # dictionary version of *info() functions to get rid of
     # SXPisms.
