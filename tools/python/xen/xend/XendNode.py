@@ -138,7 +138,7 @@ class XendNode:
             
         if not self.get_sr_by_type('qcow_file'):
             qcow_sr_uuid = uuid.createString()
-            self.srs[qcow_sr_uuid] = XendQCowStorageRepo(qcow_sr_uuid)
+            self.srs[qcow_sr_uuid] = XendQCoWStorageRepo(qcow_sr_uuid)
 
 
 
