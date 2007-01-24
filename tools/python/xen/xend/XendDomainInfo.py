@@ -44,6 +44,7 @@ from xen.xend.XendConfig import scrub_password
 from xen.xend.XendBootloader import bootloader, bootloader_tidy
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendDevices import XendDevices
+from xen.xend.XendTask import XendTask
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, ResumeDomain
 from xen.xend.xenstore.xswatch import xswatch
@@ -387,12 +388,13 @@ class XendDomainInfo:
 
         if self.state == DOM_STATE_HALTED:
             try:
-                self._constructDomain()
-                self._initDomain()
-                self._storeVmDetails()
-                self._storeDomDetails()
-                self._registerWatches()
-                self.refreshShutdown()
+                XendTask.log_progress(0, 30, self._constructDomain)
+                XendTask.log_progress(31, 60, self._initDomain)
+                
+                XendTask.log_progress(61, 70, self._storeVmDetails)
+                XendTask.log_progress(71, 80, self._storeDomDetails)
+                XendTask.log_progress(81, 90, self._registerWatches)
+                XendTask.log_progress(91, 100, self.refreshShutdown)
 
                 # save running configuration if XendDomains believe domain is
                 # persistent

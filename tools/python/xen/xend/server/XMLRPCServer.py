@@ -139,6 +139,8 @@ class XMLRPCServer:
                 meth = getattr(self.xenapi, meth_name)
                 if callable(meth) and hasattr(meth, 'api'):
                     self.server.register_function(meth, getattr(meth, 'api'))
+
+        self.server.register_instance(XendAPI.XendAPIAsyncProxy(self.xenapi))
                 
         # Legacy deprecated xm xmlrpc api
         # --------------------------------------------------------------------
