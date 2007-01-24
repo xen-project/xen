@@ -43,13 +43,9 @@ static int xc_domain_resume_cooperative(int xc_handle, uint32_t domid)
 static int xc_domain_resume_any(int xc_handle, uint32_t domid)
 {
     DECLARE_DOMCTL;
-    int i, rc = -1;
-
-    /*
-     * (x86 only) Rewrite store_mfn and console_mfn back to MFN (from PFN).
-     */
-#if defined(__i386__) || defined(__x86_64__)
     xc_dominfo_t info;
+    int i, rc = -1;
+#if defined(__i386__) || defined(__x86_64__)
     unsigned long mfn, max_pfn = 0;
     vcpu_guest_context_t ctxt;
     start_info_t *start_info;
@@ -57,6 +53,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
     xen_pfn_t *p2m_frame_list_list = NULL;
     xen_pfn_t *p2m_frame_list = NULL;
     xen_pfn_t *p2m = NULL;
+#endif
 
     if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
     {
@@ -64,6 +61,10 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
         goto out;
     }
 
+    /*
+     * (x86 only) Rewrite store_mfn and console_mfn back to MFN (from PFN).
+     */
+#if defined(__i386__) || defined(__x86_64__)
     /* Map the shared info frame */
     shinfo = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                   PROT_READ, info.shared_info_frame);
