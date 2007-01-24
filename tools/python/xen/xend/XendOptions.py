@@ -104,6 +104,9 @@ class XendOptions:
     """Default xend management state storage."""
     xend_state_path_default = '/var/lib/xend/state'
 
+    """Default xend QCoW storage repository location."""
+    xend_storage_path_default = '/var/lib/xend/storage'
+
     """Default type of backend network interfaces"""
     netback_type = osdep.netback_type
 
@@ -211,7 +214,12 @@ class XendOptions:
     def get_xend_state_path(self):
         """ Get the path for persistent domain configuration storage
         """
-        return self.get_config_string("xend-state-path", self.xend_state_path_default)    
+        return self.get_config_string("xend-state-path", self.xend_state_path_default)
+
+    def get_xend_storage_path(self):
+        """ Get the path for persistent domain configuration storage
+        """
+        return self.get_config_string("xend-storage-path", self.xend_storage_path_default)        
 
     def get_network_script(self):
         """@return the script used to alter the network configuration when

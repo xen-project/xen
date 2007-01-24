@@ -25,7 +25,8 @@ from xen.util import Brctl
 from xen.xend import uuid
 from xen.xend.XendError import XendError, NetworkAlreadyConnected
 from xen.xend.XendOptions import instance as xendoptions
-from xen.xend.XendStorageRepository import XendStorageRepository
+from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
+from xen.xend.XendLocalStorageRepo import XendLocalStorageRepo
 from xen.xend.XendLogging import log
 from xen.xend.XendPIF import *
 from xen.xend.XendNetwork import *
@@ -88,7 +89,8 @@ class XendNode:
 
         self.pifs = {}
         self.networks = {}
-
+        self.srs = {}
+        
         # initialise networks
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
@@ -121,13 +123,23 @@ class XendNode:
                 self.PIF_create(name, mtu, '', mac, network, False)
 
         # initialise storage
-        saved_sr = self.state_store.load_state('sr')
-        if saved_sr and len(saved_sr) == 1:
-            sr_uuid = saved_sr.keys()[0]
-            self.sr = XendStorageRepository(sr_uuid)
-        else:
-            sr_uuid = uuid.createString()
-            self.sr = XendStorageRepository(sr_uuid)
+        saved_srs = self.state_store.load_state('sr')
+        if saved_srs:
+            for sr_uuid, sr_cfg in saved_srs.items():
+                if sr_cfg['type'] == 'qcow_file':
+                    self.srs[sr_uuid] = XendQCoWStorageRepo(sr_uuid)
+                elif sr_cfg['type'] == 'local_image':
+                    self.srs[sr_uuid] = XendLocalStorageRepo(sr_uuid)
+
+        # Create missing SRs if they don't exist
+        if not self.get_sr_by_type('local_image'):
+            image_sr_uuid = uuid.createString()
+            self.srs[image_sr_uuid] = XendLocalStorageRepo(image_sr_uuid)
+            
+        if not self.get_sr_by_type('qcow_file'):
+            qcow_sr_uuid = uuid.createString()
+            self.srs[qcow_sr_uuid] = XendQCowStorageRepo(qcow_sr_uuid)
+
 
 
     def network_create(self, name_label, name_description,
@@ -184,9 +196,7 @@ class XendNode:
         self.state_store.save_state('cpu', self.cpus)
         self.save_PIFs()
         self.save_networks()
-
-        sr_record = {self.sr.uuid: self.sr.get_record()}
-        self.state_store.save_state('sr', sr_record)
+        self.save_SRs()
 
     def save_PIFs(self):
         pif_records = dict([(k, v.get_record(transient = False))
@@ -198,6 +208,11 @@ class XendNode:
                             for k, v in self.networks.items()])
         self.state_store.save_state('network', net_records)
 
+    def save_SRs(self):
+        sr_records = dict([(k, v.get_record(transient = False))
+                            for k, v in self.srs.items()])
+        self.state_store.save_state('sr', sr_records)
+
     def shutdown(self):
         return 0
 
@@ -206,7 +221,6 @@ class XendNode:
 
     def notify(self, _):
         return 0
-
         
     #
     # Ref validation
@@ -221,12 +235,50 @@ class XendNode:
     def is_valid_network(self, network_ref):
         return (network_ref in self.networks)
 
+    def is_valid_sr(self, sr_ref):
+        return (sr_ref in self.srs)
+
+    def is_valid_vdi(self, vdi_ref):
+        for sr in self.srs.values():
+            if sr.is_valid_vdi(vdi_ref):
+                return True
+        return False
+
     #
-    # Storage Repo
+    # Storage Repositories
     #
 
-    def get_sr(self):
-        return self.sr
+    def get_sr(self, sr_uuid):
+        return self.srs.get(sr_uuid)
+
+    def get_sr_by_type(self, sr_type):
+        return [sr.uuid for sr in self.srs.values() if sr.type == sr_type]
+
+    def get_sr_by_name(self, name):
+        return [sr.uuid for sr in self.srs.values() if sr.name_label == name]
+
+    def get_all_sr_uuid(self):
+        return self.srs.keys()
+
+    def get_vdi_by_uuid(self, vdi_uuid):
+        for sr in self.srs.values():
+            if sr.is_valid_vdi(vdi_uuid):
+                return sr.get_vdi_by_uuid(vdi_uuid)
+        return None
+
+    def get_vdi_by_name_label(self, name):
+        for sr in self.srs.values():
+            vdi = sr.get_vdi_by_name_label(name)
+            if vdi:
+                return vdi
+        return None
+
+    def get_sr_containing_vdi(self, vdi_uuid):
+        for sr in self.srs.values():
+            if sr.is_valid_vdi(vdi_uuid):
+                return sr
+        return None
+    
 
     #
     # Host Functions

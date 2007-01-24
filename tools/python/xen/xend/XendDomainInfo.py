@@ -1656,7 +1656,7 @@ class XendDomainInfo:
 
                     from xen.xend import XendDomain
                     dom0 = XendDomain.instance().privilegedDomain()
-                    dom0._waitForDeviceUUID(dom0.create_vbd_with_vdi(vbd, fn))
+                    dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
                     fn = BOOTLOADER_LOOPBACK_DEVICE
 
                 try:
@@ -2133,24 +2133,7 @@ class XendDomainInfo:
     def get_vtpms(self):
         return self.info.get('vtpm_refs', [])
 
-    def create_vbd(self, xenapi_vbd):
-        """Create a VBD device from the passed struct in Xen API format.
-
-        @return: uuid of the device
-        @rtype: string
-        """
-
-        dev_uuid = self.info.device_add('vbd', cfg_xenapi = xenapi_vbd)
-        if not dev_uuid:
-            raise XendError('Failed to create device')
-        
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
-            _, config = self.info['devices'][dev_uuid]
-            config['devid'] = self.getDeviceController('vbd').createDevice(config)
-
-        return dev_uuid
-
-    def create_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
+    def create_vbd(self, xenapi_vbd, vdi_image_path):
         """Create a VBD using a VDI from XendStorageRepository.
 
         @param xenapi_vbd: vbd struct from the Xen API
@@ -2159,14 +2142,26 @@ class XendDomainInfo:
         @return: uuid of the device
         """
         xenapi_vbd['image'] = vdi_image_path
-        log.debug('create_vbd_with_vdi: %s' % xenapi_vbd)
-        dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+        log.debug('create_vbd: %s' % xenapi_vbd)
+        dev_uuid = ''
+        if vdi_image_path.startswith('tap'):
+            dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+        else:
+            dev_uuid = self.info.device_add('vbd', cfg_xenapi = xenapi_vbd)
+            
         if not dev_uuid:
             raise XendError('Failed to create device')
 
         if self.state == XEN_API_VM_POWER_STATE_RUNNING:
             _, config = self.info['devices'][dev_uuid]
-            config['devid'] = self.getDeviceController('tap').createDevice(config)
+            dev_control = None
+            
+            if vdi_image_path.startswith('tap'):
+                dev_control =  self.getDeviceController('tap')
+            else:
+                dev_control = self.getDeviceController('vbd')
+                
+            config['devid'] = dev_control.createDevice(config)
 
         return dev_uuid
 

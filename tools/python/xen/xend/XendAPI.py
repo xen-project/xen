@@ -214,7 +214,7 @@ def valid_vdi(func):
     @rtype: callable object
     """
     return lambda *args, **kwargs: \
-           _check_ref(XendNode.instance().get_sr().is_valid_vdi,
+           _check_ref(XendNode.instance().is_valid_vdi,
                       'VDI_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_vtpm(func):
@@ -234,7 +234,7 @@ def valid_sr(func):
     @rtype: callable object
     """
     return lambda *args, **kwargs: \
-           _check_ref(lambda r: XendNode.instance().get_sr().uuid == r,
+           _check_ref(lambda r: XendNode.instance().is_valid_sr,
                       'SR_HANDLE_INVALID', func, *args, **kwargs)
 
 def valid_pif(func):
@@ -1203,8 +1203,7 @@ class XendAPI:
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['image',
-                   'io_read_kbs',
+    VBD_attr_ro = ['io_read_kbs',
                    'io_write_kbs']
     VBD_attr_rw = ['VM',
                    'VDI',
@@ -1213,7 +1212,7 @@ class XendAPI:
                    'type',                   
                    'driver']
 
-    VBD_attr_inst = VBD_attr_rw + ['image']
+    VBD_attr_inst = VBD_attr_rw
 
     VBD_methods = [('media_change', None)]
     VBD_funcs = [('create', 'VBD')]
@@ -1250,18 +1249,15 @@ class XendAPI:
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
         vbd_ref = ''
         try:
-            if not vbd_struct.get('VDI', None):
-                # this is a traditional VBD without VDI and SR 
-                vbd_ref = dom.create_vbd(vbd_struct)
-            else:
-                # new VBD via VDI/SR
-                vdi_ref = vbd_struct.get('VDI')
-                sr = XendNode.instance().get_sr()
-                vdi_image = sr.xen_api_get_by_uuid(vdi_ref)
-                if not vdi_image:
-                    return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
-                vdi_image = vdi_image.qcow_path
-                vbd_ref = dom.create_vbd_with_vdi(vbd_struct, vdi_image)
+            # new VBD via VDI/SR
+            vdi_ref = vbd_struct.get('VDI')
+            vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+            if not vdi:
+                return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
+            vdi_image = vdi.get_image_uri()
+            vbd_ref = XendTask.log_progress(0, 100,
+                                            dom.create_vbd,
+                                            vbd_struct, vdi_image)
         except XendError:
             return xen_api_todo()
 
@@ -1275,7 +1271,7 @@ class XendAPI:
         if not vm:
             return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
 
-        vm.destroy_vbd(vbd_ref)
+        XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
         return xen_api_success_void()
 
     # attributes (rw)
@@ -1446,7 +1442,7 @@ class XendAPI:
                   ('get_by_name_label', 'Set(VDI)')]
 
     def _get_VDI(self, ref):
-        return XendNode.instance().get_sr().xen_api_get_by_uuid(ref)
+        return XendNode.instance().get_vdi_by_uuid(ref)
     
     def VDI_get_VBDs(self, session, vdi_ref):
         return xen_api_todo()
@@ -1474,8 +1470,7 @@ class XendAPI:
         return xen_api_success(self._get_VDI(vdi_ref).name_description)
 
     def VDI_get_SR(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.uuid)
+        return xen_api_success(self._get_VDI(vdi_ref).sr_uuid)
 
     def VDI_get_virtual_size(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).virtual_size)
@@ -1513,18 +1508,17 @@ class XendAPI:
         return xen_api_todo()
     
     def VDI_destroy(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        sr.destroy_image(vdi_ref)
+        sr = XendNode.instance().get_sr_containing_vdi(vdi_ref)
+        sr.destroy_vdi(vdi_ref)
         return xen_api_success_void()
 
     def VDI_get_record(self, session, vdi_ref):
-        sr = XendNode.instance().get_sr()
-        image = sr.xen_api_get_by_uuid(vdi_ref)
+        image = XendNode.instance().get_vdi_by_uuid(vdi_ref)
         return xen_api_success({
             'uuid': vdi_ref,
             'name_label': image.name_label,
             'name_description': image.name_description,
-            'SR': sr.uuid,
+            'SR': image.sr_uuid,
             'VBDs': [], # TODO
             'virtual_size': image.virtual_size,
             'physical_utilisation': image.physical_utilisation,
@@ -1538,25 +1532,22 @@ class XendAPI:
 
     # Class Functions    
     def VDI_create(self, session, vdi_struct):
-        sr = XendNode.instance().get_sr()
         sr_ref = vdi_struct.get('SR')
+        xennode = XendNode.instance()
+        if not xennode.is_valid_sr(sr_ref):
+            return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
 
-        if sr.uuid != sr_ref:
-            return xen_api_error(['SR_HANDLE_INVALID', vdi_struct.get('SR')])
-
-        vdi_uuid = sr.create_image(vdi_struct)
+        vdi_uuid = xennode.srs[sr_ref].create_vdi(vdi_struct)
         return xen_api_success(vdi_uuid)
 
     def VDI_get_all(self, session):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.list_images())
+        xennode = XendNode.instance()
+        vdis = [sr.get_vdis() for sr in xennode.srs.values()]
+        return xen_api_success(reduce(lambda x, y: x + y, vdis))
     
     def VDI_get_by_name_label(self, session, name):
-        sr = XendNode.instance().get_sr()
-        image_uuid = sr.xen_api_get_by_name_label(name)
-        if image_uuid:
-            return xen_api_success([image_uuid])
-        return xen_api_success([])
+        xennode = XendNode.instance()
+        return xen_api_success(xennode.get_vdi_by_name_label(name))
 
 
     # Xen API: Class VTPM
@@ -1691,15 +1682,11 @@ class XendAPI:
 
     # Class Functions
     def SR_get_all(self, session):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success([sr.uuid])
-
+        return xen_api_success(XendNode.instance().get_all_sr_uuid())
+  
     def SR_get_by_name_label(self, session, label):
-        sr = XendNode.instance().get_sr()
-        if sr.name_label != label:
-            return xen_api_success([])
-        return xen_api_success([sr.uuid])
-
+        return xen_api_success(XendNode.instance().get_sr_by_name(label))
+    
     def SR_create(self, session):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
@@ -1711,16 +1698,20 @@ class XendAPI:
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
     
     def SR_get_record(self, session, sr_ref):
-        sr = XendNode.instance().get_sr()
-        return xen_api_success(sr.get_record())
+        sr = XendNode.instance().get_sr(sr_ref)
+        if sr:
+            return xen_api_success(sr.get_record())
+        return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
 
     # Attribute acceess
 
-    def _get_SR_func(self, _, func):
-        return xen_api_success(getattr(XendNode.instance().get_sr(), func)())
+    def _get_SR_func(self, sr_ref, func):
+        return xen_api_success(getattr(XendNode.instance().get_sr(sr_ref),
+                                       func)())
 
-    def _get_SR_attr(self, _, attr):
-        return xen_api_success(getattr(XendNode.instance().get_sr(), attr))
+    def _get_SR_attr(self, sr_ref, attr):
+        return xen_api_success(getattr(XendNode.instance().get_sr(sr_ref),
+                                       attr))
 
     def SR_get_VDIs(self, _, ref):
         return self._get_SR_func(ref, 'list_images')
@@ -1729,10 +1720,10 @@ class XendAPI:
         return self._get_SR_func(ref, 'virtual_allocation')
 
     def SR_get_physical_utilisation(self, _, ref):
-        return self._get_SR_func(ref, 'used_space_bytes')
+        return self._get_SR_func(ref, 'physical_utilisation')
 
     def SR_get_physical_size(self, _, ref):
-        return self._get_SR_func(ref, 'total_space_bytes')
+        return self._get_SR_func(ref, 'physical_size')
     
     def SR_get_type(self, _, ref):
         return self._get_SR_attr(ref, 'type')
@@ -1747,15 +1738,17 @@ class XendAPI:
         return self._get_SR_attr(ref, 'name_description')
 
     def SR_set_name_label(self, session, sr_ref, value):
-        sr = XendNode.instance().get_sr()
-        sr.name_label = value
-        XendNode.instance().save()
+        sr = XendNode.instance.get_sr(sr_ref)
+        if sr:
+            sr.name_label = value
+            XendNode.instance().save()
         return xen_api_success_void()
     
     def SR_set_name_description(self, session, sr_ref, value):
-        sr = XendNode.instance().get_sr()
-        sr.name_description = value
-        XendNode.instance().save()        
+        sr = XendNode.instance.get_sr(sr_ref)
+        if sr:
+            sr.name_description = value
+            XendNode.instance().save()        
         return xen_api_success_void()
 
 

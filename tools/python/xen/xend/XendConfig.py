@@ -994,13 +994,15 @@ class XendConfig(dict):
                 return dev_uuid
             
             elif dev_type in ('vbd', 'tap'):
-                if dev_type == 'vbd':
-                    dev_info['uname'] = cfg_xenapi.get('image', '')
-                    dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
-                elif dev_type == 'tap':
-                    dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
-                    dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
+                dev_info['type'] = cfg_xenapi.get('type', 'Disk')
+                if dev_info['type'] == 'CD':
+                    old_vbd_type = 'cdrom'
+                else:
+                    old_vbd_type = 'disk'
                     
+                dev_info['uname'] = cfg_xenapi.get('image', '')
+                dev_info['dev'] = '%s:%s' % (cfg_xenapi.get('device'),
+                                             old_vbd_type)
                 dev_info['driver'] = cfg_xenapi.get('driver')
                 dev_info['VDI'] = cfg_xenapi.get('VDI', '')
                     
