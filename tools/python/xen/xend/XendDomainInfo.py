@@ -548,8 +548,6 @@ class XendDomainInfo:
                 
         return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
-
-
     def getDeviceSxprs(self, deviceClass):
         if self.state == DOM_STATE_RUNNING:
             return self.getDeviceController(deviceClass).sxprs()
@@ -1221,7 +1219,12 @@ class XendDomainInfo:
         for (devclass, config) in self.info.get('devices', {}).values():
             if devclass in XendDevices.valid_devices():            
                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
-                self._createDevice(devclass, config)
+                dev_uuid = config.get('uuid')
+                devid = self._createDevice(devclass, config)
+                
+                # store devid in XendConfig for caching reasons
+                if dev_uuid in self.info['devices']:
+                    self.info['devices'][dev_uuid][1]['devid'] = devid
 
         if self.image:
             self.image.createDeviceModel()
@@ -1951,11 +1954,9 @@ class XendDomainInfo:
     def get_platform_keymap(self):
         return self.info.get('platform_keymap', '')
     def get_pci_bus(self):
-        return '' # TODO
+        return self.info.get('pci_bus', '')
     def get_tools_version(self):
-        return {} # TODO
-    def get_other_config(self):
-        return {} # TODO
+        return self.info.get('tools_version', {})
     
     def get_on_shutdown(self):
         after_shutdown = self.info.get('action_after_shutdown')
@@ -2203,6 +2204,32 @@ class XendDomainInfo:
 
         return dev_uuid
 
+    def destroy_device_by_uuid(self, dev_type, dev_uuid):
+        if dev_uuid not in self.info['devices']:
+            raise XendError('Device does not exist')
+
+        try:
+            if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+                _, config = self.info['devices'][dev_uuid]
+                devid = config.get('devid')
+                if devid != None:
+                    self.getDeviceController(dev_type).destroyDevice(devid, force = False)
+                else:
+                    raise XendError('Unable to get devid for device: %s:%s' %
+                                    (dev_type, dev_uuid))
+        finally:
+            del self.info['devices'][dev_uuid]
+            self.info['%s_refs' % dev_type].remove(dev_uuid)
+
+    def destroy_vbd(self, dev_uuid):
+        self.destroy_device_by_uuid('vbd', dev_uuid)
+
+    def destroy_vif(self, dev_uuid):
+        self.destroy_device_by_uuid('vif', dev_uuid)
+
+    def destroy_vtpm(self, dev_uuid):
+        self.destroy_device_by_uuid('vtpm', dev_uuid)
+            
     def has_device(self, dev_class, dev_uuid):
         return (dev_uuid in self.info['%s_refs' % dev_class.lower()])
 

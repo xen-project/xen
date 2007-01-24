@@ -984,6 +984,8 @@ class XendConfig(dict):
                 #    dev_info['vifname'] = cfg_xenapi.get('device')
                 if cfg_xenapi.get('type'):
                     dev_info['type'] = cfg_xenapi.get('type')
+                if cfg_xenapi.get('name'):
+                    dev_info['name'] = cfg_xenapi.get('name')
                 
                 dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
                 dev_info['uuid'] = dev_uuid
