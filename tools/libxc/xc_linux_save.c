@@ -404,6 +404,33 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
     return -1;
 }
 
+/*
+** Map the top-level page of MFNs from the guest. The guest might not have
+** finished resuming from a previous restore operation, so we wait a while for
+** it to update the MFN to a reasonable value.
+*/
+static void *map_frame_list_list(int xc_handle, uint32_t dom,
+                                 shared_info_t *shinfo)
+{
+    int count = 100;
+    void *p;
+
+    while (count-- && shinfo->arch.pfn_to_mfn_frame_list_list == 0)
+        usleep(10000);
+
+    if (shinfo->arch.pfn_to_mfn_frame_list_list == 0) {
+        ERROR("Timed out waiting for frame list updated.");
+        return NULL;
+    }
+
+    p = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
+                             shinfo->arch.pfn_to_mfn_frame_list_list);
+
+    if (p == NULL)
+        ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
+
+    return p;
+}
 
 /*
 ** During transfer (or in the state file), all page-table pages must be
@@ -669,14 +696,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     max_pfn = live_shinfo->arch.max_pfn;
 
-    live_p2m_frame_list_list =
-        xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
-                             live_shinfo->arch.pfn_to_mfn_frame_list_list);
+    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom,
+                                                   live_shinfo);
 
-    if (!live_p2m_frame_list_list) {
-        ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
+    if (!live_p2m_frame_list_list)
         goto out;
-    }
 
     live_p2m_frame_list =
         xc_map_foreign_batch(xc_handle, dom, PROT_READ,
@@ -1175,8 +1199,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     ctxt.ctrlreg[3] = 
         xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
 
+    /*
+     * Reset the MFN to be a known-invalid value. See map_frame_list_list().
+     */
+    memcpy(page, live_shinfo, PAGE_SIZE);
+    ((shared_info_t *)page)->arch.pfn_to_mfn_frame_list_list = 0;
+
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
-        !write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
+        !write_exact(io_fd, page, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1) (errno %d)", errno);
         goto out;
     }

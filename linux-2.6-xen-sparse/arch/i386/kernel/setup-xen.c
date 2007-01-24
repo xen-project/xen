@@ -1736,8 +1736,6 @@ void __init setup_arch(char **cmdline_p)
 		 * frames that make up the p2m table. Used by save/restore
 		 */
 		pfn_to_mfn_frame_list_list = alloc_bootmem_low_pages(PAGE_SIZE);
-		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-		     virt_to_mfn(pfn_to_mfn_frame_list_list);
 
 		fpp = PAGE_SIZE/sizeof(unsigned long);
 		for (i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++) {
@@ -1754,6 +1752,8 @@ void __init setup_arch(char **cmdline_p)
 				virt_to_mfn(&phys_to_machine_mapping[i]);
 		}
 		HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		     virt_to_mfn(pfn_to_mfn_frame_list_list);
 	}
 
 	/*

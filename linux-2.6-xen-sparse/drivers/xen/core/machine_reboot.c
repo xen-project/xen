@@ -105,9 +105,6 @@ static void post_suspend(int suspend_cancelled)
 
 	memset(empty_zero_page, 0, PAGE_SIZE);
 
-	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-		virt_to_mfn(pfn_to_mfn_frame_list_list);
-
 	fpp = PAGE_SIZE/sizeof(unsigned long);
 	for (i = 0, j = 0, k = -1; i < max_pfn; i += fpp, j++) {
 		if ((j % fpp) == 0) {
@@ -120,6 +117,8 @@ static void post_suspend(int suspend_cancelled)
 			virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
 	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		virt_to_mfn(pfn_to_mfn_frame_list_list);
 }
 
 #else /* !(defined(__i386__) || defined(__x86_64__)) */
