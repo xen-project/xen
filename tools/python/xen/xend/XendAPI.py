@@ -1090,6 +1090,7 @@ class XendAPI:
                    'VDI',
                    'device',
                    'mode',
+                   'type',                   
                    'driver']
 
     VBD_attr_inst = VBD_attr_rw + ['image']
@@ -1169,6 +1170,11 @@ class XendAPI:
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
                                                                'driver'))
+
+    def VBD_get_type(self, session, vbd_ref):
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                              'type'))        
 
     # Xen API: Class VIF
     # ----------------------------------------------------------------

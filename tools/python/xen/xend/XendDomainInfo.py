@@ -2058,6 +2058,14 @@ class XendDomainInfo:
         if dev_class == 'vbd':
             config['VDI'] = config.get('VDI', '')
             config['device'] = config.get('dev', '')
+            if ':' in config['device']:
+                vbd_name, vbd_type = config['device'].split(':', 1)
+                config['device'] = vbd_name
+                if vbd_type == 'cdrom':
+                    config['type'] = XEN_API_VBD_TYPE[0]
+                else:
+                    config['type'] = XEN_API_VBD_TYPE[1]
+
             config['driver'] = 'paravirtualised' # TODO
             config['image'] = config.get('uname', '')
             config['io_read_kbs'] = 0.0
