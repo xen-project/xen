@@ -47,7 +47,8 @@ vdi_cfg = {
     'virtual_size': 100 * 1024,
     'sector_size': 1024,
     'type': 'system',
-    'parent': '',    
+    'parent': '',
+    'SR_name': 'QCoW',
     'sharable': False,
     'read_only': False,
 }
@@ -61,6 +62,19 @@ vbd_cfg = {
     'driver': 'paravirtualised',
 }
 
+local_vdi_cfg = {
+    'name_label': 'gentoo.amd64.img',
+    'name_description': '',
+    'uri': 'file:/root/gentoo.amd64.img',
+    'virtual_size': 0,
+    'sector_size': 0,
+    'type': 'system',
+    'parent': '',
+    'SR_name': 'Local',
+    'sharable': False,
+    'read_only': False,
+}    
+
 local_vbd_cfg = {
     'VDI': '',
     'VM': '',
@@ -68,7 +82,6 @@ local_vbd_cfg = {
     'mode': 'RW',
     'type': 'disk',
     'driver': 'paravirtualised',
-    'image': 'file:/root/gentoo.amd64.img'
 }
 
 vif_cfg = {
@@ -90,6 +103,7 @@ def test_vm_create():
     server, session = connect()
     vm_uuid = None
     vdi_uuid = None
+    local_vdi_uuid = None
     local_vbd_uuid = None
     vbd_uuid = None
     vif_uuid = None
@@ -102,8 +116,13 @@ def test_vm_create():
         vm_names.append(vm_record['name_label'])
 
     # Get default SR
-    sr_list = execute(server, 'SR.get_by_name_label', (session, 'Local'))
+    sr_list = execute(server, 'SR.get_by_name_label', (session,
+                                                       vdi_cfg['SR_name']))
     sr_uuid = sr_list[0]
+
+    local_sr_list = execute(server, 'SR.get_by_name_label',
+                            (session, local_vdi_cfg['SR_name']))
+    local_sr_uuid = local_sr_list[0]
 
     # Get default network
     net_list = execute(server, 'network.get_all', (session,))
@@ -121,13 +140,18 @@ def test_vm_create():
         vbd_cfg['VM'] = vm_uuid
         vbd_cfg['VDI'] = vdi_uuid
         vbd_uuid = execute(server, 'VBD.create', (session, vbd_cfg))
-
+        
+        # Create a new VDI (Local)
+        local_vdi_cfg['SR'] = local_sr_uuid
+        local_vdi_uuid = execute(server, 'VDI.create',
+                                 (session, local_vdi_cfg))
+ 
         # Create a new VBD (Local)
         local_vbd_cfg['VM'] = vm_uuid
-        local_vbd_cfg['VDI'] = ''
+        local_vbd_cfg['VDI'] = local_vdi_uuid
         local_vbd_uuid = execute(server, 'VBD.create',
                                  (session, local_vbd_cfg))
-        
+
         # Create a new VIF
         vif_cfg['network'] = net_uuid
         vif_cfg['VM'] = vm_uuid
@@ -138,13 +162,15 @@ def test_vm_create():
 
         time.sleep(30)
 
-        print 'Suspending VM..'
-        execute(server, 'VM.suspend', (session, vm_uuid))
-        print 'Suspended VM.'
-        time.sleep(5)
-        print 'Resuming VM ...'
-        execute(server, 'VM.resume', (session, vm_uuid, False))
-        print 'Resumed VM.'
+        test_suspend = True
+        if test_suspend:
+            print 'Suspending VM..'
+            execute(server, 'VM.suspend', (session, vm_uuid))
+            print 'Suspended VM.'
+            time.sleep(5)
+            print 'Resuming VM ...'
+            execute(server, 'VM.resume', (session, vm_uuid, False))
+            print 'Resumed VM.'
 
         # Wait for user to say we're good to shut it down
         while True:
@@ -156,12 +182,17 @@ def test_vm_create():
         # Clean up
         if vif_uuid:
             execute(server, 'VIF.destroy', (session, vif_uuid))
+            
         if local_vbd_uuid:
             execute(server, 'VBD.destroy', (session, local_vbd_uuid))
+        if local_vdi_uuid:
+            execute(server, 'VDI.destroy', (session, local_vdi_uuid))
+            
         if vbd_uuid:
             execute(server, 'VBD.destroy', (session, vbd_uuid))
         if vdi_uuid:
             execute(server, 'VDI.destroy', (session, vdi_uuid))
+        
         if vm_uuid:
             try:
                 execute(server, 'VM.hard_shutdown', (session, vm_uuid))

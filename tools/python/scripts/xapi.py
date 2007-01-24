@@ -37,7 +37,7 @@ SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
                  '%(type)-10s'
 VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
                   '%(sector_size)-8s'
-VBD_LIST_FORMAT = '%(device)-6s %(uuid)-36s %(VDI)-8s %(image)-8s'
+VBD_LIST_FORMAT = '%(device)-6s %(uuid)-36s %(VDI)-8s'
 TASK_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(status)-8s %(progress)-4s'
 VIF_LIST_FORMAT = '%(name)-8s %(device)-7s %(uuid)-36s %(MAC)-10s'
 
@@ -85,25 +85,28 @@ OPTIONS = {
                                          'action': 'store_true'})],
     
     'vdi-create': [(('--name-label',), {'help': 'Name for VDI'}),
-                   (('--description',), {'help': 'Description for VDI'}),
+                   (('--name-description',), {'help': 'Description for VDI'}),
                    (('--sector-size',), {'type': 'int',
-                                         'help': 'Sector size'}),
+                                         'help': 'Sector size',
+                                         'default': 0}),
                    (('--virtual-size',), {'type': 'int',
+                                          'default': 0,
                                           'help': 'Size of VDI in sectors'}),
                    (('--type',), {'choices': ['system', 'user', 'ephemeral'],
+                                  'default': 'system',
                                   'help': 'VDI type'}),
                    (('--sharable',), {'action': 'store_true',
                                       'help': 'VDI sharable'}),
                    (('--read-only',), {'action': 'store_true',
-                                       'help': 'Read only'})],
+                                       'help': 'Read only'}),
+                   (('--sr',), {})],
     
     'vbd-create': [(('--VDI',), {'help': 'UUID of VDI to attach to.'}),
                    (('--mode',), {'choices': ['RO', 'RW'],
                                   'help': 'device mount mode'}),
                    (('--driver',), {'choices':['paravirtualised', 'ioemu'],
                                     'help': 'Driver for VBD'}),
-                   (('--device',), {'help': 'Device name on guest domain'}),
-                   (('--image',), {'help': 'Location of drive image.'})]
+                   (('--device',), {'help': 'Device name on guest domain'})]
                    
 }
 
@@ -464,8 +467,7 @@ def xapi_vbd_list(args, async = False):
     
     print VBD_LIST_FORMAT % {'device': 'Device',
                              'uuid' : 'UUID',
-                             'VDI': 'VDI',
-                             'image': 'Image'}
+                             'VDI': 'VDI'}
     
     for vbd in vbds:
         vbd_struct = execute(server, 'VBD.get_record', (session, vbd))
@@ -547,7 +549,12 @@ def xapi_vdi_create(args, async = False):
         cfg[opt] = val
 
     server, session = connect()
-    srs = execute(server, 'SR.get_all', (session,))
+    srs = []
+    if cfg.get('SR'):    
+        srs = execute(server, 'SR.get_by_name_label', (session, cfg['SR']))
+    else:
+        srs = execute(server, 'SR.get_all', (session,))
+
     sr = srs[0]
     cfg['SR'] = sr
 
