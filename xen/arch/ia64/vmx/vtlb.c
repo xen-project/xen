@@ -248,6 +248,7 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
                   "tnat.nz p6,p7=r9;;"
                   "(p6) mov %0=1;"
                   "(p6) mov r9=r0;"
+                  "(p7) extr.u r9=r9,0,53;;"
                   "(p7) mov %0=r0;"
                   "(p7) st8 [%2]=r9;;"
                   "ssm psr.ic;;"
