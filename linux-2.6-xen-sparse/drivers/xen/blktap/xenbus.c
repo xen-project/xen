@@ -340,6 +340,7 @@ static int connect_ring(struct backend_info *be)
 	struct xenbus_device *dev = be->dev;
 	unsigned long ring_ref;
 	unsigned int evtchn;
+	char protocol[64];
 	int err;
 
 	DPRINTK("%s\n", dev->otherend);
@@ -352,6 +353,24 @@ static int connect_ring(struct backend_info *be)
 				 dev->otherend);
 		return err;
 	}
+
+	be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
+	err = xenbus_gather(XBT_NIL, dev->otherend, "protocol",
+			    "%63s", protocol, NULL);
+	if (err)
+		strcpy(protocol, "unspecified, assuming native");
+	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_NATIVE))
+		be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
+	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_X86_32))
+		be->blkif->blk_protocol = BLKIF_PROTOCOL_X86_32;
+	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_X86_64))
+		be->blkif->blk_protocol = BLKIF_PROTOCOL_X86_64;
+	else {
+		xenbus_dev_fatal(dev, err, "unknown fe protocol %s", protocol);
+		return -1;
+	}
+	printk("blktap: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
+	       ring_ref, evtchn, be->blkif->blk_protocol, protocol);
 
 	/* Map the shared frame, irq etc. */
 	err = tap_blkif_map(be->blkif, ring_ref, evtchn);

@@ -95,7 +95,6 @@ static void unmap_frontend_page(blkif_t *blkif)
 
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
-	blkif_sring_t *sring;
 	int err;
 
 	/* Already connected through? */
@@ -111,8 +110,31 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
-	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
+	switch (blkif->blk_protocol) {
+	case BLKIF_PROTOCOL_NATIVE:
+	{
+		blkif_sring_t *sring;
+		sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
+		BACK_RING_INIT(&blkif->blk_rings.native, sring, PAGE_SIZE);
+		break;
+	}
+	case BLKIF_PROTOCOL_X86_32:
+	{
+		blkif_x86_32_sring_t *sring_x86_32;
+		sring_x86_32 = (blkif_x86_32_sring_t *)blkif->blk_ring_area->addr;
+		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32, PAGE_SIZE);
+		break;
+	}
+	case BLKIF_PROTOCOL_X86_64:
+	{
+		blkif_x86_64_sring_t *sring_x86_64;
+		sring_x86_64 = (blkif_x86_64_sring_t *)blkif->blk_ring_area->addr;
+		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64, PAGE_SIZE);
+		break;
+	}
+	default:
+		BUG();
+	}
 
 	err = bind_interdomain_evtchn_to_irqhandler(
 		blkif->domid, evtchn, blkif_be_int, 0, "blkif-backend", blkif);
@@ -143,10 +165,10 @@ void blkif_disconnect(blkif_t *blkif)
 		blkif->irq = 0;
 	}
 
-	if (blkif->blk_ring.sring) {
+	if (blkif->blk_rings.common.sring) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
-		blkif->blk_ring.sring = NULL;
+		blkif->blk_rings.common.sring = NULL;
 	}
 }
 
