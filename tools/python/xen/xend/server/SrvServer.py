@@ -199,9 +199,8 @@ def _loadConfig(servers, root, reload):
                     servers.add(XMLRPCServer(auth, True, True, addr,
                                              int(port),
                                              hosts_allowed = allowed))
-        except ValueError, exn:
-            log.error('Xen-API server configuration %s is invalid.', api_cfg)
-        except TypeError, exn:
+        except (ValueError, TypeError), exn:
+            log.exception('Xen API Server init failed')
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
 
     if xoptions.get_xend_tcp_xmlrpc_server():
