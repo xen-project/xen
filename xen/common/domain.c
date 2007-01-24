@@ -129,6 +129,9 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     struct vcpu *v;
     unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
 
+    if ( (v = idle_vcpu[cpu_id]) != NULL )
+        return v;
+
     d = (vcpu_id == 0) ?
         domain_create(IDLE_DOMAIN_ID, 0) :
         idle_vcpu[cpu_id - vcpu_id]->domain;
