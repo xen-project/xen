@@ -220,11 +220,11 @@ class XendMonitor(threading.Thread):
         while True:
             self.lock.acquire()
             try:
-                active_domids = set()
+                active_domids = []
                 # Calculate utilisation for VCPUs
                 
                 for domid, cputimes in self._get_cpu_stats().items():
-                    active_domids.add(domid)
+                    active_domids.append(domid)
                     if domid not in self._domain_vcpus:
                         # if not initialised, save current stats
                         # and skip utilisation calculation
