@@ -204,7 +204,10 @@ def _loadConfig(servers, root, reload):
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
 
     if xoptions.get_xend_tcp_xmlrpc_server():
-        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, True))
+        addr = xoptions.get_xend_tcp_xmlrpc_server_address()
+        port = xoptions.get_xend_tcp_xmlrpc_server_port()
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, use_tcp = True,
+                                 host = addr, port = port))
 
     if xoptions.get_xend_unix_xmlrpc_server():
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False))

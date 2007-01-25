@@ -60,6 +60,10 @@ class XendOptions:
 
     xend_tcp_xmlrpc_server_default = 'no'
 
+    xend_tcp_xmlrpc_server_address_default = 'localhost'
+    
+    xend_tcp_xmlrpc_server_port_default = 8006
+
     xend_unix_xmlrpc_server_default = 'yes'
 
     """Default interface address xend listens at. """
@@ -154,6 +158,14 @@ class XendOptions:
     def get_xend_tcp_xmlrpc_server(self):
         return self.get_config_bool("xend-tcp-xmlrpc-server",
                                     self.xend_tcp_xmlrpc_server_default)
+
+    def get_xend_tcp_xmlrpc_server_port(self):
+        return self.get_config_int("xend-tcp-xmlrpc-server-port",
+                                    self.xend_tcp_xmlrpc_server_port_default)
+
+    def get_xend_tcp_xmlrpc_server_address(self):
+        return self.get_config_string("xend-tcp-xmlrpc-server-address",
+                                    self.xend_tcp_xmlrpc_server_address_default)    
 
     def get_xend_unix_xmlrpc_server(self):
         return self.get_config_bool("xend-unix-xmlrpc-server",
