@@ -45,6 +45,20 @@ $(LIBELF_SRCS) libelf-private.h:
 # add libelf bits to libxc
 GUEST_SRCS-y += $(LIBELF_SRCS)
 
+# new domain builder
+GUEST_SRCS-y += xc_dom_core.c xc_dom_boot.c
+GUEST_SRCS-y += xc_dom_elfloader.c
+GUEST_SRCS-y += xc_dom_binloader.c
+
+ifeq ($(CONFIG_POWERPC),y)
+# big endian boxes
+GUEST_SRCS-y += xc_dom_powerpc64.c
+else
+# little endian boxes
+GUEST_SRCS-y += xc_dom_x86.c
+GUEST_SRCS-y += xc_dom_ia64.c
+endif
+
 -include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror -Wmissing-prototypes
