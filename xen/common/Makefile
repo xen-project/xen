@@ -37,6 +37,8 @@ obj-$(CONFIG_XENCOMM) += xencomm.o
 
 subdir-$(CONFIG_COMPAT) += compat
 
+subdir-y += libelf
+
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h
 
