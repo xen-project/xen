@@ -1,0 +1,37 @@
+XEN_ROOT := ../../../..
+include $(XEN_ROOT)/tools/Rules.mk
+
+architectures := x86_32 x86_64 ia64
+headers := $(patsubst %, %.h, $(architectures))
+scripts := $(wildcard *.py)
+
+.PHONY: all clean check-headers
+all: $(headers) check-headers
+
+clean:
+	rm -f $(headers)
+	rm -f checker checker.c $(XEN_TARGET_ARCH).size
+	rm -f *.pyc *.o *~
+
+check-headers: checker
+ifeq ($(CROSS_COMPILE),)
+	./checker > $(XEN_TARGET_ARCH).size
+	diff -u reference.size $(XEN_TARGET_ARCH).size
+else
+	@echo "cross build: skipping check"
+endif
+
+x86_32.h: ../arch-x86/xen-x86_32.h ../arch-x86/xen.h ../xen.h $(scripts)
+	python mkheader.py $* $@ $(filter %.h,$^)
+
+x86_64.h: ../arch-x86/xen-x86_64.h ../arch-x86/xen.h ../xen.h $(scripts)
+	python mkheader.py $* $@ $(filter %.h,$^)
+
+ia64.h: ../arch-ia64.h ../xen.h $(scripts)
+	python mkheader.py $* $@ $(filter %.h,$^)
+
+checker: checker.c $(headers)
+	$(HOSTCC) $(CFLAGS) -o $@ $<
+
+checker.c: $(scripts)
+	python mkchecker.py $(XEN_TARGET_ARCH) $@ $(architectures)
