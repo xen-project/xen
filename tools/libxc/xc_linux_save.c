@@ -379,8 +379,29 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
         ERROR("Could not get vcpu context");
 
 
-    if (info->shutdown && info->shutdown_reason == SHUTDOWN_suspend)
-        return 0; // success
+    if (info->dying) {
+        ERROR("domain is dying");
+        return -1;
+    }
+
+    if (info->crashed) {
+        ERROR("domain has crashed");
+        return -1;
+    }
+
+    if (info->shutdown) {
+        switch (info->shutdown_reason) {
+        case SHUTDOWN_poweroff:
+        case SHUTDOWN_reboot:
+            ERROR("domain has shut down");
+            return -1;
+        case SHUTDOWN_suspend:
+            return 0;
+        case SHUTDOWN_crash:
+            ERROR("domain has crashed");
+            return -1;
+        }
+    }
 
     if (info->paused) {
         // try unpausing domain, wait, and retest
@@ -394,7 +415,7 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 
 
     if( ++i < 100 ) {
-        ERROR("Retry suspend domain.");
+        ERROR("Retry suspend domain");
         usleep(10000);  // 10ms
         goto retry;
     }
