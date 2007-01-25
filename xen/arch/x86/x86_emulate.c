@@ -162,22 +162,29 @@ static uint8_t opcode_table[256] = {
     0, 0, 0, 0,
     0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
     /* 0xF8 - 0xFF */
-    ImplicitOps, ImplicitOps, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
 };
 
 static uint8_t twobyte_table[256] = {
-    /* 0x00 - 0x0F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
+    /* 0x00 - 0x07 */
+    0, 0, 0, 0, 0, ImplicitOps, 0, 0,
+    /* 0x08 - 0x0F */
+    ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x17 */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x18 - 0x1F */
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
     ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
-    /* 0x20 - 0x2F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    /* 0x30 - 0x3F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x20 - 0x27 */
+    ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM, ImplicitOps|ModRM,
+    0, 0, 0, 0,
+    /* 0x28 - 0x2F */
+    0, 0, 0, 0, 0, 0, 0, 0,
+    /* 0x30 - 0x37 */
+    ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0, 0,
+    /* 0x38 - 0x3F */
+    0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
@@ -255,6 +262,7 @@ struct operand {
 /* EFLAGS bit definitions. */
 #define EFLG_OF (1<<11)
 #define EFLG_DF (1<<10)
+#define EFLG_IF (1<<9)
 #define EFLG_SF (1<<7)
 #define EFLG_ZF (1<<6)
 #define EFLG_AF (1<<4)
@@ -462,6 +470,10 @@ do {                                            \
 
 /* In future we will be able to generate arbitrary exceptions. */
 #define generate_exception_if(p, e) fail_if(p)
+
+/* To be done... */
+#define mode_ring0() (0)
+#define mode_iopl()  (0)
 
 /* Given byte has even parity (even number of 1s)? */
 static int even_parity(uint8_t v)
@@ -1554,10 +1566,13 @@ x86_emulate(
     dst.type = OP_NONE;
 
     /*
-     * The only implicit-operands instruction allowed a LOCK prefix is
-     * CMPXCHG{8,16}B.
+     * The only implicit-operands instructions allowed a LOCK prefix are
+     * CMPXCHG{8,16}B, MOV CRn, MOV DRn.
      */
-    generate_exception_if(lock_prefix && (b != 0xc7), EXC_GP);
+    generate_exception_if(lock_prefix &&
+                          ((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
+                          (b != 0xc7),                  /* CMPXCHG{8,16}B */
+                          EXC_GP);
 
     if ( twobyte )
         goto twobyte_special_insn;
@@ -1933,6 +1948,20 @@ x86_emulate(
         _regs.eflags |= EFLG_CF;
         break;
 
+    case 0xfa: /* cli */
+        generate_exception_if(!mode_iopl(), EXC_GP);
+        fail_if(ops->write_rflags == NULL);
+        if ( (rc = ops->write_rflags(_regs.eflags & ~EFLG_IF, ctxt)) != 0 )
+            goto done;
+        break;
+
+    case 0xfb: /* sti */
+        generate_exception_if(!mode_iopl(), EXC_GP);
+        fail_if(ops->write_rflags == NULL);
+        if ( (rc = ops->write_rflags(_regs.eflags | EFLG_IF, ctxt)) != 0 )
+            goto done;
+        break;
+
     case 0xfc: /* cld */
         _regs.eflags &= ~EFLG_DF;
         break;
@@ -2089,10 +2118,85 @@ x86_emulate(
  twobyte_special_insn:
     switch ( b )
     {
+    case 0x06: /* clts */
+        generate_exception_if(!mode_ring0(), EXC_GP);
+        fail_if((ops->read_cr == NULL) || (ops->write_cr == NULL));
+        if ( (rc = ops->read_cr(0, &dst.val, ctxt)) ||
+             (rc = ops->write_cr(0, dst.val|8, ctxt)) )
+            goto done;
+        break;
+
+    case 0x08: /* invd */
+    case 0x09: /* wbinvd */
+        generate_exception_if(!mode_ring0(), EXC_GP);
+        fail_if(ops->wbinvd == NULL);
+        if ( (rc = ops->wbinvd(ctxt)) != 0 )
+            goto done;
+        break;
+
     case 0x0d: /* GrpP (prefetch) */
     case 0x18: /* Grp16 (prefetch/nop) */
     case 0x19 ... 0x1f: /* nop (amd-defined) */
         break;
+
+    case 0x20: /* mov cr,reg */
+    case 0x21: /* mov dr,reg */
+    case 0x22: /* mov reg,cr */
+    case 0x23: /* mov reg,dr */
+        generate_exception_if(!mode_ring0(), EXC_GP);
+        modrm_rm  |= (rex_prefix & 1) << 3;
+        modrm_reg |= lock_prefix << 3;
+        if ( b & 2 )
+        {
+            /* Write to CR/DR. */
+            src.val = *(unsigned long *)decode_register(modrm_rm, &_regs, 0);
+            if ( !mode_64bit() )
+                src.val = (uint32_t)src.val;
+            rc = ((b & 1)
+                  ? (ops->write_dr
+                     ? ops->write_dr(modrm_reg, src.val, ctxt)
+                     : X86EMUL_UNHANDLEABLE)
+                  : (ops->write_cr
+                     ? ops->write_dr(modrm_reg, src.val, ctxt)
+                     : X86EMUL_UNHANDLEABLE));
+        }
+        else
+        {
+            /* Read from CR/DR. */
+            dst.type  = OP_REG;
+            dst.bytes = mode_64bit() ? 8 : 4;
+            dst.reg   = decode_register(modrm_rm, &_regs, 0);
+            rc = ((b & 1)
+                  ? (ops->read_dr
+                     ? ops->read_dr(modrm_reg, &dst.val, ctxt)
+                     : X86EMUL_UNHANDLEABLE)
+                  : (ops->read_cr
+                     ? ops->read_dr(modrm_reg, &dst.val, ctxt)
+                     : X86EMUL_UNHANDLEABLE));
+        }
+        if ( rc != 0 )
+            goto done;
+        break;
+
+    case 0x30: /* wrmsr */ {
+        uint64_t val = ((uint64_t)_regs.edx << 32) | (uint32_t)_regs.eax;
+        generate_exception_if(!mode_ring0(), EXC_GP);
+        fail_if(ops->write_msr == NULL);
+        if ( (rc = ops->write_msr((uint32_t)_regs.ecx, val, ctxt)) != 0 )
+            goto done;
+        break;
+    }
+
+    case 0x32: /* rdmsr */ {
+        uint64_t val;
+        generate_exception_if(!mode_ring0(), EXC_GP);
+        fail_if(ops->read_msr == NULL);
+        if ( (rc = ops->read_msr((uint32_t)_regs.ecx, &val, ctxt)) != 0 )
+            goto done;
+        _regs.edx = (uint32_t)(val >> 32);
+        _regs.eax = (uint32_t)(val >>  0);
+        break;
+    }
 
     case 0x80 ... 0x8f: /* jcc (near) */ {
         int rel = (((op_bytes == 2) && !mode_64bit())
