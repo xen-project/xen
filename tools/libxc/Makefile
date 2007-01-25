@@ -30,6 +30,21 @@ GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c xc_hvm_restore.c xc_hvm_save.c
 
+# symlink libelf from xen/common/libelf/
+LIBELF_SRCS := libelf-tools.c libelf-loader.c
+LIBELF_SRCS += libelf-dominfo.c libelf-relocate.c
+
+libelf-tools.o: libelf-tools.c libelf-private.h
+libelf-loader.o: libelf-loader.c libelf-private.h
+libelf-dominfo.o: libelf-dominfo.c libelf-private.h
+libelf-relocate.o: libelf-relocate.c libelf-private.h
+
+$(LIBELF_SRCS) libelf-private.h:
+	ln -s ../../xen/common/libelf/$@ $@
+
+# add libelf bits to libxc
+GUEST_SRCS-y += $(LIBELF_SRCS)
+
 -include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror -Wmissing-prototypes
