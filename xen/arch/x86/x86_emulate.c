@@ -105,7 +105,7 @@ static uint8_t opcode_table[256] = {
     /* 0x68 - 0x6F */
     ImplicitOps|Mov, DstMem|SrcImm|ModRM|Mov,
     ImplicitOps|Mov, DstMem|SrcImmByte|ModRM|Mov,
-    0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0x70 - 0x77 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -155,9 +155,11 @@ static uint8_t opcode_table[256] = {
     /* 0xD8 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xE7 */
-    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xE8 - 0xEF */
-    ImplicitOps, ImplicitOps, 0, ImplicitOps, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, 0, ImplicitOps,
+    ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     /* 0xF0 - 0xF7 */
     0, 0, 0, 0,
     0, ImplicitOps, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
@@ -1724,6 +1726,34 @@ x86_emulate(
         dst.mem.off = sp_pre_dec(dst.bytes);
         break;
 
+    case 0x6c ... 0x6d: /* ins %dx,%es:%edi */
+        generate_exception_if(!mode_iopl(), EXC_GP);
+        dst.type  = OP_MEM;
+        dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
+        dst.mem.seg = x86_seg_es;
+        dst.mem.off = truncate_ea(_regs.edi);
+        fail_if(ops->read_io == NULL);
+        if ( (rc = ops->read_io((uint16_t)_regs.edx, dst.bytes,
+                                &dst.val, ctxt)) != 0 )
+            goto done;
+        register_address_increment(
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        break;
+
+    case 0x6e ... 0x6f: /* outs %esi,%dx */
+        generate_exception_if(!mode_iopl(), EXC_GP);
+        dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
+        if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
+                             &dst.val, dst.bytes, ctxt)) != 0 )
+            goto done;
+        fail_if(ops->write_io == NULL);
+        if ( (rc = ops->write_io((uint16_t)_regs.edx, dst.bytes,
+                                 dst.val, ctxt)) != 0 )
+            goto done;
+        register_address_increment(
+            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        break;
+
     case 0x70 ... 0x7f: /* jcc (short) */ {
         int rel = insn_fetch_type(int8_t);
         if ( test_cc(b, _regs.eflags) )
@@ -1911,6 +1941,40 @@ x86_emulate(
         if ( (ad_bytes == 2) ? !(uint16_t)_regs.ecx :
              (ad_bytes == 4) ? !(uint32_t)_regs.ecx : !_regs.ecx )
             jmp_rel(rel);
+        break;
+    }
+
+    case 0xe4: /* in imm8,%al */
+    case 0xe5: /* in imm8,%eax */
+    case 0xe6: /* out %al,imm8 */
+    case 0xe7: /* out %eax,imm8 */
+    case 0xec: /* in %dx,%al */
+    case 0xed: /* in %dx,%eax */
+    case 0xee: /* out %al,%dx */
+    case 0xef: /* out %eax,%dx */ {
+        unsigned int port = ((b < 0xe8)
+                             ? insn_fetch_type(uint8_t)
+                             : (uint16_t)_regs.edx);
+        generate_exception_if(!mode_iopl(), EXC_GP);
+        op_bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
+        if ( b & 2 )
+        {
+            /* out */
+            fail_if(ops->write_io == NULL);
+            rc = ops->write_io(port, op_bytes, _regs.eax, ctxt);
+            
+        }
+        else
+        {
+            /* in */
+            dst.type  = OP_REG;
+            dst.bytes = op_bytes;
+            dst.reg   = (unsigned long *)&_regs.eax;
+            fail_if(ops->read_io == NULL);
+            rc = ops->read_io(port, dst.bytes, &dst.val, ctxt);
+        }
+        if ( rc != 0 )
+            goto done;
         break;
     }
 
@@ -2122,7 +2186,7 @@ x86_emulate(
         generate_exception_if(!mode_ring0(), EXC_GP);
         fail_if((ops->read_cr == NULL) || (ops->write_cr == NULL));
         if ( (rc = ops->read_cr(0, &dst.val, ctxt)) ||
-             (rc = ops->write_cr(0, dst.val|8, ctxt)) )
+             (rc = ops->write_cr(0, dst.val&~8, ctxt)) )
             goto done;
         break;
 
