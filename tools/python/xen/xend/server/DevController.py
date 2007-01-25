@@ -75,7 +75,7 @@ class DevController:
 
     def __init__(self, vm):
         self.vm = vm
-
+        self.hotplug = True
 
     def createDevice(self, config):
         """Trigger the creation of a device with the given configuration.
@@ -151,6 +151,9 @@ class DevController:
 
     def waitForDevice(self, devid):
         log.debug("Waiting for %s.", devid)
+
+        if not self.hotplug:
+            return 
         
         status = self.waitForBackend(devid)
 

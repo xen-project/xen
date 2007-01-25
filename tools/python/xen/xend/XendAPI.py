@@ -228,6 +228,18 @@ def valid_vtpm(func):
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('vtpm', r),
                       'VTPM_HANDLE_INVALID', func, *args, **kwargs)
 
+
+def valid_console(func):
+    """Decorator to verify if console_ref is valid before calling method.
+
+    @param func: function with params: (self, session, console_ref, ...)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('console',
+                                                                   r),
+                      'CONSOLE_HANDLE_INVALID', func, *args, **kwargs)
+
 def valid_sr(func):
     """Decorator to verify if sr_ref is valid before calling method.
 
@@ -346,6 +358,7 @@ class XendAPI(object):
             'VIF'     : valid_vif,
             'VDI'     : valid_vdi,
             'VTPM'    : valid_vtpm,
+            'console' : valid_console,
             'SR'      : valid_sr,
             'PIF'     : valid_pif,
             'task'    : valid_task,
@@ -983,14 +996,18 @@ class XendAPI(object):
     def VM_get_VTPMs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vtpms())
+
+    def VM_get_consoles(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_success(dom.get_consoles())
     
     def VM_get_PCI_bus(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # unsupported by xc
+        return dom.get_pci_bus()
     
     def VM_get_tools_version(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+        return dom.get_tools_version()
 
     # attributes (rw)
     def VM_get_name_label(self, session, vm_ref):
@@ -1783,6 +1800,54 @@ class XendAPI(object):
         vtpms = [d.get_vtpms() for d in XendDomain.instance().list('all')]
         vtpms = reduce(lambda x, y: x + y, vtpms)
         return xen_api_success(vtpms)
+
+    # Xen API: Class console
+    # ----------------------------------------------------------------
+
+
+    console_attr_ro = ['uri', 'protocol', 'VM']
+    console_attr_rw = []
+    
+    def console_get_all(self, session):
+        xendom = XendDomain.instance()
+        cons = [d.get_consoles() for d in XendDomain.instance().list('all')]
+        cons = reduce(lambda x, y: x + y, cons)
+        return xen_api_success(cons)
+
+    def console_get_uri(self, session, console_ref):
+        return xen_api_success(xendom.get_dev_property_by_uuid('console',
+                                                               console_ref,
+                                                               'uri'))
+
+    def console_get_protocol(self, session, console_ref):
+        return xen_api_success(xendom.get_dev_property_by_uuid('console',
+                                                               console_ref,
+                                                               'protocol'))
+    
+    def console_get_VM(self, session, console_ref):
+        xendom = XendDomain.instance()        
+        vm = xendom.get_vm_with_dev_uuid('console', console_ref)
+        return xen_api_success(vm.get_uuid())
+    
+    # object methods
+    def console_get_record(self, session, console_ref):
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('console', console_ref)
+        if not vm:
+            return xen_api_error(['CONSOLE_HANDLE_INVALID', console_ref])
+        cfg = vm.get_dev_xenapi_config('console', console_ref)
+        if not cfg:
+            return xen_api_error(['CONSOLE_HANDLE_INVALID', console_ref])
+        
+        valid_console_keys = self.console_attr_ro + self.console_attr_rw + \
+                             self.Base_attr_ro + self.Base_attr_rw
+
+        return_cfg = {}
+        for k in cfg.keys():
+            if k in valid_console_keys:
+                return_cfg[k] = cfg[k]
+            
+        return xen_api_success(return_cfg)
 
 
     # Xen API: Class SR

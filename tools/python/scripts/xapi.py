@@ -40,6 +40,7 @@ VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
 VBD_LIST_FORMAT = '%(device)-6s %(uuid)-36s %(VDI)-8s'
 TASK_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(status)-8s %(progress)-4s'
 VIF_LIST_FORMAT = '%(name)-8s %(device)-7s %(uuid)-36s %(MAC)-10s'
+CONSOLE_LIST_FORMAT = '%(uuid)-36s %(protocol)-8s %(uri)-32s'
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
@@ -485,7 +486,8 @@ def xapi_vbd_list(args, async = False):
     for vbd in vbds:
         vbd_struct = execute(server, 'VBD.get_record', (session, vbd))
         print VBD_LIST_FORMAT % vbd_struct
-
+        
+        
 def xapi_vbd_stats(args, async = False):
     server, session = connect()
     domname = args[0]
@@ -518,6 +520,31 @@ def xapi_vif_list(args, async = False):
         for vif in vifs:
             vif_struct = execute(server, 'VIF.get_record', (session, vif))
             pprint(vif_struct)
+
+def xapi_console_list(args, async = False):
+    server, session = connect()
+    opts, args = parse_args('vdi-list', args, set_defaults = True)
+    is_long = opts and opts.long
+    
+    domname = args[0]
+    
+    dom_uuid = resolve_vm(server, session, domname)
+    consoles = execute(server, 'VM.get_consoles', (session, dom_uuid))
+
+    if not is_long:
+        print CONSOLE_LIST_FORMAT % {'protocol': 'Protocol',
+                                     'uri': 'URI',
+                                     'uuid': 'UUID'}
+
+        for console in consoles:
+            console_struct = execute(server, 'console.get_record',
+                                     (session, console))
+            print CONSOLE_LIST_FORMAT % console_struct
+    else:
+        for console in consoles:
+            console_struct = execute(server, 'console.get_record',
+                                     (session, console))
+            pprint(console_struct)            
 
 
 def xapi_vdi_list(args, async = False):

@@ -918,8 +918,7 @@ class XendConfig(dict):
         if target == None:
             target = self
         
-        if dev_type not in XendDevices.valid_devices() and \
-           dev_type not in XendDevices.pseudo_devices():        
+        if dev_type not in XendDevices.valid_devices():
             raise XendConfigError("XendConfig: %s not a valid device type" %
                             dev_type)
 
@@ -927,10 +926,10 @@ class XendConfig(dict):
             raise XendConfigError("XendConfig: device_add requires some "
                                   "config.")
 
-        if cfg_sxp:
-            log.debug("XendConfig.device_add: %s" % str(cfg_sxp))
-        if cfg_xenapi:
-            log.debug("XendConfig.device_add: %s" % str(cfg_xenapi))
+        #if cfg_sxp:
+        #    log.debug("XendConfig.device_add: %s" % str(cfg_sxp))
+        #if cfg_xenapi:
+        #    log.debug("XendConfig.device_add: %s" % str(cfg_xenapi))
 
         if cfg_sxp:
             if sxp.child0(cfg_sxp) == 'device':
@@ -971,7 +970,12 @@ class XendConfig(dict):
                     target['vbd_refs'] = []
                 if dev_uuid not in target['vbd_refs']:
                     target['vbd_refs'].append(dev_uuid)
-
+            elif dev_type in ('console',):
+                if 'console_refs' not in target:
+                    target['console_refs'] = []
+                if dev_uuid not in target['console_refs']:
+                    target['console_refs'].append(dev_uuid)
+                    
             return dev_uuid
 
         if cfg_xenapi:
@@ -1031,7 +1035,25 @@ class XendConfig(dict):
 
         # no valid device to add
         return ''
-        
+
+    def console_add(self, protocol, uri):
+        dev_uuid = uuid.createString()
+        dev_info = {
+            'uuid': dev_uuid,
+            'protocol': protocol,
+            'uri': uri
+        }
+        if 'devices' not in self:
+            self['devices'] = {}
+            
+        self['devices'][dev_uuid] = ('console', dev_info)
+        self['console_refs'].append(dev_uuid)
+        return dev_info
+
+    def console_get_all(self, protocol):
+        consoles = [dinfo for dtype, dinfo in self['devices'].values()
+                    if dtype == 'console']
+        return [c for c in consoles if c.get('protocol') == protocol]
 
     def device_update(self, dev_uuid, cfg_sxp):
         """Update an existing device with the new configuration.
@@ -1211,7 +1233,7 @@ class XendConfig(dict):
                     self[apikey] = val
 
 
-        
+
 #
 # debugging 
 #

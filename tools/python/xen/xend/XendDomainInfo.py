@@ -682,6 +682,29 @@ class XendDomainInfo:
             for device in devices:
                 self.info.device_add(device[0], cfg_sxp = device)
 
+        self._update_consoles()
+
+    def _update_consoles(self):
+        if self.domid == None or self.domid == 0:
+            return
+
+        # Update VT100 port if it exists
+        self.console_port = self.readDom('console/port')
+        if self.console_port is not None:
+            serial_consoles = self.info.console_get_all('vt100')
+            if not serial_consoles:
+                cfg = self.info.console_add('vt100', self.console_port)
+                self._createDevice('console', cfg)
+
+        # Update VNC port if it exists
+        vnc_port = self.readDom('console/vnc-port')
+        if vnc_port is not None:
+            vnc_consoles = self.info.console_get_all('rfb')
+            if not vnc_consoles:
+                cfg = self.info.console_add('rfb', 'localhost:%s' %
+                                           str(vnc_port))
+                self._createDevice('console', cfg)                
+
     #
     # Function to update xenstore /vm/*
     #
@@ -1892,7 +1915,8 @@ class XendDomainInfo:
         # TODO: we should eventually get rid of old_dom_states
 
         self.info.update_config(info)
-
+        self._update_consoles()
+        
         if refresh:
             self.refreshShutdown(info)
 
@@ -1904,11 +1928,11 @@ class XendDomainInfo:
                                   ignore_devices = ignore_store,
                                   legacy_only = legacy_only)
 
-        if not ignore_store and self.dompath:
-            vnc_port = self.readDom('console/vnc-port')
-            if vnc_port is not None:
-                result.append(['device',
-                               ['console', ['vnc-port', str(vnc_port)]]])
+        #if not ignore_store and self.dompath:
+        #    vnc_port = self.readDom('console/vnc-port')
+        #    if vnc_port is not None:
+        #        result.append(['device',
+        #                       ['console', ['vnc-port', str(vnc_port)]]])
 
         return result
 
