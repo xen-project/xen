@@ -103,7 +103,7 @@
 #define VA_MATTR_WC     0x6
 #define VA_MATTR_NATPAGE    0x7
 
-#define VRN_MASK        0xe000000000000000L
+#define VRN_MASK        0xe000000000000000
 #define PTA_BASE_MASK       0x3fffffffffffL
 #define PTA_BASE_SHIFT      15
 #define VHPT_OFFSET_MASK    0x7fff
@@ -114,6 +114,7 @@
 #define HPA_MAPPING_ATTRIBUTE   0x61  //ED:0;AR:0;PL:0;D:1;A:1;P:1
 #define VPN_2_VRN(vpn)  ((vpn << PPN_SHIFT) >> IA64_VRN_SHIFT)
 
+#ifndef __ASSEMBLY__
 typedef enum { INSTRUCTION, DATA, REGISTER } miss_type;
 
 //typedef enum { MVHPT, STLB } vtlb_loc_type_t;
@@ -169,5 +170,6 @@ bits_v(uint64_t v, uint32_t bs, uint32_t be)
                   "M" ((len)));                                 \
          ret;                                                   \
  })
+#endif
 
 #endif

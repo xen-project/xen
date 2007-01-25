@@ -200,6 +200,7 @@ void foo(void)
 	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.privregs));
 	DEFINE(IA64_VPD_VIFS_OFFSET, offsetof (mapped_regs_t, ifs));
  	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.insvc[0]));
+	DEFINE(IA64_VPD_VPTA_OFFSET, offsetof (struct mapped_regs, pta));
 	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
 

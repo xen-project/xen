@@ -795,12 +795,14 @@ ENTRY(vmx_virtualization_fault)
     cmp.eq p9,p0=EVENT_RSM,r24
     cmp.eq p10,p0=EVENT_SSM,r24
     cmp.eq p11,p0=EVENT_MOV_TO_PSR,r24
+    cmp.eq p12,p0=EVENT_THASH,r24 
     (p6) br.dptk.many vmx_asm_mov_from_ar
     (p7) br.dptk.many vmx_asm_mov_from_rr
     (p8) br.dptk.many vmx_asm_mov_to_rr
     (p9) br.dptk.many vmx_asm_rsm
     (p10) br.dptk.many vmx_asm_ssm
     (p11) br.dptk.many vmx_asm_mov_to_psr
+    (p12) br.dptk.many vmx_asm_thash
     ;;
 vmx_virtualization_fault_back:
     mov r19=37
