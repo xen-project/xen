@@ -311,18 +311,18 @@ class XendMonitor(threading.Thread):
                     self.pifs_util[pifid] = (rx_util, tx_util)
                     self.pifs[pifid] = stats
 
-                for domid in self.domain_vcpus_util.keys():
+                for domid in self._domain_vcpus_util.keys():
                     if domid not in active_domids:
-                        del self.domain_vcpus_util[domid]
-                        del self.domain_vcpus[domid]
-                for domid in self.domain_vifs_util.keys():
+                        del self._domain_vcpus_util[domid]
+                        del self._domain_vcpus[domid]
+                for domid in self._domain_vifs_util.keys():
                     if domid not in active_domids:
-                        del self.domain_vifs_util[domid]
-                        del self.domain_vifs[domid]
-                for domid in self.domain_vbds_util.keys():
+                        del self._domain_vifs_util[domid]
+                        del self._domain_vifs[domid]
+                for domid in self._domain_vbds_util.keys():
                     if domid not in active_domids:
-                        del self.domain_vbds_util[domid]
-                        del self.domain_vbds[domid]
+                        del self._domain_vbds_util[domid]
+                        del self._domain_vbds[domid]
 
             finally:
                 self.lock.release()
