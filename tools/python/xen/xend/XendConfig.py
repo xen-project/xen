@@ -572,7 +572,7 @@ class XendConfig(dict):
         #     "0-3,^1"   -> [0,2,3]
         #     "0-3,^1,1" -> [0,1,2,3]
         try:
-            if 'cpus' in cfg:
+            if 'cpus' in cfg and type(cfg['cpus']) != list:
                 cpus = []
                 for c in cfg['cpus'].split(','):
                     if c.find('-') != -1:             
