@@ -188,14 +188,22 @@ class XMLRPCServer:
 
     def cleanup(self):
         log.debug('XMLRPCServer.cleanup()')
-        try:
-            if hasattr(self, 'server'):
-                # shutdown socket explicitly to allow reuse
-                self.server.socket.shutdown(socket.SHUT_RDWR)
+        if hasattr(self, 'server'):
+            try:
+                # This is here to make sure the socket is actually
+                # cleaned up when close() is called. Otherwise
+                # SO_REUSEADDR doesn't take effect. To replicate,
+                # try 'xend reload' and look for EADDRINUSE.
+                #
+                # May be caued by us calling close() outside of
+                # the listen()ing thread.
+                self.server.socket.shutdown(2)
+            except socket.error, e:
+                pass # ignore any socket errors
+            try:
                 self.server.socket.close()
-        except Exception, exn:
-            log.exception(exn)
-            pass
+            except socket.error, e:
+                pass
 
     def shutdown(self):
         self.running = False

@@ -333,11 +333,15 @@ class HttpServer:
     def close(self):
         self.closed = True
         self.ready = False
+        # shutdown socket explicitly to allow reuse
         try:
-            # shutdown socket explicitly to allow reuse
-            self.socket.shutdown(socket.SHUT_RDWR)
+            self.socket.shutdown(2)
+        except socket.error:
+            pass
+
+        try:
             self.socket.close()
-        except:
+        except socket.error:
             pass
 
     def getServerAddr(self):
