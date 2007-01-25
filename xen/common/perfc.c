@@ -136,8 +136,8 @@ static xen_sysctl_perfc_desc_t perfc_d[NR_PERFCTRS];
 static xen_sysctl_perfc_val_t *perfc_vals;
 static int               perfc_nbr_vals;
 static int               perfc_init = 0;
-static int perfc_copy_info(XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc,
-                           XEN_GUEST_HANDLE(xen_sysctl_perfc_val_t) val)
+static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
+                           XEN_GUEST_HANDLE_64(xen_sysctl_perfc_val_t) val)
 {
     unsigned int i, j;
     unsigned int v = 0;
