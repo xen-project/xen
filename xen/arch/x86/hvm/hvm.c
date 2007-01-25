@@ -170,12 +170,26 @@ void hvm_domain_destroy(struct domain *d)
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
+int hvm_load_cpu_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+{
+    struct vcpu *v = opaque;
+
+    if ( hvm_funcs.load_cpu_ctxt(h, opaque, version) < 0 )
+        return -EINVAL;
+
+    /* Auxiliary processors shoudl be woken immediately. */
+    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        vcpu_wake(v);
+
+    return 0;
+}
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
     hvm_register_savevm(v->domain, "xen_hvm_cpu", v->vcpu_id, 1,
-                        hvm_funcs.save_cpu_ctxt, hvm_funcs.load_cpu_ctxt, 
+                        hvm_funcs.save_cpu_ctxt, hvm_load_cpu_ctxt, 
                         (void *)v);
 
     if ( (rc = vlapic_init(v)) != 0 )
