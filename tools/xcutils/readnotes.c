@@ -11,6 +11,7 @@
 #include <sys/mman.h>
 
 #include <xg_private.h>
+#include <xc_dom.h> /* gunzip bits */
 
 #include <xen/libelf.h>
 
@@ -33,8 +34,8 @@ static void print_numeric_note(const char *prefix, struct elf_binary *elf,
 int main(int argc, char **argv)
 {
 	const char *f;
-	int fd,h,size,count;
-	void *image;
+	int fd,h,size,usize,count;
+	void *image,*tmp;
 	struct stat st;
 	struct elf_binary elf;
 	const elf_shdr *shdr;
@@ -67,6 +68,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	size = st.st_size;
+
+	usize = xc_dom_check_gzip(image, st.st_size);
+	if (usize)
+	{
+		tmp = malloc(size);
+		xc_dom_do_gunzip(image, st.st_size, tmp, size);
+		image = tmp;
+		size = usize;
+	}
 
 	if (0 != elf_init(&elf, image, size))
 	{
