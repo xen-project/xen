@@ -214,15 +214,23 @@ class LinuxImageHandler(ImageHandler):
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures())
 
+class PPC_LinuxImageHandler(LinuxImageHandler):
+
+    ostype = "linux"
+    
+    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
+        """@param shadow_mem_kb The configured shadow memory, in KiB.
+        @param maxmem_kb The configured maxmem, in KiB.
+        @return The corresponding required amount of shadow memory, also in
+        KiB.
+        PowerPC currently uses "shadow memory" to refer to the hash table."""
+        return max(maxmem_kb / 64, shadow_mem_kb)
 
 
-class PPC_ProseImageHandler(LinuxImageHandler):
+
+class PPC_ProseImageHandler(PPC_LinuxImageHandler):
 
     ostype = "prose"
-
-    def configure(self, vmConfig, imageConfig, deviceConfig):
-        LinuxImageHandler.configure(self, vmConfig, imageConfig, deviceConfig)
-        self.imageConfig = imageConfig
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -248,15 +256,6 @@ class PPC_ProseImageHandler(LinuxImageHandler):
                                    cmdline        = self.cmdline,
                                    ramdisk        = self.ramdisk,
                                    features       = self.vm.getFeatures())
-
-    def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
-        """@param shadow_mem_kb The configured shadow memory, in KiB.
-        @param maxmem_kb The configured maxmem, in KiB.
-        @return The corresponding required amount of shadow memory, also in
-        KiB.
-        PowerPC currently uses "shadow memory" to refer to the hash table."""
-        return max(maxmem_kb / 64, shadow_mem_kb)
-
 
 class HVMImageHandler(ImageHandler):
 
@@ -588,7 +587,7 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
 
 _handlers = {
     "powerpc": {
-        "linux": LinuxImageHandler,
+        "linux": PPC_LinuxImageHandler,
         "prose": PPC_ProseImageHandler,
     },
     "ia64": {
