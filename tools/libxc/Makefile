@@ -25,8 +25,8 @@ GUEST_SRCS-y :=
 GUEST_SRCS-y += xc_load_bin.c
 GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
-GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
-GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
+#GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
+#GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c xc_hvm_restore.c xc_hvm_save.c
 
@@ -58,6 +58,9 @@ else
 GUEST_SRCS-y += xc_dom_x86.c
 GUEST_SRCS-y += xc_dom_ia64.c
 endif
+
+GUEST_SRCS-$(CONFIG_X86)     += xc_dom_compat_linux.c
+GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_compat_linux.c
 
 -include $(XEN_TARGET_ARCH)/Makefile
 
