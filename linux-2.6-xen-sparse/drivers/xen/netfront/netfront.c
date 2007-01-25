@@ -613,6 +613,10 @@ static int network_open(struct net_device *dev)
 
 static inline int netfront_tx_slot_available(struct netfront_info *np)
 {
+	/* XXX Need to check we have enough grants for worst-case fragments. */
+	if (gnttab_empty_grant_references(&np->gref_tx_head))
+		return 0;
+
 	return RING_FREE_REQUESTS(&np->tx) >= MAX_SKB_FRAGS + 2;
 }
 
