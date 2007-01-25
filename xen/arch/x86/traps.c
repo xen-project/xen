@@ -1146,7 +1146,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto fail;
     op_default = op_bytes = (ar & (_SEGMENT_L|_SEGMENT_DB)) ? 4 : 2;
     ad_default = ad_bytes = (ar & _SEGMENT_L) ? 8 : op_default;
-    if ( !(ar & (_SEGMENT_CODE|_SEGMENT_S|_SEGMENT_P)) )
+    if ( !(ar & _SEGMENT_S) ||
+         !(ar & _SEGMENT_P) ||
+         !(ar & _SEGMENT_CODE) )
         goto fail;
 
     /* emulating only opcodes not allowing SS to be default */
@@ -1234,7 +1236,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                                   &data_base, &data_limit, &ar,
                                   _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P) )
                 goto fail;
-            if ( !(ar & (_SEGMENT_S|_SEGMENT_P)) ||
+            if ( !(ar & _SEGMENT_S) ||
+                 !(ar & _SEGMENT_P) ||
                  (opcode & 2 ?
                   (ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR) :
                   (ar & _SEGMENT_CODE) || !(ar & _SEGMENT_WR)) )

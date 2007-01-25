@@ -24,7 +24,9 @@ ENTRY(compat_hypercall)
         movq  %rsp,%rdi
         movl  $0xDEADBEEF,%eax
         rep   stosq
-        popq  %r9 ; popq  %r8 ; popq  %rcx; popq  %rdx; popq  %rsi; popq  %rdi
+        popq  %r8 ; popq  %r9 ; xchgl %r8d,%r9d /* Args 5&6: zero extend */
+        popq  %rdx; popq  %rcx; xchgl %edx,%ecx /* Args 3&4: zero extend */
+        popq  %rdi; popq  %rsi; xchgl %edi,%esi /* Args 1&2: zero extend */
         movl  UREGS_rax(%rsp),%eax
         pushq %rax
         pushq UREGS_rip+8(%rsp)
