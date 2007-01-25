@@ -125,7 +125,6 @@ XENAPI_HVM_CFG = {
     'platform_std_vga': 'stdvga',
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
-    'platform_enable_audio': 'soundhw',
     'platform_keymap' : 'keymap',
 }    
 
@@ -268,16 +267,18 @@ LEGACY_IMAGE_HVM_DEVICES_CFG = [
     ('boot', str),
     ('fda', str),
     ('fdb', str),
-    ('isa', str),
+    ('isa', int),
     ('keymap', str),    
-    ('localtime', str),    
+    ('localtime', int),    
     ('serial', str),
     ('stdvga', int),
     ('soundhw', str),
-    ('usb', str),
+    ('usb', int),
     ('usbdevice', str),    
     ('vcpus', int),
 ]
+
+LEGACY_DM = '/usr/lib/xen/bin/qemu-dm'
 
 ##
 ## Config Choices
@@ -748,10 +749,19 @@ class XendConfig(dict):
             hvm = self['HVM_boot'] != ''
             self['image']['type'] = hvm and 'hvm' or 'linux'
             if hvm:
-                self['image']['hvm'] = {}
+                self['image']['hvm'] = {'devices': {}}
                 for xapi, cfgapi in XENAPI_HVM_CFG.items():
-                    self['image']['hvm'][cfgapi] = self[xapi]
-            
+                    if xapi in self:
+                        self['image']['hvm']['devices'][cfgapi] = self[xapi]
+
+                # currently unsupported options
+                self['image']['hvm']['device_model'] = LEGACY_DM
+                self['image']['vnc'] = 1
+                self['image']['hvm']['pae'] = 1
+
+                if self['platform_enable_audio']:
+                    self['image']['hvm']['devices']['soundhw'] = 'sb16'
+
 
     def _get_old_state_string(self):
         """Returns the old xm state string.
@@ -965,7 +975,8 @@ class XendConfig(dict):
             return dev_uuid
 
         if cfg_xenapi:
-            dev_info = {}            
+            dev_info = {}
+            dev_uuid = ''
             if dev_type == 'vif':
                 if cfg_xenapi.get('MAC'): # don't add if blank
                     dev_info['mac'] = cfg_xenapi.get('MAC')
@@ -983,7 +994,6 @@ class XendConfig(dict):
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vif_refs'].append(dev_uuid)
-                return dev_uuid
             
             elif dev_type in ('vbd', 'tap'):
                 dev_info['type'] = cfg_xenapi.get('type', 'Disk')
@@ -1007,7 +1017,6 @@ class XendConfig(dict):
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vbd_refs'].append(dev_uuid)                
-                return dev_uuid
 
             elif dev_type == 'vtpm':
                 if cfg_xenapi.get('type'):
@@ -1017,9 +1026,12 @@ class XendConfig(dict):
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vtpm_refs'].append(dev_uuid)
-                return dev_uuid
 
+            return dev_uuid
+
+        # no valid device to add
         return ''
+        
 
     def device_update(self, dev_uuid, cfg_sxp):
         """Update an existing device with the new configuration.
@@ -1117,13 +1129,18 @@ class XendConfig(dict):
         if 'hvm' in self['image']:
             for arg, conv in LEGACY_IMAGE_HVM_CFG:
                 if self['image']['hvm'].get(arg):
-                    image.append([arg, self['image']['hvm'][arg]])
+                    image.append([arg, conv(self['image']['hvm'][arg])])
 
         if 'hvm' in self['image'] and 'devices' in self['image']['hvm']:
             for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
-                if self['image']['hvm']['devices'].get(arg):
-                    image.append([arg,
-                                  self['image']['hvm']['devices'][arg]])
+                val = self['image']['hvm']['devices'].get(arg)
+                if val != None:
+                    try:
+                        if conv: val = conv(val)
+                    except (ValueError, TypeError):
+                        if type(val) == bool: val = int(val)
+                            
+                    image.append([arg, val])
 
         return image
 
@@ -1172,7 +1189,11 @@ class XendConfig(dict):
         for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
             val = sxp.child_value(image_sxp, arg, None)
             if val != None:
-                image_hvm_devices[arg] = conv(val)
+                try:
+                    image_hvm_devices[arg] = conv(val)
+                except (ValueError, TypeError):
+                    image_hvm_devices[arg] = val
+                        
 
         if image_hvm or image_hvm_devices:
             image['hvm'] = image_hvm
@@ -1188,6 +1209,7 @@ class XendConfig(dict):
                     self[apikey] = type_conv(val)
                 else:
                     self[apikey] = val
+
 
         
 #

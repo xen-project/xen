@@ -392,8 +392,11 @@ class HVMImageHandler(ImageHandler):
 
             # Handle booleans gracefully
             if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
-                if v != None: v = int(v)
-                if v: ret.append("-%s" % a)
+                try:
+                    if v != None: v = int(v)
+                    if v: ret.append("-%s" % a)
+                except (ValueError, TypeError):
+                    pass # if we can't convert it to a sane type, ignore it
             else:
                 if v:
                     ret.append("-%s" % a)
