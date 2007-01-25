@@ -730,6 +730,8 @@ typedef enum {
   XC_ERROR_NONE = 0,
   XC_INTERNAL_ERROR = 1,
   XC_INVALID_KERNEL = 2,
+  XC_INVALID_PARAM = 3,
+  XC_OUT_OF_MEMORY = 4,
 } xc_error_code;
 
 #define XC_MAX_ERROR_MSG_LEN 1024

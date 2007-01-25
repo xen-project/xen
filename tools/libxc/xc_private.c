@@ -45,6 +45,10 @@ const char *xc_error_code_to_desc(int code)
         return "Internal error";
     case XC_INVALID_KERNEL:
         return "Invalid kernel";
+    case XC_INVALID_PARAM:
+        return "Invalid configuration";
+    case XC_OUT_OF_MEMORY:
+        return "Out of memory";
     }
 
     return "Unknown error code";
