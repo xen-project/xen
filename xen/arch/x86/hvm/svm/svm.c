@@ -1069,7 +1069,7 @@ int start_svm(void)
     hvm_funcs.init_ap_context = svm_init_ap_context;
     hvm_funcs.init_hypercall_page = svm_init_hypercall_page;
 
-    hvm_enabled = 1;
+    hvm_enable();
 
     return 1;
 }

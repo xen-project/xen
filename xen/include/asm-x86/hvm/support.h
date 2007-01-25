@@ -90,8 +90,6 @@ enum hval_bitmaps {
       EXCEPTION_BITMAP_BP )
 #endif
 
-#define PC_DEBUG_PORT   0x80
-
 #define VMX_DELIVER_NO_ERROR_CODE  -1
 
 #if HVM_DEBUG
@@ -244,16 +242,18 @@ static inline void hvm_get_buffer(hvm_domain_context_t *h, char *buf, int len)
 #define hvm_get_struct(_h, _p) \
     hvm_get_buffer((_h), (char *)(_p), sizeof(*(_p)))
 
+int hvm_save(struct vcpu*, hvm_domain_context_t *h);
+int hvm_load(struct vcpu*, hvm_domain_context_t *h);
 
-extern int hvm_save(struct vcpu*, hvm_domain_context_t *h);
-extern int hvm_load(struct vcpu*, hvm_domain_context_t *h);
+int arch_sethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
+int arch_gethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
 
-extern int arch_sethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
-extern int arch_gethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
+void shpage_init(struct domain *d, shared_iopage_t *sp);
 
-extern void shpage_init(struct domain *d, shared_iopage_t *sp);
-
+extern char hvm_io_bitmap[];
 extern int hvm_enabled;
+
+void hvm_enable(void);
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
 int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);

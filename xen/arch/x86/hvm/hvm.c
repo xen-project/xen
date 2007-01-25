@@ -50,12 +50,31 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-int hvm_enabled = 0;
+int hvm_enabled;
 
-unsigned int opt_hvm_debug_level = 0;
+unsigned int opt_hvm_debug_level;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
+
+/* I/O permission bitmap is globally shared by all HVM guests. */
+char __attribute__ ((__section__ (".bss.page_aligned")))
+    hvm_io_bitmap[3*PAGE_SIZE];
+
+void hvm_enable(void)
+{
+    if ( hvm_enabled )
+        return;
+
+    /*
+     * Allow direct access to the PC debug port (it is often used for I/O
+     * delays, but the vmexits simply slow things down).
+     */
+    memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
+    clear_bit(0x80, hvm_io_bitmap);
+
+    hvm_enabled = 1;
+}
 
 void hvm_stts(struct vcpu *v)
 {

@@ -1011,9 +1011,6 @@ static void vmx_inject_exception(
 /* Setup HVM interfaces */
 static void vmx_setup_hvm_funcs(void)
 {
-    if ( hvm_enabled )
-        return;
-
     hvm_funcs.disable = stop_vmx;
 
     hvm_funcs.vcpu_initialise = vmx_vcpu_initialise;
@@ -1104,7 +1101,7 @@ int start_vmx(void)
 
     vmx_setup_hvm_funcs();
 
-    hvm_enabled = 1;
+    hvm_enable();
 
     return 1;
 }

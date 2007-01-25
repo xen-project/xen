@@ -56,7 +56,7 @@
       CPU_BASED_INVDPG_EXITING |                        \
       CPU_BASED_MWAIT_EXITING |                         \
       CPU_BASED_MOV_DR_EXITING |                        \
-      CPU_BASED_UNCOND_IO_EXITING |                     \
+      CPU_BASED_ACTIVATE_IO_BITMAP |                    \
       CPU_BASED_USE_TSC_OFFSETING )
 
 /* Basic flags for VM-Exit controls. */
@@ -301,6 +301,10 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
+
+    /* I/O access bitmap. */
+    __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
+    __vmwrite(IO_BITMAP_B, virt_to_maddr(hvm_io_bitmap + PAGE_SIZE));
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);

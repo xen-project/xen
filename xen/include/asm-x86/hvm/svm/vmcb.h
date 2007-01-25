@@ -452,7 +452,6 @@ struct vmcb_struct {
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
     u64                 vmcb_pa;
-    u32                 *iopm;
     u32                 *msrpm;
     u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
     int                 saved_irq_vector;

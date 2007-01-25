@@ -115,19 +115,12 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ | CR_INTERCEPT_CR2_WRITE);
 
     /* I/O and MSR permission bitmaps. */
-    arch_svm->iopm  = alloc_xenheap_pages(get_order_from_bytes(IOPM_SIZE));
     arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
-    if ( (arch_svm->iopm == NULL) || (arch_svm->msrpm == NULL) )
-    {
-        free_xenheap_pages(arch_svm->iopm,  get_order_from_bytes(IOPM_SIZE));
-        free_xenheap_pages(arch_svm->msrpm, get_order_from_bytes(MSRPM_SIZE));
+    if ( arch_svm->msrpm == NULL )
         return -ENOMEM;
-    }
-    memset(arch_svm->iopm, 0xff, IOPM_SIZE);
-    clear_bit(PC_DEBUG_PORT, arch_svm->iopm);
     memset(arch_svm->msrpm, 0xff, MSRPM_SIZE);
-    vmcb->iopm_base_pa = (u64)virt_to_maddr(arch_svm->iopm);
     vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
+    vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);
 
     /* Virtualise EFLAGS.IF and LAPIC TPR (CR8). */
     vmcb->vintr.fields.intr_masking = 1;
@@ -240,13 +233,6 @@ void svm_destroy_vmcb(struct vcpu *v)
 
     if ( arch_svm->vmcb != NULL )
         free_vmcb(arch_svm->vmcb);
-
-    if ( arch_svm->iopm != NULL )
-    {
-        free_xenheap_pages(
-            arch_svm->iopm, get_order_from_bytes(IOPM_SIZE));
-        arch_svm->iopm = NULL;
-    }
 
     if ( arch_svm->msrpm != NULL )
     {
