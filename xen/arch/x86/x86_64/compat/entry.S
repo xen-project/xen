@@ -33,11 +33,11 @@ ENTRY(compat_hypercall)
 #else
         /* Relocate argument registers and zero-extend to 64 bits. */
         movl  %eax,%eax              /* Hypercall #  */
-        movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
         xchgl %ecx,%esi              /* Arg 2, Arg 4 */
         movl  %edx,%edx              /* Arg 3        */
         movl  %edi,%r8d              /* Arg 5        */
         movl  %ebp,%r9d              /* Arg 6        */
+        movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
 #endif
         leaq  compat_hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
