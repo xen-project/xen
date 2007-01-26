@@ -1860,7 +1860,6 @@ print_bios_banner()
   printf("TCG-enabled BIOS.\n");
 #endif
   printf("\n");
-  test_gateway();
 }
 
 

@@ -5,25 +5,21 @@
 /* shared include file for bcc and gcc */
 
 /* bcc does not like 'enum' */
-#define IDX_MULTIPLY                       0
-#define IDX_ADD                            1
-#define IDX_SET_STATIC                     2
+#define IDX_TCGINTERRUPTHANDLER            0
+#define IDX_TCPA_ACPI_INIT                 1
+#define IDX_TCPA_EXTEND_ACPI_LOG           2
+#define IDX_TCPA_CALLING_INT19H            3
+#define IDX_TCPA_RETURNED_INT19H           4
+#define IDX_TCPA_ADD_EVENT_SEPARATORS      5
+#define IDX_TCPA_WAKE_EVENT                6
+#define IDX_TCPA_ADD_BOOTDEVICE            7
+#define IDX_TCPA_START_OPTION_ROM_SCAN     8
+#define IDX_TCPA_OPTION_ROM                9
+#define IDX_TCPA_IPL                       10
+#define IDX_TCPA_INITIALIZE_TPM            11
+#define IDX_TCPA_MEASURE_POST              12
 
-#define IDX_TCGINTERRUPTHANDLER            3
-#define IDX_TCPA_ACPI_INIT                 4
-#define IDX_TCPA_EXTEND_ACPI_LOG           5
-#define IDX_TCPA_CALLING_INT19H            6
-#define IDX_TCPA_RETURNED_INT19H           7
-#define IDX_TCPA_ADD_EVENT_SEPARATORS      8
-#define IDX_TCPA_WAKE_EVENT                9
-#define IDX_TCPA_ADD_BOOTDEVICE            10
-#define IDX_TCPA_START_OPTION_ROM_SCAN     11
-#define IDX_TCPA_OPTION_ROM                12
-#define IDX_TCPA_IPL                       13
-#define IDX_TCPA_INITIALIZE_TPM            14
-#define IDX_TCPA_MEASURE_POST              15
-
-#define IDX_LAST                           16 /* keep last! */
+#define IDX_LAST                           13 /* keep last! */
 
 
 #ifdef GCC_PROTOS
@@ -32,10 +28,6 @@
   /* bcc doesn't want any parameter types in prototypes */
   #define PARMS(x...)
 #endif
-
-Bit32u multiply( PARMS(Bit32u a, Bit32u b) );
-Bit32u add( PARMS(Bit32u a, Bit32u b) );
-Bit32u set_static( PARMS(Bit32u) );
 
 Bit32u TCGInterruptHandler( PARMS(pushad_regs_t *regs, Bit32u esds, Bit32u flags_ptr));
 

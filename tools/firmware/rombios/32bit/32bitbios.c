@@ -23,26 +23,6 @@
 #include "jumptable.h"
 #include "32bitprotos.h"
 
-/* same prototypes as in the 16bit BIOS */
-Bit32u multiply(Bit32u a, Bit32u b)
-{
-	return a*b;
-}
-
-Bit32u add(Bit32u a, Bit32u b)
-{
-	return a+b;
-}
-
-static Bit32u stat_a = 0x1;
-Bit32u set_static(Bit32u a)
-{
-	Bit32u _a = stat_a;
-	stat_a = a;
-	return _a;
-}
-
-
 /*
    the jumptable that will be copied into the rombios in the 0xf000 segment
    for every function that is to be called from the lower BIOS, make an entry
@@ -51,10 +31,6 @@ Bit32u set_static(Bit32u a)
 #define TABLE_ENTRY(idx, func) [idx] = (uint32_t)func
 uint32_t jumptable[IDX_LAST+1] __attribute__((section (JUMPTABLE_SECTION_NAME))) =
 {
-	TABLE_ENTRY(IDX_MULTIPLY   , multiply),
-	TABLE_ENTRY(IDX_ADD        , add),
-	TABLE_ENTRY(IDX_SET_STATIC , set_static),
-
 	TABLE_ENTRY(IDX_TCPA_ACPI_INIT, tcpa_acpi_init),
 	TABLE_ENTRY(IDX_TCPA_EXTEND_ACPI_LOG, tcpa_extend_acpi_log),
 
