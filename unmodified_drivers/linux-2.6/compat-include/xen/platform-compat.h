@@ -76,8 +76,12 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
        __attribute__ ((format (printf, 2, 3)));
 #endif
 
-#if defined(_I386_PAGE_H) && defined(CONFIG_X86_PAE)
-#define __supported_pte_mask ~0ULL
-#endif
+/*
+ * This variable at present is referenced by netfront, but only in code that
+ * is dead when running in hvm guests. To detect potential active uses of it
+ * in the future, don't try to supply a 'valid' value here, so that any
+ * mappings created with it will fault when accessed.
+ */
+#define __supported_pte_mask ((maddr_t)0)
 
 #endif
