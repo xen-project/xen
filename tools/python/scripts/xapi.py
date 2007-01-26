@@ -19,6 +19,7 @@
 import sys
 import time
 import re
+import os
 sys.path.append('/usr/lib/python')
 
 from xen.util.xmlrpclib2 import ServerProxy
@@ -27,6 +28,10 @@ from pprint import pprint
 from types import DictType
 from getpass import getpass
 
+# Get default values from the environment
+SERVER_URI = os.environ.get('XAPI_SERVER_URI', 'http://localhost:9363/')
+SERVER_USER = os.environ.get('XAPI_SERVER_USER', '')
+SERVER_PASS = os.environ.get('XAPI_SERVER_PASS', '')
 
 MB = 1024 * 1024
 
@@ -173,16 +178,16 @@ def connect(*args):
     global _server, _session, _initialised
     
     if not _initialised:
-        # try without password
+        # try without password or default credentials
         try:
-            _server = ServerProxy('http://localhost:9363/')
+            _server = ServerProxy(SERVER_URI)
             _session = execute(_server.session, 'login_with_password',
-                               ('',''))
+                               (SERVER_USER, SERVER_PASS))
         except:
             login = raw_input("Login: ")
             password = getpass()
             creds = (login, password)            
-            _server = ServerProxy('http://localhost:9363/')
+            _server = ServerProxy(SERVER_URI)
             _session = execute(_server.session, 'login_with_password',
                                creds)
 
@@ -262,6 +267,8 @@ def xapi_vm_name(args, async = False):
 def xapi_vm_list(args, async = False):
     opts, args = parse_args('vm-list', args, set_defaults = True)
     is_long = opts and opts.long
+
+    list_only = args
     
     server, session = connect()
     vm_uuids = execute(server, 'VM.get_all', (session,))
@@ -274,6 +281,11 @@ def xapi_vm_list(args, async = False):
 
     for uuid in vm_uuids:
         vm_info = execute(server, 'VM.get_record', (session, uuid))
+
+        # skip domain if we don't want
+        if list_only and vm_info['name_label'] not in list_only:
+            continue
+        
         if is_long:
             vbds = vm_info['VBDs']
             vifs = vm_info['VIFs']
@@ -692,6 +704,28 @@ def xapi_debug_wait(args, async = False):
     task_uuid = execute(server, 'debug.wait', (session, secs), async=async)
     print 'Task UUID: %s' % task_uuid
 
+def xapi_vm_stat(args, async = False):
+    domname = args[0]
+    
+    server, session = connect()
+    vm_uuid = resolve_vm(server, session, domname)
+    vif_uuids = execute(server, 'VM.get_VIFs', (session, vm_uuid))
+    vbd_uuids = execute(server, 'VM.get_VBDs', (session, vm_uuid))
+    vcpus_utils = execute(server, 'VM.get_VCPUs_utilisation',
+                          (session, vm_uuid))
+
+    for vcpu_num in sorted(vcpus_utils.keys()):
+        print 'CPU %s : %5.2f%%' % (vcpu_num, vcpus_utils[vcpu_num] * 100)
+        
+    for vif_uuid in vif_uuids:
+        vif = execute(server, 'VIF.get_record', (session, vif_uuid))
+        print '%(device)s: rx: %(io_read_kbs)10.2f tx: %(io_write_kbs)10.2f' \
+              % vif
+    for vbd_uuid in vbd_uuids:
+        vbd = execute(server, 'VBD.get_record', (session, vbd_uuid))
+        print '%(device)s: rd: %(io_read_kbs)10.2f wr: %(io_write_kbs)10.2f' \
+              % vbd
+        
 #
 # Command Line Utils
 #
@@ -777,12 +811,55 @@ def usage(command = None, print_usage = True):
         parse_args(command, ['-h'])
 
 def main(args):
+    
+    # poor man's optparse that doesn't abort on unrecognised opts
 
-    if len(args) < 1 or args[0] in ('-h', '--help', 'help'):
+    options = {}
+    remaining = []
+    
+    arg_n = 0
+    while args:
+        arg = args.pop(0)
+        
+        if arg in ('--help', '-h'):
+            options['help'] = True
+        elif arg in ('--server', '-s') and args:
+            options['server'] = args.pop(0)
+        elif arg in ('--user', '-u') and args:
+            options['user'] = args.pop(0)
+        elif arg in ('--password', '-p') and args:
+            options['password'] = args.pop(0)
+        else:
+            remaining.append(arg)
+
+    # abort here if these conditions are true
+
+    if options.get('help') and not remaining:
         usage()
         sys.exit(1)
 
-    subcmd = args[0].replace('-', '_')
+    if options.get('help') and remaining:
+        usage(remaining[0])
+        sys.exit(1)
+
+    if not remaining:
+        usage()
+        sys.exit(1)
+
+    if options.get('server'):
+        # it is ugly to use a global, but it is simple
+        global SERVER_URI
+        SERVER_URI = options['server']
+
+    if options.get('user'):
+        global SERVER_USER
+        SERVER_USER = options['user']
+
+    if options.get('password'):
+        global SERVER_PASS
+        SERVER_PASS = options['password']
+
+    subcmd = remaining[0].replace('-', '_')
     is_async = 'async' in subcmd
     if is_async:
         subcmd = re.sub('async_', '', subcmd)
@@ -796,12 +873,8 @@ def main(args):
         usage()
         sys.exit(1)
 
-    if '-h' in args[1:] or '--help' in args[1:]:
-        usage(subcmd)
-        sys.exit(1)
-        
     try:
-        subcmd_func(args[1:], async = is_async)
+        subcmd_func(remaining[1:], async = is_async)
     except XenAPIError, e:
         print 'Error: %s' % str(e.args[0])
         sys.exit(2)
