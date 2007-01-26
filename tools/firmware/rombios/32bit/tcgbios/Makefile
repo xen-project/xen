@@ -9,7 +9,7 @@ FILES   = tcgbios tpm_drivers
 OBJECTS = $(foreach f,$(FILES),$(f).o)
 
 CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
-CFLAGS += -I../ -I../../
+CFLAGS += -I../ -I../../ -DGCC_PROTOS
 
 .PHONY: all clean
 

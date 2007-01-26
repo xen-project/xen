@@ -8,7 +8,7 @@ SOURCES = util.c
 TARGET = 32bitbios_flat.h
 
 CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
-CFLAGS += -I../
+CFLAGS += -I../ -DGCC_PROTOS
 
 SUBDIRS = tcgbios
 

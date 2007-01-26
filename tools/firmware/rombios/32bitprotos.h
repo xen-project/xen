@@ -1,7 +1,6 @@
 #ifndef PROTOS_HIGHBIOS
 #define PROTOS_HIGHBIOS
 
-
 /* shared include file for bcc and gcc */
 
 /* bcc does not like 'enum' */
@@ -20,7 +19,6 @@
 #define IDX_TCPA_MEASURE_POST              12
 
 #define IDX_LAST                           13 /* keep last! */
-
 
 #ifdef GCC_PROTOS
   #define PARMS(x...) x
