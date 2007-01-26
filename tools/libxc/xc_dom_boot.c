@@ -91,37 +91,33 @@ static int clear_page(struct xc_dom_image *dom, xen_pfn_t pfn)
 
 static int x86_compat(int xc, domid_t domid, char *guest_type)
 {
-#ifdef XEN_DOMCTL_set_compat
     static const struct {
 	char           *guest;
-	unsigned long  cmd;
+	uint32_t        size;
     } types[] = {
-	{ "xen-3.0-x86_32p", XEN_DOMCTL_set_compat },
-	{ "xen-3.0-x86_64",  XEN_DOMCTL_set_native },
+	{ "xen-3.0-x86_32p", 32 },
+	{ "xen-3.0-x86_64",  64 },
     };
     DECLARE_DOMCTL;
     int i,rc;
 
     memset(&domctl, 0, sizeof(domctl));
     domctl.domain = domid;
+    domctl.cmd    = XEN_DOMCTL_set_address_size;
     for (i = 0; i < sizeof(types)/sizeof(types[0]); i++)
 	if (0 == strcmp(types[i].guest, guest_type))
-	    domctl.cmd = types[i].cmd;
-    if (0 == domctl.cmd)
+	    domctl.u.address_size.size = types[i].size;
+    if (0 == domctl.u.address_size.size)
 	/* nothing to do */
 	return 0;
 
-    xc_dom_printf("%s: guest %s, cmd %d\n", __FUNCTION__,
-		  guest_type, domctl.cmd);
+    xc_dom_printf("%s: guest %s, address size %" PRId32 "\n", __FUNCTION__,
+		  guest_type, domctl.u.address_size.size);
     rc = do_domctl(xc, &domctl);
     if (0 != rc)
 	xc_dom_printf("%s: warning: failed (rc=%d)\n",
 		      __FUNCTION__, rc);
     return rc;
-#else
-    xc_dom_printf("%s: compiled without compat/native switching\n", __FUNCTION__);
-    return 0;
-#endif /* XEN_DOMCTL_set_compat */
 }
 
 

@@ -354,6 +354,46 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_set_address_size:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = find_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        switch ( domctl->u.address_size.size )
+        {
+#ifdef CONFIG_COMPAT
+        case 32:
+            ret = switch_compat(d);
+            break;
+        case 64:
+            ret = switch_native(d);
+            break;
+#endif
+        default:
+            ret = (domctl->u.address_size.size == BITS_PER_LONG) ? 0 : -EINVAL;
+            break;
+        }
+
+        put_domain(d);
+    }
+
+    case XEN_DOMCTL_get_address_size:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = find_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        domctl->u.address_size.size = BITS_PER_GUEST_LONG(d);
+
+        ret = 0;
+        put_domain(d);
+    }
+
     default:
         ret = -ENOSYS;
         break;

@@ -401,6 +401,13 @@ typedef struct xen_domctl_hvmcontext {
 } xen_domctl_hvmcontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
 
+#define XEN_DOMCTL_set_address_size 35
+#define XEN_DOMCTL_get_address_size 36
+typedef struct xen_domctl_address_size {
+    uint32_t size;
+} xen_domctl_address_size_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_address_size_t);
+
 #define XEN_DOMCTL_real_mode_area     26
 struct xen_domctl_real_mode_area {
     uint32_t log; /* log2 of Real Mode Area size */
@@ -435,6 +442,7 @@ struct xen_domctl {
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
+        struct xen_domctl_address_size      address_size;
         uint8_t                             pad[128];
     } u;
 };
