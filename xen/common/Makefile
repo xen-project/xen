@@ -26,6 +26,7 @@ obj-y += trace.o
 obj-y += version.o
 obj-y += vsprintf.o
 obj-y += xmalloc.o
+obj-y += rcupdate.o
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o

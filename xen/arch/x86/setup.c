@@ -17,6 +17,7 @@
 #include <xen/hypercall.h>
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
+#include <xen/rcupdate.h>
 #include <public/version.h>
 #ifdef CONFIG_COMPAT
 #include <compat/platform.h>
@@ -658,6 +659,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     trap_init();
 
+    rcu_init();
+    
     timer_init();
 
     early_time_init();
@@ -694,7 +697,10 @@ void __init __start_xen(multiboot_info_t *mbi)
         if ( num_online_cpus() >= max_cpus )
             break;
         if ( !cpu_online(i) )
+        {
+            rcu_online_cpu(i);
             __cpu_up(i);
+        }
 
         /* Set up cpu_to_node[]. */
         srat_detect_node(i);
