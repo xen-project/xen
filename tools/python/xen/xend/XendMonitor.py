@@ -49,7 +49,7 @@ PROC_NET_DEV_RE = r'(?P<rx_bytes>\d+)\s+' \
 
 VIF_DOMAIN_RE = re.compile(r'vif(?P<domid>\d+)\.(?P<iface>\d+):\s*' +
                            PROC_NET_DEV_RE)
-PIF_RE = re.compile(r'peth(?P<iface>\d+):\s*' + PROC_NET_DEV_RE)
+PIF_RE = re.compile(r'^\s*(?P<iface>peth\d+):\s*' + PROC_NET_DEV_RE)
 
 # The VBD transfer figures are in "requests" where we don't
 # really know how many bytes per requests. For now we make
@@ -154,10 +154,10 @@ class XendMonitor(threading.Thread):
             if not is_pif:
                 continue
             
-            pifid = int(is_pif.group('iface'))
+            pifname = is_pif.group('iface')
             rx_bytes = int(is_pif.group('rx_bytes'))
             tx_bytes = int(is_pif.group('tx_bytes'))
-            stats[pifid] = (usage_at, rx_bytes, tx_bytes)
+            stats[pifname] = (usage_at, rx_bytes, tx_bytes)
 
         return stats    
 
@@ -297,19 +297,19 @@ class XendMonitor(threading.Thread):
 
                 # Calculate utilisation for PIFs
 
-                for pifid, stats in self._get_pif_stats().items():
-                    if pifid not in self.pifs:
-                        self.pifs[pifid] = stats
+                for pifname, stats in self._get_pif_stats().items():
+                    if pifname not in self.pifs:
+                        self.pifs[pifname] = stats
                         continue
 
                     usage_at, rx, tx = stats
-                    prv_at, prv_rx, prv_tx  = self.pifs[pifid]
+                    prv_at, prv_rx, prv_tx  = self.pifs[pifname]
                     interval = usage_at - prv_at
                     rx_util = (rx - prv_rx)/interval
                     tx_util = (tx - prv_tx)/interval
 
-                    self.pifs_util[pifid] = (rx_util, tx_util)
-                    self.pifs[pifid] = stats
+                    self.pifs_util[pifname] = (rx_util, tx_util)
+                    self.pifs[pifname] = stats
 
                 for domid in self._domain_vcpus_util.keys():
                     if domid not in active_domids:

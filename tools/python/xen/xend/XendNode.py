@@ -482,10 +482,10 @@ class XendNode:
             return vbd_loads[domid].get(vbdid, (0.0, 0.0))
         return (0.0, 0.0)
 
-    def get_pif_util(self, pifid):
+    def get_pif_util(self, pifname):
         pifs_util = self.monitor.get_pifs_util()
-        if pifid in pifs_util:
-            return pifs_util[pifid]
+        if pifname in pifs_util:
+            return pifs_util[pifname]
         return (0.0, 0.0)
 
     # dictionary version of *info() functions to get rid of

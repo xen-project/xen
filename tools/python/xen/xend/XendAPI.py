@@ -1448,10 +1448,15 @@ class XendAPI(object):
                                                               'type'))        
 
     def VBD_get_io_read_kbs(self, session, vbd_ref):
-        return xen_api_todo()
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                              'io_read_kbs'))
+    
     
     def VBD_get_io_write_kbs(self, session, vbd_ref):
-        return xen_api_todo()
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                              'io_read_kbs'))
     
     def VBD_get_all(self, session):
         xendom = XendDomain.instance()
@@ -1553,10 +1558,14 @@ class XendAPI(object):
     
  
     def VIF_get_io_read_kbs(self, session, vif_ref):
-        return xen_api_todo()
-    
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
+                                                               'io_read_kbs'))
+
     def VIF_get_io_write_kbs(self, session, vif_ref):
-        return xen_api_todo()
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
+                                                               'io_write_kbs'))
     
     def VIF_get_all(self, session):
         xendom = XendDomain.instance()
