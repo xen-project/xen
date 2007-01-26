@@ -210,6 +210,8 @@
 ^xen/include/asm-.*/asm-offsets\.h$
 ^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
+^xen/include/public/foreign/.*\.(c|h|size)$
+^xen/include/public/foreign/checker$
 ^xen/include/public/public$
 ^xen/include/xen/.*\.new$
 ^xen/include/xen/acm_policy\.h$
