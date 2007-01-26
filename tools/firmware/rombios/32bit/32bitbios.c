@@ -55,6 +55,22 @@ uint32_t jumptable[IDX_LAST+1] __attribute__((section (JUMPTABLE_SECTION_NAME)))
 	TABLE_ENTRY(IDX_ADD        , add),
 	TABLE_ENTRY(IDX_SET_STATIC , set_static),
 
+	TABLE_ENTRY(IDX_TCPA_ACPI_INIT, tcpa_acpi_init),
+	TABLE_ENTRY(IDX_TCPA_EXTEND_ACPI_LOG, tcpa_extend_acpi_log),
+
+	TABLE_ENTRY(IDX_TCGINTERRUPTHANDLER, TCGInterruptHandler),
+
+	TABLE_ENTRY(IDX_TCPA_CALLING_INT19H, tcpa_calling_int19h),
+	TABLE_ENTRY(IDX_TCPA_RETURNED_INT19H, tcpa_returned_int19h),
+	TABLE_ENTRY(IDX_TCPA_ADD_EVENT_SEPARATORS, tcpa_add_event_separators),
+	TABLE_ENTRY(IDX_TCPA_WAKE_EVENT, tcpa_wake_event),
+	TABLE_ENTRY(IDX_TCPA_ADD_BOOTDEVICE, tcpa_add_bootdevice),
+	TABLE_ENTRY(IDX_TCPA_START_OPTION_ROM_SCAN, tcpa_start_option_rom_scan),
+	TABLE_ENTRY(IDX_TCPA_OPTION_ROM, tcpa_option_rom),
+	TABLE_ENTRY(IDX_TCPA_IPL, tcpa_ipl),
+	TABLE_ENTRY(IDX_TCPA_MEASURE_POST, tcpa_measure_post),
+
+	TABLE_ENTRY(IDX_TCPA_INITIALIZE_TPM, tcpa_initialize_tpm),
 
 	TABLE_ENTRY(IDX_LAST       , 0)     /* keep last */
 };

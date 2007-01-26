@@ -154,6 +154,8 @@
 #define BX_USE_ATADRV    1
 #define BX_ELTORITO_BOOT 1
 
+#define BX_TCGBIOS       0              /* main switch for TCG BIOS ext. */
+
 #define BX_MAX_ATA_INTERFACES   4
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
 
@@ -1854,6 +1856,9 @@ print_bios_banner()
 {
   printf(BX_APPNAME" BIOS, %d cpu%s, ", BX_SMP_PROCESSORS, BX_SMP_PROCESSORS>1?"s":"");
   printf("%s %s\n", bios_cvs_version_string, bios_date_string);
+#if BX_TCGBIOS
+  printf("TCG-enabled BIOS.\n");
+#endif
   printf("\n");
   test_gateway();
 }
@@ -5717,6 +5722,10 @@ int13_cdemu(DS, ES, DI, SI, BP, SP, BX, DX, CX, AX, IP, CS, FLAGS)
     BX_INFO("int13_cdemu: function %02x, emulation not active for DL= %02x\n", GET_AH(), GET_DL());
     goto int13_fail;
     }
+
+#if BX_TCGBIOS
+  tcpa_ipl((Bit32u)bootseg);               /* specs: 8.2.3 steps 4 and 5 */
+#endif
   
   switch (GET_AH()) {
 
@@ -9504,6 +9513,9 @@ rom_scan:
   ;;   2         ROM length in 512-byte blocks
   ;;   3         ROM initialization entry point (FAR CALL)
 
+#if BX_TCGBIOS
+  call _tcpa_start_option_rom_scan    /* specs: 3.2.3.3 + 10.4.3 */
+#endif
   mov  cx, #0xc000
 rom_scan_loop:
   mov  ds, cx
@@ -9522,6 +9534,20 @@ rom_scan_loop:
   add  al, #0x04
 block_count_rounded:
 
+#if BX_TCGBIOS
+  push ax
+  push ds
+  push ecx
+  xor ax, ax
+  mov ds, ax
+  and ecx, #0xffff
+  push ecx       ;; segment where option rom is located at
+  call _tcpa_option_rom                   /* specs: 3.2.3.3 */
+  add sp, #4    ;; pop segment
+  pop ecx	;; original ecx
+  pop ds
+  pop ax
+#endif
   xor  bx, bx   ;; Restore DS back to 0000:
   mov  ds, bx
   push ax       ;; Save AX
@@ -9827,6 +9853,16 @@ post_default_ints:
   in   al, 0x71
   mov  0x0410, ax
 
+#if BX_TCGBIOS
+  call _tcpa_acpi_init
+
+  push dword #0
+  call _tcpa_initialize_tpm
+  add sp, #4
+
+  call _tcpa_do_measure_POSTs
+  call _tcpa_wake_event     /* specs: 3.2.3.7 */
+#endif
 
   ;; Parallel setup
   SET_INT_VECTOR(0x0F, #0xF000, #dummy_iret_handler)
@@ -9949,9 +9985,16 @@ post_default_ints:
   ;;
 #endif // BX_ELTORITO_BOOT
  
+#if BX_TCGBIOS
+  call _tcpa_calling_int19h          /* specs: 8.2.3 step 1 */
+  call _tcpa_add_event_separators    /* specs: 8.2.3 step 2 */
+#endif
   int  #0x19
   //JMP_EP(0x0064) ; INT 19h location
 
+#if BX_TCGBIOS
+  call _tcpa_returned_int19h         /* specs: 8.2.3 step 3/7 */
+#endif
 
 .org 0xe2c3 ; NMI Handler Entry Point
 nmi:
@@ -10434,6 +10477,21 @@ db 0x00    ;; base  23:16
 ;----------
 .org 0xfe6e ; INT 1Ah Time-of-day Service Entry Point
 int1a_handler:
+#if BX_TCGBIOS
+  cmp  ah, #0xbb
+  jne  no_tcg
+  pushf
+  push ds
+  push es
+  pushad
+  call _int1a_function32
+  popad
+  pop es
+  pop ds
+  popf
+  iret
+no_tcg:
+#endif
 #if BX_PCIBIOS
   cmp  ah, #0xb1
   jne  int1a_normal

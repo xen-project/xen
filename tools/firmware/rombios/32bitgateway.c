@@ -484,3 +484,5 @@ test_gateway()
 		printf("working correctly\n");
 	}
 }
+
+#include "tcgbios.c"
