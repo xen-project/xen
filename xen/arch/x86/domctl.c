@@ -410,7 +410,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #else
 #define c(fld) (c.nat->fld)
 #endif
-    unsigned long flags;
 
     if ( !IS_COMPAT(v->domain) )
         memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
@@ -444,12 +443,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c(user_regs.eflags |= v->arch.iopl << 12);
     }
 
-    flags = 0;
+    c(flags &= ~(VGCF_i387_valid|VGCF_in_kernel));
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
-        flags |= VGCF_i387_valid;
+        c(flags |= VGCF_i387_valid);
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        flags |= VGCF_in_kernel;
-    c(flags = flags);
+        c(flags |= VGCF_in_kernel);
 
     if ( !IS_COMPAT(v->domain) )
         c.nat->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
