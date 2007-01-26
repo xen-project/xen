@@ -11,9 +11,11 @@ OBJECTS = $(foreach f,$(FILES),$(f).o)
 CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
 CFLAGS += -I../ -I../../
 
+.PHONY: all clean
+
 all: $(TARGET)
 
-clean::
+clean:
 	rm -rf *.o $(TARGET)
 
 $(TARGET): $(OBJECTS)

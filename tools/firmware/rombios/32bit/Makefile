@@ -12,33 +12,29 @@ CFLAGS += -I../
 
 SUBDIRS = tcgbios
 
-MODULES := 32bitbios.o
-MODULES += tcgbios/tcgbiosext.o
-MODULES += util.o
+MODULES = tcgbios/tcgbiosext.o
 
-.PHONY: all subdirs
+.PHONY: all subdirs clean
 
 subdirs:
 	@for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir all; \
 	done;
 
-all: subdirs $(TARGET)
+all: $(TARGET)
 
-clean::
+clean:
 	rm -rf *.o $(TARGET)
 	@for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
 	done;
 
-$(TARGET): 32bitbios_all.o $(SOURCES)
-	unref=`nm -u 32bitbios_all.o`
-	@if [ "$$unref" != "" ]; then \
-		echo "There are unresolved symbols in the BIOS.";	\
-		echo $$unref ;						\
-	else								\
-		bash mkhex highbios_array 32bitbios_all.o > $(TARGET); \
-	fi
-
-32bitbios_all.o: $(MODULES)
-	ld $(LDFLAGS_DIRECT) -r $(MODULES) -o 32bitbios_all.o
+$(TARGET): subdirs 32bitbios.o util.o
+	ld $(LDFLAGS_DIRECT) -r 32bitbios.o $(MODULES) util.o -o 32bitbios_all.o
+	@nm 32bitbios_all.o |                                \
+	  grep -E -q '^ +U ' && {                            \
+	    echo "There are undefined symbols in the BIOS:"; \
+	    nm -u 32bitbios_all.o;                           \
+	    exit 11;                                         \
+	  } || :
+	bash mkhex highbios_array 32bitbios_all.o > $@
