@@ -722,6 +722,8 @@ typedef struct {
     } cdemu_t;
 #endif // BX_ELTORITO_BOOT
   
+#include "32bitgateway.h"
+
   // for access to EBDA area
   //     The EBDA structure should conform to 
   //     http://www.cybertrails.com/~fys/rombios.htm document
@@ -745,6 +747,7 @@ typedef struct {
     cdemu_t cdemu;
 #endif // BX_ELTORITO_BOOT
 
+    upcall_t upcall;
     } ebda_data_t;
   
   #define EbdaData ((ebda_data_t *) 0)
@@ -1852,6 +1855,7 @@ print_bios_banner()
   printf(BX_APPNAME" BIOS, %d cpu%s, ", BX_SMP_PROCESSORS, BX_SMP_PROCESSORS>1?"s":"");
   printf("%s %s\n", bios_cvs_version_string, bios_date_string);
   printf("\n");
+  test_gateway();
 }
 
 
@@ -8853,6 +8857,10 @@ use16 386
 
 #endif
 
+ASM_END
+#include "32bitgateway.c"
+ASM_START
+
 ;--------------------
 #if BX_PCIBIOS
 use32 386
@@ -10691,13 +10699,23 @@ static Bit8u vgafont8[128*8]=
 };
 
 #ifdef HVMASSIST
+ASM_START
+
+// space for addresses in 32bit BIOS area; currently 256/4 entries
+// are allocated
+.org 0xcb00
+jmptable:
+db 0x5F, 0x5F, 0x5F, 0x4A, 0x4D, 0x50, 0x54 ;; ___JMPT
+dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;;  64 bytes
+dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 128 bytes
+dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 192 bytes
+
 //
 // MP Tables
 // just carve out some blank space for HVMLOADER to write the MP tables to
 //
 // NOTE: There should be enough space for a 32 processor entry MP table
 //
-ASM_START
 .org 0xcc00
 db 0x5F, 0x5F, 0x5F, 0x48, 0x56, 0x4D, 0x4D, 0x50 ;; ___HVMMP
 dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;;  64 bytes

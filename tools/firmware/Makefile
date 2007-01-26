@@ -7,7 +7,7 @@ TARGET      := hvmloader/hvmloader
 INST_DIR := $(DESTDIR)/usr/lib/xen/boot
 
 SUBDIRS :=
-SUBDIRS += rombios
+SUBDIRS += rombios rombios/32bit
 SUBDIRS += vgabios
 SUBDIRS += vmxassist
 SUBDIRS += hvmloader
