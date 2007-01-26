@@ -324,6 +324,14 @@ done:
     msg = xenbus_read(XBT_NIL, "device/vif/0/backend", &backend);
     msg = xenbus_read(XBT_NIL, "device/vif/0/mac", &mac);
 
+    if ((backend == NULL) || (mac == NULL)) {
+        struct evtchn_close op = { info->local_port };
+        printk("%s: backend/mac failed\n", __func__);
+        unbind_evtchn(info->local_port);
+        HYPERVISOR_event_channel_op(EVTCHNOP_close, &op);
+        return;
+    }
+
     printk("backend at %s\n",backend);
     printk("mac is %s\n",mac);
 
@@ -383,10 +391,7 @@ void init_rx_buffers(void)
     netif_rx_request_t *req;
     int notify;
 
-    np->rx.req_prod_pvt = requeue_idx;
-
-
-    /* Step 2: Rebuild the RX buffer freelist and the RX ring itself. */
+    /* Rebuild the RX buffer freelist and the RX ring itself. */
     for (requeue_idx = 0, i = 0; i < NET_RX_RING_SIZE; i++) 
     {
         struct net_buffer* buf = &rx_buffers[requeue_idx];
@@ -402,16 +407,12 @@ void init_rx_buffers(void)
 
     np->rx.req_prod_pvt = requeue_idx;
 
-
-
     RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->rx, notify);
 
-    if(notify) 
+    if (notify) 
         notify_remote_via_evtchn(np->evtchn);
 
     np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
-
-
 }
 
 
