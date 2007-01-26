@@ -47,7 +47,7 @@ long arch_do_domctl(struct xen_domctl *domctl,
     case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = find_domain_by_id(domctl->domain);
+        struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         uint64_t mfn;
         struct list_head *list_ent;
@@ -84,7 +84,7 @@ long arch_do_domctl(struct xen_domctl *domctl,
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(domctl->domain);
+        d = get_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
             ret = shadow_domctl(d, &domctl->u.shadow_op, u_domctl);
@@ -99,7 +99,7 @@ long arch_do_domctl(struct xen_domctl *domctl,
         unsigned int order = domctl->u.real_mode_area.log - PAGE_SHIFT;
 
         ret = -ESRCH;
-        d = find_domain_by_id(domctl->domain);
+        d = get_domain_by_id(domctl->domain);
         if (d != NULL) {
             ret = -EINVAL;
             if (cpu_rma_valid(order))

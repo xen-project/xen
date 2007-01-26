@@ -1882,7 +1882,7 @@ static int set_foreigndom(domid_t domid)
     }
     else
     {
-        info->foreign = e = find_domain_by_id(domid);
+        info->foreign = e = get_domain_by_id(domid);
         if ( e == NULL )
         {
             switch ( domid )
@@ -2963,7 +2963,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = find_domain_by_id(xatp.domid)) == NULL )
+        else if ( (d = get_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
         switch ( xatp.space )
@@ -3034,7 +3034,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = find_domain_by_id(fmap.domid)) == NULL )
+        else if ( (d = get_domain_by_id(fmap.domid)) == NULL )
             return -ESRCH;
 
         rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,

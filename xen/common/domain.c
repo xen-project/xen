@@ -203,7 +203,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 }
 
 
-struct domain *find_domain_by_id(domid_t dom)
+struct domain *get_domain_by_id(domid_t dom)
 {
     struct domain *d;
 

@@ -276,7 +276,7 @@ int construct_dom0(
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
 
-struct domain *find_domain_by_id(domid_t dom);
+struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 void domain_kill(struct domain *d);
 void domain_shutdown(struct domain *d, u8 reason);

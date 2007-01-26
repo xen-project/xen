@@ -346,7 +346,7 @@ static int add_active_list(domid_t domid)
     if ( adomains >= MAX_OPROF_DOMAINS )
         return -E2BIG;
 
-    d = find_domain_by_id(domid);
+    d = get_domain_by_id(domid);
     if ( d == NULL )
         return -EINVAL;
 
@@ -369,7 +369,7 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     if ( copy_from_guest(&passive, arg, 1) )
         return -EFAULT;
 
-    d = find_domain_by_id(passive.domain_id);
+    d = get_domain_by_id(passive.domain_id);
     if ( d == NULL )
         return -EINVAL;
 

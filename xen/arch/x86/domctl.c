@@ -39,7 +39,7 @@ long arch_do_domctl(
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(domctl->domain);
+        d = get_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
             ret = shadow_domctl(d,
@@ -62,7 +62,7 @@ long arch_do_domctl(
             break;
 
         ret = -ESRCH;
-        if ( unlikely((d = find_domain_by_id(domctl->domain)) == NULL) )
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
             break;
 
         if ( np == 0 )
@@ -86,7 +86,7 @@ long arch_do_domctl(
         ret = -EINVAL;
 
         if ( unlikely(!mfn_valid(mfn)) ||
-             unlikely((d = find_domain_by_id(dom)) == NULL) )
+             unlikely((d = get_domain_by_id(dom)) == NULL) )
             break;
 
         page = mfn_to_page(mfn);
@@ -134,7 +134,7 @@ long arch_do_domctl(
         uint32_t *arr32;
         ret = -ESRCH;
 
-        if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
+        if ( unlikely((d = get_domain_by_id(dom)) == NULL) )
             break;
 
         if ( unlikely(num > 1024) )
@@ -217,7 +217,7 @@ long arch_do_domctl(
     case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = find_domain_by_id(domctl->domain);
+        struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         uint64_t mfn;
         struct list_head *list_ent;
@@ -255,7 +255,7 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_hypercall_init:
     {
-        struct domain *d = find_domain_by_id(domctl->domain);
+        struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long gmfn = domctl->u.hypercall_init.gmfn;
         unsigned long mfn;
         void *hypercall_page;
@@ -293,7 +293,7 @@ long arch_do_domctl(
         struct vcpu               *v;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
 
         ret = -ENOMEM;
@@ -324,7 +324,7 @@ long arch_do_domctl(
         struct vcpu               *v;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
 
         ret = -ENOMEM;
@@ -360,7 +360,7 @@ long arch_do_domctl(
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
 
         switch ( domctl->u.address_size.size )
@@ -386,7 +386,7 @@ long arch_do_domctl(
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
 
         domctl->u.address_size.size = BITS_PER_GUEST_LONG(d);

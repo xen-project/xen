@@ -73,7 +73,7 @@ static inline int is_free_domid(domid_t dom)
     if ( dom >= DOMID_FIRST_RESERVED )
         return 0;
 
-    if ( (d = find_domain_by_id(dom)) == NULL )
+    if ( (d = get_domain_by_id(dom)) == NULL )
         return 1;
 
     put_domain(d);
@@ -196,7 +196,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_setvcpucontext:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         vcpu_guest_context_u c = { .nat = NULL };
         unsigned int vcpu = op->u.vcpucontext.vcpu;
         struct vcpu *v;
@@ -248,7 +248,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_pausedomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -265,7 +265,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_unpausedomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -283,7 +283,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_resumedomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         struct vcpu *v;
 
         ret = -ESRCH;
@@ -367,7 +367,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         /* Needed, for example, to ensure writable p.t. state is synced. */
@@ -402,7 +402,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_destroydomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -421,7 +421,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getvcpuaffinity:
     {
         domid_t dom = op->domain;
-        struct domain *d = find_domain_by_id(dom);
+        struct domain *d = get_domain_by_id(dom);
         struct vcpu *v;
         cpumask_t new_affinity;
 
@@ -460,7 +460,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = sched_adjust(d, &op->u.scheduler_op);
@@ -514,7 +514,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu         *v;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -570,7 +570,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu_runstate_info runstate;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -604,7 +604,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned long new_max;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -627,7 +627,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             memcpy(d->handle, op->u.setdomainhandle.handle,
@@ -642,7 +642,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             if ( op->u.setdebugging.enable )
@@ -665,7 +665,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -689,7 +689,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -707,7 +707,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
