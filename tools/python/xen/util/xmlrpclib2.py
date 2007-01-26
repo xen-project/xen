@@ -50,8 +50,7 @@ except ImportError:
 
 
 def stringify(value):
-    if isinstance(value, float) or \
-       isinstance(value, long) or \
+    if isinstance(value, long) or \
        (isinstance(value, int) and not isinstance(value, bool)):
         return str(value)
     elif isinstance(value, dict):
