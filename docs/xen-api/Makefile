@@ -1,22 +1,41 @@
+#!/usr/bin/make -f
+
+XEN_ROOT=../..
+include $(XEN_ROOT)/Config.mk
+include $(XEN_ROOT)/docs/Docs.mk
+
+
 TEX := $(wildcard *.tex)
 EPS := $(wildcard *.eps)
 EPSDOT := $(patsubst %.dot,%.eps,$(wildcard *.dot))
 
 .PHONY: all
-all: xenapi.pdf xenapi.ps
+all: build
+
+.PHONY: build
+build: xenapi.pdf xenapi.ps
+
+install:
+	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)/ps
+	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)/pdf
+
+	cp xenapi.ps $(DESTDIR)$(pkgdocdir)/ps
+	cp xenapi.pdf $(DESTDIR)$(pkgdocdir)/pdf
+
 
 xenapi.dvi: $(TEX) $(EPS) $(EPSDOT)
-	latex xenapi.tex
-	latex xenapi.tex
+	$(LATEX) xenapi.tex
+	$(LATEX) xenapi.tex
+	rm -f *.aux *.log
 
 %.pdf: %.ps
-	ps2pdf $< $@
+	$(PS2PDF) $< $@
 
 %.ps: %.dvi
-	dvips $< -o $@
+	$(DVIPS) $< -o $@
 
 %.eps: %.dot
-	dot -Tps $< >$@
+	$(DOT) -Tps $< >$@
 
 .PHONY: clean
 clean:

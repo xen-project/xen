@@ -2,19 +2,9 @@
 
 XEN_ROOT=..
 include $(XEN_ROOT)/Config.mk
+include $(XEN_ROOT)/docs/Docs.mk
 
 VERSION		= xen-unstable
-
-PS2PDF		:= ps2pdf
-DVIPS		:= dvips
-LATEX		:= latex
-FIG2DEV		:= fig2dev
-LATEX2HTML	:= latex2html
-DOXYGEN		:= doxygen
-POD2MAN		:= pod2man
-
-pkgdocdir	:= /usr/share/doc/xen
-mandir		:= /usr/share/man
 
 DOC_MAN5SRC	:= $(wildcard man/*.pod.5)
 DOC_MAN1SRC	:= $(wildcard man/*.pod.1)
@@ -32,6 +22,9 @@ all: build
 
 .PHONY: build
 build: ps pdf html man-pages
+	@if which $(DOT) 1>/dev/null 2>/dev/null ; then              \
+	$(MAKE) -C xen-api build ; else                              \
+        echo "Graphviz (dot) not installed; skipping xen-api." ; fi
 	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
 .PHONY: dev-docs
@@ -74,6 +67,7 @@ man5/%.5: man/%.pod.5 Makefile
 
 .PHONY: clean
 clean:
+	$(MAKE) -C xen-api clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
 	rm -rf $(GFX) ps pdf html
@@ -88,6 +82,9 @@ distclean: clean
 install: all
 	rm -rf $(DESTDIR)$(pkgdocdir)
 	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)
+
+	$(MAKE) -C xen-api install
+
 	cp -dR ps $(DESTDIR)$(pkgdocdir)
 	cp -dR pdf $(DESTDIR)$(pkgdocdir)
 	$(INSTALL_DIR) $(DESTDIR)$(mandir)
