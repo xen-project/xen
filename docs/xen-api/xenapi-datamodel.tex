@@ -9642,134 +9642,6 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is at
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: console}
-\subsubsection{RPC name:~get\_record}
-
-{\bf Overview:} 
-Get the current state of the given console.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (console record) get_record (session_id s, console ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt console ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-console record
-}
-
-
-all fields from the object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_by\_uuid}
-
-{\bf Overview:} 
-Get a reference to the object with the specified UUID.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (console ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt string } & uuid & UUID of object to return \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-console ref
-}
-
-
-reference to the object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new console instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (console ref) create (session_id s, console record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt console record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-console ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified console instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, console ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt console ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -9895,6 +9767,134 @@ VM ref
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new console instance, and return its handle.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console ref) create (session_id s, console record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified console instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the console instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (console record) get_record (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+console record
+}
+
+
+all fields from the object
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
