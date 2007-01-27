@@ -1,0 +1,18 @@
+diff -pruN ../orig-linux-2.6.18/drivers/ide/ide-lib.c ./drivers/ide/ide-lib.c
+--- ../orig-linux-2.6.18/drivers/ide/ide-lib.c	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/ide/ide-lib.c	2007-01-12 16:07:37.000000000 +0000
+@@ -408,10 +408,10 @@ void ide_toggle_bounce(ide_drive_t *driv
+ {
+ 	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
+ 
+-	if (!PCI_DMA_BUS_IS_PHYS) {
+-		addr = BLK_BOUNCE_ANY;
+-	} else if (on && drive->media == ide_disk) {
+-		if (HWIF(drive)->pci_dev)
++	if (on && drive->media == ide_disk) {
++		if (!PCI_DMA_BUS_IS_PHYS)
++			addr = BLK_BOUNCE_ANY;
++		else if (HWIF(drive)->pci_dev)
+ 			addr = HWIF(drive)->pci_dev->dma_mask;
+ 	}
+ 

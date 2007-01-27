@@ -10,6 +10,7 @@
 #include <xen/errno.h>
 #include <xen/bitmap.h>
 #include <xen/bitops.h>
+#include <asm/byteorder.h>
 
 /*
  * bitmaps provide an array of bits, implemented using an an
@@ -467,3 +468,52 @@ int bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
 	return 0;
 }
 EXPORT_SYMBOL(bitmap_allocate_region);
+
+#ifdef __BIG_ENDIAN
+
+void bitmap_long_to_byte(uint8_t *bp, const unsigned long *lp, int nbits)
+{
+	unsigned long l;
+	int i, j, b;
+
+	for (i = 0, b = 0; nbits > 0; i++, b += sizeof(l)) {
+		l = lp[i];
+		for (j = 0; (j < sizeof(l)) && (nbits > 0); j++) {
+			bp[b+j] = l;
+			l >>= 8;
+			nbits -= 8;
+		}
+	}
+}
+
+void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits)
+{
+	unsigned long l;
+	int i, j, b;
+
+	for (i = 0, b = 0; nbits > 0; i++, b += sizeof(l)) {
+		l = 0;
+		for (j = 0; (j < sizeof(l)) && (nbits > 0); j++) {
+			l |= (unsigned long)bp[b+j] << (j*8);
+			nbits -= 8;
+		}
+		lp[i] = l;
+	}
+}
+
+#elif defined(__LITTLE_ENDIAN)
+
+void bitmap_long_to_byte(uint8_t *bp, const unsigned long *lp, int nbits)
+{
+	memcpy(bp, lp, (nbits+7)/8);
+}
+
+void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits)
+{
+	/* We may need to pad the final longword with zeroes. */
+	if (nbits & (BITS_PER_LONG-1))
+		lp[BITS_TO_LONGS(nbits)-1] = 0;
+	memcpy(lp, bp, (nbits+7)/8);
+}
+
+#endif

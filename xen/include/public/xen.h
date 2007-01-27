@@ -588,6 +588,16 @@ DEFINE_XEN_GUEST_HANDLE(uint64_t);
 
 #endif /* !__ASSEMBLY__ */
 
+/* Default definitions for macros used by domctl/sysctl. */
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+#ifndef uint64_aligned_t
+#define uint64_aligned_t uint64_t
+#endif
+#ifndef XEN_GUEST_HANDLE_64
+#define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
+#endif
+#endif
+
 #endif /* __XEN_PUBLIC_XEN_H__ */
 
 /*

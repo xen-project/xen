@@ -2,6 +2,8 @@
  * linux/arch/i386/kernel/sysenter.c
  *
  * (C) Copyright 2002 Linus Torvalds
+ * Portions based on the vdso-randomization code from exec-shield:
+ * Copyright(C) 2005-2006, Red Hat, Inc., Ingo Molnar
  *
  * This file contains the needed initializations to support sysenter.
  */
@@ -14,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/elf.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 
 #include <asm/cpufeature.h>
 #include <asm/msr.h>
@@ -23,6 +26,23 @@
 #ifdef CONFIG_XEN
 #include <xen/interface/callback.h>
 #endif
+
+/*
+ * Should the kernel map a VDSO page into processes and pass its
+ * address down to glibc upon exec()?
+ */
+unsigned int __read_mostly vdso_enabled = 1;
+
+EXPORT_SYMBOL_GPL(vdso_enabled);
+
+static int __init vdso_setup(char *s)
+{
+	vdso_enabled = simple_strtoul(s, NULL, 0);
+
+	return 1;
+}
+
+__setup("vdso=", vdso_setup);
 
 extern asmlinkage void sysenter_entry(void);
 
@@ -70,22 +90,32 @@ int __init sysenter_setup(void)
 	}
 #endif
 
-	if (boot_cpu_has(X86_FEATURE_SEP)) {
+#ifdef CONFIG_COMPAT_VDSO
+	__set_fixmap(FIX_VDSO, __pa(syscall_page), PAGE_READONLY);
+	printk("Compat vDSO mapped to %08lx.\n", __fix_to_virt(FIX_VDSO));
+#else
+	/*
+	 * In the non-compat case the ELF coredumping code needs the fixmap:
+	 */
+	__set_fixmap(FIX_VDSO, __pa(syscall_page), PAGE_KERNEL_RO);
+#endif
+
+	if (!boot_cpu_has(X86_FEATURE_SEP)) {
 		memcpy(syscall_page,
-		       &vsyscall_sysenter_start,
-		       &vsyscall_sysenter_end - &vsyscall_sysenter_start);
+		       &vsyscall_int80_start,
+		       &vsyscall_int80_end - &vsyscall_int80_start);
 		return 0;
 	}
 
 	memcpy(syscall_page,
-	       &vsyscall_int80_start,
-	       &vsyscall_int80_end - &vsyscall_int80_start);
+	       &vsyscall_sysenter_start,
+	       &vsyscall_sysenter_end - &vsyscall_sysenter_start);
 
 	return 0;
 }
 
-static struct page*
-syscall_nopage(struct vm_area_struct *vma, unsigned long adr, int *type)
+static struct page *syscall_nopage(struct vm_area_struct *vma,
+				unsigned long adr, int *type)
 {
 	struct page *p = virt_to_page(adr - vma->vm_start + syscall_page);
 	get_page(p);
@@ -102,21 +132,32 @@ static struct vm_operations_struct syscall_vm_ops = {
 	.nopage = syscall_nopage,
 };
 
+/* Defined in vsyscall-sysenter.S */
+extern void SYSENTER_RETURN;
+
 /* Setup a VMA at program startup for the vsyscall page */
 int arch_setup_additional_pages(struct linux_binprm *bprm, int exstack)
 {
 	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
+	unsigned long addr;
 	int ret;
 
-	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!vma)
-		return -ENOMEM;
+	down_write(&mm->mmap_sem);
+	addr = get_unmapped_area(NULL, 0, PAGE_SIZE, 0, 0);
+	if (IS_ERR_VALUE(addr)) {
+		ret = addr;
+		goto up_fail;
+	}
 
-	memset(vma, 0, sizeof(struct vm_area_struct));
-	/* Could randomize here */
-	vma->vm_start = VSYSCALL_BASE;
-	vma->vm_end = VSYSCALL_BASE + PAGE_SIZE;
+	vma = kmem_cache_zalloc(vm_area_cachep, SLAB_KERNEL);
+	if (!vma) {
+		ret = -ENOMEM;
+		goto up_fail;
+	}
+
+	vma->vm_start = addr;
+	vma->vm_end = addr + PAGE_SIZE;
 	/* MAYWRITE to allow gdb to COW and set breakpoints */
 	vma->vm_flags = VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC|VM_MAYWRITE;
 	vma->vm_flags |= mm->def_flags;
@@ -124,15 +165,26 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int exstack)
 	vma->vm_ops = &syscall_vm_ops;
 	vma->vm_mm = mm;
 
-	down_write(&mm->mmap_sem);
-	if ((ret = insert_vm_struct(mm, vma))) {
-		up_write(&mm->mmap_sem);
+	ret = insert_vm_struct(mm, vma);
+	if (unlikely(ret)) {
 		kmem_cache_free(vm_area_cachep, vma);
-		return ret;
+		goto up_fail;
 	}
+
+	current->mm->context.vdso = (void *)addr;
+	current_thread_info()->sysenter_return =
+				    (void *)VDSO_SYM(&SYSENTER_RETURN);
 	mm->total_vm++;
+up_fail:
 	up_write(&mm->mmap_sem);
-	return 0;
+	return ret;
+}
+
+const char *arch_vma_name(struct vm_area_struct *vma)
+{
+	if (vma->vm_mm && vma->vm_start == (long)vma->vm_mm->context.vdso)
+		return "[vdso]";
+	return NULL;
 }
 
 struct vm_area_struct *get_gate_vma(struct task_struct *tsk)

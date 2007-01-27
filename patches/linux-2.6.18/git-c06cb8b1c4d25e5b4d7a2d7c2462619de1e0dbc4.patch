@@ -1,0 +1,29 @@
+commit c06cb8b1c4d25e5b4d7a2d7c2462619de1e0dbc4
+Author: Vivek Goyal <vgoyal@in.ibm.com>
+Date:   Wed Nov 8 17:44:41 2006 -0800
+
+    [PATCH] i386: Force data segment to be 4K aligned
+    
+    o Currently there is no specific alignment restriction in linker script
+      and in some cases it can be placed non 4K aligned addresses. This fails
+      kexec which checks that segment to be loaded is page aligned.
+    
+    o I guess, it does not harm data segment to be 4K aligned.
+    
+    Signed-off-by: Vivek Goyal <vgoyal@in.ibm.com>
+    Signed-off-by: Andi Kleen <ak@suse.de>
+    Signed-off-by: Andrew Morton <akpm@osdl.org>
+    Signed-off-by: Linus Torvalds <torvalds@osdl.org>
+
+diff --git a/arch/i386/kernel/vmlinux.lds.S b/arch/i386/kernel/vmlinux.lds.S
+index adc1f23..c6f84a0 100644
+--- a/arch/i386/kernel/vmlinux.lds.S
++++ b/arch/i386/kernel/vmlinux.lds.S
+@@ -51,6 +51,7 @@ SECTIONS
+   __tracedata_end = .;
+ 
+   /* writeable */
++  . = ALIGN(4096);
+   .data : AT(ADDR(.data) - LOAD_OFFSET) {	/* Data */
+ 	*(.data)
+ 	CONSTRUCTORS

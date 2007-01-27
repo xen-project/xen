@@ -91,6 +91,15 @@ int strcmp(const char *cs, const char *ct)
     return res;
 }
 
+int strncmp(const char *s1, const char *s2, uint32_t n)
+{
+	uint32_t ctr;
+	for (ctr = 0; ctr < n; ctr++)
+		if (s1[ctr] != s2[ctr])
+			return (int)(s1[ctr] - s2[ctr]);
+	return 0;
+}
+
 void *memcpy(void *dest, const void *src, unsigned n)
 {
     int t0, t1, t2;

@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/guest_access.h>
+#include <xen/compat.h>
 #include <public/domctl.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
@@ -24,21 +25,12 @@
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <public/hvm/e820.h>
-#ifdef CONFIG_COMPAT
-#include <compat/xen.h>
-#endif
 
-#ifndef COMPAT
-#define _long                long
-#define copy_from_xxx_offset copy_from_guest_offset
-#define copy_to_xxx_offset   copy_to_guest_offset
-#endif
-
-_long arch_do_domctl(
+long arch_do_domctl(
     struct xen_domctl *domctl,
     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
-    _long ret = 0;
+    long ret = 0;
 
     switch ( domctl->cmd )
     {
@@ -47,7 +39,7 @@ _long arch_do_domctl(
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(domctl->domain);
+        d = get_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
             ret = shadow_domctl(d,
@@ -70,7 +62,7 @@ _long arch_do_domctl(
             break;
 
         ret = -ESRCH;
-        if ( unlikely((d = find_domain_by_id(domctl->domain)) == NULL) )
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
             break;
 
         if ( np == 0 )
@@ -94,7 +86,7 @@ _long arch_do_domctl(
         ret = -EINVAL;
 
         if ( unlikely(!mfn_valid(mfn)) ||
-             unlikely((d = find_domain_by_id(dom)) == NULL) )
+             unlikely((d = get_domain_by_id(dom)) == NULL) )
             break;
 
         page = mfn_to_page(mfn);
@@ -135,15 +127,14 @@ _long arch_do_domctl(
 
     case XEN_DOMCTL_getpageframeinfo2:
     {
-#define GPF2_BATCH (PAGE_SIZE / sizeof(_long))
         int n,j;
         int num = domctl->u.getpageframeinfo2.num;
         domid_t dom = domctl->domain;
         struct domain *d;
-        unsigned _long *l_arr;
+        uint32_t *arr32;
         ret = -ESRCH;
 
-        if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
+        if ( unlikely((d = get_domain_by_id(dom)) == NULL) )
             break;
 
         if ( unlikely(num > 1024) )
@@ -153,16 +144,18 @@ _long arch_do_domctl(
             break;
         }
 
-        l_arr = alloc_xenheap_page();
+        arr32 = alloc_xenheap_page();
  
         ret = 0;
         for ( n = 0; n < num; )
         {
-            int k = ((num-n)>GPF2_BATCH)?GPF2_BATCH:(num-n);
+            int k = PAGE_SIZE / 4;
+            if ( (num - n) < k )
+                k = num - n;
 
-            if ( copy_from_xxx_offset(l_arr,
-                                      domctl->u.getpageframeinfo2.array,
-                                      n, k) )
+            if ( copy_from_guest_offset(arr32,
+                                        domctl->u.getpageframeinfo2.array,
+                                        n, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -171,13 +164,13 @@ _long arch_do_domctl(
             for ( j = 0; j < k; j++ )
             {      
                 struct page_info *page;
-                unsigned _long mfn = l_arr[j];
+                unsigned long mfn = arr32[j];
 
                 page = mfn_to_page(mfn);
 
                 if ( likely(mfn_valid(mfn) && get_page(page, d)) ) 
                 {
-                    unsigned _long type = 0;
+                    unsigned long type = 0;
 
                     switch( page->u.inuse.type_info & PGT_type_mask )
                     {
@@ -197,16 +190,16 @@ _long arch_do_domctl(
 
                     if ( page->u.inuse.type_info & PGT_pinned )
                         type |= XEN_DOMCTL_PFINFO_LPINTAB;
-                    l_arr[j] |= type;
+                    arr32[j] |= type;
                     put_page(page);
                 }
                 else
-                    l_arr[j] |= XEN_DOMCTL_PFINFO_XTAB;
+                    arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
 
             }
 
-            if ( copy_to_xxx_offset(domctl->u.getpageframeinfo2.array,
-                                    n, l_arr, k) )
+            if ( copy_to_guest_offset(domctl->u.getpageframeinfo2.array,
+                                      n, arr32, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -215,7 +208,7 @@ _long arch_do_domctl(
             n += k;
         }
 
-        free_xenheap_page(l_arr);
+        free_xenheap_page(arr32);
 
         put_domain(d);
     }
@@ -224,9 +217,9 @@ _long arch_do_domctl(
     case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = find_domain_by_id(domctl->domain);
+        struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        xen_pfn_t mfn;
+        uint64_t mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -241,8 +234,8 @@ _long arch_do_domctl(
             {
                 mfn = page_to_mfn(list_entry(
                     list_ent, struct page_info, list));
-                if ( copy_to_xxx_offset(domctl->u.getmemlist.buffer,
-                                        i, &mfn, 1) )
+                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                          i, &mfn, 1) )
                 {
                     ret = -EFAULT;
                     break;
@@ -262,7 +255,7 @@ _long arch_do_domctl(
 
     case XEN_DOMCTL_hypercall_init:
     {
-        struct domain *d = find_domain_by_id(domctl->domain);
+        struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long gmfn = domctl->u.hypercall_init.gmfn;
         unsigned long mfn;
         void *hypercall_page;
@@ -293,6 +286,115 @@ _long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_sethvmcontext:
+    { 
+        struct hvm_domain_context *c;
+        struct domain             *d;
+        struct vcpu               *v;
+
+        ret = -ESRCH;
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = -ENOMEM;
+        if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
+            goto sethvmcontext_out;
+
+        v = d->vcpu[0];
+        
+        ret = -EFAULT;
+
+        if ( copy_from_guest(c, domctl->u.hvmcontext.ctxt, 1) != 0 )
+            goto sethvmcontext_out;
+
+        ret = arch_sethvm_ctxt(v, c);
+
+        xfree(c);
+
+    sethvmcontext_out:
+        put_domain(d);
+
+    }
+    break;
+
+    case XEN_DOMCTL_gethvmcontext:
+    { 
+        struct hvm_domain_context *c;
+        struct domain             *d;
+        struct vcpu               *v;
+
+        ret = -ESRCH;
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = -ENOMEM;
+        if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
+            goto gethvmcontext_out;
+
+        v = d->vcpu[0];
+
+        ret = -ENODATA;
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            goto gethvmcontext_out;
+        
+        ret = 0;
+        if (arch_gethvm_ctxt(v, c) == -1)
+            ret = -EFAULT;
+
+        if ( copy_to_guest(domctl->u.hvmcontext.ctxt, c, 1) )
+            ret = -EFAULT;
+
+        xfree(c);
+
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+
+    gethvmcontext_out:
+        put_domain(d);
+
+    }
+    break;
+
+    case XEN_DOMCTL_set_address_size:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        switch ( domctl->u.address_size.size )
+        {
+#ifdef CONFIG_COMPAT
+        case 32:
+            ret = switch_compat(d);
+            break;
+        case 64:
+            ret = switch_native(d);
+            break;
+#endif
+        default:
+            ret = (domctl->u.address_size.size == BITS_PER_LONG) ? 0 : -EINVAL;
+            break;
+        }
+
+        put_domain(d);
+    }
+
+    case XEN_DOMCTL_get_address_size:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        domctl->u.address_size.size = BITS_PER_GUEST_LONG(d);
+
+        ret = 0;
+        put_domain(d);
+    }
+
     default:
         ret = -ENOSYS;
         break;
@@ -301,7 +403,6 @@ _long arch_do_domctl(
     return ret;
 }
 
-#ifndef COMPAT
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 #ifdef CONFIG_COMPAT
@@ -309,15 +410,12 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #else
 #define c(fld) (c.nat->fld)
 #endif
-    unsigned long flags;
 
     if ( !IS_COMPAT(v->domain) )
         memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
-    {
         XLAT_vcpu_guest_context(c.cmp, &v->arch.guest_context);
-    }
 #endif
 
     if ( is_hvm_vcpu(v) )
@@ -345,12 +443,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c(user_regs.eflags |= v->arch.iopl << 12);
     }
 
-    flags = 0;
+    c(flags &= ~(VGCF_i387_valid|VGCF_in_kernel));
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
-        flags |= VGCF_i387_valid;
+        c(flags |= VGCF_i387_valid);
     if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        flags |= VGCF_in_kernel;
-    c(flags = flags);
+        c(flags |= VGCF_in_kernel);
 
     if ( !IS_COMPAT(v->domain) )
         c.nat->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
@@ -365,7 +462,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     c(vm_assist = v->domain->vm_assist);
 #undef c
 }
-#endif
 
 /*
  * Local variables:

@@ -35,10 +35,13 @@ _install: $(TARGET).gz
 		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/hvm
 	[ -d $(DESTDIR)/usr/include/xen/io ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
+	[ -d $(DESTDIR)/usr/include/xen/foreign ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/foreign
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
 	$(INSTALL_DATA) include/public/arch-x86/*.h $(DESTDIR)/usr/include/xen/arch-x86
 	$(INSTALL_DATA) include/public/hvm/*.h $(DESTDIR)/usr/include/xen/hvm
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
+	$(INSTALL_DATA) include/public/foreign/*.h $(DESTDIR)/usr/include/xen/foreign
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
 .PHONY: _debug
@@ -48,6 +51,7 @@ _debug:
 .PHONY: _clean
 _clean: delete-unfresh-files
 	$(MAKE) -C tools clean
+	$(MAKE) -C include/public/foreign clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean

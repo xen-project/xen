@@ -26,6 +26,30 @@ atomic_t irq_mis_count;
 #endif
 #endif
 
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+/*
+ * Probabilistic stack overflow check:
+ *
+ * Only check the stack in process context, because everything else
+ * runs on the big interrupt stacks. Checking reliably is too expensive,
+ * so we just check from interrupts.
+ */
+static inline void stack_overflow_check(struct pt_regs *regs)
+{
+	u64 curbase = (u64) current->thread_info;
+	static unsigned long warned = -60*HZ;
+
+	if (regs->rsp >= curbase && regs->rsp <= curbase + THREAD_SIZE &&
+	    regs->rsp <  curbase + sizeof(struct thread_info) + 128 &&
+	    time_after(jiffies, warned + 60*HZ)) {
+		printk("do_IRQ: %s near stack overflow (cur:%Lx,rsp:%lx)\n",
+		       current->comm, curbase, regs->rsp);
+		show_stack(NULL,NULL);
+		warned = jiffies;
+	}
+}
+#endif
+
 /*
  * Generic, controller-independent functions:
  */
@@ -38,9 +62,8 @@ int show_interrupts(struct seq_file *p, void *v)
 
 	if (i == 0) {
 		seq_printf(p, "           ");
-		for (j=0; j<NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "CPU%d       ",j);
+		for_each_online_cpu(j)
+			seq_printf(p, "CPU%-8d",j);
 		seq_putc(p, '\n');
 	}
 
@@ -53,12 +76,10 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j=0; j<NR_CPUS; j++)
-			if (cpu_online(j))
-			seq_printf(p, "%10u ",
-				kstat_cpu(j).irqs[i]);
+		for_each_online_cpu(j)
+			seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 #endif
-		seq_printf(p, " %14s", irq_desc[i].handler->typename);
+		seq_printf(p, " %14s", irq_desc[i].chip->typename);
 
 		seq_printf(p, "  %s", action->name);
 		for (action=action->next; action; action = action->next)
@@ -68,15 +89,13 @@ skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	} else if (i == NR_IRQS) {
 		seq_printf(p, "NMI: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", cpu_pda(j)->__nmi_count);
+		for_each_online_cpu(j)
+			seq_printf(p, "%10u ", cpu_pda(j)->__nmi_count);
 		seq_putc(p, '\n');
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "LOC: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", cpu_pda(j)->apic_timer_irqs);
+		for_each_online_cpu(j)
+			seq_printf(p, "%10u ", cpu_pda(j)->apic_timer_irqs);
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
@@ -99,9 +118,17 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	/* high bit used in ret_from_ code  */
 	unsigned irq = ~regs->orig_rax;
 
+	if (unlikely(irq >= NR_IRQS)) {
+		printk(KERN_EMERG "%s: cannot handle IRQ %d\n",
+					__FUNCTION__, irq);
+		BUG();
+	}
+
 	exit_idle();
 	irq_enter();
-
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+	stack_overflow_check(regs);
+#endif
 	__do_IRQ(irq, regs);
 	irq_exit();
 
@@ -119,13 +146,13 @@ void fixup_irqs(cpumask_t map)
 		if (irq == 2)
 			continue;
 
-		cpus_and(mask, irq_affinity[irq], map);
+		cpus_and(mask, irq_desc[irq].affinity, map);
 		if (any_online_cpu(mask) == NR_CPUS) {
 			printk("Breaking affinity for irq %i\n", irq);
 			mask = map;
 		}
-		if (irq_desc[irq].handler->set_affinity)
-			irq_desc[irq].handler->set_affinity(irq, mask);
+		if (irq_desc[irq].chip->set_affinity)
+			irq_desc[irq].chip->set_affinity(irq, mask);
 		else if (irq_desc[irq].action && !(warned++))
 			printk("Cannot set affinity for irq %i\n", irq);
 	}
@@ -150,8 +177,10 @@ asmlinkage void do_softirq(void)
  	local_irq_save(flags);
  	pending = local_softirq_pending();
  	/* Switch to interrupt stack */
- 	if (pending)
+ 	if (pending) {
 		call_softirq();
+		WARN_ON_ONCE(softirq_count());
+	}
  	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(do_softirq);

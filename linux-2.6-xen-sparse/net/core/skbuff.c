@@ -38,7 +38,6 @@
  *	The functions in this file will not compile correctly with gcc 2.4.x
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -112,6 +111,14 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
 	BUG();
 }
 
+void skb_truesize_bug(struct sk_buff *skb)
+{
+	printk(KERN_ERR "SKB BUG: Invalid truesize (%u) "
+	       "len=%u, sizeof(sk_buff)=%Zd\n",
+	       skb->truesize, skb->len, sizeof(struct sk_buff));
+}
+EXPORT_SYMBOL(skb_truesize_bug);
+
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
  *	'private' fields and also do memory statistics to find all the
  *	[BEEP] leaks.
@@ -132,7 +139,6 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
-#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone)
 {
@@ -150,7 +156,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 
 	/* Get the DATA. Size must match skb_add_mtu(). */
 	size = SKB_DATA_ALIGN(size);
-	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
+	data = ____kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
 	if (!data)
 		goto nodata;
 
@@ -187,7 +193,6 @@ nodata:
 	skb = NULL;
 	goto out;
 }
-#endif /* !CONFIG_HAVE_ARCH_ALLOC_SKB */
 
 /**
  *	alloc_skb_from_cache	-	allocate a network buffer
@@ -205,18 +210,14 @@ nodata:
  */
 struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 				     unsigned int size,
-				     gfp_t gfp_mask,
-				     int fclone)
+				     gfp_t gfp_mask)
 {
-	kmem_cache_t *cache;
-	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	u8 *data;
 
-	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
-
 	/* Get the HEAD */
-	skb = kmem_cache_alloc(cache, gfp_mask & ~__GFP_DMA);
+	skb = kmem_cache_alloc(skbuff_head_cache,
+			       gfp_mask & ~__GFP_DMA);
 	if (!skb)
 		goto out;
 
@@ -233,33 +234,47 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 	skb->data = data;
 	skb->tail = data;
 	skb->end  = data + size;
-	/* make sure we initialize shinfo sequentially */
-	shinfo = skb_shinfo(skb);
-	atomic_set(&shinfo->dataref, 1);
-	shinfo->nr_frags  = 0;
-	shinfo->gso_size = 0;
-	shinfo->gso_segs = 0;
-	shinfo->gso_type = 0;
-	shinfo->ip6_frag_id = 0;
-	shinfo->frag_list = NULL;
 
-	if (fclone) {
-		struct sk_buff *child = skb + 1;
-		atomic_t *fclone_ref = (atomic_t *) (child + 1);
-
-		skb->fclone = SKB_FCLONE_ORIG;
-		atomic_set(fclone_ref, 1);
-
-		child->fclone = SKB_FCLONE_UNAVAILABLE;
-	}
+	atomic_set(&(skb_shinfo(skb)->dataref), 1);
+	skb_shinfo(skb)->nr_frags  = 0;
+	skb_shinfo(skb)->gso_size = 0;
+	skb_shinfo(skb)->gso_segs = 0;
+	skb_shinfo(skb)->gso_type = 0;
+	skb_shinfo(skb)->ip6_frag_id = 0;
+	skb_shinfo(skb)->frag_list = NULL;
 out:
 	return skb;
 nodata:
-	kmem_cache_free(cache, skb);
+	kmem_cache_free(skbuff_head_cache, skb);
 	skb = NULL;
 	goto out;
 }
 
+/**
+ *	__netdev_alloc_skb - allocate an skbuff for rx on a specific device
+ *	@dev: network device to receive on
+ *	@length: length to allocate
+ *	@gfp_mask: get_free_pages mask, passed to alloc_skb
+ *
+ *	Allocate a new &sk_buff and assign it a usage count of one. The
+ *	buffer has unspecified headroom built in. Users should allocate
+ *	the headroom they think they need without accounting for the
+ *	built in space. The built in space is used for optimisations.
+ *
+ *	%NULL is returned if there is no free memory.
+ */
+struct sk_buff *__netdev_alloc_skb(struct net_device *dev,
+		unsigned int length, gfp_t gfp_mask)
+{
+	struct sk_buff *skb;
+
+	skb = alloc_skb(length + NET_SKB_PAD, gfp_mask);
+	if (likely(skb)) {
+		skb_reserve(skb, NET_SKB_PAD);
+		skb->dev = dev;
+	}
+	return skb;
+}
 
 static void skb_drop_list(struct sk_buff **listp)
 {
@@ -287,7 +302,7 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 		skb_get(list);
 }
 
-void skb_release_data(struct sk_buff *skb)
+static void skb_release_data(struct sk_buff *skb)
 {
 	if (!skb->cloned ||
 	    !atomic_sub_return(skb->nohdr ? (1 << SKB_DATAREF_SHIFT) + 1 : 1,
@@ -380,6 +395,24 @@ void __kfree_skb(struct sk_buff *skb)
 }
 
 /**
+ *	kfree_skb - free an sk_buff
+ *	@skb: buffer to free
+ *
+ *	Drop a reference to the buffer and free it if the usage count has
+ *	hit zero.
+ */
+void kfree_skb(struct sk_buff *skb)
+{
+	if (unlikely(!skb))
+		return;
+	if (likely(atomic_read(&skb->users) == 1))
+		smp_rmb();
+	else if (likely(!atomic_dec_and_test(&skb->users)))
+		return;
+	__kfree_skb(skb);
+}
+
+/**
  *	skb_clone	-	duplicate an sk_buff
  *	@skb: buffer to clone
  *	@gfp_mask: allocation priority
@@ -466,7 +499,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	n->tc_verd = CLR_TC_MUNGED(n->tc_verd);
 	C(input_dev);
 #endif
-
+	skb_copy_secmark(n, skb);
 #endif
 	C(truesize);
 	atomic_set(&n->users, 1);
@@ -528,6 +561,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 	new->tc_index	= old->tc_index;
 #endif
+	skb_copy_secmark(new, old);
 	atomic_set(&new->users, 1);
 	skb_shinfo(new)->gso_size = skb_shinfo(old)->gso_size;
 	skb_shinfo(new)->gso_segs = skb_shinfo(old)->gso_segs;
@@ -609,7 +643,6 @@ struct sk_buff *pskb_copy(struct sk_buff *skb, gfp_t gfp_mask)
 	n->csum	     = skb->csum;
 	n->ip_summed = skb->ip_summed;
 
-	n->truesize += skb->data_len;
 	n->data_len  = skb->data_len;
 	n->len	     = skb->len;
 
@@ -784,24 +817,40 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
  *	filled. Used by network drivers which may DMA or transfer data
  *	beyond the buffer end onto the wire.
  *
- *	May return NULL in out of memory cases.
+ *	May return error in out of memory cases. The skb is freed on error.
  */
  
-struct sk_buff *skb_pad(struct sk_buff *skb, int pad)
+int skb_pad(struct sk_buff *skb, int pad)
 {
-	struct sk_buff *nskb;
+	int err;
+	int ntail;
 	
 	/* If the skbuff is non linear tailroom is always zero.. */
-	if (skb_tailroom(skb) >= pad) {
+	if (!skb_cloned(skb) && skb_tailroom(skb) >= pad) {
 		memset(skb->data+skb->len, 0, pad);
-		return skb;
+		return 0;
 	}
-	
-	nskb = skb_copy_expand(skb, skb_headroom(skb), skb_tailroom(skb) + pad, GFP_ATOMIC);
+
+	ntail = skb->data_len + pad - (skb->end - skb->tail);
+	if (likely(skb_cloned(skb) || ntail > 0)) {
+		err = pskb_expand_head(skb, 0, ntail, GFP_ATOMIC);
+		if (unlikely(err))
+			goto free_skb;
+	}
+
+	/* FIXME: The use of this function with non-linear skb's really needs
+	 * to be audited.
+	 */
+	err = skb_linearize(skb);
+	if (unlikely(err))
+		goto free_skb;
+
+	memset(skb->data + skb->len, 0, pad);
+	return 0;
+
+free_skb:
 	kfree_skb(skb);
-	if (nskb)
-		memset(nskb->data+nskb->len, 0, pad);
-	return nskb;
+	return err;
 }	
  
 /* Trims skb to length len. It can change skb pointers.
@@ -1764,12 +1813,15 @@ unsigned int skb_find_text(struct sk_buff *skb, unsigned int from,
 			   unsigned int to, struct ts_config *config,
 			   struct ts_state *state)
 {
+	unsigned int ret;
+
 	config->get_next_block = skb_ts_get_next_block;
 	config->finish = skb_ts_finish;
 
 	skb_prepare_seq_read(skb, from, to, TS_SKB_CB(state));
 
-	return textsearch_find(config, state);
+	ret = textsearch_find(config, state);
+	return (ret <= to - from ? ret : UINT_MAX);
 }
 
 /**
@@ -1970,6 +2022,29 @@ err:
 
 EXPORT_SYMBOL_GPL(skb_segment);
 
+/**
+ *	skb_pull_rcsum - pull skb and update receive checksum
+ *	@skb: buffer to update
+ *	@start: start of data before pull
+ *	@len: length of data pulled
+ *
+ *	This function performs an skb_pull on the packet and updates
+ *	update the CHECKSUM_HW checksum.  It should be used on receive
+ *	path processing instead of skb_pull unless you know that the
+ *	checksum difference is zero (e.g., a valid IP header) or you
+ *	are setting ip_summed to CHECKSUM_NONE.
+ */
+unsigned char *skb_pull_rcsum(struct sk_buff *skb, unsigned int len)
+{
+	BUG_ON(len > skb->len);
+	skb->len -= len;
+	BUG_ON(skb->len < skb->data_len);
+	skb_postpull_rcsum(skb, skb->data, len);
+	return skb->data += len;
+}
+
+EXPORT_SYMBOL_GPL(skb_pull_rcsum);
+
 void __init skb_init(void)
 {
 	skbuff_head_cache = kmem_cache_create("skbuff_head_cache",
@@ -1992,8 +2067,10 @@ void __init skb_init(void)
 
 EXPORT_SYMBOL(___pskb_trim);
 EXPORT_SYMBOL(__kfree_skb);
+EXPORT_SYMBOL(kfree_skb);
 EXPORT_SYMBOL(__pskb_pull_tail);
 EXPORT_SYMBOL(__alloc_skb);
+EXPORT_SYMBOL(__netdev_alloc_skb);
 EXPORT_SYMBOL(pskb_copy);
 EXPORT_SYMBOL(pskb_expand_head);
 EXPORT_SYMBOL(skb_checksum);

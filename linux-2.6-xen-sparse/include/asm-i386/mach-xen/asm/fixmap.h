@@ -13,7 +13,6 @@
 #ifndef _ASM_FIXMAP_H
 #define _ASM_FIXMAP_H
 
-#include <linux/config.h>
 
 /* used by vmalloc.c, vsyscall.lds.S.
  *
@@ -52,6 +51,7 @@ extern unsigned long __FIXADDR_TOP;
  */
 enum fixed_addresses {
 	FIX_HOLE,
+	FIX_VDSO,
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif
@@ -95,10 +95,10 @@ enum fixed_addresses {
 	__end_of_fixed_addresses
 };
 
+extern void set_fixaddr_top(unsigned long top);
+
 extern void __set_fixmap(enum fixed_addresses idx,
 					maddr_t phys, pgprot_t flags);
-
-extern void set_fixaddr_top(void);
 
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)

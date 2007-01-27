@@ -47,6 +47,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/vpt.h>
+#include <public/hvm/save.h>
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
@@ -361,6 +362,306 @@ static inline void __restore_debug_registers(struct vcpu *v)
     /* No 4 and 5 */
     loaddebug(&v->arch.guest_context, 6);
     /* DR7 is loaded from the VMCS. */
+}
+
+static int __get_instruction_length(void);
+int vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
+{
+    unsigned long inst_len;
+
+    inst_len = __get_instruction_length();
+    c->eip = __vmread(GUEST_RIP);
+
+#ifdef HVM_DEBUG_SUSPEND
+    printk("vmx_vmcs_save: inst_len=0x%lx, eip=0x%"PRIx64".\n", 
+            inst_len, c->eip);
+#endif
+
+    c->esp = __vmread(GUEST_RSP);
+    c->eflags = __vmread(GUEST_RFLAGS);
+
+    c->cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
+    c->cr3 = v->arch.hvm_vmx.cpu_cr3;
+    c->cr4 = v->arch.hvm_vmx.cpu_shadow_cr4;
+
+#ifdef HVM_DEBUG_SUSPEND
+    printk("vmx_vmcs_save: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
+            c->cr3,
+            c->cr0,
+            c->cr4);
+#endif
+
+    c->idtr_limit = __vmread(GUEST_IDTR_LIMIT);
+    c->idtr_base = __vmread(GUEST_IDTR_BASE);
+
+    c->gdtr_limit = __vmread(GUEST_GDTR_LIMIT);
+    c->gdtr_base = __vmread(GUEST_GDTR_BASE);
+
+    c->cs_sel = __vmread(GUEST_CS_SELECTOR);
+    c->cs_limit = __vmread(GUEST_CS_LIMIT);
+    c->cs_base = __vmread(GUEST_CS_BASE);
+    c->cs_arbytes = __vmread(GUEST_CS_AR_BYTES);
+
+    c->ds_sel = __vmread(GUEST_DS_SELECTOR);
+    c->ds_limit = __vmread(GUEST_DS_LIMIT);
+    c->ds_base = __vmread(GUEST_DS_BASE);
+    c->ds_arbytes = __vmread(GUEST_DS_AR_BYTES);
+
+    c->es_sel = __vmread(GUEST_ES_SELECTOR);
+    c->es_limit = __vmread(GUEST_ES_LIMIT);
+    c->es_base = __vmread(GUEST_ES_BASE);
+    c->es_arbytes = __vmread(GUEST_ES_AR_BYTES);
+
+    c->ss_sel = __vmread(GUEST_SS_SELECTOR);
+    c->ss_limit = __vmread(GUEST_SS_LIMIT);
+    c->ss_base = __vmread(GUEST_SS_BASE);
+    c->ss_arbytes = __vmread(GUEST_SS_AR_BYTES);
+
+    c->fs_sel = __vmread(GUEST_FS_SELECTOR);
+    c->fs_limit = __vmread(GUEST_FS_LIMIT);
+    c->fs_base = __vmread(GUEST_FS_BASE);
+    c->fs_arbytes = __vmread(GUEST_FS_AR_BYTES);
+
+    c->gs_sel = __vmread(GUEST_GS_SELECTOR);
+    c->gs_limit = __vmread(GUEST_GS_LIMIT);
+    c->gs_base = __vmread(GUEST_GS_BASE);
+    c->gs_arbytes = __vmread(GUEST_GS_AR_BYTES);
+
+    c->tr_sel = __vmread(GUEST_TR_SELECTOR);
+    c->tr_limit = __vmread(GUEST_TR_LIMIT);
+    c->tr_base = __vmread(GUEST_TR_BASE);
+    c->tr_arbytes = __vmread(GUEST_TR_AR_BYTES);
+
+    c->ldtr_sel = __vmread(GUEST_LDTR_SELECTOR);
+    c->ldtr_limit = __vmread(GUEST_LDTR_LIMIT);
+    c->ldtr_base = __vmread(GUEST_LDTR_BASE);
+    c->ldtr_arbytes = __vmread(GUEST_LDTR_AR_BYTES);
+
+    c->sysenter_cs = __vmread(GUEST_SYSENTER_CS);
+    c->sysenter_esp = __vmread(GUEST_SYSENTER_ESP);
+    c->sysenter_eip = __vmread(GUEST_SYSENTER_EIP);
+
+    return 1;
+}
+
+int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
+{
+    unsigned long mfn, old_base_mfn;
+
+    vmx_vmcs_enter(v);
+
+    __vmwrite(GUEST_RIP, c->eip);
+    __vmwrite(GUEST_RSP, c->esp);
+    __vmwrite(GUEST_RFLAGS, c->eflags);
+
+    v->arch.hvm_vmx.cpu_shadow_cr0 = c->cr0;
+    __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
+
+#ifdef HVM_DEBUG_SUSPEND
+    printk("vmx_vmcs_restore: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
+            c->cr3,
+            c->cr0,
+            c->cr4);
+#endif
+
+    if (!vmx_paging_enabled(v)) {
+        printk("vmx_vmcs_restore: paging not enabled.");
+        goto skip_cr3;
+    }
+
+    if (c->cr3 == v->arch.hvm_vmx.cpu_cr3) {
+        /*
+         * This is simple TLB flush, implying the guest has
+         * removed some translation or changed page attributes.
+         * We simply invalidate the shadow.
+         */
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
+            goto bad_cr3;
+        }
+    } else {
+        /*
+         * If different, make a shadow. Check if the PDBR is valid
+         * first.
+         */
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
+        /* current!=vcpu as not called by arch_vmx_do_launch */
+        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
+            goto bad_cr3;
+        }
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
+        if (old_base_mfn)
+             put_page(mfn_to_page(old_base_mfn));
+        /*
+         * arch.shadow_table should now hold the next CR3 for shadow
+         */
+        v->arch.hvm_vmx.cpu_cr3 = c->cr3;
+    }
+
+ skip_cr3:
+#if defined(__x86_64__)
+    if (vmx_long_mode_enabled(v)) {
+        unsigned long vm_entry_value;
+        vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
+        vm_entry_value |= VM_ENTRY_IA32E_MODE;
+        __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
+    }
+#endif
+
+    __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
+    v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
+    __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
+
+    __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
+    __vmwrite(GUEST_IDTR_BASE, c->idtr_base);
+
+    __vmwrite(GUEST_GDTR_LIMIT, c->gdtr_limit);
+    __vmwrite(GUEST_GDTR_BASE, c->gdtr_base);
+
+    __vmwrite(GUEST_CS_SELECTOR, c->cs_sel);
+    __vmwrite(GUEST_CS_LIMIT, c->cs_limit);
+    __vmwrite(GUEST_CS_BASE, c->cs_base);
+    __vmwrite(GUEST_CS_AR_BYTES, c->cs_arbytes);
+
+    __vmwrite(GUEST_DS_SELECTOR, c->ds_sel);
+    __vmwrite(GUEST_DS_LIMIT, c->ds_limit);
+    __vmwrite(GUEST_DS_BASE, c->ds_base);
+    __vmwrite(GUEST_DS_AR_BYTES, c->ds_arbytes);
+
+    __vmwrite(GUEST_ES_SELECTOR, c->es_sel);
+    __vmwrite(GUEST_ES_LIMIT, c->es_limit);
+    __vmwrite(GUEST_ES_BASE, c->es_base);
+    __vmwrite(GUEST_ES_AR_BYTES, c->es_arbytes);
+
+    __vmwrite(GUEST_SS_SELECTOR, c->ss_sel);
+    __vmwrite(GUEST_SS_LIMIT, c->ss_limit);
+    __vmwrite(GUEST_SS_BASE, c->ss_base);
+    __vmwrite(GUEST_SS_AR_BYTES, c->ss_arbytes);
+
+    __vmwrite(GUEST_FS_SELECTOR, c->fs_sel);
+    __vmwrite(GUEST_FS_LIMIT, c->fs_limit);
+    __vmwrite(GUEST_FS_BASE, c->fs_base);
+    __vmwrite(GUEST_FS_AR_BYTES, c->fs_arbytes);
+
+    __vmwrite(GUEST_GS_SELECTOR, c->gs_sel);
+    __vmwrite(GUEST_GS_LIMIT, c->gs_limit);
+    __vmwrite(GUEST_GS_BASE, c->gs_base);
+    __vmwrite(GUEST_GS_AR_BYTES, c->gs_arbytes);
+
+    __vmwrite(GUEST_TR_SELECTOR, c->tr_sel);
+    __vmwrite(GUEST_TR_LIMIT, c->tr_limit);
+    __vmwrite(GUEST_TR_BASE, c->tr_base);
+    __vmwrite(GUEST_TR_AR_BYTES, c->tr_arbytes);
+
+    __vmwrite(GUEST_LDTR_SELECTOR, c->ldtr_sel);
+    __vmwrite(GUEST_LDTR_LIMIT, c->ldtr_limit);
+    __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
+    __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes);
+
+    __vmwrite(GUEST_SYSENTER_CS, c->sysenter_cs);
+    __vmwrite(GUEST_SYSENTER_ESP, c->sysenter_esp);
+    __vmwrite(GUEST_SYSENTER_EIP, c->sysenter_eip);
+
+    vmx_vmcs_exit(v);
+
+    shadow_update_paging_modes(v);
+    return 0;
+
+ bad_cr3:
+    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"", c->cr3);
+    vmx_vmcs_exit(v);
+    return -EINVAL;
+}
+
+#ifdef HVM_DEBUG_SUSPEND
+static void dump_msr_state(struct vmx_msr_state *m)
+{
+    int i = 0;
+    printk("**** msr state ****\n");
+    printk("shadow_gs=0x%lx, flags=0x%lx, msr_items:", m->shadow_gs, m->flags);
+    for (i = 0; i < VMX_MSR_COUNT; i++)
+        printk("0x%lx,", m->msrs[i]);
+    printk("\n");
+}
+#else
+static void dump_msr_state(struct vmx_msr_state *m)
+{
+}
+#endif
+        
+void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+{
+    struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
+    unsigned long guest_flags = guest_state->flags;
+    int i = 0;
+
+    data->shadow_gs = guest_state->shadow_gs;
+    data->vmxassist_enabled = v->arch.hvm_vmx.vmxassist_enabled;
+    /* save msrs */
+    data->flags = guest_flags;
+    for (i = 0; i < VMX_MSR_COUNT; i++)
+        data->msr_items[i] = guest_state->msrs[i];
+    
+    data->tsc = hvm_get_guest_time(v);
+    
+    dump_msr_state(guest_state);
+}
+
+void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+{
+    int i = 0;
+    struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
+
+    /* restore msrs */
+    guest_state->flags = data->flags;
+    for (i = 0; i < VMX_MSR_COUNT; i++)
+        guest_state->msrs[i] = data->msr_items[i];
+
+    guest_state->shadow_gs = data->shadow_gs;
+
+    /*XXX:no need to restore msrs, current!=vcpu as not called by arch_vmx_do_launch */
+/*    vmx_restore_guest_msrs(v);*/
+
+    v->arch.hvm_vmx.vmxassist_enabled = data->vmxassist_enabled;
+
+    hvm_set_guest_time(v, data->tsc);
+
+    dump_msr_state(guest_state);
+}
+
+
+void vmx_save_vmcs_ctxt(hvm_domain_context_t *h, void *opaque)
+{
+    struct vcpu *v = opaque;
+    struct hvm_hw_cpu ctxt;
+
+    vmx_save_cpu_state(v, &ctxt);
+    vmx_vmcs_enter(v);
+    vmx_vmcs_save(v, &ctxt);
+    vmx_vmcs_exit(v);
+
+    hvm_put_struct(h, &ctxt);
+}
+
+int vmx_load_vmcs_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+{
+    struct vcpu *v = opaque;
+    struct hvm_hw_cpu ctxt;
+
+    if (version != 1)
+        return -EINVAL;
+
+    hvm_get_struct(h, &ctxt);
+    vmx_load_cpu_state(v, &ctxt);
+    if (vmx_vmcs_restore(v, &ctxt)) {
+        printk("vmx_vmcs restore failed!\n");
+        domain_crash(v->domain);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 
 /*
@@ -710,9 +1011,6 @@ static void vmx_inject_exception(
 /* Setup HVM interfaces */
 static void vmx_setup_hvm_funcs(void)
 {
-    if ( hvm_enabled )
-        return;
-
     hvm_funcs.disable = stop_vmx;
 
     hvm_funcs.vcpu_initialise = vmx_vcpu_initialise;
@@ -720,6 +1018,9 @@ static void vmx_setup_hvm_funcs(void)
 
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
+
+    hvm_funcs.save_cpu_ctxt = vmx_save_vmcs_ctxt;
+    hvm_funcs.load_cpu_ctxt = vmx_load_vmcs_ctxt;
 
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
@@ -800,7 +1101,7 @@ int start_vmx(void)
 
     vmx_setup_hvm_funcs();
 
-    hvm_enabled = 1;
+    hvm_enable();
 
     return 1;
 }
@@ -2005,7 +2306,7 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
         msr_content = __vmread(GUEST_SYSENTER_EIP);
         break;
     case MSR_IA32_APICBASE:
-        msr_content = vcpu_vlapic(v)->apic_base_msr;
+        msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
     default:
         if ( long_mode_do_msr_read(regs) )

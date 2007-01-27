@@ -47,7 +47,6 @@
 #include <linux/hdreg.h>
 #include <linux/blkdev.h>
 #include <linux/major.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <xen/gnttab.h>

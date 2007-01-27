@@ -35,9 +35,9 @@
 #include <asm/hvm/support.h>
 
 #define vpic_domain(v) (container_of((v), struct domain, \
-                        arch.hvm_domain.irq.vpic[!vpic->is_master]))
-#define __vpic_lock(v) &container_of((v), struct hvm_irq, \
-                                     vpic[!(v)->is_master])->lock
+                        arch.hvm_domain.vpic[!vpic->is_master]))
+#define __vpic_lock(v) &container_of((v), struct hvm_domain, \
+                                        vpic[!(v)->is_master])->irq_lock
 #define vpic_lock(v)   spin_lock(__vpic_lock(v))
 #define vpic_unlock(v) spin_unlock(__vpic_lock(v))
 #define vpic_is_locked(v) spin_is_locked(__vpic_lock(v))
@@ -45,7 +45,7 @@
 
 /* Return the highest priority found in mask. Return 8 if none. */
 #define VPIC_PRIO_NONE 8
-static int vpic_get_priority(struct vpic *vpic, uint8_t mask)
+static int vpic_get_priority(struct hvm_hw_vpic *vpic, uint8_t mask)
 {
     int prio;
 
@@ -61,7 +61,7 @@ static int vpic_get_priority(struct vpic *vpic, uint8_t mask)
 }
 
 /* Return the PIC's highest priority pending interrupt. Return -1 if none. */
-static int vpic_get_highest_priority_irq(struct vpic *vpic)
+static int vpic_get_highest_priority_irq(struct hvm_hw_vpic *vpic)
 {
     int cur_priority, priority, irq;
     uint8_t mask;
@@ -92,7 +92,7 @@ static int vpic_get_highest_priority_irq(struct vpic *vpic)
     return (priority < cur_priority) ? irq : -1;
 }
 
-static void vpic_update_int_output(struct vpic *vpic)
+static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
 {
     int irq;
 
@@ -129,7 +129,7 @@ static void vpic_update_int_output(struct vpic *vpic)
     }
 }
 
-static void __vpic_intack(struct vpic *vpic, int irq)
+static void __vpic_intack(struct hvm_hw_vpic *vpic, int irq)
 {
     uint8_t mask = 1 << irq;
 
@@ -147,7 +147,7 @@ static void __vpic_intack(struct vpic *vpic, int irq)
     vpic_update_int_output(vpic);
 }
 
-static int vpic_intack(struct vpic *vpic)
+static int vpic_intack(struct hvm_hw_vpic *vpic)
 {
     int irq = -1;
 
@@ -174,7 +174,7 @@ static int vpic_intack(struct vpic *vpic)
     return irq;
 }
 
-static void vpic_ioport_write(struct vpic *vpic, uint32_t addr, uint32_t val)
+static void vpic_ioport_write(struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t val)
 {
     int priority, cmd, irq;
     uint8_t mask;
@@ -291,7 +291,7 @@ static void vpic_ioport_write(struct vpic *vpic, uint32_t addr, uint32_t val)
     vpic_unlock(vpic);
 }
 
-static uint32_t vpic_ioport_read(struct vpic *vpic, uint32_t addr)
+static uint32_t vpic_ioport_read(struct hvm_hw_vpic *vpic, uint32_t addr)
 {
     if ( vpic->poll )
     {
@@ -307,7 +307,7 @@ static uint32_t vpic_ioport_read(struct vpic *vpic, uint32_t addr)
 
 static int vpic_intercept_pic_io(ioreq_t *p)
 {
-    struct vpic *vpic;
+    struct hvm_hw_vpic *vpic;
     uint32_t data;
 
     if ( (p->size != 1) || (p->count != 1) )
@@ -316,7 +316,7 @@ static int vpic_intercept_pic_io(ioreq_t *p)
         return 1;
     }
 
-    vpic = &current->domain->arch.hvm_domain.irq.vpic[p->addr >> 7];
+    vpic = &current->domain->arch.hvm_domain.vpic[p->addr >> 7];
 
     if ( p->dir == IOREQ_WRITE )
     {
@@ -340,7 +340,7 @@ static int vpic_intercept_pic_io(ioreq_t *p)
 
 static int vpic_intercept_elcr_io(ioreq_t *p)
 {
-    struct vpic *vpic;
+    struct hvm_hw_vpic *vpic;
     uint32_t data;
 
     if ( (p->size != 1) || (p->count != 1) )
@@ -349,7 +349,7 @@ static int vpic_intercept_elcr_io(ioreq_t *p)
         return 1;
     }
 
-    vpic = &current->domain->arch.hvm_domain.irq.vpic[p->addr & 1];
+    vpic = &current->domain->arch.hvm_domain.vpic[p->addr & 1];
 
     if ( p->dir == IOREQ_WRITE )
     {
@@ -378,28 +378,77 @@ static int vpic_intercept_elcr_io(ioreq_t *p)
     return 1;
 }
 
+#ifdef HVM_DEBUG_SUSPEND
+static void vpic_info(struct hvm_hw_vpic *s)
+{
+    printk("*****pic state:*****\n");
+    printk("pic 0x%x.\n", s->irr);
+    printk("pic 0x%x.\n", s->imr);
+    printk("pic 0x%x.\n", s->isr);
+    printk("pic 0x%x.\n", s->irq_base);
+    printk("pic 0x%x.\n", s->init_state);
+    printk("pic 0x%x.\n", s->priority_add);
+    printk("pic 0x%x.\n", s->readsel_isr);
+    printk("pic 0x%x.\n", s->poll);
+    printk("pic 0x%x.\n", s->auto_eoi);
+    printk("pic 0x%x.\n", s->rotate_on_auto_eoi);
+    printk("pic 0x%x.\n", s->special_fully_nested_mode);
+    printk("pic 0x%x.\n", s->special_mask_mode);
+    printk("pic 0x%x.\n", s->elcr);
+    printk("pic 0x%x.\n", s->int_output);
+    printk("pic 0x%x.\n", s->is_master);
+}
+#else
+static void vpic_info(struct hvm_hw_vpic *s)
+{
+}
+#endif
+
+static void vpic_save(hvm_domain_context_t *h, void *opaque)
+{
+    struct hvm_hw_vpic *s = opaque;
+    
+    vpic_info(s);
+    hvm_put_struct(h, s);
+}
+
+static int vpic_load(hvm_domain_context_t *h, void *opaque, int version_id)
+{
+    struct hvm_hw_vpic *s = opaque;
+    
+    if (version_id != 1)
+        return -EINVAL;
+
+    hvm_get_struct(h, s);
+    vpic_info(s);
+
+    return 0;
+}
+
 void vpic_init(struct domain *d)
 {
-    struct vpic *vpic;
+    struct hvm_hw_vpic *vpic;
 
     /* Master PIC. */
-    vpic = &d->arch.hvm_domain.irq.vpic[0];
+    vpic = &d->arch.hvm_domain.vpic[0];
     memset(vpic, 0, sizeof(*vpic));
     vpic->is_master = 1;
     vpic->elcr      = 1 << 2;
+    hvm_register_savevm(d, "xen_hvm_i8259", 0x20, 1, vpic_save, vpic_load, vpic);
     register_portio_handler(d, 0x20, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0x4d0, 1, vpic_intercept_elcr_io);
 
     /* Slave PIC. */
     vpic++;
     memset(vpic, 0, sizeof(*vpic));
+    hvm_register_savevm(d, "xen_hvm_i8259", 0xa0, 1, vpic_save, vpic_load, vpic);
     register_portio_handler(d, 0xa0, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0x4d1, 1, vpic_intercept_elcr_io);
 }
 
 void vpic_irq_positive_edge(struct domain *d, int irq)
 {
-    struct vpic *vpic = &d->arch.hvm_domain.irq.vpic[irq >> 3];
+    struct hvm_hw_vpic *vpic = &d->arch.hvm_domain.vpic[irq >> 3];
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(irq <= 15);
@@ -415,7 +464,7 @@ void vpic_irq_positive_edge(struct domain *d, int irq)
 
 void vpic_irq_negative_edge(struct domain *d, int irq)
 {
-    struct vpic *vpic = &d->arch.hvm_domain.irq.vpic[irq >> 3];
+    struct hvm_hw_vpic *vpic = &d->arch.hvm_domain.vpic[irq >> 3];
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(irq <= 15);
@@ -432,7 +481,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
 int cpu_get_pic_interrupt(struct vcpu *v, int *type)
 {
     int irq, vector;
-    struct vpic *vpic = &v->domain->arch.hvm_domain.irq.vpic[0];
+    struct hvm_hw_vpic *vpic = &v->domain->arch.hvm_domain.vpic[0];
 
     if ( !vlapic_accept_pic_intr(v) || !vpic->int_output )
         return -1;

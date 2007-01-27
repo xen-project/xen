@@ -1,0 +1,20 @@
+diff -pruN ../orig-linux-2.6.18/arch/x86_64/kernel/vmlinux.lds.S ./arch/x86_64/kernel/vmlinux.lds.S
+--- ../orig-linux-2.6.18/arch/x86_64/kernel/vmlinux.lds.S	2007-01-12 18:20:02.000000000 +0000
++++ ./arch/x86_64/kernel/vmlinux.lds.S	2007-01-12 18:20:20.000000000 +0000
+@@ -17,6 +17,7 @@ PHDRS {
+ 	text PT_LOAD FLAGS(5);	/* R_E */
+ 	data PT_LOAD FLAGS(7);	/* RWE */
+ 	user PT_LOAD FLAGS(7);	/* RWE */
++	data.init PT_LOAD FLAGS(7);	/* RWE */
+ 	note PT_NOTE FLAGS(4);	/* R__ */
+ }
+ SECTIONS
+@@ -131,7 +132,7 @@ SECTIONS
+   . = ALIGN(8192);		/* init_task */
+   .data.init_task : AT(ADDR(.data.init_task) - LOAD_OFFSET) {
+ 	*(.data.init_task)
+-  } :data
++  }:data.init
+ 
+   . = ALIGN(4096);
+   .data.page_aligned : AT(ADDR(.data.page_aligned) - LOAD_OFFSET) {

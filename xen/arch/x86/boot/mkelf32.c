@@ -25,7 +25,7 @@
 #define s16 int16_t
 #define s32 int32_t
 #define s64 int64_t
-#include "../../../include/xen/elf.h"
+#include "../../../include/public/elfstructs.h"
 
 #define DYNAMICALLY_FILLED   0
 #define RAW_OFFSET         128

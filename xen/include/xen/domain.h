@@ -12,16 +12,13 @@ struct vcpu *alloc_vcpu(
 int boot_vcpu(
     struct domain *d, int vcpuid, vcpu_guest_context_u ctxt);
 struct vcpu *alloc_idle_vcpu(unsigned int cpu_id);
+int vcpu_reset(struct vcpu *v);
 
 struct domain *alloc_domain(domid_t domid);
 void free_domain(struct domain *d);
 
 struct xen_domctl_getdomaininfo;
-void getdomaininfo(
-    struct domain *d, struct xen_domctl_getdomaininfo *info);
-struct compat_domctl_getdomaininfo;
-void compat_getdomaininfo(
-    struct domain *d, struct compat_domctl_getdomaininfo *info);
+void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
 
 /*
  * Arch-specifics.
@@ -55,5 +52,7 @@ void dump_pageframe_info(struct domain *d);
 void arch_dump_vcpu_info(struct vcpu *v);
 
 void arch_dump_domain_info(struct domain *d);
+
+int arch_vcpu_reset(struct vcpu *v);
 
 #endif /* __XEN_DOMAIN_H__ */

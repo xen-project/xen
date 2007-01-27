@@ -14,7 +14,6 @@
  *	Mikael Pettersson	:	PM converted to driver model.
  */
 
-#include <linux/config.h>
 #include <linux/init.h>
 
 #include <linux/mm.h>
@@ -194,5 +193,5 @@ int __init APIC_init_uniprocessor (void)
 			setup_IO_APIC();
 #endif
 
-	return 0;
+	return 1;
 }

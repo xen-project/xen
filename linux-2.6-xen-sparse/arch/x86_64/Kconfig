@@ -24,6 +24,14 @@ config X86
 	bool
 	default y
 
+config LOCKDEP_SUPPORT
+	bool
+	default y
+
+config STACKTRACE_SUPPORT
+	bool
+	default y
+
 config SEMAPHORE_SLEEPERS
 	bool
 	default y
@@ -44,6 +52,10 @@ config RWSEM_GENERIC_SPINLOCK
 
 config RWSEM_XCHGADD_ALGORITHM
 	bool
+
+config GENERIC_HWEIGHT
+	bool
+	default y
 
 config GENERIC_CALIBRATE_DELAY
 	bool
@@ -70,6 +82,10 @@ config ARCH_MAY_HAVE_PC_FDC
 	default y
 
 config DMI
+	bool
+	default y
+
+config AUDIT_ARCH
 	bool
 	default y
 
@@ -147,6 +163,11 @@ config X86_L1_CACHE_SHIFT
 	int
 	default "7" if GENERIC_CPU || MPSC
 	default "6" if MK8
+
+config X86_INTERNODE_CACHE_BYTES
+	int
+	default "4096" if X86_VSMP
+	default X86_L1_CACHE_BYTES if !X86_VSMP
 
 config X86_TSC
 	bool
@@ -271,6 +292,15 @@ config SCHED_SMT
 	  cost of slightly increased overhead in some places. If unsure say
 	  N here.
 
+config SCHED_MC
+	bool "Multi-core scheduler support"
+	depends on SMP && !X86_64_XEN
+	default y
+	help
+	  Multi-core scheduler support improves the CPU scheduler's decision
+	  making when dealing with multi-core CPU chips at a cost of slightly
+	  increased overhead in some places. If unsure say N here.
+
 source "kernel/Kconfig.preempt"
 
 config NUMA
@@ -295,12 +325,18 @@ config K8_NUMA
 	 Northbridge of Opteron. It is recommended to use X86_64_ACPI_NUMA
 	 instead, which also takes priority if both are compiled in.   
 
+config NODES_SHIFT
+	int
+	default "6"
+	depends on NEED_MULTIPLE_NODES
+
 # Dummy CONFIG option to select ACPI_NUMA from drivers/acpi/Kconfig.
 
 config X86_64_ACPI_NUMA
        bool "ACPI NUMA detection"
        depends on NUMA
        select ACPI 
+	select PCI
        select ACPI_NUMA
        default y
        help
@@ -346,9 +382,13 @@ config HAVE_ARCH_EARLY_PFN_TO_NID
 	def_bool y
 	depends on NUMA
 
+config OUT_OF_LINE_PFN_TO_PAGE
+	def_bool y
+	depends on DISCONTIGMEM
+
 config NR_CPUS
 	int "Maximum number of CPUs (2-256)"
-	range 2 256
+	range 2 255
 	depends on SMP
 	default "16" if X86_64_XEN
 	default "8"
@@ -387,25 +427,47 @@ config HPET_EMULATE_RTC
 	bool "Provide RTC interrupt"
 	depends on HPET_TIMER && RTC=y
 
-config GART_IOMMU
-	bool "K8 GART IOMMU support"
+# Mark as embedded because too many people got it wrong.
+# The code disables itself when not needed.
+config IOMMU
+	bool "IOMMU support" if EMBEDDED
 	default y
 	select SWIOTLB
+	select AGP
 	depends on PCI && !X86_64_XEN
 	help
-	  Support the IOMMU. Needed to run systems with more than 3GB of memory
-	  properly with 32-bit PCI devices that do not support DAC (Double Address
-	  Cycle). The IOMMU can be turned off at runtime with the iommu=off parameter.
-	  Normally the kernel will take the right choice by itself.
-	  This option includes a driver for the AMD Opteron/Athlon64 northbridge IOMMU
-	  and a software emulation used on other systems.
+	  Support for full DMA access of devices with 32bit memory access only
+	  on systems with more than 3GB. This is usually needed for USB,
+	  sound, many IDE/SATA chipsets and some other devices.
+	  Provides a driver for the AMD Athlon64/Opteron/Turion/Sempron GART
+	  based IOMMU and a software bounce buffer based IOMMU used on Intel
+	  systems and as fallback.
+	  The code is only active when needed (enough memory and limited
+	  device) unless CONFIG_IOMMU_DEBUG or iommu=force is specified
+	  too.
+
+config CALGARY_IOMMU
+	bool "IBM Calgary IOMMU support"
+	default y
+	select SWIOTLB
+	depends on PCI && EXPERIMENTAL
+	help
+	  Support for hardware IOMMUs in IBM's xSeries x366 and x460
+	  systems. Needed to run systems with more than 3GB of memory
+	  properly with 32-bit PCI devices that do not support DAC
+	  (Double Address Cycle). Calgary also supports bus level
+	  isolation, where all DMAs pass through the IOMMU.  This
+	  prevents them from going anywhere except their intended
+	  destination. This catches hard-to-find kernel bugs and
+	  mis-behaving drivers and devices that do not use the DMA-API
+	  properly to set up their DMA buffers.  The IOMMU can be
+	  turned off at boot time with the iommu=off parameter.
+	  Normally the kernel will make the right choice by itself.
 	  If unsure, say Y.
 
-# need this always enabled with GART_IOMMU for the VIA workaround
+# need this always selected by IOMMU for the VIA workaround
 config SWIOTLB
 	bool
-	default y
-	depends on GART_IOMMU
 
 config X86_MCE
 	bool "Machine check support" if EMBEDDED
@@ -439,10 +501,10 @@ config KEXEC
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
-	  but it is indepedent of the system firmware.   And like a reboot
+	  but it is independent of the system firmware.   And like a reboot
 	  you can start any kernel with it, not just Linux.
 
-	  The name comes from the similiarity to the exec system call.
+	  The name comes from the similarity to the exec system call.
 
 	  It is an ongoing process to be certain the hardware in a machine
 	  is properly shutdown, so do not be surprised if this code does not
@@ -459,10 +521,10 @@ config CRASH_DUMP
 config PHYSICAL_START
 	hex "Physical address where the kernel is loaded" if (EMBEDDED || CRASH_DUMP)
 	default "0x1000000" if CRASH_DUMP
-	default "0x100000"
+	default "0x200000"
 	help
 	  This gives the physical address where the kernel is loaded. Normally
-	  for regular kernels this value is 0x100000 (1MB). But in the case
+	  for regular kernels this value is 0x200000 (2MB). But in the case
 	  of kexec on panic the fail safe kernel needs to run at a different
 	  address than the panic-ed kernel. This option is used to set the load
 	  address for kernels used to capture crash dump on being kexec'ed
@@ -493,6 +555,18 @@ config SECCOMP
 	  If unsure, say Y. Only embedded should say N here.
 
 source kernel/Kconfig.hz
+
+config REORDER
+	bool "Function reordering"
+	default n
+	help
+         This option enables the toolchain to reorder functions for a more 
+         optimal TLB usage. If you have pretty much any version of binutils, 
+	 this can increase your kernel build time by roughly one minute.
+
+config K8_NB
+	def_bool y
+	depends on AGP_AMD64 || IOMMU || (PCI && NUMA)
 
 endmenu
 
@@ -559,16 +633,6 @@ config XEN_PCIDEV_FE_DEBUG
 	default n
 	help
 	  Enables some debug statements within the PCI Frontend.
-
-config UNORDERED_IO
-       bool "Unordered IO mapping access"
-       depends on EXPERIMENTAL
-       help
-         Use unordered stores to access IO memory mappings in device drivers.
-	 Still very experimental. When a driver works on IA64/ppc64/pa-risc it should
-	 work with this option, but it makes the drivers behave differently
-	 from i386. Requires that the driver writer used memory barriers
-	 properly.
 
 source "drivers/pci/pcie/Kconfig"
 

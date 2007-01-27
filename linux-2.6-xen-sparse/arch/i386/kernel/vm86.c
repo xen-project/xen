@@ -31,7 +31,6 @@
  */
 
 #include <linux/capability.h>
-#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -324,7 +323,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 
 	/*call audit_syscall_exit since we do not exit via the normal paths */
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, AUDITSC_RESULT(eax), eax);
+		audit_syscall_exit(AUDITSC_RESULT(eax), eax);
 
 	__asm__ __volatile__(
 		"movl %0,%%esp\n\t"

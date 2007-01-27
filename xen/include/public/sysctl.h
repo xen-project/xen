@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000002
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000003
 
 /*
  * Read console content from Xen buffer ring.
@@ -43,7 +43,7 @@
 struct xen_sysctl_readconsole {
     /* IN variables. */
     uint32_t clear;                /* Non-zero -> clear after reading. */
-    XEN_GUEST_HANDLE(char) buffer; /* Buffer start */
+    XEN_GUEST_HANDLE_64(char) buffer; /* Buffer start */
     /* IN/OUT variables. */
     uint32_t count;            /* In: Buffer size;  Out: Used buffer size  */
 };
@@ -65,7 +65,7 @@ struct xen_sysctl_tbuf_op {
     struct xenctl_cpumap cpu_mask;
     uint32_t             evt_mask;
     /* OUT variables */
-    uint64_t buffer_mfn;
+    uint64_aligned_t buffer_mfn;
     uint32_t size;
 };
 typedef struct xen_sysctl_tbuf_op xen_sysctl_tbuf_op_t;
@@ -81,9 +81,9 @@ struct xen_sysctl_physinfo {
     uint32_t sockets_per_node;
     uint32_t nr_nodes;
     uint32_t cpu_khz;
-    uint64_t total_pages;
-    uint64_t free_pages;
-    uint64_t scrub_pages;
+    uint64_aligned_t total_pages;
+    uint64_aligned_t free_pages;
+    uint64_aligned_t scrub_pages;
     uint32_t hw_cap[8];
 };
 typedef struct xen_sysctl_physinfo xen_sysctl_physinfo_t;
@@ -121,9 +121,9 @@ struct xen_sysctl_perfc_op {
     uint32_t       nr_counters;       /*  number of counters description  */
     uint32_t       nr_vals;           /*  number of values  */
     /* counter information (or NULL) */
-    XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc;
+    XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc;
     /* counter values (or NULL) */
-    XEN_GUEST_HANDLE(xen_sysctl_perfc_val_t) val;
+    XEN_GUEST_HANDLE_64(xen_sysctl_perfc_val_t) val;
 };
 typedef struct xen_sysctl_perfc_op xen_sysctl_perfc_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_op_t);
@@ -133,7 +133,7 @@ struct xen_sysctl_getdomaininfolist {
     /* IN variables. */
     domid_t               first_domain;
     uint32_t              max_domains;
-    XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t) buffer;
+    XEN_GUEST_HANDLE_64(xen_domctl_getdomaininfo_t) buffer;
     /* OUT variables. */
     uint32_t              num_domains;
 };

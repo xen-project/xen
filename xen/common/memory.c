@@ -242,7 +242,7 @@ static long translate_gpfn_list(
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = find_domain_by_id(op.domid)) == NULL )
+    if ( (d = get_domain_by_id(op.domid)) == NULL )
         return -ESRCH;
 
     if ( !shadow_mode_translate(d) )
@@ -543,7 +543,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         if ( likely(reservation.domid == DOMID_SELF) )
             d = current->domain;
         else if ( !IS_PRIV(current->domain) ||
-                  ((d = find_domain_by_id(reservation.domid)) == NULL) )
+                  ((d = get_domain_by_id(reservation.domid)) == NULL) )
             return start_extent;
         args.domain = d;
 
@@ -589,7 +589,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             d = current->domain;
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = find_domain_by_id(domid)) == NULL )
+        else if ( (d = get_domain_by_id(domid)) == NULL )
             return -ESRCH;
 
         rc = (op == XENMEM_current_reservation) ? d->tot_pages : d->max_pages;

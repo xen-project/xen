@@ -54,7 +54,7 @@
 // if dmi_res is non-null, then return a pointer to new object.
 // Also, this does not fill in the measurements. They should be filled by
 // design dependent code or saveNVM
-TPM_RESULT init_dmi(UINT32 dmi_id, BYTE type,  VTPM_DMI_RESOURCE **dmi_res) {
+TPM_RESULT init_dmi(UINT32 dmi_id, BYTE dmi_type, VTPM_DMI_RESOURCE **dmi_res) {
 
   TPM_RESULT status=TPM_SUCCESS;
   VTPM_DMI_RESOURCE *new_dmi=NULL;
@@ -66,6 +66,7 @@ TPM_RESULT init_dmi(UINT32 dmi_id, BYTE type,  VTPM_DMI_RESOURCE **dmi_res) {
   }
   memset(new_dmi, 0, sizeof(VTPM_DMI_RESOURCE));
   new_dmi->dmi_id = dmi_id;
+  new_dmi->dmi_type = dmi_type;
   new_dmi->connected = FALSE;
   new_dmi->TCSContext = 0;
 
@@ -120,47 +121,46 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
   
   VTPM_DMI_RESOURCE *new_dmi=NULL;
   TPM_RESULT status=TPM_FAIL;
-  BYTE type, startup_mode;
+  BYTE dmi_type, vm_type, startup_mode;
   UINT32 dmi_id; 
 
   if (param_buf == NULL) { // Assume creation of Dom 0 control
-    type = VTPM_TYPE_NON_MIGRATABLE;
+    dmi_type = VTPM_TYPE_NON_MIGRATABLE;
     dmi_id = VTPM_CTL_DM;
-  } else if (buffer_len(param_buf) != sizeof(BYTE) + sizeof(BYTE) + sizeof(UINT32)) {
+  } else if (buffer_len(param_buf) != sizeof(BYTE) * 3  + sizeof(UINT32)) {
     vtpmloginfo(VTPM_LOG_VTPM, "New DMI command wrong length: %d.\n", buffer_len(param_buf));
     status = TPM_BAD_PARAMETER;
     goto abort_egress;
   } else {
     vtpm_globals->connected_dmis++; // Put this here so we don't count Dom0
-    BSG_UnpackList( param_buf->bytes, 3,
-		    BSG_TYPE_BYTE, &type,
+    BSG_UnpackList( param_buf->bytes, 4,
+		    BSG_TYPE_BYTE, &dmi_type,
 		    BSG_TYPE_BYTE, &startup_mode,
+		    BSG_TYPE_BYTE, &vm_type,
 		    BSG_TYPE_UINT32,  &dmi_id);
+  }
+
+  if ((dmi_type != VTPM_TYPE_NON_MIGRATABLE) && (dmi_type != VTPM_TYPE_MIGRATABLE)) {
+    vtpmlogerror(VTPM_LOG_VTPM, "Creation of VTPM with illegal type.\n");
+    status = TPM_BAD_PARAMETER;
+    goto abort_egress;
   }
 
   new_dmi = (VTPM_DMI_RESOURCE *) hashtable_search(vtpm_globals->dmi_map, &dmi_id);
   if (new_dmi == NULL) { 
     vtpmloginfo(VTPM_LOG_VTPM, "Creating new DMI instance %d attached.\n", dmi_id );
     // Brand New DMI. Initialize the persistent pieces
-    TPMTRYRETURN(init_dmi(dmi_id, type, &new_dmi) );  
+    TPMTRYRETURN(init_dmi(dmi_id, dmi_type, &new_dmi) );  
   } else 
     vtpmloginfo(VTPM_LOG_VTPM, "Re-attaching DMI instance %d.\n", dmi_id);
 
-  if (type != VTPM_TYPE_MIGRATED) {
-    new_dmi->dmi_type = type;
-  } else {
-    vtpmlogerror(VTPM_LOG_VTPM, "Creation of VTPM with illegal type.\n");
-    status = TPM_BAD_PARAMETER;
-    goto abort_egress;
-  }
-  
   if (new_dmi->connected) {
     vtpmlogerror(VTPM_LOG_VTPM, "Attempt to re-attach, currently attached instance %d. Ignoring\n", dmi_id);
     status = TPM_BAD_PARAMETER;
     goto abort_egress;
   }
   
-  if (type == VTPM_TYPE_MIGRATED) {
+  if (new_dmi->dmi_type == VTPM_TYPE_MIGRATED) {
     vtpmlogerror(VTPM_LOG_VTPM, "Attempt to re-attach previously migrated instance %d without recovering first. Ignoring\n", dmi_id);
     status = TPM_BAD_PARAMETER;
     goto abort_egress;
@@ -173,7 +173,7 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
 
   // Design specific new DMI code. 
   // Includes: create IPCs, Measuring DMI, and maybe launching DMI
-  status = VTPM_New_DMI_Extra(new_dmi, startup_mode);
+  TPMTRYRETURN(VTPM_New_DMI_Extra(new_dmi, vm_type, startup_mode) );
   goto egress;
   
  abort_egress:

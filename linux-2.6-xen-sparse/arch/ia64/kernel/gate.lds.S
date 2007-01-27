@@ -4,7 +4,6 @@
  * in one page).  This script controls its layout.
  */
 
-#include <linux/config.h>
 
 #include <asm/system.h>
 
@@ -74,6 +73,7 @@ SECTIONS
 	*(.dynbss)
 	*(.bss .bss.* .gnu.linkonce.b.*)
 	*(__ex_table)
+	*(__mca_table)
   }
 }
 

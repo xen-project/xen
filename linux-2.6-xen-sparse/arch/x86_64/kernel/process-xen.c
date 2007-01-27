@@ -10,7 +10,6 @@
  *	Andi Kleen.
  *
  *	CPU hotplug support - ashok.raj@intel.com
- *  $Id: process.c,v 1.38 2002/01/15 10:08:03 ak Exp $
  * 
  *  Jun Nakajima <jun.nakajima@intel.com> 
  *     Modified for Xen
@@ -38,8 +37,8 @@
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
 #include <linux/random.h>
-#include <linux/kprobes.h>
 #include <linux/notifier.h>
+#include <linux/kprobes.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -73,26 +72,20 @@ EXPORT_SYMBOL(boot_option_idle_override);
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void);
+EXPORT_SYMBOL(pm_idle);
 static DEFINE_PER_CPU(unsigned int, cpu_idle_state);
 
-static struct notifier_block *idle_notifier;
-static DEFINE_SPINLOCK(idle_notifier_lock);
+static ATOMIC_NOTIFIER_HEAD(idle_notifier);
 
 void idle_notifier_register(struct notifier_block *n)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&idle_notifier_lock, flags);
-	notifier_chain_register(&idle_notifier, n);
-	spin_unlock_irqrestore(&idle_notifier_lock, flags);
+	atomic_notifier_chain_register(&idle_notifier, n);
 }
 EXPORT_SYMBOL_GPL(idle_notifier_register);
 
 void idle_notifier_unregister(struct notifier_block *n)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&idle_notifier_lock, flags);
-	notifier_chain_unregister(&idle_notifier, n);
-	spin_unlock_irqrestore(&idle_notifier_lock, flags);
+	atomic_notifier_chain_unregister(&idle_notifier, n);
 }
 EXPORT_SYMBOL(idle_notifier_unregister);
 
@@ -102,13 +95,13 @@ static DEFINE_PER_CPU(enum idle_state, idle_state) = CPU_NOT_IDLE;
 void enter_idle(void)
 {
 	__get_cpu_var(idle_state) = CPU_IDLE;
-	notifier_call_chain(&idle_notifier, IDLE_START, NULL);
+	atomic_notifier_call_chain(&idle_notifier, IDLE_START, NULL);
 }
 
 static void __exit_idle(void)
 {
 	__get_cpu_var(idle_state) = CPU_NOT_IDLE;
-	notifier_call_chain(&idle_notifier, IDLE_END, NULL);
+	atomic_notifier_call_chain(&idle_notifier, IDLE_END, NULL);
 }
 
 /* Called from interrupts to signify idle end */
@@ -145,10 +138,10 @@ static void xen_idle(void)
 	if (need_resched())
 		local_irq_enable();
 	else {
-		clear_thread_flag(TIF_POLLING_NRFLAG);
+		current_thread_info()->status &= ~TS_POLLING;
 		smp_mb__after_clear_bit();
 		safe_halt();
-		set_thread_flag(TIF_POLLING_NRFLAG);
+		current_thread_info()->status |= TS_POLLING;
 	}
 }
 
@@ -177,8 +170,7 @@ static inline void play_dead(void)
  */
 void cpu_idle (void)
 {
-	set_thread_flag(TIF_POLLING_NRFLAG);
-
+	current_thread_info()->status |= TS_POLLING;
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
@@ -265,7 +257,7 @@ void __show_regs(struct pt_regs * regs)
 		system_utsname.version);
 	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
 	printk_address(regs->rip); 
-	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp,
+	printk("RSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp,
 		regs->eflags);
 	printk("RAX: %016lx RBX: %016lx RCX: %016lx\n",
 	       regs->rax, regs->rbx, regs->rcx);
@@ -298,7 +290,7 @@ void show_regs(struct pt_regs *regs)
 {
 	printk("CPU %d:", smp_processor_id());
 	__show_regs(regs);
-	show_trace(&regs->rsp);
+	show_trace(NULL, regs, (void *)(regs + 1));
 }
 
 /*
@@ -308,13 +300,6 @@ void exit_thread(void)
 {
 	struct task_struct *me = current;
 	struct thread_struct *t = &me->thread;
-
-	/*
-	 * Remove function-return probe instances associated with this task
-	 * and put them back on the free list. Do not insert an exit probe for
-	 * this function, it will be disabled by kprobe_flush_task if you do.
-	 */
-	kprobe_flush_task(me);
 
 	if (me->thread.io_bitmap_ptr) { 
 #ifndef CONFIG_X86_NO_TSS
@@ -350,8 +335,11 @@ void flush_thread(void)
 	struct task_struct *tsk = current;
 	struct thread_info *t = current_thread_info();
 
-	if (t->flags & _TIF_ABI_PENDING)
+	if (t->flags & _TIF_ABI_PENDING) {
 		t->flags ^= (_TIF_ABI_PENDING | _TIF_IA32);
+		if (t->flags & _TIF_IA32)
+			current_thread_info()->status |= TS_COMPAT;
+	}
 
 	tsk->thread.debugreg0 = 0;
 	tsk->thread.debugreg1 = 0;
@@ -512,7 +500,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	 * multicall to indicate FPU task switch, rather than
 	 * synchronously trapping to Xen.
 	 * This must be here to ensure both math_state_restore() and
-	 * kernel_fpu_begin() work consistently.
+	 * kernel_fpu_begin() work consistently. 
 	 * The AMD workaround requires it to be after DS reload, or
 	 * after DS has been cleared, which we do in __prepare_arch_switch.
 	 */
@@ -591,7 +579,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		HYPERVISOR_set_segment_base(SEGBASE_GS_USER, next->gs); 
 
 	/* 
-	 * Switch the PDA context.
+	 * Switch the PDA and FPU contexts.
 	 */
 	prev->userrsp = read_pda(oldrsp); 
 	write_pda(oldrsp, next->userrsp); 
@@ -781,10 +769,16 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 	}
 	case ARCH_GET_GS: { 
 		unsigned long base;
+		unsigned gsindex;
 		if (task->thread.gsindex == GS_TLS_SEL)
 			base = read_32bit_tls(task, GS_TLS);
-		else if (doit)
-			rdmsrl(MSR_KERNEL_GS_BASE, base);
+		else if (doit) {
+ 			asm("movl %%gs,%0" : "=r" (gsindex));
+			if (gsindex)
+				rdmsrl(MSR_KERNEL_GS_BASE, base);
+			else
+				base = task->thread.gs;
+		}
 		else
 			base = task->thread.gs;
 		ret = put_user(base, (unsigned long __user *)addr); 

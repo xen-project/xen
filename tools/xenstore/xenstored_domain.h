@@ -32,6 +32,9 @@ void do_is_domain_introduced(struct connection *conn, const char *domid_str);
 void do_release(struct connection *conn, const char *domid_str);
 
 /* domid */
+void do_resume(struct connection *conn, const char *domid_str);
+
+/* domid */
 void do_get_domain_path(struct connection *conn, const char *domid_str);
 
 /* Returns the event channel handle */

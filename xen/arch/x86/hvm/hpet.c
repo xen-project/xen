@@ -142,9 +142,13 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn)
     stop_timer(&h->timers[tn]);
 }
 
+/* the number of HPET tick that stands for
+ * 1/(2^10) second, namely, 0.9765625 milliseconds */
+#define  HPET_TINY_TIME_SPAN  (h->tsc_freq >> 10)
+
 static void hpet_set_timer(HPETState *h, unsigned int tn)
 {
-    uint64_t tn_cmp, cur_tick;
+    uint64_t tn_cmp, cur_tick, diff;
 
     ASSERT(tn < HPET_TIMER_NUM);
     
@@ -167,11 +171,19 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
         cur_tick = (uint32_t)cur_tick;
     }
 
-    if ( (int64_t)(tn_cmp - cur_tick) > 0 )
-        set_timer(&h->timers[tn], NOW() +
-                  hpet_tick_to_ns(h, tn_cmp-cur_tick));
-    else
-        set_timer(&h->timers[tn], NOW());
+    diff = tn_cmp - cur_tick;
+
+    /*
+     * Detect time values set in the past. This is hard to do for 32-bit
+     * comparators as the timer does not have to be set that far in the future
+     * for the counter difference to wrap a 32-bit signed integer. We fudge
+     * by looking for a 'small' time value in the past.
+     */
+    if ( (int64_t)diff < 0 )
+        diff = (timer_is_32bit(h, tn) && (-diff > HPET_TINY_TIME_SPAN))
+            ? (uint32_t)diff : 0;
+
+    set_timer(&h->timers[tn], NOW() + hpet_tick_to_ns(h, diff));
 }
 
 static inline uint64_t hpet_fixup_reg(
@@ -302,7 +314,6 @@ static void hpet_route_interrupt(HPETState *h, unsigned int tn)
 {
     unsigned int tn_int_route = timer_int_route(h, tn);
     struct domain *d = h->vcpu->domain;
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
 
     if ( (tn <= 1) && (h->hpet.config & HPET_CFG_LEGACY) )
     {
@@ -324,9 +335,9 @@ static void hpet_route_interrupt(HPETState *h, unsigned int tn)
     }
 
     /* We only support edge-triggered interrupt now  */
-    spin_lock(&hvm_irq->lock);
+    spin_lock(&d->arch.hvm_domain.irq_lock);
     vioapic_irq_positive_edge(d, tn_int_route);
-    spin_unlock(&hvm_irq->lock);
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
 static void hpet_timer_fn(void *opaque)

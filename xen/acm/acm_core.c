@@ -276,7 +276,7 @@ int
 acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
 {
     struct acm_ssid_domain *ssid;
-    struct domain *subj = find_domain_by_id(id);
+    struct domain *subj = get_domain_by_id(id);
     int ret1, ret2;
  
     if (subj == NULL)

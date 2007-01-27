@@ -668,17 +668,7 @@ EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 
 void xs_suspend(void)
 {
-	struct xenbus_watch *watch;
-	char token[sizeof(watch) * 2 + 1];
-
 	down_write(&xs_state.suspend_mutex);
-
-	/* No need for watches_lock: the suspend_mutex is sufficient. */
-	list_for_each_entry(watch, &watches, list) {
-		sprintf(token, "%lX", (long)watch);
-		xs_unwatch(watch->node, token);
-	}
-
 	mutex_lock(&xs_state.request_mutex);
 }
 
@@ -695,6 +685,12 @@ void xs_resume(void)
 		xs_watch(watch->node, token);
 	}
 
+	up_write(&xs_state.suspend_mutex);
+}
+
+void xs_suspend_cancel(void)
+{
+	mutex_unlock(&xs_state.request_mutex);
 	up_write(&xs_state.suspend_mutex);
 }
 

@@ -40,6 +40,13 @@
 #define gfp_t unsigned
 #endif
 
+#if defined (_LINUX_NOTIFIER_H) && !defined ATOMIC_NOTIFIER_HEAD
+#define ATOMIC_NOTIFIER_HEAD(name) struct notifier_block *name
+#define atomic_notifier_chain_register(chain,nb) notifier_chain_register(chain,nb)
+#define atomic_notifier_chain_unregister(chain,nb) notifier_chain_unregister(chain,nb)
+#define atomic_notifier_call_chain(chain,val,v) notifier_call_chain(chain,val,v)
+#endif
+
 #if defined(_LINUX_FS_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
 #define nonseekable_open(inode, filp) /* Nothing to do */
 #endif
@@ -68,5 +75,13 @@ void *kzalloc(size_t size, int flags);
 extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
        __attribute__ ((format (printf, 2, 3)));
 #endif
+
+/*
+ * This variable at present is referenced by netfront, but only in code that
+ * is dead when running in hvm guests. To detect potential active uses of it
+ * in the future, don't try to supply a 'valid' value here, so that any
+ * mappings created with it will fault when accessed.
+ */
+#define __supported_pte_mask ((maddr_t)0)
 
 #endif

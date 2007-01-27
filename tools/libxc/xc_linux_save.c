@@ -379,8 +379,29 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
         ERROR("Could not get vcpu context");
 
 
-    if (info->shutdown && info->shutdown_reason == SHUTDOWN_suspend)
-        return 0; // success
+    if (info->dying) {
+        ERROR("domain is dying");
+        return -1;
+    }
+
+    if (info->crashed) {
+        ERROR("domain has crashed");
+        return -1;
+    }
+
+    if (info->shutdown) {
+        switch (info->shutdown_reason) {
+        case SHUTDOWN_poweroff:
+        case SHUTDOWN_reboot:
+            ERROR("domain has shut down");
+            return -1;
+        case SHUTDOWN_suspend:
+            return 0;
+        case SHUTDOWN_crash:
+            ERROR("domain has crashed");
+            return -1;
+        }
+    }
 
     if (info->paused) {
         // try unpausing domain, wait, and retest
@@ -394,7 +415,7 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 
 
     if( ++i < 100 ) {
-        ERROR("Retry suspend domain.");
+        ERROR("Retry suspend domain");
         usleep(10000);  // 10ms
         goto retry;
     }
@@ -404,6 +425,33 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
     return -1;
 }
 
+/*
+** Map the top-level page of MFNs from the guest. The guest might not have
+** finished resuming from a previous restore operation, so we wait a while for
+** it to update the MFN to a reasonable value.
+*/
+static void *map_frame_list_list(int xc_handle, uint32_t dom,
+                                 shared_info_t *shinfo)
+{
+    int count = 100;
+    void *p;
+
+    while (count-- && shinfo->arch.pfn_to_mfn_frame_list_list == 0)
+        usleep(10000);
+
+    if (shinfo->arch.pfn_to_mfn_frame_list_list == 0) {
+        ERROR("Timed out waiting for frame list updated.");
+        return NULL;
+    }
+
+    p = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
+                             shinfo->arch.pfn_to_mfn_frame_list_list);
+
+    if (p == NULL)
+        ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
+
+    return p;
+}
 
 /*
 ** During transfer (or in the state file), all page-table pages must be
@@ -669,14 +717,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     max_pfn = live_shinfo->arch.max_pfn;
 
-    live_p2m_frame_list_list =
-        xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
-                             live_shinfo->arch.pfn_to_mfn_frame_list_list);
+    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom,
+                                                   live_shinfo);
 
-    if (!live_p2m_frame_list_list) {
-        ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
+    if (!live_p2m_frame_list_list)
         goto out;
-    }
 
     live_p2m_frame_list =
         xc_map_foreign_batch(xc_handle, dom, PROT_READ,
@@ -787,8 +832,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     analysis_phase(xc_handle, dom, max_pfn, to_skip, 0);
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
-    pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
+    pfn_type   = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
+    pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
         ERROR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
@@ -952,10 +997,16 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            if (xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type)) {
+            for ( j = 0; j < batch; j++ )
+                ((uint32_t *)pfn_type)[i] = pfn_type[i];
+            if ( xc_get_pfn_type_batch(xc_handle, dom, batch,
+                                       (uint32_t *)pfn_type) )
+            {
                 ERROR("get_pfn_type_batch failed");
                 goto out;
             }
+            for ( j = batch-1; j >= 0; j-- )
+                pfn_type[i] = ((uint32_t *)pfn_type)[i];
 
             for ( j = 0; j < batch; j++ )
             {
@@ -1175,8 +1226,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     ctxt.ctrlreg[3] = 
         xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
 
+    /*
+     * Reset the MFN to be a known-invalid value. See map_frame_list_list().
+     */
+    memcpy(page, live_shinfo, PAGE_SIZE);
+    ((shared_info_t *)page)->arch.pfn_to_mfn_frame_list_list = 0;
+
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
-        !write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
+        !write_exact(io_fd, page, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1) (errno %d)", errno);
         goto out;
     }

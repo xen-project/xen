@@ -2184,10 +2184,11 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     expected_count = (page->count_info & PGC_allocated) ? 1 : 0;
     if ( (page->count_info & PGC_count_mask) != expected_count )
     {
-        /* Don't complain if we're in HVM and there's one extra mapping: 
-         * The qemu helper process has an untyped mapping of this dom's RAM */
+        /* Don't complain if we're in HVM and there are some extra mappings: 
+         * The qemu helper process has an untyped mapping of this dom's RAM 
+         * and the HVM restore program takes another. */
         if ( !(shadow_mode_external(v->domain)
-               && (page->count_info & PGC_count_mask) <= 2
+               && (page->count_info & PGC_count_mask) <= 3
                && (page->u.inuse.type_info & PGT_count_mask) == 0) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx: "
@@ -2568,12 +2569,15 @@ static void sh_update_paging_modes(struct vcpu *v)
                 /* Need to make a new monitor table for the new mode */
                 mfn_t new_mfn, old_mfn;
 
-                if ( v != current ) 
+                if ( v != current && vcpu_runnable(v) ) 
                 {
                     SHADOW_ERROR("Some third party (d=%u v=%u) is changing "
-                                  "this HVM vcpu's (d=%u v=%u) paging mode!\n",
-                                  current->domain->domain_id, current->vcpu_id,
-                                  v->domain->domain_id, v->vcpu_id);
+                                 "this HVM vcpu's (d=%u v=%u) paging mode "
+                                 "while it is running.\n",
+                                 current->domain->domain_id, current->vcpu_id,
+                                 v->domain->domain_id, v->vcpu_id);
+                    /* It's not safe to do that because we can't change
+                     * the host CR£ for a running domain */
                     domain_crash(v->domain);
                     return;
                 }
@@ -2589,7 +2593,8 @@ static void sh_update_paging_modes(struct vcpu *v)
                  * pull it down!  Switch CR3, and warn the HVM code that
                  * its host cr3 has changed. */
                 make_cr3(v, mfn_x(new_mfn));
-                write_ptbase(v);
+                if ( v == current )
+                    write_ptbase(v);
                 hvm_update_host_cr3(v);
                 old_mode->destroy_monitor_table(v, old_mfn);
             }
@@ -3186,19 +3191,16 @@ static int shadow_log_dirty_op(
         if ( likely(peek) )
         {
             if ( copy_to_guest_offset(
-                     sc->dirty_bitmap,
-                     i/(8*sizeof(unsigned long)),
-                     d->arch.shadow.dirty_bitmap+(i/(8*sizeof(unsigned long))),
-                     (bytes+sizeof(unsigned long)-1) / sizeof(unsigned long)) )
+                sc->dirty_bitmap, i/8,
+                (uint8_t *)d->arch.shadow.dirty_bitmap + (i/8), bytes) )
             {
-                    rv = -EFAULT;
-                    goto out;
+                rv = -EFAULT;
+                goto out;
             }
         }
 
         if ( clean )
-            memset(d->arch.shadow.dirty_bitmap + (i/(8*sizeof(unsigned long))),
-                   0, bytes);
+            memset((uint8_t *)d->arch.shadow.dirty_bitmap + (i/8), 0, bytes);
     }
 #undef CHUNK
 

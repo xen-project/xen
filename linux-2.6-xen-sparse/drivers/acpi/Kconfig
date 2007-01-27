@@ -10,9 +10,8 @@ menu "ACPI (Advanced Configuration and Power Interface) Support"
 config ACPI
 	bool "ACPI Support"
 	depends on IA64 || X86
+	depends on PCI
 	select PM
-	select PCI
-
 	default y
 	---help---
 	  Advanced Configuration and Power Interface (ACPI) support for 
@@ -108,7 +107,6 @@ config ACPI_BUTTON
 config ACPI_VIDEO
 	tristate "Video"
 	depends on X86
-	default y
 	help
 	  This driver implement the ACPI Extensions For Display Adapters
 	  for integrated graphics devices on motherboard, as specified in
@@ -133,6 +131,12 @@ config ACPI_FAN
 	help
 	  This driver adds support for ACPI fan devices, allowing user-mode 
 	  applications to perform basic fan control (on, off, status).
+
+config ACPI_DOCK
+	tristate "Dock"
+	depends on EXPERIMENTAL
+	help
+	  This driver adds support for ACPI controlled docking stations
 
 config ACPI_PROCESSOR
 	tristate "Processor"
@@ -162,7 +166,7 @@ config ACPI_THERMAL
 config ACPI_NUMA
 	bool "NUMA support"
 	depends on NUMA
-	depends on (IA64 || X86_64)
+	depends on (X86 || IA64)
 	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_ASUS
@@ -205,6 +209,19 @@ config ACPI_IBM
 
 	  If you have an IBM ThinkPad laptop, say Y or M here.
 
+config ACPI_IBM_DOCK
+	bool "Legacy Docking Station Support"
+	depends on ACPI_IBM
+	depends on ACPI_DOCK=n
+	default n
+	---help---
+	  Allows the ibm_acpi driver to handle docking station events.
+	  This support is obsoleted by CONFIG_HOTPLUG_PCI_ACPI.  It will
+	  allow locking and removing the laptop from the docking station,
+	  but will not properly connect PCI devices.
+
+	  If you are not sure, say N here.
+
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
 	depends on X86
@@ -244,7 +261,8 @@ config ACPI_CUSTOM_DSDT_FILE
 	depends on ACPI_CUSTOM_DSDT
 	default ""
 	help
-	  Enter the full path name to the file wich includes the AmlCode declaration.
+	  Enter the full path name to the file which includes the AmlCode
+	  declaration.
 
 config ACPI_BLACKLIST_YEAR
 	int "Disable ACPI for systems before Jan 1st this year" if X86_32
@@ -334,6 +352,17 @@ config ACPI_HOTPLUG_MEMORY
 	  If one selects "m," this driver can be loaded using the following
 	  command: 
 		$>modprobe acpi_memhotplug 
+
+config ACPI_SBS
+	tristate "Smart Battery System (EXPERIMENTAL)"
+	depends on X86 && I2C
+	depends on EXPERIMENTAL
+	help
+	  This driver adds support for the Smart Battery System.
+	  Depends on I2C (Device Drivers ---> I2C support)
+	  A "Smart Battery" is quite old and quite rare compared
+	  to today's ACPI "Control Method" battery.
+
 endif	# ACPI
 
 endmenu

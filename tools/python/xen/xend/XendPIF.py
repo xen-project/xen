@@ -115,10 +115,12 @@ class XendPIF:
         return success
 
     def get_io_read_kbs(self):
-        return 0.0
+        from xen.xend.XendNode import instance as xennode
+        return xennode().get_pif_util(self.name)[0]
 
     def get_io_write_kbs(self):
-        return 0.0
+        from xen.xend.XendNode import instance as xennode
+        return xennode().get_pif_util(self.name)[1]      
 
     def get_record(self, transient = True):
         result = {'name': self.name,

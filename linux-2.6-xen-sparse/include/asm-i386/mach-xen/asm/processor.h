@@ -17,9 +17,9 @@
 #include <asm/msr.h>
 #include <asm/system.h>
 #include <linux/cache.h>
-#include <linux/config.h>
 #include <linux/threads.h>
 #include <asm/percpu.h>
+#include <linux/cpumask.h>
 #include <xen/interface/physdev.h>
 
 /* flag for disabling the tsc */
@@ -68,9 +68,16 @@ struct cpuinfo_x86 {
 	char	pad0;
 	int	x86_power;
 	unsigned long loops_per_jiffy;
+#ifdef CONFIG_SMP
+	cpumask_t llc_shared_map;	/* cpus sharing the last level cache */
+#endif
 	unsigned char x86_max_cores;	/* cpuid returned max cores value */
-	unsigned char booted_cores;	/* number of cores as seen by OS */
 	unsigned char apicid;
+#ifdef CONFIG_SMP
+	unsigned char booted_cores;	/* number of cores as seen by OS */
+	__u8 phys_proc_id; 		/* Physical processor id. */
+	__u8 cpu_core_id;  		/* Core id */
+#endif
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
 #define X86_VENDOR_INTEL 0
@@ -104,13 +111,13 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
-extern	int phys_proc_id[NR_CPUS];
-extern	int cpu_core_id[NR_CPUS];
+extern	int cpu_llc_id[NR_CPUS];
 extern char ignore_fpu_irq;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
+extern unsigned short num_cache_leaves;
 
 #ifdef CONFIG_X86_HT
 extern void detect_ht(struct cpuinfo_x86 *c);
@@ -557,7 +564,7 @@ extern void prepare_to_copy(struct task_struct *tsk);
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 extern unsigned long thread_saved_pc(struct task_struct *tsk);
-void show_trace(struct task_struct *task, unsigned long *stack);
+void show_trace(struct task_struct *task, struct pt_regs *regs, unsigned long *stack);
 
 unsigned long get_wchan(struct task_struct *p);
 
@@ -623,8 +630,6 @@ struct extended_sigtable {
 	unsigned int reserved[3];
 	struct extended_signature sigs[0];
 };
-/* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
-#define MICROCODE_IOCFREE	_IO('6',0)
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static inline void rep_nop(void)
@@ -732,19 +737,5 @@ extern void select_idle_routine(const struct cpuinfo_x86 *c);
 extern unsigned long boot_option_idle_override;
 extern void enable_sep_cpu(void);
 extern int sysenter_setup(void);
-
-#ifdef CONFIG_MTRR
-extern void mtrr_ap_init(void);
-extern void mtrr_bp_init(void);
-#else
-#define mtrr_ap_init() do {} while (0)
-#define mtrr_bp_init() do {} while (0)
-#endif
-
-#ifdef CONFIG_X86_MCE
-extern void mcheck_init(struct cpuinfo_x86 *c);
-#else
-#define mcheck_init(c) do {} while(0)
-#endif
 
 #endif /* __ASM_I386_PROCESSOR_H */

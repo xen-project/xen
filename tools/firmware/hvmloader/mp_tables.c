@@ -45,12 +45,6 @@ typedef unsigned long uint64_t;
 typedef   signed long int64_t;
 #endif
 
-#define ROMBIOS_SEG            0xF000
-#define ROMBIOS_BEGIN          0x000F0000
-#define ROMBIOS_SIZE           0x00010000 
-#define ROMBIOS_MAXOFFSET      0x0000FFFF
-#define ROMBIOS_END            (ROMBIOS_BEGIN + ROMBIOS_SIZE)
-
 /* number of non-processor MP table entries */
 #define NR_NONPROC_ENTRIES     18
 
@@ -311,10 +305,7 @@ void* get_mp_table_start(void)
           bios_mem != (char *)ROMBIOS_END; 
           bios_mem++ )
     {
-        if ( bios_mem[0] == '_' && bios_mem[1] == '_' &&
-             bios_mem[2] == '_' && bios_mem[3] == 'H' &&
-             bios_mem[4] == 'V' && bios_mem[5] == 'M' &&
-             bios_mem[6] == 'M' && bios_mem[7] == 'P' )
+        if ( strncmp(bios_mem, "___HVMMP", 8) == 0)
             return bios_mem;
     }
 

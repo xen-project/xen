@@ -59,6 +59,12 @@
 
 #(xend-unix-path /var/lib/xend/xend-socket)
 
+# Address and port xend should use for the TCP XMLRPC interface, 
+# if xen-tcp-xmlrpc-server is set.
+#(xen-tcp-xmlrpc-server-address 'localhost')
+#(xen-tcp-xmlrpc-server-port 8006)
+
+
 # Port xend should use for the HTTP interface, if xend-http-server is set.
 #(xend-port            8000)
 

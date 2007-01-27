@@ -18,38 +18,30 @@
 #include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
-#ifdef CONFIG_COMPAT
-#include <xen/compat.h>
-#endif
+#include <xen/bitmap.h>
 #include <asm/current.h>
 #include <public/domctl.h>
 #include <acm/acm_hooks.h>
 
-#ifndef COMPAT
-typedef long ret_t;
-#define copy_to_xxx_offset copy_to_guest_offset
-#endif
-
-extern ret_t arch_do_domctl(
+extern long arch_do_domctl(
     struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
-
-#ifndef COMPAT
 
 void cpumask_to_xenctl_cpumap(
     struct xenctl_cpumap *xenctl_cpumap, cpumask_t *cpumask)
 {
     unsigned int guest_bytes, copy_bytes, i;
     uint8_t zero = 0;
+    uint8_t bytemap[(NR_CPUS + 7) / 8];
 
     if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
         return;
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, (NR_CPUS + 7) / 8);
+    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
 
-    copy_to_guest(xenctl_cpumap->bitmap,
-                  (uint8_t *)cpus_addr(*cpumask),
-                  copy_bytes);
+    bitmap_long_to_byte(bytemap, cpus_addr(*cpumask), NR_CPUS);
+
+    copy_to_guest(xenctl_cpumap->bitmap, &bytemap[0], copy_bytes);
 
     for ( i = copy_bytes; i < guest_bytes; i++ )
         copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1);
@@ -59,21 +51,20 @@ void xenctl_cpumap_to_cpumask(
     cpumask_t *cpumask, struct xenctl_cpumap *xenctl_cpumap)
 {
     unsigned int guest_bytes, copy_bytes;
+    uint8_t bytemap[(NR_CPUS + 7) / 8];
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, (NR_CPUS + 7) / 8);
+    copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
 
     cpus_clear(*cpumask);
 
     if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
         return;
 
-    copy_from_guest((uint8_t *)cpus_addr(*cpumask),
-                    xenctl_cpumap->bitmap,
-                    copy_bytes);
-}
+    copy_from_guest(&bytemap[0], xenctl_cpumap->bitmap, copy_bytes);
 
-#endif /* COMPAT */
+    bitmap_byte_to_long(cpus_addr(*cpumask), bytemap, NR_CPUS);
+}
 
 static inline int is_free_domid(domid_t dom)
 {
@@ -82,7 +73,7 @@ static inline int is_free_domid(domid_t dom)
     if ( dom >= DOMID_FIRST_RESERVED )
         return 0;
 
-    if ( (d = find_domain_by_id(dom)) == NULL )
+    if ( (d = get_domain_by_id(dom)) == NULL )
         return 1;
 
     put_domain(d);
@@ -179,9 +170,9 @@ static unsigned int default_vcpu0_location(void)
     return cpu;
 }
 
-ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
-    ret_t ret = 0;
+    long ret = 0;
     struct xen_domctl curop, *op = &curop;
     void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
     static DEFINE_SPINLOCK(domctl_lock);
@@ -205,19 +196,59 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_setvcpucontext:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
+        vcpu_guest_context_u c = { .nat = NULL };
+        unsigned int vcpu = op->u.vcpucontext.vcpu;
+        struct vcpu *v;
+
         ret = -ESRCH;
-        if ( d != NULL )
+        if ( d == NULL )
+            break;
+
+        ret = -EINVAL;
+        if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
+            goto svc_out;
+
+        if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
         {
-            ret = set_info_guest(d, &op->u.vcpucontext);
-            put_domain(d);
+            ret = vcpu_reset(v);
+            goto svc_out;
         }
+
+#ifdef CONFIG_COMPAT
+        BUILD_BUG_ON(sizeof(struct vcpu_guest_context)
+                     < sizeof(struct compat_vcpu_guest_context));
+#endif
+        ret = -ENOMEM;
+        if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
+            goto svc_out;
+
+        if ( !IS_COMPAT(v->domain) )
+            ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
+#ifdef CONFIG_COMPAT
+        else
+            ret = copy_from_guest(c.cmp,
+                                  guest_handle_cast(op->u.vcpucontext.ctxt,
+                                                    void), 1);
+#endif
+        ret = ret ? -EFAULT : 0;
+
+        if ( ret == 0 )
+        {
+            domain_pause(d);
+            ret = arch_set_info_guest(v, c);
+            domain_unpause(d);
+        }
+
+    svc_out:
+        xfree(c.nat);
+        put_domain(d);
     }
     break;
 
     case XEN_DOMCTL_pausedomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -234,7 +265,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_unpausedomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -245,6 +276,23 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
             }
+            put_domain(d);
+        }
+    }
+    break;
+
+    case XEN_DOMCTL_resumedomain:
+    {
+        struct domain *d = get_domain_by_id(op->domain);
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        if ( d != NULL )
+        {
+            ret = 0;
+            if ( test_and_clear_bit(_DOMF_shutdown, &d->domain_flags) )
+                for_each_vcpu ( d, v )
+                    vcpu_wake(v);
             put_domain(d);
         }
     }
@@ -293,32 +341,12 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = domain_create(dom, domcr_flags)) == NULL )
             break;
 
-        ret = 0;
-        switch ( (op->u.createdomain.flags >> XEN_DOMCTL_CDF_WORDSIZE_SHIFT)
-                 & XEN_DOMCTL_CDF_WORDSIZE_MASK )
-        {
-        case 0:
-            if ( !IS_COMPAT(current->domain) )
-                op->u.createdomain.flags |= BITS_PER_LONG
-                                            << XEN_DOMCTL_CDF_WORDSIZE_SHIFT;
 #ifdef CONFIG_COMPAT
-            else
-            {
-                op->u.createdomain.flags |= COMPAT_BITS_PER_LONG
-                                            << XEN_DOMCTL_CDF_WORDSIZE_SHIFT;
-        case COMPAT_BITS_PER_LONG:
-                ret = switch_compat(d);
-            }
+        if ( IS_COMPAT(current->domain) && ((ret = switch_compat(d)) != 0) )
+            break;
 #endif
-            break;
-        case BITS_PER_LONG:
-            break;
-        default:
-            ret = -EINVAL;
-            break;
-        }
-        if ( ret )
-            break;
+
+        ret = 0;
 
         memcpy(d->handle, op->u.createdomain.handle,
                sizeof(xen_domain_handle_t));
@@ -339,7 +367,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         /* Needed, for example, to ensure writable p.t. state is synced. */
@@ -374,7 +402,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_destroydomain:
     {
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -393,7 +421,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getvcpuaffinity:
     {
         domid_t dom = op->domain;
-        struct domain *d = find_domain_by_id(dom);
+        struct domain *d = get_domain_by_id(dom);
         struct vcpu *v;
         cpumask_t new_affinity;
 
@@ -432,7 +460,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = sched_adjust(d, &op->u.scheduler_op);
@@ -481,12 +509,12 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_getvcpucontext:
     { 
-        vcpu_guest_context_u       c;
-        struct domain             *d;
-        struct vcpu               *v;
+        vcpu_guest_context_u c = { .nat = NULL };
+        struct domain       *d;
+        struct vcpu         *v;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -519,35 +547,18 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             vcpu_unpause(v);
 
         if ( !IS_COMPAT(v->domain) )
-        {
-#ifndef COMPAT
-            if ( copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1) )
-#else
-            if ( copy_to_guest(compat_handle_cast(op->u.vcpucontext.ctxt,
-                                                  void),
-                               c.nat, 1) )
-#endif
-                ret = -EFAULT;
-        }
+            ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
 #ifdef CONFIG_COMPAT
         else
-        {
-#ifndef COMPAT
-            if ( copy_to_guest(guest_handle_cast(op->u.vcpucontext.ctxt, void),
-                               c.cmp, 1) )
-#else
-            if ( copy_to_compat(op->u.vcpucontext.ctxt, c.cmp, 1) )
-#endif
-                ret = -EFAULT;
-        }
+            ret = copy_to_guest(guest_handle_cast(op->u.vcpucontext.ctxt,
+                                                  void), c.cmp, 1);
 #endif
 
-        xfree(c.nat);
-
-        if ( copy_to_guest(u_domctl, op, 1) )
+        if ( copy_to_guest(u_domctl, op, 1) || ret )
             ret = -EFAULT;
 
     getvcpucontext_out:
+        xfree(c.nat);
         put_domain(d);
     }
     break;
@@ -559,7 +570,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu_runstate_info runstate;
 
         ret = -ESRCH;
-        if ( (d = find_domain_by_id(op->domain)) == NULL )
+        if ( (d = get_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -593,7 +604,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned long new_max;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -616,7 +627,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             memcpy(d->handle, op->u.setdomainhandle.handle,
@@ -631,7 +642,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             if ( op->u.setdebugging.enable )
@@ -654,7 +665,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -678,7 +689,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -696,7 +707,7 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
@@ -705,16 +716,6 @@ ret_t do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
     }
     break;
-
-#ifdef CONFIG_COMPAT
-    case XEN_DOMCTL_set_compat:
-        ret = switch_compat(find_domain_by_id(op->domain));
-        break;
-
-    case XEN_DOMCTL_set_native:
-        ret = switch_native(find_domain_by_id(op->domain));
-        break;
-#endif
 
     default:
         ret = arch_do_domctl(op, u_domctl);

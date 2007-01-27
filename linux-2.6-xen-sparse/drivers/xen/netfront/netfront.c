@@ -613,7 +613,8 @@ static int network_open(struct net_device *dev)
 
 static inline int netfront_tx_slot_available(struct netfront_info *np)
 {
-	return RING_FREE_REQUESTS(&np->tx) >= MAX_SKB_FRAGS + 2;
+	return ((np->tx.req_prod_pvt - np->tx.rsp_cons) <
+		(TX_MAX_TARGET - MAX_SKB_FRAGS - 2));
 }
 
 static inline void network_maybe_wake_tx(struct net_device *dev)

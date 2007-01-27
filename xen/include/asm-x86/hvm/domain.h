@@ -26,6 +26,21 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/io.h>
 #include <public/hvm/params.h>
+#include <public/hvm/save.h>
+
+typedef void SaveStateHandler(hvm_domain_context_t *h, void *opaque);
+typedef int LoadStateHandler(hvm_domain_context_t *h, void *opaque, int version_id);
+
+#define HVM_SE_IDSTR_LEN 32
+typedef struct HVMStateEntry {
+    char idstr[HVM_SE_IDSTR_LEN];
+    int instance_id;
+    int version_id;
+    SaveStateHandler *save_state;
+    LoadStateHandler *load_state;
+    void *opaque;
+    struct HVMStateEntry *next;
+} HVMStateEntry;
 
 struct hvm_domain {
     unsigned long          shared_page_va;
@@ -36,7 +51,11 @@ struct hvm_domain {
 
     struct hvm_io_handler  io_handler;
 
-    struct hvm_irq         irq;
+    /* Lock protects access to irq, vpic and vioapic. */
+    spinlock_t             irq_lock;
+    struct hvm_hw_irq      irq;
+    struct hvm_hw_vpic     vpic[2]; /* 0=master; 1=slave */
+    struct hvm_hw_vioapic  vioapic;
 
     /* hvm_print_line() logging. */
     char                   pbuf[80];
@@ -44,6 +63,9 @@ struct hvm_domain {
     spinlock_t             pbuf_lock;
 
     uint64_t               params[HVM_NR_PARAMS];
+
+    struct hvm_domain_context *hvm_ctxt;
+    HVMStateEntry *first_se;
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

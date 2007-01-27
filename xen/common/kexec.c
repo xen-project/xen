@@ -26,11 +26,6 @@
 
 typedef long ret_t;
 
-#define ELFNOTE_ALIGN(_n_) (((_n_)+3)&~3)
-#define ELFNOTE_NAME(_n_) ((void*)(_n_) + sizeof(*(_n_)))
-#define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + ELFNOTE_ALIGN((_n_)->namesz))
-#define ELFNOTE_NEXT(_n_) (ELFNOTE_DESC(_n_) + ELFNOTE_ALIGN((_n_)->descsz))
-
 static DEFINE_PER_CPU(void *, crash_notes);
 
 static Elf_Note *xen_crash_note;
@@ -75,10 +70,10 @@ void kexec_crash_save_cpu(void)
     if ( cpu_test_and_set(cpu, crash_saved_cpus) )
         return;
 
-    prstatus = ELFNOTE_DESC(note);
+    prstatus = (ELF_Prstatus *)ELFNOTE_DESC(note);
 
     note = ELFNOTE_NEXT(note);
-    xencore = ELFNOTE_DESC(note);
+    xencore = (crash_xen_core_t *)ELFNOTE_DESC(note);
 
     elf_core_save_regs(&prstatus->pr_reg, xencore);
 }
@@ -87,7 +82,7 @@ void kexec_crash_save_cpu(void)
 crash_xen_info_t *kexec_crash_save_info(void)
 {
     int cpu = smp_processor_id();
-    crash_xen_info_t *info = ELFNOTE_DESC(xen_crash_note);
+    crash_xen_info_t *info = (crash_xen_info_t *)ELFNOTE_DESC(xen_crash_note);
 
     BUG_ON(!cpu_test_and_set(cpu, crash_saved_cpus));
 

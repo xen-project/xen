@@ -19,12 +19,13 @@ int
 main(int argc, char **argv)
 {
     unsigned int xc_fd, io_fd, domid, nr_pfns, store_evtchn, console_evtchn;
+    unsigned int hvm, pae, apic;
     int ret;
     unsigned long store_mfn, console_mfn;
 
-    if (argc != 6)
+    if (argc != 9)
 	errx(1,
-	     "usage: %s iofd domid nr_pfns store_evtchn console_evtchn",
+	     "usage: %s iofd domid nr_pfns store_evtchn console_evtchn hvm pae apic",
 	     argv[0]);
 
     xc_fd = xc_interface_open();
@@ -36,9 +37,19 @@ main(int argc, char **argv)
     nr_pfns = atoi(argv[3]);
     store_evtchn = atoi(argv[4]);
     console_evtchn = atoi(argv[5]);
+    hvm  = atoi(argv[6]);
+    pae  = atoi(argv[7]);
+    apic = atoi(argv[8]);
 
-    ret = xc_linux_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
-			   &store_mfn, console_evtchn, &console_mfn);
+    if (hvm) {
+         /* pass the memsize to xc_hvm_restore to find the store_mfn */
+        store_mfn = hvm;
+        ret = xc_hvm_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
+                &store_mfn, console_evtchn, &console_mfn, pae, apic);
+    } else 
+        ret = xc_linux_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
+                &store_mfn, console_evtchn, &console_mfn);
+
     if (ret == 0) {
 	printf("store-mfn %li\n", store_mfn);
 	printf("console-mfn %li\n", console_mfn);

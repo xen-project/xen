@@ -6,7 +6,6 @@ headers-y := \
     compat/acm.h \
     compat/acm_ops.h \
     compat/callback.h \
-    compat/domctl.h \
     compat/elfnote.h \
     compat/event_channel.h \
     compat/features.h \
@@ -17,7 +16,6 @@ headers-y := \
     compat/physdev.h \
     compat/platform.h \
     compat/sched.h \
-    compat/sysctl.h \
     compat/trace.h \
     compat/vcpu.h \
     compat/version.h \

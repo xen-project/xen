@@ -12,13 +12,14 @@
  *	<tomsoft@informatik.tu-chemnitz.de>
  */
 
-#include <linux/config.h>
 #include <linux/profile.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
 #include <asm/sections.h>
 
 struct hw_interrupt_type;
+
+#define NMI_VECTOR		0x02
 
 /*
  * Various low-level irq details needed by irq.c, process.c,
@@ -67,11 +68,5 @@ extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
-
-extern void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i);
-static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
-{
-	resend_irq_on_evtchn(h, i);
-}
 
 #endif /* _ASM_HW_IRQ_H */

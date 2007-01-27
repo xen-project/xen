@@ -107,7 +107,7 @@ class XendStateStore:
             if child.nodeType != Node.ELEMENT_NODE:
                 continue # skip non element nodes
                 
-            uuid = child.getAttribute('uuid')
+            uuid = child.getAttribute('uuid').encode('utf8')
             cls_dict = {}
             for val_elem in child.childNodes:
                 if val_elem.nodeType != Node.ELEMENT_NODE:

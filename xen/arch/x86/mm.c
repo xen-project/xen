@@ -154,6 +154,15 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 #define l3_disallow_mask(d) L3_DISALLOW_MASK
 #endif
 
+static void queue_deferred_ops(struct domain *d, unsigned int ops)
+{
+    if ( d == current->domain )
+        this_cpu(percpu_mm_info).deferred_ops |= ops;
+    else
+        BUG_ON(!test_bit(_DOMF_paused, &d->domain_flags) ||
+               !cpus_empty(d->domain_dirty_cpumask));
+}
+
 void __init init_frametable(void)
 {
     unsigned long nr_pages, page_step, i, mfn;
@@ -416,8 +425,7 @@ void invalidate_shadow_ldt(struct vcpu *v)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    ASSERT(v->processor == smp_processor_id());
-    this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
+    queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
 }
 
 
@@ -945,7 +953,8 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
     }
 #else
     memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-           &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+           &compat_idle_pg_table_l2[
+               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
            COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*pl2e));
 #endif
     unmap_domain_page(pl2e);
@@ -1561,7 +1570,7 @@ void free_page_type(struct page_info *page, unsigned long type)
          * (e.g., update_va_mapping()) or we could end up modifying a page
          * that is no longer a page table (and hence screw up ref counts).
          */
-        this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
+        queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
 
         if ( unlikely(shadow_mode_enabled(owner)) )
         {
@@ -1759,24 +1768,14 @@ int new_guest_cr3(unsigned long mfn)
     int okay;
     unsigned long old_base_mfn;
 
-    if ( is_hvm_domain(d) && !hvm_paging_enabled(v) )
-        return 0;
-
 #ifdef CONFIG_COMPAT
     if ( IS_COMPAT(d) )
     {
-        l4_pgentry_t l4e = l4e_from_pfn(mfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
-
-        if ( shadow_mode_refcounts(d) )
-        {
-            okay = get_page_from_pagenr(mfn, d);
-            old_base_mfn = l4e_get_pfn(l4e);
-            if ( okay && old_base_mfn )
-                put_page(mfn_to_page(old_base_mfn));
-        }
-        else
-            okay = mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
-                                l4e, 0);
+        okay = shadow_mode_refcounts(d)
+            ? 0 /* Old code was broken, but what should it be? */
+            : mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
+                           l4e_from_pfn(mfn, (_PAGE_PRESENT|_PAGE_RW|
+                                              _PAGE_USER|_PAGE_ACCESSED)), 0);
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
@@ -1789,41 +1788,13 @@ int new_guest_cr3(unsigned long mfn)
         return 1;
     }
 #endif
-    if ( shadow_mode_refcounts(d) )
+    okay = shadow_mode_refcounts(d)
+        ? get_page_from_pagenr(mfn, d)
+        : get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
+    if ( unlikely(!okay) )
     {
-        okay = get_page_from_pagenr(mfn, d);
-        if ( unlikely(!okay) )
-        {
-            MEM_LOG("Error while installing new baseptr %lx", mfn);
-            return 0;
-        }
-    }
-    else
-    {
-        okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
-        if ( unlikely(!okay) )
-        {
-            /* Switch to idle pagetable: this VCPU has no active p.t. now. */
-            MEM_LOG("New baseptr %lx: slow path via idle pagetables", mfn);
-            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = pagetable_null();
-            update_cr3(v);
-            write_cr3(__pa(idle_pg_table));
-            if ( old_base_mfn != 0 )
-                put_page_and_type(mfn_to_page(old_base_mfn));
-
-            /* Retry the validation with no active p.t. for this VCPU. */
-            okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
-            if ( !okay )
-            {
-                /* Failure here is unrecoverable: the VCPU has no pagetable! */
-                MEM_LOG("Fatal error while installing new baseptr %lx", mfn);
-                domain_crash(d);
-                ASSERT(v->processor == smp_processor_id());
-                this_cpu(percpu_mm_info).deferred_ops = 0;
-                return 0;
-            }
-        }
+        MEM_LOG("Error while installing new baseptr %lx", mfn);
+        return 0;
     }
 
     invalidate_shadow_ldt(v);
@@ -1831,7 +1802,7 @@ int new_guest_cr3(unsigned long mfn)
     old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
 
     v->arch.guest_table = pagetable_from_pfn(mfn);
-    update_cr3(v); /* update shadow_table and cr3 fields of vcpu struct */
+    update_cr3(v);
 
     write_ptbase(v);
 
@@ -1911,7 +1882,7 @@ static int set_foreigndom(domid_t domid)
     }
     else
     {
-        info->foreign = e = find_domain_by_id(domid);
+        info->foreign = e = get_domain_by_id(domid);
         if ( e == NULL )
         {
             switch ( domid )
@@ -2992,7 +2963,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = find_domain_by_id(xatp.domid)) == NULL )
+        else if ( (d = get_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
         switch ( xatp.space )
@@ -3063,7 +3034,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = find_domain_by_id(fmap.domid)) == NULL )
+        else if ( (d = get_domain_by_id(fmap.domid)) == NULL )
             return -ESRCH;
 
         rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,

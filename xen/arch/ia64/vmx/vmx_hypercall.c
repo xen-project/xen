@@ -53,7 +53,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -85,7 +85,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -126,7 +126,7 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             d = current->domain;
         }
         else if (IS_PRIV(current->domain)) {
-            d = find_domain_by_id(a.domid);
+            d = get_domain_by_id(a.domid);
             if (d == NULL)
                 return -ESRCH;
         }

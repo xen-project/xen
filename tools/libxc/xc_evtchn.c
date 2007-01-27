@@ -37,7 +37,7 @@ int xc_evtchn_alloc_unbound(int xc_handle,
                             uint32_t dom,
                             uint32_t remote_dom)
 {
-    int         rc;
+    int rc;
     struct evtchn_alloc_unbound arg = {
         .dom = (domid_t)dom,
         .remote_dom = (domid_t)remote_dom
@@ -48,4 +48,11 @@ int xc_evtchn_alloc_unbound(int xc_handle,
         rc = arg.port;
 
     return rc;
+}
+
+int xc_evtchn_reset(int xc_handle,
+                    uint32_t dom)
+{
+    struct evtchn_reset arg = { .dom = (domid_t)dom };
+    return do_evtchn_op(xc_handle, EVTCHNOP_reset, &arg, sizeof(arg));
 }

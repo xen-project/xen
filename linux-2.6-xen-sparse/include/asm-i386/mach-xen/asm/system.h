@@ -1,29 +1,26 @@
 #ifndef __ASM_SYSTEM_H
 #define __ASM_SYSTEM_H
 
-#include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/bitops.h>
-#include <asm/synch_bitops.h>
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
+#include <linux/bitops.h> /* for LOCK_PREFIX */
+#include <asm/synch_bitops.h>
 #include <asm/hypervisor.h>
-#include <asm/smp_alt.h>
 
 #ifdef __KERNEL__
-
-#ifdef CONFIG_SMP
-#define __vcpu_id smp_processor_id()
-#else
-#define __vcpu_id 0
-#endif
 
 struct task_struct;	/* one of the stranger aspects of C forward declarations.. */
 extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struct task_struct *next));
 
+/*
+ * Saving eflags is important. It switches not only IOPL between tasks,
+ * it also protects other tasks from NT leaking through sysenter etc.
+ */
 #define switch_to(prev,next,last) do {					\
 	unsigned long esi,edi;						\
-	asm volatile("pushl %%ebp\n\t"					\
+	asm volatile("pushfl\n\t"		/* Save flags */	\
+		     "pushl %%ebp\n\t"					\
 		     "movl %%esp,%0\n\t"	/* save ESP */		\
 		     "movl %5,%%esp\n\t"	/* restore ESP */	\
 		     "movl $1f,%1\n\t"		/* save EIP */		\
@@ -31,6 +28,7 @@ extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struc
 		     "jmp __switch_to\n"				\
 		     "1:\t"						\
 		     "popl %%ebp\n\t"					\
+		     "popfl"						\
 		     :"=m" (prev->thread.esp),"=m" (prev->thread.eip),	\
 		      "=a" (last),"=S" (esi),"=D" (edi)			\
 		     :"m" (next->thread.esp),"m" (next->thread.eip),	\
@@ -92,10 +90,6 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 #define savesegment(seg, value) \
 	asm volatile("mov %%" #seg ",%0":"=rm" (value))
 
-/*
- * Clear and set 'TS' bit respectively
- */
-#define clts() (HYPERVISOR_fpu_taskswitch(0))
 #define read_cr0() ({ \
 	unsigned int __dummy; \
 	__asm__ __volatile__( \
@@ -104,12 +98,12 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 	__dummy; \
 })
 #define write_cr0(x) \
-	__asm__ __volatile__("movl %0,%%cr0": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr0": :"r" (x))
 
 #define read_cr2() \
 	(HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
 #define write_cr2(x) \
-	__asm__ __volatile__("movl %0,%%cr2": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr2": :"r" (x))
 
 #define read_cr3() ({ \
 	unsigned int __dummy; \
@@ -124,7 +118,6 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 	__dummy = xen_pfn_to_cr3(__dummy);			\
 	__asm__ __volatile__("movl %0,%%cr3": :"r" (__dummy));	\
 })
-
 #define read_cr4() ({ \
 	unsigned int __dummy; \
 	__asm__( \
@@ -132,7 +125,6 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
-
 #define read_cr4_safe() ({			      \
 	unsigned int __dummy;			      \
 	/* This could fault if %cr4 does not exist */ \
@@ -147,12 +139,17 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 
 #define write_cr4(x) \
 	__asm__ __volatile__("movl %0,%%cr4": :"r" (x));
+
+/*
+ * Clear and set 'TS' bit respectively
+ */
+#define clts() (HYPERVISOR_fpu_taskswitch(0))
 #define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #endif	/* __KERNEL__ */
 
 #define wbinvd() \
-	__asm__ __volatile__ ("wbinvd": : :"memory");
+	__asm__ __volatile__ ("wbinvd": : :"memory")
 
 static inline unsigned long get_limit(unsigned long segment)
 {
@@ -279,19 +276,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK "cmpxchgb %b1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK "cmpxchgw %w1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -344,7 +341,7 @@ static inline unsigned long long __cmpxchg64(volatile void *ptr, unsigned long l
 				      unsigned long long new)
 {
 	unsigned long long prev;
-	__asm__ __volatile__(LOCK "cmpxchg8b %3"
+	__asm__ __volatile__(LOCK_PREFIX "cmpxchg8b %3"
 			     : "=A"(prev)
 			     : "b"((unsigned long)new),
 			       "c"((unsigned long)(new >> 32)),
@@ -360,67 +357,6 @@ static inline unsigned long long __cmpxchg64(volatile void *ptr, unsigned long l
 
 #endif
     
-#ifdef __KERNEL__
-struct alt_instr { 
-	__u8 *instr; 		/* original instruction */
-	__u8 *replacement;
-	__u8  cpuid;		/* cpuid bit set for replacement */
-	__u8  instrlen;		/* length of original instruction */
-	__u8  replacementlen; 	/* length of new instruction, <= instrlen */ 
-	__u8  pad;
-}; 
-#endif
-
-/* 
- * Alternative instructions for different CPU types or capabilities.
- * 
- * This allows to use optimized instructions even on generic binary
- * kernels.
- * 
- * length of oldinstr must be longer or equal the length of newinstr
- * It can be padded with nops as needed.
- * 
- * For non barrier like inlines please define new variants
- * without volatile and memory clobber.
- */
-#define alternative(oldinstr, newinstr, feature) 	\
-	asm volatile ("661:\n\t" oldinstr "\n662:\n" 		     \
-		      ".section .altinstructions,\"a\"\n"     	     \
-		      "  .align 4\n"				       \
-		      "  .long 661b\n"            /* label */          \
-		      "  .long 663f\n"		  /* new instruction */ 	\
-		      "  .byte %c0\n"             /* feature bit */    \
-		      "  .byte 662b-661b\n"       /* sourcelen */      \
-		      "  .byte 664f-663f\n"       /* replacementlen */ \
-		      ".previous\n"						\
-		      ".section .altinstr_replacement,\"ax\"\n"			\
-		      "663:\n\t" newinstr "\n664:\n"   /* replacement */    \
-		      ".previous" :: "i" (feature) : "memory")  
-
-/*
- * Alternative inline assembly with input.
- * 
- * Pecularities:
- * No memory clobber here. 
- * Argument numbers start with 1.
- * Best is to use constraints that are fixed size (like (%1) ... "r")
- * If you use variable sized constraints like "m" or "g" in the 
- * replacement maake sure to pad to the worst case length.
- */
-#define alternative_input(oldinstr, newinstr, feature, input...)		\
-	asm volatile ("661:\n\t" oldinstr "\n662:\n"				\
-		      ".section .altinstructions,\"a\"\n"			\
-		      "  .align 4\n"						\
-		      "  .long 661b\n"            /* label */			\
-		      "  .long 663f\n"		  /* new instruction */ 	\
-		      "  .byte %c0\n"             /* feature bit */		\
-		      "  .byte 662b-661b\n"       /* sourcelen */		\
-		      "  .byte 664f-663f\n"       /* replacementlen */ 		\
-		      ".previous\n"						\
-		      ".section .altinstr_replacement,\"ax\"\n"			\
-		      "663:\n\t" newinstr "\n664:\n"   /* replacement */ 	\
-		      ".previous" :: "i" (feature), ##input)
-
 /*
  * Force strict CPU ordering.
  * And yes, this is required on UP too when we're talking
@@ -497,7 +433,7 @@ struct alt_instr {
  * does not enforce ordering, since there is no data dependency between
  * the read of "a" and the read of "b".  Therefore, on some CPUs, such
  * as Alpha, "y" could be set to 3 and "x" to 0.  Use rmb()
- * in cases like thiswhere there are no data dependencies.
+ * in cases like this where there are no data dependencies.
  **/
 
 #define read_barrier_depends()	do { } while(0)
@@ -511,55 +447,11 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_wmb()	wmb()
-#if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
-#define smp_alt_mb(instr)                                           \
-__asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-                     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673:.byte 6668b-6667b\n"                     \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 6671f-6670f\n"                          \
-                     ".byte 0\n"                                    \
-		     ".byte %c0\n"                                  \
-		     "6669:lock;addl $0,0(%%esp)\n"                 \
-		     "6670:" instr "\n"                             \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     :                                              \
-		     : "i" (X86_FEATURE_XMM2)                       \
-		     : "memory")
-#define smp_rmb() smp_alt_mb("lfence")
-#define smp_mb()  smp_alt_mb("mfence")
-#define set_mb(var, value) do {                                     \
-unsigned long __set_mb_temp;                                        \
-__asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-		     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673: .byte 6668b-6667b\n"                    \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 0\n"                                    \
-		     ".byte 6671f-6670f\n"                          \
-		     ".byte -1\n"                                   \
-		     "6669: xchg %1, %0\n"                          \
-		     "6670:movl %1, %0\n"                           \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     : "=m" (var), "=r" (__set_mb_temp)             \
-		     : "1" (value)                                  \
-		     : "memory"); } while (0)
-#else
-#define smp_rmb()	rmb()
 #define smp_mb()	mb()
-#define set_mb(var, value) do { (void) xchg(&var, value); } while (0)
-#endif
+#define smp_rmb()	rmb()
+#define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
+#define set_mb(var, value) do { (void) xchg(&var, value); } while (0)
 #else
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()
@@ -568,94 +460,7 @@ __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
 #define set_mb(var, value) do { var = value; barrier(); } while (0)
 #endif
 
-#define set_wmb(var, value) do { var = value; wmb(); } while (0)
-
-/* interrupt control.. */
-
-/* 
- * The use of 'barrier' in the following reflects their use as local-lock
- * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following
- * critical operations are executed. All critical operations must complete
- * /before/ reentrancy is permitted (e.g., __sti()). Alpha architecture also
- * includes these barriers, for example.
- */
-
-#define __cli()								\
-do {									\
-	vcpu_info_t *_vcpu;						\
-	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	_vcpu->evtchn_upcall_mask = 1;					\
-	preempt_enable_no_resched();					\
-	barrier();							\
-} while (0)
-
-#define __sti()								\
-do {									\
-	vcpu_info_t *_vcpu;						\
-	barrier();							\
-	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	_vcpu->evtchn_upcall_mask = 0;					\
-	barrier(); /* unmask then check (avoid races) */		\
-	if (unlikely(_vcpu->evtchn_upcall_pending))			\
-		force_evtchn_callback();				\
-	preempt_enable();						\
-} while (0)
-
-#define __save_flags(x)							\
-do {									\
-	vcpu_info_t *_vcpu;						\
-	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	(x) = _vcpu->evtchn_upcall_mask;				\
-	preempt_enable();						\
-} while (0)
-
-#define __restore_flags(x)						\
-do {									\
-	vcpu_info_t *_vcpu;						\
-	barrier();							\
-	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
-		barrier(); /* unmask then check (avoid races) */	\
-		if (unlikely(_vcpu->evtchn_upcall_pending))		\
-			force_evtchn_callback();			\
-		preempt_enable();					\
-	} else								\
-		preempt_enable_no_resched();				\
-} while (0)
-
-void safe_halt(void);
-void halt(void);
-
-#define __save_and_cli(x)						\
-do {									\
-	vcpu_info_t *_vcpu;						\
-	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	(x) = _vcpu->evtchn_upcall_mask;				\
-	_vcpu->evtchn_upcall_mask = 1;					\
-	preempt_enable_no_resched();					\
-	barrier();							\
-} while (0)
-
-#define local_irq_save(x)	__save_and_cli(x)
-#define local_irq_restore(x)	__restore_flags(x)
-#define local_save_flags(x)	__save_flags(x)
-#define local_irq_disable()	__cli()
-#define local_irq_enable()	__sti()
-
-/* Cannot use preempt_enable() here as we would recurse in preempt_sched(). */
-#define irqs_disabled()							\
-({	int ___x;							\
-	vcpu_info_t *_vcpu;						\
-	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	___x = (_vcpu->evtchn_upcall_mask != 0);			\
-	preempt_enable_no_resched();					\
-	___x; })
+#include <linux/irqflags.h>
 
 /*
  * disable hlt during certain critical i/o operations
@@ -677,5 +482,8 @@ static inline void sched_cacheflush(void)
 }
 
 extern unsigned long arch_align_stack(unsigned long sp);
+extern void free_init_pages(char *what, unsigned long begin, unsigned long end);
+
+void default_idle(void);
 
 #endif

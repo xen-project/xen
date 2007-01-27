@@ -115,7 +115,7 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ssidref = getssid.id.ssidref;
         else if (getssid.get_ssid_by == ACM_GETBY_domainid)
         {
-            struct domain *subj = find_domain_by_id(getssid.id.domainid);
+            struct domain *subj = get_domain_by_id(getssid.id.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -152,7 +152,7 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ssidref1 = getdecision.id1.ssidref;
         else if (getdecision.get_decision_by1 == ACM_GETBY_domainid)
         {
-            struct domain *subj = find_domain_by_id(getdecision.id1.domainid);
+            struct domain *subj = get_domain_by_id(getdecision.id1.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -176,7 +176,7 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ssidref2 = getdecision.id2.ssidref;
         else if (getdecision.get_decision_by2 == ACM_GETBY_domainid)
         {
-            struct domain *subj = find_domain_by_id(getdecision.id2.domainid);
+            struct domain *subj = get_domain_by_id(getdecision.id2.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */

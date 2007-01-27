@@ -165,7 +165,7 @@ TPM_RESULT VTPM_Handle_Get_Migration_key( const buffer_t *param_buf,
 TPM_RESULT VTPM_SaveManagerData(void);
 TPM_RESULT VTPM_LoadManagerData(void);
 
-TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode);
+TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE vm_type, BYTE startup_mode);
 
 TPM_RESULT VTPM_Close_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res);
 

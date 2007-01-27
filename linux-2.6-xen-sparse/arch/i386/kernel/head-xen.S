@@ -1,12 +1,12 @@
 
 
 .text
-#include <linux/config.h>
 #include <linux/elfnote.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/page.h>
+#include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/xen.h>
@@ -61,7 +61,8 @@ ENTRY(startup_32)
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-	call start_kernel
+	pushl %eax		# fake return address
+	jmp start_kernel
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
@@ -92,6 +93,7 @@ ENTRY(empty_zero_page)
 /*
  * The Global Descriptor Table contains 28 quadwords, per-CPU.
  */
+	.align L1_CACHE_BYTES
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */

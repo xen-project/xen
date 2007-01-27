@@ -16,23 +16,28 @@ ENTRY(compat_hypercall)
         jae   compat_bad_hypercall
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
-        pushq UREGS_rbx(%rsp); pushq %rcx; pushq %rdx; pushq %rsi; pushq %rdi; pushq UREGS_rbp+5*8(%rsp)
+        pushq UREGS_rbx(%rsp); pushq %rcx; pushq %rdx; pushq %rsi; pushq %rdi
+        pushq UREGS_rbp+5*8(%rsp)
         leaq  compat_hypercall_args_table(%rip),%r10
         movq  $6,%rcx
         subb  (%r10,%rax,1),%cl
         movq  %rsp,%rdi
         movl  $0xDEADBEEF,%eax
         rep   stosq
-        popq  %r9 ; popq  %r8 ; popq  %rcx; popq  %rdx; popq  %rsi; popq  %rdi
+        popq  %r8 ; popq  %r9 ; xchgl %r8d,%r9d /* Args 5&6: zero extend */
+        popq  %rdx; popq  %rcx; xchgl %edx,%ecx /* Args 3&4: zero extend */
+        popq  %rdi; popq  %rsi; xchgl %edi,%esi /* Args 1&2: zero extend */
         movl  UREGS_rax(%rsp),%eax
         pushq %rax
         pushq UREGS_rip+8(%rsp)
 #else
-        movl  %eax,%eax
-        movl  %ebp,%r9d
-        movl  %edi,%r8d
-        xchgl  %ecx,%esi
-        movl  UREGS_rbx(%rsp),%edi
+        /* Relocate argument registers and zero-extend to 64 bits. */
+        movl  %eax,%eax              /* Hypercall #  */
+        xchgl %ecx,%esi              /* Arg 2, Arg 4 */
+        movl  %edx,%edx              /* Arg 3        */
+        movl  %edi,%r8d              /* Arg 5        */
+        movl  %ebp,%r9d              /* Arg 6        */
+        movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
 #endif
         leaq  compat_hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
@@ -276,6 +281,9 @@ CFIX14:
         .quad CFLT14,CFIX14
 .previous
 
+compat_domctl:
+compat_sysctl:
+
 .section .rodata, "a", @progbits
 
 ENTRY(compat_hypercall_table)
@@ -314,8 +322,8 @@ ENTRY(compat_hypercall_table)
         .quad do_event_channel_op
         .quad compat_physdev_op
         .quad do_hvm_op
-        .quad compat_sysctl             /* 35 */
-        .quad compat_domctl
+        .quad do_sysctl                 /* 35 */
+        .quad do_domctl
         .quad compat_kexec_op
         .rept NR_hypercalls-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall

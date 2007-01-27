@@ -63,6 +63,9 @@
 #define VTPM_TX_HP_FNAME       "/var/vtpm/fifos/to_console.fifo"
 #define VTPM_RX_HP_FNAME       "/var/vtpm/fifos/from_console.fifo"
 
+#define VTPM_TYPE_PVM_STRING "pvm"
+#define VTPM_TYPE_HVM_STRING "hvm"
+
 struct vtpm_thread_params_s {
   vtpm_ipc_handle_t *tx_ipc_h;
   vtpm_ipc_handle_t *rx_ipc_h;
@@ -104,12 +107,12 @@ void signal_handler(int reason) {
 
 struct sigaction ctl_c_handler;
 
-TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode) {
+TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE vm_type, BYTE startup_mode) {
 
   TPM_RESULT status = TPM_SUCCESS;
   int fh;
   char dmi_id_str[11]; // UINT32s are up to 10 digits + NULL
-  char *tx_vtpm_name, *tx_tpm_name;
+  char *tx_vtpm_name, *tx_tpm_name, *vm_type_string;
   struct stat file_info;
 
   if (dmi_res->dmi_id == VTPM_CTL_DM) {
@@ -156,6 +159,10 @@ TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode) {
     */
     memset(&dmi_res->DMI_measurement, 0xcc, sizeof(TPM_DIGEST));
 
+    if (vm_type == VTPM_TYPE_PVM)
+      vm_type_string = (BYTE *)&VTPM_TYPE_PVM_STRING;
+    else
+      vm_type_string = (BYTE *)&VTPM_TYPE_HVM_STRING;
 
     // Launch DMI
     sprintf(dmi_id_str, "%d", (int) dmi_res->dmi_id);
@@ -172,13 +179,13 @@ TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode) {
     } else if (pid == 0) {
       switch (startup_mode) {
       case TPM_ST_CLEAR:
-        execl (TPM_EMULATOR_PATH, "vtpmd", "clear", dmi_id_str, NULL);
+        execl (TPM_EMULATOR_PATH, "vtpmd", "clear", vm_type_string, dmi_id_str, NULL);
         break;
       case TPM_ST_STATE:
-        execl (TPM_EMULATOR_PATH, "vtpmd", "save", dmi_id_str, NULL);
+        execl (TPM_EMULATOR_PATH, "vtpmd", "save", vm_type_string, dmi_id_str, NULL);
         break;
       case TPM_ST_DEACTIVATED:
-        execl (TPM_EMULATOR_PATH, "vtpmd", "deactivated", dmi_id_str, NULL);
+        execl (TPM_EMULATOR_PATH, "vtpmd", "deactivated", vm_type_string, dmi_id_str, NULL);
         break;
       default:
         status = TPM_BAD_PARAMETER;

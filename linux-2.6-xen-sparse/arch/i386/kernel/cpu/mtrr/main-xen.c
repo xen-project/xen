@@ -4,11 +4,12 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
+#include <linux/mutex.h>
 
 #include <asm/mtrr.h>
 #include "mtrr.h"
 
-static DECLARE_MUTEX(mtrr_sem);
+static DEFINE_MUTEX(mtrr_mutex);
 
 void generic_get_mtrr(unsigned int reg, unsigned long *base,
 		      unsigned int *size, mtrr_type * type)
@@ -65,7 +66,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	int error;
 	dom0_op_t op;
 
-	down(&mtrr_sem);
+	mutex_lock(&mtrr_mutex);
 
 	op.cmd = DOM0_ADD_MEMTYPE;
 	op.u.add_memtype.mfn     = base;
@@ -73,7 +74,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	op.u.add_memtype.type    = type;
 	error = HYPERVISOR_dom0_op(&op);
 	if (error) {
-		up(&mtrr_sem);
+		mutex_unlock(&mtrr_mutex);
 		BUG_ON(error > 0);
 		return error;
 	}
@@ -81,7 +82,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	if (increment)
 		++usage_table[op.u.add_memtype.reg];
 
-	up(&mtrr_sem);
+	mutex_unlock(&mtrr_mutex);
 
 	return op.u.add_memtype.reg;
 }
@@ -118,7 +119,7 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	int error = -EINVAL;
 	dom0_op_t op;
 
-	down(&mtrr_sem);
+	mutex_lock(&mtrr_mutex);
 
 	if (reg < 0) {
 		/*  Search for existing MTRR  */
@@ -151,7 +152,7 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	}
 	error = reg;
  out:
-	up(&mtrr_sem);
+	mutex_unlock(&mtrr_mutex);
 	return error;
 }
 

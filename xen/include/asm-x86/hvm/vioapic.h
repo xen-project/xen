@@ -28,13 +28,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/smp.h>
-
-#ifdef __ia64__
-#define VIOAPIC_IS_IOSAPIC 1
-#define VIOAPIC_NUM_PINS  24
-#else
-#define VIOAPIC_NUM_PINS  48 /* 16 ISA IRQs, 32 non-legacy PCI IRQS. */
-#endif
+#include <public/hvm/save.h>
 
 #if !VIOAPIC_IS_IOSAPIC
 #define VIOAPIC_VERSION_ID 0x11 /* IOAPIC version */
@@ -58,38 +52,9 @@
 #define VIOAPIC_REG_VERSION 0x01
 #define VIOAPIC_REG_ARB_ID  0x02 /* x86 IOAPIC only */
 
-#define domain_vioapic(d) (&(d)->arch.hvm_domain.irq.vioapic)
+#define domain_vioapic(d) (&(d)->arch.hvm_domain.vioapic)
 #define vioapic_domain(v) (container_of((v), struct domain, \
-                                        arch.hvm_domain.irq.vioapic))
-
-union vioapic_redir_entry
-{
-    uint64_t bits;
-    struct {
-        uint8_t vector;
-        uint8_t delivery_mode:3;
-        uint8_t dest_mode:1;
-        uint8_t delivery_status:1;
-        uint8_t polarity:1;
-        uint8_t remote_irr:1;
-        uint8_t trig_mode:1;
-        uint8_t mask:1;
-        uint8_t reserve:7;
-#if !VIOAPIC_IS_IOSAPIC
-        uint8_t reserved[4];
-        uint8_t dest_id;
-#else
-        uint8_t reserved[3];
-        uint16_t dest_id;
-#endif
-    } fields;
-};
-
-struct vioapic {
-    uint32_t ioregsel, id;
-    unsigned long base_address;
-    union vioapic_redir_entry redirtbl[VIOAPIC_NUM_PINS];
-};
+                                        arch.hvm_domain.vioapic))
 
 void vioapic_init(struct domain *d);
 void vioapic_irq_positive_edge(struct domain *d, unsigned int irq);

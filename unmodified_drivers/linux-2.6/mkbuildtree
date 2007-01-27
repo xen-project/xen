@@ -24,11 +24,7 @@ ln -sf ${XL}/drivers/xen/core/features.c platform-pci
 ln -sf ${XL}/drivers/xen/core/xen_proc.c xenbus
 ln -sf ${XL}/drivers/xen/core/reboot.c util
 
-mkdir -p include
-mkdir -p include/xen
-mkdir -p include/public
-mkdir -p include/asm
-mkdir -p include/asm/xen
+mkdir -p include/asm include/xen
 
 lndir -silent ${XL}/include/xen include/xen
 ln -nsf ${XEN}/include/public include/xen/interface
@@ -43,7 +39,8 @@ in
     ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/hypercall.h include/asm
     ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/synch_bitops.h include/asm
     ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/maddr.h include/asm
-    ln -sf ${XL}/include/asm-i386 include/asm-i386
+    mkdir include/asm-i386
+    lndir -silent ${XL}/include/asm-i386 include/asm-i386
   ;;
 i[34567]86)
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/hypervisor.h include/asm
@@ -56,6 +53,7 @@ i[34567]86)
     ln -sf ${XL}/include/asm-ia64/hypercall.h include/asm
     ln -sf ${XL}/include/asm-ia64/synch_bitops.h include/asm
     ln -sf ${XL}/include/asm-ia64/maddr.h include/asm
+    mkdir include/asm/xen
     ln -sf ${XL}/include/asm-ia64/xen/xcom_hcall.h include/asm/xen
     ln -sf ${XL}/include/asm-ia64/xen/xencomm.h include/asm/xen
     ln -sf ${XL}/arch/ia64/xen/xcom_mini.c platform-pci

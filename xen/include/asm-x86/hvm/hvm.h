@@ -22,6 +22,8 @@
 #define __ASM_X86_HVM_HVM_H__
 
 #include <asm/x86_emulate.h>
+#include <public/domctl.h>
+#include <public/hvm/save.h>
 
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
@@ -79,6 +81,11 @@ struct hvm_function_table {
         struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs);
     void (*load_cpu_guest_regs)(
         struct vcpu *v, struct cpu_user_regs *r);
+
+    /* save and load hvm guest cpu context for save/restore */
+    void (*save_cpu_ctxt)(hvm_domain_context_t *h, void *opaque);
+    int (*load_cpu_ctxt)(hvm_domain_context_t *h, void *opaque, int version);
+
     /*
      * Examine specifics of the guest state:
      * 1) determine whether paging is enabled,
@@ -157,6 +164,9 @@ hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
     hvm_funcs.load_cpu_guest_regs(v, r);
 }
 
+void hvm_set_guest_time(struct vcpu *v, u64 gtime);
+u64 hvm_get_guest_time(struct vcpu *v);
+
 static inline int
 hvm_paging_enabled(struct vcpu *v)
 {
@@ -222,8 +232,6 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_stts(struct vcpu *v);
-void hvm_set_guest_time(struct vcpu *v, u64 gtime);
-u64 hvm_get_guest_time(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 

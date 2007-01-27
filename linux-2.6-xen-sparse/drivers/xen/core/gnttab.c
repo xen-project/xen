@@ -464,7 +464,7 @@ int gnttab_suspend(void)
 
 #endif /* !CONFIG_XEN */
 
-int __init gnttab_init(void)
+int __devinit gnttab_init(void)
 {
 	int i;
 

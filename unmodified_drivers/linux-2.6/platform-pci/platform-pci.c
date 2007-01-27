@@ -61,7 +61,7 @@ MODULE_LICENSE("GPL");
 unsigned long *phys_to_machine_mapping;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
-static int __init init_xen_info(void)
+static int __devinit init_xen_info(void)
 {
 	unsigned long shared_info_frame;
 	struct xen_add_to_physmap xatp;
@@ -194,16 +194,33 @@ static uint64_t get_callback_via(struct pci_dev *pdev)
 	       rid);
 	return rid | IA64_CALLBACK_IRQ_RID;
 #else /* !__ia64__ */
+	u8 pin;
+
 	if (pdev->irq < 16)
 		return pdev->irq; /* ISA IRQ */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
+	pin = pdev->pin;
+#else
+	pci_read_config_byte(pdev, PCI_INTERRUPT_PIN, &pin);
+#endif
+
 	/* We don't know the GSI. Specify the PCI INTx line instead. */
 	return (((uint64_t)0x01 << 56) | /* PCI INTx identifier */
 		((uint64_t)pci_domain_nr(pdev->bus) << 32) |
 		((uint64_t)pdev->bus->number << 16) |
 		((uint64_t)(pdev->devfn & 0xff) << 8) |
-		((uint64_t)(pdev->pin - 1) & 3));
+		((uint64_t)(pin - 1) & 3));
 #endif
 }
+
+/* Invalidate foreign mappings (e.g., in qemu-based device model). */
+static uint16_t invlmap_port;
+void xen_invalidate_foreign_mappings(void)
+{
+	outb(0, invlmap_port);
+}
+EXPORT_SYMBOL(xen_invalidate_foreign_mappings);
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
@@ -229,6 +246,8 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		printk(KERN_WARNING DRV_NAME ":no resources found\n");
 		return -ENOENT;
 	}
+
+	invlmap_port = ioaddr;
 
 	if (request_mem_region(mmio_addr, mmio_len, DRV_NAME) == NULL)
 	{

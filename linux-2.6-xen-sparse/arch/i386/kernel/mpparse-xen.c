@@ -17,7 +17,6 @@
 #include <linux/init.h>
 #include <linux/acpi.h>
 #include <linux/delay.h>
-#include <linux/config.h>
 #include <linux/bootmem.h>
 #include <linux/smp_lock.h>
 #include <linux/kernel_stat.h>
@@ -37,12 +36,6 @@
 /* Have we found an MP table */
 int smp_found_config;
 unsigned int __initdata maxcpus = NR_CPUS;
-
-#ifdef CONFIG_HOTPLUG_CPU
-#define CPU_HOTPLUG_ENABLED	(1)
-#else
-#define CPU_HOTPLUG_ENABLED	(0)
-#endif
 
 /*
  * Various Linux-internal data structures created from the
@@ -110,21 +103,6 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 static int mpc_record; 
 static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
 
-#ifdef CONFIG_X86_NUMAQ
-static int MP_valid_apicid(int apicid, int version)
-{
-	return hweight_long(apicid & 0xf) == 1 && (apicid >> 4) != 0xf;
-}
-#elif !defined(CONFIG_XEN)
-static int MP_valid_apicid(int apicid, int version)
-{
-	if (version >= 0x14)
-		return apicid < 0xff;
-	else
-		return apicid < 0xf;
-}
-#endif
-
 #ifndef CONFIG_XEN
 static void __devinit MP_processor_info (struct mpc_config_processor *m)
 {
@@ -191,12 +169,6 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 
 	ver = m->mpc_apicver;
 
-	if (!MP_valid_apicid(apicid, ver)) {
-		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
-			m->mpc_apicid, MAX_APICS);
-		return;
-	}
-
 	/*
 	 * Validate version
 	 */
@@ -226,7 +198,14 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 	cpu_set(num_processors, cpu_possible_map);
 	num_processors++;
 
-	if (CPU_HOTPLUG_ENABLED || (num_processors > 8)) {
+	/*
+	 * Would be preferable to switch to bigsmp when CONFIG_HOTPLUG_CPU=y
+	 * but we need to work other dependencies like SMP_SUSPEND etc
+	 * before this can be done without some confusion.
+	 * if (CPU_HOTPLUG_ENABLED || num_processors > 8)
+	 *       - Ashok Raj <ashok.raj@intel.com>
+	 */
+	if (num_processors > 8) {
 		switch (boot_cpu_data.x86_vendor) {
 		case X86_VENDOR_INTEL:
 			if (!APIC_XAPIC(ver)) {
@@ -255,6 +234,13 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 	str[6] = 0;
 
 	mpc_oem_bus_info(m, str, translation_table[mpc_record]);
+
+	if (m->mpc_busid >= MAX_MP_BUSSES) {
+		printk(KERN_WARNING "MP table busid value (%d) for bustype %s "
+			" is too large, max. supported is %d\n",
+			m->mpc_busid, str, MAX_MP_BUSSES - 1);
+		return;
+	}
 
 	if (strncmp(str, BUSTYPE_ISA, sizeof(BUSTYPE_ISA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_ISA;
@@ -844,6 +830,8 @@ void __init find_smp_config (void)
 #endif
 }
 
+int es7000_plat;
+
 /* --------------------------------------------------------------------------
                             ACPI-based MP Configuration
    -------------------------------------------------------------------------- */
@@ -957,7 +945,8 @@ void __init mp_register_ioapic (
 #ifndef CONFIG_XEN
 	set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);
 #endif
-	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) && (boot_cpu_data.x86 < 15))
+	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+		&& !APIC_XAPIC(apic_version[boot_cpu_physical_apicid]))
 		tmpid = io_apic_get_unique_id(idx, id);
 	else
 		tmpid = id;
@@ -1032,8 +1021,6 @@ void __init mp_override_legacy_irq (
 
 	return;
 }
-
-int es7000_plat;
 
 void __init mp_config_acpi_legacy_irqs (void)
 {
@@ -1164,7 +1151,17 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 		 */
 		int irq = gsi;
 		if (gsi < MAX_GSI_NUM) {
-			if (gsi > 15)
+			/*
+			 * Retain the VIA chipset work-around (gsi > 15), but
+			 * avoid a problem where the 8254 timer (IRQ0) is setup
+			 * via an override (so it's not on pin 0 of the ioapic),
+			 * and at the same time, the pin 0 interrupt is a PCI
+			 * type.  The gsi > 15 test could cause these two pins
+			 * to be shared as IRQ0, and they are not shareable.
+			 * So test for this condition, and if necessary, avoid
+			 * the pin collision.
+			 */
+			if (gsi > 15 || (gsi == 0 && !timer_uses_ioapic_pin_0))
 				gsi = pci_irq++;
 			/*
 			 * Don't assign IRQ used by ACPI SCI

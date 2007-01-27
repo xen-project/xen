@@ -5,6 +5,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/compat.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -26,9 +27,6 @@
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
-#ifdef CONFIG_COMPAT
-#include <compat/domctl.h>
-#endif
 
 /* Both these structures are protected by the domlist_lock. */
 DEFINE_RWLOCK(domlist_lock);
@@ -128,6 +126,9 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     struct vcpu *v;
     unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
 
+    if ( (v = idle_vcpu[cpu_id]) != NULL )
+        return v;
+
     d = (vcpu_id == 0) ?
         domain_create(IDLE_DOMAIN_ID, 0) :
         idle_vcpu[cpu_id - vcpu_id]->domain;
@@ -202,7 +203,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 }
 
 
-struct domain *find_domain_by_id(domid_t dom)
+struct domain *get_domain_by_id(domid_t dom)
 {
     struct domain *d;
 
@@ -447,70 +448,6 @@ void domain_unpause_by_systemcontroller(struct domain *d)
     }
 }
 
-
-/*
- * set_info_guest is used for final setup, launching, and state modification 
- * of domains other than domain 0. ie. the domains that are being built by 
- * the userspace dom0 domain builder.
- */
-int set_info_guest(struct domain *d,
-                   xen_domctl_vcpucontext_u vcpucontext)
-{
-    int rc = 0;
-    vcpu_guest_context_u c;
-#ifdef CONFIG_COMPAT
-    CHECK_FIELD(domctl_vcpucontext, vcpu);
-#endif
-    unsigned long vcpu = vcpucontext.nat->vcpu;
-    struct vcpu *v;
-
-    if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
-        return -EINVAL;
-    
-#ifdef CONFIG_COMPAT
-    BUILD_BUG_ON(sizeof(struct vcpu_guest_context)
-                 < sizeof(struct compat_vcpu_guest_context));
-#endif
-    if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
-        return -ENOMEM;
-
-    domain_pause(d);
-
-    if ( !IS_COMPAT(v->domain) )
-    {
-        if ( !IS_COMPAT(current->domain)
-             ? copy_from_guest(c.nat, vcpucontext.nat->ctxt, 1)
-#ifndef CONFIG_COMPAT
-             : 0 )
-#else
-             : copy_from_guest(c.nat,
-                               compat_handle_cast(vcpucontext.cmp->ctxt,
-                                                  void),
-                               1) )
-#endif
-            rc = -EFAULT;
-    }
-#ifdef CONFIG_COMPAT
-    else
-    {
-        if ( !IS_COMPAT(current->domain)
-             ? copy_from_guest(c.cmp,
-                               guest_handle_cast(vcpucontext.nat->ctxt, void),
-                               1)
-             : copy_from_compat(c.cmp, vcpucontext.cmp->ctxt, 1) )
-            rc = -EFAULT;
-    }
-#endif
-
-    if ( rc == 0 )
-        rc = arch_set_info_guest(v, c);
-
-    domain_unpause(d);
-
-    xfree(c.nat);
-    return rc;
-}
-
 int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 {
     struct vcpu *v = d->vcpu[vcpuid];
@@ -519,6 +456,36 @@ int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 
     return arch_set_info_guest(v, ctxt);
 }
+
+int vcpu_reset(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    int rc;
+
+    domain_pause(d);
+    LOCK_BIGLOCK(d);
+
+    rc = arch_vcpu_reset(v);
+    if ( rc != 0 )
+        goto out;
+
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+    clear_bit(_VCPUF_nmi_masked, &v->vcpu_flags);
+    clear_bit(_VCPUF_polling, &v->vcpu_flags);
+
+ out:
+    UNLOCK_BIGLOCK(v->domain);
+    domain_unpause(d);
+
+    return rc;
+}
+
 
 long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 {

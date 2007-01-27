@@ -1,6 +1,7 @@
 SUBDIRS =
 
-TESTS = 01_xapi-vm_basic.test
+TESTS = 01_xapi-vm_basic.test \
+	02_xapi-vbd_basic.test
 
 XFAIL_TESTS =
 

@@ -50,12 +50,31 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-int hvm_enabled = 0;
+int hvm_enabled;
 
-unsigned int opt_hvm_debug_level = 0;
+unsigned int opt_hvm_debug_level;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
+
+/* I/O permission bitmap is globally shared by all HVM guests. */
+char __attribute__ ((__section__ (".bss.page_aligned")))
+    hvm_io_bitmap[3*PAGE_SIZE];
+
+void hvm_enable(void)
+{
+    if ( hvm_enabled )
+        return;
+
+    /*
+     * Allow direct access to the PC debug port (it is often used for I/O
+     * delays, but the vmexits simply slow things down).
+     */
+    memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
+    clear_bit(0x80, hvm_io_bitmap);
+
+    hvm_enabled = 1;
+}
 
 void hvm_stts(struct vcpu *v)
 {
@@ -135,7 +154,7 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
-    spin_lock_init(&d->arch.hvm_domain.irq.lock);
+    spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
     rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
     if ( rc != 0 )
@@ -149,11 +168,19 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
+    HVMStateEntry *se, *dse;
     pit_deinit(d);
     rtc_deinit(d);
     pmtimer_deinit(d);
     hpet_deinit(d);
 
+    se = d->arch.hvm_domain.first_se;
+    while (se) {
+        dse = se;
+        se = se->next;
+        xfree(dse);
+    }
+ 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
             (void *)d->arch.hvm_domain.shared_page_va);
@@ -162,9 +189,27 @@ void hvm_domain_destroy(struct domain *d)
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
+int hvm_load_cpu_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+{
+    struct vcpu *v = opaque;
+
+    if ( hvm_funcs.load_cpu_ctxt(h, opaque, version) < 0 )
+        return -EINVAL;
+
+    /* Auxiliary processors shoudl be woken immediately. */
+    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        vcpu_wake(v);
+
+    return 0;
+}
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
+
+    hvm_register_savevm(v->domain, "xen_hvm_cpu", v->vcpu_id, 1,
+                        hvm_funcs.save_cpu_ctxt, hvm_load_cpu_ctxt, 
+                        (void *)v);
 
     if ( (rc = vlapic_init(v)) != 0 )
         return rc;
@@ -186,9 +231,13 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( v->vcpu_id != 0 )
         return 0;
 
+    pit_init(v, cpu_khz);
     rtc_init(v, RTC_PORT(0), RTC_IRQ);
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
     hpet_init(v);
+ 
+    /* init hvm sharepage */
+    shpage_init(v->domain, get_sp(v->domain));
 
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
@@ -625,7 +674,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -668,7 +717,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -711,7 +760,7 @@ static int hvmop_set_pci_link_route(
     if ( (op.link > 3) || (op.isa_irq > 15) )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -756,7 +805,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( IS_PRIV(current->domain) )
         {
-            d = find_domain_by_id(a.domid);
+            d = get_domain_by_id(a.domid);
             if ( d == NULL )
                 return -ESRCH;
         }

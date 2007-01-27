@@ -62,7 +62,7 @@ static void rtc_timer_update(RTCState *s)
 #ifdef DEBUG_RTC
         printk("HVM_RTC: period = %uns\n", period);
 #endif
-        create_periodic_time(&s->pt, period, RTC_IRQ, 0, rtc_periodic_cb, s);
+        create_periodic_time(current, &s->pt, period, RTC_IRQ, 0, rtc_periodic_cb, s);
     } 
     else
         destroy_periodic_time(&s->pt);

@@ -1,7 +1,6 @@
 #ifndef __X86_64_MMU_CONTEXT_H
 #define __X86_64_MMU_CONTEXT_H
 
-#include <linux/config.h>
 #include <asm/desc.h>
 #include <asm/atomic.h>
 #include <asm/pgalloc.h>
@@ -76,12 +75,12 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		BUG_ON(!next->context.pinned);
 
 		/* stop flush ipis for the previous mm */
-		clear_bit(cpu, &prev->cpu_vm_mask);
+		cpu_clear(cpu, prev->cpu_vm_mask);
 #if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 		write_pda(mmu_state, TLBSTATE_OK);
 		write_pda(active_mm, next);
 #endif
-		set_bit(cpu, &next->cpu_vm_mask);
+		cpu_set(cpu, next->cpu_vm_mask);
 
 		/* load_cr3(next->pgd) */
 		op->cmd = MMUEXT_NEW_BASEPTR;
@@ -108,7 +107,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		write_pda(mmu_state, TLBSTATE_OK);
 		if (read_pda(active_mm) != next)
 			out_of_line_bug();
-		if(!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
+		if (!cpu_test_and_set(cpu, next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 
 			 * tlb flush IPI delivery. We must reload CR3
 			 * to make sure to use no freed page tables.

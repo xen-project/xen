@@ -24,3 +24,6 @@ def IntroduceDomain(domid, page, port):
 
 def GetDomainPath(domid):
     return xshandle().get_domain_path(domid)
+
+def ResumeDomain(domid):
+    return xshandle().resume_domain(domid)

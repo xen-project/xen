@@ -11,6 +11,9 @@ obj-$(CONFIG_IA32_EMULATION) += $(sysv-y)
 
 obj-$(CONFIG_IA32_AOUT) += ia32_aout.o
 
+audit-class-$(CONFIG_AUDIT) := audit.o
+obj-$(CONFIG_IA32_EMULATION) += $(audit-class-y)
+
 $(obj)/syscall32_syscall.o: \
 	$(foreach F,sysenter syscall,$(obj)/vsyscall-$F.so)
 
@@ -20,6 +23,7 @@ targets := $(foreach F,sysenter syscall,vsyscall-$F.o vsyscall-$F.so)
 # The DSO images are built using a special linker script
 quiet_cmd_syscall = SYSCALL $@
       cmd_syscall = $(CC) -m32 -nostdlib -shared -s \
+			  $(call ld-option, -Wl$(comma)--hash-style=sysv) \
 			   -Wl,-soname=linux-gate.so.1 -o $@ \
 			   -Wl,-T,$(filter-out FORCE,$^)
 

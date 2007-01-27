@@ -1274,7 +1274,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
     if (flags & (ASSIGN_nocache | ASSIGN_pgc_allocated))
         return -EINVAL;
 
-    rd = find_domain_by_id(domid);
+    rd = get_domain_by_id(domid);
     if (unlikely(rd == NULL)) {
         switch (domid) {
         case DOMID_XEN:
@@ -2055,7 +2055,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if (!IS_PRIV(current->domain))
             return -EPERM;
-        else if ((d = find_domain_by_id(xatp.domid)) == NULL)
+        else if ((d = get_domain_by_id(xatp.domid)) == NULL)
             return -ESRCH;
 
         /* This hypercall is used for VT-i domain only */

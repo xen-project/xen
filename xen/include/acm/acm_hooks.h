@@ -241,7 +241,7 @@ static inline int acm_pre_domctl(struct xen_domctl *op, void **ssid)
                     __func__);
             return -EACCES;
         }
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if (d != NULL) {
             *ssid = d->ssid; /* save for post destroy when d is gone */
             if (*ssid == NULL) {

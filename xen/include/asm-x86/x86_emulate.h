@@ -4,6 +4,7 @@
  * Generic x86 (32-bit and 64-bit) instruction decoder and emulator.
  * 
  * Copyright (c) 2005-2007 Keir Fraser
+ * Copyright (c) 2005-2007 XenSource Inc.
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,16 +70,19 @@ struct x86_emulate_ops
 {
     /*
      * All functions:
+     *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
+     * All memory-access functions:
      *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
      *  @offset:[IN ] Offset within segment.
-     *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
+     * Read functions:
+     *  @val:   [OUT] Value read, zero-extended to 'ulong'.
+     * Write functions:
+     *  @val:   [IN ] Value to write (low-order bytes used as req'd).
+     * Variable-length access functions:
+     *  @bytes: [IN ] Number of bytes to read or write.
      */
 
-    /*
-     * read: Emulate a memory read.
-     *  @val:   [OUT] Value read from memory, zero-extended to 'ulong'.
-     *  @bytes: [IN ] Number of bytes to read from memory.
-     */
+    /* read: Emulate a memory read. */
     int (*read)(
         enum x86_segment seg,
         unsigned long offset,
@@ -97,11 +101,7 @@ struct x86_emulate_ops
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
-    /*
-     * write: Emulate a memory write.
-     *  @val:   [IN ] Value to write to memory (low-order bytes used as req'd).
-     *  @bytes: [IN ] Number of bytes to write to memory.
-     */
+    /* write: Emulate a memory write. */
     int (*write)(
         enum x86_segment seg,
         unsigned long offset,
@@ -113,7 +113,6 @@ struct x86_emulate_ops
      * cmpxchg: Emulate an atomic (LOCKed) CMPXCHG operation.
      *  @old:   [IN ] Value expected to be current at @addr.
      *  @new:   [IN ] Value to write to @addr.
-     *  @bytes: [IN ] Number of bytes to access using CMPXCHG.
      */
     int (*cmpxchg)(
         enum x86_segment seg,
@@ -140,6 +139,89 @@ struct x86_emulate_ops
         unsigned long old_hi,
         unsigned long new_lo,
         unsigned long new_hi,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_io: Read from I/O port(s).
+     *  @port:  [IN ] Base port for access.
+     */
+    int (*read_io)(
+        unsigned int port,
+        unsigned int bytes,
+        unsigned long *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_io: Write to I/O port(s).
+     *  @port:  [IN ] Base port for access.
+     */
+    int (*write_io)(
+        unsigned int port,
+        unsigned int bytes,
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_cr: Read from control register.
+     *  @reg:   [IN ] Register to read (0-15).
+     */
+    int (*read_cr)(
+        unsigned int reg,
+        unsigned long *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_cr: Write to control register.
+     *  @reg:   [IN ] Register to write (0-15).
+     */
+    int (*write_cr)(
+        unsigned int reg,
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_dr: Read from debug register.
+     *  @reg:   [IN ] Register to read (0-15).
+     */
+    int (*read_dr)(
+        unsigned int reg,
+        unsigned long *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_dr: Write to debug register.
+     *  @reg:   [IN ] Register to write (0-15).
+     */
+    int (*write_dr)(
+        unsigned int reg,
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_msr: Read from model-specific register.
+     *  @reg:   [IN ] Register to read.
+     */
+    int (*read_msr)(
+        unsigned long reg,
+        uint64_t *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_dr: Write to model-specific register.
+     *  @reg:   [IN ] Register to write.
+     */
+    int (*write_msr)(
+        unsigned long reg,
+        uint64_t val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* write_rflags: Modify privileged bits in RFLAGS. */
+    int (*write_rflags)(
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* wbinvd: Write-back and invalidate cache contents. */
+    int (*wbinvd)(
         struct x86_emulate_ctxt *ctxt);
 };
 

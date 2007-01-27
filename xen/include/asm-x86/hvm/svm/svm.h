@@ -28,7 +28,6 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/i387.h>
 
-extern void asidpool_retire(struct vmcb_struct *vmcb, int core);
 extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 extern void svm_do_launch(struct vcpu *v);
 extern void arch_svm_do_resume(struct vcpu *v);

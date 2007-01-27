@@ -112,7 +112,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = find_domain_by_id(dom)) == NULL )
+    if ( (d = get_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
     spin_lock(&d->evtchn_lock);
@@ -150,7 +150,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
 
-    if ( (rd = find_domain_by_id(rdom)) == NULL )
+    if ( (rd = get_domain_by_id(rdom)) == NULL )
         return -ESRCH;
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
@@ -598,7 +598,7 @@ static long evtchn_status(evtchn_status_t *status)
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = find_domain_by_id(dom)) == NULL )
+    if ( (d = get_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
     spin_lock(&d->evtchn_lock);
@@ -735,6 +735,29 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
 }
 
 
+static long evtchn_reset(evtchn_reset_t *r)
+{
+    domid_t dom = r->dom;
+    struct domain *d;
+    int i;
+
+    if ( dom == DOMID_SELF )
+        dom = current->domain->domain_id;
+    else if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( (d = get_domain_by_id(dom)) == NULL )
+        return -ESRCH;
+
+    for ( i = 0; port_is_valid(d, i); i++ )
+        (void)__evtchn_close(d, i);
+
+    put_domain(d);
+
+    return 0;
+}
+
+
 long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     long rc;
@@ -830,6 +853,14 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&unmask, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_unmask(&unmask);
+        break;
+    }
+
+    case EVTCHNOP_reset: {
+        struct evtchn_reset reset;
+        if ( copy_from_guest(&reset, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_reset(&reset);
         break;
     }
 

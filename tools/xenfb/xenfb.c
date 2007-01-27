@@ -7,6 +7,7 @@
 #include <xen/io/xenbus.h>
 #include <xen/io/fbif.h>
 #include <xen/io/kbdif.h>
+#include <xen/io/protocols.h>
 #include <sys/select.h>
 #include <stdbool.h>
 #include <xen/linux/evtchn.h>
@@ -40,6 +41,7 @@ struct xenfb_private {
 	struct xs_handle *xsh;	/* xs daemon handle */
 	struct xenfb_device fb, kbd;
 	size_t fb_len;		/* size of framebuffer */
+	char protocol[64];	/* frontend protocol */
 };
 
 static void xenfb_detach_dom(struct xenfb_private *);
@@ -324,16 +326,79 @@ static int xenfb_wait_for_frontend_initialised(struct xenfb_device *dev)
 	return 0;
 }
 
+static void xenfb_copy_mfns(int mode, int count, unsigned long *dst, void *src)
+{
+	uint32_t *src32 = src;
+	uint64_t *src64 = src;
+	int i;
+
+	for (i = 0; i < count; i++)
+		dst[i] = (mode == 32) ? src32[i] : src64[i];
+}
+
 static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 {
 	struct xenfb_page *page = xenfb->fb.page;
 	int n_fbmfns;
 	int n_fbdirs;
-	unsigned long *fbmfns;
+	unsigned long *pgmfns = NULL;
+	unsigned long *fbmfns = NULL;
+	void *map, *pd;
+	int mode, ret = -1;
+
+	/* default to native */
+	pd = page->pd;
+	mode = sizeof(unsigned long) * 8;
+
+	if (0 == strlen(xenfb->protocol)) {
+		/*
+		 * Undefined protocol, some guesswork needed.
+		 *
+		 * Old frontends which don't set the protocol use
+		 * one page directory only, thus pd[1] must be zero.
+		 * pd[1] of the 32bit struct layout and the lower
+		 * 32 bits of pd[0] of the 64bit struct layout have
+		 * the same location, so we can check that ...
+		 */
+		uint32_t *ptr32 = NULL;
+		uint32_t *ptr64 = NULL;
+#if defined(__i386__)
+		ptr32 = (void*)page->pd;
+		ptr64 = ((void*)page->pd) + 4;
+#elif defined(__x86_64__)
+		ptr32 = ((void*)page->pd) - 4;
+		ptr64 = (void*)page->pd;
+#endif
+		if (ptr32) {
+			if (0 == ptr32[1]) {
+				mode = 32;
+				pd   = ptr32;
+			} else {
+				mode = 64;
+				pd   = ptr64;
+			}
+		}
+#if defined(__x86_64__)
+	} else if (0 == strcmp(xenfb->protocol, XEN_IO_PROTO_ABI_X86_32)) {
+		/* 64bit dom0, 32bit domU */
+		mode = 32;
+		pd   = ((void*)page->pd) - 4;
+#elif defined(__i386__)
+	} else if (0 == strcmp(xenfb->protocol, XEN_IO_PROTO_ABI_X86_64)) {
+		/* 32bit dom0, 64bit domU */
+		mode = 64;
+		pd   = ((void*)page->pd) + 4;
+#endif
+	}
 
 	n_fbmfns = (xenfb->fb_len + (XC_PAGE_SIZE - 1)) / XC_PAGE_SIZE;
-	n_fbdirs = n_fbmfns * sizeof(unsigned long);
+	n_fbdirs = n_fbmfns * mode / 8;
 	n_fbdirs = (n_fbdirs + (XC_PAGE_SIZE - 1)) / XC_PAGE_SIZE;
+
+	pgmfns = malloc(sizeof(unsigned long) * n_fbdirs);
+	fbmfns = malloc(sizeof(unsigned long) * n_fbmfns);
+	if (!pgmfns || !fbmfns)
+		goto out;
 
 	/*
 	 * Bug alert: xc_map_foreign_batch() can fail partly and
@@ -341,19 +406,27 @@ static int xenfb_map_fb(struct xenfb_private *xenfb, int domid)
 	 * happens, we happily continue here, and later crash on
 	 * access.
 	 */
-	fbmfns = xc_map_foreign_batch(xenfb->xc, domid,
-			PROT_READ, page->pd, n_fbdirs);
-	if (fbmfns == NULL)
-		return -1;
+	xenfb_copy_mfns(mode, n_fbdirs, pgmfns, pd);
+	map = xc_map_foreign_batch(xenfb->xc, domid,
+				   PROT_READ, pgmfns, n_fbdirs);
+	if (map == NULL)
+		goto out;
+	xenfb_copy_mfns(mode, n_fbmfns, fbmfns, map);
+	munmap(map, n_fbdirs * XC_PAGE_SIZE);
 
 	xenfb->pub.pixels = xc_map_foreign_batch(xenfb->xc, domid,
 				PROT_READ | PROT_WRITE, fbmfns, n_fbmfns);
-	if (xenfb->pub.pixels == NULL) {
-		munmap(fbmfns, n_fbdirs * XC_PAGE_SIZE);
-		return -1;
-	}
+	if (xenfb->pub.pixels == NULL)
+		goto out;
 
-	return munmap(fbmfns, n_fbdirs * XC_PAGE_SIZE);
+	ret = 0; /* all is fine */
+
+ out:
+	if (pgmfns)
+		free(pgmfns);
+	if (fbmfns)
+		free(fbmfns);
+	return ret;
 }
 
 static int xenfb_bind(struct xenfb_device *dev)
@@ -491,6 +564,9 @@ int xenfb_attach_dom(struct xenfb *xenfb_pub, int domid)
 		errno = ENOTSUP;
 		goto error;
 	}
+	if (xenfb_xs_scanf1(xsh, xenfb->fb.otherend, "protocol", "%63s",
+			    xenfb->protocol) < 0)
+		xenfb->protocol[0] = '\0';
 	xenfb_xs_printf(xsh, xenfb->fb.nodename, "request-update", "1");
 
 	/* TODO check for permitted ranges */

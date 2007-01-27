@@ -38,8 +38,6 @@
 #include <xen/keyhandler.h>
 
 extern int svm_dbg_on;
-extern int asidpool_assign_next(
-    struct vmcb_struct *vmcb, int retire_current, int oldcore, int newcore);
 
 #define GUEST_SEGMENT_LIMIT 0xffffffff
 
@@ -92,8 +90,9 @@ static int construct_vmcb(struct vcpu *v)
     struct vmcb_struct *vmcb = arch_svm->vmcb;
     svm_segment_attributes_t attrib;
 
-    /* Always flush the TLB on VMRUN. */
+    /* Always flush the TLB on VMRUN. All guests share a single ASID (1). */
     vmcb->tlb_control = 1;
+    vmcb->guest_asid  = 1;
 
     /* SVM intercepts. */
     vmcb->general1_intercepts = 
@@ -116,19 +115,12 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->cr_intercepts = ~(CR_INTERCEPT_CR2_READ | CR_INTERCEPT_CR2_WRITE);
 
     /* I/O and MSR permission bitmaps. */
-    arch_svm->iopm  = alloc_xenheap_pages(get_order_from_bytes(IOPM_SIZE));
     arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
-    if ( (arch_svm->iopm == NULL) || (arch_svm->msrpm == NULL) )
-    {
-        free_xenheap_pages(arch_svm->iopm,  get_order_from_bytes(IOPM_SIZE));
-        free_xenheap_pages(arch_svm->msrpm, get_order_from_bytes(MSRPM_SIZE));
+    if ( arch_svm->msrpm == NULL )
         return -ENOMEM;
-    }
-    memset(arch_svm->iopm, 0xff, IOPM_SIZE);
-    clear_bit(PC_DEBUG_PORT, arch_svm->iopm);
     memset(arch_svm->msrpm, 0xff, MSRPM_SIZE);
-    vmcb->iopm_base_pa = (u64)virt_to_maddr(arch_svm->iopm);
     vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
+    vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);
 
     /* Virtualise EFLAGS.IF and LAPIC TPR (CR8). */
     vmcb->vintr.fields.intr_masking = 1;
@@ -240,17 +232,7 @@ void svm_destroy_vmcb(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
 
     if ( arch_svm->vmcb != NULL )
-    {
-        asidpool_retire(arch_svm->vmcb, arch_svm->asid_core);
         free_vmcb(arch_svm->vmcb);
-    }
-
-    if ( arch_svm->iopm != NULL )
-    {
-        free_xenheap_pages(
-            arch_svm->iopm, get_order_from_bytes(IOPM_SIZE));
-        arch_svm->iopm = NULL;
-    }
 
     if ( arch_svm->msrpm != NULL )
     {
@@ -264,16 +246,10 @@ void svm_destroy_vmcb(struct vcpu *v)
 
 void svm_do_launch(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int core = smp_processor_id();
-
     hvm_stts(v);
 
     /* current core is the one we intend to perform the VMRUN on */
-    v->arch.hvm_svm.launch_core = v->arch.hvm_svm.asid_core = core;
-    clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    if ( !asidpool_assign_next(vmcb, 0, core, core) )
-        BUG();
+    v->arch.hvm_svm.launch_core = smp_processor_id();
 
     v->arch.schedule_tail = arch_svm_do_resume;
 }

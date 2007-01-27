@@ -32,7 +32,6 @@
  */
 
 #define ASSEMBLY 1
-#include <linux/config.h>
 #ifdef CONFIG_DEBUG_INFO
 #undef CONFIG_DEBUG_INFO
 #endif
@@ -49,6 +48,7 @@
 #include <asm/thread_info.h>
 #include <asm/hw_irq.h>
 #include <asm/page.h>
+#include <asm/irqflags.h>
 #include <asm/errno.h>
 #include <xen/interface/arch-x86_64.h>
 #include <xen/interface/features.h>
@@ -62,6 +62,16 @@
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
+
+
+.macro TRACE_IRQS_IRETQ offset=ARGOFFSET
+#ifdef CONFIG_TRACE_IRQFLAGS
+	bt   $9,EFLAGS-\offset(%rsp)	/* interrupts off? */
+	jnc  1f
+	TRACE_IRQS_ON
+1:
+#endif
+.endm
 
 NMI_MASK = 0x80000000
 	
@@ -195,6 +205,7 @@ rff_trace:
 	GET_THREAD_INFO(%rcx)	
 	jmp rff_action
 	CFI_ENDPROC
+END(ret_from_fork)
 
 /*
  * System call entry. Upto 6 arguments in registers are supported.
@@ -229,11 +240,15 @@ rff_trace:
 
 ENTRY(system_call)
 	CFI_STARTPROC	simple
-	CFI_DEF_CFA	rsp,0
+	CFI_DEF_CFA	rsp,PDA_STACKOFFSET
 	CFI_REGISTER	rip,rcx
 	/*CFI_REGISTER	rflags,r11*/
 	SAVE_ARGS -8,0
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp) 
+	/*
+	 * No need to follow this irqs off/on section - it's straight
+	 * and short:
+	 */
         XEN_UNBLOCK_EVENTS(%r11)        
 	GET_THREAD_INFO(%rcx)
 	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SECCOMP),threadinfo_flags(%rcx)
@@ -255,10 +270,15 @@ ret_from_sys_call:
 sysret_check:		
 	GET_THREAD_INFO(%rcx)
         XEN_BLOCK_EVENTS(%rsi)        
+	TRACE_IRQS_OFF
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	CFI_REMEMBER_STATE
 	jnz  sysret_careful 
+	/*
+	 * sysretq will re-enable interrupts:
+	 */
+	TRACE_IRQS_ON
         XEN_UNBLOCK_EVENTS(%rsi)                
 	CFI_REGISTER	rip,rcx
 	RESTORE_ARGS 0,8,0
@@ -271,6 +291,7 @@ sysret_careful:
 	CFI_RESTORE_STATE
 	bt $TIF_NEED_RESCHED,%edx
 	jnc sysret_signal
+	TRACE_IRQS_ON
 	XEN_UNBLOCK_EVENTS(%rsi)
 	pushq %rdi
 	CFI_ADJUST_CFA_OFFSET 8
@@ -281,6 +302,7 @@ sysret_careful:
 
 	/* Handle a signal */ 
 sysret_signal:
+	TRACE_IRQS_ON
 /*	sti */
         XEN_UNBLOCK_EVENTS(%rsi)        
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
@@ -296,6 +318,7 @@ sysret_signal:
 	/* Use IRET because user could have changed frame. This
 	   works because ptregscall_common has called FIXUP_TOP_OF_STACK. */
 	XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
 	jmp int_with_check
 	
 badsys:
@@ -320,6 +343,7 @@ tracesys:
 	/* Use IRET because user could have changed frame */
 	jmp int_ret_from_sys_call
 	CFI_ENDPROC
+END(system_call)
 		
 /* 
  * Syscall return path ending with IRET.
@@ -342,6 +366,7 @@ ENTRY(int_ret_from_sys_call)
 	CFI_REL_OFFSET	r9,R9-ARGOFFSET
 	CFI_REL_OFFSET	r10,R10-ARGOFFSET
 	CFI_REL_OFFSET	r11,R11-ARGOFFSET
+	TRACE_IRQS_OFF
         XEN_BLOCK_EVENTS(%rsi)
 	testb $3,CS-ARGOFFSET(%rsp)
         jnz 1f
@@ -365,6 +390,7 @@ int_with_check:
 int_careful:
 	bt $TIF_NEED_RESCHED,%edx
 	jnc  int_very_careful
+	TRACE_IRQS_ON
 /*	sti */
         XEN_UNBLOCK_EVENTS(%rsi)
 	pushq %rdi
@@ -373,10 +399,12 @@ int_careful:
 	popq %rdi
 	CFI_ADJUST_CFA_OFFSET -8
 	XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
 	jmp int_with_check
 
 	/* handle signals and tracing -- both require a full stack frame */
 int_very_careful:
+	TRACE_IRQS_ON
 /*	sti */
         XEN_UNBLOCK_EVENTS(%rsi)
 	SAVE_REST
@@ -391,6 +419,7 @@ int_very_careful:
 	CFI_ADJUST_CFA_OFFSET -8
 	andl $~(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP),%edi
 	XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
 	jmp int_restore_rest
 	
 int_signal:
@@ -403,8 +432,10 @@ int_signal:
 int_restore_rest:
 	RESTORE_REST
 	XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
 	jmp int_with_check
 	CFI_ENDPROC
+END(int_ret_from_sys_call)
 		
 /* 
  * Certain special system calls that need to save a complete full stack frame.
@@ -416,6 +447,7 @@ int_restore_rest:
 	leaq	\func(%rip),%rax
 	leaq    -ARGOFFSET+8(%rsp),\arg /* 8 for return address */
 	jmp	ptregscall_common
+END(\label)
 	.endm
 
 	CFI_STARTPROC
@@ -445,6 +477,7 @@ ENTRY(ptregscall_common)
 	CFI_REL_OFFSET rip, 0
 	ret
 	CFI_ENDPROC
+END(ptregscall_common)
 	
 ENTRY(stub_execve)
 	CFI_STARTPROC
@@ -459,6 +492,7 @@ ENTRY(stub_execve)
 	RESTORE_REST
 	jmp int_ret_from_sys_call
 	CFI_ENDPROC
+END(stub_execve)
 	
 /*
  * sigreturn is special because it needs to restore all registers on return.
@@ -476,6 +510,7 @@ ENTRY(stub_rt_sigreturn)
 	RESTORE_REST
 	jmp int_ret_from_sys_call
 	CFI_ENDPROC
+END(stub_rt_sigreturn)
 
 /*
  * initial frame state for interrupts and exceptions
@@ -523,6 +558,7 @@ retint_careful:
 	CFI_RESTORE_STATE
 	bt    $TIF_NEED_RESCHED,%edx
 	jnc   retint_signal
+	TRACE_IRQS_ON
 	XEN_UNBLOCK_EVENTS(%rsi)
 /*	sti */        
 	pushq %rdi
@@ -533,11 +569,13 @@ retint_careful:
 	GET_THREAD_INFO(%rcx)
 	XEN_BLOCK_EVENTS(%rsi)		
 /*	cli */
+	TRACE_IRQS_OFF
 	jmp retint_check
 	
 retint_signal:
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    retint_restore_args
+	TRACE_IRQS_ON
         XEN_UNBLOCK_EVENTS(%rsi)
 	SAVE_REST
 	movq $-1,ORIG_RAX(%rsp) 			
@@ -546,6 +584,7 @@ retint_signal:
 	call do_notify_resume
 	RESTORE_REST
         XEN_BLOCK_EVENTS(%rsi)		
+	TRACE_IRQS_OFF
 	movl $_TIF_NEED_RESCHED,%edi
 	GET_THREAD_INFO(%rcx)
 	jmp retint_check
@@ -564,7 +603,9 @@ retint_kernel:
 	call preempt_schedule_irq
 	jmp retint_kernel       /* check again */
 #endif	
+
 	CFI_ENDPROC
+END(common_interrupt)
 	
 /*
  * APIC interrupts.
@@ -581,17 +622,21 @@ retint_kernel:
 #ifndef CONFIG_XEN
 ENTRY(thermal_interrupt)
 	apicinterrupt THERMAL_APIC_VECTOR,smp_thermal_interrupt
+END(thermal_interrupt)
 
 ENTRY(threshold_interrupt)
 	apicinterrupt THRESHOLD_APIC_VECTOR,mce_threshold_interrupt
+END(threshold_interrupt)
 
 #ifdef CONFIG_SMP	
 ENTRY(reschedule_interrupt)
 	apicinterrupt RESCHEDULE_VECTOR,smp_reschedule_interrupt
+END(reschedule_interrupt)
 
 	.macro INVALIDATE_ENTRY num
 ENTRY(invalidate_interrupt\num)
 	apicinterrupt INVALIDATE_TLB_VECTOR_START+\num,smp_invalidate_interrupt	
+END(invalidate_interrupt\num)
 	.endm
 
 	INVALIDATE_ENTRY 0
@@ -605,17 +650,21 @@ ENTRY(invalidate_interrupt\num)
 
 ENTRY(call_function_interrupt)
 	apicinterrupt CALL_FUNCTION_VECTOR,smp_call_function_interrupt
+END(call_function_interrupt)
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC	
 ENTRY(apic_timer_interrupt)
 	apicinterrupt LOCAL_TIMER_VECTOR,smp_apic_timer_interrupt
+END(apic_timer_interrupt)
 
 ENTRY(error_interrupt)
 	apicinterrupt ERROR_APIC_VECTOR,smp_error_interrupt
+END(error_interrupt)
 
 ENTRY(spurious_interrupt)
 	apicinterrupt SPURIOUS_APIC_VECTOR,smp_spurious_interrupt
+END(spurious_interrupt)
 #endif
 #endif /* !CONFIG_XEN */
 				
@@ -651,7 +700,7 @@ ENTRY(spurious_interrupt)
 #if 0 /* not XEN */
 	/* error code is on the stack already */
 	/* handle NMI like exceptions that can happen everywhere */
-	.macro paranoidentry sym, ist=0
+	.macro paranoidentry sym, ist=0, irqtrace=1
         movq (%rsp),%rcx
         movq 8(%rsp),%r11
         addq $0x10,%rsp /* skip rcx and r11 */        
@@ -682,9 +731,74 @@ ENTRY(spurious_interrupt)
 	.endif
 /*	cli */
 	XEN_BLOCK_EVENTS(%rsi)		
+	.if \irqtrace
+	TRACE_IRQS_OFF
+	.endif
+	.endm
+
+	/*
+ 	 * "Paranoid" exit path from exception stack.
+  	 * Paranoid because this is used by NMIs and cannot take
+	 * any kernel state for granted.
+	 * We don't do kernel preemption checks here, because only
+	 * NMI should be common and it does not enable IRQs and
+	 * cannot get reschedule ticks.
+	 *
+	 * "trace" is 0 for the NMI handler only, because irq-tracing
+	 * is fundamentally NMI-unsafe. (we cannot change the soft and
+	 * hard flags at once, atomically)
+	 */
+	.macro paranoidexit trace=1
+	/* ebx:	no swapgs flag */
+paranoid_exit\trace:
+	testl %ebx,%ebx				/* swapgs needed? */
+	jnz paranoid_restore\trace
+	testl $3,CS(%rsp)
+	jnz   paranoid_userspace\trace
+paranoid_swapgs\trace:
+	TRACE_IRQS_IRETQ 0
+	swapgs
+paranoid_restore\trace:
+	RESTORE_ALL 8
+	iretq
+paranoid_userspace\trace:
+	GET_THREAD_INFO(%rcx)
+	movl threadinfo_flags(%rcx),%ebx
+	andl $_TIF_WORK_MASK,%ebx
+	jz paranoid_swapgs\trace
+	movq %rsp,%rdi			/* &pt_regs */
+	call sync_regs
+	movq %rax,%rsp			/* switch stack for scheduling */
+	testl $_TIF_NEED_RESCHED,%ebx
+	jnz paranoid_schedule\trace
+	movl %ebx,%edx			/* arg3: thread flags */
+	.if \trace
+	TRACE_IRQS_ON
+	.endif
+	sti
+	xorl %esi,%esi 			/* arg2: oldset */
+	movq %rsp,%rdi 			/* arg1: &pt_regs */
+	call do_notify_resume
+	cli
+	.if \trace
+	TRACE_IRQS_OFF
+	.endif
+	jmp paranoid_userspace\trace
+paranoid_schedule\trace:
+	.if \trace
+	TRACE_IRQS_ON
+	.endif
+	sti
+	call schedule
+	cli
+	.if \trace
+	TRACE_IRQS_OFF
+	.endif
+	jmp paranoid_userspace\trace
+	CFI_ENDPROC
 	.endm
 #endif
-	
+
 /*
  * Exception entry point. This expects an error code/orig_rax on the stack
  * and the exception handler in %rax.	
@@ -738,6 +852,7 @@ error_exit:
 	RESTORE_REST
 /*	cli */
 	XEN_BLOCK_EVENTS(%rsi)		
+	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)	
 	testb $3,CS-ARGOFFSET(%rsp)
 	jz retint_kernel
@@ -745,6 +860,10 @@ error_exit:
 	movl  $_TIF_WORK_MASK,%edi	
 	andl  %edi,%edx
 	jnz   retint_careful
+	/*
+	 * The iret might restore flags:
+	 */
+	TRACE_IRQS_IRETQ
 	jmp   retint_restore_args
 
 error_kernelspace:
@@ -772,6 +891,7 @@ error_kernelspace:
         je   error_swapgs
 	jmp  error_sti
 #endif        
+END(error_entry)
 	
 ENTRY(hypervisor_callback)
 	zeroentry do_hypervisor_callback
@@ -868,7 +988,7 @@ ENTRY(failsafe_callback)
 	movq (%rsp),%rcx
 	movq 8(%rsp),%r11
 	addq $0x30,%rsp
-	movq $-9999,%rdi	/* better code? */
+	movq $11,%rdi	/* SIGSEGV */
 	jmp do_exit			
 1:	/* Segment mismatch => Category 1 (Bad segment). Retry the IRET. */
 	movq (%rsp),%rcx
@@ -931,9 +1051,11 @@ ENTRY(kernel_thread)
 	UNFAKE_STACK_FRAME
 	ret
 	CFI_ENDPROC
-
+ENDPROC(kernel_thread)
 	
 child_rip:
+	pushq $0		# fake return address
+	CFI_STARTPROC
 	/*
 	 * Here we are in the child and the registers are set as they were
 	 * at kernel_thread() invocation in the parent.
@@ -944,6 +1066,8 @@ child_rip:
 	# exit
 	xorl %edi, %edi
 	call do_exit
+	CFI_ENDPROC
+ENDPROC(child_rip)
 
 /*
  * execve(). This function needs to use IRET, not SYSRET, to set up all state properly.
@@ -974,19 +1098,24 @@ ENTRY(execve)
 	UNFAKE_STACK_FRAME
 	ret
 	CFI_ENDPROC
+ENDPROC(execve)
 
 KPROBE_ENTRY(page_fault)
 	errorentry do_page_fault
+END(page_fault)
 	.previous .text
 
 ENTRY(coprocessor_error)
 	zeroentry do_coprocessor_error
+END(coprocessor_error)
 
 ENTRY(simd_coprocessor_error)
 	zeroentry do_simd_coprocessor_error	
+END(simd_coprocessor_error)
 
 ENTRY(device_not_available)
 	zeroentry math_state_restore
+END(device_not_available)
 
 	/* runs on exception stack */
 KPROBE_ENTRY(debug)
@@ -994,8 +1123,9 @@ KPROBE_ENTRY(debug)
 /*	pushq $0
 	CFI_ADJUST_CFA_OFFSET 8	*/
 	zeroentry do_debug
-/*	jmp paranoid_exit */
+/*	paranoid_exit */
 	CFI_ENDPROC
+END(debug)
 	.previous .text
 
 #if 0
@@ -1004,49 +1134,14 @@ KPROBE_ENTRY(nmi)
 	INTR_FRAME
 	pushq $-1
 	CFI_ADJUST_CFA_OFFSET 8
-	paranoidentry do_nmi
-	/*
- 	 * "Paranoid" exit path from exception stack.
-  	 * Paranoid because this is used by NMIs and cannot take
-	 * any kernel state for granted.
-	 * We don't do kernel preemption checks here, because only
-	 * NMI should be common and it does not enable IRQs and
-	 * cannot get reschedule ticks.
-	 */
-	/* ebx:	no swapgs flag */
-paranoid_exit:
-	testl %ebx,%ebx				/* swapgs needed? */
-	jnz paranoid_restore
-	testl $3,CS(%rsp)
-	jnz   paranoid_userspace
-paranoid_swapgs:	
-	swapgs
-paranoid_restore:	
-	RESTORE_ALL 8
-	iretq
-paranoid_userspace:	
-	GET_THREAD_INFO(%rcx)
-	movl threadinfo_flags(%rcx),%ebx
-	andl $_TIF_WORK_MASK,%ebx
-	jz paranoid_swapgs
-	movq %rsp,%rdi			/* &pt_regs */
-	call sync_regs
-	movq %rax,%rsp			/* switch stack for scheduling */
-	testl $_TIF_NEED_RESCHED,%ebx
-	jnz paranoid_schedule
-	movl %ebx,%edx			/* arg3: thread flags */
-	sti
-	xorl %esi,%esi 			/* arg2: oldset */
-	movq %rsp,%rdi 			/* arg1: &pt_regs */
-	call do_notify_resume
-	cli
-	jmp paranoid_userspace
-paranoid_schedule:
-	sti
-	call schedule
-	cli
-	jmp paranoid_userspace
-	CFI_ENDPROC
+	paranoidentry do_nmi, 0, 0
+#ifdef CONFIG_TRACE_IRQFLAGS
+	paranoidexit 0
+#else
+	jmp paranoid_exit1
+ 	CFI_ENDPROC
+#endif
+END(nmi)
 	.previous .text
 #endif        
 
@@ -1055,58 +1150,72 @@ KPROBE_ENTRY(int3)
 /* 	pushq $0
  	CFI_ADJUST_CFA_OFFSET 8 */
  	zeroentry do_int3
-/* 	jmp paranoid_exit */
+/* 	jmp paranoid_exit1 */
  	CFI_ENDPROC
+END(int3)
 	.previous .text
 
 ENTRY(overflow)
 	zeroentry do_overflow
+END(debug)
 
 ENTRY(bounds)
 	zeroentry do_bounds
+END(bounds)
 
 ENTRY(invalid_op)
 	zeroentry do_invalid_op	
+END(invalid_op)
 
 ENTRY(coprocessor_segment_overrun)
 	zeroentry do_coprocessor_segment_overrun
+END(coprocessor_segment_overrun)
 
 ENTRY(reserved)
 	zeroentry do_reserved
+END(reserved)
 
 #if 0
 	/* runs on exception stack */
 ENTRY(double_fault)
 	XCPT_FRAME
 	paranoidentry do_double_fault
-	jmp paranoid_exit
+	jmp paranoid_exit1
 	CFI_ENDPROC
+END(double_fault)
 #endif
 
 ENTRY(invalid_TSS)
 	errorentry do_invalid_TSS
+END(invalid_TSS)
 
 ENTRY(segment_not_present)
 	errorentry do_segment_not_present
+END(segment_not_present)
 
 	/* runs on exception stack */
 ENTRY(stack_segment)
 	XCPT_FRAME
 	errorentry do_stack_segment
 	CFI_ENDPROC
+END(stack_segment)
 
 KPROBE_ENTRY(general_protection)
 	errorentry do_general_protection
+END(general_protection)
 	.previous .text
 
 ENTRY(alignment_check)
 	errorentry do_alignment_check
+END(alignment_check)
 
 ENTRY(divide_error)
 	zeroentry do_divide_error
+END(divide_error)
 
 ENTRY(spurious_interrupt_bug)
 	zeroentry do_spurious_interrupt_bug
+END(spurious_interrupt_bug)
 
 #ifdef CONFIG_X86_MCE
 	/* runs on exception stack */
@@ -1115,22 +1224,60 @@ ENTRY(machine_check)
 	pushq $0
 	CFI_ADJUST_CFA_OFFSET 8	
 	paranoidentry do_machine_check
-	jmp paranoid_exit
+	jmp paranoid_exit1
 	CFI_ENDPROC
+END(machine_check)
 #endif
 
+/* Call softirq on interrupt stack. Interrupts are off. */
 ENTRY(call_softirq)
 	CFI_STARTPROC
-	movq %gs:pda_irqstackptr,%rax
-	movq %rsp,%rdx
-	CFI_DEF_CFA_REGISTER	rdx
+	push %rbp
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET rbp,0
+	mov  %rsp,%rbp
+	CFI_DEF_CFA_REGISTER rbp
 	incl %gs:pda_irqcount
-	cmove %rax,%rsp
-	pushq %rdx
-	/*todo CFI_DEF_CFA_EXPRESSION ...*/
+	cmove %gs:pda_irqstackptr,%rsp
+	push  %rbp			# backlink for old unwinder
 	call __do_softirq
-	popq %rsp
+	leaveq
 	CFI_DEF_CFA_REGISTER	rsp
+	CFI_ADJUST_CFA_OFFSET   -8
 	decl %gs:pda_irqcount
 	ret
 	CFI_ENDPROC
+ENDPROC(call_softirq)
+
+#ifdef CONFIG_STACK_UNWIND
+ENTRY(arch_unwind_init_running)
+	CFI_STARTPROC
+	movq	%r15, R15(%rdi)
+	movq	%r14, R14(%rdi)
+	xchgq	%rsi, %rdx
+	movq	%r13, R13(%rdi)
+	movq	%r12, R12(%rdi)
+	xorl	%eax, %eax
+	movq	%rbp, RBP(%rdi)
+	movq	%rbx, RBX(%rdi)
+	movq	(%rsp), %rcx
+	movq	%rax, R11(%rdi)
+	movq	%rax, R10(%rdi)
+	movq	%rax, R9(%rdi)
+	movq	%rax, R8(%rdi)
+	movq	%rax, RAX(%rdi)
+	movq	%rax, RCX(%rdi)
+	movq	%rax, RDX(%rdi)
+	movq	%rax, RSI(%rdi)
+	movq	%rax, RDI(%rdi)
+	movq	%rax, ORIG_RAX(%rdi)
+	movq	%rcx, RIP(%rdi)
+	leaq	8(%rsp), %rcx
+	movq	$__KERNEL_CS, CS(%rdi)
+	movq	%rax, EFLAGS(%rdi)
+	movq	%rcx, RSP(%rdi)
+	movq	$__KERNEL_DS, SS(%rdi)
+	jmpq	*%rdx
+	CFI_ENDPROC
+ENDPROC(arch_unwind_init_running)
+#endif

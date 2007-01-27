@@ -15,6 +15,7 @@ CTRL_SRCS-y       += xc_private.c
 CTRL_SRCS-y       += xc_sedf.c
 CTRL_SRCS-y       += xc_csched.c
 CTRL_SRCS-y       += xc_tbuf.c
+CTRL_SRCS-y       += xc_resume.c
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
@@ -24,10 +25,42 @@ GUEST_SRCS-y :=
 GUEST_SRCS-y += xc_load_bin.c
 GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
-GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
-GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
+#GUEST_SRCS-$(CONFIG_X86) += xc_linux_build.c
+#GUEST_SRCS-$(CONFIG_IA64) += xc_linux_build.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
-GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
+GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c xc_hvm_restore.c xc_hvm_save.c
+
+# symlink libelf from xen/common/libelf/
+LIBELF_SRCS := libelf-tools.c libelf-loader.c
+LIBELF_SRCS += libelf-dominfo.c libelf-relocate.c
+
+libelf-tools.o: libelf-tools.c libelf-private.h
+libelf-loader.o: libelf-loader.c libelf-private.h
+libelf-dominfo.o: libelf-dominfo.c libelf-private.h
+libelf-relocate.o: libelf-relocate.c libelf-private.h
+
+$(LIBELF_SRCS) libelf-private.h:
+	ln -s ../../xen/common/libelf/$@ $@
+
+# add libelf bits to libxc
+GUEST_SRCS-y += $(LIBELF_SRCS)
+
+# new domain builder
+GUEST_SRCS-y += xc_dom_core.c xc_dom_boot.c
+GUEST_SRCS-y += xc_dom_elfloader.c
+GUEST_SRCS-y += xc_dom_binloader.c
+
+ifeq ($(CONFIG_POWERPC),y)
+# big endian boxes
+GUEST_SRCS-y += xc_dom_powerpc64.c
+else
+# little endian boxes
+GUEST_SRCS-y += xc_dom_x86.c
+GUEST_SRCS-y += xc_dom_ia64.c
+endif
+
+GUEST_SRCS-$(CONFIG_X86)     += xc_dom_compat_linux.c
+GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_compat_linux.c
 
 -include $(XEN_TARGET_ARCH)/Makefile
 

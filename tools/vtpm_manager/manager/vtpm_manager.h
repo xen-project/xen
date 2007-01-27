@@ -70,6 +70,10 @@
 #define VTPM_ORD_MIGRATE_OUT  (VTPM_PRIV_BASE + 5) // migrate VTPM to dest 
 
 //************************ Return Codes ****************************
+#define VTPM_TYPE_PVM 1 // Paravirtualized Domain
+#define VTPM_TYPE_HVM 2 // HVM Domain
+
+//************************ Return Codes ****************************
 #define VTPM_SUCCESS               0
 #define VTPM_FAIL                  1
 #define VTPM_UNSUPPORTED           2
@@ -104,8 +108,9 @@ VTPM Response Format
 
 VTPM_Open:
   Input Parameters:
-    Domain_type: 1 byte 
+    mig_type: 1 byte 
     startup_mode: 1 byte // Cold Boot = 1, resume = 2, deactive = 3
+    domain type: 1 byte
     instance_id: 4 bytes
   Output Parameters:
     None

@@ -5,7 +5,6 @@
  * We need the APIC definitions automatically as part of 'smp.h'
  */
 #ifndef __ASSEMBLY__
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/threads.h>
 #include <linux/cpumask.h>
@@ -91,6 +90,7 @@ static __inline int logical_smp_processor_id(void)
 
 extern int __cpu_disable(void);
 extern void __cpu_die(unsigned int cpu);
+extern void prefill_possible_map(void);
 #endif /* !__ASSEMBLY__ */
 
 #else /* CONFIG_SMP */

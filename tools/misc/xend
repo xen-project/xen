@@ -44,7 +44,7 @@ for p in ['python%s' % sys.version[:3], 'python']:
         if os.path.exists(os.path.join(d, AUXBIN)):
             sys.path.append(d)
             import xen.util.auxbin
-            libpath = xen.util.auxbin.libpath()
+            libpath = os.path.join(xen.util.auxbin.libpath(), p)
             sys.path = sys.path[:-1]
             sys.path.append(libpath)
             break

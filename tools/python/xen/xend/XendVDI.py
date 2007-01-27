@@ -141,7 +141,7 @@ class XendVDI(AutoSaveObject):
 
         return True
 
-    def get_record(self):
+    def get_record(self, transient = True):
         return {'uuid': self.uuid,
                 'name_label': self.name_label,
                 'name_description': self.name_description,
@@ -152,12 +152,14 @@ class XendVDI(AutoSaveObject):
                 'children': [],
                 'sharable': False,
                 'readonly': False,
-                'SR': self.sr.get_uuid(),
+                'SR': self.sr_uuid,
                 'VBDs': []}
+
+    def get_image_uri(self):
+        raise NotImplementedError()
                 
 
-class XendQCOWVDI(XendVDI):
-
+class XendQCoWVDI(XendVDI):
     def __init__(self, uuid, sr_uuid, qcow_path, cfg_path, vsize, psize):
         XendVDI.__init__(self, uuid, sr_uuid)
         self.auto_save = False
@@ -168,3 +170,26 @@ class XendQCOWVDI(XendVDI):
         self.sector_size = 512
         self.auto_save = True
 
+    def get_image_uri(self):
+        return 'tap:qcow:%s' % self.qcow_path
+
+class XendLocalVDI(XendVDI):
+    def __init__(self, vdi_struct):
+        vdi_uuid = vdi_struct['uuid']
+        sr_uuid = vdi_struct['SR']
+        XendVDI.__init__(self, vdi_uuid, sr_uuid)
+        
+        self.auto_save = False
+        self.cfg_path = None
+        self.name_label = vdi_struct.get('name_label','')
+        self.name_description = vdi_struct.get('name_description', '')
+        self.physical_utilisation = 0
+        self.virtual_size = 0
+        self.sector_size = 0
+        self.type = vdi_struct.get('type', '')
+        self.sharable = vdi_struct.get('sharable', False)
+        self.read_only = vdi_struct.get('read_only', False)
+        self.image_uri = vdi_struct.get('uri', 'file:/dev/null')
+
+    def get_image_uri(self):
+        return self.image_uri

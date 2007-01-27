@@ -31,7 +31,7 @@
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/version.h>
-#include <xen/elf.h>
+#include <public/libelf.h>
 #include <asm/pgalloc.h>
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 #include <asm/vcpu.h>   /* for function declarations */
@@ -756,7 +756,7 @@ domain_set_shared_info_va (unsigned long va)
 }
 
 /* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
-#define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
+#define SHADOW_COPY_CHUNK 1024
 
 int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 {
@@ -824,7 +824,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 
 	case XEN_DOMCTL_SHADOW_OP_CLEAN:
 	  {
-		int nbr_longs;
+		int nbr_bytes;
 
 		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
 		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
@@ -841,21 +841,21 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		if (sc->pages > d->arch.shadow_bitmap_size)
 			sc->pages = d->arch.shadow_bitmap_size; 
 
-		nbr_longs = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+		nbr_bytes = (sc->pages + 7) / 8;
 
-		for (i = 0; i < nbr_longs; i += SHADOW_COPY_CHUNK) {
-			int size = (nbr_longs - i) > SHADOW_COPY_CHUNK ?
-			           SHADOW_COPY_CHUNK : nbr_longs - i;
+		for (i = 0; i < nbr_bytes; i += SHADOW_COPY_CHUNK) {
+			int size = (nbr_bytes - i) > SHADOW_COPY_CHUNK ?
+			           SHADOW_COPY_CHUNK : nbr_bytes - i;
      
-			if (copy_to_guest_offset(sc->dirty_bitmap, i,
-			                         d->arch.shadow_bitmap + i,
-			                         size)) {
+			if (copy_to_guest_offset(
+                            sc->dirty_bitmap, i,
+                            (uint8_t *)d->arch.shadow_bitmap + i,
+                            size)) {
 				rc = -EFAULT;
 				break;
 			}
 
-			memset(d->arch.shadow_bitmap + i,
-			       0, size * sizeof(unsigned long));
+			memset((uint8_t *)d->arch.shadow_bitmap + i, 0, size);
 		}
 		
 		break;
@@ -877,9 +877,9 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		if (sc->pages > d->arch.shadow_bitmap_size)
 			sc->pages = d->arch.shadow_bitmap_size; 
 
-		size = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
-		if (copy_to_guest(sc->dirty_bitmap, 
-		                  d->arch.shadow_bitmap, size)) {
+		size = (sc->pages + 7) / 8;
+		if (copy_to_guest(sc->dirty_bitmap,
+		                  (uint8_t *)d->arch.shadow_bitmap, size)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -910,38 +910,23 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 #define	privify_memory(x,y) do {} while(0)
 #endif
 
-// see arch/x86/xxx/domain_build.c
-int elf_sanity_check(const Elf_Ehdr *ehdr)
+static void loaddomainelfimage(struct domain *d, struct elf_binary *elf)
 {
-	if (!(IS_ELF(*ehdr)))
-	{
-		printk("DOM0 image is not a Xen-compatible Elf image.\n");
-		return 0;
-	}
-	return 1;
-}
-
-static void loaddomainelfimage(struct domain *d, unsigned long image_start)
-{
-	char *elfbase = (char *) image_start;
-	Elf_Ehdr ehdr;
-	Elf_Phdr phdr;
-	int h, filesz, memsz;
+	const elf_phdr *phdr;
+	int phnum, h, filesz, memsz;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
 	struct page_info *p;
-  
-	memcpy(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
-	for ( h = 0; h < ehdr.e_phnum; h++ ) {
-		memcpy(&phdr,
-		       elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
-		       sizeof(Elf_Phdr));
-		if ((phdr.p_type != PT_LOAD))
+
+	phnum = elf_uval(elf, elf->ehdr, e_phnum);
+	for (h = 0; h < phnum; h++) {
+		phdr = elf_phdr_by_index(elf, h);
+		if (!elf_phdr_is_loadable(elf, phdr))
 		    continue;
 
-		filesz = phdr.p_filesz;
-		memsz = phdr.p_memsz;
-		elfaddr = (unsigned long) elfbase + phdr.p_offset;
-		dom_mpaddr = phdr.p_paddr;
+		filesz = elf_uval(elf, phdr, p_filesz);
+		memsz = elf_uval(elf, phdr, p_memsz);
+		elfaddr = (unsigned long) elf->image + elf_uval(elf, phdr, p_offset);
+		dom_mpaddr = elf_uval(elf, phdr, p_paddr);
 
 		while (memsz > 0) {
 			p = assign_new_domain_page(d,dom_mpaddr);
@@ -961,7 +946,7 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 					       PAGE_SIZE-filesz);
 				}
 //FIXME: This test for code seems to find a lot more than objdump -x does
-				if (phdr.p_flags & PF_X) {
+				if (elf_uval(elf, phdr, p_flags) & PF_X) {
 					privify_memory(dom_imva,PAGE_SIZE);
 					flush_icache_range(dom_imva,
 							   dom_imva+PAGE_SIZE);
@@ -1024,7 +1009,8 @@ int construct_dom0(struct domain *d,
 	struct vcpu *v = d->vcpu[0];
 	unsigned long max_pages;
 
-	struct domain_setup_info dsi;
+	struct elf_binary elf;
+	struct elf_dom_parms parms;
 	unsigned long p_start;
 	unsigned long pkern_start;
 	unsigned long pkern_entry;
@@ -1042,23 +1028,36 @@ int construct_dom0(struct domain *d,
 	BUG_ON(d->vcpu[0] == NULL);
 	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 
-	memset(&dsi, 0, sizeof(struct domain_setup_info));
-
 	printk("*** LOADING DOMAIN 0 ***\n");
 
 	max_pages = dom0_size / PAGE_SIZE;
 	d->max_pages = max_pages;
 	d->tot_pages = 0;
-	dsi.image_addr = (unsigned long)image_start;
-	dsi.image_len  = image_len;
-	rc = parseelfimage(&dsi);
+
+	rc = elf_init(&elf, (void*)image_start, image_len);
 	if ( rc != 0 )
 	    return rc;
+#ifdef VERBOSE
+	elf_set_verbose(&elf);
+#endif
+	elf_parse_binary(&elf);
+	if (0 != (elf_xen_parse(&elf, &parms)))
+		return rc;
 
-	p_start = dsi.v_start;
-	pkern_start = dsi.v_kernstart;
-	pkern_end = dsi.v_kernend;
-	pkern_entry = dsi.v_kernentry;
+	printk(" Dom0 kernel: %s, %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+	       elf_64bit(&elf) ? "64-bit" : "32-bit",
+	       elf_msb(&elf)   ? "msb"    : "lsb",
+	       elf.pstart, elf.pend);
+        if (!elf_64bit(&elf) ||
+	    elf_uval(&elf, elf.ehdr, e_machine) != EM_IA_64) {
+		printk("Incompatible kernel binary\n");
+		return -1;
+	}
+
+	p_start = parms.virt_base;
+	pkern_start = parms.virt_kstart;
+	pkern_end = parms.virt_kend;
+	pkern_entry = parms.virt_entry;
 
 //printk("p_start=%lx, pkern_start=%lx, pkern_end=%lx, pkern_entry=%lx\n",p_start,pkern_start,pkern_end,pkern_entry);
 
@@ -1129,7 +1128,7 @@ int construct_dom0(struct domain *d,
 		panic("Cannot allocate dom0 vcpu %d\n", i);
 
 	/* Copy the OS image. */
-	loaddomainelfimage(d,image_start);
+	loaddomainelfimage(d,&elf);
 
 	BUILD_BUG_ON(sizeof(start_info_t) + sizeof(dom0_vga_console_info_t) +
 	             sizeof(struct ia64_boot_param) > PAGE_SIZE);

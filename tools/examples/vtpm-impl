@@ -32,11 +32,14 @@
 # OF THE POSSIBILITY OF SUCH DAMAGE.
 # ===================================================================
 
-#            |        SRC        |    TAG  |      CMD SIZE     |        ORD       | type| mode
-TPM_CMD_OPEN=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x10\\x01\\x00\\x00\\x01\\x01\\x01
-TPM_CMD_RESM=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x10\\x01\\x00\\x00\\x01\\x01\\x02
+#            |        SRC        |    TAG  |      CMD SIZE     |        ORD       |mtype|strt
+TPM_CMD_OPEN=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x11\\x01\\x00\\x00\\x01\\x01\\x01
+TPM_CMD_RESM=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x11\\x01\\x00\\x00\\x01\\x01\\x02
 TPM_CMD_CLOS=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x0e\\x01\\x00\\x00\\x02
 TPM_CMD_DELE=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x0e\\x01\\x00\\x00\\x03
+
+TPM_TYPE_PVM=\\x01
+TPM_TYPE_HVM=\\x02
 
 TPM_SUCCESS=00000000
 
@@ -80,11 +83,25 @@ function vtpm_manager_cmd() {
  release_lock vtpm_mgr
 
  #return whether the command was successful
- if [ $resp_hex != $TPM_SUCCESS ]; then
+ if [ $resp_hex ne $TPM_SUCCESS ]; then
    vtpm_fatal_error=1
    false
   else
    true
+ fi
+}
+
+# Helper to get vm type to pass to vtpm_manager open/resume
+function vtpm_get_type() {
+ local inst=$(xenstore_read $XENBUS_PATH/frontend-id)
+ local vm=$(xenstore_read /local/domain/$inst/vm)
+ if [ "$vm" != "" ]; then
+  local ostype=$(xenstore-read $vm/image/ostype)
+  if [ "$ostype" == "hvm" ]; then
+   echo $TPM_TYPE_HVM;
+  else
+   echo $TPM_TYPE_PVM;
+  fi
  fi
 }
 
@@ -99,11 +116,13 @@ function vtpm_create () {
 
 # Setup vtpm instance for use.
 function vtpm_start() {
- $(vtpm_manager_cmd $TPM_CMD_OPEN $1)
+ local vmtype=$(vtpm_get_type);
+ $(vtpm_manager_cmd $TPM_CMD_OPEN$vmtype $1)
 }
 
 function vtpm_resume() {
- $(vtpm_manager_cmd $TPM_CMD_RESM $1)
+ local vmtype=$(vtpm_get_type);
+ $(vtpm_manager_cmd $TPM_CMD_RESM$vmtype $1)
 }
 
 # Reset the vtpm AKA clear PCRs

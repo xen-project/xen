@@ -571,6 +571,14 @@ def set_int(opt, k, v):
         opt.opts.err('Invalid value: ' + str(v))
     opt.set(v)
 
+def set_long(opt, k, v):
+    """Set an option to a long integer value."""
+    try:
+        v = long(v)
+    except:
+        opt.opts.err('Invalid value: ' + str(v))
+    opt.set(v)
+
 def set_float(opt, k, v):
     """Set an option to a float value."""
     try:

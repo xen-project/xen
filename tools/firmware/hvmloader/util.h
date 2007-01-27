@@ -53,6 +53,7 @@ int get_apic_mode(void);
 
 /* String and memory functions */
 int strcmp(const char *cs, const char *ct);
+int strncmp(const char *s1, const char *s2, uint32_t n);
 char *strcpy(char *dest, const char *src);
 char *strncpy(char *dest, const char *src, unsigned n);
 unsigned strlen(const char *s);
@@ -76,6 +77,10 @@ int vprintf(const char *fmt, va_list ap);
 
 /* Allocate region of specified type in the e820 table. */
 uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask);
+
+/* Prepare the 32bit BIOS */
+int highbios_setup(void);
+
 
 #define isdigit(c) ((c) >= '0' && (c) <= '9')
 

@@ -93,7 +93,7 @@ static int setup_cpu_watcher(struct notifier_block *notifier,
 	(void)register_xenbus_watch(&cpu_watch);
 
 	if (!is_initial_xendomain()) {
-		for_each_cpu(i)
+		for_each_possible_cpu(i)
 			vcpu_hotplug(i);
 		printk(KERN_INFO "Brought up %ld CPUs\n",
 		       (long)num_online_cpus());
@@ -139,7 +139,7 @@ int smp_suspend(void)
 			if (err) {
 				printk(KERN_CRIT "Failed to take all CPUs "
 				       "down: %d.\n", err);
-				for_each_cpu(i)
+				for_each_possible_cpu(i)
 					vcpu_hotplug(i);
 				return err;
 			}
@@ -154,12 +154,12 @@ void smp_resume(void)
 {
 	int cpu;
 
-	for_each_cpu(cpu)
+	for_each_possible_cpu(cpu)
 		cpu_initialize_context(cpu);
 
 	unlock_cpu_hotplug();
 
-	for_each_cpu(cpu)
+	for_each_possible_cpu(cpu)
 		vcpu_hotplug(cpu);
 }
 

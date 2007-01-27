@@ -618,6 +618,33 @@ static PyObject *xspy_introduce_domain(XsHandle *self, PyObject *args)
     return none(result);
 }
 
+#define xspy_resume_domain_doc "\n"                                \
+	"Tell xenstore to clear its shutdown flag for a domain.\n" \
+	"This ensures that a subsequent shutdown will fire the\n"  \
+	"appropriate watches.\n"                                   \
+	" dom [int]: domain id\n"			           \
+        "\n"						           \
+        "Returns None on success.\n"				   \
+        "Raises xen.lowlevel.xs.Error on error.\n"
+
+static PyObject *xspy_resume_domain(XsHandle *self, PyObject *args)
+{
+    uint32_t dom;
+
+    struct xs_handle *xh = xshandle(self);
+    bool result = 0;
+
+    if (!xh)
+        return NULL;
+    if (!PyArg_ParseTuple(args, "i", &dom))
+        return NULL;
+
+    Py_BEGIN_ALLOW_THREADS
+    result = xs_resume_domain(xh, dom);
+    Py_END_ALLOW_THREADS
+
+    return none(result);
+}
 
 #define xspy_release_domain_doc "\n"					\
 	"Tell xenstore to release its channel to a domain.\n"		\
@@ -789,6 +816,7 @@ static PyMethodDef xshandle_methods[] = {
     XSPY_METH(transaction_start, METH_NOARGS),
     XSPY_METH(transaction_end,   METH_VARARGS | METH_KEYWORDS),
     XSPY_METH(introduce_domain,  METH_VARARGS),
+    XSPY_METH(resume_domain,     METH_VARARGS),
     XSPY_METH(release_domain,    METH_VARARGS),
     XSPY_METH(close,             METH_NOARGS),
     XSPY_METH(get_domain_path,   METH_VARARGS),

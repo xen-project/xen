@@ -21,17 +21,12 @@
 #include <asm/current.h>
 #include <public/sysctl.h>
 
-#ifndef COMPAT
-typedef long ret_t;
-#define copy_to_xxx_offset copy_to_guest_offset
-#endif
-
-extern ret_t arch_do_sysctl(
+extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
 
-ret_t do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
-    ret_t ret = 0;
+    long ret = 0;
     struct xen_sysctl curop, *op = &curop;
     static DEFINE_SPINLOCK(sysctl_lock);
 
@@ -101,8 +96,8 @@ ret_t do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
             put_domain(d);
 
-            if ( copy_to_xxx_offset(op->u.getdomaininfolist.buffer,
-                                    num_domains, &info, 1) )
+            if ( copy_to_guest_offset(op->u.getdomaininfolist.buffer,
+                                      num_domains, &info, 1) )
             {
                 ret = -EFAULT;
                 break;

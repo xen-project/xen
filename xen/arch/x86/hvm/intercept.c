@@ -29,6 +29,8 @@
 #include <asm/current.h>
 #include <io_ports.h>
 #include <xen/event.h>
+#include <xen/compile.h>
+#include <public/version.h>
 
 
 extern struct hvm_mmio_handler hpet_mmio_handler;
@@ -153,6 +155,308 @@ static inline void hvm_mmio_access(struct vcpu *v,
         domain_crash_synchronous();
         break;
     }
+}
+
+
+int hvm_register_savevm(struct domain *d,
+                    const char *idstr,
+                    int instance_id,
+                    int version_id,
+                    SaveStateHandler *save_state,
+                    LoadStateHandler *load_state,
+                    void *opaque)
+{
+    HVMStateEntry *se, **pse;
+
+    if ( (se = xmalloc(struct HVMStateEntry)) == NULL ){
+        printk("allocat hvmstate entry fail.\n");
+        return -1;
+    }
+
+    strncpy(se->idstr, idstr, HVM_SE_IDSTR_LEN);
+
+    se->instance_id = instance_id;
+    se->version_id = version_id;
+    se->save_state = save_state;
+    se->load_state = load_state;
+    se->opaque = opaque;
+    se->next = NULL;
+
+    /* add at the end of list */
+    pse = &d->arch.hvm_domain.first_se;
+    while (*pse != NULL)
+        pse = &(*pse)->next;
+    *pse = se;
+    return 0;
+}
+
+int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
+{
+    uint32_t len, len_pos, cur_pos;
+    uint32_t eax, ebx, ecx, edx;
+    HVMStateEntry *se;
+    char *chgset;
+    struct hvm_save_header hdr;
+
+    if (!is_hvm_vcpu(v)) {
+        printk("hvm_save only for hvm guest!\n");
+        return -1;
+    }
+
+    memset(h, 0, sizeof(hvm_domain_context_t));
+
+    hdr.magic = HVM_FILE_MAGIC;
+    hdr.version = HVM_FILE_VERSION;
+    cpuid(1, &eax, &ebx, &ecx, &edx);
+    hdr.cpuid = eax;
+    hvm_put_struct(h, &hdr);
+
+    /* save xen changeset */
+    chgset = strrchr(XEN_CHANGESET, ' ');
+    if ( chgset )
+        chgset++;
+    else
+        chgset = XEN_CHANGESET;
+
+    len = strlen(chgset);
+    hvm_put_8u(h, len);
+    hvm_put_buffer(h, chgset, len);
+
+    for(se = v->domain->arch.hvm_domain.first_se; se != NULL; se = se->next) {
+        /* ID string */
+        len = strnlen(se->idstr, HVM_SE_IDSTR_LEN);
+        hvm_put_8u(h, len);
+        hvm_put_buffer(h, se->idstr, len);
+
+        hvm_put_32u(h, se->instance_id);
+        hvm_put_32u(h, se->version_id);
+
+        /* record size */
+        len_pos = hvm_ctxt_tell(h);
+        hvm_put_32u(h, 0);
+
+        se->save_state(h, se->opaque);
+
+        cur_pos = hvm_ctxt_tell(h);
+        len = cur_pos - len_pos - 4;
+        hvm_ctxt_seek(h, len_pos);
+        hvm_put_32u(h, len);
+        hvm_ctxt_seek(h, cur_pos);
+
+    }
+
+    h->size = hvm_ctxt_tell(h);
+    hvm_ctxt_seek(h, 0);
+
+    if (h->size >= HVM_CTXT_SIZE) {
+        printk("hvm_domain_context overflow when hvm_save! need %"PRId32" bytes for use.\n", h->size);
+        return -1;
+    }
+
+    return 0;
+
+}
+
+static HVMStateEntry *find_se(struct domain *d, const char *idstr, int instance_id)
+{
+    HVMStateEntry *se;
+
+    for(se = d->arch.hvm_domain.first_se; se != NULL; se = se->next) {
+        if (!strncmp(se->idstr, idstr, HVM_SE_IDSTR_LEN) &&
+            instance_id == se->instance_id){
+            return se;
+        }
+    }
+    return NULL;
+}
+
+int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
+{
+    uint32_t len, rec_len, rec_pos, instance_id, version_id;
+    uint32_t eax, ebx, ecx, edx;
+    HVMStateEntry *se;
+    char idstr[HVM_SE_IDSTR_LEN];
+    xen_changeset_info_t chgset;
+    char *cur_chgset;
+    int ret;
+    struct hvm_save_header hdr;
+
+    if (!is_hvm_vcpu(v)) {
+        printk("hvm_load only for hvm guest!\n");
+        return -1;
+    }
+
+    if (h->size >= HVM_CTXT_SIZE) {
+        printk("hvm_load fail! seems hvm_domain_context overflow when hvm_save! need %"PRId32" bytes.\n", h->size);
+        return -1;
+    }
+
+    hvm_ctxt_seek(h, 0);
+
+    hvm_get_struct(h, &hdr);
+
+    if (hdr.magic != HVM_FILE_MAGIC) {
+        printk("HVM restore magic dismatch!\n");
+        return -1;
+    }
+
+    if (hdr.version != HVM_FILE_VERSION) {
+        printk("HVM restore version dismatch!\n");
+        return -1;
+    }
+
+    /* check cpuid */
+    cpuid(1, &eax, &ebx, &ecx, &edx);
+    /*TODO: need difine how big difference is acceptable */
+    if (hdr.cpuid != eax)
+        printk("warnings: try to restore hvm guest(0x%"PRIx32") "
+               "on a different type processor(0x%"PRIx32").\n",
+                hdr.cpuid,
+                eax);
+
+
+    /* check xen change set */
+    cur_chgset = strrchr(XEN_CHANGESET, ' ');
+    if ( cur_chgset )
+        cur_chgset++;
+    else
+        cur_chgset = XEN_CHANGESET;
+
+    len = hvm_get_8u(h);
+    if (len > 20) { /*typical length is 18 -- "revision number:changeset id" */
+        printk("wrong change set length %d when hvm restore!\n", len);
+        return -1;
+    }
+
+    hvm_get_buffer(h, chgset, len);
+    chgset[len] = '\0';
+    if (strncmp(cur_chgset, chgset, len + 1))
+        printk("warnings: try to restore hvm guest(%s) on a different changeset %s.\n",
+                chgset, cur_chgset);
+
+
+    if ( !strcmp(cur_chgset, "unavailable") )
+        printk("warnings: try to restore hvm guest when changeset is unavailable.\n");
+
+
+    while(1) {
+        if (hvm_ctxt_end(h)) {
+            break;
+        }
+
+        /* ID string */
+        len = hvm_get_8u(h);
+        if (len > HVM_SE_IDSTR_LEN) {
+            printk("wrong HVM save entry idstr len %d!", len);
+            return -1;
+        }
+
+        hvm_get_buffer(h, idstr, len);
+        idstr[len] = '\0';
+
+        instance_id = hvm_get_32u(h);
+        version_id = hvm_get_32u(h);
+
+        printk("HVM S/R Loading \"%s\" instance %#x\n", idstr, instance_id);
+
+        rec_len = hvm_get_32u(h);
+        rec_pos = hvm_ctxt_tell(h);
+
+        se = find_se(v->domain, idstr, instance_id);
+        if (se == NULL) {
+            printk("warnings: hvm load can't find device %s's instance %d!\n",
+                    idstr, instance_id);
+        } else {
+            ret = se->load_state(h, se->opaque, version_id);
+            if (ret < 0)
+                printk("warnings: loading state fail for device %s instance %d!\n",
+                        idstr, instance_id);
+        }
+                    
+
+        /* make sure to jump end of record */
+        if ( hvm_ctxt_tell(h) - rec_pos != rec_len) {
+            printk("wrong hvm record size, maybe some dismatch between save&restore handler!\n");
+        }
+        hvm_ctxt_seek(h, rec_pos + rec_len);
+    }
+
+    return 0;
+}
+
+int arch_gethvm_ctxt(
+    struct vcpu *v, struct hvm_domain_context *c)
+{
+    if ( !is_hvm_vcpu(v) )
+        return -1;
+
+    return hvm_save(v, c);
+
+}
+
+int arch_sethvm_ctxt(
+        struct vcpu *v, struct hvm_domain_context *c)
+{
+    return hvm_load(v, c);
+}
+
+#ifdef HVM_DEBUG_SUSPEND
+static void shpage_info(shared_iopage_t *sh)
+{
+
+    vcpu_iodata_t *p = &sh->vcpu_iodata[0];
+    ioreq_t *req = &p->vp_ioreq;
+    printk("*****sharepage_info******!\n");
+    printk("vp_eport=%d\n", p->vp_eport);
+    printk("io packet: "
+                     "state:%x, pvalid: %x, dir:%x, port: %"PRIx64", "
+                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
+                     req->state, req->data_is_ptr, req->dir, req->addr,
+                     req->data, req->count, req->size);
+}
+#else
+static void shpage_info(shared_iopage_t *sh)
+{
+}
+#endif
+
+static void shpage_save(hvm_domain_context_t *h, void *opaque)
+{
+    /* XXX:no action required for shpage save/restore, since it's in guest memory
+     * keep it for debug purpose only */
+
+#if 0
+    struct shared_iopage *s = opaque;
+    /* XXX:smp */
+    struct ioreq *req = &s->vcpu_iodata[0].vp_ioreq;
+    
+    shpage_info(s);
+
+    hvm_put_buffer(h, (char*)req, sizeof(struct ioreq));
+#endif
+}
+
+static int shpage_load(hvm_domain_context_t *h, void *opaque, int version_id)
+{
+    struct shared_iopage *s = opaque;
+#if 0
+    /* XXX:smp */
+    struct ioreq *req = &s->vcpu_iodata[0].vp_ioreq;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    hvm_get_buffer(h, (char*)req, sizeof(struct ioreq));
+
+
+#endif
+    shpage_info(s);
+    return 0;
+}
+
+void shpage_init(struct domain *d, shared_iopage_t *sp)
+{
+    hvm_register_savevm(d, "xen_hvm_shpage", 0x10, 1, shpage_save, shpage_load, sp);
 }
 
 int hvm_buffered_io_intercept(ioreq_t *p)

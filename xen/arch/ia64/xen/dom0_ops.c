@@ -40,10 +40,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getmemlist:
     {
         unsigned long i;
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         unsigned long start_page = op->u.getmemlist.start_pfn;
         unsigned long nr_pages = op->u.getmemlist.max_pfns;
-        unsigned long mfn;
+        uint64_t mfn;
 
         if ( d == NULL ) {
             ret = -EINVAL;
@@ -76,7 +76,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_arch_setup:
     {
         xen_domctl_arch_setup_t *ds = &op->u.arch_setup;
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
 
         if ( d == NULL) {
             ret = -EINVAL;
@@ -140,7 +140,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d; 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             ret = shadow_mode_control(d, &op->u.shadow_op);
@@ -158,7 +158,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned int lp = fp + np - 1;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if (unlikely(d == NULL))
             break;
 

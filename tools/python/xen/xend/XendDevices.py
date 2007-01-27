@@ -21,6 +21,8 @@
 
 from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, usbif, vfbif
 from xen.xend.server.BlktapController import BlktapController
+from xen.xend.server.ConsoleController import ConsoleController
+
 
 class XendDevices:
     """ An ugly halfway point between the module local device name
@@ -43,17 +45,13 @@ class XendDevices:
         'tap': BlktapController,
         'vfb': vfbif.VfbifController,
         'vkbd': vfbif.VkbdifController,
+        'console': ConsoleController,
     }
 
     #@classmethod
     def valid_devices(cls):
         return cls.controllers.keys()
     valid_devices = classmethod(valid_devices)
-
-    #@classmethod
-    def pseudo_devices(cls):
-        return ['console']
-    pseudo_devices = classmethod(pseudo_devices)
 
     #@classmethod
     def make_controller(cls, name, domain):

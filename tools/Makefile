@@ -26,6 +26,7 @@ SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 SUBDIRS-y += python
 SUBDIRS-y += pygrub
+SUBDIRS-y += ptsname
 endif
 
 .PHONY: all
