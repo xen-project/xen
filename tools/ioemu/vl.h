@@ -158,6 +158,9 @@ extern FILE *logfile;
 
 
 #if defined(__i386__) || defined(__x86_64__)
+
+#define MAPCACHE
+
 #if defined(__i386__) 
 #define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
 #define MCACHE_BUCKET_SHIFT 16
@@ -174,6 +177,20 @@ struct map_cache {
 };
 
 uint8_t *qemu_map_cache(target_phys_addr_t phys_addr);
+void     qemu_invalidate_map_cache(void);
+
+#include <pthread.h>
+extern  pthread_mutex_t mapcache_mutex;
+#define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
+#define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)
+
+#else 
+
+#define qemu_invalidate_map_cache() ((void)0)
+
+#define mapcache_lock()   ((void)0)
+#define mapcache_unlock() ((void)0)
+
 #endif
 
 extern int xc_handle;

@@ -285,7 +285,7 @@ int register_ioport_write(int start, int length, int size,
     for(i = start; i < start + length; i += size) {
         ioport_write_table[bsize][i] = func;
         if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
-            hw_error("register_ioport_read: invalid opaque");
+            hw_error("register_ioport_write: invalid opaque");
         ioport_opaque[i] = opaque;
     }
     return 0;
@@ -5826,6 +5826,10 @@ void suspend(int sig)
 static struct map_cache *mapcache_entry;
 static unsigned long nr_buckets;
 
+/* For most cases (>99.9%), the page address is the same. */
+static unsigned long last_address_index = ~0UL;
+static uint8_t      *last_address_vaddr;
+
 static int qemu_map_cache_init(unsigned long nr_pages)
 {
     unsigned long max_pages = MAX_MCACHE_SIZE >> PAGE_SHIFT;
@@ -5861,10 +5865,6 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
     struct map_cache *entry;
     unsigned long address_index  = phys_addr >> MCACHE_BUCKET_SHIFT;
     unsigned long address_offset = phys_addr & (MCACHE_BUCKET_SIZE-1);
-
-    /* For most cases (>99.9%), the page address is the same. */
-    static unsigned long last_address_index = ~0UL;
-    static uint8_t      *last_address_vaddr;
 
     if (address_index == last_address_index)
         return last_address_vaddr + address_offset;
@@ -5904,6 +5904,34 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
     last_address_vaddr = entry->vaddr_base;
 
     return last_address_vaddr + address_offset;
+}
+
+void qemu_invalidate_map_cache(void)
+{
+    unsigned long i;
+
+    mapcache_lock();
+
+    for (i = 0; i < nr_buckets; i++) {
+        struct map_cache *entry = &mapcache_entry[i];
+
+        if (entry->vaddr_base == NULL)
+            continue;
+
+        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
+        if (errno) {
+            fprintf(logfile, "unmap fails %d\n", errno);
+            exit(-1);
+        }
+
+        entry->paddr_index = 0;
+        entry->vaddr_base  = NULL;
+    }
+
+    last_address_index =  ~0UL;
+    last_address_vaddr = NULL;
+
+    mapcache_unlock();
 }
 #endif
 

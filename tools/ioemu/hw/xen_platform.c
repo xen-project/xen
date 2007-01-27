@@ -31,19 +31,14 @@ extern FILE *logfile;
 
 static void platform_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
-    return;
-}
-
-static uint32_t platform_ioport_read(void *opaque, uint32_t addr)
-{
-    return 0;
+    if (val == 0)
+        qemu_invalidate_map_cache();
 }
 
 static void platform_ioport_map(PCIDevice *pci_dev, int region_num,
                                 uint32_t addr, uint32_t size, int type)
 {
-    register_ioport_write(addr, 16, 4, platform_ioport_write, NULL);
-    register_ioport_read(addr, 16, 1, platform_ioport_read, NULL);
+    register_ioport_write(addr, 1, 1, platform_ioport_write, NULL);
 }
 
 static uint32_t platform_mmio_read(void *opaque, target_phys_addr_t addr)

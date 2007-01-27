@@ -129,18 +129,8 @@ FILE *logfile;
 int loglevel;
 
 
-#if defined(__i386__) || defined(__x86_64__)
-#define MAPCACHE
-#endif
-
 #ifdef MAPCACHE
-#include <pthread.h>
-static pthread_mutex_t mapcache_mutex;
-#define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
-#define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)
-#else 
-#define mapcache_lock() ( (void)0 )
-#define mapcache_unlock() ( (void)0 )
+pthread_mutex_t mapcache_mutex;
 #endif
 
 
