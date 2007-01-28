@@ -451,7 +451,6 @@ class XendAPI(object):
 
     session_attr_ro = ['this_host', 'this_user']
     session_methods = [('logout', None)]
-    # session_funcs = ['login_with_password']    
 
     def session_login_with_password(self, *args):
         if len(args) != 2:
@@ -473,8 +472,6 @@ class XendAPI(object):
     def session_logout(self, session):
         auth_manager().logout(session)
         return xen_api_success_void()
-    def session_destroy(self, session):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
     def session_get_record(self, session):
         record = {'this_host': XendNode.instance().uuid,
                   'this_user': auth_manager().get_user(session)}
