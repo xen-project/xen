@@ -556,6 +556,12 @@ void arch_domain_destroy(struct domain *d)
 	deallocate_rid_range(d);
 }
 
+int arch_vcpu_reset(struct vcpu *v)
+{
+	/* FIXME: Stub for now */
+	return 0;
+}
+
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
