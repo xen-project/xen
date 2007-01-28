@@ -27,3 +27,5 @@ class ConsoleController(DevController):
                        if val != None])
         return config
 
+    def migrate(self, deviceConfig, network, dst, step, domName):
+        return 0
