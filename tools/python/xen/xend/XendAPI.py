@@ -496,16 +496,16 @@ class XendAPI(object):
     # Xen API: Class Tasks
     # ----------------------------------------------------------------
 
-    task_attr_ro = ['status',
+    task_attr_ro = ['name_label',
+                    'name_description',
+                    'status',
                     'progress',
-                    'eta',                    
                     'type',
                     'result',
                     'error_code',
                     'error_info']
 
-    task_attr_rw = ['name_label',
-                    'name_description']
+    task_attr_rw = []
 
     task_funcs = [('get_by_name_label', 'Set(task)')]
 
@@ -516,10 +516,6 @@ class XendAPI(object):
     def task_get_progress(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
         return xen_api_success(task.progress)
-
-    def task_get_eta(self, session, task_ref):
-        task = XendTaskManager.get_task(task_ref)
-        return xen_api_success(task.eta)
 
     def task_get_type(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
@@ -545,23 +541,9 @@ class XendAPI(object):
         task = XendTaskManager.get_task(task_ref)
         return xen_api_success(task.name_description)
 
-    def task_set_name_label(self, session, task_ref, label):
-        task = XendTaskManager.get_task(task_ref)
-        task.name_label = label
-        return xen_api_success_void()
-
-    def task_set_name_description(self, session, task_ref, desc):
-        task = XendTaskManager.get_task(task_ref)
-        task.name_description = desc
-        return xen_api_success_void()    
-
     def task_get_all(self, session):
         tasks = XendTaskManager.get_all_tasks()
         return xen_api_success(tasks)
-
-    def task_destroy(self, session, task_uuid):
-        XendTaskManager.destroy_task(task_uuid)
-        return xen_api_success_void()
 
     def task_get_record(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
