@@ -386,7 +386,7 @@ struct xen_domctl_settimeoffset {
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
  
-#define HVM_CTXT_SIZE        6144
+#define HVM_CTXT_SIZE        8192
 typedef struct hvm_domain_context {
     uint32_t cur;
     uint32_t size;
