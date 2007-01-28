@@ -17,7 +17,12 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+#include <inttypes.h>
 #include <elf.h>
+#ifdef __sun__
+#include <sys/machelf.h>
+#endif
+
 #include <xen/hvm/e820.h>
 #include "util.h"
 #include "config.h"
@@ -35,7 +40,7 @@ static int relocate_elf(unsigned char *elfarray) {
     int i;
 
     if (ehdr->e_type != ET_REL) {
-        printf("Not a relocatabel BIOS object file. Has type %d, need %d\n",
+        printf("Not a relocatable BIOS object file. Has type %d, need %d\n",
                ehdr->e_type, ET_REL);
         return -1;
     }

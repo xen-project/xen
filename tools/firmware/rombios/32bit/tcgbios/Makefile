@@ -19,4 +19,4 @@ clean:
 	rm -rf *.o $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	ld $(LDFLAGS_DIRECT) -r $^ -o $@
+	$(LD) $(LDFLAGS_DIRECT) -r $^ -o $@
