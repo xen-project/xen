@@ -417,12 +417,6 @@ HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
 
 ///////////////////////////////////////////////////////////////////////////
-// PageForeign(), SetPageForeign(), ClearPageForeign()
-
-struct address_space xen_ia64_foreign_dummy_mapping;
-EXPORT_SYMBOL(xen_ia64_foreign_dummy_mapping);
-
-///////////////////////////////////////////////////////////////////////////
 // foreign mapping
 #include <linux/efi.h>
 #include <asm/meminit.h> // for IA64_GRANULE_SIZE, GRANULEROUND{UP,DOWN}()
