@@ -395,7 +395,7 @@ xen_register_percpu_irq (unsigned int vec, struct irqaction *action, int save)
 			 * mark the interrupt for migrations and trigger it
 			 * on cpu hotplug.
 			 */
-			desc = irq_descp(irq);
+			desc = irq_desc + irq;
 			desc->status |= IRQ_PER_CPU;
 		}
 	} 
