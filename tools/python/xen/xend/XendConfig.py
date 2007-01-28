@@ -28,7 +28,7 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 
 log = logging.getLogger("xend.XendConfig")
-log.setLevel(logging.WARN)
+log.setLevel(logging.DEBUG)
 
 
 """
@@ -878,6 +878,13 @@ class XendConfig(dict):
                         controller = domain.getDeviceController(cls)
                         configs = controller.configurations()
                         for config in configs:
+                            if sxp.name(config) in ('vbd', 'tap'):
+                                # The bootable flag is never written to the
+                                # store as part of the device config.
+                                uuid = sxp.child_value(sxpr, 'uuid')
+                                sxpr.append(
+                                    'bootable', 
+                                    self['devices'][dev_uuid]['bootable'])
                             sxpr.append(['device', config])
 
                         found = True
@@ -948,6 +955,7 @@ class XendConfig(dict):
                     pass
 
             if dev_type == 'vbd':
+                dev_info['bootable'] = False
                 if dev_info.get('dev', '').startswith('ioemu:'):
                     dev_info['driver'] = 'ioemu'
                 else:
@@ -964,13 +972,21 @@ class XendConfig(dict):
                 if param not in target:
                     target[param] = []
                 if dev_uuid not in target[param]:
+                    if dev_type == 'vbd' and not target[param]:
+                        # Compat hack -- this is the first disk, so mark it
+                        # bootable.
+                        dev_info['bootable'] = True
                     target[param].append(dev_uuid)
-            elif dev_type in ('tap',):
+            elif dev_type == 'tap':
                 if 'vbd_refs' not in target:
                     target['vbd_refs'] = []
                 if dev_uuid not in target['vbd_refs']:
+                    if not target['vbd_refs']:
+                        # Compat hack -- this is the first disk, so mark it
+                        # bootable.
+                        dev_info['bootable'] = True
                     target['vbd_refs'].append(dev_uuid)
-            elif dev_type in ('console',):
+            elif dev_type == 'console':
                 if 'console_refs' not in target:
                     target['console_refs'] = []
                 if dev_uuid not in target['console_refs']:
@@ -1009,6 +1025,7 @@ class XendConfig(dict):
                 dev_info['uname'] = cfg_xenapi.get('image', '')
                 dev_info['dev'] = '%s:%s' % (cfg_xenapi.get('device'),
                                              old_vbd_type)
+                dev_info['bootable'] = cfg_xenapi.get('bootable', False)
                 dev_info['driver'] = cfg_xenapi.get('driver')
                 dev_info['VDI'] = cfg_xenapi.get('VDI', '')
                     

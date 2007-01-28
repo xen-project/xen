@@ -1348,6 +1348,7 @@ class XendAPI(object):
     VBD_attr_rw = ['VM',
                    'VDI',
                    'device',
+                   'bootable',
                    'mode',
                    'type',                   
                    'driver']
@@ -1429,6 +1430,10 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
                                                                'device'))
+    def VBD_get_bootable(self, session, vbd_ref):
+        xendom = XendDomain.instance()
+        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
+                                                               'bootable'))
     def VBD_get_mode(self, session, vbd_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
@@ -1454,6 +1459,14 @@ class XendAPI(object):
         return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
                                                               'io_read_kbs'))
     
+    def VBD_set_bootable(self, session, vbd_ref, bootable):
+        bootable = bool(bootable)
+        xd = XendDomain.instance()
+        vm = xd.get_vm_with_dev_uuid('vbd', vbd_ref)
+        vm.set_dev_property('vbd', vbd_ref, 'bootable', bootable)
+        xd.managed_config_save(vm)
+        return xen_api_success_void()
+
     def VBD_get_all(self, session):
         xendom = XendDomain.instance()
         vbds = [d.get_vbds() for d in XendDomain.instance().list('all')]

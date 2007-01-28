@@ -1653,48 +1653,45 @@ class XendDomainInfo:
                 blexec = osdep.pygrub_path
 
             blcfg = None
-            for (devtype, devinfo) in self.info.all_devices_sxpr():
-                if not devtype or not devinfo or devtype not in ('vbd', 'tap'):
-                    continue
-                disk = None
-                for param in devinfo:
-                    if param[0] == 'uname':
-                        disk = param[1]
-                        break
+            disks = [x for x in self.info['vbd_refs']
+                     if self.info['devices'][x][1]['bootable']]
 
-                if disk is None:
-                    continue
-                fn = blkdev_uname_to_file(disk)
-                mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            if not disks:
+                msg = "Had a bootloader specified, but no disks are bootable"
+                log.error(msg)
+                raise VmError(msg)
+
+            disk = disks[0]
+
+            fn = blkdev_uname_to_file(disk)
+            mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            if mounted:
+                # This is a file, not a device.  pygrub can cope with a
+                # file if it's raw, but if it's QCOW or other such formats
+                # used through blktap, then we need to mount it first.
+
+                log.info("Mounting %s on %s." %
+                         (fn, BOOTLOADER_LOOPBACK_DEVICE))
+
+                vbd = {
+                    'mode': 'RO',
+                    'device': BOOTLOADER_LOOPBACK_DEVICE,
+                    }
+
+                from xen.xend import XendDomain
+                dom0 = XendDomain.instance().privilegedDomain()
+                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
+                fn = BOOTLOADER_LOOPBACK_DEVICE
+
+            try:
+                blcfg = bootloader(blexec, fn, self, False,
+                                   bootloader_args, kernel, ramdisk, args)
+            finally:
                 if mounted:
-                    # This is a file, not a device.  pygrub can cope with a
-                    # file if it's raw, but if it's QCOW or other such formats
-                    # used through blktap, then we need to mount it first.
-
-                    log.info("Mounting %s on %s." %
+                    log.info("Unmounting %s from %s." %
                              (fn, BOOTLOADER_LOOPBACK_DEVICE))
 
-                    vbd = {
-                        'mode': 'RO',
-                        'device': BOOTLOADER_LOOPBACK_DEVICE,
-                        }
-
-                    from xen.xend import XendDomain
-                    dom0 = XendDomain.instance().privilegedDomain()
-                    dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
-                    fn = BOOTLOADER_LOOPBACK_DEVICE
-
-                try:
-                    blcfg = bootloader(blexec, fn, self, False,
-                                       bootloader_args, kernel, ramdisk, args)
-                finally:
-                    if mounted:
-                        log.info("Unmounting %s from %s." %
-                                 (fn, BOOTLOADER_LOOPBACK_DEVICE))
-
-                        dom0.destroyDevice('tap', '/dev/xvdp')
-
-                break
+                    dom0.destroyDevice('tap', '/dev/xvdp')
 
             if blcfg is None:
                 msg = "Had a bootloader specified, but can't find disk"
@@ -2136,6 +2133,9 @@ class XendDomainInfo:
             return config[field]
         except KeyError:
             raise XendError('Invalid property for device: %s' % field)
+
+    def set_dev_property(self, dev_class, dev_uuid, field, value):
+        self.info['devices'][dev_uuid][1][field] = value
 
     def get_vcpus_util(self):
         vcpu_util = {}

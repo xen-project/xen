@@ -55,6 +55,9 @@ static const struct_member xen_vbd_record_struct_members[] =
         { .key = "image",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vbd_record, image) },
+        { .key = "bootable",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vbd_record, bootable) },
         { .key = "mode",
           .type = &xen_vbd_mode_abstract_type_,
           .offset = offsetof(xen_vbd_record, mode) },
@@ -218,6 +221,22 @@ xen_vbd_get_device(xen_session *session, char **result, xen_vbd vbd)
 
 
 bool
+xen_vbd_get_bootable(xen_session *session, bool *result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VBD.get_bootable");
+    return session->ok;
+}
+
+
+bool
 xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd)
 {
     abstract_value param_values[] =
@@ -327,6 +346,22 @@ xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device)
         };
 
     xen_call_(session, "VBD.set_device", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_set_bootable(xen_session *session, xen_vbd vbd, bool bootable)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_bool,
+              .u.bool_val = bootable }
+        };
+
+    xen_call_(session, "VBD.set_bootable", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

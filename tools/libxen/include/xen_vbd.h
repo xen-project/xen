@@ -70,6 +70,7 @@ typedef struct xen_vbd_record
     struct xen_vdi_record_opt *vdi;
     char *device;
     char *image;
+    bool bootable;
     enum xen_vbd_mode mode;
     enum xen_driver_type driver;
     double io_read_kbs;
@@ -212,6 +213,13 @@ xen_vbd_get_device(xen_session *session, char **result, xen_vbd vbd);
 
 
 /**
+ * Get the bootable field of the given VBD.
+ */
+extern bool
+xen_vbd_get_bootable(xen_session *session, bool *result, xen_vbd vbd);
+
+
+/**
  * Get the mode field of the given VBD.
  */
 extern bool
@@ -258,6 +266,13 @@ xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi);
  */
 extern bool
 xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device);
+
+
+/**
+ * Set the bootable field of the given VBD.
+ */
+extern bool
+xen_vbd_set_bootable(xen_session *session, xen_vbd vbd, bool bootable);
 
 
 /**

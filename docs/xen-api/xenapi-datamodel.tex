@@ -1089,7 +1089,10 @@ control domain to some other bootloader.  The other fields, PV/kernel,
 PV/ramdisk, PV/args and PV/bootloader\_args will be passed to the
 bootloader unmodified, and interpretation of those fields is then specific
 to the bootloader itself, including the possibility that the bootloader
-will ignore some or all of those given values.
+will ignore some or all of those given values. Finally the paths of all
+bootable disks are added to the bootloader commandline (a disk is bootable
+if its VBD has the bootable flag set). There may be zero, one or many
+bootable disks; the bootloader decides which disk (if any) to boot from.
 
 If the bootloader is pygrub, then the menu.lst is parsed if present in the
 guest's filesystem, otherwise the specified kernel and ramdisk are used, or
@@ -8665,7 +8668,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RW}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RW}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
-$\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the disk should be mounted with \\
+$\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
+$\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
 $\mathit{RW}$ &  {\tt driver} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
@@ -8922,6 +8926,72 @@ Set the device field of the given VBD.
 {\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_bootable}
+
+{\bf Overview:} 
+Get the bootable field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_bootable (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_bootable}
+
+{\bf Overview:} 
+Set the bootable field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_bootable (session_id s, VBD ref self, bool value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt bool } & value & New value to set \\ \hline 
 
 \end{tabular}
 
