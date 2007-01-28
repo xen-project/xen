@@ -175,7 +175,7 @@ class XendPIF:
 
 
     def interface_name(self):
-        if self.vlan:
+        if self.vlan != -1:
             return '%s.%d' % (self.device, self.vlan)
         else:
             return self.device
