@@ -19,7 +19,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2007-01-28 12:59+0000\n"
+"PO-Revision-Date: 2007-01-28 18:02+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -64,6 +64,9 @@ msgstr "The VM handle %(1)s is invalid."
 
 msgid "VTPM_HANDLE_INVALID"
 msgstr "The VTPM handle %(1)s is invalid."
+
+msgid "OPERATION_NOT_ALLOWED"
+msgstr "You attempted an operation that was not allowed."
 
 msgid "NETWORK_ALREADY_CONNECTED"
 msgstr "The network you specified already has a PIF attached to it, and so another one may not be attached."

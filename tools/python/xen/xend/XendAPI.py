@@ -503,11 +503,22 @@ class XendAPI(object):
                     'type',
                     'result',
                     'error_code',
-                    'error_info']
+                    'error_info',
+                    'allowed_operations',
+                    ]
 
     task_attr_rw = []
 
-    task_funcs = [('get_by_name_label', 'Set(task)')]
+    task_funcs = [('get_by_name_label', 'Set(task)'),
+                  ('cancel', None)]
+
+    def task_get_name_label(self, session, task_ref):
+        task = XendTaskManager.get_task(task_ref)
+        return xen_api_success(task.name_label)
+
+    def task_get_name_description(self, session, task_ref):
+        task = XendTaskManager.get_task(task_ref)
+        return xen_api_success(task.name_description)
 
     def task_get_status(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
@@ -533,13 +544,8 @@ class XendAPI(object):
         task = XendTaskManager.get_task(task_ref)
         return xen_api_success(task.error_info)
 
-    def task_get_name_label(self, session, task_ref):
-        task = XendTaskManager.get_task(task_ref)
-        return xen_api_success(task.name_label)
-
-    def task_get_name_description(self, session, task_ref):
-        task = XendTaskManager.get_task(task_ref)
-        return xen_api_success(task.name_description)
+    def task_get_allowed_operations(self, session, task_ref):
+        return xen_api_success({})
 
     def task_get_all(self, session):
         tasks = XendTaskManager.get_all_tasks()
@@ -548,6 +554,9 @@ class XendAPI(object):
     def task_get_record(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
         return xen_api_success(task.get_record())
+
+    def task_cancel(self, session, task_ref):
+        return xen_api_error('OPERATION_NOT_ALLOWED')
 
     def task_get_by_name_label(self, session, name):
         return xen_api_success(XendTaskManager.get_task_by_name(name))

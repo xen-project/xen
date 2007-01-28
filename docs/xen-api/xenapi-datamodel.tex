@@ -137,11 +137,22 @@ The following enumeration types are used:
 \vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
+{\tt enum task\_allowed\_operations} & \\
+\hline
+\hspace{0.5cm}{\tt Cancel} & Cancel \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
+\begin{longtable}{|ll|}
+\hline
 {\tt enum task\_status\_type} & \\
 \hline
 \hspace{0.5cm}{\tt pending} & task is in progress \\
 \hspace{0.5cm}{\tt success} & task was completed successfully \\
 \hspace{0.5cm}{\tt failure} & task has failed \\
+\hspace{0.5cm}{\tt cancelling} & task is being cancelled \\
+\hspace{0.5cm}{\tt cancelled} & task has been cancelled \\
 \hline
 \end{longtable}
 
@@ -558,9 +569,48 @@ $\mathit{RO}_\mathit{run}$ &  {\tt type} & string & if the task has completed su
 $\mathit{RO}_\mathit{run}$ &  {\tt result} & string & if the task has completed successfully, this field contains the result value (either Void or an object reference). Undefined otherwise. \\
 $\mathit{RO}_\mathit{run}$ &  {\tt error\_code} & int & if the task has failed, this field contains the error code. Undefined otherwise. \\
 $\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has failed, this field contains the set of associated error strings. Undefined otherwise. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt allowed\_operations} & (task\_allowed\_operations) Set & Operations allowed on this task \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: task}
+\subsubsection{RPC name:~cancel}
+
+{\bf Overview:} 
+Cancel this task.  If task.allowed\_operations does not contain Cancel,
+then this will fail with OPERATION\_NOT\_ALLOWED.  The task will show the
+status 'cancelling', and you should continue to check its status until it
+shows 'cancelled'.  There is no guarantee as to the time within which this
+task will be cancelled.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void cancel (session_id s, task ref task)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & task & The task \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt OPERATION\_NOT\_ALLOWED}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -863,6 +913,38 @@ Get the error\_info field of the given task.
  \noindent {\bf Return Type:} 
 {\tt 
 string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_allowed\_operations}
+
+{\bf Overview:} 
+Get the allowed\_operations field of the given task.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((task_allowed_operations) Set) get_allowed_operations (session_id s, task ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt task ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(task\_allowed\_operations) Set
 }
 
 
@@ -10469,6 +10551,15 @@ already attached to some other PIF, and so the creation failed.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{OPERATION\_NOT\_ALLOWED}
+
+You attempted an operation that was not allowed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}OPERATION_NOT_ALLOWED()\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{PIF\_IS\_PHYSICAL}
