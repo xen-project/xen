@@ -1661,7 +1661,9 @@ class XendDomainInfo:
                 log.error(msg)
                 raise VmError(msg)
 
-            disk = disks[0]
+            devinfo = self.info['devices'][disks[0]]
+            devtype = devinfo[0]
+            disk = devinfo[1]['uname']
 
             fn = blkdev_uname_to_file(disk)
             mounted = devtype == 'tap' and not os.stat(fn).st_rdev
