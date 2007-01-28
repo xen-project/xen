@@ -19,7 +19,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2007-01-28 18:02+0000\n"
+"PO-Revision-Date: 2007-01-28 21:58+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -49,6 +49,9 @@ msgstr "The host handle %(1)s is invalid."
 
 msgid "SR_HANDLE_INVALID"
 msgstr "The SR handle %(1)s is invalid."
+
+msgid "TASK_HANDLE_INVALID"
+msgstr "The task handle %(1)s is invalid."
 
 msgid "VBD_HANDLE_INVALID"
 msgstr "The VBD handle %(1)s is invalid."
