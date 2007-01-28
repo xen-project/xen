@@ -37,6 +37,8 @@
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
+#define XEN_GUEST_HANDLE_64(name)       XEN_GUEST_HANDLE(name)
+#define uint64_aligned_t                uint64_t
 #define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
 #ifdef __XEN_TOOLS__
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
