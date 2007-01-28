@@ -104,10 +104,9 @@ extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
 static inline void ia64_resend_irq(unsigned int vector)
 {
 #ifdef CONFIG_XEN
-	extern void resend_irq_on_evtchn(struct hw_interrupt_type *h,
-					 unsigned int i);
+	extern int resend_irq_on_evtchn(unsigned int i);
 	if (is_running_on_xen())
-		resend_irq_on_evtchn(h, vector);
+		resend_irq_on_evtchn(vector);
 	else
 #endif /* CONFIG_XEN */
 	platform_send_ipi(smp_processor_id(), vector, IA64_IPI_DM_INT, 0);
