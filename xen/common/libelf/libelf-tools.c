@@ -7,7 +7,7 @@
 /* ------------------------------------------------------------------------ */
 
 uint64_t elf_access_unsigned(struct elf_binary * elf, const void *ptr,
-			     off_t offset, size_t size)
+			     uint64_t offset, size_t size)
 {
     int need_swap = elf_swap(elf);
     const uint8_t *u8;
@@ -35,7 +35,7 @@ uint64_t elf_access_unsigned(struct elf_binary * elf, const void *ptr,
 }
 
 int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
-			  off_t offset, size_t size)
+			  uint64_t offset, size_t size)
 {
     int need_swap = elf_swap(elf);
     const int8_t *s8;

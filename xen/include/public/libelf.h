@@ -1,25 +1,12 @@
 #ifndef __XC_LIBELF__
 #define __XC_LIBELF__ 1
 
-#ifdef __XEN__
-
-#include <xen/inttypes.h>
-#include <public/features.h>
-typedef uint64_t off_t;
-
-#define LITTLE_ENDIAN 1234
-#define BIG_ENDIAN    4321
 #if defined(__i386__) || defined(__x86_64) || defined(__ia64__)
-#define BYTE_ORDER LITTLE_ENDIAN
+#define XEN_ELF_LITTLE_ENDIAN
 #elif defined(__powerpc__)
-#define BYTE_ORDER BIG_ENDIAN
-#endif
-
-#else /* !__XEN__ */
-
-#include <stddef.h>
-#include <inttypes.h>
-
+#define XEN_ELF_BIG_ENDIAN
+#else
+#error define architectural endianness
 #endif
 
 #undef ELFSIZE
@@ -91,14 +78,10 @@ struct elf_binary {
 /* ------------------------------------------------------------------------ */
 /* accessing elf header fields                                              */
 
-#if !defined(BYTE_ORDER)
-# error BYTE_ORDER not defined
-#elif BYTE_ORDER == BIG_ENDIAN
+#ifdef XEN_ELF_BIG_ENDIAN
 # define NATIVE_ELFDATA ELFDATA2MSB
-#elif BYTE_ORDER == LITTLE_ENDIAN
-# define NATIVE_ELFDATA ELFDATA2LSB
 #else
-# error BYTE_ORDER unknown
+# define NATIVE_ELFDATA ELFDATA2LSB
 #endif
 
 #define elf_32bit(elf) (ELFCLASS32 == (elf)->class)
@@ -131,9 +114,9 @@ struct elf_binary {
 	: sizeof((str)->e32))
 
 uint64_t elf_access_unsigned(struct elf_binary *elf, const void *ptr,
-			     off_t offset, size_t size);
+			     uint64_t offset, size_t size);
 int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
-			  off_t offset, size_t size);
+			  uint64_t offset, size_t size);
 
 uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr);
 
