@@ -1,7 +1,13 @@
+#ifndef __LIBELF_PRIVATE_H__
+#define __LIBELF_PRIVATE_H_
+
 #ifdef __XEN__
 
+#include <xen/config.h>
+#include <xen/types.h>
 #include <xen/string.h>
 #include <xen/lib.h>
+#include <asm/byteorder.h>
 #include <public/elfnote.h>
 #include <public/libelf.h>
 
@@ -11,29 +17,25 @@
 	printk(fmt, ## args )
 
 #define strtoull(str, end, base) simple_strtoull(str, end, base)
-#define bswap_16(x) \
-     ((((x) >> 8) & 0xff) | (((x) & 0xff) << 8))
-#define bswap_32(x) \
-     (  (((x) & 0xff000000) >> 24)  \
-      | (((x) & 0x00ff0000) >>  8)  \
-      | (((x) & 0x0000ff00) <<  8)  \
-      | (((x) & 0x000000ff) << 24))
-#define bswap_64(x) \
-     (  (((x) & 0xff00000000000000ull) >> 56)  \
-      | (((x) & 0x00ff000000000000ull) >> 40)  \
-      | (((x) & 0x0000ff0000000000ull) >> 24)  \
-      | (((x) & 0x000000ff00000000ull) >> 8)   \
-      | (((x) & 0x00000000ff000000ull) << 8)   \
-      | (((x) & 0x0000000000ff0000ull) << 24)  \
-      | (((x) & 0x000000000000ff00ull) << 40)  \
-      | (((x) & 0x00000000000000ffull) << 56))
+#define bswap_16(x) swab16(x)
+#define bswap_32(x) swab32(x)
+#define bswap_64(x) swab64(x)
 
 #else /* !__XEN__ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
+#include <inttypes.h>
+#ifdef __sun__
+#include <sys/byteorder.h>
+#define bswap_16(x) BSWAP_16(x)
+#define bswap_32(x) BSWAP_32(x)
+#define bswap_64(x) BSWAP_64(x)
+#else
 #include <byteswap.h>
+#endif
 #include <xen/elfnote.h>
 #include <xen/libelf.h>
 
@@ -49,3 +51,5 @@
 	} while (0)
 
 #endif
+
+#endif /* __LIBELF_PRIVATE_H_ */

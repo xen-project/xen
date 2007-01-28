@@ -706,6 +706,15 @@ def parse_doms_info(info):
         'seclabel' : security.get_security_printlabel(info),
         }
 
+def check_sched_type(sched):
+    current = 'unknown'
+    for x in server.xend.node.info()[1:]:
+        if len(x) > 1 and x[0] == 'xen_scheduler':
+            current = x[1]
+            break
+    if sched != current:
+        err("Xen is running with the %s scheduler" % current)
+        sys.exit(1)
 
 def parse_sedf_info(info):
     def get_info(n, t, d):
@@ -1098,6 +1107,8 @@ def xm_sched_sedf(args):
         print( ("%(name)-32s %(domid)3d %(period)9.1f %(slice)9.1f" +
                 " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
+    check_sched_type('sedf')
+
     # we want to just display current info if no parameters are passed
     if len(args) == 0:
         domid = None
@@ -1170,6 +1181,8 @@ def xm_sched_sedf(args):
 def xm_sched_credit(args):
     """Get/Set options for Credit Scheduler."""
     
+    check_sched_type('credit')
+
     try:
         opts, params = getopt.getopt(args, "d:w:c:",
             ["domain=", "weight=", "cap="])

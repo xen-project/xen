@@ -943,6 +943,9 @@ class XendDomain:
                                  POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
+            self.domain_sched_credit_set(dominfo.getDomid(),
+                                         dominfo.getWeight(),
+                                         dominfo.getCap())
         finally:
             self.domains_lock.release()
         dominfo.waitForDevices()
