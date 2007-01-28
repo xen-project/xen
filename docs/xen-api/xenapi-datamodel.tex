@@ -6583,8 +6583,10 @@ PIF ref
 
 The reference of the created PIF object
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VLAN\_TAG\_INVALID}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
@@ -6615,8 +6617,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt PIF\_IS\_PHYSICAL}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -10498,6 +10502,17 @@ already attached to some other PIF, and so the creation failed.
 \begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
+\subsubsection{PIF\_IS\_PHYSICAL}
+
+You tried to destroy a PIF, but it represents an aspect of the physical
+host configuration, and so cannot be destroyed.  The parameter echoes the
+PIF handle you gave.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
 \subsubsection{SESSION\_AUTHENTICATION\_FAILED}
 
 The credentials given by the user are incorrect, so access has been denied,
@@ -10559,11 +10574,21 @@ The handle parameter echoes the bad value given.
 \begin{verbatim}VIF_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
+\subsubsection{VLAN\_TAG\_INVALID}
+
+You tried to create a VLAN, but the tag you gave was invalid -- it mmust be
+between 0 and 4095.  The parameter echoes the VLAN tag you gave.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VLAN_TAG_INVALID(VLAN)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
 \subsubsection{VM\_BAD\_POWER\_STATE}
 
 You attempted an operation on a VM that was not in an appropriate power
 state at the time; for example, you attempted to start a VM that was
-already running.  The parameters returned are the VM's UUID, and the
+already running.  The parameters returned are the VM's handle, and the
 expected and actual VM state at the time of the call.
 
 \vspace{0.3cm}
