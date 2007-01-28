@@ -2019,18 +2019,21 @@ class XendAPIAsyncProxy:
 
         # Only deal with method names that start with "Async."
         if not method.startswith(self.method_prefix):
-            raise Exception('Method %s not supported' % method)
-
-        # Require 'session' argument to be present.
-        if len(args) < 1:
-            raise Exception('Not enough arguments')
+            return xen_api_error(['MESSAGE_METHOD_UNKNOWN', method])
 
         # Lookup synchronous version of the method
         synchronous_method_name = method[len(self.method_prefix):]
         if synchronous_method_name not in self.method_map:
-            raise Exception('Method %s not supported' % method)
+            return xen_api_error(['MESSAGE_METHOD_UNKNOWN', method])
         
         method = self.method_map[synchronous_method_name]
+
+        # Check that we've got enough arguments before issuing a task ID.
+        needed = argcounts[method.api]
+        if len(args) != needed:
+            return xen_api_error(['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                                  self.method_prefix + method.api, needed,
+                                  len(args)])
 
         # Validate the session before proceeding
         session = args[0]
