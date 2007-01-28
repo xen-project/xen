@@ -6529,22 +6529,94 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PIF} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A physical network interface (note separate VLANs are represented as several PIFs)}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+physical network interface (note separate VLANs are represented as several
+PIFs)}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RW}$ &  {\tt name} & string & human-readable name of the interface \\
+$\mathit{RW}$ &  {\tt device} & string & machine-readable name of the interface (e.g. eth0) \\
 $\mathit{RW}$ &  {\tt network} & network ref & virtual network to which this pif is connected \\
 $\mathit{RW}$ &  {\tt host} & host ref & physical machine to which this pif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of physical interface \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
-$\mathit{RW}$ &  {\tt VLAN} & string & VLAN tag for all traffic passing through this interface \\
+$\mathit{RW}$ &  {\tt VLAN} & int & VLAN tag for all traffic passing through this interface \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: PIF}
+\subsubsection{RPC name:~create\_VLAN}
+
+{\bf Overview:} 
+Create a VLAN interface from an existing physical interface
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF ref) create_VLAN (session_id s, string device, network ref network, host ref host, int VLAN)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & device & physical interface on which to crate the VLAN interface \\ \hline 
+
+{\tt network ref } & network & network to which this interface should be connected \\ \hline 
+
+{\tt host ref } & host & physical machine to which this PIF is connected \\ \hline 
+
+{\tt int } & VLAN & VLAN tag for the new interface \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF ref
+}
+
+
+The reference of the created PIF object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the interface (provided it is a synthetic interface like a VLAN; fail if it is a physical interface)
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, PIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF ref } & self & the PIF object to destroy \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -6577,13 +6649,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_name}
+\subsubsection{RPC name:~get\_device}
 
 {\bf Overview:} 
-Get the name field of the given PIF.
+Get the device field of the given PIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_name (session_id s, PIF ref self)\end{verbatim}
+\begin{verbatim} string get_device (session_id s, PIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -6609,13 +6681,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_name}
+\subsubsection{RPC name:~set\_device}
 
 {\bf Overview:} 
-Set the name field of the given PIF.
+Set the device field of the given PIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_name (session_id s, PIF ref self, string value)\end{verbatim}
+\begin{verbatim} void set_device (session_id s, PIF ref self, string value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -6913,7 +6985,7 @@ void
 Get the VLAN field of the given PIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_VLAN (session_id s, PIF ref self)\end{verbatim}
+\begin{verbatim} int get_VLAN (session_id s, PIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -6931,7 +7003,7 @@ Get the VLAN field of the given PIF.
 
  \noindent {\bf Return Type:} 
 {\tt 
-string
+int
 }
 
 
@@ -6945,7 +7017,7 @@ value of the field
 Set the VLAN field of the given PIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_VLAN (session_id s, PIF ref self, string value)\end{verbatim}
+\begin{verbatim} void set_VLAN (session_id s, PIF ref self, int value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -6957,7 +7029,7 @@ Set the VLAN field of the given PIF.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt PIF ref } & self & reference to the object \\ \hline 
 
-{\tt string } & value & New value to set \\ \hline 
+{\tt int } & value & New value to set \\ \hline 
 
 \end{tabular}
 
@@ -7034,70 +7106,6 @@ float
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new PIF instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (PIF ref) create (session_id s, PIF record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-PIF ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified PIF instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, PIF ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

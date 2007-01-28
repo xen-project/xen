@@ -752,7 +752,7 @@ class XendAPI(object):
 
     PIF_attr_ro = ['io_read_kbs',
                    'io_write_kbs']
-    PIF_attr_rw = ['name',
+    PIF_attr_rw = ['device',
                    'network',
                    'host',
                    'MAC',
@@ -766,24 +766,11 @@ class XendAPI(object):
     def _get_PIF(self, ref):
         return XendNode.instance().pifs[ref]
 
-    def PIF_create(self, _, name, network_uuid, host_uuid, mac, mtu, vlan):
-        try:
-            node = XendNode.instance()
-            if host_uuid != node.uuid:
-                return xen_api_error(['HOST_HANDLE_INVALID', host_uuid])
-
-            elif _is_valid_ref(network_uuid, node.is_valid_network):
-                network = node.get_network(network_uuid)
-                return xen_api_success(node.PIF_create(name, mtu, vlan, mac,
-                                                       network))
-            else:
-                return xen_api_error(['NETWORK_HANDLE_INVALID', network_uuid])
-        except NetworkAlreadyConnected, exn:
-            return xen_api_error(['NETWORK_ALREADY_CONNECTED',
-                                  network_uuid, exn.pif_uuid])
-
     def PIF_destroy(self, _, ref):
-        return xen_api_success(XendNode.instance().PIF_destroy(ref))
+        try:
+            return xen_api_success(XendNode.instance().PIF_destroy(ref))
+        except PIFIsPhysical, exn:
+            return xen_api_error(['PIF_IS_PHYSICAL', ref])
 
     # object methods
     def PIF_get_record(self, _, ref):
@@ -792,8 +779,8 @@ class XendAPI(object):
     def PIF_get_all(self, _):
         return xen_api_success(XendNode.instance().pifs.keys())
 
-    def PIF_get_name(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).name)
+    def PIF_get_device(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).device)
 
     def PIF_get_network(self, _, ref):
         return xen_api_success(self._get_PIF(ref).network.uuid)
@@ -816,8 +803,8 @@ class XendAPI(object):
     def PIF_get_io_write_kbs(self, _, ref):
         return xen_api_success(self._get_PIF(ref).get_io_write_kbs())
     
-    def PIF_set_name(self, _, ref, name):
-        return xen_api_success(self._get_PIF(ref).set_name(name))
+    def PIF_set_device(self, _, ref, device):
+        return xen_api_success(self._get_PIF(ref).set_device(device))
 
     def PIF_set_MAC(self, _, ref, mac):
         return xen_api_success(self._get_PIF(ref).set_mac(mac))
@@ -827,14 +814,23 @@ class XendAPI(object):
 
     def PIF_create_VLAN(self, _, ref, network, vlan):
         try:
-            if _is_valid_ref(network, XendNode.instance().is_valid_network):
-                return xen_api_success(XendNode.instance().PIF_create_VLAN(
-                    ref, network, vlan))
+            vlan = int(vlan)
+        except:
+            return xen_api_error(['VLAN_TAG_INVALID', vlan])
+
+        try:
+            node = XendNode.instance()
+            
+            if _is_valid_ref(network, node.is_valid_network):
+                return xen_api_success(
+                    node.PIF_create_VLAN(ref, network, vlan))
             else:
                 return xen_api_error(['NETWORK_HANDLE_INVALID', network])
         except NetworkAlreadyConnected, exn:
             return xen_api_error(['NETWORK_ALREADY_CONNECTED',
                                   network, exn.pif_uuid])
+        except VLANTagInvalid:
+            return xen_api_error(['VLAN_TAG_INVALID', vlan])
 
 
     # Xen API: Class VM

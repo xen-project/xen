@@ -26,8 +26,8 @@
 
 
 /*
- * The PIF class. 
- *  
+ * The PIF class.
+ * 
  * A physical network interface (note separate VLANs are represented as
  * several PIFs).
  */
@@ -65,12 +65,12 @@ typedef struct xen_pif_record
 {
     xen_pif handle;
     char *uuid;
-    char *name;
+    char *device;
     struct xen_network_record_opt *network;
     struct xen_host_record_opt *host;
     char *mac;
     int64_t mtu;
-    char *vlan;
+    int64_t vlan;
     double io_read_kbs;
     double io_write_kbs;
 } xen_pif_record;
@@ -169,20 +169,6 @@ xen_pif_get_by_uuid(xen_session *session, xen_pif *result, char *uuid);
 
 
 /**
- * Create a new PIF instance, and return its handle.
- */
-extern bool
-xen_pif_create(xen_session *session, xen_pif *result, xen_pif_record *record);
-
-
-/**
- * Destroy the specified PIF instance.
- */
-extern bool
-xen_pif_destroy(xen_session *session, xen_pif pif);
-
-
-/**
  * Get the uuid field of the given PIF.
  */
 extern bool
@@ -190,10 +176,10 @@ xen_pif_get_uuid(xen_session *session, char **result, xen_pif pif);
 
 
 /**
- * Get the name field of the given PIF.
+ * Get the device field of the given PIF.
  */
 extern bool
-xen_pif_get_name(xen_session *session, char **result, xen_pif pif);
+xen_pif_get_device(xen_session *session, char **result, xen_pif pif);
 
 
 /**
@@ -228,7 +214,7 @@ xen_pif_get_mtu(xen_session *session, int64_t *result, xen_pif pif);
  * Get the VLAN field of the given PIF.
  */
 extern bool
-xen_pif_get_vlan(xen_session *session, char **result, xen_pif pif);
+xen_pif_get_vlan(xen_session *session, int64_t *result, xen_pif pif);
 
 
 /**
@@ -246,10 +232,10 @@ xen_pif_get_io_write_kbs(xen_session *session, double *result, xen_pif pif);
 
 
 /**
- * Set the name field of the given PIF.
+ * Set the device field of the given PIF.
  */
 extern bool
-xen_pif_set_name(xen_session *session, xen_pif pif, char *name);
+xen_pif_set_device(xen_session *session, xen_pif pif, char *device);
 
 
 /**
@@ -284,7 +270,22 @@ xen_pif_set_mtu(xen_session *session, xen_pif pif, int64_t mtu);
  * Set the VLAN field of the given PIF.
  */
 extern bool
-xen_pif_set_vlan(xen_session *session, xen_pif pif, char *vlan);
+xen_pif_set_vlan(xen_session *session, xen_pif pif, int64_t vlan);
+
+
+/**
+ * Create a VLAN interface from an existing physical interface
+ */
+extern bool
+xen_pif_create_vlan(xen_session *session, xen_pif *result, char *device, xen_network network, xen_host host, int64_t vlan);
+
+
+/**
+ * Destroy the interface (provided it is a synthetic interface like a
+ * VLAN; fail if it is a physical interface)
+ */
+extern bool
+xen_pif_destroy(xen_session *session, xen_pif self);
 
 
 #endif

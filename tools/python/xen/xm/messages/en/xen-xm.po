@@ -12,14 +12,14 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 # ============================================================================
-# Copyright (c) 2006 XenSource Inc.
+# Copyright (c) 2006-2007 XenSource Inc.
 # ============================================================================
 # 
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2006-12-28 15:43+0000\n"
+"PO-Revision-Date: 2007-01-28 12:59+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -67,6 +67,12 @@ msgstr "The VTPM handle %(1)s is invalid."
 
 msgid "NETWORK_ALREADY_CONNECTED"
 msgstr "The network you specified already has a PIF attached to it, and so another one may not be attached."
+
+msgid "PIF_IS_PHYSICAL"
+msgstr "The PIF %(1)s corresponds to a physical interface, and so may not be destroyed."
+
+msgid "VLAN_TAG_INVALID"
+msgstr "The VLAN tag you gave (%(1)s) is invalid -- it must be between 0 and 4095."
 
 msgid "VM_BAD_POWER_STATE"
 msgstr "The VM must be %(2)s to perform the requested operation (it is currently %(3)s)."

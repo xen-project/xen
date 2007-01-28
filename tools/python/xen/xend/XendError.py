@@ -43,6 +43,14 @@ class NetworkAlreadyConnected(XendError):
         XendError.__init__(self, 'Network already connected')
         self.pif_uuid = pif_uuid
 
+class PIFIsPhysical(XendError):
+    def __init__(self):
+        XendError.__init__(self, 'PIF is physical')
+
+class VLANTagInvalid(XendError):
+    def __init__(self):
+        XendError.__init__(self, 'VLAN tag invalid')
+
 class VmError(XendError):
     """Vm construction error."""
     pass

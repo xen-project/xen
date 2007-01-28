@@ -23,7 +23,7 @@ import xen.lowlevel.xc
 from xen.util import Brctl
 
 from xen.xend import uuid
-from xen.xend.XendError import XendError, NetworkAlreadyConnected
+from xen.xend.XendError import *
 from xen.xend.XendOptions import instance as xendoptions
 from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
 from xen.xend.XendLocalStorageRepo import XendLocalStorageRepo
@@ -111,8 +111,13 @@ class XendNode:
                 if pif.get('network') in self.networks:
                     network = self.networks[pif['network']]
                     try:
-                        self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
-                                        pif['MAC'], network, False, pif_uuid)
+                        if 'device' not in pif and 'name' in pif:
+                            # Compatibility hack, can go pretty soon.
+                            pif['device'] = pif['name']
+                        
+                        self._PIF_create(pif['device'], pif['MTU'],
+                                         int(pif['VLAN']),
+                                         pif['MAC'], network, False, pif_uuid)
                     except NetworkAlreadyConnected, exn:
                         log.error('Cannot load saved PIF %s, as network %s ' +
                                   'is already connected to PIF %s',
@@ -120,7 +125,7 @@ class XendNode:
         else:
             for name, mtu, mac in linux_get_phy_ifaces():
                 network = self.networks.values()[0]
-                self.PIF_create(name, mtu, '', mac, network, False)
+                self._PIF_create(name, mtu, -1, mac, network, False)
 
         # initialise storage
         saved_srs = self.state_store.load_state('sr')
@@ -161,8 +166,8 @@ class XendNode:
         self.save_networks()
 
 
-    def PIF_create(self, name, mtu, vlan, mac, network, persist = True,
-                   pif_uuid = None):
+    def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
+                    pif_uuid = None):
         for pif in self.pifs.values():
             if pif.network == network:
                 raise NetworkAlreadyConnected(pif.uuid)
@@ -178,12 +183,20 @@ class XendNode:
 
 
     def PIF_create_VLAN(self, pif_uuid, network_uuid, vlan):
+        if vlan < 0 or vlan >= 4096:
+            raise VLANTagInvalid()
+            
         pif = self.pifs[pif_uuid]
         network = self.networks[network_uuid]
-        return self.PIF_create(pif.name, pif.mtu, vlan, pif.mac, network)
+        return self._PIF_create(pif.device, pif.mtu, vlan, pif.mac, network)
 
 
     def PIF_destroy(self, pif_uuid):
+        pif = self.pifs[pif_uuid]
+
+        if pif.vlan == -1:
+            raise PIFIsPhysical()
+
         del self.pifs[pif_uuid]
         self.save_PIFs()
 
