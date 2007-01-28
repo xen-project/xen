@@ -454,7 +454,8 @@ setup_arch (char **cmdline_p)
 
 		setup_xen_features();
 		/* Register a call for panic conditions. */
-		notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+		atomic_notifier_chain_register(&panic_notifier_list,
+		                               &xen_panic_block);
 	}
 #endif
 
