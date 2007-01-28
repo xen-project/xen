@@ -1404,49 +1404,38 @@ class XendAPI(object):
         return xen_api_success_void()
 
     # attributes (rw)
+    def _VBD_get(self, vbd_ref, prop):
+        return xen_api_success(
+            XendDomain.instance().get_dev_property_by_uuid(
+            'vbd', vbd_ref, prop))
+
     def VBD_get_VM(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd',
-                                                               vbd_ref, 'VM'))
+        return self._VBD_get(vbd_ref, 'VM')
     
     def VBD_get_VDI(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd',
-                                                               vbd_ref, 'VDI'))
-    
+        return self._VBD_get(vbd_ref, 'VDI')
+
     def VBD_get_device(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                               'device'))
+        return self._VBD_get(vbd_ref, 'device')
+
     def VBD_get_bootable(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                               'bootable'))
+        return self._VBD_get(vbd_ref, 'bootable')
+
     def VBD_get_mode(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                               'mode'))
+        return self._VBD_get(vbd_ref, 'mode')
+
     def VBD_get_driver(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                               'driver'))
+        return self._VBD_get(vbd_ref, 'driver')
 
     def VBD_get_type(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                              'type'))        
+        return self._VBD_get(vbd_ref, 'type')
 
     def VBD_get_io_read_kbs(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                              'io_read_kbs'))
-    
+        return self._VBD_get(vbd_ref, 'io_read_kbs')
     
     def VBD_get_io_write_kbs(self, session, vbd_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vbd', vbd_ref,
-                                                              'io_read_kbs'))
-    
+        return self._VBD_get(vbd_ref, 'io_write_kbs')
+
     def VBD_set_bootable(self, session, vbd_ref, bootable):
         bootable = bool(bootable)
         xd = XendDomain.instance()
