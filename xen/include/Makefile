@@ -30,8 +30,8 @@ cppflags-y                := -include public/xen-compat.h
 cppflags-$(CONFIG_X86)    += -m32
 
 # 8-byte types are 4-byte aligned on x86_32 ...
-prefix-$(CONFIG_X86)      := \#pragma pack(push, 4)
-suffix-$(CONFIG_X86)      := \#pragma pack(pop)
+prefix-$(CONFIG_X86)      := \#pragma pack(4)
+suffix-$(CONFIG_X86)      := \#pragma pack()
 
 endif
 

@@ -24,10 +24,10 @@ inttypes["x86_32"] = {
 };
 header["x86_32"] = """
 #define __i386___X86_32 1
-#pragma pack(push, 4)
+#pragma pack(4)
 """;
 footer["x86_32"] = """
-#pragma pack(pop)
+#pragma pack()
 """;
 
 # x86_64

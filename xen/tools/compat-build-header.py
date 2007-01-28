@@ -3,7 +3,7 @@
 import re,sys
 
 pats = [
- [ r"__InClUdE__", r"#include" ],
+ [ r"__InClUdE__(.*)", r"#include\1\n#pragma pack(4)" ],
  [ r"\"xen-compat.h\"", r"<public/xen-compat.h>" ],
  [ r"(struct|union|enum)\s+(xen_?)?(\w)", r"\1 compat_\3" ],
  [ r"@KeeP@", r"" ],
