@@ -2,6 +2,7 @@
 #include <xen/ctype.h>
 #include <xen/lib.h>
 #include <xen/types.h>
+#include <asm/byteorder.h>
 
 /* for ctype.h */
 unsigned char _ctype[] = {
@@ -80,9 +81,15 @@ union uu {
     long           sl[2];          /* as two signed longs */
     unsigned long  ul[2];          /* as two unsigned longs */
 };
-/* XXX RN: Yuck hardcoded endianess :) */
+
+#ifdef __BIG_ENDIAN
+#define _QUAD_HIGHWORD 0
+#define _QUAD_LOWWORD 1
+#else /* __LITTLE_ENDIAN */
 #define _QUAD_HIGHWORD 1
 #define _QUAD_LOWWORD 0
+#endif
+
 /*
  * Define high and low longwords.
  */
