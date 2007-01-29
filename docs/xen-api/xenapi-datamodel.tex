@@ -279,7 +279,8 @@ The following enumeration types are used:
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf session} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A session}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+session.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -293,7 +294,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt last\_active} & int & Timestamp for last time
 \subsubsection{RPC name:~login\_with\_password}
 
 {\bf Overview:} 
-Attempt to authenticate the user, returning a session\_id if successful
+Attempt to authenticate the user, returning a session\_id if successful.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (session ref) login_with_password (string uname, string pwd)\end{verbatim}
@@ -327,7 +328,7 @@ ID of newly created session
 \subsubsection{RPC name:~logout}
 
 {\bf Overview:} 
-Log out of a session
+Log out of a session.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void logout (session_id s)\end{verbatim}
@@ -545,7 +546,8 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf task} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A long-running asynchronous task}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+long-running asynchronous task.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -1045,7 +1047,8 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VM} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual machine (or 'guest').
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+virtual machine (or 'guest').
 
 VM booting is controlled by setting one of the two mutually exclusive
 groups: "PV", and "HVM".  If HVM.boot is the empty string, then paravirtual
@@ -1075,7 +1078,7 @@ ramdisk values will be treated as paths within the control domain.  If both
 PV/bootloader and PV/kernel are empty, then the behaviour is as if
 PV/bootloader was specified as "pygrub".
 
-When using HVM booting, HVM/boot specifies the order of the boot devices}} \\
+When using HVM booting, HVM/boot specifies the order of the boot devices.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -1128,7 +1131,10 @@ $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & addit
 \subsubsection{RPC name:~clone}
 
 {\bf Overview:} 
-Clones the specified VM, making a new VM. Clone automatically exploits the capabilities of the underlying storage repository in which the VM's disk images are stored (e.g. Copy on Write).   This function can only be called when the VM is in the Halted State.
+Clones the specified VM, making a new VM. Clone automatically exploits the
+capabilities of the underlying storage repository in which the VM's disk
+images are stored (e.g. Copy on Write).   This function can only be called
+when the VM is in the Halted State.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VM ref) clone (session_id s, VM ref vm, string new_name)\end{verbatim}
@@ -1164,7 +1170,8 @@ The ID of the newly created VM.
 \subsubsection{RPC name:~start}
 
 {\bf Overview:} 
-Start the specified VM.  This function can only be called with the VM is in the Halted State.
+Start the specified VM.  This function can only be called with the VM is in
+the Halted State.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void start (session_id s, VM ref vm, bool start_paused)\end{verbatim}
@@ -1200,7 +1207,8 @@ void
 \subsubsection{RPC name:~pause}
 
 {\bf Overview:} 
-Pause the specified VM. This can only be called when the specified VM is in the Running state.
+Pause the specified VM. This can only be called when the specified VM is in
+the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void pause (session_id s, VM ref vm)\end{verbatim}
@@ -1234,7 +1242,8 @@ void
 \subsubsection{RPC name:~unpause}
 
 {\bf Overview:} 
-Resume the specified VM. This can only be called when the specified VM is in the Paused state.
+Resume the specified VM. This can only be called when the specified VM is
+in the Paused state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void unpause (session_id s, VM ref vm)\end{verbatim}
@@ -1268,9 +1277,11 @@ void
 \subsubsection{RPC name:~clean\_shutdown}
 
 {\bf Overview:} 
-Attempt to cleanly shutdown the specified VM. (Note: this may not be supported---e.g. if a guest agent is not installed).
+Attempt to cleanly shutdown the specified VM. (Note: this may not be
+supported---e.g. if a guest agent is not installed).
 
-Once shutdown has been completed perform poweroff action specified in guest configuration.
+Once shutdown has been completed perform poweroff action specified in guest
+configuration.
 
 This can only be called when the specified VM is in the Running state.
 
@@ -1306,9 +1317,11 @@ void
 \subsubsection{RPC name:~clean\_reboot}
 
 {\bf Overview:} 
-Attempt to cleanly shutdown the specified VM (Note: this may not be supported---e.g. if a guest agent is not installed).
+Attempt to cleanly shutdown the specified VM (Note: this may not be
+supported---e.g. if a guest agent is not installed).
 
-Once shutdown has been completed perform reboot action specified in guest configuration.
+Once shutdown has been completed perform reboot action specified in guest
+configuration.
 
 This can only be called when the specified VM is in the Running state.
 
@@ -1344,7 +1357,8 @@ void
 \subsubsection{RPC name:~hard\_shutdown}
 
 {\bf Overview:} 
-Stop executing the specified VM without attempting a clean shutdown. Then perform poweroff action specified in VM configuration.
+Stop executing the specified VM without attempting a clean shutdown. Then
+perform poweroff action specified in VM configuration.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void hard_shutdown (session_id s, VM ref vm)\end{verbatim}
@@ -1376,7 +1390,8 @@ void
 \subsubsection{RPC name:~hard\_reboot}
 
 {\bf Overview:} 
-Stop executing the specified VM without attempting a clean shutdown. Then perform reboot action specified in VM configuration
+Stop executing the specified VM without attempting a clean shutdown. Then
+perform reboot action specified in VM configuration.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void hard_reboot (session_id s, VM ref vm)\end{verbatim}
@@ -1408,7 +1423,8 @@ void
 \subsubsection{RPC name:~suspend}
 
 {\bf Overview:} 
-Suspend the specified VM to disk.  This can only be called when the specified VM is in the Running state.
+Suspend the specified VM to disk.  This can only be called when the
+specified VM is in the Running state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void suspend (session_id s, VM ref vm)\end{verbatim}
@@ -1442,7 +1458,8 @@ void
 \subsubsection{RPC name:~resume}
 
 {\bf Overview:} 
-Awaken the specified VM and resume it.  This can only be called when the specified VM is in the Suspended state.
+Awaken the specified VM and resume it.  This can only be called when the
+specified VM is in the Suspended state.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void resume (session_id s, VM ref vm, bool start_paused)\end{verbatim}
@@ -2513,7 +2530,8 @@ void
 \subsubsection{RPC name:~add\_VCPUs\_features\_force\_on}
 
 {\bf Overview:} 
-Add the given value to the VCPUs/features/force\_on field of the given VM.  If the value is already in that Set, then do nothing.
+Add the given value to the VCPUs/features/force\_on field of the given VM. 
+If the value is already in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void add_VCPUs_features_force_on (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -2547,7 +2565,8 @@ void
 \subsubsection{RPC name:~remove\_VCPUs\_features\_force\_on}
 
 {\bf Overview:} 
-Remove the given value from the VCPUs/features/force\_on field of the given VM.  If the value is not in that Set, then do nothing.
+Remove the given value from the VCPUs/features/force\_on field of the given
+VM.  If the value is not in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void remove_VCPUs_features_force_on (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -2647,7 +2666,8 @@ void
 \subsubsection{RPC name:~add\_VCPUs\_features\_force\_off}
 
 {\bf Overview:} 
-Add the given value to the VCPUs/features/force\_off field of the given VM.  If the value is already in that Set, then do nothing.
+Add the given value to the VCPUs/features/force\_off field of the given VM.
+ If the value is already in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void add_VCPUs_features_force_off (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -2681,7 +2701,8 @@ void
 \subsubsection{RPC name:~remove\_VCPUs\_features\_force\_off}
 
 {\bf Overview:} 
-Remove the given value from the VCPUs/features/force\_off field of the given VM.  If the value is not in that Set, then do nothing.
+Remove the given value from the VCPUs/features/force\_off field of the
+given VM.  If the value is not in that Set, then do nothing.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void remove_VCPUs_features_force_off (session_id s, VM ref self, cpu_feature value)\end{verbatim}
@@ -4066,7 +4087,8 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-Destroy the specified VM.  The VM is completely removed from the system.  This function can only be called when the VM is in the Halted State.
+Destroy the specified VM.  The VM is completely removed from the system. 
+This function can only be called when the VM is in the Halted State.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, VM ref self)\end{verbatim}
@@ -4199,7 +4221,8 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf host} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A physical host}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+physical host.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -4216,7 +4239,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physi
 \subsubsection{RPC name:~disable}
 
 {\bf Overview:} 
-Puts the host into a state in which no new VMs can be started. Currently active VMs on the host continue to execute.
+Puts the host into a state in which no new VMs can be started. Currently
+active VMs on the host continue to execute.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void disable (session_id s, host ref host)\end{verbatim}
@@ -4280,7 +4304,8 @@ void
 \subsubsection{RPC name:~shutdown}
 
 {\bf Overview:} 
-Shutdown the host. (This function can only be called if there are no currently running VMs on the host and it is disabled.)
+Shutdown the host. (This function can only be called if there are no
+currently running VMs on the host and it is disabled.).
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void shutdown (session_id s, host ref host)\end{verbatim}
@@ -4312,7 +4337,8 @@ void
 \subsubsection{RPC name:~reboot}
 
 {\bf Overview:} 
-Reboot the host. (This function can only be called if there are no currently running VMs on the host and it is disabled.)
+Reboot the host. (This function can only be called if there are no
+currently running VMs on the host and it is disabled.).
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void reboot (session_id s, host ref host)\end{verbatim}
@@ -5229,7 +5255,8 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf network} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual network}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+virtual network.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -5792,7 +5819,8 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VIF} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual network interface}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+virtual network interface.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -6371,7 +6399,7 @@ all fields from the object
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PIF} \\
 \multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
 physical network interface (note separate VLANs are represented as several
-PIFs)}} \\
+PIFs).}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -6390,7 +6418,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \subsubsection{RPC name:~create\_VLAN}
 
 {\bf Overview:} 
-Create a VLAN interface from an existing physical interface
+Create a VLAN interface from an existing physical interface.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (PIF ref) create_VLAN (session_id s, string device, network ref network, host ref host, int VLAN)\end{verbatim}
@@ -6430,7 +6458,8 @@ The reference of the created PIF object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-Destroy the interface (provided it is a synthetic interface like a VLAN; fail if it is a physical interface)
+Destroy the interface (provided it is a synthetic interface like a VLAN;
+fail if it is a physical interface).
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, PIF ref self)\end{verbatim}
@@ -7025,7 +7054,8 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf SR} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A storage repository}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+storage repository.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -7623,7 +7653,8 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VDI} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual disk image}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+virtual disk image.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -7644,7 +7675,8 @@ $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted
 \subsubsection{RPC name:~snapshot}
 
 {\bf Overview:} 
-Take an exact copy of the VDI; the snapshot lives in the same Storage Repository as its parent.
+Take an exact copy of the VDI; the snapshot lives in the same Storage
+Repository as its parent.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (VDI ref) snapshot (session_id s, VDI ref vdi)\end{verbatim}
@@ -8431,7 +8463,8 @@ references to objects with match names
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VBD} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual block device}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+virtual block device.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -8450,7 +8483,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \subsubsection{RPC name:~media\_change}
 
 {\bf Overview:} 
-Change the media in the device for CDROM-like devices only. For other devices, detach the VBD and attach a new one
+Change the media in the device for CDROM-like devices only. For other
+devices, detach the VBD and attach a new one.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void media_change (session_id s, VBD ref vbd, VDI ref vdi)\end{verbatim}
@@ -9384,7 +9418,8 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf console} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A console}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+console.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -9659,7 +9694,8 @@ all fields from the object
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf user} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A user of the system}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+user of the system.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -9958,7 +9994,7 @@ A list of all the IDs of all the debug records
 \subsubsection{RPC name:~return\_failure}
 
 {\bf Overview:} 
-Return an API 'successful' failure
+Return an API 'successful' failure.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void return_failure (session_id s)\end{verbatim}
