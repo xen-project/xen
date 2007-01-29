@@ -190,20 +190,13 @@ int hvm_register_savevm(struct domain *d,
     return 0;
 }
 
-int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
+int hvm_save(struct domain *d, hvm_domain_context_t *h)
 {
     uint32_t len, len_pos, cur_pos;
     uint32_t eax, ebx, ecx, edx;
     HVMStateEntry *se;
     char *chgset;
     struct hvm_save_header hdr;
-
-    if (!is_hvm_vcpu(v)) {
-        printk("hvm_save only for hvm guest!\n");
-        return -1;
-    }
-
-    memset(h, 0, sizeof(hvm_domain_context_t));
 
     hdr.magic = HVM_FILE_MAGIC;
     hdr.version = HVM_FILE_VERSION;
@@ -222,7 +215,7 @@ int hvm_save(struct vcpu *v, hvm_domain_context_t *h)
     hvm_put_8u(h, len);
     hvm_put_buffer(h, chgset, len);
 
-    for(se = v->domain->arch.hvm_domain.first_se; se != NULL; se = se->next) {
+    for(se = d->arch.hvm_domain.first_se; se != NULL; se = se->next) {
         /* ID string */
         len = strnlen(se->idstr, HVM_SE_IDSTR_LEN);
         hvm_put_8u(h, len);
@@ -270,7 +263,7 @@ static HVMStateEntry *find_se(struct domain *d, const char *idstr, int instance_
     return NULL;
 }
 
-int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
+int hvm_load(struct domain *d, hvm_domain_context_t *h)
 {
     uint32_t len, rec_len, rec_pos, instance_id, version_id;
     uint32_t eax, ebx, ecx, edx;
@@ -280,11 +273,7 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
     char *cur_chgset;
     int ret;
     struct hvm_save_header hdr;
-
-    if (!is_hvm_vcpu(v)) {
-        printk("hvm_load only for hvm guest!\n");
-        return -1;
-    }
+    struct vcpu *v;
 
     if (h->size >= HVM_CTXT_SIZE) {
         printk("hvm_load fail! seems hvm_domain_context overflow when hvm_save! need %"PRId32" bytes.\n", h->size);
@@ -339,6 +328,11 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
         printk("warnings: try to restore hvm guest when changeset is unavailable.\n");
 
 
+    /* Down all the vcpus: we only re-enable the ones that had state saved. */
+    for_each_vcpu(d, v) 
+        if ( test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+            vcpu_sleep_nosync(v);
+
     while(1) {
         if (hvm_ctxt_end(h)) {
             break;
@@ -362,7 +356,7 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
         rec_len = hvm_get_32u(h);
         rec_pos = hvm_ctxt_tell(h);
 
-        se = find_se(v->domain, idstr, instance_id);
+        se = find_se(d, idstr, instance_id);
         if (se == NULL) {
             printk("warnings: hvm load can't find device %s's instance %d!\n",
                     idstr, instance_id);
@@ -384,21 +378,6 @@ int hvm_load(struct vcpu *v, hvm_domain_context_t *h)
     return 0;
 }
 
-int arch_gethvm_ctxt(
-    struct vcpu *v, struct hvm_domain_context *c)
-{
-    if ( !is_hvm_vcpu(v) )
-        return -1;
-
-    return hvm_save(v, c);
-
-}
-
-int arch_sethvm_ctxt(
-        struct vcpu *v, struct hvm_domain_context *c)
-{
-    return hvm_load(v, c);
-}
 
 #ifdef HVM_DEBUG_SUSPEND
 static void shpage_info(shared_iopage_t *sh)

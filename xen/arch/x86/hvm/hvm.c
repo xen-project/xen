@@ -189,17 +189,15 @@ void hvm_domain_destroy(struct domain *d)
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
-#define HVM_VCPU_CTXT_MAGIC 0x85963130
 void hvm_save_cpu_ctxt(hvm_domain_context_t *h, void *opaque)
 {
     struct vcpu *v = opaque;
 
-    if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) {
-        hvm_put_32u(h, 0x0);
+    /* We don't need to save state for a vcpu that is down; the restore 
+     * code will leave it down if there is nothing saved. */
+    if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) 
         return;
-    }
 
-    hvm_put_32u(h, HVM_VCPU_CTXT_MAGIC);
     hvm_funcs.save_cpu_ctxt(h, opaque);
 }
 
@@ -207,13 +205,10 @@ int hvm_load_cpu_ctxt(hvm_domain_context_t *h, void *opaque, int version)
 {
     struct vcpu *v = opaque;
 
-    if ( hvm_get_32u(h) != HVM_VCPU_CTXT_MAGIC )
-        return 0;
-
     if ( hvm_funcs.load_cpu_ctxt(h, opaque, version) < 0 )
         return -EINVAL;
 
-    /* Auxiliary processors shoudl be woken immediately. */
+    /* Auxiliary processors should be woken immediately. */
     if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
         vcpu_wake(v);
 

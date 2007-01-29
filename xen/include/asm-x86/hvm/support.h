@@ -242,11 +242,8 @@ static inline void hvm_get_buffer(hvm_domain_context_t *h, char *buf, int len)
 #define hvm_get_struct(_h, _p) \
     hvm_get_buffer((_h), (char *)(_p), sizeof(*(_p)))
 
-int hvm_save(struct vcpu*, hvm_domain_context_t *h);
-int hvm_load(struct vcpu*, hvm_domain_context_t *h);
-
-int arch_sethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
-int arch_gethvm_ctxt(struct vcpu *v, struct hvm_domain_context *c);
+int hvm_save(struct domain *d, hvm_domain_context_t *h);
+int hvm_load(struct domain *d, hvm_domain_context_t *h);
 
 void shpage_init(struct domain *d, shared_iopage_t *sp);
 
