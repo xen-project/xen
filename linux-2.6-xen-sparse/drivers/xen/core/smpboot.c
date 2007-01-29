@@ -48,6 +48,7 @@ cpumask_t cpu_online_map;
 EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
+static cpumask_t cpu_initialized_map;
 
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_data);
@@ -278,6 +279,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	if (xen_smp_intr_init(0))
 		BUG();
 
+	cpu_initialized_map = cpumask_of_cpu(0);
+
 	/* Restrict the possible_map according to max_cpus. */
 	while ((num_possible_cpus() > 1) && (num_possible_cpus() > max_cpus)) {
 		for (cpu = NR_CPUS-1; !cpu_isset(cpu, cpu_possible_map); cpu--)
@@ -330,8 +333,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #else
 		cpu_set(cpu, cpu_present_map);
 #endif
-
-		cpu_initialize_context(cpu);
 	}
 
 	init_xenbus_allowed_cpumask();
@@ -417,6 +418,11 @@ int __devinit __cpu_up(unsigned int cpu)
 	rc = cpu_up_check(cpu);
 	if (rc)
 		return rc;
+
+	if (!cpu_isset(cpu, cpu_initialized_map)) {
+		cpu_set(cpu, cpu_initialized_map);
+		cpu_initialize_context(cpu);
+	}
 
 	if (num_online_cpus() == 1)
 		alternatives_smp_switch(1);
