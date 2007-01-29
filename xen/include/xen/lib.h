@@ -62,8 +62,7 @@ extern int printk_ratelimit(void);
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)
     __attribute__ ((format (printf, 2, 3)));
-extern int vsprintf(char *buf, const char *, va_list)
-    __attribute__ ((format (printf, 2, 0)));
+#define vsprintf __xen_has_no_vsprintf__
 extern int snprintf(char * buf, size_t size, const char * fmt, ...)
     __attribute__ ((format (printf, 3, 4)));
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
