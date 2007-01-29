@@ -24,6 +24,7 @@
 #include "xen_host.h"
 #include "xen_host_cpu.h"
 #include "xen_internal.h"
+#include "xen_pbd.h"
 #include "xen_pif.h"
 #include "xen_string_string_map.h"
 #include "xen_vm.h"
@@ -58,6 +59,9 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "PIFs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, pifs) },
+        { .key = "PBDs",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_host_record, pbds) },
         { .key = "host_CPUs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, host_cpus) }
@@ -87,6 +91,7 @@ xen_host_record_free(xen_host_record *record)
     xen_string_string_map_free(record->software_version);
     xen_vm_record_opt_set_free(record->resident_vms);
     xen_pif_record_opt_set_free(record->pifs);
+    xen_pbd_record_opt_set_free(record->pbds);
     xen_host_cpu_record_opt_set_free(record->host_cpus);
     free(record);
 }
@@ -261,6 +266,23 @@ xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host ho
 
     *result = NULL;
     XEN_CALL_("host.get_PIFs");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("host.get_PBDs");
     return session->ok;
 }
 

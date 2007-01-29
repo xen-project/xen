@@ -20,13 +20,14 @@
 #define XEN_SR_H
 
 #include "xen_common.h"
+#include "xen_pbd_decl.h"
 #include "xen_sr_decl.h"
 #include "xen_vdi_decl.h"
 
 
 /*
- * The SR class. 
- *  
+ * The SR class.
+ * 
  * A storage repository.
  */
 
@@ -66,6 +67,7 @@ typedef struct xen_sr_record
     char *name_label;
     char *name_description;
     struct xen_vdi_record_opt_set *vdis;
+    struct xen_pbd_record_opt_set *pbds;
     int64_t virtual_allocation;
     int64_t physical_utilisation;
     int64_t physical_size;
@@ -213,6 +215,13 @@ xen_sr_get_name_description(xen_session *session, char **result, xen_sr sr);
  */
 extern bool
 xen_sr_get_vdis(xen_session *session, struct xen_vdi_set **result, xen_sr sr);
+
+
+/**
+ * Get the PBDs field of the given SR.
+ */
+extern bool
+xen_sr_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_sr sr);
 
 
 /**

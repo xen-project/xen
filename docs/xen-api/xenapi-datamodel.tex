@@ -33,6 +33,7 @@ Name & Description \\
 {\tt SR} & A storage repository \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
+{\tt PBD} & The physical block devices through which hosts access SRs \\
 {\tt VTPM} & A virtual TPM device \\
 {\tt console} & A console \\
 {\tt user} & A user of the system \\
@@ -46,6 +47,8 @@ Fields that are bound together are shown in the following table:
 {\em object.field} & {\em object.field} & {\em relationship} \\
 
 \hline
+host.PBDs & PBD.host & many-to-one\\
+SR.PBDs & PBD.SR & many-to-one\\
 VDI.VBDs & VBD.VDI & many-to-one\\
 VBD.VM & VM.VBDs & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
@@ -4232,6 +4235,7 @@ $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & physical network interfaces \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
 \hline
 \end{longtable}
@@ -4641,6 +4645,38 @@ Get the PIFs field of the given host.
  \noindent {\bf Return Type:} 
 {\tt 
 (PIF ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PBDs}
+
+{\bf Overview:} 
+Get the PBDs field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PBD ref) Set) get_PBDs (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PBD ref) Set
 }
 
 
@@ -7063,6 +7099,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VDIs} & (VDI ref) Set & managed virtual disks \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt virtual\_allocation} & int & sum of virtual\_sizes of all VDIs in this storage repository (in bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & physical space currently utilised on this storage repository (in bytes). Note that for sparse disk formats, physical\_utilisation may be less than virtual\_allocation \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt physical\_size} & int & total physical size of the repository (in bytes) \\
@@ -7318,6 +7355,38 @@ Get the VDIs field of the given SR.
  \noindent {\bf Return Type:} 
 {\tt 
 (VDI ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PBDs}
+
+{\bf Overview:} 
+Get the PBDs field of the given SR.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PBD ref) Set) get_PBDs (session_id s, SR ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt SR ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PBD ref) Set
 }
 
 
@@ -9128,6 +9197,315 @@ Get a record containing the current state of the given VBD.
  \noindent {\bf Return Type:} 
 {\tt 
 VBD record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: PBD}
+\subsection{Fields for class: PBD}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PBD} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The physical block devices through which hosts access SRs.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & physical machine on which the pbd is available \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt SR} & SR ref & the storage repository that the pbd realises \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt device\_config} & (string $\rightarrow$ string) Map & a config string that is provided to the host's SR-backend-driver \\
+$\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the SR currently attached on this host? \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: PBD}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given PBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_host}
+
+{\bf Overview:} 
+Get the host field of the given PBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host ref) get_host (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_SR}
+
+{\bf Overview:} 
+Get the SR field of the given PBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (SR ref) get_SR (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+SR ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_device\_config}
+
+{\bf Overview:} 
+Get the device\_config field of the given PBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_device_config (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_currently\_attached}
+
+{\bf Overview:} 
+Get the currently\_attached field of the given PBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_currently_attached (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new PBD instance, and return its handle.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PBD ref) create (session_id s, PBD record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PBD ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified PBD instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the PBD instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PBD ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PBD ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given PBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PBD record) get_record (session_id s, PBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PBD record
 }
 
 

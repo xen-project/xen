@@ -22,6 +22,7 @@
 
 #include "xen_common.h"
 #include "xen_internal.h"
+#include "xen_pbd.h"
 #include "xen_sr.h"
 #include "xen_vdi.h"
 
@@ -49,6 +50,9 @@ static const struct_member xen_sr_record_struct_members[] =
         { .key = "VDIs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_sr_record, vdis) },
+        { .key = "PBDs",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_sr_record, pbds) },
         { .key = "virtual_allocation",
           .type = &abstract_type_int,
           .offset = offsetof(xen_sr_record, virtual_allocation) },
@@ -88,6 +92,7 @@ xen_sr_record_free(xen_sr_record *record)
     free(record->name_label);
     free(record->name_description);
     xen_vdi_record_opt_set_free(record->vdis);
+    xen_pbd_record_opt_set_free(record->pbds);
     free(record->type);
     free(record->location);
     free(record);

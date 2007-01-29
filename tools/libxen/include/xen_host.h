@@ -22,14 +22,15 @@
 #include "xen_common.h"
 #include "xen_host_cpu_decl.h"
 #include "xen_host_decl.h"
+#include "xen_pbd_decl.h"
 #include "xen_pif_decl.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
 
 /*
- * The host class. 
- *  
+ * The host class.
+ * 
  * A physical host.
  */
 
@@ -71,6 +72,7 @@ typedef struct xen_host_record
     xen_string_string_map *software_version;
     struct xen_vm_record_opt_set *resident_vms;
     struct xen_pif_record_opt_set *pifs;
+    struct xen_pbd_record_opt_set *pbds;
     struct xen_host_cpu_record_opt_set *host_cpus;
 } xen_host_record;
 
@@ -228,6 +230,13 @@ xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_
  */
 extern bool
 xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host host);
+
+
+/**
+ * Get the PBDs field of the given host.
+ */
+extern bool
+xen_host_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_host host);
 
 
 /**
