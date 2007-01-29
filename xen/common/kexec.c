@@ -131,7 +131,7 @@ __initcall(register_crashdump_trigger);
 
 static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 {
-    strcpy(ELFNOTE_NAME(n), name);
+    safe_strcpy(ELFNOTE_NAME(n), name);
     n->namesz = strlen(name);
     n->descsz = descsz;
     n->type = type;

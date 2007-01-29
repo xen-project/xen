@@ -82,9 +82,6 @@ extern void * memchr(const void *,int,__kernel_size_t);
 }
 #endif
 
-#define safe_strcpy(d,s)                        \
-do { strncpy((d),(s),sizeof((d)));              \
-     (d)[sizeof((d))-1] = '\0';                 \
-} while (0)
+#define safe_strcpy(d, s) strlcpy(d, s, sizeof(d))
 
 #endif /* _LINUX_STRING_H_ */

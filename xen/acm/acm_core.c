@@ -89,8 +89,11 @@ acm_set_policy_reference(u8 * buf, u32 buf_size)
     if (!acm_bin_pol.policy_reference_name)
         return -ENOMEM;
 
-    strcpy(acm_bin_pol.policy_reference_name, (char *)(buf + sizeof(struct acm_policy_reference_buffer)));
-    printk("%s: Activating policy %s\n", __func__, acm_bin_pol.policy_reference_name);
+    strlcpy(acm_bin_pol.policy_reference_name,
+            (char *)(buf + sizeof(struct acm_policy_reference_buffer)),
+            ntohl(pr->len));
+    printk("%s: Activating policy %s\n", __func__,
+           acm_bin_pol.policy_reference_name);
     return 0;
 }
 
@@ -106,8 +109,9 @@ acm_dump_policy_reference(u8 *buf, u32 buf_size)
 
     memset(buf, 0, ret);
     pr_buf->len = htonl(strlen(acm_bin_pol.policy_reference_name) + 1); /* including stringend '\0' */
-    strcpy((char *)(buf + sizeof(struct acm_policy_reference_buffer)),
-           acm_bin_pol.policy_reference_name);
+    strlcpy((char *)(buf + sizeof(struct acm_policy_reference_buffer)),
+            acm_bin_pol.policy_reference_name,
+            ntohl(pr_buf->len));
     return ret;
 }
 

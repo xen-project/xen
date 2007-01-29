@@ -148,8 +148,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
     {
         for ( i = 0; i < NR_PERFCTRS; i++ )
         {
-            strlcpy(perfc_d[i].name, perfc_info[i].name,
-                    sizeof(perfc_d[i].name));
+            safe_strcpy(perfc_d[i].name, perfc_info[i].name);
 
             switch ( perfc_info[i].type )
             {

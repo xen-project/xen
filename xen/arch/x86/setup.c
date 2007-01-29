@@ -111,7 +111,7 @@ char acpi_param[10] = "";
 static void parse_acpi_param(char *s)
 {
     /* Save the parameter so it can be propagated to domain0. */
-    strlcpy(acpi_param, s, sizeof(acpi_param));
+    safe_strcpy(acpi_param, s);
 
     /* Interpret the parameter for use within Xen. */
     if ( !strcmp(s, "off") )
@@ -748,7 +748,7 @@ void __init __start_xen(multiboot_info_t *mbi)
         if ( (cmdline = strchr(cmdline, ' ')) != NULL )
         {
             while ( *cmdline == ' ' ) cmdline++;
-            strcpy(dom0_cmdline, cmdline);
+            safe_strcpy(dom0_cmdline, cmdline);
         }
 
         cmdline = dom0_cmdline;
