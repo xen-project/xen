@@ -273,16 +273,6 @@ The following enumeration types are used:
 \end{longtable}
 
 \vspace{1cm}
-\begin{longtable}{|ll|}
-\hline
-{\tt enum driver\_type} & \\
-\hline
-\hspace{0.5cm}{\tt ioemu} & use hardware emulation \\
-\hspace{0.5cm}{\tt paravirtualised} & use paravirtualised driver \\
-\hline
-\end{longtable}
-
-\vspace{1cm}
 
 \newpage
 \section{Class: session}
@@ -5807,8 +5797,6 @@ references to objects with match names
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RW}$ &  {\tt name} & string & human-readable name of the interface \\
-$\mathit{RW}$ &  {\tt type} & driver\_type & interface type \\
 $\mathit{RW}$ &  {\tt device} & string & name of network device as exposed to guest e.g. eth0 \\
 $\mathit{RW}$ &  {\tt network} & network ref & virtual network to which this vif is connected \\
 $\mathit{RW}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
@@ -5902,72 +5890,6 @@ Set the name field of the given VIF.
 {\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_type}
-
-{\bf Overview:} 
-Get the type field of the given VIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (driver_type) get_type (session_id s, VIF ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-driver\_type
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_type}
-
-{\bf Overview:} 
-Set the type field of the given VIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_type (session_id s, VIF ref self, driver_type value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & reference to the object \\ \hline 
-
-{\tt driver\_type } & value & New value to set \\ \hline 
 
 \end{tabular}
 
@@ -8652,7 +8574,6 @@ $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
-$\mathit{RW}$ &  {\tt driver} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
@@ -9120,72 +9041,6 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_driver}
-
-{\bf Overview:} 
-Get the driver field of the given VBD.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (driver_type) get_driver (session_id s, VBD ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-driver\_type
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_driver}
-
-{\bf Overview:} 
-Set the driver field of the given VBD.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_driver (session_id s, VBD ref self, driver_type value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & reference to the object \\ \hline 
-
-{\tt driver\_type } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_io\_read\_kbs}
 
 {\bf Overview:} 
@@ -9393,7 +9248,6 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt backend} & VM ref & the domain where the backend is located \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt driver} & driver\_type & the style of driver \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt instance} & int & the instance number the virtual TPM represents \\
 \hline
 \end{longtable}
@@ -9487,38 +9341,6 @@ Get the backend field of the given VTPM.
  \noindent {\bf Return Type:} 
 {\tt 
 VM ref
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_driver}
-
-{\bf Overview:} 
-Get the driver field of the given VTPM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (driver_type) get_driver (session_id s, VTPM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VTPM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-driver\_type
 }
 
 

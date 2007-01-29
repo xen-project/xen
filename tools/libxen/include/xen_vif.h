@@ -20,15 +20,14 @@
 #define XEN_VIF_H
 
 #include "xen_common.h"
-#include "xen_driver_type.h"
 #include "xen_network_decl.h"
 #include "xen_vif_decl.h"
 #include "xen_vm_decl.h"
 
 
 /*
- * The VIF class. 
- *  
+ * The VIF class.
+ * 
  * A virtual network interface.
  */
 
@@ -65,8 +64,6 @@ typedef struct xen_vif_record
 {
     xen_vif handle;
     char *uuid;
-    char *name;
-    enum xen_driver_type type;
     char *device;
     struct xen_network_record_opt *network;
     struct xen_vm_record_opt *vm;
@@ -191,20 +188,6 @@ xen_vif_get_uuid(xen_session *session, char **result, xen_vif vif);
 
 
 /**
- * Get the name field of the given VIF.
- */
-extern bool
-xen_vif_get_name(xen_session *session, char **result, xen_vif vif);
-
-
-/**
- * Get the type field of the given VIF.
- */
-extern bool
-xen_vif_get_type(xen_session *session, enum xen_driver_type *result, xen_vif vif);
-
-
-/**
  * Get the device field of the given VIF.
  */
 extern bool
@@ -251,20 +234,6 @@ xen_vif_get_io_read_kbs(xen_session *session, double *result, xen_vif vif);
  */
 extern bool
 xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif);
-
-
-/**
- * Set the name field of the given VIF.
- */
-extern bool
-xen_vif_set_name(xen_session *session, xen_vif vif, char *name);
-
-
-/**
- * Set the type field of the given VIF.
- */
-extern bool
-xen_vif_set_type(xen_session *session, xen_vif vif, enum xen_driver_type type);
 
 
 /**

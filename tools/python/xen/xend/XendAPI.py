@@ -1338,8 +1338,7 @@ class XendAPI(object):
                    'device',
                    'bootable',
                    'mode',
-                   'type',                   
-                   'driver']
+                   'type']
 
     VBD_attr_inst = VBD_attr_rw
 
@@ -1424,9 +1423,6 @@ class XendAPI(object):
     def VBD_get_mode(self, session, vbd_ref):
         return self._VBD_get(vbd_ref, 'mode')
 
-    def VBD_get_driver(self, session, vbd_ref):
-        return self._VBD_get(vbd_ref, 'driver')
-
     def VBD_get_type(self, session, vbd_ref):
         return self._VBD_get(vbd_ref, 'type')
 
@@ -1455,9 +1451,7 @@ class XendAPI(object):
 
     VIF_attr_ro = ['io_read_kbs',
                    'io_write_kbs']
-    VIF_attr_rw = ['name',
-                   'type',
-                   'device',
+    VIF_attr_rw = ['device',
                    'network',
                    'VM',
                    'MAC',
@@ -1518,10 +1512,6 @@ class XendAPI(object):
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)        
         return xen_api_success(vm.get_uuid())
     
-    def VIF_get_name(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'name'))
     def VIF_get_MTU(self, session, vif_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
@@ -1531,17 +1521,10 @@ class XendAPI(object):
         return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
                                                                'MAC'))
 
-    def VIF_get_type(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'type'))
-    
-
     def VIF_get_device(self, session, vif_ref):
         xendom = XendDomain.instance()
         return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
                                                                'device'))
-    
  
     def VIF_get_io_read_kbs(self, session, vif_ref):
         xendom = XendDomain.instance()
@@ -1695,8 +1678,7 @@ class XendAPI(object):
     VTPM_attr_rw = [ ]
     VTPM_attr_ro = ['VM',
                     'backend',
-                    'instance',
-                    'driver']
+                    'instance']
 
     VTPM_attr_inst = VTPM_attr_rw
 
@@ -1733,20 +1715,6 @@ class XendAPI(object):
         else:
             instance = -1
         return xen_api_success(instance)
-
-    def VTPM_get_driver(self, session, vtpm_ref):
-        xendom = XendDomain.instance()
-        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
-        if not vm:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-        cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
-        if not cfg:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-        if cfg.has_key('type'):
-            driver = cfg['type']
-        else:
-            driver = "Unknown"
-        return xen_api_success(driver)
 
     def VTPM_get_backend(self, session, vtpm_ref):
         xendom = XendDomain.instance()

@@ -382,8 +382,7 @@ static xen_vm create_new_vm(xen_session *session)
             .vm = &vm_record_opt,
             .vdi = &vdi0_record_opt,
             .device = "xvda1",
-            .mode = XEN_VBD_MODE_RW,
-            .driver = XEN_DRIVER_TYPE_PARAVIRTUALISED
+            .mode = XEN_VBD_MODE_RW
         };
 
     xen_vbd vbd0;

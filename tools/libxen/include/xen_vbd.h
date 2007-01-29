@@ -20,7 +20,6 @@
 #define XEN_VBD_H
 
 #include "xen_common.h"
-#include "xen_driver_type.h"
 #include "xen_vbd_decl.h"
 #include "xen_vbd_mode.h"
 #include "xen_vdi_decl.h"
@@ -28,8 +27,8 @@
 
 
 /*
- * The VBD class. 
- *  
+ * The VBD class.
+ * 
  * A virtual block device.
  */
 
@@ -72,7 +71,6 @@ typedef struct xen_vbd_record
     char *image;
     bool bootable;
     enum xen_vbd_mode mode;
-    enum xen_driver_type driver;
     double io_read_kbs;
     double io_write_kbs;
 } xen_vbd_record;
@@ -227,13 +225,6 @@ xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd);
 
 
 /**
- * Get the driver field of the given VBD.
- */
-extern bool
-xen_vbd_get_driver(xen_session *session, enum xen_driver_type *result, xen_vbd vbd);
-
-
-/**
  * Get the io/read_kbs field of the given VBD.
  */
 extern bool
@@ -280,13 +271,6 @@ xen_vbd_set_bootable(xen_session *session, xen_vbd vbd, bool bootable);
  */
 extern bool
 xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode);
-
-
-/**
- * Set the driver field of the given VBD.
- */
-extern bool
-xen_vbd_set_driver(xen_session *session, xen_vbd vbd, enum xen_driver_type driver);
 
 
 /**
