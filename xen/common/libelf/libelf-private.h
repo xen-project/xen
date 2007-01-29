@@ -21,6 +21,8 @@
 #define bswap_32(x) swab32(x)
 #define bswap_64(x) swab64(x)
 
+#define elf_strlcpy(d,s,c) strlcpy(d,s,c)
+
 #else /* !__XEN__ */
 
 #include <stdio.h>
@@ -49,6 +51,14 @@
             fprintf(elf->log, fmt , ## args );            \
         xc_set_error(XC_INVALID_KERNEL, fmt , ## args );  \
 	} while (0)
+
+/* SysV unices have no strlcpy/strlcat. */
+static inline size_t elf_strlcpy(char *dest, const char *src, size_t size)
+{
+    strncpy(dest, src, size-1);
+    dest[size-1] = '\0';
+    return strlen(src);
+}
 
 #endif
 

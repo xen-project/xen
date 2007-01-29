@@ -128,16 +128,16 @@ int elf_xen_parse_note(struct elf_binary *elf,
     switch (type)
     {
     case XEN_ELFNOTE_LOADER:
-	strlcpy(parms->loader, str, sizeof(parms->loader));
+	elf_strlcpy(parms->loader, str, sizeof(parms->loader));
 	break;
     case XEN_ELFNOTE_GUEST_OS:
-	strlcpy(parms->guest_os, str, sizeof(parms->guest_os));
+	elf_strlcpy(parms->guest_os, str, sizeof(parms->guest_os));
 	break;
     case XEN_ELFNOTE_GUEST_VERSION:
-	strlcpy(parms->guest_ver, str, sizeof(parms->guest_ver));
+	elf_strlcpy(parms->guest_ver, str, sizeof(parms->guest_ver));
 	break;
     case XEN_ELFNOTE_XEN_VERSION:
-	strlcpy(parms->xen_ver, str, sizeof(parms->xen_ver));
+	elf_strlcpy(parms->xen_ver, str, sizeof(parms->xen_ver));
 	break;
     case XEN_ELFNOTE_PAE_MODE:
 	if (0 == strcmp(str, "yes"))
@@ -224,13 +224,13 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
 
 	/* strings */
 	if (0 == strcmp(name, "LOADER"))
-	    strlcpy(parms->loader, value, sizeof(parms->loader));
+	    elf_strlcpy(parms->loader, value, sizeof(parms->loader));
 	if (0 == strcmp(name, "GUEST_OS"))
-	    strlcpy(parms->guest_os, value, sizeof(parms->guest_os));
+	    elf_strlcpy(parms->guest_os, value, sizeof(parms->guest_os));
 	if (0 == strcmp(name, "GUEST_VER"))
-	    strlcpy(parms->guest_ver, value, sizeof(parms->guest_ver));
+	    elf_strlcpy(parms->guest_ver, value, sizeof(parms->guest_ver));
 	if (0 == strcmp(name, "XEN_VER"))
-	    strlcpy(parms->xen_ver, value, sizeof(parms->xen_ver));
+	    elf_strlcpy(parms->xen_ver, value, sizeof(parms->xen_ver));
 	if (0 == strcmp(name, "PAE"))
 	{
 	    if (0 == strcmp(value, "yes[extended-cr3]"))
