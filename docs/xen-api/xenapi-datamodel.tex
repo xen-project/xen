@@ -5862,8 +5862,8 @@ Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt device} & string & name of network device as exposed to guest e.g. eth0 \\
-$\mathit{RW}$ &  {\tt network} & network ref & virtual network to which this vif is connected \\
-$\mathit{RW}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to which this vif is connected \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
@@ -6001,40 +6001,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_network}
-
-{\bf Overview:} 
-Set the network field of the given VIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_network (session_id s, VIF ref self, network ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & reference to the object \\ \hline 
-
-{\tt network ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_VM}
 
 {\bf Overview:} 
@@ -6064,40 +6030,6 @@ VM ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_VM}
-
-{\bf Overview:} 
-Set the VM field of the given VIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_VM (session_id s, VIF ref self, VM ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & reference to the object \\ \hline 
-
-{\tt VM ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -6441,8 +6373,8 @@ Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt device} & string & machine-readable name of the interface (e.g. eth0) \\
-$\mathit{RW}$ &  {\tt network} & network ref & virtual network to which this pif is connected \\
-$\mathit{RW}$ &  {\tt host} & host ref & physical machine to which this pif is connected \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to which this pif is connected \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & physical machine to which this pif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of physical interface \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
 $\mathit{RW}$ &  {\tt VLAN} & int & VLAN tag for all traffic passing through this interface \\
@@ -6656,40 +6588,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_network}
-
-{\bf Overview:} 
-Set the network field of the given PIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_network (session_id s, PIF ref self, network ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & reference to the object \\ \hline 
-
-{\tt network ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_host}
 
 {\bf Overview:} 
@@ -6719,40 +6617,6 @@ host ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_host}
-
-{\bf Overview:} 
-Set the host field of the given PIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_host (session_id s, PIF ref self, host ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & reference to the object \\ \hline 
-
-{\tt host ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -8538,8 +8402,8 @@ virtual block device.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RW}$ &  {\tt VM} & VM ref & the virtual machine \\
-$\mathit{RW}$ &  {\tt VDI} & VDI ref & the virtual disk \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
@@ -8648,40 +8512,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_VM}
-
-{\bf Overview:} 
-Set the VM field of the given VBD.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_VM (session_id s, VBD ref self, VM ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & reference to the object \\ \hline 
-
-{\tt VM ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_VDI}
 
 {\bf Overview:} 
@@ -8711,40 +8541,6 @@ VDI ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_VDI}
-
-{\bf Overview:} 
-Set the VDI field of the given VBD.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_VDI (session_id s, VBD ref self, VDI ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VBD ref } & self & reference to the object \\ \hline 
-
-{\tt VDI ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

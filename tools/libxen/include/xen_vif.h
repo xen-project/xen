@@ -244,20 +244,6 @@ xen_vif_set_device(xen_session *session, xen_vif vif, char *device);
 
 
 /**
- * Set the network field of the given VIF.
- */
-extern bool
-xen_vif_set_network(xen_session *session, xen_vif vif, xen_network network);
-
-
-/**
- * Set the VM field of the given VIF.
- */
-extern bool
-xen_vif_set_vm(xen_session *session, xen_vif vif, xen_vm vm);
-
-
-/**
  * Set the MAC field of the given VIF.
  */
 extern bool

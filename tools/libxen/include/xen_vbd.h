@@ -239,20 +239,6 @@ xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd);
 
 
 /**
- * Set the VM field of the given VBD.
- */
-extern bool
-xen_vbd_set_vm(xen_session *session, xen_vbd vbd, xen_vm vm);
-
-
-/**
- * Set the VDI field of the given VBD.
- */
-extern bool
-xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi);
-
-
-/**
  * Set the device field of the given VBD.
  */
 extern bool

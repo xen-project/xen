@@ -283,38 +283,6 @@ xen_pif_set_device(xen_session *session, xen_pif pif, char *device)
 
 
 bool
-xen_pif_set_network(xen_session *session, xen_pif pif, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif },
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    xen_call_(session, "PIF.set_network", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_pif_set_host(xen_session *session, xen_pif pif, xen_host host)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif },
-            { .type = &abstract_type_string,
-              .u.string_val = host }
-        };
-
-    xen_call_(session, "PIF.set_host", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_pif_set_mac(xen_session *session, xen_pif pif, char *mac)
 {
     abstract_value param_values[] =

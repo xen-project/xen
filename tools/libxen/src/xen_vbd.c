@@ -282,38 +282,6 @@ xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd)
 
 
 bool
-xen_vbd_set_vm(xen_session *session, xen_vbd vbd, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vbd },
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    xen_call_(session, "VBD.set_VM", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vbd },
-            { .type = &abstract_type_string,
-              .u.string_val = vdi }
-        };
-
-    xen_call_(session, "VBD.set_VDI", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device)
 {
     abstract_value param_values[] =

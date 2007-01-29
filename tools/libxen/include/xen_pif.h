@@ -239,20 +239,6 @@ xen_pif_set_device(xen_session *session, xen_pif pif, char *device);
 
 
 /**
- * Set the network field of the given PIF.
- */
-extern bool
-xen_pif_set_network(xen_session *session, xen_pif pif, xen_network network);
-
-
-/**
- * Set the host field of the given PIF.
- */
-extern bool
-xen_pif_set_host(xen_session *session, xen_pif pif, xen_host host);
-
-
-/**
  * Set the MAC field of the given PIF.
  */
 extern bool

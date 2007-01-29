@@ -295,38 +295,6 @@ xen_vif_set_device(xen_session *session, xen_vif vif, char *device)
 
 
 bool
-xen_vif_set_network(xen_session *session, xen_vif vif, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif },
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    xen_call_(session, "VIF.set_network", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vif_set_vm(xen_session *session, xen_vif vif, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif },
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    xen_call_(session, "VIF.set_VM", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vif_set_mac(xen_session *session, xen_vif vif, char *mac)
 {
     abstract_value param_values[] =
