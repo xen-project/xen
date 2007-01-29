@@ -25,6 +25,7 @@
 #include "xen_internal.h"
 #include "xen_network.h"
 #include "xen_pif.h"
+#include "xen_pif_metrics.h"
 
 
 XEN_FREE(xen_pif)
@@ -59,12 +60,9 @@ static const struct_member xen_pif_record_struct_members[] =
         { .key = "VLAN",
           .type = &abstract_type_int,
           .offset = offsetof(xen_pif_record, vlan) },
-        { .key = "io_read_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_pif_record, io_read_kbs) },
-        { .key = "io_write_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_pif_record, io_write_kbs) }
+        { .key = "metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_pif_record, metrics) }
     };
 
 const abstract_type xen_pif_record_abstract_type_ =
@@ -90,6 +88,7 @@ xen_pif_record_free(xen_pif_record *record)
     xen_network_record_opt_free(record->network);
     xen_host_record_opt_free(record->host);
     free(record->mac);
+    xen_pif_metrics_record_opt_free(record->metrics);
     free(record);
 }
 
@@ -235,7 +234,7 @@ xen_pif_get_vlan(xen_session *session, int64_t *result, xen_pif pif)
 
 
 bool
-xen_pif_get_io_read_kbs(xen_session *session, double *result, xen_pif pif)
+xen_pif_get_metrics(xen_session *session, xen_pif_metrics *result, xen_pif pif)
 {
     abstract_value param_values[] =
         {
@@ -243,25 +242,10 @@ xen_pif_get_io_read_kbs(xen_session *session, double *result, xen_pif pif)
               .u.string_val = pif }
         };
 
-    abstract_type result_type = abstract_type_float;
+    abstract_type result_type = abstract_type_string;
 
-    XEN_CALL_("PIF.get_io_read_kbs");
-    return session->ok;
-}
-
-
-bool
-xen_pif_get_io_write_kbs(xen_session *session, double *result, xen_pif pif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif }
-        };
-
-    abstract_type result_type = abstract_type_float;
-
-    XEN_CALL_("PIF.get_io_write_kbs");
+    *result = NULL;
+    XEN_CALL_("PIF.get_metrics");
     return session->ok;
 }
 

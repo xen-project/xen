@@ -23,6 +23,7 @@
 #include "xen_host_decl.h"
 #include "xen_network_decl.h"
 #include "xen_pif_decl.h"
+#include "xen_pif_metrics_decl.h"
 
 
 /*
@@ -71,8 +72,7 @@ typedef struct xen_pif_record
     char *mac;
     int64_t mtu;
     int64_t vlan;
-    double io_read_kbs;
-    double io_write_kbs;
+    struct xen_pif_metrics_record_opt *metrics;
 } xen_pif_record;
 
 /**
@@ -218,17 +218,10 @@ xen_pif_get_vlan(xen_session *session, int64_t *result, xen_pif pif);
 
 
 /**
- * Get the io/read_kbs field of the given PIF.
+ * Get the metrics field of the given PIF.
  */
 extern bool
-xen_pif_get_io_read_kbs(xen_session *session, double *result, xen_pif pif);
-
-
-/**
- * Get the io/write_kbs field of the given PIF.
- */
-extern bool
-xen_pif_get_io_write_kbs(xen_session *session, double *result, xen_pif pif);
+xen_pif_get_metrics(xen_session *session, xen_pif_metrics *result, xen_pif pif);
 
 
 /**

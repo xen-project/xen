@@ -30,6 +30,7 @@ Name & Description \\
 {\tt network} & A virtual network \\
 {\tt VIF} & A virtual network interface \\
 {\tt PIF} & A physical network interface (note separate VLANs are represented as several PIFs) \\
+{\tt PIF\_metrics} & The metrics associated with a physical network interface \\
 {\tt SR} & A storage repository \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
@@ -53,6 +54,7 @@ VDI.VBDs & VBD.VDI & many-to-one\\
 VBD.VM & VM.VBDs & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
+PIF.metrics & PIF\_metrics.PIF & one-to-one\\
 PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
@@ -6378,8 +6380,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & physical machine to which 
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of physical interface \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
 $\mathit{RW}$ &  {\tt VLAN} & int & VLAN tag for all traffic passing through this interface \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & PIF\_metrics ref & metrics associated with this PIF. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: PIF}
@@ -6818,13 +6819,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_read\_kbs}
+\subsubsection{RPC name:~get\_metrics}
 
 {\bf Overview:} 
-Get the io/read\_kbs field of the given PIF.
+Get the metrics field of the given PIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_read_kbs (session_id s, PIF ref self)\end{verbatim}
+\begin{verbatim} (PIF_metrics ref) get_metrics (session_id s, PIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -6842,39 +6843,7 @@ Get the io/read\_kbs field of the given PIF.
 
  \noindent {\bf Return Type:} 
 {\tt 
-float
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_write\_kbs}
-
-{\bf Overview:} 
-Get the io/write\_kbs field of the given PIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_write_kbs (session_id s, PIF ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-float
+PIF\_metrics ref
 }
 
 
@@ -6939,6 +6908,218 @@ Get a record containing the current state of the given PIF.
  \noindent {\bf Return Type:} 
 {\tt 
 PIF record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: PIF\_metrics}
+\subsection{Fields for class: PIF\_metrics}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PIF\_metrics} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The metrics associated with a physical network interface.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt PIF} & PIF ref & PIF to which these metrics apply \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: PIF\_metrics}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PIF}
+
+{\bf Overview:} 
+Get the PIF field of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF ref) get_PIF (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
+
+{\bf Overview:} 
+Get the io/read\_kbs field of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_read_kbs (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
+
+{\bf Overview:} 
+Get the io/write\_kbs field of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_write_kbs (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the PIF\_metrics instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF_metrics ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF\_metrics ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PIF_metrics record) get_record (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PIF\_metrics record
 }
 
 

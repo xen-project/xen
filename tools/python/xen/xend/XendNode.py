@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (c) 2006 Xensource Inc.
+# Copyright (c) 2006, 2007 Xensource Inc.
 #============================================================================
 
 import os
@@ -29,6 +29,7 @@ from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
 from xen.xend.XendLocalStorageRepo import XendLocalStorageRepo
 from xen.xend.XendLogging import log
 from xen.xend.XendPIF import *
+from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendNetwork import *
 from xen.xend.XendStateStore import XendStateStore
 from xen.xend.XendMonitor import XendMonitor
@@ -88,6 +89,7 @@ class XendNode:
                 self.cpus[cpu_uuid] = cpu_info
 
         self.pifs = {}
+        self.pif_metrics = {}
         self.networks = {}
         self.srs = {}
         
@@ -114,10 +116,14 @@ class XendNode:
                         if 'device' not in pif and 'name' in pif:
                             # Compatibility hack, can go pretty soon.
                             pif['device'] = pif['name']
-                        
+                        if 'metrics' not in pif:
+                            # Compatibility hack, can go pretty soon.
+                            pif['metrics'] = uuid.createString()
+
                         self._PIF_create(pif['device'], pif['MTU'],
                                          int(pif['VLAN']),
-                                         pif['MAC'], network, False, pif_uuid)
+                                         pif['MAC'], network, False, pif_uuid,
+                                         pif['metrics'])
                     except NetworkAlreadyConnected, exn:
                         log.error('Cannot load saved PIF %s, as network %s ' +
                                   'is already connected to PIF %s',
@@ -167,15 +173,23 @@ class XendNode:
 
 
     def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
-                    pif_uuid = None):
+                    pif_uuid = None, metrics_uuid = None):
         for pif in self.pifs.values():
             if pif.network == network:
                 raise NetworkAlreadyConnected(pif.uuid)
 
         if pif_uuid is None:
             pif_uuid = uuid.createString()
-        self.pifs[pif_uuid] = XendPIF(pif_uuid, name, mtu, vlan, mac, network,
-                                      self)
+        if metrics_uuid is None:
+            metrics_uuid = uuid.createString()
+
+        metrics = XendPIFMetrics(metrics_uuid)
+        pif = XendPIF(pif_uuid, metrics, name, mtu, vlan, mac, network, self)
+        metrics.set_PIF(pif)
+
+        self.pif_metrics[metrics_uuid] = metrics
+        self.pifs[pif_uuid] = pif
+
         if persist:
             self.save_PIFs()
             self.refreshBridges()
@@ -212,7 +226,7 @@ class XendNode:
         self.save_SRs()
 
     def save_PIFs(self):
-        pif_records = dict([(k, v.get_record(transient = False))
+        pif_records = dict([(k, v.get_record())
                             for k, v in self.pifs.items()])
         self.state_store.save_state('pif', pif_records)
 
@@ -493,12 +507,6 @@ class XendNode:
         vbd_loads = self.monitor.get_domain_vbds_util()
         if domid in vbd_loads:
             return vbd_loads[domid].get(vbdid, (0.0, 0.0))
-        return (0.0, 0.0)
-
-    def get_pif_util(self, pifname):
-        pifs_util = self.monitor.get_pifs_util()
-        if pifname in pifs_util:
-            return pifs_util[pifname]
         return (0.0, 0.0)
 
     # dictionary version of *info() functions to get rid of

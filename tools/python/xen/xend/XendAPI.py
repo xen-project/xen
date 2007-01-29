@@ -12,7 +12,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2006 XenSource Ltd.
+# Copyright (C) 2006-2007 XenSource Ltd.
 #============================================================================
 
 import inspect
@@ -261,6 +261,17 @@ def valid_pif(func):
            _check_ref(lambda r: r in XendNode.instance().pifs,
                       'PIF_HANDLE_INVALID', func, *args, **kwargs)
 
+def valid_pif_metrics(func):
+    """Decorator to verify if pif_metrics_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, pif_metrics_ref)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: r in XendNode.instance().pif_metrics,
+                      'PIF_METRICS_HANDLE_INVALID', func, *args, **kwargs)
+
 def valid_task(func):
     """Decorator to verify if task_ref is valid before calling
     method.
@@ -361,6 +372,7 @@ class XendAPI(object):
             'console' : valid_console,
             'SR'      : valid_sr,
             'PIF'     : valid_pif,
+            'PIF_metrics': valid_pif_metrics,
             'task'    : valid_task,
             'debug'   : valid_debug,
         }
@@ -738,8 +750,7 @@ class XendAPI(object):
     # Xen API: Class PIF
     # ----------------------------------------------------------------
 
-    PIF_attr_ro = ['io_read_kbs',
-                   'io_write_kbs']
+    PIF_attr_ro = ['metrics']
     PIF_attr_rw = ['device',
                    'network',
                    'host',
@@ -767,6 +778,9 @@ class XendAPI(object):
     def PIF_get_all(self, _):
         return xen_api_success(XendNode.instance().pifs.keys())
 
+    def PIF_get_metrics(self, _, ref):
+        return xen_api_success(self._get_PIF(ref).metrics.uuid)
+
     def PIF_get_device(self, _, ref):
         return xen_api_success(self._get_PIF(ref).device)
 
@@ -785,12 +799,6 @@ class XendAPI(object):
     def PIF_get_VLAN(self, _, ref):
         return xen_api_success(self._get_PIF(ref).vlan)
 
-    def PIF_get_io_read_kbs(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).get_io_read_kbs())
-
-    def PIF_get_io_write_kbs(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).get_io_write_kbs())
-    
     def PIF_set_device(self, _, ref, device):
         return xen_api_success(self._get_PIF(ref).set_device(device))
 
@@ -819,6 +827,27 @@ class XendAPI(object):
                                   network, exn.pif_uuid])
         except VLANTagInvalid:
             return xen_api_error(['VLAN_TAG_INVALID', vlan])
+
+
+    # Xen API: Class PIF_metrics
+    # ----------------------------------------------------------------
+
+    PIF_metrics_attr_ro = ['io_read_kbs',
+                           'io_write_kbs']
+    PIF_metrics_attr_rw = []
+    PIF_methods = []
+
+    def _PIF_metrics_get(self, ref):
+        return XendNode.instance().pif_metrics[ref]
+
+    def PIF_metrics_get_record(self, _, ref):
+        return xen_api_success(self._PIF_metrics_get(ref).get_record())
+
+    def PIF_metrics_get_io_read_kbs(self, _, ref):
+        return xen_api_success(self._PIF_metrics_get(ref).get_io_read_kbs())
+
+    def PIF_metrics_get_io_write_kbs(self, _, ref):
+        return xen_api_success(self._PIF_metrics_get(ref).get_io_write_kbs())
 
 
     # Xen API: Class VM

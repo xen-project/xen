@@ -90,8 +90,10 @@ def linux_set_mtu(iface, mtu):
 class XendPIF:
     """Representation of a Physical Network Interface."""
     
-    def __init__(self, uuid, device, mtu, vlan, mac, network, host):
+    def __init__(self, uuid, metrics, device, mtu, vlan, mac, network,
+                 host):
         self.uuid = uuid
+        self.metrics = metrics
         self.device = device
         self.mac = mac
         self.mtu = mtu
@@ -114,26 +116,14 @@ class XendPIF:
             self.mtu = new_mtu
         return success
 
-    def get_io_read_kbs(self):
-        from xen.xend.XendNode import instance as xennode
-        return xennode().get_pif_util(self.device)[0]
-
-    def get_io_write_kbs(self):
-        from xen.xend.XendNode import instance as xennode
-        return xennode().get_pif_util(self.device)[1]      
-
-    def get_record(self, transient = True):
-        result = {'device': self.device,
-                  'MAC': self.mac,
-                  'MTU': self.mtu,
-                  'VLAN': self.vlan,
-                  'host': self.host.uuid,
-                  'network': self.network.uuid}
-        if transient:
-            result['io_read_kbs'] = self.get_io_read_kbs()
-            result['io_write_kbs'] = self.get_io_write_kbs()
-        return result
-
+    def get_record(self):
+        return {'device': self.device,
+                'MAC': self.mac,
+                'MTU': self.mtu,
+                'VLAN': self.vlan,
+                'host': self.host.uuid,
+                'network': self.network.uuid,
+                'metrics': self.metrics.uuid}
 
     def refresh(self, bridges):
         ifname = self.interface_name()
