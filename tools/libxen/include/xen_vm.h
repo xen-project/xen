@@ -51,7 +51,10 @@
  * PV/ramdisk, PV/args and PV/bootloader_args will be passed to the bootloader
  * unmodified, and interpretation of those fields is then specific to the
  * bootloader itself, including the possibility that the bootloader will
- * ignore some or all of those given values.
+ * ignore some or all of those given values. Finally the paths of all bootable
+ * disks are added to the bootloader commandline (a disk is bootable if its
+ * VBD has the bootable flag set). There may be zero, one or many bootable
+ * disks; the bootloader decides which disk (if any) to boot from.
  * 
  * If the bootloader is pygrub, then the menu.lst is parsed if present in the
  * guest's filesystem, otherwise the specified kernel and ramdisk are used, or
@@ -846,6 +849,8 @@ xen_vm_unpause(xen_session *session, xen_vm vm);
  * 
  * Once shutdown has been completed perform poweroff action specified in guest
  * configuration.
+ * 
+ * This can only be called when the specified VM is in the Running state.
  */
 extern bool
 xen_vm_clean_shutdown(xen_session *session, xen_vm vm);
@@ -857,6 +862,8 @@ xen_vm_clean_shutdown(xen_session *session, xen_vm vm);
  * 
  * Once shutdown has been completed perform reboot action specified in guest
  * configuration.
+ * 
+ * This can only be called when the specified VM is in the Running state.
  */
 extern bool
 xen_vm_clean_reboot(xen_session *session, xen_vm vm);
@@ -879,14 +886,16 @@ xen_vm_hard_reboot(xen_session *session, xen_vm vm);
 
 
 /**
- * Suspend the specified VM to disk.
+ * Suspend the specified VM to disk.  This can only be called when the
+ * specified VM is in the Running state.
  */
 extern bool
 xen_vm_suspend(xen_session *session, xen_vm vm);
 
 
 /**
- * Awaken the specified VM and resume it.
+ * Awaken the specified VM and resume it.  This can only be called when
+ * the specified VM is in the Suspended state.
  */
 extern bool
 xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused);
