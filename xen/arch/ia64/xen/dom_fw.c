@@ -333,13 +333,13 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
 	/* setup XSDT (64bit version of RSDT) */
-	strncpy(xsdt->signature, XSDT_SIG, 4);
+	strlcpy(xsdt->signature, XSDT_SIG, sizeof(xsdt->signature));
 	/* XSDT points to both the FADT and the MADT, so add one entry */
 	xsdt->length = sizeof(struct xsdt_descriptor_rev2) + sizeof(u64);
 	xsdt->revision = 1;
-	strcpy(xsdt->oem_id, "XEN");
-	strcpy(xsdt->oem_table_id, "Xen/ia64");
-	strcpy(xsdt->asl_compiler_id, "XEN");
+	strlcpy(xsdt->oem_id, "XEN", sizeof(xsdt->oem_id));
+	strlcpy(xsdt->oem_table_id, "Xen/ia64", sizeof(xsdt->oem_table_id));
+	strlcpy(xsdt->asl_compiler_id, "XEN", sizeof(xsdt->asl_compiler_id));
 	xsdt->asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
@@ -349,16 +349,16 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	xsdt->checksum = generate_acpi_checksum(xsdt, xsdt->length);
 
 	/* setup FADT */
-	strncpy(fadt->signature, FADT_SIG, 4);
+	strlcpy(fadt->signature, FADT_SIG, sizeof(fadt->signature));
 	fadt->length = sizeof(struct fadt_descriptor_rev2);
 	fadt->revision = FADT2_REVISION_ID;
-	strcpy(fadt->oem_id, "XEN");
-	strcpy(fadt->oem_table_id, "Xen/ia64");
-	strcpy(fadt->asl_compiler_id, "XEN");
+	strlcpy(fadt->oem_id, "XEN", sizeof(fadt->oem_id));
+	strlcpy(fadt->oem_table_id, "Xen/ia64", sizeof(fadt->oem_table_id));
+	strlcpy(fadt->asl_compiler_id, "XEN", sizeof(fadt->asl_compiler_id));
 	fadt->asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
-	strncpy(facs->signature, FACS_SIG, 4);
+	strlcpy(facs->signature, FACS_SIG, sizeof(facs->signature));
 	facs->version = 1;
 	facs->length = sizeof(struct facs_descriptor_rev2);
 
@@ -386,8 +386,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	fadt->checksum = generate_acpi_checksum(fadt, fadt->length);
 
 	/* setup RSDP */
-	strncpy(rsdp->signature, RSDP_SIG, 8);
-	strcpy(rsdp->oem_id, "XEN");
+	strlcpy(rsdp->signature, RSDP_SIG, sizeof(rsdp->signature));
+	strlcpy(rsdp->oem_id, "XEN", sizeof(rsdp->oem_id));
 	rsdp->revision = 2; /* ACPI 2.0 includes XSDT */
 	rsdp->length = sizeof(struct acpi20_table_rsdp);
 	rsdp->xsdt_address = ACPI_TABLE_MPA(xsdt);
@@ -397,11 +397,11 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	rsdp->ext_checksum = generate_acpi_checksum(rsdp, rsdp->length);
 
 	/* setup DSDT with trivial namespace. */ 
-	strncpy(dsdt->signature, DSDT_SIG, 4);
+	strlcpy(dsdt->signature, DSDT_SIG, sizeof(dsdt->signature));
 	dsdt->revision = 1;
-	strcpy(dsdt->oem_id, "XEN");
-	strcpy(dsdt->oem_table_id, "Xen/ia64");
-	strcpy(dsdt->asl_compiler_id, "XEN");
+	strlcpy(dsdt->oem_id, "XEN", sizeof(dsdt->oem_id));
+	strlcpy(dsdt->oem_table_id, "Xen/ia64", sizeof(dsdt->oem_table_id));
+	strlcpy(dsdt->asl_compiler_id, "XEN", sizeof(dsdt->asl_compiler_id));
 	dsdt->asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
@@ -409,7 +409,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	tables->aml[0] = 0x10; /* Scope */
 	tables->aml[1] = 0x40; /* length/offset to next object (patched) */
 	tables->aml[2] = 0x00;
-	strncpy((char *)&tables->aml[3], "_SB_", 4);
+	strlcpy((char *)&tables->aml[3], "_SB_", 5);
 
 	/* The processor object isn't absolutely necessary, revist for SMP */
 	aml_len = 7;
@@ -437,11 +437,14 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
 	/* setup MADT */
-	strncpy(madt->header.signature, APIC_SIG, 4);
+	strlcpy(madt->header.signature, APIC_SIG, sizeof(madt->header.signature));
 	madt->header.revision = 2;
-	strcpy(madt->header.oem_id, "XEN");
-	strcpy(madt->header.oem_table_id, "Xen/ia64");
-	strcpy(madt->header.asl_compiler_id, "XEN");
+	strlcpy(madt->header.oem_id, "XEN",
+		sizeof(madt->header.oem_id));
+	strlcpy(madt->header.oem_table_id, "Xen/ia64",
+		sizeof(madt->header.oem_table_id));
+	strlcpy(madt->header.asl_compiler_id, "XEN",
+		sizeof(madt->header.asl_compiler_id));
 	madt->header.asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
@@ -760,8 +763,10 @@ dom_fw_init(struct domain *d,
 	tables->sal_systab.sal_rev_major = 0;
 	tables->sal_systab.entry_count = 2;
 
-	strcpy((char *)tables->sal_systab.oem_id, "Xen/ia64");
-	strcpy((char *)tables->sal_systab.product_id, "Xen/ia64");
+	strlcpy((char *)tables->sal_systab.oem_id, "Xen/ia64",
+		sizeof(tables->sal_systab.oem_id));
+	strlcpy((char *)tables->sal_systab.product_id, "Xen/ia64",
+		sizeof(tables->sal_systab.product_id));
 
 	/* PAL entry point: */
 	tables->sal_ed.type = SAL_DESC_ENTRY_POINT;

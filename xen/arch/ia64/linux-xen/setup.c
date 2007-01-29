@@ -424,8 +424,7 @@ setup_arch (char **cmdline_p)
 			else
 				len = strlen (mvec_name);
 			len = min(len, sizeof (str) - 1);
-			strncpy (str, mvec_name, len);
-			str[len] = '\0';
+			strlcpy (str, mvec_name, len);
 			mvec_name = str;
 		} else
 			mvec_name = acpi_get_sysname();
@@ -564,7 +563,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 				*cp++ = sep;
 			sep = ',';
 			*cp++ = ' ';
-			strcpy(cp, feature_bits[i].feature_name);
+			strlcpy(cp, feature_bits[i].feature_name, sizeof(features));
 			cp += strlen(feature_bits[i].feature_name);
 			mask &= ~feature_bits[i].mask;
 		}
