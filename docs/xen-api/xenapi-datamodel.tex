@@ -10643,6 +10643,16 @@ You attempted an operation that was not allowed.
 \begin{verbatim}OPERATION_NOT_ALLOWED()\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
+\subsubsection{PIF\_HANDLE\_INVALID}
+
+You gave an invalid PIF handle.  The PIF may have recently been deleted. 
+The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}PIF_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
 \subsubsection{PIF\_IS\_PHYSICAL}
 
 You tried to destroy a PIF, but it represents an aspect of the physical
@@ -10652,6 +10662,16 @@ PIF handle you gave.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{PIF\_METRICS\_HANDLE\_INVALID}
+
+You gave an invalid PIF\_metrics handle.  The PIF\_metrics may have
+recently been deleted.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}PIF_METRICS_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{SESSION\_AUTHENTICATION\_FAILED}
