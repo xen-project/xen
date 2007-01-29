@@ -302,7 +302,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		break;
 	}
 	safe_strcpy(c->x86_model_id, Cx86_model[dir0_msn & 7]);
-	if (p) strcat(c->x86_model_id, p);
+	if (p) safe_strcat(c->x86_model_id, p);
 	return;
 }
 

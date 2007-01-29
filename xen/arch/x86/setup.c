@@ -751,19 +751,19 @@ void __init __start_xen(multiboot_info_t *mbi)
             safe_strcpy(dom0_cmdline, cmdline);
         }
 
-        cmdline = dom0_cmdline;
-
         /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            strcat(cmdline, " noapic");
+        if ( skip_ioapic_setup && !strstr(dom0_cmdline, "noapic") )
+            safe_strcat(dom0_cmdline, " noapic");
         if ( acpi_skip_timer_override &&
-             !strstr(cmdline, "acpi_skip_timer_override") )
-            strcat(cmdline, " acpi_skip_timer_override");
-        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
+             !strstr(dom0_cmdline, "acpi_skip_timer_override") )
+            safe_strcat(dom0_cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) != 0) && !strstr(dom0_cmdline, "acpi=") )
         {
-            strcat(cmdline, " acpi=");
-            strcat(cmdline, acpi_param);
+            safe_strcat(dom0_cmdline, " acpi=");
+            safe_strcat(dom0_cmdline, acpi_param);
         }
+
+        cmdline = dom0_cmdline;
     }
 
     if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
