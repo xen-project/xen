@@ -47,7 +47,6 @@ Fields that are bound together are shown in the following table:
 
 \hline
 VDI.VBDs & VBD.VDI & many-to-one\\
-VDI.parent & VDI.children & one-to-many\\
 VBD.VM & VM.VBDs & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
@@ -7703,8 +7702,6 @@ $\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the gu
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & amount of physical space that the disk image is currently taking up on the storage repository (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt sector\_size} & int & sector size of VDI (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt parent} & VDI ref & parent disk (e.g. in the case of copy on write) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt children} & (VDI ref) Set & child disks (e.g. in the case of copy on write) \\
 $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
 \hline
@@ -8193,70 +8190,6 @@ Get the type field of the given VDI.
  \noindent {\bf Return Type:} 
 {\tt 
 vdi\_type
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_parent}
-
-{\bf Overview:} 
-Get the parent field of the given VDI.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (VDI ref) get_parent (session_id s, VDI ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-VDI ref
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_children}
-
-{\bf Overview:} 
-Get the children field of the given VDI.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} ((VDI ref) Set) get_children (session_id s, VDI ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-(VDI ref) Set
 }
 
 

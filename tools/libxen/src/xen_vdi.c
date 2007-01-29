@@ -66,12 +66,6 @@ static const struct_member xen_vdi_record_struct_members[] =
         { .key = "type",
           .type = &xen_vdi_type_abstract_type_,
           .offset = offsetof(xen_vdi_record, type) },
-        { .key = "parent",
-          .type = &abstract_type_ref,
-          .offset = offsetof(xen_vdi_record, parent) },
-        { .key = "children",
-          .type = &abstract_type_ref_set,
-          .offset = offsetof(xen_vdi_record, children) },
         { .key = "sharable",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vdi_record, sharable) },
@@ -103,8 +97,6 @@ xen_vdi_record_free(xen_vdi_record *record)
     free(record->name_description);
     xen_sr_record_opt_free(record->sr);
     xen_vbd_record_opt_set_free(record->vbds);
-    xen_vdi_record_opt_free(record->parent);
-    xen_vdi_record_opt_set_free(record->children);
     free(record);
 }
 
@@ -326,40 +318,6 @@ xen_vdi_get_type(xen_session *session, enum xen_vdi_type *result, xen_vdi vdi)
     char *result_str = NULL;
     XEN_CALL_("VDI.get_type");
     *result = xen_vdi_type_from_string(session, result_str);
-    return session->ok;
-}
-
-
-bool
-xen_vdi_get_parent(xen_session *session, xen_vdi *result, xen_vdi vdi)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VDI.get_parent");
-    return session->ok;
-}
-
-
-bool
-xen_vdi_get_children(xen_session *session, struct xen_vdi_set **result, xen_vdi vdi)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi }
-        };
-
-    abstract_type result_type = abstract_type_string_set;
-
-    *result = NULL;
-    XEN_CALL_("VDI.get_children");
     return session->ok;
 }
 

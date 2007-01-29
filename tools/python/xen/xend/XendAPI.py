@@ -1548,9 +1548,7 @@ class XendAPI(object):
     VDI_attr_ro = ['VBDs',
                    'physical_utilisation',
                    'sector_size',
-                   'type',
-                   'parent',
-                   'children']
+                   'type']
     VDI_attr_rw = ['name_label',
                    'name_description',
                    'SR',
@@ -1578,12 +1576,6 @@ class XendAPI(object):
     
     def VDI_get_type(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).type)
-    
-    def VDI_get_parent(self, session, vdi_ref):
-        return xen_api_success(self._get_VDI(vdi_ref).parent)        
-    
-    def VDI_get_children(self, session, vdi_ref):
-        return xen_api_success(self._get_VDI(vdi_ref).children)        
     
     def VDI_get_name_label(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).name_label)
@@ -1646,8 +1638,6 @@ class XendAPI(object):
             'physical_utilisation': image.physical_utilisation,
             'sector_size': image.sector_size,
             'type': image.type,
-            'parent': image.parent,
-            'children': image.children,
             'sharable': image.sharable,
             'read_only': image.read_only,
             })
