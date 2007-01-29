@@ -72,8 +72,7 @@ void cmdline_parse(char *cmdline)
             switch ( param->type )
             {
             case OPT_STR:
-                strncpy(param->var, optval, param->len);
-                ((char *)param->var)[param->len-1] = '\0';
+                strlcpy(param->var, optval, param->len);
                 break;
             case OPT_UINT:
                 *(unsigned int *)param->var =

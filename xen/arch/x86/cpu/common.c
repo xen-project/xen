@@ -386,8 +386,8 @@ void __devinit identify_cpu(struct cpuinfo_x86 *c)
 			strcpy(c->x86_model_id, p);
 		else
 			/* Last resort... */
-			sprintf(c->x86_model_id, "%02x/%02x",
-				c->x86_vendor, c->x86_model);
+			snprintf(c->x86_model_id, sizeof(c->x86_model_id),
+				"%02x/%02x", c->x86_vendor, c->x86_model);
 	}
 
 	/* Now the feature flags better reflect actual CPU features! */

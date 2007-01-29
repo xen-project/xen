@@ -173,7 +173,7 @@ int hvm_register_savevm(struct domain *d,
         return -1;
     }
 
-    strncpy(se->idstr, idstr, HVM_SE_IDSTR_LEN);
+    strlcpy(se->idstr, idstr, HVM_SE_IDSTR_LEN);
 
     se->instance_id = instance_id;
     se->version_id = version_id;

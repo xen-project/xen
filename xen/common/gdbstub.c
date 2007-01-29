@@ -268,7 +268,7 @@ gdb_send_packet(struct gdb_context *ctx)
     char buf[3];
     int count;
 
-    sprintf(buf, "%.02x\n", ctx->out_csum);
+    snprintf(buf, sizeof(buf), "%.02x\n", ctx->out_csum);
 
     gdb_write_to_packet_char('#', ctx);
     gdb_write_to_packet(buf, 2, ctx);
