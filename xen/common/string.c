@@ -41,44 +41,6 @@ int strnicmp(const char *s1, const char *s2, size_t len)
 }
 #endif
 
-#ifndef __HAVE_ARCH_STRCPY
-/**
- * strcpy - Copy a %NUL terminated string
- * @dest: Where to copy the string to
- * @src: Where to copy the string from
- */
-char * strcpy(char * dest,const char *src)
-{
-	char *tmp = dest;
-
-	while ((*dest++ = *src++) != '\0')
-		/* nothing */;
-	return tmp;
-}
-#endif
-
-#ifndef __HAVE_ARCH_STRNCPY
-/**
- * strncpy - Copy a length-limited, %NUL-terminated string
- * @dest: Where to copy the string to
- * @src: Where to copy the string from
- * @count: The maximum number of bytes to copy
- *
- * Note that unlike userspace strncpy, this does not %NUL-pad the buffer.
- * However, the result is not %NUL-terminated if the source exceeds
- * @count bytes.
- */
-char * strncpy(char * dest,const char *src,size_t count)
-{
-	char *tmp = dest;
-
-	while (count-- && (*dest++ = *src++) != '\0')
-		/* nothing */;
-
-	return tmp;
-}
-#endif
-
 #ifndef __HAVE_ARCH_STRLCPY
 /**
  * strlcpy - Copy a %NUL terminated string into a sized buffer
@@ -105,52 +67,33 @@ size_t strlcpy(char *dest, const char *src, size_t size)
 EXPORT_SYMBOL(strlcpy);
 #endif
 
-#ifndef __HAVE_ARCH_STRCAT
+#ifndef __HAVE_ARCH_STRLCAT
 /**
- * strcat - Append one %NUL-terminated string to another
- * @dest: The string to be appended to
- * @src: The string to append to it
- */
-char * strcat(char * dest, const char * src)
-{
-	char *tmp = dest;
-
-	while (*dest)
-		dest++;
-	while ((*dest++ = *src++) != '\0')
-		;
-
-	return tmp;
-}
-#endif
-
-#ifndef __HAVE_ARCH_STRNCAT
-/**
- * strncat - Append a length-limited, %NUL-terminated string to another
- * @dest: The string to be appended to
- * @src: The string to append to it
- * @count: The maximum numbers of bytes to copy
+ * strlcat - Append a %NUL terminated string into a sized buffer
+ * @dest: Where to copy the string to
+ * @src: Where to copy the string from
+ * @size: size of destination buffer
  *
- * Note that in contrast to strncpy, strncat ensures the result is
- * terminated.
+ * Compatible with *BSD: the result is always a valid
+ * NUL-terminated string that fits in the buffer (unless,
+ * of course, the buffer size is zero).
  */
-char * strncat(char *dest, const char *src, size_t count)
+size_t strlcat(char *dest, const char *src, size_t size)
 {
-	char *tmp = dest;
+	size_t slen = strlen(src);
+	size_t dlen = strnlen(dest, size);
+	char *p = dest + dlen;
 
-	if (count) {
-		while (*dest)
-			dest++;
-		while ((*dest++ = *src++)) {
-			if (--count == 0) {
-				*dest = '\0';
-				break;
-			}
-		}
-	}
+	while ((p - dest) < size)
+		if ((*p++ = *src++) == '\0')
+			break;
 
-	return tmp;
+	if (dlen < size)
+		*(p-1) = '\0';
+
+	return slen + dlen;
 }
+EXPORT_SYMBOL(strlcat);
 #endif
 
 #ifndef __HAVE_ARCH_STRCMP

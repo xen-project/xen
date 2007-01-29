@@ -111,7 +111,7 @@ char acpi_param[10] = "";
 static void parse_acpi_param(char *s)
 {
     /* Save the parameter so it can be propagated to domain0. */
-    strlcpy(acpi_param, s, sizeof(acpi_param));
+    safe_strcpy(acpi_param, s);
 
     /* Interpret the parameter for use within Xen. */
     if ( !strcmp(s, "off") )
@@ -748,22 +748,22 @@ void __init __start_xen(multiboot_info_t *mbi)
         if ( (cmdline = strchr(cmdline, ' ')) != NULL )
         {
             while ( *cmdline == ' ' ) cmdline++;
-            strcpy(dom0_cmdline, cmdline);
+            safe_strcpy(dom0_cmdline, cmdline);
+        }
+
+        /* Append any extra parameters. */
+        if ( skip_ioapic_setup && !strstr(dom0_cmdline, "noapic") )
+            safe_strcat(dom0_cmdline, " noapic");
+        if ( acpi_skip_timer_override &&
+             !strstr(dom0_cmdline, "acpi_skip_timer_override") )
+            safe_strcat(dom0_cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) != 0) && !strstr(dom0_cmdline, "acpi=") )
+        {
+            safe_strcat(dom0_cmdline, " acpi=");
+            safe_strcat(dom0_cmdline, acpi_param);
         }
 
         cmdline = dom0_cmdline;
-
-        /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            strcat(cmdline, " noapic");
-        if ( acpi_skip_timer_override &&
-             !strstr(cmdline, "acpi_skip_timer_override") )
-            strcat(cmdline, " acpi_skip_timer_override");
-        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
-        {
-            strcat(cmdline, " acpi=");
-            strcat(cmdline, acpi_param);
-        }
     }
 
     if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )

@@ -1148,8 +1148,7 @@ int construct_dom0(struct domain *d,
 	dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
 
 	/* Fill boot param.  */
-	strncpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
-	si->cmd_line[sizeof(si->cmd_line)-1] = 0;
+	strlcpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
 
 	bp = (struct ia64_boot_param *)((unsigned char *)si +
 	                                sizeof(start_info_t));

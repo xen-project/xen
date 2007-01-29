@@ -67,8 +67,7 @@ void register_keyhandler(
     ASSERT(key_table[key].u.handler == NULL);
     key_table[key].u.handler = handler;
     key_table[key].flags     = 0;
-    strlcpy(key_table[key].desc, desc, STR_MAX);
-    key_table[key].desc[STR_MAX-1] = '\0';
+    safe_strcpy(key_table[key].desc, desc);
 }
 
 void register_irq_keyhandler(
@@ -77,7 +76,7 @@ void register_irq_keyhandler(
     ASSERT(key_table[key].u.irq_handler == NULL);
     key_table[key].u.irq_handler = handler;
     key_table[key].flags         = KEYHANDLER_IRQ_CALLBACK;
-    strlcpy(key_table[key].desc, desc, STR_MAX);
+    safe_strcpy(key_table[key].desc, desc);
 }
 
 static void show_handlers(unsigned char key)

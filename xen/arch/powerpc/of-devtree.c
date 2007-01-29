@@ -358,8 +358,7 @@ static ofdn_t ofd_node_create(
     n->on_io = 0;
     n->on_pathlen = pathlen;
     n->on_last = ofd_pathsplit_left(path, '/', pathlen);
-    strncpy(n->on_path, path, pathlen);
-    n->on_path[n->on_pathlen] = 0;
+    strlcpy(n->on_path, path, pathlen);
 
     return pos;
 }

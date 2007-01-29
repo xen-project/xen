@@ -283,7 +283,7 @@ struct rangeset *rangeset_new(
 
     if ( name != NULL )
     {
-        strlcpy(r->name, name, sizeof(r->name));
+        safe_strcpy(r->name, name);
     }
     else
     {

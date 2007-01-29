@@ -173,7 +173,7 @@ int hvm_register_savevm(struct domain *d,
         return -1;
     }
 
-    strlcpy(se->idstr, idstr, HVM_SE_IDSTR_LEN);
+    safe_strcpy(se->idstr, idstr);
 
     se->instance_id = instance_id;
     se->version_id = version_id;
@@ -217,7 +217,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
 
     for(se = d->arch.hvm_domain.first_se; se != NULL; se = se->next) {
         /* ID string */
-        len = strnlen(se->idstr, HVM_SE_IDSTR_LEN);
+        len = strnlen(se->idstr, sizeof(se->idstr));
         hvm_put_8u(h, len);
         hvm_put_buffer(h, se->idstr, len);
 
@@ -255,7 +255,7 @@ static HVMStateEntry *find_se(struct domain *d, const char *idstr, int instance_
     HVMStateEntry *se;
 
     for(se = d->arch.hvm_domain.first_se; se != NULL; se = se->next) {
-        if (!strncmp(se->idstr, idstr, HVM_SE_IDSTR_LEN) &&
+        if (!strncmp(se->idstr, idstr, sizeof(se->idstr)) &&
             instance_id == se->instance_id){
             return se;
         }

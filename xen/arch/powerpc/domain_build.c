@@ -290,7 +290,7 @@ int construct_dom0(struct domain *d,
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
-        strncpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
+        strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
 
     v->arch.ctxt.msr = msr;
     v->arch.ctxt.pc = pc;

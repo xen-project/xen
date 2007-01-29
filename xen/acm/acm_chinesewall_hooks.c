@@ -132,26 +132,26 @@ static int chwall_dump_policy(u8 * buf, u32 buf_size)
     if (buf_size < sizeof(struct acm_chwall_policy_buffer))
         return -EINVAL;
 
-    chwall_buf->chwall_max_types = htonl(chwall_bin_pol.max_types);
-    chwall_buf->chwall_max_ssidrefs = htonl(chwall_bin_pol.max_ssidrefs);
-    chwall_buf->policy_code = htonl(ACM_CHINESE_WALL_POLICY);
+    chwall_buf->chwall_max_types = cpu_to_be32(chwall_bin_pol.max_types);
+    chwall_buf->chwall_max_ssidrefs = cpu_to_be32(chwall_bin_pol.max_ssidrefs);
+    chwall_buf->policy_code = cpu_to_be32(ACM_CHINESE_WALL_POLICY);
     chwall_buf->chwall_ssid_offset =
-        htonl(sizeof(struct acm_chwall_policy_buffer));
+        cpu_to_be32(sizeof(struct acm_chwall_policy_buffer));
     chwall_buf->chwall_max_conflictsets =
-        htonl(chwall_bin_pol.max_conflictsets);
+        cpu_to_be32(chwall_bin_pol.max_conflictsets);
     chwall_buf->chwall_conflict_sets_offset =
-        htonl(ntohl(chwall_buf->chwall_ssid_offset) +
+        cpu_to_be32(be32_to_cpu(chwall_buf->chwall_ssid_offset) +
               sizeof(domaintype_t) * chwall_bin_pol.max_ssidrefs *
               chwall_bin_pol.max_types);
     chwall_buf->chwall_running_types_offset =
-        htonl(ntohl(chwall_buf->chwall_conflict_sets_offset) +
+        cpu_to_be32(be32_to_cpu(chwall_buf->chwall_conflict_sets_offset) +
               sizeof(domaintype_t) * chwall_bin_pol.max_conflictsets *
               chwall_bin_pol.max_types);
     chwall_buf->chwall_conflict_aggregate_offset =
-        htonl(ntohl(chwall_buf->chwall_running_types_offset) +
+        cpu_to_be32(be32_to_cpu(chwall_buf->chwall_running_types_offset) +
               sizeof(domaintype_t) * chwall_bin_pol.max_types);
 
-    ret = ntohl(chwall_buf->chwall_conflict_aggregate_offset) +
+    ret = be32_to_cpu(chwall_buf->chwall_conflict_aggregate_offset) +
         sizeof(domaintype_t) * chwall_bin_pol.max_types;
 
     ret = (ret + 7) & ~7;
@@ -160,21 +160,21 @@ static int chwall_dump_policy(u8 * buf, u32 buf_size)
         return -EINVAL;
 
     /* now copy buffers over */
-    arrcpy16((u16 *) (buf + ntohl(chwall_buf->chwall_ssid_offset)),
+    arrcpy16((u16 *) (buf + be32_to_cpu(chwall_buf->chwall_ssid_offset)),
              chwall_bin_pol.ssidrefs,
              chwall_bin_pol.max_ssidrefs * chwall_bin_pol.max_types);
 
     arrcpy16((u16 *) (buf +
-                      ntohl(chwall_buf->chwall_conflict_sets_offset)),
+                      be32_to_cpu(chwall_buf->chwall_conflict_sets_offset)),
              chwall_bin_pol.conflict_sets,
              chwall_bin_pol.max_conflictsets * chwall_bin_pol.max_types);
 
     arrcpy16((u16 *) (buf +
-                      ntohl(chwall_buf->chwall_running_types_offset)),
+                      be32_to_cpu(chwall_buf->chwall_running_types_offset)),
              chwall_bin_pol.running_types, chwall_bin_pol.max_types);
 
     arrcpy16((u16 *) (buf +
-                      ntohl(chwall_buf->chwall_conflict_aggregate_offset)),
+                      be32_to_cpu(chwall_buf->chwall_conflict_aggregate_offset)),
              chwall_bin_pol.conflict_aggregate_set,
              chwall_bin_pol.max_types);
     return ret;
@@ -267,20 +267,20 @@ static int chwall_set_policy(u8 * buf, u32 buf_size)
         return -EINVAL;
 
     /* rewrite the policy due to endianess */
-    chwall_buf->policy_code = ntohl(chwall_buf->policy_code);
-    chwall_buf->policy_version = ntohl(chwall_buf->policy_version);
-    chwall_buf->chwall_max_types = ntohl(chwall_buf->chwall_max_types);
+    chwall_buf->policy_code = be32_to_cpu(chwall_buf->policy_code);
+    chwall_buf->policy_version = be32_to_cpu(chwall_buf->policy_version);
+    chwall_buf->chwall_max_types = be32_to_cpu(chwall_buf->chwall_max_types);
     chwall_buf->chwall_max_ssidrefs =
-        ntohl(chwall_buf->chwall_max_ssidrefs);
+        be32_to_cpu(chwall_buf->chwall_max_ssidrefs);
     chwall_buf->chwall_max_conflictsets =
-        ntohl(chwall_buf->chwall_max_conflictsets);
-    chwall_buf->chwall_ssid_offset = ntohl(chwall_buf->chwall_ssid_offset);
+        be32_to_cpu(chwall_buf->chwall_max_conflictsets);
+    chwall_buf->chwall_ssid_offset = be32_to_cpu(chwall_buf->chwall_ssid_offset);
     chwall_buf->chwall_conflict_sets_offset =
-        ntohl(chwall_buf->chwall_conflict_sets_offset);
+        be32_to_cpu(chwall_buf->chwall_conflict_sets_offset);
     chwall_buf->chwall_running_types_offset =
-        ntohl(chwall_buf->chwall_running_types_offset);
+        be32_to_cpu(chwall_buf->chwall_running_types_offset);
     chwall_buf->chwall_conflict_aggregate_offset =
-        ntohl(chwall_buf->chwall_conflict_aggregate_offset);
+        be32_to_cpu(chwall_buf->chwall_conflict_aggregate_offset);
 
     /* policy type and version checks */
     if ((chwall_buf->policy_code != ACM_CHINESE_WALL_POLICY) ||

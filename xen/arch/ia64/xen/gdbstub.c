@@ -639,7 +639,7 @@ kgdb_get_reg(int regnum, struct unw_frame_info *info,
 		outbuffer[size*2] = 0;
 	}
 	else
-		strcpy(outbuffer, "E0");
+		strlcpy(outbuffer, "E0", sizeof("E0"));
 
 	return;
 #else
