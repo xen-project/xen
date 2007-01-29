@@ -141,7 +141,7 @@ typedef struct xen_vm_record
     bool platform_enable_audio;
     char *pci_bus;
     xen_string_string_map *tools_version;
-    xen_string_string_map *otherconfig;
+    xen_string_string_map *other_config;
 } xen_vm_record;
 
 /**
@@ -555,10 +555,10 @@ xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, x
 
 
 /**
- * Get the otherConfig field of the given VM.
+ * Get the other_config field of the given VM.
  */
 extern bool
-xen_vm_get_otherconfig(xen_session *session, xen_string_string_map **result, xen_vm vm);
+xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xen_vm vm);
 
 
 /**
@@ -783,10 +783,27 @@ xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_au
 
 
 /**
- * Set the otherConfig field of the given VM.
+ * Set the other_config field of the given VM.
  */
 extern bool
-xen_vm_set_otherconfig(xen_session *session, xen_vm vm, xen_string_string_map *otherconfig);
+xen_vm_set_other_config(xen_session *session, xen_vm vm, xen_string_string_map *other_config);
+
+
+/**
+ * Add the given key-value pair to the other_config field of the given
+ * VM.
+ */
+extern bool
+xen_vm_add_to_other_config(xen_session *session, xen_vm vm, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * other_config field of the given VM.  If the key is not in that Map, then do
+ * nothing.
+ */
+extern bool
+xen_vm_remove_from_other_config(xen_session *session, xen_vm vm, char *key);
 
 
 /**

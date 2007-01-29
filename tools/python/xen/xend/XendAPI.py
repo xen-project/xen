@@ -868,7 +868,7 @@ class XendAPI(object):
                   'platform_clock_offset',
                   'platform_enable_audio',
                   'platform_keymap',
-                  'otherConfig']
+                  'other_config']
 
     VM_methods = [('clone', 'VM'),
                   ('start', None),
@@ -880,8 +880,8 @@ class XendAPI(object):
                   ('hard_reboot', None),
                   ('suspend', None),
                   ('resume', None),
-                  ('add_to_otherConfig', None),
-                  ('remove_from_otherConfig', None)]
+                  ('add_to_other_config', None),
+                  ('remove_from_other_config', None)]
     
     VM_funcs  = [('create', 'VM'),
                  ('get_by_name_label', 'Set(VM)')]
@@ -920,7 +920,7 @@ class XendAPI(object):
         'platform_keymap',
         'grub_cmdline',
         'PCI_bus',
-        'otherConfig']
+        'other_config']
         
     def VM_get(self, name, session, vm_ref):
         return xen_api_success(
@@ -1092,8 +1092,8 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_platform_keymap())
     
-    def VM_get_otherConfig(self, session, vm_ref):
-        return self.VM_get('otherConfig', session, vm_ref)        
+    def VM_get_other_config(self, session, vm_ref):
+        return self.VM_get('otherconfig', session, vm_ref)        
 
     def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1192,16 +1192,16 @@ class XendAPI(object):
     def VM_set_platform_enable_audio(self, session, vm_ref, value):
         return self.VM_set('platform_enable_audio', session, vm_ref, value)
     
-    def VM_set_otherConfig(self, session, vm_ref, value):
+    def VM_set_other_config(self, session, vm_ref, value):
         return self.VM_set('otherconfig', session, vm_ref, value)
 
-    def VM_add_to_otherConfig(self, session, vm_ref, key, value):
+    def VM_add_to_other_config(self, session, vm_ref, key, value):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         if dom and 'otherconfig' in dom.info:
             dom.info['otherconfig'][key] = value
         return xen_api_success_void()
 
-    def VM_remove_from_otherConfig(self, session, vm_ref, key):
+    def VM_remove_from_other_config(self, session, vm_ref, key):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         if dom and 'otherconfig' in dom.info \
                and key in dom.info['otherconfig']:
@@ -1277,7 +1277,7 @@ class XendAPI(object):
             'platform_keymap': xeninfo.get_platform_keymap(),
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
-            'otherConfig': xeninfo.info.get('otherconfig'),
+            'other_config': xeninfo.info.get('otherconfig'),
         }
         return xen_api_success(record)
 

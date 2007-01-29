@@ -174,9 +174,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "tools_version",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, tools_version) },
-        { .key = "otherConfig",
+        { .key = "other_config",
           .type = &abstract_type_string_string_map,
-          .offset = offsetof(xen_vm_record, otherconfig) }
+          .offset = offsetof(xen_vm_record, other_config) }
     };
 
 const abstract_type xen_vm_record_abstract_type_ =
@@ -221,7 +221,7 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->platform_serial);
     free(record->pci_bus);
     xen_string_string_map_free(record->tools_version);
-    xen_string_string_map_free(record->otherconfig);
+    xen_string_string_map_free(record->other_config);
     free(record);
 }
 
@@ -989,7 +989,7 @@ xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, x
 
 
 bool
-xen_vm_get_otherconfig(xen_session *session, xen_string_string_map **result, xen_vm vm)
+xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -1000,7 +1000,7 @@ xen_vm_get_otherconfig(xen_session *session, xen_string_string_map **result, xen
     abstract_type result_type = abstract_type_string_string_map;
 
     *result = NULL;
-    XEN_CALL_("VM.get_otherConfig");
+    XEN_CALL_("VM.get_other_config");
     return session->ok;
 }
 
@@ -1502,17 +1502,51 @@ xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_au
 
 
 bool
-xen_vm_set_otherconfig(xen_session *session, xen_vm vm, xen_string_string_map *otherconfig)
+xen_vm_set_other_config(xen_session *session, xen_vm vm, xen_string_string_map *other_config)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &abstract_type_string_string_map,
-              .u.set_val = (arbitrary_set *)otherconfig }
+              .u.set_val = (arbitrary_set *)other_config }
         };
 
-    xen_call_(session, "VM.set_otherConfig", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_other_config", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_add_to_other_config(xen_session *session, xen_vm vm, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VM.add_to_other_config", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_remove_from_other_config(xen_session *session, xen_vm vm, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VM.remove_from_other_config", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
