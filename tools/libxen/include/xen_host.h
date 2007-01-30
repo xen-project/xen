@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_host_cpu_decl.h"
 #include "xen_host_decl.h"
+#include "xen_host_metrics_decl.h"
 #include "xen_pbd_decl.h"
 #include "xen_pif_decl.h"
 #include "xen_sr_decl.h"
@@ -79,6 +80,7 @@ typedef struct xen_host_record
     struct xen_sr_record_opt *crash_dump_sr;
     struct xen_pbd_record_opt_set *pbds;
     struct xen_host_cpu_record_opt_set *host_cpus;
+    struct xen_host_metrics_record_opt *metrics;
 } xen_host_record;
 
 /**
@@ -277,6 +279,13 @@ xen_host_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_host ho
  */
 extern bool
 xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, xen_host host);
+
+
+/**
+ * Get the metrics field of the given host.
+ */
+extern bool
+xen_host_get_metrics(xen_session *session, xen_host_metrics *result, xen_host host);
 
 
 /**

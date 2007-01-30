@@ -158,6 +158,17 @@ def valid_host(func):
            _check_ref(XendNode.instance().is_valid_host,
                       'HOST_HANDLE_INVALID', func, *args, **kwargs)
 
+def valid_host_metrics(func):
+    """Decorator to verify if host_metrics_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, host_metrics_ref)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: r == XendNode.instance().host_metrics_uuid,
+                      'HOST_METRICS_HANDLE_INVALID', func, *args, **kwargs)
+
 def valid_host_cpu(func):
     """Decorator to verify if host_cpu_ref is valid before calling method.
 
@@ -360,21 +371,22 @@ class XendAPI(object):
         """
         global_validators = [session_required, catch_typeerror]
         classes = {
-            'session' : None,
-            'host'    : valid_host,
-            'host_cpu': valid_host_cpu,
-            'network' : valid_network,
-            'VM'      : valid_vm,
-            'VBD'     : valid_vbd,
-            'VIF'     : valid_vif,
-            'VDI'     : valid_vdi,
-            'VTPM'    : valid_vtpm,
-            'console' : valid_console,
-            'SR'      : valid_sr,
-            'PIF'     : valid_pif,
-            'PIF_metrics': valid_pif_metrics,
-            'task'    : valid_task,
-            'debug'   : valid_debug,
+            'session'      : None,
+            'host'         : valid_host,
+            'host_cpu'     : valid_host_cpu,
+            'host_metrics' : valid_host_metrics,
+            'network'      : valid_network,
+            'VM'           : valid_vm,
+            'VBD'          : valid_vbd,
+            'VIF'          : valid_vif,
+            'VDI'          : valid_vdi,
+            'VTPM'         : valid_vtpm,
+            'console'      : valid_console,
+            'SR'           : valid_sr,
+            'PIF'          : valid_pif,
+            'PIF_metrics'  : valid_pif_metrics,
+            'task'         : valid_task,
+            'debug'        : valid_debug,
         }
 
         # Cheat methods
@@ -573,12 +585,13 @@ class XendAPI(object):
     def task_get_by_name_label(self, session, name):
         return xen_api_success(XendTaskManager.get_task_by_name(name))
 
-    # Xen API: Class Host
+    # Xen API: Class host
     # ----------------------------------------------------------------    
 
     host_attr_ro = ['software_version',
                     'resident_VMs',
-                    'host_CPUs']
+                    'host_CPUs',
+                    'metrics']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -627,6 +640,8 @@ class XendAPI(object):
         return xen_api_success(XendDomain.instance().get_domain_refs())
     def host_get_host_CPUs(self, session, host_ref):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
+    def host_get_metrics(self, _, ref):
+        return xen_api_success(XendNode.instance().host_metrics_uuid)
 
     # object methods
     def host_destroy(self, session, host_ref):
@@ -645,6 +660,7 @@ class XendAPI(object):
         if not XendDomain.instance().allow_new_domains():
             return xen_api_error(XEND_ERROR_HOST_RUNNING)
         return xen_api_error(XEND_ERROR_UNSUPPORTED)        
+
     def host_get_record(self, session, host_ref):
         node = XendNode.instance()
         dom = XendDomain.instance()
@@ -653,7 +669,8 @@ class XendAPI(object):
                   'name_description': '',
                   'software_version': node.xen_version(),
                   'resident_VMs': dom.get_domain_refs(),
-                  'host_CPUs': node.get_host_cpu_refs()}
+                  'host_CPUs': node.get_host_cpu_refs(),
+                  'metrics': node.host_metrics_uuid}
         return xen_api_success(record)
 
     # class methods
@@ -667,7 +684,7 @@ class XendAPI(object):
         return xen_api_success([])
     
 
-    # Xen API: Class Host_CPU
+    # Xen API: Class host_CPU
     # ----------------------------------------------------------------
 
     host_cpu_attr_ro = ['host',
@@ -698,6 +715,44 @@ class XendAPI(object):
     # class methods
     def host_cpu_get_all(self, session):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
+
+
+    # Xen API: Class host_metrics
+    # ----------------------------------------------------------------
+
+    host_metrics_attr_ro = ['memory_total',
+                            'memory_free',
+                            'host']
+    host_metrics_attr_rw = []
+    host_methods = []
+
+    def _host_metrics_get(self, ref, f):
+        return xen_api_success(getattr(node, f)())
+
+    def host_metrics_get_record(self, _, ref):
+        return xen_api_success({
+            'uuid'         : ref,
+            'host'         : XendNode.instance().uuid,
+            'memory_total' : self._host_metrics_get_memory_total(),
+            'memory_free'  : self._host_metrics_get_memory_free(),
+            })
+
+    def host_metrics_get_host(self, _, ref):
+        return xen_api_success(XendNode.instance().uuid)
+
+    def host_metrics_get_memory_total(self, _, ref):
+        return xen_api_success(self._host_metrics_get_memory_total())
+
+    def host_metrics_get_memory_free(self, _, ref):
+        return xen_api_success(self._host_metrics_get_memory_free())
+
+    def _host_metrics_get_memory_total(self):
+        node = XendNode.instance()
+        return node.xc.physinfo()['total_memory'] * 1024
+
+    def _host_metrics_get_memory_free(self):
+        node = XendNode.instance()
+        return node.xc.physinfo()['free_memory'] * 1024
 
 
     # Xen API: Class network

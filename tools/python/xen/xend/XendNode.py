@@ -40,10 +40,12 @@ class XendNode:
     def __init__(self):
         """Initalises the state of all host specific objects such as
 
-        * Host
-        * Host_CPU
+        * host
+        * host_CPU
+        * host_metrics
         * PIF
-        * Network
+        * PIF_metrics
+        * network
         * Storage Repository
         """
         
@@ -59,6 +61,8 @@ class XendNode:
             host = saved_host[self.uuid]
             self.name = host.get('name_label', socket.gethostname())
             self.desc = host.get('name_description', '')
+            self.host_metrics_uuid = host.get('metrics_uuid',
+                                              uuid.createString())
             try:
                 self.other_config = eval(host['other_config'])
             except:
@@ -229,6 +233,7 @@ class XendNode:
         # save state
         host_record = {self.uuid: {'name_label':self.name,
                                    'name_description':self.desc,
+                                   'metrics_uuid': self.host_metrics_uuid,
                                    'other_config': repr(self.other_config)}}
         self.state_store.save_state('host',host_record)
         self.state_store.save_state('cpu', self.cpus)

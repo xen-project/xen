@@ -26,6 +26,7 @@ Name & Description \\
 {\tt task} & A long-running asynchronous task \\
 {\tt VM} & A virtual machine (or 'guest') \\
 {\tt host} & A physical host \\
+{\tt host\_metrics} & The metrics associated with a host \\
 {\tt host\_cpu} & A physical CPU \\
 {\tt network} & A virtual network \\
 {\tt VIF} & A virtual network interface \\
@@ -57,6 +58,7 @@ VBD.VM & VM.VBDs & one-to-many\\
 crashdump.VM & VM.crash\_dumps & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
+host.metrics & host\_metrics.host & one-to-one\\
 PIF.metrics & PIF\_metrics.PIF & one-to-one\\
 PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
@@ -3835,6 +3837,7 @@ $\mathit{RW}$ &  {\tt suspend\_image\_sr} & SR ref & The SR in which VDIs for su
 $\mathit{RW}$ &  {\tt crash\_dump\_sr} & SR ref & The SR in which VDIs for crash dumps are created \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: host}
@@ -4720,6 +4723,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_metrics}
+
+{\bf Overview:} 
+Get the metrics field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host_metrics ref) get_metrics (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host\_metrics ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
@@ -4877,6 +4912,218 @@ Get all the host instances with the given label.
 
 
 references to objects with match names
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: host\_metrics}
+\subsection{Fields for class: host\_metrics}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf host\_metrics} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The metrics associated with a host.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & Host to which these metrics apply \\
+$\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (bytes) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: host\_metrics}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_host}
+
+{\bf Overview:} 
+Get the host field of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host ref) get_host (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_memory\_total}
+
+{\bf Overview:} 
+Get the memory/total field of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_memory_total (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_memory\_free}
+
+{\bf Overview:} 
+Get the memory/free field of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_memory_free (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the host\_metrics instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host_metrics ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host\_metrics ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host_metrics record) get_record (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host\_metrics record
+}
+
+
+all fields from the object
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -10847,6 +11094,16 @@ The handle parameter echoes the bad value given.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{HOST\_METRICS\_HANDLE\_INVALID}
+
+You gave an invalid host\_metrics handle.  The host\_metrics may have
+recently been deleted.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HOST_METRICS_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{INTERNAL\_ERROR}

@@ -23,6 +23,7 @@
 #include "xen_common.h"
 #include "xen_host.h"
 #include "xen_host_cpu.h"
+#include "xen_host_metrics.h"
 #include "xen_internal.h"
 #include "xen_pbd.h"
 #include "xen_pif.h"
@@ -77,7 +78,10 @@ static const struct_member xen_host_record_struct_members[] =
           .offset = offsetof(xen_host_record, pbds) },
         { .key = "host_CPUs",
           .type = &abstract_type_ref_set,
-          .offset = offsetof(xen_host_record, host_cpus) }
+          .offset = offsetof(xen_host_record, host_cpus) },
+        { .key = "metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_host_record, metrics) }
     };
 
 const abstract_type xen_host_record_abstract_type_ =
@@ -110,6 +114,7 @@ xen_host_record_free(xen_host_record *record)
     xen_sr_record_opt_free(record->crash_dump_sr);
     xen_pbd_record_opt_set_free(record->pbds);
     xen_host_cpu_record_opt_set_free(record->host_cpus);
+    xen_host_metrics_record_opt_free(record->metrics);
     free(record);
 }
 
@@ -385,6 +390,23 @@ xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, x
 
     *result = NULL;
     XEN_CALL_("host.get_host_CPUs");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_metrics(xen_session *session, xen_host_metrics *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_metrics");
     return session->ok;
 }
 
