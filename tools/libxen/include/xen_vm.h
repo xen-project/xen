@@ -120,7 +120,6 @@ typedef struct xen_vm_record
     xen_int_float_map *vcpus_utilisation;
     enum xen_on_normal_exit actions_after_shutdown;
     enum xen_on_normal_exit actions_after_reboot;
-    enum xen_on_normal_exit actions_after_suspend;
     enum xen_on_crash_behaviour actions_after_crash;
     struct xen_console_record_opt_set *consoles;
     struct xen_vif_record_opt_set *vifs;
@@ -392,13 +391,6 @@ xen_vm_get_actions_after_reboot(xen_session *session, enum xen_on_normal_exit *r
 
 
 /**
- * Get the actions/after_suspend field of the given VM.
- */
-extern bool
-xen_vm_get_actions_after_suspend(xen_session *session, enum xen_on_normal_exit *result, xen_vm vm);
-
-
-/**
  * Get the actions/after_crash field of the given VM.
  */
 extern bool
@@ -613,13 +605,6 @@ xen_vm_set_actions_after_shutdown(xen_session *session, xen_vm vm, enum xen_on_n
  */
 extern bool
 xen_vm_set_actions_after_reboot(xen_session *session, xen_vm vm, enum xen_on_normal_exit after_reboot);
-
-
-/**
- * Set the actions/after_suspend field of the given VM.
- */
-extern bool
-xen_vm_set_actions_after_suspend(xen_session *session, xen_vm vm, enum xen_on_normal_exit after_suspend);
 
 
 /**

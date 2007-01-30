@@ -1034,7 +1034,6 @@ $\mathit{RW}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RW}$ &  {\tt actions/after\_shutdown} & on\_normal\_exit & action to take after the guest has shutdown itself \\
 $\mathit{RW}$ &  {\tt actions/after\_reboot} & on\_normal\_exit & action to take after the guest has rebooted itself \\
-$\mathit{RW}$ &  {\tt actions/after\_suspend} & on\_normal\_exit & action to take after the guest has suspended itself \\
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
 $\mathit{RO}_\mathit{run}$ &  {\tt consoles} & (console ref) Set & virtual console devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
@@ -2431,72 +2430,6 @@ Set the actions/after\_reboot field of the given VM.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void set_actions_after_reboot (session_id s, VM ref self, on_normal_exit value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt on\_normal\_exit } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_actions\_after\_suspend}
-
-{\bf Overview:} 
-Get the actions/after\_suspend field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (on_normal_exit) get_actions_after_suspend (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-on\_normal\_exit
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_actions\_after\_suspend}
-
-{\bf Overview:} 
-Set the actions/after\_suspend field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_actions_after_suspend (session_id s, VM ref self, on_normal_exit value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}

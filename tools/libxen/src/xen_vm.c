@@ -103,9 +103,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "actions_after_reboot",
           .type = &xen_on_normal_exit_abstract_type_,
           .offset = offsetof(xen_vm_record, actions_after_reboot) },
-        { .key = "actions_after_suspend",
-          .type = &xen_on_normal_exit_abstract_type_,
-          .offset = offsetof(xen_vm_record, actions_after_suspend) },
         { .key = "actions_after_crash",
           .type = &xen_on_crash_behaviour_abstract_type_,
           .offset = offsetof(xen_vm_record, actions_after_crash) },
@@ -583,21 +580,6 @@ xen_vm_get_actions_after_reboot(xen_session *session, enum xen_on_normal_exit *r
 
     abstract_type result_type = xen_on_normal_exit_abstract_type_;
     XEN_CALL_("VM.get_actions_after_reboot");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_actions_after_suspend(xen_session *session, enum xen_on_normal_exit *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = xen_on_normal_exit_abstract_type_;
-    XEN_CALL_("VM.get_actions_after_suspend");
     return session->ok;
 }
 
@@ -1107,22 +1089,6 @@ xen_vm_set_actions_after_reboot(xen_session *session, xen_vm vm, enum xen_on_nor
         };
 
     xen_call_(session, "VM.set_actions_after_reboot", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_actions_after_suspend(xen_session *session, xen_vm vm, enum xen_on_normal_exit after_suspend)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_on_normal_exit_abstract_type_,
-              .u.string_val = xen_on_normal_exit_to_string(after_suspend) }
-        };
-
-    xen_call_(session, "VM.set_actions_after_suspend", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
