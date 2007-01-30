@@ -836,14 +836,16 @@ static int lapic_load(hvm_domain_context_t *h, void *opaque, int version_id)
     tmict = vlapic_get_reg(s, APIC_TMICT);
     if (tmict > 0) {
         uint64_t period = APIC_BUS_CYCLE_NS * (uint32_t)tmict * s->hw.timer_divisor;
+        uint32_t lvtt = vlapic_get_reg(s, APIC_LVTT);
 
+        s->pt.irq = lvtt & APIC_VECTOR_MASK;
         create_periodic_time(v, &s->pt, period, s->pt.irq,
                              vlapic_lvtt_period(s), NULL, s);
 
         printk("lapic_load to rearm the actimer:"
                     "bus cycle is %uns, "
-                    "saved tmict count %lu, period %"PRIu64"ns\n",
-                    APIC_BUS_CYCLE_NS, tmict, period);
+                    "saved tmict count %lu, period %"PRIu64"ns, irq=%"PRIu8"\n",
+                    APIC_BUS_CYCLE_NS, tmict, period, s->pt.irq);
 
     }
 
