@@ -652,15 +652,11 @@ class XendAPI(object):
 
     host_cpu_attr_ro = ['host',
                         'number',
-                        'features',
                         'utilisation']
 
     # attributes
     def host_cpu_get_host(self, session, host_cpu_ref):
         return xen_api_success(XendNode.instance().uuid)
-    def host_cpu_get_features(self, session, host_cpu_ref):
-        features = XendNode.instance().get_host_cpu_features(host_cpu_ref)
-        return xen_api_success(features)
     def host_cpu_get_utilisation(self, session, host_cpu_ref):
         util = XendNode.instance().get_host_cpu_load(host_cpu_ref)
         return xen_api_success(util)
@@ -676,7 +672,6 @@ class XendAPI(object):
         record = {'uuid': host_cpu_ref,
                   'host': node.uuid,
                   'number': node.get_host_cpu_number(host_cpu_ref),
-                  'features': node.get_host_cpu_features(host_cpu_ref),
                   'utilisation': node.get_host_cpu_load(host_cpu_ref)}
         return xen_api_success(record)
 
@@ -860,8 +855,6 @@ class XendAPI(object):
                   'memory_static_min',
                   'VCPUs_number',
                   'VCPUs_utilisation',
-                  'VCPUs_features_required',
-                  'VCPUs_can_use',
                   'consoles',
                   'VIFs',
                   'VBDs',
@@ -879,8 +872,6 @@ class XendAPI(object):
                   'memory_dynamic_min',
                   'VCPUs_policy',
                   'VCPUs_params',
-                  'VCPUs_features_force_on',
-                  'VCPUs_features_force_off',
                   'actions_after_shutdown',
                   'actions_after_reboot',
                   'actions_after_suspend',
@@ -927,10 +918,6 @@ class XendAPI(object):
         'memory_static_min',
         'VCPUs_policy',
         'VCPUs_params',
-        'VCPUs_features_required',
-        'VCPUs_features_can_use',
-        'VCPUs_features_force_on',
-        'VCPUs_features_force_off',
         'actions_after_shutdown',
         'actions_after_reboot',
         'actions_after_suspend',
@@ -990,14 +977,6 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vcpus_util())
     
-    def VM_get_VCPUs_features_required(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # unsupported by xc
-    
-    def VM_get_VCPUs_can_use(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # unsupported by xc
-    
     def VM_get_VIFs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vifs())
@@ -1054,14 +1033,6 @@ class XendAPI(object):
     def VM_get_VCPUs_params(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo() # need access to scheduler
-    
-    def VM_get_VCPUs_features_force_on(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
-    
-    def VM_get_VCPUs_features_force_off(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
     
     def VM_get_actions_after_shutdown(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1154,14 +1125,6 @@ class XendAPI(object):
         return xen_api_todo()
     
     def VM_set_VCPUs_params(self, session, vm_ref, params):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
-    
-    def VM_set_VCPUs_features_force_on(self, session, vm_ref, features):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
-    
-    def VM_set_VCPUs_features_force_off(self, session, vm_ref, features):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
@@ -1280,10 +1243,6 @@ class XendAPI(object):
             'VCPUs_params': xeninfo.get_vcpus_params(),
             'VCPUs_number': xeninfo.getVCpuCount(),
             'VCPUs_utilisation': xeninfo.get_vcpus_util(),
-            'VCPUs_features_required': [],
-            'VCPUs_features_can_use': [],
-            'VCPUs_features_force_on': [],
-            'VCPUs_features_force_off': [],
             'actions_after_shutdown': xeninfo.get_on_shutdown(),
             'actions_after_reboot': xeninfo.get_on_reboot(),
             'actions_after_suspend': xeninfo.get_on_suspend(),

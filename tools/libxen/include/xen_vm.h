@@ -21,7 +21,6 @@
 
 #include "xen_common.h"
 #include "xen_console_decl.h"
-#include "xen_cpu_feature.h"
 #include "xen_host_decl.h"
 #include "xen_int_float_map.h"
 #include "xen_on_crash_behaviour.h"
@@ -119,10 +118,6 @@ typedef struct xen_vm_record
     char *vcpus_params;
     int64_t vcpus_number;
     xen_int_float_map *vcpus_utilisation;
-    struct xen_cpu_feature_set *vcpus_features_required;
-    struct xen_cpu_feature_set *vcpus_features_can_use;
-    struct xen_cpu_feature_set *vcpus_features_force_on;
-    struct xen_cpu_feature_set *vcpus_features_force_off;
     enum xen_on_normal_exit actions_after_shutdown;
     enum xen_on_normal_exit actions_after_reboot;
     enum xen_on_normal_exit actions_after_suspend;
@@ -383,34 +378,6 @@ xen_vm_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, x
 
 
 /**
- * Get the VCPUs/features/required field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_features_required(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm);
-
-
-/**
- * Get the VCPUs/features/can_use field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_features_can_use(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm);
-
-
-/**
- * Get the VCPUs/features/force_on field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_features_force_on(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm);
-
-
-/**
- * Get the VCPUs/features/force_off field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_features_force_off(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm);
-
-
-/**
  * Get the actions/after_shutdown field of the given VM.
  */
 extern bool
@@ -632,52 +599,6 @@ xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params);
  */
 extern bool
 xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number);
-
-
-/**
- * Set the VCPUs/features/force_on field of the given VM.
- */
-extern bool
-xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_on);
-
-
-/**
- * Add the given value to the VCPUs/features/force_on field of the
- * given VM.  If the value is already in that Set, then do nothing.
- */
-extern bool
-xen_vm_add_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
-
-
-/**
- * Remove the given value from the VCPUs/features/force_on field of the
- * given VM.  If the value is not in that Set, then do nothing.
- */
-extern bool
-xen_vm_remove_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
-
-
-/**
- * Set the VCPUs/features/force_off field of the given VM.
- */
-extern bool
-xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_off);
-
-
-/**
- * Add the given value to the VCPUs/features/force_off field of the
- * given VM.  If the value is already in that Set, then do nothing.
- */
-extern bool
-xen_vm_add_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
-
-
-/**
- * Remove the given value from the VCPUs/features/force_off field of
- * the given VM.  If the value is not in that Set, then do nothing.
- */
-extern bool
-xen_vm_remove_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value);
 
 
 /**

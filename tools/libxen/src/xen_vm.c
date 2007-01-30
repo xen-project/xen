@@ -22,8 +22,6 @@
 
 #include "xen_common.h"
 #include "xen_console.h"
-#include "xen_cpu_feature.h"
-#include "xen_cpu_feature_internal.h"
 #include "xen_host.h"
 #include "xen_int_float_map.h"
 #include "xen_internal.h"
@@ -99,18 +97,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "VCPUs_utilisation",
           .type = &abstract_type_int_float_map,
           .offset = offsetof(xen_vm_record, vcpus_utilisation) },
-        { .key = "VCPUs_features_required",
-          .type = &xen_cpu_feature_set_abstract_type_,
-          .offset = offsetof(xen_vm_record, vcpus_features_required) },
-        { .key = "VCPUs_features_can_use",
-          .type = &xen_cpu_feature_set_abstract_type_,
-          .offset = offsetof(xen_vm_record, vcpus_features_can_use) },
-        { .key = "VCPUs_features_force_on",
-          .type = &xen_cpu_feature_set_abstract_type_,
-          .offset = offsetof(xen_vm_record, vcpus_features_force_on) },
-        { .key = "VCPUs_features_force_off",
-          .type = &xen_cpu_feature_set_abstract_type_,
-          .offset = offsetof(xen_vm_record, vcpus_features_force_off) },
         { .key = "actions_after_shutdown",
           .type = &xen_on_normal_exit_abstract_type_,
           .offset = offsetof(xen_vm_record, actions_after_shutdown) },
@@ -204,10 +190,6 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->vcpus_policy);
     free(record->vcpus_params);
     xen_int_float_map_free(record->vcpus_utilisation);
-    xen_cpu_feature_set_free(record->vcpus_features_required);
-    xen_cpu_feature_set_free(record->vcpus_features_can_use);
-    xen_cpu_feature_set_free(record->vcpus_features_force_on);
-    xen_cpu_feature_set_free(record->vcpus_features_force_off);
     xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
@@ -571,74 +553,6 @@ xen_vm_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, x
 
     *result = NULL;
     XEN_CALL_("VM.get_VCPUs_utilisation");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_features_required(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = xen_cpu_feature_set_abstract_type_;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_features_required");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_features_can_use(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = xen_cpu_feature_set_abstract_type_;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_features_can_use");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_features_force_on(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = xen_cpu_feature_set_abstract_type_;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_features_force_on");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_features_force_off(xen_session *session, struct xen_cpu_feature_set **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = xen_cpu_feature_set_abstract_type_;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_features_force_off");
     return session->ok;
 }
 
@@ -1161,102 +1075,6 @@ xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number)
         };
 
     xen_call_(session, "VM.set_VCPUs_number", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_vcpus_features_force_on(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_on)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_cpu_feature_set_abstract_type_,
-              .u.set_val = (arbitrary_set *)force_on }
-        };
-
-    xen_call_(session, "VM.set_VCPUs_features_force_on", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_add_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_cpu_feature_abstract_type_,
-              .u.string_val = xen_cpu_feature_to_string(value) }
-        };
-
-    xen_call_(session, "VM.add_VCPUs_features_force_on", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_remove_vcpus_features_force_on(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_cpu_feature_abstract_type_,
-              .u.string_val = xen_cpu_feature_to_string(value) }
-        };
-
-    xen_call_(session, "VM.remove_VCPUs_features_force_on", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_vcpus_features_force_off(xen_session *session, xen_vm vm, struct xen_cpu_feature_set *force_off)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_cpu_feature_set_abstract_type_,
-              .u.set_val = (arbitrary_set *)force_off }
-        };
-
-    xen_call_(session, "VM.set_VCPUs_features_force_off", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_add_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_cpu_feature_abstract_type_,
-              .u.string_val = xen_cpu_feature_to_string(value) }
-        };
-
-    xen_call_(session, "VM.add_VCPUs_features_force_off", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_remove_vcpus_features_force_off(xen_session *session, xen_vm vm, enum xen_cpu_feature value)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &xen_cpu_feature_abstract_type_,
-              .u.string_val = xen_cpu_feature_to_string(value) }
-        };
-
-    xen_call_(session, "VM.remove_VCPUs_features_force_off", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
