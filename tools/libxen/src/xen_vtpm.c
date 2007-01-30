@@ -47,9 +47,6 @@ static const struct_member xen_vtpm_record_struct_members[] =
         { .key = "backend",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_vtpm_record, backend) },
-        { .key = "instance",
-          .type = &abstract_type_int,
-          .offset = offsetof(xen_vtpm_record, instance) }
     };
 
 const abstract_type xen_vtpm_record_abstract_type_ =
@@ -178,22 +175,6 @@ xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm)
 
     *result = NULL;
     XEN_CALL_("VTPM.get_backend");
-    return session->ok;
-}
-
-
-bool
-xen_vtpm_get_instance(xen_session *session, int64_t *result, xen_vtpm vtpm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vtpm }
-        };
-
-    abstract_type result_type = abstract_type_int;
-
-    XEN_CALL_("VTPM.get_instance");
     return session->ok;
 }
 

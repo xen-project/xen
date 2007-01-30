@@ -2125,7 +2125,10 @@ class XendDomainInfo:
                 config['mode'] = 'RW'
 
         if dev_class == 'vtpm':
-            config['driver'] = 'paravirtualised' # TODO
+            if not config.has_type('type'):
+                config['type'] = 'paravirtualised' # TODO
+            if not config.has_key('backend'):
+                config['backend'] = "00000000-0000-0000-0000-000000000000"
 
         return config
 

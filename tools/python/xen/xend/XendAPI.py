@@ -1735,8 +1735,7 @@ class XendAPI(object):
 
     VTPM_attr_rw = [ ]
     VTPM_attr_ro = ['VM',
-                    'backend',
-                    'instance']
+                    'backend']
 
     VTPM_attr_inst = VTPM_attr_rw
 
@@ -1753,27 +1752,14 @@ class XendAPI(object):
             return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
         valid_vtpm_keys = self.VTPM_attr_ro + self.VTPM_attr_rw + \
                           self.Base_attr_ro + self.Base_attr_rw
+        return_cfg = {}
         for k in cfg.keys():
-            if k not in valid_vtpm_keys:
-                del cfg[k]
+            if k in valid_vtpm_keys:
+                return_cfg[k] = cfg[k]
 
-        return xen_api_success(cfg)
+        return xen_api_success(return_cfg)
 
     # Class Functions
-    def VTPM_get_instance(self, session, vtpm_ref):
-        xendom = XendDomain.instance()
-        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
-        if not vm:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-        cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
-        if not cfg:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-        if cfg.has_key('instance'):
-            instance = cfg['instance']
-        else:
-            instance = -1
-        return xen_api_success(instance)
-
     def VTPM_get_backend(self, session, vtpm_ref):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
@@ -1782,11 +1768,9 @@ class XendAPI(object):
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
             return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-        if cfg.has_key('backend'):
-            backend = cfg['backend']
-        else:
-            backend = "Domain-0"
-        return xen_api_success(backend)
+        if not cfg.has_key('backend'):
+            return xen_api_error(['VTPM backend not set'])
+        return xen_api_success(cfg['backend'])
 
     def VTPM_get_VM(self, session, vtpm_ref):
         xendom = XendDomain.instance()
@@ -1795,12 +1779,18 @@ class XendAPI(object):
 
     def VTPM_destroy(self, session, vtpm_ref):
         xendom = XendDomain.instance()
-        vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
-        if not vm:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
-
-        vm.destroy_vtpm(vtpm_ref)
-        return xen_api_success_void()    
+        dom = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
+        if dom:
+            if dom.state != XEN_API_VM_POWER_STATE_HALTED:
+                vm_ref = dom.get_dev_property('vtpm', vtpm_ref, 'VM')
+                return xen_api_error(['VM_BAD_POWER_STATE', vm_ref,
+                 XendDomain.POWER_STATE_NAMES[XEN_API_VM_POWER_STATE_HALTED],
+                 XendDomain.POWER_STATE_NAMES[dom.state]])
+            from xen.xend.server import tpmif
+            tpmif.destroy_vtpmstate(dom.getName())
+            return xen_api_success(True)
+        else:
+            return xen_api_error(['VM_HANDLE_INVALID', vtpm_struct['VM']])
 
     # class methods
     def VTPM_create(self, session, vtpm_struct):

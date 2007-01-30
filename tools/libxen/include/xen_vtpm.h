@@ -196,12 +196,4 @@ xen_vtpm_get_vm(xen_session *session, xen_vm *result, xen_vtpm vtpm);
 extern bool
 xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm);
 
-
-/**
- * Get the instance field of the given VTPM.
- */
-extern bool
-xen_vtpm_get_instance(xen_session *session, int64_t *result, xen_vtpm vtpm);
-
-
 #endif
