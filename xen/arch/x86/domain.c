@@ -1412,7 +1412,13 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
                 put_page_and_type(mfn_to_page(pfn));
         }
 
-        v->arch.guest_table = pagetable_null();
+        if ( is_hvm_vcpu(v) )
+            v->arch.guest_table = pagetable_null();
+        else
+            l4e_write(
+                (l4_pgentry_t *) __va(pagetable_get_paddr(v->arch.guest_table)),
+                l4e_empty());
+
         v->arch.cr3 = 0;
         return;
     }
