@@ -941,6 +941,7 @@ class XendAPI(object):
                   'VTPMs',
                   'PCI_bus',
                   'tools_version',
+                  'is_control_domain',
                   ]
                   
     VM_attr_rw = ['name_label',
@@ -1175,6 +1176,11 @@ class XendAPI(object):
     def VM_get_other_config(self, session, vm_ref):
         return self.VM_get('otherconfig', session, vm_ref)        
 
+    def VM_get_is_control_domain(self, session, vm_ref):
+        xd = XendDomain.instance()
+        return xen_api_success(
+            xd.get_vm_by_uuid(vm_ref) == xd.privilegedDomain())
+
     def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.setName(label)
@@ -1346,6 +1352,7 @@ class XendAPI(object):
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
             'other_config': xeninfo.info.get('otherconfig'),
+            'is_control_domain': xeninfo == xendom.privilegedDomain(),
         }
         return xen_api_success(record)
 

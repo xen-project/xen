@@ -167,7 +167,10 @@ static const struct_member xen_vm_record_struct_members[] =
           .offset = offsetof(xen_vm_record, tools_version) },
         { .key = "other_config",
           .type = &abstract_type_string_string_map,
-          .offset = offsetof(xen_vm_record, other_config) }
+          .offset = offsetof(xen_vm_record, other_config) },
+        { .key = "is_control_domain",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vm_record, is_control_domain) }
     };
 
 const abstract_type xen_vm_record_abstract_type_ =
@@ -941,6 +944,22 @@ xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xe
 
     *result = NULL;
     XEN_CALL_("VM.get_other_config");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_is_control_domain(xen_session *session, bool *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VM.get_is_control_domain");
     return session->ok;
 }
 

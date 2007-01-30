@@ -143,6 +143,7 @@ typedef struct xen_vm_record
     char *pci_bus;
     xen_string_string_map *tools_version;
     xen_string_string_map *other_config;
+    bool is_control_domain;
 } xen_vm_record;
 
 /**
@@ -539,6 +540,13 @@ xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, x
  */
 extern bool
 xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xen_vm vm);
+
+
+/**
+ * Get the is_control_domain field of the given VM.
+ */
+extern bool
+xen_vm_get_is_control_domain(xen_session *session, bool *result, xen_vm vm);
 
 
 /**
