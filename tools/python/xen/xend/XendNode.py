@@ -74,6 +74,7 @@ class XendNode:
             self.desc = ''
             self.other_config = {}
             self.cpus = {}
+            self.host_metrics_uuid = uuid.createString()
             
         # load CPU UUIDs
         saved_cpus = self.state_store.load_state('cpu')
