@@ -561,29 +561,6 @@ int scnprintf(char * buf, size_t size, const char *fmt, ...)
 }
 EXPORT_SYMBOL(scnprintf);
 
-/**
- * sprintf - Format a string and place it in a buffer
- * @buf: The buffer to place the result into
- * @fmt: The format string to use
- * @...: Arguments for the format string
- *
- * The function returns the number of characters written
- * into @buf. Use snprintf or scnprintf in order to avoid
- * buffer overflows.
- */
-int sprintf(char * buf, const char *fmt, ...)
-{
-    va_list args;
-    int i;
-
-    va_start(args, fmt);
-    i=vsnprintf(buf, INT_MAX, fmt, args);
-    va_end(args);
-    return i;
-}
-
-EXPORT_SYMBOL(sprintf);
-
 /*
  * Local variables:
  * mode: C
