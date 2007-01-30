@@ -14,12 +14,8 @@ clean:
 	rm -f *.pyc *.o *~
 
 check-headers: checker
-ifeq ($(CROSS_COMPILE),)
 	./checker > $(XEN_TARGET_ARCH).size
 	diff -u reference.size $(XEN_TARGET_ARCH).size
-else
-	@echo "cross build: skipping check"
-endif
 
 x86_32.h: ../arch-x86/xen-x86_32.h ../arch-x86/xen.h ../xen.h $(scripts)
 	python mkheader.py $* $@ $(filter %.h,$^)
