@@ -551,10 +551,10 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
     int major = xen_major_version();
     int minor = xen_minor_version();
 
-    p += sprintf(p,"xen-%d.%d-ia64 ", major, minor);
+    p += snprintf(p,sizeof(info), "xen-%d.%d-ia64 ", major, minor);
 
     if (vmx_enabled)
-        p += sprintf(p,"hvm-%d.%d-ia64 ", major, minor);
+        p += snprintf(p,sizeof(info) - (p - info),"hvm-%d.%d-ia64 ", major, minor);
 
     *(p-1) = 0;
 

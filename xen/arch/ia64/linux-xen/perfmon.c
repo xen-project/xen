@@ -2305,7 +2305,7 @@ pfm_alloc_fd(struct file **cfile)
 	inode->i_uid  = current->fsuid;
 	inode->i_gid  = current->fsgid;
 
-	sprintf(name, "[%lu]", inode->i_ino);
+	snprintf(name, sizeof(name), "[%lu]", inode->i_ino);
 	this.name = name;
 	this.len  = strlen(name);
 	this.hash = inode->i_ino;

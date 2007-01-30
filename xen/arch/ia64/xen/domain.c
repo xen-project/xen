@@ -1124,7 +1124,7 @@ int construct_dom0(struct domain *d,
 		panic("can't allocate start info page");
 	si = page_to_virt(start_info_page);
 	memset(si, 0, PAGE_SIZE);
-	sprintf(si->magic, "xen-%i.%i-ia64",
+	snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-ia64",
 		xen_major_version(), xen_minor_version());
 	si->nr_pages     = max_pages;
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;

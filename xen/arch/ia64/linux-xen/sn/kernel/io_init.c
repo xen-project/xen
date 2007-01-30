@@ -754,7 +754,7 @@ void sn_generate_path(struct pci_bus *pci_bus, char *address)
 	geoid = cnodeid_get_geoid(cnode);
 	moduleid = geo_module(geoid);
 
-	sprintf(address, "module_%c%c%c%c%.2d",
+	snprintf(address, 15, "module_%c%c%c%c%.2d",
 		'0'+RACK_GET_CLASS(MODULE_GET_RACK(moduleid)),
 		'0'+RACK_GET_GROUP(MODULE_GET_RACK(moduleid)),
 		'0'+RACK_GET_NUM(MODULE_GET_RACK(moduleid)),
@@ -764,7 +764,7 @@ void sn_generate_path(struct pci_bus *pci_bus, char *address)
 	bricktype = MODULE_GET_BTYPE(moduleid);
 	if ((bricktype == L1_BRICKTYPE_191010) ||
 	    (bricktype == L1_BRICKTYPE_1932))
-			sprintf(address, "%s^%d", address, geo_slot(geoid));
+			snprintf(address, 15+8, "%s^%d", address, geo_slot(geoid));
 }
 #endif
 

@@ -550,7 +550,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 	switch (c->family) {
 	      case 0x07:	memcpy(family, "Itanium", 8); break;
 	      case 0x1f:	memcpy(family, "Itanium 2", 10); break;
-	      default:		sprintf(family, "%u", c->family); break;
+	      default:		snprintf(family, sizeof(family), "%u", c->family); break;
 	}
 
 	/* build the feature string: */
@@ -572,7 +572,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 		/* print unknown features as a hex value: */
 		if (sep)
 			*cp++ = sep;
-		sprintf(cp, " 0x%lx", mask);
+		snprintf(cp, sizeof(features) - (cp - features), " 0x%lx", mask);
 	}
 
 	seq_printf(m,

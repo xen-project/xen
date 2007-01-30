@@ -185,7 +185,7 @@ int construct_dom0(struct domain *d,
     si = (start_info_t *)(rma_addr(&d->arch, RMA_START_INFO) + rma);
     printk("xen_start_info: %p\n", si);
 
-    sprintf(si->magic, "xen-%i.%i-powerpc%d%s",
+    snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-powerpc%d%s",
             xen_major_version(), xen_minor_version(), BITS_PER_LONG, "HV");
     si->flags = SIF_PRIVILEGED | SIF_INITDOMAIN;
 
