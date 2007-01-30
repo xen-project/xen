@@ -72,6 +72,7 @@ typedef struct xen_host_record
     xen_string_string_map *software_version;
     xen_string_string_map *other_config;
     struct xen_vm_record_opt_set *resident_vms;
+    xen_string_string_map *logging;
     struct xen_pif_record_opt_set *pifs;
     struct xen_pbd_record_opt_set *pbds;
     struct xen_host_cpu_record_opt_set *host_cpus;
@@ -234,6 +235,13 @@ xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_
 
 
 /**
+ * Get the logging field of the given host.
+ */
+extern bool
+xen_host_get_logging(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
  * Get the PIFs field of the given host.
  */
 extern bool
@@ -290,6 +298,28 @@ xen_host_add_to_other_config(xen_session *session, xen_host host, char *key, cha
  */
 extern bool
 xen_host_remove_from_other_config(xen_session *session, xen_host host, char *key);
+
+
+/**
+ * Set the logging field of the given host.
+ */
+extern bool
+xen_host_set_logging(xen_session *session, xen_host host, xen_string_string_map *logging);
+
+
+/**
+ * Add the given key-value pair to the logging field of the given host.
+ */
+extern bool
+xen_host_add_to_logging(xen_session *session, xen_host host, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the logging
+ * field of the given host.  If the key is not in that Map, then do nothing.
+ */
+extern bool
+xen_host_remove_from_logging(xen_session *session, xen_host host, char *key);
 
 
 /**
