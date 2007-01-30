@@ -802,69 +802,53 @@ void __init __start_xen(multiboot_info_t *mbi)
 
 void arch_get_xen_caps(xen_capabilities_info_t info)
 {
-    char *p = info;
-    int i = 0;
     int major = xen_major_version();
     int minor = xen_minor_version();
+    char s[32];
+
+    info[0] = '\0';
 
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 
-    i = snprintf(p, sizeof(xen_capabilities_info_t),
-                 "xen-%d.%d-x86_32 ", major, minor);
-    p += i;
-    if ( hvm_enabled ) {
-        i = snprintf(p, sizeof(xen_capabilities_info_t) - i,
-		"hvm-%d.%d-x86_32 ", major, minor);
-	p += i;
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_32 ", major, minor);
+    safe_strcat(info, s);
+    if ( hvm_enabled )
+    {
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
+        safe_strcat(info, s);
     }
 
 #elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
 
-    i = snprintf(p, sizeof(xen_capabilities_info_t),
-                 "xen-%d.%d-x86_32p ", major, minor);
-    p += i;
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
+    safe_strcat(info, s);
     if ( hvm_enabled )
     {
-        i = snprintf(p, sizeof(xen_capabilities_info_t),
-                     "hvm-%d.%d-x86_32 ", major, minor);
-        p += i;
-        i = snprintf(p, sizeof(xen_capabilities_info_t) - i,
-                     "hvm-%d.%d-x86_32p ", major, minor);
-        p += i;
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
+        safe_strcat(info, s);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
+        safe_strcat(info, s);
     }
 
 #elif defined(CONFIG_X86_64)
 
-    i = snprintf(p, sizeof(xen_capabilities_info_t),
-                 "xen-%d.%d-x86_64 ", major, minor);
-    p += i;
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_64 ", major, minor);
+    safe_strcat(info, s);
 #ifdef CONFIG_COMPAT
-    i = snprintf(p, sizeof(xen_capabilities_info_t) - i,
-                "xen-%d.%d-x86_32p ", major, minor);
-    p += i;
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
+    safe_strcat(info, s);
 #endif
     if ( hvm_enabled )
     {
-        i = snprintf(p, sizeof(xen_capabilities_info_t) - i,
-                     "hvm-%d.%d-x86_32 ", major, minor);
-        p += i;
-        i = snprintf(p, sizeof(xen_capabilities_info_t) - i,
-                     "hvm-%d.%d-x86_32p ", major, minor);
-        p += i;
-        i = snprintf(p, sizeof(xen_capabilities_info_t) - i,
-                     "hvm-%d.%d-x86_64 ", major, minor);
-        p += i;
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
+        safe_strcat(info, s);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
+        safe_strcat(info, s);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_64 ", major, minor);
+        safe_strcat(info, s);
     }
 
-#else
-
-    p++;
-
 #endif
-
-    *(p-1) = 0;
-
-    BUG_ON((p - info) > sizeof(xen_capabilities_info_t));
 }
 
 /*

@@ -547,18 +547,19 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
 void arch_get_xen_caps(xen_capabilities_info_t info)
 {
-    char *p=info;
     int major = xen_major_version();
     int minor = xen_minor_version();
+    char s[32];
 
-    p += snprintf(p,sizeof(info), "xen-%d.%d-ia64 ", major, minor);
+    info[0] = '\0';
+
+    snprintf(s, sizeof(s), "xen-%d.%d-ia54 ", major, minor);
+    safe_strcat(info, s);
 
     if (vmx_enabled)
-        p += snprintf(p,sizeof(info) - (p - info),"hvm-%d.%d-ia64 ", major, minor);
-
-    *(p-1) = 0;
-
-    BUG_ON((p-info)>sizeof(xen_capabilities_info_t));
-
+    {
+        snprintf(s, sizeof(s), "hvm-%d.%d-ia64 ", major, minor);
+        safe_strcat(info, s);
+    }
 }
 
