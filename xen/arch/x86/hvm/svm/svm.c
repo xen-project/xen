@@ -2141,8 +2141,8 @@ static inline void svm_do_msr_access(
         switch (ecx)
         {
         case MSR_IA32_TIME_STAMP_COUNTER:
-            pt_reset(v);
             hvm_set_guest_time(v, msr_content);
+            pt_reset(v);
             break;
         case MSR_IA32_SYSENTER_CS:
             vmcb->sysenter_cs = msr_content;

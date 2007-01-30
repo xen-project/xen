@@ -2346,8 +2346,8 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
-        pt_reset(v);
         hvm_set_guest_time(v, msr_content);
+        pt_reset(v);
         break;
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
