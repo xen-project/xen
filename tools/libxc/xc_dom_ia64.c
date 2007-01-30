@@ -26,7 +26,11 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     /* allocate special pages */
     dom->console_pfn = dom->total_pages -1;
     dom->xenstore_pfn = dom->total_pages -2;
-    dom->start_info_pfn = dom->total_pages -3;
+
+    /*
+     * this is initialized by arch_setup_middle().
+     * dom->start_info_pfn = dom->total_pages -3;
+     */
     return 0;
 }
 
@@ -39,6 +43,7 @@ static int start_info_ia64(struct xc_dom_image *dom)
 
     xc_dom_printf("%s\n", __FUNCTION__);
 
+    memset(start_info, 0, sizeof(*start_info));
     sprintf(start_info->magic, dom->guest_type);
     start_info->flags = dom->flags;
     start_info->nr_pages = dom->total_pages;
@@ -54,12 +59,12 @@ static int start_info_ia64(struct xc_dom_image *dom)
 	bp->initrd_start = start_info->mod_start;
 	bp->initrd_size = start_info->mod_len;
     }
+    bp->command_line = (dom->start_info_pfn << PAGE_SHIFT_IA64)
+	    + offsetof(start_info_t, cmd_line);
     if (dom->cmdline)
     {
 	strncpy((char *)start_info->cmd_line, dom->cmdline, MAX_GUEST_CMDLINE);
 	start_info->cmd_line[MAX_GUEST_CMDLINE - 1] = '\0';
-	bp->command_line = (dom->start_info_pfn << PAGE_SHIFT_IA64)
-	    + offsetof(start_info_t, cmd_line);
     }
     return 0;
 }
