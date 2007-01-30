@@ -439,7 +439,7 @@ static int pit_load(hvm_domain_context_t *h, void *opaque, int version_id)
      * we hope the guest can handle it. */
 
     for(i = 0; i < 3; i++) {
-        pit_load_count(pit, i, pit_get_count(pit, i));
+        pit_load_count(pit, i, pit->hw.channels[i].count);
         pit->pt[i].last_plt_gtime = hvm_get_guest_time(d->vcpu[0]);
     }
 
