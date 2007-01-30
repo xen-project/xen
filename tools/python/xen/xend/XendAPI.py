@@ -497,7 +497,8 @@ class XendAPI(object):
         auth_manager().logout(session)
         return xen_api_success_void()
     def session_get_record(self, session):
-        record = {'this_host': XendNode.instance().uuid,
+        record = {'uuid'     : session,
+                  'this_host': XendNode.instance().uuid,
                   'this_user': auth_manager().get_user(session)}
         return xen_api_success(record)
     def session_get_all(self):
@@ -902,7 +903,8 @@ class XendAPI(object):
     # Xen API: Class PIF_metrics
     # ----------------------------------------------------------------
 
-    PIF_metrics_attr_ro = ['io_read_kbs',
+    PIF_metrics_attr_ro = ['PIF',
+                           'io_read_kbs',
                            'io_write_kbs']
     PIF_metrics_attr_rw = []
     PIF_methods = []
@@ -912,6 +914,9 @@ class XendAPI(object):
 
     def PIF_metrics_get_record(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_record())
+
+    def PIF_metrics_get_PIF(self, _, ref):
+        return xen_api_success(self._PIF_metrics_get(ref).pif.uuid)
 
     def PIF_metrics_get_io_read_kbs(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_io_read_kbs())
