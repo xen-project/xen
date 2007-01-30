@@ -39,7 +39,7 @@ Bit32u tcpa_extend_acpi_log(entry_ptr)
     Bit32u entry_ptr;
 {
 	ASM_START
-	DoUpcall IDX_TCPA_EXTEND_ACPI_LOG
+	DoUpcall(IDX_TCPA_EXTEND_ACPI_LOG)
 	ASM_END
 }
 
@@ -52,7 +52,7 @@ Bit32u tcpa_extend_acpi_log(entry_ptr)
 tcpa_acpi_init()
 {
 	ASM_START
-	DoUpcall IDX_TCPA_ACPI_INIT
+	DoUpcall(IDX_TCPA_ACPI_INIT)
 	ASM_END
 }
 
@@ -64,7 +64,7 @@ tcpa_acpi_init()
 tcpa_calling_int19h()
 {
 	ASM_START
-	DoUpcall IDX_TCPA_CALLING_INT19H
+	DoUpcall(IDX_TCPA_CALLING_INT19H)
 	ASM_END
 }
 
@@ -75,7 +75,7 @@ tcpa_calling_int19h()
 tcpa_returned_int19h()
 {
 	ASM_START
-	DoUpcall IDX_TCPA_RETURNED_INT19H
+	DoUpcall(IDX_TCPA_RETURNED_INT19H)
 	ASM_END
 }
 
@@ -86,7 +86,7 @@ tcpa_returned_int19h()
 tcpa_add_event_separators()
 {
 	ASM_START
-	DoUpcall IDX_TCPA_ADD_EVENT_SEPARATORS
+	DoUpcall(IDX_TCPA_ADD_EVENT_SEPARATORS)
 	ASM_END
 }
 
@@ -98,7 +98,7 @@ tcpa_add_event_separators()
 tcpa_wake_event()
 {
 	ASM_START
-	DoUpcall IDX_TCPA_WAKE_EVENT
+	DoUpcall(IDX_TCPA_WAKE_EVENT)
 	ASM_END
 }
 
@@ -111,7 +111,7 @@ tcpa_wake_event()
 tcpa_start_option_rom_scan()
 {
 	ASM_START
-	DoUpcall IDX_TCPA_START_OPTION_ROM_SCAN
+	DoUpcall(IDX_TCPA_START_OPTION_ROM_SCAN)
 	ASM_END
 }
 
@@ -124,7 +124,7 @@ tcpa_option_rom(seg)
     Bit32u seg;
 {
 	ASM_START
-	DoUpcall IDX_TCPA_OPTION_ROM
+	DoUpcall(IDX_TCPA_OPTION_ROM)
 	ASM_END
 }
 
@@ -138,7 +138,7 @@ void
   Bit32u bootdrv;
 {
 	ASM_START
-	DoUpcall IDX_TCPA_ADD_BOOTDEVICE
+	DoUpcall(IDX_TCPA_ADD_BOOTDEVICE)
 	ASM_END
 }
 
@@ -154,7 +154,7 @@ tcpa_ipl(seg)
     Bit32u seg;
 {
 	ASM_START
-	DoUpcall IDX_TCPA_IPL
+	DoUpcall(IDX_TCPA_IPL)
 	ASM_END
 }
 
@@ -164,7 +164,7 @@ tcpa_initialize_tpm(physpres)
   Bit32u physpres;
 {
 	ASM_START
-	DoUpcall IDX_TCPA_INITIALIZE_TPM
+	DoUpcall(IDX_TCPA_INITIALIZE_TPM)
 	ASM_END
 }
 
@@ -174,7 +174,7 @@ tcpa_measure_post(from, to)
    Bit32u to;
 {
 	ASM_START
-	DoUpcall IDX_TCPA_MEASURE_POST
+	DoUpcall(IDX_TCPA_MEASURE_POST)
 	ASM_END
 }
 
@@ -194,12 +194,12 @@ tcpa_do_measure_POSTs()
 {
 	ASM_START
 
-	POST_MEASURE post, nmi
-	POST_MEASURE floppy_drive_post, hard_drive_post
-	POST_MEASURE hard_drive_post, ebda_post
-	POST_MEASURE ebda_post, eoi_jmp_post
-	POST_MEASURE eoi_jmp_post, timer_tick_post
-	POST_MEASURE timer_tick_post, int76_handler
+	POST_MEASURE(post, nmi)
+	POST_MEASURE(floppy_drive_post, hard_drive_post)
+	POST_MEASURE(hard_drive_post, ebda_post)
+	POST_MEASURE(ebda_post, eoi_jmp_post)
+	POST_MEASURE(eoi_jmp_post, timer_tick_post)
+	POST_MEASURE(timer_tick_post, int76_handler)
 
 	ret
 	ASM_END
@@ -213,7 +213,7 @@ TCGInterruptHandler(regs_ptr, es, ds, flags_ptr)
    Bit32u flags_ptr;
 {
 	ASM_START
-	DoUpcall IDX_TCGINTERRUPTHANDLER
+	DoUpcall(IDX_TCGINTERRUPTHANDLER)
 	ASM_END
 }
 
