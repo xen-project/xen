@@ -32,7 +32,7 @@ CFLAGS += $(CFLAGS-y)
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(XEN_OS)
+.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(XEN_OS) mk-foreign-headers
 
 mk-symlinks-SunOS:
 
@@ -43,7 +43,7 @@ mk-symlinks-Linux:
 	  ln -sf ../../$(LINUX_ROOT)/include/xen/public/*.h . )
 	( cd xen && rm -f sys && ln -sf linux sys )
 
-mk-symlinks-xen:
+mk-symlinks-xen: mk-foreign-headers
 	mkdir -p xen
 	( cd xen && ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
 	mkdir -p xen/hvm
@@ -54,5 +54,8 @@ mk-symlinks-xen:
 	( cd xen/arch-x86 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-x86/*.h . )
 	mkdir -p xen/foreign
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/*.h . )
+
+mk-foreign-headers:
+	make -C $(XEN_ROOT)/xen/include/public/foreign
 
 mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)

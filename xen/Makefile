@@ -22,7 +22,7 @@ build install debug clean distclean cscope TAGS tags MAP::
 _build: $(TARGET).gz
 
 .PHONY: _install
-_install: $(TARGET).gz
+_install: $(TARGET).gz build-headers
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
@@ -69,7 +69,7 @@ $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
 	mv $@.new $@
 
-$(TARGET): delete-unfresh-files
+$(TARGET): delete-unfresh-files build-headers
 	$(MAKE) -C tools
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/acm_policy.h
@@ -132,6 +132,11 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
 	  echo ""; \
 	  echo "#endif") <$< >$@
+
+# generate header files
+.PHONY: build-headers
+build-headers:
+	$(MAKE) -C include/public/foreign
 
 SUBDIRS = acm arch/$(TARGET_ARCH) common drivers 
 define all_sources
