@@ -581,12 +581,15 @@ class XendAPI(object):
                     'host_CPUs']
     
     host_attr_rw = ['name_label',
-                    'name_description']
+                    'name_description',
+                    'other_config']
 
     host_methods = [('disable', None),
                     ('enable', None),
                     ('reboot', None),
-                    ('shutdown', None)]
+                    ('shutdown', None),
+                    ('add_to_other_config', None),
+                    ('remove_from_other_config', None)]
     
     host_funcs = [('get_by_name_label', 'Set(host)')]
 
@@ -600,6 +603,23 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().description)
     def host_set_name_description(self, session, host_ref, new_desc):
         XendNode.instance().set_description(new_desc)
+        return xen_api_success_void()
+    def host_get_other_config(self, session, host_ref):
+        return xen_api_success(XendNode.instance().other_config)
+    def host_set_other_config(self, session, host_ref, other_config):
+        node = XendNode.instance()
+        node.other_config = dict(other_config)
+        node.save()
+        return xen_api_success_void()
+    def host_add_to_other_config(self, session, host_ref, key, value):
+        node = XendNode.instance()
+        node.other_config[key] = value
+        node.save()
+        return xen_api_success_void()
+    def host_remove_from_other_config(self, session, host_ref, key):
+        node = XendNode.instance()
+        del node.other_config[key]
+        node.save()
         return xen_api_success_void()
     def host_get_software_version(self, session, host_ref):
         return xen_api_success(XendNode.instance().xen_version())

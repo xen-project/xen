@@ -53,6 +53,9 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "software_version",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_host_record, software_version) },
+        { .key = "other_config",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_host_record, other_config) },
         { .key = "resident_VMs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, resident_vms) },
@@ -89,6 +92,7 @@ xen_host_record_free(xen_host_record *record)
     free(record->name_label);
     free(record->name_description);
     xen_string_string_map_free(record->software_version);
+    xen_string_string_map_free(record->other_config);
     xen_vm_record_opt_set_free(record->resident_vms);
     xen_pif_record_opt_set_free(record->pifs);
     xen_pbd_record_opt_set_free(record->pbds);
@@ -237,6 +241,23 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
 
 
 bool
+xen_host_get_other_config(xen_session *session, xen_string_string_map **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("host.get_other_config");
+    return session->ok;
+}
+
+
+bool
 xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_host host)
 {
     abstract_value param_values[] =
@@ -332,6 +353,56 @@ xen_host_set_name_description(xen_session *session, xen_host host, char *descrip
         };
 
     xen_call_(session, "host.set_name_description", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_other_config(xen_session *session, xen_host host, xen_string_string_map *other_config)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)other_config }
+        };
+
+    xen_call_(session, "host.set_other_config", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_add_to_other_config(xen_session *session, xen_host host, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "host.add_to_other_config", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_remove_from_other_config(xen_session *session, xen_host host, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "host.remove_from_other_config", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

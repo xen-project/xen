@@ -59,11 +59,16 @@ class XendNode:
             host = saved_host[self.uuid]
             self.name = host.get('name_label', socket.gethostname())
             self.desc = host.get('name_description', '')
+            try:
+                self.other_config = eval(host['other_config'])
+            except:
+                self.other_config = {}
             self.cpus = {}
         else:
             self.uuid = uuid.createString()
             self.name = socket.gethostname()
             self.desc = ''
+            self.other_config = {}
             self.cpus = {}
             
         # load CPU UUIDs
@@ -218,7 +223,8 @@ class XendNode:
     def save(self):
         # save state
         host_record = {self.uuid: {'name_label':self.name,
-                                   'name_description':self.desc}}
+                                   'name_description':self.desc,
+                                   'other_config': repr(self.other_config)}}
         self.state_store.save_state('host',host_record)
         self.state_store.save_state('cpu', self.cpus)
         self.save_PIFs()
