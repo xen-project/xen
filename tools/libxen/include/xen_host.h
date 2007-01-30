@@ -24,6 +24,7 @@
 #include "xen_host_decl.h"
 #include "xen_pbd_decl.h"
 #include "xen_pif_decl.h"
+#include "xen_sr_decl.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
@@ -74,6 +75,8 @@ typedef struct xen_host_record
     struct xen_vm_record_opt_set *resident_vms;
     xen_string_string_map *logging;
     struct xen_pif_record_opt_set *pifs;
+    struct xen_sr_record_opt *suspend_image_sr;
+    struct xen_sr_record_opt *crash_dump_sr;
     struct xen_pbd_record_opt_set *pbds;
     struct xen_host_cpu_record_opt_set *host_cpus;
 } xen_host_record;
@@ -249,6 +252,20 @@ xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host ho
 
 
 /**
+ * Get the suspend_image_sr field of the given host.
+ */
+extern bool
+xen_host_get_suspend_image_sr(xen_session *session, xen_sr *result, xen_host host);
+
+
+/**
+ * Get the crash_dump_sr field of the given host.
+ */
+extern bool
+xen_host_get_crash_dump_sr(xen_session *session, xen_sr *result, xen_host host);
+
+
+/**
  * Get the PBDs field of the given host.
  */
 extern bool
@@ -320,6 +337,20 @@ xen_host_add_to_logging(xen_session *session, xen_host host, char *key, char *va
  */
 extern bool
 xen_host_remove_from_logging(xen_session *session, xen_host host, char *key);
+
+
+/**
+ * Set the suspend_image_sr field of the given host.
+ */
+extern bool
+xen_host_set_suspend_image_sr(xen_session *session, xen_host host, xen_sr suspend_image_sr);
+
+
+/**
+ * Set the crash_dump_sr field of the given host.
+ */
+extern bool
+xen_host_set_crash_dump_sr(xen_session *session, xen_host host, xen_sr crash_dump_sr);
 
 
 /**

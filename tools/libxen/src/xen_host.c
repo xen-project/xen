@@ -26,6 +26,7 @@
 #include "xen_internal.h"
 #include "xen_pbd.h"
 #include "xen_pif.h"
+#include "xen_sr.h"
 #include "xen_string_string_map.h"
 #include "xen_vm.h"
 
@@ -65,6 +66,12 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "PIFs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, pifs) },
+        { .key = "suspend_image_sr",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_host_record, suspend_image_sr) },
+        { .key = "crash_dump_sr",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_host_record, crash_dump_sr) },
         { .key = "PBDs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, pbds) },
@@ -99,6 +106,8 @@ xen_host_record_free(xen_host_record *record)
     xen_vm_record_opt_set_free(record->resident_vms);
     xen_string_string_map_free(record->logging);
     xen_pif_record_opt_set_free(record->pifs);
+    xen_sr_record_opt_free(record->suspend_image_sr);
+    xen_sr_record_opt_free(record->crash_dump_sr);
     xen_pbd_record_opt_set_free(record->pbds);
     xen_host_cpu_record_opt_set_free(record->host_cpus);
     free(record);
@@ -313,6 +322,40 @@ xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host ho
 
 
 bool
+xen_host_get_suspend_image_sr(xen_session *session, xen_sr *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_suspend_image_sr");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_crash_dump_sr(xen_session *session, xen_sr *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_crash_dump_sr");
+    return session->ok;
+}
+
+
+bool
 xen_host_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_host host)
 {
     abstract_value param_values[] =
@@ -474,6 +517,38 @@ xen_host_remove_from_logging(xen_session *session, xen_host host, char *key)
         };
 
     xen_call_(session, "host.remove_from_logging", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_suspend_image_sr(xen_session *session, xen_host host, xen_sr suspend_image_sr)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = suspend_image_sr }
+        };
+
+    xen_call_(session, "host.set_suspend_image_sr", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_crash_dump_sr(xen_session *session, xen_host host, xen_sr crash_dump_sr)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = crash_dump_sr }
+        };
+
+    xen_call_(session, "host.set_crash_dump_sr", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

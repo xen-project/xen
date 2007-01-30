@@ -30,7 +30,9 @@ static const char *lookup_table[] =
 {
     "system",
     "user",
-    "ephemeral"
+    "ephemeral",
+    "suspend",
+    "crashdump"
 };
 
 

@@ -22,6 +22,7 @@
 
 #include "xen_common.h"
 #include "xen_console.h"
+#include "xen_crashdump.h"
 #include "xen_host.h"
 #include "xen_int_float_map.h"
 #include "xen_internal.h"
@@ -29,6 +30,7 @@
 #include "xen_on_normal_exit_internal.h"
 #include "xen_string_string_map.h"
 #include "xen_vbd.h"
+#include "xen_vdi.h"
 #include "xen_vif.h"
 #include "xen_vm.h"
 #include "xen_vm_power_state_internal.h"
@@ -67,6 +69,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "auto_power_on",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, auto_power_on) },
+        { .key = "suspend_VDI",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_vm_record, suspend_vdi) },
         { .key = "resident_on",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_vm_record, resident_on) },
@@ -115,6 +120,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "VBDs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vbds) },
+        { .key = "crash_dumps",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_vm_record, crash_dumps) },
         { .key = "VTPMs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, vtpms) },
@@ -183,6 +191,7 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->uuid);
     free(record->name_label);
     free(record->name_description);
+    xen_vdi_record_opt_free(record->suspend_vdi);
     xen_host_record_opt_free(record->resident_on);
     free(record->vcpus_policy);
     free(record->vcpus_params);
@@ -190,6 +199,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
+    xen_crashdump_record_opt_set_free(record->crash_dumps);
     xen_vtpm_record_opt_set_free(record->vtpms);
     free(record->pv_bootloader);
     free(record->pv_kernel);
@@ -386,6 +396,23 @@ xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm)
     abstract_type result_type = abstract_type_bool;
 
     XEN_CALL_("VM.get_auto_power_on");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_suspend_vdi(xen_session *session, xen_vdi *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_suspend_VDI");
     return session->ok;
 }
 
@@ -646,6 +673,23 @@ xen_vm_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vm vm)
 
     *result = NULL;
     XEN_CALL_("VM.get_VBDs");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_crash_dumps(xen_session *session, struct xen_crashdump_set **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_crash_dumps");
     return session->ok;
 }
 

@@ -21,12 +21,14 @@
 
 #include "xen_common.h"
 #include "xen_console_decl.h"
+#include "xen_crashdump_decl.h"
 #include "xen_host_decl.h"
 #include "xen_int_float_map.h"
 #include "xen_on_crash_behaviour.h"
 #include "xen_on_normal_exit.h"
 #include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
+#include "xen_vdi_decl.h"
 #include "xen_vif_decl.h"
 #include "xen_vm_decl.h"
 #include "xen_vm_power_state.h"
@@ -108,6 +110,7 @@ typedef struct xen_vm_record
     int64_t user_version;
     bool is_a_template;
     bool auto_power_on;
+    struct xen_vdi_record_opt *suspend_vdi;
     struct xen_host_record_opt *resident_on;
     int64_t memory_static_max;
     int64_t memory_dynamic_max;
@@ -124,6 +127,7 @@ typedef struct xen_vm_record
     struct xen_console_record_opt_set *consoles;
     struct xen_vif_record_opt_set *vifs;
     struct xen_vbd_record_opt_set *vbds;
+    struct xen_crashdump_record_opt_set *crash_dumps;
     struct xen_vtpm_record_opt_set *vtpms;
     char *pv_bootloader;
     char *pv_kernel;
@@ -307,6 +311,13 @@ xen_vm_get_auto_power_on(xen_session *session, bool *result, xen_vm vm);
 
 
 /**
+ * Get the suspend_VDI field of the given VM.
+ */
+extern bool
+xen_vm_get_suspend_vdi(xen_session *session, xen_vdi *result, xen_vm vm);
+
+
+/**
  * Get the resident_on field of the given VM.
  */
 extern bool
@@ -416,6 +427,13 @@ xen_vm_get_vifs(xen_session *session, struct xen_vif_set **result, xen_vm vm);
  */
 extern bool
 xen_vm_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vm vm);
+
+
+/**
+ * Get the crash_dumps field of the given VM.
+ */
+extern bool
+xen_vm_get_crash_dumps(xen_session *session, struct xen_crashdump_set **result, xen_vm vm);
 
 
 /**

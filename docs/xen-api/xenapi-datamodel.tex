@@ -35,6 +35,7 @@ Name & Description \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
 {\tt PBD} & The physical block devices through which hosts access SRs \\
+{\tt crashdump} & A VM crashdump \\
 {\tt VTPM} & A virtual TPM device \\
 {\tt console} & A console \\
 {\tt user} & A user of the system \\
@@ -51,7 +52,9 @@ Fields that are bound together are shown in the following table:
 host.PBDs & PBD.host & many-to-one\\
 SR.PBDs & PBD.SR & many-to-one\\
 VDI.VBDs & VBD.VDI & many-to-one\\
+VDI.crash\_dumps & crashdump.VDI & many-to-one\\
 VBD.VM & VM.VBDs & one-to-many\\
+crashdump.VM & VM.crash\_dumps & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
 PIF.metrics & PIF\_metrics.PIF & one-to-one\\
@@ -121,6 +124,8 @@ The following enumeration types are used:
 \hspace{0.5cm}{\tt system} & a disk that may be replaced on upgrade \\
 \hspace{0.5cm}{\tt user} & a disk that is always preserved on upgrade \\
 \hspace{0.5cm}{\tt ephemeral} & a disk that may be reformatted on upgrade \\
+\hspace{0.5cm}{\tt suspend} & a disk that stores a suspend image \\
+\hspace{0.5cm}{\tt crashdump} & a disk that stores VM crashdump information \\
 \hline
 \end{longtable}
 
@@ -1022,6 +1027,7 @@ $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-
 $\mathit{RW}$ &  {\tt user\_version} & int & a user version number for this machine \\
 $\mathit{RW}$ &  {\tt is\_a\_template} & bool & true if this is a template. Template VMs can never be started, they are used only for cloning other VMs \\
 $\mathit{RW}$ &  {\tt auto\_power\_on} & bool & true if this VM should be started automatically after host boot \\
+$\mathit{RO}_\mathit{run}$ &  {\tt suspend\_VDI} & VDI ref & The VDI that a suspend image is stored on. (Only has meaning if VM is currently suspended) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_on} & host ref & the host the VM is currently resident on \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute) maximum (bytes) \\
 $\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum (bytes) \\
@@ -1038,6 +1044,7 @@ $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to t
 $\mathit{RO}_\mathit{run}$ &  {\tt consoles} & (console ref) Set & virtual console devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & virtual network interfaces \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices \\
+$\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & crash dumps associated with this VM \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
 $\mathit{RW}$ &  {\tt PV/bootloader} & string & name of or path to bootloader \\
 $\mathit{RW}$ &  {\tt PV/kernel} & string & path to the kernel \\
@@ -1835,6 +1842,38 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_suspend\_VDI}
+
+{\bf Overview:} 
+Get the suspend\_VDI field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VDI ref) get_suspend_VDI (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VDI ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_resident\_on}
 
 {\bf Overview:} 
@@ -2612,6 +2651,38 @@ Get the VBDs field of the given VM.
  \noindent {\bf Return Type:} 
 {\tt 
 (VBD ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_crash\_dumps}
+
+{\bf Overview:} 
+Get the crash\_dumps field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((crashdump ref) Set) get_crash_dumps (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(crashdump ref) Set
 }
 
 
@@ -3760,6 +3831,8 @@ $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & addit
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RW}$ &  {\tt logging} & (string $\rightarrow$ string) Map & logging configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & physical network interfaces \\
+$\mathit{RW}$ &  {\tt suspend\_image\_sr} & SR ref & The SR in which VDIs for suspend images are created \\
+$\mathit{RW}$ &  {\tt crash\_dump\_sr} & SR ref & The SR in which VDIs for crash dumps are created \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
 \hline
@@ -4448,6 +4521,138 @@ Get the PIFs field of the given host.
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_suspend\_image\_sr}
+
+{\bf Overview:} 
+Get the suspend\_image\_sr field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (SR ref) get_suspend_image_sr (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+SR ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_suspend\_image\_sr}
+
+{\bf Overview:} 
+Set the suspend\_image\_sr field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_suspend_image_sr (session_id s, host ref self, SR ref value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+{\tt SR ref } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_crash\_dump\_sr}
+
+{\bf Overview:} 
+Get the crash\_dump\_sr field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (SR ref) get_crash_dump_sr (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+SR ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_crash\_dump\_sr}
+
+{\bf Overview:} 
+Set the crash\_dump\_sr field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_crash_dump_sr (session_id s, host ref self, SR ref value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+{\tt SR ref } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -7541,6 +7746,7 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RW}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
+$\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & list of crash dumps that refer to this disk \\
 $\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in multiples of sector\_size field) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & amount of physical space that the disk image is currently taking up on the storage repository (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt sector\_size} & int & sector size of VDI (in bytes) \\
@@ -7872,6 +8078,38 @@ Get the VBDs field of the given VDI.
  \noindent {\bf Return Type:} 
 {\tt 
 (VBD ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_crash\_dumps}
+
+{\bf Overview:} 
+Get the crash\_dumps field of the given VDI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((crashdump ref) Set) get_crash_dumps (session_id s, VDI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(crashdump ref) Set
 }
 
 
@@ -9257,12 +9495,277 @@ all fields from the object
 
 \vspace{1cm}
 \newpage
+\section{Class: crashdump}
+\subsection{Fields for class: crashdump}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf crashdump} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+VM crashdump.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt VDI} & VDI ref & the virtual disk \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: crashdump}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the crashdumps known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((crashdump ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(crashdump ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given crashdump.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM}
+
+{\bf Overview:} 
+Get the VM field of the given crashdump.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM ref) get_VM (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VDI}
+
+{\bf Overview:} 
+Get the VDI field of the given crashdump.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VDI ref) get_VDI (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VDI ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new crashdump instance, and return its handle.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (crashdump ref) create (session_id s, crashdump record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+crashdump ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified crashdump instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the crashdump instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (crashdump ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+crashdump ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given crashdump.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (crashdump record) get_record (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+crashdump record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
 \section{Class: VTPM}
 \subsection{Fields for class: VTPM}
 \begin{longtable}{|lllp{0.38\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VTPM} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A virtual TPM device}} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+virtual TPM device.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline

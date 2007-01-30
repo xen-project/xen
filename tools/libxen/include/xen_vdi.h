@@ -20,6 +20,7 @@
 #define XEN_VDI_H
 
 #include "xen_common.h"
+#include "xen_crashdump_decl.h"
 #include "xen_sr_decl.h"
 #include "xen_vbd_decl.h"
 #include "xen_vdi_decl.h"
@@ -69,6 +70,7 @@ typedef struct xen_vdi_record
     char *name_description;
     struct xen_sr_record_opt *sr;
     struct xen_vbd_record_opt_set *vbds;
+    struct xen_crashdump_record_opt_set *crash_dumps;
     int64_t virtual_size;
     int64_t physical_utilisation;
     int64_t sector_size;
@@ -224,6 +226,13 @@ xen_vdi_get_sr(xen_session *session, xen_sr *result, xen_vdi vdi);
  */
 extern bool
 xen_vdi_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vdi vdi);
+
+
+/**
+ * Get the crash_dumps field of the given VDI.
+ */
+extern bool
+xen_vdi_get_crash_dumps(xen_session *session, struct xen_crashdump_set **result, xen_vdi vdi);
 
 
 /**
