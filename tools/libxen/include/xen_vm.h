@@ -31,6 +31,7 @@
 #include "xen_vdi_decl.h"
 #include "xen_vif_decl.h"
 #include "xen_vm_decl.h"
+#include "xen_vm_metrics_decl.h"
 #include "xen_vm_power_state.h"
 #include "xen_vtpm_decl.h"
 
@@ -114,11 +115,12 @@ typedef struct xen_vm_record
     struct xen_host_record_opt *resident_on;
     int64_t memory_static_max;
     int64_t memory_dynamic_max;
-    int64_t memory_actual;
     int64_t memory_dynamic_min;
     int64_t memory_static_min;
     char *vcpus_policy;
-    char *vcpus_params;
+    xen_string_string_map *vcpus_params;
+    int64_t vcpus_max;
+    int64_t vcpus_at_startup;
     int64_t vcpus_number;
     xen_int_float_map *vcpus_utilisation;
     enum xen_on_normal_exit actions_after_shutdown;
@@ -144,6 +146,7 @@ typedef struct xen_vm_record
     xen_string_string_map *tools_version;
     xen_string_string_map *other_config;
     bool is_control_domain;
+    struct xen_vm_metrics_record_opt *metrics;
 } xen_vm_record;
 
 /**
@@ -340,13 +343,6 @@ xen_vm_get_memory_dynamic_max(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
- * Get the memory/actual field of the given VM.
- */
-extern bool
-xen_vm_get_memory_actual(xen_session *session, int64_t *result, xen_vm vm);
-
-
-/**
  * Get the memory/dynamic_min field of the given VM.
  */
 extern bool
@@ -371,7 +367,21 @@ xen_vm_get_vcpus_policy(xen_session *session, char **result, xen_vm vm);
  * Get the VCPUs/params field of the given VM.
  */
 extern bool
-xen_vm_get_vcpus_params(xen_session *session, char **result, xen_vm vm);
+xen_vm_get_vcpus_params(xen_session *session, xen_string_string_map **result, xen_vm vm);
+
+
+/**
+ * Get the VCPUs/max field of the given VM.
+ */
+extern bool
+xen_vm_get_vcpus_max(xen_session *session, int64_t *result, xen_vm vm);
+
+
+/**
+ * Get the VCPUs/at_startup field of the given VM.
+ */
+extern bool
+xen_vm_get_vcpus_at_startup(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
@@ -550,6 +560,13 @@ xen_vm_get_is_control_domain(xen_session *session, bool *result, xen_vm vm);
 
 
 /**
+ * Get the metrics field of the given VM.
+ */
+extern bool
+xen_vm_get_metrics(xen_session *session, xen_vm_metrics *result, xen_vm vm);
+
+
+/**
  * Set the name/label field of the given VM.
  */
 extern bool
@@ -585,6 +602,13 @@ xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on);
 
 
 /**
+ * Set the memory/static_max field of the given VM.
+ */
+extern bool
+xen_vm_set_memory_static_max(xen_session *session, xen_vm vm, int64_t static_max);
+
+
+/**
  * Set the memory/dynamic_max field of the given VM.
  */
 extern bool
@@ -599,6 +623,13 @@ xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm vm, int64_t dynamic_m
 
 
 /**
+ * Set the memory/static_min field of the given VM.
+ */
+extern bool
+xen_vm_set_memory_static_min(xen_session *session, xen_vm vm, int64_t static_min);
+
+
+/**
  * Set the VCPUs/policy field of the given VM.
  */
 extern bool
@@ -609,14 +640,38 @@ xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy);
  * Set the VCPUs/params field of the given VM.
  */
 extern bool
-xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params);
+xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, xen_string_string_map *params);
 
 
 /**
- * Set the VCPUs/number field of the given VM.
+ * Add the given key-value pair to the VCPUs/params field of the given
+ * VM.
  */
 extern bool
-xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number);
+xen_vm_add_to_vcpus_params(xen_session *session, xen_vm vm, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * VCPUs/params field of the given VM.  If the key is not in that Map, then do
+ * nothing.
+ */
+extern bool
+xen_vm_remove_from_vcpus_params(xen_session *session, xen_vm vm, char *key);
+
+
+/**
+ * Set the VCPUs/max field of the given VM.
+ */
+extern bool
+xen_vm_set_vcpus_max(xen_session *session, xen_vm vm, int64_t max);
+
+
+/**
+ * Set the VCPUs/at_startup field of the given VM.
+ */
+extern bool
+xen_vm_set_vcpus_at_startup(xen_session *session, xen_vm vm, int64_t at_startup);
 
 
 /**

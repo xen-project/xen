@@ -33,6 +33,7 @@
 #include "xen_vdi.h"
 #include "xen_vif.h"
 #include "xen_vm.h"
+#include "xen_vm_metrics.h"
 #include "xen_vm_power_state_internal.h"
 #include "xen_vtpm.h"
 
@@ -81,9 +82,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "memory_dynamic_max",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, memory_dynamic_max) },
-        { .key = "memory_actual",
-          .type = &abstract_type_int,
-          .offset = offsetof(xen_vm_record, memory_actual) },
         { .key = "memory_dynamic_min",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, memory_dynamic_min) },
@@ -94,8 +92,14 @@ static const struct_member xen_vm_record_struct_members[] =
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, vcpus_policy) },
         { .key = "VCPUs_params",
-          .type = &abstract_type_string,
+          .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, vcpus_params) },
+        { .key = "VCPUs_max",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vm_record, vcpus_max) },
+        { .key = "VCPUs_at_startup",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vm_record, vcpus_at_startup) },
         { .key = "VCPUs_number",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, vcpus_number) },
@@ -170,7 +174,10 @@ static const struct_member xen_vm_record_struct_members[] =
           .offset = offsetof(xen_vm_record, other_config) },
         { .key = "is_control_domain",
           .type = &abstract_type_bool,
-          .offset = offsetof(xen_vm_record, is_control_domain) }
+          .offset = offsetof(xen_vm_record, is_control_domain) },
+        { .key = "metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_vm_record, metrics) }
     };
 
 const abstract_type xen_vm_record_abstract_type_ =
@@ -197,7 +204,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_vdi_record_opt_free(record->suspend_vdi);
     xen_host_record_opt_free(record->resident_on);
     free(record->vcpus_policy);
-    free(record->vcpus_params);
+    xen_string_string_map_free(record->vcpus_params);
     xen_int_float_map_free(record->vcpus_utilisation);
     xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
@@ -214,6 +221,7 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->pci_bus);
     xen_string_string_map_free(record->tools_version);
     xen_string_string_map_free(record->other_config);
+    xen_vm_metrics_record_opt_free(record->metrics);
     free(record);
 }
 
@@ -470,22 +478,6 @@ xen_vm_get_memory_dynamic_max(xen_session *session, int64_t *result, xen_vm vm)
 
 
 bool
-xen_vm_get_memory_actual(xen_session *session, int64_t *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_int;
-
-    XEN_CALL_("VM.get_memory_actual");
-    return session->ok;
-}
-
-
-bool
 xen_vm_get_memory_dynamic_min(xen_session *session, int64_t *result, xen_vm vm)
 {
     abstract_value param_values[] =
@@ -535,7 +527,7 @@ xen_vm_get_vcpus_policy(xen_session *session, char **result, xen_vm vm)
 
 
 bool
-xen_vm_get_vcpus_params(xen_session *session, char **result, xen_vm vm)
+xen_vm_get_vcpus_params(xen_session *session, xen_string_string_map **result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -543,10 +535,42 @@ xen_vm_get_vcpus_params(xen_session *session, char **result, xen_vm vm)
               .u.string_val = vm }
         };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_string_map;
 
     *result = NULL;
     XEN_CALL_("VM.get_VCPUs_params");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_vcpus_max(xen_session *session, int64_t *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("VM.get_VCPUs_max");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_vcpus_at_startup(xen_session *session, int64_t *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("VM.get_VCPUs_at_startup");
     return session->ok;
 }
 
@@ -965,6 +989,23 @@ xen_vm_get_is_control_domain(xen_session *session, bool *result, xen_vm vm)
 
 
 bool
+xen_vm_get_metrics(xen_session *session, xen_vm_metrics *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_metrics");
+    return session->ok;
+}
+
+
+bool
 xen_vm_set_name_label(xen_session *session, xen_vm vm, char *label)
 {
     abstract_value param_values[] =
@@ -1045,6 +1086,22 @@ xen_vm_set_auto_power_on(xen_session *session, xen_vm vm, bool auto_power_on)
 
 
 bool
+xen_vm_set_memory_static_max(xen_session *session, xen_vm vm, int64_t static_max)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_int,
+              .u.int_val = static_max }
+        };
+
+    xen_call_(session, "VM.set_memory_static_max", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_set_memory_dynamic_max(xen_session *session, xen_vm vm, int64_t dynamic_max)
 {
     abstract_value param_values[] =
@@ -1077,6 +1134,22 @@ xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm vm, int64_t dynamic_m
 
 
 bool
+xen_vm_set_memory_static_min(xen_session *session, xen_vm vm, int64_t static_min)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_int,
+              .u.int_val = static_min }
+        };
+
+    xen_call_(session, "VM.set_memory_static_min", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy)
 {
     abstract_value param_values[] =
@@ -1093,14 +1166,14 @@ xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy)
 
 
 bool
-xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params)
+xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, xen_string_string_map *params)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = params }
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)params }
         };
 
     xen_call_(session, "VM.set_VCPUs_params", param_values, 2, NULL, NULL);
@@ -1109,17 +1182,67 @@ xen_vm_set_vcpus_params(xen_session *session, xen_vm vm, char *params)
 
 
 bool
-xen_vm_set_vcpus_number(xen_session *session, xen_vm vm, int64_t number)
+xen_vm_add_to_vcpus_params(xen_session *session, xen_vm vm, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VM.add_to_VCPUs_params", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_remove_from_vcpus_params(xen_session *session, xen_vm vm, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VM.remove_from_VCPUs_params", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_vcpus_max(xen_session *session, xen_vm vm, int64_t max)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &abstract_type_int,
-              .u.int_val = number }
+              .u.int_val = max }
         };
 
-    xen_call_(session, "VM.set_VCPUs_number", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_VCPUs_max", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_vcpus_at_startup(xen_session *session, xen_vm vm, int64_t at_startup)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_int,
+              .u.int_val = at_startup }
+        };
+
+    xen_call_(session, "VM.set_VCPUs_at_startup", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

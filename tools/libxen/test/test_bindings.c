@@ -277,6 +277,7 @@ int main(int argc, char **argv)
  */
 static xen_vm create_new_vm(xen_session *session)
 {
+    xen_string_string_map *vcpus_params = xen_string_string_map_alloc(1);
     xen_vm_record vm_record =
         {
             .name_label = "NewVM",
@@ -288,7 +289,7 @@ static xen_vm create_new_vm(xen_session *session)
             .memory_dynamic_min = 128,
             .memory_static_min = 128,
             .vcpus_policy = "credit",
-            .vcpus_params = "",
+            .vcpus_params = vcpus_params,
             .vcpus_number = 2,
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
