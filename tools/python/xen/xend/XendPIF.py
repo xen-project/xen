@@ -117,7 +117,8 @@ class XendPIF:
         return success
 
     def get_record(self):
-        return {'device': self.device,
+        return {'uuid': self.uuid,
+                'device': self.device,
                 'MAC': self.mac,
                 'MTU': self.mtu,
                 'VLAN': self.vlan,
