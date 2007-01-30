@@ -998,7 +998,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             for ( j = 0; j < batch; j++ )
-                ((uint32_t *)pfn_type)[i] = pfn_type[i];
+                ((uint32_t *)pfn_type)[j] = pfn_type[j];
             if ( xc_get_pfn_type_batch(xc_handle, dom, batch,
                                        (uint32_t *)pfn_type) )
             {
@@ -1006,7 +1006,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
             for ( j = batch-1; j >= 0; j-- )
-                pfn_type[i] = ((uint32_t *)pfn_type)[i];
+                pfn_type[j] = ((uint32_t *)pfn_type)[j];
 
             for ( j = 0; j < batch; j++ )
             {
