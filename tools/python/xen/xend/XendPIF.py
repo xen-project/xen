@@ -138,8 +138,9 @@ class XendPIF:
             
             rc, _ = _cmd('vconfig add %s %d', self.device, self.vlan)
             if rc != 0:
-                log.error('Could not refresh %s', ifname)
+                log.error('Could not refresh VLAN for interface %s', ifname)
                 return
+            
             log.info('Created network interface %s', ifname)
 
         for brname, nics in bridges.items():

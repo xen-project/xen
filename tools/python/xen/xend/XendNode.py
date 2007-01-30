@@ -125,8 +125,13 @@ class XendNode:
                             # Compatibility hack, can go pretty soon.
                             pif['metrics'] = uuid.createString()
 
+                        try:
+                            pif['VLAN'] = int(pif.get('VLAN', -1))
+                        except (ValueError, TypeError):
+                            pif['VLAN'] = -1
+
                         self._PIF_create(pif['device'], pif['MTU'],
-                                         int(pif['VLAN']),
+                                         pif['VLAN'],
                                          pif['MAC'], network, False, pif_uuid,
                                          pif['metrics'])
                     except NetworkAlreadyConnected, exn:
