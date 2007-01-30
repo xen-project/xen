@@ -45,8 +45,8 @@ class XendTask(threading.Thread):
     task_progress = {}
     task_progress_lock = threading.Lock()
 
-    def __init__(self, uuid, func, args, func_name, return_type = None,
-                 label = None, desc = None):
+    def __init__(self, uuid, func, args, func_name, return_type, label, desc,
+                 session):
         """
         @param uuid: UUID of the task
         @type uuid: string
@@ -81,6 +81,8 @@ class XendTask(threading.Thread):
         self.func_name = func_name 
         self.func = func
         self.args = args
+
+        self.session = session
 
     def set_status(self, new_status):
         self.status_lock.acquire()
@@ -145,6 +147,7 @@ class XendTask(threading.Thread):
             'error_code': self.error_code,
             'error_info': self.error_info,
             'allowed_operations': {},
+            'session': self.session,
         }
 
     def get_progress(self):

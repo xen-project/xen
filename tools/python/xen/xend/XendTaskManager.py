@@ -32,7 +32,7 @@ import threading
 tasks = {}
 tasks_lock = threading.Lock()
 
-def create_task(func, args, func_name, return_type = None, label = ''):
+def create_task(func, args, func_name, return_type, label, session):
     """Creates a new Task and registers it with the XendTaskManager.
 
     @param func: callable object XMLRPC method
@@ -48,8 +48,8 @@ def create_task(func, args, func_name, return_type = None, label = ''):
     task_uuid = uuid.createString()
     try:
         tasks_lock.acquire()
-        task = XendTask(task_uuid, func, args, func_name,
-                        return_type = return_type, label = label)
+        task = XendTask(task_uuid, func, args, func_name, return_type, label,
+                        '', session)
         tasks[task_uuid] = task
     finally:
         tasks_lock.release()

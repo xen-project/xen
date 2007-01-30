@@ -396,6 +396,9 @@ class XendAPI(object):
         #    all get_by_uuid() methods.
         
         for api_cls in classes.keys():
+            if api_cls == 'session':
+                continue
+            
             get_by_uuid = '%s_get_by_uuid' % api_cls
             get_uuid = '%s_get_uuid' % api_cls
             def _get_by_uuid(_1, _2, ref):
@@ -501,9 +504,13 @@ class XendAPI(object):
                   'this_host': XendNode.instance().uuid,
                   'this_user': auth_manager().get_user(session)}
         return xen_api_success(record)
-    def session_get_all(self):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
-    
+
+    def session_get_uuid(self, session):
+        return xen_api_success(session)
+
+    def session_get_by_uuid(self, session):
+        return xen_api_success(session)
+
     # attributes (ro)
     def session_get_this_host(self, session):
         return xen_api_success(XendNode.instance().uuid)
@@ -530,6 +537,7 @@ class XendAPI(object):
                     'error_code',
                     'error_info',
                     'allowed_operations',
+                    'session'
                     ]
 
     task_attr_rw = []
@@ -571,6 +579,10 @@ class XendAPI(object):
 
     def task_get_allowed_operations(self, session, task_ref):
         return xen_api_success({})
+
+    def task_get_session(self, session, task_ref):
+        task = XendTaskManager.get_task(task_ref)
+        return xen_api_success(task.session)
 
     def task_get_all(self, session):
         tasks = XendTaskManager.get_all_tasks()
@@ -2057,7 +2069,8 @@ class XendAPIAsyncProxy:
         task_uuid = XendTaskManager.create_task(method, args,
                                                 synchronous_method_name,
                                                 return_type,
-                                                synchronous_method_name)
+                                                synchronous_method_name,
+                                                session)
         return xen_api_success(task_uuid)
 
 #   
