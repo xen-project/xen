@@ -34,7 +34,7 @@ from xen.xend.XendError import XendInvalidDomain
 def fixup_sxpr(sexpr):
     ret = []
     for k in sexpr:
-        if type(k) in (types.ListType, types.TupleType):
+        if type(k) in (list, tuple):
             if len(k) != 2 or k[0] != 'vcpu_avail':
                 ret.append(fixup_sxpr(k))
         else:
