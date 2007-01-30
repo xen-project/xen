@@ -881,10 +881,10 @@ class XendConfig(dict):
                             if sxp.name(config) in ('vbd', 'tap'):
                                 # The bootable flag is never written to the
                                 # store as part of the device config.
-                                uuid = sxp.child_value(sxpr, 'uuid')
-                                sxpr.append(
-                                    'bootable', 
-                                    self['devices'][dev_uuid]['bootable'])
+                                dev_uuid = sxp.child_value(config, 'uuid')
+                                dev_type, dev_cfg = self['devices'][dev_uuid]
+                                config.append(['bootable',
+                                               int(dev_cfg['bootable'])])
                             sxpr.append(['device', config])
 
                         found = True
