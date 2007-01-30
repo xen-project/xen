@@ -66,7 +66,6 @@ typedef struct xen_vtpm_record
     char *uuid;
     struct xen_vm_record_opt *vm;
     struct xen_vm_record_opt *backend;
-    int64_t instance;
 } xen_vtpm_record;
 
 /**
