@@ -162,10 +162,10 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     case XENVER_capabilities:
     {
         xen_capabilities_info_t info;
-        extern void arch_get_xen_caps(xen_capabilities_info_t info);
+        extern void arch_get_xen_caps(xen_capabilities_info_t *info);
 
         memset(info, 0, sizeof(info));
-        arch_get_xen_caps(info);
+        arch_get_xen_caps(&info);
 
         if ( copy_to_guest(arg, (char *)info, sizeof(info)) )
             return -EFAULT;

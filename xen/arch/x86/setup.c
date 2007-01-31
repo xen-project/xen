@@ -800,52 +800,52 @@ void __init __start_xen(multiboot_info_t *mbi)
     startup_cpu_idle_loop();
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t info)
+void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
     int major = xen_major_version();
     int minor = xen_minor_version();
     char s[32];
 
-    info[0] = '\0';
+    (*info)[0] = '\0';
 
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 
     snprintf(s, sizeof(s), "xen-%d.%d-x86_32 ", major, minor);
-    safe_strcat(info, s);
+    safe_strcat(*info, s);
     if ( hvm_enabled )
     {
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
-        safe_strcat(info, s);
+        safe_strcat(*info, s);
     }
 
 #elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
 
     snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
-    safe_strcat(info, s);
+    safe_strcat(*info, s);
     if ( hvm_enabled )
     {
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
-        safe_strcat(info, s);
+        safe_strcat(*info, s);
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
-        safe_strcat(info, s);
+        safe_strcat(*info, s);
     }
 
 #elif defined(CONFIG_X86_64)
 
     snprintf(s, sizeof(s), "xen-%d.%d-x86_64 ", major, minor);
-    safe_strcat(info, s);
+    safe_strcat(*info, s);
 #ifdef CONFIG_COMPAT
     snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
-    safe_strcat(info, s);
+    safe_strcat(*info, s);
 #endif
     if ( hvm_enabled )
     {
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
-        safe_strcat(info, s);
+        safe_strcat(*info, s);
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
-        safe_strcat(info, s);
+        safe_strcat(*info, s);
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_64 ", major, minor);
-        safe_strcat(info, s);
+        safe_strcat(*info, s);
     }
 
 #endif

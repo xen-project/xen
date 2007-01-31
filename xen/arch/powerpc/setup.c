@@ -444,8 +444,8 @@ void __init __start_xen_ppc(
 
 }
 
-extern void arch_get_xen_caps(xen_capabilities_info_t info);
-void arch_get_xen_caps(xen_capabilities_info_t info)
+extern void arch_get_xen_caps(xen_capabilities_info_t *info);
+void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
 }
 
