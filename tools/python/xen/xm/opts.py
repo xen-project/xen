@@ -250,7 +250,8 @@ class OptVar(Opt):
 class OptVals:
     """Class to hold option values.
     """
-    pass
+    def __init__(self):
+        self.quiet = False
 
 class Opts:
     """Container for options.
@@ -276,7 +277,6 @@ class Opts:
         self.argv = []
         # Option values.
         self.vals = OptVals()
-        self.vals.quiet = 0
         # Variables for default scripts.
         self.vars = {}
         # Option to use for bare words.
