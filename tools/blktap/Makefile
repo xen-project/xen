@@ -9,7 +9,7 @@ SUBDIRS-y += drivers
 all: build
 
 .PHONY: build
-build: mk-symlinks
+build:
 	@set -e; for subdir in $(SUBDIRS-y); do \
 	$(MAKE) -C $$subdir all;       \
 		done
@@ -22,7 +22,7 @@ install:
 
 .PHONY: clean
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) TAGS
 	@set -e; for subdir in $(SUBDIRS-y); do \
 	$(MAKE) -C $$subdir clean;       \
 		done

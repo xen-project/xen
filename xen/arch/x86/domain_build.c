@@ -871,7 +871,7 @@ int construct_dom0(struct domain *d,
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
-        safe_strcpy(si->cmd_line, cmdline);
+        strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
 
     if ( fill_console_start_info((void *)(si + 1)) )
     {
