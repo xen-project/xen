@@ -381,10 +381,40 @@ struct hvm_hw_rtc {
 DECLARE_HVM_SAVE_TYPE(RTC, 9, struct hvm_hw_rtc);
 
 
+/*
+ * HPET
+ */
+
+#define HPET_TIMER_NUM     3    /* 3 timers supported now */
+struct hvm_hw_hpet {
+    /* Memory-mapped, software visible registers */
+    uint64_t capability;        /* capabilities */
+    uint64_t res0;              /* reserved */
+    uint64_t config;            /* configuration */
+    uint64_t res1;              /* reserved */
+    uint64_t isr;               /* interrupt status reg */
+    uint64_t res2[25];          /* reserved */
+    uint64_t mc64;              /* main counter */
+    uint64_t res3;              /* reserved */
+    struct {                    /* timers */
+        uint64_t config;        /* configuration/cap */
+        uint64_t cmp;           /* comparator */
+        uint64_t fsb;           /* FSB route, not supported now */
+        uint64_t res4;          /* reserved */
+    } timers[HPET_TIMER_NUM];
+    uint64_t res5[4*(24-HPET_TIMER_NUM)];  /* reserved, up to 0x3ff */
+
+    /* Hidden register state */
+    uint64_t period[HPET_TIMER_NUM]; /* Last value written to comparator */
+};
+
+DECLARE_HVM_SAVE_TYPE(HPET, 10, struct hvm_hw_hpet);
+
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 9
+#define HVM_SAVE_CODE_MAX 10
 
 
 /* 
