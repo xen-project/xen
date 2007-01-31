@@ -1223,7 +1223,12 @@ class XendConfig(dict):
                                   "configuration dictionary.")
             
         sxpr.append(dev_type)
-        config = [(opt, val) for opt, val in dev_info.items()]
+        if dev_type in ('console', 'vfb'):
+            config = [(opt, val) for opt, val in dev_info.items()
+                      if opt != 'other_config']
+        else:
+            config = [(opt, val) for opt, val in dev_info.items()]
+            
         sxpr += config
 
         return sxpr
