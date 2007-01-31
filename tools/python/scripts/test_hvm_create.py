@@ -13,16 +13,11 @@ vm_cfg = {
     
     
     'VCPUs_policy': 'credit',
-    'VCPUs_params': '',
+    'VCPUs_params': {},
     'VCPUs_number': 2,
-    'VCPUs_features_required': '',
-    'VCPUs_features_can_use': '',
-    'VCPUs_features_force_on': '',
-    'VCPUs_features_force_off': '',
 
     'actions_after_shutdown': 'destroy',
     'actions_after_reboot': 'restart',
-    'actions_after_suspend': 'destroy',
     'actions_after_crash': 'destroy',
     
     'PV_bootloader': '',
@@ -44,7 +39,7 @@ vm_cfg = {
 local_vdi_cfg = {
     'name_label': 'gentoo.hvm',
     'name_description': '',
-    'uri': 'file:/root/gentoo.amd64.hvm.img',
+    'location': 'file:/root/gentoo.amd64.hvm.img',
     'virtual_size': 0,
     'sector_size': 0,
     'type': 'system',
@@ -71,6 +66,12 @@ vif_cfg = {
     'MAC': '',
     'MTU': 1500,
 }    
+
+console_cfg = {
+    'protocol': 'rfb',
+    'other_config': {'vncunused': 1, 'vncpasswd': 'testing'},
+}
+
 
 import sys
 import time
@@ -124,6 +125,12 @@ def test_vm_create():
         vif_cfg['network'] = net_uuid
         vif_cfg['VM'] = vm_uuid
         vif_uuid = execute(server, 'VIF.create', (session, vif_cfg))
+
+        # Create a console
+        console_cfg['VM'] = vm_uuid
+        console_uuid = execute(server, 'console.create',
+                               (session, console_cfg))
+        print console_uuid
 
         # Start the VM
         execute(server, 'VM.start', (session, vm_uuid, False))

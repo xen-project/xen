@@ -74,6 +74,7 @@ typedef struct xen_vdi_record
     int64_t virtual_size;
     int64_t physical_utilisation;
     int64_t sector_size;
+    char *location;
     enum xen_vdi_type type;
     bool sharable;
     bool read_only;

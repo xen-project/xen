@@ -8,7 +8,7 @@ class ConsoleController(DevController):
     console devices with persistent UUIDs.
     """
 
-    valid_cfg = ['uri', 'uuid', 'protocol']
+    valid_cfg = ['location', 'uuid', 'protocol']
 
     def __init__(self, vm):
         DevController.__init__(self, vm)
@@ -29,3 +29,7 @@ class ConsoleController(DevController):
 
     def migrate(self, deviceConfig, network, dst, step, domName):
         return 0
+
+    def destroyDevice(self, devid, force):
+        DevController.destroyDevice(self, devid, True)
+        

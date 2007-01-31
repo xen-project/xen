@@ -126,6 +126,7 @@ XENAPI_HVM_CFG = {
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
     'platform_keymap' : 'keymap',
+    'HVM_boot': 'boot',
 }    
 
 # List of XendConfig configuration keys that have no direct equivalent
@@ -250,7 +251,8 @@ LEGACY_IMAGE_CFG = [
     ('sdl', int),
     ('vncdisplay', int),
     ('vncunused', int),
-    ('vncpasswd', str),    
+    ('vncpasswd', str),
+    ('vnclisten', str),
 ]
 
 LEGACY_IMAGE_HVM_CFG = [
@@ -379,6 +381,7 @@ class XendConfig(dict):
             'vif_refs': [],
             'vbd_refs': [],
             'vtpm_refs': [],
+            'other_config': {},
         }
         
         defaults['name_label'] = 'Domain-' + defaults['uuid']
@@ -660,6 +663,25 @@ class XendConfig(dict):
         self['vbd_refs'] = cfg.get('vbd_refs', [])
         self['vtpm_refs'] = cfg.get('vtpm_refs', [])
 
+        # coalesce hvm vnc frame buffer with vfb config
+        if self['image']['type'] == 'hvm' and self['image'].get('vnc', 0):
+            # add vfb device if it isn't there already
+            has_rfb = False
+            for console_uuid in self['console_refs']:
+                if self['devices'][console_uuid][1].get('protocol') == 'rfb':
+                    has_rfb = True
+                    break
+
+            if not has_rfb:
+                dev_config = ['vfb']
+                # copy VNC related params from image config to vfb dev conf
+                for key in ['vncpasswd', 'vncunused', 'vncdisplay',
+                            'vnclisten']:
+                    if key in self['image']:
+                        dev_config.append([key, self['image'][key]])
+
+                self.device_add('vfb', cfg_sxp = dev_config)
+
 
     def _sxp_to_xapi_unsupported(self, sxp_cfg):
         """Read in an SXP configuration object and populate
@@ -756,7 +778,7 @@ class XendConfig(dict):
 
                 # currently unsupported options
                 self['image']['hvm']['device_model'] = LEGACY_DM
-                self['image']['vnc'] = 1
+                self['image']['vnc'] = 0
                 self['image']['hvm']['pae'] = 1
 
                 if self['platform_enable_audio']:
@@ -883,8 +905,9 @@ class XendConfig(dict):
                                 # store as part of the device config.
                                 dev_uuid = sxp.child_value(config, 'uuid')
                                 dev_type, dev_cfg = self['devices'][dev_uuid]
-                                config.append(['bootable',
-                                               int(dev_cfg['bootable'])])
+                                is_bootable = dev_cfg.get('bootable', 0)
+                                config.append(['bootable', int(is_bootable)])
+
                             sxpr.append(['device', config])
 
                         found = True
@@ -955,7 +978,7 @@ class XendConfig(dict):
                     pass
 
             if dev_type == 'vbd':
-                dev_info['bootable'] = False
+                dev_info['bootable'] = 0
                 if dev_info.get('dev', '').startswith('ioemu:'):
                     dev_info['driver'] = 'ioemu'
                 else:
@@ -975,7 +998,7 @@ class XendConfig(dict):
                     if dev_type == 'vbd' and not target[param]:
                         # Compat hack -- this is the first disk, so mark it
                         # bootable.
-                        dev_info['bootable'] = True
+                        dev_info['bootable'] = 1
                     target[param].append(dev_uuid)
             elif dev_type == 'tap':
                 if 'vbd_refs' not in target:
@@ -984,8 +1007,30 @@ class XendConfig(dict):
                     if not target['vbd_refs']:
                         # Compat hack -- this is the first disk, so mark it
                         # bootable.
-                        dev_info['bootable'] = True
+                        dev_info['bootable'] = 1
                     target['vbd_refs'].append(dev_uuid)
+                    
+            elif dev_type == 'vfb':
+                # Populate other config with aux data that is associated
+                # with vfb
+
+                other_config = {}
+                for key in ['vncunused', 'vncdisplay', 'vnclisten',
+                            'vncpasswd', 'type', 'display', 'xauthority',
+                            'keymap']:
+                    if key in dev_info:
+                        other_config[key] = dev_info[key]
+                target['devices'][dev_uuid][1]['other_config'] =  other_config
+                
+                
+                if 'console_refs' not in target:
+                    target['console_refs'] = []
+
+                # Treat VFB devices as console devices so they are found
+                # through Xen API
+                if dev_uuid not in target['console_refs']:
+                    target['console_refs'].append(dev_uuid)
+
             elif dev_type == 'console':
                 if 'console_refs' not in target:
                     target['console_refs'] = []
@@ -1025,8 +1070,8 @@ class XendConfig(dict):
                 dev_info['uname'] = cfg_xenapi.get('image', '')
                 dev_info['dev'] = '%s:%s' % (cfg_xenapi.get('device'),
                                              old_vbd_type)
-                dev_info['bootable'] = cfg_xenapi.get('bootable', False)
-                dev_info['driver'] = cfg_xenapi.get('driver')
+                dev_info['bootable'] = int(cfg_xenapi.get('bootable', 0))
+                dev_info['driver'] = cfg_xenapi.get('driver', '')
                 dev_info['VDI'] = cfg_xenapi.get('VDI', '')
                     
                 if cfg_xenapi.get('mode') == 'RW':
@@ -1048,50 +1093,117 @@ class XendConfig(dict):
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vtpm_refs'].append(dev_uuid)
 
+            elif dev_type == 'console':
+                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_info['uuid'] = dev_uuid
+                dev_info['protocol'] = cfg_xenapi.get('protocol', 'rfb')
+                dev_info['other_config'] = cfg_xenapi.get('other_config', {})
+                if dev_info['protocol'] == 'rfb':
+                    # collapse other config into devinfo for things
+                    # such as vncpasswd, vncunused, etc.                    
+                    dev_info.update(cfg_xenapi.get('other_config', {}))
+                    dev_info['type'] = 'vnc'                        
+                    target['devices'][dev_uuid] = ('vfb', dev_info)
+                    target['console_refs'].append(dev_uuid)
+
+                    # Finally, if we are a pvfb, we need to make a vkbd
+                    # as well that is not really exposed to Xen API
+                    vkbd_uuid = uuid.createString()
+                    target['devices'][vkbd_uuid] = ('vkbd', {})
+                    
+                elif dev_info['protocol'] == 'vt100':
+                    # if someone tries to create a VT100 console
+                    # via the Xen API, we'll have to ignore it
+                    # because we create one automatically in
+                    # XendDomainInfo._update_consoles
+                    raise XendConfigError('Creating vt100 consoles via '
+                                          'Xen API is unsupported')
+
             return dev_uuid
 
         # no valid device to add
         return ''
 
-    def console_add(self, protocol, uri):
+    def console_add(self, protocol, location, other_config = {}):
         dev_uuid = uuid.createString()
-        dev_info = {
-            'uuid': dev_uuid,
-            'protocol': protocol,
-            'uri': uri
-        }
-        if 'devices' not in self:
-            self['devices'] = {}
+        if protocol == 'vt100':
+            dev_info = {
+                'uuid': dev_uuid,
+                'protocol': protocol,
+                'location': location,
+                'other_config': other_config,
+            }
+
+            if 'devices' not in self:
+                self['devices'] = {}
             
-        self['devices'][dev_uuid] = ('console', dev_info)
-        self['console_refs'].append(dev_uuid)
-        return dev_info
+            self['devices'][dev_uuid] = ('console', dev_info)
+            self['console_refs'].append(dev_uuid)
+            return dev_info
+
+        return {}
+
+    def console_update(self, console_uuid, key, value):
+        for dev_uuid, (dev_type, dev_info) in self['devices'].items():
+            if dev_uuid == console_uuid:
+                dev_info[key] = value
+                break
 
     def console_get_all(self, protocol):
-        consoles = [dinfo for dtype, dinfo in self['devices'].values()
-                    if dtype == 'console']
-        return [c for c in consoles if c.get('protocol') == protocol]
+        if protocol == 'vt100':
+            consoles = [dinfo for dtype, dinfo in self['devices'].values()
+                        if dtype == 'console']
+            return [c for c in consoles if c.get('protocol') == protocol]
 
-    def device_update(self, dev_uuid, cfg_sxp):
+        elif protocol == 'rfb':
+            vfbs = [dinfo for dtype, dinfo in self['devices'].values()
+                   if dtype == 'vfb']
+
+            # move all non-console key values to other_config before
+            # returning console config
+            valid_keys = ['uuid', 'location']
+            for vfb in vfbs:
+                other_config = {}
+                for key, val in vfb.items():
+                    if key not in valid_keys:
+                        other_config[key] = vfb[key]
+                    del vfb[key]
+                vfb['other_config'] = other_config
+                vfb['protocol'] = 'rfb'
+                        
+            return vfbs
+
+        else:
+            return []
+
+    def device_update(self, dev_uuid, cfg_sxp = [], cfg_xenapi = {}):
         """Update an existing device with the new configuration.
 
         @rtype: boolean
         @return: Returns True if succesfully found and updated a device conf
         """
-        if dev_uuid in self['devices']:
+        if dev_uuid in self['devices'] and cfg_sxp:
             if sxp.child0(cfg_sxp) == 'device':            
                 config = sxp.child0(cfg_sxp)
             else:
                 config = cfg_sxp
-                
+
+            dev_type, dev_info = self['devices'][dev_uuid]
             for opt_val in config[1:]:
                 try:
                     opt, val = opt_val
-                    self['devices'][dev_uuid][opt] = val
+                    dev_info[opt] = val
                 except (TypeError, ValueError):
                     pass # no value for this config option
-            
+
+            self['devices'][dev_uuid] = (dev_type, dev_info)
             return True
+        
+        elif dev_uuid in self['devices'] and cfg_xenapi:
+            dev_type, dev_info = self['devices'][dev_uuid]
+            for key, val in cfg_xenapi.items():
+                dev_info[key] = val
+            self['devices'][dev_uuid] = (dev_type, dev_info)
 
         return False
 
@@ -1111,7 +1223,12 @@ class XendConfig(dict):
                                   "configuration dictionary.")
             
         sxpr.append(dev_type)
-        config = [(opt, val) for opt, val in dev_info.items()]
+        if dev_type in ('console', 'vfb'):
+            config = [(opt, val) for opt, val in dev_info.items()
+                      if opt != 'other_config']
+        else:
+            config = [(opt, val) for opt, val in dev_info.items()]
+            
         sxpr += config
 
         return sxpr
