@@ -1835,8 +1835,9 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
 
-    console_attr_ro = ['uri', 'protocol', 'VM']
-    console_attr_rw = []
+    console_attr_ro = ['location', 'protocol', 'VM']
+    console_attr_rw = ['other_config']
+    console_funcs = [('create', 'console')]
     
     def console_get_all(self, session):
         xendom = XendDomain.instance()
@@ -1844,10 +1845,10 @@ class XendAPI(object):
         cons = reduce(lambda x, y: x + y, cons)
         return xen_api_success(cons)
 
-    def console_get_uri(self, session, console_ref):
+    def console_get_location(self, session, console_ref):
         return xen_api_success(xendom.get_dev_property_by_uuid('console',
                                                                console_ref,
-                                                               'uri'))
+                                                               'location'))
 
     def console_get_protocol(self, session, console_ref):
         return xen_api_success(xendom.get_dev_property_by_uuid('console',
@@ -1879,6 +1880,22 @@ class XendAPI(object):
             
         return xen_api_success(return_cfg)
 
+    def console_create(self, session, console_struct):
+        xendom = XendDomain.instance()
+        if not xendom.is_valid_vm(console_struct['VM']):
+            return xen_api_error(['VM_HANDLE_INVALID', console_struct['VM']])
+        
+        dom = xendom.get_vm_by_uuid(console_struct['VM'])
+        try:
+            if 'protocol' not in console_struct:
+                return xen_api_error(['CONSOLE_PROTOCOL_INVALID',
+                                      'No protocol specified'])
+            
+            console_ref = dom.create_console(console_struct)
+            xendom.managed_config_save(dom)
+            return xen_api_success(console_ref)
+        except XendError, e:
+            return xen_api_error([XEND_ERROR_TODO, str(e)])
 
     # Xen API: Class SR
     # ----------------------------------------------------------------

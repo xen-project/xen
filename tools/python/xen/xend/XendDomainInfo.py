@@ -695,16 +695,29 @@ class XendDomainInfo:
             if not serial_consoles:
                 cfg = self.info.console_add('vt100', self.console_port)
                 self._createDevice('console', cfg)
+            else:
+                console_uuid = serial_consoles[0].get('uuid')
+                self.info.console_update(console_uuid, 'location',
+                                         self.console_port)
+                
 
-        # Update VNC port if it exists
+        # Update VNC port if it exists and write to xenstore
         vnc_port = self.readDom('console/vnc-port')
         if vnc_port is not None:
-            vnc_consoles = self.info.console_get_all('rfb')
-            if not vnc_consoles:
-                cfg = self.info.console_add('rfb', 'localhost:%s' %
-                                           str(vnc_port))
-                self._createDevice('console', cfg)                
+            for dev_uuid, (dev_type, dev_info) in self.info['devices'].items():
+                if dev_type == 'vfb':
+                    old_location = dev_info.get('location')
+                    listen_host = dev_info.get('vnclisten', 'localhost')
+                    new_location = '%s:%s' % (listen_host, str(vnc_port))
+                    if old_location == new_location:
+                        break
 
+                    dev_info['location'] = new_location
+                    self.info.device_update(dev_uuid, cfg_xenapi = dev_info)
+                    vfb_ctrl = self.getDeviceController('vfb')
+                    vfb_ctrl.reconfigureDevice(0, dev_info)
+                    break
+                
     #
     # Function to update xenstore /vm/*
     #
@@ -2017,21 +2030,18 @@ class XendDomainInfo:
 
         @rtype: dictionary
         """
-        dev_type_config = self.info['devices'].get(dev_uuid)
+        dev_type, dev_config = self.info['devices'].get(dev_uuid, (None, None))
 
         # shortcut if the domain isn't started because
         # the devcontrollers will have no better information
         # than XendConfig.
         if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
-            if dev_type_config:
-                return copy.deepcopy(dev_type_config[1])
+            if dev_config:
+                return copy.deepcopy(dev_config)
             return None
 
         # instead of using dev_class, we use the dev_type
         # that is from XendConfig.
-        # This will accomdate 'tap' as well as 'vbd'
-        dev_type = dev_type_config[0]
-        
         controller = self.getDeviceController(dev_type)
         if not controller:
             return None
@@ -2040,14 +2050,14 @@ class XendDomainInfo:
         if not all_configs:
             return None
 
-        dev_config = copy.deepcopy(dev_type_config[1])
+        updated_dev_config = copy.deepcopy(dev_config)
         for _devid, _devcfg in all_configs.items():
             if _devcfg.get('uuid') == dev_uuid:
-                dev_config.update(_devcfg)
-                dev_config['id'] = _devid
-                return dev_config
+                updated_dev_config.update(_devcfg)
+                updated_dev_config['id'] = _devid
+                return updated_dev_config
 
-        return dev_config
+        return updated_dev_config
                     
     def get_dev_xenapi_config(self, dev_class, dev_uuid):
         config = self.get_dev_config_by_uuid(dev_class, dev_uuid)
@@ -2225,6 +2235,21 @@ class XendDomainInfo:
         if self.get_vtpms() != []:
             raise VmError('Domain already has a vTPM.')
         dev_uuid = self.info.device_add('vtpm', cfg_xenapi = xenapi_vtpm)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        return dev_uuid
+
+    def create_console(self, xenapi_console):
+        """ Create a console device from a Xen API struct.
+
+        @return: uuid of device
+        @rtype: string
+        """
+        if self.state not in (DOM_STATE_HALTED,):
+            raise VmError("Can only add console to a halted domain.")
+
+        dev_uuid = self.info.device_add('console', cfg_xenapi = xenapi_console)
         if not dev_uuid:
             raise XendError('Failed to create device')
 

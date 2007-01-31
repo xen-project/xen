@@ -91,6 +91,11 @@ vif_cfg = {
     'network': '',
     'MAC': '',
     'MTU': 1500,
+}
+
+console_cfg = {
+    'protocol': 'rfb',
+    'other_config': {'vncunused': 1, 'vncpasswd': 'testing'},
 }    
 
 import sys
@@ -157,12 +162,18 @@ def test_vm_create():
         vif_cfg['VM'] = vm_uuid
         vif_uuid = execute(server, 'VIF.create', (session, vif_cfg))
 
+        # Create a console
+        console_cfg['VM'] = vm_uuid
+        console_uuid = execute(server, 'console.create',
+                               (session, console_cfg))
+        print console_uuid
+
         # Start the VM
         execute(server, 'VM.start', (session, vm_uuid, False))
 
         time.sleep(30)
 
-        test_suspend = True
+        test_suspend = False
         if test_suspend:
             print 'Suspending VM..'
             execute(server, 'VM.suspend', (session, vm_uuid))
