@@ -1121,11 +1121,11 @@ class XendAPI(object):
     
     def VM_get_VCPUs_policy(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return dom.get_vcpus_policy()
+        return xen_api_success(dom.get_vcpus_policy())
     
     def VM_get_VCPUs_params(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # need access to scheduler
+        return xen_api_success(dom.get_vcpus_params())
     
     def VM_get_actions_after_shutdown(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1186,7 +1186,7 @@ class XendAPI(object):
         return xen_api_success(dom.get_platform_keymap())
     
     def VM_get_other_config(self, session, vm_ref):
-        return self.VM_get('otherconfig', session, vm_ref)        
+        return self.VM_get('other_config', session, vm_ref)        
 
     def VM_get_is_control_domain(self, session, vm_ref):
         xd = XendDomain.instance()
@@ -1363,7 +1363,7 @@ class XendAPI(object):
             'platform_keymap': xeninfo.get_platform_keymap(),
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
-            'other_config': xeninfo.info.get('otherconfig'),
+            'other_config': xeninfo.info.get('other_config', {}),
             'is_control_domain': xeninfo == xendom.privilegedDomain(),
         }
         return xen_api_success(record)
@@ -1469,7 +1469,7 @@ class XendAPI(object):
             vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
             if not vdi:
                 return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
-            vdi_image = vdi.get_image_uri()
+            vdi_image = vdi.get_location()
             vbd_ref = XendTask.log_progress(0, 100,
                                             dom.create_vbd,
                                             vbd_struct, vdi_image)

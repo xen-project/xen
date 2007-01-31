@@ -15,14 +15,9 @@ vm_cfg = {
     'VCPUs_policy': 'credit',
     'VCPUs_params': '',
     'VCPUs_number': 2,
-    'VCPUs_features_required': '',
-    'VCPUs_features_can_use': '',
-    'VCPUs_features_force_on': '',
-    'VCPUs_features_force_off': '',
 
     'actions_after_shutdown': 'destroy',
     'actions_after_reboot': 'restart',
-    'actions_after_suspend': 'destroy',
     'actions_after_crash': 'destroy',
     
     'PV_bootloader': '',
@@ -65,7 +60,7 @@ vbd_cfg = {
 local_vdi_cfg = {
     'name_label': 'gentoo.amd64.img',
     'name_description': '',
-    'uri': 'file:/root/gentoo.amd64.img',
+    'location': 'file:/root/gentoo.amd64.img',
     'virtual_size': 0,
     'sector_size': 0,
     'type': 'system',
@@ -183,13 +178,13 @@ def test_vm_create():
             execute(server, 'VM.resume', (session, vm_uuid, False))
             print 'Resumed VM.'
 
+    finally:
         # Wait for user to say we're good to shut it down
         while True:
             destroy = raw_input('destroy VM? ')
             if destroy[0] in ('y', 'Y'):
                 break
-
-    finally:
+        
         # Clean up
         if vif_uuid:
             execute(server, 'VIF.destroy', (session, vif_uuid))

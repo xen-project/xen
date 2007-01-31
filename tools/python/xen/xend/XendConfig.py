@@ -905,7 +905,7 @@ class XendConfig(dict):
                                 # store as part of the device config.
                                 dev_uuid = sxp.child_value(config, 'uuid')
                                 dev_type, dev_cfg = self['devices'][dev_uuid]
-                                is_bootable = dev_cfg.get('bootable', False)
+                                is_bootable = dev_cfg.get('bootable', 0)
                                 config.append(['bootable', int(is_bootable)])
 
                             sxpr.append(['device', config])
@@ -978,7 +978,7 @@ class XendConfig(dict):
                     pass
 
             if dev_type == 'vbd':
-                dev_info['bootable'] = False
+                dev_info['bootable'] = 0
                 if dev_info.get('dev', '').startswith('ioemu:'):
                     dev_info['driver'] = 'ioemu'
                 else:
@@ -998,7 +998,7 @@ class XendConfig(dict):
                     if dev_type == 'vbd' and not target[param]:
                         # Compat hack -- this is the first disk, so mark it
                         # bootable.
-                        dev_info['bootable'] = True
+                        dev_info['bootable'] = 1
                     target[param].append(dev_uuid)
             elif dev_type == 'tap':
                 if 'vbd_refs' not in target:
@@ -1007,7 +1007,7 @@ class XendConfig(dict):
                     if not target['vbd_refs']:
                         # Compat hack -- this is the first disk, so mark it
                         # bootable.
-                        dev_info['bootable'] = True
+                        dev_info['bootable'] = 1
                     target['vbd_refs'].append(dev_uuid)
                     
             elif dev_type == 'vfb':
@@ -1070,8 +1070,8 @@ class XendConfig(dict):
                 dev_info['uname'] = cfg_xenapi.get('image', '')
                 dev_info['dev'] = '%s:%s' % (cfg_xenapi.get('device'),
                                              old_vbd_type)
-                dev_info['bootable'] = cfg_xenapi.get('bootable', False)
-                dev_info['driver'] = cfg_xenapi.get('driver')
+                dev_info['bootable'] = int(cfg_xenapi.get('bootable', 0))
+                dev_info['driver'] = cfg_xenapi.get('driver', '')
                 dev_info['VDI'] = cfg_xenapi.get('VDI', '')
                     
                 if cfg_xenapi.get('mode') == 'RW':
@@ -1223,7 +1223,12 @@ class XendConfig(dict):
                                   "configuration dictionary.")
             
         sxpr.append(dev_type)
-        config = [(opt, val) for opt, val in dev_info.items()]
+        if dev_type in ('console', 'vfb'):
+            config = [(opt, val) for opt, val in dev_info.items()
+                      if opt != 'other_config']
+        else:
+            config = [(opt, val) for opt, val in dev_info.items()]
+            
         sxpr += config
 
         return sxpr

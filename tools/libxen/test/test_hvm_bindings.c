@@ -280,8 +280,8 @@ static xen_vm create_new_vm(xen_session *session)
     xen_string_string_map *vcpus_params = xen_string_string_map_alloc(1);
     xen_vm_record vm_record =
         {
-            .name_label = "NewVM",
-            .name_description = "New VM Description",
+            .name_label = "NewHVM",
+            .name_description = "New HVM Description",
             .user_version = 1,
             .is_a_template = false,
             .memory_static_max = 256,
@@ -294,12 +294,7 @@ static xen_vm create_new_vm(xen_session *session)
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
-            .hvm_boot = "",
-            //.pv_bootloader = "pygrub",
-            .pv_kernel = "/boot/vmlinuz-2.6.18-xenU",
-            .pv_ramdisk = "",
-            .pv_args = "root=/dev/sda1 ro",
-            .pv_bootloader_args = ""
+            .hvm_boot = "cda",
         };
 
 
@@ -338,7 +333,7 @@ static xen_vm create_new_vm(xen_session *session)
             .sr = &sr_record,
             .virtual_size = (1 << 21),  // 1GiB / 512 bytes/sector
             .sector_size = 512,
-            .location = "file:/root/gentoo.amd64.img",
+            .location = "file:/root/gentoo.amd64.hvm.img",
             .type = XEN_VDI_TYPE_SYSTEM,
             .sharable = false,
             .read_only = false
@@ -368,9 +363,8 @@ static xen_vm create_new_vm(xen_session *session)
         {
             .vm = &vm_record_opt,
             .vdi = &vdi0_record_opt,
-            .device = "sda1",
-            .mode = XEN_VBD_MODE_RW,
-            .bootable = 1,
+            .device = "xvda1",
+            .mode = XEN_VBD_MODE_RW
         };
 
     xen_vbd vbd0;

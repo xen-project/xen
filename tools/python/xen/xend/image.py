@@ -450,10 +450,10 @@ class HVMImageHandler(ImageHandler):
 
         vnc_config = {}
         has_vfb = False
-        has_vnc = int(vmConfig['image'].get('vnc')) != 0
+        has_vnc = int(vmConfig['image'].get('vnc', 0)) != 0
         for dev_uuid in vmConfig['console_refs']:
-            dev_type, dev_info = vmConfig['devices'][devuuid]
-            if dev_type == 'rfb':
+            dev_type, dev_info = vmConfig['devices'][dev_uuid]
+            if dev_type == 'vfb':
                 vnc_config = dev_info.get('other_config', {})
                 has_vfb = True
                 break
