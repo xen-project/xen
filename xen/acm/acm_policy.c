@@ -63,9 +63,9 @@ do_acm_set_policy(void *buf, u32 buf_size)
 {
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *)buf;
     /* some sanity checking */
-    if ((ntohl(pol->magic) != ACM_MAGIC) ||
-        (buf_size != ntohl(pol->len)) ||
-        (ntohl(pol->policy_version) != ACM_POLICY_VERSION))
+    if ((be32_to_cpu(pol->magic) != ACM_MAGIC) ||
+        (buf_size != be32_to_cpu(pol->len)) ||
+        (be32_to_cpu(pol->policy_version) != ACM_POLICY_VERSION))
     {
         printk("%s: ERROR in Magic, Version, or buf size.\n", __func__);
         goto error_free;
@@ -73,8 +73,8 @@ do_acm_set_policy(void *buf, u32 buf_size)
 
     if (acm_active_security_policy == ACM_POLICY_UNDEFINED) {
         /* setup the policy with the boot policy */
-        if (acm_init_binary_policy((ntohl(pol->secondary_policy_code) << 4) |
-                                   ntohl(pol->primary_policy_code))) {
+        if (acm_init_binary_policy((be32_to_cpu(pol->secondary_policy_code) << 4) |
+                                   be32_to_cpu(pol->primary_policy_code))) {
             goto error_free;
         }
         acm_active_security_policy =
@@ -82,8 +82,8 @@ do_acm_set_policy(void *buf, u32 buf_size)
     }
 
     /* once acm_active_security_policy is set, it cannot be changed */
-    if ((ntohl(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
-        (ntohl(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code))
+    if ((be32_to_cpu(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
+        (be32_to_cpu(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code))
     {
         printkd("%s: Wrong policy type in boot policy!\n", __func__);
         goto error_free;
@@ -93,21 +93,21 @@ do_acm_set_policy(void *buf, u32 buf_size)
     write_lock(&acm_bin_pol_rwlock);
 
     /* set label reference name */
-    if (acm_set_policy_reference(buf + ntohl(pol->policy_reference_offset),
-                                 ntohl(pol->primary_buffer_offset) -
-                                 ntohl(pol->policy_reference_offset)))
+    if (acm_set_policy_reference(buf + be32_to_cpu(pol->policy_reference_offset),
+                                 be32_to_cpu(pol->primary_buffer_offset) -
+                                 be32_to_cpu(pol->policy_reference_offset)))
         goto error_lock_free;
 
     /* set primary policy data */
-    if (acm_primary_ops->set_binary_policy(buf + ntohl(pol->primary_buffer_offset),
-                                           ntohl(pol->secondary_buffer_offset) -
-                                           ntohl(pol->primary_buffer_offset)))
+    if (acm_primary_ops->set_binary_policy(buf + be32_to_cpu(pol->primary_buffer_offset),
+                                           be32_to_cpu(pol->secondary_buffer_offset) -
+                                           be32_to_cpu(pol->primary_buffer_offset)))
         goto error_lock_free;
 
     /* set secondary policy data */
-    if (acm_secondary_ops->set_binary_policy(buf + ntohl(pol->secondary_buffer_offset),
-                                             ntohl(pol->len) - 
-                                             ntohl(pol->secondary_buffer_offset)))
+    if (acm_secondary_ops->set_binary_policy(buf + be32_to_cpu(pol->secondary_buffer_offset),
+                                             be32_to_cpu(pol->len) - 
+                                             be32_to_cpu(pol->secondary_buffer_offset)))
         goto error_lock_free;
 
     write_unlock(&acm_bin_pol_rwlock);
@@ -136,38 +136,38 @@ acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
     read_lock(&acm_bin_pol_rwlock);
 
     bin_pol = (struct acm_policy_buffer *)policy_buffer;
-    bin_pol->magic = htonl(ACM_MAGIC);
-    bin_pol->primary_policy_code = htonl(acm_bin_pol.primary_policy_code);
-    bin_pol->secondary_policy_code = htonl(acm_bin_pol.secondary_policy_code);
+    bin_pol->magic = cpu_to_be32(ACM_MAGIC);
+    bin_pol->primary_policy_code = cpu_to_be32(acm_bin_pol.primary_policy_code);
+    bin_pol->secondary_policy_code = cpu_to_be32(acm_bin_pol.secondary_policy_code);
 
-    bin_pol->len = htonl(sizeof(struct acm_policy_buffer));
-    bin_pol->policy_reference_offset = htonl(ntohl(bin_pol->len));
-    bin_pol->primary_buffer_offset = htonl(ntohl(bin_pol->len));
-    bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
+    bin_pol->len = cpu_to_be32(sizeof(struct acm_policy_buffer));
+    bin_pol->policy_reference_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
+    bin_pol->primary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
+    bin_pol->secondary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
      
-    ret = acm_dump_policy_reference(policy_buffer + ntohl(bin_pol->policy_reference_offset),
-                                    buf_size - ntohl(bin_pol->policy_reference_offset));
+    ret = acm_dump_policy_reference(policy_buffer + be32_to_cpu(bin_pol->policy_reference_offset),
+                                    buf_size - be32_to_cpu(bin_pol->policy_reference_offset));
     if (ret < 0)
         goto error_free_unlock;
 
-    bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-    bin_pol->primary_buffer_offset = htonl(ntohl(bin_pol->len));
+    bin_pol->len = cpu_to_be32(be32_to_cpu(bin_pol->len) + ret);
+    bin_pol->primary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
 
-    ret = acm_primary_ops->dump_binary_policy (policy_buffer + ntohl(bin_pol->primary_buffer_offset),
-                                               buf_size - ntohl(bin_pol->primary_buffer_offset));
+    ret = acm_primary_ops->dump_binary_policy (policy_buffer + be32_to_cpu(bin_pol->primary_buffer_offset),
+                                               buf_size - be32_to_cpu(bin_pol->primary_buffer_offset));
     if (ret < 0)
         goto error_free_unlock;
 
-    bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-    bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
+    bin_pol->len = cpu_to_be32(be32_to_cpu(bin_pol->len) + ret);
+    bin_pol->secondary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
 
-    ret = acm_secondary_ops->dump_binary_policy(policy_buffer + ntohl(bin_pol->secondary_buffer_offset),
-                                                buf_size - ntohl(bin_pol->secondary_buffer_offset));
+    ret = acm_secondary_ops->dump_binary_policy(policy_buffer + be32_to_cpu(bin_pol->secondary_buffer_offset),
+                                                buf_size - be32_to_cpu(bin_pol->secondary_buffer_offset));
     if (ret < 0)
         goto error_free_unlock;
 
-    bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-    if (copy_to_guest(buf, policy_buffer, ntohl(bin_pol->len)))
+    bin_pol->len = cpu_to_be32(be32_to_cpu(bin_pol->len) + ret);
+    if (copy_to_guest(buf, policy_buffer, be32_to_cpu(bin_pol->len)))
         goto error_free_unlock;
 
     read_unlock(&acm_bin_pol_rwlock);
@@ -204,12 +204,12 @@ acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size)
     if (len2 < 0)
         goto error_lock_free;
 
-    acm_stats.magic = htonl(ACM_MAGIC);
-    acm_stats.primary_policy_code = htonl(acm_bin_pol.primary_policy_code);
-    acm_stats.secondary_policy_code = htonl(acm_bin_pol.secondary_policy_code);
-    acm_stats.primary_stats_offset = htonl(sizeof(struct acm_stats_buffer));
-    acm_stats.secondary_stats_offset = htonl(sizeof(struct acm_stats_buffer) + len1);
-    acm_stats.len = htonl(sizeof(struct acm_stats_buffer) + len1 + len2);
+    acm_stats.magic = cpu_to_be32(ACM_MAGIC);
+    acm_stats.primary_policy_code = cpu_to_be32(acm_bin_pol.primary_policy_code);
+    acm_stats.secondary_policy_code = cpu_to_be32(acm_bin_pol.secondary_policy_code);
+    acm_stats.primary_stats_offset = cpu_to_be32(sizeof(struct acm_stats_buffer));
+    acm_stats.secondary_stats_offset = cpu_to_be32(sizeof(struct acm_stats_buffer) + len1);
+    acm_stats.len = cpu_to_be32(sizeof(struct acm_stats_buffer) + len1 + len2);
 
     memcpy(stats_buffer, &acm_stats, sizeof(struct acm_stats_buffer));
 

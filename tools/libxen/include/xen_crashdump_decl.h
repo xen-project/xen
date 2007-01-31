@@ -16,22 +16,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
  */
 
+#ifndef XEN_CRASHDUMP_DECL_H
+#define XEN_CRASHDUMP_DECL_H
 
-/*
- * Declarations of the abstract types used during demarshalling of enum
- * xen_driver_type.  Internal to this library -- do not use from outside.
- */
+typedef void *xen_crashdump;
 
-
-#ifndef XEN_DRIVER_TYPE_INTERNAL_H
-#define XEN_DRIVER_TYPE_INTERNAL_H
-
-
-#include "xen_internal.h"
-
-
-extern const abstract_type xen_driver_type_abstract_type_;
-extern const abstract_type xen_driver_type_set_abstract_type_;
-
+struct xen_crashdump_set;
+struct xen_crashdump_record;
+struct xen_crashdump_record_set;
+struct xen_crashdump_record_opt;
+struct xen_crashdump_record_opt_set;
 
 #endif

@@ -72,8 +72,7 @@ void cmdline_parse(char *cmdline)
             switch ( param->type )
             {
             case OPT_STR:
-                strncpy(param->var, optval, param->len);
-                ((char *)param->var)[param->len-1] = '\0';
+                strlcpy(param->var, optval, param->len);
                 break;
             case OPT_UINT:
                 *(unsigned int *)param->var =
@@ -163,10 +162,10 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     case XENVER_capabilities:
     {
         xen_capabilities_info_t info;
-        extern void arch_get_xen_caps(xen_capabilities_info_t info);
+        extern void arch_get_xen_caps(xen_capabilities_info_t *info);
 
         memset(info, 0, sizeof(info));
-        arch_get_xen_caps(info);
+        arch_get_xen_caps(&info);
 
         if ( copy_to_guest(arg, (char *)info, sizeof(info)) )
             return -EFAULT;

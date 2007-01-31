@@ -11,10 +11,6 @@
 #include <xen/types.h>
 #include <xen/byteorder/swab.h>
 
-#define __constant_htonl(x) ((__force __be32)(__u32)(x))
-#define __constant_ntohl(x) ((__force __u32)(__be32)(x))
-#define __constant_htons(x) ((__force __be16)(__u16)(x))
-#define __constant_ntohs(x) ((__force __u16)(__be16)(x))
 #define __constant_cpu_to_le64(x) ((__force __le64)___constant_swab64((x)))
 #define __constant_le64_to_cpu(x) ___constant_swab64((__force __u64)(__le64)(x))
 #define __constant_cpu_to_le32(x) ((__force __le32)___constant_swab32((x)))

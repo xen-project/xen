@@ -142,15 +142,17 @@ void __print_symbol(const char *fmt, unsigned long address)
     const char *name;
     unsigned long offset, size;
     char namebuf[KSYM_NAME_LEN+1];
-    char buffer[sizeof("%s+%#lx/%#lx [%s]") + KSYM_NAME_LEN +
-               2*(BITS_PER_LONG*3/10) + 1];
+
+#define BUFFER_SIZE sizeof("%s+%#lx/%#lx [%s]") + KSYM_NAME_LEN + \
+			2*(BITS_PER_LONG*3/10) + 1
+    char buffer[BUFFER_SIZE];
 
     name = symbols_lookup(address, &size, &offset, namebuf);
 
     if (!name)
-        sprintf(buffer, "???");
+        snprintf(buffer, BUFFER_SIZE, "???");
     else
-        sprintf(buffer, "%s+%#lx/%#lx", name, offset, size);
+        snprintf(buffer, BUFFER_SIZE, "%s+%#lx/%#lx", name, offset, size);
 
     printk(fmt, buffer);
 }

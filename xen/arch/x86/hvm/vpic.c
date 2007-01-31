@@ -404,26 +404,43 @@ static void vpic_info(struct hvm_hw_vpic *s)
 }
 #endif
 
-static void vpic_save(hvm_domain_context_t *h, void *opaque)
+static int vpic_save(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_hw_vpic *s = opaque;
-    
-    vpic_info(s);
-    hvm_put_struct(h, s);
-}
+    struct hvm_hw_vpic *s;
+    int i;
 
-static int vpic_load(hvm_domain_context_t *h, void *opaque, int version_id)
-{
-    struct hvm_hw_vpic *s = opaque;
-    
-    if (version_id != 1)
-        return -EINVAL;
-
-    hvm_get_struct(h, s);
-    vpic_info(s);
+    /* Save the state of both PICs */
+    for ( i = 0; i < 2 ; i++ )
+    {
+        s = &d->arch.hvm_domain.vpic[i];
+        vpic_info(s);
+        if ( hvm_save_entry(PIC, i, h, s) )
+            return 1;
+    }
 
     return 0;
 }
+
+static int vpic_load(struct domain *d, hvm_domain_context_t *h)
+{
+    struct hvm_hw_vpic *s;
+    uint16_t inst;
+    
+    /* Which PIC is this? */
+    inst = hvm_load_instance(h);
+    if ( inst > 1 )
+        return -EINVAL;
+    s = &d->arch.hvm_domain.vpic[inst];
+
+    /* Load the state */
+    if ( hvm_load_entry(PIC, h, s) != 0 )
+        return -EINVAL;
+
+    vpic_info(s);
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(PIC, vpic_save, vpic_load);
 
 void vpic_init(struct domain *d)
 {
@@ -434,14 +451,12 @@ void vpic_init(struct domain *d)
     memset(vpic, 0, sizeof(*vpic));
     vpic->is_master = 1;
     vpic->elcr      = 1 << 2;
-    hvm_register_savevm(d, "xen_hvm_i8259", 0x20, 1, vpic_save, vpic_load, vpic);
     register_portio_handler(d, 0x20, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0x4d0, 1, vpic_intercept_elcr_io);
 
     /* Slave PIC. */
     vpic++;
     memset(vpic, 0, sizeof(*vpic));
-    hvm_register_savevm(d, "xen_hvm_i8259", 0xa0, 1, vpic_save, vpic_load, vpic);
     register_portio_handler(d, 0xa0, 2, vpic_intercept_pic_io);
     register_portio_handler(d, 0x4d1, 1, vpic_intercept_elcr_io);
 }

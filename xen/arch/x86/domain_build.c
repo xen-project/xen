@@ -821,7 +821,7 @@ int construct_dom0(struct domain *d,
     si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!IS_COMPAT(d);
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
-    sprintf(si->magic, "xen-%i.%i-x86_%d%s",
+    snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-x86_%d%s",
             xen_major_version(), xen_minor_version(),
             elf_64bit(&elf) ? 64 : 32,
             parms.pae ? "p" : "");
@@ -871,7 +871,7 @@ int construct_dom0(struct domain *d,
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
-        strncpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
+        strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
 
     if ( fill_console_start_info((void *)(si + 1)) )
     {

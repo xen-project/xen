@@ -50,6 +50,11 @@
         xc_set_error(XC_INVALID_KERNEL, fmt , ## args );  \
 	} while (0)
 
+#define safe_strcpy(d,s)                        \
+do { strncpy((d),(s),sizeof((d))-1);            \
+     (d)[sizeof((d))-1] = '\0';                 \
+} while (0)
+
 #endif
 
 #endif /* __LIBELF_PRIVATE_H_ */

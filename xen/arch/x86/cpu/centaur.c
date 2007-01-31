@@ -437,7 +437,8 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 				/* Add L1 data and code cache sizes. */
 				c->x86_cache_size = (cc>>24)+(dd>>24);
 			}
-			sprintf( c->x86_model_id, "WinChip %s", name );
+			snprintf( c->x86_model_id, sizeof(c->x86_model_id),
+				"WinChip %s", name );
 			break;
 
 		case 6:

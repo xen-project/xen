@@ -21,11 +21,6 @@ from xen.xend import uuid
 from xen.xend.XendError import *
 from xen.xend.XendLogging import log
 
-try:
-    import PAM
-except ImportError:
-    log.warn("python-pam is required for XenAPI support.")
-
 class XendAuthSessions:
     """Keeps track of Xen API Login Sessions using PAM.
 
@@ -80,7 +75,11 @@ class XendAuthSessions:
         """
         pam_auth = None
         try:
+            import PAM
             pam_auth = PAM.pam()
+        except ImportError:
+            log.warn("python-pam is required for XenAPI support.")
+            return False
         except NameError:
             # if PAM doesn't exist, let's ignore it
             return False

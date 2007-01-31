@@ -481,7 +481,7 @@ void printk(const char *fmt, ...)
 
 void set_printk_prefix(const char *prefix)
 {
-    strcpy(printk_prefix, prefix);
+    safe_strcpy(printk_prefix, prefix);
 }
 
 void init_console(void)
@@ -771,7 +771,7 @@ void debugtrace_printk(const char *fmt, ...)
 
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
 
-    sprintf(buf, "%u ", ++count);
+    snprintf(buf, sizeof(buf), "%u ", ++count);
 
     va_start(args, fmt);
     (void)vsnprintf(buf + strlen(buf), sizeof(buf), fmt, args);

@@ -290,7 +290,6 @@ long arch_do_domctl(
     { 
         struct hvm_domain_context *c;
         struct domain             *d;
-        struct vcpu               *v;
 
         ret = -ESRCH;
         if ( (d = get_domain_by_id(domctl->domain)) == NULL )
@@ -299,15 +298,18 @@ long arch_do_domctl(
         ret = -ENOMEM;
         if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
             goto sethvmcontext_out;
-
-        v = d->vcpu[0];
         
         ret = -EFAULT;
-
         if ( copy_from_guest(c, domctl->u.hvmcontext.ctxt, 1) != 0 )
             goto sethvmcontext_out;
+        c->size = sizeof (c->data);
+        c->cur = 0;
 
-        ret = arch_sethvm_ctxt(v, c);
+        ret = -EINVAL;
+        if ( !is_hvm_domain(d) ) 
+            goto sethvmcontext_out;
+
+        ret = hvm_load(d, c);
 
         xfree(c);
 
@@ -321,7 +323,6 @@ long arch_do_domctl(
     { 
         struct hvm_domain_context *c;
         struct domain             *d;
-        struct vcpu               *v;
 
         ret = -ESRCH;
         if ( (d = get_domain_by_id(domctl->domain)) == NULL )
@@ -330,15 +331,15 @@ long arch_do_domctl(
         ret = -ENOMEM;
         if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
             goto gethvmcontext_out;
-
-        v = d->vcpu[0];
-
+        memset(c, 0, sizeof(*c));
+        c->size = sizeof (c->data);
+        
         ret = -ENODATA;
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !is_hvm_domain(d) ) 
             goto gethvmcontext_out;
         
         ret = 0;
-        if (arch_gethvm_ctxt(v, c) == -1)
+        if (hvm_save(d, c) != 0)
             ret = -EFAULT;
 
         if ( copy_to_guest(domctl->u.hvmcontext.ctxt, c, 1) )

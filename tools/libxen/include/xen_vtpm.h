@@ -21,7 +21,6 @@
 #define XEN_VTPM_H
 
 #include "xen_common.h"
-#include "xen_driver_type.h"
 #include "xen_vm_decl.h"
 #include "xen_vtpm_decl.h"
 
@@ -67,8 +66,6 @@ typedef struct xen_vtpm_record
     char *uuid;
     struct xen_vm_record_opt *vm;
     struct xen_vm_record_opt *backend;
-    enum xen_driver_type driver;
-    int64_t instance;
 } xen_vtpm_record;
 
 /**
@@ -197,20 +194,5 @@ xen_vtpm_get_vm(xen_session *session, xen_vm *result, xen_vtpm vtpm);
  */
 extern bool
 xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm);
-
-
-/**
- * Get the driver field of the given VTPM.
- */
-extern bool
-xen_vtpm_get_driver(xen_session *session, enum xen_driver_type *result, xen_vtpm vtpm);
-
-
-/**
- * Get the instance field of the given VTPM.
- */
-extern bool
-xen_vtpm_get_instance(xen_session *session, int64_t *result, xen_vtpm vtpm);
-
 
 #endif

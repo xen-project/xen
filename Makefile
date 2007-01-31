@@ -22,7 +22,7 @@ endif
 install: install-xen install-kernels install-tools install-docs
 
 .PHONY: build
-build: kernels build-headers
+build: kernels
 	$(MAKE) -C xen build
 	$(MAKE) -C tools build
 	$(MAKE) -C docs build
@@ -59,11 +59,11 @@ prep-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-prep || exit 1; done
 
 .PHONY: install-xen
-install-xen: build-headers
+install-xen:
 	$(MAKE) -C xen install
 
 .PHONY: install-tools
-install-tools: build-headers
+install-tools:
 	$(MAKE) -C tools install
 
 .PHONY: install-kernels
@@ -81,11 +81,6 @@ dev-docs:
 # Build all the various kernels and modules
 .PHONY: kbuild
 kbuild: kernels
-
-# generate header files
-.PHONY: build-headers
-build-headers:
-	$(MAKE) -C xen/include/public/foreign
 
 # Delete the kernel build trees entirely
 .PHONY: kdelete

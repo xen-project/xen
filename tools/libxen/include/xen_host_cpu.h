@@ -20,7 +20,6 @@
 #define XEN_HOST_CPU_H
 
 #include "xen_common.h"
-#include "xen_cpu_feature.h"
 #include "xen_host_cpu_decl.h"
 #include "xen_host_decl.h"
 
@@ -69,7 +68,6 @@ typedef struct xen_host_cpu_record
     char *vendor;
     int64_t speed;
     char *modelname;
-    struct xen_cpu_feature_set *features;
     double utilisation;
 } xen_host_cpu_record;
 
@@ -220,13 +218,6 @@ xen_host_cpu_get_speed(xen_session *session, int64_t *result, xen_host_cpu host_
  */
 extern bool
 xen_host_cpu_get_modelname(xen_session *session, char **result, xen_host_cpu host_cpu);
-
-
-/**
- * Get the features field of the given host_cpu.
- */
-extern bool
-xen_host_cpu_get_features(xen_session *session, struct xen_cpu_feature_set **result, xen_host_cpu host_cpu);
 
 
 /**

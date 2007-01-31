@@ -26,6 +26,7 @@ import xen.lowlevel.xc
 from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
 from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
+from xen.xend.XendOptions import instance as xenopts
 from xen.xend.server.netif import randomMAC
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
@@ -340,8 +341,6 @@ class HVMImageHandler(ImageHandler):
 
         self.pid = None
 
-        self.dmargs += self.configVNC(imageConfig)
-
         self.pae  = imageConfig['hvm'].get('pae', 0)
         self.apic  = imageConfig['hvm'].get('apic', 0)
         self.acpi  = imageConfig['hvm']['devices'].get('acpi', 0)
@@ -379,8 +378,8 @@ class HVMImageHandler(ImageHandler):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
                    'localtime', 'serial', 'stdvga', 'isa',
                    'acpi', 'usb', 'usbdevice', 'keymap' ]
+        
         hvmDeviceConfig = vmConfig['image']['hvm']['devices']
-
         ret = ['-vcpus', str(self.vm.getVCpuCount())]
 
         for a in dmargs:
@@ -439,49 +438,59 @@ class HVMImageHandler(ImageHandler):
             ret.append("-net")
             ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
 
-        return ret
 
-    def configVNC(self, imageConfig):
-        # Handle graphics library related options
-        vnc = imageConfig.get('vnc')
-        sdl = imageConfig.get('sdl')
-        ret = []
-        nographic = imageConfig.get('nographic')
-
-        # get password from VM config (if password omitted, None)
-        vncpasswd_vmconfig = imageConfig.get('vncpasswd')
-
-        if nographic:
+        #
+        # Find RFB console device, and if it exists, make QEMU enable
+        # the VNC console.
+        #
+        if vmConfig['image'].get('nographic'):
+            # skip vnc init if nographic is set
             ret.append('-nographic')
             return ret
 
-        if vnc:
-            vncdisplay = imageConfig.get('vncdisplay',
-                                         int(self.vm.getDomid()))
-            vncunused = imageConfig.get('vncunused')
+        vnc_config = {}
+        has_vfb = False
+        has_vnc = int(vmConfig['image'].get('vnc')) != 0
+        for dev_uuid in vmConfig['console_refs']:
+            dev_type, dev_info = vmConfig['devices'][devuuid]
+            if dev_type == 'rfb':
+                vnc_config = dev_info.get('other_config', {})
+                has_vfb = True
+                break
 
-            if vncunused:
-                ret += ['-vncunused']
-            else:
-                ret += ['-vnc', '%d' % vncdisplay]
+        if not vnc_config:
+            for key in ('vncunused', 'vnclisten', 'vncdisplay', 'vncpasswd'):
+                if key in vmConfig['image']:
+                    vnc_config[key] = vmConfig['image'][key]
 
-            vnclisten = imageConfig.get('vnclisten')
+        if not has_vfb and not has_vnc:
+            ret.append('-nographic')
+            return ret
 
-            if not(vnclisten):
-                vnclisten = (xen.xend.XendOptions.instance().
-                             get_vnclisten_address())
-            if vnclisten:
-                ret += ['-vnclisten', vnclisten]
+                    
+        if not vnc_config.get('vncunused', 0) and \
+               vnc_config.get('vncdisplay', 0):
+            ret.append('-vnc')
+            ret.append(str(vncdisplay))
+        else:
+            ret.append('-vncunused')
 
-            vncpasswd = vncpasswd_vmconfig
-            if vncpasswd is None:
-                vncpasswd = (xen.xend.XendOptions.instance().
-                             get_vncpasswd_default())
-                if vncpasswd is None:
-                    raise VmError('vncpasswd is not set up in ' +
-                                  'VMconfig and xend-config.')
-            if vncpasswd != '':
-                self.vm.storeVm("vncpasswd", vncpasswd)
+        vnclisten = vnc_config.get('vnclisten',
+                                   xenopts().get_vnclisten_address())
+        ret.append('-vnclisten')
+        ret.append(str(vnclisten))
+        
+        # Store vncpassword in xenstore
+        vncpasswd = vnc_config.get('vncpasswd')
+        if not vncpasswd:
+            vncpasswd = xenopts().get_vncpasswd_default()
+                    
+        if vncpasswd is None:
+            raise VmError('vncpasswd is not setup in vmconfig or '
+                          'xend-config.sxp')
+
+        if vncpasswd != '':
+            self.vm.storeVm('vncpasswd', vncpasswd)
 
         return ret
 

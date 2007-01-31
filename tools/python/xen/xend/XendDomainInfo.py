@@ -695,16 +695,29 @@ class XendDomainInfo:
             if not serial_consoles:
                 cfg = self.info.console_add('vt100', self.console_port)
                 self._createDevice('console', cfg)
+            else:
+                console_uuid = serial_consoles[0].get('uuid')
+                self.info.console_update(console_uuid, 'location',
+                                         self.console_port)
+                
 
-        # Update VNC port if it exists
+        # Update VNC port if it exists and write to xenstore
         vnc_port = self.readDom('console/vnc-port')
         if vnc_port is not None:
-            vnc_consoles = self.info.console_get_all('rfb')
-            if not vnc_consoles:
-                cfg = self.info.console_add('rfb', 'localhost:%s' %
-                                           str(vnc_port))
-                self._createDevice('console', cfg)                
+            for dev_uuid, (dev_type, dev_info) in self.info['devices'].items():
+                if dev_type == 'vfb':
+                    old_location = dev_info.get('location')
+                    listen_host = dev_info.get('vnclisten', 'localhost')
+                    new_location = '%s:%s' % (listen_host, str(vnc_port))
+                    if old_location == new_location:
+                        break
 
+                    dev_info['location'] = new_location
+                    self.info.device_update(dev_uuid, cfg_xenapi = dev_info)
+                    vfb_ctrl = self.getDeviceController('vfb')
+                    vfb_ctrl.reconfigureDevice(0, dev_info)
+                    break
+                
     #
     # Function to update xenstore /vm/*
     #
@@ -1653,48 +1666,47 @@ class XendDomainInfo:
                 blexec = osdep.pygrub_path
 
             blcfg = None
-            for (devtype, devinfo) in self.info.all_devices_sxpr():
-                if not devtype or not devinfo or devtype not in ('vbd', 'tap'):
-                    continue
-                disk = None
-                for param in devinfo:
-                    if param[0] == 'uname':
-                        disk = param[1]
-                        break
+            disks = [x for x in self.info['vbd_refs']
+                     if self.info['devices'][x][1]['bootable']]
 
-                if disk is None:
-                    continue
-                fn = blkdev_uname_to_file(disk)
-                mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            if not disks:
+                msg = "Had a bootloader specified, but no disks are bootable"
+                log.error(msg)
+                raise VmError(msg)
+
+            devinfo = self.info['devices'][disks[0]]
+            devtype = devinfo[0]
+            disk = devinfo[1]['uname']
+
+            fn = blkdev_uname_to_file(disk)
+            mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            if mounted:
+                # This is a file, not a device.  pygrub can cope with a
+                # file if it's raw, but if it's QCOW or other such formats
+                # used through blktap, then we need to mount it first.
+
+                log.info("Mounting %s on %s." %
+                         (fn, BOOTLOADER_LOOPBACK_DEVICE))
+
+                vbd = {
+                    'mode': 'RO',
+                    'device': BOOTLOADER_LOOPBACK_DEVICE,
+                    }
+
+                from xen.xend import XendDomain
+                dom0 = XendDomain.instance().privilegedDomain()
+                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
+                fn = BOOTLOADER_LOOPBACK_DEVICE
+
+            try:
+                blcfg = bootloader(blexec, fn, self, False,
+                                   bootloader_args, kernel, ramdisk, args)
+            finally:
                 if mounted:
-                    # This is a file, not a device.  pygrub can cope with a
-                    # file if it's raw, but if it's QCOW or other such formats
-                    # used through blktap, then we need to mount it first.
-
-                    log.info("Mounting %s on %s." %
+                    log.info("Unmounting %s from %s." %
                              (fn, BOOTLOADER_LOOPBACK_DEVICE))
 
-                    vbd = {
-                        'mode': 'RO',
-                        'device': BOOTLOADER_LOOPBACK_DEVICE,
-                        }
-
-                    from xen.xend import XendDomain
-                    dom0 = XendDomain.instance().privilegedDomain()
-                    dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
-                    fn = BOOTLOADER_LOOPBACK_DEVICE
-
-                try:
-                    blcfg = bootloader(blexec, fn, self, False,
-                                       bootloader_args, kernel, ramdisk, args)
-                finally:
-                    if mounted:
-                        log.info("Unmounting %s from %s." %
-                                 (fn, BOOTLOADER_LOOPBACK_DEVICE))
-
-                        dom0.destroyDevice('tap', '/dev/xvdp')
-
-                break
+                    dom0.destroyDevice('tap', '/dev/xvdp')
 
             if blcfg is None:
                 msg = "Had a bootloader specified, but can't find disk"
@@ -2018,21 +2030,18 @@ class XendDomainInfo:
 
         @rtype: dictionary
         """
-        dev_type_config = self.info['devices'].get(dev_uuid)
+        dev_type, dev_config = self.info['devices'].get(dev_uuid, (None, None))
 
         # shortcut if the domain isn't started because
         # the devcontrollers will have no better information
         # than XendConfig.
         if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
-            if dev_type_config:
-                return copy.deepcopy(dev_type_config[1])
+            if dev_config:
+                return copy.deepcopy(dev_config)
             return None
 
         # instead of using dev_class, we use the dev_type
         # that is from XendConfig.
-        # This will accomdate 'tap' as well as 'vbd'
-        dev_type = dev_type_config[0]
-        
         controller = self.getDeviceController(dev_type)
         if not controller:
             return None
@@ -2041,14 +2050,14 @@ class XendDomainInfo:
         if not all_configs:
             return None
 
-        dev_config = copy.deepcopy(dev_type_config[1])
+        updated_dev_config = copy.deepcopy(dev_config)
         for _devid, _devcfg in all_configs.items():
             if _devcfg.get('uuid') == dev_uuid:
-                dev_config.update(_devcfg)
-                dev_config['id'] = _devid
-                return dev_config
+                updated_dev_config.update(_devcfg)
+                updated_dev_config['id'] = _devid
+                return updated_dev_config
 
-        return dev_config
+        return updated_dev_config
                     
     def get_dev_xenapi_config(self, dev_class, dev_uuid):
         config = self.get_dev_config_by_uuid(dev_class, dev_uuid)
@@ -2126,7 +2135,10 @@ class XendDomainInfo:
                 config['mode'] = 'RW'
 
         if dev_class == 'vtpm':
-            config['driver'] = 'paravirtualised' # TODO
+            if not config.has_key('type'):
+                config['type'] = 'paravirtualised' # TODO
+            if not config.has_key('backend'):
+                config['backend'] = "00000000-0000-0000-0000-000000000000"
 
         return config
 
@@ -2136,6 +2148,9 @@ class XendDomainInfo:
             return config[field]
         except KeyError:
             raise XendError('Invalid property for device: %s' % field)
+
+    def set_dev_property(self, dev_class, dev_uuid, field, value):
+        self.info['devices'][dev_uuid][1][field] = value
 
     def get_vcpus_util(self):
         vcpu_util = {}
@@ -2220,6 +2235,21 @@ class XendDomainInfo:
         if self.get_vtpms() != []:
             raise VmError('Domain already has a vTPM.')
         dev_uuid = self.info.device_add('vtpm', cfg_xenapi = xenapi_vtpm)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        return dev_uuid
+
+    def create_console(self, xenapi_console):
+        """ Create a console device from a Xen API struct.
+
+        @return: uuid of device
+        @rtype: string
+        """
+        if self.state not in (DOM_STATE_HALTED,):
+            raise VmError("Can only add console to a halted domain.")
+
+        dev_uuid = self.info.device_add('console', cfg_xenapi = xenapi_console)
         if not dev_uuid:
             raise XendError('Failed to create device')
 

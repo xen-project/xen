@@ -125,7 +125,7 @@ fsimage_file_dealloc(fsimage_file_t *file)
 	if (file->file != NULL)
 		fsi_close_file(file->file);
 	Py_XDECREF(file->fs);
-	PyMem_DEL(file);
+	PyObject_DEL(file);
 }
 
 static char fsimage_file_type__doc__[] = "Filesystem image file";
@@ -226,7 +226,7 @@ fsimage_fs_dealloc (fsimage_fs_t *fs)
 {
 	if (fs->fs != NULL)
 		fsi_close_fsimage(fs->fs);
-	PyMem_DEL(fs);
+	PyObject_DEL(fs);
 }
 
 PyDoc_STRVAR(fsimage_fs_type__doc__, "Filesystem image");

@@ -21,7 +21,6 @@
 #include <stdlib.h>
 
 #include "xen_common.h"
-#include "xen_driver_type_internal.h"
 #include "xen_internal.h"
 #include "xen_network.h"
 #include "xen_vif.h"
@@ -42,12 +41,6 @@ static const struct_member xen_vif_record_struct_members[] =
         { .key = "uuid",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vif_record, uuid) },
-        { .key = "name",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vif_record, name) },
-        { .key = "type",
-          .type = &xen_driver_type_abstract_type_,
-          .offset = offsetof(xen_vif_record, type) },
         { .key = "device",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vif_record, device) },
@@ -90,7 +83,6 @@ xen_vif_record_free(xen_vif_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    free(record->name);
     free(record->device);
     xen_network_record_opt_free(record->network);
     xen_vm_record_opt_free(record->vm);
@@ -166,38 +158,6 @@ xen_vif_destroy(xen_session *session, xen_vif vif)
         };
 
     xen_call_(session, "VIF.destroy", param_values, 1, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vif_get_name(xen_session *session, char **result, xen_vif vif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VIF.get_name");
-    return session->ok;
-}
-
-
-bool
-xen_vif_get_type(xen_session *session, enum xen_driver_type *result, xen_vif vif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif }
-        };
-
-    abstract_type result_type = xen_driver_type_abstract_type_;
-    XEN_CALL_("VIF.get_type");
     return session->ok;
 }
 
@@ -319,38 +279,6 @@ xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif)
 
 
 bool
-xen_vif_set_name(xen_session *session, xen_vif vif, char *name)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif },
-            { .type = &abstract_type_string,
-              .u.string_val = name }
-        };
-
-    xen_call_(session, "VIF.set_name", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vif_set_type(xen_session *session, xen_vif vif, enum xen_driver_type type)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif },
-            { .type = &xen_driver_type_abstract_type_,
-              .u.string_val = xen_driver_type_to_string(type) }
-        };
-
-    xen_call_(session, "VIF.set_type", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vif_set_device(xen_session *session, xen_vif vif, char *device)
 {
     abstract_value param_values[] =
@@ -362,38 +290,6 @@ xen_vif_set_device(xen_session *session, xen_vif vif, char *device)
         };
 
     xen_call_(session, "VIF.set_device", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vif_set_network(xen_session *session, xen_vif vif, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif },
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    xen_call_(session, "VIF.set_network", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vif_set_vm(xen_session *session, xen_vif vif, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vif },
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    xen_call_(session, "VIF.set_VM", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

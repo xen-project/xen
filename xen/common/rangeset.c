@@ -283,12 +283,11 @@ struct rangeset *rangeset_new(
 
     if ( name != NULL )
     {
-        strncpy(r->name, name, sizeof(r->name));
-        r->name[sizeof(r->name)-1] = '\0';
+        safe_strcpy(r->name, name);
     }
     else
     {
-        sprintf(r->name, "(no name)");
+        snprintf(r->name, sizeof(r->name), "(no name)");
     }
 
     if ( (r->domain = d) != NULL )

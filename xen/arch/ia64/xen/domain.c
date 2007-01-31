@@ -1146,7 +1146,7 @@ int construct_dom0(struct domain *d,
 		panic("can't allocate start info page");
 	si = page_to_virt(start_info_page);
 	memset(si, 0, PAGE_SIZE);
-	sprintf(si->magic, "xen-%i.%i-ia64",
+	snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-ia64",
 		xen_major_version(), xen_minor_version());
 	si->nr_pages     = max_pages;
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
@@ -1162,8 +1162,7 @@ int construct_dom0(struct domain *d,
 	dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
 
 	/* Fill boot param.  */
-	strncpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
-	si->cmd_line[sizeof(si->cmd_line)-1] = 0;
+	strlcpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
 
 	bp = (struct ia64_boot_param *)((unsigned char *)si +
 	                                sizeof(start_info_t));

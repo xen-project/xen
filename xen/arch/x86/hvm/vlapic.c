@@ -810,48 +810,105 @@ static void lapic_info(struct vlapic *s)
 }
 #endif
 
-static void lapic_save(hvm_domain_context_t *h, void *opaque)
+/* rearm the actimer if needed, after a HVM restore */
+static void lapic_rearm(struct vlapic *s)
 {
-    struct vlapic *s = opaque;
-
-    lapic_info(s);
-
-    hvm_put_struct(h, &s->hw);
-    hvm_put_struct(h, s->regs);
-}
-
-static int lapic_load(hvm_domain_context_t *h, void *opaque, int version_id)
-{
-    struct vlapic *s = opaque;
-    struct vcpu *v = vlapic_vcpu(s);
     unsigned long tmict;
 
-    if (version_id != 1)
-        return -EINVAL;
-
-    hvm_get_struct(h, &s->hw);
-    hvm_get_struct(h, s->regs);
-
-    /* rearm the actiemr if needed */
     tmict = vlapic_get_reg(s, APIC_TMICT);
     if (tmict > 0) {
         uint64_t period = APIC_BUS_CYCLE_NS * (uint32_t)tmict * s->hw.timer_divisor;
+        uint32_t lvtt = vlapic_get_reg(s, APIC_LVTT);
 
-        create_periodic_time(v, &s->pt, period, s->pt.irq,
+        s->pt.irq = lvtt & APIC_VECTOR_MASK;
+        create_periodic_time(vlapic_vcpu(s), &s->pt, period, s->pt.irq,
                              vlapic_lvtt_period(s), NULL, s);
 
         printk("lapic_load to rearm the actimer:"
                     "bus cycle is %uns, "
-                    "saved tmict count %lu, period %"PRIu64"ns\n",
-                    APIC_BUS_CYCLE_NS, tmict, period);
-
+                    "saved tmict count %lu, period %"PRIu64"ns, irq=%"PRIu8"\n",
+                    APIC_BUS_CYCLE_NS, tmict, period, s->pt.irq);
     }
 
-
     lapic_info(s);
+}
 
+static int lapic_save_hidden(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+    struct vlapic *s;
+
+    for_each_vcpu(d, v)
+    {
+        s = vcpu_vlapic(v);
+        lapic_info(s);
+
+        if ( hvm_save_entry(LAPIC, v->vcpu_id, h, &s->hw) != 0 )
+            return 1; 
+    }
     return 0;
 }
+
+static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+    struct vlapic *s;
+
+    for_each_vcpu(d, v)
+    {
+        s = vcpu_vlapic(v);
+        if ( hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, s->regs) != 0 )
+            return 1; 
+    }
+    return 0;
+}
+
+static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
+{
+    uint16_t vcpuid;
+    struct vcpu *v;
+    struct vlapic *s;
+    
+    /* Which vlapic to load? */
+    vcpuid = hvm_load_instance(h); 
+    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL ) 
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: domain has no vlapic %u\n", vcpuid);
+        return -EINVAL;
+    }
+    s = vcpu_vlapic(v);
+    
+    if ( hvm_load_entry(LAPIC, h, &s->hw) != 0 ) 
+        return -EINVAL;
+
+    lapic_info(s);
+    return 0;
+}
+
+static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
+{
+    uint16_t vcpuid;
+    struct vcpu *v;
+    struct vlapic *s;
+    
+    /* Which vlapic to load? */
+    vcpuid = hvm_load_instance(h); 
+    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL ) 
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: domain has no vlapic %u\n", vcpuid);
+        return -EINVAL;
+    }
+    s = vcpu_vlapic(v);
+    
+    if ( hvm_load_entry(LAPIC_REGS, h, s->regs) != 0 ) 
+        return -EINVAL;
+
+    lapic_rearm(s);
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(LAPIC, lapic_save_hidden, lapic_load_hidden);
+HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_load_regs);
 
 int vlapic_init(struct vcpu *v)
 {
@@ -871,7 +928,6 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
     memset(vlapic->regs, 0, PAGE_SIZE);
 
-    hvm_register_savevm(v->domain, "xen_hvm_lapic", v->vcpu_id, 1, lapic_save, lapic_load, vlapic);
     vlapic_reset(vlapic);
 
     vlapic->hw.apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;

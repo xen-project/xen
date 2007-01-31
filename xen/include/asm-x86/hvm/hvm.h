@@ -83,8 +83,8 @@ struct hvm_function_table {
         struct vcpu *v, struct cpu_user_regs *r);
 
     /* save and load hvm guest cpu context for save/restore */
-    void (*save_cpu_ctxt)(hvm_domain_context_t *h, void *opaque);
-    int (*load_cpu_ctxt)(hvm_domain_context_t *h, void *opaque, int version);
+    void (*save_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
+    int (*load_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
 
     /*
      * Examine specifics of the guest state:

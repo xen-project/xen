@@ -168,19 +168,11 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
-    HVMStateEntry *se, *dse;
     pit_deinit(d);
     rtc_deinit(d);
     pmtimer_deinit(d);
     hpet_deinit(d);
 
-    se = d->arch.hvm_domain.first_se;
-    while (se) {
-        dse = se;
-        se = se->next;
-        xfree(dse);
-    }
- 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
             (void *)d->arch.hvm_domain.shared_page_va);
@@ -189,44 +181,57 @@ void hvm_domain_destroy(struct domain *d)
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
-#define HVM_VCPU_CTXT_MAGIC 0x85963130
-void hvm_save_cpu_ctxt(hvm_domain_context_t *h, void *opaque)
+static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    struct vcpu *v = opaque;
+    struct vcpu *v;
+    struct hvm_hw_cpu ctxt;
 
-    if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) {
-        hvm_put_32u(h, 0x0);
-        return;
+    for_each_vcpu(d, v)
+    {
+        /* We don't need to save state for a vcpu that is down; the restore 
+         * code will leave it down if there is nothing saved. */
+        if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) 
+            continue;
+
+        hvm_funcs.save_cpu_ctxt(v, &ctxt);
+        if ( hvm_save_entry(CPU, v->vcpu_id, h, &ctxt) != 0 )
+            return 1; 
     }
-
-    hvm_put_32u(h, HVM_VCPU_CTXT_MAGIC);
-    hvm_funcs.save_cpu_ctxt(h, opaque);
+    return 0;
 }
 
-int hvm_load_cpu_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    struct vcpu *v = opaque;
+    int vcpuid;
+    struct vcpu *v;
+    struct hvm_hw_cpu ctxt;
 
-    if ( hvm_get_32u(h) != HVM_VCPU_CTXT_MAGIC )
-        return 0;
+    /* Which vcpu is this? */
+    vcpuid = hvm_load_instance(h);
+    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL ) 
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
+        return -EINVAL;
+    }
 
-    if ( hvm_funcs.load_cpu_ctxt(h, opaque, version) < 0 )
+    if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;
 
-    /* Auxiliary processors shoudl be woken immediately. */
+    if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
+        return -EINVAL;
+
+    /* Auxiliary processors should be woken immediately. */
     if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
         vcpu_wake(v);
 
     return 0;
 }
 
+HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt);
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
-
-    hvm_register_savevm(v->domain, "xen_hvm_cpu", v->vcpu_id, 1,
-                        hvm_save_cpu_ctxt, hvm_load_cpu_ctxt, 
-                        (void *)v);
 
     if ( (rc = vlapic_init(v)) != 0 )
         return rc;
@@ -249,13 +254,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
         return 0;
 
     pit_init(v, cpu_khz);
-    rtc_init(v, RTC_PORT(0), RTC_IRQ);
+    rtc_init(v, RTC_PORT(0));
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
     hpet_init(v);
  
-    /* init hvm sharepage */
-    shpage_init(v->domain, get_sp(v->domain));
-
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
 

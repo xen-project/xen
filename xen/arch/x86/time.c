@@ -274,7 +274,7 @@ static char *freq_string(u64 freq)
     unsigned int x, y;
     y = (unsigned int)do_div(freq, 1000000) / 1000;
     x = (unsigned int)freq;
-    sprintf(s, "%u.%03uMHz", x, y);
+    snprintf(s, sizeof(s), "%u.%03uMHz", x, y);
     return s;
 }
 

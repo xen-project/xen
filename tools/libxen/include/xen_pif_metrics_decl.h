@@ -16,22 +16,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
  */
 
+#ifndef XEN_PIF_METRICS_DECL_H
+#define XEN_PIF_METRICS_DECL_H
 
-/*
- * Declarations of the abstract types used during demarshalling of enum
- * xen_cpu_feature.  Internal to this library -- do not use from outside.
- */
+typedef void *xen_pif_metrics;
 
-
-#ifndef XEN_CPU_FEATURE_INTERNAL_H
-#define XEN_CPU_FEATURE_INTERNAL_H
-
-
-#include "xen_internal.h"
-
-
-extern const abstract_type xen_cpu_feature_abstract_type_;
-extern const abstract_type xen_cpu_feature_set_abstract_type_;
-
+struct xen_pif_metrics_set;
+struct xen_pif_metrics_record;
+struct xen_pif_metrics_record_set;
+struct xen_pif_metrics_record_opt;
+struct xen_pif_metrics_record_opt_set;
 
 #endif

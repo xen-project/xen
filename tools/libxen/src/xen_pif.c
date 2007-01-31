@@ -25,6 +25,7 @@
 #include "xen_internal.h"
 #include "xen_network.h"
 #include "xen_pif.h"
+#include "xen_pif_metrics.h"
 
 
 XEN_FREE(xen_pif)
@@ -41,9 +42,9 @@ static const struct_member xen_pif_record_struct_members[] =
         { .key = "uuid",
           .type = &abstract_type_string,
           .offset = offsetof(xen_pif_record, uuid) },
-        { .key = "name",
+        { .key = "device",
           .type = &abstract_type_string,
-          .offset = offsetof(xen_pif_record, name) },
+          .offset = offsetof(xen_pif_record, device) },
         { .key = "network",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_pif_record, network) },
@@ -57,14 +58,11 @@ static const struct_member xen_pif_record_struct_members[] =
           .type = &abstract_type_int,
           .offset = offsetof(xen_pif_record, mtu) },
         { .key = "VLAN",
-          .type = &abstract_type_string,
+          .type = &abstract_type_int,
           .offset = offsetof(xen_pif_record, vlan) },
-        { .key = "io_read_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_pif_record, io_read_kbs) },
-        { .key = "io_write_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_pif_record, io_write_kbs) }
+        { .key = "metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_pif_record, metrics) }
     };
 
 const abstract_type xen_pif_record_abstract_type_ =
@@ -86,11 +84,11 @@ xen_pif_record_free(xen_pif_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    free(record->name);
+    free(record->device);
     xen_network_record_opt_free(record->network);
     xen_host_record_opt_free(record->host);
     free(record->mac);
-    free(record->vlan);
+    xen_pif_metrics_record_opt_free(record->metrics);
     free(record);
 }
 
@@ -136,38 +134,7 @@ xen_pif_get_by_uuid(xen_session *session, xen_pif *result, char *uuid)
 
 
 bool
-xen_pif_create(xen_session *session, xen_pif *result, xen_pif_record *record)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &xen_pif_record_abstract_type_,
-              .u.struct_val = record }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("PIF.create");
-    return session->ok;
-}
-
-
-bool
-xen_pif_destroy(xen_session *session, xen_pif pif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif }
-        };
-
-    xen_call_(session, "PIF.destroy", param_values, 1, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_pif_get_name(xen_session *session, char **result, xen_pif pif)
+xen_pif_get_device(xen_session *session, char **result, xen_pif pif)
 {
     abstract_value param_values[] =
         {
@@ -178,7 +145,7 @@ xen_pif_get_name(xen_session *session, char **result, xen_pif pif)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("PIF.get_name");
+    XEN_CALL_("PIF.get_device");
     return session->ok;
 }
 
@@ -251,7 +218,23 @@ xen_pif_get_mtu(xen_session *session, int64_t *result, xen_pif pif)
 
 
 bool
-xen_pif_get_vlan(xen_session *session, char **result, xen_pif pif)
+xen_pif_get_vlan(xen_session *session, int64_t *result, xen_pif pif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = pif }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("PIF.get_VLAN");
+    return session->ok;
+}
+
+
+bool
+xen_pif_get_metrics(xen_session *session, xen_pif_metrics *result, xen_pif pif)
 {
     abstract_value param_values[] =
         {
@@ -262,87 +245,23 @@ xen_pif_get_vlan(xen_session *session, char **result, xen_pif pif)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("PIF.get_VLAN");
+    XEN_CALL_("PIF.get_metrics");
     return session->ok;
 }
 
 
 bool
-xen_pif_get_io_read_kbs(xen_session *session, double *result, xen_pif pif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif }
-        };
-
-    abstract_type result_type = abstract_type_float;
-
-    XEN_CALL_("PIF.get_io_read_kbs");
-    return session->ok;
-}
-
-
-bool
-xen_pif_get_io_write_kbs(xen_session *session, double *result, xen_pif pif)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif }
-        };
-
-    abstract_type result_type = abstract_type_float;
-
-    XEN_CALL_("PIF.get_io_write_kbs");
-    return session->ok;
-}
-
-
-bool
-xen_pif_set_name(xen_session *session, xen_pif pif, char *name)
+xen_pif_set_device(xen_session *session, xen_pif pif, char *device)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = pif },
             { .type = &abstract_type_string,
-              .u.string_val = name }
+              .u.string_val = device }
         };
 
-    xen_call_(session, "PIF.set_name", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_pif_set_network(xen_session *session, xen_pif pif, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif },
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    xen_call_(session, "PIF.set_network", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_pif_set_host(xen_session *session, xen_pif pif, xen_host host)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif },
-            { .type = &abstract_type_string,
-              .u.string_val = host }
-        };
-
-    xen_call_(session, "PIF.set_host", param_values, 2, NULL, NULL);
+    xen_call_(session, "PIF.set_device", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -380,17 +299,54 @@ xen_pif_set_mtu(xen_session *session, xen_pif pif, int64_t mtu)
 
 
 bool
-xen_pif_set_vlan(xen_session *session, xen_pif pif, char *vlan)
+xen_pif_set_vlan(xen_session *session, xen_pif pif, int64_t vlan)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = pif },
-            { .type = &abstract_type_string,
-              .u.string_val = vlan }
+            { .type = &abstract_type_int,
+              .u.int_val = vlan }
         };
 
     xen_call_(session, "PIF.set_VLAN", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_pif_create_vlan(xen_session *session, xen_pif *result, char *device, xen_network network, xen_host host, int64_t vlan)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = device },
+            { .type = &abstract_type_string,
+              .u.string_val = network },
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_int,
+              .u.int_val = vlan }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("PIF.create_VLAN");
+    return session->ok;
+}
+
+
+bool
+xen_pif_destroy(xen_session *session, xen_pif self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "PIF.destroy", param_values, 1, NULL, NULL);
     return session->ok;
 }
 

@@ -57,8 +57,6 @@ class XendVDI(AutoSaveObject):
                  'sector_size',
                  'virtual_size',
                  'physical_utilisation',
-                 'parent',
-                 'children',
                  'sharable',
                  'read_only']
 
@@ -72,8 +70,6 @@ class XendVDI(AutoSaveObject):
         self.sector_size = 1024
         self.virtual_size = 0
         self.physical_utilisation = 0
-        self.parent = None
-        self.children = []
         self.sharable = False
         self.read_only = False
         self.type = "system"
@@ -148,8 +144,6 @@ class XendVDI(AutoSaveObject):
                 'virtual_size': self.virtual_size,
                 'physical_utilisation': self.physical_utilisation,
                 'sector_size': self.sector_size,
-                'parent': None,
-                'children': [],
                 'sharable': False,
                 'readonly': False,
                 'SR': self.sr_uuid,

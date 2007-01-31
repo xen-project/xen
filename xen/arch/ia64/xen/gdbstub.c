@@ -289,13 +289,13 @@ gdb_arch_read_reg(unsigned long regnum, struct cpu_user_regs *regs,
 	}
 
 	dbg_printk("Register read regnum = 0x%lx, val = 0x%lx\n", regnum, reg);	
-	sprintf(buf, "%.08lx", swab64(reg));
+	snprintf(buf, sizeof(buf), "%.08lx", swab64(reg));
 out:
 	return gdb_send_reply(buf, ctx);
 
 out_err:
 	dbg_printk("Register read unsupported regnum = 0x%lx\n", regnum);
-	sprintf(buf, "%s", "x");
+	safe_strcpy(buf, "x");
 	goto out;
 }
 #else
@@ -639,7 +639,7 @@ kgdb_get_reg(int regnum, struct unw_frame_info *info,
 		outbuffer[size*2] = 0;
 	}
 	else
-		strcpy(outbuffer, "E0");
+		strlcpy(outbuffer, "E0", sizeof("E0"));
 
 	return;
 #else
@@ -756,19 +756,19 @@ gdb_arch_read_reg(unsigned long regnum, struct cpu_user_regs *regs,
 	if (arg.error > 0) {
 		// notify gdb that this register is not supported.
 		// see fetch_register_using_p() in gdb/remote.c.
-		sprintf(buf, "%s", "x");
+		safe_strcpy(buf, "x");
 	} else if (IA64_FR0_REGNUM <= regnum && regnum <= IA64_FR0_REGNUM + 127) {
-		sprintf(buf, "%.016lx", swab64(freg.u.bits[0]));
-		sprintf(buf + 16, "%.016lx", swab64(freg.u.bits[1]));
+		snprintf(buf, sizeof(buf), "%.016lx", swab64(freg.u.bits[0]));
+		snprintf(buf + 16, sizeof(buf) - 16, "%.016lx", swab64(freg.u.bits[1]));
 	} else {
-		sprintf(buf, "%.016lx", swab64(reg));
+		snprintf(buf, sizeof(buf), "%.016lx", swab64(reg));
 	}
 out:
 	return gdb_send_reply(buf, ctx);
 
 out_err:
 	dbg_printk("Register read unsupported regnum = 0x%lx\n", regnum);
-	sprintf(buf, "%s", "E0");
+	safe_strcpy(buf, "E0");
 	goto out;
 }
 #endif

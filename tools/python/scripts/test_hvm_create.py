@@ -72,6 +72,12 @@ vif_cfg = {
     'MTU': 1500,
 }    
 
+console_cfg = {
+    'protocol': 'rfb',
+    'other_config': {'vncunused': 1, 'vncpasswd': 'testing'},
+}
+
+
 import sys
 import time
 sys.path.append('/usr/lib/python')
@@ -124,6 +130,12 @@ def test_vm_create():
         vif_cfg['network'] = net_uuid
         vif_cfg['VM'] = vm_uuid
         vif_uuid = execute(server, 'VIF.create', (session, vif_cfg))
+
+        # Create a console
+        console_cfg['VM'] = vm_uuid
+        console_uuid = execute(server, 'console.create',
+                               (session, console_cfg))
+        print console_uuid
 
         # Start the VM
         execute(server, 'VM.start', (session, vm_uuid, False))

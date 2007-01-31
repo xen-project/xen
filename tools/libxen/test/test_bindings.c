@@ -277,13 +277,7 @@ int main(int argc, char **argv)
  */
 static xen_vm create_new_vm(xen_session *session)
 {
-    xen_cpu_feature_set *empty_cpu_feature_set =
-        xen_cpu_feature_set_alloc(0);
-
-    xen_cpu_feature_set *force_off_cpu_feature_set =
-        xen_cpu_feature_set_alloc(1);
-    force_off_cpu_feature_set->contents[0] = XEN_CPU_FEATURE_MMX;
-
+    xen_string_string_map *vcpus_params = xen_string_string_map_alloc(1);
     xen_vm_record vm_record =
         {
             .name_label = "NewVM",
@@ -295,15 +289,10 @@ static xen_vm create_new_vm(xen_session *session)
             .memory_dynamic_min = 128,
             .memory_static_min = 128,
             .vcpus_policy = "credit",
-            .vcpus_params = "",
+            .vcpus_params = vcpus_params,
             .vcpus_number = 2,
-            .vcpus_features_required = empty_cpu_feature_set,
-            .vcpus_features_can_use = empty_cpu_feature_set,
-            .vcpus_features_force_on = empty_cpu_feature_set,
-            .vcpus_features_force_off = force_off_cpu_feature_set,
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
-            .actions_after_suspend = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
             .hvm_boot = "",
             .pv_bootloader = "pygrub",
@@ -316,9 +305,6 @@ static xen_vm create_new_vm(xen_session *session)
 
     xen_vm vm;
     xen_vm_create(session, &vm, &vm_record);
-
-    xen_cpu_feature_set_free(empty_cpu_feature_set);
-    xen_cpu_feature_set_free(force_off_cpu_feature_set);
 
     if (!session->ok)
     {
@@ -382,8 +368,7 @@ static xen_vm create_new_vm(xen_session *session)
             .vm = &vm_record_opt,
             .vdi = &vdi0_record_opt,
             .device = "xvda1",
-            .mode = XEN_VBD_MODE_RW,
-            .driver = XEN_DRIVER_TYPE_PARAVIRTUALISED
+            .mode = XEN_VBD_MODE_RW
         };
 
     xen_vbd vbd0;

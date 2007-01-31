@@ -45,7 +45,7 @@ VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
 VBD_LIST_FORMAT = '%(device)-6s %(uuid)-36s %(VDI)-8s'
 TASK_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(status)-8s %(progress)-4s'
 VIF_LIST_FORMAT = '%(name)-8s %(device)-7s %(uuid)-36s %(MAC)-10s'
-CONSOLE_LIST_FORMAT = '%(uuid)-36s %(protocol)-8s %(uri)-32s'
+CONSOLE_LIST_FORMAT = '%(uuid)-36s %(protocol)-8s %(location)-32s'
 
 COMMANDS = {
     'host-info': ('', 'Get Xen Host Info'),
@@ -545,7 +545,7 @@ def xapi_console_list(args, async = False):
 
     if not is_long:
         print CONSOLE_LIST_FORMAT % {'protocol': 'Protocol',
-                                     'uri': 'URI',
+                                     'location': 'Location',
                                      'uuid': 'UUID'}
 
         for console in consoles:
@@ -678,14 +678,6 @@ def xapi_vtpm_create(args, async = False):
     print "Creating vTPM with cfg = %s" % cfg
     vtpm_uuid = execute(server, 'VTPM.create', (session, cfg))
     print "Done. (%s)" % vtpm_uuid
-    vtpm_id = execute(server, 'VTPM.get_instance', (session, vtpm_uuid))
-    print "Has instance number '%s'" % vtpm_id
-    vtpm_be = execute(server, 'VTPM.get_backend', (session, vtpm_uuid))
-    print "Has backend in '%s'" % vtpm_be
-    driver = execute(server, 'VTPM.get_driver', (session, vtpm_uuid))
-    print "Has driver type '%s'" % driver
-    vtpm_rec = execute(server, 'VTPM.get_record', (session, vtpm_uuid))
-    print "Has vtpm record '%s'" % vtpm_rec
 
 
 def xapi_pif_list(args, async = False):

@@ -523,49 +523,57 @@ static void hvmirq_info(struct hvm_hw_irq *hvm_irq)
 }
 #endif
 
-static void ioapic_save(hvm_domain_context_t *h, void *opaque)
-{
-    struct domain *d = opaque;
-    struct hvm_hw_vioapic *s = domain_vioapic(d);
-    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
 
+static int ioapic_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct hvm_hw_vioapic *s = domain_vioapic(d);
     ioapic_info(s);
-    hvmirq_info(hvm_irq);
 
     /* save io-apic state*/
-    hvm_put_struct(h, s);
-
-    /* save hvm irq state */
-    hvm_put_struct(h, hvm_irq);
+    return ( hvm_save_entry(IOAPIC, 0, h, s) );
 }
 
-static int ioapic_load(hvm_domain_context_t *h, void *opaque, int version_id)
+static int ioapic_save_irqs(struct domain *d, hvm_domain_context_t *h)
 {
-    struct domain *d = opaque;
-    struct hvm_hw_vioapic *s = domain_vioapic(d);
     struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    
-    if (version_id != 1)
-        return -EINVAL;
-
-    /* restore ioapic state */
-    hvm_get_struct(h, s);
-
-    /* restore irq state */
-    hvm_get_struct(h, hvm_irq);
-
-    ioapic_info(s);
     hvmirq_info(hvm_irq);
 
+    /* save IRQ state*/
+    return ( hvm_save_entry(IRQ, 0, h, hvm_irq) );    
+}
+
+
+static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
+{
+    struct hvm_hw_vioapic *s = domain_vioapic(d);
+    
+    /* restore ioapic state */
+    if ( hvm_load_entry(IOAPIC, h, s) != 0 )
+        return -EINVAL;
+
+    ioapic_info(s);
     return 0;
 }
+
+static int ioapic_load_irqs(struct domain *d, hvm_domain_context_t *h)
+{
+    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
+
+    /* restore irq state */
+    if ( hvm_load_entry(IRQ, h, hvm_irq) != 0 )
+        return -EINVAL;
+
+    hvmirq_info(hvm_irq);
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load);
+HVM_REGISTER_SAVE_RESTORE(IRQ, ioapic_save_irqs, ioapic_load_irqs);
 
 void vioapic_init(struct domain *d)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
     int i;
-
-    hvm_register_savevm(d, "xen_hvm_ioapic", 0, 1, ioapic_save, ioapic_load, d);
 
     memset(vioapic, 0, sizeof(*vioapic));
     for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )

@@ -157,6 +157,12 @@ static int arch_setup_early(struct xc_dom_image *dom)
     return rc;
 }
 
+static int arch_setup_middle(struct xc_dom_image *dom)
+{
+    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    return 0;
+}
+
 static int arch_setup_late(struct xc_dom_image *dom)
 {
     static const struct {
@@ -259,6 +265,12 @@ static int arch_setup_late(struct xc_dom_image *dom)
 
 static int arch_setup_early(struct xc_dom_image *dom)
 {
+    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    return 0;
+}
+
+static int arch_setup_middle(struct xc_dom_image *dom)
+{
     DECLARE_DOMCTL;
     int rc;
 
@@ -268,16 +280,35 @@ static int arch_setup_early(struct xc_dom_image *dom)
     domctl.cmd = XEN_DOMCTL_arch_setup;
     domctl.domain = dom->guest_domid;
     domctl.u.arch_setup.flags = 0;
+
+    /* dom->start_info_pfn should be initialized by alloc_magic_pages().
+     * However it is called later. So we initialize here.
+     */
+    dom->start_info_pfn = dom->total_pages - 3;
     domctl.u.arch_setup.bp = (dom->start_info_pfn << PAGE_SHIFT)
 	+ sizeof(start_info_t);
-    domctl.u.arch_setup.maxmem = dom->total_pages << PAGE_SHIFT;
+    /* 3 = start info page, xenstore page and console page */
+    domctl.u.arch_setup.maxmem = (dom->total_pages - 3) << PAGE_SHIFT;
     rc = do_domctl(dom->guest_xc, &domctl);
     return rc;
 }
 
 static int arch_setup_late(struct xc_dom_image *dom)
 {
-    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+    shared_info_t *shared_info;
+
+    /* setup shared_info page */
+    xc_dom_printf("%s: shared_info: mfn 0x%" PRIpfn "\n",
+		  __FUNCTION__, dom->shared_info_mfn);
+    shared_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+				       page_size,
+				       PROT_READ | PROT_WRITE,
+				       dom->shared_info_mfn);
+    if (NULL == shared_info)
+	return -1;
+    dom->arch_hooks->shared_info(dom, shared_info);
+    munmap(shared_info, page_size);
     return 0;
 }
 
@@ -287,6 +318,12 @@ static int arch_setup_late(struct xc_dom_image *dom)
 #elif defined(__powerpc64__)
 
 static int arch_setup_early(struct xc_dom_image *dom)
+{
+    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    return 0;
+}
+
+static int arch_setup_middle(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
@@ -319,6 +356,12 @@ static int arch_setup_late(struct xc_dom_image *dom)
 #else
 
 static int arch_setup_early(struct xc_dom_image *dom)
+{
+    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    return 0;
+}
+
+static int arch_setup_middle(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
@@ -394,6 +437,9 @@ int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 		     __FUNCTION__);
 	return rc;
     }
+
+    if (0 != (rc = arch_setup_middle(dom)))
+        return rc;
 
     return 0;
 }

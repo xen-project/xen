@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (c) 2006 Xensource Inc.
+# Copyright (c) 2006, 2007 Xensource Inc.
 #============================================================================
 
 import os
@@ -23,12 +23,13 @@ import xen.lowlevel.xc
 from xen.util import Brctl
 
 from xen.xend import uuid
-from xen.xend.XendError import XendError, NetworkAlreadyConnected
+from xen.xend.XendError import *
 from xen.xend.XendOptions import instance as xendoptions
 from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
 from xen.xend.XendLocalStorageRepo import XendLocalStorageRepo
 from xen.xend.XendLogging import log
 from xen.xend.XendPIF import *
+from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendNetwork import *
 from xen.xend.XendStateStore import XendStateStore
 from xen.xend.XendMonitor import XendMonitor
@@ -39,10 +40,12 @@ class XendNode:
     def __init__(self):
         """Initalises the state of all host specific objects such as
 
-        * Host
-        * Host_CPU
+        * host
+        * host_CPU
+        * host_metrics
         * PIF
-        * Network
+        * PIF_metrics
+        * network
         * Storage Repository
         """
         
@@ -58,12 +61,20 @@ class XendNode:
             host = saved_host[self.uuid]
             self.name = host.get('name_label', socket.gethostname())
             self.desc = host.get('name_description', '')
+            self.host_metrics_uuid = host.get('metrics_uuid',
+                                              uuid.createString())
+            try:
+                self.other_config = eval(host['other_config'])
+            except:
+                self.other_config = {}
             self.cpus = {}
         else:
             self.uuid = uuid.createString()
             self.name = socket.gethostname()
             self.desc = ''
+            self.other_config = {}
             self.cpus = {}
+            self.host_metrics_uuid = uuid.createString()
             
         # load CPU UUIDs
         saved_cpus = self.state_store.load_state('cpu')
@@ -88,6 +99,7 @@ class XendNode:
                 self.cpus[cpu_uuid] = cpu_info
 
         self.pifs = {}
+        self.pif_metrics = {}
         self.networks = {}
         self.srs = {}
         
@@ -111,8 +123,22 @@ class XendNode:
                 if pif.get('network') in self.networks:
                     network = self.networks[pif['network']]
                     try:
-                        self.PIF_create(pif['name'], pif['MTU'], pif['VLAN'],
-                                        pif['MAC'], network, False, pif_uuid)
+                        if 'device' not in pif and 'name' in pif:
+                            # Compatibility hack, can go pretty soon.
+                            pif['device'] = pif['name']
+                        if 'metrics' not in pif:
+                            # Compatibility hack, can go pretty soon.
+                            pif['metrics'] = uuid.createString()
+
+                        try:
+                            pif['VLAN'] = int(pif.get('VLAN', -1))
+                        except (ValueError, TypeError):
+                            pif['VLAN'] = -1
+
+                        self._PIF_create(pif['device'], pif['MTU'],
+                                         pif['VLAN'],
+                                         pif['MAC'], network, False, pif_uuid,
+                                         pif['metrics'])
                     except NetworkAlreadyConnected, exn:
                         log.error('Cannot load saved PIF %s, as network %s ' +
                                   'is already connected to PIF %s',
@@ -120,7 +146,7 @@ class XendNode:
         else:
             for name, mtu, mac in linux_get_phy_ifaces():
                 network = self.networks.values()[0]
-                self.PIF_create(name, mtu, '', mac, network, False)
+                self._PIF_create(name, mtu, -1, mac, network, False)
 
         # initialise storage
         saved_srs = self.state_store.load_state('sr')
@@ -161,16 +187,24 @@ class XendNode:
         self.save_networks()
 
 
-    def PIF_create(self, name, mtu, vlan, mac, network, persist = True,
-                   pif_uuid = None):
+    def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
+                    pif_uuid = None, metrics_uuid = None):
         for pif in self.pifs.values():
             if pif.network == network:
                 raise NetworkAlreadyConnected(pif.uuid)
 
         if pif_uuid is None:
             pif_uuid = uuid.createString()
-        self.pifs[pif_uuid] = XendPIF(pif_uuid, name, mtu, vlan, mac, network,
-                                      self)
+        if metrics_uuid is None:
+            metrics_uuid = uuid.createString()
+
+        metrics = XendPIFMetrics(metrics_uuid)
+        pif = XendPIF(pif_uuid, metrics, name, mtu, vlan, mac, network, self)
+        metrics.set_PIF(pif)
+
+        self.pif_metrics[metrics_uuid] = metrics
+        self.pifs[pif_uuid] = pif
+
         if persist:
             self.save_PIFs()
             self.refreshBridges()
@@ -178,12 +212,20 @@ class XendNode:
 
 
     def PIF_create_VLAN(self, pif_uuid, network_uuid, vlan):
+        if vlan < 0 or vlan >= 4096:
+            raise VLANTagInvalid()
+            
         pif = self.pifs[pif_uuid]
         network = self.networks[network_uuid]
-        return self.PIF_create(pif.name, pif.mtu, vlan, pif.mac, network)
+        return self._PIF_create(pif.device, pif.mtu, vlan, pif.mac, network)
 
 
     def PIF_destroy(self, pif_uuid):
+        pif = self.pifs[pif_uuid]
+
+        if pif.vlan == -1:
+            raise PIFIsPhysical()
+
         del self.pifs[pif_uuid]
         self.save_PIFs()
 
@@ -191,7 +233,9 @@ class XendNode:
     def save(self):
         # save state
         host_record = {self.uuid: {'name_label':self.name,
-                                   'name_description':self.desc}}
+                                   'name_description':self.desc,
+                                   'metrics_uuid': self.host_metrics_uuid,
+                                   'other_config': repr(self.other_config)}}
         self.state_store.save_state('host',host_record)
         self.state_store.save_state('cpu', self.cpus)
         self.save_PIFs()
@@ -199,7 +243,7 @@ class XendNode:
         self.save_SRs()
 
     def save_PIFs(self):
-        pif_records = dict([(k, v.get_record(transient = False))
+        pif_records = dict([(k, v.get_record())
                             for k, v in self.pifs.items()])
         self.state_store.save_state('pif', pif_records)
 
@@ -480,12 +524,6 @@ class XendNode:
         vbd_loads = self.monitor.get_domain_vbds_util()
         if domid in vbd_loads:
             return vbd_loads[domid].get(vbdid, (0.0, 0.0))
-        return (0.0, 0.0)
-
-    def get_pif_util(self, pifname):
-        pifs_util = self.monitor.get_pifs_util()
-        if pifname in pifs_util:
-            return pifs_util[pifname]
         return (0.0, 0.0)
 
     # dictionary version of *info() functions to get rid of
