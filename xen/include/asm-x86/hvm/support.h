@@ -119,133 +119,121 @@ extern unsigned int opt_hvm_debug_level;
 #define TRACE_VMEXIT(index, value)                              \
     current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
 
-/* save/restore support */
+/*
+ * Save/restore support 
+ */
 
-//#define HVM_DEBUG_SUSPEND
-
-extern int hvm_register_savevm(struct domain *d,
-                    const char *idstr,
-                    int instance_id,
-                    int version_id,
-                    SaveStateHandler *save_state,
-                    LoadStateHandler *load_state,
-                    void *opaque);
-
-static inline void hvm_ctxt_seek(hvm_domain_context_t *h, unsigned int pos)
+/* Marshalling an entry: check space and fill in the header */
+static inline int _hvm_init_entry(struct hvm_domain_context *h,
+                                  uint16_t tc, uint16_t inst, uint32_t len)
 {
-    h->cur = pos;
-}
-
-static inline uint32_t hvm_ctxt_tell(hvm_domain_context_t *h)
-{
-    return h->cur;
-}
-
-static inline int hvm_ctxt_end(hvm_domain_context_t *h)
-{
-    return (h->cur >= h->size || h->cur >= HVM_CTXT_SIZE);
-}
-
-static inline void hvm_put_byte(hvm_domain_context_t *h, unsigned int i)
-{
-    if (h->cur >= HVM_CTXT_SIZE) {
-        h->cur++;
-        return;
-    }
-    h->data[h->cur++] = (char)i;
-}
-
-static inline void hvm_put_8u(hvm_domain_context_t *h, uint8_t b)
-{
-    hvm_put_byte(h, b);
-}
-
-static inline void hvm_put_16u(hvm_domain_context_t *h, uint16_t b)
-{
-    hvm_put_8u(h, b >> 8);
-    hvm_put_8u(h, b);
-}
-
-static inline void hvm_put_32u(hvm_domain_context_t *h, uint32_t b)
-{
-    hvm_put_16u(h, b >> 16);
-    hvm_put_16u(h, b);
-}
-
-static inline void hvm_put_64u(hvm_domain_context_t *h, uint64_t b)
-{
-    hvm_put_32u(h, b >> 32);
-    hvm_put_32u(h, b);
-}
-
-static inline void hvm_put_buffer(hvm_domain_context_t *h, const char *buf, int len)
-{
-    memcpy(&h->data[h->cur], buf, len);
-    h->cur += len;
-}
-
-static inline char hvm_get_byte(hvm_domain_context_t *h)
-{
-    if (h->cur >= HVM_CTXT_SIZE) {
-        printk("hvm_get_byte overflow.\n");
+    struct hvm_save_descriptor *d 
+        = (struct hvm_save_descriptor *)&h->data[h->cur];
+    if ( h->size - h->cur < len + sizeof (*d) )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "HVM save: no room for %"PRIu32" + %u bytes "
+                 "for typecode %"PRIu16"\n",
+                 len, (unsigned) sizeof (*d), tc);
         return -1;
     }
+    d->typecode = tc;
+    d->instance = inst;
+    d->length = len;
+    h->cur += sizeof (*d);
+    return 0;
+}
 
-    if (h->cur >= h->size) {
-        printk("hvm_get_byte exceed data area.\n");
+/* Marshalling: copy the contents in a type-safe way */
+#define _hvm_write_entry(_x, _h, _src) do {                     \
+    *(HVM_SAVE_TYPE(_x) *)(&(_h)->data[(_h)->cur]) = *(_src);   \
+    (_h)->cur += HVM_SAVE_LENGTH(_x);                           \
+} while (0)
+
+/* Marshalling: init and copy; evaluates to zero on success */
+#define hvm_save_entry(_x, _inst, _h, _src) ({          \
+    int r;                                              \
+    r = _hvm_init_entry((_h), HVM_SAVE_CODE(_x),        \
+                        (_inst), HVM_SAVE_LENGTH(_x));  \
+    if ( r == 0 )                                       \
+        _hvm_write_entry(_x, (_h), (_src));             \
+    r; })
+
+/* Unmarshalling: test an entry's size and typecode and record the instance */
+static inline int _hvm_check_entry(struct hvm_domain_context *h, 
+                                   uint16_t type, uint32_t len)
+{
+    struct hvm_save_descriptor *d 
+        = (struct hvm_save_descriptor *)&h->data[h->cur];
+    if ( len + sizeof (*d) > h->size - h->cur)
+    {
+        gdprintk(XENLOG_WARNING, 
+                 "HVM restore: not enough data left to read %u bytes "
+                 "for type %u\n", len, type);
+        return -1;
+    }    
+    if ( type != d->typecode || len != d->length )
+    {
+        gdprintk(XENLOG_WARNING, 
+                 "HVM restore mismatch: expected type %u length %u, "
+                 "saw type %u length %u\n", type, len, d->typecode, d->length);
         return -1;
     }
-
-    return h->data[h->cur++];
+    h->cur += sizeof (*d);
+    return 0;
 }
 
-static inline uint8_t hvm_get_8u(hvm_domain_context_t *h)
+/* Unmarshalling: copy the contents in a type-safe way */
+#define _hvm_read_entry(_x, _h, _dst) do {                      \
+    *(_dst) = *(HVM_SAVE_TYPE(_x) *) (&(_h)->data[(_h)->cur]);  \
+    (_h)->cur += HVM_SAVE_LENGTH(_x);                           \
+} while (0)
+
+/* Unmarshalling: check, then copy. Evaluates to zero on success. */
+#define hvm_load_entry(_x, _h, _dst) ({                                 \
+    int r;                                                              \
+    r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x), HVM_SAVE_LENGTH(_x)); \
+    if ( r == 0 )                                                       \
+        _hvm_read_entry(_x, (_h), (_dst));                              \
+    r; })
+
+/* Unmarshalling: what is the instance ID of the next entry? */
+static inline uint16_t hvm_load_instance(struct hvm_domain_context *h)
 {
-    return hvm_get_byte(h);
+    struct hvm_save_descriptor *d 
+        = (struct hvm_save_descriptor *)&h->data[h->cur];
+    return d->instance;
 }
 
-static inline uint16_t hvm_get_16u(hvm_domain_context_t *h)
-{
-    uint16_t v;
-    v =  hvm_get_8u(h) << 8;
-    v |= hvm_get_8u(h);
+/* Handler types for different types of save-file entry. 
+ * The save handler may save multiple instances of a type into the buffer;
+ * the load handler will be called once for each instance found when
+ * restoring.  Both return non-zero on error. */
+typedef int (*hvm_save_handler) (struct domain *d, 
+                                 hvm_domain_context_t *h);
+typedef int (*hvm_load_handler) (struct domain *d,
+                                 hvm_domain_context_t *h);
 
-    return v;
-}
+/* Init-time function to declare a pair of handlers for a type */
+void hvm_register_savevm(uint16_t typecode, 
+                         hvm_save_handler save_state,
+                         hvm_load_handler load_state);
 
-static inline uint32_t hvm_get_32u(hvm_domain_context_t *h)
-{
-    uint32_t v;
-    v =  hvm_get_16u(h) << 16;
-    v |= hvm_get_16u(h);
+/* Syntactic sugar around that function */
+#define HVM_REGISTER_SAVE_RESTORE(_x, _save, _load)             \
+static int __hvm_register_##_x##_save_and_restore(void)         \
+{                                                               \
+    hvm_register_savevm(HVM_SAVE_CODE(_x), &_save, &_load);     \
+    return 0;                                                   \
+}                                                               \
+__initcall(__hvm_register_##_x##_save_and_restore);
 
-    return v;
-}
 
-static inline uint64_t hvm_get_64u(hvm_domain_context_t *h)
-{
-    uint64_t v;
-    v =  (uint64_t)hvm_get_32u(h) << 32;
-    v |= hvm_get_32u(h);
-
-    return v;
-}
-
-static inline void hvm_get_buffer(hvm_domain_context_t *h, char *buf, int len)
-{
-    memcpy(buf, &h->data[h->cur], len);
-    h->cur += len;
-}
-
-#define hvm_put_struct(_h, _p) \
-    hvm_put_buffer((_h), (char *)(_p), sizeof(*(_p)))
-#define hvm_get_struct(_h, _p) \
-    hvm_get_buffer((_h), (char *)(_p), sizeof(*(_p)))
-
+/* Entry points for saving and restoring HVM domain state */
 int hvm_save(struct domain *d, hvm_domain_context_t *h);
 int hvm_load(struct domain *d, hvm_domain_context_t *h);
 
-void shpage_init(struct domain *d, shared_iopage_t *sp);
+/* End of save/restore */
 
 extern char hvm_io_bitmap[];
 extern int hvm_enabled;

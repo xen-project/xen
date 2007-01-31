@@ -40,24 +40,52 @@
  */
 
 /* 
- * Save/restore header
+ * Each entry is preceded by a descriptor giving its type and length
+ */
+struct hvm_save_descriptor {
+    uint16_t typecode;          /* Used to demux the various types below */
+    uint16_t instance;          /* Further demux within a type */
+    uint32_t length;            /* In bytes, *not* including this descriptor */
+};
+
+
+/* 
+ * Each entry has a datatype associated with it: for example, the CPU state 
+ * is saved as a HVM_SAVE_TYPE(CPU), which has HVM_SAVE_LENGTH(CPU), 
+ * and is identified by a descriptor with typecode HVM_SAVE_CODE(CPU).
+ * DECLARE_HVM_SAVE_TYPE binds these things together with some type-system
+ * ugliness.
  */
 
-#define HVM_SAVE_TYPE_HEADER 0
+#define DECLARE_HVM_SAVE_TYPE(_x, _code, _type)                   \
+  struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; }
+
+#define HVM_SAVE_TYPE(_x) typeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->t)
+#define HVM_SAVE_LENGTH(_x) (sizeof (HVM_SAVE_TYPE(_x)))
+#define HVM_SAVE_CODE(_x) (sizeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->c))
+
+
+/* 
+ * Save/restore header: general info about the save file. 
+ */
 
 #define HVM_FILE_MAGIC   0x54381286
 #define HVM_FILE_VERSION 0x00000001
 
 struct hvm_save_header {
-    uint32_t magic;
-    uint32_t version;
-    uint32_t cpuid;
+    uint32_t magic;             /* Must be HVM_FILE_MAGIC */
+    uint32_t version;           /* File format version */
+    uint64_t changeset;         /* Version of Xen that saved this file */
+    uint32_t cpuid;             /* CPUID[0x01][%eax] on the saving machine */
 };
+
+DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
+
 
 /*
  * Processor
  */
-#define HVM_SAVE_TYPE_CPU  1
+
 struct hvm_hw_cpu {
     uint64_t eip;
     uint64_t esp;
@@ -124,11 +152,13 @@ struct hvm_hw_cpu {
     uint64_t tsc;
 };
 
+DECLARE_HVM_SAVE_TYPE(CPU, 2, struct hvm_hw_cpu);
+
 
 /* 
  *  PIT
  */
-#define HVM_SAVE_TYPE_PIT 2
+
 struct hvm_hw_pit {
     struct hvm_hw_pit_channel {
         int64_t count_load_time;
@@ -148,11 +178,13 @@ struct hvm_hw_pit {
     uint32_t speaker_data_on;
 };
 
+DECLARE_HVM_SAVE_TYPE(PIT, 3, struct hvm_hw_pit);
+
 
 /*
  * PIC
  */
-#define HVM_SAVE_TYPE_PIC 3
+
 struct hvm_hw_vpic {
     /* IR line bitmasks. */
     uint8_t irr;
@@ -201,11 +233,12 @@ struct hvm_hw_vpic {
     uint8_t int_output;
 };
 
+DECLARE_HVM_SAVE_TYPE(PIC, 4, struct hvm_hw_vpic);
+
 
 /*
  * IO-APIC
  */
-#define HVM_SAVE_TYPE_IOAPIC 4
 
 #ifdef __ia64__
 #define VIOAPIC_IS_IOSAPIC 1
@@ -242,11 +275,13 @@ struct hvm_hw_vioapic {
     } redirtbl[VIOAPIC_NUM_PINS];
 };
 
+DECLARE_HVM_SAVE_TYPE(IOAPIC, 5, struct hvm_hw_vioapic);
+
 
 /*
  * IRQ
  */
-#define HVM_SAVE_TYPE_IRQ 5
+
 struct hvm_hw_irq {
     /*
      * Virtual interrupt wires for a single PCI bus.
@@ -309,22 +344,40 @@ struct hvm_hw_irq {
     u8 round_robin_prev_vcpu;
 };
 
+DECLARE_HVM_SAVE_TYPE(IRQ, 6, struct hvm_hw_irq);
 
 /*
  * LAPIC
  */
-#define HVM_SAVE_TYPE_LAPIC 6
+
 struct hvm_hw_lapic {
     uint64_t             apic_base_msr;
     uint32_t             disabled; /* VLAPIC_xx_DISABLED */
     uint32_t             timer_divisor;
 };
 
-#define HVM_SAVE_TYPE_LAPIC_REGS 7
+DECLARE_HVM_SAVE_TYPE(LAPIC, 7, struct hvm_hw_lapic);
 
 struct hvm_hw_lapic_regs {
     /* A 4k page of register state */
     uint8_t  data[0x400];
 };
+
+DECLARE_HVM_SAVE_TYPE(LAPIC_REGS, 8, struct hvm_hw_lapic_regs);
+
+
+/* 
+ * Largest type-code in use
+ */
+#define HVM_SAVE_CODE_MAX 8
+
+
+/* 
+ * The series of save records is teminated by a zero-type, zero-length 
+ * descriptor.
+ */
+
+struct hvm_save_end {};
+DECLARE_HVM_SAVE_TYPE(END, 0, struct hvm_save_end);
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_H__ */

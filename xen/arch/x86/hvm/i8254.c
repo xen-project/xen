@@ -411,28 +411,24 @@ static void pit_info(PITState *pit)
 }
 #endif
 
-static void pit_save(hvm_domain_context_t *h, void *opaque)
+static int pit_save(struct domain *d, hvm_domain_context_t *h)
 {
-    struct domain *d = opaque;
     PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
     
     pit_info(pit);
 
     /* Save the PIT hardware state */
-    hvm_put_struct(h, &pit->hw);
+    return hvm_save_entry(PIT, 0, h, &pit->hw);
 }
 
-static int pit_load(hvm_domain_context_t *h, void *opaque, int version_id)
+static int pit_load(struct domain *d, hvm_domain_context_t *h)
 {
-    struct domain *d = opaque;
     PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
     int i;
 
-    if (version_id != 1)
-        return -EINVAL;
-
     /* Restore the PIT hardware state */
-    hvm_get_struct(h, &pit->hw);
+    if ( hvm_load_entry(PIT, h, &pit->hw) )
+        return 1;
     
     /* Recreate platform timers from hardware state.  There will be some 
      * time jitter here, but the wall-clock will have jumped massively, so 
@@ -446,6 +442,8 @@ static int pit_load(hvm_domain_context_t *h, void *opaque, int version_id)
     pit_info(pit);
     return 0;
 }
+
+HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load);
 
 static void pit_reset(void *opaque)
 {
@@ -474,7 +472,6 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     pt++; pt->vcpu = v;
     pt++; pt->vcpu = v;
 
-    hvm_register_savevm(v->domain, "xen_hvm_i8254", PIT_BASE, 1, pit_save, pit_load, v->domain);
     register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
     /* register the speaker port */
     register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);

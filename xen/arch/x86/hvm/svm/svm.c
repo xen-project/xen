@@ -603,29 +603,16 @@ void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     // dump_msr_state(guest_state);
 }
 
-void svm_save_vmcb_ctxt(hvm_domain_context_t *h, void *opaque)
+void svm_save_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
-    struct vcpu *v = opaque;
-    struct hvm_hw_cpu ctxt;
-
-    svm_save_cpu_state(v, &ctxt);
-
-    svm_vmcs_save(v, &ctxt);
-
-    hvm_put_struct(h, &ctxt);
+    svm_save_cpu_state(v, ctxt);
+    svm_vmcs_save(v, ctxt);
 }
 
-int svm_load_vmcb_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
-    struct vcpu *v = opaque;
-    struct hvm_hw_cpu ctxt;
-
-    if (version != 1)
-        return -EINVAL;
-
-    hvm_get_struct(h, &ctxt);
-    svm_load_cpu_state(v, &ctxt);
-    if (svm_vmcb_restore(v, &ctxt)) {
+    svm_load_cpu_state(v, ctxt);
+    if (svm_vmcb_restore(v, ctxt)) {
         printk("svm_vmcb restore failed!\n");
         domain_crash(v->domain);
         return -EINVAL;

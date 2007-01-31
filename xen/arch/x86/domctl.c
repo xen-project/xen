@@ -302,6 +302,8 @@ long arch_do_domctl(
         ret = -EFAULT;
         if ( copy_from_guest(c, domctl->u.hvmcontext.ctxt, 1) != 0 )
             goto sethvmcontext_out;
+        c->size = sizeof (c->data);
+        c->cur = 0;
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d) ) 
@@ -330,6 +332,7 @@ long arch_do_domctl(
         if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
             goto gethvmcontext_out;
         memset(c, 0, sizeof(*c));
+        c->size = sizeof (c->data);
         
         ret = -ENODATA;
         if ( !is_hvm_domain(d) ) 

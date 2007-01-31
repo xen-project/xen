@@ -364,19 +364,9 @@ static inline void __restore_debug_registers(struct vcpu *v)
     /* DR7 is loaded from the VMCS. */
 }
 
-static int __get_instruction_length(void);
 int vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
-{
-    unsigned long inst_len;
-
-    inst_len = __get_instruction_length();
+{    
     c->eip = __vmread(GUEST_RIP);
-
-#ifdef HVM_DEBUG_SUSPEND
-    printk("vmx_vmcs_save: inst_len=0x%lx, eip=0x%"PRIx64".\n", 
-            inst_len, c->eip);
-#endif
-
     c->esp = __vmread(GUEST_RSP);
     c->eflags = __vmread(GUEST_RFLAGS);
 
@@ -632,30 +622,18 @@ void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 }
 
 
-void vmx_save_vmcs_ctxt(hvm_domain_context_t *h, void *opaque)
+void vmx_save_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
-    struct vcpu *v = opaque;
-    struct hvm_hw_cpu ctxt;
-
-    vmx_save_cpu_state(v, &ctxt);
+    vmx_save_cpu_state(v, ctxt);
     vmx_vmcs_enter(v);
-    vmx_vmcs_save(v, &ctxt);
+    vmx_vmcs_save(v, ctxt);
     vmx_vmcs_exit(v);
-
-    hvm_put_struct(h, &ctxt);
 }
 
-int vmx_load_vmcs_ctxt(hvm_domain_context_t *h, void *opaque, int version)
+int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
-    struct vcpu *v = opaque;
-    struct hvm_hw_cpu ctxt;
-
-    if (version != 1)
-        return -EINVAL;
-
-    hvm_get_struct(h, &ctxt);
-    vmx_load_cpu_state(v, &ctxt);
-    if (vmx_vmcs_restore(v, &ctxt)) {
+    vmx_load_cpu_state(v, ctxt);
+    if (vmx_vmcs_restore(v, ctxt)) {
         printk("vmx_vmcs restore failed!\n");
         domain_crash(v->domain);
         return -EINVAL;
