@@ -98,6 +98,8 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     /* Types of the pfns in the current region */
     unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
+    struct xen_add_to_physmap xatp;
+
     /* hvm guest mem size (Mb) */
     memsize = (unsigned long long)*store_mfn;
     v_end = memsize << 20;
@@ -133,15 +135,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         errno = ENOMEM;
         goto out;
     }
-
-    /* Get the domain's shared-info frame. */
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)dom;
-    if (xc_domctl(xc_handle, &domctl) < 0) {
-        ERROR("Could not get information on new domain");
-        goto out;
-    }
-    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
     if(xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
         errno = ENOMEM;
@@ -344,6 +337,21 @@ int xc_hvm_restore(int xc_handle, int io_fd,
             ERROR("Could not set vcpu context, rc=%d", rc);
             goto out;
         }
+    }
+
+    /* Shared-info pfn */
+    if (!read_exact(io_fd, &(shared_info_frame), sizeof(uint32_t)) ) {
+        ERROR("reading the shared-info pfn failed!\n");
+        goto out;
+    }
+    /* Map the shared-info frame where it was before */
+    xatp.domid = dom;
+    xatp.space = XENMAPSPACE_shared_info;
+    xatp.idx   = 0;
+    xatp.gpfn  = shared_info_frame;
+    if ( (rc = xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp)) != 0 ) {
+        ERROR("setting the shared-info pfn failed!\n");
+        goto out;
     }
 
     rc = 0;

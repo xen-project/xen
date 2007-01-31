@@ -702,6 +702,12 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             goto out;
         }
     }
+
+    /* Shared-info pfn */
+    if (!write_exact(io_fd, &(shared_info_frame), sizeof(uint32_t)) ) {
+        ERROR("write shared-info pfn failed!\n");
+        goto out;
+    }
  
     /* Success! */
     rc = 0;
