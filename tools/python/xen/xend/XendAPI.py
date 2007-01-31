@@ -1121,11 +1121,11 @@ class XendAPI(object):
     
     def VM_get_VCPUs_policy(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return dom.get_vcpus_policy()
+        return xen_api_success(dom.get_vcpus_policy())
     
     def VM_get_VCPUs_params(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo() # need access to scheduler
+        return xen_api_success(dom.get_vcpus_params())
     
     def VM_get_actions_after_shutdown(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)

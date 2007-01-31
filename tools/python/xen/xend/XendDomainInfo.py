@@ -1976,7 +1976,11 @@ class XendDomainInfo:
         else:
             return 'unknown'
     def get_vcpus_params(self):
-        return '' # TODO
+        if self.getDomid() is None:
+            return {}
+
+        retval = xc.sched_credit_domain_get(self.getDomid())
+        return retval
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
     def get_platform_std_vga(self):
