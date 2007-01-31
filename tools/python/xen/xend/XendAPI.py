@@ -1186,7 +1186,7 @@ class XendAPI(object):
         return xen_api_success(dom.get_platform_keymap())
     
     def VM_get_other_config(self, session, vm_ref):
-        return self.VM_get('otherconfig', session, vm_ref)        
+        return self.VM_get('other_config', session, vm_ref)        
 
     def VM_get_is_control_domain(self, session, vm_ref):
         xd = XendDomain.instance()
@@ -1363,7 +1363,7 @@ class XendAPI(object):
             'platform_keymap': xeninfo.get_platform_keymap(),
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
-            'other_config': xeninfo.info.get('otherconfig'),
+            'other_config': xeninfo.info.get('other_config', {}),
             'is_control_domain': xeninfo == xendom.privilegedDomain(),
         }
         return xen_api_success(record)
