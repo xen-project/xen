@@ -13,16 +13,11 @@ vm_cfg = {
     
     
     'VCPUs_policy': 'credit',
-    'VCPUs_params': '',
+    'VCPUs_params': {},
     'VCPUs_number': 2,
-    'VCPUs_features_required': '',
-    'VCPUs_features_can_use': '',
-    'VCPUs_features_force_on': '',
-    'VCPUs_features_force_off': '',
 
     'actions_after_shutdown': 'destroy',
     'actions_after_reboot': 'restart',
-    'actions_after_suspend': 'destroy',
     'actions_after_crash': 'destroy',
     
     'PV_bootloader': '',
@@ -44,7 +39,7 @@ vm_cfg = {
 local_vdi_cfg = {
     'name_label': 'gentoo.hvm',
     'name_description': '',
-    'uri': 'file:/root/gentoo.amd64.hvm.img',
+    'location': 'file:/root/gentoo.amd64.hvm.img',
     'virtual_size': 0,
     'sector_size': 0,
     'type': 'system',
