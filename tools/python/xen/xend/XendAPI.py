@@ -1469,7 +1469,7 @@ class XendAPI(object):
             vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
             if not vdi:
                 return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
-            vdi_image = vdi.get_image_uri()
+            vdi_image = vdi.get_location()
             vbd_ref = XendTask.log_progress(0, 100,
                                             dom.create_vbd,
                                             vbd_struct, vdi_image)

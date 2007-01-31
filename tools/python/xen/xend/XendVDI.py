@@ -73,6 +73,7 @@ class XendVDI(AutoSaveObject):
         self.sharable = False
         self.read_only = False
         self.type = "system"
+        self.location = ''
 
     def load_config_dict(self, cfg):
         """Loads configuration into the object from a dict.
@@ -147,9 +148,10 @@ class XendVDI(AutoSaveObject):
                 'sharable': False,
                 'readonly': False,
                 'SR': self.sr_uuid,
+                'location': self.get_location(),
                 'VBDs': []}
 
-    def get_image_uri(self):
+    def get_location(self):
         raise NotImplementedError()
                 
 
@@ -163,9 +165,10 @@ class XendQCoWVDI(XendVDI):
         self.virtual_size = vsize
         self.sector_size = 512
         self.auto_save = True
+        self.location = 'tap:qcow:%s' % self.qcow_path
 
-    def get_image_uri(self):
-        return 'tap:qcow:%s' % self.qcow_path
+    def get_location(self):
+        return self.location
 
 class XendLocalVDI(XendVDI):
     def __init__(self, vdi_struct):
@@ -183,7 +186,7 @@ class XendLocalVDI(XendVDI):
         self.type = vdi_struct.get('type', '')
         self.sharable = vdi_struct.get('sharable', False)
         self.read_only = vdi_struct.get('read_only', False)
-        self.image_uri = vdi_struct.get('uri', 'file:/dev/null')
+        self.location = vdi_struct.get('location', 'file:/dev/null')
 
-    def get_image_uri(self):
-        return self.image_uri
+    def get_location(self):
+        return self.location
