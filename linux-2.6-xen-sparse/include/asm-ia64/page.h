@@ -238,6 +238,15 @@ get_order (unsigned long size)
 #include <xen/features.h>	// to compile netback, netfront
 #include <asm/maddr.h>
 
+#define arch_free_page(_page, _order)		\
+({						\
+	int foreign = PageForeign(_page);	\
+	if (foreign)                            \
+		PageForeignDestructor(_page);   \
+	foreign;                                \
+})
+#define HAVE_ARCH_FREE_PAGE
+
 #endif /* CONFIG_XEN */
 #endif /* __ASSEMBLY__ */
 
