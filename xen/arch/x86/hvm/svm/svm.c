@@ -660,6 +660,13 @@ void svm_update_guest_cr3(struct vcpu *v)
     v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 }
 
+static void svm_update_vtpr(struct vcpu *v, unsigned long value)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    vmcb->vintr.fields.tpr = value & 0x0f;
+}
+
 unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
 {
     switch ( num )
@@ -1048,6 +1055,8 @@ int start_svm(void)
     hvm_funcs.update_host_cr3 = svm_update_host_cr3;
     hvm_funcs.update_guest_cr3 = svm_update_guest_cr3;
     
+    hvm_funcs.update_vtpr = svm_update_vtpr;
+
     hvm_funcs.stts = svm_stts;
     hvm_funcs.set_tsc_offset = svm_set_tsc_offset;
 
@@ -1939,6 +1948,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
     case 8:
         vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
+        vmcb->vintr.fields.tpr = value & 0x0F;
         break;
 
     default:

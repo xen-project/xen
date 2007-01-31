@@ -986,6 +986,11 @@ static void vmx_inject_exception(
         v->arch.hvm_vmx.cpu_cr2 = cr2;
 }
 
+static void vmx_update_vtpr(struct vcpu *v, unsigned long value)
+{
+    /* VMX doesn't have a V_TPR field */
+}
+
 /* Setup HVM interfaces */
 static void vmx_setup_hvm_funcs(void)
 {
@@ -1010,6 +1015,8 @@ static void vmx_setup_hvm_funcs(void)
 
     hvm_funcs.update_host_cr3 = vmx_update_host_cr3;
     hvm_funcs.update_guest_cr3 = vmx_update_guest_cr3;
+
+    hvm_funcs.update_vtpr = vmx_update_vtpr;
 
     hvm_funcs.stts = vmx_stts;
     hvm_funcs.set_tsc_offset = vmx_set_tsc_offset;
