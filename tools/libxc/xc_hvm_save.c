@@ -33,6 +33,12 @@
 #include "xg_save_restore.h"
 
 /*
+ * Size of a buffer big enough to take the HVM state of a domain.
+ * Ought to calculate this a bit more carefully, or maybe ask Xen.
+ */
+#define HVM_CTXT_SIZE 8192
+
+/*
 ** Default values for important tuning parameters. Can override by passing
 ** non-zero replacement values to xc_hvm_save().
 **
@@ -279,8 +285,8 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long *pfn_type = NULL;
     unsigned long *pfn_batch = NULL;
 
-    /* A copy of hvm domain context */
-    hvm_domain_context_t hvm_ctxt;
+    /* A copy of hvm domain context buffer*/
+    uint8_t *hvm_buf = NULL;
 
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
@@ -423,8 +429,12 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     to_send = malloc(BITMAP_SIZE);
     to_skip = malloc(BITMAP_SIZE);
 
-    if (!to_send ||!to_skip) {
-        ERROR("Couldn't allocate to_send array");
+    page_array = (unsigned long *) malloc( sizeof(unsigned long) * max_pfn);
+
+    hvm_buf = malloc(HVM_CTXT_SIZE);
+
+    if (!to_send ||!to_skip ||!page_array ||!hvm_buf ) {
+        ERROR("Couldn't allocate memory");
         goto out;
     }
 
@@ -444,11 +454,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     analysis_phase(xc_handle, dom, max_pfn, to_skip, 0);
 
     /* get all the HVM domain pfns */
-    if ( (page_array = (unsigned long *) malloc (sizeof(unsigned long) * max_pfn)) == NULL) {
-        ERROR("HVM:malloc fail!\n");
-        goto out;
-    }
-
     for ( i = 0; i < max_pfn; i++)
         page_array[i] = i;
 
@@ -655,24 +660,18 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /* save hvm hypervisor state including pic/pit/shpage */
-    if (mlock(&hvm_ctxt, sizeof(hvm_ctxt))) {
-        ERROR("Unable to mlock ctxt");
-        return 1;
-    }
-
-    if (xc_domain_hvm_getcontext(xc_handle, dom, &hvm_ctxt)){
-        ERROR("HVM:Could not get hvm context");
+    if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
+                                              HVM_CTXT_SIZE)) == -1) {
+        ERROR("HVM:Could not get hvm buffer");
         goto out;
     }
 
-    rec_size = sizeof(hvm_ctxt);
     if (!write_exact(io_fd, &rec_size, sizeof(uint32_t))) {
-        ERROR("error write hvm ctxt size");
+        ERROR("error write hvm buffer size");
         goto out;
     }
 
-    if ( !write_exact(io_fd, &hvm_ctxt, sizeof(hvm_ctxt)) ) {
+    if ( !write_exact(io_fd, hvm_buf, rec_size) ) {
         ERROR("write HVM info failed!\n");
     }
 
@@ -722,6 +721,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
+    free(hvm_buf);
     free(page_array);
 
     free(pfn_type);

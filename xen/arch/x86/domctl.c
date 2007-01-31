@@ -288,71 +288,73 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_sethvmcontext:
     { 
-        struct hvm_domain_context *c;
+        struct hvm_domain_context c;
         struct domain             *d;
 
+        c.cur = 0;
+        c.size = domctl->u.hvmcontext.size;
+        c.data = NULL;
+        
         ret = -ESRCH;
         if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
-
-        ret = -ENOMEM;
-        if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
-            goto sethvmcontext_out;
-        
-        ret = -EFAULT;
-        if ( copy_from_guest(c, domctl->u.hvmcontext.ctxt, 1) != 0 )
-            goto sethvmcontext_out;
-        c->size = sizeof (c->data);
-        c->cur = 0;
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d) ) 
             goto sethvmcontext_out;
 
-        ret = hvm_load(d, c);
+        ret = -ENOMEM;
+        if ( (c.data = xmalloc_bytes(c.size)) == NULL )
+            goto sethvmcontext_out;
 
-        xfree(c);
+        ret = -EFAULT;
+        if ( copy_from_guest(c.data, domctl->u.hvmcontext.buffer, c.size) != 0)
+            goto sethvmcontext_out;
+
+        ret = hvm_load(d, &c);
 
     sethvmcontext_out:
-        put_domain(d);
+        if ( c.data != NULL )
+            xfree(c.data);
 
+        put_domain(d);
     }
     break;
 
     case XEN_DOMCTL_gethvmcontext:
     { 
-        struct hvm_domain_context *c;
+        struct hvm_domain_context c;
         struct domain             *d;
+
+        c.cur = 0;
+        c.size = domctl->u.hvmcontext.size;
+        c.data = NULL;
 
         ret = -ESRCH;
         if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
 
-        ret = -ENOMEM;
-        if ( (c = xmalloc(struct hvm_domain_context)) == NULL )
-            goto gethvmcontext_out;
-        memset(c, 0, sizeof(*c));
-        c->size = sizeof (c->data);
-        
-        ret = -ENODATA;
+        ret = -EINVAL;
         if ( !is_hvm_domain(d) ) 
             goto gethvmcontext_out;
-        
-        ret = 0;
-        if (hvm_save(d, c) != 0)
-            ret = -EFAULT;
 
-        if ( copy_to_guest(domctl->u.hvmcontext.ctxt, c, 1) )
-            ret = -EFAULT;
+        ret = -ENOMEM;
+        if ( (c.data = xmalloc_bytes(c.size)) == NULL )
+            goto gethvmcontext_out;
 
-        xfree(c);
+        ret = hvm_save(d, &c);
+
+        if ( copy_to_guest(domctl->u.hvmcontext.buffer, c.data, c.size) != 0 )
+            ret = -EFAULT;
 
         if ( copy_to_guest(u_domctl, domctl, 1) )
             ret = -EFAULT;
 
     gethvmcontext_out:
-        put_domain(d);
+        if ( c.data != NULL )
+            xfree(c.data);
 
+        put_domain(d);
     }
     break;
 

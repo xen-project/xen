@@ -386,18 +386,11 @@ struct xen_domctl_settimeoffset {
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
  
-#define HVM_CTXT_SIZE        8192
-typedef struct hvm_domain_context {
-    uint32_t cur;
-    uint32_t size;
-    uint8_t data[HVM_CTXT_SIZE];
-} hvm_domain_context_t;
-DEFINE_XEN_GUEST_HANDLE(hvm_domain_context_t);
-
 #define XEN_DOMCTL_gethvmcontext   33
 #define XEN_DOMCTL_sethvmcontext   34
 typedef struct xen_domctl_hvmcontext {
-    XEN_GUEST_HANDLE_64(hvm_domain_context_t) ctxt;  /* IN/OUT */
+    uint32_t size; /* IN/OUT: size of buffer / bytes filled */
+    XEN_GUEST_HANDLE(uint8_t) buffer; /* IN/OUT */
 } xen_domctl_hvmcontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
 

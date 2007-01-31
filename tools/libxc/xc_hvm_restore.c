@@ -87,7 +87,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     xc_dominfo_t info;
     unsigned int rc = 1, n, i;
     uint32_t rec_len, nr_vcpus;
-    hvm_domain_context_t hvm_ctxt;
+    uint8_t *hvm_buf = NULL;
     unsigned long long v_end, memsize;
     unsigned long shared_page_nr;
 
@@ -128,8 +128,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     }
 
 
-    p2m        = malloc(max_pfn * sizeof(xen_pfn_t));
-
+    p2m = malloc(max_pfn * sizeof(xen_pfn_t));
     if (p2m == NULL) {
         ERROR("memory alloc failed");
         errno = ENOMEM;
@@ -297,18 +296,21 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         ERROR("error read hvm context size!\n");
         goto out;
     }
-    if (rec_len != sizeof(hvm_ctxt)) {
-        ERROR("hvm context size dismatch!\n");
+
+    hvm_buf = malloc(rec_len);
+    if (hvm_buf == NULL) {
+        ERROR("memory alloc for hvm context buffer failed");
+        errno = ENOMEM;
         goto out;
     }
 
-    if (!read_exact(io_fd, &hvm_ctxt, sizeof(hvm_ctxt))) {
-        ERROR("error read hvm context!\n");
+    if (!read_exact(io_fd, hvm_buf, rec_len)) {
+        ERROR("error read hvm buffer!\n");
         goto out;
     }
 
-    if (( rc = xc_domain_hvm_setcontext(xc_handle, dom, &hvm_ctxt))) {
-        ERROR("error set hvm context!\n");
+    if (( rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len))) {
+        ERROR("error set hvm buffer!\n");
         goto out;
     }
 
@@ -361,6 +363,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
     free(p2m);
+    free(hvm_buf);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
 

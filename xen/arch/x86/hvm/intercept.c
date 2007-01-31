@@ -205,7 +205,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_save_entry(HEADER, 0, h, &hdr) != 0 )
     {
         gdprintk(XENLOG_ERR, "HVM save: failed to write header\n");
-        return -1;
+        return -EFAULT;
     } 
 
     /* Save all available kinds of state */
@@ -219,7 +219,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
             {
                 gdprintk(XENLOG_ERR, 
                          "HVM save: failed to save type %"PRIu16"\n", i);
-                return -1;
+                return -EFAULT;
             } 
         }
     }
@@ -229,7 +229,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     {
         /* Run out of data */
         gdprintk(XENLOG_ERR, "HVM save: no room for end marker.\n");
-        return -1;
+        return -EFAULT;
     }
 
     /* Save macros should not have let us overrun */
