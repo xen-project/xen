@@ -12,7 +12,7 @@ INSTALL_DIR     = $(INSTALL) -d -m0755
 all: build
 
 .PHONY: build
-build: mk-symlinks
+build:
 	$(MAKE) vncfb sdlfb
 
 install: all
