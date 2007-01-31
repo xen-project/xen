@@ -254,7 +254,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         return 0;
 
     pit_init(v, cpu_khz);
-    rtc_init(v, RTC_PORT(0), RTC_IRQ);
+    rtc_init(v, RTC_PORT(0));
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
     hpet_init(v);
  

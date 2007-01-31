@@ -161,10 +161,12 @@ static inline void hvm_mmio_access(struct vcpu *v,
 static struct { 
     hvm_save_handler save;
     hvm_load_handler load; 
-} hvm_sr_handlers [HVM_SAVE_CODE_MAX + 1] = {{NULL, NULL},};
+    const char *name;
+} hvm_sr_handlers [HVM_SAVE_CODE_MAX + 1] = {{NULL, NULL, "<?>"},};
 
 /* Init-time function to add entries to that list */
 void hvm_register_savevm(uint16_t typecode, 
+                         const char *name,
                          hvm_save_handler save_state,
                          hvm_load_handler load_state)
 {
@@ -173,6 +175,7 @@ void hvm_register_savevm(uint16_t typecode,
     ASSERT(hvm_sr_handlers[typecode].load == NULL);
     hvm_sr_handlers[typecode].save = save_state;
     hvm_sr_handlers[typecode].load = load_state;
+    hvm_sr_handlers[typecode].name = name;
 }
 
 
@@ -211,6 +214,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
         handler = hvm_sr_handlers[i].save;
         if ( handler != NULL ) 
         {
+            gdprintk(XENLOG_INFO, "HVM save: %s\n",  hvm_sr_handlers[i].name);
             if ( handler(d, h) != 0 ) 
             {
                 gdprintk(XENLOG_ERR, 
@@ -312,6 +316,8 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
         }
 
         /* Load the entry */
+        gdprintk(XENLOG_INFO, "HVM restore: %s %"PRIu16"\n",  
+                 hvm_sr_handlers[desc->typecode].name, desc->instance);
         if ( handler(d, h) != 0 ) 
         {
             gdprintk(XENLOG_ERR, 

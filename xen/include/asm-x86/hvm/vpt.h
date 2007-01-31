@@ -97,12 +97,11 @@ typedef struct PITState {
     struct periodic_time pt[3];
 } PITState;
 
-#define RTC_SIZE 14
 typedef struct RTCState {
-    uint8_t cmos_data[RTC_SIZE];  /* Only handle time/interrupt part in HV */
-    uint8_t cmos_index;
+    /* Hardware state */
+    struct hvm_hw_rtc hw;
+    /* RTC's idea of the current time */
     struct tm current_tm;
-    int irq;
     /* second update */
     int64_t next_second_time;
     struct timer second_timer;
@@ -145,7 +144,7 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void pit_stop_channel0_irq(PITState * pit);
 void pit_migrate_timers(struct vcpu *v);
 void pit_deinit(struct domain *d);
-void rtc_init(struct vcpu *v, int base, int irq);
+void rtc_init(struct vcpu *v, int base);
 void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
 int is_rtc_periodic_irq(void *opaque);

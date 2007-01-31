@@ -367,9 +367,24 @@ DECLARE_HVM_SAVE_TYPE(LAPIC_REGS, 8, struct hvm_hw_lapic_regs);
 
 
 /* 
+ * RTC
+ */ 
+
+#define RTC_CMOS_SIZE 14
+struct hvm_hw_rtc {
+    /* CMOS bytes */
+    uint8_t cmos_data[RTC_CMOS_SIZE];
+    /* Index register for 2-part operations */
+    uint8_t cmos_index;
+};
+
+DECLARE_HVM_SAVE_TYPE(RTC, 9, struct hvm_hw_rtc);
+
+
+/* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 8
+#define HVM_SAVE_CODE_MAX 9
 
 
 /* 

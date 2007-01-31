@@ -215,17 +215,18 @@ typedef int (*hvm_load_handler) (struct domain *d,
                                  hvm_domain_context_t *h);
 
 /* Init-time function to declare a pair of handlers for a type */
-void hvm_register_savevm(uint16_t typecode, 
+void hvm_register_savevm(uint16_t typecode,
+                         const char *name, 
                          hvm_save_handler save_state,
                          hvm_load_handler load_state);
 
 /* Syntactic sugar around that function */
-#define HVM_REGISTER_SAVE_RESTORE(_x, _save, _load)             \
-static int __hvm_register_##_x##_save_and_restore(void)         \
-{                                                               \
-    hvm_register_savevm(HVM_SAVE_CODE(_x), &_save, &_load);     \
-    return 0;                                                   \
-}                                                               \
+#define HVM_REGISTER_SAVE_RESTORE(_x, _save, _load)                     \
+static int __hvm_register_##_x##_save_and_restore(void)                 \
+{                                                                       \
+    hvm_register_savevm(HVM_SAVE_CODE(_x), #_x, &_save, &_load);        \
+    return 0;                                                           \
+}                                                                       \
 __initcall(__hvm_register_##_x##_save_and_restore);
 
 
