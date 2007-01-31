@@ -72,8 +72,8 @@ int main(int argc, char **argv)
 	usize = xc_dom_check_gzip(image, st.st_size);
 	if (usize)
 	{
-		tmp = malloc(size);
-		xc_dom_do_gunzip(image, st.st_size, tmp, size);
+		tmp = malloc(usize);
+		xc_dom_do_gunzip(image, st.st_size, tmp, usize);
 		image = tmp;
 		size = usize;
 	}
