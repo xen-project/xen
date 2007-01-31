@@ -599,7 +599,17 @@ complete_dom0_memmap(struct domain *d,
 
 		case EFI_UNUSABLE_MEMORY:
 		case EFI_PAL_CODE:
-			/* Discard.  */
+			/*
+			 * We don't really need these, but holes in the
+			 * memory map may cause Linux to assume there are
+			 * uncacheable ranges within a granule.
+			 */
+			dom_md->type = EFI_UNUSABLE_MEMORY;
+			dom_md->phys_addr = start;
+			dom_md->virt_addr = 0;
+			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
+			dom_md->attribute = EFI_MEMORY_WB;
+			num_mds++;
 			break;
 
 		default:
