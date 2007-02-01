@@ -449,48 +449,50 @@ class HVMImageHandler(ImageHandler):
             return ret
 
         vnc_config = {}
-        has_vfb = False
         has_vnc = int(vmConfig['image'].get('vnc', 0)) != 0
+        has_sdl = int(vmConfig['image'].get('sdl', 0)) != 0
         for dev_uuid in vmConfig['console_refs']:
             dev_type, dev_info = vmConfig['devices'][dev_uuid]
             if dev_type == 'vfb':
                 vnc_config = dev_info.get('other_config', {})
-                has_vfb = True
+                has_vnc = True
                 break
 
-        if not vnc_config:
-            for key in ('vncunused', 'vnclisten', 'vncdisplay', 'vncpasswd'):
-                if key in vmConfig['image']:
-                    vnc_config[key] = vmConfig['image'][key]
+        if has_vnc:
+            if not vnc_config:
+                for key in ('vncunused', 'vnclisten', 'vncdisplay',
+                            'vncpasswd'):
+                    if key in vmConfig['image']:
+                        vnc_config[key] = vmConfig['image'][key]
 
-        if not has_vfb and not has_vnc:
-            ret.append('-nographic')
-            return ret
+            if not vnc_config.get('vncunused', 0) and \
+                   vnc_config.get('vncdisplay', 0):
+                ret.append('-vnc')
+                ret.append(str(vncdisplay))
+            else:
+                ret.append('-vncunused')
 
-                    
-        if not vnc_config.get('vncunused', 0) and \
-               vnc_config.get('vncdisplay', 0):
-            ret.append('-vnc')
-            ret.append(str(vncdisplay))
+            vnclisten = vnc_config.get('vnclisten',
+                                       xenopts().get_vnclisten_address())
+            ret.append('-vnclisten')
+            ret.append(str(vnclisten))
+
+            # Store vncpassword in xenstore
+            vncpasswd = vnc_config.get('vncpasswd')
+            if not vncpasswd:
+                vncpasswd = xenopts().get_vncpasswd_default()
+
+            if vncpasswd is None:
+                raise VmError('vncpasswd is not setup in vmconfig or '
+                              'xend-config.sxp')
+
+            if vncpasswd != '':
+                self.vm.storeVm('vncpasswd', vncpasswd)
+        elif has_sdl:
+            # SDL is default in QEMU.
+            pass
         else:
-            ret.append('-vncunused')
-
-        vnclisten = vnc_config.get('vnclisten',
-                                   xenopts().get_vnclisten_address())
-        ret.append('-vnclisten')
-        ret.append(str(vnclisten))
-        
-        # Store vncpassword in xenstore
-        vncpasswd = vnc_config.get('vncpasswd')
-        if not vncpasswd:
-            vncpasswd = xenopts().get_vncpasswd_default()
-                    
-        if vncpasswd is None:
-            raise VmError('vncpasswd is not setup in vmconfig or '
-                          'xend-config.sxp')
-
-        if vncpasswd != '':
-            self.vm.storeVm('vncpasswd', vncpasswd)
+            ret.append('-nographic')
 
         return ret
 
