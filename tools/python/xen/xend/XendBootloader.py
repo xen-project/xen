@@ -97,7 +97,9 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
 
         try:
             log.debug("Launching bootloader as %s." % str(args))
-            os.execvp(args[0], args)
+            env = os.environ.copy()
+            env['TERM'] = 'vt100'
+            os.execvpe(args[0], args, env)
         except OSError, e:
             print e
             pass
