@@ -214,7 +214,7 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
-void leave_hypervisor_tail(struct pt_regs *regs)
+void leave_hypervisor_tail(void)
 {
     struct domain *d = current->domain;
     struct vcpu *v = current;
