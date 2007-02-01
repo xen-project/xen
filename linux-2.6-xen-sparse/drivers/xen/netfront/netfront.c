@@ -1935,8 +1935,6 @@ static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 	np                   = netdev_priv(netdev);
 	np->xbdev            = dev;
 
-	netif_carrier_off(netdev);
-
 	spin_lock_init(&np->tx_lock);
 	spin_lock_init(&np->rx_lock);
 
@@ -1991,6 +1989,9 @@ static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 	SET_NETDEV_DEV(netdev, &dev->dev);
 
 	np->netdev = netdev;
+
+	netif_carrier_off(netdev);
+
 	return netdev;
 
  exit_free_tx:

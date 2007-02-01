@@ -33,6 +33,9 @@ from DomainTracking import *
 from acm import *
 
 
+DOM0_UUID = "00000000-0000-0000-0000-000000000000"
+
+
 def getDefaultKernel():
     return arch.getDefaultKernel()
 
