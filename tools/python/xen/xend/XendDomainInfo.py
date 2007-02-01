@@ -1978,7 +1978,7 @@ class XendDomainInfo:
             return 'unknown'
     def get_vcpus_params(self):
         if self.getDomid() is None:
-            return {}
+            return self.info['vcpus_params']
 
         retval = xc.sched_credit_domain_get(self.getDomid())
         return retval
