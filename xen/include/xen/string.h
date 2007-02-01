@@ -82,8 +82,16 @@ extern void * memchr(const void *,int,__kernel_size_t);
 }
 #endif
 
+#define is_char_array(x) __builtin_types_compatible_p(typeof(x), char[])
+
 /* safe_xxx always NUL-terminates and returns !=0 if result is truncated. */
-#define safe_strcpy(d, s) (strlcpy(d, s, sizeof(d)) >= sizeof(d))
-#define safe_strcat(d, s) (strlcat(d, s, sizeof(d)) >= sizeof(d))
+#define safe_strcpy(d, s) ({                    \
+    BUILD_BUG_ON(!is_char_array(d));            \
+    (strlcpy(d, s, sizeof(d)) >= sizeof(d));    \
+})
+#define safe_strcat(d, s) ({                    \
+    BUILD_BUG_ON(!is_char_array(d));            \
+    (strlcat(d, s, sizeof(d)) >= sizeof(d));    \
+})
 
 #endif /* _LINUX_STRING_H_ */

@@ -42,9 +42,9 @@
  * A virtual machine (or 'guest').
  * 
  * VM booting is controlled by setting one of the two mutually exclusive
- * groups: "PV", and "HVM".  If HVM.boot is the empty string, then paravirtual
- * domain building and booting will be used; otherwise the VM will be loaded
- * as an HVM domain, and booted using an emulated BIOS.
+ * groups: "PV", and "HVM".  If HVM.boot_policy is the empty string, then
+ * paravirtual domain building and booting will be used; otherwise the VM will
+ * be loaded as an HVM domain, and booted using an emulated BIOS.
  * 
  * When paravirtual booting is in use, the PV/bootloader field indicates the
  * bootloader to use.  It may be "pygrub", in which case the platform's
@@ -69,7 +69,10 @@
  * PV/bootloader and PV/kernel are empty, then the behaviour is as if
  * PV/bootloader was specified as "pygrub".
  * 
- * When using HVM booting, HVM/boot specifies the order of the boot devices.
+ * When using HVM booting, HVM/boot_policy and HVM/boot_params specify the
+ * boot handling.  Only one policy is currently defined: "BIOS order".  In
+ * this case, HVM/boot_params should contain one key-value pair "order" = "N"
+ * where N is the string that will be passed to QEMU..
  */
 
 
@@ -136,7 +139,8 @@ typedef struct xen_vm_record
     char *pv_ramdisk;
     char *pv_args;
     char *pv_bootloader_args;
-    char *hvm_boot;
+    char *hvm_boot_policy;
+    xen_string_string_map *hvm_boot_params;
     bool platform_std_vga;
     char *platform_serial;
     bool platform_localtime;
@@ -490,10 +494,17 @@ xen_vm_get_pv_bootloader_args(xen_session *session, char **result, xen_vm vm);
 
 
 /**
- * Get the HVM/boot field of the given VM.
+ * Get the HVM/boot_policy field of the given VM.
  */
 extern bool
-xen_vm_get_hvm_boot(xen_session *session, char **result, xen_vm vm);
+xen_vm_get_hvm_boot_policy(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the HVM/boot_params field of the given VM.
+ */
+extern bool
+xen_vm_get_hvm_boot_params(xen_session *session, xen_string_string_map **result, xen_vm vm);
 
 
 /**
@@ -731,10 +742,34 @@ xen_vm_set_pv_bootloader_args(xen_session *session, xen_vm vm, char *bootloader_
 
 
 /**
- * Set the HVM/boot field of the given VM.
+ * Set the HVM/boot_policy field of the given VM.
  */
 extern bool
-xen_vm_set_hvm_boot(xen_session *session, xen_vm vm, char *boot);
+xen_vm_set_hvm_boot_policy(xen_session *session, xen_vm vm, char *boot_policy);
+
+
+/**
+ * Set the HVM/boot_params field of the given VM.
+ */
+extern bool
+xen_vm_set_hvm_boot_params(xen_session *session, xen_vm vm, xen_string_string_map *boot_params);
+
+
+/**
+ * Add the given key-value pair to the HVM/boot_params field of the
+ * given VM.
+ */
+extern bool
+xen_vm_add_to_hvm_boot_params(xen_session *session, xen_vm vm, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * HVM/boot_params field of the given VM.  If the key is not in that Map, then
+ * do nothing.
+ */
+extern bool
+xen_vm_remove_from_hvm_boot_params(xen_session *session, xen_vm vm, char *key);
 
 
 /**

@@ -12,7 +12,7 @@ HDRS     = $(wildcard *.h)
 TARGETS  = xenperf xc_shadow
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xen-bugtool xend xenperf
+INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf
 
 .PHONY: all
 all: build

@@ -145,9 +145,12 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "PV_bootloader_args",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, pv_bootloader_args) },
-        { .key = "HVM_boot",
+        { .key = "HVM_boot_policy",
           .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, hvm_boot) },
+          .offset = offsetof(xen_vm_record, hvm_boot_policy) },
+        { .key = "HVM_boot_params",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vm_record, hvm_boot_params) },
         { .key = "platform_std_VGA",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, platform_std_vga) },
@@ -216,7 +219,8 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->pv_ramdisk);
     free(record->pv_args);
     free(record->pv_bootloader_args);
-    free(record->hvm_boot);
+    free(record->hvm_boot_policy);
+    xen_string_string_map_free(record->hvm_boot_params);
     free(record->platform_serial);
     free(record->pci_bus);
     xen_string_string_map_free(record->tools_version);
@@ -824,7 +828,7 @@ xen_vm_get_pv_bootloader_args(xen_session *session, char **result, xen_vm vm)
 
 
 bool
-xen_vm_get_hvm_boot(xen_session *session, char **result, xen_vm vm)
+xen_vm_get_hvm_boot_policy(xen_session *session, char **result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -835,7 +839,24 @@ xen_vm_get_hvm_boot(xen_session *session, char **result, xen_vm vm)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("VM.get_HVM_boot");
+    XEN_CALL_("VM.get_HVM_boot_policy");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_hvm_boot_params(xen_session *session, xen_string_string_map **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_HVM_boot_params");
     return session->ok;
 }
 
@@ -1376,17 +1397,67 @@ xen_vm_set_pv_bootloader_args(xen_session *session, xen_vm vm, char *bootloader_
 
 
 bool
-xen_vm_set_hvm_boot(xen_session *session, xen_vm vm, char *boot)
+xen_vm_set_hvm_boot_policy(xen_session *session, xen_vm vm, char *boot_policy)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &abstract_type_string,
-              .u.string_val = boot }
+              .u.string_val = boot_policy }
         };
 
-    xen_call_(session, "VM.set_HVM_boot", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_HVM_boot_policy", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_hvm_boot_params(xen_session *session, xen_vm vm, xen_string_string_map *boot_params)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)boot_params }
+        };
+
+    xen_call_(session, "VM.set_HVM_boot_params", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_add_to_hvm_boot_params(xen_session *session, xen_vm vm, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VM.add_to_HVM_boot_params", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_remove_from_hvm_boot_params(xen_session *session, xen_vm vm, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VM.remove_from_HVM_boot_params", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

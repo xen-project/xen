@@ -278,6 +278,8 @@ int main(int argc, char **argv)
 static xen_vm create_new_vm(xen_session *session)
 {
     xen_string_string_map *vcpus_params = xen_string_string_map_alloc(1);
+    vcpus_params->contents[0].key = strdup("weight");
+    vcpus_params->contents[0].val = strdup("300");
     xen_vm_record vm_record =
         {
             .name_label = "NewVM",
@@ -294,9 +296,10 @@ static xen_vm create_new_vm(xen_session *session)
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
-            .hvm_boot = "",
-            //.pv_bootloader = "pygrub",
-            .pv_kernel = "/boot/vmlinuz-2.6.18-xenU",
+            .hvm_boot_policy = NULL,
+            .hvm_boot_params = NULL,
+            .pv_bootloader = "pygrub",
+            .pv_kernel = "/boot/vmlinuz-2.6.16.33-xen",
             .pv_ramdisk = "",
             .pv_args = "root=/dev/sda1 ro",
             .pv_bootloader_args = ""
@@ -305,6 +308,8 @@ static xen_vm create_new_vm(xen_session *session)
 
     xen_vm vm;
     xen_vm_create(session, &vm, &vm_record);
+
+    xen_string_string_map_free(vcpus_params);
 
     if (!session->ok)
     {

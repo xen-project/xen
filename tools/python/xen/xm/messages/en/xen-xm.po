@@ -19,7 +19,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2007-01-30 17:15+0000\n"
+"PO-Revision-Date: 2007-01-31 12:34+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -40,6 +40,9 @@ msgstr "The method %(1)s takes %(2)s argument(s) (%(3)s given)."
 
 msgid "SESSION_AUTHENTICATION_FAILED"
 msgstr "Permission denied."
+
+msgid "VALUE_NOT_SUPPORTED"
+msgstr "Value \"%(2)s\" for %(1)s is not supported by this server.  The server said \"%(3)s\"."
 
 msgid "HOST_CPU_HANDLE_INVALID"
 msgstr "The host_cpu handle %(1)s is invalid."

@@ -131,10 +131,18 @@ __initcall(register_crashdump_trigger);
 
 static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 {
-    safe_strcpy(ELFNOTE_NAME(n), name);
-    n->namesz = strlen(name);
+    int l = strlen(name) + 1;
+    strlcpy(ELFNOTE_NAME(n), name, l);
+    n->namesz = l;
     n->descsz = descsz;
     n->type = type;
+}
+
+static int sizeof_note(const char *name, int descsz)
+{
+    return (sizeof(Elf_Note) +
+            ELFNOTE_ALIGN(sizeof(name)) +
+            ELFNOTE_ALIGN(descsz));
 }
 
 #define kexec_get(x)      kexec_get_##x
@@ -162,16 +170,17 @@ static int kexec_get(xen)(xen_kexec_range_t *range)
 static int kexec_get(cpu)(xen_kexec_range_t *range)
 {
     int nr = range->nr;
-    int nr_bytes = sizeof(Elf_Note) * 2
-        + ELFNOTE_ALIGN(sizeof(ELF_Prstatus))
-        + ELFNOTE_ALIGN(sizeof(crash_xen_core_t));
+    int nr_bytes = 0;
 
     if ( nr < 0 || nr >= num_present_cpus() )
         return -EINVAL;
 
+    nr_bytes += sizeof_note("CORE", sizeof(ELF_Prstatus));
+    nr_bytes += sizeof_note("Xen", sizeof(crash_xen_core_t));
+
     /* The Xen info note is included in CPU0's range. */
     if ( nr == 0 )
-        nr_bytes += sizeof(Elf_Note) + ELFNOTE_ALIGN(sizeof(crash_xen_info_t));
+        nr_bytes += sizeof_note("Xen", sizeof(crash_xen_info_t));
 
     if ( per_cpu(crash_notes, nr) == NULL )
     {
