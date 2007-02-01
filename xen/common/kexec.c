@@ -141,7 +141,7 @@ static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 static int sizeof_note(const char *name, int descsz)
 {
     return (sizeof(Elf_Note) +
-            ELFNOTE_ALIGN(sizeof(name)) +
+            ELFNOTE_ALIGN(strlen(name)+1) +
             ELFNOTE_ALIGN(descsz));
 }
 
@@ -163,7 +163,7 @@ static int kexec_get(reserve)(xen_kexec_range_t *range)
 static int kexec_get(xen)(xen_kexec_range_t *range)
 {
     range->start = virt_to_maddr(_start);
-    range->size = (unsigned long)_end - (unsigned long)_start;
+    range->size = (unsigned long)xenheap_phys_end - (unsigned long)range->start;
     return 0;
 }
 
