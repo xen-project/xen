@@ -146,7 +146,7 @@ XENAPI_CFG_TYPES = {
     'memory_actual': int,
     'cpus': list,
     'vcpus_policy': str,
-    'vcpus_params': str,
+    'vcpus_params': dict,
     'vcpus_number': int,
     'vcpus_features_required': list,
     'vcpus_features_can_use': list,
@@ -349,7 +349,6 @@ class XendConfig(dict):
 
     def _defaults(self):
         defaults = {
-            'uuid': uuid.createString(),
             'name_label': 'Domain-Unnamed',
             'actions_after_shutdown': 'destroy',
             'actions_after_reboot': 'restart',
@@ -385,7 +384,6 @@ class XendConfig(dict):
             'other_config': {},
         }
         
-        defaults['name_label'] = 'Domain-' + defaults['uuid']
         return defaults
 
     def _memory_sanity_check(self):
@@ -415,13 +413,21 @@ class XendConfig(dict):
 
     def _uuid_sanity_check(self):
         """Make sure UUID is in proper string format with hyphens."""
-        self['uuid'] = uuid.toString(uuid.fromString(self['uuid']))
+        if 'uuid' not in self or not self['uuid']:
+            self['uuid'] = uuid.createString()
+        else:
+            self['uuid'] = uuid.toString(uuid.fromString(self['uuid']))
+
+    def _name_sanity_check(self):
+        if 'name_label' not in self:
+            self['name_label'] = 'Domain-' + self['uuid']
 
     def validate(self):
+        self._uuid_sanity_check()
+        self._name_sanity_check()
         self._memory_sanity_check()
         self._actions_sanity_check()
         self._vcpus_sanity_check()
-        self._uuid_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
@@ -840,8 +846,6 @@ class XendConfig(dict):
             else:
                 self[key] = val
 
-        self.validate()
-
     def to_sxp(self, domain = None, ignore_devices = False, ignore = [],
                legacy_only = True):
         """ Get SXP representation of this config object.
@@ -865,9 +869,13 @@ class XendConfig(dict):
             sxpr.append(['domid', domain.getDomid()])
 
         if not legacy_only:
-            for name in XENAPI_CFG_TYPES.keys():
+            for name, typ in XENAPI_CFG_TYPES.items():
                 if name in self and self[name] not in (None, []):
-                    sxpr.append([name, str(self[name])])
+                    if typ == dict:
+                        s = self[name].items()
+                    else:
+                        s = str(self[name])
+                    sxpr.append([name, s])
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
@@ -996,7 +1004,9 @@ class XendConfig(dict):
                     dev_info['driver'] = 'paravirtualised'
 
             # create uuid if it doesn't exist
-            dev_uuid = dev_info.get('uuid', uuid.createString())
+            dev_uuid = dev_info.get('uuid', None)
+            if not dev_uuid:
+                dev_uuid = uuid.createString()
             dev_info['uuid'] = dev_uuid
 
             # store dev references by uuid for certain device types
@@ -1066,7 +1076,9 @@ class XendConfig(dict):
                 if cfg_xenapi.get('name'):
                     dev_info['name'] = cfg_xenapi.get('name')
                 
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vif_refs'].append(dev_uuid)
@@ -1090,7 +1102,9 @@ class XendConfig(dict):
                 else:
                     dev_info['mode'] = 'r'
 
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vbd_refs'].append(dev_uuid)                
@@ -1099,13 +1113,17 @@ class XendConfig(dict):
                 if cfg_xenapi.get('type'):
                     dev_info['type'] = cfg_xenapi.get('type')
 
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vtpm_refs'].append(dev_uuid)
 
             elif dev_type == 'console':
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 dev_info['protocol'] = cfg_xenapi.get('protocol', 'rfb')
                 dev_info['other_config'] = cfg_xenapi.get('other_config', {})
