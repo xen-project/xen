@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 XenSource, Inc.
+ * Copyright (c) 2006-2007 XenSource, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,7 @@
 #include "xen_sr.h"
 #include "xen_vbd.h"
 #include "xen_vdi.h"
+#include "xen_console.h"
 #include "xen_vm.h"
 
 
@@ -58,7 +59,7 @@ typedef struct
 } xen_comms;
 
 
-static xen_vm create_new_vm(xen_session *session);
+static xen_vm create_new_vm(xen_session *session, bool hvm);
 static void print_vm_power_state(xen_session *session, xen_vm vm);
 
 
@@ -245,7 +246,7 @@ int main(int argc, char **argv)
     xen_string_string_map_free(versions);
 
 
-    xen_vm new_vm = create_new_vm(session);
+    xen_vm new_vm = create_new_vm(session, true);
     if (!session->ok)
     {
         /* Error has been logged, just clean up. */
@@ -275,15 +276,28 @@ int main(int argc, char **argv)
  * allocation patterns can be used, as long as the allocation and free are
  * paired correctly.
  */
-static xen_vm create_new_vm(xen_session *session)
+static xen_vm create_new_vm(xen_session *session, bool hvm)
 {
     xen_string_string_map *vcpus_params = xen_string_string_map_alloc(1);
     vcpus_params->contents[0].key = strdup("weight");
     vcpus_params->contents[0].val = strdup("300");
+
+    xen_string_string_map *hvm_boot_params;
+    if (hvm)
+    {
+        hvm_boot_params = xen_string_string_map_alloc(1);
+        hvm_boot_params->contents[0].key = strdup("order");
+        hvm_boot_params->contents[0].val = strdup("cd");
+    }
+    else
+    {
+        hvm_boot_params = NULL;
+    }
+
     xen_vm_record vm_record =
         {
-            .name_label = "NewVM",
-            .name_description = "New VM Description",
+            .name_label = hvm ? "NewHVM" : "NewPV",
+            .name_description = hvm ? "New HVM VM" : "New PV VM",
             .user_version = 1,
             .is_a_template = false,
             .memory_static_max = 256,
@@ -296,20 +310,17 @@ static xen_vm create_new_vm(xen_session *session)
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
-            .hvm_boot_policy = NULL,
-            .hvm_boot_params = NULL,
-            .pv_bootloader = "pygrub",
-            .pv_kernel = "/boot/vmlinuz-2.6.16.33-xen",
-            .pv_ramdisk = "",
-            .pv_args = "root=/dev/sda1 ro",
-            .pv_bootloader_args = ""
+            .hvm_boot_policy = hvm ? "BIOS order" : NULL,
+            .hvm_boot_params = hvm ? hvm_boot_params : NULL,
+            .pv_bootloader   = hvm ? NULL : "pygrub",
+            .pv_kernel       = hvm ? NULL : "/boot/vmlinuz-2.6.16.33-xen",
         };
-
 
     xen_vm vm;
     xen_vm_create(session, &vm, &vm_record);
 
     xen_string_string_map_free(vcpus_params);
+    xen_string_string_map_free(hvm_boot_params);
 
     if (!session->ok)
     {
@@ -343,7 +354,6 @@ static xen_vm create_new_vm(xen_session *session)
             .sr = &sr_record,
             .virtual_size = (1 << 21),  // 1GiB / 512 bytes/sector
             .sector_size = 512,
-            .location = "file:/root/gentoo.amd64.img",
             .type = XEN_VDI_TYPE_SYSTEM,
             .sharable = false,
             .read_only = false
@@ -373,7 +383,7 @@ static xen_vm create_new_vm(xen_session *session)
         {
             .vm = &vm_record_opt,
             .vdi = &vdi0_record_opt,
-            .device = "sda1",
+            .device = "xvda1",
             .mode = XEN_VBD_MODE_RW,
             .bootable = 1,
         };
@@ -390,13 +400,38 @@ static xen_vm create_new_vm(xen_session *session)
         return NULL;
     }
 
+    xen_console vnc_console = NULL;
+    if (hvm) {
+        xen_console_record vnc_console_record =
+            {
+                .protocol = XEN_CONSOLE_PROTOCOL_RFB,
+                .vm = &vm_record_opt,
+            };
+
+        if (!xen_console_create(session, &vnc_console, &vnc_console_record))
+        {
+            fprintf(stderr, "VNC console creation failed.\n");
+            print_error(session);
+
+            xen_vbd_free(vbd0);
+            xen_vdi_free(vdi0);
+            xen_sr_set_free(srs);
+            xen_vm_free(vm);
+            return NULL;
+        }
+    }
+
     char *vm_uuid;
     char *vdi0_uuid;
     char *vbd0_uuid;
+    char *vnc_uuid = NULL;
 
     xen_vm_get_uuid(session,  &vm_uuid,   vm);
     xen_vdi_get_uuid(session, &vdi0_uuid, vdi0);
     xen_vbd_get_uuid(session, &vbd0_uuid, vbd0); 
+    if (hvm) {
+        xen_console_get_uuid(session, &vnc_uuid, vnc_console);
+    }
 
     if (!session->ok)
     {
@@ -406,22 +441,35 @@ static xen_vm create_new_vm(xen_session *session)
         xen_uuid_free(vm_uuid);
         xen_uuid_free(vdi0_uuid);
         xen_uuid_free(vbd0_uuid);
+        xen_uuid_free(vnc_uuid);
         xen_vbd_free(vbd0);
         xen_vdi_free(vdi0);
+        xen_console_free(vnc_console);
         xen_sr_set_free(srs);
         xen_vm_free(vm);
         return NULL;
     }
 
-    fprintf(stderr,
-            "Created a new VM, with UUID %s, VDI UUID %s, and VBD UUID %s.\n",
-            vm_uuid, vdi0_uuid, vbd0_uuid);
+    if (hvm) {
+        fprintf(stderr,
+                "Created a new HVM VM, with UUID %s, VDI UUID %s, VBD "
+                "UUID %s, and VNC console UUID %s.\n",
+                vm_uuid, vdi0_uuid, vbd0_uuid, vnc_uuid);
+    }
+    else {
+        fprintf(stderr,
+                "Created a new PV VM, with UUID %s, VDI UUID %s, and VBD "
+                "UUID %s.\n",
+                vm_uuid, vdi0_uuid, vbd0_uuid);
+    }
 
     xen_uuid_free(vm_uuid);
     xen_uuid_free(vdi0_uuid);
     xen_uuid_free(vbd0_uuid);
+    xen_uuid_free(vnc_uuid);
     xen_vbd_free(vbd0);
     xen_vdi_free(vdi0);
+    xen_console_free(vnc_console);
     xen_sr_set_free(srs);
 
     return vm;
