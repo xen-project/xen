@@ -679,6 +679,9 @@ class XendConfig(dict):
                 if self['devices'][console_uuid][1].get('protocol') == 'rfb':
                     has_rfb = True
                     break
+                if self['devices'][console_uuid][0] == 'vfb':
+                    has_rfb = True
+                    break
 
             if not has_rfb:
                 dev_config = ['vfb']
