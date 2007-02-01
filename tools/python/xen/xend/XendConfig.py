@@ -125,8 +125,7 @@ XENAPI_HVM_CFG = {
     'platform_std_vga': 'stdvga',
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
-    'platform_keymap' : 'keymap',
-    'HVM_boot': 'boot',
+    'platform_keymap' : 'keymap'
 }    
 
 # List of XendConfig configuration keys that have no direct equivalent
@@ -735,6 +734,7 @@ class XendConfig(dict):
                 val = sxp.child_value(image_sxp, imgkey, None)
                 if val != None:
                     self[apikey] = val
+            self._hvm_boot_params_from_sxp(image_sxp)
 
         # extract backend value
                     
@@ -1372,11 +1372,18 @@ class XendConfig(dict):
             val = sxp.child_value(image_sxp, imgkey, None)
             if val != None:
                 type_conv = XENAPI_CFG_TYPES[apikey]
-                if callable(conv):
+                if callable(type_conv):
                     self[apikey] = type_conv(val)
                 else:
                     self[apikey] = val
+        self._hvm_boot_params_from_sxp(image_sxp)
 
+
+    def _hvm_boot_params_from_sxp(self, image_sxp):
+        boot = sxp.child_value(image_sxp, 'boot', None)
+        if boot is not None:
+            self['HVM_boot_policy'] = 'BIOS order'
+            self['HVM_boot_params'] = { 'order' : boot }
 
 
 #
