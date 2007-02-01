@@ -227,7 +227,7 @@ handle_array() {
 
 build_body() {
 	echo
-	echo -n "#define XLAT_$1(_d_, _s_)"
+	echo -n "#define XLAT_$1(_d_, _s_) do {"
 	local level=1 fields= id= array= arrlvl=1 array_type= type= token
 	for token in $2
 	do
@@ -303,6 +303,8 @@ build_body() {
 		esac
 		test -z "$fields" || fields="$fields $token"
 	done
+	echo " \\"
+	echo "} while (0)"
 	echo ""
 }
 
