@@ -28,7 +28,7 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 
 log = logging.getLogger("xend.XendConfig")
-log.setLevel(logging.WARN)
+log.setLevel(logging.DEBUG)
 
 
 """
@@ -164,7 +164,8 @@ XENAPI_CFG_TYPES = {
     'PV_ramdisk': str,
     'PV_args': str,
     'PV_bootloader_args': str,
-    'HVM_boot': str,
+    'HVM_boot_policy': str,
+    'HVM_boot_params': dict,
     'platform_std_vga': bool0,
     'platform_serial': str,
     'platform_localtime': bool0,
@@ -361,7 +362,8 @@ class XendConfig(dict):
             'PV_ramdisk': '',
             'PV_args': '',
             'PV_bootloader_args': '',
-            'HVM_boot': '',
+            'HVM_boot_policy': '',
+            'HVM_boot_params': {},
             'memory_static_min': 0,
             'memory_dynamic_min': 0,
             'shadow_memory': 0,
@@ -495,6 +497,12 @@ class XendConfig(dict):
                 except (TypeError, ValueError), e:
                     log.warn("Unable to parse key %s: %s: %s" %
                              (key, str(val), e))
+
+        # Compatibility hack -- can go soon.
+        boot_order = sxp.child_value(sxp_cfg, 'HVM_boot')
+        if boot_order:
+            cfg['HVM_boot_policy'] = 'BIOS order'
+            cfg['HVM_boot_params'] = { 'order' : boot_order }
 
         # Parsing the device SXP's. In most cases, the SXP looks
         # like this:
@@ -768,7 +776,7 @@ class XendConfig(dict):
         if 'image' in xapi_dict:
             self['image'].update(xapi_dict['image'])
         else:
-            hvm = self['HVM_boot'] != ''
+            hvm = self['HVM_boot_policy'] != ''
             self['image']['type'] = hvm and 'hvm' or 'linux'
             if hvm:
                 self['image']['hvm'] = {'devices': {}}
