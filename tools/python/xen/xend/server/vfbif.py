@@ -46,7 +46,7 @@ class VfbifController(DevController):
 
     def createDevice(self, config):
         DevController.createDevice(self, config)
-        if self.vm.info.get('HVM_boot'):
+        if self.vm.info.get('HVM_boot_policy'):
             # is HVM, so qemu-dm will handle the vfb.
             return
         
@@ -90,7 +90,7 @@ class VfbifController(DevController):
 
 
     def waitForDevice(self, devid):
-        if self.vm.info.get('HVM_boot'):
+        if self.vm.info.get('HVM_boot_policy'):
             log.debug('skip waiting for HVM vfb')
             # is a qemu-dm managed device, don't wait for hotplug for these.
             return
@@ -110,7 +110,7 @@ class VfbifController(DevController):
         raise VmError('Refusing to reconfigure device vfb:%d' % devid)
 
     def destroyDevice(self, devid, force):
-        if self.vm.info.get('HVM_boot'):
+        if self.vm.info.get('HVM_boot_policy'):
             # remove the backend xenstore entries for HVM guests no matter
             # what
             DevController.destroyDevice(self, devid, True)
@@ -119,7 +119,7 @@ class VfbifController(DevController):
 
 
     def migrate(self, deviceConfig, network, dst, step, domName):
-        if self.vm.info.get('HVM_boot'):        
+        if self.vm.info.get('HVM_boot_policy'):        
             return 0
         return DevController.migrate(self, deviceConfig, network, dst, step,
                                      domName)
@@ -136,14 +136,14 @@ class VkbdifController(DevController):
         return (devid, back, front)
 
     def waitForDevice(self, config):
-        if self.vm.info.get('HVM_boot'):
+        if self.vm.info.get('HVM_boot_policy'):
             # is a qemu-dm managed device, don't wait for hotplug for these.
             return
 
         DevController.waitForDevice(self, config)
 
     def destroyDevice(self, devid, force):
-        if self.vm.info.get('HVM_boot'):
+        if self.vm.info.get('HVM_boot_policy'):
             # remove the backend xenstore entries for HVM guests no matter
             # what
             DevController.destroyDevice(self, devid, True)
@@ -151,7 +151,7 @@ class VkbdifController(DevController):
             DevController.destroyDevice(self, devid, force)
 
     def migrate(self, deviceConfig, network, dst, step, domName):
-        if self.vm.info.get('HVM_boot'):        
+        if self.vm.info.get('HVM_boot_policy'):        
             return 0
         return DevController.migrate(self, deviceConfig, network, dst, step,
                                      domName)        
