@@ -124,6 +124,8 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
 #ifdef CONFIG_XEN
+	;;
+	srlz.d
 	mov r9=1
 	movl r8=XSI_PSR_IC
 	;;
