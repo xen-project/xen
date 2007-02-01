@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+#  -*- mode: python; -*-
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2007 XenSource Inc.
+#============================================================================
+
+
+# Use the auxbin module in Xend to determine the correct Python path.  We
+# take the first installed instance of auxbin that we find, and then run it
+# to determine the correct path, appending that to sys.path.
+
+AUXBIN = 'xen/util/auxbin.py'
+
+import os
+import os.path
+import sys
+
+for p in ['python%s' % sys.version[:3], 'python']:
+    for l in ['/usr/lib64', '/usr/lib']:
+        d = os.path.join(l, p)
+        if os.path.exists(os.path.join(d, AUXBIN)):
+            sys.path.append(d)
+            import xen.util.auxbin
+            print os.path.join(xen.util.auxbin.libpath(), p)
+            sys.exit(0)
+
+print >>sys.stderr, "Cannot find Xen Python modules."
+sys.exit(1)
