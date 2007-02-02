@@ -178,6 +178,7 @@ static void release_xenbus_id(int id)
     BUG_ON(!req_info[id].in_use);
     spin_lock(&req_lock);
     nr_live_reqs--;
+    req_info[id].in_use = 0;
     if (nr_live_reqs == NR_REQS - 1)
         wake_up(&req_wq);
     spin_unlock(&req_lock);
@@ -212,6 +213,7 @@ static int allocate_xenbus_id(void)
     probe = o_probe + 1;
     spin_unlock(&req_lock);
     init_waitqueue_head(&req_info[o_probe].waitq);
+
     return o_probe;
 }
 
