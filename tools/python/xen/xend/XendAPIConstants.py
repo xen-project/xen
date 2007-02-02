@@ -12,7 +12,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2006 XenSource Ltd.
+# Copyright (C) 2006-2007 XenSource Ltd.
 #============================================================================
 
 #
@@ -49,16 +49,8 @@ XEN_API_ON_CRASH_BEHAVIOUR = [
     'rename_restart'
 ]
 
-XEN_API_BOOT_TYPE = [
-    'bios',
-    'grub',
-    'kernel_external',
-    'kernel_internal'
-]
-
 XEN_API_VBD_MODE = ['RO', 'RW']
 XEN_API_VDI_TYPE = ['system', 'user', 'ephemeral']
-XEN_API_DRIVER_TYPE = ['ioemu', 'paravirtualised']
 XEN_API_VBD_TYPE = ['CD', 'Disk']
 XEN_API_TASK_STATUS_TYPE = ['pending', 'success', 'failure']
 XEN_API_CONSOLE_PROTOCOL = ['vt100', 'rfb', 'rdp']
