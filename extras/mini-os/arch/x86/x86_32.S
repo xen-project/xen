@@ -69,7 +69,7 @@ CS		= 0x2C
 	popl %ds;	\
 	popl %es;	\
 	addl $4,%esp;	\
-	iret;		\
+	iret;		
 
 ENTRY(divide_error)
 	pushl $0		# no error code
@@ -101,10 +101,9 @@ do_exception:
     jmp ret_from_exception
     
 ret_from_exception:
-        movb CS(%esp),%cl
-	test $2,%cl          # slow return to ring 2 or 3
-	jne  safesti
-        RESTORE_ALL
+    movb CS(%esp),%cl
+    addl $8,%esp
+    RESTORE_ALL
 
 # A note on the "critical region" in our callback handler.
 # We want to avoid stacking callback handlers due to events occurring
