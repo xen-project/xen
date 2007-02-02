@@ -4664,10 +4664,42 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~dmesg}
+
+{\bf Overview:} 
+Get the host xen dmesg.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string dmesg (session_id s, host ref host)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The Host to query \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+dmesg string
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Return a list of all the hosts known to the system
+Return a list of all the hosts known to the system.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((host ref) Set) get_all (session_id s)\end{verbatim}

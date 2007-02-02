@@ -22,7 +22,7 @@ import sys
 import traceback
 import threading
 
-from xen.xend import XendDomain, XendDomainInfo, XendNode
+from xen.xend import XendDomain, XendDomainInfo, XendNode, XendDmesg
 from xen.xend import XendLogging, XendTaskManager
 
 from xen.xend.XendAuthSessions import instance as auth_manager
@@ -615,7 +615,8 @@ class XendAPI(object):
                     ('reboot', None),
                     ('shutdown', None),
                     ('add_to_other_config', None),
-                    ('remove_from_other_config', None)]
+                    ('remove_from_other_config', None),
+                    ('dmesg', 'String')]
     
     host_funcs = [('get_by_name_label', 'Set(host)')]
 
@@ -673,6 +674,9 @@ class XendAPI(object):
         if not XendDomain.instance().allow_new_domains():
             return xen_api_error(XEND_ERROR_HOST_RUNNING)
         return xen_api_error(XEND_ERROR_UNSUPPORTED)        
+
+    def host_dmesg(self, session, host_ref):
+        return xen_api_success(XendDmesg.instance().info())
 
     def host_get_record(self, session, host_ref):
         node = XendNode.instance()
@@ -737,7 +741,7 @@ class XendAPI(object):
                             'memory_free',
                             'host']
     host_metrics_attr_rw = []
-    host_methods = []
+    host_metrics_methods = []
 
     def _host_metrics_get(self, ref, f):
         return xen_api_success(getattr(node, f)())

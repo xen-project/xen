@@ -206,6 +206,20 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    char *dmesg;
+    if (!xen_host_dmesg(session, &dmesg, host))
+    {
+        print_error(session);
+        xen_string_string_map_free(versions);
+        xen_host_free(host);
+        xen_vm_record_free(vm_record);
+        xen_uuid_bytes_free(vm_uuid_bytes);
+        xen_uuid_free(vm_uuid);
+        xen_vm_free(vm);
+        CLEANUP;
+        return 1;
+    }
+
     printf("%s.\n", vm_uuid);
 
     fprintf(stderr, "In bytes, the VM UUID is ");
@@ -222,6 +236,8 @@ int main(int argc, char **argv)
         printf("%s -> %s.\n", versions->contents[i].key,
                versions->contents[i].val);
     }
+
+    printf("Host dmesg follows:\n%s\n\n", dmesg);
 
     printf("%s.\n", vm_record->uuid);
 
@@ -244,6 +260,7 @@ int main(int argc, char **argv)
 
     xen_host_free(host);
     xen_string_string_map_free(versions);
+    free(dmesg);
 
 
     xen_vm new_vm = create_new_vm(session, true);
