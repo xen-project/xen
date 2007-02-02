@@ -371,6 +371,7 @@ class XendConfig(dict):
             'cpu_weight': 256,
             'cpu_cap': 0,
             'vcpus_number': 1,
+            'vcpus_params': {},
             'console_refs': [],
             'vif_refs': [],
             'vbd_refs': [],
