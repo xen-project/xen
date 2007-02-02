@@ -24,7 +24,7 @@ XEN_API_VM_POWER_STATE = [
     'Paused',
     'Running',
     'Suspended',
-    'ShuttingDown',
+    'Halted',
     'Unknown'
 ]
 
