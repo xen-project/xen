@@ -597,6 +597,11 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         if ( !IS_PRIV(current->domain) )
             clear_bit(X86_FEATURE_MTRR, &d);
     }
+    else if ( regs->eax == 0x80000001 )
+    {
+        /* Modify Feature Information. */
+        clear_bit(X86_FEATURE_RDTSCP % 32, &d);
+    }
     else
     {
         (void)cpuid_hypervisor_leaves(regs->eax, &a, &b, &c, &d);
