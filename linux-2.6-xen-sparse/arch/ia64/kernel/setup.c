@@ -63,6 +63,7 @@
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
 #include <asm/xen/xencomm.h>
+#include <xen/xencons.h>
 #endif
 #include <linux/dma-mapping.h>
 
