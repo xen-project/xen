@@ -88,6 +88,8 @@ new_tlbflush_clock_period(void)
     smp_mb();
     for_each_domain(d) {
         for_each_vcpu(d, v) {
+            if (!test_bit(_VCPUF_initialised, &v->vcpu_flags) || VMX_DOMAIN(v))
+                continue;
             if (HAS_PERVCPU_VHPT(v->domain))
                 vcpu_vhpt_flush(v);
         }
