@@ -99,7 +99,6 @@ static struct notifier_block xen_panic_block = {
 
 void xen_pm_power_off(void)
 {
-	printk("%s called\n", __FUNCTION__);
 	local_irq_disable();
 	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
