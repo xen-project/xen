@@ -95,6 +95,13 @@ xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 static struct notifier_block xen_panic_block = {
 	xen_panic_event, NULL, 0 /* try to go last */
 };
+
+void xen_pm_power_off(void)
+{
+	printk("%s called\n", __FUNCTION__);
+	local_irq_disable();
+	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
+}
 #endif
 
 extern void ia64_setup_printk_clock(void);
@@ -456,6 +463,7 @@ setup_arch (char **cmdline_p)
 		/* Register a call for panic conditions. */
 		atomic_notifier_chain_register(&panic_notifier_list,
 		                               &xen_panic_block);
+		pm_power_off = xen_pm_power_off;
 	}
 #endif
 
