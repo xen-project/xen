@@ -279,7 +279,7 @@ static void hpet_write(
              (h->hpet.timers[tn].config & HPET_TN_SETVAL) )
             h->hpet.timers[tn].cmp = new_val;
         else
-            h->period[tn] = new_val;
+            h->hpet.period[tn] = new_val;
         h->hpet.timers[tn].config &= ~HPET_TN_SETVAL;
         if ( hpet_enabled(h) && timer_enabled(h, tn) )
             hpet_set_timer(h, tn);
@@ -289,7 +289,7 @@ static void hpet_write(
     case HPET_T1_ROUTE:
     case HPET_T2_ROUTE:
         tn = (addr - HPET_T0_ROUTE) >> 5;
-        h->hpet.timers[tn].hpet_fsb[0] = new_val;
+        h->hpet.timers[tn].fsb = new_val;
         break;
 
     default:
@@ -351,21 +351,22 @@ static void hpet_timer_fn(void *opaque)
 
     hpet_route_interrupt(h, tn);
 
-    if ( timer_is_periodic(h, tn) && (h->period[tn] != 0) )
+    if ( timer_is_periodic(h, tn) && (h->hpet.period[tn] != 0) )
     {
         uint64_t mc = hpet_read_maincounter(h);
         if ( timer_is_32bit(h, tn) )
         {
             while ( hpet_time_after(mc, h->hpet.timers[tn].cmp) )
                 h->hpet.timers[tn].cmp = (uint32_t)(
-                    h->hpet.timers[tn].cmp + h->period[tn]);
+                    h->hpet.timers[tn].cmp + h->hpet.period[tn]);
         }
         else
         {
             while ( hpet_time_after64(mc, h->hpet.timers[tn].cmp) )
-                h->hpet.timers[tn].cmp += h->period[tn];
+                h->hpet.timers[tn].cmp += h->hpet.period[tn];
         }
-        set_timer(&h->timers[tn], NOW() + hpet_tick_to_ns(h, h->period[tn]));
+        set_timer(&h->timers[tn], 
+                  NOW() + hpet_tick_to_ns(h, h->hpet.period[tn]));
     }
 }
 
@@ -377,6 +378,35 @@ void hpet_migrate_timers(struct vcpu *v)
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
         migrate_timer(&h->timers[i], v->processor);
 }
+
+static int hpet_save(struct domain *d, hvm_domain_context_t *h)
+{
+    HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
+
+    /* Save the HPET registers */
+    return hvm_save_entry(HPET, 0, h, &hp->hpet);
+}
+
+static int hpet_load(struct domain *d, hvm_domain_context_t *h)
+{
+    HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
+    int i;
+
+    /* Reload the HPET registers */
+    if ( hvm_load_entry(HPET, h, &hp->hpet) )
+        return -EINVAL;
+    
+    /* Recalculate the offset between the main counter and guest time */
+    hp->mc_offset = hp->hpet.mc64 - hvm_get_guest_time(hp->vcpu);
+                
+    /* Restart the timers */
+    for ( i = 0; i < HPET_TIMER_NUM; i++ )
+        hpet_set_timer(hp, i);
+
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load);
 
 void hpet_init(struct vcpu *v)
 {

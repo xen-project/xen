@@ -1648,14 +1648,15 @@ class XendDomainInfo:
         kernel          = self.info['PV_kernel']
         ramdisk         = self.info['PV_ramdisk']
         args            = self.info['PV_args']
-        boot            = self.info['HVM_boot']
+        boot            = self.info['HVM_boot_policy']
 
         if boot:
             # HVM booting.
             self.info['image']['type'] = 'hvm'
             if not 'devices' in self.info['image']:
                 self.info['image']['devices'] = {}
-            self.info['image']['devices']['boot'] = boot
+            self.info['image']['devices']['boot'] = \
+                self.info['HVM_boot_params'].get('order', 'dc')
         elif not blexec and kernel:
             # Boot from dom0.  Nothing left to do -- the kernel and ramdisk
             # will be picked up by image.py.
@@ -1976,7 +1977,11 @@ class XendDomainInfo:
         else:
             return 'unknown'
     def get_vcpus_params(self):
-        return '' # TODO
+        if self.getDomid() is None:
+            return self.info['vcpus_params']
+
+        retval = xc.sched_credit_domain_get(self.getDomid())
+        return retval
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
     def get_platform_std_vga(self):

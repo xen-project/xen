@@ -328,13 +328,15 @@ int xc_domain_getinfolist(int xc_handle,
  * This function returns information about the context of a hvm domain
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the domain to get information from
- * @parm hvm_ctxt a pointer to a structure to store the execution context of the
- *            hvm domain
+ * @parm ctxt_buf a pointer to a structure to store the execution context of
+ *            the hvm domain
+ * @parm size the size of ctxt_buf in bytes
  * @return 0 on success, -1 on failure
  */
 int xc_domain_hvm_getcontext(int xc_handle,
                              uint32_t domid,
-                             hvm_domain_context_t *hvm_ctxt);
+                             uint8_t *ctxt_buf,
+                             uint32_t size);
 
 /**
  * This function will set the context for hvm domain
@@ -342,11 +344,13 @@ int xc_domain_hvm_getcontext(int xc_handle,
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the domain to set the hvm domain context for
  * @parm hvm_ctxt pointer to the the hvm context with the values to set
+ * @parm size the size of hvm_ctxt in bytes
  * @return 0 on success, -1 on failure
  */
 int xc_domain_hvm_setcontext(int xc_handle,
                              uint32_t domid,
-                             hvm_domain_context_t *hvm_ctxt);
+                             uint8_t *hvm_ctxt,
+                             uint32_t size);
 
 /**
  * This function returns information about the execution context of a

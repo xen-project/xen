@@ -363,9 +363,9 @@ diff -pruN ../orig-linux-2.6.18/drivers/oprofile/oprof.c ./drivers/oprofile/opro
 +	if (!oprofile_ops.set_active)
 +		return -EINVAL;
 +
-+	down(&start_sem);
++	mutex_lock(&start_mutex);
 +	err = oprofile_ops.set_active(active_domains, adomains);
-+	up(&start_sem);
++	mutex_unlock(&start_mutex);
 +	return err;
 +}
 +
@@ -376,9 +376,9 @@ diff -pruN ../orig-linux-2.6.18/drivers/oprofile/oprof.c ./drivers/oprofile/opro
 +	if (!oprofile_ops.set_passive)
 +		return -EINVAL;
 +
-+	down(&start_sem);
++	mutex_lock(&start_mutex);
 +	err = oprofile_ops.set_passive(passive_domains, pdomains);
-+	up(&start_sem);
++	mutex_unlock(&start_mutex);
 +	return err;
 +}
 +

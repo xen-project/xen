@@ -26,11 +26,7 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     /* allocate special pages */
     dom->console_pfn = dom->total_pages -1;
     dom->xenstore_pfn = dom->total_pages -2;
-
-    /*
-     * this is initialized by arch_setup_middle().
-     * dom->start_info_pfn = dom->total_pages -3;
-     */
+    dom->start_info_pfn = dom->total_pages -3;
     return 0;
 }
 

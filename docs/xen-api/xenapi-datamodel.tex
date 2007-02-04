@@ -142,7 +142,6 @@ The following enumeration types are used:
 \hspace{0.5cm}{\tt Paused} & Paused \\
 \hspace{0.5cm}{\tt Running} & Running \\
 \hspace{0.5cm}{\tt Suspended} & Suspended \\
-\hspace{0.5cm}{\tt ShuttingDown} & Shutting Down \\
 \hspace{0.5cm}{\tt Unknown} & Some other unknown state \\
 \hline
 \end{longtable}
@@ -1026,9 +1025,9 @@ references to objects with match names
 virtual machine (or 'guest').
 
 VM booting is controlled by setting one of the two mutually exclusive
-groups: "PV", and "HVM".  If HVM.boot is the empty string, then paravirtual
-domain building and booting will be used; otherwise the VM will be loaded
-as an HVM domain, and booted using an emulated BIOS.
+groups: "PV", and "HVM".  If HVM.boot\_policy is the empty string, then
+paravirtual domain building and booting will be used; otherwise the VM will
+be loaded as an HVM domain, and booted using an emulated BIOS.
 
 When paravirtual booting is in use, the PV/bootloader field indicates the
 bootloader to use.  It may be "pygrub", in which case the platform's
@@ -1053,7 +1052,10 @@ ramdisk values will be treated as paths within the control domain.  If both
 PV/bootloader and PV/kernel are empty, then the behaviour is as if
 PV/bootloader was specified as "pygrub".
 
-When using HVM booting, HVM/boot specifies the order of the boot devices.}} \\
+When using HVM booting, HVM/boot\_policy and HVM/boot\_params specify the
+boot handling.  Only one policy is currently defined: "BIOS order".  In
+this case, HVM/boot\_params should contain one key-value pair "order" = "N"
+where N is the string that will be passed to QEMU.}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -1089,7 +1091,8 @@ $\mathit{RW}$ &  {\tt PV/kernel} & string & path to the kernel \\
 $\mathit{RW}$ &  {\tt PV/ramdisk} & string & path to the initrd \\
 $\mathit{RW}$ &  {\tt PV/args} & string & kernel command-line arguments \\
 $\mathit{RW}$ &  {\tt PV/bootloader\_args} & string & miscellaneous arguments for the bootloader \\
-$\mathit{RW}$ &  {\tt HVM/boot} & string & device boot order \\
+$\mathit{RW}$ &  {\tt HVM/boot\_policy} & string & HVM boot policy \\
+$\mathit{RW}$ &  {\tt HVM/boot\_params} & (string $\rightarrow$ string) Map & HVM boot params \\
 $\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
 $\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
 $\mathit{RW}$ &  {\tt platform/localtime} & bool & set RTC to local time \\
@@ -3297,13 +3300,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_HVM\_boot}
+\subsubsection{RPC name:~get\_HVM\_boot\_policy}
 
 {\bf Overview:} 
-Get the HVM/boot field of the given VM.
+Get the HVM/boot\_policy field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_HVM_boot (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} string get_HVM_boot_policy (session_id s, VM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3329,13 +3332,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_HVM\_boot}
+\subsubsection{RPC name:~set\_HVM\_boot\_policy}
 
 {\bf Overview:} 
-Set the HVM/boot field of the given VM.
+Set the HVM/boot\_policy field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_HVM_boot (session_id s, VM ref self, string value)\end{verbatim}
+\begin{verbatim} void set_HVM_boot_policy (session_id s, VM ref self, string value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3348,6 +3351,143 @@ Set the HVM/boot field of the given VM.
 {\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_HVM\_boot\_params}
+
+{\bf Overview:} 
+Get the HVM/boot\_params field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_HVM_boot_params (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_HVM\_boot\_params}
+
+{\bf Overview:} 
+Set the HVM/boot\_params field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_HVM_boot_params (session_id s, VM ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_HVM\_boot\_params}
+
+{\bf Overview:} 
+Add the given key-value pair to the HVM/boot\_params field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_HVM_boot_params (session_id s, VM ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_HVM\_boot\_params}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the HVM/boot\_params
+field of the given VM.  If the key is not in that Map, then do nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_HVM_boot_params (session_id s, VM ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
 
 \end{tabular}
 
@@ -4524,10 +4664,42 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~dmesg}
+
+{\bf Overview:} 
+Get the host xen dmesg.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string dmesg (session_id s, host ref host)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The Host to query \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+dmesg string
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Return a list of all the hosts known to the system
+Return a list of all the hosts known to the system.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((host ref) Set) get_all (session_id s)\end{verbatim}
@@ -11756,6 +11928,17 @@ The handle parameter echoes the bad value given.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}TASK_HANDLE_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VALUE\_NOT\_SUPPORTED}
+
+You attempted to set a value that is not supported by this implementation. 
+The fully-qualified field name and the value that you tried to set are
+returned.  Also returned is a developer-only diagnostic reason.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{VBD\_HANDLE\_INVALID}

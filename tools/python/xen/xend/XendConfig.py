@@ -28,7 +28,7 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 
 log = logging.getLogger("xend.XendConfig")
-log.setLevel(logging.WARN)
+log.setLevel(logging.DEBUG)
 
 
 """
@@ -125,8 +125,7 @@ XENAPI_HVM_CFG = {
     'platform_std_vga': 'stdvga',
     'platform_serial' : 'serial',
     'platform_localtime': 'localtime',
-    'platform_keymap' : 'keymap',
-    'HVM_boot': 'boot',
+    'platform_keymap' : 'keymap'
 }    
 
 # List of XendConfig configuration keys that have no direct equivalent
@@ -147,24 +146,19 @@ XENAPI_CFG_TYPES = {
     'memory_actual': int,
     'cpus': list,
     'vcpus_policy': str,
-    'vcpus_params': str,
+    'vcpus_params': dict,
     'vcpus_number': int,
-    'vcpus_features_required': list,
-    'vcpus_features_can_use': list,
-    'vcpus_features_force_on': list, 
-    'vcpus_features_force_off': list,
     'actions_after_shutdown': str,
     'actions_after_reboot': str,
-    'actions_after_suspend': str,
     'actions_after_crash': str,
-    'tpm_instance': int,
     'tpm_backend': int,    
     'PV_bootloader': str,
     'PV_kernel': str,
     'PV_ramdisk': str,
     'PV_args': str,
     'PV_bootloader_args': str,
-    'HVM_boot': str,
+    'HVM_boot_policy': str,
+    'HVM_boot_params': dict,
     'platform_std_vga': bool0,
     'platform_serial': str,
     'platform_localtime': bool0,
@@ -349,7 +343,6 @@ class XendConfig(dict):
 
     def _defaults(self):
         defaults = {
-            'uuid': uuid.createString(),
             'name_label': 'Domain-Unnamed',
             'actions_after_shutdown': 'destroy',
             'actions_after_reboot': 'restart',
@@ -361,7 +354,8 @@ class XendConfig(dict):
             'PV_ramdisk': '',
             'PV_args': '',
             'PV_bootloader_args': '',
-            'HVM_boot': '',
+            'HVM_boot_policy': '',
+            'HVM_boot_params': {},
             'memory_static_min': 0,
             'memory_dynamic_min': 0,
             'shadow_memory': 0,
@@ -377,6 +371,7 @@ class XendConfig(dict):
             'cpu_weight': 256,
             'cpu_cap': 0,
             'vcpus_number': 1,
+            'vcpus_params': {},
             'console_refs': [],
             'vif_refs': [],
             'vbd_refs': [],
@@ -384,7 +379,6 @@ class XendConfig(dict):
             'other_config': {},
         }
         
-        defaults['name_label'] = 'Domain-' + defaults['uuid']
         return defaults
 
     def _memory_sanity_check(self):
@@ -414,13 +408,21 @@ class XendConfig(dict):
 
     def _uuid_sanity_check(self):
         """Make sure UUID is in proper string format with hyphens."""
-        self['uuid'] = uuid.toString(uuid.fromString(self['uuid']))
+        if 'uuid' not in self or not self['uuid']:
+            self['uuid'] = uuid.createString()
+        else:
+            self['uuid'] = uuid.toString(uuid.fromString(self['uuid']))
+
+    def _name_sanity_check(self):
+        if 'name_label' not in self:
+            self['name_label'] = 'Domain-' + self['uuid']
 
     def validate(self):
+        self._uuid_sanity_check()
+        self._name_sanity_check()
         self._memory_sanity_check()
         self._actions_sanity_check()
         self._vcpus_sanity_check()
-        self._uuid_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
@@ -495,6 +497,12 @@ class XendConfig(dict):
                 except (TypeError, ValueError), e:
                     log.warn("Unable to parse key %s: %s: %s" %
                              (key, str(val), e))
+
+        # Compatibility hack -- can go soon.
+        boot_order = sxp.child_value(sxp_cfg, 'HVM_boot')
+        if boot_order:
+            cfg['HVM_boot_policy'] = 'BIOS order'
+            cfg['HVM_boot_params'] = { 'order' : boot_order }
 
         # Parsing the device SXP's. In most cases, the SXP looks
         # like this:
@@ -671,6 +679,9 @@ class XendConfig(dict):
                 if self['devices'][console_uuid][1].get('protocol') == 'rfb':
                     has_rfb = True
                     break
+                if self['devices'][console_uuid][0] == 'vfb':
+                    has_rfb = True
+                    break
 
             if not has_rfb:
                 dev_config = ['vfb']
@@ -724,6 +735,7 @@ class XendConfig(dict):
                 val = sxp.child_value(image_sxp, imgkey, None)
                 if val != None:
                     self[apikey] = val
+            self._hvm_boot_params_from_sxp(image_sxp)
 
         # extract backend value
                     
@@ -768,7 +780,7 @@ class XendConfig(dict):
         if 'image' in xapi_dict:
             self['image'].update(xapi_dict['image'])
         else:
-            hvm = self['HVM_boot'] != ''
+            hvm = self['HVM_boot_policy'] != ''
             self['image']['type'] = hvm and 'hvm' or 'linux'
             if hvm:
                 self['image']['hvm'] = {'devices': {}}
@@ -829,8 +841,6 @@ class XendConfig(dict):
             else:
                 self[key] = val
 
-        self.validate()
-
     def to_sxp(self, domain = None, ignore_devices = False, ignore = [],
                legacy_only = True):
         """ Get SXP representation of this config object.
@@ -854,9 +864,13 @@ class XendConfig(dict):
             sxpr.append(['domid', domain.getDomid()])
 
         if not legacy_only:
-            for name in XENAPI_CFG_TYPES.keys():
+            for name, typ in XENAPI_CFG_TYPES.items():
                 if name in self and self[name] not in (None, []):
-                    sxpr.append([name, str(self[name])])
+                    if typ == dict:
+                        s = self[name].items()
+                    else:
+                        s = str(self[name])
+                    sxpr.append([name, s])
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
@@ -905,7 +919,7 @@ class XendConfig(dict):
                                 # store as part of the device config.
                                 dev_uuid = sxp.child_value(config, 'uuid')
                                 dev_type, dev_cfg = self['devices'][dev_uuid]
-                                is_bootable = dev_cfg.get('bootable', False)
+                                is_bootable = dev_cfg.get('bootable', 0)
                                 config.append(['bootable', int(is_bootable)])
 
                             sxpr.append(['device', config])
@@ -978,14 +992,16 @@ class XendConfig(dict):
                     pass
 
             if dev_type == 'vbd':
-                dev_info['bootable'] = False
+                dev_info['bootable'] = 0
                 if dev_info.get('dev', '').startswith('ioemu:'):
                     dev_info['driver'] = 'ioemu'
                 else:
                     dev_info['driver'] = 'paravirtualised'
 
             # create uuid if it doesn't exist
-            dev_uuid = dev_info.get('uuid', uuid.createString())
+            dev_uuid = dev_info.get('uuid', None)
+            if not dev_uuid:
+                dev_uuid = uuid.createString()
             dev_info['uuid'] = dev_uuid
 
             # store dev references by uuid for certain device types
@@ -998,7 +1014,7 @@ class XendConfig(dict):
                     if dev_type == 'vbd' and not target[param]:
                         # Compat hack -- this is the first disk, so mark it
                         # bootable.
-                        dev_info['bootable'] = True
+                        dev_info['bootable'] = 1
                     target[param].append(dev_uuid)
             elif dev_type == 'tap':
                 if 'vbd_refs' not in target:
@@ -1007,7 +1023,7 @@ class XendConfig(dict):
                     if not target['vbd_refs']:
                         # Compat hack -- this is the first disk, so mark it
                         # bootable.
-                        dev_info['bootable'] = True
+                        dev_info['bootable'] = 1
                     target['vbd_refs'].append(dev_uuid)
                     
             elif dev_type == 'vfb':
@@ -1055,7 +1071,9 @@ class XendConfig(dict):
                 if cfg_xenapi.get('name'):
                     dev_info['name'] = cfg_xenapi.get('name')
                 
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vif_refs'].append(dev_uuid)
@@ -1070,8 +1088,8 @@ class XendConfig(dict):
                 dev_info['uname'] = cfg_xenapi.get('image', '')
                 dev_info['dev'] = '%s:%s' % (cfg_xenapi.get('device'),
                                              old_vbd_type)
-                dev_info['bootable'] = cfg_xenapi.get('bootable', False)
-                dev_info['driver'] = cfg_xenapi.get('driver')
+                dev_info['bootable'] = int(cfg_xenapi.get('bootable', 0))
+                dev_info['driver'] = cfg_xenapi.get('driver', '')
                 dev_info['VDI'] = cfg_xenapi.get('VDI', '')
                     
                 if cfg_xenapi.get('mode') == 'RW':
@@ -1079,7 +1097,9 @@ class XendConfig(dict):
                 else:
                     dev_info['mode'] = 'r'
 
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vbd_refs'].append(dev_uuid)                
@@ -1088,13 +1108,17 @@ class XendConfig(dict):
                 if cfg_xenapi.get('type'):
                     dev_info['type'] = cfg_xenapi.get('type')
 
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vtpm_refs'].append(dev_uuid)
 
             elif dev_type == 'console':
-                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_uuid = cfg_xenapi.get('uuid', None)
+                if not dev_uuid:
+                    dev_uuid = uuid.createString()
                 dev_info['uuid'] = dev_uuid
                 dev_info['protocol'] = cfg_xenapi.get('protocol', 'rfb')
                 dev_info['other_config'] = cfg_xenapi.get('other_config', {})
@@ -1223,7 +1247,12 @@ class XendConfig(dict):
                                   "configuration dictionary.")
             
         sxpr.append(dev_type)
-        config = [(opt, val) for opt, val in dev_info.items()]
+        if dev_type in ('console', 'vfb'):
+            config = [(opt, val) for opt, val in dev_info.items()
+                      if opt != 'other_config']
+        else:
+            config = [(opt, val) for opt, val in dev_info.items()]
+            
         sxpr += config
 
         return sxpr
@@ -1356,11 +1385,18 @@ class XendConfig(dict):
             val = sxp.child_value(image_sxp, imgkey, None)
             if val != None:
                 type_conv = XENAPI_CFG_TYPES[apikey]
-                if callable(conv):
+                if callable(type_conv):
                     self[apikey] = type_conv(val)
                 else:
                     self[apikey] = val
+        self._hvm_boot_params_from_sxp(image_sxp)
 
+
+    def _hvm_boot_params_from_sxp(self, image_sxp):
+        boot = sxp.child_value(image_sxp, 'boot', None)
+        if boot is not None:
+            self['HVM_boot_policy'] = 'BIOS order'
+            self['HVM_boot_params'] = { 'order' : boot }
 
 
 #

@@ -241,45 +241,49 @@ int xc_domain_getinfolist(int xc_handle,
 /* get info from hvm guest for save */
 int xc_domain_hvm_getcontext(int xc_handle,
                              uint32_t domid,
-                             hvm_domain_context_t *hvm_ctxt)
+                             uint8_t *ctxt_buf,
+                             uint32_t size)
 {
-    int rc;
+    int ret;
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_gethvmcontext;
     domctl.domain = (domid_t)domid;
-    set_xen_guest_handle(domctl.u.hvmcontext.ctxt, hvm_ctxt);
+    domctl.u.hvmcontext.size = size;
+    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
-    if ( (rc = mlock(hvm_ctxt, sizeof(*hvm_ctxt))) != 0 )
-        return rc;
+    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+        return ret;
 
-    rc = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xc_handle, &domctl);
 
-    safe_munlock(hvm_ctxt, sizeof(*hvm_ctxt));
+    unlock_pages(ctxt_buf, size);
 
-    return rc;
+    return (ret < 0 ? -1 : domctl.u.hvmcontext.size);
 }
 
 /* set info to hvm guest for restore */
 int xc_domain_hvm_setcontext(int xc_handle,
                              uint32_t domid,
-                             hvm_domain_context_t *hvm_ctxt)
+                             uint8_t *ctxt_buf,
+                             uint32_t size)
 {
-    int rc;
+    int ret;
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_sethvmcontext;
     domctl.domain = domid;
-    set_xen_guest_handle(domctl.u.hvmcontext.ctxt, hvm_ctxt);
+    domctl.u.hvmcontext.size = size;
+    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
-    if ( (rc = mlock(hvm_ctxt, sizeof(*hvm_ctxt))) != 0 )
-        return rc;
+    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+        return ret;
 
-    rc = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xc_handle, &domctl);
 
-    safe_munlock(hvm_ctxt, sizeof(*hvm_ctxt));
+    unlock_pages(ctxt_buf, size);
 
-    return rc;
+    return ret;
 }
 
 int xc_vcpu_getcontext(int xc_handle,

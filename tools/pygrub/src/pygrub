@@ -197,7 +197,10 @@ class Grub:
             self.screen = curses.initscr()
             self.screen.timeout(1000)
             if hasattr(curses, 'use_default_colors'):
-                curses.use_default_colors()
+                try:
+                    curses.use_default_colors()
+                except:
+                    pass # Not important if we can't use colour
             enable_cursor(False)
             self.entry_win = curses.newwin(10, 74, 2, 1)
             self.text_win = curses.newwin(10, 70, 12, 5)

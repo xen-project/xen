@@ -632,6 +632,23 @@ xen_host_reboot(xen_session *session, xen_host host)
 
 
 bool
+xen_host_dmesg(xen_session *session, char **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.dmesg");
+    return session->ok;
+}
+
+
+bool
 xen_host_get_all(xen_session *session, struct xen_host_set **result)
 {
 

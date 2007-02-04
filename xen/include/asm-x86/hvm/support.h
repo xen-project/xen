@@ -123,6 +123,13 @@ extern unsigned int opt_hvm_debug_level;
  * Save/restore support 
  */
 
+/* Marshalling and unmarshalling uses a buffer with size and cursor. */
+typedef struct hvm_domain_context {
+    uint32_t cur;
+    uint32_t size;
+    uint8_t *data;
+} hvm_domain_context_t;
+
 /* Marshalling an entry: check space and fill in the header */
 static inline int _hvm_init_entry(struct hvm_domain_context *h,
                                   uint16_t tc, uint16_t inst, uint32_t len)

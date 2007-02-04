@@ -31,22 +31,6 @@
 #include <asm/hvm/vpic.h>
 #include <public/hvm/save.h>
 
-#define HPET_TIMER_NUM     3    /* 3 timers supported now */
-struct HPET {
-    uint64_t capability;        /* capabilities */
-    uint64_t res0;              /* reserved */
-    uint64_t config;            /* configuration */
-    uint64_t res1;              /* reserved */
-    uint64_t isr;               /* interrupt status reg */
-    uint64_t res2[25];          /* reserved */
-    uint64_t mc64;              /* main counter */
-    uint64_t res3;              /* reserved */
-    struct {                    /* timers */
-        uint64_t config;        /* configuration/cap */
-        uint64_t cmp;           /* comparator */
-        uint64_t hpet_fsb[2];   /* FSB route, not supported now */
-    } timers[HPET_TIMER_NUM];
-};
 
 struct HPETState;
 struct HPET_timer_fn_info {
@@ -55,11 +39,10 @@ struct HPET_timer_fn_info {
 };
 
 typedef struct HPETState {
-    struct HPET     hpet;
-    struct vcpu     *vcpu;
-    uint64_t        tsc_freq;
-    uint64_t        mc_offset;
-    uint64_t        period[HPET_TIMER_NUM];
+    struct hvm_hw_hpet hpet;
+    struct vcpu *vcpu;
+    uint64_t tsc_freq;
+    uint64_t mc_offset;
     struct timer timers[HPET_TIMER_NUM];
     struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 
 } HPETState;

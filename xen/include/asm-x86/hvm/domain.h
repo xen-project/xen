@@ -49,8 +49,6 @@ struct hvm_domain {
     spinlock_t             pbuf_lock;
 
     uint64_t               params[HVM_NR_PARAMS];
-
-    struct hvm_domain_context *hvm_ctxt;
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

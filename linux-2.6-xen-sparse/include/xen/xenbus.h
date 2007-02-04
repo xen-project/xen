@@ -295,7 +295,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 
 int __init xenbus_dev_init(void);
 
-char *xenbus_strstate(enum xenbus_state state);
+const char *xenbus_strstate(enum xenbus_state state);
 int xenbus_dev_is_online(struct xenbus_device *dev);
 int xenbus_frontend_closed(struct xenbus_device *dev);
 

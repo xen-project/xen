@@ -11,10 +11,12 @@ AC_PROG_CC
 #AC_PROG_INSTALL
 AC_CHECK_PROG([LILO],	lilo,	lilo,	"no",	[$PATH])
 
+XEN_PYTHON_PATH=$(/usr/sbin/xen-python-path)
+
 # Right now, we can assume that the lib/ directory
 # is two levels above the tests
 TESTLIB=../../lib
-TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB"
+TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB:$XEN_PYTHON_PATH"
 
 AC_ARG_ENABLE(hvm-support,
 	[[  --enable-hvm-support           enable hardware virtual machine assist]],

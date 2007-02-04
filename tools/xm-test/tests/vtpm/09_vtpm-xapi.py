@@ -13,7 +13,6 @@
 from XmTestLib import xapi
 from XmTestLib.XenAPIDomain import XmTestAPIDomain
 from XmTestLib import *
-from xen.xend import XendDomain
 from vtpm_utils import *
 import commands
 import os
@@ -28,7 +27,7 @@ except Exception, e:
 vm_uuid = domain.get_uuid()
 
 vtpmcfg = {}
-vtpmcfg['backend'] = XendDomain.DOM0_UUID
+vtpmcfg['backend'] = DOM0_UUID
 vtpmcfg['VM'] = vm_uuid
 
 session = xapi.connect()

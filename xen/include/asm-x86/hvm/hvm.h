@@ -115,6 +115,11 @@ struct hvm_function_table {
     void (*update_guest_cr3)(struct vcpu *v);
 
     /*
+     * Reflect the virtual APIC's value in the guest's V_TPR register
+     */
+    void (*update_vtpr)(struct vcpu *v, unsigned long value);
+
+    /*
      * Update specifics of the guest state:
      * 1) TS bit in guest cr0 
      * 2) TSC offset in guest
@@ -201,6 +206,12 @@ static inline void
 hvm_update_host_cr3(struct vcpu *v)
 {
     hvm_funcs.update_host_cr3(v);
+}
+
+static inline void
+hvm_update_vtpr(struct vcpu *v, unsigned long value)
+{
+    hvm_funcs.update_vtpr(v, value);
 }
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);

@@ -394,6 +394,13 @@ xen_host_reboot(xen_session *session, xen_host host);
 
 
 /**
+ * Get the host xen dmesg.
+ */
+extern bool
+xen_host_dmesg(xen_session *session, char **result, xen_host host);
+
+
+/**
  * Return a list of all the hosts known to the system.
  */
 extern bool

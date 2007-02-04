@@ -56,6 +56,6 @@ mk-symlinks-xen:
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/Makefile . )
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/reference.size . )
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/*.py . )
-	make -C xen/foreign
+	$(MAKE) -C xen/foreign
 
 mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)

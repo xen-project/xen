@@ -536,8 +536,6 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
             if (!MFN_IS_IN_PSEUDOPHYS_MAP(mfn)) {
                 /* This will happen if the type info is stale which
                    is quite feasible under live migration */
-                DPRINTF("PT Race: [%08lx,%d] pte=%llx, mfn=%08lx\n",
-                        type, i, (unsigned long long)pte, mfn);
                 pfn  = 0;  /* zap it - we'll retransmit this page later */
                 race = 1;  /* inform the caller of race; fatal if !live */ 
             } else

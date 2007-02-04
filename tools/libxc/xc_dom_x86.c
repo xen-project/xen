@@ -66,11 +66,12 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
 
     extra_pages = dom->alloc_bootstack ? 1 : 0;
     extra_pages += dom->extra_pages;
+    extra_pages += 128; /* 512kB padding */
     pages = extra_pages;
     for (;;)
     {
 	try_virt_end = round_up(dom->virt_alloc_end + pages * PAGE_SIZE_X86,
-				bits_to_mask(l1_bits));
+				bits_to_mask(22)); /* 4MB alignment */
 	dom->pg_l4 =
 	    nr_page_tables(dom->parms.virt_base, try_virt_end, l4_bits);
 	dom->pg_l3 =
@@ -313,6 +314,7 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     if (xc_dom_feature_translated(dom))
 	dom->shared_info_pfn = xc_dom_alloc_page(dom, "shared info");
     dom->alloc_bootstack = 1;
+
     return 0;
 }
 

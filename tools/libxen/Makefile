@@ -51,6 +51,9 @@ libxenapi.a: $(LIBXENAPI_OBJS)
 test/test_bindings: test/test_bindings.o libxenapi.so
 	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
 
+test/test_hvm_bindings: test/test_hvm_bindings.o libxenapi.so
+	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
+
 
 .PHONY: install
 install: all

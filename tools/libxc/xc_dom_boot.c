@@ -144,7 +144,7 @@ static int x86_shadow(int xc, domid_t domid)
     return rc;
 }
 
-static int arch_setup_early(struct xc_dom_image *dom)
+static int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc = 0;
 
@@ -157,13 +157,13 @@ static int arch_setup_early(struct xc_dom_image *dom)
     return rc;
 }
 
-static int arch_setup_middle(struct xc_dom_image *dom)
+static int arch_setup_bootearly(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
 }
 
-static int arch_setup_late(struct xc_dom_image *dom)
+static int arch_setup_bootlate(struct xc_dom_image *dom)
 {
     static const struct {
 	char *guest;
@@ -263,13 +263,13 @@ static int arch_setup_late(struct xc_dom_image *dom)
 
 #elif defined(__ia64__)
 
-static int arch_setup_early(struct xc_dom_image *dom)
+static int arch_setup_meminit(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
 }
 
-static int arch_setup_middle(struct xc_dom_image *dom)
+static int arch_setup_bootearly(struct xc_dom_image *dom)
 {
     DECLARE_DOMCTL;
     int rc;
@@ -281,10 +281,6 @@ static int arch_setup_middle(struct xc_dom_image *dom)
     domctl.domain = dom->guest_domid;
     domctl.u.arch_setup.flags = 0;
 
-    /* dom->start_info_pfn should be initialized by alloc_magic_pages().
-     * However it is called later. So we initialize here.
-     */
-    dom->start_info_pfn = dom->total_pages - 3;
     domctl.u.arch_setup.bp = (dom->start_info_pfn << PAGE_SHIFT)
 	+ sizeof(start_info_t);
     /* 3 = start info page, xenstore page and console page */
@@ -293,7 +289,7 @@ static int arch_setup_middle(struct xc_dom_image *dom)
     return rc;
 }
 
-static int arch_setup_late(struct xc_dom_image *dom)
+static int arch_setup_bootlate(struct xc_dom_image *dom)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
     shared_info_t *shared_info;
@@ -317,19 +313,19 @@ static int arch_setup_late(struct xc_dom_image *dom)
 
 #elif defined(__powerpc64__)
 
-static int arch_setup_early(struct xc_dom_image *dom)
+static int arch_setup_meminit(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
 }
 
-static int arch_setup_middle(struct xc_dom_image *dom)
+static int arch_setup_bootearly(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
 }
 
-static int arch_setup_late(struct xc_dom_image *dom)
+static int arch_setup_bootlate(struct xc_dom_image *dom)
 {
     start_info_t *si =
 	xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
@@ -355,19 +351,19 @@ static int arch_setup_late(struct xc_dom_image *dom)
 
 #else
 
-static int arch_setup_early(struct xc_dom_image *dom)
+static int arch_setup_meminit(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
 }
 
-static int arch_setup_middle(struct xc_dom_image *dom)
+static int arch_setup_bootearly(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
 }
 
-static int arch_setup_late(struct xc_dom_image *dom)
+static int arch_setup_bootlate(struct xc_dom_image *dom)
 {
     xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
     return 0;
@@ -423,7 +419,7 @@ int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
-    if (0 != (rc = arch_setup_early(dom)))
+    if (0 != (rc = arch_setup_meminit(dom)))
 	return rc;
 
     /* allocate guest memory */
@@ -437,9 +433,6 @@ int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 		     __FUNCTION__);
 	return rc;
     }
-
-    if (0 != (rc = arch_setup_middle(dom)))
-        return rc;
 
     return 0;
 }
@@ -497,6 +490,10 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
+    /* misc ia64 stuff*/
+    if (0 != (rc = arch_setup_bootearly(dom)))
+	return rc;
+
     /* collect some info */
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = dom->guest_domid;
@@ -542,7 +539,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     xc_dom_log_memory_footprint(dom);
 
     /* misc x86 stuff */
-    if (0 != (rc = arch_setup_late(dom)))
+    if (0 != (rc = arch_setup_bootlate(dom)))
 	return rc;
 
     /* let the vm run */
