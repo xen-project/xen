@@ -270,72 +270,46 @@ DECLARE_HVM_SAVE_TYPE(LAPIC_REGS, 6, struct hvm_hw_lapic_regs);
 
 
 /*
- * IRQ
+ * IRQs
  */
 
-struct hvm_hw_irq {
+struct hvm_hw_pci_irqs {
     /*
      * Virtual interrupt wires for a single PCI bus.
      * Indexed by: device*4 + INTx#.
      */
-    DECLARE_BITMAP(pci_intx, 32*4);
+    union {
+        DECLARE_BITMAP(i, 32*4);
+        uint64_t pad[2];
+    };
+};
 
+DECLARE_HVM_SAVE_TYPE(PCI_IRQ, 7, struct hvm_hw_pci_irqs);
+
+struct hvm_hw_isa_irqs {
     /*
      * Virtual interrupt wires for ISA devices.
      * Indexed by ISA IRQ (assumes no ISA-device IRQ sharing).
      */
-    DECLARE_BITMAP(isa_irq, 16);
-
-    /* Virtual interrupt and via-link for paravirtual platform driver. */
-    uint32_t callback_via_asserted;
     union {
-        enum {
-            HVMIRQ_callback_none,
-            HVMIRQ_callback_gsi,
-            HVMIRQ_callback_pci_intx
-        } callback_via_type;
-        uint32_t pad; /* So the next field will be aligned */
+        DECLARE_BITMAP(i, 16);
+        uint64_t pad[1];
     };
-    union {
-        uint32_t gsi;
-        struct { uint8_t dev, intx; } pci;
-    } callback_via;
+};
 
+DECLARE_HVM_SAVE_TYPE(ISA_IRQ, 8, struct hvm_hw_isa_irqs);
+
+struct hvm_hw_pci_link {
     /*
      * PCI-ISA interrupt router.
      * Each PCI <device:INTx#> is 'wire-ORed' into one of four links using
      * the traditional 'barber's pole' mapping ((device + INTx#) & 3).
      * The router provides a programmable mapping from each link to a GSI.
      */
-    u8 pci_link_route[4];
-
-    /* Number of INTx wires asserting each PCI-ISA link. */
-    u8 pci_link_assert_count[4];
-
-    /*
-     * Number of wires asserting each GSI.
-     * 
-     * GSIs 0-15 are the ISA IRQs. ISA devices map directly into this space
-     * except ISA IRQ 0, which is connected to GSI 2.
-     * PCI links map into this space via the PCI-ISA bridge.
-     * 
-     * GSIs 16+ are used only be PCI devices. The mapping from PCI device to
-     * GSI is as follows: ((device*4 + device/8 + INTx#) & 31) + 16
-     */
-    u8 gsi_assert_count[VIOAPIC_NUM_PINS];
-
-    /*
-     * GSIs map onto PIC/IO-APIC in the usual way:
-     *  0-7:  Master 8259 PIC, IO-APIC pins 0-7
-     *  8-15: Slave  8259 PIC, IO-APIC pins 8-15
-     *  16+ : IO-APIC pins 16+
-     */
-
-    /* Last VCPU that was delivered a LowestPrio interrupt. */
-    u8 round_robin_prev_vcpu;
+    u8 route[4];
 };
 
-DECLARE_HVM_SAVE_TYPE(IRQ, 7, struct hvm_hw_irq);
+DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
 
 
 /* 
@@ -360,7 +334,7 @@ struct hvm_hw_pit {
     uint32_t speaker_data_on;
 };
 
-DECLARE_HVM_SAVE_TYPE(PIT, 8, struct hvm_hw_pit);
+DECLARE_HVM_SAVE_TYPE(PIT, 10, struct hvm_hw_pit);
 
 
 /* 
@@ -375,7 +349,7 @@ struct hvm_hw_rtc {
     uint8_t cmos_index;
 };
 
-DECLARE_HVM_SAVE_TYPE(RTC, 9, struct hvm_hw_rtc);
+DECLARE_HVM_SAVE_TYPE(RTC, 11, struct hvm_hw_rtc);
 
 
 /*
@@ -405,13 +379,13 @@ struct hvm_hw_hpet {
     uint64_t period[HPET_TIMER_NUM]; /* Last value written to comparator */
 };
 
-DECLARE_HVM_SAVE_TYPE(HPET, 10, struct hvm_hw_hpet);
+DECLARE_HVM_SAVE_TYPE(HPET, 12, struct hvm_hw_hpet);
 
 
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 10
+#define HVM_SAVE_CODE_MAX 12
 
 
 /* 
