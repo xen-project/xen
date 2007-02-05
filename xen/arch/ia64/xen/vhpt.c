@@ -54,11 +54,7 @@ local_vhpt_flush(void)
 void
 vcpu_vhpt_flush(struct vcpu* v)
 {
-	/* increment flush clock before flush */
-	u32 flush_time = tlbflush_clock_inc_and_return();
 	__vhpt_flush(vcpu_vhpt_maddr(v));
-	/* this must be after flush */
-	tlbflush_update_time(&v->arch.tlbflush_timestamp, flush_time);
 	perfc_incrc(vcpu_vhpt_flush);
 }
 

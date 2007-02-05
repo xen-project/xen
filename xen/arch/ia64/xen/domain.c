@@ -448,9 +448,6 @@ int vcpu_late_initialise(struct vcpu *v)
 		assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
 		                   virt_to_maddr(v->arch.privregs + i));
 
-	tlbflush_update_time(&v->arch.tlbflush_timestamp,
-	                     tlbflush_current_time());
-
 	return 0;
 }
 

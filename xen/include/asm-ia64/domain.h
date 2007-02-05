@@ -200,9 +200,6 @@ struct arch_vcpu {
     struct page_info*   vhpt_page;
     unsigned long       vhpt_entries;
 #endif
-#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
-    u32 tlbflush_timestamp;
-#endif
 #define INVALID_PROCESSOR       INT_MAX
     int last_processor;
 };
