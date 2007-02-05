@@ -86,16 +86,7 @@ struct arch_vmx_struct {
     unsigned long   cr_isr;    /* for emulation */
     unsigned long   cause;
     unsigned long   opcode;
-
-//    unsigned long   mrr5;
-//    unsigned long   mrr6;
-//    unsigned long   mrr7;
-    unsigned long   mdcr;
     unsigned long   mpta;
-//    unsigned long   rfi_pfs;
-//    unsigned long   rfi_iip;
-//    unsigned long   rfi_ipsr;
-//    unsigned long   rfi_ifs;
     unsigned long   flags;
     unsigned long   xen_port;
     unsigned char   xtp;

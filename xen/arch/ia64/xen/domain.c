@@ -42,6 +42,7 @@
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/vhpt.h>
+#include <asm/vcpu.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
@@ -204,9 +205,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         if (!VMX_DOMAIN(next)) {
             /* VMX domains can change the physical cr.dcr.
              * Restore default to prevent leakage. */
-            ia64_setreg(_IA64_REG_CR_DCR, (IA64_DCR_DP | IA64_DCR_DK
-                           | IA64_DCR_DX | IA64_DCR_DR | IA64_DCR_PP
-                           | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
+            ia64_setreg(_IA64_REG_CR_DCR, IA64_DEFAULT_DCR_BITS);
         }
     }
     if (VMX_DOMAIN(next))
@@ -582,7 +581,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		er->dtrs[i].rid = v->arch.dtrs[i].rid;
 	}
 	er->event_callback_ip = v->arch.event_callback_ip;
-	er->dcr = v->arch.dcr;
+	er->dcr = PSCB(v,dcr);
 	er->iva = v->arch.iva;
 }
 
@@ -618,7 +617,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			             er->dtrs[i].rid);
 		}
 		v->arch.event_callback_ip = er->event_callback_ip;
-		v->arch.dcr = er->dcr;
+		PSCB(v,dcr) = er->dcr;
 		v->arch.iva = er->iva;
 	}
 

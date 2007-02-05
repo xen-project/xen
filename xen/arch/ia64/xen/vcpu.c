@@ -501,7 +501,7 @@ BOOLEAN vcpu_get_psr_i(VCPU * vcpu)
 
 u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 {
-	u64 dcr = PSCBX(vcpu, dcr);
+	u64 dcr = PSCB(vcpu, dcr);
 	PSR psr;
 
 	//printk("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
@@ -532,10 +532,7 @@ u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 
 IA64FAULT vcpu_get_dcr(VCPU * vcpu, u64 * pval)
 {
-//verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
-	// Reads of cr.dcr on Xen always have the sign bit set, so
-	// a domain can differentiate whether it is running on SP or not
-	*pval = PSCBX(vcpu, dcr) | 0x8000000000000000L;
+	*pval = PSCB(vcpu, dcr);
 	return IA64_NO_FAULT;
 }
 
@@ -651,11 +648,7 @@ IA64FAULT vcpu_get_iha(VCPU * vcpu, u64 * pval)
 
 IA64FAULT vcpu_set_dcr(VCPU * vcpu, u64 val)
 {
-	// Reads of cr.dcr on SP always have the sign bit set, so
-	// a domain can differentiate whether it is running on SP or not
-	// Thus, writes of DCR should ignore the sign bit
-//verbose("vcpu_set_dcr: called\n");
-	PSCBX(vcpu, dcr) = val & ~0x8000000000000000L;
+	PSCB(vcpu, dcr) = val;
 	return IA64_NO_FAULT;
 }
 

@@ -1234,7 +1234,7 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 #endif  //CHECK_FAULT
     r2 = cr_igfld_mask(inst.M32.cr3,r2);
     switch (inst.M32.cr3) {
-        case 0: return vmx_vcpu_set_dcr(vcpu,r2);
+        case 0: return vcpu_set_dcr(vcpu,r2);
         case 1: return vmx_vcpu_set_itm(vcpu,r2);
         case 2: return vmx_vcpu_set_iva(vcpu,r2);
         case 8: return vmx_vcpu_set_pta(vcpu,r2);
@@ -1299,7 +1299,7 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 
 //    from_cr_cnt[inst.M33.cr3]++;
     switch (inst.M33.cr3) {
-        case 0: return vmx_cr_get(dcr);
+        case 0: return cr_get(dcr);
         case 1: return vmx_cr_get(itm);
         case 2: return vmx_cr_get(iva);
         case 8: return vmx_cr_get(pta);

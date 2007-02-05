@@ -162,7 +162,6 @@ struct arch_vcpu {
     unsigned long irr[4];	    /* Interrupt request register.  */
     unsigned long insvc[4];		/* Interrupt in service.  */
     unsigned long iva;
-    unsigned long dcr;
     unsigned long domain_itm;
     unsigned long domain_itm_last;
 
