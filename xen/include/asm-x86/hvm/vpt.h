@@ -66,7 +66,7 @@ struct periodic_time {
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
     struct timer timer;         /* ac_timer */
     time_cb *cb;
-    void *priv;                 /* ponit back to platform time source */
+    void *priv;                 /* point back to platform time source */
 };
 
 
@@ -76,6 +76,8 @@ struct periodic_time {
 typedef struct PITState {
     /* Hardware state */
     struct hvm_hw_pit hw;
+    /* Last time the counters read zero, for calcuating counter reads */
+    int64_t count_load_time[3];
     /* irq handling */
     struct periodic_time pt[3];
 } PITState;

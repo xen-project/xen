@@ -83,8 +83,8 @@ static int pit_get_count(PITState *s, int channel)
     struct hvm_hw_pit_channel *c = &s->hw.channels[channel];
     struct periodic_time *pt = &s->pt[channel];
 
-    d = muldiv64(hvm_get_guest_time(pt->vcpu) 
-                 - c->count_load_time, PIT_FREQ, ticks_per_sec(pt->vcpu));
+    d = muldiv64(hvm_get_guest_time(pt->vcpu) - s->count_load_time[channel],
+                 PIT_FREQ, ticks_per_sec(pt->vcpu));
     switch(c->mode) {
     case 0:
     case 1:
@@ -110,7 +110,7 @@ int pit_get_out(PITState *pit, int channel, int64_t current_time)
     uint64_t d;
     int out;
 
-    d = muldiv64(current_time - s->count_load_time, 
+    d = muldiv64(current_time - pit->count_load_time[channel], 
                  PIT_FREQ, ticks_per_sec(pit->pt[channel].vcpu));
     switch(s->mode) {
     default:
@@ -153,7 +153,7 @@ void pit_set_gate(PITState *pit, int channel, int val)
     case 5:
         if (s->gate < val) {
             /* restart counting on rising edge */
-            s->count_load_time = hvm_get_guest_time(pt->vcpu);
+            pit->count_load_time[channel] = hvm_get_guest_time(pt->vcpu);
 //            pit_irq_timer_update(s, s->count_load_time);
         }
         break;
@@ -161,7 +161,7 @@ void pit_set_gate(PITState *pit, int channel, int val)
     case 3:
         if (s->gate < val) {
             /* restart counting on rising edge */
-            s->count_load_time = hvm_get_guest_time(pt->vcpu);
+            pit->count_load_time[channel] = hvm_get_guest_time(pt->vcpu);
 //            pit_irq_timer_update(s, s->count_load_time);
         }
         /* XXX: disable/enable counting */
@@ -177,8 +177,8 @@ int pit_get_gate(PITState *pit, int channel)
 
 void pit_time_fired(struct vcpu *v, void *priv)
 {
-    struct hvm_hw_pit_channel *s = priv;
-    s->count_load_time = hvm_get_guest_time(v);
+    uint64_t *count_load_time = priv;
+    *count_load_time = hvm_get_guest_time(v);
 }
 
 static inline void pit_load_count(PITState *pit, int channel, int val)
@@ -190,7 +190,7 @@ static inline void pit_load_count(PITState *pit, int channel, int val)
 
     if (val == 0)
         val = 0x10000;
-    s->count_load_time = hvm_get_guest_time(pt->vcpu);
+    pit->count_load_time[channel] = hvm_get_guest_time(pt->vcpu);
     s->count = val;
     period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
 
@@ -203,7 +203,7 @@ static inline void pit_load_count(PITState *pit, int channel, int val)
             val,
             period,
             s->mode,
-            (long long)s->count_load_time);
+            (long long)pit->count_load_time[channel]);
 #endif
 
     /* Choose a vcpu to set the timer on: current if appropriate else vcpu 0 */
@@ -216,11 +216,13 @@ static inline void pit_load_count(PITState *pit, int channel, int val)
     switch (s->mode) {
         case 2:
             /* create periodic time */
-            create_periodic_time(v, pt, period, 0, 0, pit_time_fired, s);
+            create_periodic_time(v, pt, period, 0, 0, pit_time_fired, 
+                                 &pit->count_load_time[channel]);
             break;
         case 1:
             /* create one shot time */
-            create_periodic_time(v, pt, period, 0, 1, pit_time_fired, s);
+            create_periodic_time(v, pt, period, 0, 1, pit_time_fired,
+                                 &pit->count_load_time[channel]);
 #ifdef DEBUG_PIT
             printk("HVM_PIT: create one shot time.\n");
 #endif
@@ -387,7 +389,7 @@ static void pit_info(PITState *pit)
         printk("pit 0x%x.\n", s->mode);
         printk("pit 0x%x.\n", s->bcd);
         printk("pit 0x%x.\n", s->gate);
-        printk("pit %"PRId64"\n", s->count_load_time);
+        printk("pit %"PRId64"\n", pit->count_load_time[i]);
 
         pt = &pit->pt[i];
         if (pt) {

@@ -140,45 +140,16 @@ struct hvm_hw_cpu {
     uint64_t sysenter_esp;
     uint64_t sysenter_eip;
 
-    /* msr for em64t */
+    /* MSRs */
     uint64_t shadow_gs;
     uint64_t flags;
-
-    /* same size as VMX_MSR_COUNT */
     uint64_t msr_items[6];
-    uint64_t vmxassist_enabled;
 
     /* guest's idea of what rdtsc() would return */
     uint64_t tsc;
 };
 
 DECLARE_HVM_SAVE_TYPE(CPU, 2, struct hvm_hw_cpu);
-
-
-/* 
- *  PIT
- */
-
-struct hvm_hw_pit {
-    struct hvm_hw_pit_channel {
-        int64_t count_load_time;
-        uint32_t count; /* can be 65536 */
-        uint16_t latched_count;
-        uint8_t count_latched;
-        uint8_t status_latched;
-        uint8_t status;
-        uint8_t read_state;
-        uint8_t write_state;
-        uint8_t write_latch;
-        uint8_t rw_mode;
-        uint8_t mode;
-        uint8_t bcd; /* not supported */
-        uint8_t gate; /* timer start */
-    } channels[3];  /* 3 x 24 bytes */
-    uint32_t speaker_data_on;
-};
-
-DECLARE_HVM_SAVE_TYPE(PIT, 3, struct hvm_hw_pit);
 
 
 /*
@@ -233,7 +204,7 @@ struct hvm_hw_vpic {
     uint8_t int_output;
 };
 
-DECLARE_HVM_SAVE_TYPE(PIC, 4, struct hvm_hw_vpic);
+DECLARE_HVM_SAVE_TYPE(PIC, 3, struct hvm_hw_vpic);
 
 
 /*
@@ -275,7 +246,27 @@ struct hvm_hw_vioapic {
     } redirtbl[VIOAPIC_NUM_PINS];
 };
 
-DECLARE_HVM_SAVE_TYPE(IOAPIC, 5, struct hvm_hw_vioapic);
+DECLARE_HVM_SAVE_TYPE(IOAPIC, 4, struct hvm_hw_vioapic);
+
+
+/*
+ * LAPIC
+ */
+
+struct hvm_hw_lapic {
+    uint64_t             apic_base_msr;
+    uint32_t             disabled; /* VLAPIC_xx_DISABLED */
+    uint32_t             timer_divisor;
+};
+
+DECLARE_HVM_SAVE_TYPE(LAPIC, 5, struct hvm_hw_lapic);
+
+struct hvm_hw_lapic_regs {
+    /* A 4k page of register state */
+    uint8_t  data[0x400];
+};
+
+DECLARE_HVM_SAVE_TYPE(LAPIC_REGS, 6, struct hvm_hw_lapic_regs);
 
 
 /*
@@ -344,26 +335,32 @@ struct hvm_hw_irq {
     u8 round_robin_prev_vcpu;
 };
 
-DECLARE_HVM_SAVE_TYPE(IRQ, 6, struct hvm_hw_irq);
+DECLARE_HVM_SAVE_TYPE(IRQ, 7, struct hvm_hw_irq);
 
-/*
- * LAPIC
+
+/* 
+ *  PIT
  */
 
-struct hvm_hw_lapic {
-    uint64_t             apic_base_msr;
-    uint32_t             disabled; /* VLAPIC_xx_DISABLED */
-    uint32_t             timer_divisor;
+struct hvm_hw_pit {
+    struct hvm_hw_pit_channel {
+        uint32_t count; /* can be 65536 */
+        uint16_t latched_count;
+        uint8_t count_latched;
+        uint8_t status_latched;
+        uint8_t status;
+        uint8_t read_state;
+        uint8_t write_state;
+        uint8_t write_latch;
+        uint8_t rw_mode;
+        uint8_t mode;
+        uint8_t bcd; /* not supported */
+        uint8_t gate; /* timer start */
+    } channels[3];  /* 3 x 16 bytes */
+    uint32_t speaker_data_on;
 };
 
-DECLARE_HVM_SAVE_TYPE(LAPIC, 7, struct hvm_hw_lapic);
-
-struct hvm_hw_lapic_regs {
-    /* A 4k page of register state */
-    uint8_t  data[0x400];
-};
-
-DECLARE_HVM_SAVE_TYPE(LAPIC_REGS, 8, struct hvm_hw_lapic_regs);
+DECLARE_HVM_SAVE_TYPE(PIT, 8, struct hvm_hw_pit);
 
 
 /* 
