@@ -6,3 +6,6 @@
 # a Xen kernel to find the right headers)
 EXTRA_CFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030202
 EXTRA_CFLAGS += -I$(M)/include -I$(M)/compat-include -DHAVE_XEN_PLATFORM_COMPAT_H
+ifeq ($(ARCH),ia64)
+  EXTRA_CFLAGS += -DCONFIG_VMX_GUEST
+endif
