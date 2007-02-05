@@ -580,7 +580,7 @@ GLOBAL_ENTRY(ia64_leave_hypercall)
     ;;
 //(pUStk) ld4 r17=[r17]			// M0|1 r17 = cpu_data->phys_stacked_size_p8
     mov r19=ar.bsp			// M2   get new backing store pointer
-    adds r18=IA64_RBS_OFFSET, r3
+    addl r18=IA64_RBS_OFFSET, r3
     ;;
     mov r3=r0
     sub r18=r19,r18     // get byte size of existing "dirty" partition
