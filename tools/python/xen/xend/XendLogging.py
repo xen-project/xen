@@ -52,8 +52,8 @@ if 'TRACE' not in logging.__dict__:
         for frame in frames:
             filename = os.path.normcase(frame[1])
             if filename != thisfile and filename != logging._srcfile:
-                major, minor, _, _, _ = sys.version_info
-                if major == 2 and minor >= 4:
+                major, minor, micro, _, _ = sys.version_info
+                if (major, minor, micro) >= (2, 4, 2):
                     return filename, frame[2], frame[3]
                 else:
                     return filename, frame[2]
