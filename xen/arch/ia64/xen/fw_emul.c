@@ -625,6 +625,9 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		if (VMX_DOMAIN(current))
 			status = PAL_STATUS_SUCCESS;
 		break;
+	    case PAL_LOGICAL_TO_PHYSICAL:
+		/* Optional, no need to complain about being unimplemented */
+		break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",
 				index);
