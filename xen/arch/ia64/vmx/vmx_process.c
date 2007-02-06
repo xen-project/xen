@@ -393,7 +393,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     
         if (!vpsr.ic)
             misr.ni = 1;
-        if(!vhpt_enabled(v, vadr, misr.rs?RSE_REF:DATA_REF)){
+        if (!vhpt_enabled(v, vadr, INST_REF)) {
             vcpu_set_isr(v, misr.val);
             alt_itlb(v, vadr);
             return IA64_FAULT;
