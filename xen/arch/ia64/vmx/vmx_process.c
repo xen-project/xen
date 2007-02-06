@@ -227,17 +227,23 @@ void leave_hypervisor_tail(void)
         local_irq_disable();
 
         if (v->vcpu_id == 0) {
-            int callback_irq =
+            unsigned long callback_irq =
                 d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+            /*
+             * val[63:56] == 1: val[55:0] is a delivery PCI INTx line:
+             *                  Domain = val[47:32], Bus  = val[31:16],
+             *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+             * val[63:56] == 0: val[55:0] is a delivery as GSI
+             */
             if (callback_irq != 0 && local_events_need_delivery()) {
                 /* change level for para-device callback irq */
                 /* use level irq to send discrete event */
-                if (callback_irq & IA64_CALLBACK_IRQ_RID) {
-                    /* case of using Requester-ID as callback irq */
-                    /* RID: '<#bus(8)><#dev(5)><#func(3)>' */
-                    int dev = (callback_irq >> 3) & 0x1f;
-                    viosapic_set_pci_irq(d, dev, 0, 1);
-                    viosapic_set_pci_irq(d, dev, 0, 0);
+                if ((uint8_t)(callback_irq >> 56) == 1) {
+                    /* case of using PCI INTx line as callback irq */
+                    int pdev = (callback_irq >> 11) & 0x1f;
+                    int pintx = callback_irq & 3;
+                    viosapic_set_pci_irq(d, pdev, pintx, 1);
+                    viosapic_set_pci_irq(d, pdev, pintx, 0);
                 } else {
                     /* case of using GSI as callback irq */
                     viosapic_set_irq(d, callback_irq, 1);

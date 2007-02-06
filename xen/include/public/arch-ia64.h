@@ -64,10 +64,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_MCA_CMC    VIRQ_ARCH_1 /* MCA cmc interrupt */
 #define VIRQ_MCA_CPE    VIRQ_ARCH_2 /* MCA cpe interrupt */
 
-/* Arch specific callback irq definition */
-/* using Requester-ID(RID) as callback irq */
-#define IA64_CALLBACK_IRQ_RID        (1 << 31)
-
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
 #define MAX_VIRT_CPUS 64
