@@ -117,6 +117,14 @@ struct arch_shared_info {
 struct arch_vcpu_info {
 };
 
+#define RMA_SHARED_INFO 1
+#define RMA_START_INFO 2
+#define RMA_LAST_DOM0 2
+/* these are not used for dom0 so they should be last */
+#define RMA_CONSOLE 3
+#define RMA_STORE 4
+#define RMA_LAST_DOMU 4
+
 /* Support for multi-processor guests. */
 #define MAX_VIRT_CPUS 32
 #endif

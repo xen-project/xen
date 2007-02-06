@@ -107,13 +107,6 @@ extern void load_segments(struct vcpu *);
 extern void save_float(struct vcpu *);
 extern void load_float(struct vcpu *);
 
-#define RMA_SHARED_INFO 1
-#define RMA_START_INFO 2
-#define RMA_LAST_DOM0 2
-/* these are not used for dom0 so they should be last */
-#define RMA_CONSOLE 3
-#define RMA_LAST_DOMU 3
-
 #define rma_size(rma_order) (1UL << ((rma_order) + PAGE_SHIFT))
 
 static inline ulong rma_addr(struct arch_domain *ad, int type)

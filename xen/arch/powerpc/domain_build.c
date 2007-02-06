@@ -30,6 +30,7 @@
 #include <xen/version.h>
 #include <asm/processor.h>
 #include <asm/papr.h>
+#include <public/arch-powerpc.h>
 #include "oftree.h"
 
 extern int parseelfimage_32(struct domain_setup_info *dsi);

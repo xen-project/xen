@@ -28,6 +28,7 @@
 #include <asm/init.h>
 #include <asm/page.h>
 #include <asm/string.h>
+#include <public/arch-powerpc.h>
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                                  \
