@@ -273,6 +273,24 @@ void hvm_vcpu_destroy(struct vcpu *v)
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
+
+void hvm_vcpu_reset(struct vcpu *v)
+{
+    vcpu_pause(v);
+
+    vlapic_reset(vcpu_vlapic(v));
+
+    hvm_funcs.vcpu_initialise(v);
+
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+
+    vcpu_unpause(v);
+}
+
 static void hvm_vcpu_down(void)
 {
     struct vcpu *v = current;
@@ -624,19 +642,12 @@ void hvm_hypercall_page_initialise(struct domain *d,
  */
 int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 {
-    struct vcpu *bsp = current, *v;
-    struct domain *d = bsp->domain;
+    struct vcpu *v;
+    struct domain *d = current->domain;
     struct vcpu_guest_context *ctxt;
     int rc = 0;
 
     BUG_ON(!is_hvm_domain(d));
-
-    if ( bsp->vcpu_id != 0 )
-    {
-        gdprintk(XENLOG_ERR, "Not calling hvm_bringup_ap from BSP context.\n");
-        domain_crash(bsp->domain);
-        return -EINVAL;
-    }
 
     if ( (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
@@ -668,8 +679,8 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
         goto out;
     }
 
-    if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
-        vcpu_wake(d->vcpu[vcpuid]);
+    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        vcpu_wake(v);
     gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 
  out:

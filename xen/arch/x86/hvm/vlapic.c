@@ -83,8 +83,6 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 #define vlapic_base_address(vlapic)                             \
     (vlapic->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
 
-static int vlapic_reset(struct vlapic *vlapic);
-
 /*
  * Generic APIC bitmap vector update & search routines.
  */
@@ -293,8 +291,11 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     case APIC_DM_SMI:
+        gdprintk(XENLOG_WARNING, "Ignoring guest SMI\n");
+        break;
+
     case APIC_DM_NMI:
-        gdprintk(XENLOG_WARNING, "Ignoring guest SMI/NMI\n");
+        gdprintk(XENLOG_WARNING, "Ignoring guest NMI\n");
         break;
 
     case APIC_DM_INIT:
@@ -303,10 +304,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
             break;
         /* FIXME How to check the situation after vcpu reset? */
         if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-        {
-            gdprintk(XENLOG_ERR, "Reset hvm vcpu not supported yet\n");
-            goto exit_and_crash;
-        }
+            hvm_vcpu_reset(v);
         v->arch.hvm_vcpu.init_sipi_sipi_state =
             HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI;
         result = 1;
@@ -764,7 +762,7 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
 }
 
 /* Reset the VLPAIC back to its power-on/reset state. */
-static int vlapic_reset(struct vlapic *vlapic)
+void vlapic_reset(struct vlapic *vlapic)
 {
     struct vcpu *v = vlapic_vcpu(vlapic);
     int i;
@@ -793,8 +791,6 @@ static int vlapic_reset(struct vlapic *vlapic)
 
     vlapic_set_reg(vlapic, APIC_SPIV, 0xff);
     vlapic->hw.disabled |= VLAPIC_SW_DISABLED;
-
-    return 1;
 }
 
 #ifdef HVM_DEBUG_SUSPEND
@@ -922,7 +918,6 @@ int vlapic_init(struct vcpu *v)
     {
         dprintk(XENLOG_ERR, "malloc vlapic regs error for vcpu %x\n",
                 v->vcpu_id);
-        xfree(vlapic);
         return -ENOMEM;
     }
 
