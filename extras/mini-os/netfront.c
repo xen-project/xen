@@ -349,7 +349,9 @@ done:
     init_rx_buffers();
 
     unsigned char rawmac[6];
-    sscanf(mac,"%x:%x:%x:%x:%x:%x",
+        /* Special conversion specifier 'hh' needed for __ia64__. Without
+           this mini-os panics with 'Unaligned reference'. */
+    sscanf(mac,"%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
             &rawmac[0],
             &rawmac[1],
             &rawmac[2],
