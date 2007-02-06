@@ -32,7 +32,12 @@ extern int make_devtree(struct ft_cxt *root,
                         unsigned long shadow_mb,
                         unsigned long initrd_base,
                         unsigned long initrd_len,
-                        const char *bootargs);
+                        const char *bootargs,
+                        uint64_t shared_info_paddr,
+                        unsigned long console_evtchn,
+                        uint64_t console_paddr,
+                        unsigned long store_evtchn,
+                        uint64_t store_paddr);
 
 #define MAX_PATH 200
 #define BUFSIZE 1024

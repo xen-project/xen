@@ -316,13 +316,17 @@ int make_devtree(struct ft_cxt *root,
                  unsigned long shadow_mb,
                  unsigned long initrd_base,
                  unsigned long initrd_len,
-                 const char *bootargs)
+                 const char *bootargs,
+                 uint64_t shared_info_paddr,
+                 unsigned long console_evtchn,
+                 uint64_t console_paddr,
+                 unsigned long store_evtchn,
+                 uint64_t store_paddr)
 {
     struct boot_param_header *bph = NULL;
     uint64_t val[2];
     uint32_t val32[2];
     unsigned long remaining;
-    unsigned long rma_reserve = 4 * PAGE_SIZE;
     unsigned long initrd_end = initrd_base + initrd_len;
     int64_t shadow_mb_log;
     uint64_t pft_size;
@@ -351,10 +355,26 @@ int make_devtree(struct ft_cxt *root,
 
     /* you MUST set reservations BEFORE _starting_the_tree_ */
 
-    /* reserve some pages at the end of RMA */
-    val[0] = cpu_to_be64((u64) (rma_bytes - rma_reserve));
-    val[1] = cpu_to_be64((u64) rma_reserve);
-    ft_add_rsvmap(root, val[0], val[1]);
+    /* reserve shared_info_t page */
+    if (shared_info_paddr) {
+        val[0] = cpu_to_be64((u64) shared_info_paddr);
+        val[1] = cpu_to_be64((u64) PAGE_SIZE);
+        ft_add_rsvmap(root, val[0], val[1]);
+    }
+
+    /* reserve console page for domU */
+    if (console_paddr) {
+        val[0] = cpu_to_be64((u64) console_paddr);
+        val[1] = cpu_to_be64((u64) PAGE_SIZE);
+        ft_add_rsvmap(root, val[0], val[1]);
+    }
+
+    /* reserve xen store page for domU */
+    if (store_paddr) {
+        val[0] = cpu_to_be64((u64) store_paddr);
+        val[1] = cpu_to_be64((u64) PAGE_SIZE);
+        ft_add_rsvmap(root, val[0], val[1]);
+    }
 
     /* reserve space for initrd if needed */
     if ( initrd_len > 0 )  {
@@ -419,18 +439,18 @@ int make_devtree(struct ft_cxt *root,
     /* xen = root.addnode('xen') */
     ft_begin_node(root, "xen");
 
-    /* start-info is the first page in the RMA reserved area */
-    val[0] = cpu_to_be64((u64) (rma_bytes - rma_reserve));
-    val[1] = cpu_to_be64((u64) PAGE_SIZE);
-    ft_prop(root, "start-info", val, sizeof(val));
-
     /*  xen.addprop('version', 'Xen-3.0-unstable\0') */
-    ft_prop_str(root, "version", "Xen-3.0-unstable");
+    ft_prop_str(root, "compatible", "Xen-3.0-unstable");
 
     /* xen.addprop('reg', long(imghandler.vm.domid), long(0)) */
     val[0] = cpu_to_be64((u64) domid);
     val[1] = cpu_to_be64((u64) 0);
     ft_prop(root, "reg", val, sizeof(val));
+
+    /* point to shared_info_t page base addr */
+    val[0] = cpu_to_be64((u64) shared_info_paddr);
+    val[1] = cpu_to_be64((u64) PAGE_SIZE);
+    ft_prop(root, "shared-info", val, sizeof(val));
 
     /* xen.addprop('domain-name', imghandler.vm.getName() + '\0') */
     /* libxc doesn't know the domain name, that is purely a xend thing */
@@ -439,16 +459,41 @@ int make_devtree(struct ft_cxt *root,
     /* add xen/linux,phandle for chosen/interrupt-controller */
     ft_prop_int(root, "linux,phandle", xen_phandle);
 
-    /* xencons = xen.addnode('console') */
-    ft_begin_node(root, "console");
+    if (console_paddr != 0) {
+        /* xencons = xen.addnode('console') */
+        ft_begin_node(root, "console");
 
-    /* xencons.addprop('interrupts', 1, 0) */
-    val32[0] = cpu_to_be32((u32) 1);
-    val32[1] = cpu_to_be32((u32) 0);
-    ft_prop(root, "interrupts", val32, sizeof(val32));
+        /* console_paddr */
+        val[0] = cpu_to_be64((u64) console_paddr);
+        val[1] = cpu_to_be64((u64) PAGE_SIZE);
+        ft_prop(root, "reg", val, sizeof(val));
 
-    /* end of console */
-    ft_end_node(root);
+        /* xencons.addprop('interrupts', console_evtchn, 0) */
+        val32[0] = cpu_to_be32((u32) console_evtchn);
+        val32[1] = cpu_to_be32((u32) 0);
+        ft_prop(root, "interrupts", val32, sizeof(val32));
+
+        /* end of console */
+        ft_end_node(root);
+    }
+
+    if (store_paddr != 0) {
+        /* start store node */
+        ft_begin_node(root, "store");
+
+        /* store paddr */
+        val[0] = cpu_to_be64((u64) store_paddr);
+        val[1] = cpu_to_be64((u64) PAGE_SIZE);
+        ft_prop(root, "reg", val, sizeof(val));
+
+        /* store event channel */
+        val32[0] = cpu_to_be32((u32) store_evtchn);
+        val32[1] = cpu_to_be32((u32) 0);
+        ft_prop(root, "interrupts", val32, sizeof(val32));
+
+        /* end of store */
+        ft_end_node(root);
+    }
 
     /* end of xen node */
     ft_end_node(root);

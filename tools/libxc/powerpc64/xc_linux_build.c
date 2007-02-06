@@ -33,6 +33,7 @@
 #include <xc_private.h>
 #include <xg_private.h>
 #include <xenctrl.h>
+#include <xen/arch-powerpc.h>
 
 #include "flatdevtree_env.h"
 #include "flatdevtree.h"
@@ -109,34 +110,6 @@ out:
     return rc;
 }
 
-static unsigned long create_start_info(
-        start_info_t *start_info,
-        unsigned int console_evtchn,
-        unsigned int store_evtchn,
-        unsigned long nr_pages,
-        unsigned long rma_pages)
-{
-    unsigned long start_info_addr;
-    uint64_t rma_top;
-
-    memset(start_info, 0, sizeof(*start_info));
-    snprintf(start_info->magic, sizeof(start_info->magic),
-             "xen-%d.%d-powerpc64HV", 3, 0);
-
-    rma_top = rma_pages << PAGE_SHIFT;
-    DPRINTF("RMA top = 0x%"PRIX64"\n", rma_top);
-
-    start_info->nr_pages = nr_pages;
-    start_info->shared_info = rma_top - PAGE_SIZE;
-    start_info->store_mfn = (rma_top >> PAGE_SHIFT) - 2;
-    start_info->store_evtchn = store_evtchn;
-    start_info->console.domU.mfn = (rma_top >> PAGE_SHIFT) - 3;
-    start_info->console.domU.evtchn = console_evtchn;
-    start_info_addr = rma_top - 4*PAGE_SIZE;
-
-    return start_info_addr;
-}
-
 static void free_page_array(xen_pfn_t *page_array)
 {
     free(page_array);
@@ -191,7 +164,6 @@ int xc_linux_build(int xc_handle,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn)
 {
-    start_info_t start_info;
     struct domain_setup_info dsi;
     xen_pfn_t *page_array = NULL;
     unsigned long nr_pages;
@@ -199,9 +171,11 @@ int xc_linux_build(int xc_handle,
     unsigned long kern_addr;
     unsigned long initrd_base = 0;
     unsigned long initrd_len = 0;
-    unsigned long start_info_addr;
     unsigned long rma_pages;
     unsigned long shadow_mb;
+    u64 shared_info_paddr;
+    u64 store_paddr;
+    u64 console_paddr;
     u32 remaining_kb;
     u32 extent_order;
     u64 nr_extents;
@@ -281,22 +255,25 @@ int xc_linux_build(int xc_handle,
         goto out;
     }
 
+    /* determine shared_info, console, and store paddr */
+    shared_info_paddr = (rma_pages << PAGE_SHIFT) -
+                        (RMA_SHARED_INFO * PAGE_SIZE);
+    console_paddr = (rma_pages << PAGE_SHIFT) - (RMA_CONSOLE * PAGE_SIZE);
+    store_paddr = (rma_pages << PAGE_SHIFT) - (RMA_STORE * PAGE_SIZE);
+
+    /* map paddrs to mfns */
+    *store_mfn = page_array[(xen_pfn_t)(store_paddr >> PAGE_SHIFT)];
+    *console_mfn = page_array[(xen_pfn_t)(console_paddr >> PAGE_SHIFT)];
+    DPRINTF("console_mfn->%08lx store_mfn->%08lx\n", *console_mfn,
+            *store_mfn);
+
     /* build the devtree here */
     DPRINTF("constructing devtree\n");
-    if (make_devtree(&devtree, domid, mem_mb, (rma_pages*PAGE_SIZE), shadow_mb,
-                     initrd_base, initrd_len, cmdline) < 0) {
+    if (make_devtree(&devtree, domid, mem_mb, (rma_pages << PAGE_SHIFT),
+                     shadow_mb, initrd_base, initrd_len, cmdline, 
+                     shared_info_paddr, console_evtchn, console_paddr,
+                     store_evtchn, store_paddr) < 0) {
         DPRINTF("failed to create flattened device tree\n");
-        rc = -1;
-        goto out;
-    }
-    
-    /* start_info stuff: about to be removed  */
-    start_info_addr = create_start_info(&start_info, console_evtchn,
-                                        store_evtchn, nr_pages, rma_pages);
-    *console_mfn = page_array[start_info.console.domU.mfn];
-    *store_mfn = page_array[start_info.store_mfn];
-    if (install_image(xc_handle, domid, page_array, &start_info,
-                      start_info_addr, sizeof(start_info_t))) {
         rc = -1;
         goto out;
     }
