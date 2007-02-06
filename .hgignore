@@ -20,6 +20,7 @@
 ^\.config$
 ^TAGS$
 ^tags$
+^build.*$
 ^dist/.*$
 ^docs/.*\.aux$
 ^docs/.*\.dvi$
@@ -57,7 +58,7 @@
 ^docs/xen-api/xenapi-datamodel-graph.eps$
 ^extras/mini-os/h/hypervisor-ifs$
 ^extras/mini-os/h/xen-public$
-^extras/mini-os/mini-os\..*$
+^extras/mini-os/mini-os.*$
 ^install/.*$
 ^linux-[^/]*-native/.*$
 ^linux-[^/]*-xen/.*$
@@ -141,6 +142,8 @@
 ^tools/python/build/.*$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
+^tools/tests/blowfish\.bin$
+^tools/tests/blowfish\.h$
 ^tools/tests/test_x86_emulator$
 ^tools/vnet/Make.local$
 ^tools/vnet/build/.*$
@@ -205,7 +208,10 @@
 ^xen/ddb/.*$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
+^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
+^xen/include/public/foreign/.*\.(c|h|size)$
+^xen/include/public/foreign/checker$
 ^xen/include/public/public$
 ^xen/include/xen/.*\.new$
 ^xen/include/xen/acm_policy\.h$

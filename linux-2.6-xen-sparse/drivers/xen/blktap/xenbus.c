@@ -92,9 +92,30 @@ static long get_id(const char *str)
         return simple_strtol(num, NULL, 10);
 }				
 
+static int blktap_name(blkif_t *blkif, char *buf)
+{
+	char *devpath, *devname;
+	struct xenbus_device *dev = blkif->be->dev;
+
+	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
+	if (IS_ERR(devpath)) 
+		return PTR_ERR(devpath);
+	
+	if ((devname = strstr(devpath, "/dev/")) != NULL)
+		devname += strlen("/dev/");
+	else
+		devname  = devpath;
+
+	snprintf(buf, TASK_COMM_LEN, "blktap.%d.%s", blkif->domid, devname);
+	kfree(devpath);
+	
+	return 0;
+}
+
 static void tap_update_blkif_status(blkif_t *blkif)
 { 
 	int err;
+	char name[TASK_COMM_LEN];
 
 	/* Not ready to connect? */
 	if(!blkif->irq || !blkif->sectors) {
@@ -110,10 +131,13 @@ static void tap_update_blkif_status(blkif_t *blkif)
 	if (blkif->be->dev->state != XenbusStateConnected)
 		return;
 
-	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif,
-				     "xvd %d",
-				     blkif->domid);
+	err = blktap_name(blkif, name);
+	if (err) {
+		xenbus_dev_error(blkif->be->dev, err, "get blktap dev name");
+		return;
+	}
 
+	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif, name);
 	if (IS_ERR(blkif->xenblkd)) {
 		err = PTR_ERR(blkif->xenblkd);
 		blkif->xenblkd = NULL;
@@ -316,6 +340,7 @@ static int connect_ring(struct backend_info *be)
 	struct xenbus_device *dev = be->dev;
 	unsigned long ring_ref;
 	unsigned int evtchn;
+	char protocol[64];
 	int err;
 
 	DPRINTK("%s\n", dev->otherend);
@@ -328,6 +353,24 @@ static int connect_ring(struct backend_info *be)
 				 dev->otherend);
 		return err;
 	}
+
+	be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
+	err = xenbus_gather(XBT_NIL, dev->otherend, "protocol",
+			    "%63s", protocol, NULL);
+	if (err)
+		strcpy(protocol, "unspecified, assuming native");
+	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_NATIVE))
+		be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
+	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_X86_32))
+		be->blkif->blk_protocol = BLKIF_PROTOCOL_X86_32;
+	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_X86_64))
+		be->blkif->blk_protocol = BLKIF_PROTOCOL_X86_64;
+	else {
+		xenbus_dev_fatal(dev, err, "unknown fe protocol %s", protocol);
+		return -1;
+	}
+	printk("blktap: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
+	       ring_ref, evtchn, be->blkif->blk_protocol, protocol);
 
 	/* Map the shared frame, irq etc. */
 	err = tap_blkif_map(be->blkif, ring_ref, evtchn);

@@ -22,36 +22,33 @@
 #include <xen/version.h>
 #include <public/elfnote.h>
 
-DEFINE_PER_CPU (crash_note_t, crash_notes);
-cpumask_t crash_saved_cpus;
+#ifndef COMPAT
 
-xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
+typedef long ret_t;
+
+static DEFINE_PER_CPU(void *, crash_notes);
+
+static Elf_Note *xen_crash_note;
+
+static cpumask_t crash_saved_cpus;
+
+static xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
 
 #define KEXEC_FLAG_DEFAULT_POS   (KEXEC_IMAGE_NR + 0)
 #define KEXEC_FLAG_CRASH_POS     (KEXEC_IMAGE_NR + 1)
 #define KEXEC_FLAG_IN_PROGRESS   (KEXEC_IMAGE_NR + 2)
 
-unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
+static unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
 
-spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
 
 xen_kexec_reserve_t kexec_crash_area;
 
 static void __init parse_crashkernel(const char *str)
 {
-    unsigned long start, size;
-
-    size = parse_size_and_unit(str, &str);
+    kexec_crash_area.size = parse_size_and_unit(str, &str);
     if ( *str == '@' )
-        start = parse_size_and_unit(str+1, NULL);
-    else
-        start = 0;
-
-    if ( start && size )
-    {
-        kexec_crash_area.start = start;
-        kexec_crash_area.size = size;
-    }
+        kexec_crash_area.start = parse_size_and_unit(str+1, NULL);
 }
 custom_param("crashkernel", parse_crashkernel);
 
@@ -66,39 +63,28 @@ static void one_cpu_only(void)
 void kexec_crash_save_cpu(void)
 {
     int cpu = smp_processor_id();
-    crash_note_t *cntp;
+    Elf_Note *note = per_cpu(crash_notes, cpu);
+    ELF_Prstatus *prstatus;
+    crash_xen_core_t *xencore;
 
     if ( cpu_test_and_set(cpu, crash_saved_cpus) )
         return;
 
-    cntp = &per_cpu(crash_notes, cpu);
-    elf_core_save_regs(&cntp->core.desc.desc.pr_reg,
-                       &cntp->xen_regs.desc.desc);
+    prstatus = (ELF_Prstatus *)ELFNOTE_DESC(note);
 
-    /* Set up crash "CORE" note. */
-    setup_crash_note(cntp, core, CORE_STR, CORE_STR_LEN, NT_PRSTATUS);
+    note = ELFNOTE_NEXT(note);
+    xencore = (crash_xen_core_t *)ELFNOTE_DESC(note);
 
-    /* Set up crash note "Xen", XEN_ELFNOTE_CRASH_REGS. */
-    setup_crash_note(cntp, xen_regs, XEN_STR, XEN_STR_LEN,
-                     XEN_ELFNOTE_CRASH_REGS);
+    elf_core_save_regs(&prstatus->pr_reg, xencore);
 }
 
 /* Set up the single Xen-specific-info crash note. */
 crash_xen_info_t *kexec_crash_save_info(void)
 {
     int cpu = smp_processor_id();
-    crash_note_t *cntp;
-    crash_xen_info_t *info;
+    crash_xen_info_t *info = (crash_xen_info_t *)ELFNOTE_DESC(xen_crash_note);
 
     BUG_ON(!cpu_test_and_set(cpu, crash_saved_cpus));
-
-    cntp = &per_cpu(crash_notes, cpu);
-
-    /* Set up crash note "Xen", XEN_ELFNOTE_CRASH_INFO. */
-    setup_crash_note(cntp, xen_info, XEN_STR, XEN_STR_LEN,
-                     XEN_ELFNOTE_CRASH_INFO);
-
-    info = &cntp->xen_info.desc.desc;
 
     info->xen_major_version = xen_major_version();
     info->xen_minor_version = xen_minor_version();
@@ -143,33 +129,89 @@ static __init int register_crashdump_trigger(void)
 }
 __initcall(register_crashdump_trigger);
 
-static int kexec_get_reserve(xen_kexec_range_t *range)
+static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 {
-    range->start = kexec_crash_area.start;
-    range->size = kexec_crash_area.size;
+    int l = strlen(name) + 1;
+    strlcpy(ELFNOTE_NAME(n), name, l);
+    n->namesz = l;
+    n->descsz = descsz;
+    n->type = type;
+}
+
+static int sizeof_note(const char *name, int descsz)
+{
+    return (sizeof(Elf_Note) +
+            ELFNOTE_ALIGN(strlen(name)+1) +
+            ELFNOTE_ALIGN(descsz));
+}
+
+#define kexec_get(x)      kexec_get_##x
+
+#endif
+
+static int kexec_get(reserve)(xen_kexec_range_t *range)
+{
+    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0) {
+        range->start = kexec_crash_area.start;
+        range->size = kexec_crash_area.size;
+    }
+    else
+        range->start = range->size = 0;
     return 0;
 }
 
-extern unsigned long _text;
-
-static int kexec_get_xen(xen_kexec_range_t *range)
+static int kexec_get(xen)(xen_kexec_range_t *range)
 {
-    range->start = virt_to_maddr(&_text);
-    range->size = (unsigned long)&_end - (unsigned long)&_text;
+    range->start = virt_to_maddr(_start);
+    range->size = (unsigned long)xenheap_phys_end - (unsigned long)range->start;
     return 0;
 }
 
-static int kexec_get_cpu(xen_kexec_range_t *range)
+static int kexec_get(cpu)(xen_kexec_range_t *range)
 {
-    if ( range->nr < 0 || range->nr >= num_present_cpus() )
+    int nr = range->nr;
+    int nr_bytes = 0;
+
+    if ( nr < 0 || nr >= num_present_cpus() )
         return -EINVAL;
 
-    range->start = __pa((unsigned long)&per_cpu(crash_notes, range->nr));
-    range->size = sizeof(crash_note_t);
+    nr_bytes += sizeof_note("CORE", sizeof(ELF_Prstatus));
+    nr_bytes += sizeof_note("Xen", sizeof(crash_xen_core_t));
+
+    /* The Xen info note is included in CPU0's range. */
+    if ( nr == 0 )
+        nr_bytes += sizeof_note("Xen", sizeof(crash_xen_info_t));
+
+    if ( per_cpu(crash_notes, nr) == NULL )
+    {
+        Elf_Note *note;
+
+        note = per_cpu(crash_notes, nr) = xmalloc_bytes(nr_bytes);
+
+        if ( note == NULL )
+            return -ENOMEM;
+
+        /* Setup CORE note. */
+        setup_note(note, "CORE", NT_PRSTATUS, sizeof(ELF_Prstatus));
+
+        /* Setup Xen CORE note. */
+        note = ELFNOTE_NEXT(note);
+        setup_note(note, "Xen", XEN_ELFNOTE_CRASH_REGS, sizeof(crash_xen_core_t));
+
+        if (nr == 0)
+        {
+            /* Setup system wide Xen info note. */
+            xen_crash_note = note = ELFNOTE_NEXT(note);
+            setup_note(note, "Xen", XEN_ELFNOTE_CRASH_INFO, sizeof(crash_xen_info_t));
+        }
+    }
+
+    range->start = __pa((unsigned long)per_cpu(crash_notes, nr));
+    range->size = nr_bytes;
     return 0;
 }
 
-static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
+static int kexec_get(range)(XEN_GUEST_HANDLE(void) uarg)
 {
     xen_kexec_range_t range;
     int ret = -EINVAL;
@@ -180,13 +222,13 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
     switch ( range.range )
     {
     case KEXEC_RANGE_MA_CRASH:
-        ret = kexec_get_reserve(&range);
+        ret = kexec_get(reserve)(&range);
         break;
     case KEXEC_RANGE_MA_XEN:
-        ret = kexec_get_xen(&range);
+        ret = kexec_get(xen)(&range);
         break;
     case KEXEC_RANGE_MA_CPU:
-        ret = kexec_get_cpu(&range);
+        ret = kexec_get(cpu)(&range);
         break;
     }
 
@@ -195,6 +237,8 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+#ifndef COMPAT
 
 static int kexec_load_get_bits(int type, int *base, int *bit)
 {
@@ -213,6 +257,8 @@ static int kexec_load_get_bits(int type, int *base, int *bit)
     }
     return 0;
 }
+
+#endif
 
 static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 {
@@ -236,7 +282,11 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
         BUG_ON(test_bit((base + !pos), &kexec_flags)); /* must be free */
 
+#ifndef COMPAT
         memcpy(image, &load.image, sizeof(*image));
+#else
+        XLAT_kexec_image(image, &load.image);
+#endif
 
         if ( !(ret = machine_kexec_load(load.type, base + !pos, image)) )
         {
@@ -260,6 +310,8 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+#ifndef COMPAT
 
 static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
 {
@@ -294,7 +346,9 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     return -EINVAL; /* never reached */
 }
 
-long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+#endif
+
+ret_t do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 {
     unsigned long flags;
     int ret = -EINVAL;
@@ -305,7 +359,7 @@ long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
     switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
-        ret = kexec_get_range(uarg);
+        ret = kexec_get(range)(uarg);
         break;
     case KEXEC_CMD_kexec_load:
     case KEXEC_CMD_kexec_unload:
@@ -323,6 +377,10 @@ long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 
     return ret;
 }
+
+#if defined(CONFIG_COMPAT) && !defined(COMPAT)
+#include "compat/kexec.c"
+#endif
 
 /*
  * Local variables:

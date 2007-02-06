@@ -2,7 +2,6 @@
  *  linux/arch/i386/mm/pgtable.c
  */
 
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -26,7 +25,6 @@
 #include <asm/mmu_context.h>
 
 #include <xen/features.h>
-#include <xen/foreign_page.h>
 #include <asm/hypervisor.h>
 
 static void pgd_test_and_unpin(pgd_t *pgd);
@@ -39,13 +37,12 @@ void show_mem(void)
 	struct page *page;
 	pg_data_t *pgdat;
 	unsigned long i;
-	struct page_state ps;
 	unsigned long flags;
 
 	printk(KERN_INFO "Mem-info:\n");
 	show_free_areas();
 	printk(KERN_INFO "Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
-	for_each_pgdat(pgdat) {
+	for_each_online_pgdat(pgdat) {
 		pgdat_resize_lock(pgdat, &flags);
 		for (i = 0; i < pgdat->node_spanned_pages; ++i) {
 			page = pgdat_page_nr(pgdat, i);
@@ -67,12 +64,13 @@ void show_mem(void)
 	printk(KERN_INFO "%d pages shared\n", shared);
 	printk(KERN_INFO "%d pages swap cached\n", cached);
 
-	get_page_state(&ps);
-	printk(KERN_INFO "%lu pages dirty\n", ps.nr_dirty);
-	printk(KERN_INFO "%lu pages writeback\n", ps.nr_writeback);
-	printk(KERN_INFO "%lu pages mapped\n", ps.nr_mapped);
-	printk(KERN_INFO "%lu pages slab\n", ps.nr_slab);
-	printk(KERN_INFO "%lu pages pagetables\n", ps.nr_page_table_pages);
+	printk(KERN_INFO "%lu pages dirty\n", global_page_state(NR_FILE_DIRTY));
+	printk(KERN_INFO "%lu pages writeback\n",
+					global_page_state(NR_WRITEBACK));
+	printk(KERN_INFO "%lu pages mapped\n", global_page_state(NR_FILE_MAPPED));
+	printk(KERN_INFO "%lu pages slab\n", global_page_state(NR_SLAB));
+	printk(KERN_INFO "%lu pages pagetables\n",
+					global_page_state(NR_PAGETABLE));
 }
 
 /*
@@ -196,9 +194,10 @@ unsigned long hypervisor_virt_start = HYPERVISOR_VIRT_START;
 unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - 2 * PAGE_SIZE);
 EXPORT_SYMBOL(__FIXADDR_TOP);
 
-void __init set_fixaddr_top()
+void __init set_fixaddr_top(unsigned long top)
 {
 	BUG_ON(nr_fixmaps > 0);
+	hypervisor_virt_start = top;
 	__FIXADDR_TOP = hypervisor_virt_start - 2 * PAGE_SIZE;
 }
 
@@ -215,6 +214,7 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 #ifdef CONFIG_X86_F00F_BUG
 	case FIX_F00F_IDT:
 #endif
+	case FIX_VDSO:
 		set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
 		break;
 	default:
@@ -240,24 +240,29 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	pte = alloc_pages(GFP_KERNEL|__GFP_HIGHMEM|__GFP_REPEAT|__GFP_ZERO, 0);
 #else
 	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+#endif
 	if (pte) {
 		SetPageForeign(pte, pte_free);
-		set_page_count(pte, 1);
+		init_page_count(pte);
 	}
-#endif
 	return pte;
 }
 
 void pte_free(struct page *pte)
 {
-	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
+	unsigned long pfn = page_to_pfn(pte);
 
-	if (!pte_write(*virt_to_ptep(va)))
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
+	if (!PageHighMem(pte)) {
+		unsigned long va = (unsigned long)__va(pfn << PAGE_SHIFT);
+
+		if (!pte_write(*virt_to_ptep(va)))
+			BUG_ON(HYPERVISOR_update_va_mapping(
+			       va, pfn_pte(pfn, PAGE_KERNEL), 0));
+	} else
+		clear_bit(PG_pinned, &pte->flags);
 
 	ClearPageForeign(pte);
-	set_page_count(pte, 1);
+	init_page_count(pte);
 
 	__free_page(pte);
 }
@@ -568,46 +573,48 @@ void make_pages_writable(void *va, unsigned int nr, unsigned int feature)
 	}
 }
 
-static inline void pgd_walk_set_prot(void *pt, pgprot_t flags)
+static inline int pgd_walk_set_prot(struct page *page, pgprot_t flags)
 {
-	struct page *page = virt_to_page(pt);
 	unsigned long pfn = page_to_pfn(page);
 
 	if (PageHighMem(page))
-		return;
+		return pgprot_val(flags) & _PAGE_RW
+		       ? test_and_clear_bit(PG_pinned, &page->flags)
+		       : !test_and_set_bit(PG_pinned, &page->flags);
+
 	BUG_ON(HYPERVISOR_update_va_mapping(
 		(unsigned long)__va(pfn << PAGE_SHIFT),
 		pfn_pte(pfn, flags), 0));
+
+	return 0;
 }
 
-static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
+static int pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 {
 	pgd_t *pgd = pgd_base;
 	pud_t *pud;
 	pmd_t *pmd;
-	pte_t *pte;
-	int    g, u, m;
+	int    g, u, m, flush;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
-		return;
+		return 0;
 
-	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
+	for (g = 0, flush = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
 		if (pgd_none(*pgd))
 			continue;
 		pud = pud_offset(pgd, 0);
 		if (PTRS_PER_PUD > 1) /* not folded */
-			pgd_walk_set_prot(pud,flags);
+			flush |= pgd_walk_set_prot(virt_to_page(pud),flags);
 		for (u = 0; u < PTRS_PER_PUD; u++, pud++) {
 			if (pud_none(*pud))
 				continue;
 			pmd = pmd_offset(pud, 0);
 			if (PTRS_PER_PMD > 1) /* not folded */
-				pgd_walk_set_prot(pmd,flags);
+				flush |= pgd_walk_set_prot(virt_to_page(pmd),flags);
 			for (m = 0; m < PTRS_PER_PMD; m++, pmd++) {
 				if (pmd_none(*pmd))
 					continue;
-				pte = pte_offset_kernel(pmd,0);
-				pgd_walk_set_prot(pte,flags);
+				flush |= pgd_walk_set_prot(pmd_page(*pmd),flags);
 			}
 		}
 	}
@@ -616,11 +623,14 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 		(unsigned long)pgd_base,
 		pfn_pte(virt_to_phys(pgd_base)>>PAGE_SHIFT, flags),
 		UVMF_TLB_FLUSH));
+
+	return flush;
 }
 
 static void __pgd_pin(pgd_t *pgd)
 {
-	pgd_walk(pgd, PAGE_KERNEL_RO);
+	if (pgd_walk(pgd, PAGE_KERNEL_RO))
+		kmap_flush_unused();
 	xen_pgd_pin(__pa(pgd));
 	set_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
@@ -628,7 +638,8 @@ static void __pgd_pin(pgd_t *pgd)
 static void __pgd_unpin(pgd_t *pgd)
 {
 	xen_pgd_unpin(__pa(pgd));
-	pgd_walk(pgd, PAGE_KERNEL);
+	if (pgd_walk(pgd, PAGE_KERNEL))
+		kmap_flush_unused();
 	clear_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
 

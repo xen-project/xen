@@ -22,14 +22,17 @@
 #include "xen_common.h"
 #include "xen_host_cpu_decl.h"
 #include "xen_host_decl.h"
+#include "xen_host_metrics_decl.h"
+#include "xen_pbd_decl.h"
 #include "xen_pif_decl.h"
+#include "xen_sr_decl.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
 
 /*
- * The host class. 
- *  
+ * The host class.
+ * 
  * A physical host.
  */
 
@@ -69,9 +72,15 @@ typedef struct xen_host_record
     char *name_label;
     char *name_description;
     xen_string_string_map *software_version;
+    xen_string_string_map *other_config;
     struct xen_vm_record_opt_set *resident_vms;
+    xen_string_string_map *logging;
     struct xen_pif_record_opt_set *pifs;
+    struct xen_sr_record_opt *suspend_image_sr;
+    struct xen_sr_record_opt *crash_dump_sr;
+    struct xen_pbd_record_opt_set *pbds;
     struct xen_host_cpu_record_opt_set *host_cpus;
+    struct xen_host_metrics_record_opt *metrics;
 } xen_host_record;
 
 /**
@@ -217,10 +226,24 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
 
 
 /**
+ * Get the other_config field of the given host.
+ */
+extern bool
+xen_host_get_other_config(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
  * Get the resident_VMs field of the given host.
  */
 extern bool
 xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_host host);
+
+
+/**
+ * Get the logging field of the given host.
+ */
+extern bool
+xen_host_get_logging(xen_session *session, xen_string_string_map **result, xen_host host);
 
 
 /**
@@ -231,10 +254,38 @@ xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host ho
 
 
 /**
+ * Get the suspend_image_sr field of the given host.
+ */
+extern bool
+xen_host_get_suspend_image_sr(xen_session *session, xen_sr *result, xen_host host);
+
+
+/**
+ * Get the crash_dump_sr field of the given host.
+ */
+extern bool
+xen_host_get_crash_dump_sr(xen_session *session, xen_sr *result, xen_host host);
+
+
+/**
+ * Get the PBDs field of the given host.
+ */
+extern bool
+xen_host_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_host host);
+
+
+/**
  * Get the host_CPUs field of the given host.
  */
 extern bool
 xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, xen_host host);
+
+
+/**
+ * Get the metrics field of the given host.
+ */
+extern bool
+xen_host_get_metrics(xen_session *session, xen_host_metrics *result, xen_host host);
 
 
 /**
@@ -249,6 +300,66 @@ xen_host_set_name_label(xen_session *session, xen_host host, char *label);
  */
 extern bool
 xen_host_set_name_description(xen_session *session, xen_host host, char *description);
+
+
+/**
+ * Set the other_config field of the given host.
+ */
+extern bool
+xen_host_set_other_config(xen_session *session, xen_host host, xen_string_string_map *other_config);
+
+
+/**
+ * Add the given key-value pair to the other_config field of the given
+ * host.
+ */
+extern bool
+xen_host_add_to_other_config(xen_session *session, xen_host host, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * other_config field of the given host.  If the key is not in that Map, then
+ * do nothing.
+ */
+extern bool
+xen_host_remove_from_other_config(xen_session *session, xen_host host, char *key);
+
+
+/**
+ * Set the logging field of the given host.
+ */
+extern bool
+xen_host_set_logging(xen_session *session, xen_host host, xen_string_string_map *logging);
+
+
+/**
+ * Add the given key-value pair to the logging field of the given host.
+ */
+extern bool
+xen_host_add_to_logging(xen_session *session, xen_host host, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the logging
+ * field of the given host.  If the key is not in that Map, then do nothing.
+ */
+extern bool
+xen_host_remove_from_logging(xen_session *session, xen_host host, char *key);
+
+
+/**
+ * Set the suspend_image_sr field of the given host.
+ */
+extern bool
+xen_host_set_suspend_image_sr(xen_session *session, xen_host host, xen_sr suspend_image_sr);
+
+
+/**
+ * Set the crash_dump_sr field of the given host.
+ */
+extern bool
+xen_host_set_crash_dump_sr(xen_session *session, xen_host host, xen_sr crash_dump_sr);
 
 
 /**
@@ -280,6 +391,13 @@ xen_host_shutdown(xen_session *session, xen_host host);
  */
 extern bool
 xen_host_reboot(xen_session *session, xen_host host);
+
+
+/**
+ * Get the host xen dmesg.
+ */
+extern bool
+xen_host_dmesg(xen_session *session, char **result, xen_host host);
 
 
 /**

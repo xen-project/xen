@@ -2,7 +2,6 @@ obj-y += acm_ops.o
 obj-y += bitmap.o
 obj-y += domctl.o
 obj-y += domain.o
-obj-y += elf.o
 obj-y += event_channel.o
 obj-y += grant_table.o
 obj-y += kernel.o
@@ -27,6 +26,7 @@ obj-y += trace.o
 obj-y += version.o
 obj-y += vsprintf.o
 obj-y += xmalloc.o
+obj-y += rcupdate.o
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
@@ -34,5 +34,18 @@ obj-$(xenoprof)    += xenoprof.o
 
 obj-$(CONFIG_XENCOMM) += xencomm.o
 
+subdir-$(CONFIG_COMPAT) += compat
+
+subdir-y += libelf
+
 # Object file contains changeset and compiler information.
 version.o: $(BASEDIR)/include/xen/compile.h
+
+ifeq ($(CONFIG_COMPAT),y)
+# extra dependencies
+acm_ops.o: compat/acm_ops.c
+grant_table.o: compat/grant_table.c
+kexec.o: compat/kexec.c
+schedule.o: compat/schedule.c
+xenoprof.o: compat/xenoprof.c
+endif

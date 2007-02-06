@@ -12,7 +12,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2006 XenSource Ltd.
+# Copyright (C) 2006-2007 XenSource Ltd.
 #============================================================================
 
 #
@@ -24,7 +24,7 @@ XEN_API_VM_POWER_STATE = [
     'Paused',
     'Running',
     'Suspended',
-    'ShuttingDown',
+    'Halted',
     'Unknown'
 ]
 
@@ -34,20 +34,6 @@ XEN_API_VM_POWER_STATE_RUNNING = 2
 XEN_API_VM_POWER_STATE_SUSPENDED = 3
 XEN_API_VM_POWER_STATE_SHUTTINGDOWN = 4
 XEN_API_VM_POWER_STATE_UNKNOWN = 5
-
-XEN_API_CPU_FEATURE = [
-    'FPU', 'VME', 'DE', 'PSE', 'TSC', 'MSR', 'PAE'
-    'MCE', 'CX8', 'APIC', 'SEP', 'MTRR', 'PGE', 'MCA',
-    'CMOV', 'PAT', 'PSE36', 'PN', 'CLFLSH', 'DTES',
-    'ACPI', 'MMX', 'FXCR', 'XMM', 'XMM2', 'SELFSNOOP',
-    'HT', 'ACC', 'IA64', 'SYSCALL', 'MP', 'NX', 'MMXEXT',
-    'LM', '3DNOWEXT', '3DNOW', 'RECOVERY', 'LONGRUN',
-    'LRTI', 'CXMMX', 'K6_MTRR', 'CYRIX_ARR', 'CENTAUR_MCR',
-    'K8', 'K7', 'P3', 'P4', 'CONSTANT_TSC', 'FXSAVE_LEAK',
-    'XMM3', 'MWAIT', 'DSCPL', 'EST', 'TM2', 'CID', 'CX16',
-    'XTPR', 'XSTORE', 'XSTORE_EN', 'XCRYPT', 'XCRYPT_EN',
-    'LAHF_LM', 'CMP_LEGACY'
-]
 
 XEN_API_ON_NORMAL_EXIT = [
     'destroy',
@@ -63,13 +49,8 @@ XEN_API_ON_CRASH_BEHAVIOUR = [
     'rename_restart'
 ]
 
-XEN_API_BOOT_TYPE = [
-    'bios',
-    'grub',
-    'kernel_external',
-    'kernel_internal'
-]
-
 XEN_API_VBD_MODE = ['RO', 'RW']
 XEN_API_VDI_TYPE = ['system', 'user', 'ephemeral']
-XEN_API_DRIVER_TYPE = ['ioemu', 'paravirtualised']
+XEN_API_VBD_TYPE = ['CD', 'Disk']
+XEN_API_TASK_STATUS_TYPE = ['pending', 'success', 'failure']
+XEN_API_CONSOLE_PROTOCOL = ['vt100', 'rfb', 'rdp']

@@ -2512,6 +2512,9 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn)
               pic_set_irq_new, isa_pic, 15);
     ide_init_ioport(&d->ide_if[0], 0x1f0, 0x3f6);
     ide_init_ioport(&d->ide_if[2], 0x170, 0x376);
+
+    register_savevm("ide_pci", 0, 1, generic_pci_save, generic_pci_load, d);
+
 #ifdef DMA_MULTI_THREAD    
     dma_create_thread();
 #endif //DMA_MULTI_THREAD    

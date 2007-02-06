@@ -58,6 +58,7 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 #include <asm/msr.h>
+#include <asm/shared.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/vpt.h>
 
@@ -115,22 +116,6 @@ integer_param("debug_stack_lines", debug_stack_lines);
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 #endif
 
-int is_kernel_text(unsigned long addr)
-{
-    extern char _stext, _etext;
-    if (addr >= (unsigned long) &_stext &&
-        addr <= (unsigned long) &_etext)
-        return 1;
-    return 0;
-
-}
-
-unsigned long kernel_text_end(void)
-{
-    extern char _etext;
-    return (unsigned long) &_etext;
-}
-
 static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
@@ -138,6 +123,12 @@ static void show_guest_stack(struct cpu_user_regs *regs)
 
     if ( is_hvm_vcpu(current) )
         return;
+
+    if ( IS_COMPAT(container_of(regs, struct cpu_info, guest_cpu_user_regs)->current_vcpu->domain) )
+    {
+        compat_show_guest_stack(regs, debug_stack_lines);
+        return;
+    }
 
     if ( vm86_mode(regs) )
     {
@@ -187,7 +178,7 @@ static void show_trace(struct cpu_user_regs *regs)
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
-        if ( is_kernel_text(addr) )
+        if ( is_kernel_text(addr) || is_kernel_inittext(addr) )
         {
             printk("[<%p>]", _p(addr));
             print_symbol(" %s\n   ", addr);
@@ -316,7 +307,7 @@ void show_stack_overflow(unsigned long esp)
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
-        if ( is_kernel_text(addr) )
+        if ( is_kernel_text(addr) || is_kernel_inittext(addr) )
         {
             printk("%p: [<%p>]", stack, _p(addr));
             print_symbol(" %s\n   ", addr);
@@ -398,7 +389,7 @@ static int do_guest_trap(
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
 
-    if ( unlikely(null_trap_bounce(tb)) )
+    if ( unlikely(null_trap_bounce(v, tb)) )
         gdprintk(XENLOG_WARNING, "Unhandled %s fault/trap [#%d] in "
                  "domain %d on VCPU %d [ec=%04x]\n",
                  trapstr(trapnr), trapnr, v->domain->domain_id, v->vcpu_id,
@@ -606,6 +597,11 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         if ( !IS_PRIV(current->domain) )
             clear_bit(X86_FEATURE_MTRR, &d);
     }
+    else if ( regs->eax == 0x80000001 )
+    {
+        /* Modify Feature Information. */
+        clear_bit(X86_FEATURE_RDTSCP % 32, &d);
+    }
     else
     {
         (void)cpuid_hypervisor_leaves(regs->eax, &a, &b, &c, &d);
@@ -675,7 +671,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     struct trap_bounce *tb = &v->arch.trap_bounce;
 
     v->arch.guest_context.ctrlreg[2] = addr;
-    v->vcpu_info->arch.cr2           = addr;
+    arch_set_cr2(v, addr);
 
     /* Re-set error_code.user flag appropriately for the guest. */
     error_code &= ~PFEC_user_mode;
@@ -689,7 +685,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
-    if ( unlikely(null_trap_bounce(tb)) )
+    if ( unlikely(null_trap_bounce(v, tb)) )
     {
         printk("Unhandled page fault in domain %d on VCPU %d (ec=%04X)\n",
                v->domain->domain_id, v->vcpu_id, error_code);
@@ -986,6 +982,64 @@ long do_fpu_taskswitch(int set)
     return 0;
 }
 
+static int read_descriptor(unsigned int sel,
+                           const struct vcpu *v,
+                           const struct cpu_user_regs * regs,
+                           unsigned long *base,
+                           unsigned long *limit,
+                           unsigned int *ar,
+                           unsigned int vm86attr)
+{
+    struct desc_struct desc;
+
+    if ( !vm86_mode(regs) )
+    {
+        if ( sel < 4)
+            desc.b = desc.a = 0;
+        else if ( __get_user(desc,
+                        (const struct desc_struct *)(!(sel & 4)
+                                                     ? GDT_VIRT_START(v)
+                                                     : LDT_VIRT_START(v))
+                        + (sel >> 3)) )
+            return 0;
+        if ( !(vm86attr & _SEGMENT_CODE) )
+            desc.b &= ~_SEGMENT_L;
+    }
+    else
+    {
+        desc.a = (sel << 20) | 0xffff;
+        desc.b = vm86attr | (sel >> 12);
+    }
+
+    *ar = desc.b & 0x00f0ff00;
+    if ( !(desc.b & _SEGMENT_L) )
+    {
+        *base = (desc.a >> 16) + ((desc.b & 0xff) << 16) + (desc.b & 0xff000000);
+        *limit = (desc.a & 0xffff) | (desc.b & 0x000f0000);
+        if ( desc.b & _SEGMENT_G )
+            *limit = ((*limit + 1) << 12) - 1;
+#ifndef NDEBUG
+        if ( !vm86_mode(regs) && sel > 3 )
+        {
+            unsigned int a, l;
+            unsigned char valid;
+
+            __asm__("larl %2, %0\n\tsetz %1" : "=r" (a), "=rm" (valid) : "rm" (sel));
+            BUG_ON(valid && (a & 0x00f0ff00) != *ar);
+            __asm__("lsll %2, %0\n\tsetz %1" : "=r" (l), "=rm" (valid) : "rm" (sel));
+            BUG_ON(valid && l != *limit);
+        }
+#endif
+    }
+    else
+    {
+        *base = 0UL;
+        *limit = ~0UL;
+    }
+
+    return 1;
+}
+
 /* Has the guest requested sufficient permission for this I/O access? */
 static inline int guest_io_okay(
     unsigned int port, unsigned int bytes,
@@ -1050,74 +1104,179 @@ unsigned long guest_to_host_gpr_switch(unsigned long)
     __attribute__((__regparm__(1)));
 
 /* Instruction fetch with error handling. */
-#define insn_fetch(_type, _size, cs, eip)                                   \
-({  unsigned long _rc, _x, _ptr = eip;                                      \
-    if ( vm86_mode(regs) )                                                  \
-        _ptr += cs << 4;                                                    \
-    if ( (_rc = copy_from_user(&_x, (_type *)_ptr, sizeof(_type))) != 0 )   \
+#define insn_fetch(type, base, eip, limit)                                  \
+({  unsigned long _rc, _ptr = (base) + (eip);                               \
+    type _x;                                                                \
+    if ( (limit) < sizeof(_x) - 1 || (eip) > (limit) - (sizeof(_x) - 1) )   \
+        goto fail;                                                          \
+    if ( (_rc = copy_from_user(&_x, (type *)_ptr, sizeof(_x))) != 0 )       \
     {                                                                       \
-        propagate_page_fault(eip + sizeof(_type) - _rc, 0);                 \
+        propagate_page_fault(_ptr + sizeof(_x) - _rc, 0);                   \
         return EXCRET_fault_fixed;                                          \
     }                                                                       \
-    eip += _size; (_type)_x; })
+    (eip) += sizeof(_x); _x; })
+
+#if defined(CONFIG_X86_32)
+# define read_sreg(regs, sr) ((regs)->sr)
+#elif defined(CONFIG_X86_64)
+# define read_sreg(regs, sr) read_segment_register(sr)
+#endif
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    unsigned long *reg, eip = regs->eip, cs = regs->cs, res;
-    u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
-    unsigned int port, i, op_bytes = 4, data, rc;
+    unsigned long *reg, eip = regs->eip, res;
+    u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, lock = 0, rex = 0;
+    enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
+    unsigned int port, i, data_sel, ar, data, rc;
+    unsigned int op_bytes, op_default, ad_bytes, ad_default;
+#define rd_ad(reg) (ad_bytes >= sizeof(regs->reg) \
+                    ? regs->reg \
+                    : ad_bytes == 4 \
+                      ? (u32)regs->reg \
+                      : (u16)regs->reg)
+#define wr_ad(reg, val) (ad_bytes >= sizeof(regs->reg) \
+                         ? regs->reg = (val) \
+                         : ad_bytes == 4 \
+                           ? (*(u32 *)&regs->reg = (val)) \
+                           : (*(u16 *)&regs->reg = (val)))
+    unsigned long code_base, code_limit;
     char io_emul_stub[16];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
     u32 l, h;
 
+    if ( !read_descriptor(regs->cs, v, regs,
+                          &code_base, &code_limit, &ar,
+                          _SEGMENT_CODE|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P) )
+        goto fail;
+    op_default = op_bytes = (ar & (_SEGMENT_L|_SEGMENT_DB)) ? 4 : 2;
+    ad_default = ad_bytes = (ar & _SEGMENT_L) ? 8 : op_default;
+    if ( !(ar & _SEGMENT_S) ||
+         !(ar & _SEGMENT_P) ||
+         !(ar & _SEGMENT_CODE) )
+        goto fail;
+
+    /* emulating only opcodes not allowing SS to be default */
+    data_sel = read_sreg(regs, ds);
+
     /* Legacy prefixes. */
-    for ( i = 0; i < 8; i++ )
+    for ( i = 0; i < 8; i++, rex == opcode || (rex = 0) )
     {
-        switch ( opcode = insn_fetch(u8, 1, cs, eip) )
+        switch ( opcode = insn_fetch(u8, code_base, eip, code_limit) )
         {
         case 0x66: /* operand-size override */
-            op_bytes ^= 6; /* switch between 2/4 bytes */
-            break;
+            op_bytes = op_default ^ 6; /* switch between 2/4 bytes */
+            continue;
         case 0x67: /* address-size override */
+            ad_bytes = ad_default != 4 ? 4 : 2; /* switch to 2/4 bytes */
+            continue;
         case 0x2e: /* CS override */
+            data_sel = regs->cs;
+            continue;
         case 0x3e: /* DS override */
+            data_sel = read_sreg(regs, ds);
+            continue;
         case 0x26: /* ES override */
+            data_sel = read_sreg(regs, es);
+            continue;
         case 0x64: /* FS override */
+            data_sel = read_sreg(regs, fs);
+            lm_ovr = lm_seg_fs;
+            continue;
         case 0x65: /* GS override */
+            data_sel = read_sreg(regs, gs);
+            lm_ovr = lm_seg_gs;
+            continue;
         case 0x36: /* SS override */
+            data_sel = regs->ss;
+            continue;
         case 0xf0: /* LOCK */
+            lock = 1;
+            continue;
         case 0xf2: /* REPNE/REPNZ */
-            break;
         case 0xf3: /* REP/REPE/REPZ */
             rep_prefix = 1;
-            break;
+            continue;
         default:
-            goto done_prefixes;
+            if ( (ar & _SEGMENT_L) && (opcode & 0xf0) == 0x40 )
+            {
+                rex = opcode;
+                continue;
+            }
+            break;
         }
+        break;
     }
- done_prefixes:
 
-#ifdef __x86_64__
     /* REX prefix. */
-    if ( (opcode & 0xf0) == 0x40 )
-    {
-        modrm_reg = (opcode & 4) << 1;  /* REX.R */
-        modrm_rm  = (opcode & 1) << 3;  /* REX.B */
-
-        /* REX.W and REX.X do not need to be decoded. */
-        opcode = insn_fetch(u8, 1, cs, eip);
-    }
-#endif
+    if ( rex & 8 ) /* REX.W */
+        op_bytes = 4; /* emulating only opcodes not supporting 64-bit operands */
+    modrm_reg = (rex & 4) << 1;  /* REX.R */
+    /* REX.X does not need to be decoded. */
+    modrm_rm  = (rex & 1) << 3;  /* REX.B */
 
     if ( opcode == 0x0f )
         goto twobyte_opcode;
     
+    if ( lock )
+        goto fail;
+
     /* Input/Output String instructions. */
     if ( (opcode >= 0x6c) && (opcode <= 0x6f) )
     {
-        if ( rep_prefix && (regs->ecx == 0) )
+        unsigned long data_base, data_limit;
+
+        if ( rep_prefix && (rd_ad(ecx) == 0) )
             goto done;
+
+        if ( !(opcode & 2) )
+        {
+            data_sel = read_sreg(regs, es);
+            lm_ovr = lm_seg_none;
+        }
+
+        if ( !(ar & _SEGMENT_L) )
+        {
+            if ( !read_descriptor(data_sel, v, regs,
+                                  &data_base, &data_limit, &ar,
+                                  _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P) )
+                goto fail;
+            if ( !(ar & _SEGMENT_S) ||
+                 !(ar & _SEGMENT_P) ||
+                 (opcode & 2 ?
+                  (ar & _SEGMENT_CODE) && !(ar & _SEGMENT_WR) :
+                  (ar & _SEGMENT_CODE) || !(ar & _SEGMENT_WR)) )
+                goto fail;
+        }
+#ifdef CONFIG_X86_64
+        else
+        {
+            if ( lm_ovr == lm_seg_none || data_sel < 4 )
+            {
+                switch ( lm_ovr )
+                {
+                case lm_seg_none:
+                    data_base = 0UL;
+                    break;
+                case lm_seg_fs:
+                    data_base = v->arch.guest_context.fs_base;
+                    break;
+                case lm_seg_gs:
+                    if ( guest_kernel_mode(v, regs) )
+                        data_base = v->arch.guest_context.gs_base_kernel;
+                    else
+                        data_base = v->arch.guest_context.gs_base_user;
+                    break;
+                }
+            }
+            else
+                read_descriptor(data_sel, v, regs,
+                                &data_base, &data_limit, &ar,
+                                0);
+            data_limit = ~0UL;
+            ar = _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P;
+        }
+#endif
 
     continue_io_string:
         switch ( opcode )
@@ -1125,7 +1284,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6c: /* INSB */
             op_bytes = 1;
         case 0x6d: /* INSW/INSL */
-            if ( !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
+            if ( data_limit < op_bytes - 1 ||
+                 rd_ad(edi) > data_limit - (op_bytes - 1) ||
+                 !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
                 goto fail;
             port = (u16)regs->edx;
             switch ( op_bytes )
@@ -1143,24 +1304,26 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 data = (u32)(guest_inl_okay(port, v, regs) ? inl(port) : ~0);
                 break;
             }
-            if ( (rc = copy_to_user((void *)regs->edi, &data, op_bytes)) != 0 )
+            if ( (rc = copy_to_user((void *)data_base + rd_ad(edi), &data, op_bytes)) != 0 )
             {
-                propagate_page_fault(regs->edi + op_bytes - rc,
+                propagate_page_fault(data_base + rd_ad(edi) + op_bytes - rc,
                                      PFEC_write_access);
                 return EXCRET_fault_fixed;
             }
-            regs->edi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
+            wr_ad(edi, regs->edi + (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes));
             break;
 
         case 0x6e: /* OUTSB */
             op_bytes = 1;
         case 0x6f: /* OUTSW/OUTSL */
-            if ( !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
+            if ( data_limit < op_bytes - 1 ||
+                 rd_ad(esi) > data_limit - (op_bytes - 1) ||
+                 !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
                 goto fail;
-            rc = copy_from_user(&data, (void *)regs->esi, op_bytes);
+            rc = copy_from_user(&data, (void *)data_base + rd_ad(esi), op_bytes);
             if ( rc != 0 )
             {
-                propagate_page_fault(regs->esi + op_bytes - rc, 0);
+                propagate_page_fault(data_base + rd_ad(esi) + op_bytes - rc, 0);
                 return EXCRET_fault_fixed;
             }
             port = (u16)regs->edx;
@@ -1181,11 +1344,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                     outl((u32)data, port);
                 break;
             }
-            regs->esi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
+            wr_ad(esi, regs->esi + (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes));
             break;
         }
 
-        if ( rep_prefix && (--regs->ecx != 0) )
+        if ( rep_prefix && (wr_ad(ecx, regs->ecx - 1) != 0) )
         {
             if ( !hypercall_preempt_check() )
                 goto continue_io_string;
@@ -1225,7 +1388,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0xe4: /* IN imm8,%al */
         op_bytes = 1;
     case 0xe5: /* IN imm8,%eax */
-        port = insn_fetch(u8, 1, cs, eip);
+        port = insn_fetch(u8, code_base, eip, code_limit);
         io_emul_stub[7] = port; /* imm8 */
     exec_in:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
@@ -1267,7 +1430,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0xe6: /* OUT %al,imm8 */
         op_bytes = 1;
     case 0xe7: /* OUT %eax,imm8 */
-        port = insn_fetch(u8, 1, cs, eip);
+        port = insn_fetch(u8, code_base, eip, code_limit);
         io_emul_stub[7] = port; /* imm8 */
     exec_out:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
@@ -1320,7 +1483,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto fail;
 
     /* Privileged (ring 0) instructions. */
-    opcode = insn_fetch(u8, 1, cs, eip);
+    opcode = insn_fetch(u8, code_base, eip, code_limit);
+    if ( lock && (opcode & ~3) != 0x20 )
+        goto fail;
     switch ( opcode )
     {
     case 0x06: /* CLTS */
@@ -1338,8 +1503,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x20: /* MOV CR?,<reg> */
-        opcode = insn_fetch(u8, 1, cs, eip);
-        modrm_reg |= (opcode >> 3) & 7;
+        opcode = insn_fetch(u8, code_base, eip, code_limit);
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         switch ( modrm_reg )
@@ -1354,8 +1519,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
             
         case 3: /* Read CR3 */
-            *reg = xen_pfn_to_cr3(mfn_to_gmfn(
-                v->domain, pagetable_get_pfn(v->arch.guest_table)));
+            if ( !IS_COMPAT(v->domain) )
+                *reg = xen_pfn_to_cr3(mfn_to_gmfn(
+                    v->domain, pagetable_get_pfn(v->arch.guest_table)));
+#ifdef CONFIG_COMPAT
+            else
+                *reg = compat_pfn_to_cr3(mfn_to_gmfn(
+                    v->domain, l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)))));
+#endif
             break;
 
         case 4: /* Read CR4 */
@@ -1372,8 +1543,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x21: /* MOV DR?,<reg> */
-        opcode = insn_fetch(u8, 1, cs, eip);
-        modrm_reg |= (opcode >> 3) & 7;
+        opcode = insn_fetch(u8, code_base, eip, code_limit);
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         if ( (res = do_get_debugreg(modrm_reg)) > (unsigned long)-256 )
@@ -1382,8 +1553,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x22: /* MOV <reg>,CR? */
-        opcode = insn_fetch(u8, 1, cs, eip);
-        modrm_reg |= (opcode >> 3) & 7;
+        opcode = insn_fetch(u8, code_base, eip, code_limit);
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         switch ( modrm_reg )
@@ -1400,12 +1571,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 2: /* Write CR2 */
             v->arch.guest_context.ctrlreg[2] = *reg;
-            v->vcpu_info->arch.cr2           = *reg;
+            arch_set_cr2(v, *reg);
             break;
 
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
-            rc = new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
+            if ( !IS_COMPAT(v->domain) )
+                rc = new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
+#ifdef CONFIG_COMPAT
+            else
+                rc = new_guest_cr3(gmfn_to_mfn(v->domain, compat_cr3_to_pfn(*reg)));
+#endif
             UNLOCK_BIGLOCK(v->domain);
             if ( rc == 0 ) /* not okay */
                 goto fail;
@@ -1425,8 +1601,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x23: /* MOV <reg>,DR? */
-        opcode = insn_fetch(u8, 1, cs, eip);
-        modrm_reg |= (opcode >> 3) & 7;
+        opcode = insn_fetch(u8, code_base, eip, code_limit);
+        modrm_reg += ((opcode >> 3) & 7) + (lock << 3);
         modrm_rm  |= (opcode >> 0) & 7;
         reg = decode_register(modrm_rm, regs, 0);
         if ( do_set_debugreg(modrm_reg, *reg) != 0 )
@@ -1438,18 +1614,24 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
+            if ( IS_COMPAT(v->domain) )
+                goto fail;
             if ( wrmsr_safe(MSR_FS_BASE, regs->eax, regs->edx) )
                 goto fail;
             v->arch.guest_context.fs_base =
                 ((u64)regs->edx << 32) | regs->eax;
             break;
         case MSR_GS_BASE:
+            if ( IS_COMPAT(v->domain) )
+                goto fail;
             if ( wrmsr_safe(MSR_GS_BASE, regs->eax, regs->edx) )
                 goto fail;
             v->arch.guest_context.gs_base_kernel =
                 ((u64)regs->edx << 32) | regs->eax;
             break;
         case MSR_SHADOW_GS_BASE:
+            if ( IS_COMPAT(v->domain) )
+                goto fail;
             if ( wrmsr_safe(MSR_SHADOW_GS_BASE, regs->eax, regs->edx) )
                 goto fail;
             v->arch.guest_context.gs_base_user =
@@ -1474,14 +1656,20 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
+            if ( IS_COMPAT(v->domain) )
+                goto fail;
             regs->eax = v->arch.guest_context.fs_base & 0xFFFFFFFFUL;
             regs->edx = v->arch.guest_context.fs_base >> 32;
             break;
         case MSR_GS_BASE:
+            if ( IS_COMPAT(v->domain) )
+                goto fail;
             regs->eax = v->arch.guest_context.gs_base_kernel & 0xFFFFFFFFUL;
             regs->edx = v->arch.guest_context.gs_base_kernel >> 32;
             break;
         case MSR_SHADOW_GS_BASE:
+            if ( IS_COMPAT(v->domain) )
+                goto fail;
             regs->eax = v->arch.guest_context.gs_base_user & 0xFFFFFFFFUL;
             regs->edx = v->arch.guest_context.gs_base_user >> 32;
             break;
@@ -1509,6 +1697,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     default:
         goto fail;
     }
+
+#undef wr_ad
+#undef rd_ad
 
  done:
     regs->eip = eip;
@@ -1611,7 +1802,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
     if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
         return;
 
-    set_bit(reason_idx, &d->shared_info->arch.nmi_reason);
+    set_bit(reason_idx, nmi_reason(d));
 
     if ( test_and_set_bit(_VCPUF_nmi_pending, &v->vcpu_flags) )
         raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
@@ -1677,7 +1868,7 @@ static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
 }
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
- 
+
 asmlinkage void do_nmi(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
@@ -1801,6 +1992,13 @@ void set_tss_desc(unsigned int n, void *addr)
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
+#ifdef CONFIG_COMPAT
+    _set_tssldt_desc(
+        compat_gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)addr,
+        offsetof(struct tss_struct, __cacheline_filler) - 1,
+        11);
+#endif
 }
 
 void __init trap_init(void)
@@ -1875,7 +2073,7 @@ long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
         if ( cur.address == 0 )
             break;
 
-        fixup_guest_code_selector(cur.cs);
+        fixup_guest_code_selector(current->domain, cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
 

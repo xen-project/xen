@@ -1,33 +1,28 @@
 #ifndef _I386_PGALLOC_H
 #define _I386_PGALLOC_H
 
-#include <linux/config.h>
 #include <asm/fixmap.h>
 #include <linux/threads.h>
 #include <linux/mm.h>		/* for struct page */
 #include <asm/io.h>		/* for phys_to_virt and page_to_pseudophys */
-
-/* Is this pagetable pinned? */
-#define PG_pinned	PG_arch_1
 
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
 #define pmd_populate(mm, pmd, pte) 					\
 do {									\
+	unsigned long pfn = page_to_pfn(pte);				\
 	if (test_bit(PG_pinned, &virt_to_page((mm)->pgd)->flags)) {	\
 		if (!PageHighMem(pte))					\
 			BUG_ON(HYPERVISOR_update_va_mapping(		\
-			  (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT),\
-			  pfn_pte(page_to_pfn(pte), PAGE_KERNEL_RO), 0));\
-		set_pmd(pmd, __pmd(_PAGE_TABLE +			\
-			((unsigned long long)page_to_pfn(pte) <<	\
-				(unsigned long long) PAGE_SHIFT)));	\
-	} else {							\
-		*(pmd) = __pmd(_PAGE_TABLE +				\
-			((unsigned long long)page_to_pfn(pte) <<	\
-				(unsigned long long) PAGE_SHIFT));	\
-	}								\
+			  (unsigned long)__va(pfn << PAGE_SHIFT),	\
+			  pfn_pte(pfn, PAGE_KERNEL_RO), 0));		\
+		else if (!test_and_set_bit(PG_pinned, &pte->flags))	\
+			kmap_flush_unused();				\
+		set_pmd(pmd,						\
+		        __pmd(_PAGE_TABLE + ((paddr_t)pfn << PAGE_SHIFT))); \
+	} else							\
+		*(pmd) = __pmd(_PAGE_TABLE + ((paddr_t)pfn << PAGE_SHIFT)); \
 } while (0)
 
 /*
@@ -42,7 +37,7 @@ extern struct page *pte_alloc_one(struct mm_struct *, unsigned long);
 static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
-	make_page_writable(pte, XENFEAT_writable_page_tables);
+	make_lowmem_page_writable(pte, XENFEAT_writable_page_tables);
 }
 
 extern void pte_free(struct page *pte);

@@ -21,7 +21,6 @@
 #include <stdlib.h>
 
 #include "xen_common.h"
-#include "xen_driver_type_internal.h"
 #include "xen_internal.h"
 #include "xen_vbd.h"
 #include "xen_vbd_mode_internal.h"
@@ -55,12 +54,12 @@ static const struct_member xen_vbd_record_struct_members[] =
         { .key = "image",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vbd_record, image) },
+        { .key = "bootable",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vbd_record, bootable) },
         { .key = "mode",
           .type = &xen_vbd_mode_abstract_type_,
           .offset = offsetof(xen_vbd_record, mode) },
-        { .key = "driver",
-          .type = &xen_driver_type_abstract_type_,
-          .offset = offsetof(xen_vbd_record, driver) },
         { .key = "io_read_kbs",
           .type = &abstract_type_float,
           .offset = offsetof(xen_vbd_record, io_read_kbs) },
@@ -218,6 +217,22 @@ xen_vbd_get_device(xen_session *session, char **result, xen_vbd vbd)
 
 
 bool
+xen_vbd_get_bootable(xen_session *session, bool *result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VBD.get_bootable");
+    return session->ok;
+}
+
+
+bool
 xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd)
 {
     abstract_value param_values[] =
@@ -230,23 +245,6 @@ xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd)
     char *result_str = NULL;
     XEN_CALL_("VBD.get_mode");
     *result = xen_vbd_mode_from_string(session, result_str);
-    return session->ok;
-}
-
-
-bool
-xen_vbd_get_driver(xen_session *session, enum xen_driver_type *result, xen_vbd vbd)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vbd }
-        };
-
-    abstract_type result_type = xen_driver_type_abstract_type_;
-    char *result_str = NULL;
-    XEN_CALL_("VBD.get_driver");
-    *result = xen_driver_type_from_string(session, result_str);
     return session->ok;
 }
 
@@ -284,38 +282,6 @@ xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd)
 
 
 bool
-xen_vbd_set_vm(xen_session *session, xen_vbd vbd, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vbd },
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    xen_call_(session, "VBD.set_VM", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vbd_set_vdi(xen_session *session, xen_vbd vbd, xen_vdi vdi)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vbd },
-            { .type = &abstract_type_string,
-              .u.string_val = vdi }
-        };
-
-    xen_call_(session, "VBD.set_VDI", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device)
 {
     abstract_value param_values[] =
@@ -332,6 +298,22 @@ xen_vbd_set_device(xen_session *session, xen_vbd vbd, char *device)
 
 
 bool
+xen_vbd_set_bootable(xen_session *session, xen_vbd vbd, bool bootable)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_bool,
+              .u.bool_val = bootable }
+        };
+
+    xen_call_(session, "VBD.set_bootable", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode)
 {
     abstract_value param_values[] =
@@ -343,22 +325,6 @@ xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode)
         };
 
     xen_call_(session, "VBD.set_mode", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vbd_set_driver(xen_session *session, xen_vbd vbd, enum xen_driver_type driver)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vbd },
-            { .type = &xen_driver_type_abstract_type_,
-              .u.string_val = xen_driver_type_to_string(driver) }
-        };
-
-    xen_call_(session, "VBD.set_driver", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

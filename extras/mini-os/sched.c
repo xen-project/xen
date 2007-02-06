@@ -155,11 +155,27 @@ void schedule(void)
     if(prev != next) switch_threads(prev, next);
 }
 
-
-/* Gets run when a new thread is scheduled the first time ever, 
-   defined in x86_[32/64].S */
-extern void thread_starter(void);
-
+struct thread* create_thread(char *name, void (*function)(void *), void *data)
+{
+    struct thread *thread;
+    unsigned long flags;
+    /* Call architecture specific setup. */
+    thread = arch_create_thread(name, function, data);
+    /* Not runable, not exited, not sleeping */
+    thread->flags = 0;
+    thread->wakeup_time = 0LL;
+    set_runnable(thread);
+    local_irq_save(flags);
+    if(idle_thread != NULL) {
+        list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
+    } else if(function != idle_thread_fn)
+    {
+        printk("BUG: Not allowed to create thread before initialising scheduler.\n");
+        BUG();
+    }
+    local_irq_restore(flags);
+    return thread;
+}
 
 void exit_thread(void)
 {

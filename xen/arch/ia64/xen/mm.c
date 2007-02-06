@@ -700,12 +700,12 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
 
     printk("%s: d 0x%p id %d current 0x%p id %d\n",
            __func__, d, d->domain_id, current, current->vcpu_id);
-    if ((mpaddr >> PAGE_SHIFT) < d->max_pages)
+    if (mpaddr < d->arch.convmem_end)
         printk("%s: non-allocated mpa 0x%lx (< 0x%lx)\n", __func__,
-               mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
+               mpaddr, d->arch.convmem_end);
     else
         printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
-               mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
+               mpaddr, d->arch.convmem_end);
 
     if (entry != NULL)
         p2m_entry_set(entry, NULL, __pte(0));
@@ -972,7 +972,7 @@ ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
         // clear pte
         old_pte = ptep_get_and_clear(mm, mpaddr, pte);
     }
-    domain_flush_vtlb_all();
+    domain_flush_vtlb_all(d);
     return 0;
 }
 
@@ -1274,7 +1274,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
     if (flags & (ASSIGN_nocache | ASSIGN_pgc_allocated))
         return -EINVAL;
 
-    rd = find_domain_by_id(domid);
+    rd = get_domain_by_id(domid);
     if (unlikely(rd == NULL)) {
         switch (domid) {
         case DOMID_XEN:
@@ -1439,10 +1439,9 @@ dom0vp_expose_p2m(struct domain* d,
     for (i = 0; i < expose_num_pfn / PTRS_PER_PTE + 1; i++) {
         assign_pte = lookup_noalloc_domain_pte(d, (assign_start_gpfn + i) <<
                                                PAGE_SHIFT);
-        BUG_ON(assign_pte == NULL);
-        if (pte_present(*assign_pte)) {
+        if (assign_pte == NULL || pte_present(*assign_pte))
             continue;
-        }
+
         if (expose_p2m_page(d, (assign_start_gpfn + i) << PAGE_SHIFT,
                             p2m_pte_zero_page) < 0) {
             gdprintk(XENLOG_INFO, "%s failed to assign zero-pte page\n", __func__);
@@ -1731,7 +1730,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
 #ifndef CONFIG_XEN_IA64_TLB_TRACK
     //XXX sledgehammer.
     //    flush finer range.
-    domain_flush_vtlb_all();
+    domain_flush_vtlb_all(d);
     put_page(page);
 #else
     switch (tlb_track_search_and_remove(d->arch.tlb_track,
@@ -1750,7 +1749,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          * queue the page and flush vTLB only once.
          * I.e. The caller must call dfree_flush() explicitly.
          */
-        domain_flush_vtlb_all();
+        domain_flush_vtlb_all(d);
         put_page(page);
         break;
     case TLB_TRACK_NOT_FOUND:
@@ -1784,7 +1783,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
          * So we abondaned to track virtual addresses.
          * full vTLB flush is necessary.
          */
-        domain_flush_vtlb_all();
+        domain_flush_vtlb_all(d);
         put_page(page);
         break;
     case TLB_TRACK_AGAIN:
@@ -2056,7 +2055,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if (!IS_PRIV(current->domain))
             return -EPERM;
-        else if ((d = find_domain_by_id(xatp.domid)) == NULL)
+        else if ((d = get_domain_by_id(xatp.domid)) == NULL)
             return -ESRCH;
 
         /* This hypercall is used for VT-i domain only */

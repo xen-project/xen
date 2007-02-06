@@ -1,11 +1,22 @@
 #ifndef _LINUX_HIGHMEM_H
 #define _LINUX_HIGHMEM_H
 
-#include <linux/config.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
 
 #include <asm/cacheflush.h>
+
+#ifndef ARCH_HAS_FLUSH_ANON_PAGE
+static inline void flush_anon_page(struct page *page, unsigned long vmaddr)
+{
+}
+#endif
+
+#ifndef ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
+static inline void flush_kernel_dcache_page(struct page *page)
+{
+}
+#endif
 
 #ifdef CONFIG_HIGHMEM
 

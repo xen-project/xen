@@ -2,29 +2,22 @@
  * xc_hvm_build.c
  */
 
-#define ELFSIZE 32
 #include <stddef.h>
 #include <inttypes.h>
-#include "xg_private.h"
-#include "xc_private.h"
-#include "xc_elf.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
+
+#include "xg_private.h"
+#include "xc_private.h"
+
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 #include <xen/hvm/e820.h>
 
-#define SCRATCH_PFN 0xFFFFF
+#include <xen/libelf.h>
 
-#define HVM_LOADER_ENTR_ADDR  0x00100000
-static int
-parseelfimage(
-    char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
-static int
-loadelfimage(
-    char *elfbase, int xch, uint32_t dom, unsigned long *parray,
-    struct domain_setup_info *dsi);
+#define SCRATCH_PFN 0xFFFFF
 
 int xc_set_hvm_param(
     int handle, domid_t dom, int param, unsigned long value)
@@ -144,6 +137,48 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     *(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map;
 }
 
+static int
+loadelfimage(struct elf_binary *elf, int xch, uint32_t dom, unsigned long *parray)
+{
+    privcmd_mmap_entry_t *entries = NULL;
+    int pages = (elf->pend - elf->pstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    int i, rc = -1;
+
+    /* map hvmloader address space */
+    entries = malloc(pages * sizeof(privcmd_mmap_entry_t));
+    if (NULL == entries)
+        goto err;
+    elf->dest = mmap(NULL, pages << PAGE_SHIFT, PROT_READ | PROT_WRITE,
+                     MAP_SHARED, xch, 0);
+    if (MAP_FAILED == elf->dest)
+        goto err;
+
+    for (i = 0; i < pages; i++)
+    {
+        entries[i].va = (uintptr_t)elf->dest + (i << PAGE_SHIFT);
+        entries[i].mfn = parray[(elf->pstart >> PAGE_SHIFT) + i];
+        entries[i].npages = 1;
+    }
+    rc = xc_map_foreign_ranges(xch, dom, entries, pages);
+    if (rc < 0)
+        goto err;
+
+    /* load hvmloader */
+    elf_load_binary(elf);
+    rc = 0;
+
+ err:
+    /* cleanup */
+    if (elf->dest) {
+        munmap(elf->dest, pages << PAGE_SHIFT);
+        elf->dest = NULL;
+    }
+    if (entries)
+        free(entries);
+
+    return rc;
+}
+
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
@@ -155,35 +190,35 @@ static int setup_guest(int xc_handle,
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
     void *e820_page;
-    struct domain_setup_info dsi;
-    uint64_t v_end;
+    struct elf_binary elf;
+    uint64_t v_start, v_end;
     int rc;
 
-    memset(&dsi, 0, sizeof(struct domain_setup_info));
-
-    if ( (parseelfimage(image, image_size, &dsi)) != 0 )
+    if (0 != elf_init(&elf, image, image_size))
         goto error_out;
+    elf_parse_binary(&elf);
+    v_start = 0;
+    v_end = (unsigned long long)memsize << 20;
 
-    if ( (dsi.v_kernstart & (PAGE_SIZE - 1)) != 0 )
+    if ( (elf.pstart & (PAGE_SIZE - 1)) != 0 )
     {
         PERROR("Guest OS must load to a page boundary.\n");
         goto error_out;
     }
 
-    v_end = (unsigned long long)memsize << 20;
-
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
-           "  Loaded HVM loader:    %016"PRIx64"->%016"PRIx64"\n"
-           "  TOTAL:                %016"PRIx64"->%016"PRIx64"\n",
-           dsi.v_kernstart, dsi.v_kernend,
-           dsi.v_start, v_end);
-    IPRINTF("  ENTRY ADDRESS:        %016"PRIx64"\n", dsi.v_kernentry);
+            "  Loaded HVM loader:    %016"PRIx64"->%016"PRIx64"\n"
+            "  TOTAL:                %016"PRIx64"->%016"PRIx64"\n"
+            "  ENTRY ADDRESS:        %016"PRIx64"\n",
+            elf.pstart, elf.pend,
+            v_start, v_end,
+            elf_uval(&elf, elf.ehdr, e_entry));
 
-    if ( (v_end - dsi.v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
+    if ( (v_end - v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
     {
         PERROR("Initial guest OS requires too much space: "
                "(%lluMB is greater than %lluMB limit)\n",
-               (unsigned long long)(v_end - dsi.v_start) >> 20,
+               (unsigned long long)(v_end - v_start) >> 20,
                ((unsigned long long)nr_pages << PAGE_SHIFT) >> 20);
         goto error_out;
     }
@@ -212,7 +247,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    loadelfimage(image, xc_handle, dom, page_array, &dsi);
+    loadelfimage(&elf, xc_handle, dom, page_array);
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
@@ -233,8 +268,7 @@ static int setup_guest(int xc_handle,
              SCRATCH_PFN)) == NULL) )
         goto error_out;
     memset(shared_info, 0, PAGE_SIZE);
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+    /* NB. evtchn_upcall_mask is unused: leave as zero. */
     memset(&shared_info->evtchn_mask[0], 0xff,
            sizeof(shared_info->evtchn_mask));
     munmap(shared_info, PAGE_SIZE);
@@ -256,7 +290,7 @@ static int setup_guest(int xc_handle,
 
     free(page_array);
 
-    ctxt->user_regs.eip = dsi.v_kernentry;
+    ctxt->user_regs.eip = elf_uval(&elf, elf.ehdr, e_entry);
 
     return 0;
 
@@ -313,131 +347,6 @@ static inline int is_loadable_phdr(Elf32_Phdr *phdr)
 {
     return ((phdr->p_type == PT_LOAD) &&
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
-}
-
-static int parseelfimage(char *elfbase,
-                         unsigned long elfsize,
-                         struct domain_setup_info *dsi)
-{
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfbase;
-    Elf32_Phdr *phdr;
-    Elf32_Shdr *shdr;
-    unsigned long kernstart = ~0UL, kernend=0UL;
-    char *shstrtab;
-    int h;
-
-    if ( !IS_ELF(*ehdr) )
-    {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "Kernel image does not have an ELF header.");
-        return -EINVAL;
-    }
-
-    if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
-    {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "ELF program headers extend beyond end of image.");
-        return -EINVAL;
-    }
-
-    if ( (ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize)) > elfsize )
-    {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "ELF section headers extend beyond end of image.");
-        return -EINVAL;
-    }
-
-    /* Find the section-header strings table. */
-    if ( ehdr->e_shstrndx == SHN_UNDEF )
-    {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "ELF image has no section-header strings table (shstrtab).");
-        return -EINVAL;
-    }
-    shdr = (Elf32_Shdr *)(elfbase + ehdr->e_shoff +
-                          (ehdr->e_shstrndx*ehdr->e_shentsize));
-    shstrtab = elfbase + shdr->sh_offset;
-
-    for ( h = 0; h < ehdr->e_phnum; h++ )
-    {
-        phdr = (Elf32_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
-        if ( !is_loadable_phdr(phdr) )
-            continue;
-        if ( phdr->p_paddr < kernstart )
-            kernstart = phdr->p_paddr;
-        if ( (phdr->p_paddr + phdr->p_memsz) > kernend )
-            kernend = phdr->p_paddr + phdr->p_memsz;
-    }
-
-    if ( (kernstart > kernend) ||
-         (ehdr->e_entry < kernstart) ||
-         (ehdr->e_entry > kernend) )
-    {
-        xc_set_error(XC_INVALID_KERNEL,
-                     "Malformed ELF image.");
-        return -EINVAL;
-    }
-
-    dsi->v_start = 0x00000000;
-
-    dsi->v_kernstart = kernstart;
-    dsi->v_kernend   = kernend;
-    dsi->v_kernentry = HVM_LOADER_ENTR_ADDR;
-
-    dsi->v_end       = dsi->v_kernend;
-
-    return 0;
-}
-
-static int
-loadelfimage(
-    char *elfbase, int xch, uint32_t dom, unsigned long *parray,
-    struct domain_setup_info *dsi)
-{
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfbase;
-    Elf32_Phdr *phdr;
-    int h;
-
-    char         *va;
-    unsigned long pa, done, chunksz;
-
-    for ( h = 0; h < ehdr->e_phnum; h++ )
-    {
-        phdr = (Elf32_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
-        if ( !is_loadable_phdr(phdr) )
-            continue;
-
-        for ( done = 0; done < phdr->p_filesz; done += chunksz )
-        {
-            pa = (phdr->p_paddr + done) - dsi->v_start;
-            if ((va = xc_map_foreign_range(
-                xch, dom, PAGE_SIZE, PROT_WRITE,
-                parray[pa >> PAGE_SHIFT])) == 0)
-                return -1;
-            chunksz = phdr->p_filesz - done;
-            if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
-                chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
-            memcpy(va + (pa & (PAGE_SIZE-1)),
-                   elfbase + phdr->p_offset + done, chunksz);
-            munmap(va, PAGE_SIZE);
-        }
-
-        for ( ; done < phdr->p_memsz; done += chunksz )
-        {
-            pa = (phdr->p_paddr + done) - dsi->v_start;
-            if ((va = xc_map_foreign_range(
-                xch, dom, PAGE_SIZE, PROT_WRITE,
-                parray[pa >> PAGE_SHIFT])) == 0)
-                return -1;
-            chunksz = phdr->p_memsz - done;
-            if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
-                chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
-            memset(va + (pa & (PAGE_SIZE-1)), 0, chunksz);
-            munmap(va, PAGE_SIZE);
-        }
-    }
-
-    return 0;
 }
 
 /* xc_hvm_build

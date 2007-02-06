@@ -7,7 +7,7 @@
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
 #ifdef CONFIG_X86_PAE
-#define __PHYSICAL_MASK_SHIFT	36
+#define __PHYSICAL_MASK_SHIFT	40
 #define __PHYSICAL_MASK		((1ULL << __PHYSICAL_MASK_SHIFT) - 1)
 #define PHYSICAL_PAGE_MASK	(~((1ULL << PAGE_SHIFT) - 1) & __PHYSICAL_MASK)
 #else
@@ -22,20 +22,18 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <asm/bug.h>
 #include <xen/interface/xen.h>
 #include <xen/features.h>
-#include <xen/foreign_page.h>
 
-#define arch_free_page(_page,_order)			\
-({	int foreign = PageForeign(_page);		\
-	if (foreign)					\
-		(PageForeignDestructor(_page))(_page);	\
-	foreign;					\
+#define arch_free_page(_page,_order)		\
+({	int foreign = PageForeign(_page);	\
+	if (foreign)				\
+		PageForeignDestructor(_page);	\
+	foreign;				\
 })
 #define HAVE_ARCH_FREE_PAGE
 
@@ -172,6 +170,8 @@ static inline unsigned long pgd_val(pgd_t x)
 
 #ifndef __ASSEMBLY__
 
+struct vm_area_struct;
+
 /*
  * This much address space is reserved for vmalloc() and iomap()
  * as well as fixmap mappings.
@@ -205,8 +205,6 @@ extern int page_is_ram(unsigned long pagenr);
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 #ifdef CONFIG_FLATMEM
-#define pfn_to_page(pfn)	(mem_map + (pfn))
-#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
 #endif /* CONFIG_FLATMEM */
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
@@ -220,8 +218,10 @@ extern int page_is_ram(unsigned long pagenr);
 
 #define __HAVE_ARCH_GATE_AREA 1
 
-#endif /* __KERNEL__ */
-
+#include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
+
+#define __HAVE_ARCH_GATE_AREA 1
+#endif /* __KERNEL__ */
 
 #endif /* _I386_PAGE_H */

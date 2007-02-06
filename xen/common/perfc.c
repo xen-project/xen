@@ -148,9 +148,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc,
     {
         for ( i = 0; i < NR_PERFCTRS; i++ )
         {
-            strncpy(perfc_d[i].name, perfc_info[i].name,
-                    sizeof(perfc_d[i].name));
-            perfc_d[i].name[sizeof(perfc_d[i].name)-1] = '\0';
+            safe_strcpy(perfc_d[i].name, perfc_info[i].name);
 
             switch ( perfc_info[i].type )
             {
@@ -219,20 +217,29 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc,
 int perfc_control(xen_sysctl_perfc_op_t *pc)
 {
     static DEFINE_SPINLOCK(lock);
+    XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t) desc;
+    XEN_GUEST_HANDLE(xen_sysctl_perfc_val_t) val;
     int rc;
+
+    /*
+     * 64 bit guest handles cannot be passed as parameters to
+     * functions so cast to a regular guest handle.
+     */
+    desc = guest_handle_cast(pc->desc, xen_sysctl_perfc_desc_t);
+    val = guest_handle_cast(pc->val, xen_sysctl_perfc_val_t);
 
     spin_lock(&lock);
 
     switch ( pc->cmd )
     {
     case XEN_SYSCTL_PERFCOP_reset:
-        perfc_copy_info(pc->desc, pc->val);
+        perfc_copy_info(desc, val);
         perfc_reset(0);
         rc = 0;
         break;
 
     case XEN_SYSCTL_PERFCOP_query:
-        perfc_copy_info(pc->desc, pc->val);
+        perfc_copy_info(desc, val);
         rc = 0;
         break;
 

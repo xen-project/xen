@@ -1,0 +1,69 @@
+diff -pruN ../orig-linux-2.6.18/arch/i386/mm/pgtable.c ./arch/i386/mm/pgtable.c
+--- ../orig-linux-2.6.18/arch/i386/mm/pgtable.c	2006-09-20 04:42:06.000000000 +0100
++++ ./arch/i386/mm/pgtable.c	2007-01-17 17:19:36.000000000 +0000
+@@ -12,6 +12,7 @@
+ #include <linux/slab.h>
+ #include <linux/pagemap.h>
+ #include <linux/spinlock.h>
++#include <linux/module.h>
+ 
+ #include <asm/system.h>
+ #include <asm/pgtable.h>
+@@ -137,6 +138,10 @@ void set_pmd_pfn(unsigned long vaddr, un
+ 	__flush_tlb_one(vaddr);
+ }
+ 
++static int nr_fixmaps = 0;
++unsigned long __FIXADDR_TOP = 0xfffff000;
++EXPORT_SYMBOL(__FIXADDR_TOP);
++
+ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
+ {
+ 	unsigned long address = __fix_to_virt(idx);
+@@ -146,6 +151,13 @@ void __set_fixmap (enum fixed_addresses 
+ 		return;
+ 	}
+ 	set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
++	nr_fixmaps++;
++}
++
++void set_fixaddr_top(unsigned long top)
++{
++	BUG_ON(nr_fixmaps > 0);
++	__FIXADDR_TOP = top - PAGE_SIZE;
+ }
+ 
+ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+diff -pruN ../orig-linux-2.6.18/include/asm-i386/fixmap.h ./include/asm-i386/fixmap.h
+--- ../orig-linux-2.6.18/include/asm-i386/fixmap.h	2006-09-20 04:42:06.000000000 +0100
++++ ./include/asm-i386/fixmap.h	2007-01-17 17:19:36.000000000 +0000
+@@ -19,7 +19,7 @@
+  * Leave one empty page between vmalloc'ed areas and
+  * the start of the fixmap.
+  */
+-#define __FIXADDR_TOP	0xfffff000
++extern unsigned long __FIXADDR_TOP;
+ 
+ #ifndef __ASSEMBLY__
+ #include <linux/kernel.h>
+@@ -94,6 +94,8 @@ enum fixed_addresses {
+ extern void __set_fixmap (enum fixed_addresses idx,
+ 					unsigned long phys, pgprot_t flags);
+ 
++extern void set_fixaddr_top(unsigned long top);
++
+ #define set_fixmap(idx, phys) \
+ 		__set_fixmap(idx, phys, PAGE_KERNEL)
+ /*
+diff -pruN ../orig-linux-2.6.18/include/asm-i386/page.h ./include/asm-i386/page.h
+--- ../orig-linux-2.6.18/include/asm-i386/page.h	2006-09-20 04:42:06.000000000 +0100
++++ ./include/asm-i386/page.h	2007-01-17 17:19:36.000000000 +0000
+@@ -122,7 +122,7 @@ extern int page_is_ram(unsigned long pag
+ 
+ #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
+ #define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
+-#define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)
++#define MAXMEM			(__FIXADDR_TOP-__PAGE_OFFSET-__VMALLOC_RESERVE)
+ #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
+ #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
+ #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)

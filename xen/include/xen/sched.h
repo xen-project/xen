@@ -6,6 +6,7 @@
 #include <xen/types.h>
 #include <xen/spinlock.h>
 #include <xen/smp.h>
+#include <xen/shared.h>
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/vcpu.h>
@@ -17,15 +18,26 @@
 #include <xen/xenoprof.h>
 #include <xen/irq.h>
 
+#ifdef CONFIG_COMPAT
+#include <compat/vcpu.h>
+DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
+#endif
+
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
 
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
 
-#define MAX_EVTCHNS        NR_EVENT_CHANNELS
+#ifndef CONFIG_COMPAT
+#define MAX_EVTCHNS(d)     NR_EVENT_CHANNELS
+#else
+#define MAX_EVTCHNS(d)     (!IS_COMPAT(d) ? \
+                            NR_EVENT_CHANNELS : \
+                            sizeof(unsigned int) * sizeof(unsigned int) * 64)
+#endif
 #define EVTCHNS_PER_BUCKET 128
-#define NR_EVTCHN_BUCKETS  (MAX_EVTCHNS / EVTCHNS_PER_BUCKET)
+#define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
 
 struct evtchn
 {
@@ -75,7 +87,16 @@ struct vcpu
     void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;
+#ifndef CONFIG_COMPAT
+# define runstate_guest(v) ((v)->runstate_guest)
     XEN_GUEST_HANDLE(vcpu_runstate_info_t) runstate_guest; /* guest address */
+#else
+# define runstate_guest(v) ((v)->runstate_guest.native)
+    union {
+        XEN_GUEST_HANDLE(vcpu_runstate_info_t) native;
+        XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t) compat;
+    } runstate_guest; /* guest address */
+#endif
 
     unsigned long    vcpu_flags;
 
@@ -254,9 +275,8 @@ int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-int set_info_guest(struct domain *d, xen_domctl_vcpucontext_t *);
 
-struct domain *find_domain_by_id(domid_t dom);
+struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 void domain_kill(struct domain *d);
 void domain_shutdown(struct domain *d, u8 reason);
@@ -422,6 +442,9 @@ extern struct domain *domain_list;
  /* Domain is paused by the hypervisor? */
 #define _DOMF_paused           5
 #define DOMF_paused            (1UL<<_DOMF_paused)
+ /* Domain is a compatibility one? */
+#define _DOMF_compat           6
+#define DOMF_compat            (1UL<<_DOMF_compat)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
@@ -457,6 +480,13 @@ static inline void vcpu_unblock(struct vcpu *v)
 }
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
+
+#ifdef CONFIG_COMPAT
+#define IS_COMPAT(_d)                                       \
+    (test_bit(_DOMF_compat, &(_d)->domain_flags))
+#else
+#define IS_COMPAT(_d) 0
+#endif
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

@@ -19,7 +19,6 @@
  *   Support for CPU Hotplug
  */
 
-#include <linux/config.h>
 
 #include <asm/asmmacro.h>
 #include <asm/fpu.h>
@@ -197,6 +196,11 @@ start_ap:
 	rsm psr.i | psr.ic
 	;;
 	srlz.i
+	;;
+ {
+	flushrs				// must be first insn in group
+	srlz.i
+ }
 	;;
 	/*
 	 * Save the region registers, predicate before they get clobbered
@@ -860,7 +864,6 @@ END(__ia64_init_fpu)
  */
 GLOBAL_ENTRY(ia64_switch_mode_phys)
  {
-	alloc r2=ar.pfs,0,0,0,0
 	rsm psr.i | psr.ic		// disable interrupts and interrupt collection
 	mov r15=ip
  }
@@ -909,7 +912,6 @@ END(ia64_switch_mode_phys)
  */
 GLOBAL_ENTRY(ia64_switch_mode_virt)
  {
-	alloc r2=ar.pfs,0,0,0,0
 	rsm psr.i | psr.ic		// disable interrupts and interrupt collection
 	mov r15=ip
  }

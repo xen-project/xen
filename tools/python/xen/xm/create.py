@@ -24,10 +24,12 @@ import os.path
 import sys
 import socket
 import re
+import time
 import xmlrpclib
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
+from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
@@ -189,6 +191,10 @@ gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
 
+gopts.var('vcpu_avail', val='VCPUS',
+          fn=set_long, default=None,
+          use="Bitmask for virtual CPUs to make available immediately.")
+
 gopts.var('cpu_cap', val='CAP',
           fn=set_int, default=None,
           use="""Set the maximum amount of cpu.
@@ -291,7 +297,8 @@ gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,dis
           For type=vnc, connect an external vncviewer.  The server will listen
           on ADDR (default 127.0.0.1) on port N+5900.  N defaults to the
           domain id.  If vncunused=1, the server will try to find an arbitrary
-          unused port above 5900.
+          unused port above 5900.  vncpasswd overrides the XenD configured
+          default password.
           For type=sdl, a viewer will be started automatically using the
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.""")
@@ -300,7 +307,7 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,ba
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
-          If type is not specified, default is netfront not ioemu device.
+          If type is not specified, default is netfront.
           If mac is not specified a random MAC address is used.
           If not specified then the network backend chooses it's own MAC address.
           If bridge is not specified the first bridge found is used.
@@ -587,6 +594,9 @@ def configure_vfbs(config_devs, vals):
                           'xauthority', 'type', 'vncpasswd' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
+        if not d.has_key("keymap"):
+            if vals.keymap:
+                config.append(['keymap',vals.keymap])
         if not d.has_key("display") and os.environ.has_key("DISPLAY"):
             config.append(["display", os.environ['DISPLAY']])
         if not d.has_key("xauthority"):
@@ -703,23 +713,6 @@ def configure_hvm(config_image, vals):
             config_image.append([a, vals.__dict__[a]])
     config_image.append(['vncpasswd', vals.vncpasswd])
 
-def run_bootloader(vals, config_image):
-    if not os.access(vals.bootloader, os.F_OK):
-        err("Bootloader '%s' does not exist" % vals.bootloader)
-    if not os.access(vals.bootloader, os.X_OK):
-        err("Bootloader '%s' isn't executable" % vals.bootloader)
-    if len(vals.disk) < 1:
-        err("No disks configured and boot loader requested")
-    (uname, dev, mode, backend) = vals.disk[0]
-    file = blkif.blkdev_uname_to_file(uname)
-
-    if vals.bootentry:
-        warn("The bootentry option is deprecated.  Use bootargs and pass "
-             "--entry= directly.")
-        vals.bootargs = "--entry=%s" %(vals.bootentry,)
-
-    return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.bootargs, config_image)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -735,7 +728,7 @@ def make_config(vals):
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
                    'restart', 'on_poweroff',
-                   'on_reboot', 'on_crash', 'vcpus', 'features',
+                   'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop'])
 
     if vals.uuid is not None:
@@ -759,10 +752,14 @@ def make_config(vals):
 
     config_image = configure_image(vals)
     if vals.bootloader:
-        config_image = run_bootloader(vals, config_image)
+        if vals.bootloader == "pygrub":
+            vals.bootloader = osdep.pygrub_path
+
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
             config.append(['bootloader_args', vals.bootargs])
+        else: 
+            config.append(['bootloader_args', '-q'])        
     config.append(['image', config_image])
 
     config_devs = []
@@ -823,7 +820,7 @@ def preprocess_ioports(vals):
         if len(d) == 1:
             d.append(d[0])
         # Components are in hex: add hex specifier.
-        hexd = map(lambda v: '0x'+v, d)
+        hexd = ['0x' + x for x in d]
         ioports.append(hexd)
     vals.ioports = ioports
         
@@ -990,8 +987,6 @@ def preprocess_vnc(vals):
             vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
-    if not vals.kernel and not vals.bootloader:
-        err("No kernel specified")
     preprocess_disk(vals)
     preprocess_pci(vals)
     preprocess_ioports(vals)
@@ -1176,6 +1171,7 @@ def config_security_check(config, verbose):
         try:
             domain_label = security.ssidref2label(security.NULL_SSIDREF)
         except:
+            import traceback
             traceback.print_exc(limit=1)
             return 0
         domain_policy = 'NULL'
@@ -1251,9 +1247,28 @@ def main(argv):
         if not create_security_check(config):
             raise security.ACMError('Security Configuration prevents domain from starting')
         else:
-            dom = make_domain(opts, config)
             if opts.vals.console_autoconnect:
-                console.execConsole(dom)        
-             
+                cpid = os.fork() 
+                if cpid != 0:
+                    for i in range(10):
+                        # Catch failure of the create process 
+                        time.sleep(1)
+                        (p, rv) = os.waitpid(cpid, os.WNOHANG)
+                        if os.WIFEXITED(rv):
+                            if os.WEXITSTATUS(rv) != 0:
+                                sys.exit(os.WEXITSTATUS(rv))
+                        try:
+                            # Acquire the console of the created dom
+                            name = sxp.child_value(config, 'name', -1)
+                            dom = server.xend.domain(name)
+                            domid = int(sxp.child_value(dom, 'domid', '-1'))
+                            console.execConsole(domid)
+                        except:
+                            pass
+                    print("Could not start console\n");
+                    sys.exit(0)
+            dom = make_domain(opts, config)
+
+
 if __name__ == '__main__':
     main(sys.argv)

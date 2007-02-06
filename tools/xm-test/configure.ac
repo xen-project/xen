@@ -11,10 +11,12 @@ AC_PROG_CC
 #AC_PROG_INSTALL
 AC_CHECK_PROG([LILO],	lilo,	lilo,	"no",	[$PATH])
 
+XEN_PYTHON_PATH=$(/usr/sbin/xen-python-path)
+
 # Right now, we can assume that the lib/ directory
 # is two levels above the tests
 TESTLIB=../../lib
-TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB"
+TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB:$XEN_PYTHON_PATH"
 
 AC_ARG_ENABLE(hvm-support,
 	[[  --enable-hvm-support           enable hardware virtual machine assist]],
@@ -150,6 +152,7 @@ AC_CONFIG_FILES([
     tests/vcpu-pin/Makefile
     tests/vcpu-disable/Makefile
     tests/vtpm/Makefile
+    tests/xapi/Makefile
     tests/enforce_dom0_cpus/Makefile
     lib/XmTestReport/xmtest.py
     lib/XmTestLib/config.py

@@ -5,7 +5,6 @@
  *  Copyright (C) 2001,2002 Andi Kleen, SuSE Labs.
  */
 
-#include <linux/config.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -40,6 +39,41 @@
 #define PF_USER	(1<<2)
 #define PF_RSVD	(1<<3)
 #define PF_INSTR	(1<<4)
+
+#ifdef CONFIG_KPROBES
+ATOMIC_NOTIFIER_HEAD(notify_page_fault_chain);
+
+/* Hook to register for page fault notifications */
+int register_page_fault_notifier(struct notifier_block *nb)
+{
+	vmalloc_sync_all();
+	return atomic_notifier_chain_register(&notify_page_fault_chain, nb);
+}
+
+int unregister_page_fault_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&notify_page_fault_chain, nb);
+}
+
+static inline int notify_page_fault(enum die_val val, const char *str,
+			struct pt_regs *regs, long err, int trap, int sig)
+{
+	struct die_args args = {
+		.regs = regs,
+		.str = str,
+		.err = err,
+		.trapnr = trap,
+		.signr = sig
+	};
+	return atomic_notifier_call_chain(&notify_page_fault_chain, val, &args);
+}
+#else
+static inline int notify_page_fault(enum die_val val, const char *str,
+			struct pt_regs *regs, long err, int trap, int sig)
+{
+	return NOTIFY_DONE;
+}
+#endif
 
 void bust_spinlocks(int yes)
 {
@@ -158,7 +192,7 @@ void dump_pagetable(unsigned long address)
 	printk("PGD %lx ", pgd_val(*pgd));
 	if (!pgd_present(*pgd)) goto ret; 
 
-	pud = __pud_offset_k((pud_t *)pgd_page(*pgd), address);
+	pud = pud_offset(pgd, address);
 	if (bad_address(pud)) goto bad;
 	printk("PUD %lx ", pud_val(*pud));
 	if (!pud_present(*pud))	goto ret;
@@ -265,6 +299,8 @@ static int vmalloc_fault(unsigned long address)
 		return -1;
 	if (pgd_none(*pgd))
 		set_pgd(pgd, *pgd_ref);
+	else
+		BUG_ON(pgd_page(*pgd) != pgd_page(*pgd_ref));
 
 	/* Below here mismatches are bugs because these lower tables
 	   are shared */
@@ -370,22 +406,14 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	if (!user_mode(regs))
 		error_code &= ~PF_USER; /* means kernel */
 
+	tsk = current;
+	mm = tsk->mm;
+	prefetchw(&mm->mmap_sem);
+
 	/* get the address */
 	address = HYPERVISOR_shared_info->vcpu_info[
 		smp_processor_id()].arch.cr2;
-	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
-					SIGSEGV) == NOTIFY_STOP)
-		return;
 
-	if (likely(regs->eflags & X86_EFLAGS_IF))
-		local_irq_enable();
-
-	if (unlikely(page_fault_trace))
-		printk("pagefault rip:%lx rsp:%lx cs:%lu ss:%lu address %lx error %lx\n",
-		       regs->rip,regs->rsp,regs->cs,regs->ss,address,error_code); 
-
-	tsk = current;
-	mm = tsk->mm;
 	info.si_code = SEGV_MAPERR;
 
 
@@ -410,12 +438,14 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 		 */
 		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
 		      ((address >= VMALLOC_START && address < VMALLOC_END))) {
-			if (vmalloc_fault(address) < 0)
-				goto bad_area_nosemaphore;
-			return;
+			if (vmalloc_fault(address) >= 0)
+				return;
 		}
 		/* Can take a spurious fault if mapping changes R/O -> R/W. */
 		if (spurious_fault(regs, address, error_code))
+			return;
+		if (notify_page_fault(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
+						SIGSEGV) == NOTIFY_STOP)
 			return;
 		/*
 		 * Don't take the mm semaphore here. If we fixup a prefetch
@@ -423,6 +453,17 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 		 */
 		goto bad_area_nosemaphore;
 	}
+
+	if (notify_page_fault(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
+					SIGSEGV) == NOTIFY_STOP)
+		return;
+
+	if (likely(regs->eflags & X86_EFLAGS_IF))
+		local_irq_enable();
+
+	if (unlikely(page_fault_trace))
+		printk("pagefault rip:%lx rsp:%lx cs:%lu ss:%lu address %lx error %lx\n",
+		       regs->rip,regs->rsp,regs->cs,regs->ss,address,error_code); 
 
 	if (unlikely(error_code & PF_RSVD))
 		pgtable_bad(address, regs, error_code);
@@ -438,7 +479,7 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	/* When running in the kernel we expect faults to occur only to
 	 * addresses in user space.  All other faults represent errors in the
 	 * kernel and should generate an OOPS.  Unfortunatly, in the case of an
-	 * erroneous fault occuring in a code path which already holds mmap_sem
+	 * erroneous fault occurring in a code path which already holds mmap_sem
 	 * we will deadlock attempting to validate the fault against the
 	 * address space.  Luckily the kernel only validly references user
 	 * space from well defined areas of code, which are listed in the
@@ -465,8 +506,10 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
 	if (error_code & 4) {
-		// XXX: align red zone size with ABI 
-		if (address + 128 < regs->rsp)
+		/* Allow userspace just enough access below the stack pointer
+		 * to let the 'enter' instruction work.
+		 */
+		if (address + 65536 + 32 * sizeof(unsigned long) < regs->rsp)
 			goto bad_area;
 	}
 	if (expand_stack(vma, address))
@@ -589,7 +632,6 @@ no_context:
 		printk(KERN_ALERT "Unable to handle kernel paging request");
 	printk(" at %016lx RIP: \n" KERN_ALERT,address);
 	printk_address(regs->rip);
-	printk("\n");
 	dump_pagetable(address);
 	tsk->thread.cr2 = address;
 	tsk->thread.trap_no = 14;
@@ -633,9 +675,51 @@ do_sigbus:
 	return;
 }
 
+DEFINE_SPINLOCK(pgd_lock);
+struct page *pgd_list;
+
+void vmalloc_sync_all(void)
+{
+	/* Note that races in the updates of insync and start aren't 
+	   problematic:
+	   insync can only get set bits added, and updates to start are only
+	   improving performance (without affecting correctness if undone). */
+	static DECLARE_BITMAP(insync, PTRS_PER_PGD);
+	static unsigned long start = VMALLOC_START & PGDIR_MASK;
+	unsigned long address;
+
+	for (address = start; address <= VMALLOC_END; address += PGDIR_SIZE) {
+		if (!test_bit(pgd_index(address), insync)) {
+			const pgd_t *pgd_ref = pgd_offset_k(address);
+			struct page *page;
+
+			if (pgd_none(*pgd_ref))
+				continue;
+			spin_lock(&pgd_lock);
+			for (page = pgd_list; page;
+			     page = (struct page *)page->index) {
+				pgd_t *pgd;
+				pgd = (pgd_t *)page_address(page) + pgd_index(address);
+				if (pgd_none(*pgd))
+					set_pgd(pgd, *pgd_ref);
+				else
+					BUG_ON(pgd_page(*pgd) != pgd_page(*pgd_ref));
+			}
+			spin_unlock(&pgd_lock);
+			set_bit(pgd_index(address), insync);
+		}
+		if (address == start)
+			start = address + PGDIR_SIZE;
+	}
+	/* Check that there is no need to do the same for the modules area. */
+	BUILD_BUG_ON(!(MODULES_VADDR > __START_KERNEL));
+	BUILD_BUG_ON(!(((MODULES_END - 1) & PGDIR_MASK) == 
+				(__START_KERNEL & PGDIR_MASK)));
+}
+
 static int __init enable_pagefaulttrace(char *str)
 {
 	page_fault_trace = 1;
-	return 0;
+	return 1;
 }
 __setup("pagefaulttrace", enable_pagefaulttrace);

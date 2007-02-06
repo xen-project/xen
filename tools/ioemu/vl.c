@@ -285,7 +285,7 @@ int register_ioport_write(int start, int length, int size,
     for(i = start; i < start + length; i += size) {
         ioport_write_table[bsize][i] = func;
         if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
-            hw_error("register_ioport_read: invalid opaque");
+            hw_error("register_ioport_write: invalid opaque");
         ioport_opaque[i] = opaque;
     }
     return 0;
@@ -4441,6 +4441,11 @@ int qemu_loadvm(const char *filename)
         qemu_fseek(f, cur_pos + record_len, SEEK_SET);
     }
     fclose(f);
+
+    /* del tmp file */
+    if (unlink(filename) == -1)
+        fprintf(stderr, "delete tmp qemu state file failed.\n");
+
     ret = 0;
  the_end:
     if (saved_vm_running)
@@ -5027,6 +5032,7 @@ typedef struct QEMUResetEntry {
 static QEMUResetEntry *first_reset_entry;
 int reset_requested;
 int shutdown_requested;
+int suspend_requested;
 static int powerdown_requested;
 
 void qemu_register_reset(QEMUResetHandler *func, void *opaque)
@@ -5808,9 +5814,21 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
     return 0;
 }
 
+void suspend(int sig)
+{
+   fprintf(logfile, "suspend sig handler called with requested=%d!\n", suspend_requested);
+    if (sig != SIGUSR1)
+        fprintf(logfile, "suspend signal dismatch, get sig=%d!\n", sig);
+    suspend_requested = 1;
+}
+
 #if defined(__i386__) || defined(__x86_64__)
 static struct map_cache *mapcache_entry;
 static unsigned long nr_buckets;
+
+/* For most cases (>99.9%), the page address is the same. */
+static unsigned long last_address_index = ~0UL;
+static uint8_t      *last_address_vaddr;
 
 static int qemu_map_cache_init(unsigned long nr_pages)
 {
@@ -5847,10 +5865,6 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
     struct map_cache *entry;
     unsigned long address_index  = phys_addr >> MCACHE_BUCKET_SHIFT;
     unsigned long address_offset = phys_addr & (MCACHE_BUCKET_SIZE-1);
-
-    /* For most cases (>99.9%), the page address is the same. */
-    static unsigned long last_address_index = ~0UL;
-    static uint8_t      *last_address_vaddr;
 
     if (address_index == last_address_index)
         return last_address_vaddr + address_offset;
@@ -5890,6 +5904,34 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
     last_address_vaddr = entry->vaddr_base;
 
     return last_address_vaddr + address_offset;
+}
+
+void qemu_invalidate_map_cache(void)
+{
+    unsigned long i;
+
+    mapcache_lock();
+
+    for (i = 0; i < nr_buckets; i++) {
+        struct map_cache *entry = &mapcache_entry[i];
+
+        if (entry->vaddr_base == NULL)
+            continue;
+
+        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
+        if (errno) {
+            fprintf(logfile, "unmap fails %d\n", errno);
+            exit(-1);
+        }
+
+        entry->paddr_index = 0;
+        entry->vaddr_base  = NULL;
+    }
+
+    last_address_index =  ~0UL;
+    last_address_vaddr = NULL;
+
+    mapcache_unlock();
 }
 #endif
 
@@ -6153,7 +6195,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_boot:
                 boot_device = strdup(optarg);
                 if (strspn(boot_device, "acd"
-#ifdef TARGET_SPARC
+#if defined(TARGET_SPARC) || defined(TARGET_I386)
                            "n"
 #endif
                         ) != strlen(boot_device)) {
@@ -6464,10 +6506,6 @@ int main(int argc, char **argv)
     }
 
 #if defined (__ia64__)
-    /* ram_size passed from xend has added on GFW memory,
-       so we must subtract it here */
-    ram_size -= 16 * MEM_M;
-
     if (ram_size > MMIO_START)
         ram_size += 1 * MEM_G; /* skip 3G-4G MMIO, LEGACY_IO_SPACE etc. */
 #endif
@@ -6718,6 +6756,26 @@ int main(int argc, char **argv)
             vm_start();
         }
     }
+
+    /* register signal for the suspend request when save */
+    {
+        struct sigaction act;
+        sigset_t set;
+        act.sa_handler = suspend;
+        act.sa_flags = SA_RESTART;
+        sigemptyset(&act.sa_mask);
+
+        sigaction(SIGUSR1, &act, NULL);
+
+        /* control panel mask some signals when spawn qemu, need unmask here*/
+        sigemptyset(&set);
+        sigaddset(&set, SIGUSR1);
+        sigaddset(&set, SIGTERM);
+        if (sigprocmask(SIG_UNBLOCK, &set, NULL) == -1)
+            fprintf(stderr, "unblock signal fail, possible issue for HVM save!\n");
+
+    }
+
     main_loop();
     quit_timers();
     return 0;

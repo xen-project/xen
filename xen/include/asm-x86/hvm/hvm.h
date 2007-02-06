@@ -22,6 +22,8 @@
 #define __ASM_X86_HVM_HVM_H__
 
 #include <asm/x86_emulate.h>
+#include <public/domctl.h>
+#include <public/hvm/save.h>
 
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
@@ -79,6 +81,11 @@ struct hvm_function_table {
         struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs);
     void (*load_cpu_guest_regs)(
         struct vcpu *v, struct cpu_user_regs *r);
+
+    /* save and load hvm guest cpu context for save/restore */
+    void (*save_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
+    int (*load_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
+
     /*
      * Examine specifics of the guest state:
      * 1) determine whether paging is enabled,
@@ -106,6 +113,11 @@ struct hvm_function_table {
      * Called to inform HVM layer that a guest cr3 has changed
      */
     void (*update_guest_cr3)(struct vcpu *v);
+
+    /*
+     * Reflect the virtual APIC's value in the guest's V_TPR register
+     */
+    void (*update_vtpr)(struct vcpu *v, unsigned long value);
 
     /*
      * Update specifics of the guest state:
@@ -157,6 +169,9 @@ hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
     hvm_funcs.load_cpu_guest_regs(v, r);
 }
 
+void hvm_set_guest_time(struct vcpu *v, u64 gtime);
+u64 hvm_get_guest_time(struct vcpu *v);
+
 static inline int
 hvm_paging_enabled(struct vcpu *v)
 {
@@ -185,12 +200,18 @@ hvm_guest_x86_mode(struct vcpu *v)
     return hvm_funcs.guest_x86_mode(v);
 }
 
-int hvm_instruction_length(unsigned long pc, int mode);
+int hvm_instruction_length(unsigned long pc, int address_bytes);
 
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
 {
     hvm_funcs.update_host_cr3(v);
+}
+
+static inline void
+hvm_update_vtpr(struct vcpu *v, unsigned long value)
+{
+    hvm_funcs.update_vtpr(v, value);
 }
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);
@@ -222,8 +243,6 @@ hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_stts(struct vcpu *v);
-void hvm_set_guest_time(struct vcpu *v, u64 gtime);
-u64 hvm_get_guest_time(struct vcpu *v);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 

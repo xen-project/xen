@@ -48,7 +48,7 @@ from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
 
-from xen.xend import XendNode, XendRoot, XendAPI
+from xen.xend import XendNode, XendOptions, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
@@ -57,7 +57,7 @@ from xen.web.SrvDir import SrvDir
 from SrvRoot import SrvRoot
 from XMLRPCServer import XMLRPCServer
 
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 
 class XendServers:
@@ -65,6 +65,7 @@ class XendServers:
     def __init__(self, root):
         self.servers = []
         self.root = root
+        self.running = False
         self.cleaningUp = False
         self.reloadingConfig = False
 
@@ -79,6 +80,7 @@ class XendServers:
                 server.shutdown()
             except:
                 pass
+        self.running = False
 
     def reloadConfig(self, signum = 0, frame = None):
         log.debug("SrvServer.reloadConfig()")
@@ -107,12 +109,11 @@ class XendServers:
                 if server.ready:
                     continue
 
-                thread = Thread(target=server.run, name=server.__class__.__name__)
-                if isinstance(server, HttpServer):
-                    thread.setDaemon(True)
+                thread = Thread(target=server.run,
+                                name=server.__class__.__name__)
+                thread.setDaemon(True)
                 thread.start()
                 threads.append(thread)
-
 
             # check for when all threads have initialized themselves and then
             # close the status pipe
@@ -143,47 +144,32 @@ class XendServers:
                 status.close()
                 status = None
 
-            # Interruptible Thread.join - Python Bug #1167930
-            #   Replaces: for t in threads: t.join()
-            #   Reason:   The above will cause python signal handlers to be
-            #             blocked so we're not able to catch SIGTERM in any
-            #             way for cleanup
-            runningThreads = threads
-            while len(runningThreads) > 0:
-                try:
-                    for t in threads:
-                        t.join(1.0)
-                    runningThreads = [t for t in threads
-                                      if t.isAlive() and not t.isDaemon()]
-                    if self.cleaningUp and len(runningThreads) > 0:
-                        log.debug("Waiting for %s." %
-                                  [x.getName() for x in runningThreads])
-                except:
-                    pass
-
+            # loop to keep main thread alive until it receives a SIGTERM
+            self.running = True
+            while self.running:
+                time.sleep(100000000)
+                
             if self.reloadingConfig:
                 log.info("Restarting all XML-RPC and Xen-API servers...")
                 self.cleaningUp = False
                 self.reloadingConfig = False
-                xroot.set_config()
-                new_servers = [x for x in self.servers
-                               if isinstance(x, HttpServer)]
-                self.servers = new_servers
+                xoptions.set_config()
+                self.servers = []
                 _loadConfig(self, self.root, True)
             else:
                 break
 
 def _loadConfig(servers, root, reload):
-    if not reload and xroot.get_xend_http_server():
+    if xoptions.get_xend_http_server():
         servers.add(HttpServer(root,
-                               xroot.get_xend_address(),
-                               xroot.get_xend_port()))
-    if not reload and xroot.get_xend_unix_server():
-        path = xroot.get_xend_unix_path()
+                               xoptions.get_xend_address(),
+                               xoptions.get_xend_port()))
+    if  xoptions.get_xend_unix_server():
+        path = xoptions.get_xend_unix_path()
         log.info('unix path=' + path)
         servers.add(UnixHttpServer(root, path))
 
-    api_cfg = xroot.get_xen_api_server()
+    api_cfg = xoptions.get_xen_api_server()
     if api_cfg:
         try:
             addrs = [(str(x[0]).split(':'),
@@ -213,15 +199,17 @@ def _loadConfig(servers, root, reload):
                     servers.add(XMLRPCServer(auth, True, True, addr,
                                              int(port),
                                              hosts_allowed = allowed))
-        except ValueError, exn:
-            log.error('Xen-API server configuration %s is invalid.', api_cfg)
-        except TypeError, exn:
+        except (ValueError, TypeError), exn:
+            log.exception('Xen API Server init failed')
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
 
-    if xroot.get_xend_tcp_xmlrpc_server():
-        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, True))
+    if xoptions.get_xend_tcp_xmlrpc_server():
+        addr = xoptions.get_xend_tcp_xmlrpc_server_address()
+        port = xoptions.get_xend_tcp_xmlrpc_server_port()
+        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, use_tcp = True,
+                                 host = addr, port = port))
 
-    if xroot.get_xend_unix_xmlrpc_server():
+    if xoptions.get_xend_unix_xmlrpc_server():
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False))
 
 

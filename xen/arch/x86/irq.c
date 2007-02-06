@@ -13,6 +13,7 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/keyhandler.h>
+#include <xen/compat.h>
 #include <asm/current.h>
 #include <asm/smpboot.h>
 
@@ -332,7 +333,7 @@ int pirq_guest_unmask(struct domain *d)
           irq < NR_IRQS;
           irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
     {
-        if ( !test_bit(d->pirq_to_evtchn[irq], s->evtchn_mask) )
+        if ( !test_bit(d->pirq_to_evtchn[irq], __shared_info_addr(d, s, evtchn_mask)) )
             __pirq_guest_eoi(d, irq);
     }
 
@@ -624,14 +625,13 @@ static void dump_irqs(unsigned char key)
                 printk("%u(%c%c%c%c)",
                        d->domain_id,
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 d->shared_info->evtchn_pending) ?
+                                 shared_info_addr(d, evtchn_pending)) ?
                         'P' : '-'),
-                       (test_bit(d->pirq_to_evtchn[irq]/BITS_PER_LONG,
-                                 &d->shared_info->vcpu_info[0].
-                                 evtchn_pending_sel) ?
+                       (test_bit(d->pirq_to_evtchn[irq]/BITS_PER_GUEST_LONG(d),
+                                 vcpu_info_addr(d->vcpu[0], evtchn_pending_sel)) ?
                         'S' : '-'),
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 d->shared_info->evtchn_mask) ?
+                                 shared_info_addr(d, evtchn_mask)) ?
                         'M' : '-'),
                        (test_bit(irq, d->pirq_mask) ?
                         'M' : '-'));

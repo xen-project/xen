@@ -29,8 +29,23 @@ _xend_autorestart = {
     "SunOS": False,
 }
 
+_pygrub_path = {
+    "SunOS": "/usr/lib/xen/bin/pygrub"
+}
+
+_netback_type = {
+    "SunOS": "SUNW_mac"
+}
+
+_vif_script = {
+    "SunOS": "vif-vnic"
+}
+
 def _get(var, default=None):
     return var.get(os.uname()[0], default)
 
 scripts_dir = _get(_scripts_dir, "/etc/xen/scripts")
 xend_autorestart = _get(_xend_autorestart)
+pygrub_path = _get(_pygrub_path, "/usr/bin/pygrub")
+netback_type = _get(_netback_type, "netfront")
+vif_script = _get(_vif_script, "vif-bridge")

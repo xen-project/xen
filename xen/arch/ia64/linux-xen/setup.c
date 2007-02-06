@@ -424,8 +424,7 @@ setup_arch (char **cmdline_p)
 			else
 				len = strlen (mvec_name);
 			len = min(len, sizeof (str) - 1);
-			strncpy (str, mvec_name, len);
-			str[len] = '\0';
+			strlcpy (str, mvec_name, len);
 			mvec_name = str;
 		} else
 			mvec_name = acpi_get_sysname();
@@ -551,7 +550,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 	switch (c->family) {
 	      case 0x07:	memcpy(family, "Itanium", 8); break;
 	      case 0x1f:	memcpy(family, "Itanium 2", 10); break;
-	      default:		sprintf(family, "%u", c->family); break;
+	      default:		snprintf(family, sizeof(family), "%u", c->family); break;
 	}
 
 	/* build the feature string: */
@@ -564,7 +563,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 				*cp++ = sep;
 			sep = ',';
 			*cp++ = ' ';
-			strcpy(cp, feature_bits[i].feature_name);
+			strlcpy(cp, feature_bits[i].feature_name, sizeof(features));
 			cp += strlen(feature_bits[i].feature_name);
 			mask &= ~feature_bits[i].mask;
 		}
@@ -573,7 +572,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 		/* print unknown features as a hex value: */
 		if (sep)
 			*cp++ = sep;
-		sprintf(cp, " 0x%lx", mask);
+		snprintf(cp, sizeof(features) - (cp - features), " 0x%lx", mask);
 	}
 
 	seq_printf(m,

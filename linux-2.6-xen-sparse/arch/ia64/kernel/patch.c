@@ -115,7 +115,7 @@ ia64_patch_vtop (unsigned long start, unsigned long end)
 	ia64_srlz_i();
 }
 
-void
+void __init
 ia64_patch_mckinley_e9 (unsigned long start, unsigned long end)
 {
 	static int first_time = 1;
@@ -149,7 +149,7 @@ ia64_patch_mckinley_e9 (unsigned long start, unsigned long end)
 	ia64_srlz_i();
 }
 
-static void
+static void __init
 patch_fsyscall_table (unsigned long start, unsigned long end)
 {
 	extern unsigned long fsyscall_table[NR_syscalls];
@@ -166,7 +166,7 @@ patch_fsyscall_table (unsigned long start, unsigned long end)
 	ia64_srlz_i();
 }
 
-static void
+static void __init
 patch_brl_fsys_bubble_down (unsigned long start, unsigned long end)
 {
 	extern char fsys_bubble_down[];
@@ -236,13 +236,9 @@ patch_brl_symaddr(unsigned long start, unsigned long end,
 static void
 patch_brl_in_vdso(void)
 {
-	EXTERN_PATCHLIST(xen_rsm_be_i);
-	EXTERN_PATCHLIST(xen_get_psr);
 	EXTERN_PATCHLIST(xen_ssm_i_0);
 	EXTERN_PATCHLIST(xen_ssm_i_1);
 
-	PATCH_BRL_SYMADDR(xen_rsm_be_i);
-	PATCH_BRL_SYMADDR(xen_get_psr);
 	PATCH_BRL_SYMADDR(xen_ssm_i_0);
 	PATCH_BRL_SYMADDR(xen_ssm_i_1);
 }
@@ -251,7 +247,7 @@ patch_brl_in_vdso(void)
 #define patch_brl_in_vdso()			do { } while (0)
 #endif
 
-void
+void __init
 ia64_patch_gate (void)
 {
 #	define START(name)	((unsigned long) __start_gate_##name##_patchlist)

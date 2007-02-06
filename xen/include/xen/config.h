@@ -63,6 +63,8 @@
 /* Linux 'checker' project. */
 #define __iomem
 #define __user
+#define __force
+#define __bitwise
 
 #ifndef __ASSEMBLY__
 

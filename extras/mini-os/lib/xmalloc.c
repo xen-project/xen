@@ -48,6 +48,12 @@ struct xmalloc_hdr
     /* Total including this hdr. */
     size_t size;
     struct list_head freelist;
+#if defined(__ia64__)
+		// Needed for ia64 as long as the align parameter in _xmalloc()
+		// is not supported.
+    uint64_t pad;
+#endif
+
 } __cacheline_aligned;
 
 static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)

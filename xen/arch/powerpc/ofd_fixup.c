@@ -276,7 +276,7 @@ static ofdn_t ofd_chosen_props(void *m, const char *cmdline)
                      &path[1], sizeof (path) - 1);
     }
 
-    strcpy(bootargs, cmdline);
+    strlcpy(bootargs, cmdline, sizeof(bootargs));
     bsz = strlen(bootargs) + 1;
     rm = sizeof (bootargs) - bsz;
 

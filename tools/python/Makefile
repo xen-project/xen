@@ -8,7 +8,7 @@ all: build
 build:
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
 	if which $(MSGFMT) >/dev/null ; then \
-          for file in `cd xen/xm; find messages -name xen-xm.po`; do \
+          for file in `cd ./xen/xm; find messages -name xen-xm.po`; do \
             dest=`echo "build/$$file" | \
                   sed -e 's#xen-xm.po#LC_MESSAGES/xen-xm.mo#'`; \
             mkdir -p `dirname "$$dest"`; \

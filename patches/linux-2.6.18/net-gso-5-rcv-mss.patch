@@ -1,0 +1,12 @@
+diff -pruN ../orig-linux-2.6.18/net/ipv4/tcp_input.c ./net/ipv4/tcp_input.c
+--- ../orig-linux-2.6.18/net/ipv4/tcp_input.c	2006-09-20 04:42:06.000000000 +0100
++++ ./net/ipv4/tcp_input.c	2007-01-12 18:10:16.000000000 +0000
+@@ -127,7 +127,7 @@ static void tcp_measure_rcv_mss(struct s
+ 	/* skb->len may jitter because of SACKs, even if peer
+ 	 * sends good full-sized frames.
+ 	 */
+-	len = skb->len;
++	len = skb_shinfo(skb)->gso_size ?: skb->len;
+ 	if (len >= icsk->icsk_ack.rcv_mss) {
+ 		icsk->icsk_ack.rcv_mss = len;
+ 	} else {

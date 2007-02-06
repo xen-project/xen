@@ -17,17 +17,11 @@
 #include <xen/shadow.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/errno.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <public/memory.h>
-
-/*
- * To allow safe resume of do_memory_op() after preemption, we need to know 
- * at what point in the page list to resume. For this purpose I steal the 
- * high-order bits of the @cmd parameter, which are otherwise unused and zero.
- */
-#define START_EXTENT_SHIFT 4 /* cmd[:4] == start_extent */
 
 struct memop_args {
     /* INPUT */
@@ -236,7 +230,7 @@ static long translate_gpfn_list(
         return -EFAULT;
 
     /* Is size too large for us to encode a continuation? */
-    if ( op.nr_gpfns > (ULONG_MAX >> START_EXTENT_SHIFT) )
+    if ( op.nr_gpfns > (ULONG_MAX >> MEMOP_EXTENT_SHIFT) )
         return -EINVAL;
 
     if ( !guest_handle_okay(op.gpfn_list, op.nr_gpfns) ||
@@ -248,7 +242,7 @@ static long translate_gpfn_list(
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = find_domain_by_id(op.domid)) == NULL )
+    if ( (d = get_domain_by_id(op.domid)) == NULL )
         return -ESRCH;
 
     if ( !shadow_mode_translate(d) )
@@ -511,20 +505,20 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
     struct memop_args args;
     domid_t domid;
 
-    op = cmd & ((1 << START_EXTENT_SHIFT) - 1);
+    op = cmd & MEMOP_CMD_MASK;
 
     switch ( op )
     {
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        start_extent = cmd >> START_EXTENT_SHIFT;
+        start_extent = cmd >> MEMOP_EXTENT_SHIFT;
 
         if ( copy_from_guest(&reservation, arg, 1) )
             return start_extent;
 
         /* Is size too large for us to encode a continuation? */
-        if ( reservation.nr_extents > (ULONG_MAX >> START_EXTENT_SHIFT) )
+        if ( reservation.nr_extents > (ULONG_MAX >> MEMOP_EXTENT_SHIFT) )
             return start_extent;
 
         if ( unlikely(start_extent > reservation.nr_extents) )
@@ -549,7 +543,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         if ( likely(reservation.domid == DOMID_SELF) )
             d = current->domain;
         else if ( !IS_PRIV(current->domain) ||
-                  ((d = find_domain_by_id(reservation.domid)) == NULL) )
+                  ((d = get_domain_by_id(reservation.domid)) == NULL) )
             return start_extent;
         args.domain = d;
 
@@ -574,7 +568,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         if ( args.preempted )
             return hypercall_create_continuation(
                 __HYPERVISOR_memory_op, "lh",
-                op | (rc << START_EXTENT_SHIFT), arg);
+                op | (rc << MEMOP_EXTENT_SHIFT), arg);
 
         break;
 
@@ -595,7 +589,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             d = current->domain;
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = find_domain_by_id(domid)) == NULL )
+        else if ( (d = get_domain_by_id(domid)) == NULL )
             return -ESRCH;
 
         rc = (op == XENMEM_current_reservation) ? d->tot_pages : d->max_pages;
@@ -606,14 +600,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENMEM_translate_gpfn_list:
-        progress = cmd >> START_EXTENT_SHIFT;
+        progress = cmd >> MEMOP_EXTENT_SHIFT;
         rc = translate_gpfn_list(
             guest_handle_cast(arg, xen_translate_gpfn_list_t),
             &progress);
         if ( rc == -EAGAIN )
             return hypercall_create_continuation(
                 __HYPERVISOR_memory_op, "lh",
-                op | (progress << START_EXTENT_SHIFT), arg);
+                op | (progress << MEMOP_EXTENT_SHIFT), arg);
         break;
 
     default:

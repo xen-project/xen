@@ -17,7 +17,7 @@ void vcpu_flush_vtlb_all(struct vcpu *v);
 void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range);
 
 /* Global all flush of vTLB  */
-void domain_flush_vtlb_all (void);
+void domain_flush_vtlb_all(struct domain *d);
 
 /* Global range-flush of vTLB.  */
 void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range);

@@ -298,17 +298,20 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 
 static int do_block_io_op(blkif_t *blkif)
 {
-	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
+	blkif_back_rings_t *blk_rings = &blkif->blk_rings;
 	blkif_request_t req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
 	int more_to_do = 0;
 
-	rc = blk_ring->req_cons;
-	rp = blk_ring->sring->req_prod;
+	rc = blk_rings->common.req_cons;
+	rp = blk_rings->common.sring->req_prod;
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-	while ((rc != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, rc)) {
+	while ((rc != rp)) {
+
+		if (RING_REQUEST_CONS_OVERFLOW(&blk_rings->common, rc))
+			break;
 
 		pending_req = alloc_req();
 		if (NULL == pending_req) {
@@ -317,8 +320,20 @@ static int do_block_io_op(blkif_t *blkif)
 			break;
 		}
 
-		memcpy(&req, RING_GET_REQUEST(blk_ring, rc), sizeof(req));
-		blk_ring->req_cons = ++rc; /* before make_response() */
+		switch (blkif->blk_protocol) {
+		case BLKIF_PROTOCOL_NATIVE:
+			memcpy(&req, RING_GET_REQUEST(&blk_rings->native, rc), sizeof(req));
+			break;
+		case BLKIF_PROTOCOL_X86_32:
+			blkif_get_x86_32_req(&req, RING_GET_REQUEST(&blk_rings->x86_32, rc));
+			break;
+		case BLKIF_PROTOCOL_X86_64:
+			blkif_get_x86_64_req(&req, RING_GET_REQUEST(&blk_rings->x86_64, rc));
+			break;
+		default:
+			BUG();
+		}
+		blk_rings->common.req_cons = ++rc; /* before make_response() */
 
 		switch (req.operation) {
 		case BLKIF_OP_READ:
@@ -498,34 +513,48 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 static void make_response(blkif_t *blkif, unsigned long id, 
 			  unsigned short op, int st)
 {
-	blkif_response_t *resp;
+	blkif_response_t  resp;
 	unsigned long     flags;
-	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
+	blkif_back_rings_t *blk_rings = &blkif->blk_rings;
 	int more_to_do = 0;
 	int notify;
 
+	resp.id        = id;
+	resp.operation = op;
+	resp.status    = st;
+
 	spin_lock_irqsave(&blkif->blk_ring_lock, flags);
-
-	/* Place on the response ring for the relevant domain. */ 
-	resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
-	resp->id        = id;
-	resp->operation = op;
-	resp->status    = st;
-	blk_ring->rsp_prod_pvt++;
-	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(blk_ring, notify);
-
-	if (blk_ring->rsp_prod_pvt == blk_ring->req_cons) {
+	/* Place on the response ring for the relevant domain. */
+	switch (blkif->blk_protocol) {
+	case BLKIF_PROTOCOL_NATIVE:
+		memcpy(RING_GET_RESPONSE(&blk_rings->native, blk_rings->native.rsp_prod_pvt),
+		       &resp, sizeof(resp));
+		break;
+	case BLKIF_PROTOCOL_X86_32:
+		memcpy(RING_GET_RESPONSE(&blk_rings->x86_32, blk_rings->x86_32.rsp_prod_pvt),
+		       &resp, sizeof(resp));
+		break;
+	case BLKIF_PROTOCOL_X86_64:
+		memcpy(RING_GET_RESPONSE(&blk_rings->x86_64, blk_rings->x86_64.rsp_prod_pvt),
+		       &resp, sizeof(resp));
+		break;
+	default:
+		BUG();
+	}
+	blk_rings->common.rsp_prod_pvt++;
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&blk_rings->common, notify);
+	if (blk_rings->common.rsp_prod_pvt == blk_rings->common.req_cons) {
 		/*
 		 * Tail check for pending requests. Allows frontend to avoid
 		 * notifications if requests are already in flight (lower
 		 * overheads and promotes batching).
 		 */
-		RING_FINAL_CHECK_FOR_REQUESTS(blk_ring, more_to_do);
+		RING_FINAL_CHECK_FOR_REQUESTS(&blk_rings->common, more_to_do);
 
-	} else if (RING_HAS_UNCONSUMED_REQUESTS(blk_ring)) {
+	} else if (RING_HAS_UNCONSUMED_REQUESTS(&blk_rings->common)) {
 		more_to_do = 1;
-
 	}
+
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
 	if (more_to_do)

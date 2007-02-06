@@ -1,6 +1,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/compat.h>
 #include <asm/e820.h>
 #include <asm/page.h>
 
@@ -341,6 +342,39 @@ static void __init clip_4gb(void)
 #define clip_4gb() ((void)0)
 #endif
 
+#ifdef CONFIG_COMPAT
+static void __init clip_compat(void)
+{
+    unsigned long long limit;
+    unsigned int i;
+
+    if ( compat_disabled )
+        return;
+    /* 32-bit guests restricted to 166 GB (with current memory allocator). */
+    limit = (unsigned long long)(MACH2PHYS_COMPAT_VIRT_END -
+                                 __HYPERVISOR_COMPAT_VIRT_START) << 10;
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( (e820.map[i].addr + e820.map[i].size) <= limit )
+            continue;
+        printk("WARNING: Only the first %Lu GB of the physical memory map "
+               "can be accessed\n"
+               "         by compatibility mode guests. "
+               "Truncating the memory map...\n",
+	       limit >> 30);
+        if ( e820.map[i].addr >= limit )
+            e820.nr_map = i;
+        else
+        {
+            e820.map[i].size = limit - e820.map[i].addr;
+            e820.nr_map = i + 1;
+        }
+    }
+}
+#else
+#define clip_compat() ((void)0)
+#endif
+
 static void __init clip_mem(void)
 {
     int i;
@@ -374,6 +408,7 @@ static void __init machine_specific_memory_setup(
     *raw_nr = nr;
     (void)copy_e820_map(raw, nr);
     clip_4gb();
+    clip_compat();
     clip_mem();
 }
 

@@ -64,7 +64,7 @@ then
 fi
 
 
-function frob_iptable()
+frob_iptable()
 {
   if [ "$command" == "online" ]
   then
@@ -89,7 +89,7 @@ If you are using iptables, this may affect networking for guest domains."
 # to those coming from the specified networks, though we allow DHCP requests
 # as well.
 #
-function handle_iptable()
+handle_iptable()
 {
   # Check for a working iptables installation.  Checking for the iptables
   # binary is not sufficient, because the user may not have the appropriate
@@ -123,7 +123,7 @@ function handle_iptable()
 # Print the IP address currently in use at the given interface, or nothing if
 # the interface is not up.
 #
-function ip_of()
+ip_of()
 {
   ip addr show "$1" | awk "/^.*inet.*$1\$/{print \$2}" | sed -n '1 s,/.*,,p'
 }
@@ -137,7 +137,7 @@ function ip_of()
 # to these scripts, or eth0 by default.  This function will call fatal if no
 # such interface could be found.
 #
-function dom0_ip()
+dom0_ip()
 {
   local nd=${netdev:-eth0}
   local result=$(ip_of "$nd")

@@ -13,7 +13,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, sys, string, struct, tempfile
+import os, sys, string, struct, tempfile, re
 import copy
 import logging
 
@@ -48,8 +48,7 @@ def is_disk_image(file):
         return True
     return False
 
-SECTOR_SIZE=512
-def get_active_offset(file):
+def get_active_partition(file):
     """Find the offset for the start of the first active partition "
     "in the disk image file."""
 
@@ -58,13 +57,56 @@ def get_active_offset(file):
     for poff in (446, 462, 478, 494): # partition offsets
         # active partition has 0x80 as the first byte
         if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
-            return struct.unpack("<L",
-                                 buf[poff+8:poff+12])[0] * SECTOR_SIZE
+            return buf[poff:poff+16]
 
     # if there's not a partition marked as active, fall back to
     # the first partition
-    P1 = 446
-    return struct.unpack("<L", buf[P1+8:P1+12])[0] * SECTOR_SIZE
+    return buf[446:446+16]
+
+SECTOR_SIZE=512
+DK_LABEL_LOC=1
+DKL_MAGIC=0xdabe
+V_ROOT=0x2
+
+def get_solaris_slice(file, offset):
+    """Find the root slice in a Solaris VTOC."""
+
+    fd = os.open(file, os.O_RDONLY)
+    os.lseek(fd, offset + (DK_LABEL_LOC * SECTOR_SIZE), 0)
+    buf = os.read(fd, 512)
+    if struct.unpack("<H", buf[508:510])[0] != DKL_MAGIC:
+        raise RuntimeError, "Invalid disklabel magic"
+
+    nslices = struct.unpack("<H", buf[30:32])[0]
+
+    for i in range(nslices):
+        sliceoff = 72 + 12 * i
+        slicetag = struct.unpack("<H", buf[sliceoff:sliceoff+2])[0]
+        slicesect = struct.unpack("<L", buf[sliceoff+4:sliceoff+8])[0]
+        if slicetag == V_ROOT:
+            return slicesect * SECTOR_SIZE
+
+    raise RuntimeError, "No root slice found"      
+
+FDISK_PART_SOLARIS=0xbf
+FDISK_PART_SOLARIS_OLD=0x82
+
+def get_fs_offset(file):
+    if not is_disk_image(file):
+        return 0
+
+    partbuf = get_active_partition(file)
+    if len(partbuf) == 0:
+        raise RuntimeError, "Unable to find active partition on disk"
+
+    offset = struct.unpack("<L", partbuf[8:12])[0] * SECTOR_SIZE
+
+    type = struct.unpack("<B", partbuf[4:5])[0]
+
+    if type == FDISK_PART_SOLARIS or type == FDISK_PART_SOLARIS_OLD:
+        offset += get_solaris_slice(file, offset)
+
+    return offset
 
 class GrubLineEditor(curses.textpad.Textbox):
     def __init__(self, screen, startx, starty, line = ""):
@@ -143,23 +185,28 @@ class GrubLineEditor(curses.textpad.Textbox):
         
 
 class Grub:
-    def __init__(self, file, isconfig = False):
+    def __init__(self, file, fs = None):
         self.screen = None
         self.entry_win = None
         self.text_win = None
         if file:
-            self.read_config(file, isconfig)
+            self.read_config(file, fs)
 
     def draw_main_windows(self):
         if self.screen is None: #only init stuff once
             self.screen = curses.initscr()
             self.screen.timeout(1000)
             if hasattr(curses, 'use_default_colors'):
-                curses.use_default_colors()
+                try:
+                    curses.use_default_colors()
+                except:
+                    pass # Not important if we can't use colour
             enable_cursor(False)
             self.entry_win = curses.newwin(10, 74, 2, 1)
             self.text_win = curses.newwin(10, 70, 12, 5)
-            
+            curses.def_prog_mode()
+        
+        curses.reset_prog_mode()
         self.screen.clear()
         self.screen.refresh()
 
@@ -295,8 +342,8 @@ class Grub:
             # else, we cancelled and should just go back
             break
 
-    def read_config(self, fn, isConfig = False):
-        """Read the given file to parse the config.  If isconfig, then
+    def read_config(self, fn, fs = None):
+        """Read the given file to parse the config.  If fs = None, then
         we're being given a raw config file rather than a disk image."""
         
         if not os.access(fn, os.R_OK):
@@ -304,38 +351,25 @@ class Grub:
 
         self.cf = grub.GrubConf.GrubConfigFile()
 
-        if isConfig:
+        if not fs:
             # set the config file and parse it
             self.cf.filename = fn
             self.cf.parse()
             return
 
-        offset = 0
-        if is_disk_image(fn):
-            offset = get_active_offset(fn)
-            if offset == -1:
-                raise RuntimeError, "Unable to find active partition on disk"
-
-        # open the image and read the grub config
-        fs = fsimage.open(fn, offset)
-
-        if fs is not None:
-            grubfile = None
-            for f in ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                      "/grub/menu.lst", "/grub/grub.conf"):
-                if fs.file_exists(f):
-                    grubfile = f
-                    break
-            if grubfile is None:
-                raise RuntimeError, "we couldn't find grub config file in the image provided."
-            f = fs.open_file(grubfile)
-            buf = f.read()
-            del f
-            del fs
-            # then parse the grub config
-            self.cf.parse(buf)
-        else:
-            raise RuntimeError, "Unable to read filesystem" 
+        grubfile = None
+        for f in ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                  "/grub/menu.lst", "/grub/grub.conf"):
+            if fs.file_exists(f):
+                grubfile = f
+                break
+        if grubfile is None:
+            raise RuntimeError, "we couldn't find grub config file in the image provided."
+        f = fs.open_file(grubfile)
+        buf = f.read()
+        del f
+        # then parse the grub config
+        self.cf.parse(buf)
 
     def run(self):
         timeout = int(self.cf.timeout)
@@ -371,11 +405,20 @@ class Grub:
                                    %(int(timeout) - mytime))
             else:
                 self.screen.addstr(20, 5, " " * 80)
-
             self.fill_entry_list()
+
             c = self.screen.getch()
-            if mytime != -1:
-                mytime += 1
+            if c == -1:
+                # Timed out waiting for a keypress
+                if mytime != -1:
+                    mytime += 1
+                    if mytime >= int(timeout):
+                        self.isdone = True
+                        break
+            else:
+                # received a keypress: stop the timer
+                mytime = -1
+                self.screen.timeout(-1)
 
             # handle keypresses
             if c == ord('c'):
@@ -400,10 +443,8 @@ class Grub:
                 self.isdone = True
                 break
             elif c == curses.KEY_UP:
-                mytime = -1
                 self.selected_image -= 1
             elif c == curses.KEY_DOWN:
-                mytime = -1
                 self.selected_image += 1
 #            elif c in (ord('q'), 27): # 27 == esc
 #                self.selected_image = -1
@@ -431,19 +472,94 @@ def get_entry_idx(cf, entry):
 
     return None
 
+def run_grub(file, entry, fs):
+    global g
+    global sel
+
+    def run_main(scr, *args):
+        global sel
+        global g
+        sel = g.run()
+
+    g = Grub(file, fs)
+    if interactive:
+        curses.wrapper(run_main)
+    else:
+        sel = g.cf.default
+
+    # set the entry to boot as requested
+    if entry is not None:
+        idx = get_entry_idx(g.cf, entry)
+        if idx is not None and idx > 0 and idx < len(g.cf.images):
+           sel = idx
+
+    if sel == -1:
+        print "No kernel image selected!"
+        sys.exit(1)
+
+    img = g.cf.images[sel]
+
+    grubcfg = { "kernel": None, "ramdisk": None, "args": None }
+
+    grubcfg["kernel"] = img.kernel[1]
+    if img.initrd:
+        grubcfg["ramdisk"] = img.initrd[1]
+    if img.args:
+        grubcfg["args"] = img.args
+
+    return grubcfg
+
+# If nothing has been specified, look for a Solaris domU. If found, perform the
+# necessary tweaks.
+def sniff_solaris(fs, cfg):
+    if not fs.file_exists("/platform/i86xpv/kernel/unix"):
+        return cfg
+    
+    # darned python
+    longmode = (sys.maxint != 2147483647L)
+    if not longmode:
+        longmode = os.uname()[4] == "x86_64"
+    if not longmode:
+        if (os.access("/usr/bin/isainfo", os.R_OK) and
+            os.popen("/usr/bin/isainfo -b").read() == "64\n"):
+            longmode = True
+
+    if not cfg["kernel"]:
+        cfg["kernel"] = "/platform/i86xpv/kernel/unix"
+        cfg["ramdisk"] = "/platform/i86pc/boot_archive"
+        if longmode:
+            cfg["kernel"] = "/platform/i86xpv/kernel/amd64/unix"
+            cfg["ramdisk"] = "/platform/i86pc/amd64/boot_archive"
+
+    # Unpleasant. Typically we'll have 'root=foo -k' or 'root=foo /kernel -k',
+    # and we need to maintain Xen properties (root= and ip=) and the kernel
+    # before any user args.
+    
+    xenargs = ""
+    userargs = ""
+    
+    if not cfg["args"]:
+        cfg["args"] = cfg["kernel"]
+    else:
+        for arg in cfg["args"].split():
+            if re.match("^root=", arg) or re.match("^ip=", arg):
+                xenargs += arg + " "
+            elif arg != cfg["kernel"]:
+                userargs += arg + " "
+        cfg["args"] = xenargs + " " + cfg["kernel"] + " " + userargs
+
+    return cfg
+ 
 if __name__ == "__main__":
     sel = None
     
-    def run_main(scr, *args):
-        global sel
-        sel = g.run()
-
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [--output=] [--entry=] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] <image>" %(sys.argv[0],)
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qh::',
-                                   ["quiet", "help", "output=", "entry=",
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qih::',
+                                   ["quiet", "interactive", "help", "output=",
+                                    "entry=", "kernel=", "ramdisk=", "args=",
                                     "isconfig"])
     except getopt.GetoptError:
         usage()
@@ -458,14 +574,30 @@ if __name__ == "__main__":
     entry = None
     interactive = True
     isconfig = False
+
+    # what was passed in
+    incfg = { "kernel": None, "ramdisk": None, "args": None }
+    # what grub or sniffing chose
+    chosencfg = { "kernel": None, "ramdisk": None, "args": None }
+    # what to boot
+    bootcfg = { "kernel": None, "ramdisk": None, "args": None }
+
     for o, a in opts:
         if o in ("-q", "--quiet"):
             interactive = False
+        elif o in ("-i", "--interactive"):
+            interactive = True
         elif o in ("-h", "--help"):
             usage()
             sys.exit()
         elif o in ("--output",):
             output = a
+        elif o in ("--kernel",):
+            incfg["kernel"] = a
+        elif o in ("--ramdisk",):
+            incfg["ramdisk"] = a
+        elif o in ("--args",):
+            incfg["args"] = a
         elif o in ("--entry",):
             entry = a
             # specifying the entry to boot implies non-interactive
@@ -478,58 +610,42 @@ if __name__ == "__main__":
     else:
         fd = os.open(output, os.O_WRONLY)
 
-    g = Grub(file, isconfig)
-    if interactive:
-        curses.wrapper(run_main)
-    else:
-        sel = g.cf.default
-
-    # set the entry to boot as requested
-    if entry is not None:
-        idx = get_entry_idx(g.cf, entry)
-        if idx is not None and idx > 0 and idx < len(g.cf.images):
-            sel = idx
-
-    if sel == -1:
-        print "No kernel image selected!"
-        sys.exit(1)
-
-    img = g.cf.images[sel]
-    print "Going to boot %s" %(img.title)
-    print "  kernel: %s" %(img.kernel[1],)
-    if img.initrd:
-        print "  initrd: %s" %(img.initrd[1],)
-
+    # debug
     if isconfig:
-        print "  args: %s" %(img.args,)
+        chosencfg = run_grub(file, entry)
+        print "  kernel: %s" % chosencfg["kernel"]
+        if img.initrd:
+            print "  initrd: %s" % chosencfg["ramdisk"]
+        print "  args: %s" % chosencfg["args"]
         sys.exit(0)
-        
-    offset = 0
-    if is_disk_image(file):
-        offset = get_active_offset(file)
-        if offset == -1:
-            raise RuntimeError, "Unable to find active partition on disk"
 
-    # read the kernel and initrd onto the hostfs
-    fs = fsimage.open(file, offset)
+    fs = fsimage.open(file, get_fs_offset(file))
 
-    kernel = fs.open_file(img.kernel[1],).read()
-    (tfd, fn) = tempfile.mkstemp(prefix="boot_kernel.",
+    chosencfg = sniff_solaris(fs, incfg)
+
+    if not chosencfg["kernel"]:
+        chosencfg = run_grub(file, entry, fs)
+
+    data = fs.open_file(chosencfg["kernel"]).read()
+    (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
         dir="/var/run/xend/boot")
-    os.write(tfd, kernel)
+    os.write(tfd, data)
     os.close(tfd)
-    sxp = "linux (kernel %s)" %(fn,)
 
-    if img.initrd:
-        initrd = fs.open_file(img.initrd[1],).read()
-        (tfd, fn) = tempfile.mkstemp(prefix="boot_ramdisk.",
+    if chosencfg["ramdisk"]:
+        data = fs.open_file(chosencfg["ramdisk"],).read()
+        (tfd, bootcfg["ramdisk"]) = tempfile.mkstemp(prefix="boot_ramdisk.",
             dir="/var/run/xend/boot")
-        os.write(tfd, initrd)
+        os.write(tfd, data)
         os.close(tfd)
-        sxp += "(ramdisk %s)" %(fn,)
     else:
         initrd = None
-    sxp += "(args '%s')" %(img.args,)
+
+    sxp = "linux (kernel %s)" % bootcfg["kernel"]
+    if bootcfg["ramdisk"]:
+        sxp += "(ramdisk %s)" % bootcfg["ramdisk"]
+    if chosencfg["args"]:
+        sxp += "(args \"%s\")" % chosencfg["args"]
 
     sys.stdout.flush()
     os.write(fd, sxp)

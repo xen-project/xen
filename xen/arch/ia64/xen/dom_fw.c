@@ -333,13 +333,13 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
 	/* setup XSDT (64bit version of RSDT) */
-	strncpy(xsdt->signature, XSDT_SIG, 4);
+	memcpy(xsdt->signature, XSDT_SIG, sizeof(xsdt->signature));
 	/* XSDT points to both the FADT and the MADT, so add one entry */
 	xsdt->length = sizeof(struct xsdt_descriptor_rev2) + sizeof(u64);
 	xsdt->revision = 1;
-	strcpy(xsdt->oem_id, "XEN");
-	strcpy(xsdt->oem_table_id, "Xen/ia64");
-	strcpy(xsdt->asl_compiler_id, "XEN");
+	memcpy(xsdt->oem_id, "XEN", 3);
+	memcpy(xsdt->oem_table_id, "Xen/ia64", 8);
+	memcpy(xsdt->asl_compiler_id, "XEN", 3);
 	xsdt->asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
@@ -349,16 +349,16 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	xsdt->checksum = generate_acpi_checksum(xsdt, xsdt->length);
 
 	/* setup FADT */
-	strncpy(fadt->signature, FADT_SIG, 4);
+	memcpy(fadt->signature, FADT_SIG, sizeof(fadt->signature));
 	fadt->length = sizeof(struct fadt_descriptor_rev2);
 	fadt->revision = FADT2_REVISION_ID;
-	strcpy(fadt->oem_id, "XEN");
-	strcpy(fadt->oem_table_id, "Xen/ia64");
-	strcpy(fadt->asl_compiler_id, "XEN");
+	memcpy(fadt->oem_id, "XEN", 3);
+	memcpy(fadt->oem_table_id, "Xen/ia64", 8);
+	memcpy(fadt->asl_compiler_id, "XEN", 3);
 	fadt->asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
-	strncpy(facs->signature, FACS_SIG, 4);
+	memcpy(facs->signature, FACS_SIG, sizeof(facs->signature));
 	facs->version = 1;
 	facs->length = sizeof(struct facs_descriptor_rev2);
 
@@ -386,8 +386,8 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	fadt->checksum = generate_acpi_checksum(fadt, fadt->length);
 
 	/* setup RSDP */
-	strncpy(rsdp->signature, RSDP_SIG, 8);
-	strcpy(rsdp->oem_id, "XEN");
+	memcpy(rsdp->signature, RSDP_SIG, strlen(RSDP_SIG));
+	memcpy(rsdp->oem_id, "XEN", 3);
 	rsdp->revision = 2; /* ACPI 2.0 includes XSDT */
 	rsdp->length = sizeof(struct acpi20_table_rsdp);
 	rsdp->xsdt_address = ACPI_TABLE_MPA(xsdt);
@@ -397,11 +397,11 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	rsdp->ext_checksum = generate_acpi_checksum(rsdp, rsdp->length);
 
 	/* setup DSDT with trivial namespace. */ 
-	strncpy(dsdt->signature, DSDT_SIG, 4);
+	memcpy(dsdt->signature, DSDT_SIG, strlen(DSDT_SIG));
 	dsdt->revision = 1;
-	strcpy(dsdt->oem_id, "XEN");
-	strcpy(dsdt->oem_table_id, "Xen/ia64");
-	strcpy(dsdt->asl_compiler_id, "XEN");
+	memcpy(dsdt->oem_id, "XEN", 3);
+	memcpy(dsdt->oem_table_id, "Xen/ia64", 8);
+	memcpy(dsdt->asl_compiler_id, "XEN", 3);
 	dsdt->asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
@@ -409,7 +409,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	tables->aml[0] = 0x10; /* Scope */
 	tables->aml[1] = 0x40; /* length/offset to next object (patched) */
 	tables->aml[2] = 0x00;
-	strncpy((char *)&tables->aml[3], "_SB_", 4);
+	memcpy(&tables->aml[3], "_SB_", 4);
 
 	/* The processor object isn't absolutely necessary, revist for SMP */
 	aml_len = 7;
@@ -437,11 +437,11 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
 	/* setup MADT */
-	strncpy(madt->header.signature, APIC_SIG, 4);
+	memcpy(madt->header.signature, APIC_SIG, sizeof(madt->header.signature));
 	madt->header.revision = 2;
-	strcpy(madt->header.oem_id, "XEN");
-	strcpy(madt->header.oem_table_id, "Xen/ia64");
-	strcpy(madt->header.asl_compiler_id, "XEN");
+	memcpy(madt->header.oem_id, "XEN", 3);
+	memcpy(madt->header.oem_table_id, "Xen/ia64", 8);
+	memcpy(madt->header.asl_compiler_id, "XEN", 3);
 	madt->header.asl_compiler_revision = (xen_major_version() << 16) |
 		xen_minor_version();
 
@@ -516,10 +516,10 @@ complete_dom0_memmap(struct domain *d,
 {
 	efi_memory_desc_t *md;
 	u64 addr;
-	int j;
 	void *efi_map_start, *efi_map_end, *p;
 	u64 efi_desc_size;
 	int i;
+	unsigned long dom_mem = maxmem - (d->tot_pages << PAGE_SHIFT);
 
 	/* Walk through all MDT entries.
 	   Copy all interesting entries.  */
@@ -533,6 +533,7 @@ complete_dom0_memmap(struct domain *d,
 		u64 start = md->phys_addr;
 		u64 size = md->num_pages << EFI_PAGE_SHIFT;
 		u64 end = start + size;
+		unsigned long flags;
 
 		switch (md->type) {
 		case EFI_RUNTIME_SERVICES_CODE:
@@ -540,9 +541,20 @@ complete_dom0_memmap(struct domain *d,
 		case EFI_ACPI_RECLAIM_MEMORY:
 		case EFI_ACPI_MEMORY_NVS:
 		case EFI_RESERVED_TYPE:
-			/* Map into dom0 - All these are writable.  */
-			assign_domain_mach_page(d, start, size,
-			                        ASSIGN_writable);
+			/*
+			 * Map into dom0 - We must respect protection
+			 * and cache attributes.  Not all of these pages
+			 * are writable!!!
+			 */
+			flags = ASSIGN_writable;	/* dummy - zero */
+			if (md->attribute & EFI_MEMORY_WP)
+				flags |= ASSIGN_readonly;
+			if ((md->attribute & EFI_MEMORY_UC) &&
+			    !(md->attribute & EFI_MEMORY_WB))
+				flags |= ASSIGN_nocache;
+
+			assign_domain_mach_page(d, start, size, flags);
+
 			/* Fall-through.  */
 		case EFI_MEMORY_MAPPED_IO:
 			/* Will be mapped with ioremap.  */
@@ -566,26 +578,23 @@ complete_dom0_memmap(struct domain *d,
 		case EFI_LOADER_DATA:
 		case EFI_BOOT_SERVICES_CODE:
 		case EFI_BOOT_SERVICES_DATA:
-			/* Create dom0 MDT entries for conventional memory
-			   below 1MB.  Without this Linux will assume VGA is
-			   present because 0xA0000 will always be either a hole
-			   in the MDT or an I/O region via the passthrough.  */
-
-			end = min(ONE_MB, end);
-
-			/* Avoid firmware and hypercall area.
-			   We know they are 0-based.  */
-			if (end < FW_END_PADDR || start >= ONE_MB)
+			if (!(md->attribute & EFI_MEMORY_WB))
 				break;
-			if (start < FW_END_PADDR)
-				start = FW_END_PADDR;
-			
+
+			start = max(FW_END_PADDR, start);
+			end = min(start + dom_mem, end);
+			if (end <= start)
+				break;
+
 			dom_md->type = EFI_CONVENTIONAL_MEMORY;
 			dom_md->phys_addr = start;
 			dom_md->virt_addr = 0;
 			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
-			dom_md->attribute = md->attribute;
+			dom_md->attribute = EFI_MEMORY_WB;
 			num_mds++;
+
+			dom_mem -= dom_md->num_pages << EFI_PAGE_SHIFT;
+			d->arch.convmem_end = end;
 			break;
 
 		case EFI_UNUSABLE_MEMORY:
@@ -604,66 +613,13 @@ complete_dom0_memmap(struct domain *d,
 	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
 	     efi_mdt_cmp, NULL);
 
-	/* find gaps and fill them with conventional memory */
-	i = num_mds;
-	for (j = 0; j < num_mds; j++) {
-		unsigned long end;
-		unsigned long next_start;
-		
-		md = &tables->efi_memmap[j];
-		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
-		
-		if (j + 1 < num_mds) {
-			efi_memory_desc_t* next_md;
-			next_md = &tables->efi_memmap[j + 1];
-			next_start = next_md->phys_addr;
-			
-			/* Have just been sorted.  */
-			BUG_ON(end > next_start);
-			
-			/* No room for memory!  */
-			if (end == next_start)
-				continue;
-			
-			if (next_start > maxmem)
-				next_start = maxmem;
-		}
-		else
-			next_start = maxmem;
-		
-		/* Avoid "legacy" low memory addresses 
-		   and the HYPERCALL area.  */
-		if (end < ONE_MB)
-			end = ONE_MB;
-						      
-		// clip the range and align to PAGE_SIZE
-		next_start = next_start & PAGE_MASK;
-		end = PAGE_ALIGN(end);
-		
-		/* No room for memory.  */
-		if (end >= next_start)
-			continue;
-		
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-		        end, next_start);
-
-		if (next_start >= maxmem)
-			break;
-	}
-	num_mds = i;
-	BUG_ON(num_mds > NUM_MEM_DESCS);
-	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
-	     efi_mdt_cmp, NULL);
-
 	/* setup_guest() @ libxc/xc_linux_build() arranges memory for domU.
 	 * however no one arranges memory for dom0,
 	 * instead we allocate pages manually.
 	 */
 	for (i = 0; i < num_mds; i++) {
 		md = &tables->efi_memmap[i];
-		if (md->phys_addr > maxmem)
-			break;
-		
+
 		if (md->type == EFI_LOADER_DATA ||
 		    md->type == EFI_PAL_CODE ||
 		    md->type == EFI_CONVENTIONAL_MEMORY) {
@@ -675,8 +631,6 @@ complete_dom0_memmap(struct domain *d,
 				/* md->num_pages = 0 is allowed. */
 				continue;
 			}
-			if (end > (max_page << PAGE_SHIFT))
-				end = (max_page << PAGE_SHIFT);
 			
 			for (addr = start; addr < end; addr += PAGE_SIZE)
 				assign_new_domain0_page(d, addr);
@@ -806,8 +760,8 @@ dom_fw_init(struct domain *d,
 	tables->sal_systab.sal_rev_major = 0;
 	tables->sal_systab.entry_count = 2;
 
-	strcpy((char *)tables->sal_systab.oem_id, "Xen/ia64");
-	strcpy((char *)tables->sal_systab.product_id, "Xen/ia64");
+	memcpy((char *)tables->sal_systab.oem_id, "Xen/ia64", 8);
+	memcpy((char *)tables->sal_systab.product_id, "Xen/ia64", 8);
 
 	/* PAL entry point: */
 	tables->sal_ed.type = SAL_DESC_ENTRY_POINT;
@@ -863,6 +817,7 @@ dom_fw_init(struct domain *d,
 		/* Memory.  */
 		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
 		        FW_END_PADDR, maxmem);
+		d->arch.convmem_end = maxmem;
 		
 		/* Create an entry for IO ports.  */
 		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,

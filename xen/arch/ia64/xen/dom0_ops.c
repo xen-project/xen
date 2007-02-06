@@ -40,10 +40,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getmemlist:
     {
         unsigned long i;
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
         unsigned long start_page = op->u.getmemlist.start_pfn;
         unsigned long nr_pages = op->u.getmemlist.max_pfns;
-        unsigned long mfn;
+        uint64_t mfn;
 
         if ( d == NULL ) {
             ret = -EINVAL;
@@ -76,7 +76,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_arch_setup:
     {
         xen_domctl_arch_setup_t *ds = &op->u.arch_setup;
-        struct domain *d = find_domain_by_id(op->domain);
+        struct domain *d = get_domain_by_id(op->domain);
 
         if ( d == NULL) {
             ret = -EINVAL;
@@ -102,16 +102,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                     printk("No VMX hardware feature for vmx domain.\n");
                     ret = -EINVAL;
                     break;
-                }
-                if (!d->arch.is_vti) {
-                    struct vcpu *v;
-                    for_each_vcpu(d, v) {
-                        BUG_ON(v->arch.privregs == NULL);
-                        free_domheap_pages(virt_to_page(v->arch.privregs),
-                                      get_order_from_shift(XMAPPEDREGS_SHIFT));
-                        v->arch.privregs = NULL;
-                        relinquish_vcpu_resources(v);
-                    }
                 }
                 d->arch.is_vti = 1;
                 vmx_setup_platform(d);
@@ -150,7 +140,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d; 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if ( d != NULL )
         {
             ret = shadow_mode_control(d, &op->u.shadow_op);
@@ -168,7 +158,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned int lp = fp + np - 1;
 
         ret = -ESRCH;
-        d = find_domain_by_id(op->domain);
+        d = get_domain_by_id(op->domain);
         if (unlikely(d == NULL))
             break;
 
@@ -226,6 +216,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #endif
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
+        pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);

@@ -12,6 +12,7 @@
 #include <xen/softirq.h>
 #include <xen/domain.h>
 #include <xen/rangeset.h>
+#include <xen/compat.h>
 #include <asm/debugger.h>
 #include <asm/shadow.h>
 #include <asm/div64.h>
@@ -66,8 +67,7 @@ void register_keyhandler(
     ASSERT(key_table[key].u.handler == NULL);
     key_table[key].u.handler = handler;
     key_table[key].flags     = 0;
-    strncpy(key_table[key].desc, desc, STR_MAX);
-    key_table[key].desc[STR_MAX-1] = '\0';
+    safe_strcpy(key_table[key].desc, desc);
 }
 
 void register_irq_keyhandler(
@@ -76,8 +76,7 @@ void register_irq_keyhandler(
     ASSERT(key_table[key].u.irq_handler == NULL);
     key_table[key].u.irq_handler = handler;
     key_table[key].flags         = KEYHANDLER_IRQ_CALLBACK;
-    strncpy(key_table[key].desc, desc, STR_MAX);
-    key_table[key].desc[STR_MAX-1] = '\0';
+    safe_strcpy(key_table[key].desc, desc);
 }
 
 static void show_handlers(unsigned char key)
@@ -94,6 +93,11 @@ static void show_handlers(unsigned char key)
 static void __dump_execstate(void *unused)
 {
     dump_execution_state();
+    printk("*** Dumping CPU%d guest state: ***\n", smp_processor_id());
+    if ( is_idle_vcpu(current) )
+        printk("No guest context (CPU is idle).\n");
+    else
+        show_execution_state(guest_cpu_user_regs());
 }
 
 static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
@@ -103,16 +107,18 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     printk("'%c' pressed -> dumping registers\n", key);
 
     /* Get local execution state out immediately, in case we get stuck. */
-    printk("\n*** Dumping CPU%d state: ***\n", smp_processor_id());
-    show_execution_state(regs);
+    printk("\n*** Dumping CPU%d host state: ***\n", smp_processor_id());
+    __dump_execstate(NULL);
 
     for_each_online_cpu ( cpu )
     {
         if ( cpu == smp_processor_id() )
             continue;
-        printk("\n*** Dumping CPU%d state: ***\n", cpu);
+        printk("\n*** Dumping CPU%d host state: ***\n", cpu);
         on_selected_cpus(cpumask_of_cpu(cpu), __dump_execstate, NULL, 1, 1);
     }
+
+    printk("\n");
 }
 
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
@@ -171,8 +177,8 @@ static void dump_domains(unsigned char key)
                    v->vcpu_id, v->processor,
                    test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F',
                    v->vcpu_flags,
-                   v->vcpu_info->evtchn_upcall_pending, 
-                   v->vcpu_info->evtchn_upcall_mask);
+                   vcpu_info(v, evtchn_upcall_pending),
+                   vcpu_info(v, evtchn_upcall_mask));
             cpuset_print(cpuset, sizeof(cpuset), v->vcpu_dirty_cpumask);
             printk("dirty_cpus=%s ", cpuset);
             cpuset_print(cpuset, sizeof(cpuset), v->cpu_affinity);
@@ -181,11 +187,11 @@ static void dump_domains(unsigned char key)
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            d->shared_info->evtchn_pending),
+                            shared_info_addr(d, evtchn_pending)),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            d->shared_info->evtchn_mask),
-                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG]/BITS_PER_LONG, 
-                            &v->vcpu_info->evtchn_pending_sel));
+                            shared_info_addr(d, evtchn_mask)),
+                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG]/BITS_PER_GUEST_LONG(d),
+                            vcpu_info_addr(v, evtchn_pending_sel)));
             send_guest_vcpu_virq(v, VIRQ_DEBUG);
         }
     }

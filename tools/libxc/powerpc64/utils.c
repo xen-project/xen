@@ -53,7 +53,7 @@ int get_rma_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
     DPRINTF("xc_get_pfn_list\n");
     /* We know that the RMA is machine contiguous so lets just get the
      * first MFN and fill the rest in ourselves */
-    rc = xc_get_pfn_list(xc_handle, domid, *page_array, 1);
+    rc = xc_get_pfn_list(xc_handle, domid, (uint64_t *)*page_array, 1);
     if (rc == -1) {
         perror("Could not get the page frame list");
         return -1;

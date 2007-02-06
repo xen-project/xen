@@ -143,11 +143,11 @@ ste_dump_policy(u8 *buf, u32 buf_size) {
     if (buf_size < sizeof(struct acm_ste_policy_buffer))
         return -EINVAL;
 
-    ste_buf->ste_max_types = htonl(ste_bin_pol.max_types);
-    ste_buf->ste_max_ssidrefs = htonl(ste_bin_pol.max_ssidrefs);
-    ste_buf->policy_code = htonl(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
-    ste_buf->ste_ssid_offset = htonl(sizeof(struct acm_ste_policy_buffer));
-    ret = ntohl(ste_buf->ste_ssid_offset) +
+    ste_buf->ste_max_types = cpu_to_be32(ste_bin_pol.max_types);
+    ste_buf->ste_max_ssidrefs = cpu_to_be32(ste_bin_pol.max_ssidrefs);
+    ste_buf->policy_code = cpu_to_be32(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
+    ste_buf->ste_ssid_offset = cpu_to_be32(sizeof(struct acm_ste_policy_buffer));
+    ret = be32_to_cpu(ste_buf->ste_ssid_offset) +
         sizeof(domaintype_t)*ste_bin_pol.max_ssidrefs*ste_bin_pol.max_types;
 
     ret = (ret + 7) & ~7;
@@ -156,7 +156,7 @@ ste_dump_policy(u8 *buf, u32 buf_size) {
         return -EINVAL;
 
     /* now copy buffer over */
-    arrcpy(buf + ntohl(ste_buf->ste_ssid_offset),
+    arrcpy(buf + be32_to_cpu(ste_buf->ste_ssid_offset),
            ste_bin_pol.ssidrefs,
            sizeof(domaintype_t),
            ste_bin_pol.max_ssidrefs*ste_bin_pol.max_types);
@@ -205,7 +205,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 ste_rssidref = ste_rssid->ste_ssidref;
             } else if ((*pd)->evtchn[port]->state == ECS_UNBOUND) {
                 rdomid = (*pd)->evtchn[port]->u.unbound.remote_domid;
-                if ((rdom = find_domain_by_id(rdomid)) == NULL) {
+                if ((rdom = get_domain_by_id(rdomid)) == NULL) {
                     printk("%s: Error finding domain to id %x!\n", __func__, rdomid);
                     goto out;
                 }
@@ -245,7 +245,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                         __func__, (*pd)->domain_id, i, sha_copy.flags, sha_copy.domid, 
                         (unsigned long)sha_copy.frame);
                 rdomid = sha_copy.domid;
-                if ((rdom = find_domain_by_id(rdomid)) == NULL) {
+                if ((rdom = get_domain_by_id(rdomid)) == NULL) {
                     printkd("%s: domain not found ERROR!\n", __func__);
                     goto out;
                 };
@@ -287,11 +287,11 @@ ste_set_policy(u8 *buf, u32 buf_size)
         return -EINVAL;
 
     /* Convert endianess of policy */
-    ste_buf->policy_code = ntohl(ste_buf->policy_code);
-    ste_buf->policy_version = ntohl(ste_buf->policy_version);
-    ste_buf->ste_max_types = ntohl(ste_buf->ste_max_types);
-    ste_buf->ste_max_ssidrefs = ntohl(ste_buf->ste_max_ssidrefs);
-    ste_buf->ste_ssid_offset = ntohl(ste_buf->ste_ssid_offset);
+    ste_buf->policy_code = be32_to_cpu(ste_buf->policy_code);
+    ste_buf->policy_version = be32_to_cpu(ste_buf->policy_version);
+    ste_buf->ste_max_types = be32_to_cpu(ste_buf->ste_max_types);
+    ste_buf->ste_max_ssidrefs = be32_to_cpu(ste_buf->ste_max_ssidrefs);
+    ste_buf->ste_ssid_offset = be32_to_cpu(ste_buf->ste_ssid_offset);
 
     /* policy type and version checks */
     if ((ste_buf->policy_code != ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY) ||
@@ -348,12 +348,12 @@ ste_dump_stats(u8 *buf, u16 buf_len)
     struct acm_ste_stats_buffer stats;
 
     /* now send the hook counts to user space */
-    stats.ec_eval_count = htonl(atomic_read(&ste_bin_pol.ec_eval_count));
-    stats.gt_eval_count = htonl(atomic_read(&ste_bin_pol.gt_eval_count));
-    stats.ec_denied_count = htonl(atomic_read(&ste_bin_pol.ec_denied_count));
-    stats.gt_denied_count = htonl(atomic_read(&ste_bin_pol.gt_denied_count));
-    stats.ec_cachehit_count = htonl(atomic_read(&ste_bin_pol.ec_cachehit_count));
-    stats.gt_cachehit_count = htonl(atomic_read(&ste_bin_pol.gt_cachehit_count));
+    stats.ec_eval_count = cpu_to_be32(atomic_read(&ste_bin_pol.ec_eval_count));
+    stats.gt_eval_count = cpu_to_be32(atomic_read(&ste_bin_pol.gt_eval_count));
+    stats.ec_denied_count = cpu_to_be32(atomic_read(&ste_bin_pol.ec_denied_count));
+    stats.gt_denied_count = cpu_to_be32(atomic_read(&ste_bin_pol.gt_denied_count));
+    stats.ec_cachehit_count = cpu_to_be32(atomic_read(&ste_bin_pol.ec_cachehit_count));
+    stats.gt_cachehit_count = cpu_to_be32(atomic_read(&ste_bin_pol.gt_cachehit_count));
 
     if (buf_len < sizeof(struct acm_ste_stats_buffer))
         return -ENOMEM;
@@ -507,8 +507,8 @@ ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
     if (id1 == DOMID_SELF) id1 = current->domain->domain_id;
     if (id2 == DOMID_SELF) id2 = current->domain->domain_id;
 
-    subj = find_domain_by_id(id1);
-    obj  = find_domain_by_id(id2);
+    subj = get_domain_by_id(id1);
+    obj  = get_domain_by_id(id2);
     if ((subj == NULL) || (obj == NULL)) {
         ret = ACM_ACCESS_DENIED;
         goto out;
@@ -552,7 +552,7 @@ ste_pre_eventchannel_interdomain(domid_t id)
     if (id == DOMID_SELF) id = current->domain->domain_id;
 
     subj = current->domain;
-    obj  = find_domain_by_id(id);
+    obj  = get_domain_by_id(id);
     if (obj == NULL) {
         ret = ACM_ACCESS_DENIED;
         goto out;
@@ -595,7 +595,7 @@ ste_pre_grant_map_ref (domid_t id) {
     }
     atomic_inc(&ste_bin_pol.gt_eval_count);
     subj = current->domain;
-    obj = find_domain_by_id(id);
+    obj = get_domain_by_id(id);
 
     if (share_common_type(subj, obj)) {
         cache_result(subj, obj);
@@ -633,7 +633,7 @@ ste_pre_grant_setup (domid_t id) {
     }
     /* b) check types */
     subj = current->domain;
-    obj = find_domain_by_id(id);
+    obj = get_domain_by_id(id);
 
     if (share_common_type(subj, obj)) {
         cache_result(subj, obj);

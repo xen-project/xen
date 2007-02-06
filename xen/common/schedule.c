@@ -13,6 +13,7 @@
  *
  */
 
+#ifndef COMPAT
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -32,8 +33,6 @@
 #include <xen/multicall.h>
 #include <public/sched.h>
 
-extern void arch_getdomaininfo_ctxt(struct vcpu *,
-                                    struct vcpu_guest_context *);
 /* opt_sched: scheduler - default to credit */
 static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);
@@ -277,10 +276,11 @@ static long do_block(void)
 
 static long do_poll(struct sched_poll *sched_poll)
 {
-    struct vcpu  *v = current;
-    evtchn_port_t port;
-    long          rc = 0;
-    unsigned int  i;
+    struct vcpu   *v = current;
+    struct domain *d = v->domain;
+    evtchn_port_t  port;
+    long           rc = 0;
+    unsigned int   i;
 
     /* Fairly arbitrary limit. */
     if ( sched_poll->nr_ports > 128 )
@@ -292,7 +292,7 @@ static long do_poll(struct sched_poll *sched_poll)
     /* These operations must occur in order. */
     set_bit(_VCPUF_blocked, &v->vcpu_flags);
     set_bit(_VCPUF_polling, &v->vcpu_flags);
-    set_bit(_DOMF_polling, &v->domain->domain_flags);
+    set_bit(_DOMF_polling, &d->domain_flags);
 
     /* Check for events /after/ setting flags: avoids wakeup waiting race. */
     for ( i = 0; i < sched_poll->nr_ports; i++ )
@@ -302,18 +302,18 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = -EINVAL;
-        if ( port >= MAX_EVTCHNS )
+        if ( port >= MAX_EVTCHNS(d) )
             goto out;
 
         rc = 0;
-        if ( test_bit(port, v->domain->shared_info->evtchn_pending) )
+        if ( test_bit(port, shared_info_addr(d, evtchn_pending)) )
             goto out;
     }
 
     if ( sched_poll->timeout != 0 )
         set_timer(&v->poll_timer, sched_poll->timeout);
 
-    TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
+    TRACE_2D(TRC_SCHED_BLOCK, d->domain_id, v->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
 
     return 0;
@@ -365,9 +365,13 @@ long do_sched_op_compat(int cmd, unsigned long arg)
     return ret;
 }
 
-long do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+typedef long ret_t;
+
+#endif /* !COMPAT */
+
+ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    long ret = 0;
+    ret_t ret = 0;
 
     switch ( cmd )
     {
@@ -426,7 +430,7 @@ long do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         ret = -ESRCH;
-        d = find_domain_by_id(sched_remote_shutdown.domain_id);
+        d = get_domain_by_id(sched_remote_shutdown.domain_id);
         if ( d == NULL )
             break;
 
@@ -443,6 +447,8 @@ long do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     return ret;
 }
+
+#ifndef COMPAT
 
 /* Per-domain one-shot-timer hypercall. */
 long do_set_timer_op(s_time_t timeout)
@@ -734,6 +740,12 @@ void dump_runq(unsigned char key)
 
     local_irq_restore(flags);
 }
+
+#ifdef CONFIG_COMPAT
+#include "compat/schedule.c"
+#endif
+
+#endif /* !COMPAT */
 
 /*
  * Local variables:

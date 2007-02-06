@@ -30,9 +30,9 @@ static void default_init(struct cpuinfo_x86 * c)
 	if (c->cpuid_level == -1) {
 		/* No cpuid. It must be an ancient CPU */
 		if (c->x86 == 4)
-			strcpy(c->x86_model_id, "486");
+			safe_strcpy(c->x86_model_id, "486");
 		else if (c->x86 == 3)
-			strcpy(c->x86_model_id, "386");
+			safe_strcpy(c->x86_model_id, "386");
 	}
 }
 
@@ -383,11 +383,11 @@ void __devinit identify_cpu(struct cpuinfo_x86 *c)
 		char *p;
 		p = table_lookup_model(c);
 		if ( p )
-			strcpy(c->x86_model_id, p);
+			safe_strcpy(c->x86_model_id, p);
 		else
 			/* Last resort... */
-			sprintf(c->x86_model_id, "%02x/%02x",
-				c->x86_vendor, c->x86_model);
+			snprintf(c->x86_model_id, sizeof(c->x86_model_id),
+				"%02x/%02x", c->x86_vendor, c->x86_model);
 	}
 
 	/* Now the feature flags better reflect actual CPU features! */

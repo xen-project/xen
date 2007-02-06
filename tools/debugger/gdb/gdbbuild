@@ -2,19 +2,21 @@
 
 set -e
 
+GDB_VERSION=6.2.1
+
 [ "$GDB_MIRROR" ] || GDB_MIRROR="ftp://ftp.gnu.org/gnu/gdb/"
 
-rm -rf gdb-6.2.1 gdb-6.2.1-linux-i386-xen
-[ -a gdb-6.2.1.tar.bz2 ] || wget -c "$GDB_MIRROR/gdb-6.2.1.tar.bz2"
-tar xjf gdb-6.2.1.tar.bz2
+rm -rf gdb-$GDB_VERSION gdb-$GDB_VERSION-linux-i386-xen
+[ -a gdb-$GDB_VERSION.tar.bz2 ] || wget -c "$GDB_MIRROR/gdb-$GDB_VERSION.tar.bz2"
+tar xjf gdb-$GDB_VERSION.tar.bz2
 
-cd gdb-6.2.1-xen-sparse
-bash ./mkbuildtree ../gdb-6.2.1
+cd gdb-$GDB_VERSION-xen-sparse
+bash ./mkbuildtree ../gdb-$GDB_VERSION
 
 cd ..
-mkdir gdb-6.2.1-linux-i386-xen
-cd gdb-6.2.1-linux-i386-xen
-../gdb-6.2.1/configure
+mkdir gdb-$GDB_VERSION-linux-i386-xen
+cd gdb-$GDB_VERSION-linux-i386-xen
+../gdb-$GDB_VERSION/configure
 
 # Use $MAKE if set, else use gmake if present, otherwise use make
 if [ "$MAKE" ]; then

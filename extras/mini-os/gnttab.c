@@ -23,31 +23,24 @@
 
 #define NR_GRANT_FRAMES 4
 #define NR_GRANT_ENTRIES (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
-#define GNTTAB_LIST_END (NR_GRANT_ENTRIES + 1)
 
 static grant_entry_t *gnttab_table;
 static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
-static grant_ref_t gnttab_free_head;
-
-static grant_ref_t
-get_free_entries(int count)
-{
-    grant_ref_t ref;
-    grant_ref_t head;
-
-    ref = head = gnttab_free_head;
-    while (count-- > 1)
-	head = gnttab_list[head];
-    gnttab_free_head = gnttab_list[head];
-    gnttab_list[head] = GNTTAB_LIST_END;
-    return ref;
-}
 
 static void
-put_free_entry(grant_ref_t gref)
+put_free_entry(grant_ref_t ref)
 {
-    gnttab_list[gref] = gnttab_free_head;
-    gnttab_free_head = gref;
+    gnttab_list[ref] = gnttab_list[0];
+    gnttab_list[0]  = ref;
+
+}
+
+static grant_ref_t
+get_free_entry(void)
+{
+    unsigned int ref = gnttab_list[0];
+    gnttab_list[0] = gnttab_list[ref];
+    return ref;
 }
 
 grant_ref_t
@@ -55,7 +48,7 @@ gnttab_grant_access(domid_t domid, unsigned long frame, int readonly)
 {
     grant_ref_t ref;
 
-    ref = get_free_entries(1);
+    ref = get_free_entry();
     gnttab_table[ref].frame = frame;
     gnttab_table[ref].domid = domid;
     wmb();
@@ -70,7 +63,7 @@ gnttab_grant_transfer(domid_t domid, unsigned long pfn)
 {
     grant_ref_t ref;
 
-    ref = get_free_entries(1);
+    ref = get_free_entry();
     gnttab_table[ref].frame = pfn;
     gnttab_table[ref].domid = domid;
     wmb();
@@ -157,8 +150,7 @@ init_gnttab(void)
     int i;
 
     for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
-	gnttab_list[i] = i + 1;
-    gnttab_free_head = NR_RESERVED_ENTRIES;
+        put_free_entry(i);
 
     setup.dom = DOMID_SELF;
     setup.nr_frames = NR_GRANT_FRAMES;

@@ -24,13 +24,13 @@
 #include <linux/interrupt.h>
 #include <xen/interface/hvm/params.h>
 
-static inline int set_callback_irq(int irq)
+static inline int set_callback_via(uint64_t via)
 {
 	struct xen_hvm_param a;
 
 	a.domid = DOMID_SELF;
 	a.index = HVM_PARAM_CALLBACK_IRQ;
-	a.value = irq;
+	a.value = via;
 	return HYPERVISOR_hvm_op(HVMOP_set_param, &a);
 }
 

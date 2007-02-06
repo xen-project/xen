@@ -43,7 +43,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	struct xen_pci_op *active_op = &pdev->sh_info->op;
 	unsigned long irq_flags;
 	evtchn_port_t port = pdev->evtchn;
-	nsec_t ns, ns_timeout;
+	s64 ns, ns_timeout;
 	struct timeval tv;
 
 	spin_lock_irqsave(&pdev->sh_info_lock, irq_flags);
@@ -62,7 +62,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	 * timeout in the past). 1s difference gives plenty of slack for error.
 	 */
 	do_gettimeofday(&tv);
-	ns_timeout = timeval_to_ns(&tv) + 2 * (nsec_t)NSEC_PER_SEC;
+	ns_timeout = timeval_to_ns(&tv) + 2 * (s64)NSEC_PER_SEC;
 
 	clear_evtchn(port);
 
@@ -239,17 +239,17 @@ static void free_root_bus_devs(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
 
-	spin_lock(&pci_bus_lock);
+	down_write(&pci_bus_sem);
 	while (!list_empty(&bus->devices)) {
 		dev = container_of(bus->devices.next, struct pci_dev, bus_list);
-		spin_unlock(&pci_bus_lock);
+		up_write(&pci_bus_sem);
 
 		dev_dbg(&dev->dev, "removing device\n");
 		pci_remove_bus_device(dev);
 
-		spin_lock(&pci_bus_lock);
+		down_write(&pci_bus_sem);
 	}
-	spin_unlock(&pci_bus_lock);
+	up_write(&pci_bus_sem);
 }
 
 void pcifront_free_roots(struct pcifront_device *pdev)

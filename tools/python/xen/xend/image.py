@@ -26,6 +26,7 @@ import xen.lowlevel.xc
 from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
 from xen.xend.XendError import VmError, XendError
 from xen.xend.XendLogging import log
+from xen.xend.XendOptions import instance as xenopts
 from xen.xend.server.netif import randomMAC
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
@@ -172,7 +173,7 @@ class ImageHandler:
         """Build the domain. Define in subclass."""
         raise NotImplementedError()
 
-    def createDeviceModel(self):
+    def createDeviceModel(self, restore = False):
         """Create device model for the domain (define in subclass if needed)."""
         pass
     
@@ -277,7 +278,7 @@ class HVMImageHandler(ImageHandler):
             raise VmError("HVM guest support is unavailable: is VT/AMD-V "
                           "supported by your CPU and enabled in your BIOS?")
 
-        self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
+        self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.device_model = imageConfig['hvm'].get('device_model')
         if not self.device_model:
             raise VmError("hvm: missing device model")
@@ -291,8 +292,6 @@ class HVMImageHandler(ImageHandler):
                         ("image/display", self.display))
 
         self.pid = None
-
-        self.dmargs += self.configVNC(imageConfig)
 
         self.pae  = imageConfig['hvm'].get('pae', 0)
         self.apic  = imageConfig['hvm'].get('apic', 0)
@@ -327,13 +326,14 @@ class HVMImageHandler(ImageHandler):
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
-    def parseDeviceModelArgs(self, imageConfig, deviceConfig):
+    def parseDeviceModelArgs(self, vmConfig):
         dmargs = [ 'boot', 'fda', 'fdb', 'soundhw',
-                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
+                   'localtime', 'serial', 'stdvga', 'isa',
                    'acpi', 'usb', 'usbdevice', 'keymap' ]
-        ret = []
-        hvmDeviceConfig = imageConfig['hvm']['devices']
         
+        hvmDeviceConfig = vmConfig['image']['hvm']['devices']
+        ret = ['-vcpus', str(self.vm.getVCpuCount())]
+
         for a in dmargs:
             v = hvmDeviceConfig.get(a)
 
@@ -343,8 +343,11 @@ class HVMImageHandler(ImageHandler):
 
             # Handle booleans gracefully
             if a in ['localtime', 'std-vga', 'isa', 'usb', 'acpi']:
-                if v != None: v = int(v)
-                if v: ret.append("-%s" % a)
+                try:
+                    if v != None: v = int(v)
+                    if v: ret.append("-%s" % a)
+                except (ValueError, TypeError):
+                    pass # if we can't convert it to a sane type, ignore it
             else:
                 if v:
                     ret.append("-%s" % a)
@@ -361,76 +364,91 @@ class HVMImageHandler(ImageHandler):
         ret = ret + ["-domain-name", str(self.vm.info['name_label'])]
         nics = 0
         
-        for devuuid, (devtype, devinfo) in deviceConfig.items():
-            if devtype == 'vbd':
-                uname = devinfo.get('uname')
-                if uname is not None and 'file:' in uname:
-                    (_, vbdparam) = string.split(uname, ':', 1)
-                    if not os.path.isfile(vbdparam):
-                        raise VmError('Disk image does not exist: %s' %
-                                      vbdparam)
-            if devtype == 'vif':
-                dtype = devinfo.get('type', 'ioemu')
-                if dtype != 'ioemu':
-                    continue
-                nics += 1
-                mac = devinfo.get('mac')
-                if mac == None:
-                    mac = randomMAC()
-                bridge = devinfo.get('bridge', 'xenbr0')
-                model = devinfo.get('model', 'rtl8139')
-                ret.append("-net")
-                ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
-                           (nics, mac, model))
-                ret.append("-net")
-                ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
-        return ret
+        for devuuid in vmConfig['vbd_refs']:
+            devinfo = vmConfig['devices'][devuuid][1]
+            uname = devinfo.get('uname')
+            if uname is not None and 'file:' in uname:
+                (_, vbdparam) = string.split(uname, ':', 1)
+                if not os.path.isfile(vbdparam):
+                    raise VmError('Disk image does not exist: %s' %
+                                  vbdparam)
 
-    def configVNC(self, imageConfig):
-        # Handle graphics library related options
-        vnc = imageConfig.get('vnc')
-        sdl = imageConfig.get('sdl')
-        ret = []
-        nographic = imageConfig.get('nographic')
+        for devuuid in vmConfig['vif_refs']:
+            devinfo = vmConfig['devices'][devuuid][1]
+            dtype = devinfo.get('type', 'ioemu')
+            if dtype != 'ioemu':
+                continue
+            nics += 1
+            mac = devinfo.get('mac')
+            if mac is None:
+                mac = randomMAC()
+            bridge = devinfo.get('bridge', 'xenbr0')
+            model = devinfo.get('model', 'rtl8139')
+            ret.append("-net")
+            ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
+                       (nics, mac, model))
+            ret.append("-net")
+            ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
 
-        # get password from VM config (if password omitted, None)
-        vncpasswd_vmconfig = imageConfig.get('vncpasswd')
 
-        if nographic:
+        #
+        # Find RFB console device, and if it exists, make QEMU enable
+        # the VNC console.
+        #
+        if vmConfig['image'].get('nographic'):
+            # skip vnc init if nographic is set
             ret.append('-nographic')
             return ret
 
-        if vnc:
-            vncdisplay = imageConfig.get('vncdisplay',
-                                         int(self.vm.getDomid()))
-            vncunused = imageConfig.get('vncunused')
+        vnc_config = {}
+        has_vnc = int(vmConfig['image'].get('vnc', 0)) != 0
+        has_sdl = int(vmConfig['image'].get('sdl', 0)) != 0
+        for dev_uuid in vmConfig['console_refs']:
+            dev_type, dev_info = vmConfig['devices'][dev_uuid]
+            if dev_type == 'vfb':
+                vnc_config = dev_info.get('other_config', {})
+                has_vnc = True
+                break
 
-            if vncunused:
-                ret += ['-vncunused']
+        if has_vnc:
+            if not vnc_config:
+                for key in ('vncunused', 'vnclisten', 'vncdisplay',
+                            'vncpasswd'):
+                    if key in vmConfig['image']:
+                        vnc_config[key] = vmConfig['image'][key]
+
+            if not vnc_config.get('vncunused', 0) and \
+                   vnc_config.get('vncdisplay', 0):
+                ret.append('-vnc')
+                ret.append(str(vncdisplay))
             else:
-                ret += ['-vnc', '%d' % vncdisplay]
+                ret.append('-vncunused')
 
-            vnclisten = imageConfig.get('vnclisten')
+            vnclisten = vnc_config.get('vnclisten',
+                                       xenopts().get_vnclisten_address())
+            ret.append('-vnclisten')
+            ret.append(str(vnclisten))
 
-            if not(vnclisten):
-                vnclisten = (xen.xend.XendRoot.instance().
-                             get_vnclisten_address())
-            if vnclisten:
-                ret += ['-vnclisten', vnclisten]
+            # Store vncpassword in xenstore
+            vncpasswd = vnc_config.get('vncpasswd')
+            if not vncpasswd:
+                vncpasswd = xenopts().get_vncpasswd_default()
 
-            vncpasswd = vncpasswd_vmconfig
             if vncpasswd is None:
-                vncpasswd = (xen.xend.XendRoot.instance().
-                             get_vncpasswd_default())
-                if vncpasswd is None:
-                    raise VmError('vncpasswd is not set up in ' +
-                                  'VMconfig and xend-config.')
+                raise VmError('vncpasswd is not setup in vmconfig or '
+                              'xend-config.sxp')
+
             if vncpasswd != '':
-                self.vm.storeVm("vncpasswd", vncpasswd)
+                self.vm.storeVm('vncpasswd', vncpasswd)
+        elif has_sdl:
+            # SDL is default in QEMU.
+            pass
+        else:
+            ret.append('-nographic')
 
         return ret
 
-    def createDeviceModel(self):
+    def createDeviceModel(self, restore = False):
         if self.pid:
             return
         # Execute device model.
@@ -439,6 +457,8 @@ class HVMImageHandler(ImageHandler):
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
                   "-m", "%s" % (self.getRequiredInitialReservation() / 1024)])
         args = args + self.dmargs
+        if restore:
+            args = args + ([ "-loadvm", "/tmp/xen.qemu-dm.%d" % self.vm.getDomid() ])
         env = dict(os.environ)
         if self.display:
             env['DISPLAY'] = self.display
@@ -457,12 +477,16 @@ class HVMImageHandler(ImageHandler):
         self.register_reboot_feature_watch()
         self.pid = self.vm.gatherDom(('image/device-model-pid', int))
 
-    def destroy(self):
+    def destroy(self, suspend = False):
         self.unregister_shutdown_watch()
         self.unregister_reboot_feature_watch();
         if self.pid:
             try:
-                os.kill(self.pid, signal.SIGKILL)
+                sig = signal.SIGKILL
+                if suspend:
+                    log.info("use sigusr1 to signal qemu %d", self.pid)
+                    sig = signal.SIGUSR1
+                os.kill(self.pid, sig)
             except OSError, exn:
                 log.exception(exn)
             try:
@@ -550,6 +574,9 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         # ROM size for guest firmware, ioreq page and xenstore page
         extra_pages = 1024 + 3
         return mem_kb + extra_pages * page_kb
+
+    def getRequiredInitialReservation(self):
+        return self.vm.getMemoryTarget()
 
     def getRequiredShadowMemory(self, shadow_mem_kb, maxmem_kb):
         # Explicit shadow memory is not a concept 

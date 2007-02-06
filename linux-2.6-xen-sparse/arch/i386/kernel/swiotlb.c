@@ -47,10 +47,8 @@ EXPORT_SYMBOL(swiotlb);
  */
 #define IO_TLB_SHIFT 11
 
-/* Width of DMA addresses. 30 bits is a b44 limitation. */
-#define DEFAULT_DMA_BITS 30
+int swiotlb_force;
 
-static int swiotlb_force;
 static char *iotlb_virt_start;
 static unsigned long iotlb_nslabs;
 
@@ -98,11 +96,12 @@ static struct phys_addr {
  */
 static DEFINE_SPINLOCK(io_tlb_lock);
 
-unsigned int dma_bits = DEFAULT_DMA_BITS;
+static unsigned int dma_bits;
+static unsigned int __initdata max_dma_bits = 32;
 static int __init
 setup_dma_bits(char *str)
 {
-	dma_bits = simple_strtoul(str, NULL, 0);
+	max_dma_bits = simple_strtoul(str, NULL, 0);
 	return 0;
 }
 __setup("dma_bits=", setup_dma_bits);
@@ -143,6 +142,7 @@ void
 swiotlb_init_with_default_size (size_t default_size)
 {
 	unsigned long i, bytes;
+	int rc;
 
 	if (!iotlb_nslabs) {
 		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
@@ -159,16 +159,33 @@ swiotlb_init_with_default_size (size_t default_size)
 	 */
 	iotlb_virt_start = alloc_bootmem_low_pages(bytes);
 	if (!iotlb_virt_start)
-		panic("Cannot allocate SWIOTLB buffer!\n"
-		      "Use dom0_mem Xen boot parameter to reserve\n"
-		      "some DMA memory (e.g., dom0_mem=-128M).\n");
+		panic("Cannot allocate SWIOTLB buffer!\n");
 
+	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
 	for (i = 0; i < iotlb_nslabs; i += IO_TLB_SEGSIZE) {
-		int rc = xen_create_contiguous_region(
-			(unsigned long)iotlb_virt_start + (i << IO_TLB_SHIFT),
-			get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
-			dma_bits);
-		BUG_ON(rc);
+		do {
+			rc = xen_create_contiguous_region(
+				(unsigned long)iotlb_virt_start + (i << IO_TLB_SHIFT),
+				get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
+				dma_bits);
+		} while (rc && dma_bits++ < max_dma_bits);
+		if (rc) {
+			if (i == 0)
+				panic("No suitable physical memory available for SWIOTLB buffer!\n"
+				      "Use dom0_mem Xen boot parameter to reserve\n"
+				      "some DMA memory (e.g., dom0_mem=-128M).\n");
+			iotlb_nslabs = i;
+			i <<= IO_TLB_SHIFT;
+			free_bootmem(__pa(iotlb_virt_start + i), bytes - i);
+			bytes = i;
+			for (dma_bits = 0; i > 0; i -= IO_TLB_SEGSIZE << IO_TLB_SHIFT) {
+				unsigned int bits = fls64(virt_to_bus(iotlb_virt_start + i - 1));
+
+				if (bits > dma_bits)
+					dma_bits = bits;
+			}
+			break;
+		}
 	}
 
 	/*
@@ -186,17 +203,27 @@ swiotlb_init_with_default_size (size_t default_size)
 	 * Get the overflow emergency buffer
 	 */
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
+	if (!io_tlb_overflow_buffer)
+		panic("Cannot allocate SWIOTLB overflow buffer!\n");
+
+	do {
+		rc = xen_create_contiguous_region(
+			(unsigned long)io_tlb_overflow_buffer,
+			get_order(io_tlb_overflow),
+			dma_bits);
+	} while (rc && dma_bits++ < max_dma_bits);
+	if (rc)
+		panic("No suitable physical memory available for SWIOTLB overflow buffer!\n");
 
 	iotlb_pfn_start = __pa(iotlb_virt_start) >> PAGE_SHIFT;
 	iotlb_pfn_end   = iotlb_pfn_start + (bytes >> PAGE_SHIFT);
 
 	printk(KERN_INFO "Software IO TLB enabled: \n"
 	       " Aperture:     %lu megabytes\n"
-	       " Kernel range: 0x%016lx - 0x%016lx\n"
+	       " Kernel range: %p - %p\n"
 	       " Address size: %u bits\n",
 	       bytes >> 20,
-	       (unsigned long)iotlb_virt_start,
-	       (unsigned long)iotlb_virt_start + bytes,
+	       iotlb_virt_start, iotlb_virt_start + bytes,
 	       dma_bits);
 }
 
@@ -238,9 +265,12 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 		char *dev, *host, *kmp;
 		len = size;
 		while (len != 0) {
+			unsigned long flags;
+
 			if (((bytes = len) + buffer.offset) > PAGE_SIZE)
 				bytes = PAGE_SIZE - buffer.offset;
-			kmp  = kmap_atomic(buffer.page, KM_SWIOTLB);
+			local_irq_save(flags); /* protects KM_BOUNCE_READ */
+			kmp  = kmap_atomic(buffer.page, KM_BOUNCE_READ);
 			dev  = dma_addr + size - len;
 			host = kmp + buffer.offset;
 			if (dir == DMA_FROM_DEVICE) {
@@ -248,7 +278,8 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 					/* inaccessible */;
 			} else
 				memcpy(dev, host, bytes);
-			kunmap_atomic(kmp, KM_SWIOTLB);
+			kunmap_atomic(kmp, KM_BOUNCE_READ);
+			local_irq_restore(flags);
 			len -= bytes;
 			buffer.page++;
 			buffer.offset = 0;
@@ -617,6 +648,8 @@ swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
 				    sg->dma_length, dir);
 }
 
+#ifdef CONFIG_HIGHMEM
+
 dma_addr_t
 swiotlb_map_page(struct device *hwdev, struct page *page,
 		 unsigned long offset, size_t size,
@@ -650,6 +683,8 @@ swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
 		unmap_single(hwdev, bus_to_virt(dma_address), size, direction);
 }
 
+#endif
+
 int
 swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 {
@@ -677,7 +712,5 @@ EXPORT_SYMBOL(swiotlb_sync_single_for_cpu);
 EXPORT_SYMBOL(swiotlb_sync_single_for_device);
 EXPORT_SYMBOL(swiotlb_sync_sg_for_cpu);
 EXPORT_SYMBOL(swiotlb_sync_sg_for_device);
-EXPORT_SYMBOL(swiotlb_map_page);
-EXPORT_SYMBOL(swiotlb_unmap_page);
 EXPORT_SYMBOL(swiotlb_dma_mapping_error);
 EXPORT_SYMBOL(swiotlb_dma_supported);

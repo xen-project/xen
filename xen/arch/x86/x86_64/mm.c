@@ -28,8 +28,13 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
+#include <asm/hypercall.h>
 #include <asm/msr.h>
 #include <public/memory.h>
+
+#ifdef CONFIG_COMPAT
+unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
+#endif
 
 struct page_info *alloc_xen_pagetable(void)
 {
@@ -121,6 +126,47 @@ void __init paging_init(void)
         l2_ro_mpt++;
     }
 
+#ifdef CONFIG_COMPAT
+    if ( !compat_disabled )
+    {
+        /* Create user-accessible L2 directory to map the MPT for compatibility guests. */
+        BUILD_BUG_ON(l4_table_offset(RDWR_MPT_VIRT_START) !=
+                     l4_table_offset(HIRO_COMPAT_MPT_VIRT_START));
+        l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(HIRO_COMPAT_MPT_VIRT_START)]);
+        if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
+            goto nomem;
+        compat_idle_pg_table_l2 = l2_ro_mpt = clear_page(page_to_virt(l2_pg));
+        l3e_write(&l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+                  l3e_from_page(l2_pg, __PAGE_HYPERVISOR));
+        l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
+        /*
+         * Allocate and map the compatibility mode machine-to-phys table.
+        */
+        mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
+        if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )
+            mpt_size = RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START;
+        mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+        if ( m2p_compat_vstart + mpt_size < MACH2PHYS_COMPAT_VIRT_END )
+            m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
+        for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
+        {
+            if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
+                goto nomem;
+            map_pages_to_xen(
+                RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
+                page_to_mfn(l1_pg),
+                1UL << PAGETABLE_ORDER,
+                PAGE_HYPERVISOR);
+            memset((void *)(RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
+                   0x55,
+                   1UL << L2_PAGETABLE_SHIFT);
+            /* NB. Cannot be GLOBAL as the pt entries get copied into per-VM space. */
+            l2e_write(l2_ro_mpt, l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
+            l2_ro_mpt++;
+        }
+    }
+#endif
+
     /* Set up linear page table mapping. */
     l4e_write(&idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)],
               l4e_from_paddr(__pa(idle_pg_table), __PAGE_HYPERVISOR));
@@ -182,6 +228,30 @@ void subarch_init_memory(void)
             share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
         }
     }
+#ifdef CONFIG_COMPAT
+    if ( !compat_disabled )
+    {
+        for ( v  = RDWR_COMPAT_MPT_VIRT_START;
+              v != RDWR_COMPAT_MPT_VIRT_END;
+              v += 1 << L2_PAGETABLE_SHIFT )
+        {
+            l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
+                l3_table_offset(v)];
+            if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+                continue;
+            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                continue;
+            m2p_start_mfn = l2e_get_pfn(l2e);
+
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+            {
+                struct page_info *page = mfn_to_page(m2p_start_mfn + i);
+                share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
+            }
+        }
+    }
+#endif
 }
 
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
@@ -189,7 +259,8 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     struct xen_machphys_mfn_list xmml;
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
-    unsigned long mfn, v;
+    unsigned long v;
+    xen_pfn_t mfn;
     unsigned int i;
     long rc = 0;
 
@@ -231,7 +302,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
-    fixup_guest_stack_selector(ss);
+    fixup_guest_stack_selector(current->domain, ss);
     current->arch.guest_context.kernel_ss = ss;
     current->arch.guest_context.kernel_sp = esp;
     return 0;
@@ -291,7 +362,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 
 
 /* Returns TRUE if given descriptor is valid for GDT or LDT. */
-int check_descriptor(struct desc_struct *d)
+int check_descriptor(const struct domain *dom, struct desc_struct *d)
 {
     u32 a = d->a, b = d->b;
     u16 cs;
@@ -301,12 +372,16 @@ int check_descriptor(struct desc_struct *d)
         goto good;
 
     /* Check and fix up the DPL. */
-    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL << 13) )
-        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL << 13);
+    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL(dom) << 13) )
+        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL(dom) << 13);
 
     /* All code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )
-        goto good;
+    {
+        if ( !IS_COMPAT(dom) || !(b & _SEGMENT_L) )
+            goto good;
+        goto bad;
+    }
 
     /* Invalid type 0 is harmless. It is used for 2nd half of a call gate. */
     if ( (b & _SEGMENT_TYPE) == 0x000 )
@@ -318,8 +393,8 @@ int check_descriptor(struct desc_struct *d)
 
     /* Validate and fix up the target code selector. */
     cs = a >> 16;
-    fixup_guest_code_selector(cs);
-    if ( !guest_gate_selector_okay(cs) )
+    fixup_guest_code_selector(dom, cs);
+    if ( !guest_gate_selector_okay(dom, cs) )
         goto bad;
     a = d->a = (d->a & 0xffffU) | (cs << 16);
 
@@ -332,6 +407,8 @@ int check_descriptor(struct desc_struct *d)
  bad:
     return 0;
 }
+
+#include "compat/mm.c"
 
 /*
  * Local variables:

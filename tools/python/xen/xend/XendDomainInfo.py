@@ -37,15 +37,16 @@ from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 from xen.util import security
 
-from xen.xend import balloon, sxp, uuid, image, arch
-from xen.xend import XendRoot, XendNode, XendConfig
+from xen.xend import balloon, sxp, uuid, image, arch, osdep
+from xen.xend import XendOptions, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
-from xen.xend.XendBootloader import bootloader
+from xen.xend.XendBootloader import bootloader, bootloader_tidy
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendDevices import XendDevices
+from xen.xend.XendTask import XendTask
 from xen.xend.xenstore.xstransact import xstransact, complete
-from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
+from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, ResumeDomain
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
@@ -54,29 +55,10 @@ MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
 
 xc = xen.lowlevel.xc.xc()
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
-
-
-#
-# There are a number of CPU-related fields:
-#
-#   vcpus:       the number of virtual CPUs this domain is configured to use.
-#   vcpu_avail:  a bitmap telling the guest domain whether it may use each of
-#                its VCPUs.  This is translated to
-#                <dompath>/cpu/<id>/availability = {online,offline} for use
-#                by the guest domain.
-#   cpumap:      a list of bitmaps, one for each VCPU, giving the physical
-#                CPUs that that VCPU may use.
-#   cpu:         a configuration setting requesting that VCPU 0 is pinned to
-#                the specified physical CPU.
-#
-# vcpus and vcpu_avail settings persist with the VM (i.e. they are persistent
-# across save, restore, migrate, and restart).  The other settings are only
-# specific to the domain, so are lost when the VM moves.
-#
 
 
 def create(config):
@@ -120,7 +102,6 @@ def create_from_dict(config_dict):
         log.exception('Domain construction failed')
         vm.destroy()
         raise
-
     return vm
 
 def recreate(info, priv):
@@ -206,6 +187,11 @@ def recreate(info, priv):
 
     vm._registerWatches()
     vm.refreshShutdown(xeninfo)
+
+    # register the domain in the list 
+    from xen.xend import XendDomain
+    XendDomain.instance().add_domain(vm)
+
     return vm
 
 
@@ -402,12 +388,13 @@ class XendDomainInfo:
 
         if self.state == DOM_STATE_HALTED:
             try:
-                self._constructDomain()
-                self._initDomain()
-                self._storeVmDetails()
-                self._storeDomDetails()
-                self._registerWatches()
-                self.refreshShutdown()
+                XendTask.log_progress(0, 30, self._constructDomain)
+                XendTask.log_progress(31, 60, self._initDomain)
+                
+                XendTask.log_progress(61, 70, self._storeVmDetails)
+                XendTask.log_progress(71, 80, self._storeDomDetails)
+                XendTask.log_progress(81, 90, self._registerWatches)
+                XendTask.log_progress(91, 100, self.refreshShutdown)
 
                 # save running configuration if XendDomains believe domain is
                 # persistent
@@ -439,7 +426,7 @@ class XendDomainInfo:
 
     def shutdown(self, reason):
         """Shutdown a domain by signalling this via xenstored."""
-        log.debug('XendDomainInfo.shutdown')
+        log.debug('XendDomainInfo.shutdown(%s)', reason)
         if self.state in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
             raise XendError('Domain cannot be shutdown')
 
@@ -450,6 +437,16 @@ class XendDomainInfo:
             raise XendError('Invalid reason: %s' % reason)
         self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
+
+        ## shutdown hypercall for hvm domain desides xenstore write
+        image_cfg = self.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+        if hvm:
+            for code in DOMAIN_SHUTDOWN_REASONS.keys():
+                if DOMAIN_SHUTDOWN_REASONS[code] == reason:
+                    break
+            xc.domain_shutdown(self.domid, code)
+
 
     def pause(self):
         """Pause domain
@@ -496,7 +493,7 @@ class XendDomainInfo:
         self._waitForDevice(dev_type, devid)
         return self.getDeviceController(dev_type).sxpr(devid)
 
-    def device_configure(self, dev_config, devid = None):
+    def device_configure(self, dev_sxp, devid = None):
         """Configure an existing device.
         
         @param dev_config: device configuration
@@ -506,19 +503,24 @@ class XendDomainInfo:
         @return: Returns True if successfully updated device
         @rtype: boolean
         """
-        deviceClass = sxp.name(dev_config)
-        
-        # look up uuid of the device
-        dev_control =  self.getDeviceController(deviceClass)
-        dev_sxpr = dev_control.sxpr(devid)
-        dev_uuid = sxp.child_value(sxpr, 'uuid')
-        if not dev_uuid:
-            return False
 
-        self.info.device_update(dev_uuid, dev_config)
-        dev_config_dict = self.info['devices'].get(dev_uuid)
-        if dev_config_dict:
-            dev_control.reconfigureDevice(devid, dev_config_dict[1])
+        # convert device sxp to a dict
+        dev_class = sxp.name(dev_sxp)
+        dev_config = {}
+        for opt_val in dev_sxp[1:]:
+            try:
+                dev_config[opt_val[0]] = opt_val[1]
+            except IndexError:
+                pass
+
+        # use DevController.reconfigureDevice to change device config
+        dev_control = self.getDeviceController(dev_class)
+        dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
+
+        # update XendConfig with new device info
+        if dev_uuid:
+            self.info.device_update(dev_uuid, dev_sxp)
+            
         return True
 
     def waitForDevices(self):
@@ -545,8 +547,6 @@ class XendDomainInfo:
                     break
                 
         return self.getDeviceController(deviceClass).destroyDevice(devid, force)
-
-
 
     def getDeviceSxprs(self, deviceClass):
         if self.state == DOM_STATE_RUNNING:
@@ -609,7 +609,7 @@ class XendDomainInfo:
                     ['name',       self.info['name_label']],
                     ['vcpu_count', self.info['vcpus_number']]]
 
-            for i in range(0, self.info['max_vcpu_id']+1):
+            for i in range(0, self.info['vcpus_number']):
                 info = xc.vcpu_getinfo(self.domid, i)
 
                 sxpr.append(['vcpu',
@@ -682,6 +682,42 @@ class XendDomainInfo:
             for device in devices:
                 self.info.device_add(device[0], cfg_sxp = device)
 
+        self._update_consoles()
+
+    def _update_consoles(self):
+        if self.domid == None or self.domid == 0:
+            return
+
+        # Update VT100 port if it exists
+        self.console_port = self.readDom('console/port')
+        if self.console_port is not None:
+            serial_consoles = self.info.console_get_all('vt100')
+            if not serial_consoles:
+                cfg = self.info.console_add('vt100', self.console_port)
+                self._createDevice('console', cfg)
+            else:
+                console_uuid = serial_consoles[0].get('uuid')
+                self.info.console_update(console_uuid, 'location',
+                                         self.console_port)
+                
+
+        # Update VNC port if it exists and write to xenstore
+        vnc_port = self.readDom('console/vnc-port')
+        if vnc_port is not None:
+            for dev_uuid, (dev_type, dev_info) in self.info['devices'].items():
+                if dev_type == 'vfb':
+                    old_location = dev_info.get('location')
+                    listen_host = dev_info.get('vnclisten', 'localhost')
+                    new_location = '%s:%s' % (listen_host, str(vnc_port))
+                    if old_location == new_location:
+                        break
+
+                    dev_info['location'] = new_location
+                    self.info.device_update(dev_uuid, cfg_xenapi = dev_info)
+                    vfb_ctrl = self.getDeviceController('vfb')
+                    vfb_ctrl.reconfigureDevice(0, dev_info)
+                    break
+                
     #
     # Function to update xenstore /vm/*
     #
@@ -734,7 +770,7 @@ class XendDomainInfo:
             'domid':              str(self.domid),
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
-            'console/limit':      str(xroot.get_console_limit() * 1024),
+            'console/limit':      str(xoptions.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_static_min'] * 1024)
             }
 
@@ -893,8 +929,9 @@ class XendDomainInfo:
                 self._writeDom(self._vcpuDomDetails())
         else:
             self.info['vcpus_number'] = vcpus
-            self.info['online_vcpus'] = vcpus
             xen.xend.XendDomain.instance().managed_config_save(self)
+        log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
+                 vcpus)
 
     def getLabel(self):
         return security.get_security_info(self.info, 'label')
@@ -914,7 +951,7 @@ class XendDomainInfo:
         return self.info.get('cpu_cap', 0)
 
     def getWeight(self):
-        return self.info['cpu_weight']
+        return self.info.get('cpu_weight', 256)
 
     def setResume(self, state):
         self._resume = state
@@ -969,9 +1006,15 @@ class XendDomainInfo:
 
                 log.warn('Domain has crashed: name=%s id=%d.',
                          self.info['name_label'], self.domid)
+                self._writeVm(LAST_SHUTDOWN_REASON, 'crash')
 
-                if xroot.get_enable_dump():
-                    self.dumpCore()
+                if xoptions.get_enable_dump():
+                    try:
+                        self.dumpCore()
+                    except XendError:
+                        # This error has been logged -- there's nothing more
+                        # we can do in this context.
+                        pass
 
                 restart_reason = 'crash'
                 self._stateSet(DOM_STATE_HALTED)
@@ -988,6 +1031,7 @@ class XendDomainInfo:
 
                     log.info('Domain has shutdown: name=%s id=%d reason=%s.',
                              self.info['name_label'], self.domid, reason)
+                    self._writeVm(LAST_SHUTDOWN_REASON, reason)
 
                     self._clearRestart()
 
@@ -1162,7 +1206,10 @@ class XendDomainInfo:
     #
 
     def dumpCore(self, corefile = None):
-        """Create a core dump for this domain.  Nothrow guarantee."""
+        """Create a core dump for this domain.
+
+        @raise: XendError if core dumping failed.
+        """
         
         try:
             if not corefile:
@@ -1205,16 +1252,26 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
-        for (devclass, config) in self.info.get('devices', {}).values():
-            if devclass in XendDevices.valid_devices():            
+        ordered_refs = self.info.ordered_device_refs()
+        for dev_uuid in ordered_refs:
+            devclass, config = self.info['devices'][dev_uuid]
+            if devclass in XendDevices.valid_devices():
                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
-                self._createDevice(devclass, config)
+                dev_uuid = config.get('uuid')
+                devid = self._createDevice(devclass, config)
+                
+                # store devid in XendConfig for caching reasons
+                if dev_uuid in self.info['devices']:
+                    self.info['devices'][dev_uuid][1]['devid'] = devid
 
         if self.image:
             self.image.createDeviceModel()
 
-    def _releaseDevices(self):
+    def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""
+        if suspend and self.image:
+            self.image.destroy(suspend)
+            return
 
         while True:
             t = xstransact("%s/device" % self.dompath)
@@ -1328,6 +1385,9 @@ class XendDomainInfo:
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus_number']))
 
+        # register the domain in the list 
+        from xen.xend import XendDomain
+        XendDomain.instance().add_domain(self)
 
     def _introduceDomain(self):
         assert self.domid is not None
@@ -1366,7 +1426,7 @@ class XendDomainInfo:
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
             if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
-                for v in range(0, self.info['max_vcpu_id']+1):
+                for v in range(0, self.info['vcpus_number']):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
             # Use architecture- and image-specific calculations to determine
@@ -1380,6 +1440,7 @@ class XendDomainInfo:
                 self.info['shadow_memory'] * 1024,
                 self.info['memory_static_max'] * 1024)
 
+            log.debug("_initDomain:shadow_memory=0x%x, memory_static_max=0x%x, memory_static_min=0x%x.", self.info['shadow_memory'], self.info['memory_static_max'], self.info['memory_static_min'],)
             # Round shadow up to a multiple of a MiB, as shadow_mem_control
             # takes MiB and we must not round down and end up under-providing.
             shadow = ((shadow + 1023) / 1024) * 1024
@@ -1425,6 +1486,7 @@ class XendDomainInfo:
         try:
             self.unwatchShutdown()
             self._releaseDevices()
+            bootloader_tidy(self)
 
             if self.image:
                 try:
@@ -1479,6 +1541,16 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
+        image_cfg = self.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+        if hvm:
+            self.image = image.create(self,
+                    self.info,
+                    self.info['image'],
+                    self.info['devices'])
+            if self.image:
+                self.image.createDeviceModel(True)
+                self.image.register_shutdown_watch()
         self._storeDomDetails()
         self._registerWatches()
         self.refreshShutdown()
@@ -1515,8 +1587,21 @@ class XendDomainInfo:
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
+        from xen.xend import XendDomain
+        XendDomain.instance().remove_domain(self)
+
         self.cleanupDomain()
 
+
+    def resumeDomain(self):
+        log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
+
+        try:
+            if self.domid is not None:
+                xc.domain_resume(self.domid)
+                ResumeDomain(self.domid)
+        except:
+            log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
 
     #
     # Channels for xenstore and console
@@ -1533,10 +1618,23 @@ class XendDomainInfo:
         """Create an event channel to the domain.
         """
         try:
-            return xc.evtchn_alloc_unbound(domid=self.domid, remote_dom=0)
+            if self.domid != None:
+                return xc.evtchn_alloc_unbound(domid = self.domid,
+                                               remote_dom = 0)
         except:
-            log.exception("Exception in alloc_unbound(%d)", self.domid)
+            log.exception("Exception in alloc_unbound(%s)", str(self.domid))
             raise
+
+    def _resetChannels(self):
+        """Reset all event channels in the domain.
+        """
+        try:
+            if self.domid != None:
+                return xc.evtchn_reset(dom = self.domid)
+        except:
+            log.exception("Exception in evtcnh_reset(%s)", str(self.domid))
+            raise
+
 
     #
     # Bootloader configuration
@@ -1550,14 +1648,15 @@ class XendDomainInfo:
         kernel          = self.info['PV_kernel']
         ramdisk         = self.info['PV_ramdisk']
         args            = self.info['PV_args']
-        boot            = self.info['HVM_boot']
+        boot            = self.info['HVM_boot_policy']
 
         if boot:
             # HVM booting.
             self.info['image']['type'] = 'hvm'
             if not 'devices' in self.info['image']:
                 self.info['image']['devices'] = {}
-            self.info['image']['devices']['boot'] = boot
+            self.info['image']['devices']['boot'] = \
+                self.info['HVM_boot_params'].get('order', 'dc')
         elif not blexec and kernel:
             # Boot from dom0.  Nothing left to do -- the kernel and ramdisk
             # will be picked up by image.py.
@@ -1565,51 +1664,50 @@ class XendDomainInfo:
         else:
             # Boot using bootloader
             if not blexec or blexec == 'pygrub':
-                blexec = '/usr/bin/pygrub'
+                blexec = osdep.pygrub_path
 
             blcfg = None
-            for (devtype, devinfo) in self.info.all_devices_sxpr():
-                if not devtype or not devinfo or devtype not in ('vbd', 'tap'):
-                    continue
-                disk = None
-                for param in devinfo:
-                    if param[0] == 'uname':
-                        disk = param[1]
-                        break
+            disks = [x for x in self.info['vbd_refs']
+                     if self.info['devices'][x][1]['bootable']]
 
-                if disk is None:
-                    continue
-                fn = blkdev_uname_to_file(disk)
-                mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            if not disks:
+                msg = "Had a bootloader specified, but no disks are bootable"
+                log.error(msg)
+                raise VmError(msg)
+
+            devinfo = self.info['devices'][disks[0]]
+            devtype = devinfo[0]
+            disk = devinfo[1]['uname']
+
+            fn = blkdev_uname_to_file(disk)
+            mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            if mounted:
+                # This is a file, not a device.  pygrub can cope with a
+                # file if it's raw, but if it's QCOW or other such formats
+                # used through blktap, then we need to mount it first.
+
+                log.info("Mounting %s on %s." %
+                         (fn, BOOTLOADER_LOOPBACK_DEVICE))
+
+                vbd = {
+                    'mode': 'RO',
+                    'device': BOOTLOADER_LOOPBACK_DEVICE,
+                    }
+
+                from xen.xend import XendDomain
+                dom0 = XendDomain.instance().privilegedDomain()
+                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
+                fn = BOOTLOADER_LOOPBACK_DEVICE
+
+            try:
+                blcfg = bootloader(blexec, fn, self, False,
+                                   bootloader_args, kernel, ramdisk, args)
+            finally:
                 if mounted:
-                    # This is a file, not a device.  pygrub can cope with a
-                    # file if it's raw, but if it's QCOW or other such formats
-                    # used through blktap, then we need to mount it first.
-
-                    log.info("Mounting %s on %s." %
+                    log.info("Unmounting %s from %s." %
                              (fn, BOOTLOADER_LOOPBACK_DEVICE))
 
-                    vbd = {
-                        'mode': 'RO',
-                        'device': BOOTLOADER_LOOPBACK_DEVICE,
-                        }
-
-                    from xen.xend import XendDomain
-                    dom0 = XendDomain.instance().privilegedDomain()
-                    dom0._waitForDeviceUUID(dom0.create_vbd_with_vdi(vbd, fn))
-                    fn = BOOTLOADER_LOOPBACK_DEVICE
-
-                try:
-                    blcfg = bootloader(blexec, fn, True,
-                                       bootloader_args, kernel, ramdisk, args)
-                finally:
-                    if mounted:
-                        log.info("Unmounting %s from %s." %
-                                 (fn, BOOTLOADER_LOOPBACK_DEVICE))
-
-                        dom0.destroyDevice('tap', '/dev/xvdp')
-
-                break
+                    dom0.destroyDevice('tap', '/dev/xvdp')
 
             if blcfg is None:
                 msg = "Had a bootloader specified, but can't find disk"
@@ -1685,6 +1783,25 @@ class XendDomainInfo:
             test = 0
             diff = time.time() - start
             for i in self.getDeviceController('vbd').deviceIDs():
+                test = 1
+                log.info("Dev %s still active, looping...", i)
+                time.sleep(0.1)
+                
+            if test == 0:
+                break
+            if diff >= MIGRATE_TIMEOUT:
+                log.info("Dev still active but hit max loop timeout")
+                break
+
+    def testvifsComplete(self):
+        """ In case vifs are released and then created for the same
+        domain, we need to wait the device shut down.
+        """
+        start = time.time()
+        while True:
+            test = 0
+            diff = time.time() - start
+            for i in self.getDeviceController('vif').deviceIDs():
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)
@@ -1811,7 +1928,8 @@ class XendDomainInfo:
         # TODO: we should eventually get rid of old_dom_states
 
         self.info.update_config(info)
-
+        self._update_consoles()
+        
         if refresh:
             self.refreshShutdown(info)
 
@@ -1823,11 +1941,11 @@ class XendDomainInfo:
                                   ignore_devices = ignore_store,
                                   legacy_only = legacy_only)
 
-        if not ignore_store and self.dompath:
-            vnc_port = self.readDom('console/vnc-port')
-            if vnc_port is not None:
-                result.append(['device',
-                               ['console', ['vnc-port', str(vnc_port)]]])
+        #if not ignore_store and self.dompath:
+        #    vnc_port = self.readDom('console/vnc-port')
+        #    if vnc_port is not None:
+        #        result.append(['device',
+        #                       ['console', ['vnc-port', str(vnc_port)]]])
 
         return result
 
@@ -1859,7 +1977,11 @@ class XendDomainInfo:
         else:
             return 'unknown'
     def get_vcpus_params(self):
-        return '' # TODO
+        if self.getDomid() is None:
+            return self.info['vcpus_params']
+
+        retval = xc.sched_credit_domain_get(self.getDomid())
+        return retval
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
     def get_platform_std_vga(self):
@@ -1875,11 +1997,9 @@ class XendDomainInfo:
     def get_platform_keymap(self):
         return self.info.get('platform_keymap', '')
     def get_pci_bus(self):
-        return '' # TODO
+        return self.info.get('pci_bus', '')
     def get_tools_version(self):
-        return {} # TODO
-    def get_other_config(self):
-        return {} # TODO
+        return self.info.get('tools_version', {})
     
     def get_on_shutdown(self):
         after_shutdown = self.info.get('action_after_shutdown')
@@ -1915,21 +2035,18 @@ class XendDomainInfo:
 
         @rtype: dictionary
         """
-        dev_type_config = self.info['devices'].get(dev_uuid)
+        dev_type, dev_config = self.info['devices'].get(dev_uuid, (None, None))
 
         # shortcut if the domain isn't started because
         # the devcontrollers will have no better information
         # than XendConfig.
         if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
-            if dev_type_config:
-                return copy.deepcopy(dev_type_config[1])
+            if dev_config:
+                return copy.deepcopy(dev_config)
             return None
 
         # instead of using dev_class, we use the dev_type
         # that is from XendConfig.
-        # This will accomdate 'tap' as well as 'vbd'
-        dev_type = dev_type_config[0]
-        
         controller = self.getDeviceController(dev_type)
         if not controller:
             return None
@@ -1938,14 +2055,14 @@ class XendDomainInfo:
         if not all_configs:
             return None
 
-        dev_config = copy.deepcopy(dev_type_config[1])
+        updated_dev_config = copy.deepcopy(dev_config)
         for _devid, _devcfg in all_configs.items():
             if _devcfg.get('uuid') == dev_uuid:
-                dev_config.update(_devcfg)
-                dev_config['id'] = _devid
-                return dev_config
+                updated_dev_config.update(_devcfg)
+                updated_dev_config['id'] = _devid
+                return updated_dev_config
 
-        return dev_config
+        return updated_dev_config
                     
     def get_dev_xenapi_config(self, dev_class, dev_uuid):
         config = self.get_dev_config_by_uuid(dev_class, dev_uuid)
@@ -1981,23 +2098,52 @@ class XendDomainInfo:
                     # handle that properly.
 
             config['MTU'] = 1500 # TODO
-            config['io_read_kbs'] = 0.0
-            config['io_write_kbs'] = 0.0
+            
+            if self.state not in (XEN_API_VM_POWER_STATE_HALTED,):
+                xennode = XendNode.instance()
+                rx_bps, tx_bps = xennode.get_vif_util(self.domid, devid)
+                config['io_read_kbs'] = rx_bps/1024
+                config['io_write_kbs'] = tx_bps/1024
+            else:
+                config['io_read_kbs'] = 0.0
+                config['io_write_kbs'] = 0.0                
 
         if dev_class == 'vbd':
+
+            if self.state not in (XEN_API_VM_POWER_STATE_HALTED,):
+                controller = self.getDeviceController(dev_class)
+                devid, _1, _2 = controller.getDeviceDetails(config)
+                xennode = XendNode.instance()
+                rd_blkps, wr_blkps = xennode.get_vbd_util(self.domid, devid)
+                config['io_read_kbs'] = rd_blkps
+                config['io_write_kbs'] = wr_blkps
+            else:
+                config['io_read_kbs'] = 0.0
+                config['io_write_kbs'] = 0.0                
+            
             config['VDI'] = config.get('VDI', '')
             config['device'] = config.get('dev', '')
+            if ':' in config['device']:
+                vbd_name, vbd_type = config['device'].split(':', 1)
+                config['device'] = vbd_name
+                if vbd_type == 'cdrom':
+                    config['type'] = XEN_API_VBD_TYPE[0]
+                else:
+                    config['type'] = XEN_API_VBD_TYPE[1]
+
             config['driver'] = 'paravirtualised' # TODO
             config['image'] = config.get('uname', '')
-            config['io_read_kbs'] = 0.0
-            config['io_write_kbs'] = 0.0
-            if config['mode'] == 'r':
+
+            if config.get('mode', 'r') == 'r':
                 config['mode'] = 'RO'
             else:
                 config['mode'] = 'RW'
 
         if dev_class == 'vtpm':
-            config['driver'] = 'paravirtualised' # TODO
+            if not config.has_key('type'):
+                config['type'] = 'paravirtualised' # TODO
+            if not config.has_key('backend'):
+                config['backend'] = "00000000-0000-0000-0000-000000000000"
 
         return config
 
@@ -2008,15 +2154,16 @@ class XendDomainInfo:
         except KeyError:
             raise XendError('Invalid property for device: %s' % field)
 
+    def set_dev_property(self, dev_class, dev_uuid, field, value):
+        self.info['devices'][dev_uuid][1][field] = value
+
     def get_vcpus_util(self):
-        # TODO: this returns the total accum cpu time, rather than util
-        # TODO: spec says that key is int, however, python does not allow
-        #       non-string keys to dictionaries.
         vcpu_util = {}
-        if 'max_vcpu_id' in self.info and self.domid != None:
-            for i in range(0, self.info['max_vcpu_id']+1):
-                info = xc.vcpu_getinfo(self.domid, i)
-                vcpu_util[str(i)] = info['cpu_time']/1000000000.0
+        xennode = XendNode.instance()
+        if 'vcpus_number' in self.info and self.domid != None:
+            for i in range(0, self.info['vcpus_number']):
+                util = xennode.get_vcpu_util(self.domid, i)
+                vcpu_util[str(i)] = util
                 
         return vcpu_util
 
@@ -2032,24 +2179,7 @@ class XendDomainInfo:
     def get_vtpms(self):
         return self.info.get('vtpm_refs', [])
 
-    def create_vbd(self, xenapi_vbd):
-        """Create a VBD device from the passed struct in Xen API format.
-
-        @return: uuid of the device
-        @rtype: string
-        """
-
-        dev_uuid = self.info.device_add('vbd', cfg_xenapi = xenapi_vbd)
-        if not dev_uuid:
-            raise XendError('Failed to create device')
-        
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
-            _, config = self.info['devices'][dev_uuid]
-            config['devid'] = self.getDeviceController('vbd').createDevice(config)
-
-        return dev_uuid
-
-    def create_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
+    def create_vbd(self, xenapi_vbd, vdi_image_path):
         """Create a VBD using a VDI from XendStorageRepository.
 
         @param xenapi_vbd: vbd struct from the Xen API
@@ -2058,14 +2188,26 @@ class XendDomainInfo:
         @return: uuid of the device
         """
         xenapi_vbd['image'] = vdi_image_path
-        log.debug('create_vbd_with_vdi: %s' % xenapi_vbd)
-        dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+        log.debug('create_vbd: %s' % xenapi_vbd)
+        dev_uuid = ''
+        if vdi_image_path.startswith('tap'):
+            dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+        else:
+            dev_uuid = self.info.device_add('vbd', cfg_xenapi = xenapi_vbd)
+            
         if not dev_uuid:
             raise XendError('Failed to create device')
 
         if self.state == XEN_API_VM_POWER_STATE_RUNNING:
             _, config = self.info['devices'][dev_uuid]
-            config['devid'] = self.getDeviceController('tap').createDevice(config)
+            dev_control = None
+            
+            if vdi_image_path.startswith('tap'):
+                dev_control =  self.getDeviceController('tap')
+            else:
+                dev_control = self.getDeviceController('vbd')
+                
+            config['devid'] = dev_control.createDevice(config)
 
         return dev_uuid
 
@@ -2103,6 +2245,47 @@ class XendDomainInfo:
 
         return dev_uuid
 
+    def create_console(self, xenapi_console):
+        """ Create a console device from a Xen API struct.
+
+        @return: uuid of device
+        @rtype: string
+        """
+        if self.state not in (DOM_STATE_HALTED,):
+            raise VmError("Can only add console to a halted domain.")
+
+        dev_uuid = self.info.device_add('console', cfg_xenapi = xenapi_console)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        return dev_uuid
+
+    def destroy_device_by_uuid(self, dev_type, dev_uuid):
+        if dev_uuid not in self.info['devices']:
+            raise XendError('Device does not exist')
+
+        try:
+            if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+                _, config = self.info['devices'][dev_uuid]
+                devid = config.get('devid')
+                if devid != None:
+                    self.getDeviceController(dev_type).destroyDevice(devid, force = False)
+                else:
+                    raise XendError('Unable to get devid for device: %s:%s' %
+                                    (dev_type, dev_uuid))
+        finally:
+            del self.info['devices'][dev_uuid]
+            self.info['%s_refs' % dev_type].remove(dev_uuid)
+
+    def destroy_vbd(self, dev_uuid):
+        self.destroy_device_by_uuid('vbd', dev_uuid)
+
+    def destroy_vif(self, dev_uuid):
+        self.destroy_device_by_uuid('vif', dev_uuid)
+
+    def destroy_vtpm(self, dev_uuid):
+        self.destroy_device_by_uuid('vtpm', dev_uuid)
+            
     def has_device(self, dev_class, dev_uuid):
         return (dev_uuid in self.info['%s_refs' % dev_class.lower()])
 

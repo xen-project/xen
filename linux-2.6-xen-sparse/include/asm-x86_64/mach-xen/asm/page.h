@@ -1,7 +1,6 @@
 #ifndef _X86_64_PAGE_H
 #define _X86_64_PAGE_H
 
-#include <linux/config.h>
 /* #include <linux/string.h> */
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
@@ -9,13 +8,12 @@
 #include <asm/bug.h>
 #endif
 #include <xen/interface/xen.h> 
-#include <xen/foreign_page.h>
 
-#define arch_free_page(_page,_order)			\
-({	int foreign = PageForeign(_page);		\
-	if (foreign)					\
-		(PageForeignDestructor(_page))(_page);	\
-	foreign;					\
+#define arch_free_page(_page,_order)		\
+({	int foreign = PageForeign(_page);	\
+	if (foreign)				\
+		PageForeignDestructor(_page);	\
+	foreign;				\
 })
 #define HAVE_ARCH_FREE_PAGE
 
@@ -49,7 +47,7 @@
 #define EXCEPTION_STACK_ORDER 0
 #define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
 
-#define DEBUG_STACK_ORDER EXCEPTION_STACK_ORDER
+#define DEBUG_STACK_ORDER (EXCEPTION_STACK_ORDER + 1)
 #define DEBUG_STKSZ (PAGE_SIZE << DEBUG_STACK_ORDER)
 
 #define IRQSTACK_ORDER 2
@@ -189,8 +187,6 @@ static inline pgd_t __pgd(unsigned long x)
 #define __boot_va(x)		__va(x)
 #define __boot_pa(x)		__pa(x)
 #ifdef CONFIG_FLATMEM
-#define pfn_to_page(pfn)	(mem_map + (pfn))
-#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < end_pfn)
 #endif
 
@@ -204,8 +200,9 @@ static inline pgd_t __pgd(unsigned long x)
 
 #define __HAVE_ARCH_GATE_AREA 1	
 
-#endif /* __KERNEL__ */
-
+#include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
+
+#endif /* __KERNEL__ */
 
 #endif /* _X86_64_PAGE_H */

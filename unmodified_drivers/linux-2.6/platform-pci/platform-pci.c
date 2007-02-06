@@ -61,7 +61,7 @@ MODULE_LICENSE("GPL");
 unsigned long *phys_to_machine_mapping;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
-static int __init init_xen_info(void)
+static int __devinit init_xen_info(void)
 {
 	unsigned long shared_info_frame;
 	struct xen_add_to_physmap xatp;
@@ -179,26 +179,56 @@ static int get_hypercall_stubs(void)
 #define get_hypercall_stubs()	(0)
 #endif
 
-static int get_callback_irq(struct pci_dev *pdev)
+static uint64_t get_callback_via(struct pci_dev *pdev)
 {
 #ifdef __ia64__
-	int irq;
+	int irq, rid;
 	for (irq = 0; irq < 16; irq++) {
 		if (isa_irq_to_vector(irq) == pdev->irq)
 			return irq;
 	}
-	return 0;
+	/* use Requester-ID as callback_irq */
+	/* RID: '<#bus(8)><#dev(5)><#func(3)>' (cf. PCI-Express spec) */
+	rid = ((pdev->bus->number & 0xff) << 8) | pdev->devfn;
+	printk(KERN_INFO DRV_NAME ":use Requester-ID(%04x) as callback irq\n",
+	       rid);
+	return rid | IA64_CALLBACK_IRQ_RID;
 #else /* !__ia64__ */
-	return pdev->irq;
+	u8 pin;
+
+	if (pdev->irq < 16)
+		return pdev->irq; /* ISA IRQ */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
+	pin = pdev->pin;
+#else
+	pci_read_config_byte(pdev, PCI_INTERRUPT_PIN, &pin);
+#endif
+
+	/* We don't know the GSI. Specify the PCI INTx line instead. */
+	return (((uint64_t)0x01 << 56) | /* PCI INTx identifier */
+		((uint64_t)pci_domain_nr(pdev->bus) << 32) |
+		((uint64_t)pdev->bus->number << 16) |
+		((uint64_t)(pdev->devfn & 0xff) << 8) |
+		((uint64_t)(pin - 1) & 3));
 #endif
 }
+
+/* Invalidate foreign mappings (e.g., in qemu-based device model). */
+static uint16_t invlmap_port;
+void xen_invalidate_foreign_mappings(void)
+{
+	outb(0, invlmap_port);
+}
+EXPORT_SYMBOL(xen_invalidate_foreign_mappings);
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
-	int i, ret, callback_irq;
+	int i, ret;
 	long ioaddr, iolen;
 	long mmio_addr, mmio_len;
+	uint64_t callback_via;
 
 	i = pci_enable_device(pdev);
 	if (i)
@@ -210,12 +240,14 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	mmio_addr = pci_resource_start(pdev, 1);
 	mmio_len = pci_resource_len(pdev, 1);
 
-	callback_irq = get_callback_irq(pdev);
+	callback_via = get_callback_via(pdev);
 
-	if (mmio_addr == 0 || ioaddr == 0 || callback_irq == 0) {
+	if (mmio_addr == 0 || ioaddr == 0 || callback_via == 0) {
 		printk(KERN_WARNING DRV_NAME ":no resources found\n");
 		return -ENOENT;
 	}
+
+	invlmap_port = ioaddr;
 
 	if (request_mem_region(mmio_addr, mmio_len, DRV_NAME) == NULL)
 	{
@@ -242,12 +274,12 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if ((ret = init_xen_info()))
 		goto out;
 
-	if ((ret = request_irq(pdev->irq, evtchn_interrupt, SA_SHIRQ,
-			       "xen-platform-pci", pdev))) {
+	if ((ret = request_irq(pdev->irq, evtchn_interrupt,
+			       SA_SHIRQ | SA_SAMPLE_RANDOM,
+			       "xen-platform-pci", pdev)))
 		goto out;
-	}
 
-	if ((ret = set_callback_irq(callback_irq)))
+	if ((ret = set_callback_via(callback_via)))
 		goto out;
 
  out:
@@ -297,7 +329,7 @@ static void __exit platform_pci_module_cleanup(void)
 {
 	printk(KERN_INFO DRV_NAME ":Do platform module cleanup\n");
 	/* disable hypervisor for callback irq */
-	set_callback_irq(0);
+	set_callback_via(0);
 	if (pci_device_registered)
 		pci_unregister_driver(&platform_driver);
 }

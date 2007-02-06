@@ -54,7 +54,10 @@ typedef l4_pgentry_t root_pgentry_t;
 #define l4_linear_offset(_a) (((_a) & VADDR_MASK) >> L4_PAGETABLE_SHIFT)
 
 #define is_guest_l1_slot(_s) (1)
-#define is_guest_l2_slot(_t, _s) (1)
+#define is_guest_l2_slot(_d, _t, _s)                   \
+    ( !IS_COMPAT(_d) ||                                \
+      !((_t) & PGT_pae_xen_l2) ||                      \
+      ((_s) < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_d)) )
 #define is_guest_l3_slot(_s) (1)
 #define is_guest_l4_slot(_s)                   \
     (((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT) || \
@@ -92,6 +95,8 @@ typedef l4_pgentry_t root_pgentry_t;
 #define L2_DISALLOW_MASK (BASE_DISALLOW_MASK)
 #define L3_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
 #define L4_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
+
+#define COMPAT_L3_DISALLOW_MASK L3_DISALLOW_MASK
 
 #define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
 #define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)

@@ -49,6 +49,8 @@ def domid(name):
 
     if status != 0 or "Traceback" in output:
         return -1
+    if output == "None":
+        return -1
     try:
         return int(output)
     except:

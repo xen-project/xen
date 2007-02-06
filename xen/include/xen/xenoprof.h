@@ -10,6 +10,7 @@
 #ifndef __XEN_XENOPROF_H__
 #define __XEN_XENOPROF_H__
 
+#include <xen/config.h>
 #include <public/xenoprof.h>
 #include <asm/xenoprof.h>
 
@@ -22,9 +23,19 @@
 #define XENOPROF_READY             2
 #define XENOPROF_PROFILING         3
 
+#ifndef CONFIG_COMPAT
+typedef struct xenoprof_buf xenoprof_buf_t;
+#else
+#include <compat/xenoprof.h>
+typedef union {
+	struct xenoprof_buf native;
+	struct compat_oprof_buf compat;
+} xenoprof_buf_t;
+#endif
+
 struct xenoprof_vcpu {
     int event_size;
-    struct xenoprof_buf *buffer;
+    xenoprof_buf_t *buffer;
 };
 
 struct xenoprof {
@@ -35,8 +46,21 @@ struct xenoprof {
     int domain_type;
     int domain_ready;
     int is_primary;
+#ifdef CONFIG_COMPAT
+    int is_compat;
+#endif
     struct xenoprof_vcpu vcpu [MAX_VIRT_CPUS];
 };
+
+#ifndef CONFIG_COMPAT
+#define XENOPROF_COMPAT(x) 0
+#define xenoprof_buf(d, b, field) ((b)->field)
+#else
+#define XENOPROF_COMPAT(x) ((x)->is_compat)
+#define xenoprof_buf(d, b, field) (*(!(d)->xenoprof->is_compat ? \
+                                       &(b)->native.field : \
+                                       &(b)->compat.field))
+#endif
 
 struct domain;
 void free_xenoprof_pages(struct domain *d);

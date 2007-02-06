@@ -55,7 +55,9 @@ void *kmap_atomic(struct page *page, enum km_type type)
 /* Same as kmap_atomic but with PAGE_KERNEL_RO page protection. */
 void *kmap_atomic_pte(struct page *page, enum km_type type)
 {
-	return __kmap_atomic(page, type, PAGE_KERNEL_RO);
+	return __kmap_atomic(page, type,
+	                     test_bit(PG_pinned, &page->flags)
+	                     ? PAGE_KERNEL_RO : kmap_prot);
 }
 
 void kunmap_atomic(void *kvaddr, enum km_type type)
@@ -129,5 +131,6 @@ struct page *kmap_atomic_to_page(void *ptr)
 EXPORT_SYMBOL(kmap);
 EXPORT_SYMBOL(kunmap);
 EXPORT_SYMBOL(kmap_atomic);
+EXPORT_SYMBOL(kmap_atomic_pte);
 EXPORT_SYMBOL(kunmap_atomic);
 EXPORT_SYMBOL(kmap_atomic_to_page);

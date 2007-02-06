@@ -19,7 +19,7 @@
 from threading import Event
 import types
 
-from xen.xend import sxp, XendRoot
+from xen.xend import sxp, XendOptions
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
@@ -50,7 +50,7 @@ xenbusState = {
     'Closed'       : 6,
     }
 
-xroot = XendRoot.instance()
+xoptions = XendOptions.instance()
 
 xenbusState.update(dict(zip(xenbusState.values(), xenbusState.keys())))
 
@@ -75,7 +75,7 @@ class DevController:
 
     def __init__(self, vm):
         self.vm = vm
-
+        self.hotplug = True
 
     def createDevice(self, config):
         """Trigger the creation of a device with the given configuration.
@@ -151,6 +151,9 @@ class DevController:
 
     def waitForDevice(self, devid):
         log.debug("Waiting for %s.", devid)
+
+        if not self.hotplug:
+            return 
         
         status = self.waitForBackend(devid)
 
@@ -324,7 +327,7 @@ class DevController:
                       Make sure that the migration has finished and only
                       then return from the call.
         """
-        tool = xroot.get_external_migration_tool()
+        tool = xoptions.get_external_migration_tool()
         if tool:
             log.info("Calling external migration tool for step %d" % step)
             fd = os.popen("%s -type %s -step %d -host %s -domname %s" %
@@ -341,7 +344,7 @@ class DevController:
         """ Recover from device migration. The given step was the
             last one that was successfully executed.
         """
-        tool = xroot.get_external_migration_tool()
+        tool = xoptions.get_external_migration_tool()
         if tool:
             log.info("Calling external migration tool")
             fd = os.popen("%s -type %s -step %d -host %s -domname %s -recover" %

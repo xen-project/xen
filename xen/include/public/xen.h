@@ -408,7 +408,9 @@ struct vcpu_info {
     struct arch_vcpu_info arch;
     struct vcpu_time_info time;
 }; /* 64 bytes (x86) */
+#ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
+#endif
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
@@ -466,7 +468,9 @@ struct shared_info {
     struct arch_shared_info arch;
 
 };
+#ifndef __XEN__
 typedef struct shared_info shared_info_t;
+#endif
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):
@@ -583,6 +587,16 @@ DEFINE_XEN_GUEST_HANDLE(uint64_t);
 #define mk_unsigned_long(x) x
 
 #endif /* !__ASSEMBLY__ */
+
+/* Default definitions for macros used by domctl/sysctl. */
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+#ifndef uint64_aligned_t
+#define uint64_aligned_t uint64_t
+#endif
+#ifndef XEN_GUEST_HANDLE_64
+#define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
+#endif
+#endif
 
 #endif /* __XEN_PUBLIC_XEN_H__ */
 

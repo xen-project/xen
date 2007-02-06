@@ -101,6 +101,7 @@ struct xenbus_driver {
 				 enum xenbus_state backend_state);
 	int (*remove)(struct xenbus_device *dev);
 	int (*suspend)(struct xenbus_device *dev);
+	int (*suspend_cancel)(struct xenbus_device *dev);
 	int (*resume)(struct xenbus_device *dev);
 	int (*uevent)(struct xenbus_device *, char **, int, char *, int);
 	struct device_driver driver;
@@ -160,13 +161,15 @@ int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
 void xs_suspend(void);
 void xs_resume(void);
+void xs_suspend_cancel(void);
 
 /* Used by xenbus_dev to borrow kernel's store connection. */
 void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg);
 
-/* Called from xen core code. */
+/* Prepare for domain suspend: then resume or cancel the suspend. */
 void xenbus_suspend(void);
 void xenbus_resume(void);
+void xenbus_suspend_cancel(void);
 
 #define XENBUS_IS_ERR_READ(str) ({			\
 	if (!IS_ERR(str) && strlen(str) == 0) {		\
@@ -292,7 +295,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 
 int __init xenbus_dev_init(void);
 
-char *xenbus_strstate(enum xenbus_state state);
+const char *xenbus_strstate(enum xenbus_state state);
 int xenbus_dev_is_online(struct xenbus_device *dev);
 int xenbus_frontend_closed(struct xenbus_device *dev);
 

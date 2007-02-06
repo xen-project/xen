@@ -119,7 +119,7 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
         chunksz -= chunk_skip;
         skip -= chunk_skip;
 
-        if (skip == 0) {
+        if (skip == 0 && chunksz > 0) {
             unsigned long src_maddr;
             unsigned long dest = (unsigned long)to + to_pos;
             unsigned int bytes = min(chunksz, n - to_pos);
@@ -225,7 +225,7 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
         chunksz -= chunk_skip;
         skip -= chunk_skip;
 
-        if (skip == 0) {
+        if (skip == 0 && chunksz > 0) {
             unsigned long dest_maddr;
             unsigned long source = (unsigned long)from + from_pos;
             unsigned int bytes = min(chunksz, n - from_pos);

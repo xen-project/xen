@@ -14,7 +14,6 @@
  *	Mikael Pettersson	:	PM converted to driver model.
  */
 
-#include <linux/config.h>
 #include <linux/init.h>
 
 #include <linux/mm.h>
@@ -36,8 +35,10 @@
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
 #include <asm/i8253.h>
+#include <asm/nmi.h>
 
 #include <mach_apic.h>
+#include <mach_apicdef.h>
 #include <mach_ipi.h>
 
 #include "io_ports.h"
@@ -59,6 +60,20 @@ int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
  * Debug level
  */
 int apic_verbosity;
+
+#ifndef CONFIG_XEN
+static int modern_apic(void)
+{
+	unsigned int lvr, version;
+	/* AMD systems use old APIC versions, so check the CPU */
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+		boot_cpu_data.x86 >= 0xf)
+		return 1;
+	lvr = apic_read(APIC_LVR);
+	version = GET_APIC_VERSION(lvr);
+	return version >= 0x14;
+}
+#endif /* !CONFIG_XEN */
 
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.

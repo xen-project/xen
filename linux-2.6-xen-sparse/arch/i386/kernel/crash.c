@@ -69,7 +69,7 @@ static void crash_save_this_cpu(struct pt_regs *regs, int cpu)
 	 * for the data I pass, and I need tags
 	 * on the data to indicate what information I have
 	 * squirrelled away.  ELF notes happen to provide
-	 * all of that that no need to invent something new.
+	 * all of that, so there is no need to invent something new.
 	 */
 	buf = (u32*)per_cpu_ptr(crash_notes, cpu);
 	if (!buf)
@@ -91,7 +91,7 @@ static void crash_save_self(struct pt_regs *regs)
 }
 
 #ifndef CONFIG_XEN
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC)
 static atomic_t waiting_for_crash_ipi;
 
 static int crash_nmi_callback(struct pt_regs *regs, int cpu)
@@ -106,7 +106,7 @@ static int crash_nmi_callback(struct pt_regs *regs, int cpu)
 		return 1;
 	local_irq_disable();
 
-	if (!user_mode(regs)) {
+	if (!user_mode_vm(regs)) {
 		crash_fixup_ss_esp(&fixed_regs, regs);
 		regs = &fixed_regs;
 	}
@@ -115,19 +115,15 @@ static int crash_nmi_callback(struct pt_regs *regs, int cpu)
 	atomic_dec(&waiting_for_crash_ipi);
 	/* Assume hlt works */
 	halt();
-	for(;;);
+	for (;;)
+		cpu_relax();
 
 	return 1;
 }
 
-/*
- * By using the NMI code instead of a vector we just sneak thru the
- * word generator coming out with just what we want.  AND it does
- * not matter if clustered_apic_mode is set or not.
- */
 static void smp_send_nmi_allbutself(void)
 {
-	send_IPI_allbutself(APIC_DM_NMI);
+	send_IPI_allbutself(NMI_VECTOR);
 }
 
 static void nmi_shootdown_cpus(void)
@@ -164,7 +160,7 @@ static void nmi_shootdown_cpus(void)
 void machine_crash_shutdown(struct pt_regs *regs)
 {
 	/* This function is only called after the system
-	 * has paniced or is otherwise in a critical state.
+	 * has panicked or is otherwise in a critical state.
 	 * The minimum amount of code to allow a kexec'd kernel
 	 * to run successfully needs to happen here.
 	 *

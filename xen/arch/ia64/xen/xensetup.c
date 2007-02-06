@@ -249,6 +249,7 @@ void start_kernel(void)
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long md_end, relo_start, relo_end, relo_size = 0;
     struct domain *idle_domain;
+    struct vcpu *dom0_vcpu0;
     efi_memory_desc_t *kern_md, *last_md, *md;
 #ifdef CONFIG_SMP
     int i;
@@ -503,8 +504,11 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0);
-    if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
+    if (dom0 == NULL)
         panic("Error creating domain 0\n");
+    dom0_vcpu0 = alloc_vcpu(dom0, 0, 0);
+    if (dom0_vcpu0 == NULL || vcpu_late_initialise(dom0_vcpu0) != 0)
+        panic("Cannot allocate dom0 vcpu 0\n");
 
     dom0->is_privileged = 1;
 
@@ -541,20 +545,21 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     startup_cpu_idle_loop();
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t info)
+void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
-    char *p=info;
     int major = xen_major_version();
     int minor = xen_minor_version();
+    char s[32];
 
-    p += sprintf(p,"xen-%d.%d-ia64 ", major, minor);
+    (*info)[0] = '\0';
+
+    snprintf(s, sizeof(s), "xen-%d.%d-ia64 ", major, minor);
+    safe_strcat(*info, s);
 
     if (vmx_enabled)
-        p += sprintf(p,"hvm-%d.%d-ia64 ", major, minor);
-
-    *(p-1) = 0;
-
-    BUG_ON((p-info)>sizeof(xen_capabilities_info_t));
-
+    {
+        snprintf(s, sizeof(s), "hvm-%d.%d-ia64 ", major, minor);
+        safe_strcat(*info, s);
+    }
 }
 

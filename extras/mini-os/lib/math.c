@@ -57,6 +57,10 @@
 
 #include <types.h>
 
+	/* On ia64 these functions lead to crashes. These are replaced by
+	 * assembler functions. */
+#if !defined(__ia64__)
+
 /*
  * Depending on the desired operation, we view a `long long' (aka quad_t) in
  * one or more of the following formats.
@@ -380,3 +384,4 @@ __umoddi3(u_quad_t a, u_quad_t b)
         return (r);
 }
 
+#endif /* !defined(__ia64__) */

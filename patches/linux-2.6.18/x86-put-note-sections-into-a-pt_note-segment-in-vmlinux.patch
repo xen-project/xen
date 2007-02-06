@@ -1,0 +1,143 @@
+diff -pruN ../orig-linux-2.6.18/arch/i386/kernel/vmlinux.lds.S ./arch/i386/kernel/vmlinux.lds.S
+--- ../orig-linux-2.6.18/arch/i386/kernel/vmlinux.lds.S	2006-09-20 04:42:06.000000000 +0100
++++ ./arch/i386/kernel/vmlinux.lds.S	2007-01-12 18:19:44.000000000 +0000
+@@ -13,6 +13,12 @@ OUTPUT_FORMAT("elf32-i386", "elf32-i386"
+ OUTPUT_ARCH(i386)
+ ENTRY(phys_startup_32)
+ jiffies = jiffies_64;
++
++PHDRS {
++	text PT_LOAD FLAGS(5);	/* R_E */
++	data PT_LOAD FLAGS(7);	/* RWE */
++	note PT_NOTE FLAGS(4);	/* R__ */
++}
+ SECTIONS
+ {
+   . = __KERNEL_START;
+@@ -26,7 +32,7 @@ SECTIONS
+ 	KPROBES_TEXT
+ 	*(.fixup)
+ 	*(.gnu.warning)
+-	} = 0x9090
++	} :text = 0x9090
+ 
+   _etext = .;			/* End of text section */
+ 
+@@ -48,7 +54,7 @@ SECTIONS
+   .data : AT(ADDR(.data) - LOAD_OFFSET) {	/* Data */
+ 	*(.data)
+ 	CONSTRUCTORS
+-	}
++	} :data
+ 
+   . = ALIGN(4096);
+   __nosave_begin = .;
+@@ -184,4 +190,6 @@ SECTIONS
+   STABS_DEBUG
+ 
+   DWARF_DEBUG
++
++  NOTES
+ }
+diff -pruN ../orig-linux-2.6.18/include/asm-generic/vmlinux.lds.h ./include/asm-generic/vmlinux.lds.h
+--- ../orig-linux-2.6.18/include/asm-generic/vmlinux.lds.h	2006-09-20 04:42:06.000000000 +0100
++++ ./include/asm-generic/vmlinux.lds.h	2007-01-12 18:19:44.000000000 +0000
+@@ -194,3 +194,6 @@
+ 		.stab.index 0 : { *(.stab.index) }			\
+ 		.stab.indexstr 0 : { *(.stab.indexstr) }		\
+ 		.comment 0 : { *(.comment) }
++
++#define NOTES								\
++		.notes : { *(.note.*) } :note
+diff -pruN ../orig-linux-2.6.18/include/linux/elfnote.h ./include/linux/elfnote.h
+--- ../orig-linux-2.6.18/include/linux/elfnote.h	1970-01-01 01:00:00.000000000 +0100
++++ ./include/linux/elfnote.h	2007-01-12 18:19:44.000000000 +0000
+@@ -0,0 +1,88 @@
++#ifndef _LINUX_ELFNOTE_H
++#define _LINUX_ELFNOTE_H
++/*
++ * Helper macros to generate ELF Note structures, which are put into a
++ * PT_NOTE segment of the final vmlinux image.  These are useful for
++ * including name-value pairs of metadata into the kernel binary (or
++ * modules?) for use by external programs.
++ *
++ * Each note has three parts: a name, a type and a desc.  The name is
++ * intended to distinguish the note's originator, so it would be a
++ * company, project, subsystem, etc; it must be in a suitable form for
++ * use in a section name.  The type is an integer which is used to tag
++ * the data, and is considered to be within the "name" namespace (so
++ * "FooCo"'s type 42 is distinct from "BarProj"'s type 42).  The
++ * "desc" field is the actual data.  There are no constraints on the
++ * desc field's contents, though typically they're fairly small.
++ *
++ * All notes from a given NAME are put into a section named
++ * .note.NAME.  When the kernel image is finally linked, all the notes
++ * are packed into a single .notes section, which is mapped into the
++ * PT_NOTE segment.  Because notes for a given name are grouped into
++ * the same section, they'll all be adjacent the output file.
++ *
++ * This file defines macros for both C and assembler use.  Their
++ * syntax is slightly different, but they're semantically similar.
++ *
++ * See the ELF specification for more detail about ELF notes.
++ */
++
++#ifdef __ASSEMBLER__
++/*
++ * Generate a structure with the same shape as Elf{32,64}_Nhdr (which
++ * turn out to be the same size and shape), followed by the name and
++ * desc data with appropriate padding.  The 'desc' argument includes
++ * the assembler pseudo op defining the type of the data: .asciz
++ * "hello, world"
++ */
++.macro ELFNOTE name type desc:vararg
++.pushsection ".note.\name"
++  .align 4
++  .long 2f - 1f			/* namesz */
++  .long 4f - 3f			/* descsz */
++  .long \type
++1:.asciz "\name"
++2:.align 4
++3:\desc
++4:.align 4
++.popsection
++.endm
++#else	/* !__ASSEMBLER__ */
++#include <linux/elf.h>
++/*
++ * Use an anonymous structure which matches the shape of
++ * Elf{32,64}_Nhdr, but includes the name and desc data.  The size and
++ * type of name and desc depend on the macro arguments.  "name" must
++ * be a literal string, and "desc" must be passed by value.  You may
++ * only define one note per line, since __LINE__ is used to generate
++ * unique symbols.
++ */
++#define _ELFNOTE_PASTE(a,b)	a##b
++#define _ELFNOTE(size, name, unique, type, desc)			\
++	static const struct {						\
++		struct elf##size##_note _nhdr;				\
++		unsigned char _name[sizeof(name)]			\
++		__attribute__((aligned(sizeof(Elf##size##_Word))));	\
++		typeof(desc) _desc					\
++			     __attribute__((aligned(sizeof(Elf##size##_Word)))); \
++	} _ELFNOTE_PASTE(_note_, unique)				\
++		__attribute_used__					\
++		__attribute__((section(".note." name),			\
++			       aligned(sizeof(Elf##size##_Word)),	\
++			       unused)) = {				\
++		{							\
++			sizeof(name),					\
++			sizeof(desc),					\
++			type,						\
++		},							\
++		name,							\
++		desc							\
++	}
++#define ELFNOTE(size, name, type, desc)		\
++	_ELFNOTE(size, name, __LINE__, type, desc)
++
++#define ELFNOTE32(name, type, desc) ELFNOTE(32, name, type, desc)
++#define ELFNOTE64(name, type, desc) ELFNOTE(64, name, type, desc)
++#endif	/* __ASSEMBLER__ */
++
++#endif /* _LINUX_ELFNOTE_H */

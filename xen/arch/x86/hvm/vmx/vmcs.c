@@ -56,7 +56,7 @@
       CPU_BASED_INVDPG_EXITING |                        \
       CPU_BASED_MWAIT_EXITING |                         \
       CPU_BASED_MOV_DR_EXITING |                        \
-      CPU_BASED_UNCOND_IO_EXITING |                     \
+      CPU_BASED_ACTIVATE_IO_BITMAP |                    \
       CPU_BASED_USE_TSC_OFFSETING )
 
 /* Basic flags for VM-Exit controls. */
@@ -278,7 +278,14 @@ static void vmx_set_host_env(struct vcpu *v)
     host_env.tr_base = (unsigned long) &init_tss[cpu];
     __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
     __vmwrite(HOST_TR_BASE, host_env.tr_base);
-    __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
+
+    /*
+     * Skip end of cpu_user_regs when entering the hypervisor because the
+     * CPU does not save context onto the stack. SS,RSP,CS,RIP,RFLAGS,etc
+     * all get saved into the VMCS instead.
+     */
+    __vmwrite(HOST_RSP,
+              (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
 
 static void construct_vmcs(struct vcpu *v)
@@ -294,6 +301,10 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
+
+    /* I/O access bitmap. */
+    __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
+    __vmwrite(IO_BITMAP_B, virt_to_maddr(hvm_io_bitmap + PAGE_SIZE));
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);

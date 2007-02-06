@@ -32,7 +32,7 @@ import threading
 import xen.lowlevel.xc
 
 
-from xen.xend import XendRoot, XendCheckpoint, XendDomainInfo
+from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo, XendNode
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
@@ -51,7 +51,7 @@ from xen.util import mkdir, security
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
-xroot = XendRoot.instance() 
+xoptions = XendOptions.instance() 
 
 __all__ = [ "XendDomain" ]
 
@@ -115,7 +115,6 @@ class XendDomain:
                 
                 dom0info['name'] = DOM0_NAME
                 dom0 = XendDomainInfo.recreate(dom0info, True)
-                self._add_domain(dom0)
             except IndexError:
                 raise XendError('Unable to find Domain 0')
             
@@ -172,7 +171,6 @@ class XendDomain:
                 if dom['domid'] != DOM0_ID:
                     try:
                         new_dom = XendDomainInfo.recreate(dom, False)
-                        self._add_domain(new_dom)
                     except Exception:
                         log.exception("Failed to create reference to running "
                                       "domain id: %d" % dom['domid'])
@@ -214,7 +212,7 @@ class XendDomain:
         @rtype: String
         @return: Path.
         """
-        dom_path = xroot.get_xend_domains_path()
+        dom_path = xoptions.get_xend_domains_path()
         if domuuid:
             dom_path = os.path.join(dom_path, domuuid)
         return dom_path
@@ -361,7 +359,7 @@ class XendDomain:
 
     def _setDom0CPUCount(self):
         """Sets the number of VCPUs dom0 has. Retreived from the
-        Xend configuration, L{XendRoot}.
+        Xend configuration, L{XendOptions}.
 
         @requires: Expects to be protected by domains_lock.
         @rtype: None
@@ -369,7 +367,7 @@ class XendDomain:
         dom0 = self.privilegedDomain()
 
         # get max number of vcpus to use for dom0 from config
-        target = int(xroot.get_dom0_vcpus())
+        target = int(xoptions.get_dom0_vcpus())
         log.debug("number of vcpus to use is %d", target)
    
         # target == 0 means use all processors
@@ -377,7 +375,7 @@ class XendDomain:
             dom0.setVCpuCount(target)
 
 
-    def _refresh(self):
+    def _refresh(self, refresh_shutdown = True):
         """Refresh the domain list. Needs to be called when
         either xenstore has changed or when a method requires
         up to date information (like uptime, cputime stats).
@@ -393,11 +391,10 @@ class XendDomain:
         for dom in running:
             domid = dom['domid']
             if domid in self.domains:
-                self.domains[domid].update(dom)
+                self.domains[domid].update(dom, refresh_shutdown)
             elif domid not in self.domains and dom['dying'] != 1:
                 try:
                     new_dom = XendDomainInfo.recreate(dom, False)
-                    self._add_domain(new_dom)                    
                 except VmError:
                     log.exception("Unable to recreate domain")
                     try:
@@ -416,10 +413,10 @@ class XendDomain:
         running_domids = [d['domid'] for d in running if d['dying'] != 1]
         for domid, dom in self.domains.items():
             if domid not in running_domids and domid != DOM0_ID:
-                self._remove_domain(dom, domid)
+                self.remove_domain(dom, domid)
 
 
-    def _add_domain(self, info):
+    def add_domain(self, info):
         """Add a domain to the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
@@ -434,7 +431,7 @@ class XendDomain:
         if info.get_uuid() in self.managed_domains:
             self._managed_domain_register(info)
 
-    def _remove_domain(self, info, domid = None):
+    def remove_domain(self, info, domid = None):
         """Remove the domain from the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
@@ -473,7 +470,6 @@ class XendDomain:
         try:
             security.refresh_ssidref(config)
             dominfo = XendDomainInfo.restore(config)
-            self._add_domain(dominfo)
             return dominfo
         finally:
             self.domains_lock.release()
@@ -495,7 +491,7 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
-            self._refresh()
+            self._refresh(refresh_shutdown = False)
             dom = self.domain_lookup_nr(domid)
             if not dom:
                 raise XendError("No domain named '%s'." % str(domid))
@@ -640,18 +636,18 @@ class XendDomain:
             self.domains_lock.release()
 
     def get_dev_property_by_uuid(self, klass, dev_uuid, field):
+        value = None
         self.domains_lock.acquire()
         try:
             dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
-            if not dom:
-                return None
-
-            value = dom.get_device_property(klass, dev_uuid, field)
-            return value
+            if dom:
+                value = dom.get_dev_property(klass, dev_uuid, field)
         except ValueError, e:
             pass
+
+        self.domains_lock.release()
         
-        return None
+        return value
 
     def is_valid_vm(self, vm_ref):
         return (self.get_vm_by_uuid(vm_ref) != None)
@@ -731,7 +727,7 @@ class XendDomain:
         
         self.domains_lock.acquire()
         try:
-            self._refresh()
+            self._refresh(refresh_shutdown = False)
             
             # active domains
             active_domains = self.domains.values()
@@ -848,7 +844,6 @@ class XendDomain:
                                            os.open(chkpath, os.O_RDONLY),
                                            dominfo,
                                            paused = start_paused)
-                    self._add_domain(dominfo)
                     os.unlink(chkpath)
                 except OSError, ex:
                     raise XendError("Failed to read stored checkpoint file")
@@ -873,10 +868,10 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create(config)
-            self._add_domain(dominfo)
-            self.domain_sched_credit_set(dominfo.getDomid(),
-                                         dominfo.getWeight(),
-                                         dominfo.getCap())
+            if XendNode.instance().xenschedinfo() == 'credit':
+                self.domain_sched_credit_set(dominfo.getDomid(),
+                                             dominfo.getWeight(),
+                                             dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()
@@ -893,10 +888,10 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create_from_dict(config_dict)
-            self._add_domain(dominfo)
-            self.domain_sched_credit_set(dominfo.getDomid(),
-                                         dominfo.getWeight(),
-                                         dominfo.getCap())
+            if XendNode.instance().xenschedinfo() == 'credit':
+                self.domain_sched_credit_set(dominfo.getDomid(),
+                                             dominfo.getWeight(),
+                                             dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()
@@ -950,7 +945,10 @@ class XendDomain:
                                  POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
-            self._add_domain(dominfo)
+            if XendNode.instance().xenschedinfo() == 'credit':
+                self.domain_sched_credit_set(dominfo.getDomid(),
+                                             dominfo.getWeight(),
+                                             dominfo.getCap())
         finally:
             self.domains_lock.release()
         dominfo.waitForDevices()
@@ -983,7 +981,7 @@ class XendDomain:
                          (dominfo.getName(), dominfo.info.get('uuid')))
 
                 self._managed_domain_unregister(dominfo)
-                self._remove_domain(dominfo)
+                self.remove_domain(dominfo)
                 XendDevices.destroy_device_state(dominfo)
             except Exception, ex:
                 raise XendError(str(ex))
@@ -1164,7 +1162,7 @@ class XendDomain:
             dominfo.checkLiveMigrateMemory()
 
         if port == 0:
-            port = xroot.get_xend_relocation_port()
+            port = xoptions.get_xend_relocation_port()
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((dst, port))
@@ -1174,7 +1172,6 @@ class XendDomain:
         sock.send("receive\n")
         sock.recv(80)
         XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
-        dominfo.testDeviceComplete()
         sock.close()
 
     def domain_save(self, domid, dst):

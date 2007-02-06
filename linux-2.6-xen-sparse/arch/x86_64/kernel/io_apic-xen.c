@@ -25,7 +25,6 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
-#include <linux/config.h>
 #include <linux/smp_lock.h>
 #include <linux/mc146818rtc.h>
 #include <linux/acpi.h>
@@ -41,6 +40,7 @@
 #include <asm/mach_apic.h>
 #include <asm/acpi.h>
 #include <asm/dma.h>
+#include <asm/nmi.h>
 
 #define __apicdebuginit  __init
 
@@ -51,13 +51,14 @@ static int no_timer_check;
 int disable_timer_pin_1 __initdata;
 
 #ifndef CONFIG_XEN
-int timer_over_8254 __initdata = 1;
+int timer_over_8254 __initdata = 0;
 
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 #endif
 
 static DEFINE_SPINLOCK(ioapic_lock);
+static DEFINE_SPINLOCK(vector_lock);
 
 /*
  * # of IRQ routing registers
@@ -321,6 +322,18 @@ __setup("enable_8254_timer", setup_enable_8254_timer);
 #include <linux/pci_ids.h>
 #include <linux/pci.h>
 
+
+#ifdef CONFIG_ACPI
+
+static int nvidia_hpet_detected __initdata;
+
+static int __init nvidia_hpet_check(unsigned long phys, unsigned long size)
+{
+	nvidia_hpet_detected = 1;
+	return 0;
+}
+#endif
+
 /* Temporary Hack. Nvidia and VIA boards currently only work with IO-APIC
    off. Check for an Nvidia or VIA PCI bridge and turn it off.
    Use pci direct infrastructure because this runs before the PCI subsystem. 
@@ -355,23 +368,31 @@ void __init check_ioapic(void)
 				vendor &= 0xffff;
 				switch (vendor) { 
 				case PCI_VENDOR_ID_VIA:
-#ifdef CONFIG_GART_IOMMU
+#ifdef CONFIG_IOMMU
 					if ((end_pfn > MAX_DMA32_PFN ||
 					     force_iommu) &&
 					    !iommu_aperture_allowed) {
 						printk(KERN_INFO
-    "Looks like a VIA chipset. Disabling IOMMU. Overwrite with \"iommu=allowed\"\n");
+    "Looks like a VIA chipset. Disabling IOMMU. Override with \"iommu=allowed\"\n");
 						iommu_aperture_disabled = 1;
 					}
 #endif
 					return;
 				case PCI_VENDOR_ID_NVIDIA:
 #ifdef CONFIG_ACPI
-					/* All timer overrides on Nvidia
-				           seem to be wrong. Skip them. */
-					acpi_skip_timer_override = 1;
-					printk(KERN_INFO 
-	     "Nvidia board detected. Ignoring ACPI timer override.\n");
+					/*
+					 * All timer overrides on Nvidia are
+					 * wrong unless HPET is enabled.
+					 */
+					nvidia_hpet_detected = 0;
+					acpi_table_parse(ACPI_HPET,
+							nvidia_hpet_check);
+					if (nvidia_hpet_detected == 0) {
+						acpi_skip_timer_override = 1;
+						printk(KERN_INFO "Nvidia board "
+						    "detected. Ignoring ACPI "
+						    "timer override.\n");
+					}
 #endif
 					/* RED-PEN skip them on mptables too? */
 					return;
@@ -867,21 +888,33 @@ u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
 
 int assign_irq_vector(int irq)
 {
+	unsigned long flags;
+	int vector;
 	struct physdev_irq irq_op;
   
   	BUG_ON(irq != AUTO_ASSIGN && (unsigned)irq >= NR_IRQ_VECTORS);
-  	if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
+
+	spin_lock_irqsave(&vector_lock, flags);
+
+  	if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0) {
+		spin_unlock_irqrestore(&vector_lock, flags);
   		return IO_APIC_VECTOR(irq);
+	}
 
 	irq_op.irq = irq;
-	if (HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op))
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op)) {
+		spin_unlock_irqrestore(&vector_lock, flags);
 		return -ENOSPC;
+	}
 
-	vector_irq[irq_op.vector] = irq;
+	vector = irq_op.vector;
+	vector_irq[vector] = irq;
 	if (irq != AUTO_ASSIGN)
-		IO_APIC_VECTOR(irq) = irq_op.vector;
+		IO_APIC_VECTOR(irq) = vector;
 
-	return irq_op.vector;
+	spin_unlock_irqrestore(&vector_lock, flags);
+
+	return vector;
 }
 
 extern void (*interrupt[NR_IRQS])(void);
@@ -893,23 +926,18 @@ static struct hw_interrupt_type ioapic_edge_type;
 #define IOAPIC_EDGE	0
 #define IOAPIC_LEVEL	1
 
-static inline void ioapic_register_intr(int irq, int vector, unsigned long trigger)
+static void ioapic_register_intr(int irq, int vector, unsigned long trigger)
 {
-	if (use_pci_vector() && !platform_legacy_irq(irq)) {
-		if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
-				trigger == IOAPIC_LEVEL)
-			irq_desc[vector].handler = &ioapic_level_type;
-		else
-			irq_desc[vector].handler = &ioapic_edge_type;
-		set_intr_gate(vector, interrupt[vector]);
-	} else	{
-		if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
-				trigger == IOAPIC_LEVEL)
-			irq_desc[irq].handler = &ioapic_level_type;
-		else
-			irq_desc[irq].handler = &ioapic_edge_type;
-		set_intr_gate(vector, interrupt[irq]);
-	}
+	unsigned idx;
+
+	idx = use_pci_vector() && !platform_legacy_irq(irq) ? vector : irq;
+
+	if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
+			trigger == IOAPIC_LEVEL)
+		irq_desc[idx].chip = &ioapic_level_type;
+	else
+		irq_desc[idx].chip = &ioapic_edge_type;
+	set_intr_gate(vector, interrupt[idx]);
 }
 #else
 #define ioapic_register_intr(_irq,_vector,_trigger) ((void)0)
@@ -1014,7 +1042,7 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
 	 * The timer IRQ doesn't have to know that behind the
 	 * scene we have a 8259A-master in AEOI mode ...
 	 */
-	irq_desc[0].handler = &ioapic_edge_type;
+	irq_desc[0].chip = &ioapic_edge_type;
 
 	/*
 	 * Add it to the IO-APIC irq-routing table:
@@ -1659,6 +1687,13 @@ static void set_ioapic_affinity_vector (unsigned int vector,
 #endif // CONFIG_SMP
 #endif // CONFIG_PCI_MSI
 
+static int ioapic_retrigger(unsigned int irq)
+{
+	send_IPI_self(IO_APIC_VECTOR(irq));
+
+	return 1;
+}
+
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,
  * so we use two separate IRQ descriptors. Edge triggered IRQs can be
@@ -1679,6 +1714,7 @@ static struct hw_interrupt_type ioapic_edge_type __read_mostly = {
 #ifdef CONFIG_SMP
 	.set_affinity = set_ioapic_affinity,
 #endif
+	.retrigger	= ioapic_retrigger,
 };
 
 static struct hw_interrupt_type ioapic_level_type __read_mostly = {
@@ -1692,6 +1728,7 @@ static struct hw_interrupt_type ioapic_level_type __read_mostly = {
 #ifdef CONFIG_SMP
 	.set_affinity = set_ioapic_affinity,
 #endif
+	.retrigger	= ioapic_retrigger,
 };
 #endif /* !CONFIG_XEN */
 
@@ -1728,7 +1765,7 @@ static inline void init_IO_APIC_traps(void)
 #ifndef CONFIG_XEN
 			else
 				/* Strange. Oh, well.. */
-				irq_desc[irq].handler = &no_irq_type;
+				irq_desc[irq].chip = &no_irq_type;
 #endif
 		}
 	}
@@ -1849,6 +1886,8 @@ static inline void unlock_ExtINT_logic(void)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
+int timer_uses_ioapic_pin_0;
+
 /*
  * This code may look a bit paranoid, but it's supposed to cooperate with
  * a wide range of boards and BIOS bugs.  Fortunately only the timer IRQ
@@ -1886,6 +1925,9 @@ static inline void check_timer(void)
 	pin2  = ioapic_i8259.pin;
 	apic2 = ioapic_i8259.apic;
 
+	if (pin1 == 0)
+		timer_uses_ioapic_pin_0 = 1;
+
 	apic_printk(APIC_VERBOSE,KERN_INFO "..TIMER: vector=0x%02X apic1=%d pin1=%d apic2=%d pin2=%d\n",
 		vector, apic1, pin1, apic2, pin2);
 
@@ -1920,7 +1962,7 @@ static inline void check_timer(void)
 		 */
 		setup_ExtINT_IRQ0_pin(apic2, pin2, vector);
 		if (timer_irq_works()) {
-			printk("works.\n");
+			apic_printk(APIC_VERBOSE," works.\n");
 			nmi_watchdog_default();
 			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
@@ -1932,7 +1974,7 @@ static inline void check_timer(void)
 		 */
 		clear_IO_APIC_pin(apic2, pin2);
 	}
-	printk(" failed.\n");
+	apic_printk(APIC_VERBOSE," failed.\n");
 
 	if (nmi_watchdog == NMI_IO_APIC) {
 		printk(KERN_WARNING "timer doesn't work through the IO-APIC - disabling NMI Watchdog!\n");
@@ -1942,12 +1984,12 @@ static inline void check_timer(void)
 	apic_printk(APIC_VERBOSE, KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 
 	disable_8259A_irq(0);
-	irq_desc[0].handler = &lapic_irq_type;
+	irq_desc[0].chip = &lapic_irq_type;
 	apic_write(APIC_LVT0, APIC_DM_FIXED | vector);	/* Fixed mode */
 	enable_8259A_irq(0);
 
 	if (timer_irq_works()) {
-		apic_printk(APIC_QUIET, " works.\n");
+		apic_printk(APIC_VERBOSE," works.\n");
 		return;
 	}
 	apic_write(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_FIXED | vector);
@@ -1970,6 +2012,7 @@ static inline void check_timer(void)
 }
 #else
 #define check_timer() ((void)0)
+int timer_uses_ioapic_pin_0 = 0;
 #endif /* !CONFIG_XEN */
 
 static int __init notimercheck(char *s)

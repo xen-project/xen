@@ -96,16 +96,19 @@ int xc_vcpu_setaffinity(int xc_handle,
 {
     DECLARE_DOMCTL;
     int ret = -1;
+    uint8_t local[sizeof (cpumap)];
 
     domctl.cmd = XEN_DOMCTL_setvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu    = vcpu;
 
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap,
-                         (uint8_t *)&cpumap);
+    bitmap_64_to_byte(local, &cpumap, sizeof (cpumap));
+
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+
     domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(cpumap) * 8;
     
-    if ( lock_pages(&cpumap, sizeof(cpumap)) != 0 )
+    if ( lock_pages(local, sizeof(local)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -113,7 +116,7 @@ int xc_vcpu_setaffinity(int xc_handle,
 
     ret = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(&cpumap, sizeof(cpumap));
+    unlock_pages(local, sizeof(local));
 
  out:
     return ret;
@@ -127,16 +130,16 @@ int xc_vcpu_getaffinity(int xc_handle,
 {
     DECLARE_DOMCTL;
     int ret = -1;
+    uint8_t local[sizeof (cpumap)];
 
     domctl.cmd = XEN_DOMCTL_getvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
 
-    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap,
-                         (uint8_t *)cpumap);
-    domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(*cpumap) * 8;
+    set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
+    domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(cpumap) * 8;
     
-    if ( lock_pages(cpumap, sizeof(*cpumap)) != 0 )
+    if ( lock_pages(local, sizeof(local)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -144,8 +147,8 @@ int xc_vcpu_getaffinity(int xc_handle,
 
     ret = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(cpumap, sizeof(*cpumap));
-
+    unlock_pages(local, sizeof (local));
+    bitmap_byte_to_64(cpumap, local, sizeof (local));
  out:
     return ret;
 }
@@ -235,10 +238,58 @@ int xc_domain_getinfolist(int xc_handle,
     return ret;
 }
 
+/* get info from hvm guest for save */
+int xc_domain_hvm_getcontext(int xc_handle,
+                             uint32_t domid,
+                             uint8_t *ctxt_buf,
+                             uint32_t size)
+{
+    int ret;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_gethvmcontext;
+    domctl.domain = (domid_t)domid;
+    domctl.u.hvmcontext.size = size;
+    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
+
+    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+        return ret;
+
+    ret = do_domctl(xc_handle, &domctl);
+
+    unlock_pages(ctxt_buf, size);
+
+    return (ret < 0 ? -1 : domctl.u.hvmcontext.size);
+}
+
+/* set info to hvm guest for restore */
+int xc_domain_hvm_setcontext(int xc_handle,
+                             uint32_t domid,
+                             uint8_t *ctxt_buf,
+                             uint32_t size)
+{
+    int ret;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_sethvmcontext;
+    domctl.domain = domid;
+    domctl.u.hvmcontext.size = size;
+    set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
+
+    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+        return ret;
+
+    ret = do_domctl(xc_handle, &domctl);
+
+    unlock_pages(ctxt_buf, size);
+
+    return ret;
+}
+
 int xc_vcpu_getcontext(int xc_handle,
-                               uint32_t domid,
-                               uint32_t vcpu,
-                               vcpu_guest_context_t *ctxt)
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt)
 {
     int rc;
     DECLARE_DOMCTL;
@@ -276,7 +327,8 @@ int xc_shadow_control(int xc_handle,
     domctl.u.shadow_op.pages  = pages;
     domctl.u.shadow_op.mb     = mb ? *mb : 0;
     domctl.u.shadow_op.mode   = mode;
-    set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap, dirty_bitmap);
+    set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
+                         (uint8_t *)dirty_bitmap);
 
     rc = do_domctl(xc_handle, &domctl);
 
@@ -545,15 +597,15 @@ int xc_vcpu_setcontext(int xc_handle,
     domctl.u.vcpucontext.vcpu = vcpu;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
 
-    if ( (rc = lock_pages(ctxt, sizeof(*ctxt))) != 0 )
+    if ( (ctxt != NULL) && ((rc = lock_pages(ctxt, sizeof(*ctxt))) != 0) )
         return rc;
 
     rc = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(ctxt, sizeof(*ctxt));
+    if ( ctxt != NULL )
+        unlock_pages(ctxt, sizeof(*ctxt));
 
     return rc;
-
 }
 
 int xc_domain_irq_permission(int xc_handle,

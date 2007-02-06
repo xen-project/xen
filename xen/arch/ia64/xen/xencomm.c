@@ -153,7 +153,7 @@ xencomm_copy_from_guest(
         chunksz -= chunk_skip;
         skip -= chunk_skip;
 
-        if (skip == 0) {
+        if (skip == 0 && chunksz > 0) {
             unsigned int bytes = min(chunksz, n - to_pos);
 	    int res;
 
@@ -295,7 +295,7 @@ xencomm_copy_to_guest(
         skip -= chunk_skip;
         dest_paddr += chunk_skip;
 
-        if (skip == 0) {
+        if (skip == 0 && chunksz > 0) {
             unsigned int bytes = min(chunksz, n - from_pos);
             int res;
 

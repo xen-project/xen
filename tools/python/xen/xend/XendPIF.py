@@ -90,18 +90,20 @@ def linux_set_mtu(iface, mtu):
 class XendPIF:
     """Representation of a Physical Network Interface."""
     
-    def __init__(self, uuid, name, mtu, vlan, mac, network, host):
+    def __init__(self, uuid, metrics, device, mtu, vlan, mac, network,
+                 host):
         self.uuid = uuid
-        self.name = name
+        self.metrics = metrics
+        self.device = device
         self.mac = mac
         self.mtu = mtu
         self.vlan = vlan
         self.network = network
         self.host = host
 
-    def set_name(self, new_name):
-        self.name = new_name
-            
+    def set_device(self, new_device):
+        self.device = new_device
+
     def set_mac(self, new_mac):
         success = linux_set_mac(new_mac)
         if success:
@@ -114,24 +116,15 @@ class XendPIF:
             self.mtu = new_mtu
         return success
 
-    def get_io_read_kbs(self):
-        return 0.0
-
-    def get_io_write_kbs(self):
-        return 0.0
-
-    def get_record(self, transient = True):
-        result = {'name': self.name,
-                  'MAC': self.mac,
-                  'MTU': self.mtu,
-                  'VLAN': self.vlan,
-                  'host': self.host.uuid,
-                  'network': self.network.uuid}
-        if transient:
-            result['io_read_kbs'] = self.get_io_read_kbs()
-            result['io_write_kbs'] = self.get_io_write_kbs()
-        return result
-
+    def get_record(self):
+        return {'uuid': self.uuid,
+                'device': self.device,
+                'MAC': self.mac,
+                'MTU': self.mtu,
+                'VLAN': self.vlan,
+                'host': self.host.uuid,
+                'network': self.network.uuid,
+                'metrics': self.metrics.uuid}
 
     def refresh(self, bridges):
         ifname = self.interface_name()
@@ -141,13 +134,14 @@ class XendPIF:
             # there's nothing we can do -- this should have been set up with
             # the network script.  Otherwise, we can use vconfig to derive
             # a subinterface.
-            if not self.vlan:
+            if self.vlan == -1:
                 return
             
-            rc, _ = _cmd('vconfig add %s %s', self.name, self.vlan)
+            rc, _ = _cmd('vconfig add %s %d', self.device, self.vlan)
             if rc != 0:
-                log.error('Could not refresh %s', ifname)
+                log.error('Could not refresh VLAN for interface %s', ifname)
                 return
+            
             log.info('Created network interface %s', ifname)
 
         for brname, nics in bridges.items():
@@ -173,10 +167,10 @@ class XendPIF:
 
 
     def interface_name(self):
-        if self.vlan:
-            return '%s.%s' % (self.name, self.vlan)
+        if self.vlan != -1:
+            return '%s.%d' % (self.device, self.vlan)
         else:
-            return self.name
+            return self.device
 
 
 def _cmd(cmd, *args):

@@ -13,6 +13,8 @@ extern long
 do_event_channel_op_compat(
     XEN_GUEST_HANDLE(evtchn_op_t) uop);
 
+extern long do_pirq_guest_eoi(int pirq);
+
 extern int
 vmx_do_mmu_update(
     mmu_update_t *ureqs,

@@ -62,35 +62,20 @@ struct acm_binary_policy acm_bin_pol;
 /* acm binary policy lock */
 DEFINE_RWLOCK(acm_bin_pol_rwlock);
 
-/* until we have endian support in Xen, we discover it at runtime */
-u8 little_endian = 1;
-void
-acm_set_endian(void)
-{
-    u32 test = 1;
-    if (*((u8 *)&test) == 1)
-    {
-        printkd("ACM module running in LITTLE ENDIAN.\n");
-        little_endian = 1;
-    }
-    else
-    {
-        printkd("ACM module running in BIG ENDIAN.\n");
-        little_endian = 0;
-    }
-}
-
 int
-acm_set_policy_reference(u8 * buf, u32 buf_size)
+acm_set_policy_reference(u8 *buf, u32 buf_size)
 {
     struct acm_policy_reference_buffer *pr = (struct acm_policy_reference_buffer *)buf;
-    acm_bin_pol.policy_reference_name = (char *)xmalloc_array(u8, ntohl(pr->len));
+    acm_bin_pol.policy_reference_name = (char *)xmalloc_array(u8, be32_to_cpu(pr->len));
 
     if (!acm_bin_pol.policy_reference_name)
         return -ENOMEM;
 
-    strcpy(acm_bin_pol.policy_reference_name, (char *)(buf + sizeof(struct acm_policy_reference_buffer)));
-    printk("%s: Activating policy %s\n", __func__, acm_bin_pol.policy_reference_name);
+    strlcpy(acm_bin_pol.policy_reference_name,
+            (char *)(buf + sizeof(struct acm_policy_reference_buffer)),
+            be32_to_cpu(pr->len));
+    printk("%s: Activating policy %s\n", __func__,
+           acm_bin_pol.policy_reference_name);
     return 0;
 }
 
@@ -105,9 +90,10 @@ acm_dump_policy_reference(u8 *buf, u32 buf_size)
         return -EINVAL;
 
     memset(buf, 0, ret);
-    pr_buf->len = htonl(strlen(acm_bin_pol.policy_reference_name) + 1); /* including stringend '\0' */
-    strcpy((char *)(buf + sizeof(struct acm_policy_reference_buffer)),
-           acm_bin_pol.policy_reference_name);
+    pr_buf->len = cpu_to_be32(strlen(acm_bin_pol.policy_reference_name) + 1); /* including stringend '\0' */
+    strlcpy((char *)(buf + sizeof(struct acm_policy_reference_buffer)),
+            acm_bin_pol.policy_reference_name,
+            be32_to_cpu(pr_buf->len));
     return ret;
 }
 
@@ -198,7 +184,7 @@ acm_is_policy(char *buf, unsigned long len)
         return 0;
 
     pol = (struct acm_policy_buffer *)buf;
-    return ntohl(pol->magic) == ACM_MAGIC;
+    return be32_to_cpu(pol->magic) == ACM_MAGIC;
 }
 
 
@@ -213,7 +199,7 @@ acm_setup(char *policy_start,
         return rc;
 
     pol = (struct acm_policy_buffer *)policy_start;
-    if (ntohl(pol->magic) != ACM_MAGIC)
+    if (be32_to_cpu(pol->magic) != ACM_MAGIC)
         return rc;
 
     rc = do_acm_set_policy((void *)policy_start, (u32)policy_len);
@@ -236,8 +222,6 @@ acm_init(char *policy_start,
          unsigned long policy_len)
 {
     int ret = ACM_OK;
-
-    acm_set_endian();
 
     /* first try to load the boot policy (uses its own locks) */
     acm_setup(policy_start, policy_len);
@@ -276,7 +260,7 @@ int
 acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
 {
     struct acm_ssid_domain *ssid;
-    struct domain *subj = find_domain_by_id(id);
+    struct domain *subj = get_domain_by_id(id);
     int ret1, ret2;
  
     if (subj == NULL)

@@ -181,7 +181,6 @@ static void __init geode_configure(void)
 static void __init init_cyrix(struct cpuinfo_x86 *c)
 {
 	unsigned char dir0, dir0_msn, dir0_lsn, dir1 = 0;
-	char *buf = c->x86_model_id;
 	const char *p = NULL;
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
@@ -302,8 +301,8 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		dir0_msn = 7;
 		break;
 	}
-	strcpy(buf, Cx86_model[dir0_msn & 7]);
-	if (p) strcat(buf, p);
+	safe_strcpy(c->x86_model_id, Cx86_model[dir0_msn & 7]);
+	if (p) safe_strcat(c->x86_model_id, p);
 	return;
 }
 
@@ -339,7 +338,7 @@ static void cyrix_identify(struct cpuinfo_x86 * c)
 	if ( c->x86 == 4 && test_cyrix_52div() ) {
 		unsigned char dir0, dir1;
 		
-		strcpy(c->x86_vendor_id, "CyrixInstead");
+		safe_strcpy(c->x86_vendor_id, "CyrixInstead");
 	        c->x86_vendor = X86_VENDOR_CYRIX;
 	        
 	        /* Actually enable cpuid on the older cyrix */

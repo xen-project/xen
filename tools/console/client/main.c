@@ -71,6 +71,43 @@ static void usage(const char *program) {
 	       , program);
 }
 
+static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
+/* Check for a pty in xenstore, open it and return its fd.
+ * Assumes there is already a watch set in the store for this path. */
+{
+	struct timeval tv;
+	fd_set watch_fdset;
+	int xs_fd = xs_fileno(xs), pty_fd = -1;
+	int start, now;
+	unsigned int len = 0;
+	char *pty_path, **watch_paths;;
+
+	start = now = time(NULL);
+	do {
+		tv.tv_usec = 0;
+		tv.tv_sec = (start + seconds) - now;
+		FD_ZERO(&watch_fdset);
+		FD_SET(xs_fd, &watch_fdset);
+		if (select(xs_fd + 1, &watch_fdset, NULL, NULL, &tv)) {
+			/* Read the watch to drain the buffer */
+			watch_paths = xs_read_watch(xs, &len);
+			free(watch_paths);
+			/* We only watch for one thing, so no need to 
+			 * disambiguate: just read the pty path */
+			pty_path = xs_read(xs, XBT_NULL, path, &len);
+			if (pty_path != NULL) {
+				pty_fd = open(pty_path, O_RDWR | O_NOCTTY);
+				if (pty_fd == -1) 
+					err(errno, "Could not open tty `%s'", 
+					    pty_path);
+				free(pty_path);
+			}
+		}
+	} while (pty_fd == -1 && (now = time(NULL)) < start + seconds);
+	return pty_fd;
+}
+
+
 /* don't worry too much if setting terminal attributes fail */
 static void init_term(int fd, struct termios *old)
 {
@@ -91,23 +128,37 @@ static void restore_term(int fd, struct termios *old)
 	tcsetattr(fd, TCSAFLUSH, old);
 }
 
-static int console_loop(int fd)
+static int console_loop(int fd, struct xs_handle *xs, char *pty_path)
 {
-	int ret;
+	int ret, xs_fd = xs_fileno(xs), max_fd;
 
 	do {
 		fd_set fds;
 
 		FD_ZERO(&fds);
 		FD_SET(STDIN_FILENO, &fds);
-		FD_SET(fd, &fds);
+		max_fd = STDIN_FILENO;
+		FD_SET(xs_fd, &fds);
+		if (xs_fd > max_fd) max_fd = xs_fd;
+		if (fd != -1) FD_SET(fd, &fds);
+		if (fd > max_fd) max_fd = fd;
 
-		ret = select(fd + 1, &fds, NULL, NULL, NULL);
+		ret = select(max_fd + 1, &fds, NULL, NULL, NULL);
 		if (ret == -1) {
 			if (errno == EINTR || errno == EAGAIN) {
 				continue;
 			}
 			return -1;
+		}
+
+		if (FD_ISSET(xs_fileno(xs), &fds)) {
+			int newfd = get_pty_fd(xs, pty_path, 0);
+			close(fd);
+                        if (newfd == -1) 
+				/* Console PTY has become invalid */
+				return 0;
+			fd = newfd;
+			continue;
 		}
 
 		if (FD_ISSET(STDIN_FILENO, &fds)) {
@@ -128,12 +179,13 @@ static int console_loop(int fd)
 			}
 
 			if (!write_sync(fd, msg, len)) {
-				perror("write() failed");
-				return -1;
+				close(fd);
+				fd = -1;
+				continue;
 			}
 		}
 
-		if (FD_ISSET(fd, &fds)) {
+		if (fd != -1 && FD_ISSET(fd, &fds)) {
 			ssize_t len;
 			char msg[512];
 
@@ -143,7 +195,9 @@ static int console_loop(int fd)
 				    (errno == EINTR || errno == EAGAIN)) {
 					continue;
 				}
-				return -1;
+				close(fd);
+				fd = -1;
+				continue;
 			}
 
 			if (!write_sync(STDOUT_FILENO, msg, len)) {
@@ -168,12 +222,10 @@ int main(int argc, char **argv)
 		{ 0 },
 
 	};
-	char *str_pty, *path;
-	int spty;
-	unsigned int len = 0;
+	char *path;
+	int spty, xsfd;
 	struct xs_handle *xs;
 	char *end;
-	time_t now;
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -213,7 +265,6 @@ int main(int argc, char **argv)
 	if (path == NULL)
 		err(ENOMEM, "realloc");
 	strcat(path, "/console/tty");
-	str_pty = xs_read(xs, XBT_NULL, path, &len);
 
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
 	   console which is good when we break domain-0 up.  To keep us
@@ -224,38 +275,24 @@ int main(int argc, char **argv)
 		exit(EINVAL);
 	}
 
+	/* Set a watch on this domain's console pty */
+	if (!xs_watch(xs, path, ""))
+		err(errno, "Can't set watch for console pty");
+	xsfd = xs_fileno(xs);
+
 	/* Wait a little bit for tty to appear.  There is a race
-	   condition that occurs after xend creates a domain.  This
-	   code might be running before consoled has noticed the new
-	   domain and setup a pty for it.
-
-	   A xenstore watch would slightly improve responsiveness but
-	   a timeout would still be needed since we don't want to
-	   block forever if given an invalid domain or worse yet, a
-	   domain that someone else has connected to. */
-
-	now = time(0);
-	while (str_pty == NULL && (now + 5) > time(0)) {
-		struct timeval tv = { 0, 250000 };
-		select(0, NULL, NULL, NULL, &tv); /* pause briefly */
-
-		str_pty = xs_read(xs, XBT_NULL, path, &len);
-	}
-
-	if (str_pty == NULL) {
+	   condition that occurs after xend creates a domain.  This code
+	   might be running before consoled has noticed the new domain
+	   and setup a pty for it. */ 
+        spty = get_pty_fd(xs, path, 5);
+	if (spty == -1) {
 		err(errno, "Could not read tty from store");
 	}
 
-	spty = open(str_pty, O_RDWR | O_NOCTTY);
-	if (spty == -1) {
-		err(errno, "Could not open tty `%s'", str_pty);
-	}
-	free(str_pty);
-	free(path);
-
 	init_term(STDIN_FILENO, &attr);
-	console_loop(spty);
+	console_loop(spty, xs, path);
 	restore_term(STDIN_FILENO, &attr);
 
+	free(path);
 	return 0;
  }

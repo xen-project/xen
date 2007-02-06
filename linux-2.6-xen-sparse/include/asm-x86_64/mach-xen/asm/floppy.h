@@ -44,7 +44,7 @@
  * Do not use vmalloc/vfree: floppy_release_irq_and_dma() gets called from
  * softirq context via motor_off_callback. A generic bug we happen to trigger.
  */
-#define fd_dma_mem_alloc(size)	__get_free_pages(GFP_KERNEL, get_order(size))
+#define fd_dma_mem_alloc(size)	__get_free_pages(GFP_KERNEL|__GFP_NORETRY, get_order(size))
 #define fd_dma_mem_free(addr, size) free_pages(addr, get_order(size))
 #define fd_dma_setup(addr, size, mode, io) vdma_dma_setup(addr, size, mode, io)
 
@@ -134,8 +134,8 @@ static int vdma_get_dma_residue(unsigned int dummy)
 
 static int fd_request_irq(void)
 {
-	return request_irq(FLOPPY_IRQ, floppy_hardint,SA_INTERRUPT,
-					   "floppy", NULL);
+	return request_irq(FLOPPY_IRQ, floppy_hardint,
+			   IRQF_DISABLED, "floppy", NULL);
 }
 
 #if 0

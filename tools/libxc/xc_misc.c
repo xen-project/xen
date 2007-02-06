@@ -110,15 +110,15 @@ int xc_hvm_set_pci_intx_level(
     arg.intx   = intx;
     arg.level  = level;
 
-    if ( mlock(&arg, sizeof(arg)) != 0 )
+    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
-        return -1;
+        return rc;
     }
 
     rc = do_xen_hypercall(xc_handle, &hypercall);
 
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
 
     return rc;
 }
@@ -140,15 +140,15 @@ int xc_hvm_set_isa_irq_level(
     arg.isa_irq = isa_irq;
     arg.level   = level;
 
-    if ( mlock(&arg, sizeof(arg)) != 0 )
+    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
-        return -1;
+        return rc;
     }
 
     rc = do_xen_hypercall(xc_handle, &hypercall);
 
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
 
     return rc;
 }
@@ -168,15 +168,15 @@ int xc_hvm_set_pci_link_route(
     arg.link    = link;
     arg.isa_irq = isa_irq;
 
-    if ( mlock(&arg, sizeof(arg)) != 0 )
+    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
     {
         PERROR("Could not lock memory");
-        return -1;
+        return rc;
     }
 
     rc = do_xen_hypercall(xc_handle, &hypercall);
 
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
 
     return rc;
 }

@@ -11,7 +11,7 @@ OpenBSD|NetBSD|FreeBSD)
 Linux)
 	TOOL="udevinfo"
 	UDEV_VERSION="0"
-	test -x "$(which ${TOOL})" && \
+	test -x "$(which ${TOOL} 2>/dev/null)" && \
 		UDEV_VERSION=$(${TOOL} -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
 	if test "${UDEV_VERSION}" -ge 059; then
 		RC=0
@@ -28,7 +28,7 @@ esac
 
 if test ${RC} -ne 0; then
 	echo
-	echo ' *** Check for ${TOOL} FAILED'
+	echo " *** Check for ${TOOL} FAILED"
 fi
 
 exit ${RC}

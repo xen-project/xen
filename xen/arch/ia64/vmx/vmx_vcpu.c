@@ -145,48 +145,6 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     return ;
 }
 
-/* Adjust slot both in pt_regs and vpd, upon vpsr.ri which
- * should have sync with ipsr in entry.
- *
- * Clear some bits due to successfully emulation.
- */
-IA64FAULT vmx_vcpu_increment_iip(VCPU *vcpu)
-{
-    // TODO: trap_bounce?? Eddie
-    REGS *regs = vcpu_regs(vcpu);
-    IA64_PSR *ipsr = (IA64_PSR *)&regs->cr_ipsr;
-
-    if (ipsr->ri == 2) {
-        ipsr->ri = 0;
-        regs->cr_iip += 16;
-    } else {
-        ipsr->ri++;
-    }
-
-    ipsr->val &=
-            (~ (IA64_PSR_ID |IA64_PSR_DA | IA64_PSR_DD |
-                IA64_PSR_SS | IA64_PSR_ED | IA64_PSR_IA
-            ));
-
-    return (IA64_NO_FAULT);
-}
-
-
-IA64FAULT vmx_vcpu_decrement_iip(VCPU *vcpu)
-{
-    REGS *regs = vcpu_regs(vcpu);
-    IA64_PSR *ipsr = (IA64_PSR *)&regs->cr_ipsr;
-    
-    if (ipsr->ri == 0) {
-        ipsr->ri = 2;
-        regs->cr_iip -= 16;
-    } else {
-        ipsr->ri--;
-    }
-    return (IA64_NO_FAULT);
-}
-
-
 IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
 {
     REGS *regs = vcpu_regs(vcpu);
@@ -199,14 +157,11 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
     return (IA64_NO_FAULT);
 }
 
-
 struct virtual_platform_def *
 vmx_vcpu_get_plat(VCPU *vcpu)
 {
     return &(vcpu->domain->arch.vmx_platform);
 }
-
-
 
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
 {

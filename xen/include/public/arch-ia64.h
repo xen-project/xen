@@ -62,6 +62,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_MCA_CMC    VIRQ_ARCH_1 /* MCA cmc interrupt */
 #define VIRQ_MCA_CPE    VIRQ_ARCH_2 /* MCA cpe interrupt */
 
+/* Arch specific callback irq definition */
+/* using Requester-ID(RID) as callback irq */
+#define IA64_CALLBACK_IRQ_RID        (1 << 31)
+
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
 #define MAX_VIRT_CPUS 64
@@ -283,10 +287,9 @@ struct mapped_regs {
              */
             unsigned char *interrupt_mask_addr;
             int pending_interruption;
-            int incomplete_regframe; // see SDM vol2 6.8
             unsigned char vpsr_pp;
-            unsigned char reserved5_2[7];
-            unsigned long reserved5_1[3];
+            unsigned char reserved5_2[3];
+            unsigned long reserved5_1[4];
             int metaphysical_mode; // 1 = use metaphys mapping, 0 = use virtual
             int banknum; // 0 or 1, which virtual register bank is active
             unsigned long rrs[8]; // region registers
@@ -430,35 +433,36 @@ struct xen_ia64_boot_param {
 #define XMAPPEDREGS_OFS			XSI_SIZE
 
 /* Hyperprivops.  */
-#define HYPERPRIVOP_RFI			0x1
-#define HYPERPRIVOP_RSM_DT		0x2
-#define HYPERPRIVOP_SSM_DT		0x3
-#define HYPERPRIVOP_COVER		0x4
-#define HYPERPRIVOP_ITC_D		0x5
-#define HYPERPRIVOP_ITC_I		0x6
-#define HYPERPRIVOP_SSM_I		0x7
-#define HYPERPRIVOP_GET_IVR		0x8
-#define HYPERPRIVOP_GET_TPR		0x9
-#define HYPERPRIVOP_SET_TPR		0xa
-#define HYPERPRIVOP_EOI			0xb
-#define HYPERPRIVOP_SET_ITM		0xc
-#define HYPERPRIVOP_THASH		0xd
-#define HYPERPRIVOP_PTC_GA		0xe
-#define HYPERPRIVOP_ITR_D		0xf
-#define HYPERPRIVOP_GET_RR		0x10
-#define HYPERPRIVOP_SET_RR		0x11
-#define HYPERPRIVOP_SET_KR		0x12
-#define HYPERPRIVOP_FC			0x13
-#define HYPERPRIVOP_GET_CPUID		0x14
-#define HYPERPRIVOP_GET_PMD		0x15
-#define HYPERPRIVOP_GET_EFLAG		0x16
-#define HYPERPRIVOP_SET_EFLAG		0x17
-#define HYPERPRIVOP_RSM_BE		0x18
-#define HYPERPRIVOP_GET_PSR		0x19
-#define HYPERPRIVOP_MAX			0x19
+#define HYPERPRIVOP_START		0x1
+#define HYPERPRIVOP_RFI			(HYPERPRIVOP_START + 0x0)
+#define HYPERPRIVOP_RSM_DT		(HYPERPRIVOP_START + 0x1)
+#define HYPERPRIVOP_SSM_DT		(HYPERPRIVOP_START + 0x2)
+#define HYPERPRIVOP_COVER		(HYPERPRIVOP_START + 0x3)
+#define HYPERPRIVOP_ITC_D		(HYPERPRIVOP_START + 0x4)
+#define HYPERPRIVOP_ITC_I		(HYPERPRIVOP_START + 0x5)
+#define HYPERPRIVOP_SSM_I		(HYPERPRIVOP_START + 0x6)
+#define HYPERPRIVOP_GET_IVR		(HYPERPRIVOP_START + 0x7)
+#define HYPERPRIVOP_GET_TPR		(HYPERPRIVOP_START + 0x8)
+#define HYPERPRIVOP_SET_TPR		(HYPERPRIVOP_START + 0x9)
+#define HYPERPRIVOP_EOI			(HYPERPRIVOP_START + 0xa)
+#define HYPERPRIVOP_SET_ITM		(HYPERPRIVOP_START + 0xb)
+#define HYPERPRIVOP_THASH		(HYPERPRIVOP_START + 0xc)
+#define HYPERPRIVOP_PTC_GA		(HYPERPRIVOP_START + 0xd)
+#define HYPERPRIVOP_ITR_D		(HYPERPRIVOP_START + 0xe)
+#define HYPERPRIVOP_GET_RR		(HYPERPRIVOP_START + 0xf)
+#define HYPERPRIVOP_SET_RR		(HYPERPRIVOP_START + 0x10)
+#define HYPERPRIVOP_SET_KR		(HYPERPRIVOP_START + 0x11)
+#define HYPERPRIVOP_FC			(HYPERPRIVOP_START + 0x12)
+#define HYPERPRIVOP_GET_CPUID		(HYPERPRIVOP_START + 0x13)
+#define HYPERPRIVOP_GET_PMD		(HYPERPRIVOP_START + 0x14)
+#define HYPERPRIVOP_GET_EFLAG		(HYPERPRIVOP_START + 0x15)
+#define HYPERPRIVOP_SET_EFLAG		(HYPERPRIVOP_START + 0x16)
+#define HYPERPRIVOP_RSM_BE		(HYPERPRIVOP_START + 0x17)
+#define HYPERPRIVOP_GET_PSR		(HYPERPRIVOP_START + 0x18)
+#define HYPERPRIVOP_MAX			(0x19)
 
 /* Fast and light hypercalls.  */
-#define __HYPERVISOR_ia64_fast_eoi	0x0200
+#define __HYPERVISOR_ia64_fast_eoi	__HYPERVISOR_arch_1
 
 /* Xencomm macros.  */
 #define XENCOMM_INLINE_MASK 0xf800000000000000UL

@@ -91,10 +91,11 @@ static void stack_push(struct thread *thread, unsigned long value)
     *((unsigned long *)thread->sp) = value;
 }
 
-struct thread* create_thread(char *name, void (*function)(void *), void *data)
+/* Architecture specific setup of thread creation */
+struct thread* arch_create_thread(char *name, void (*function)(void *),
+                                  void *data)
 {
     struct thread *thread;
-    unsigned long flags;
     
     thread = xmalloc(struct thread);
     /* Allocate 2 pages for stack, stack will be 2pages aligned */
@@ -110,23 +111,8 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     stack_push(thread, (unsigned long) function);
     stack_push(thread, (unsigned long) data);
     thread->ip = (unsigned long) thread_starter;
-     
-    /* Not runable, not exited, not sleeping */
-    thread->flags = 0;
-    thread->wakeup_time = 0LL;
-    set_runnable(thread);
-    local_irq_save(flags);
-    if(idle_thread != NULL) {
-        list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
-    } else if(function != idle_thread_fn)
-    {
-        printk("BUG: Not allowed to create thread before initialising scheduler.\n");
-        BUG();
-    }
-    local_irq_restore(flags);
     return thread;
 }
-
 
 void run_idle_thread(void)
 {

@@ -34,11 +34,10 @@
 **
 ** Returns 1 on success, 0 on failure.
 */
-static int get_platform_info(int xc_handle, uint32_t dom,
-                             /* OUT */ unsigned long *max_mfn,
-                             /* OUT */ unsigned long *hvirt_start,
-                             /* OUT */ unsigned int *pt_levels)
-
+static inline int get_platform_info(int xc_handle, uint32_t dom,
+                                    /* OUT */ unsigned long *max_mfn,
+                                    /* OUT */ unsigned long *hvirt_start,
+                                    /* OUT */ unsigned int *pt_levels)
 {
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
@@ -53,8 +52,17 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 
     *hvirt_start = xen_params.virt_start;
 
+    /*
+     * XXX For now, 32bit dom0's can only save/restore 32bit domUs
+     * on 64bit hypervisors, so no need to check which type of domain
+     * we're dealing with.
+     */
     if (strstr(xen_caps, "xen-3.0-x86_64"))
+#if defined(__i386__)
+        *pt_levels = 3;
+#else
         *pt_levels = 4;
+#endif
     else if (strstr(xen_caps, "xen-3.0-x86_32p"))
         *pt_levels = 3;
     else if (strstr(xen_caps, "xen-3.0-x86_32"))

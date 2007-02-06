@@ -23,11 +23,17 @@
 #include <asm/mtrr.h>
 #include "cpu/mtrr/mtrr.h"
 
-long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
+#ifndef COMPAT
+typedef long ret_t;
+DEFINE_SPINLOCK(xenpf_lock);
+#else
+extern spinlock_t xenpf_lock;
+#endif
+
+ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
-    long ret = 0;
+    ret_t ret = 0;
     struct xen_platform_op curop, *op = &curop;
-    static DEFINE_SPINLOCK(xenpf_lock);
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -105,8 +111,15 @@ long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     case XENPF_microcode_update:
     {
         extern int microcode_update(XEN_GUEST_HANDLE(void), unsigned long len);
+#ifndef COMPAT
         ret = microcode_update(op->u.microcode.data,
                                op->u.microcode.length);
+#else
+        XEN_GUEST_HANDLE(void) data;
+
+        guest_from_compat_handle(data, op->u.microcode.data);
+        ret = microcode_update(data, op->u.microcode.length);
+#endif
     }
     break;
 

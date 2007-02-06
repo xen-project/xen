@@ -119,8 +119,7 @@ int
 xenoprof_arch_init(int *num_events, int *is_primary, char *cpu_type)
 {
     *num_events = 0;
-    strncpy(cpu_type, get_cpu_type(), XENOPROF_CPU_TYPE_SIZE - 1);
-    cpu_type[XENOPROF_CPU_TYPE_SIZE - 1] = '\0';
+    strlcpy(cpu_type, get_cpu_type(), XENOPROF_CPU_TYPE_SIZE);
 
     *is_primary = 0;
     if (xenoprof_primary_profiler == NULL) {

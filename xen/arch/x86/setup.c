@@ -17,7 +17,12 @@
 #include <xen/hypercall.h>
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
+#include <xen/rcupdate.h>
 #include <public/version.h>
+#ifdef CONFIG_COMPAT
+#include <compat/platform.h>
+#include <compat/xen.h>
+#endif
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -106,8 +111,7 @@ char acpi_param[10] = "";
 static void parse_acpi_param(char *s)
 {
     /* Save the parameter so it can be propagated to domain0. */
-    strncpy(acpi_param, s, sizeof(acpi_param));
-    acpi_param[sizeof(acpi_param)-1] = '\0';
+    safe_strcpy(acpi_param, s);
 
     /* Interpret the parameter for use within Xen. */
     if ( !strcmp(s, "off") )
@@ -407,6 +411,23 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("WARNING: Buggy e820 map detected and fixed "
                "(truncated length fields).\n");
 
+    /* Ensure that all E820 RAM regions are page-aligned and -sized. */
+    for ( i = 0; i < e820_raw_nr; i++ )
+    {
+        uint64_t s, e;
+        if ( e820_raw[i].type != E820_RAM )
+            continue;
+        s = PFN_UP(e820_raw[i].addr);
+        e = PFN_DOWN(e820_raw[i].addr + e820_raw[i].size);
+        e820_raw[i].size = 0; /* discarded later */
+        if ( s < e )
+        {
+            e820_raw[i].addr = s << PAGE_SHIFT;
+            e820_raw[i].size = (e - s) << PAGE_SHIFT;
+        }
+    }
+
+    /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = init_e820(e820_raw, &e820_raw_nr);
 
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
@@ -419,7 +440,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             printk("Not enough memory to stash the DOM0 kernel image.\n");
             for ( ; ; ) ;
         }
-        
+
         if ( (e820.map[i].type == E820_RAM) &&
              (e820.map[i].size >= modules_length) &&
              ((e820.map[i].addr + e820.map[i].size) >=
@@ -470,10 +491,10 @@ void __init __start_xen(multiboot_info_t *mbi)
             start = PFN_UP(e820.map[i].addr);
             end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
             /* Clip the range to exclude what the bootstrapper initialised. */
-            if ( end < init_mapped )
-                continue;
             if ( start < init_mapped )
                 start = init_mapped;
+            if ( end <= start )
+                continue;
             /* Request the mapping. */
             map_pages_to_xen(
                 PAGE_OFFSET + (start << PAGE_SHIFT),
@@ -482,7 +503,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #endif
     }
 
-    if ( kexec_crash_area.size > 0 )
+    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0)
     {
         unsigned long kdump_start, kdump_size, k;
 
@@ -544,7 +565,14 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     BUILD_BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
-    BUILD_BUG_ON(sizeof(vcpu_info_t) != 64);
+    BUILD_BUG_ON(sizeof(struct vcpu_info) != 64);
+
+#ifdef CONFIG_COMPAT
+    BUILD_BUG_ON(sizeof(((struct compat_platform_op *)0)->u) !=
+                 sizeof(((struct compat_platform_op *)0)->u.pad));
+    BUILD_BUG_ON(sizeof(start_info_compat_t) > PAGE_SIZE);
+    BUILD_BUG_ON(sizeof(struct compat_vcpu_info) != 64);
+#endif
 
     /* Check definitions in public headers match internal defs. */
     BUILD_BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
@@ -630,6 +658,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     trap_init();
 
+    rcu_init();
+    
     timer_init();
 
     early_time_init();
@@ -666,7 +696,10 @@ void __init __start_xen(multiboot_info_t *mbi)
         if ( num_online_cpus() >= max_cpus )
             break;
         if ( !cpu_online(i) )
+        {
+            rcu_online_cpu(i);
             __cpu_up(i);
+        }
 
         /* Set up cpu_to_node[]. */
         srat_detect_node(i);
@@ -715,22 +748,22 @@ void __init __start_xen(multiboot_info_t *mbi)
         if ( (cmdline = strchr(cmdline, ' ')) != NULL )
         {
             while ( *cmdline == ' ' ) cmdline++;
-            strcpy(dom0_cmdline, cmdline);
+            safe_strcpy(dom0_cmdline, cmdline);
+        }
+
+        /* Append any extra parameters. */
+        if ( skip_ioapic_setup && !strstr(dom0_cmdline, "noapic") )
+            safe_strcat(dom0_cmdline, " noapic");
+        if ( acpi_skip_timer_override &&
+             !strstr(dom0_cmdline, "acpi_skip_timer_override") )
+            safe_strcat(dom0_cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) != 0) && !strstr(dom0_cmdline, "acpi=") )
+        {
+            safe_strcat(dom0_cmdline, " acpi=");
+            safe_strcat(dom0_cmdline, acpi_param);
         }
 
         cmdline = dom0_cmdline;
-
-        /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            strcat(cmdline, " noapic");
-        if ( acpi_skip_timer_override &&
-             !strstr(cmdline, "acpi_skip_timer_override") )
-            strcat(cmdline, " acpi_skip_timer_override");
-        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
-        {
-            strcat(cmdline, " acpi=");
-            strcat(cmdline, acpi_param);
-        }
     }
 
     if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
@@ -767,46 +800,55 @@ void __init __start_xen(multiboot_info_t *mbi)
     startup_cpu_idle_loop();
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t info)
+void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
-    char *p = info;
     int major = xen_major_version();
     int minor = xen_minor_version();
+    char s[32];
+
+    (*info)[0] = '\0';
 
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 
-    p += sprintf(p, "xen-%d.%d-x86_32 ", major, minor);
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_32 ", major, minor);
+    safe_strcat(*info, s);
     if ( hvm_enabled )
-        p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);
+    {
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
+        safe_strcat(*info, s);
+    }
 
 #elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
 
-    p += sprintf(p, "xen-%d.%d-x86_32p ", major, minor);
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
+    safe_strcat(*info, s);
     if ( hvm_enabled )
     {
-        p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);
-        p += sprintf(p, "hvm-%d.%d-x86_32p ", major, minor);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
+        safe_strcat(*info, s);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
+        safe_strcat(*info, s);
     }
 
 #elif defined(CONFIG_X86_64)
 
-    p += sprintf(p, "xen-%d.%d-x86_64 ", major, minor);
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_64 ", major, minor);
+    safe_strcat(*info, s);
+#ifdef CONFIG_COMPAT
+    snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
+    safe_strcat(*info, s);
+#endif
     if ( hvm_enabled )
     {
-        p += sprintf(p, "hvm-%d.%d-x86_32 ", major, minor);
-        p += sprintf(p, "hvm-%d.%d-x86_32p ", major, minor);
-        p += sprintf(p, "hvm-%d.%d-x86_64 ", major, minor);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32 ", major, minor);
+        safe_strcat(*info, s);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
+        safe_strcat(*info, s);
+        snprintf(s, sizeof(s), "hvm-%d.%d-x86_64 ", major, minor);
+        safe_strcat(*info, s);
     }
 
-#else
-
-    p++;
-
 #endif
-
-    *(p-1) = 0;
-
-    BUG_ON((p - info) > sizeof(xen_capabilities_info_t));
 }
 
 /*

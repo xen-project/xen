@@ -130,7 +130,7 @@ SUBCOMMAND_HELP = {
     'log'         : ('', 'Print Xend log'),
     'rename'      : ('<Domain> <NewDomainName>', 'Rename a domain.'),
     'sched-sedf'  : ('<Domain> [options]', 'Get/set EDF parameters.'),
-    'sched-credit': ('-d <Domain> [-w[=WEIGHT]|-c[=CAP]]',
+    'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
@@ -693,16 +693,28 @@ def parse_doms_info(info):
         up_time = time.time() - start_time
 
     return {
-        'domid'    : get_info('domid',        str,   ''),
-        'name'     : get_info('name',         str,   '??'),
+        'domid'    : get_info('domid',              str,   ''),
+        'name'     : get_info('name',               str,   '??'),
         'mem'      : get_info('memory_dynamic_min', int,   0),
-        'vcpus'    : get_info('online_vcpus',        int,   0),
-        'state'    : get_info('state',        str,    ''),
-        'cpu_time' : get_info('cpu_time',     float, 0),
+        'state'    : get_info('state',              str,   ''),
+        'cpu_time' : get_info('cpu_time',           float, 0.0),
+        # VCPUs is the number online when the VM is up, or the number
+        # configured otherwise.
+        'vcpus'    : get_info('online_vcpus', int,
+                              get_info('vcpus', int, 0)),
         'up_time'  : up_time,
         'seclabel' : security.get_security_printlabel(info),
         }
 
+def check_sched_type(sched):
+    current = 'unknown'
+    for x in server.xend.node.info()[1:]:
+        if len(x) > 1 and x[0] == 'xen_scheduler':
+            current = x[1]
+            break
+    if sched != current:
+        err("Xen is running with the %s scheduler" % current)
+        sys.exit(1)
 
 def parse_sedf_info(info):
     def get_info(n, t, d):
@@ -716,6 +728,10 @@ def parse_sedf_info(info):
         'extratime': get_info('extratime',     int,   -1),
         'weight'   : get_info('weight',        int,   -1),
         }
+
+def domid_match(domid, info):
+    return domid is None or domid == info['name'] or \
+           domid == str(info['domid'])
 
 def xm_brief_list(doms):
     print '%-40s %3s %5s %5s %10s %9s' % \
@@ -1091,9 +1107,7 @@ def xm_sched_sedf(args):
         print( ("%(name)-32s %(domid)3d %(period)9.1f %(slice)9.1f" +
                 " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
-    def domid_match(domid, info):
-        return domid is None or domid == info['name'] or \
-               domid == str(info['domid'])
+    check_sched_type('sedf')
 
     # we want to just display current info if no parameters are passed
     if len(args) == 0:
@@ -1130,6 +1144,9 @@ def xm_sched_sedf(args):
     doms = filter(lambda x : domid_match(domid, x),
                         [parse_doms_info(dom)
                          for dom in getDomains(None, 'running')])
+    if domid is not None and doms == []: 
+        err("Domain '%s' does not exist." % domid)
+        usage('sched-sedf')
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
@@ -1167,6 +1184,8 @@ def xm_sched_sedf(args):
 def xm_sched_credit(args):
     """Get/Set options for Credit Scheduler."""
     
+    check_sched_type('credit')
+
     try:
         opts, params = getopt.getopt(args, "d:w:c:",
             ["domain=", "weight=", "cap="])
@@ -1174,27 +1193,46 @@ def xm_sched_credit(args):
         err(opterr)
         usage('sched-credit')
 
-    domain = None
+    domid = None
     weight = None
     cap = None
 
     for o, a in opts:
         if o == "-d":
-            domain = a
+            domid = a
         elif o == "-w":
             weight = int(a)
         elif o == "-c":
             cap = int(a);
 
-    if domain is None:
-        # place holder for system-wide scheduler parameters
-        err("No domain given.")
-        usage('sched-credit')
+    doms = filter(lambda x : domid_match(domid, x),
+                  [parse_doms_info(dom)
+                  for dom in getDomains(None, 'running')])
 
     if weight is None and cap is None:
-        print server.xend.domain.sched_credit_get(domain)
+        if domid is not None and doms == []: 
+            err("Domain '%s' does not exist." % domid)
+            usage('sched-credit')
+        # print header if we aren't setting any parameters
+        print '%-33s %-2s %-6s %-4s' % ('Name','ID','Weight','Cap')
+        
+        for d in doms:
+            try:
+                info = server.xend.domain.sched_credit_get(d['domid'])
+            except xmlrpclib.Fault:
+                # domain does not support sched-credit?
+                info = {'weight': -1, 'cap': -1}
+            
+            info['name']  = d['name']
+            info['domid'] = int(d['domid'])
+            print( ("%(name)-32s %(domid)3d %(weight)6d %(cap)4d") % info)
     else:
-        result = server.xend.domain.sched_credit_set(domain, weight, cap)
+        if domid is None:
+            # place holder for system-wide scheduler parameters
+            err("No domain given.")
+            usage('sched-credit')
+        
+        result = server.xend.domain.sched_credit_set(domid, weight, cap)
         if result != 0:
             err(str(result))
 

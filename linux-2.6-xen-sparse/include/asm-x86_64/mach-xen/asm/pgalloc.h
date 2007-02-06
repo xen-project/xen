@@ -64,54 +64,73 @@ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
 	}
 }
 
-static inline void pmd_free(pmd_t *pmd)
-{
-	pte_t *ptep = virt_to_ptep(pmd);
-
-	if (!pte_write(*ptep)) {
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			(unsigned long)pmd,
-			pfn_pte(virt_to_phys(pmd)>>PAGE_SHIFT, PAGE_KERNEL),
-			0));
-	}
-	free_page((unsigned long)pmd);
-}
+extern struct page *pte_alloc_one(struct mm_struct *mm, unsigned long addr);
+extern void pte_free(struct page *pte);
 
 static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-        pmd_t *pmd = (pmd_t *) get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-        return pmd;
+	struct page *pg;
+
+	pg = pte_alloc_one(mm, addr);
+	return pg ? page_address(pg) : NULL;
+}
+
+static inline void pmd_free(pmd_t *pmd)
+{
+	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
+	pte_free(virt_to_page(pmd));
 }
 
 static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-        pud_t *pud = (pud_t *) get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-        return pud;
+	struct page *pg;
+
+	pg = pte_alloc_one(mm, addr);
+	return pg ? page_address(pg) : NULL;
 }
 
 static inline void pud_free(pud_t *pud)
 {
-	pte_t *ptep = virt_to_ptep(pud);
+	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
+	pte_free(virt_to_page(pud));
+}
 
-	if (!pte_write(*ptep)) {
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			(unsigned long)pud,
-			pfn_pte(virt_to_phys(pud)>>PAGE_SHIFT, PAGE_KERNEL),
-			0));
-	}
-	free_page((unsigned long)pud);
+static inline void pgd_list_add(pgd_t *pgd)
+{
+	struct page *page = virt_to_page(pgd);
+
+	spin_lock(&pgd_lock);
+	page->index = (pgoff_t)pgd_list;
+	if (pgd_list)
+		pgd_list->private = (unsigned long)&page->index;
+	pgd_list = page;
+	page->private = (unsigned long)&pgd_list;
+	spin_unlock(&pgd_lock);
+}
+
+static inline void pgd_list_del(pgd_t *pgd)
+{
+	struct page *next, **pprev, *page = virt_to_page(pgd);
+
+	spin_lock(&pgd_lock);
+	next = (struct page *)page->index;
+	pprev = (struct page **)page->private;
+	*pprev = next;
+	if (next)
+		next->private = (unsigned long)pprev;
+	spin_unlock(&pgd_lock);
 }
 
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
-        /*
-         * We allocate two contiguous pages for kernel and user.
-         */
-        unsigned boundary;
+	/*
+	 * We allocate two contiguous pages for kernel and user.
+	 */
+	unsigned boundary;
 	pgd_t *pgd = (pgd_t *)__get_free_pages(GFP_KERNEL|__GFP_REPEAT, 1);
-
 	if (!pgd)
 		return NULL;
+	pgd_list_add(pgd);
 	/*
 	 * Copy kernel pointers in from init.
 	 * Could keep a freelist or slab cache of those because the kernel
@@ -124,11 +143,11 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	       (PTRS_PER_PGD - boundary) * sizeof(pgd_t));
 
 	memset(__user_pgd(pgd), 0, PAGE_SIZE); /* clean up user pgd */
-        /*
-         * Set level3_user_pgt for vsyscall area
-         */
+	/*
+	 * Set level3_user_pgt for vsyscall area
+	 */
 	set_pgd(__user_pgd(pgd) + pgd_index(VSYSCALL_START), 
-                mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
+		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 	return pgd;
 }
 
@@ -155,23 +174,16 @@ static inline void pgd_free(pgd_t *pgd)
 			       0));
 	}
 
+	pgd_list_del(pgd);
 	free_pages((unsigned long)pgd, 1);
 }
 
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-        pte_t *pte = (pte_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-        if (pte)
+	pte_t *pte = (pte_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
+	if (pte)
 		make_page_readonly(pte, XENFEAT_writable_page_tables);
 
-	return pte;
-}
-
-static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
-{
-	struct page *pte;
-
-	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
 	return pte;
 }
 
@@ -181,18 +193,12 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 static inline void pte_free_kernel(pte_t *pte)
 {
 	BUG_ON((unsigned long)pte & (PAGE_SIZE-1));
-        make_page_writable(pte, XENFEAT_writable_page_tables);
+	make_page_writable(pte, XENFEAT_writable_page_tables);
 	free_page((unsigned long)pte); 
 }
 
-extern void pte_free(struct page *pte);
-
-//#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte)) 
-//#define __pmd_free_tlb(tlb,x)   tlb_remove_page((tlb),virt_to_page(x))
-//#define __pud_free_tlb(tlb,x)   tlb_remove_page((tlb),virt_to_page(x))
-
-#define __pte_free_tlb(tlb,x)   pte_free((x))
-#define __pmd_free_tlb(tlb,x)   pmd_free((x))
-#define __pud_free_tlb(tlb,x)   pud_free((x))
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
+#define __pmd_free_tlb(tlb,x)   tlb_remove_page((tlb),virt_to_page(x))
+#define __pud_free_tlb(tlb,x)   tlb_remove_page((tlb),virt_to_page(x))
 
 #endif /* _X86_64_PGALLOC_H */

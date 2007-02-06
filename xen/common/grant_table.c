@@ -123,7 +123,7 @@ __gnttab_map_grant_ref(
         return;
     }
 
-    if ( unlikely((rd = find_domain_by_id(op->dom)) == NULL) )
+    if ( unlikely((rd = get_domain_by_id(op->dom)) == NULL) )
     {
         if ( rd != NULL )
             put_domain(rd);
@@ -369,7 +369,7 @@ __gnttab_unmap_grant_ref(
     ref   = map->ref;
     flags = map->flags;
 
-    if ( unlikely((rd = find_domain_by_id(dom)) == NULL) )
+    if ( unlikely((rd = get_domain_by_id(dom)) == NULL) )
     {
         /* This can happen when a grant is implicitly unmapped. */
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", dom);
@@ -516,7 +516,7 @@ gnttab_setup_table(
         goto out;
     }
 
-    if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
+    if ( unlikely((d = get_domain_by_id(dom)) == NULL) )
     {
         gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
         op.status = GNTST_bad_domain;
@@ -653,7 +653,7 @@ gnttab_transfer(
         }
 
         /* Find the target domain. */
-        if ( unlikely((e = find_domain_by_id(gop.domid)) == NULL) )
+        if ( unlikely((e = get_domain_by_id(gop.domid)) == NULL) )
         {
             gdprintk(XENLOG_INFO, "gnttab_transfer: can't find domain %d\n",
                     gop.domid);
@@ -866,7 +866,7 @@ __gnttab_copy(
         sd = current->domain;
         get_knownalive_domain(sd);
     }
-    else if ( (sd = find_domain_by_id(op->source.domid)) == NULL )
+    else if ( (sd = get_domain_by_id(op->source.domid)) == NULL )
     {
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->source.domid);
@@ -877,7 +877,7 @@ __gnttab_copy(
         dd = current->domain;
         get_knownalive_domain(dd);
     }
-    else if ( (dd = find_domain_by_id(op->dest.domid)) == NULL )
+    else if ( (dd = get_domain_by_id(op->dest.domid)) == NULL )
     {
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->dest.domid);
@@ -1048,6 +1048,10 @@ do_grant_table_op(
     return rc;
 }
 
+#ifdef CONFIG_COMPAT
+#include "compat/grant_table.c"
+#endif
+
 int 
 grant_table_create(
     struct domain *d)
@@ -1128,7 +1132,7 @@ gnttab_release_mappings(
                 "flags:(%x) dom:(%hu)\n",
                 handle, ref, map->flags, map->domid);
 
-        rd = find_domain_by_id(map->domid);
+        rd = get_domain_by_id(map->domid);
         if ( rd == NULL )
         {
             /* Nothing to clear up... */

@@ -31,6 +31,9 @@ void idle_thread_fn(void *unused);
 
 #define switch_threads(prev, next) arch_switch_threads(prev, next)
  
+    /* Architecture specific setup of thread creation. */
+struct thread* arch_create_thread(char *name, void (*function)(void *),
+                                  void *data);
 
 void init_sched(void);
 void run_idle_thread(void);

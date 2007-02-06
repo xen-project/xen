@@ -17,50 +17,49 @@
 # Copyright (C) 2006 IBM Corporation
 #============================================================================
 
+import atexit
 import os
 import sys
 from XmTestLib import *
-from xen.util.xmlrpclib2 import ServerProxy
+from xen.xm import main as xmmain
+from xen.xm import XenAPI
+from xen.xm.opts import OptionError
 from types import DictType
+import xml.dom.minidom
 
+def get_login_pwd():
+    if xmmain.serverType == xmmain.SERVER_XEN_API:
+        try:
+            login, password = xmmain.parseAuthentication()
+            return (login, password)
+        except:
+            raise OptionError("Configuration for login/pwd not found. "
+                              "Need to run xapi-setup.py?")
+    raise OptionError("Xm configuration file not using Xen-API for "
+                      "communication with xend.")
 
-XAPI_DEFAULT_LOGIN = " "
-XAPI_DEFAULT_PASSWORD = " "
+sessions=[]
 
-class XenAPIError(Exception):
-    pass
-
-
-#A list of VMs' UUIDs that were created using vm_create
-_VMuuids = []
-
-#Terminate previously created managed(!) VMs and destroy their configs
-def vm_destroy_all():
-    server, session = _connect()
-    for uuid in _VMuuids:
-        execute(server.VM.hard_shutdown, session, uuid)
-        execute(server.VM.destroy      , session, uuid)
-
-
-def execute(fn, *args):
-    result = fn(*args)
-    if type(result) != DictType:
-        raise TypeError("Function returned object of type: %s" %
-                        str(type(result)))
-    if 'Value' not in result:
-        raise XenAPIError(*result['ErrorDescription'])
-    return result['Value']
-
-_initialised = False
-_server = None
-_session = None
-def _connect(*args):
-    global _server, _session, _initialised
-    if not _initialised:
-        _server = ServerProxy('httpu:///var/run/xend/xen-api.sock')
-        login = XAPI_DEFAULT_LOGIN
-        password = XAPI_DEFAULT_PASSWORD
-        creds = (login, password)
-        _session = execute(_server.session.login_with_password, *creds)
-        _initialised = True
-    return (_server, _session)
+def connect(*args):
+    try:
+        creds = get_login_pwd()
+    except Exception, e:
+        FAIL("%s" % str(e))
+    try:
+        session = XenAPI.Session(xmmain.serverURI)
+    except:
+        raise OptionError("Could not create XenAPI session with Xend." \
+                          "URI=%s" % xmmain.serverURI)
+    try:
+        session.login_with_password(*creds)
+    except:
+        raise OptionError("Could not login to Xend. URI=%s" % xmmain.serverURI)
+    def logout():
+        try:
+            for s in sessions:
+                s.xenapi.session.logout()
+        except:
+            pass
+    sessions.append(session)
+    atexit.register(logout)
+    return session

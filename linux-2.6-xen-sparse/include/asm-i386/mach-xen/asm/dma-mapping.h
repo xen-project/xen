@@ -53,6 +53,7 @@ extern int dma_map_sg(struct device *hwdev, struct scatterlist *sg,
 extern void dma_unmap_sg(struct device *hwdev, struct scatterlist *sg,
 			 int nents, enum dma_data_direction direction);
 
+#ifdef CONFIG_HIGHMEM
 extern dma_addr_t
 dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	     size_t size, enum dma_data_direction direction);
@@ -60,6 +61,11 @@ dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 extern void
 dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 	       enum dma_data_direction direction);
+#else
+#define dma_map_page(dev, page, offset, size, dir) \
+	dma_map_single(dev, page_address(page) + (offset), (size), (dir))
+#define dma_unmap_page dma_unmap_single
+#endif
 
 extern void
 dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,

@@ -13,6 +13,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/rcupdate.h>
 #include <xen/softirq.h>
 
 #ifndef __ARCH_IRQ_STAT
@@ -33,6 +34,10 @@ asmlinkage void do_softirq(void)
          * us to another processor.
          */
         cpu = smp_processor_id();
+
+        if ( rcu_pending(cpu) )
+            rcu_check_callbacks(cpu);
+
         if ( (pending = softirq_pending(cpu)) == 0 )
             break;
 

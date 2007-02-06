@@ -26,26 +26,21 @@
 #include <xen/spinlock.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
+#include <public/hvm/save.h>
+
 
 struct hvm_irq {
-    /* Lock protects access to all other fields. */
-    spinlock_t lock;
-
     /*
      * Virtual interrupt wires for a single PCI bus.
      * Indexed by: device*4 + INTx#.
      */
-    DECLARE_BITMAP(pci_intx, 32*4);
+    struct hvm_hw_pci_irqs pci_intx;
 
     /*
      * Virtual interrupt wires for ISA devices.
      * Indexed by ISA IRQ (assumes no ISA-device IRQ sharing).
      */
-    DECLARE_BITMAP(isa_irq, 16);
-
-    /* Virtual interrupt wire and GSI link for paravirtual platform driver. */
-    DECLARE_BITMAP(callback_irq_wire, 1);
-    unsigned int callback_gsi;
+    struct hvm_hw_isa_irqs isa_irq;
 
     /*
      * PCI-ISA interrupt router.
@@ -53,7 +48,22 @@ struct hvm_irq {
      * the traditional 'barber's pole' mapping ((device + INTx#) & 3).
      * The router provides a programmable mapping from each link to a GSI.
      */
-    u8 pci_link_route[4];
+    struct hvm_hw_pci_link pci_link;
+
+    /* Virtual interrupt and via-link for paravirtual platform driver. */
+    uint32_t callback_via_asserted;
+    union {
+        enum {
+            HVMIRQ_callback_none,
+            HVMIRQ_callback_gsi,
+            HVMIRQ_callback_pci_intx
+        } callback_via_type;
+        uint32_t pad; /* So the next field will be aligned */
+    };
+    union {
+        uint32_t gsi;
+        struct { uint8_t dev, intx; } pci;
+    } callback_via;
 
     /* Number of INTx wires asserting each PCI-ISA link. */
     u8 pci_link_assert_count[4];
@@ -76,8 +86,6 @@ struct hvm_irq {
      *  8-15: Slave  8259 PIC, IO-APIC pins 8-15
      *  16+ : IO-APIC pins 16+
      */
-    struct vpic    vpic[2]; /* 0=master; 1=slave */
-    struct vioapic vioapic;
 
     /* Last VCPU that was delivered a LowestPrio interrupt. */
     u8 round_robin_prev_vcpu;
@@ -105,7 +113,7 @@ void hvm_isa_irq_deassert(
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 
 void hvm_set_callback_irq_level(void);
-void hvm_set_callback_gsi(struct domain *d, unsigned int gsi);
+void hvm_set_callback_via(struct domain *d, uint64_t via);
 
 int cpu_get_interrupt(struct vcpu *v, int *type);
 int cpu_has_pending_irq(struct vcpu *v);

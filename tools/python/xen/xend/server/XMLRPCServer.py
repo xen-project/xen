@@ -34,7 +34,7 @@ from xen.xend.XendError import XendInvalidDomain
 def fixup_sxpr(sexpr):
     ret = []
     for k in sexpr:
-        if type(k) in (types.ListType, types.TupleType):
+        if type(k) in (list, tuple):
             if len(k) != 2 or k[0] != 'vcpu_avail':
                 ret.append(fixup_sxpr(k))
         else:
@@ -139,6 +139,8 @@ class XMLRPCServer:
                 meth = getattr(self.xenapi, meth_name)
                 if callable(meth) and hasattr(meth, 'api'):
                     self.server.register_function(meth, getattr(meth, 'api'))
+
+        self.server.register_instance(XendAPI.XendAPIAsyncProxy(self.xenapi))
                 
         # Legacy deprecated xm xmlrpc api
         # --------------------------------------------------------------------
@@ -179,21 +181,32 @@ class XMLRPCServer:
         # Custom runloop so we can cleanup when exiting.
         # -----------------------------------------------------------------
         try:
-            self.server.socket.settimeout(1.0)
             while self.running:
                 self.server.handle_request()
         finally:
-            self.cleanup()
+            self.shutdown()
 
     def cleanup(self):
-        log.debug("XMLRPCServer.cleanup()")
-        try:
-            self.server.socket.close()
-        except Exception, exn:
-            log.exception(exn)
-            pass
+        log.debug('XMLRPCServer.cleanup()')
+        if hasattr(self, 'server'):
+            try:
+                # This is here to make sure the socket is actually
+                # cleaned up when close() is called. Otherwise
+                # SO_REUSEADDR doesn't take effect. To replicate,
+                # try 'xend reload' and look for EADDRINUSE.
+                #
+                # May be caued by us calling close() outside of
+                # the listen()ing thread.
+                self.server.socket.shutdown(2)
+            except socket.error, e:
+                pass # ignore any socket errors
+            try:
+                self.server.socket.close()
+            except socket.error, e:
+                pass
 
     def shutdown(self):
         self.running = False
-        self.ready = False
-
+        if self.ready:
+            self.ready = False
+            self.cleanup()

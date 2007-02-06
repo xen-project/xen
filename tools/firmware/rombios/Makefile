@@ -12,7 +12,7 @@ clean:
 	rm -f  rombios*.txt rombios*.sym usage biossums
 	rm -f  BIOS-bochs-*
 
-BIOS-bochs-latest: rombios.c biossums
+BIOS-bochs-latest: rombios.c biossums 32bitgateway.c tcgbios.c
 	gcc -DBX_SMP_PROCESSORS=1 -E -P $< > _rombios_.c
 	bcc -o rombios.s -C-c -D__i86__ -0 -S _rombios_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' rombios.s > _rombios_.s

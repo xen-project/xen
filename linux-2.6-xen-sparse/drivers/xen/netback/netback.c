@@ -136,42 +136,6 @@ static inline void maybe_schedule_tx_action(void)
 		tasklet_schedule(&net_tx_tasklet);
 }
 
-/*
- * A gross way of confirming the origin of an skb data page. The slab
- * allocator abuses a field in the page struct to cache the kmem_cache_t ptr.
- */
-static inline int is_xen_skb(struct sk_buff *skb)
-{
-	extern kmem_cache_t *skbuff_cachep;
-	kmem_cache_t *cp = (kmem_cache_t *)virt_to_page(skb->head)->lru.next;
-	return (cp == skbuff_cachep);
-}
-
-/*
- * We can flip without copying the packet unless:
- *  1. The data is not allocated from our special cache; or
- *  2. The main data area is shared; or
- *  3. One or more fragments are shared; or
- *  4. There are chained fragments.
- */
-static inline int is_flippable_skb(struct sk_buff *skb)
-{
-	int frag;
-
-	if (!is_xen_skb(skb) || skb_cloned(skb))
-		return 0;
-
-	for (frag = 0; frag < skb_shinfo(skb)->nr_frags; frag++) {
-		if (page_count(skb_shinfo(skb)->frags[frag].page) > 1)
-			return 0;
-	}
-
-	if (skb_shinfo(skb)->frag_list != NULL)
-		return 0;
-
-	return 1;
-}
-
 static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 {
 	struct skb_shared_info *ninfo;
@@ -285,7 +249,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * Copy the packet here if it's destined for a flipping interface
 	 * but isn't flippable (e.g. extra references to data).
 	 */
-	if (!netif->copying_receiver && !is_flippable_skb(skb)) {
+	if (!netif->copying_receiver) {
 		struct sk_buff *nskb = netbk_copy_skb(skb);
 		if ( unlikely(nskb == NULL) )
 			goto drop;
@@ -1361,7 +1325,7 @@ static void netif_idx_release(u16 pending_idx)
 static void netif_page_release(struct page *page)
 {
 	/* Ready for next use. */
-	set_page_count(page, 1);
+	init_page_count(page);
 
 	netif_idx_release(page->index);
 }

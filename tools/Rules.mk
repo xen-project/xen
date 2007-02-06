@@ -52,5 +52,10 @@ mk-symlinks-xen:
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
 	mkdir -p xen/arch-x86
 	( cd xen/arch-x86 && ln -sf ../../$(XEN_ROOT)/xen/include/public/arch-x86/*.h . )
+	mkdir -p xen/foreign
+	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/Makefile . )
+	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/reference.size . )
+	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/*.py . )
+	$(MAKE) -C xen/foreign
 
 mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)

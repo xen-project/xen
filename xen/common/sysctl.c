@@ -23,8 +23,6 @@
 
 extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
-extern void getdomaininfo(
-    struct domain *d, struct xen_domctl_getdomaininfo *info);
 
 long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
@@ -123,7 +121,6 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 #ifdef PERF_COUNTERS
     case XEN_SYSCTL_perfc_op:
     {
-        extern int perfc_control(xen_sysctl_perfc_op_t *);
         ret = perfc_control(&op->u.perfc_op);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;

@@ -188,13 +188,34 @@ unsigned long csum_page(void *page)
     return sum ^ (sum>>32);
 }
 
-__attribute__((weak)) int xc_hvm_build(
-    int xc_handle,
-    uint32_t domid,
-    int memsize,
-    const char *image_name)
+__attribute__((weak)) 
+int xc_hvm_build(int xc_handle,
+                 uint32_t domid,
+                 int memsize,
+                 const char *image_name)
 {
-    return -ENOSYS;
+    errno = ENOSYS;
+    return -1;
+}
+
+__attribute__((weak)) 
+int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+                uint32_t max_factor, uint32_t flags,
+                int (*suspend)(int domid))
+{
+    errno = ENOSYS;
+    return -1;
+}
+
+__attribute__((weak)) 
+int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
+                   unsigned long nr_pfns, unsigned int store_evtchn,
+                   unsigned long *store_mfn, unsigned int console_evtchn,
+                   unsigned long *console_mfn,
+                   unsigned int pae, unsigned int apic)
+{
+    errno = ENOSYS;
+    return -1;
 }
 
 __attribute__((weak)) int xc_get_hvm_param(

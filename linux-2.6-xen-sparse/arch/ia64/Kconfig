@@ -34,11 +34,19 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_FIND_NEXT_BIT
+	bool
+	default y
+
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
 
 config TIME_INTERPOLATION
+	bool
+	default y
+
+config DMI
 	bool
 	default y
 
@@ -90,6 +98,15 @@ config DMA_IS_DMA32
 	bool
 	default y
 
+config DMA_IS_NORMAL
+	bool
+	depends on IA64_SGI_SN2
+	default y
+
+config AUDIT_ARCH
+	bool
+	default y
+
 choice
 	prompt "System type"
 	default IA64_GENERIC
@@ -97,6 +114,7 @@ choice
 config IA64_GENERIC
 	bool "generic"
 	select ACPI
+	select PCI
 	select NUMA
 	select ACPI_NUMA
 	help
@@ -272,7 +290,7 @@ config NR_CPUS
 	int "Maximum number of CPUs (2-1024)"
 	range 2 1024
 	depends on SMP
-	default "64"
+	default "1024"
 	help
 	  You should set this to the number of CPUs in your system, but
 	  keep in mind that a kernel compiled for, e.g., 2 CPUs will boot but
@@ -296,11 +314,29 @@ config ARCH_ENABLE_MEMORY_HOTPLUG
 config SCHED_SMT
 	bool "SMT scheduler support"
 	depends on SMP
-	default off
 	help
 	  Improves the CPU scheduler's decision making when dealing with
 	  Intel IA64 chips with MultiThreading at a cost of slightly increased
 	  overhead in some places. If unsure say N here.
+
+config PERMIT_BSP_REMOVE
+	bool "Support removal of Bootstrap Processor"
+	depends on HOTPLUG_CPU
+	default n
+	---help---
+	Say Y here if your platform SAL will support removal of BSP with HOTPLUG_CPU
+	support. 
+
+config FORCE_CPEI_RETARGET
+	bool "Force assumption that CPEI can be re-targetted"
+	depends on PERMIT_BSP_REMOVE
+	default n
+	---help---
+	Say Y if you need to force the assumption that CPEI can be re-targetted to
+	any cpu in the system. This hint is available via ACPI 3.0 specifications.
+	Tiger4 systems are capable of re-directing CPEI to any CPU other than BSP.
+	This option it useful to enable this feature on older BIOS's as well.
+	You can also enable this by using boot command line option force_cpei=1.
 
 config PREEMPT
 	bool "Preemptible Kernel"
@@ -347,6 +383,16 @@ config NUMA
 	  Access).  This option is for configuring high-end multiprocessor
 	  server systems.  If in doubt, say N.
 
+config NODES_SHIFT
+	int "Max num nodes shift(3-10)"
+	range 3 10
+	default "10"
+	depends on NEED_MULTIPLE_NODES
+	help
+	  This option specifies the maximum number of nodes in your SSI system.
+	  MAX_NUMNODES will be 2^(This value).
+	  If in doubt, use the default.
+
 # VIRTUAL_MEM_MAP and FLAT_NODE_MEM_MAP are functionally equivalent.
 # VIRTUAL_MEM_MAP has been retained for historical reasons.
 config VIRTUAL_MEM_MAP
@@ -367,6 +413,10 @@ config HOLES_IN_ZONE
 config HAVE_ARCH_EARLY_PFN_TO_NID
 	def_bool y
 	depends on NEED_MULTIPLE_NODES
+
+config HAVE_ARCH_NODEDATA_EXTENSION
+	def_bool y
+	depends on NUMA
 
 config IA32_SUPPORT
 	bool "Support for Linux/x86 binaries"
@@ -406,6 +456,8 @@ config IA64_PALINFO
 
 config SGI_SN
 	def_bool y if (IA64_SGI_SN2 || IA64_GENERIC)
+
+source "drivers/sn/Kconfig"
 
 source "drivers/firmware/Kconfig"
 
@@ -456,6 +508,8 @@ config XEN_PCIDEV_FE_DEBUG
 	help
 	  Enables some debug statements within the PCI Frontend.
 
+source "drivers/pci/pcie/Kconfig"
+
 source "drivers/pci/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"
@@ -490,6 +544,10 @@ config GENERIC_PENDING_IRQ
 	depends on GENERIC_HARDIRQS && SMP
 	default y
 
+config IRQ_PER_CPU
+	bool
+	default y
+
 source "arch/ia64/hp/sim/Kconfig"
 
 menu "Instrumentation Support"
@@ -521,18 +579,8 @@ if XEN
 config XEN_UTIL
 	default n
 
-config HAVE_ARCH_ALLOC_SKB
-	default y
-
-config HAVE_ARCH_DEV_ALLOC_SKB
-	default y
-
 config XEN_BALLOON
 	default y
-
-config XEN_SKBUFF
-	default y
-	depends on NET
 
 config XEN_REBOOT
 	default y

@@ -12,6 +12,16 @@
 #include <asm/intrinsics.h>
 #include <asm/types.h>
 
+#ifdef XEN  /* This will go away with newer upstream */
+#define RGN_SHIFT	61
+#define RGN_BASE(r)	(r << RGN_SHIFT)
+#define RGN_BITS	RGN_BASE(-1)
+#define RGN_HPAGE	REGION_HPAGE
+#ifndef CONFIG_HUGETLB_PAGE
+# define REGION_HPAGE	(4UL)
+#endif
+#endif
+
 /*
  * PAGE_SHIFT determines the actual kernel page size.
  */

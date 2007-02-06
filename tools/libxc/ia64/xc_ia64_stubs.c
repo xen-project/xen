@@ -74,10 +74,11 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
 }
 
 int
-xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
+xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
                 unsigned long max_pfns)
 {
-    return xc_ia64_get_pfn_list (xc_handle, domid, pfn_buf, 0, max_pfns);
+    return xc_ia64_get_pfn_list(xc_handle, domid, (xen_pfn_t *)pfn_buf,
+                                0, max_pfns);
 }
 
 long
@@ -86,7 +87,8 @@ xc_get_max_pages(int xc_handle, uint32_t domid)
     struct xen_domctl domctl;
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)domid;
-    return (do_domctl(xc_handle, &domctl) < 0) ? -1 : domctl.u.getdomaininfo.max_pages;
+    return ((do_domctl(xc_handle, &domctl) < 0)
+            ? -1 : domctl.u.getdomaininfo.max_pages);
 }
 
 /*

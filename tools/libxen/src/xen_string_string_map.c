@@ -25,8 +25,10 @@
 xen_string_string_map *
 xen_string_string_map_alloc(size_t size)
 {
-    return calloc(1, sizeof(xen_string_string_map) +
-                  size * sizeof(struct xen_string_string_map_contents));
+    xen_string_string_map *result = calloc(1, sizeof(xen_string_string_map) +
+                                           size * sizeof(struct xen_string_string_map_contents));
+    result->size = size;
+    return result;
 }
 
 

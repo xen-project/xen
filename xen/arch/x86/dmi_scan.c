@@ -159,7 +159,7 @@ static void __init dmi_save_ident(struct dmi_header *dm, int slot, int string)
 		return;
 	dmi_ident[slot] = alloc_bootmem(strlen(p)+1);
 	if(dmi_ident[slot])
-		strcpy(dmi_ident[slot], p);
+		strlcpy(dmi_ident[slot], p, strlen(p)+1);
 	else
 		printk(KERN_ERR "dmi_save_ident: out of memory.\n");
 }

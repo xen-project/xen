@@ -57,26 +57,6 @@ is_platform_hp_ski(void)
 struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 
 ///////////////////////////////
-// from arch/ia64/traps.c
-///////////////////////////////
-
-int is_kernel_text(unsigned long addr)
-{
-	extern char _stext[], _etext[];
-	if (addr >= (unsigned long) _stext &&
-	    addr <= (unsigned long) _etext)
-	    return 1;
-
-	return 0;
-}
-
-unsigned long kernel_text_end(void)
-{
-	extern char _etext[];
-	return (unsigned long) _etext;
-}
-
-///////////////////////////////
 // from common/keyhandler.c
 ///////////////////////////////
 void dump_pageframe_info(struct domain *d)
@@ -97,7 +77,7 @@ void console_print(char *msg)
 // called from unaligned.c
 ////////////////////////////////////
 
-void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+void die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
 	if (user_mode(regs))
 		return;
@@ -108,7 +88,7 @@ void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ (
 	domain_crash_synchronous();
 }
 
-void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
 	if (vmx_user_mode(regs))
 		return;

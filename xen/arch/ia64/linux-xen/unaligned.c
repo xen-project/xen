@@ -24,7 +24,7 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
-extern void die_if_kernel(char *str, struct pt_regs *regs, long err) __attribute__ ((noreturn));
+extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 
 #undef DEBUG_UNALIGNED_TRAP
 
@@ -1792,7 +1792,7 @@ printk("ia64_handle_unaligned: called, not working yet\n");
 			char buf[200];	/* comm[] is at most 16 bytes... */
 			size_t len;
 
-			len = sprintf(buf, "%s(%d): unaligned access to 0x%016lx, "
+			len = snprintf(buf, sizeof(buf), "%s(%d): unaligned access to 0x%016lx, "
 				      "ip=0x%016lx\n\r", current->comm, current->pid,
 				      ifa, regs->cr_iip + ipsr->ri);
 			/*

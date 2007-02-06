@@ -19,20 +19,20 @@ extern __kernel_size_t strspn(const char *,const char *);
  */
 #include <asm/string.h>
 
-#ifndef __HAVE_ARCH_STRCPY
-extern char * strcpy(char *,const char *);
-#endif
-#ifndef __HAVE_ARCH_STRNCPY
-extern char * strncpy(char *,const char *, __kernel_size_t);
-#endif
+/*
+ * These string functions are considered too dangerous for normal use.
+ * Use safe_strcpy(), safe_strcat(), strlcpy(), strlcat() as appropriate.
+ */
+#define strcpy  __xen_has_no_strcpy__
+#define strcat  __xen_has_no_strcat__
+#define strncpy __xen_has_no_strncpy__
+#define strncat __xen_has_no_strncat__
+
 #ifndef __HAVE_ARCH_STRLCPY
 extern size_t strlcpy(char *,const char *, __kernel_size_t);
 #endif
-#ifndef __HAVE_ARCH_STRCAT
-extern char * strcat(char *, const char *);
-#endif
-#ifndef __HAVE_ARCH_STRNCAT
-extern char * strncat(char *, const char *, __kernel_size_t);
+#ifndef __HAVE_ARCH_STRLCAT
+extern size_t strlcat(char *,const char *, __kernel_size_t);
 #endif
 #ifndef __HAVE_ARCH_STRCMP
 extern int strcmp(const char *,const char *);
@@ -82,9 +82,16 @@ extern void * memchr(const void *,int,__kernel_size_t);
 }
 #endif
 
-#define safe_strcpy(d,s)                        \
-do { strncpy((d),(s),sizeof((d)));              \
-     (d)[sizeof((d))-1] = '\0';                 \
-} while (0)
+#define is_char_array(x) __builtin_types_compatible_p(typeof(x), char[])
+
+/* safe_xxx always NUL-terminates and returns !=0 if result is truncated. */
+#define safe_strcpy(d, s) ({                    \
+    BUILD_BUG_ON(!is_char_array(d));            \
+    (strlcpy(d, s, sizeof(d)) >= sizeof(d));    \
+})
+#define safe_strcat(d, s) ({                    \
+    BUILD_BUG_ON(!is_char_array(d));            \
+    (strlcat(d, s, sizeof(d)) >= sizeof(d));    \
+})
 
 #endif /* _LINUX_STRING_H_ */

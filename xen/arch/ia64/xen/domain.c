@@ -31,7 +31,7 @@
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/version.h>
-#include <xen/elf.h>
+#include <public/libelf.h>
 #include <asm/pgalloc.h>
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 #include <asm/vcpu.h>   /* for function declarations */
@@ -305,24 +305,14 @@ void hlt_timer_fn(void *data)
 
 void relinquish_vcpu_resources(struct vcpu *v)
 {
-    if (HAS_PERVCPU_VHPT(v->domain))
-        pervcpu_vhpt_free(v);
-    if (v->arch.privregs != NULL) {
-        // this might be called by arch_do_domctl() with XEN_DOMCTL_arch_setup()
-        // for domVTi.
-        if (!(atomic_read(&v->domain->refcnt) & DOMAIN_DESTROYED)) {
-            unsigned long i;
-            for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
-                guest_physmap_remove_page(v->domain,
-                    IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
-                    virt_to_maddr(v->arch.privregs + i));
-        }
-
-        free_xenheap_pages(v->arch.privregs,
-                           get_order_from_shift(XMAPPEDREGS_SHIFT));
-        v->arch.privregs = NULL;
-    }
-    kill_timer(&v->arch.hlt_timer);
+	if (HAS_PERVCPU_VHPT(v->domain))
+		pervcpu_vhpt_free(v);
+	if (v->arch.privregs != NULL) {
+		free_xenheap_pages(v->arch.privregs,
+		                   get_order_from_shift(XMAPPEDREGS_SHIFT));
+		v->arch.privregs = NULL;
+	}
+	kill_timer(&v->arch.hlt_timer);
 }
 
 struct vcpu *alloc_vcpu_struct(void)
@@ -361,36 +351,8 @@ void free_vcpu_struct(struct vcpu *v)
 int vcpu_initialise(struct vcpu *v)
 {
 	struct domain *d = v->domain;
-	int rc, order, i;
 
 	if (!is_idle_domain(d)) {
-	    if (!d->arch.is_vti) {
-		if (HAS_PERVCPU_VHPT(d))
-			if ((rc = pervcpu_vhpt_alloc(v)) != 0)
-				return rc;
-
-		/* Create privregs page only if not VTi. */
-		order = get_order_from_shift(XMAPPEDREGS_SHIFT);
-		v->arch.privregs = alloc_xenheap_pages(order);
-		BUG_ON(v->arch.privregs == NULL);
-		memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
-		for (i = 0; i < (1 << order); i++)
-		    share_xen_page_with_guest(virt_to_page(v->arch.privregs) +
-		                              i, d, XENSHARE_writable);
-		/*
-		 * XXX IA64_XMAPPEDREGS_PADDR
-		 * assign these pages into guest pseudo physical address
-		 * space for dom0 to map this page by gmfn.
-		 * this is necessary for domain save, restore and dump-core.
-		 */
-		for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
-		    assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
-                                      virt_to_maddr(v->arch.privregs + i));
-
-		tlbflush_update_time(&v->arch.tlbflush_timestamp,
-		                     tlbflush_current_time());
-	    }
-
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
 	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
@@ -416,6 +378,41 @@ int vcpu_initialise(struct vcpu *v)
 	if (!VMX_DOMAIN(v))
 		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v,
 		           first_cpu(cpu_online_map));
+
+	return 0;
+}
+
+int vcpu_late_initialise(struct vcpu *v)
+{
+	struct domain *d = v->domain;
+	int rc, order, i;
+
+	if (HAS_PERVCPU_VHPT(d)) {
+		rc = pervcpu_vhpt_alloc(v);
+		if (rc != 0)
+			return rc;
+	}
+
+	/* Create privregs page. */
+	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
+	v->arch.privregs = alloc_xenheap_pages(order);
+	BUG_ON(v->arch.privregs == NULL);
+	memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
+	for (i = 0; i < (1 << order); i++)
+		share_xen_page_with_guest(virt_to_page(v->arch.privregs) + i,
+		                          d, XENSHARE_writable);
+	/*
+	 * XXX IA64_XMAPPEDREGS_PADDR
+	 * assign these pages into guest pseudo physical address
+	 * space for dom0 to map this page by gmfn.
+	 * this is necessary for domain save, restore and dump-core.
+	 */
+	for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
+		assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
+		                   virt_to_maddr(v->arch.privregs + i));
+
+	tlbflush_update_time(&v->arch.tlbflush_timestamp,
+	                     tlbflush_current_time());
 
 	return 0;
 }
@@ -522,14 +519,14 @@ void arch_domain_destroy(struct domain *d)
 	deallocate_rid_range(d);
 }
 
-void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
+void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
-	struct vcpu_extra_regs *er = &c->extra_regs;
+	struct vcpu_extra_regs *er = &c.nat->extra_regs;
 
-	c->user_regs = *vcpu_regs (v);
- 	c->privregs_pfn = get_gpfn_from_mfn(virt_to_maddr(v->arch.privregs) >>
-                                           PAGE_SHIFT);
+	c.nat->user_regs = *vcpu_regs(v);
+ 	c.nat->privregs_pfn = get_gpfn_from_mfn(virt_to_maddr(v->arch.privregs) >>
+                                                PAGE_SHIFT);
 
 	/* Fill extra regs.  */
 	for (i = 0; i < 8; i++) {
@@ -549,12 +546,13 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 	er->iva = v->arch.iva;
 }
 
-int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
+int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
+	int rc;
 	
-	*regs = c->user_regs;
+	*regs = c.nat->user_regs;
  	
  	if (!d->arch.is_vti) {
  		/* domain runs at PL2/3 */
@@ -562,9 +560,9 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
  		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
  	}
 
-	if (c->flags & VGCF_EXTRA_REGS) {
+	if (c.nat->flags & VGCF_EXTRA_REGS) {
 		int i;
-		struct vcpu_extra_regs *er = &c->extra_regs;
+		struct vcpu_extra_regs *er = &c.nat->extra_regs;
 
 		for (i = 0; i < 8; i++) {
 			vcpu_set_itr(v, i, er->itrs[i].pte,
@@ -582,16 +580,25 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 		v->arch.event_callback_ip = er->event_callback_ip;
 		v->arch.dcr = er->dcr;
 		v->arch.iva = er->iva;
-  	}
-	
-  	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
- 		return 0;
- 	if (d->arch.is_vti)
- 		vmx_final_setup_guest(v);
-	
- 	/* This overrides some registers.  */
-  	vcpu_init_regs(v);
-  
+	}
+
+	if (test_bit(_VCPUF_initialised, &v->vcpu_flags))
+		return 0;
+
+	if (d->arch.is_vti)
+		vmx_final_setup_guest(v);
+	else {
+		rc = vcpu_late_initialise(v);
+		if (rc != 0)
+			return rc;
+		VCPU(v, interrupt_mask_addr) = 
+			(unsigned char *) d->arch.shared_info_va +
+			INT_ENABLE_OFFSET(v);
+	}
+
+	/* This overrides some registers. */
+	vcpu_init_regs(v);
+
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 	return 0;
@@ -683,7 +690,6 @@ domain_set_shared_info_va (unsigned long va)
 {
 	struct vcpu *v = current;
 	struct domain *d = v->domain;
-	struct vcpu *v1;
 
 	/* Check virtual address:
 	   must belong to region 7,
@@ -699,10 +705,8 @@ domain_set_shared_info_va (unsigned long va)
 	printk ("Domain set shared_info_va to 0x%016lx\n", va);
 	d->arch.shared_info_va = va;
 
-	for_each_vcpu (d, v1) {
-		VCPU(v1, interrupt_mask_addr) = 
-			(unsigned char *)va + INT_ENABLE_OFFSET(v1);
-	}
+	VCPU(v, interrupt_mask_addr) = (unsigned char *)va +
+	                               INT_ENABLE_OFFSET(v);
 
 	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)(va + XSI_PSR_IC_OFS);
 
@@ -713,7 +717,7 @@ domain_set_shared_info_va (unsigned long va)
 }
 
 /* Transfer and clear the shadow bitmap in 1kB chunks for L1 cache. */
-#define SHADOW_COPY_CHUNK (1024 / sizeof (unsigned long))
+#define SHADOW_COPY_CHUNK 1024
 
 int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 {
@@ -760,8 +764,9 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		atomic64_set(&d->arch.shadow_fault_count, 0);
 		atomic64_set(&d->arch.shadow_dirty_count, 0);
 
-		d->arch.shadow_bitmap_size = (d->max_pages + BITS_PER_LONG-1) &
-		                             ~(BITS_PER_LONG-1);
+		d->arch.shadow_bitmap_size =
+			((d->arch.convmem_end >> PAGE_SHIFT) +
+			 BITS_PER_LONG - 1) & ~(BITS_PER_LONG - 1);
 		d->arch.shadow_bitmap = xmalloc_array(unsigned long,
 		                   d->arch.shadow_bitmap_size / BITS_PER_LONG);
 		if (d->arch.shadow_bitmap == NULL) {
@@ -780,7 +785,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 
 	case XEN_DOMCTL_SHADOW_OP_CLEAN:
 	  {
-		int nbr_longs;
+		int nbr_bytes;
 
 		sc->stats.fault_count = atomic64_read(&d->arch.shadow_fault_count);
 		sc->stats.dirty_count = atomic64_read(&d->arch.shadow_dirty_count);
@@ -797,21 +802,21 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		if (sc->pages > d->arch.shadow_bitmap_size)
 			sc->pages = d->arch.shadow_bitmap_size; 
 
-		nbr_longs = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
+		nbr_bytes = (sc->pages + 7) / 8;
 
-		for (i = 0; i < nbr_longs; i += SHADOW_COPY_CHUNK) {
-			int size = (nbr_longs - i) > SHADOW_COPY_CHUNK ?
-			           SHADOW_COPY_CHUNK : nbr_longs - i;
+		for (i = 0; i < nbr_bytes; i += SHADOW_COPY_CHUNK) {
+			int size = (nbr_bytes - i) > SHADOW_COPY_CHUNK ?
+			           SHADOW_COPY_CHUNK : nbr_bytes - i;
      
-			if (copy_to_guest_offset(sc->dirty_bitmap, i,
-			                         d->arch.shadow_bitmap + i,
-			                         size)) {
+			if (copy_to_guest_offset(
+                            sc->dirty_bitmap, i,
+                            (uint8_t *)d->arch.shadow_bitmap + i,
+                            size)) {
 				rc = -EFAULT;
 				break;
 			}
 
-			memset(d->arch.shadow_bitmap + i,
-			       0, size * sizeof(unsigned long));
+			memset((uint8_t *)d->arch.shadow_bitmap + i, 0, size);
 		}
 		
 		break;
@@ -833,9 +838,9 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 		if (sc->pages > d->arch.shadow_bitmap_size)
 			sc->pages = d->arch.shadow_bitmap_size; 
 
-		size = (sc->pages + BITS_PER_LONG - 1) / BITS_PER_LONG;
-		if (copy_to_guest(sc->dirty_bitmap, 
-		                  d->arch.shadow_bitmap, size)) {
+		size = (sc->pages + 7) / 8;
+		if (copy_to_guest(sc->dirty_bitmap,
+		                  (uint8_t *)d->arch.shadow_bitmap, size)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -866,38 +871,23 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 #define	privify_memory(x,y) do {} while(0)
 #endif
 
-// see arch/x86/xxx/domain_build.c
-int elf_sanity_check(const Elf_Ehdr *ehdr)
+static void loaddomainelfimage(struct domain *d, struct elf_binary *elf)
 {
-	if (!(IS_ELF(*ehdr)))
-	{
-		printk("DOM0 image is not a Xen-compatible Elf image.\n");
-		return 0;
-	}
-	return 1;
-}
-
-static void loaddomainelfimage(struct domain *d, unsigned long image_start)
-{
-	char *elfbase = (char *) image_start;
-	Elf_Ehdr ehdr;
-	Elf_Phdr phdr;
-	int h, filesz, memsz;
+	const elf_phdr *phdr;
+	int phnum, h, filesz, memsz;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
 	struct page_info *p;
-  
-	memcpy(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
-	for ( h = 0; h < ehdr.e_phnum; h++ ) {
-		memcpy(&phdr,
-		       elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
-		       sizeof(Elf_Phdr));
-		if ((phdr.p_type != PT_LOAD))
+
+	phnum = elf_uval(elf, elf->ehdr, e_phnum);
+	for (h = 0; h < phnum; h++) {
+		phdr = elf_phdr_by_index(elf, h);
+		if (!elf_phdr_is_loadable(elf, phdr))
 		    continue;
 
-		filesz = phdr.p_filesz;
-		memsz = phdr.p_memsz;
-		elfaddr = (unsigned long) elfbase + phdr.p_offset;
-		dom_mpaddr = phdr.p_paddr;
+		filesz = elf_uval(elf, phdr, p_filesz);
+		memsz = elf_uval(elf, phdr, p_memsz);
+		elfaddr = (unsigned long) elf->image + elf_uval(elf, phdr, p_offset);
+		dom_mpaddr = elf_uval(elf, phdr, p_paddr);
 
 		while (memsz > 0) {
 			p = assign_new_domain_page(d,dom_mpaddr);
@@ -917,7 +907,7 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 					       PAGE_SIZE-filesz);
 				}
 //FIXME: This test for code seems to find a lot more than objdump -x does
-				if (phdr.p_flags & PF_X) {
+				if (elf_uval(elf, phdr, p_flags) & PF_X) {
 					privify_memory(dom_imva,PAGE_SIZE);
 					flush_icache_range(dom_imva,
 							   dom_imva+PAGE_SIZE);
@@ -980,7 +970,8 @@ int construct_dom0(struct domain *d,
 	struct vcpu *v = d->vcpu[0];
 	unsigned long max_pages;
 
-	struct domain_setup_info dsi;
+	struct elf_binary elf;
+	struct elf_dom_parms parms;
 	unsigned long p_start;
 	unsigned long pkern_start;
 	unsigned long pkern_entry;
@@ -1004,18 +995,31 @@ int construct_dom0(struct domain *d,
 	BUG_ON(d->vcpu[0] == NULL);
 	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 
-	memset(&dsi, 0, sizeof(struct domain_setup_info));
-
 	printk("*** LOADING DOMAIN 0 ***\n");
 
 	max_pages = dom0_size / PAGE_SIZE;
 	d->max_pages = max_pages;
 	d->tot_pages = 0;
-	dsi.image_addr = (unsigned long)image_start;
-	dsi.image_len  = image_len;
-	rc = parseelfimage(&dsi);
+
+	rc = elf_init(&elf, (void*)image_start, image_len);
 	if ( rc != 0 )
 	    return rc;
+#ifdef VERBOSE
+	elf_set_verbose(&elf);
+#endif
+	elf_parse_binary(&elf);
+	if (0 != (elf_xen_parse(&elf, &parms)))
+		return rc;
+
+	printk(" Dom0 kernel: %s, %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+	       elf_64bit(&elf) ? "64-bit" : "32-bit",
+	       elf_msb(&elf)   ? "msb"    : "lsb",
+	       elf.pstart, elf.pend);
+        if (!elf_64bit(&elf) ||
+	    elf_uval(&elf, elf.ehdr, e_machine) != EM_IA_64) {
+		printk("Incompatible kernel binary\n");
+		return -1;
+	}
 
 #ifdef VALIDATE_VT
 	/* Temp workaround */
@@ -1034,10 +1038,10 @@ int construct_dom0(struct domain *d,
 	}
 #endif
 
-	p_start = dsi.v_start;
-	pkern_start = dsi.v_kernstart;
-	pkern_end = dsi.v_kernend;
-	pkern_entry = dsi.v_kernentry;
+	p_start = parms.virt_base;
+	pkern_start = parms.virt_kstart;
+	pkern_end = parms.virt_kend;
+	pkern_entry = parms.virt_entry;
 
 //printk("p_start=%lx, pkern_start=%lx, pkern_end=%lx, pkern_entry=%lx\n",p_start,pkern_start,pkern_end,pkern_entry);
 
@@ -1051,10 +1055,11 @@ int construct_dom0(struct domain *d,
 	if(initrd_start && initrd_len){
 	    unsigned long offset;
 
-	    pinitrd_start= dom0_size - (PAGE_ALIGN(initrd_len) + 4*1024*1024);
-	    if (pinitrd_start <= pstart_info)
-		panic("%s:enough memory is not assigned to dom0", __func__);
-
+	    /* The next page aligned boundary after the start info.
+	       Note: EFI_PAGE_SHIFT = 12 <= PAGE_SHIFT */
+	    pinitrd_start = pstart_info + PAGE_SIZE;
+	    if (pinitrd_start + initrd_len >= dom0_size)
+		    panic("%s: not enough memory assigned to dom0", __func__);
 	    for (offset = 0; offset < initrd_len; offset += PAGE_SIZE) {
 		struct page_info *p;
 		p = assign_new_domain_page(d, pinitrd_start + offset);
@@ -1104,14 +1109,10 @@ int construct_dom0(struct domain *d,
 	printk ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
 	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
-		printk ("Cannot allocate dom0 vcpu %d\n", i);
+		panic("Cannot allocate dom0 vcpu %d\n", i);
 
 	/* Copy the OS image. */
-	loaddomainelfimage(d,image_start);
-
-	/* Copy the initial ramdisk. */
-	//if ( initrd_len != 0 )
-	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
+	loaddomainelfimage(d,&elf);
 
 	BUILD_BUG_ON(sizeof(start_info_t) + sizeof(dom0_vga_console_info_t) +
 	             sizeof(struct ia64_boot_param) > PAGE_SIZE);
@@ -1123,7 +1124,7 @@ int construct_dom0(struct domain *d,
 		panic("can't allocate start info page");
 	si = page_to_virt(start_info_page);
 	memset(si, 0, PAGE_SIZE);
-	sprintf(si->magic, "xen-%i.%i-ia64",
+	snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-ia64",
 		xen_major_version(), xen_minor_version());
 	si->nr_pages     = max_pages;
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
@@ -1147,8 +1148,7 @@ int construct_dom0(struct domain *d,
 	dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
 
 	/* Fill boot param.  */
-	strncpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
-	si->cmd_line[sizeof(si->cmd_line)-1] = 0;
+	strlcpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
 
 	bp = (struct ia64_boot_param *)((unsigned char *)si +
 	                                sizeof(start_info_t));
@@ -1161,8 +1161,7 @@ int construct_dom0(struct domain *d,
 	bp->console_info.orig_y = bp->console_info.num_rows == 0 ?
 	                          0 : bp->console_info.num_rows - 1;
 
-	bp->initrd_start = dom0_size -
-	             (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+	bp->initrd_start = pinitrd_start;
 	bp->initrd_size = ia64_boot_param->initrd_size;
 
 	ci = (dom0_vga_console_info_t *)((unsigned char *)si +

@@ -15,6 +15,7 @@
  *
  */
 
+#ifndef COMPAT
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
@@ -28,6 +29,10 @@
 #include <xen/guest_access.h>
 #include <acm/acm_hooks.h>
 
+typedef long ret_t;
+
+#endif /* !COMPAT */
+
 #ifndef ACM_SECURITY
 
 
@@ -40,6 +45,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 #else
 
 
+#ifndef COMPAT
 int acm_authorize_acm_ops(struct domain *d)
 {
     /* currently, policy management functions are restricted to privileged domains */
@@ -47,11 +53,12 @@ int acm_authorize_acm_ops(struct domain *d)
         return -EPERM;
     return 0;
 }
+#endif
 
 
-long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    long rc = -EFAULT;
+    ret_t rc = -EFAULT;
 
     if (acm_authorize_acm_ops(current->domain))
         return -EPERM;
@@ -108,7 +115,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ssidref = getssid.id.ssidref;
         else if (getssid.get_ssid_by == ACM_GETBY_domainid)
         {
-            struct domain *subj = find_domain_by_id(getssid.id.domainid);
+            struct domain *subj = get_domain_by_id(getssid.id.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -145,7 +152,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ssidref1 = getdecision.id1.ssidref;
         else if (getdecision.get_decision_by1 == ACM_GETBY_domainid)
         {
-            struct domain *subj = find_domain_by_id(getdecision.id1.domainid);
+            struct domain *subj = get_domain_by_id(getdecision.id1.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -169,7 +176,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ssidref2 = getdecision.id2.ssidref;
         else if (getdecision.get_decision_by2 == ACM_GETBY_domainid)
         {
-            struct domain *subj = find_domain_by_id(getdecision.id2.domainid);
+            struct domain *subj = get_domain_by_id(getdecision.id2.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -217,6 +224,10 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
+#endif
+
+#if defined(CONFIG_COMPAT) && !defined(COMPAT)
+#include "compat/acm_ops.c"
 #endif
 
 /*

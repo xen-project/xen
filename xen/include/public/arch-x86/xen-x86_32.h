@@ -21,7 +21,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Copyright (c) 2004-2006, K A Fraser
+ * Copyright (c) 2004-2007, K A Fraser
  */
 
 #ifndef __XEN_PUBLIC_ARCH_X86_XEN_X86_32_H__
@@ -87,6 +87,23 @@
 #define MACH2PHYS_NR_ENTRIES  ((MACH2PHYS_VIRT_END-MACH2PHYS_VIRT_START)>>2)
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)MACH2PHYS_VIRT_START)
+#endif
+
+/* 32-/64-bit invariability for control interfaces (domctl/sysctl). */
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+#undef __DEFINE_XEN_GUEST_HANDLE
+#define __DEFINE_XEN_GUEST_HANDLE(name, type)                   \
+    typedef struct { type *p; }                                 \
+        __guest_handle_ ## name;                                \
+    typedef struct { union { type *p; uint64_aligned_t q; }; }  \
+        __guest_handle_64_ ## name
+#undef set_xen_guest_handle
+#define set_xen_guest_handle(hnd, val)                      \
+    do { if ( sizeof(hnd) == 8 ) *(uint64_t *)&(hnd) = 0;   \
+         (hnd).p = val;                                     \
+    } while ( 0 )
+#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
+#define XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name __attribute__((aligned(8)))
 #endif
 
 #ifndef __ASSEMBLY__

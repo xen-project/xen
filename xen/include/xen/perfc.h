@@ -102,6 +102,9 @@ extern struct perfcounter perfcounters;
 #else
 #define perfc_incr_histo(_x,_v,_n) ((void)0)
 #endif
+
+struct xen_sysctl_perfc_op;
+int perfc_control(struct xen_sysctl_perfc_op *);
     
 #else /* PERF_COUNTERS */
 

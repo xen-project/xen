@@ -44,31 +44,28 @@
  */
 #define VLAPIC_HW_DISABLED              0x1
 #define VLAPIC_SW_DISABLED              0x2
-#define vlapic_sw_disabled(vlapic)  ((vlapic)->disabled & VLAPIC_SW_DISABLED)
-#define vlapic_hw_disabled(vlapic)  ((vlapic)->disabled & VLAPIC_HW_DISABLED)
-#define vlapic_disabled(vlapic)     ((vlapic)->disabled)
-#define vlapic_enabled(vlapic)      (!vlapic_disabled(vlapic))
+#define vlapic_sw_disabled(vlapic) ((vlapic)->hw.disabled & VLAPIC_SW_DISABLED)
+#define vlapic_hw_disabled(vlapic) ((vlapic)->hw.disabled & VLAPIC_HW_DISABLED)
+#define vlapic_disabled(vlapic)    ((vlapic)->hw.disabled)
+#define vlapic_enabled(vlapic)     (!vlapic_disabled(vlapic))
 
 struct vlapic {
-    uint64_t             apic_base_msr;
-    uint32_t             disabled; /* VLAPIC_xx_DISABLED */
-    uint32_t             timer_divisor;
-    struct periodic_time pt;
-    int                  timer_pending_count;
-    s_time_t             timer_last_update;
-    struct page_info     *regs_page;
-    void                 *regs;
+    struct hvm_hw_lapic      hw;
+    struct hvm_hw_lapic_regs *regs;
+    struct periodic_time     pt;
+    s_time_t                 timer_last_update;
+    struct page_info         *regs_page;
 };
 
 static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)
 {
-    return *((uint32_t *)(vlapic->regs + reg));
+    return *((uint32_t *)(&vlapic->regs->data[reg]));
 }
 
 static inline void vlapic_set_reg(
     struct vlapic *vlapic, uint32_t reg, uint32_t val)
 {
-    *((uint32_t *)(vlapic->regs + reg)) = val;
+    *((uint32_t *)(&vlapic->regs->data[reg])) = val;
 }
 
 int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);

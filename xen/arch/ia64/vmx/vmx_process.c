@@ -93,7 +93,7 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         if (vector == IA64_FP_FAULT_VECTOR) {
             status = handle_fpu_swa(1, regs, isr);
             if (!status) {
-                vmx_vcpu_increment_iip(vcpu);
+                vcpu_increment_iip(vcpu);
                 return;
             } else if (IA64_RETRY == status)
                 return;
@@ -104,7 +104,7 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
             if (!status)
                 return;
             else if (IA64_RETRY == status) {
-                vmx_vcpu_decrement_iip(vcpu);
+                vcpu_decrement_iip(vcpu);
                 return;
             }
         }
@@ -143,16 +143,16 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
             /* Allow hypercalls only when cpl = 0.  */
             if (iim == d->arch.breakimm) {
                 ia64_hypercall(regs);
-                vmx_vcpu_increment_iip(v);
+                vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
             else if(iim == DOMN_PAL_REQUEST){
                 pal_emul(v);
-                vmx_vcpu_increment_iip(v);
+                vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }else if(iim == DOMN_SAL_REQUEST){
                 sal_emul(v);
-                vmx_vcpu_increment_iip(v);
+                vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
         }
@@ -212,8 +212,17 @@ void leave_hypervisor_tail(struct pt_regs *regs)
             if (callback_irq != 0 && local_events_need_delivery()) {
                 /* change level for para-device callback irq */
                 /* use level irq to send discrete event */
-                viosapic_set_irq(d, callback_irq, 1);
-                viosapic_set_irq(d, callback_irq, 0);
+                if (callback_irq & IA64_CALLBACK_IRQ_RID) {
+                    /* case of using Requester-ID as callback irq */
+                    /* RID: '<#bus(8)><#dev(5)><#func(3)>' */
+                    int dev = (callback_irq >> 3) & 0x1f;
+                    viosapic_set_pci_irq(d, dev, 0, 1);
+                    viosapic_set_pci_irq(d, dev, 0, 0);
+                } else {
+                    /* case of using GSI as callback irq */
+                    viosapic_set_irq(d, callback_irq, 1);
+                    viosapic_set_irq(d, callback_irq, 0);
+                }
             }
         }
 

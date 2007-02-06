@@ -17,7 +17,7 @@
     ((dpl) >= (vm86_mode(r) ? 3 : ((r)->cs & 3)))
 
 /* Check for null trap callback handler: Is the selector null (0-3)? */
-#define null_trap_bounce(tb) (((tb)->cs & ~3) == 0)
+#define null_trap_bounce(v, tb) (((tb)->cs & ~3) == 0)
 
 /* Number of bytes of on-stack execution state to be context-switched. */
 #define CTXT_SWITCH_STACK_BYTES (sizeof(struct cpu_user_regs))

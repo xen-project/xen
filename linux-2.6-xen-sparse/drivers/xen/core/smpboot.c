@@ -26,10 +26,6 @@
 #include <xen/cpu_hotplug.h>
 #include <xen/xenbus.h>
 
-#ifdef CONFIG_SMP_ALTERNATIVES
-#include <asm/smp_alt.h>
-#endif
-
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
@@ -52,6 +48,7 @@ cpumask_t cpu_online_map;
 EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
+static cpumask_t cpu_initialized_map;
 
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_data);
@@ -84,7 +81,8 @@ void __init prefill_possible_map(void)
 {
 	int i, rc;
 
-	if (!cpus_empty(cpu_possible_map))
+	for_each_possible_cpu(i)
+	    if (i != smp_processor_id())
 		return;
 
 	for (i = 0; i < NR_CPUS; i++) {
@@ -281,6 +279,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	if (xen_smp_intr_init(0))
 		BUG();
 
+	cpu_initialized_map = cpumask_of_cpu(0);
+
 	/* Restrict the possible_map according to max_cpus. */
 	while ((num_possible_cpus() > 1) && (num_possible_cpus() > max_cpus)) {
 		for (cpu = NR_CPUS-1; !cpu_isset(cpu, cpu_possible_map); cpu--)
@@ -288,7 +288,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		cpu_clear(cpu, cpu_possible_map);
 	}
 
-	for_each_cpu (cpu) {
+	for_each_possible_cpu (cpu) {
 		if (cpu == 0)
 			continue;
 
@@ -333,8 +333,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #else
 		cpu_set(cpu, cpu_present_map);
 #endif
-
-		cpu_initialize_context(cpu);
 	}
 
 	init_xenbus_allowed_cpumask();
@@ -351,7 +349,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	prefill_possible_map();
 	cpu_present_map  = cpumask_of_cpu(0);
 	cpu_online_map   = cpumask_of_cpu(0);
 }
@@ -396,10 +393,8 @@ void __cpu_die(unsigned int cpu)
 
 	xen_smp_intr_exit(cpu);
 
-#ifdef CONFIG_SMP_ALTERNATIVES
 	if (num_online_cpus() == 1)
-		unprepare_for_smp();
-#endif
+		alternatives_smp_switch(0);
 }
 
 #else /* !CONFIG_HOTPLUG_CPU */
@@ -424,10 +419,13 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (rc)
 		return rc;
 
-#ifdef CONFIG_SMP_ALTERNATIVES
+	if (!cpu_isset(cpu, cpu_initialized_map)) {
+		cpu_set(cpu, cpu_initialized_map);
+		cpu_initialize_context(cpu);
+	}
+
 	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
+		alternatives_smp_switch(1);
 
 	/* This must be done before setting cpu_online_map */
 	set_cpu_sibling_map(cpu);

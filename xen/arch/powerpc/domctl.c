@@ -22,6 +22,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/guest_access.h>
 #include <xen/shadow.h>
 #include <public/xen.h>
@@ -29,10 +30,9 @@
 #include <public/sysctl.h>
 #include <asm/processor.h>
 
-void arch_getdomaininfo_ctxt(struct vcpu *, vcpu_guest_context_t *);
-void arch_getdomaininfo_ctxt(struct vcpu *v, vcpu_guest_context_t *c)
+void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 { 
-    memcpy(&c->user_regs, &v->arch.ctxt, sizeof(struct cpu_user_regs));
+    memcpy(&c.nat->user_regs, &v->arch.ctxt, sizeof(struct cpu_user_regs));
     /* XXX fill in rest of vcpu_guest_context_t */
 }
 
@@ -47,9 +47,9 @@ long arch_do_domctl(struct xen_domctl *domctl,
     case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = find_domain_by_id(domctl->domain);
+        struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        xen_pfn_t mfn;
+        uint64_t mfn;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -84,7 +84,7 @@ long arch_do_domctl(struct xen_domctl *domctl,
     {
         struct domain *d;
         ret = -ESRCH;
-        d = find_domain_by_id(domctl->domain);
+        d = get_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
             ret = shadow_domctl(d, &domctl->u.shadow_op, u_domctl);
@@ -99,7 +99,7 @@ long arch_do_domctl(struct xen_domctl *domctl,
         unsigned int order = domctl->u.real_mode_area.log - PAGE_SHIFT;
 
         ret = -ESRCH;
-        d = find_domain_by_id(domctl->domain);
+        d = get_domain_by_id(domctl->domain);
         if (d != NULL) {
             ret = -EINVAL;
             if (cpu_rma_valid(order))

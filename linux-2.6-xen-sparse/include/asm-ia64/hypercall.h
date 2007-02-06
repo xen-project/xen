@@ -39,6 +39,9 @@
 
 #include <asm/xen/xcom_hcall.h>
 struct xencomm_handle;
+extern unsigned long __hypercall(unsigned long a1, unsigned long a2,
+                                 unsigned long a3, unsigned long a4,
+                                 unsigned long a5, unsigned long cmd);
 
 /*
  * Assembler stubs for hyper-calls.
@@ -47,115 +50,58 @@ struct xencomm_handle;
 #define _hypercall0(type, name)					\
 ({								\
 	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "J" (__HYPERVISOR_##name)	\
-			      : "r2","r8",			\
-			        "memory" );			\
+	__res=__hypercall(0, 0, 0, 0, 0, __HYPERVISOR_##name);	\
 	(type)__res;						\
 })
 
 #define _hypercall1(type, name, a1)				\
 ({								\
 	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r14=%2\n"			\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "J" (__HYPERVISOR_##name),	\
-				"rI" ((unsigned long)(a1))	\
-			      : "r14","r2","r8",		\
-				"memory" );			\
+	__res = __hypercall((unsigned long)a1,			\
+	                     0, 0, 0, 0, __HYPERVISOR_##name);	\
 	(type)__res;						\
 })
 
 #define _hypercall2(type, name, a1, a2)				\
 ({								\
 	long __res;						\
-	__asm__ __volatile__ (";;\n"				\
-			      "mov r14=%2\n"			\
-			      "mov r15=%3\n"			\
-			      "mov r2=%1\n"			\
-			      "break 0x1000 ;;\n"		\
-			      "mov %0=r8 ;;\n"			\
-			      : "=r" (__res)			\
-			      : "J" (__HYPERVISOR_##name),	\
-				"rI" ((unsigned long)(a1)),	\
-				"rI" ((unsigned long)(a2))	\
-			      : "r14","r15","r2","r8",		\
-				"memory" );			\
+	__res = __hypercall((unsigned long)a1,			\
+	                    (unsigned long)a2,			\
+	                    0, 0, 0, __HYPERVISOR_##name);	\
 	(type)__res;						\
 })
 
 #define _hypercall3(type, name, a1, a2, a3)			\
 ({								\
 	long __res;						\
-	__asm__ __volatile__ (";;\n"                            \
-			      "mov r14=%2\n"                    \
-			      "mov r15=%3\n"                    \
-			      "mov r16=%4\n"                    \
-			      "mov r2=%1\n"                     \
-			      "break 0x1000 ;;\n"               \
-			      "mov %0=r8 ;;\n"                  \
-			      : "=r" (__res)                    \
-			      : "J" (__HYPERVISOR_##name),      \
-				"rI" ((unsigned long)(a1)),     \
-				"rI" ((unsigned long)(a2)),     \
-				"rI" ((unsigned long)(a3))      \
-			      : "r14","r15","r16","r2","r8",	\
-			        "memory" );                     \
-	(type)__res;                                            \
+	__res = __hypercall((unsigned long)a1,			\
+	                    (unsigned long)a2,			\
+	                    (unsigned long)a3,			\
+	                    0, 0, __HYPERVISOR_##name);		\
+	(type)__res;						\
 })
 
 #define _hypercall4(type, name, a1, a2, a3, a4)			\
 ({								\
 	long __res;						\
-	__asm__ __volatile__ (";;\n"                            \
-			      "mov r14=%2\n"                    \
-			      "mov r15=%3\n"                    \
-			      "mov r16=%4\n"                    \
-			      "mov r17=%5\n"                    \
-			      "mov r2=%1\n"                     \
-			      "break 0x1000 ;;\n"               \
-			      "mov %0=r8 ;;\n"                  \
-			      : "=r" (__res)                    \
-			      : "J" (__HYPERVISOR_##name),      \
-				"rI" ((unsigned long)(a1)),     \
-				"rI" ((unsigned long)(a2)),     \
-				"rI" ((unsigned long)(a3)),     \
-				"rI" ((unsigned long)(a4))      \
-			      : "r14","r15","r16","r2","r8",	\
-			        "r17","memory" );               \
-	(type)__res;                                            \
+	__res = __hypercall((unsigned long)a1,			\
+	                    (unsigned long)a2,			\
+	                    (unsigned long)a3,			\
+	                    (unsigned long)a4,			\
+	                    0, __HYPERVISOR_##name);		\
+	(type)__res;						\
 })
 
 #define _hypercall5(type, name, a1, a2, a3, a4, a5)		\
 ({								\
 	long __res;						\
-	__asm__ __volatile__ (";;\n"                            \
-			      "mov r14=%2\n"                    \
-			      "mov r15=%3\n"                    \
-			      "mov r16=%4\n"                    \
-			      "mov r17=%5\n"                    \
-			      "mov r18=%6\n"                    \
-			      "mov r2=%1\n"                     \
-			      "break 0x1000 ;;\n"               \
-			      "mov %0=r8 ;;\n"                  \
-			      : "=r" (__res)                    \
-			      : "J" (__HYPERVISOR_##name),      \
-				"rI" ((unsigned long)(a1)),     \
-				"rI" ((unsigned long)(a2)),     \
-				"rI" ((unsigned long)(a3)),     \
-				"rI" ((unsigned long)(a4)),     \
-				"rI" ((unsigned long)(a5))      \
-			      : "r14","r15","r16","r2","r8",	\
-			        "r17","r18","memory" );         \
-	(type)__res;                                            \
+	__res = __hypercall((unsigned long)a1,			\
+	                    (unsigned long)a2,			\
+	                    (unsigned long)a3,			\
+	                    (unsigned long)a4,			\
+	                    (unsigned long)a5,			\
+	                    __HYPERVISOR_##name);		\
+	(type)__res;						\
 })
 
 

@@ -16,6 +16,7 @@ usage() {
     echo "  -r <url>    : url of test results repository to use"
     echo "  -s <report> : just submit report <report>"
     echo "  -u          : unsafe -- do not run the sanity checks before starting"
+    echo "  -md         : all created domains are xend-'managed' domains"
     echo "  -h | --help : show this help"
 }
 
@@ -218,10 +219,13 @@ run=yes
 unsafe=no
 GROUPENTERED=default
 
+#Prepare for usage with ACM
 if [ -d /etc/xen/acm-security/policies ]; then
 	cp -f tests/security-acm/xm-test-security_policy.xml \
 	      /etc/xen/acm-security/policies
 fi
+
+unset XM_MANAGED_DOMAINS
 
 # Resolve options
 while [ $# -gt 0 ]
@@ -260,6 +264,10 @@ while [ $# -gt 0 ]
 	  unsafe=yes
 	  report=no
 	  ;;
+      -md)
+          echo "(use managed domains)"
+          export XM_MANAGED_DOMAINS=1
+          ;;
       -h|--help)
           usage
           exit 0

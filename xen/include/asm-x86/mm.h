@@ -244,7 +244,7 @@ unsigned long
 pae_copy_root(struct vcpu *v, l3_pgentry_t *l3tab);
 #endif /* CONFIG_PAGING_LEVELS == 3 */
 
-int check_descriptor(struct desc_struct *d);
+int check_descriptor(const struct domain *, struct desc_struct *d);
 
 /*
  * The MPT (machine->physical mapping table) is an array of word-sized
@@ -257,7 +257,16 @@ int check_descriptor(struct desc_struct *d);
 #define INVALID_M2P_ENTRY        (~0UL)
 #define VALID_M2P(_e)            (!((_e) & (1UL<<(BITS_PER_LONG-1))))
 
+#ifdef CONFIG_COMPAT
+#define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
+#define set_gpfn_from_mfn(mfn, pfn) \
+    ((void)(compat_disabled || \
+            (mfn) >= (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 || \
+            (compat_machine_to_phys_mapping[(mfn)] = (unsigned int)(pfn))), \
+     machine_to_phys_mapping[(mfn)] = (pfn))
+#else
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
+#endif
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 
@@ -269,6 +278,11 @@ int check_descriptor(struct desc_struct *d);
 #define gmfn_to_mfn(_d, gpfn)  mfn_x(sh_gfn_to_mfn(_d, gpfn))
 
 #define INVALID_MFN             (~0UL)
+
+#ifdef CONFIG_COMPAT
+#define compat_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
+#define compat_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))
+#endif
 
 #ifdef MEMORY_GUARD
 void memguard_init(void);
@@ -315,10 +329,20 @@ int __sync_lazy_execstate(void);
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
+#ifdef CONFIG_COMPAT
+int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void));
+int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE(void));
+#endif
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
 
 int map_ldt_shadow_page(unsigned int);
+
+#ifdef CONFIG_COMPAT
+int setup_arg_xlat_area(struct vcpu *, l4_pgentry_t *);
+#else
+# define setup_arg_xlat_area(vcpu, l4tab) 0
+#endif
 
 #endif /* __ASM_X86_MM_H__ */

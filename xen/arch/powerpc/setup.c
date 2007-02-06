@@ -91,19 +91,6 @@ static struct domain *idle_domain;
 
 volatile struct processor_area * volatile global_cpu_table[NR_CPUS];
 
-int is_kernel_text(unsigned long addr)
-{
-    if (addr >= (unsigned long) &_start &&
-        addr <= (unsigned long) &_etext)
-        return 1;
-    return 0;
-}
-
-unsigned long kernel_text_end(void)
-{
-    return (unsigned long) &_etext;
-}
-
 static void __init do_initcalls(void)
 {
     initcall_t *call;
@@ -464,8 +451,8 @@ void __init __start_xen_ppc(
 
 }
 
-extern void arch_get_xen_caps(xen_capabilities_info_t info);
-void arch_get_xen_caps(xen_capabilities_info_t info)
+extern void arch_get_xen_caps(xen_capabilities_info_t *info);
+void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
 }
 

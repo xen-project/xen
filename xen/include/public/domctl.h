@@ -34,10 +34,10 @@
 
 #include "xen.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000004
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000005
 
 struct xenctl_cpumap {
-    XEN_GUEST_HANDLE(uint8_t) bitmap;
+    XEN_GUEST_HANDLE_64(uint8_t) bitmap;
     uint32_t nr_cpus;
 };
 
@@ -61,6 +61,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
 #define XEN_DOMCTL_destroydomain      2
 #define XEN_DOMCTL_pausedomain        3
 #define XEN_DOMCTL_unpausedomain      4
+#define XEN_DOMCTL_resumedomain      27
 
 #define XEN_DOMCTL_getdomaininfo      5
 struct xen_domctl_getdomaininfo {
@@ -91,10 +92,10 @@ struct xen_domctl_getdomaininfo {
 #define XEN_DOMINF_shutdownmask 255
 #define XEN_DOMINF_shutdownshift 16
     uint32_t flags;              /* XEN_DOMINF_* */
-    uint64_t tot_pages;
-    uint64_t max_pages;
-    uint64_t shared_info_frame;  /* GMFN of shared_info struct */
-    uint64_t cpu_time;
+    uint64_aligned_t tot_pages;
+    uint64_aligned_t max_pages;
+    uint64_aligned_t shared_info_frame; /* GMFN of shared_info struct */
+    uint64_aligned_t cpu_time;
     uint32_t nr_online_vcpus;    /* Number of VCPUs currently online. */
     uint32_t max_vcpu_id;        /* Maximum VCPUID in use by this domain. */
     uint32_t ssidref;
@@ -108,12 +109,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
 struct xen_domctl_getmemlist {
     /* IN variables. */
     /* Max entries to write to output buffer. */
-    uint64_t max_pfns;
+    uint64_aligned_t max_pfns;
     /* Start index in guest's page list. */
-    uint64_t start_pfn;
-    XEN_GUEST_HANDLE(xen_pfn_t) buffer;
+    uint64_aligned_t start_pfn;
+    XEN_GUEST_HANDLE_64(uint64_t) buffer;
     /* OUT variables. */
-    uint64_t num_pfns;
+    uint64_aligned_t num_pfns;
 };
 typedef struct xen_domctl_getmemlist xen_domctl_getmemlist_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
@@ -134,7 +135,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 
 struct xen_domctl_getpageframeinfo {
     /* IN variables. */
-    uint64_t gmfn;        /* GMFN to query */
+    uint64_aligned_t gmfn; /* GMFN to query */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
     uint32_t type;         /* see above type defs */
@@ -146,9 +147,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo_t);
 #define XEN_DOMCTL_getpageframeinfo2  8
 struct xen_domctl_getpageframeinfo2 {
     /* IN variables. */
-    uint64_t num;
+    uint64_aligned_t num;
     /* IN/OUT variables. */
-    XEN_GUEST_HANDLE(ulong) array;
+    XEN_GUEST_HANDLE_64(uint32_t) array;
 };
 typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
@@ -222,8 +223,8 @@ struct xen_domctl_shadow_op {
     uint32_t       mb;       /* Shadow memory allocation in MB */
 
     /* OP_PEEK / OP_CLEAN */
-    XEN_GUEST_HANDLE(ulong) dirty_bitmap;
-    uint64_t       pages;    /* Size of buffer. Updated with actual size. */
+    XEN_GUEST_HANDLE_64(uint8_t) dirty_bitmap;
+    uint64_aligned_t pages; /* Size of buffer. Updated with actual size. */
     struct xen_domctl_shadow_op_stats stats;
 };
 typedef struct xen_domctl_shadow_op xen_domctl_shadow_op_t;
@@ -233,7 +234,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_shadow_op_t);
 #define XEN_DOMCTL_max_mem           11
 struct xen_domctl_max_mem {
     /* IN variables. */
-    uint64_t max_memkb;
+    uint64_aligned_t max_memkb;
 };
 typedef struct xen_domctl_max_mem xen_domctl_max_mem_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_mem_t);
@@ -243,7 +244,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_mem_t);
 #define XEN_DOMCTL_getvcpucontext    13
 struct xen_domctl_vcpucontext {
     uint32_t              vcpu;                  /* IN */
-    XEN_GUEST_HANDLE(vcpu_guest_context_t) ctxt; /* IN/OUT */
+    XEN_GUEST_HANDLE_64(vcpu_guest_context_t) ctxt; /* IN/OUT */
 };
 typedef struct xen_domctl_vcpucontext xen_domctl_vcpucontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpucontext_t);
@@ -257,7 +258,7 @@ struct xen_domctl_getvcpuinfo {
     uint8_t  online;                  /* currently online (not hotplugged)? */
     uint8_t  blocked;                 /* blocked waiting for an event? */
     uint8_t  running;                 /* currently scheduled on its CPU? */
-    uint64_t cpu_time;                /* total cpu time consumed (ns) */
+    uint64_aligned_t cpu_time;        /* total cpu time consumed (ns) */
     uint32_t cpu;                     /* current mapping   */
 };
 typedef struct xen_domctl_getvcpuinfo xen_domctl_getvcpuinfo_t;
@@ -295,9 +296,9 @@ struct xen_domctl_scheduler_op {
     uint32_t cmd;       /* XEN_DOMCTL_SCHEDOP_* */
     union {
         struct xen_domctl_sched_sedf {
-            uint64_t period;
-            uint64_t slice;
-            uint64_t latency;
+            uint64_aligned_t period;
+            uint64_aligned_t slice;
+            uint64_aligned_t latency;
             uint32_t extratime;
             uint32_t weight;
         } sedf;
@@ -338,9 +339,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_irq_permission_t);
 
 #define XEN_DOMCTL_iomem_permission  20
 struct xen_domctl_iomem_permission {
-    uint64_t first_mfn;       /* first page (physical page number) in range */
-    uint64_t nr_mfns;         /* number of pages in range (>0) */
-    uint8_t  allow_access;    /* allow (!0) or deny (0) access to range? */
+    uint64_aligned_t first_mfn;/* first page (physical page number) in range */
+    uint64_aligned_t nr_mfns;  /* number of pages in range (>0) */
+    uint8_t  allow_access;     /* allow (!0) or deny (0) access to range? */
 };
 typedef struct xen_domctl_iomem_permission xen_domctl_iomem_permission_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_iomem_permission_t);
@@ -357,7 +358,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_permission_t);
 
 #define XEN_DOMCTL_hypercall_init    22
 struct xen_domctl_hypercall_init {
-    uint64_t  gmfn;            /* GMFN to be initialised */
+    uint64_aligned_t  gmfn;           /* GMFN to be initialised */
 };
 typedef struct xen_domctl_hypercall_init xen_domctl_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
@@ -368,12 +369,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
 #define _XEN_DOMAINSETUP_query 1 /* Get parameters (for save)  */
 #define XEN_DOMAINSETUP_query  (1UL<<_XEN_DOMAINSETUP_query)
 typedef struct xen_domctl_arch_setup {
-    uint64_t flags;      /* XEN_DOMAINSETUP_* */
+    uint64_aligned_t flags;  /* XEN_DOMAINSETUP_* */
 #ifdef __ia64__
-    uint64_t bp;            /* mpaddr of boot param area */
-    uint64_t maxmem;        /* Highest memory address for MDT.  */
-    uint64_t xsi_va;        /* Xen shared_info area virtual address.  */
-    uint32_t hypercall_imm; /* Break imm for Xen hypercalls.  */
+    uint64_aligned_t bp;     /* mpaddr of boot param area */
+    uint64_aligned_t maxmem; /* Highest memory address for MDT.  */
+    uint64_aligned_t xsi_va; /* Xen shared_info area virtual address.  */
+    uint32_t hypercall_imm;  /* Break imm for Xen hypercalls.  */
 #endif
 } xen_domctl_arch_setup_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_arch_setup_t);
@@ -384,6 +385,21 @@ struct xen_domctl_settimeoffset {
 };
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
+ 
+#define XEN_DOMCTL_gethvmcontext   33
+#define XEN_DOMCTL_sethvmcontext   34
+typedef struct xen_domctl_hvmcontext {
+    uint32_t size; /* IN/OUT: size of buffer / bytes filled */
+    XEN_GUEST_HANDLE(uint8_t) buffer; /* IN/OUT */
+} xen_domctl_hvmcontext_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
+
+#define XEN_DOMCTL_set_address_size 35
+#define XEN_DOMCTL_get_address_size 36
+typedef struct xen_domctl_address_size {
+    uint32_t size;
+} xen_domctl_address_size_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_address_size_t);
 
 #define XEN_DOMCTL_real_mode_area     26
 struct xen_domctl_real_mode_area {
@@ -418,6 +434,8 @@ struct xen_domctl {
         struct xen_domctl_arch_setup        arch_setup;
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_real_mode_area    real_mode_area;
+        struct xen_domctl_hvmcontext        hvmcontext;
+        struct xen_domctl_address_size      address_size;
         uint8_t                             pad[128];
     } u;
 };

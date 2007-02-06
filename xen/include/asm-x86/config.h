@@ -84,13 +84,10 @@
 
 #define CONFIG_DMA_BITSIZE 30
 
-#ifndef __ASSEMBLY__
-extern unsigned long _end; /* standard ELF symbol */
-#endif /* __ASSEMBLY__ */
-
 #if defined(__x86_64__)
 
 #define CONFIG_X86_64 1
+#define CONFIG_COMPAT 1
 
 #define asmlinkage
 
@@ -111,7 +108,7 @@ extern unsigned long _end; /* standard ELF symbol */
 /*
  * Memory layout:
  *  0x0000000000000000 - 0x00007fffffffffff [128TB, 2^47 bytes, PML4:0-255]
- *    Guest-defined use.
+ *    Guest-defined use (see below for compatibility mode guests).
  *  0x0000800000000000 - 0xffff7fffffffffff [16EB]
  *    Inaccessible: current arch only supports 48-bit sign-extended VAs.
  *  0xffff800000000000 - 0xffff803fffffffff [256GB, 2^38 bytes, PML4:256]
@@ -132,7 +129,11 @@ extern unsigned long _end; /* standard ELF symbol */
  *    Page-frame information array.
  *  0xffff828800000000 - 0xffff828bffffffff [16GB,  2^34 bytes, PML4:261]
  *    ioremap()/fixmap area.
- *  0xffff828c00000000 - 0xffff82ffffffffff [464GB,             PML4:261]
+ *  0xffff828c00000000 - 0xffff828c3fffffff [1GB,   2^30 bytes, PML4:261]
+ *    Compatibility machine-to-phys translation table.
+ *  0xffff828c40000000 - 0xffff828c7fffffff [1GB,   2^30 bytes, PML4:261]
+ *    High read-only compatibility machine-to-phys translation table.
+ *  0xffff828c80000000 - 0xffff82ffffffffff [462GB,             PML4:261]
  *    Reserved for future use.
  *  0xffff830000000000 - 0xffff83ffffffffff [1TB,   2^40 bytes, PML4:262-263]
  *    1:1 direct mapping of all physical memory. Xen and its heap live here.
@@ -140,6 +141,18 @@ extern unsigned long _end; /* standard ELF symbol */
  *    Reserved for future use.
  *  0xffff880000000000 - 0xffffffffffffffff [120TB, PML4:272-511]
  *    Guest-defined use.
+ *
+ * Compatibility guest area layout:
+ *  0x0000000000000000 - 0x00000000f57fffff [3928MB,            PML4:0]
+ *    Guest-defined use.
+ *  0x0000000f58000000 - 0x00000000ffffffff [168MB,             PML4:0]
+ *    Read-only machine-to-phys translation table (GUEST ACCESSIBLE).
+ *  0x0000000000000000 - 0x00000000ffffffff [508GB,             PML4:0]
+ *    Unused.
+ *  0x0000008000000000 - 0x000000ffffffffff [512GB, 2^39 bytes, PML4:1]
+ *    Hypercall argument translation area.
+ *  0x0000010000000000 - 0x00007fffffffffff [127TB, 2^46 bytes, PML4:2-255]
+ *    Reserved for future use.
  */
 
 
@@ -181,17 +194,49 @@ extern unsigned long _end; /* standard ELF symbol */
 /* Slot 261: ioremap()/fixmap area (16GB). */
 #define IOREMAP_VIRT_START      (FRAMETABLE_VIRT_END)
 #define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + (16UL<<30))
+/* Slot 261: compatibility machine-to-phys conversion table (1GB). */
+#define RDWR_COMPAT_MPT_VIRT_START IOREMAP_VIRT_END
+#define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + (1UL << 30))
+/* Slot 261: high read-only compatibility machine-to-phys conversion table (1GB). */
+#define HIRO_COMPAT_MPT_VIRT_START RDWR_COMPAT_MPT_VIRT_END
+#define HIRO_COMPAT_MPT_VIRT_END (HIRO_COMPAT_MPT_VIRT_START + (1UL << 30))
 /* Slot 262-263: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
 
+#ifndef __ASSEMBLY__
+
+/* This is not a fixed value, just a lower limit. */
+#define __HYPERVISOR_COMPAT_VIRT_START 0xF5800000
+#define HYPERVISOR_COMPAT_VIRT_START(d) ((d)->arch.hv_compat_vstart)
+#define MACH2PHYS_COMPAT_VIRT_START    HYPERVISOR_COMPAT_VIRT_START
+#define MACH2PHYS_COMPAT_VIRT_END      0xFFE00000
+#define MACH2PHYS_COMPAT_NR_ENTRIES(d) \
+    ((MACH2PHYS_COMPAT_VIRT_END-MACH2PHYS_COMPAT_VIRT_START(d))>>2)
+
+#define COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d) \
+    l2_table_offset(HYPERVISOR_COMPAT_VIRT_START(d))
+#define COMPAT_L2_PAGETABLE_LAST_XEN_SLOT  l2_table_offset(~0U)
+#define COMPAT_L2_PAGETABLE_XEN_SLOTS(d) \
+    (COMPAT_L2_PAGETABLE_LAST_XEN_SLOT - COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d) + 1)
+
+#endif
+
+#define COMPAT_ARG_XLAT_VIRT_BASE      (1UL << ROOT_PAGETABLE_SHIFT)
+#define COMPAT_ARG_XLAT_SHIFT          0
+#define COMPAT_ARG_XLAT_PAGES          (1U << COMPAT_ARG_XLAT_SHIFT)
+#define COMPAT_ARG_XLAT_SIZE           (COMPAT_ARG_XLAT_PAGES << PAGE_SHIFT)
+#define COMPAT_ARG_XLAT_VIRT_START(vcpu_id) \
+    (COMPAT_ARG_XLAT_VIRT_BASE + ((unsigned long)(vcpu_id) << \
+                                  (PAGE_SHIFT + COMPAT_ARG_XLAT_SHIFT + 1)))
+
 #define PGT_base_page_table     PGT_l4_page_table
 
-#define __HYPERVISOR_CS64 0xe010
-#define __HYPERVISOR_CS32 0xe008
+#define __HYPERVISOR_CS64 0xe008
+#define __HYPERVISOR_CS32 0xe038
 #define __HYPERVISOR_CS   __HYPERVISOR_CS64
 #define __HYPERVISOR_DS64 0x0000
-#define __HYPERVISOR_DS32 0xe018
+#define __HYPERVISOR_DS32 0xe010
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
 
 /* For generic assembly code: use macros to define operation/operand sizes. */

@@ -98,8 +98,8 @@ void xen_machine_kexec_setup_resources(void)
  err:
 	/*
 	 * It isn't possible to free xen_phys_cpus this early in the
-	 * boot. Since failure at this stage is unexpected and the
-	 * amount is small we leak the memory.
+	 * boot. Failure at this stage is unexpected and the amount of
+	 * memory is small therefore we tolerate the potential leak.
          */
 	xen_max_nr_phys_cpus = 0;
 	return;

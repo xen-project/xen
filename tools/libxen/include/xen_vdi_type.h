@@ -38,7 +38,17 @@ enum xen_vdi_type
     /**
      * a disk that may be reformatted on upgrade
      */
-    XEN_VDI_TYPE_EPHEMERAL
+    XEN_VDI_TYPE_EPHEMERAL,
+
+    /**
+     * a disk that stores a suspend image
+     */
+    XEN_VDI_TYPE_SUSPEND,
+
+    /**
+     * a disk that stores VM crashdump information
+     */
+    XEN_VDI_TYPE_CRASHDUMP
 };
 
 

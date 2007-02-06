@@ -188,7 +188,10 @@ void __flush_tlb_mask(cpumask_t mask, unsigned long va)
     
     if ( cpu_isset(smp_processor_id(), mask) )
     {
-        local_flush_tlb();
+        if ( va == FLUSHVA_ALL )
+            local_flush_tlb();
+        else
+            local_flush_tlb_one(va);
         cpu_clear(smp_processor_id(), mask);
     }
 

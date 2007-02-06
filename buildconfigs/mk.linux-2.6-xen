@@ -1,12 +1,17 @@
 LINUX_SERIES = 2.6
-LINUX_VER    = 2.6.16.33
+LINUX_VER    = 2.6.18
 
 EXTRAVERSION ?= xen
 
-LINUX_DIR    = linux-$(LINUX_VER)-$(EXTRAVERSION)
+LINUX_SRCDIR = linux-$(LINUX_VER)-xen
+LINUX_DIR    = build-linux-$(LINUX_VER)-$(EXTRAVERSION)_$(XEN_TARGET_ARCH)
 
 IMAGE_TARGET ?= vmlinuz
 INSTALL_BOOT_PATH ?= $(DESTDIR)
+
+ifeq ($(XEN_TARGET_ARCH),ia64)
+INSTALL_BOOT_PATH := $(DESTDIR)/boot
+endif
 
 LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 
@@ -23,24 +28,31 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	mkdir -p $(INSTALL_BOOT_PATH)
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(INSTALL_BOOT_PATH) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
-	rm -rf $(LINUX_DIR)
-	cp -al $(<D) $(LINUX_DIR)
+$(LINUX_SRCDIR)/.valid-src: ref-linux-$(LINUX_VER)/.valid-ref
+	rm -rf $(LINUX_SRCDIR)
+	cp -al $(<D) $(LINUX_SRCDIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_SERIES)-xen-sparse && \
-          LINUX_ARCH=$(LINUX_ARCH) bash ./mkbuildtree ../$(LINUX_DIR) )
+          LINUX_ARCH=$(LINUX_ARCH) bash ./mkbuildtree ../$(LINUX_SRCDIR) )
+	# Patch kernel Makefile to set EXTRAVERSION
+	( cd $(LINUX_SRCDIR) ; \
+	  sed -e 's,^EXTRAVERSION.*,&$$(XENGUEST),' \
+	      -e 's,^KERNELRELEASE,XENGUEST := $$(shell [ -r $$(objtree)/.xenguest ] \&\& cat $$(objtree)/.xenguest)\n&,' Makefile >Mk.tmp ; \
+	  rm -f Makefile ; mv Mk.tmp Makefile )
+	touch $@
+
+$(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
+	rm -rf $(LINUX_DIR)
+	mkdir -p $(LINUX_DIR)
 	# Re-use config from install dir if one exits else use default config
-	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
+	CONFIG_VERSION=$$(sed -ne 's/$$(XENGUEST)//; s/^EXTRAVERSION = //p' $(LINUX_SRCDIR)/Makefile); \
 	[ -r $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
 	  cp $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
 	  || sh buildconfigs/create_config.sh $(LINUX_DIR)/.config $(EXTRAVERSION) $(XEN_TARGET_ARCH) $(XEN_SYSTYPE)
 	# See if we need to munge config to enable PAE
 	$(MAKE) CONFIG_FILE=$(LINUX_DIR)/.config -f buildconfigs/Rules.mk config-update-pae
-	# Patch kernel Makefile to set EXTRAVERSION
-	( cd $(LINUX_DIR) ; \
-	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
-	  rm -f Makefile ; mv Mk.tmp Makefile )
-	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) oldconfig
+	echo "-$(EXTRAVERSION)" >$(LINUX_DIR)/.xenguest
+	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
 
 .PHONY: prep
 prep: $(LINUX_DIR)/include/linux/autoconf.h
@@ -62,4 +74,5 @@ delete:
 
 .PHONY: mrpropper
 mrpropper:
+	rm -rf $(LINUX_SRCDIR)
 	rm -f linux-$(LINUX_VER).tar.bz2

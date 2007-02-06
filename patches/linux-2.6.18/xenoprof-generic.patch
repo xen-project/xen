@@ -1,0 +1,662 @@
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/buffer_sync.c ./drivers/oprofile/buffer_sync.c
+--- ../orig-linux-2.6.18/drivers/oprofile/buffer_sync.c	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/buffer_sync.c	2007-01-12 18:19:28.000000000 +0000
+@@ -6,6 +6,10 @@
+  *
+  * @author John Levon <levon@movementarian.org>
+  *
++ * Modified by Aravind Menon for Xen
++ * These modifications are:
++ * Copyright (C) 2005 Hewlett-Packard Co.
++ *
+  * This is the core of the buffer management. Each
+  * CPU buffer is processed and entered into the
+  * global event buffer. Such processing is necessary
+@@ -38,6 +42,7 @@ static cpumask_t marked_cpus = CPU_MASK_
+ static DEFINE_SPINLOCK(task_mortuary);
+ static void process_task_mortuary(void);
+ 
++static int cpu_current_domain[NR_CPUS];
+ 
+ /* Take ownership of the task struct and place it on the
+  * list for processing. Only after two full buffer syncs
+@@ -146,6 +151,11 @@ static void end_sync(void)
+ int sync_start(void)
+ {
+ 	int err;
++	int i;
++
++	for (i = 0; i < NR_CPUS; i++) {
++		cpu_current_domain[i] = COORDINATOR_DOMAIN;
++	}
+ 
+ 	start_cpu_work();
+ 
+@@ -275,15 +285,31 @@ static void add_cpu_switch(int i)
+ 	last_cookie = INVALID_COOKIE;
+ }
+ 
+-static void add_kernel_ctx_switch(unsigned int in_kernel)
++static void add_cpu_mode_switch(unsigned int cpu_mode)
+ {
+ 	add_event_entry(ESCAPE_CODE);
+-	if (in_kernel)
+-		add_event_entry(KERNEL_ENTER_SWITCH_CODE); 
+-	else
+-		add_event_entry(KERNEL_EXIT_SWITCH_CODE); 
++	switch (cpu_mode) {
++	case CPU_MODE_USER:
++		add_event_entry(USER_ENTER_SWITCH_CODE);
++		break;
++	case CPU_MODE_KERNEL:
++		add_event_entry(KERNEL_ENTER_SWITCH_CODE);
++		break;
++	case CPU_MODE_XEN:
++		add_event_entry(XEN_ENTER_SWITCH_CODE);
++	  	break;
++	default:
++		break;
++	}
+ }
+- 
++
++static void add_domain_switch(unsigned long domain_id)
++{
++	add_event_entry(ESCAPE_CODE);
++	add_event_entry(DOMAIN_SWITCH_CODE);
++	add_event_entry(domain_id);
++}
++
+ static void
+ add_user_ctx_switch(struct task_struct const * task, unsigned long cookie)
+ {
+@@ -348,9 +374,9 @@ static int add_us_sample(struct mm_struc
+  * for later lookup from userspace.
+  */
+ static int
+-add_sample(struct mm_struct * mm, struct op_sample * s, int in_kernel)
++add_sample(struct mm_struct * mm, struct op_sample * s, int cpu_mode)
+ {
+-	if (in_kernel) {
++	if (cpu_mode >= CPU_MODE_KERNEL) {
+ 		add_sample_entry(s->eip, s->event);
+ 		return 1;
+ 	} else if (mm) {
+@@ -496,15 +522,21 @@ void sync_buffer(int cpu)
+ 	struct mm_struct *mm = NULL;
+ 	struct task_struct * new;
+ 	unsigned long cookie = 0;
+-	int in_kernel = 1;
++	int cpu_mode = 1;
+ 	unsigned int i;
+ 	sync_buffer_state state = sb_buffer_start;
+ 	unsigned long available;
++	int domain_switch = 0;
+ 
+ 	mutex_lock(&buffer_mutex);
+  
+ 	add_cpu_switch(cpu);
+ 
++	/* We need to assign the first samples in this CPU buffer to the
++	   same domain that we were processing at the last sync_buffer */
++	if (cpu_current_domain[cpu] != COORDINATOR_DOMAIN) {
++		add_domain_switch(cpu_current_domain[cpu]);
++	}
+ 	/* Remember, only we can modify tail_pos */
+ 
+ 	available = get_slots(cpu_buf);
+@@ -512,16 +544,18 @@ void sync_buffer(int cpu)
+ 	for (i = 0; i < available; ++i) {
+ 		struct op_sample * s = &cpu_buf->buffer[cpu_buf->tail_pos];
+  
+-		if (is_code(s->eip)) {
+-			if (s->event <= CPU_IS_KERNEL) {
+-				/* kernel/userspace switch */
+-				in_kernel = s->event;
++		if (is_code(s->eip) && !domain_switch) {
++			if (s->event <= CPU_MODE_XEN) {
++				/* xen/kernel/userspace switch */
++				cpu_mode = s->event;
+ 				if (state == sb_buffer_start)
+ 					state = sb_sample_start;
+-				add_kernel_ctx_switch(s->event);
++				add_cpu_mode_switch(s->event);
+ 			} else if (s->event == CPU_TRACE_BEGIN) {
+ 				state = sb_bt_start;
+ 				add_trace_begin();
++			} else if (s->event == CPU_DOMAIN_SWITCH) {
++					domain_switch = 1;				
+ 			} else {
+ 				struct mm_struct * oldmm = mm;
+ 
+@@ -535,11 +569,21 @@ void sync_buffer(int cpu)
+ 				add_user_ctx_switch(new, cookie);
+ 			}
+ 		} else {
+-			if (state >= sb_bt_start &&
+-			    !add_sample(mm, s, in_kernel)) {
+-				if (state == sb_bt_start) {
+-					state = sb_bt_ignore;
+-					atomic_inc(&oprofile_stats.bt_lost_no_mapping);
++			if (domain_switch) {
++				cpu_current_domain[cpu] = s->eip;
++				add_domain_switch(s->eip);
++				domain_switch = 0;
++			} else {
++				if (cpu_current_domain[cpu] !=
++				    COORDINATOR_DOMAIN) {
++					add_sample_entry(s->eip, s->event);
++				}
++				else  if (state >= sb_bt_start &&
++				    !add_sample(mm, s, cpu_mode)) {
++					if (state == sb_bt_start) {
++						state = sb_bt_ignore;
++						atomic_inc(&oprofile_stats.bt_lost_no_mapping);
++					}
+ 				}
+ 			}
+ 		}
+@@ -548,6 +592,11 @@ void sync_buffer(int cpu)
+ 	}
+ 	release_mm(mm);
+ 
++	/* We reset domain to COORDINATOR at each CPU switch */
++	if (cpu_current_domain[cpu] != COORDINATOR_DOMAIN) {
++		add_domain_switch(COORDINATOR_DOMAIN);
++	}
++
+ 	mark_done(cpu);
+ 
+ 	mutex_unlock(&buffer_mutex);
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/cpu_buffer.c ./drivers/oprofile/cpu_buffer.c
+--- ../orig-linux-2.6.18/drivers/oprofile/cpu_buffer.c	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/cpu_buffer.c	2007-01-12 18:18:50.000000000 +0000
+@@ -6,6 +6,10 @@
+  *
+  * @author John Levon <levon@movementarian.org>
+  *
++ * Modified by Aravind Menon for Xen
++ * These modifications are:
++ * Copyright (C) 2005 Hewlett-Packard Co.
++ *
+  * Each CPU has a local buffer that stores PC value/event
+  * pairs. We also log context switches when we notice them.
+  * Eventually each CPU's buffer is processed into the global
+@@ -34,6 +38,8 @@ static void wq_sync_buffer(void *);
+ #define DEFAULT_TIMER_EXPIRE (HZ / 10)
+ static int work_enabled;
+ 
++static int32_t current_domain = COORDINATOR_DOMAIN;
++
+ void free_cpu_buffers(void)
+ {
+ 	int i;
+@@ -57,7 +63,7 @@ int alloc_cpu_buffers(void)
+ 			goto fail;
+  
+ 		b->last_task = NULL;
+-		b->last_is_kernel = -1;
++		b->last_cpu_mode = -1;
+ 		b->tracing = 0;
+ 		b->buffer_size = buffer_size;
+ 		b->tail_pos = 0;
+@@ -113,7 +119,7 @@ void cpu_buffer_reset(struct oprofile_cp
+ 	 * collected will populate the buffer with proper
+ 	 * values to initialize the buffer
+ 	 */
+-	cpu_buf->last_is_kernel = -1;
++	cpu_buf->last_cpu_mode = -1;
+ 	cpu_buf->last_task = NULL;
+ }
+ 
+@@ -163,13 +169,13 @@ add_code(struct oprofile_cpu_buffer * bu
+  * because of the head/tail separation of the writer and reader
+  * of the CPU buffer.
+  *
+- * is_kernel is needed because on some architectures you cannot
++ * cpu_mode is needed because on some architectures you cannot
+  * tell if you are in kernel or user space simply by looking at
+- * pc. We tag this in the buffer by generating kernel enter/exit
+- * events whenever is_kernel changes
++ * pc. We tag this in the buffer by generating kernel/user (and xen)
++ *  enter events whenever cpu_mode changes
+  */
+ static int log_sample(struct oprofile_cpu_buffer * cpu_buf, unsigned long pc,
+-		      int is_kernel, unsigned long event)
++		      int cpu_mode, unsigned long event)
+ {
+ 	struct task_struct * task;
+ 
+@@ -180,18 +186,18 @@ static int log_sample(struct oprofile_cp
+ 		return 0;
+ 	}
+ 
+-	is_kernel = !!is_kernel;
+-
+ 	task = current;
+ 
+ 	/* notice a switch from user->kernel or vice versa */
+-	if (cpu_buf->last_is_kernel != is_kernel) {
+-		cpu_buf->last_is_kernel = is_kernel;
+-		add_code(cpu_buf, is_kernel);
++	if (cpu_buf->last_cpu_mode != cpu_mode) {
++		cpu_buf->last_cpu_mode = cpu_mode;
++		add_code(cpu_buf, cpu_mode);
+ 	}
+-
++	
+ 	/* notice a task switch */
+-	if (cpu_buf->last_task != task) {
++	/* if not processing other domain samples */
++	if ((cpu_buf->last_task != task) &&
++	    (current_domain == COORDINATOR_DOMAIN)) {
+ 		cpu_buf->last_task = task;
+ 		add_code(cpu_buf, (unsigned long)task);
+ 	}
+@@ -275,6 +281,25 @@ void oprofile_add_trace(unsigned long pc
+ 	add_sample(cpu_buf, pc, 0);
+ }
+ 
++int oprofile_add_domain_switch(int32_t domain_id)
++{
++	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[smp_processor_id()];
++
++	/* should have space for switching into and out of domain 
++	   (2 slots each) plus one sample and one cpu mode switch */
++	if (((nr_available_slots(cpu_buf) < 6) && 
++	     (domain_id != COORDINATOR_DOMAIN)) ||
++	    (nr_available_slots(cpu_buf) < 2))
++		return 0;
++
++	add_code(cpu_buf, CPU_DOMAIN_SWITCH);
++	add_sample(cpu_buf, domain_id, 0);
++
++	current_domain = domain_id;
++
++	return 1;
++}
++
+ /*
+  * This serves to avoid cpu buffer overflow, and makes sure
+  * the task mortuary progresses
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/cpu_buffer.h ./drivers/oprofile/cpu_buffer.h
+--- ../orig-linux-2.6.18/drivers/oprofile/cpu_buffer.h	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/cpu_buffer.h	2007-01-12 18:18:50.000000000 +0000
+@@ -36,7 +36,7 @@ struct oprofile_cpu_buffer {
+ 	volatile unsigned long tail_pos;
+ 	unsigned long buffer_size;
+ 	struct task_struct * last_task;
+-	int last_is_kernel;
++	int last_cpu_mode;
+ 	int tracing;
+ 	struct op_sample * buffer;
+ 	unsigned long sample_received;
+@@ -51,7 +51,10 @@ extern struct oprofile_cpu_buffer cpu_bu
+ void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf);
+ 
+ /* transient events for the CPU buffer -> event buffer */
+-#define CPU_IS_KERNEL 1
+-#define CPU_TRACE_BEGIN 2
++#define CPU_MODE_USER           0
++#define CPU_MODE_KERNEL         1
++#define CPU_MODE_XEN            2
++#define CPU_TRACE_BEGIN         3
++#define CPU_DOMAIN_SWITCH       4
+ 
+ #endif /* OPROFILE_CPU_BUFFER_H */
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/event_buffer.h ./drivers/oprofile/event_buffer.h
+--- ../orig-linux-2.6.18/drivers/oprofile/event_buffer.h	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/event_buffer.h	2007-01-12 18:18:50.000000000 +0000
+@@ -29,15 +29,20 @@ void wake_up_buffer_waiter(void);
+ #define CPU_SWITCH_CODE 		2
+ #define COOKIE_SWITCH_CODE 		3
+ #define KERNEL_ENTER_SWITCH_CODE	4
+-#define KERNEL_EXIT_SWITCH_CODE		5
++#define USER_ENTER_SWITCH_CODE		5
+ #define MODULE_LOADED_CODE		6
+ #define CTX_TGID_CODE			7
+ #define TRACE_BEGIN_CODE		8
+ #define TRACE_END_CODE			9
++#define XEN_ENTER_SWITCH_CODE		10
++#define DOMAIN_SWITCH_CODE		11
+  
+ #define INVALID_COOKIE ~0UL
+ #define NO_COOKIE 0UL
+ 
++/* Constant used to refer to coordinator domain (Xen) */
++#define COORDINATOR_DOMAIN -1
++
+ /* add data to the event buffer */
+ void add_event_entry(unsigned long data);
+  
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/oprof.c ./drivers/oprofile/oprof.c
+--- ../orig-linux-2.6.18/drivers/oprofile/oprof.c	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/oprof.c	2007-01-12 18:18:50.000000000 +0000
+@@ -5,6 +5,10 @@
+  * @remark Read the file COPYING
+  *
+  * @author John Levon <levon@movementarian.org>
++ *
++ * Modified by Aravind Menon for Xen
++ * These modifications are:
++ * Copyright (C) 2005 Hewlett-Packard Co.
+  */
+ 
+ #include <linux/kernel.h>
+@@ -19,7 +23,7 @@
+ #include "cpu_buffer.h"
+ #include "buffer_sync.h"
+ #include "oprofile_stats.h"
+- 
++
+ struct oprofile_operations oprofile_ops;
+ 
+ unsigned long oprofile_started;
+@@ -33,6 +37,32 @@ static DEFINE_MUTEX(start_mutex);
+  */
+ static int timer = 0;
+ 
++int oprofile_set_active(int active_domains[], unsigned int adomains)
++{
++	int err;
++
++	if (!oprofile_ops.set_active)
++		return -EINVAL;
++
++	mutex_lock(&start_mutex);
++	err = oprofile_ops.set_active(active_domains, adomains);
++	mutex_unlock(&start_mutex);
++	return err;
++}
++
++int oprofile_set_passive(int passive_domains[], unsigned int pdomains)
++{
++	int err;
++
++	if (!oprofile_ops.set_passive)
++		return -EINVAL;
++
++	mutex_lock(&start_mutex);
++	err = oprofile_ops.set_passive(passive_domains, pdomains);
++	mutex_unlock(&start_mutex);
++	return err;
++}
++
+ int oprofile_setup(void)
+ {
+ 	int err;
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/oprof.h ./drivers/oprofile/oprof.h
+--- ../orig-linux-2.6.18/drivers/oprofile/oprof.h	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/oprof.h	2007-01-12 18:18:50.000000000 +0000
+@@ -35,5 +35,8 @@ void oprofile_create_files(struct super_
+ void oprofile_timer_init(struct oprofile_operations * ops);
+ 
+ int oprofile_set_backtrace(unsigned long depth);
++
++int oprofile_set_active(int active_domains[], unsigned int adomains);
++int oprofile_set_passive(int passive_domains[], unsigned int pdomains);
+  
+ #endif /* OPROF_H */
+diff -pruN ../orig-linux-2.6.18/drivers/oprofile/oprofile_files.c ./drivers/oprofile/oprofile_files.c
+--- ../orig-linux-2.6.18/drivers/oprofile/oprofile_files.c	2006-09-20 04:42:06.000000000 +0100
++++ ./drivers/oprofile/oprofile_files.c	2007-01-12 18:18:50.000000000 +0000
+@@ -5,15 +5,21 @@
+  * @remark Read the file COPYING
+  *
+  * @author John Levon <levon@movementarian.org>
++ *
++ * Modified by Aravind Menon for Xen
++ * These modifications are:
++ * Copyright (C) 2005 Hewlett-Packard Co.	
+  */
+ 
+ #include <linux/fs.h>
+ #include <linux/oprofile.h>
++#include <asm/uaccess.h>
++#include <linux/ctype.h>
+ 
+ #include "event_buffer.h"
+ #include "oprofile_stats.h"
+ #include "oprof.h"
+- 
++
+ unsigned long fs_buffer_size = 131072;
+ unsigned long fs_cpu_buffer_size = 8192;
+ unsigned long fs_buffer_watershed = 32768; /* FIXME: tune */
+@@ -117,11 +123,202 @@ static ssize_t dump_write(struct file * 
+ static struct file_operations dump_fops = {
+ 	.write		= dump_write,
+ };
+- 
++
++#define TMPBUFSIZE 512
++
++static unsigned int adomains = 0;
++static int active_domains[MAX_OPROF_DOMAINS + 1];
++static DEFINE_MUTEX(adom_mutex);
++
++static ssize_t adomain_write(struct file * file, char const __user * buf, 
++			     size_t count, loff_t * offset)
++{
++	char *tmpbuf;
++	char *startp, *endp;
++	int i;
++	unsigned long val;
++	ssize_t retval = count;
++	
++	if (*offset)
++		return -EINVAL;	
++	if (count > TMPBUFSIZE - 1)
++		return -EINVAL;
++
++	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
++		return -ENOMEM;
++
++	if (copy_from_user(tmpbuf, buf, count)) {
++		kfree(tmpbuf);
++		return -EFAULT;
++	}
++	tmpbuf[count] = 0;
++
++	mutex_lock(&adom_mutex);
++
++	startp = tmpbuf;
++	/* Parse one more than MAX_OPROF_DOMAINS, for easy error checking */
++	for (i = 0; i <= MAX_OPROF_DOMAINS; i++) {
++		val = simple_strtoul(startp, &endp, 0);
++		if (endp == startp)
++			break;
++		while (ispunct(*endp) || isspace(*endp))
++			endp++;
++		active_domains[i] = val;
++		if (active_domains[i] != val)
++			/* Overflow, force error below */
++			i = MAX_OPROF_DOMAINS + 1;
++		startp = endp;
++	}
++	/* Force error on trailing junk */
++	adomains = *startp ? MAX_OPROF_DOMAINS + 1 : i;
++
++	kfree(tmpbuf);
++
++	if (adomains > MAX_OPROF_DOMAINS
++	    || oprofile_set_active(active_domains, adomains)) {
++		adomains = 0;
++		retval = -EINVAL;
++	}
++
++	mutex_unlock(&adom_mutex);
++	return retval;
++}
++
++static ssize_t adomain_read(struct file * file, char __user * buf, 
++			    size_t count, loff_t * offset)
++{
++	char * tmpbuf;
++	size_t len;
++	int i;
++	ssize_t retval;
++
++	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
++		return -ENOMEM;
++
++	mutex_lock(&adom_mutex);
++
++	len = 0;
++	for (i = 0; i < adomains; i++)
++		len += snprintf(tmpbuf + len,
++				len < TMPBUFSIZE ? TMPBUFSIZE - len : 0,
++				"%u ", active_domains[i]);
++	WARN_ON(len > TMPBUFSIZE);
++	if (len != 0 && len <= TMPBUFSIZE)
++		tmpbuf[len-1] = '\n';
++
++	mutex_unlock(&adom_mutex);
++
++	retval = simple_read_from_buffer(buf, count, offset, tmpbuf, len);
++
++	kfree(tmpbuf);
++	return retval;
++}
++
++
++static struct file_operations active_domain_ops = {
++	.read		= adomain_read,
++	.write		= adomain_write,
++};
++
++static unsigned int pdomains = 0;
++static int passive_domains[MAX_OPROF_DOMAINS];
++static DEFINE_MUTEX(pdom_mutex);
++
++static ssize_t pdomain_write(struct file * file, char const __user * buf, 
++			     size_t count, loff_t * offset)
++{
++	char *tmpbuf;
++	char *startp, *endp;
++	int i;
++	unsigned long val;
++	ssize_t retval = count;
++	
++	if (*offset)
++		return -EINVAL;	
++	if (count > TMPBUFSIZE - 1)
++		return -EINVAL;
++
++	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
++		return -ENOMEM;
++
++	if (copy_from_user(tmpbuf, buf, count)) {
++		kfree(tmpbuf);
++		return -EFAULT;
++	}
++	tmpbuf[count] = 0;
++
++	mutex_lock(&pdom_mutex);
++
++	startp = tmpbuf;
++	/* Parse one more than MAX_OPROF_DOMAINS, for easy error checking */
++	for (i = 0; i <= MAX_OPROF_DOMAINS; i++) {
++		val = simple_strtoul(startp, &endp, 0);
++		if (endp == startp)
++			break;
++		while (ispunct(*endp) || isspace(*endp))
++			endp++;
++		passive_domains[i] = val;
++		if (passive_domains[i] != val)
++			/* Overflow, force error below */
++			i = MAX_OPROF_DOMAINS + 1;
++		startp = endp;
++	}
++	/* Force error on trailing junk */
++	pdomains = *startp ? MAX_OPROF_DOMAINS + 1 : i;
++
++	kfree(tmpbuf);
++
++	if (pdomains > MAX_OPROF_DOMAINS
++	    || oprofile_set_passive(passive_domains, pdomains)) {
++		pdomains = 0;
++		retval = -EINVAL;
++	}
++
++	mutex_unlock(&pdom_mutex);
++	return retval;
++}
++
++static ssize_t pdomain_read(struct file * file, char __user * buf, 
++			    size_t count, loff_t * offset)
++{
++	char * tmpbuf;
++	size_t len;
++	int i;
++	ssize_t retval;
++
++	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
++		return -ENOMEM;
++
++	mutex_lock(&pdom_mutex);
++
++	len = 0;
++	for (i = 0; i < pdomains; i++)
++		len += snprintf(tmpbuf + len,
++				len < TMPBUFSIZE ? TMPBUFSIZE - len : 0,
++				"%u ", passive_domains[i]);
++	WARN_ON(len > TMPBUFSIZE);
++	if (len != 0 && len <= TMPBUFSIZE)
++		tmpbuf[len-1] = '\n';
++
++	mutex_unlock(&pdom_mutex);
++
++	retval = simple_read_from_buffer(buf, count, offset, tmpbuf, len);
++
++	kfree(tmpbuf);
++	return retval;
++}
++
++static struct file_operations passive_domain_ops = {
++	.read		= pdomain_read,
++	.write		= pdomain_write,
++};
++
+ void oprofile_create_files(struct super_block * sb, struct dentry * root)
+ {
+ 	oprofilefs_create_file(sb, root, "enable", &enable_fops);
+ 	oprofilefs_create_file_perm(sb, root, "dump", &dump_fops, 0666);
++	oprofilefs_create_file(sb, root, "active_domains", &active_domain_ops);
++	oprofilefs_create_file(sb, root, "passive_domains", &passive_domain_ops);
+ 	oprofilefs_create_file(sb, root, "buffer", &event_buffer_fops);
+ 	oprofilefs_create_ulong(sb, root, "buffer_size", &fs_buffer_size);
+ 	oprofilefs_create_ulong(sb, root, "buffer_watershed", &fs_buffer_watershed);
+diff -pruN ../orig-linux-2.6.18/include/linux/oprofile.h ./include/linux/oprofile.h
+--- ../orig-linux-2.6.18/include/linux/oprofile.h	2006-09-20 04:42:06.000000000 +0100
++++ ./include/linux/oprofile.h	2007-01-12 18:18:50.000000000 +0000
+@@ -16,6 +16,8 @@
+ #include <linux/types.h>
+ #include <linux/spinlock.h>
+ #include <asm/atomic.h>
++
++#include <xen/interface/xenoprof.h>
+  
+ struct super_block;
+ struct dentry;
+@@ -27,6 +29,11 @@ struct oprofile_operations {
+ 	/* create any necessary configuration files in the oprofile fs.
+ 	 * Optional. */
+ 	int (*create_files)(struct super_block * sb, struct dentry * root);
++	/* setup active domains with Xen */
++	int (*set_active)(int *active_domains, unsigned int adomains);
++        /* setup passive domains with Xen */
++        int (*set_passive)(int *passive_domains, unsigned int pdomains);
++	
+ 	/* Do any necessary interrupt setup. Optional. */
+ 	int (*setup)(void);
+ 	/* Do any necessary interrupt shutdown. Optional. */
+@@ -78,6 +85,8 @@ void oprofile_add_pc(unsigned long pc, i
+ /* add a backtrace entry, to be called from the ->backtrace callback */
+ void oprofile_add_trace(unsigned long eip);
+ 
++/* add a domain switch entry */
++int oprofile_add_domain_switch(int32_t domain_id);
+ 
+ /**
+  * Create a file of the given name as a child of the given root, with

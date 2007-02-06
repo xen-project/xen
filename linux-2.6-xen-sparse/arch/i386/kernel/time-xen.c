@@ -65,7 +65,6 @@
 #include "mach_time.h"
 
 #include <linux/timex.h>
-#include <linux/config.h>
 
 #include <asm/hpet.h>
 
@@ -97,17 +96,9 @@ extern unsigned long wall_jiffies;
 DEFINE_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
 
-#if defined (__i386__)
-#include <asm/i8253.h>
-#endif
-
-DEFINE_SPINLOCK(i8253_lock);
-EXPORT_SYMBOL(i8253_lock);
-
 extern struct init_timer_opts timer_tsc_init;
 extern struct timer_opts timer_tsc;
 #define timer_none timer_tsc
-struct timer_opts *cur_timer __read_mostly = &timer_tsc;
 
 /* These are peridically updated in shared_info, and then copied here. */
 struct shadow_time_info {
@@ -166,8 +157,7 @@ static int __init __permitted_clock_jitter(char *str)
 }
 __setup("permitted_clock_jitter=", __permitted_clock_jitter);
 
-int tsc_disable __devinitdata = 0;
-
+#if 0
 static void delay_tsc(unsigned long loops)
 {
 	unsigned long bclock, now;
@@ -183,6 +173,7 @@ struct timer_opts timer_tsc = {
 	.name = "tsc",
 	.delay = delay_tsc,
 };
+#endif
 
 /*
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
@@ -220,7 +211,7 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 	return product;
 }
 
-#if defined (__i386__)
+#if 0 /* defined (__i386__) */
 int read_current_timer(unsigned long *timer_val)
 {
 	rdtscl(*timer_val);
@@ -527,19 +518,19 @@ static void sync_xen_wallclock(unsigned long dummy)
 static int set_rtc_mmss(unsigned long nowtime)
 {
 	int retval;
-
-	WARN_ON(irqs_disabled());
+	unsigned long flags;
 
 	if (independent_wallclock || !is_initial_xendomain())
 		return 0;
 
 	/* gets recalled with irq locally disabled */
-	spin_lock_irq(&rtc_lock);
+	/* XXX - does irqsave resolve this? -johnstul */
+	spin_lock_irqsave(&rtc_lock, flags);
 	if (efi_enabled)
 		retval = efi_set_rtc_mmss(nowtime);
 	else
 		retval = mach_set_rtc_mmss(nowtime);
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	return retval;
 }
@@ -570,10 +561,12 @@ unsigned long long monotonic_clock(void)
 }
 EXPORT_SYMBOL(monotonic_clock);
 
+#ifdef __x86_64__
 unsigned long long sched_clock(void)
 {
 	return monotonic_clock();
 }
+#endif
 
 #if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
 unsigned long profile_pc(struct pt_regs *regs)
@@ -587,7 +580,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 	   is just accounted to the spinlock function.
 	   Better would be to write these functions in assembler again
 	   and check exactly. */
-	if (in_lock_functions(pc)) {
+	if (!user_mode_vm(regs) && in_lock_functions(pc)) {
 		char *v = *(char **)regs->rsp;
 		if ((v >= _stext && v <= _etext) ||
 			(v >= _sinittext && v <= _einittext) ||
@@ -596,7 +589,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 		return ((unsigned long *)regs->rsp)[1];
 	}
 #else
-	if (in_lock_functions(pc))
+	if (!user_mode_vm(regs) && in_lock_functions(pc))
 		return *(unsigned long *)(regs->ebp + 4);
 #endif
 
@@ -605,6 +598,11 @@ unsigned long profile_pc(struct pt_regs *regs)
 EXPORT_SYMBOL(profile_pc);
 #endif
 
+/*
+ * This is the same as the above, except we _also_ save the current
+ * Time Stamp Counter value at the time of the timer interrupt, so that
+ * we later on can estimate the time of day more exactly.
+ */
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	s64 delta, delta_cpu, stolen, blocked;
@@ -613,6 +611,13 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
 	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
 
+	/*
+	 * Here we are in the timer irq handler. We just have irqs locally
+	 * disabled but we don't know if the timer_bh is running on the other
+	 * CPU. We need to avoid to SMP race with it. NOTE: we don' t need
+	 * the irq version of write_lock because as just said we have irq
+	 * locally disabled. -arca
+	 */
 	write_seqlock(&xtime_lock);
 
 	do {
@@ -746,15 +751,16 @@ static void init_missing_ticks_accounting(int cpu)
 unsigned long get_cmos_time(void)
 {
 	unsigned long retval;
+	unsigned long flags;
 
-	spin_lock(&rtc_lock);
+	spin_lock_irqsave(&rtc_lock, flags);
 
 	if (efi_enabled)
 		retval = efi_get_time();
 	else
 		retval = mach_get_cmos_time();
 
-	spin_unlock(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	return retval;
 }
@@ -812,7 +818,6 @@ void notify_arch_cmos_timer(void)
 
 static long clock_cmos_diff, sleep_start;
 
-static struct timer_opts *last_timer;
 static int timer_suspend(struct sys_device *dev, pm_message_t state)
 {
 	/*
@@ -821,10 +826,6 @@ static int timer_suspend(struct sys_device *dev, pm_message_t state)
 	clock_cmos_diff = -get_cmos_time();
 	clock_cmos_diff += get_seconds();
 	sleep_start = get_cmos_time();
-	last_timer = cur_timer;
-	cur_timer = &timer_none;
-	if (last_timer->suspend)
-		last_timer->suspend(state);
 	return 0;
 }
 
@@ -846,10 +847,6 @@ static int timer_resume(struct sys_device *dev)
 	jiffies_64 += sleep_length;
 	wall_jiffies += sleep_length;
 	write_sequnlock_irqrestore(&xtime_lock, flags);
-	if (last_timer->resume)
-		last_timer->resume();
-	cur_timer = last_timer;
-	last_timer = NULL;
 	touch_softlockup_watchdog();
 	return 0;
 }
@@ -890,9 +887,6 @@ static void __init hpet_time_init(void)
 	if ((hpet_enable() >= 0) && hpet_use_timer) {
 		printk("Using HPET for base-timer\n");
 	}
-
-	cur_timer = select_timer();
-	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
 	time_init_hook();
 }
@@ -1014,14 +1008,14 @@ static void start_hz_timer(void)
 	cpu_clear(smp_processor_id(), nohz_cpu_mask);
 }
 
-void safe_halt(void)
+void raw_safe_halt(void)
 {
 	stop_hz_timer();
 	/* Blocking includes an implicit local_irq_enable(). */
 	HYPERVISOR_block();
 	start_hz_timer();
 }
-EXPORT_SYMBOL(safe_halt);
+EXPORT_SYMBOL(raw_safe_halt);
 
 void halt(void)
 {

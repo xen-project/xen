@@ -23,17 +23,17 @@
  * This file handles the architecture-dependent parts of initialization
  */
 
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
-#include <linux/tty.h>
+#include <linux/screen_info.h>
 #include <linux/ioport.h>
 #include <linux/acpi.h>
 #include <linux/apm_bios.h>
 #include <linux/initrd.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
+#include <linux/platform_device.h>
 #include <linux/console.h>
 #include <linux/mca.h>
 #include <linux/root_dev.h>
@@ -49,6 +49,7 @@
 #include <linux/kexec.h>
 #include <linux/crash_dump.h>
 #include <linux/dmi.h>
+#include <linux/pfn.h>
 
 #include <video/edid.h>
 
@@ -66,7 +67,7 @@
 #include <xen/interface/memory.h>
 #include <xen/features.h>
 #include <xen/xencons.h>
-#include "setup_arch_pre.h"
+#include <setup_arch.h>
 #include <bios_ebda.h>
 
 #ifdef CONFIG_XEN
@@ -402,8 +403,8 @@ EXPORT_SYMBOL(phys_to_machine_mapping);
 start_info_t *xen_start_info;
 EXPORT_SYMBOL(xen_start_info);
 
-static void __init add_memory_region(unsigned long long start,
-                                  unsigned long long size, int type)
+void __init add_memory_region(unsigned long long start,
+			      unsigned long long size, int type)
 {
 	int x;
 
@@ -524,7 +525,7 @@ static struct change_member *change_point[2*E820MAX] __initdata;
 static struct e820entry *overlap_list[E820MAX] __initdata;
 static struct e820entry new_bios[E820MAX] __initdata;
 
-static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
+int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 {
 	struct change_member *change_tmp;
 	unsigned long current_type, last_type;
@@ -693,7 +694,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
  * thinkpad 560x, for example, does not cooperate with the memory
  * detection code.)
  */
-static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
+int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 {
 #ifndef CONFIG_XEN
 	/* Only one memory region (or negative)? Ignore it */
@@ -756,12 +757,6 @@ static inline void copy_edd(void)
 {
 }
 #endif
-
-/*
- * Do NOT EVER look at the BIOS memory size location.
- * It does not work on many machines.
- */
-#define LOWMEMSIZE()	(0x9f000)
 
 static void __init parse_cmdline_early (char ** cmdline_p)
 {
@@ -1027,6 +1022,38 @@ efi_memory_present_wrapper(unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
+ /*
+  * This function checks if the entire range <start,end> is mapped with type.
+  *
+  * Note: this function only works correct if the e820 table is sorted and
+  * not-overlapping, which is the case
+  */
+int __init
+e820_all_mapped(unsigned long s, unsigned long e, unsigned type)
+{
+	u64 start = s;
+	u64 end = e;
+	int i;
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+		if (type && ei->type != type)
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->addr <= start)
+			start = ei->addr + ei->size;
+		/* if start is now at or beyond end, we're done, full
+		 * coverage */
+		if (start >= end)
+			return 1; /* we're done */
+	}
+	return 0;
+}
+
 /*
  * Find the highest page frame number we have available
  */
@@ -1124,10 +1151,10 @@ static int __init
 free_available_memory(unsigned long start, unsigned long end, void *arg)
 {
 	/* check max_low_pfn */
-	if (start >= ((max_low_pfn + 1) << PAGE_SHIFT))
+	if (start >= (max_low_pfn << PAGE_SHIFT))
 		return 0;
-	if (end >= ((max_low_pfn + 1) << PAGE_SHIFT))
-		end = (max_low_pfn + 1) << PAGE_SHIFT;
+	if (end >= (max_low_pfn << PAGE_SHIFT))
+		end = max_low_pfn << PAGE_SHIFT;
 	if (start < end)
 		free_bootmem(start, end - start);
 
@@ -1378,9 +1405,11 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 
 	for (i = 0; i < nr_map; i++) {
 		struct resource *res;
+#ifndef CONFIG_RESOURCES_64BIT
 		if (e820[i].addr + e820[i].size > 0x100000000ULL)
 			continue;
-		res = alloc_bootmem_low(sizeof(struct resource));
+#endif
+		res = kzalloc(sizeof(struct resource), GFP_ATOMIC);
 		switch (e820[i].type) {
 		case E820_RAM:	res->name = "System RAM"; break;
 		case E820_ACPI:	res->name = "ACPI Tables"; break;
@@ -1390,7 +1419,10 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 		res->start = e820[i].addr;
 		res->end = res->start + e820[i].size - 1;
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-		request_resource(&iomem_resource, res);
+		if (request_resource(&iomem_resource, res)) {
+			kfree(res);
+			continue;
+		}
 		if (e820[i].type == E820_RAM) {
 			/*
 			 *  We don't know which RAM region contains kernel data,
@@ -1467,8 +1499,11 @@ e820_setup_gap(struct e820entry *e820, int nr_map)
 
 /*
  * Request address space for all standard resources
+ *
+ * This is called just before pcibios_init(), which is also a
+ * subsys_initcall, but is linked in later (in arch/i386/pci/common.c).
  */
-static void __init register_memory(void)
+static int __init request_standard_resources(void)
 {
 #ifdef CONFIG_XEN
 	struct xen_memory_map memmap;
@@ -1477,8 +1512,9 @@ static void __init register_memory(void)
 
 	/* Nothing to do if not running in dom0. */
 	if (!is_initial_xendomain())
-		return;
+		return 0;
 
+	printk("Setting up standard PCI resources\n");
 #ifdef CONFIG_XEN
 	memmap.nr_entries = E820MAX;
 	set_xen_guest_handle(memmap.buffer, machine_e820.map);
@@ -1503,6 +1539,13 @@ static void __init register_memory(void)
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
+	return 0;
+}
+
+subsys_initcall(request_standard_resources);
+
+static void __init register_memory(void)
+{
 
 #ifdef CONFIG_XEN
 	e820_setup_gap(machine_e820.map, machine_e820.nr_map);
@@ -1510,103 +1553,6 @@ static void __init register_memory(void)
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif
 }
-
-/* Use inline assembly to define this because the nops are defined 
-   as inline assembly strings in the include files and we cannot 
-   get them easily into strings. */
-asm("\t.data\nintelnops: " 
-    GENERIC_NOP1 GENERIC_NOP2 GENERIC_NOP3 GENERIC_NOP4 GENERIC_NOP5 GENERIC_NOP6
-    GENERIC_NOP7 GENERIC_NOP8); 
-asm("\t.data\nk8nops: " 
-    K8_NOP1 K8_NOP2 K8_NOP3 K8_NOP4 K8_NOP5 K8_NOP6
-    K8_NOP7 K8_NOP8); 
-asm("\t.data\nk7nops: " 
-    K7_NOP1 K7_NOP2 K7_NOP3 K7_NOP4 K7_NOP5 K7_NOP6
-    K7_NOP7 K7_NOP8); 
-    
-extern unsigned char intelnops[], k8nops[], k7nops[];
-static unsigned char *intel_nops[ASM_NOP_MAX+1] = { 
-     NULL,
-     intelnops,
-     intelnops + 1,
-     intelnops + 1 + 2,
-     intelnops + 1 + 2 + 3,
-     intelnops + 1 + 2 + 3 + 4,
-     intelnops + 1 + 2 + 3 + 4 + 5,
-     intelnops + 1 + 2 + 3 + 4 + 5 + 6,
-     intelnops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-}; 
-static unsigned char *k8_nops[ASM_NOP_MAX+1] = { 
-     NULL,
-     k8nops,
-     k8nops + 1,
-     k8nops + 1 + 2,
-     k8nops + 1 + 2 + 3,
-     k8nops + 1 + 2 + 3 + 4,
-     k8nops + 1 + 2 + 3 + 4 + 5,
-     k8nops + 1 + 2 + 3 + 4 + 5 + 6,
-     k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-}; 
-static unsigned char *k7_nops[ASM_NOP_MAX+1] = { 
-     NULL,
-     k7nops,
-     k7nops + 1,
-     k7nops + 1 + 2,
-     k7nops + 1 + 2 + 3,
-     k7nops + 1 + 2 + 3 + 4,
-     k7nops + 1 + 2 + 3 + 4 + 5,
-     k7nops + 1 + 2 + 3 + 4 + 5 + 6,
-     k7nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-}; 
-static struct nop { 
-     int cpuid; 
-     unsigned char **noptable; 
-} noptypes[] = { 
-     { X86_FEATURE_K8, k8_nops }, 
-     { X86_FEATURE_K7, k7_nops }, 
-     { -1, NULL }
-}; 
-
-/* Replace instructions with better alternatives for this CPU type.
-
-   This runs before SMP is initialized to avoid SMP problems with
-   self modifying code. This implies that assymetric systems where
-   APs have less capabilities than the boot processor are not handled. 
-   Tough. Make sure you disable such features by hand. */ 
-void apply_alternatives(void *start, void *end) 
-{ 
-	struct alt_instr *a; 
-	int diff, i, k;
-        unsigned char **noptable = intel_nops; 
-	for (i = 0; noptypes[i].cpuid >= 0; i++) { 
-		if (boot_cpu_has(noptypes[i].cpuid)) { 
-			noptable = noptypes[i].noptable;
-			break;
-		}
-	} 
-	for (a = start; (void *)a < end; a++) { 
-		if (!boot_cpu_has(a->cpuid))
-			continue;
-		BUG_ON(a->replacementlen > a->instrlen); 
-		memcpy(a->instr, a->replacement, a->replacementlen); 
-		diff = a->instrlen - a->replacementlen; 
-		/* Pad the rest with nops */
-		for (i = a->replacementlen; diff > 0; diff -= k, i += k) {
-			k = diff;
-			if (k > ASM_NOP_MAX)
-				k = ASM_NOP_MAX;
-			memcpy(a->instr + i, noptable[k], k); 
-		} 
-	}
-} 
-
-void __init alternative_instructions(void)
-{
-	extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
-	apply_alternatives(__alt_instructions, __alt_instructions_end);
-}
-
-static char * __init machine_specific_memory_setup(void);
 
 #ifdef CONFIG_MCA
 static void set_mca_bus(int x)
@@ -1636,7 +1582,7 @@ void __init setup_arch(char **cmdline_p)
 		panic_timeout = 1;
 
 	/* Register a call for panic conditions. */
-	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+	atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
@@ -1644,6 +1590,9 @@ void __init setup_arch(char **cmdline_p)
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();
+#ifdef CONFIG_SMP
+	prefill_possible_map();
+#endif
 
 	/*
 	 * FIXME: This isn't an official loader_type right
@@ -1731,6 +1680,16 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_cmdline_early(cmdline_p);
 
+#ifdef CONFIG_EARLY_PRINTK
+	{
+		char *s = strstr(*cmdline_p, "earlyprintk=");
+		if (s) {
+			setup_early_printk(strchr(s, '=') + 1);
+			printk("early console enabled\n");
+		}
+	}
+#endif
+
 	max_low_pfn = setup_memory();
 
 	/*
@@ -1777,8 +1736,6 @@ void __init setup_arch(char **cmdline_p)
 		 * frames that make up the p2m table. Used by save/restore
 		 */
 		pfn_to_mfn_frame_list_list = alloc_bootmem_low_pages(PAGE_SIZE);
-		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-		     virt_to_mfn(pfn_to_mfn_frame_list_list);
 
 		fpp = PAGE_SIZE/sizeof(unsigned long);
 		for (i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++) {
@@ -1795,23 +1752,13 @@ void __init setup_arch(char **cmdline_p)
 				virt_to_mfn(&phys_to_machine_mapping[i]);
 		}
 		HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		     virt_to_mfn(pfn_to_mfn_frame_list_list);
 	}
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.
 	 */
-
-#ifdef CONFIG_EARLY_PRINTK
-	{
-		char *s = strstr(*cmdline_p, "earlyprintk=");
-		if (s) {
-			extern void setup_early_printk(char *);
-
-			setup_early_printk(strchr(s, '=') + 1);
-			printk("early console enabled\n");
-		}
-	}
-#endif
 
 	if (is_initial_xendomain())
 		dmi_scan_machine();
@@ -1825,10 +1772,6 @@ void __init setup_arch(char **cmdline_p)
 	set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
-#ifdef CONFIG_X86_IO_APIC
-	check_acpi_pci();	/* Checks more than just ACPI actually */
-#endif
-
 #ifdef CONFIG_ACPI
 	if (!is_initial_xendomain()) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
@@ -1840,6 +1783,13 @@ void __init setup_arch(char **cmdline_p)
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	acpi_boot_table_init();
+#endif
+
+#ifdef CONFIG_X86_IO_APIC
+	check_acpi_pci();	/* Checks more than just ACPI actually */
+#endif
+
+#ifdef CONFIG_ACPI
 	acpi_boot_init();
 
 #if defined(CONFIG_SMP) && defined(CONFIG_X86_PC)
@@ -1871,6 +1821,8 @@ void __init setup_arch(char **cmdline_p)
 		conswitchp = &dummy_con;
 #endif
 	}
+	tsc_init();
+
 	xencons_early_setup();
 }
 
@@ -1882,7 +1834,23 @@ xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 	return NOTIFY_DONE;
 }
 
-#include "setup_arch_post.h"
+static __init int add_pcspkr(void)
+{
+	struct platform_device *pd;
+	int ret;
+
+	pd = platform_device_alloc("pcspkr", -1);
+	if (!pd)
+		return -ENOMEM;
+
+	ret = platform_device_add(pd);
+	if (ret)
+		platform_device_put(pd);
+
+	return ret;
+}
+device_initcall(add_pcspkr);
+
 /*
  * Local Variables:
  * mode:c

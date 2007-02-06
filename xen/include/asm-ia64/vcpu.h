@@ -75,6 +75,7 @@ extern IA64FAULT vcpu_get_ipsr(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_isr(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_iip(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_increment_iip(VCPU * vcpu);
+extern IA64FAULT vcpu_decrement_iip(VCPU * vcpu);
 extern IA64FAULT vcpu_get_ifa(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_get_itir(VCPU * vcpu, u64 * pval);
 extern unsigned long vcpu_get_itir_on_fault(VCPU * vcpu, u64 ifa);

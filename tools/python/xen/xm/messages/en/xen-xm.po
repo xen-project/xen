@@ -12,14 +12,14 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 # ============================================================================
-# Copyright (c) 2006 XenSource Inc.
+# Copyright (c) 2006-2007 XenSource Inc.
 # ============================================================================
 # 
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2006-12-28 15:43+0000\n"
+"PO-Revision-Date: 2007-01-31 12:34+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -41,14 +41,29 @@ msgstr "The method %(1)s takes %(2)s argument(s) (%(3)s given)."
 msgid "SESSION_AUTHENTICATION_FAILED"
 msgstr "Permission denied."
 
+msgid "VALUE_NOT_SUPPORTED"
+msgstr "Value \"%(2)s\" for %(1)s is not supported by this server.  The server said \"%(3)s\"."
+
 msgid "HOST_CPU_HANDLE_INVALID"
 msgstr "The host_cpu handle %(1)s is invalid."
 
 msgid "HOST_HANDLE_INVALID"
 msgstr "The host handle %(1)s is invalid."
 
+msgid "HOST_METRICS_HANDLE_INVALID"
+msgstr "The host_metrics handle %(1)s is invalid."
+
+msgid "PIF_HANDLE_INVALID"
+msgstr "The PIF handle %(1)s is invalid."
+
+msgid "PIF_METRICS_HANDLE_INVALID"
+msgstr "The PIF_METRICS handle %(1)s is invalid."
+
 msgid "SR_HANDLE_INVALID"
 msgstr "The SR handle %(1)s is invalid."
+
+msgid "TASK_HANDLE_INVALID"
+msgstr "The task handle %(1)s is invalid."
 
 msgid "VBD_HANDLE_INVALID"
 msgstr "The VBD handle %(1)s is invalid."
@@ -62,11 +77,23 @@ msgstr "The VIF handle %(1)s is invalid."
 msgid "VM_HANDLE_INVALID"
 msgstr "The VM handle %(1)s is invalid."
 
+msgid "VM_METRICS_HANDLE_INVALID"
+msgstr "The VM_metrics handle %(1)s is invalid."
+
 msgid "VTPM_HANDLE_INVALID"
 msgstr "The VTPM handle %(1)s is invalid."
 
+msgid "OPERATION_NOT_ALLOWED"
+msgstr "You attempted an operation that was not allowed."
+
 msgid "NETWORK_ALREADY_CONNECTED"
 msgstr "The network you specified already has a PIF attached to it, and so another one may not be attached."
+
+msgid "PIF_IS_PHYSICAL"
+msgstr "The PIF %(1)s corresponds to a physical interface, and so may not be destroyed."
+
+msgid "VLAN_TAG_INVALID"
+msgstr "The VLAN tag you gave (%(1)s) is invalid -- it must be between 0 and 4095."
 
 msgid "VM_BAD_POWER_STATE"
 msgstr "The VM must be %(2)s to perform the requested operation (it is currently %(3)s)."

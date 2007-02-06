@@ -12,7 +12,6 @@
 #include <asm/types.h>
 #include <asm/sigcontext.h>
 #include <asm/cpufeature.h>
-#include <linux/config.h>
 #include <linux/threads.h>
 #include <asm/msr.h>
 #include <asm/current.h>
@@ -20,6 +19,7 @@
 #include <asm/mmsegment.h>
 #include <asm/percpu.h>
 #include <linux/personality.h>
+#include <linux/cpumask.h>
 
 #define TF_MASK		0x00000100
 #define IF_MASK		0x00000200
@@ -65,8 +65,15 @@ struct cpuinfo_x86 {
         __u32   x86_power; 	
 	__u32   extended_cpuid_level;	/* Max extended CPUID function supported */
 	unsigned long loops_per_jiffy;
+#ifdef CONFIG_SMP
+	cpumask_t llc_shared_map;	/* cpus sharing the last level cache */
+#endif
 	__u8	apicid;
+#ifdef CONFIG_SMP
 	__u8	booted_cores;	/* number of cores as seen by OS */
+	__u8	phys_proc_id;	/* Physical Processor id. */
+	__u8	cpu_core_id;	/* Core id. */
+#endif
 } ____cacheline_aligned;
 
 #define X86_VENDOR_INTEL 0
@@ -93,6 +100,7 @@ extern char ignore_irq13;
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
+extern unsigned short num_cache_leaves;
 
 /*
  * EFLAGS bits
@@ -236,7 +244,13 @@ struct tss_struct {
 DECLARE_PER_CPU(struct tss_struct,init_tss);
 #endif
 
+
 extern struct cpuinfo_x86 boot_cpu_data;
+/* Save the original ist values for checking stack pointers during debugging */
+struct orig_ist {
+	unsigned long ist[7];
+};
+DECLARE_PER_CPU(struct orig_ist, orig_ist);
 
 #ifdef CONFIG_X86_VSMP
 #define ARCH_MIN_TASKALIGN	(1 << INTERNODE_CACHE_SHIFT)
@@ -364,9 +378,6 @@ struct extended_sigtable {
 	unsigned int reserved[3];
 	struct extended_signature sigs[0];
 };
-
-/* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
-#define MICROCODE_IOCFREE	_IO('6',0)
 
 
 #define ASM_NOP1 K8_NOP1

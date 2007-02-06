@@ -114,10 +114,10 @@ SECTIONS
 
   . = ALIGN(32);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
-  .initcall.init : { *(.initcall.init) }
+  .initcall.init : { *(.initcall1.init) }
   __initcall_end = .;
   __inithcall_start = .;
   .inithcall.text : { *(.inithcall.text) }

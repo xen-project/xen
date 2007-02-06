@@ -23,8 +23,11 @@
 #include "xen_common.h"
 #include "xen_host.h"
 #include "xen_host_cpu.h"
+#include "xen_host_metrics.h"
 #include "xen_internal.h"
+#include "xen_pbd.h"
 #include "xen_pif.h"
+#include "xen_sr.h"
 #include "xen_string_string_map.h"
 #include "xen_vm.h"
 
@@ -52,15 +55,33 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "software_version",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_host_record, software_version) },
+        { .key = "other_config",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_host_record, other_config) },
         { .key = "resident_VMs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, resident_vms) },
+        { .key = "logging",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_host_record, logging) },
         { .key = "PIFs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, pifs) },
+        { .key = "suspend_image_sr",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_host_record, suspend_image_sr) },
+        { .key = "crash_dump_sr",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_host_record, crash_dump_sr) },
+        { .key = "PBDs",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_host_record, pbds) },
         { .key = "host_CPUs",
           .type = &abstract_type_ref_set,
-          .offset = offsetof(xen_host_record, host_cpus) }
+          .offset = offsetof(xen_host_record, host_cpus) },
+        { .key = "metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_host_record, metrics) }
     };
 
 const abstract_type xen_host_record_abstract_type_ =
@@ -85,9 +106,15 @@ xen_host_record_free(xen_host_record *record)
     free(record->name_label);
     free(record->name_description);
     xen_string_string_map_free(record->software_version);
+    xen_string_string_map_free(record->other_config);
     xen_vm_record_opt_set_free(record->resident_vms);
+    xen_string_string_map_free(record->logging);
     xen_pif_record_opt_set_free(record->pifs);
+    xen_sr_record_opt_free(record->suspend_image_sr);
+    xen_sr_record_opt_free(record->crash_dump_sr);
+    xen_pbd_record_opt_set_free(record->pbds);
     xen_host_cpu_record_opt_set_free(record->host_cpus);
+    xen_host_metrics_record_opt_free(record->metrics);
     free(record);
 }
 
@@ -232,6 +259,23 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
 
 
 bool
+xen_host_get_other_config(xen_session *session, xen_string_string_map **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("host.get_other_config");
+    return session->ok;
+}
+
+
+bool
 xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_host host)
 {
     abstract_value param_values[] =
@@ -244,6 +288,23 @@ xen_host_get_resident_vms(xen_session *session, struct xen_vm_set **result, xen_
 
     *result = NULL;
     XEN_CALL_("host.get_resident_VMs");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_logging(xen_session *session, xen_string_string_map **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("host.get_logging");
     return session->ok;
 }
 
@@ -266,6 +327,57 @@ xen_host_get_pifs(xen_session *session, struct xen_pif_set **result, xen_host ho
 
 
 bool
+xen_host_get_suspend_image_sr(xen_session *session, xen_sr *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_suspend_image_sr");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_crash_dump_sr(xen_session *session, xen_sr *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_crash_dump_sr");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("host.get_PBDs");
+    return session->ok;
+}
+
+
+bool
 xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, xen_host host)
 {
     abstract_value param_values[] =
@@ -278,6 +390,23 @@ xen_host_get_host_cpus(xen_session *session, struct xen_host_cpu_set **result, x
 
     *result = NULL;
     XEN_CALL_("host.get_host_CPUs");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_metrics(xen_session *session, xen_host_metrics *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_metrics");
     return session->ok;
 }
 
@@ -310,6 +439,138 @@ xen_host_set_name_description(xen_session *session, xen_host host, char *descrip
         };
 
     xen_call_(session, "host.set_name_description", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_other_config(xen_session *session, xen_host host, xen_string_string_map *other_config)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)other_config }
+        };
+
+    xen_call_(session, "host.set_other_config", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_add_to_other_config(xen_session *session, xen_host host, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "host.add_to_other_config", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_remove_from_other_config(xen_session *session, xen_host host, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "host.remove_from_other_config", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_logging(xen_session *session, xen_host host, xen_string_string_map *logging)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)logging }
+        };
+
+    xen_call_(session, "host.set_logging", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_add_to_logging(xen_session *session, xen_host host, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "host.add_to_logging", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_remove_from_logging(xen_session *session, xen_host host, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "host.remove_from_logging", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_suspend_image_sr(xen_session *session, xen_host host, xen_sr suspend_image_sr)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = suspend_image_sr }
+        };
+
+    xen_call_(session, "host.set_suspend_image_sr", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_set_crash_dump_sr(xen_session *session, xen_host host, xen_sr crash_dump_sr)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = crash_dump_sr }
+        };
+
+    xen_call_(session, "host.set_crash_dump_sr", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -366,6 +627,23 @@ xen_host_reboot(xen_session *session, xen_host host)
         };
 
     xen_call_(session, "host.reboot", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_host_dmesg(xen_session *session, char **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.dmesg");
     return session->ok;
 }
 

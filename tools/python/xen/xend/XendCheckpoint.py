@@ -22,11 +22,14 @@ from xen.xend.XendConfig import XendConfig
 from xen.xend.XendConstants import *
 
 SIGNATURE = "LinuxGuestRecord"
+QEMU_SIGNATURE = "QemuDeviceModelRecord"
+dm_batch = 512
 XC_SAVE = "xc_save"
 XC_RESTORE = "xc_restore"
 
 
 sizeof_int = calcsize("i")
+sizeof_unsigned_int = calcsize("I")
 sizeof_unsigned_long = calcsize("L")
 
 
@@ -69,6 +72,11 @@ def save(fd, dominfo, network, live, dst):
                     "could not write guest state file: config len")
         write_exact(fd, config, "could not write guest state file: config")
 
+        image_cfg = dominfo.info.get('image', {})
+        hvm = image_cfg.has_key('hvm')
+
+        if hvm:
+            log.info("save hvm domain")
         # xc_save takes three customization parameters: maxit, max_f, and
         # flags the last controls whether or not save is 'live', while the
         # first two further customize behaviour when 'live' save is
@@ -76,7 +84,7 @@ def save(fd, dominfo, network, live, dst):
         # libxenguest; see the comments and/or code in xc_linux_save() for
         # more information.
         cmd = [xen.util.auxbin.pathTo(XC_SAVE), str(fd),
-               str(dominfo.getDomid()), "0", "0", str(int(live)) ]
+               str(dominfo.getDomid()), "0", "0", str(int(live) | (int(hvm) << 2)) ]
         log.debug("[xc_save]: %s", string.join(cmd))
 
         def saveInputHandler(line, tochild):
@@ -90,13 +98,32 @@ def save(fd, dominfo, network, live, dst):
                 log.info("Domain %d suspended.", dominfo.getDomid())
                 dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP3,
                                        domain_name)
+                #send signal to device model for save
+                if hvm:
+                    log.info("release_devices for hvm domain")
+                    dominfo._releaseDevices(True)
                 tochild.write("done\n")
                 tochild.flush()
                 log.debug('Written done')
 
         forkHelper(cmd, fd, saveInputHandler, False)
 
+        # put qemu device model state
+        if hvm:
+            write_exact(fd, QEMU_SIGNATURE, "could not write qemu signature")
+            qemu_fd = os.open("/tmp/xen.qemu-dm.%d" % dominfo.getDomid(), os.O_RDONLY)
+            while True:
+                buf = os.read(qemu_fd, dm_batch)
+                if len(buf):
+                    write_exact(fd, buf, "could not write device model state")
+                else:
+                    break
+            os.close(qemu_fd)
+            os.remove("/tmp/xen.qemu-dm.%d" % dominfo.getDomid())
+
         dominfo.destroyDomain()
+        dominfo.testDeviceComplete()
+
         try:
             dominfo.setName(domain_name)
         except VmError:
@@ -109,11 +136,31 @@ def save(fd, dominfo, network, live, dst):
     except Exception, exn:
         log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
+
+        dominfo._releaseDevices()
+        dominfo.testDeviceComplete()
+        dominfo.testvifsComplete()
+        log.debug("XendCheckpoint.save: devices released")
+
+        dominfo._resetChannels()
+
+        dominfo._removeDom('control/shutdown')
+        dominfo._removeDom('device-misc/vif/nextDeviceID')
+
+        dominfo._createChannels()
+        dominfo._introduceDomain()
+        dominfo._storeDomDetails()
+
+        dominfo._createDevices()
+        log.debug("XendCheckpoint.save: devices created")
+
+        dominfo.resumeDomain()
+        log.debug("XendCheckpoint.save: resumeDomain")
+
         try:
             dominfo.setName(domain_name)
         except:
             log.exception("Failed to reset the migrating domain's name")
-        raise Exception, exn
 
 
 def restore(xd, fd, dominfo = None, paused = False):
@@ -147,19 +194,45 @@ def restore(xd, fd, dominfo = None, paused = False):
     assert store_port
     assert console_port
 
+    nr_pfns = (dominfo.getMemoryTarget() + 3) / 4 
+
+    # if hvm, pass mem size to calculate the store_mfn
+    image_cfg = dominfo.info.get('image', {})
+    is_hvm  = image_cfg.has_key('hvm')
+    if is_hvm:
+        hvm  = dominfo.info['memory_static_min']
+        apic = dominfo.info['image']['hvm'].get('apic', 0)
+        pae  = dominfo.info['image']['hvm'].get('pae',  0)
+        log.info("restore hvm domain %d, mem=%d, apic=%d, pae=%d",
+                 dominfo.domid, hvm, apic, pae)
+    else:
+        hvm  = 0
+        apic = 0
+        pae  = 0
+
     try:
         l = read_exact(fd, sizeof_unsigned_long,
                        "not a valid guest state file: pfn count read")
-        nr_pfns = unpack("L", l)[0]    # native sizeof long
-        if nr_pfns > 16*1024*1024:     # XXX 
+        max_pfn = unpack("L", l)[0]    # native sizeof long
+
+        if max_pfn > 16*1024*1024:     # XXX 
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 
-        balloon.free(xc.pages_to_kib(nr_pfns))
+        shadow = dominfo.info['shadow_memory']
+        log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, "
+                  "nr_pfns=0x%x.", dominfo.info['shadow_memory'],
+                  dominfo.info['memory_static_max'],
+                  dominfo.info['memory_static_min'], nr_pfns)
+
+        balloon.free(xc.pages_to_kib(nr_pfns) + shadow * 1024)
+
+        shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow)
+        dominfo.info['shadow_memory'] = shadow_cur
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
-                        fd, dominfo.getDomid(), nr_pfns,
-                        store_port, console_port])
+                        fd, dominfo.getDomid(), max_pfn,
+                        store_port, console_port, hvm, pae, apic])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
         handler = RestoreInputHandler()
@@ -169,10 +242,30 @@ def restore(xd, fd, dominfo = None, paused = False):
         if handler.store_mfn is None or handler.console_mfn is None:
             raise XendError('Could not read store/console MFN')
 
-        os.read(fd, 1)           # Wait for source to close connection
         dominfo.waitForDevices() # Wait for backends to set up
         if not paused:
             dominfo.unpause()
+
+         # get qemu state and create a tmp file for dm restore
+        if is_hvm:
+            qemu_signature = read_exact(fd, len(QEMU_SIGNATURE),
+                                        "invalid device model signature read")
+            if qemu_signature != QEMU_SIGNATURE:
+                raise XendError("not a valid device model state: found '%s'" %
+                                qemu_signature)
+            qemu_fd = os.open("/tmp/xen.qemu-dm.%d" % dominfo.getDomid(),
+                              os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+            while True:
+                buf = os.read(fd, dm_batch)
+                if len(buf):
+                    write_exact(qemu_fd, buf,
+                                "could not write dm state to tmp file")
+                else:
+                    break
+            os.close(qemu_fd)
+
+
+        os.read(fd, 1)           # Wait for source to close connection
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
         

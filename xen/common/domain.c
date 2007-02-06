@@ -5,6 +5,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/compat.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -90,7 +91,7 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
+    v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
     spin_lock_init(&v->pause_lock);
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
@@ -124,6 +125,9 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     struct domain *d;
     struct vcpu *v;
     unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
+
+    if ( (v = idle_vcpu[cpu_id]) != NULL )
+        return v;
 
     d = (vcpu_id == 0) ?
         domain_create(IDLE_DOMAIN_ID, 0) :
@@ -199,7 +203,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 }
 
 
-struct domain *find_domain_by_id(domid_t dom)
+struct domain *get_domain_by_id(domid_t dom)
 {
     struct domain *d;
 
@@ -444,39 +448,7 @@ void domain_unpause_by_systemcontroller(struct domain *d)
     }
 }
 
-
-/*
- * set_info_guest is used for final setup, launching, and state modification 
- * of domains other than domain 0. ie. the domains that are being built by 
- * the userspace dom0 domain builder.
- */
-int set_info_guest(struct domain *d,
-                   xen_domctl_vcpucontext_t *vcpucontext)
-{
-    int rc = 0;
-    struct vcpu_guest_context *c = NULL;
-    unsigned long vcpu = vcpucontext->vcpu;
-    struct vcpu *v;
-
-    if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
-        return -EINVAL;
-    
-    if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
-        return -ENOMEM;
-
-    domain_pause(d);
-
-    rc = -EFAULT;
-    if ( copy_from_guest(c, vcpucontext->ctxt, 1) == 0 )
-        rc = arch_set_info_guest(v, c);
-
-    domain_unpause(d);
-
-    xfree(c);
-    return rc;
-}
-
-int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt) 
+int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 {
     struct vcpu *v = d->vcpu[vcpuid];
 
@@ -484,6 +456,36 @@ int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt)
 
     return arch_set_info_guest(v, ctxt);
 }
+
+int vcpu_reset(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    int rc;
+
+    domain_pause(d);
+    LOCK_BIGLOCK(d);
+
+    rc = arch_vcpu_reset(v);
+    if ( rc != 0 )
+        goto out;
+
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+    clear_bit(_VCPUF_nmi_masked, &v->vcpu_flags);
+    clear_bit(_VCPUF_polling, &v->vcpu_flags);
+
+ out:
+    UNLOCK_BIGLOCK(v->domain);
+    domain_unpause(d);
+
+    return rc;
+}
+
 
 long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 {

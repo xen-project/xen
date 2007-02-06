@@ -111,7 +111,7 @@ DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]) = {[0 ... NR_IPIS-1] = -1};
 static int irq_bindcount[NR_IRQS];
 
 /* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
-static unsigned long pirq_needs_eoi[NR_PIRQS/sizeof(unsigned long)];
+static DECLARE_BITMAP(pirq_needs_eoi, NR_PIRQS);
 
 #ifdef CONFIG_SMP
 
@@ -582,6 +582,7 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 }
 EXPORT_SYMBOL_GPL(unbind_from_irqhandler);
 
+#ifdef CONFIG_SMP
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 {
@@ -604,11 +605,27 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 		bind_evtchn_to_cpu(evtchn, tcpu);
 }
 
-
 static void set_affinity_irq(unsigned irq, cpumask_t dest)
 {
 	unsigned tcpu = first_cpu(dest);
 	rebind_irq_to_cpu(irq, tcpu);
+}
+#endif
+
+int resend_irq_on_evtchn(unsigned int irq)
+{
+	int masked, evtchn = evtchn_from_irq(irq);
+	shared_info_t *s = HYPERVISOR_shared_info;
+
+	if (!VALID_EVTCHN(evtchn))
+		return 1;
+
+	masked = synch_test_and_set_bit(evtchn, s->evtchn_mask);
+	synch_set_bit(evtchn, s->evtchn_pending);
+	if (!masked)
+		unmask_evtchn(evtchn);
+
+	return 1;
 }
 
 /*
@@ -669,20 +686,23 @@ static void end_dynirq(unsigned int irq)
 }
 
 static struct hw_interrupt_type dynirq_type = {
-	"Dynamic-irq",
-	startup_dynirq,
-	shutdown_dynirq,
-	enable_dynirq,
-	disable_dynirq,
-	ack_dynirq,
-	end_dynirq,
-	set_affinity_irq
+	.typename = "Dynamic-irq",
+	.startup  = startup_dynirq,
+	.shutdown = shutdown_dynirq,
+	.enable   = enable_dynirq,
+	.disable  = disable_dynirq,
+	.ack      = ack_dynirq,
+	.end      = end_dynirq,
+#ifdef CONFIG_SMP
+	.set_affinity = set_affinity_irq,
+#endif
+	.retrigger = resend_irq_on_evtchn,
 };
 
 static inline void pirq_unmask_notify(int pirq)
 {
 	struct physdev_eoi eoi = { .irq = pirq };
-	if (unlikely(test_bit(pirq, &pirq_needs_eoi[0])))
+	if (unlikely(test_bit(pirq, pirq_needs_eoi)))
 		(void)HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi);
 }
 
@@ -691,9 +711,9 @@ static inline void pirq_query_unmask(int pirq)
 	struct physdev_irq_status_query irq_status;
 	irq_status.irq = pirq;
 	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
-	clear_bit(pirq, &pirq_needs_eoi[0]);
+	clear_bit(pirq, pirq_needs_eoi);
 	if (irq_status.flags & XENIRQSTAT_needs_eoi)
-		set_bit(pirq, &pirq_needs_eoi[0]);
+		set_bit(pirq, pirq_needs_eoi);
 }
 
 /*
@@ -794,14 +814,17 @@ static void end_pirq(unsigned int irq)
 }
 
 static struct hw_interrupt_type pirq_type = {
-	"Phys-irq",
-	startup_pirq,
-	shutdown_pirq,
-	enable_pirq,
-	disable_pirq,
-	ack_pirq,
-	end_pirq,
-	set_affinity_irq
+	.typename = "Phys-irq",
+	.startup  = startup_pirq,
+	.shutdown = shutdown_pirq,
+	.enable   = enable_pirq,
+	.disable  = disable_pirq,
+	.ack      = ack_pirq,
+	.end      = end_pirq,
+#ifdef CONFIG_SMP
+	.set_affinity = set_affinity_irq,
+#endif
+	.retrigger = resend_irq_on_evtchn,
 };
 
 int irq_ignore_unhandled(unsigned int irq)
@@ -813,16 +836,6 @@ int irq_ignore_unhandled(unsigned int irq)
 
 	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
 	return !!(irq_status.flags & XENIRQSTAT_shared);
-}
-
-void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i)
-{
-	int evtchn = evtchn_from_irq(i);
-	shared_info_t *s = HYPERVISOR_shared_info;
-	if (!VALID_EVTCHN(evtchn))
-		return;
-	BUG_ON(!synch_test_bit(evtchn, &s->evtchn_mask[0]));
-	synch_set_bit(evtchn, &s->evtchn_pending[0]);
 }
 
 void notify_remote_via_irq(int irq)
@@ -843,7 +856,7 @@ EXPORT_SYMBOL_GPL(irq_to_evtchn_port);
 void mask_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	synch_set_bit(port, &s->evtchn_mask[0]);
+	synch_set_bit(port, s->evtchn_mask);
 }
 EXPORT_SYMBOL_GPL(mask_evtchn);
 
@@ -862,14 +875,10 @@ void unmask_evtchn(int port)
 		return;
 	}
 
-	synch_clear_bit(port, &s->evtchn_mask[0]);
+	synch_clear_bit(port, s->evtchn_mask);
 
-	/*
-	 * The following is basically the equivalent of 'hw_resend_irq'. Just
-	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
-	 * masked.
-	 */
-	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
+	/* Did we miss an interrupt 'edge'? Re-fire if so. */
+	if (synch_test_bit(port, s->evtchn_pending) &&
 	    !synch_test_and_set_bit(port / BITS_PER_LONG,
 				    &vcpu_info->evtchn_pending_sel))
 		vcpu_info->evtchn_upcall_pending = 1;
@@ -972,10 +981,10 @@ void __init xen_init_IRQ(void)
 	for (i = 0; i < NR_DYNIRQS; i++) {
 		irq_bindcount[dynirq_to_irq(i)] = 0;
 
-		irq_desc[dynirq_to_irq(i)].status  = IRQ_DISABLED;
-		irq_desc[dynirq_to_irq(i)].action  = NULL;
-		irq_desc[dynirq_to_irq(i)].depth   = 1;
-		irq_desc[dynirq_to_irq(i)].handler = &dynirq_type;
+		irq_desc[dynirq_to_irq(i)].status = IRQ_DISABLED;
+		irq_desc[dynirq_to_irq(i)].action = NULL;
+		irq_desc[dynirq_to_irq(i)].depth = 1;
+		irq_desc[dynirq_to_irq(i)].chip = &dynirq_type;
 	}
 
 	/* Phys IRQ space is statically bound (1:1 mapping). Nail refcnts. */
@@ -988,9 +997,9 @@ void __init xen_init_IRQ(void)
 			continue;
 #endif
 
-		irq_desc[pirq_to_irq(i)].status  = IRQ_DISABLED;
-		irq_desc[pirq_to_irq(i)].action  = NULL;
-		irq_desc[pirq_to_irq(i)].depth   = 1;
-		irq_desc[pirq_to_irq(i)].handler = &pirq_type;
+		irq_desc[pirq_to_irq(i)].status = IRQ_DISABLED;
+		irq_desc[pirq_to_irq(i)].action = NULL;
+		irq_desc[pirq_to_irq(i)].depth = 1;
+		irq_desc[pirq_to_irq(i)].chip = &pirq_type;
 	}
 }

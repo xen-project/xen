@@ -1,4 +1,3 @@
-#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -11,219 +10,36 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-#include <xen/elfnote.h>
+#include <xg_private.h>
+#include <xc_dom.h> /* gunzip bits */
 
-#define ELFNOTE_NAME(_n_) ((void*)(_n_) + sizeof(*(_n_)))
-#define ELFNOTE_DESC(_n_) (ELFNOTE_NAME(_n_) + (((_n_)->n_namesz+3)&~3))
-#define ELFNOTE_NEXT(_n_) (ELFNOTE_DESC(_n_) + (((_n_)->n_descsz+3)&~3))
+#include <xen/libelf.h>
 
-#ifndef ELFSIZE
-#include <limits.h>
-#if UINT_MAX == ULONG_MAX
-#define ELFSIZE 32
-#else
-#define ELFSIZE 64
-#endif
-#endif
-
-#if (ELFSIZE == 32)
-typedef Elf32_Nhdr Elf_Nhdr;
-typedef Elf32_Half Elf_Half;
-typedef Elf32_Word Elf_Word;
-#elif (ELFSIZE == 64)
-typedef Elf64_Nhdr Elf_Nhdr;
-typedef Elf64_Half Elf_Half;
-typedef Elf64_Word Elf_Word;
-#else
-#error "Unknown ELFSIZE"
-#endif
-
-static void print_string_note(const char *prefix, Elf_Nhdr *note)
+static void print_string_note(const char *prefix, struct elf_binary *elf,
+			      const elf_note *note)
 {
-	printf("%s: %s\n", prefix, (const char *)ELFNOTE_DESC(note));
+	printf("%s: %s\n", prefix, (char*)elf_note_desc(elf, note));
 }
 
-static void print_numeric_note(const char *prefix,Elf_Nhdr *note)
+static void print_numeric_note(const char *prefix, struct elf_binary *elf,
+			       const elf_note *note)
 {
-	switch (note->n_descsz)
-	{
-	case 4:
-		printf("%s: %#010" PRIx32 " (4 bytes)\n",
-		       prefix, *(uint32_t *)ELFNOTE_DESC(note));
-		break;
-	case 8:
-		printf("%s: %#018" PRIx64 " (8 bytes)\n",
-		       prefix, *(uint64_t *)ELFNOTE_DESC(note));
-		break;
-	default:
-		printf("%s: unknown data size %#lx\n", prefix,
-		       (unsigned long)note->n_descsz);
-		break;
-	}
-}
+	uint64_t value = elf_note_numeric(elf, note);
+	int descsz = elf_uval(elf, note, descsz);
 
-static inline int is_elf(void *image)
-{
-	/*
-	 * Since we are only accessing the e_ident field we can
-	 * acccess the bytes directly without needing to figure out
-	 * which version of Elf*_Ehdr structure to use.
-	 */
-	const unsigned char *hdr = image;
-	return ( hdr[EI_MAG0] == ELFMAG0 &&
-		 hdr[EI_MAG1] == ELFMAG1 &&
-		 hdr[EI_MAG2] == ELFMAG2 &&
-		 hdr[EI_MAG3] == ELFMAG3 );
-}
-
-static inline unsigned char ehdr_class(void *image)
-{
-	/*
-	 * Since we are only accessing the e_ident field we can
-	 * acccess the bytes directly without needing to figure out
-	 * which version of Elf*_Ehdr structure to use.
-	 */
-	const unsigned char *hdr = image;
-	switch (hdr[EI_CLASS])
-	{
-	case ELFCLASS32:
-	case ELFCLASS64:
-		return hdr[EI_CLASS];
-	default:
-		fprintf(stderr, "Unknown ELF class %d\n", hdr[EI_CLASS]);
-		exit(1);
-	}
-}
-
-static inline Elf_Half ehdr_shnum(void *image)
-{
-	switch (ehdr_class(image))
-	{
-	case ELFCLASS32:
-		return ((Elf32_Ehdr *)image)->e_shnum;
-	case ELFCLASS64:
-		return ((Elf64_Ehdr *)image)->e_shnum;
-	default:
-		exit(1);
-	}
-}
-
-static inline Elf_Word shdr_type(void *image, int shnum)
-{
-	switch (ehdr_class(image))
-	{
-	case ELFCLASS32:
-	{
-		Elf32_Ehdr *ehdr = (Elf32_Ehdr *)image;
-		Elf32_Shdr *shdr = (Elf32_Shdr*)(image + ehdr->e_shoff +
-						 (shnum*ehdr->e_shentsize));
-		return shdr->sh_type;
-	}
-	case ELFCLASS64:
-	{
-		Elf64_Ehdr *ehdr = (Elf64_Ehdr *)image;
-		Elf64_Shdr *shdr = (Elf64_Shdr*)(image + ehdr->e_shoff +
-						 (shnum*ehdr->e_shentsize));
-		return shdr->sh_type;
-	}
-	default:
-		exit(1);
-	}
-}
-
-static inline const char *shdr_name(void *image, int shnum)
-{
-	const char *shstrtab;
-
-	switch (ehdr_class(image))
-	{
-	case ELFCLASS32:
-	{
-		Elf32_Ehdr *ehdr = (Elf32_Ehdr *)image;
-		Elf32_Shdr *shdr;
-		/* Find the section-header strings table. */
-		if ( ehdr->e_shstrndx == SHN_UNDEF )
-			return NULL;
-		shdr = (Elf32_Shdr *)(image + ehdr->e_shoff +
-				      (ehdr->e_shstrndx*ehdr->e_shentsize));
-		shstrtab = image + shdr->sh_offset;
-
-		shdr= (Elf32_Shdr*)(image + ehdr->e_shoff +
-				    (shnum*ehdr->e_shentsize));
-		return &shstrtab[shdr->sh_name];
-	}
-	case ELFCLASS64:
-	{
-		Elf64_Ehdr *ehdr = (Elf64_Ehdr *)image;
-		Elf64_Shdr *shdr;
-		/* Find the section-header strings table. */
-		if ( ehdr->e_shstrndx == SHN_UNDEF )
-			return NULL;
-		shdr = (Elf64_Shdr *)(image + ehdr->e_shoff +
-				      (ehdr->e_shstrndx*ehdr->e_shentsize));
-		shstrtab = image + shdr->sh_offset;
-
-		shdr= (Elf64_Shdr*)(image + ehdr->e_shoff +
-				    (shnum*ehdr->e_shentsize));
-		return &shstrtab[shdr->sh_name];
-	}
-	default:
-		exit(1);
-	}
-}
-static inline void *shdr_start(void *image, int shnum)
-{
-	switch (ehdr_class(image))
-	{
-	case ELFCLASS32:
-	{
-		Elf32_Ehdr *ehdr = (Elf32_Ehdr *)image;
-		Elf32_Shdr *shdr = (Elf32_Shdr*)(image + ehdr->e_shoff +
-						 (shnum*ehdr->e_shentsize));
-		return image + shdr->sh_offset;
-	}
-	case ELFCLASS64:
-	{
-		Elf64_Ehdr *ehdr = (Elf64_Ehdr *)image;
-		Elf64_Shdr *shdr = (Elf64_Shdr*)(image + ehdr->e_shoff +
-						 (shnum*ehdr->e_shentsize));
-		return image + shdr->sh_offset;
-	}
-	default:
-		exit(1);
-	}
-}
-
-static inline void *shdr_end(void *image, int shnum)
-{
-	switch (ehdr_class(image))
-	{
-	case ELFCLASS32:
-	{
-		Elf32_Ehdr *ehdr = (Elf32_Ehdr *)image;
-		Elf32_Shdr *shdr = (Elf32_Shdr*)(image + ehdr->e_shoff +
-						 (shnum*ehdr->e_shentsize));
-		return image + shdr->sh_offset + shdr->sh_size;
-	}
-	case ELFCLASS64:
-	{
-		Elf64_Ehdr *ehdr = (Elf64_Ehdr *)image;
-		Elf64_Shdr *shdr = (Elf64_Shdr*)(image + ehdr->e_shoff +
-						 (shnum*ehdr->e_shentsize));
-		return image + shdr->sh_offset + shdr->sh_size;
-	}
-	default:
-		exit(1);
-	}
+	printf("%s: %#*" PRIx64 " (%d bytes)\n",
+	       prefix, 2+2*descsz, value, descsz);
 }
 
 int main(int argc, char **argv)
 {
 	const char *f;
-	int fd,h;
-	void *image;
+	int fd,h,size,usize,count;
+	void *image,*tmp;
 	struct stat st;
-	Elf_Nhdr *note;
+	struct elf_binary elf;
+	const elf_shdr *shdr;
+	const elf_note *note, *end;
 
 	if (argc != 2)
 	{
@@ -251,76 +67,83 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Unable to map %s: %s\n", f, strerror(errno));
 		return 1;
 	}
+	size = st.st_size;
 
-	if ( !is_elf(image) )
+	usize = xc_dom_check_gzip(image, st.st_size);
+	if (usize)
+	{
+		tmp = malloc(usize);
+		xc_dom_do_gunzip(image, st.st_size, tmp, usize);
+		image = tmp;
+		size = usize;
+	}
+
+	if (0 != elf_init(&elf, image, size))
 	{
 		fprintf(stderr, "File %s is not an ELF image\n", f);
 		return 1;
 	}
+	elf_set_logfile(&elf, stderr, 0);
 
-	for ( h=0; h < ehdr_shnum(image); h++)
+	count = elf_shdr_count(&elf);
+	for ( h=0; h < count; h++)
 	{
-		if (shdr_type(image,h) != SHT_NOTE)
+		shdr = elf_shdr_by_index(&elf, h);
+		if (elf_uval(&elf, shdr, sh_type) != SHT_NOTE)
 			continue;
-		for (note = (Elf_Nhdr*)shdr_start(image,h);
-		     note < (Elf_Nhdr*)shdr_end(image,h);
-		     note = (Elf_Nhdr*)(ELFNOTE_NEXT(note)))
+		end = elf_section_end(&elf, shdr);
+		for (note = elf_section_start(&elf, shdr);
+		     note < end;
+		     note = elf_note_next(&elf, note))
 		{
-			switch(note->n_type)
+			if (0 != strcmp(elf_note_name(&elf, note), "Xen"))
+				continue;
+			switch(elf_uval(&elf, note, type))
 			{
 			case XEN_ELFNOTE_INFO:
-				print_string_note("INFO", note);
+				print_string_note("INFO", &elf , note);
 				break;
 			case XEN_ELFNOTE_ENTRY:
-				print_numeric_note("ENTRY", note);
+				print_numeric_note("ENTRY", &elf , note);
 				break;
 			case XEN_ELFNOTE_HYPERCALL_PAGE:
-				print_numeric_note("HYPERCALL_PAGE", note);
+				print_numeric_note("HYPERCALL_PAGE", &elf , note);
 				break;
 			case XEN_ELFNOTE_VIRT_BASE:
-				print_numeric_note("VIRT_BASE", note);
+				print_numeric_note("VIRT_BASE", &elf , note);
 				break;
 			case XEN_ELFNOTE_PADDR_OFFSET:
-				print_numeric_note("PADDR_OFFSET", note);
+				print_numeric_note("PADDR_OFFSET", &elf , note);
 				break;
 			case XEN_ELFNOTE_XEN_VERSION:
-				print_string_note("XEN_VERSION", note);
+				print_string_note("XEN_VERSION", &elf , note);
 				break;
 			case XEN_ELFNOTE_GUEST_OS:
-				print_string_note("GUEST_OS", note);
+				print_string_note("GUEST_OS", &elf , note);
 				break;
 			case XEN_ELFNOTE_GUEST_VERSION:
-				print_string_note("GUEST_VERSION", note);
+				print_string_note("GUEST_VERSION", &elf , note);
 				break;
 			case XEN_ELFNOTE_LOADER:
-				print_string_note("LOADER", note);
+				print_string_note("LOADER", &elf , note);
 				break;
 			case XEN_ELFNOTE_PAE_MODE:
-				print_string_note("PAE_MODE", note);
+				print_string_note("PAE_MODE", &elf , note);
 				break;
 			case XEN_ELFNOTE_FEATURES:
-				print_string_note("FEATURES", note);
+				print_string_note("FEATURES", &elf , note);
 				break;
 			default:
-				printf("unknown note type %#lx\n",
-				       (unsigned long)note->n_type);
+				printf("unknown note type %#x\n",
+				       (int)elf_uval(&elf, note, type));
 				break;
 			}
 		}
 	}
 
-	for ( h=0; h < ehdr_shnum(image); h++)
-	{
-		const char *name = shdr_name(image,h);
-
-		if ( name == NULL )
-			continue;
-		if ( strcmp(name, "__xen_guest") != 0 )
-			continue;
-
-		printf("__xen_guest: %s\n", (const char *)shdr_start(image, h));
-		break;
-	}
+	shdr = elf_shdr_by_name(&elf, "__xen_guest");
+	if (shdr)
+		printf("__xen_guest: %s\n", (char*)elf_section_start(&elf, shdr));
 
 	return 0;
 }

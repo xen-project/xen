@@ -21,6 +21,8 @@
 #include <asm/bug.h>
 
 #ifdef __x86_64__
+#include <asm/proto.h>
+
 int iommu_merge __read_mostly = 0;
 EXPORT_SYMBOL(iommu_merge);
 
@@ -32,10 +34,28 @@ EXPORT_SYMBOL(bad_dma_address);
 int iommu_bio_merge __read_mostly = 0;
 EXPORT_SYMBOL(iommu_bio_merge);
 
+int force_iommu __read_mostly= 0;
+
 __init int iommu_setup(char *p)
 {
     return 1;
 }
+
+void __init pci_iommu_alloc(void)
+{
+#ifdef CONFIG_SWIOTLB
+	pci_swiotlb_init();
+#endif
+}
+
+static int __init pci_iommu_init(void)
+{
+	no_iommu_init();
+	return 0;
+}
+
+/* Must execute after PCI subsystem */
+fs_initcall(pci_iommu_init);
 #endif
 
 struct dma_coherent_mem {
@@ -94,13 +114,7 @@ dma_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 }
 EXPORT_SYMBOL(dma_unmap_sg);
 
-/*
- * XXX This file is also used by xenLinux/ia64. 
- * "defined(__i386__) || defined (__x86_64__)" means "!defined(__ia64__)".
- * This #if work around should be removed once this file is merbed back into
- * i386' pci-dma or is moved to drivers/xen/core.
- */
-#if defined(__i386__) || defined(__x86_64__)
+#ifdef CONFIG_HIGHMEM
 dma_addr_t
 dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	     size_t size, enum dma_data_direction direction)
@@ -130,7 +144,7 @@ dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 		swiotlb_unmap_page(dev, dma_address, size, direction);
 }
 EXPORT_SYMBOL(dma_unmap_page);
-#endif /* defined(__i386__) || defined(__x86_64__) */
+#endif /* CONFIG_HIGHMEM */
 
 int
 dma_mapping_error(dma_addr_t dma_addr)
@@ -161,6 +175,8 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
 	unsigned int order = get_order(size);
 	unsigned long vstart;
+	u64 mask;
+
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
@@ -183,9 +199,14 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	vstart = __get_free_pages(gfp, order);
 	ret = (void *)vstart;
 
+	if (dev != NULL && dev->coherent_dma_mask)
+		mask = dev->coherent_dma_mask;
+	else
+		mask = 0xffffffff;
+
 	if (ret != NULL) {
 		if (xen_create_contiguous_region(vstart, order,
-						 dma_bits) != 0) {
+						 fls64(mask)) != 0) {
 			free_pages(vstart, order);
 			return NULL;
 		}

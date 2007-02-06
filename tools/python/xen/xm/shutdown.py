@@ -118,6 +118,7 @@ def main_dom(opts, args):
     
 def main(argv):
     opts = gopts
+    opts.reset()
     args = opts.parse(argv)
     if opts.vals.help:
         return

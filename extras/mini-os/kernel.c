@@ -37,6 +37,7 @@
 #include <sched.h>
 #include <xenbus.h>
 #include <gnttab.h>
+#include <netfront.h>
 #include <xen/features.h>
 #include <xen/version.h>
 
@@ -61,13 +62,13 @@ void setup_xen_features(void)
 
 void test_xenbus(void);
 
-void xenbus_tester(void *p)
+static void xenbus_tester(void *p)
 {
     printk("Xenbus tests disabled, because of a Xend bug.\n");
     /* test_xenbus(); */
 }
 
-void periodic_thread(void *p)
+static void periodic_thread(void *p)
 {
     struct timeval tv;
     printk("Periodic thread started.\n");
@@ -79,12 +80,18 @@ void periodic_thread(void *p)
     }
 }
 
+static void netfront_thread(void *p)
+{
+    init_netfront(&start_info);
+}
+
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
 {
     printk("Dummy main: start_info=%p\n", si);
     create_thread("xenbus_tester", xenbus_tester, si);
     create_thread("periodic_thread", periodic_thread, si);
+    create_thread("netfront", netfront_thread, si);
     return 0;
 }
 

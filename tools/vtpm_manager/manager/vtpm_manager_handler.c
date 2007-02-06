@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #include "vtpm_manager.h"
 #include "vtpmpriv.h"
@@ -105,7 +106,7 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
       for (i=0; i<size_read; i++) 
 	vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cmd_header[i]);
     } else {
-      vtpmhandlerlogerror(VTPM_LOG_VTPM, "%s can't read from ipc. Aborting... \n", thread_name);
+      vtpmhandlerlogerror(VTPM_LOG_VTPM, "%s can't read from ipc. Errono = %d. Aborting... \n", thread_name, errno);
       goto abort_command;
     }
 

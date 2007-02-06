@@ -28,7 +28,6 @@
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
-#include <linux/config.h>
 #include <linux/utsname.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
@@ -38,7 +37,6 @@
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
 #include <linux/random.h>
-#include <linux/kprobes.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -101,18 +99,34 @@ void enable_hlt(void)
 
 EXPORT_SYMBOL(enable_hlt);
 
-/* XXX XEN doesn't use default_idle(), poll_idle(). Use xen_idle() instead. */
-void xen_idle(void)
+/*
+ * On SMP it's slightly faster (but much more power-consuming!)
+ * to poll the ->work.need_resched flag instead of waiting for the
+ * cross-CPU IPI to arrive. Use this option with caution.
+ */
+static void poll_idle(void)
+{
+	local_irq_enable();
+
+	asm volatile(
+		"2:"
+		"testl %0, %1;"
+		"rep; nop;"
+		"je 2b;"
+		: : "i"(_TIF_NEED_RESCHED), "m" (current_thread_info()->flags));
+}
+
+static void xen_idle(void)
 {
 	local_irq_disable();
 
 	if (need_resched())
 		local_irq_enable();
 	else {
-		clear_thread_flag(TIF_POLLING_NRFLAG);
+		current_thread_info()->status &= ~TS_POLLING;
 		smp_mb__after_clear_bit();
 		safe_halt();
-		set_thread_flag(TIF_POLLING_NRFLAG);
+		current_thread_info()->status |= TS_POLLING;
 	}
 }
 #ifdef CONFIG_APM_MODULE
@@ -147,22 +161,27 @@ void cpu_idle(void)
 {
 	int cpu = smp_processor_id();
 
-	set_thread_flag(TIF_POLLING_NRFLAG);
+	current_thread_info()->status |= TS_POLLING;
 
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
+			void (*idle)(void);
 
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
 
 			rmb();
+			idle = pm_idle;
+
+			if (!idle)
+				idle = xen_idle;
 
 			if (cpu_is_offline(cpu))
 				play_dead();
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
-			xen_idle();
+			idle();
 		}
 		preempt_enable_no_resched();
 		schedule();
@@ -198,9 +217,22 @@ void cpu_idle_wait(void)
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
-/* XXX XEN doesn't use mwait_idle(), select_idle_routine(), idle_setup(). */
-/* Always use xen_idle() instead. */
-void __devinit select_idle_routine(const struct cpuinfo_x86 *c) {}
+void __devinit select_idle_routine(const struct cpuinfo_x86 *c)
+{
+}
+
+static int __init idle_setup (char *str)
+{
+	if (!strncmp(str, "poll", 4)) {
+		printk("using polling idle threads.\n");
+		pm_idle = poll_idle;
+	}
+
+	boot_option_idle_override = 1;
+	return 1;
+}
+
+__setup("idle=", idle_setup);
 
 void show_regs(struct pt_regs * regs)
 {
@@ -211,7 +243,7 @@ void show_regs(struct pt_regs * regs)
 	printk("EIP: %04x:[<%08lx>] CPU: %d\n",0xffff & regs->xcs,regs->eip, smp_processor_id());
 	print_symbol("EIP is at %s\n", regs->eip);
 
-	if (user_mode(regs))
+	if (user_mode_vm(regs))
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
 	printk(" EFLAGS: %08lx    %s  (%s %.*s)\n",
 	       regs->eflags, print_tainted(), system_utsname.release,
@@ -229,7 +261,7 @@ void show_regs(struct pt_regs * regs)
 	cr3 = read_cr3();
 	cr4 = read_cr4_safe();
 	printk("CR0: %08lx CR2: %08lx CR3: %08lx CR4: %08lx\n", cr0, cr2, cr3, cr4);
-	show_trace(NULL, &regs->esp);
+	show_trace(NULL, regs, &regs->esp);
 }
 
 /*
@@ -277,22 +309,15 @@ EXPORT_SYMBOL(kernel_thread);
  */
 void exit_thread(void)
 {
-	struct task_struct *tsk = current;
-	struct thread_struct *t = &tsk->thread;
-
-	/*
-	 * Remove function-return probe instances associated with this task
-	 * and put them back on the free list. Do not insert an exit probe for
-	 * this function, it will be disabled by kprobe_flush_task if you do.
-	 */
-	kprobe_flush_task(tsk);
-
 	/* The process may have allocated an io port bitmap... nuke it. */
-	if (unlikely(NULL != t->io_bitmap_ptr)) {
+	if (unlikely(test_thread_flag(TIF_IO_BITMAP))) {
+		struct task_struct *tsk = current;
+		struct thread_struct *t = &tsk->thread;
 		struct physdev_set_iobitmap set_iobitmap = { 0 };
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
+		clear_thread_flag(TIF_IO_BITMAP);
 	}
 }
 
@@ -302,6 +327,7 @@ void flush_thread(void)
 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
+	clear_tsk_thread_flag(tsk, TIF_DEBUG);
 	/*
 	 * Forget coprocessor state..
 	 */
@@ -346,7 +372,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	savesegment(gs,p->thread.gs);
 
 	tsk = current;
-	if (unlikely(NULL != tsk->thread.io_bitmap_ptr)) {
+	if (unlikely(test_tsk_thread_flag(tsk, TIF_IO_BITMAP))) {
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!p->thread.io_bitmap_ptr) {
 			p->thread.io_bitmap_max = 0;
@@ -354,6 +380,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		}
 		memcpy(p->thread.io_bitmap_ptr, tsk->thread.io_bitmap_ptr,
 			IO_BITMAP_BYTES);
+		set_tsk_thread_flag(p, TIF_IO_BITMAP);
 	}
 
 	/*
@@ -448,6 +475,23 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	elf_core_copy_regs(regs, &ptregs);
 
 	return 1;
+}
+
+static noinline void __switch_to_xtra(struct task_struct *next_p)
+{
+	struct thread_struct *next;
+
+	next = &next_p->thread;
+
+	if (test_tsk_thread_flag(next_p, TIF_DEBUG)) {
+		set_debugreg(next->debugreg[0], 0);
+		set_debugreg(next->debugreg[1], 1);
+		set_debugreg(next->debugreg[2], 2);
+		set_debugreg(next->debugreg[3], 3);
+		/* no 4 and 5 */
+		set_debugreg(next->debugreg[6], 6);
+		set_debugreg(next->debugreg[7], 7);
+	}
 }
 
 /*
@@ -591,17 +635,10 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		loadsegment(gs, next->gs);
 
 	/*
-	 * Now maybe reload the debug registers
+	 * Now maybe handle debug registers
 	 */
-	if (unlikely(next->debugreg[7])) {
-		set_debugreg(next->debugreg[0], 0);
-		set_debugreg(next->debugreg[1], 1);
-		set_debugreg(next->debugreg[2], 2);
-		set_debugreg(next->debugreg[3], 3);
-		/* no 4 and 5 */
-		set_debugreg(next->debugreg[6], 6);
-		set_debugreg(next->debugreg[7], 7);
-	}
+	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW))
+		__switch_to_xtra(next_p);
 
 	disable_tsc(prev_p, next_p);
 
@@ -697,7 +734,6 @@ unsigned long get_wchan(struct task_struct *p)
 	} while (count++ < 16);
 	return 0;
 }
-EXPORT_SYMBOL(get_wchan);
 
 /*
  * sys_alloc_thread_area: get a yet unused TLS descriptor index.

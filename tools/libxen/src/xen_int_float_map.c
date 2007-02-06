@@ -25,8 +25,10 @@
 xen_int_float_map *
 xen_int_float_map_alloc(size_t size)
 {
-    return calloc(1, sizeof(xen_int_float_map) +
-                  size * sizeof(struct xen_int_float_map_contents));
+    xen_int_float_map *result = calloc(1, sizeof(xen_int_float_map) +
+                                       size * sizeof(struct xen_int_float_map_contents));
+    result->size = size;
+    return result;
 }
 
 

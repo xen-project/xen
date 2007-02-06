@@ -250,7 +250,8 @@ class OptVar(Opt):
 class OptVals:
     """Class to hold option values.
     """
-    pass
+    def __init__(self):
+        self.quiet = False
 
 class Opts:
     """Container for options.
@@ -276,7 +277,6 @@ class Opts:
         self.argv = []
         # Option values.
         self.vals = OptVals()
-        self.vals.quiet = 0
         # Variables for default scripts.
         self.vars = {}
         # Option to use for bare words.
@@ -559,14 +559,6 @@ def set_bool(opt, k, v):
     else:
         opt.opts.err('Invalid value:' +v)
         
-def set_u32(opt, k, v):
-    """Set an option to an u32 value."""
-    try:
-        v = u32(v)
-    except:
-        opt.opts.err('Invalid value: ' + str(v))
-    opt.set(v)
-
 def set_value(opt, k, v):
     """Set an option to a value."""
     opt.set(v)
@@ -575,6 +567,14 @@ def set_int(opt, k, v):
     """Set an option to an integer value."""
     try:
         v = int(v)
+    except:
+        opt.opts.err('Invalid value: ' + str(v))
+    opt.set(v)
+
+def set_long(opt, k, v):
+    """Set an option to a long integer value."""
+    try:
+        v = long(v)
     except:
         opt.opts.err('Invalid value: ' + str(v))
     opt.set(v)

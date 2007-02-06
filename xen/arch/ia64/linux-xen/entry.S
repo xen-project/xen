@@ -676,7 +676,9 @@ GLOBAL_ENTRY(ia64_ret_from_syscall)
 	cmp.ge p6,p7=r8,r0			// syscall executed successfully?
 	adds r2=PT(R8)+16,sp			// r2 = &pt_regs.r8
 	mov r10=r0				// clear error indication in r10
+#ifndef XEN    
 (p7)	br.cond.spnt handle_syscall_error	// handle potential syscall failure
+#endif
 END(ia64_ret_from_syscall)
 	// fall through
 /*
@@ -764,7 +766,9 @@ ENTRY(ia64_leave_syscall)
 	ld8 r19=[r2],PT(B6)-PT(LOADRS)		// load ar.rsc value for "loadrs"
 	nop.i 0
 	;;
+#ifndef XEN    
 	mov r16=ar.bsp				// M2  get existing backing store pointer
+#endif    
 	ld8 r18=[r2],PT(R9)-PT(B6)		// load b6
 #ifndef XEN
 (p6)	and r15=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
@@ -814,7 +818,11 @@ ENTRY(ia64_leave_syscall)
 	mov f8=f0				// F    clear f8
 	;;
 	ld8.fill r12=[r2]			// M0|1 restore r12 (sp)
+#ifdef XEN    
+	ld8.fill r2=[r3]			// M0|1
+#else    
 	ld8.fill r15=[r3]			// M0|1 restore r15
+#endif    
 	mov b6=r18				// I0   restore b6
 
 #ifdef XEN
@@ -827,7 +835,9 @@ ENTRY(ia64_leave_syscall)
 
 	srlz.d				// M0   ensure interruption collection is off (for cover)
 	shr.u r18=r19,16		// I0|1 get byte size of existing "dirty" partition
+#ifndef XEN    
 	cover				// B    add current frame into dirty partition & set cr.ifs
+#endif    
 	;;
 (pUStk) ld4 r17=[r17]			// M0|1 r17 = cpu_data->phys_stacked_size_p8
 	mov r19=ar.bsp			// M2   get new backing store pointer
@@ -893,23 +903,18 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 .work_processed_kernel:
 #ifdef XEN
 	;;
-(pUStk) ssm psr.i
-(pUStk)    br.call.sptk.many b0=do_softirq
-(pUStk) rsm psr.i
-    ;;
-	alloc loc0=ar.pfs,0,1,1,0
-	adds out0=16,r12
+(pUStk)	ssm psr.i
+(pUStk)	br.call.sptk.many b0=do_softirq
+(pUStk)	ssm psr.i
+	;;
+(pUStk)	br.call.sptk.many b0=reflect_event
+	;;
 	adds r7 = PT(EML_UNAT)+16,r12
 	;;
 	ld8 r7 = [r7]
 	;;
-(pUStk)	br.call.sptk.many b0=reflect_event
-//(pUStk)	br.call.sptk.many b0=deliver_pending_interrupt
-    ;;
-	mov ar.pfs=loc0
 	mov ar.unat=r7  /* load eml_unat  */
 	mov r31=r0
-
 
 #else
 	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
@@ -1184,8 +1189,11 @@ skip_rbs_switch:
 	mov cr.ipsr=r29		// M2
 	mov ar.pfs=r26		// I0
 (pLvSys)mov r17=r0		// A  clear r17 for leave_syscall, no-op otherwise
-
+#ifdef XEN
+	mov cr.ifs=r30		// M2
+#else    
 (p9)	mov cr.ifs=r30		// M2
+#endif
 	mov b0=r21		// I0
 (pLvSys)mov r18=r0		// A  clear r18 for leave_syscall, no-op otherwise
 
@@ -1195,7 +1203,11 @@ skip_rbs_switch:
 	;;
 (pUStk)	mov ar.rnat=r24		// M2 must happen with RSE in lazy mode
 	nop 0
+#ifdef XEN    
+(pLvSys)mov r15=r0
+#else
 (pLvSys)mov r2=r0
+#endif
 
 	mov ar.rsc=r27		// M2
 	mov pr=r31,-1		// I0
@@ -1459,7 +1471,89 @@ GLOBAL_ENTRY(unw_init_running)
 	br.ret.sptk.many rp
 END(unw_init_running)
 
-#ifndef XEN
+#ifdef XEN
+GLOBAL_ENTRY(ia64_do_multicall_call)
+	movl r2=ia64_hypercall_table;;
+	shladd r2=r38,3,r2;;
+	ld8 r2=[r2];;
+	mov b6=r2
+	br.sptk.many b6;;
+END(ia64_do_multicall_call)
+
+    
+	.rodata
+	.align 8
+	.globl ia64_hypercall_table
+ia64_hypercall_table:
+	data8 do_ni_hypercall		/* do_set_trap_table *//*  0 */
+	data8 do_ni_hypercall		/* do_mmu_update */
+	data8 do_ni_hypercall		/* do_set_gdt */
+	data8 do_ni_hypercall		/* do_stack_switch */
+	data8 do_ni_hypercall		/* do_set_callbacks */
+	data8 do_ni_hypercall		/* do_fpu_taskswitch *//*  5 */
+	data8 do_sched_op_compat
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall		/* do_set_debugreg */
+	data8 do_ni_hypercall		/* do_get_debugreg */
+	data8 do_ni_hypercall		/* do_update_descriptor * 10 */
+	data8 do_ni_hypercall		/* do_ni_hypercall */
+	data8 do_memory_op
+	data8 do_multicall
+	data8 do_ni_hypercall		/* do_update_va_mapping */
+	data8 do_ni_hypercall		/* do_set_timer_op */  /* 15 */
+	data8 do_ni_hypercall
+	data8 do_xen_version
+	data8 do_console_io
+	data8 do_ni_hypercall
+	data8 do_grant_table_op				       /* 20 */
+	data8 do_ni_hypercall		/* do_vm_assist */
+	data8 do_ni_hypercall		/* do_update_va_mapping_othe */
+	data8 do_ni_hypercall		/* (x86 only) */
+	data8 do_ni_hypercall		/* do_vcpu_op */
+	data8 do_ni_hypercall		/* (x86_64 only) */    /* 25 */
+	data8 do_ni_hypercall		/* do_mmuext_op */
+	data8 do_ni_hypercall		/* do_acm_op */
+	data8 do_ni_hypercall		/* do_nmi_op */
+	data8 do_sched_op
+	data8 do_callback_op		/*  */                 /* 30 */
+	data8 do_xenoprof_op		/*  */
+	data8 do_event_channel_op
+	data8 do_physdev_op
+	data8 do_hvm_op			/*  */
+	data8 do_sysctl			/*  */                  /* 35 */
+	data8 do_domctl			/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */                 /* 40 */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */                 /* 45 */
+	data8 do_ni_hypercall		/*  */
+	data8 do_ni_hypercall		/*  */
+	data8 do_dom0vp_op              /* dom0vp_op */
+	data8 do_pirq_guest_eoi		/* arch_1 */
+	data8 do_ni_hypercall		/* arch_2 */           /* 50 */
+	data8 do_ni_hypercall		/* arch_3 */
+	data8 do_ni_hypercall		/* arch_4 */
+	data8 do_ni_hypercall		/* arch_5 */
+	data8 do_ni_hypercall		/* arch_6 */
+	data8 do_ni_hypercall		/* arch_7 */           /* 55 */
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall                                  /* 60 */
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall
+	data8 do_ni_hypercall
+
+	// guard against failures to increase NR_hypercalls
+	.org ia64_hypercall_table + 8*NR_hypercalls
+
+#else
 	.rodata
 	.align 8
 	.globl sys_call_table

@@ -998,9 +998,11 @@ int main(int argc, char **argv)
 
 	while ((opt = getopt_long(argc, argv, sopts, lopts, &optind)) != -1) {
 		switch (opt) {
-		case 'h':
-		case '?':
 		default:
+			usage(argv[0]);
+			exit(1);
+		case '?':
+		case 'h':
 			usage(argv[0]);
 			exit(0);
 		case 'V':
@@ -1067,9 +1069,9 @@ int main(int argc, char **argv)
 				gettimeofday(&curtime, NULL);
 				top();
 				oldtime = curtime;
-				sleep(delay);
 				if ((!loop) && !(--iterations))
 					break;
+				sleep(delay);
 			} while (1);
 	}
 

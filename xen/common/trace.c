@@ -32,13 +32,29 @@
 #include <asm/atomic.h>
 #include <public/sysctl.h>
 
+#ifdef CONFIG_COMPAT
+#include <compat/trace.h>
+#define xen_t_buf t_buf
+CHECK_t_buf;
+#undef xen_t_buf
+#define TB_COMPAT IS_COMPAT(dom0)
+#else
+#define compat_t_rec t_rec
+#define TB_COMPAT 0
+#endif
+
+typedef union {
+	struct t_rec *nat;
+	struct compat_t_rec *cmp;
+} t_rec_u;
+
 /* opt_tbuf_size: trace buffer size (in pages) */
 static unsigned int opt_tbuf_size = 0;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
 static DEFINE_PER_CPU(struct t_buf *, t_bufs);
-static DEFINE_PER_CPU(struct t_rec *, t_recs);
+static DEFINE_PER_CPU(t_rec_u, t_recs);
 static int nr_recs;
 
 /* High water mark for trace buffers; */
@@ -87,7 +103,7 @@ static int alloc_trace_bufs(void)
     nr_pages = num_online_cpus() * opt_tbuf_size;
     order    = get_order_from_pages(nr_pages);
     nr_recs  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf)) /
-        sizeof(struct t_rec);
+        (!TB_COMPAT ? sizeof(struct t_rec) : sizeof(struct compat_t_rec));
     
     if ( (rawbuf = alloc_xenheap_pages(order)) == NULL )
     {
@@ -106,7 +122,7 @@ static int alloc_trace_bufs(void)
         buf = per_cpu(t_bufs, i) = (struct t_buf *)
             &rawbuf[i*opt_tbuf_size*PAGE_SIZE];
         buf->cons = buf->prod = 0;
-        per_cpu(t_recs, i) = (struct t_rec *)(buf + 1);
+        per_cpu(t_recs, i).nat = (struct t_rec *)(buf + 1);
     }
 
     t_buf_highwater = nr_recs >> 1; /* 50% high water */
@@ -232,7 +248,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
            unsigned long d3, unsigned long d4, unsigned long d5)
 {
     struct t_buf *buf;
-    struct t_rec *rec;
+    t_rec_u rec;
     unsigned long flags;
     
     BUG_ON(!tb_init_done);
@@ -269,25 +285,51 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
 
     if ( unlikely(this_cpu(lost_records) != 0) )
     {
-        rec = &this_cpu(t_recs)[buf->prod % nr_recs];
-        memset(rec, 0, sizeof(*rec));
-        rec->cycles  = (u64)get_cycles();
-        rec->event   = TRC_LOST_RECORDS;
-        rec->data[0] = this_cpu(lost_records);
-        this_cpu(lost_records) = 0;
+        if ( !TB_COMPAT )
+        {
+            rec.nat = &this_cpu(t_recs).nat[buf->prod % nr_recs];
+            memset(rec.nat, 0, sizeof(*rec.nat));
+            rec.nat->cycles  = (u64)get_cycles();
+            rec.nat->event   = TRC_LOST_RECORDS;
+            rec.nat->data[0] = this_cpu(lost_records);
+            this_cpu(lost_records) = 0;
+        }
+        else
+        {
+            rec.cmp = &this_cpu(t_recs).cmp[buf->prod % nr_recs];
+            memset(rec.cmp, 0, sizeof(*rec.cmp));
+            rec.cmp->cycles  = (u64)get_cycles();
+            rec.cmp->event   = TRC_LOST_RECORDS;
+            rec.cmp->data[0] = this_cpu(lost_records);
+            this_cpu(lost_records) = 0;
+        }
 
         wmb();
         buf->prod++;
     }
 
-    rec = &this_cpu(t_recs)[buf->prod % nr_recs];
-    rec->cycles  = (u64)get_cycles();
-    rec->event   = event;
-    rec->data[0] = d1;
-    rec->data[1] = d2;
-    rec->data[2] = d3;
-    rec->data[3] = d4;
-    rec->data[4] = d5;
+    if ( !TB_COMPAT )
+    {
+        rec.nat = &this_cpu(t_recs).nat[buf->prod % nr_recs];
+        rec.nat->cycles  = (u64)get_cycles();
+        rec.nat->event   = event;
+        rec.nat->data[0] = d1;
+        rec.nat->data[1] = d2;
+        rec.nat->data[2] = d3;
+        rec.nat->data[3] = d4;
+        rec.nat->data[4] = d5;
+    }
+    else
+    {
+        rec.cmp = &this_cpu(t_recs).cmp[buf->prod % nr_recs];
+        rec.cmp->cycles  = (u64)get_cycles();
+        rec.cmp->event   = event;
+        rec.cmp->data[0] = d1;
+        rec.cmp->data[1] = d2;
+        rec.cmp->data[2] = d3;
+        rec.cmp->data[3] = d4;
+        rec.cmp->data[4] = d5;
+    }
 
     wmb();
     buf->prod++;

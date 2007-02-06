@@ -29,24 +29,8 @@
 #include <xen/timer.h>
 #include <xen/list.h>
 #include <asm/hvm/vpic.h>
+#include <public/hvm/save.h>
 
-
-#define HPET_TIMER_NUM     3    /* 3 timers supported now */
-struct HPET {
-    uint64_t capability;        /* capabilities */
-    uint64_t res0;              /* reserved */
-    uint64_t config;            /* configuration */
-    uint64_t res1;              /* reserved */
-    uint64_t isr;               /* interrupt status reg */
-    uint64_t res2[25];          /* reserved */
-    uint64_t mc64;              /* main counter */
-    uint64_t res3;              /* reserved */
-    struct {                    /* timers */
-        uint64_t config;        /* configuration/cap */
-        uint64_t cmp;           /* comparator */
-        uint64_t hpet_fsb[2];   /* FSB route, not supported now */
-    } timers[HPET_TIMER_NUM];
-};
 
 struct HPETState;
 struct HPET_timer_fn_info {
@@ -55,11 +39,10 @@ struct HPET_timer_fn_info {
 };
 
 typedef struct HPETState {
-    struct HPET     hpet;
-    struct vcpu     *vcpu;
-    uint64_t        tsc_freq;
-    uint64_t        mc_offset;
-    uint64_t        period[HPET_TIMER_NUM];
+    struct hvm_hw_hpet hpet;
+    struct vcpu *vcpu;
+    uint64_t tsc_freq;
+    uint64_t mc_offset;
     struct timer timers[HPET_TIMER_NUM];
     struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 
 } HPETState;
@@ -83,42 +66,27 @@ struct periodic_time {
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
     struct timer timer;         /* ac_timer */
     time_cb *cb;
-    void *priv;                 /* ponit back to platform time source */
+    void *priv;                 /* point back to platform time source */
 };
 
 
 #define PIT_FREQ 1193181
 #define PIT_BASE 0x40
 
-typedef struct PITChannelState {
-    int count; /* can be 65536 */
-    u16 latched_count;
-    u8 count_latched;
-    u8 status_latched;
-    u8 status;
-    u8 read_state;
-    u8 write_state;
-    u8 write_latch;
-    u8 rw_mode;
-    u8 mode;
-    u8 bcd; /* not supported */
-    u8 gate; /* timer start */
-    s64 count_load_time;
-    /* irq handling */
-    struct periodic_time pt;
-} PITChannelState;
-
 typedef struct PITState {
-    PITChannelState channels[3];
-    int speaker_data_on;
+    /* Hardware state */
+    struct hvm_hw_pit hw;
+    /* Last time the counters read zero, for calcuating counter reads */
+    int64_t count_load_time[3];
+    /* irq handling */
+    struct periodic_time pt[3];
 } PITState;
 
-#define RTC_SIZE 14
 typedef struct RTCState {
-    uint8_t cmos_data[RTC_SIZE];  /* Only handle time/interrupt part in HV */
-    uint8_t cmos_index;
+    /* Hardware state */
+    struct hvm_hw_rtc hw;
+    /* RTC's idea of the current time */
     struct tm current_tm;
-    int irq;
     /* second update */
     int64_t next_second_time;
     struct timer second_timer;
@@ -152,7 +120,7 @@ void pt_update_irq(struct vcpu *v);
 struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type);
 void pt_intr_post(struct vcpu *v, int vector, int type);
 void pt_reset(struct vcpu *v);
-void create_periodic_time(struct periodic_time *pt, uint64_t period,
+void create_periodic_time(struct vcpu *v, struct periodic_time *pt, uint64_t period,
                           uint8_t irq, char one_shot, time_cb *cb, void *data);
 void destroy_periodic_time(struct periodic_time *pt);
 
@@ -161,7 +129,7 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void pit_stop_channel0_irq(PITState * pit);
 void pit_migrate_timers(struct vcpu *v);
 void pit_deinit(struct domain *d);
-void rtc_init(struct vcpu *v, int base, int irq);
+void rtc_init(struct vcpu *v, int base);
 void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
 int is_rtc_periodic_irq(void *opaque);

@@ -11,142 +11,50 @@
 #include <xs.h>
 #include "xenfb.h"
 
-static int xk2linux[0x10000] = {
-	[XK_a] = KEY_A,
-	[XK_b] = KEY_B,
-	[XK_c] = KEY_C,
-	[XK_d] = KEY_D,
-	[XK_e] = KEY_E,
-	[XK_f] = KEY_F,
-	[XK_g] = KEY_G,
-	[XK_h] = KEY_H,
-	[XK_i] = KEY_I,
-	[XK_j] = KEY_J,
-	[XK_k] = KEY_K,
-	[XK_l] = KEY_L,
-	[XK_m] = KEY_M,
-	[XK_n] = KEY_N,
-	[XK_o] = KEY_O,
-	[XK_p] = KEY_P,
-	[XK_q] = KEY_Q,
-	[XK_r] = KEY_R,
-	[XK_s] = KEY_S,
-	[XK_t] = KEY_T,
-	[XK_u] = KEY_U,
-	[XK_v] = KEY_V,
-	[XK_w] = KEY_W,
-	[XK_x] = KEY_X,
-	[XK_y] = KEY_Y,
-	[XK_z] = KEY_Z,
-	[XK_A] = KEY_A,
-	[XK_B] = KEY_B,
-	[XK_C] = KEY_C,
-	[XK_D] = KEY_D,
-	[XK_E] = KEY_E,
-	[XK_F] = KEY_F,
-	[XK_G] = KEY_G,
-	[XK_H] = KEY_H,
-	[XK_I] = KEY_I,
-	[XK_J] = KEY_J,
-	[XK_K] = KEY_K,
-	[XK_L] = KEY_L,
-	[XK_M] = KEY_M,
-	[XK_N] = KEY_N,
-	[XK_O] = KEY_O,
-	[XK_P] = KEY_P,
-	[XK_Q] = KEY_Q,
-	[XK_R] = KEY_R,
-	[XK_S] = KEY_S,
-	[XK_T] = KEY_T,
-	[XK_U] = KEY_U,
-	[XK_V] = KEY_V,
-	[XK_W] = KEY_W,
-	[XK_X] = KEY_X,
-	[XK_Y] = KEY_Y,
-	[XK_Z] = KEY_Z,
-	[XK_0] = KEY_0,
-	[XK_1] = KEY_1,
-	[XK_2] = KEY_2,
-	[XK_3] = KEY_3,
-	[XK_4] = KEY_4,
-	[XK_5] = KEY_5,
-	[XK_6] = KEY_6,
-	[XK_7] = KEY_7,
-	[XK_8] = KEY_8,
-	[XK_9] = KEY_9,
-	[XK_Return] = KEY_ENTER,
-	[XK_BackSpace] = KEY_BACKSPACE,
-	[XK_Tab] = KEY_TAB,
-	[XK_Pause] = KEY_PAUSE,
-	[XK_Delete] = KEY_DELETE,
-	[XK_slash] = KEY_SLASH,
-	[XK_minus] = KEY_MINUS,
-	[XK_equal] = KEY_EQUAL,
-	[XK_Escape] = KEY_ESC,
-	[XK_braceleft] = KEY_LEFTBRACE,
-	[XK_braceright] = KEY_RIGHTBRACE,
-	[XK_bracketleft] = KEY_LEFTMETA,
-	[XK_bracketright] = KEY_RIGHTMETA,
-	[XK_Control_L] = KEY_LEFTCTRL,
-	[XK_Control_R] = KEY_RIGHTCTRL,
-	[XK_Shift_L] = KEY_LEFTSHIFT,
-	[XK_Shift_R] = KEY_RIGHTSHIFT,
-	[XK_Alt_L] = KEY_LEFTALT,
-	[XK_Alt_R] = KEY_RIGHTALT,
-	[XK_semicolon] = KEY_SEMICOLON, 
-	[XK_apostrophe] = KEY_APOSTROPHE,
-	[XK_grave] = KEY_GRAVE,
-	[XK_backslash] = KEY_BACKSLASH,
-	[XK_comma] = KEY_COMMA,
-	[XK_period] = KEY_DOT,
-	[XK_space] = KEY_SPACE,
-	[XK_Caps_Lock] = KEY_CAPSLOCK,
-	[XK_Num_Lock] = KEY_NUMLOCK,
-	[XK_Scroll_Lock] = KEY_SCROLLLOCK,
-	[XK_Sys_Req] = KEY_SYSRQ,
-	[XK_Linefeed] = KEY_LINEFEED,
-	[XK_Home] = KEY_HOME,
-	[XK_Pause] = KEY_PAUSE,
-	[XK_F1] = KEY_F1,
-	[XK_F2] = KEY_F2,
-	[XK_F3] = KEY_F3,
-	[XK_F4] = KEY_F4,
-	[XK_F5] = KEY_F5,
-	[XK_F6] = KEY_F6,
-	[XK_F7] = KEY_F7,
-	[XK_F8] = KEY_F8,
-	[XK_F9] = KEY_F9,
-	[XK_F10] = KEY_F10,
-	[XK_F11] = KEY_F11,
-	[XK_F12] = KEY_F12,
-	[XK_Up] = KEY_UP,
-	[XK_Page_Up] = KEY_PAGEUP,
-	[XK_Left] = KEY_LEFT,
-	[XK_Right] = KEY_RIGHT,
-	[XK_End] = KEY_END,
-	[XK_Down] = KEY_DOWN,
-	[XK_Page_Down] = KEY_PAGEDOWN,
-	[XK_Insert] = KEY_INSERT, 
-	[XK_colon] = KEY_SEMICOLON,
-	[XK_quotedbl] = KEY_APOSTROPHE,
-	[XK_less] = KEY_COMMA,
-	[XK_greater] = KEY_DOT,
-	[XK_question] = KEY_SLASH,
-	[XK_bar] = KEY_BACKSLASH,
-	[XK_asciitilde] = KEY_GRAVE,
-	[XK_exclam] = KEY_1,
-	[XK_at] = KEY_2,
-	[XK_numbersign] = KEY_3,
-	[XK_dollar] = KEY_4,
-	[XK_percent] = KEY_5,
-	[XK_asciicircum] = KEY_6,
-	[XK_ampersand] = KEY_7,
-	[XK_asterisk] = KEY_8,
-	[XK_parenleft] = KEY_9,
-	[XK_parenright] = KEY_0,
-	[XK_underscore] = KEY_MINUS,
-	[XK_plus] = KEY_EQUAL,
+/* Grab key translation support routines from qemu directory. */
+#define qemu_mallocz(size) calloc(1, (size))
+static const char *bios_dir = "/usr/share/xen/qemu";
+#include "vnc_keysym.h"
+#include "keymaps.c"
+
+static unsigned char atkbd_set2_keycode[512] = {
+
+	  0, 67, 65, 63, 61, 59, 60, 88,  0, 68, 66, 64, 62, 15, 41,117,
+	  0, 56, 42, 93, 29, 16,  2,  0,  0,  0, 44, 31, 30, 17,  3,  0,
+	  0, 46, 45, 32, 18,  5,  4, 95,  0, 57, 47, 33, 20, 19,  6,183,
+	  0, 49, 48, 35, 34, 21,  7,184,  0,  0, 50, 36, 22,  8,  9,185,
+	  0, 51, 37, 23, 24, 11, 10,  0,  0, 52, 53, 38, 39, 25, 12,  0,
+	  0, 89, 40,  0, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0, 85,
+	  0, 86, 91, 90, 92,  0, 14, 94,  0, 79,124, 75, 71,121,  0,  0,
+	 82, 83, 80, 76, 77, 72,  1, 69, 87, 78, 81, 74, 55, 73, 70, 99,
+
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+	217,100,255,  0, 97,165,  0,  0,156,  0,  0,  0,  0,  0,  0,125,
+	173,114,  0,113,  0,  0,  0,126,128,  0,  0,140,  0,  0,  0,127,
+	159,  0,115,  0,164,  0,  0,116,158,  0,150,166,  0,  0,  0,142,
+	157,  0,  0,  0,  0,  0,  0,  0,155,  0, 98,  0,  0,163,  0,  0,
+	226,  0,  0,  0,  0,  0,  0,  0,  0,255, 96,  0,  0,  0,143,  0,
+	  0,  0,  0,  0,  0,  0,  0,  0,  0,107,  0,105,102,  0,  0,112,
+	110,111,108,112,106,103,  0,119,  0,118,109,  0, 99,104,119,  0,
+
 };
+
+static unsigned char atkbd_unxlate_table[128] = {
+
+	  0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
+	 21, 29, 36, 45, 44, 53, 60, 67, 68, 77, 84, 91, 90, 20, 28, 27,
+	 35, 43, 52, 51, 59, 66, 75, 76, 82, 14, 18, 93, 26, 34, 33, 42,
+	 50, 49, 58, 65, 73, 74, 89,124, 17, 41, 88,  5,  6,  4, 12,  3,
+	 11,  2, 10,  1,  9,119,126,108,117,125,123,107,115,116,121,105,
+	114,122,112,113,127, 96, 97,120,  7, 15, 23, 31, 39, 47, 55, 63,
+	 71, 79, 86, 94,  8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 87,111,
+	 19, 25, 57, 81, 83, 92, 95, 98, 99,100,101,103,104,106,109,110
+
+};
+
+unsigned char keycode_table[512];
+
+static void *kbd_layout;
 
 static int btnmap[] = {
 	BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_FORWARD, BTN_BACK
@@ -165,13 +73,16 @@ static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
 	 */
 	rfbScreenInfoPtr server = cl->screen;
 	struct xenfb *xenfb = server->screenData;
-	if (keycode >= sizeof(xk2linux) / sizeof(*xk2linux))
+
+	if( keycode >= 'A' && keycode <= 'Z' )
+		keycode += 'a' - 'A';
+
+	int scancode = keycode_table[keysym2scancode(kbd_layout, keycode)];
+	if (scancode == 0)
 		return;
-	if (xk2linux[keycode] == 0)
-		return;
-	if (xenfb_send_key(xenfb, down, xk2linux[keycode]) < 0)
+	if (xenfb_send_key(xenfb, down, scancode) < 0)
 		fprintf(stderr, "Key %d %s lost (%s)\n",
-			xk2linux[keycode], down ? "down" : "up",
+			scancode, down ? "down" : "up",
 			strerror(errno));
 }
 
@@ -305,6 +216,7 @@ static struct option options[] = {
 	{ "title", 1, NULL, 't' },
 	{ "unused", 0, NULL, 'u' },
 	{ "listen", 1, NULL, 'l' },
+	{ "keymap", 1, NULL, 'k' },
 	{ NULL }
 };
 
@@ -318,6 +230,7 @@ int main(int argc, char **argv)
 	int domid = -1, port = -1;
 	char *title = NULL;
 	char *listen = NULL;
+	char *keymap = NULL;
 	bool unused = false;
 	int opt;
 	struct xenfb *xenfb;
@@ -328,10 +241,11 @@ int main(int argc, char **argv)
 	int r;
 	struct xs_handle *xsh;
 	char vncpasswd[1024];
+	int i;
 
 	vncpasswd[0] = '\0';
 
-	while ((opt = getopt_long(argc, argv, "d:p:t:u", options,
+	while ((opt = getopt_long(argc, argv, "d:p:t:uk:", options,
 				  NULL)) != -1) {
 		switch (opt) {
                 case 'd':
@@ -359,6 +273,9 @@ int main(int argc, char **argv)
                 case 'l':
 			listen = strdup(optarg);
 			break;
+                case 'k':
+			keymap = strdup(optarg);
+			break;
 		case '?':
 			exit(1);
                 }
@@ -378,7 +295,23 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Invalid port specified\n");
 		exit(1);
         }
-            
+
+	if (keymap == NULL){
+		keymap = "en-us";
+	}
+
+	kbd_layout = init_keyboard_layout(keymap);
+	if( !kbd_layout ){
+		fprintf(stderr, "Invalid keyboard_layout\n");
+		exit(1);
+        }
+
+	for (i = 0; i < 128; i++) {
+		keycode_table[i] = atkbd_set2_keycode[atkbd_unxlate_table[i]];
+		keycode_table[i | 0x80] = 
+			atkbd_set2_keycode[atkbd_unxlate_table[i] | 0x80];
+	}
+
 	fake_argv[2] = portstr;
 
         if (title != NULL)
@@ -409,7 +342,8 @@ int main(int argc, char **argv)
 	}
 
 
-	if (xenstore_read_vncpasswd(xsh, domid, vncpasswd, sizeof(vncpasswd)/sizeof(char)) < 0) {
+	if (xenstore_read_vncpasswd(xsh, domid, vncpasswd,
+				    sizeof(vncpasswd)/sizeof(char)) < 0) {
 		fprintf(stderr, "cannot read VNC password from xenstore\n");
 		exit(1);
 	}
@@ -432,7 +366,8 @@ int main(int argc, char **argv)
 	if (vncpasswd[0]) {
 		char **passwds = malloc(sizeof(char**)*2);
 		if (!passwds) {
-			fprintf(stderr, "cannot allocate memory (%s)\n", strerror(errno));
+			fprintf(stderr, "cannot allocate memory (%s)\n",
+				strerror(errno));
 			exit(1);
 		}
 		fprintf(stderr, "Registered password\n");

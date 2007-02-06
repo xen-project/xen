@@ -182,15 +182,6 @@ static char *number(
         tmp[i++]='0';
     else while (num != 0)
         tmp[i++] = digits[do_div(num,base)];
-#if 0
-    else 
-    {
-        /* XXX KAF: force unsigned mod and div. */
-        unsigned long long num2=(unsigned long long)num;
-        unsigned int base2=(unsigned int)base;
-        while (num2 != 0) { tmp[i++] = digits[num2%base2]; num2 /= base2; }
-    }
-#endif
     if (i > precision)
         precision = i;
     size -= precision;
@@ -569,49 +560,6 @@ int scnprintf(char * buf, size_t size, const char *fmt, ...)
     return (i >= size) ? (size - 1) : i;
 }
 EXPORT_SYMBOL(scnprintf);
-
-/**
- * vsprintf - Format a string and place it in a buffer
- * @buf: The buffer to place the result into
- * @fmt: The format string to use
- * @args: Arguments for the format string
- *
- * The function returns the number of characters written
- * into @buf. Use vsnprintf or vscnprintf in order to avoid
- * buffer overflows.
- *
- * Call this function if you are already dealing with a va_list.
- * You probably want sprintf instead.
- */
-int vsprintf(char *buf, const char *fmt, va_list args)
-{
-    return vsnprintf(buf, INT_MAX, fmt, args);
-}
-
-EXPORT_SYMBOL(vsprintf);
-
-/**
- * sprintf - Format a string and place it in a buffer
- * @buf: The buffer to place the result into
- * @fmt: The format string to use
- * @...: Arguments for the format string
- *
- * The function returns the number of characters written
- * into @buf. Use snprintf or scnprintf in order to avoid
- * buffer overflows.
- */
-int sprintf(char * buf, const char *fmt, ...)
-{
-    va_list args;
-    int i;
-
-    va_start(args, fmt);
-    i=vsnprintf(buf, INT_MAX, fmt, args);
-    va_end(args);
-    return i;
-}
-
-EXPORT_SYMBOL(sprintf);
 
 /*
  * Local variables:

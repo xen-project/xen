@@ -21,8 +21,6 @@
 #include <stdlib.h>
 
 #include "xen_common.h"
-#include "xen_cpu_feature.h"
-#include "xen_cpu_feature_internal.h"
 #include "xen_host.h"
 #include "xen_host_cpu.h"
 #include "xen_internal.h"
@@ -57,9 +55,6 @@ static const struct_member xen_host_cpu_record_struct_members[] =
         { .key = "modelname",
           .type = &abstract_type_string,
           .offset = offsetof(xen_host_cpu_record, modelname) },
-        { .key = "features",
-          .type = &xen_cpu_feature_set_abstract_type_,
-          .offset = offsetof(xen_host_cpu_record, features) },
         { .key = "utilisation",
           .type = &abstract_type_float,
           .offset = offsetof(xen_host_cpu_record, utilisation) }
@@ -87,7 +82,6 @@ xen_host_cpu_record_free(xen_host_cpu_record *record)
     xen_host_record_opt_free(record->host);
     free(record->vendor);
     free(record->modelname);
-    xen_cpu_feature_set_free(record->features);
     free(record);
 }
 
@@ -242,23 +236,6 @@ xen_host_cpu_get_modelname(xen_session *session, char **result, xen_host_cpu hos
 
     *result = NULL;
     XEN_CALL_("host_cpu.get_modelname");
-    return session->ok;
-}
-
-
-bool
-xen_host_cpu_get_features(xen_session *session, struct xen_cpu_feature_set **result, xen_host_cpu host_cpu)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = host_cpu }
-        };
-
-    abstract_type result_type = xen_cpu_feature_set_abstract_type_;
-
-    *result = NULL;
-    XEN_CALL_("host_cpu.get_features");
     return session->ok;
 }
 

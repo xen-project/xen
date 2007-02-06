@@ -14,15 +14,15 @@ default: build
 .PHONY: dist
 dist: install
 
-.PHONY: build install clean distclean cscope TAGS tags
-build install debug clean distclean cscope TAGS tags::
+.PHONY: build install clean distclean cscope TAGS tags MAP
+build install debug clean distclean cscope TAGS tags MAP::
 	$(MAKE) -f Rules.mk _$@
 
 .PHONY: _build
 _build: $(TARGET).gz
 
 .PHONY: _install
-_install: $(TARGET).gz
+_install: $(TARGET).gz build-headers
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
@@ -35,10 +35,13 @@ _install: $(TARGET).gz
 		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/hvm
 	[ -d $(DESTDIR)/usr/include/xen/io ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
+	[ -d $(DESTDIR)/usr/include/xen/foreign ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/foreign
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
 	$(INSTALL_DATA) include/public/arch-x86/*.h $(DESTDIR)/usr/include/xen/arch-x86
 	$(INSTALL_DATA) include/public/hvm/*.h $(DESTDIR)/usr/include/xen/hvm
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
+	$(INSTALL_DATA) include/public/foreign/*.h $(DESTDIR)/usr/include/xen/foreign
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
 .PHONY: _debug
@@ -48,6 +51,8 @@ _debug:
 .PHONY: _clean
 _clean: delete-unfresh-files
 	$(MAKE) -C tools clean
+	$(MAKE) -C include/public/foreign clean
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C include clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C acm clean
@@ -64,11 +69,12 @@ $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
 	mv $@.new $@
 
-$(TARGET): delete-unfresh-files
+$(TARGET): delete-unfresh-files build-headers
 	$(MAKE) -C tools
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/acm_policy.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/asm-$(TARGET_ARCH)/asm-offsets.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $(TARGET)
@@ -127,6 +133,11 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
+# generate header files
+.PHONY: build-headers
+build-headers:
+	$(MAKE) -C include/public/foreign
+
 SUBDIRS = acm arch/$(TARGET_ARCH) common drivers 
 define all_sources
     ( find include/asm-$(TARGET_ARCH) -name '*.h' -print; \
@@ -158,9 +169,9 @@ _cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
 
-.PHONY: MAP
-MAP:
-	$(NM) -n $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
+.PHONY: _MAP
+_MAP:
+	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
 
 .PHONY: FORCE
 FORCE:

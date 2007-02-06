@@ -595,6 +595,7 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
         return 0;
     }
 
+#ifndef __x86_64__//temp
     if (strstr(xen_caps, "xen-3.0-x86_32p")) {
         if (dsi->pae_kernel == PAEKERN_bimodal) {
             dsi->pae_kernel = PAEKERN_extended_cr3;
@@ -612,6 +613,7 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
             return 0;
         }
     }
+#endif
 
     return 1;
 }
@@ -739,7 +741,7 @@ static int setup_guest(int xc_handle,
         /*
          * Enable shadow translate mode. This must happen after
          * populate physmap because the p2m reservation is based on
-         * the domains current memory allocation.
+         * the domain's current memory allocation.
          */
         if ( xc_shadow_control(xc_handle, dom,
                            XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE,

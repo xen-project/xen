@@ -36,6 +36,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/shadow.h>
+#include <asm/shared.h>
 #include "private.h"
 
 
@@ -109,7 +110,7 @@ static int hvm_translate_linear_addr(
     unsigned long limit, addr = offset;
     uint32_t last_byte;
 
-    if ( sh_ctxt->ctxt.mode != X86EMUL_MODE_PROT64 )
+    if ( sh_ctxt->ctxt.addr_size != 64 )
     {
         /*
          * COMPATIBILITY MODE: Apply segment checks and add base.
@@ -398,7 +399,7 @@ static struct x86_emulate_ops pv_shadow_emulator_ops = {
 struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
 {
-    struct segment_register *creg;
+    struct segment_register *creg, *sreg;
     struct vcpu *v = current;
     unsigned long addr;
 
@@ -406,7 +407,7 @@ struct x86_emulate_ops *shadow_init_emulation(
 
     if ( !is_hvm_vcpu(v) )
     {
-        sh_ctxt->ctxt.mode = X86EMUL_MODE_HOST;
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = BITS_PER_LONG;
         return &pv_shadow_emulator_ops;
     }
 
@@ -415,14 +416,20 @@ struct x86_emulate_ops *shadow_init_emulation(
     creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
 
     /* Work out the emulation mode. */
-    if ( hvm_long_mode_enabled(v) )
-        sh_ctxt->ctxt.mode = creg->attr.fields.l ?
-            X86EMUL_MODE_PROT64 : X86EMUL_MODE_PROT32;
+    if ( hvm_long_mode_enabled(v) && creg->attr.fields.l )
+    {
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
+    }
     else if ( regs->eflags & X86_EFLAGS_VM )
-        sh_ctxt->ctxt.mode = X86EMUL_MODE_REAL;
+    {
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 16;
+    }
     else
-        sh_ctxt->ctxt.mode = creg->attr.fields.db ?
-            X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16;
+    {
+        sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
+        sh_ctxt->ctxt.addr_size = creg->attr.fields.db ? 32 : 16;
+        sh_ctxt->ctxt.sp_size   = sreg->attr.fields.db ? 32 : 16;
+    }
 
     /* Attempt to prefetch whole instruction. */
     sh_ctxt->insn_buf_bytes =
@@ -1304,6 +1311,9 @@ shadow_alloc_p2m_table(struct domain *d)
     if ( !shadow_set_p2m_entry(d, gfn, mfn) )
         goto error;
 
+    /* Build a p2m map that matches the m2p entries for this domain's
+     * allocated pages.  Skip any pages that have an explicitly invalid
+     * or obviously bogus m2p entry. */
     for ( entry = d->page_list.next;
           entry != &d->page_list;
           entry = entry->next )
@@ -1319,6 +1329,8 @@ shadow_alloc_p2m_table(struct domain *d)
             (gfn != 0x55555555L)
 #endif
              && gfn != INVALID_M2P_ENTRY
+             && (gfn < 
+                 (RO_MPT_VIRT_END - RO_MPT_VIRT_START) / sizeof (l1_pgentry_t))
              && !shadow_set_p2m_entry(d, gfn, mfn) )
             goto error;
     }
@@ -2172,10 +2184,11 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     expected_count = (page->count_info & PGC_allocated) ? 1 : 0;
     if ( (page->count_info & PGC_count_mask) != expected_count )
     {
-        /* Don't complain if we're in HVM and there's one extra mapping: 
-         * The qemu helper process has an untyped mapping of this dom's RAM */
+        /* Don't complain if we're in HVM and there are some extra mappings: 
+         * The qemu helper process has an untyped mapping of this dom's RAM 
+         * and the HVM restore program takes another. */
         if ( !(shadow_mode_external(v->domain)
-               && (page->count_info & PGC_count_mask) <= 2
+               && (page->count_info & PGC_count_mask) <= 3
                && (page->u.inuse.type_info & PGT_count_mask) == 0) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx: "
@@ -2442,9 +2455,10 @@ static void sh_update_paging_modes(struct vcpu *v)
         /// PV guest
         ///
 #if CONFIG_PAGING_LEVELS == 4
-        /* When 32-on-64 PV guests are supported, they must choose 
-         * a different mode here */
-        v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,4,4);
+        if ( pv_32bit_guest(v) )
+            v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
+        else
+            v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,4,4);
 #elif CONFIG_PAGING_LEVELS == 3
         v->arch.shadow.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode,3,3);
 #elif CONFIG_PAGING_LEVELS == 2
@@ -2555,12 +2569,15 @@ static void sh_update_paging_modes(struct vcpu *v)
                 /* Need to make a new monitor table for the new mode */
                 mfn_t new_mfn, old_mfn;
 
-                if ( v != current ) 
+                if ( v != current && vcpu_runnable(v) ) 
                 {
                     SHADOW_ERROR("Some third party (d=%u v=%u) is changing "
-                                  "this HVM vcpu's (d=%u v=%u) paging mode!\n",
-                                  current->domain->domain_id, current->vcpu_id,
-                                  v->domain->domain_id, v->vcpu_id);
+                                 "this HVM vcpu's (d=%u v=%u) paging mode "
+                                 "while it is running.\n",
+                                 current->domain->domain_id, current->vcpu_id,
+                                 v->domain->domain_id, v->vcpu_id);
+                    /* It's not safe to do that because we can't change
+                     * the host CR£ for a running domain */
                     domain_crash(v->domain);
                     return;
                 }
@@ -2576,7 +2593,8 @@ static void sh_update_paging_modes(struct vcpu *v)
                  * pull it down!  Switch CR3, and warn the HVM code that
                  * its host cr3 has changed. */
                 make_cr3(v, mfn_x(new_mfn));
-                write_ptbase(v);
+                if ( v == current )
+                    write_ptbase(v);
                 hvm_update_host_cr3(v);
                 old_mode->destroy_monitor_table(v, old_mfn);
             }
@@ -2917,7 +2935,7 @@ sh_alloc_log_dirty_bitmap(struct domain *d)
 {
     ASSERT(d->arch.shadow.dirty_bitmap == NULL);
     d->arch.shadow.dirty_bitmap_size =
-        (d->shared_info->arch.max_pfn + (BITS_PER_LONG - 1)) &
+        (arch_get_max_pfn(d) + (BITS_PER_LONG - 1)) &
         ~(BITS_PER_LONG - 1);
     d->arch.shadow.dirty_bitmap =
         xmalloc_array(unsigned long,
@@ -3173,19 +3191,16 @@ static int shadow_log_dirty_op(
         if ( likely(peek) )
         {
             if ( copy_to_guest_offset(
-                     sc->dirty_bitmap,
-                     i/(8*sizeof(unsigned long)),
-                     d->arch.shadow.dirty_bitmap+(i/(8*sizeof(unsigned long))),
-                     (bytes+sizeof(unsigned long)-1) / sizeof(unsigned long)) )
+                sc->dirty_bitmap, i/8,
+                (uint8_t *)d->arch.shadow.dirty_bitmap + (i/8), bytes) )
             {
-                    rv = -EFAULT;
-                    goto out;
+                rv = -EFAULT;
+                goto out;
             }
         }
 
         if ( clean )
-            memset(d->arch.shadow.dirty_bitmap + (i/(8*sizeof(unsigned long))),
-                   0, bytes);
+            memset((uint8_t *)d->arch.shadow.dirty_bitmap + (i/8), 0, bytes);
     }
 #undef CHUNK
 
@@ -3259,7 +3274,7 @@ void shadow_mark_dirty(struct domain *d, mfn_t gmfn)
 
 int shadow_domctl(struct domain *d, 
                   xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+                  XEN_GUEST_HANDLE(void) u_domctl)
 {
     int rc, preempted = 0;
 

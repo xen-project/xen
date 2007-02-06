@@ -6,7 +6,7 @@
 from XmTestLib import *
 from XmTestLib.block_utils import *
 
-import re
+import re, time
 
 def checkXmLongList(domain):
     s, o = traceCommand("xm list --long %s" % domain.getName())
@@ -35,4 +35,8 @@ if not checkXmLongList(domain):
 block_detach(domain, "xvda1")
 
 if checkXmLongList(domain):
-    FAIL("xm long list does not show that xvda1 was removed")
+    # device info is removed by hotplug scripts - give them a chance
+    # to fire (they run asynchronously with us). 
+    time.sleep(1)
+    if checkXmLongList(domain):
+        FAIL("xm long list does not show that xvda1 was removed")

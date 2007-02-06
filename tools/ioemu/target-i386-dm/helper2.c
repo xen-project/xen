@@ -498,6 +498,8 @@ void handle_buffered_io(void *opaque)
 
 void cpu_handle_ioreq(void *opaque)
 {
+    extern int vm_running;
+    extern int shutdown_requested;
     CPUState *env = opaque;
     ioreq_t *req = cpu_get_ioreq();
 
@@ -516,6 +518,25 @@ void cpu_handle_ioreq(void *opaque)
         }
 
         wmb(); /* Update ioreq contents /then/ update state. */
+
+	/*
+         * We do this before we send the response so that the tools
+         * have the opportunity to pick up on the reset before the
+         * guest resumes and does a hlt with interrupts disabled which
+         * causes Xen to powerdown the domain.
+         */
+        if (vm_running) {
+            if (shutdown_requested) {
+		fprintf(logfile, "shutdown requested in cpu_handle_ioreq\n");
+		destroy_hvm_domain();
+	    }
+	    if (reset_requested) {
+		fprintf(logfile, "reset requested in cpu_handle_ioreq.\n");
+		qemu_system_reset();
+		reset_requested = 0;
+	    }
+	}
+
         req->state = STATE_IORESP_READY;
         xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
     }
@@ -525,6 +546,7 @@ int main_loop(void)
 {
     extern int vm_running;
     extern int shutdown_requested;
+    extern int suspend_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
 
@@ -542,12 +564,24 @@ int main_loop(void)
                 qemu_system_reset();
                 reset_requested = 0;
             }
+            if (suspend_requested) {
+                fprintf(logfile, "device model received suspend signal!\n");
+                break;
+            }
         }
 
         /* Wait up to 10 msec. */
         main_loop_wait(10);
     }
-    destroy_hvm_domain();
+    if (!suspend_requested)
+        destroy_hvm_domain();
+    else {
+        char qemu_file[20];
+        sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
+        if (qemu_savevm(qemu_file) < 0)
+            fprintf(stderr, "qemu save fail.\n");
+    }
+
     return 0;
 }
 

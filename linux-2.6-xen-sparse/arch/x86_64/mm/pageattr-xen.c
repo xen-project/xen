@@ -3,7 +3,6 @@
  * Thanks to Ben LaHaise for precious feedback.
  */ 
 
-#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/highmem.h>
@@ -164,6 +163,18 @@ void _arch_exit_mmap(struct mm_struct *mm)
         mm_unpin(mm);
 }
 
+struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	struct page *pte;
+
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+	if (pte) {
+		SetPageForeign(pte, pte_free);
+		init_page_count(pte);
+	}
+	return pte;
+}
+
 void pte_free(struct page *pte)
 {
 	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
@@ -171,6 +182,10 @@ void pte_free(struct page *pte)
 	if (!pte_write(*virt_to_ptep(va)))
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
+
+	ClearPageForeign(pte);
+	init_page_count(pte);
+
 	__free_page(pte);
 }
 #endif	/* CONFIG_XEN */
@@ -206,6 +221,13 @@ static struct page *split_large_page(unsigned long address, pgprot_t prot,
 	pte_t *pbase;
 	if (!base) 
 		return NULL;
+	/*
+	 * page_private is used to track the number of entries in
+	 * the page table page have non standard attributes.
+	 */
+	SetPagePrivate(base);
+	page_private(base) = 0;
+
 	address = __pa(address);
 	addr = address & LARGE_PAGE_MASK; 
 	pbase = (pte_t *)page_address(base);
@@ -238,26 +260,12 @@ static inline void flush_map(unsigned long address)
 	on_each_cpu(flush_kernel_map, (void *)address, 1, 1);
 }
 
-struct deferred_page { 
-	struct deferred_page *next; 
-	struct page *fpage;
-	unsigned long address;
-}; 
-static struct deferred_page *df_list; /* protected by init_mm.mmap_sem */
+static struct page *deferred_pages; /* protected by init_mm.mmap_sem */
 
-static inline void save_page(unsigned long address, struct page *fpage)
+static inline void save_page(struct page *fpage)
 {
-	struct deferred_page *df;
-	df = kmalloc(sizeof(struct deferred_page), GFP_KERNEL); 
-	if (!df) {
-		flush_map(address);
-		__free_page(fpage);
-	} else { 
-		df->next = df_list;
-		df->fpage = fpage;
-		df->address = address;
-		df_list = df;
-	} 			
+	fpage->lru.next = (struct list_head *)deferred_pages;
+	deferred_pages = fpage;
 }
 
 /* 
@@ -299,8 +307,8 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 			set_pte(kpte, pfn_pte(pfn, prot));
 		} else {
  			/*
- 			 * split_large_page will take the reference for this change_page_attr
- 			 * on the split page.
+			 * split_large_page will take the reference for this
+			 * change_page_attr on the split page.
  			 */
 
 			struct page *split;
@@ -312,10 +320,11 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 			set_pte(kpte,mk_pte(split, ref_prot2));
 			kpte_page = split;
 		}	
-		get_page(kpte_page);
+		page_private(kpte_page)++;
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
 		set_pte(kpte, pfn_pte(pfn, ref_prot));
-		__put_page(kpte_page);
+		BUG_ON(page_private(kpte_page) == 0);
+		page_private(kpte_page)--;
 	} else
 		BUG();
 
@@ -329,16 +338,14 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 #ifndef CONFIG_XEN
  	BUG_ON(PageReserved(kpte_page));
 #else
-	if (!PageReserved(kpte_page))
+	if (PageReserved(kpte_page))
+		return 0;
 #endif
-		switch (page_count(kpte_page)) {
-		case 1:
-			save_page(address, kpte_page); 		     
-			revert_page(address, ref_prot);
-			break;
-		case 0:
-			BUG(); /* memleak and failed 2M page regeneration */
-	 	}
+
+	if (page_private(kpte_page) == 0) {
+		save_page(kpte_page);
+		revert_page(address, ref_prot);
+	}
 	return 0;
 } 
 
@@ -390,17 +397,18 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 
 void global_flush_tlb(void)
 { 
-	struct deferred_page *df, *next_df;
+	struct page *dpage;
 
 	down_read(&init_mm.mmap_sem);
-	df = xchg(&df_list, NULL);
+	dpage = xchg(&deferred_pages, NULL);
 	up_read(&init_mm.mmap_sem);
-	flush_map((df && !df->next) ? df->address : 0);
-	for (; df; df = next_df) { 
-		next_df = df->next;
-		if (df->fpage) 
-			__free_page(df->fpage);
-		kfree(df);
+
+	flush_map((dpage && !dpage->lru.next) ? (unsigned long)page_address(dpage) : 0);
+	while (dpage) {
+		struct page *tmp = dpage;
+		dpage = (struct page *)dpage->lru.next;
+		ClearPagePrivate(tmp);
+		__free_page(tmp);
 	} 
 } 
 

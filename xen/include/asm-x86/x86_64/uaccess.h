@@ -15,6 +15,20 @@
 
 #define array_access_ok(addr, count, size) (__addr_ok(addr))
 
+#ifdef CONFIG_COMPAT
+
+#define __compat_addr_ok(addr) \
+    ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(current->domain))
+
+#define compat_access_ok(addr, size) \
+    __compat_addr_ok((unsigned long)(addr) + ((size) ? (size) - 1 : 0))
+
+#define compat_array_access_ok(addr,count,size) \
+    (likely((count) < (~0U / (size))) && \
+     compat_access_ok(addr, (count) * (size)))
+
+#endif
+
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
@@ -35,7 +49,7 @@ do {									\
 	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
 	case 4: __get_user_asm(x,ptr,retval,"l","k","=r",errret);break;	\
 	case 8: __get_user_asm(x,ptr,retval,"q","","=r",errret); break;	\
-	default: (x) = __get_user_bad();				\
+	default: __get_user_bad();					\
 	}								\
 } while (0)
 

@@ -22,6 +22,7 @@
 #include <asm/regs.h>
 #include <asm/current.h>
 #include <xen/delay.h>
+#include <xen/string.h>
  
 #include "op_counter.h"
 #include "op_x86_model.h"
@@ -39,10 +40,9 @@ extern int is_active(struct domain *d);
 extern int active_id(struct domain *d);
 extern int is_profiled(struct domain *d);
 
-extern size_t strlcpy(char *dest, const char *src, size_t size);
 
 
-int nmi_callback(struct cpu_user_regs *regs, int cpu)
+static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
 	int xen_mode, ovf;
 
@@ -276,20 +276,20 @@ static int __init p4_init(char * cpu_type)
 	}
 
 #ifndef CONFIG_SMP
-	strncpy (cpu_type, "i386/p4", XENOPROF_CPU_TYPE_SIZE - 1);
+	strlcpy (cpu_type, "i386/p4", XENOPROF_CPU_TYPE_SIZE);
 	model = &op_p4_spec;
 	return 1;
 #else
 	switch (smp_num_siblings) {
 		case 1:
-			strncpy (cpu_type, "i386/p4", 
-				 XENOPROF_CPU_TYPE_SIZE - 1);
+			strlcpy (cpu_type, "i386/p4", 
+				 XENOPROF_CPU_TYPE_SIZE);
 			model = &op_p4_spec;
 			return 1;
 
 		case 2:
-			strncpy (cpu_type, "i386/p4-ht", 
-				 XENOPROF_CPU_TYPE_SIZE - 1);
+			strlcpy (cpu_type, "i386/p4-ht", 
+				 XENOPROF_CPU_TYPE_SIZE);
 			model = &op_p4_ht2_spec;
 			return 1;
 	}
@@ -311,17 +311,17 @@ static int __init ppro_init(char *cpu_type)
 		return 0;
 	}
 	else if (cpu_model == 15)
-		strncpy (cpu_type, "i386/core_2", XENOPROF_CPU_TYPE_SIZE - 1);
+		strlcpy (cpu_type, "i386/core_2", XENOPROF_CPU_TYPE_SIZE);
 	else if (cpu_model == 14)
-		strncpy (cpu_type, "i386/core", XENOPROF_CPU_TYPE_SIZE - 1);
+		strlcpy (cpu_type, "i386/core", XENOPROF_CPU_TYPE_SIZE);
 	else if (cpu_model == 9)
-		strncpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE - 1);
+		strlcpy (cpu_type, "i386/p6_mobile", XENOPROF_CPU_TYPE_SIZE);
 	else if (cpu_model > 5)
-		strncpy (cpu_type, "i386/piii", XENOPROF_CPU_TYPE_SIZE - 1);
+		strlcpy (cpu_type, "i386/piii", XENOPROF_CPU_TYPE_SIZE);
 	else if (cpu_model > 2)
-		strncpy (cpu_type, "i386/pii", XENOPROF_CPU_TYPE_SIZE - 1);
+		strlcpy (cpu_type, "i386/pii", XENOPROF_CPU_TYPE_SIZE);
 	else
-		strncpy (cpu_type, "i386/ppro", XENOPROF_CPU_TYPE_SIZE - 1);
+		strlcpy (cpu_type, "i386/ppro", XENOPROF_CPU_TYPE_SIZE);
 
 	model = &op_ppro_spec;
 	return 1;
@@ -346,9 +346,6 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 		}
 	}
  
-	/* Make sure string is NULL terminated */
-	cpu_type[XENOPROF_CPU_TYPE_SIZE - 1] = 0;
-
 	switch (vendor) {
 		case X86_VENDOR_AMD:
 			/* Needs to be at least an Athlon (or hammer in 32bit mode) */
@@ -361,15 +358,15 @@ int nmi_init(int *num_events, int *is_primary, char *cpu_type)
 				return -ENODEV;
 			case 6:
 				model = &op_athlon_spec;
-				strncpy (cpu_type, "i386/athlon", 
-					 XENOPROF_CPU_TYPE_SIZE - 1);
+				strlcpy (cpu_type, "i386/athlon", 
+					 XENOPROF_CPU_TYPE_SIZE);
 				break;
 			case 0xf:
 				model = &op_athlon_spec;
 				/* Actually it could be i386/hammer too, but give
 				   user space an consistent name. */
-				strncpy (cpu_type, "x86-64/hammer", 
-					 XENOPROF_CPU_TYPE_SIZE - 1);
+				strlcpy (cpu_type, "x86-64/hammer", 
+					 XENOPROF_CPU_TYPE_SIZE);
 				break;
 			}
 			break;

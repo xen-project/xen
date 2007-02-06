@@ -3,7 +3,22 @@
  * 
  * Generic x86 (32-bit and 64-bit) instruction decoder and emulator.
  * 
- * Copyright (c) 2005 Keir Fraser
+ * Copyright (c) 2005-2007 Keir Fraser
+ * Copyright (c) 2005-2007 XenSource Inc.
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef __X86_EMULATE_H__
@@ -55,16 +70,19 @@ struct x86_emulate_ops
 {
     /*
      * All functions:
+     *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
+     * All memory-access functions:
      *  @seg:   [IN ] Segment being dereferenced (specified as x86_seg_??).
      *  @offset:[IN ] Offset within segment.
-     *  @ctxt:  [IN ] Emulation context info as passed to the emulator.
+     * Read functions:
+     *  @val:   [OUT] Value read, zero-extended to 'ulong'.
+     * Write functions:
+     *  @val:   [IN ] Value to write (low-order bytes used as req'd).
+     * Variable-length access functions:
+     *  @bytes: [IN ] Number of bytes to read or write.
      */
 
-    /*
-     * read: Emulate a memory read.
-     *  @val:   [OUT] Value read from memory, zero-extended to 'ulong'.
-     *  @bytes: [IN ] Number of bytes to read from memory.
-     */
+    /* read: Emulate a memory read. */
     int (*read)(
         enum x86_segment seg,
         unsigned long offset,
@@ -83,11 +101,7 @@ struct x86_emulate_ops
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt);
 
-    /*
-     * write: Emulate a memory write.
-     *  @val:   [IN ] Value to write to memory (low-order bytes used as req'd).
-     *  @bytes: [IN ] Number of bytes to write to memory.
-     */
+    /* write: Emulate a memory write. */
     int (*write)(
         enum x86_segment seg,
         unsigned long offset,
@@ -99,7 +113,6 @@ struct x86_emulate_ops
      * cmpxchg: Emulate an atomic (LOCKed) CMPXCHG operation.
      *  @old:   [IN ] Value expected to be current at @addr.
      *  @new:   [IN ] Value to write to @addr.
-     *  @bytes: [IN ] Number of bytes to access using CMPXCHG.
      */
     int (*cmpxchg)(
         enum x86_segment seg,
@@ -127,6 +140,89 @@ struct x86_emulate_ops
         unsigned long new_lo,
         unsigned long new_hi,
         struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_io: Read from I/O port(s).
+     *  @port:  [IN ] Base port for access.
+     */
+    int (*read_io)(
+        unsigned int port,
+        unsigned int bytes,
+        unsigned long *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_io: Write to I/O port(s).
+     *  @port:  [IN ] Base port for access.
+     */
+    int (*write_io)(
+        unsigned int port,
+        unsigned int bytes,
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_cr: Read from control register.
+     *  @reg:   [IN ] Register to read (0-15).
+     */
+    int (*read_cr)(
+        unsigned int reg,
+        unsigned long *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_cr: Write to control register.
+     *  @reg:   [IN ] Register to write (0-15).
+     */
+    int (*write_cr)(
+        unsigned int reg,
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_dr: Read from debug register.
+     *  @reg:   [IN ] Register to read (0-15).
+     */
+    int (*read_dr)(
+        unsigned int reg,
+        unsigned long *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_dr: Write to debug register.
+     *  @reg:   [IN ] Register to write (0-15).
+     */
+    int (*write_dr)(
+        unsigned int reg,
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * read_msr: Read from model-specific register.
+     *  @reg:   [IN ] Register to read.
+     */
+    int (*read_msr)(
+        unsigned long reg,
+        uint64_t *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_dr: Write to model-specific register.
+     *  @reg:   [IN ] Register to write.
+     */
+    int (*write_msr)(
+        unsigned long reg,
+        uint64_t val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* write_rflags: Modify privileged bits in RFLAGS. */
+    int (*write_rflags)(
+        unsigned long val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /* wbinvd: Write-back and invalidate cache contents. */
+    int (*wbinvd)(
+        struct x86_emulate_ctxt *ctxt);
 };
 
 struct cpu_user_regs;
@@ -134,32 +230,21 @@ struct cpu_user_regs;
 struct x86_emulate_ctxt
 {
     /* Register state before/after emulation. */
-    struct cpu_user_regs   *regs;
+    struct cpu_user_regs *regs;
 
-    /* Emulated execution mode, represented by an X86EMUL_MODE value. */
-    int                     mode;
+    /* Default address size in current execution mode (16, 32, or 64). */
+    unsigned int addr_size;
+
+    /* Stack pointer width in bits (16, 32 or 64). */
+    unsigned int sp_size;
 };
 
-/* Execution mode, passed to the emulator. */
-#define X86EMUL_MODE_REAL     0 /* Real mode.             */
-#define X86EMUL_MODE_PROT16   2 /* 16-bit protected mode. */
-#define X86EMUL_MODE_PROT32   4 /* 32-bit protected mode. */
-#define X86EMUL_MODE_PROT64   8 /* 64-bit (long) mode.    */
-
-/* Host execution mode. */
-#if defined(__i386__)
-#define X86EMUL_MODE_HOST X86EMUL_MODE_PROT32
-#elif defined(__x86_64__)
-#define X86EMUL_MODE_HOST X86EMUL_MODE_PROT64
-#endif
-
 /*
- * x86_emulate_memop: Emulate an instruction that faulted attempting to
- *                    read/write a 'special' memory area.
+ * x86_emulate: Emulate an instruction.
  * Returns -1 on failure, 0 on success.
  */
 int
-x86_emulate_memop(
+x86_emulate(
     struct x86_emulate_ctxt *ctxt,
     struct x86_emulate_ops  *ops);
 

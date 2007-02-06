@@ -14,7 +14,7 @@
 
 INITRD ?= http://xm-test.xensource.com/ramdisks
 
-BR_ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e 's/ppc\(64\)*/powerpc/')
+BR_ARCH ?= $(shell uname -m | sed -e 's/i.86/i386/' -e 's/ppc\(64\)*/powerpc/' -e 's/x86_64/i386/')
 
 @MK@ifdef BR_SNAPSHOT
 @MK@  BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
@@ -36,7 +36,12 @@ XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/
 XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER)-$(BR_ARCH).img
 XMTEST_DL_IMG = $(shell echo $(XMTEST_VER_IMG) | sed -e 's/x86_64/i386/g')
 
-EXTRA_ROOT_DIRS = sys
+EXTRA_ROOT_DIRS = sys modules
+
+BLKDRV = /lib/modules/$(shell uname -r)/kernel/drivers/xen/blkfront/xenblk.ko
+NETDRV = /lib/modules/$(shell uname -r)/kernel/drivers/xen/netfront/xennet.ko
+PKTDRV = /lib/modules/$(shell uname -r)/kernel/net/packet/af_packet.ko
+
 
 if HVM
 all: initrd.img disk.img
@@ -60,7 +65,11 @@ $(BR_IMG): $(BR_SRC)
 
 $(XMTEST_VER_IMG): $(BR_IMG)
 	chmod a+x skel/etc/init.d/rcS
-	(cd skel; mkdir -p $(EXTRA_ROOT_DIRS); tar cf - .) \
+	cd skel && mkdir -p $(EXTRA_ROOT_DIRS)
+	-[ -e "$(BLKDRV)" ] && cp $(BLKDRV) skel/modules
+	-[ -e "$(NETDRV)" ] && cp $(NETDRV) skel/modules
+	-[ -e "$(PKTDRV)" ] && cp $(PKTDRV) skel/modules
+	(cd skel; tar cf - .) \
 		| (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
 	cd $(BR_SRC) && make
 	cp $(BR_IMG) $(XMTEST_VER_IMG)

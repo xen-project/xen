@@ -49,7 +49,7 @@ u64 get_mfn(struct domain *d, u64 gpfn)
         d = current->domain;
     }
     else {
-        d = find_domain_by_id(domid);
+        d = get_domain_by_id(domid);
     }
  */
     xen_gppn = arch_to_xen_ppn(gpfn);

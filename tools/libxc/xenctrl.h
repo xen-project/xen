@@ -236,6 +236,18 @@ int xc_domain_unpause(int xc_handle,
 int xc_domain_destroy(int xc_handle,
                       uint32_t domid);
 
+
+/**
+ * This function resumes a suspended domain. The domain should have
+ * been previously suspended.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain id to resume
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_resume(int xc_handle,
+                      uint32_t domid);
+
 /**
  * This function will shutdown a domain. This is intended for use in
  * fully-virtualized domains where this operation is analogous to the
@@ -313,6 +325,34 @@ int xc_domain_getinfolist(int xc_handle,
                           xc_domaininfo_t *info);
 
 /**
+ * This function returns information about the context of a hvm domain
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain to get information from
+ * @parm ctxt_buf a pointer to a structure to store the execution context of
+ *            the hvm domain
+ * @parm size the size of ctxt_buf in bytes
+ * @return 0 on success, -1 on failure
+ */
+int xc_domain_hvm_getcontext(int xc_handle,
+                             uint32_t domid,
+                             uint8_t *ctxt_buf,
+                             uint32_t size);
+
+/**
+ * This function will set the context for hvm domain
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain to set the hvm domain context for
+ * @parm hvm_ctxt pointer to the the hvm context with the values to set
+ * @parm size the size of hvm_ctxt in bytes
+ * @return 0 on success, -1 on failure
+ */
+int xc_domain_hvm_setcontext(int xc_handle,
+                             uint32_t domid,
+                             uint8_t *hvm_ctxt,
+                             uint32_t size);
+
+/**
  * This function returns information about the execution context of a
  * particular vcpu of a domain.
  *
@@ -324,9 +364,9 @@ int xc_domain_getinfolist(int xc_handle,
  * @return 0 on success, -1 on failure
  */
 int xc_vcpu_getcontext(int xc_handle,
-                               uint32_t domid,
-                               uint32_t vcpu,
-                               vcpu_guest_context_t *ctxt);
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt);
 
 typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
 int xc_vcpu_getinfo(int xc_handle,
@@ -395,6 +435,9 @@ int xc_sched_credit_domain_get(int xc_handle,
 int xc_evtchn_alloc_unbound(int xc_handle,
                             uint32_t dom,
                             uint32_t remote_dom);
+
+int xc_evtchn_reset(int xc_handle,
+                    uint32_t dom);
 
 int xc_physdev_pci_access_modify(int xc_handle,
                                  uint32_t domid,
@@ -513,7 +556,7 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
-int xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
+int xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
                     unsigned long max_pfns);
 
 unsigned long xc_ia64_fpsr_default(void);
@@ -536,7 +579,7 @@ int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 int xc_memory_op(int xc_handle, int cmd, void *arg);
 
 int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
-                          int num, unsigned long *arr);
+                          int num, uint32_t *arr);
 
 
 /* Get current total pages allocated to a domain. */
@@ -691,6 +734,8 @@ typedef enum {
   XC_ERROR_NONE = 0,
   XC_INTERNAL_ERROR = 1,
   XC_INVALID_KERNEL = 2,
+  XC_INVALID_PARAM = 3,
+  XC_OUT_OF_MEMORY = 4,
 } xc_error_code;
 
 #define XC_MAX_ERROR_MSG_LEN 1024

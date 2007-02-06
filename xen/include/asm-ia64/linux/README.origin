@@ -24,3 +24,15 @@ time.h			-> linux/include/linux/time.h
 timex.h			-> linux/include/linux/timex.h
 topology.h		-> linux/include/linux/topology.h
 wait.h			-> linux/include/linux/wait.h
+
+# The files below are from Linux-2.6.19
+completion.h		-> linux/include/linux/completion.h
+ioport.h		-> linux/include/linux/ioport.h
+klist.h			-> linux/include/linux/klist.h
+kref.h			-> linux/include/linux/kref.h
+mod_devicetable.h	-> linux/include/linux/mod_devicetable.h
+pci_ids.h		-> linux/include/linux/pci_ids.h
+pci_regs.h		-> linux/include/linux/pci_regs.h
+pm.h			-> linux/include/linux/pm.h
+sysfs.h			-> linux/include/linux/sysfs.h
+

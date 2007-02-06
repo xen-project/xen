@@ -50,6 +50,7 @@
 #include <linux/bootmem.h>
 #include <linux/sysrq.h>
 #include <linux/screen_info.h>
+#include <linux/vt.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -595,16 +596,16 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 	if (DUMMY_TTY(tty))
 		return;
 
-	down(&tty_sem);
+	mutex_lock(&tty_mutex);
 
 	if (tty->count != 1) {
-		up(&tty_sem);
+		mutex_unlock(&tty_mutex);
 		return;
 	}
 
 	/* Prevent other threads from re-opening this tty. */
 	set_bit(TTY_CLOSING, &tty->flags);
-	up(&tty_sem);
+	mutex_unlock(&tty_mutex);
 
 	tty->closing = 1;
 	tty_wait_until_sent(tty, 0);

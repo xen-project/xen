@@ -21,6 +21,7 @@ struct tlb_track;
 extern void domain_relinquish_resources(struct domain *);
 struct vcpu;
 extern void relinquish_vcpu_resources(struct vcpu *v);
+extern int vcpu_late_initialise(struct vcpu *v);
 
 /* given a current domain metaphysical address, return the physical address */
 extern unsigned long translate_domain_mpaddr(unsigned long mpaddr,
@@ -77,6 +78,9 @@ struct arch_domain {
 #endif
         };
     };
+
+    /* maximum metaphysical address of conventional memory */
+    u64 convmem_end;
 
     /* Allowed accesses to io ports.  */
     struct rangeset *ioport_caps;

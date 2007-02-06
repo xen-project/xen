@@ -9,6 +9,7 @@
  *                    VA Linux Systems Japan K.K.
  */
 
+#ifndef COMPAT
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
@@ -72,7 +73,7 @@ static void xenoprof_reset_stat(void)
 static void xenoprof_reset_buf(struct domain *d)
 {
     int j;
-    struct xenoprof_buf *buf;
+    xenoprof_buf_t *buf;
 
     if ( d->xenoprof == NULL )
     {
@@ -86,8 +87,8 @@ static void xenoprof_reset_buf(struct domain *d)
         buf = d->xenoprof->vcpu[j].buffer;
         if ( buf != NULL )
         {
-            buf->event_head = 0;
-            buf->event_tail = 0;
+            xenoprof_buf(d, buf, event_head) = 0;
+            xenoprof_buf(d, buf, event_tail) = 0;
         }
     }
 }
@@ -166,15 +167,24 @@ static int alloc_xenoprof_struct(
     for_each_vcpu ( d, v )
         nvcpu++;
 
+    bufsize = sizeof(struct xenoprof_buf);
+    i = sizeof(struct event_log);
+#ifdef CONFIG_COMPAT
+    d->xenoprof->is_compat = IS_COMPAT(is_passive ? dom0 : d);
+    if ( XENOPROF_COMPAT(d->xenoprof) )
+    {
+        bufsize = sizeof(struct compat_oprof_buf);
+        i = sizeof(struct compat_event_log);
+    }
+#endif
+
     /* reduce max_samples if necessary to limit pages allocated */
     max_bufsize = (MAX_OPROF_SHARED_PAGES * PAGE_SIZE) / nvcpu;
-    max_max_samples = ( (max_bufsize - sizeof(struct xenoprof_buf)) /
-                        sizeof(struct event_log) ) + 1;
+    max_max_samples = ( (max_bufsize - bufsize) / i ) + 1;
     if ( (unsigned)max_samples > max_max_samples )
         max_samples = max_max_samples;
 
-    bufsize = sizeof(struct xenoprof_buf) +
-        (max_samples - 1) * sizeof(struct event_log);
+    bufsize += (max_samples - 1) * i;
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
 
     d->xenoprof->rawbuf = alloc_xenheap_pages(get_order_from_pages(npages));
@@ -195,11 +205,12 @@ static int alloc_xenoprof_struct(
     i = 0;
     for_each_vcpu ( d, v )
     {
+        xenoprof_buf_t *buf = (xenoprof_buf_t *)&d->xenoprof->rawbuf[i * bufsize];
+
         d->xenoprof->vcpu[v->vcpu_id].event_size = max_samples;
-        d->xenoprof->vcpu[v->vcpu_id].buffer =
-            (struct xenoprof_buf *)&d->xenoprof->rawbuf[i * bufsize];
-        d->xenoprof->vcpu[v->vcpu_id].buffer->event_size = max_samples;
-        d->xenoprof->vcpu[v->vcpu_id].buffer->vcpu_id = v->vcpu_id;
+        d->xenoprof->vcpu[v->vcpu_id].buffer = buf;
+        xenoprof_buf(d, buf, event_size) = max_samples;
+        xenoprof_buf(d, buf, vcpu_id) = v->vcpu_id;
 
         i++;
         /* in the unlikely case that the number of active vcpus changes */
@@ -335,7 +346,7 @@ static int add_active_list(domid_t domid)
     if ( adomains >= MAX_OPROF_DOMAINS )
         return -E2BIG;
 
-    d = find_domain_by_id(domid);
+    d = get_domain_by_id(domid);
     if ( d == NULL )
         return -EINVAL;
 
@@ -358,7 +369,7 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
     if ( copy_from_guest(&passive, arg, 1) )
         return -EFAULT;
 
-    d = find_domain_by_id(passive.domain_id);
+    d = get_domain_by_id(passive.domain_id);
     if ( d == NULL )
         return -EINVAL;
 
@@ -406,8 +417,9 @@ static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
 void xenoprof_log_event(
     struct vcpu *vcpu, unsigned long eip, int mode, int event)
 {
+    struct domain *d = vcpu->domain;
     struct xenoprof_vcpu *v;
-    struct xenoprof_buf *buf;
+    xenoprof_buf_t *buf;
     int head;
     int tail;
     int size;
@@ -417,13 +429,13 @@ void xenoprof_log_event(
 
     /* ignore samples of un-monitored domains */
     /* Count samples in idle separate from other unmonitored domains */
-    if ( !is_profiled(vcpu->domain) )
+    if ( !is_profiled(d) )
     {
         others_samples++;
         return;
     }
 
-    v = &vcpu->domain->xenoprof->vcpu[vcpu->vcpu_id];
+    v = &d->xenoprof->vcpu[vcpu->vcpu_id];
 
     /* Sanity check. Should never happen */ 
     if ( v->buffer == NULL )
@@ -432,10 +444,10 @@ void xenoprof_log_event(
         return;
     }
 
-    buf = vcpu->domain->xenoprof->vcpu[vcpu->vcpu_id].buffer;
+    buf = v->buffer;
 
-    head = buf->event_head;
-    tail = buf->event_tail;
+    head = xenoprof_buf(d, buf, event_head);
+    tail = xenoprof_buf(d, buf, event_tail);
     size = v->event_size;
 
     /* make sure indexes in shared buffer are sane */
@@ -447,28 +459,28 @@ void xenoprof_log_event(
 
     if ( (head == tail - 1) || (head == size - 1 && tail == 0) )
     {
-        buf->lost_samples++;
+        xenoprof_buf(d, buf, lost_samples)++;
         lost_samples++;
     }
     else
     {
-        buf->event_log[head].eip = eip;
-        buf->event_log[head].mode = mode;
-        buf->event_log[head].event = event;
+        xenoprof_buf(d, buf, event_log[head].eip) = eip;
+        xenoprof_buf(d, buf, event_log[head].mode) = mode;
+        xenoprof_buf(d, buf, event_log[head].event) = event;
         head++;
         if ( head >= size )
             head = 0;
-        buf->event_head = head;
+        xenoprof_buf(d, buf, event_head) = head;
         if ( is_active(vcpu->domain) )
             active_samples++;
         else
             passive_samples++;
         if ( mode == 0 )
-            buf->user_samples++;
+            xenoprof_buf(d, buf, user_samples)++;
         else if ( mode == 1 )
-            buf->kernel_samples++;
+            xenoprof_buf(d, buf, kernel_samples)++;
         else
-            buf->xen_samples++;
+            xenoprof_buf(d, buf, xen_samples)++;
     }
 }
 
@@ -493,6 +505,8 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 
     return 0;
 }
+
+#endif /* !COMPAT */
 
 static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
 {
@@ -731,6 +745,10 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     return ret;
 }
+
+#if defined(CONFIG_COMPAT) && !defined(COMPAT)
+#include "compat/xenoprof.c"
+#endif
 
 /*
  * Local variables:

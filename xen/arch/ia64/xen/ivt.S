@@ -1,6 +1,8 @@
 #ifdef XEN
 #include <asm/debugger.h>
 #include <asm/vhpt.h>
+#include <public/arch-ia64.h>
+#include <asm/config.h>
 #endif
 /*
  * arch/ia64/kernel/ivt.S
@@ -1054,7 +1056,6 @@ ENTRY(break_fault)
 	 * level.
 	 */
 	DBG_FAULT(11)
-#ifdef XEN
 	mov r16=cr.isr
 	mov r17=cr.iim
 	mov r31=pr
@@ -1074,121 +1075,229 @@ ENTRY(break_fault)
 #endif
 	movl r18=THIS_CPU(current_psr_ic_addr)
 	;;
-	ld8 r18=[r18]
-	;;
-	ld4 r19=[r18]
+	ld8 r18=[r18]    
 	;;
 	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
 (p7)	br.spnt.many dispatch_privop_fault
 	;;
-	// If vpsr.ic is off, we have a hyperprivop.  A hyperprivop is
-	// hand-coded assembly with psr.ic off which means it can make
-	// no calls, cannot use r1-r15, and it can have no memory accesses
-	// unless they are to pinned addresses!
-	cmp4.eq p7,p0=r0,r19
+	// if (ipsr.cpl == 2 && (iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX)
+	// this is a hyperprivop. A hyperprivop is hand-coded assembly with
+	// psr.ic off which means it can make no calls, cannot use r1-r15,
+	// and it can have no memory accesses unless they are to pinned
+	// addresses!
+	mov r19= cr.ipsr
+	movl r20=HYPERPRIVOP_START
+	mov r21=HYPERPRIVOP_MAX
+	;;
+	sub r20=r17,r20
+	extr.u r19=r19,IA64_PSR_CPL0_BIT,2  // extract cpl field from cr.ipsr
+	;;
+	cmp.gtu p7,p0=r21,r20
+	;;
+	cmp.eq.and p7,p0=2,r19			// ipsr.cpl==2
 (p7)	br.sptk.many fast_hyperprivop
 	;;
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET
 	;;
 	ld8 r22 = [r22]
 	;;
-	adds r22=IA64_VCPU_BREAKIMM_OFFSET,r22
+	adds r23=IA64_VCPU_BREAKIMM_OFFSET,r22
 	;;
-	ld4 r23=[r22];;
-	cmp4.eq p6,p7=r23,r17			// Xen-reserved breakimm?
-(p6)	br.spnt.many dispatch_break_fault
+	ld4 r23=[r23];;
+	cmp4.eq p6,p0=r23,r17;;			// Xen-reserved breakimm?
+	cmp.eq.and p6,p0=2,r19        
+(p6)	br.spnt.many fast_hypercall
 	;;
 	br.sptk.many fast_break_reflect
 	;;
-#else /* !XEN */
-	movl r16=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
-	ld8 r16=[r16]
-	mov r17=cr.iim
-	mov r18=__IA64_BREAK_SYSCALL
-	mov r21=ar.fpsr
-	mov r29=cr.ipsr
-	mov r19=b6
-	mov r25=ar.unat
-	mov r27=ar.rsc
-	mov r26=ar.pfs
-	mov r28=cr.iip
-#ifndef XEN
-	mov r31=pr			// prepare to save predicates
-#endif
-	mov r20=r1
+
+
+fast_hypercall:
+	shr r25=r2,8;;
+	cmp.ne p7,p0=r0,r25
+(p7)	br.spnt.few dispatch_break_fault
 	;;
+	// fall through
+   
+
+	/*
+	 * The streamlined system call entry/exit paths only save/restore the initial part
+	 * of pt_regs.  This implies that the callers of system-calls must adhere to the
+	 * normal procedure calling conventions.
+	 *
+	 *   Registers to be saved & restored:
+	 *	CR registers: cr.ipsr, cr.iip, cr.ifs
+	 *	AR registers: ar.unat, ar.pfs, ar.rsc, ar.rnat, ar.bspstore, ar.fpsr
+	 * 	others: pr, b0, b6, loadrs, r1, r11, r12, r13, r15
+	 *   Registers to be restored only:
+	 * 	r8-r11: output value from the system call.
+	 *
+	 * During system call exit, scratch registers (including r15) are modified/cleared
+	 * to prevent leaking bits from kernel to user level.
+	 */
+    
+//	DBG_FAULT(11)
+//	mov.m r16=IA64_KR(CURRENT)		// M2 r16 <- current task (12 cyc)
+	mov r16=r22
+	mov r29=cr.ipsr				// M2 (12 cyc)
+//	mov r31=pr				// I0 (2 cyc)
+	mov r15=r2
+
+//	mov r17=cr.iim				// M2 (2 cyc)
+	mov.m r27=ar.rsc			// M2 (12 cyc)
+//	mov r18=__IA64_BREAK_SYSCALL		// A
+
+	mov.m ar.rsc=0				// M2
+	mov.m r21=ar.fpsr			// M2 (12 cyc)
+	mov r19=b6				// I0 (2 cyc)
+	;;
+	mov.m r23=ar.bspstore			// M2 (12 cyc)
+	mov.m r24=ar.rnat			// M2 (5 cyc)
+	mov.i r26=ar.pfs			// I0 (2 cyc)
+
+	invala					// M0|1
+	nop.m 0					// M
+	mov r20=r1				// A			save r1
+
+	nop.m 0
+//	movl r30=sys_call_table			// X
+	movl r30=ia64_hypercall_table			// X
+
+	mov r28=cr.iip				// M2 (2 cyc)
+//	cmp.eq p0,p7=r18,r17			// I0 is this a system call?
+//(p7)	br.cond.spnt non_syscall		// B  no ->
+	//
+	// From this point on, we are definitely on the syscall-path
+	// and we can use (non-banked) scratch registers.
+	//
+///////////////////////////////////////////////////////////////////////
+	mov r1=r16				// A    move task-pointer to "addl"-addressable reg
+	mov r2=r16				// A    setup r2 for ia64_syscall_setup
+//	add r9=TI_FLAGS+IA64_TASK_SIZE,r16	// A	r9 = &current_thread_info()->flags
+
 	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r16
-	cmp.eq p0,p7=r18,r17		// is this a system call? 
-					//   (p7 <- false, if so)
-(p7)	br.cond.spnt non_syscall
+//	adds r15=-1024,r15			// A    subtract 1024 from syscall number
+//	mov r3=NR_syscalls - 1
+	mov r3=NR_hypercalls - 1
 	;;
-	ld1 r17=[r16]			// load current->thread.on_ustack flag
-	st1 [r16]=r0			// clear current->thread.on_ustack flag
-	add r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16
-					// set r1 for 
-					//   MINSTATE_START_SAVE_MIN_VIRT
-	;;
-	invala
+	ld1.bias r17=[r16]			// M0|1 r17 = current->thread.on_ustack flag
+//	ld4 r9=[r9]				// M0|1 r9 = current_thread_info()->flags
+	mov r9=r0               // force flags = 0
+	extr.u r8=r29,41,2			// I0   extract ei field from cr.ipsr
 
-	/* adjust return address so we skip over the break instruction: */
-
-	extr.u r8=r29,41,2		// extract ei field from cr.ipsr
-	;;
-	cmp.eq p6,p7=2,r8		// isr.ei==2?
-	mov r2=r1			// setup r2 for ia64_syscall_setup
-	;;
-(p6)	mov r8=0			// clear ei to 0
-(p6)	adds r28=16,r28			// switch cr.iip to next bundle 
-					//   cr.ipsr.ei wrapped
-(p7)	adds r8=1,r8			// increment ei to next slot
-	;;
-	cmp.eq pKStk,pUStk=r0,r17	// are we in kernel mode already?
-	dep r29=r8,r29,41,2		// insert new ei into cr.ipsr
+	shladd r30=r15,3,r30			// A    r30 = sys_call_table + 8*(syscall-1024)
+	addl r22=IA64_RBS_OFFSET,r1		// A    compute base of RBS
+	cmp.leu p6,p7=r15,r3			// A    syscall number in range?
 	;;
 
-	// switch from user to kernel RBS:
-	MINSTATE_START_SAVE_MIN_VIRT
-	br.call.sptk.many b7=ia64_syscall_setup
-	;;
-	MINSTATE_END_SAVE_MIN_VIRT	// switch to bank 1
-	ssm psr.ic | PSR_DEFAULT_BITS
-	;;
-	srlz.i				// guarantee that interruption 
-					//   collection is on
-	mov r3=NR_syscalls - 1
-	;;
-(p15)	ssm psr.i			// restore psr.i
-	// p10==true means out registers are more than 8 or r15's Nat is true
-(p10)	br.cond.spnt.many ia64_ret_from_syscall
-	;;
-	movl r16=sys_call_table
+	lfetch.fault.excl.nt1 [r22]		// M0|1 prefetch RBS
+(p6)	ld8 r30=[r30]				// M0|1 load address of syscall entry point
+	tnat.nz.or p7,p0=r15			// I0	is syscall nr a NaT?
 
-	adds r15=-1024,r15		// r15 contains the syscall number --
-					//   subtract 1024 from it
-	movl r2=ia64_ret_from_syscall
+	mov.m ar.bspstore=r22			// M2   switch to kernel RBS
+	cmp.eq p8,p9=2,r8			// A    isr.ei==2?
 	;;
-	shladd r20=r15,3,r16		// r20 = sys_call_table + 
-					//       8*(syscall-1024)
-	cmp.leu p6,p7=r15,r3		// (syscall > 0 && syscall < 1024 +
-					//  NR_syscalls) ?
-	mov rp=r2			// set the real return addr
-	;;
-(p6)	ld8 r20=[r20]			// load address of syscall entry point
-(p7)	movl r20=sys_ni_syscall
 
-	add r2=TI_FLAGS+IA64_TASK_SIZE,r13
+(p8)	mov r8=0				// A    clear ei to 0
+//(p7)	movl r30=sys_ni_syscall			// X
+(p7)	movl r30=do_ni_hypercall			// X
+
+(p8)	adds r28=16,r28				// A    switch cr.iip to next bundle
+(p9)	adds r8=1,r8				// A    increment ei to next slot
+	nop.i 0
 	;;
-	ld4 r2=[r2]			// r2 = current_thread_info()->flags
+
+	mov.m r25=ar.unat			// M2 (5 cyc)
+	dep r29=r8,r29,41,2			// I0   insert new ei into cr.ipsr
+//	adds r15=1024,r15			// A    restore original syscall number
+	//
+	// If any of the above loads miss in L1D, we'll stall here until
+	// the data arrives.
+	//
+///////////////////////////////////////////////////////////////////////
+	st1 [r16]=r0				// M2|3 clear current->thread.on_ustack flag
+	mov b6=r30				// I0   setup syscall handler branch reg early
+	cmp.eq pKStk,pUStk=r0,r17		// A    were we on kernel stacks already?
+
+//	and r9=_TIF_SYSCALL_TRACEAUDIT,r9	// A    mask trace or audit
+	mov r18=ar.bsp				// M2 (12 cyc)
 	;;
-	and r2=_TIF_SYSCALL_TRACEAUDIT,r2  // mask trace or audit
+(pUStk)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1 // A    compute base of memory stack
+//	cmp.eq p14,p0=r9,r0			// A    are syscalls being traced/audited?
+	br.call.sptk.many b7=ia64_syscall_setup	// B
+1:
+	mov ar.rsc=0x3				// M2   set eager mode, pl 0, LE, loadrs=0
+	nop 0
+	bsw.1					// B (6 cyc) regs are saved, switch to bank 1
 	;;
-	cmp.eq p8,p0=r2,r0
-	mov b6=r20
+
+	ssm psr.ic | PSR_DEFAULT_BITS		// M2	now it's safe to re-enable intr.-collection
+//	movl r3=ia64_ret_from_syscall		// X
 	;;
-(p8)	br.call.sptk.many b6=b6		// ignore this return addr
-	br.cond.sptk ia64_trace_syscall
-	// NOT REACHED
-#endif
+
+	srlz.i					// M0   ensure interruption collection is on
+//	mov rp=r3				// I0   set the real return addr
+//(p10)	br.cond.spnt.many ia64_ret_from_syscall	// B    return if bad call-frame or r15 is a NaT
+(p15)	ssm psr.i				// M2   restore psr.i
+//(p14)	br.call.sptk.many b6=b6			// B    invoke syscall-handker (ignore return addr)
+//	br.call.sptk.many b6=b6			// B    invoke syscall-handker (ignore return addr)
+	br.call.sptk.many b0=b6			// B    invoke syscall-handker (ignore return addr)
+//	br.cond.spnt.many ia64_trace_syscall	// B	do syscall-tracing thingamagic
+	;;
+	adds r2=PT(R8)+16,r12
+	;;
+	st8 [r2]=r8
+	;;
+	br.call.sptk.many b0=do_softirq
+	;;
+	//restore hypercall argument if continuation
+	adds r2=IA64_VCPU_HYPERCALL_CONTINUATION_OFS,r13
+	;;
+	ld1 r20=[r2]
+	;;
+	st1 [r2]=r0
+	;;
+	cmp.ne p6,p0=r20,r0
+	;;
+(p6)	adds r2=PT(R16)+16,r12
+(p6)	adds r3=PT(R17)+16,r12
+	;;
+(p6)	ld8 r32=[r2],16
+(p6)	ld8 r33=[r3],16
+	;;
+(p6)	ld8 r34=[r2],16
+(p6)	ld8 r35=[r3],16
+	;;
+(p6)	ld8 r36=[r2],16
+	;;
+//save ar.bsp before cover
+	mov r16=ar.bsp
+	add r2=PT(R14)+16,r12
+	;;
+	st8 [r2]=r16
+	;;
+	rsm psr.i|psr.ic
+	;;
+	srlz.i
+	;;
+	cover
+	;;
+	mov r20=cr.ifs    
+	adds r2=PT(CR_IFS)+16,r12
+	;;
+	st8 [r2]=r20
+	;;   
+	br.call.sptk.many b0=reflect_event
+	;;
+	adds r2=PT(R14)+16,r12
+	adds r3=PT(R8)+16,r12
+	;;
+	//r16 contains ar.bsp before cover
+	ld8 r16=[r2]
+	ld8 r8=[r3]
+	;;
+	br.sptk.many ia64_ret_from_syscall
+	;;
 END(break_fault)
 
 	.org ia64_ivt+0x3000
@@ -1288,7 +1397,150 @@ END(dispatch_break_fault)
 	DBG_FAULT(14)
 	FAULT(14)
 
-#ifndef XEN
+#ifdef XEN
+    // this code segment is from 2.6.16.13
+    
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 *
+	 * ia64_syscall_setup() is a separate subroutine so that it can
+	 *	allocate stacked registers so it can safely demine any
+	 *	potential NaT values from the input registers.
+	 *
+	 * On entry:
+	 *	- executing on bank 0 or bank 1 register set (doesn't matter)
+	 *	-  r1: stack pointer
+	 *	-  r2: current task pointer
+	 *	-  r3: preserved
+	 *	- r11: original contents (saved ar.pfs to be saved)
+	 *	- r12: original contents (sp to be saved)
+	 *	- r13: original contents (tp to be saved)
+	 *	- r15: original contents (syscall # to be saved)
+	 *	- r18: saved bsp (after switching to kernel stack)
+	 *	- r19: saved b6
+	 *	- r20: saved r1 (gp)
+	 *	- r21: saved ar.fpsr
+	 *	- r22: kernel's register backing store base (krbs_base)
+	 *	- r23: saved ar.bspstore
+	 *	- r24: saved ar.rnat
+	 *	- r25: saved ar.unat
+	 *	- r26: saved ar.pfs
+	 *	- r27: saved ar.rsc
+	 *	- r28: saved cr.iip
+	 *	- r29: saved cr.ipsr
+	 *	- r31: saved pr
+	 *	-  b0: original contents (to be saved)
+	 * On exit:
+	 *	-  p10: TRUE if syscall is invoked with more than 8 out
+	 *		registers or r15's Nat is true
+	 *	-  r1: kernel's gp
+	 *	-  r3: preserved (same as on entry)
+	 *	-  r8: -EINVAL if p10 is true
+	 *	- r12: points to kernel stack
+	 *	- r13: points to current task
+	 *	- r14: preserved (same as on entry)
+	 *	- p13: preserved
+	 *	- p15: TRUE if interrupts need to be re-enabled
+	 *	- ar.fpsr: set to kernel settings
+	 *	-  b6: preserved (same as on entry)
+	 */
+GLOBAL_ENTRY(ia64_syscall_setup)
+#if PT(B6) != 0
+# error This code assumes that b6 is the first field in pt_regs.
+#endif
+	st8 [r1]=r19				// save b6
+	add r16=PT(CR_IPSR),r1			// initialize first base pointer
+	add r17=PT(R11),r1			// initialize second base pointer
+	;;
+	alloc r19=ar.pfs,8,0,0,0		// ensure in0-in7 are writable
+	st8 [r16]=r29,PT(AR_PFS)-PT(CR_IPSR)	// save cr.ipsr
+	tnat.nz p8,p0=in0
+
+	st8.spill [r17]=r11,PT(CR_IIP)-PT(R11)	// save r11
+	tnat.nz p9,p0=in1
+(pKStk)	mov r18=r0				// make sure r18 isn't NaT
+	;;
+
+	st8 [r16]=r26,PT(CR_IFS)-PT(AR_PFS)	// save ar.pfs
+	st8 [r17]=r28,PT(AR_UNAT)-PT(CR_IIP)	// save cr.iip
+	mov r28=b0				// save b0 (2 cyc)
+	;;
+
+	st8 [r17]=r25,PT(AR_RSC)-PT(AR_UNAT)	// save ar.unat
+	dep r19=0,r19,38,26			// clear all bits but 0..37 [I0]
+(p8)	mov in0=-1
+	;;
+
+	st8 [r16]=r19,PT(AR_RNAT)-PT(CR_IFS)	// store ar.pfs.pfm in cr.ifs
+	extr.u r11=r19,7,7	// I0		// get sol of ar.pfs
+	and r8=0x7f,r19		// A		// get sof of ar.pfs
+
+	st8 [r17]=r27,PT(AR_BSPSTORE)-PT(AR_RSC)// save ar.rsc
+	tbit.nz p15,p0=r29,IA64_PSR_I_BIT // I0
+(p9)	mov in1=-1
+	;;
+
+(pUStk) sub r18=r18,r22				// r18=RSE.ndirty*8
+	tnat.nz p10,p0=in2
+	add r11=8,r11
+	;;
+(pKStk) adds r16=PT(PR)-PT(AR_RNAT),r16		// skip over ar_rnat field
+(pKStk) adds r17=PT(B0)-PT(AR_BSPSTORE),r17	// skip over ar_bspstore field
+	tnat.nz p11,p0=in3
+	;;
+(p10)	mov in2=-1
+	tnat.nz p12,p0=in4				// [I0]
+(p11)	mov in3=-1
+	;;
+(pUStk) st8 [r16]=r24,PT(PR)-PT(AR_RNAT)	// save ar.rnat
+(pUStk) st8 [r17]=r23,PT(B0)-PT(AR_BSPSTORE)	// save ar.bspstore
+	shl r18=r18,16				// compute ar.rsc to be used for "loadrs"
+	;;
+	st8 [r16]=r31,PT(LOADRS)-PT(PR)		// save predicates
+	st8 [r17]=r28,PT(R1)-PT(B0)		// save b0
+	tnat.nz p13,p0=in5				// [I0]
+	;;
+	st8 [r16]=r18,PT(R12)-PT(LOADRS)	// save ar.rsc value for "loadrs"
+	st8.spill [r17]=r20,PT(R13)-PT(R1)	// save original r1
+(p12)	mov in4=-1
+	;;
+
+.mem.offset 0,0; st8.spill [r16]=r12,PT(AR_FPSR)-PT(R12)	// save r12
+.mem.offset 8,0; st8.spill [r17]=r13,PT(R15)-PT(R13)		// save r13
+(p13)	mov in5=-1
+	;;
+	st8 [r16]=r21,PT(R8)-PT(AR_FPSR)	// save ar.fpsr
+	tnat.nz p13,p0=in6
+	cmp.lt p10,p9=r11,r8	// frame size can't be more than local+8
+	;;
+	mov r8=1
+(p9)	tnat.nz p10,p0=r15
+	adds r12=-16,r1		// switch to kernel memory stack (with 16 bytes of scratch)
+
+	st8.spill [r17]=r15			// save r15
+	tnat.nz p8,p0=in7
+	nop.i 0
+
+	mov r13=r2				// establish `current'
+	movl r1=__gp				// establish kernel global pointer
+	;;
+	st8 [r16]=r8		// ensure pt_regs.r8 != 0 (see handle_syscall_error)
+(p13)	mov in6=-1
+(p8)	mov in7=-1
+
+	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
+	movl r17=FPSR_DEFAULT
+	;;
+	mov.m ar.fpsr=r17			// set ar.fpsr to kernel default value
+(p10)	mov r8=-EINVAL
+	br.ret.sptk.many b7
+END(ia64_syscall_setup)
+
+
+#else    
 	/*
 	 * There is no particular reason for this code to be here, other 
 	 * than that there happens to be space here that would go unused 

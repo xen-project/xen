@@ -50,12 +50,31 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-int hvm_enabled = 0;
+int hvm_enabled;
 
-unsigned int opt_hvm_debug_level = 0;
+unsigned int opt_hvm_debug_level;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
+
+/* I/O permission bitmap is globally shared by all HVM guests. */
+char __attribute__ ((__section__ (".bss.page_aligned")))
+    hvm_io_bitmap[3*PAGE_SIZE];
+
+void hvm_enable(void)
+{
+    if ( hvm_enabled )
+        return;
+
+    /*
+     * Allow direct access to the PC debug port (it is often used for I/O
+     * delays, but the vmexits simply slow things down).
+     */
+    memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
+    clear_bit(0x80, hvm_io_bitmap);
+
+    hvm_enabled = 1;
+}
 
 void hvm_stts(struct vcpu *v)
 {
@@ -135,7 +154,7 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
-    spin_lock_init(&d->arch.hvm_domain.irq.lock);
+    spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
     rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
     if ( rc != 0 )
@@ -162,6 +181,54 @@ void hvm_domain_destroy(struct domain *d)
         unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
+static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+    struct hvm_hw_cpu ctxt;
+
+    for_each_vcpu(d, v)
+    {
+        /* We don't need to save state for a vcpu that is down; the restore 
+         * code will leave it down if there is nothing saved. */
+        if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) 
+            continue;
+
+        hvm_funcs.save_cpu_ctxt(v, &ctxt);
+        if ( hvm_save_entry(CPU, v->vcpu_id, h, &ctxt) != 0 )
+            return 1; 
+    }
+    return 0;
+}
+
+static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+{
+    int vcpuid;
+    struct vcpu *v;
+    struct hvm_hw_cpu ctxt;
+
+    /* Which vcpu is this? */
+    vcpuid = hvm_load_instance(h);
+    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL ) 
+    {
+        gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
+        return -EINVAL;
+    }
+
+    if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
+        return -EINVAL;
+
+    if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
+        return -EINVAL;
+
+    /* Auxiliary processors should be woken immediately. */
+    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        vcpu_wake(v);
+
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt);
+
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -186,10 +253,11 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( v->vcpu_id != 0 )
         return 0;
 
-    rtc_init(v, RTC_PORT(0), RTC_IRQ);
+    pit_init(v, cpu_khz);
+    rtc_init(v, RTC_PORT(0));
     pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
     hpet_init(v);
-
+ 
     /* Init guest TSC to start from zero. */
     hvm_set_guest_time(v, 0);
 
@@ -625,7 +693,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -668,7 +736,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -711,7 +779,7 @@ static int hvmop_set_pci_link_route(
     if ( (op.link > 3) || (op.isa_irq > 15) )
         return -EINVAL;
 
-    d = find_domain_by_id(op.domid);
+    d = get_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -756,7 +824,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( IS_PRIV(current->domain) )
         {
-            d = find_domain_by_id(a.domid);
+            d = get_domain_by_id(a.domid);
             if ( d == NULL )
                 return -ESRCH;
         }
@@ -800,7 +868,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
-                hvm_set_callback_gsi(d, a.value);
+                hvm_set_callback_via(d, a.value);
                 break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;

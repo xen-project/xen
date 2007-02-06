@@ -149,16 +149,16 @@ We ought to support at least
 The XML-RPC interface is session-based; before you can make arbitrary RPC calls
 you must login and initiate a session. For example:
 \begin{verbatim}
-   session_id    Session.login_with_password(string uname, string pwd)
+   session_id    session.login_with_password(string uname, string pwd)
 \end{verbatim}
 Where {\tt uname} and {\tt password} refer to your username and password
 respectively, as defined by the Xen administrator.
-The {\tt session\_id} returned by {\tt Session.Login} is passed to subequent
-RPC calls as an authentication token.
+The {\tt session\_id} returned by {\tt session.login\_with\_password} is passed
+to subequent RPC calls as an authentication token.
 
-A session can be terminated with the {\tt Session.Logout} function:
+A session can be terminated with the {\tt session.logout} function:
 \begin{verbatim}
-   void          Session.Logout(session_id session)
+   void          session.logout(session_id session)
 \end{verbatim}
 
 \subsection{Synchronous and Asynchronous invocation}
@@ -251,14 +251,20 @@ call takes the session token as the only parameter)
   '2045dbc0-0734-4eea-9cb2-b8218c6b5bf2', '3202ae18-a046-4c32-9fda-e32e9631866e']
 \end{verbatim}
 
-Note the VM references are internally UUIDs. Once a reference to a VM has been acquired a lifecycle operation may be invoked:
+The VM references here are UUIDs, though they may not be that simple in the
+future, and you should treat them as opaque strings.  Once a reference to a VM
+has been acquired a lifecycle operation may be invoked:
 
 \begin{verbatim}
 >>> xen.VM.start(session, all_vms[3], False)
-{'Status': 'Failure', 'ErrorDescription': 'Operation not implemented'}
+{'Status': 'Failure', 'ErrorDescription': ['VM_BAD_POWER_STATE', 'Halted', 'Running']}
 \end{verbatim}
 
-In this case the {\tt start} message has not been implemented and an error response has been returned. Currently these high-level errors are returned as structured data (rather than as XMLRPC faults), allowing for internationalised errors in future. Finally, here are some examples of using accessors for object fields:
+In this case the {\tt start} message has been rejected, because the VM is
+already running, and so an error response has been returned.  These high-level
+errors are returned as structured data (rather than as XML-RPC faults),
+allowing them to be internationalised.  Finally, here are some examples of
+using accessors for object fields:
 
 \begin{verbatim}
 >>> xen.VM.get_name_label(session, all_vms[3])['Value']

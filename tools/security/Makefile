@@ -86,7 +86,7 @@ install:
 endif
 
 .PHONY: build
-build: mk-symlinks $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
+build: $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	python python/setup.py build
 	chmod 700 $(ACM_SCRIPTS)
 
@@ -104,7 +104,6 @@ clean:
 	$(RM) $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	$(RM) $(ACM_OBJS)
 	$(RM) $(PROG_DEPS)
-	$(RM) -r xen
 	$(RM) -r build
 
 .PHONY: mrproper

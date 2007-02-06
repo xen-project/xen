@@ -314,6 +314,7 @@ int main(void)
 
     printf("Loading ROMBIOS ...\n");
     memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
+    highbios_setup();
 
     apic_setup();
     pci_setup();

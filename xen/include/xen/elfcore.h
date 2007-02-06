@@ -56,49 +56,6 @@ typedef struct
     int pr_fpvalid;              /* True if math co-processor being used.  */
 } ELF_Prstatus;
 
-/*
- * The following data structures provide 64-bit ELF notes. In theory it should 
- * be possible to support both 64-bit and 32-bit ELF files, but to keep it 
- * simple we only do 64-bit.
- *
- * Please note that the current code aligns the 64-bit notes in the same
- * way as Linux does. We are not following the 64-bit ELF spec, no one does.
- *
- * We are avoiding two problems by restricting us to 64-bit notes only:
- * - Alignment of notes change with the word size. Ick.
- * - We would need to tell kexec-tools which format we are using in the
- *   hypervisor to make sure the right ELF format is generated.
- *   That requires infrastructure. Let's not.
- */
-
-#define NOTE_ALIGN(x, n) ((x + ((1 << n) - 1)) / (1 << n))
-#define PAD32(x) u32 pad_data[NOTE_ALIGN(x, 2)]
-
-#define TYPEDEF_NOTE(type, strlen, desctype)    \
-    typedef struct {                            \
-        union {                                 \
-            struct {                            \
-                Elf_Note note;                  \
-                unsigned char name[strlen];     \
-            } note;                             \
-            PAD32(sizeof(Elf_Note) + strlen);   \
-        } note;                                 \
-        union {                                 \
-            desctype desc;                      \
-            PAD32(sizeof(desctype));            \
-        } desc;                                 \
-    } __attribute__ ((packed)) type
-
-#define CORE_STR                "CORE"
-#define CORE_STR_LEN            5 /* including terminating zero */
-
-TYPEDEF_NOTE(crash_note_core_t, CORE_STR_LEN, ELF_Prstatus);
-
-#define XEN_STR                 "Xen"
-#define XEN_STR_LEN             4 /* including terminating zero */
-
-TYPEDEF_NOTE(crash_note_xen_core_t, XEN_STR_LEN, crash_xen_core_t);
-
 typedef struct {
     unsigned long xen_major_version;
     unsigned long xen_minor_version;
@@ -112,20 +69,6 @@ typedef struct {
     unsigned long dom0_pfn_to_mfn_frame_list_list;
 #endif
 } crash_xen_info_t;
-
-TYPEDEF_NOTE(crash_note_xen_info_t, XEN_STR_LEN, crash_xen_info_t);
-
-typedef struct {
-    crash_note_core_t core;
-    crash_note_xen_core_t xen_regs;
-    crash_note_xen_info_t xen_info;
-} __attribute__ ((packed)) crash_note_t;
-
-#define setup_crash_note(np, member, str, str_len, id) \
-  np->member.note.note.note.namesz = str_len; \
-  np->member.note.note.note.descsz = sizeof(np->member.desc.desc); \
-  np->member.note.note.note.type = id; \
-  memcpy(np->member.note.note.name, str, str_len)
 
 #endif /* __ELFCOREC_H__ */
 

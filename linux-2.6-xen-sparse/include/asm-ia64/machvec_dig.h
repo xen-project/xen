@@ -2,7 +2,6 @@
 #define _ASM_IA64_MACHVEC_DIG_h
 
 extern ia64_mv_setup_t dig_setup;
-extern ia64_mv_irq_init_t dig_irq_init;
 
 /*
  * This stuff has dual use!
@@ -13,7 +12,6 @@ extern ia64_mv_irq_init_t dig_irq_init;
  */
 #define platform_name		"dig"
 #define platform_setup		dig_setup
-#define platform_irq_init	dig_irq_init
 
 #ifdef CONFIG_XEN
 # define platform_dma_map_sg		dma_map_sg

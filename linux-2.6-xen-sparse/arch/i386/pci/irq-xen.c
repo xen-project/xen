@@ -4,7 +4,6 @@
  *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -110,7 +109,6 @@ static struct irq_routing_table * __init pirq_find_routing_table(void)
 		if (rt)
 			return rt;
 	}
-	
 	return NULL;
 }
 
@@ -203,14 +201,14 @@ static void write_config_nybble(struct pci_dev *router, unsigned offset, unsigne
  */
 static int pirq_ali_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
-	static unsigned char irqmap[16] = { 0, 9, 3, 10, 4, 5, 7, 6, 1, 11, 0, 12, 0, 14, 0, 15 };
+	static const unsigned char irqmap[16] = { 0, 9, 3, 10, 4, 5, 7, 6, 1, 11, 0, 12, 0, 14, 0, 15 };
 
 	return irqmap[read_config_nybble(router, 0x48, pirq-1)];
 }
 
 static int pirq_ali_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	static unsigned char irqmap[16] = { 0, 8, 0, 2, 4, 5, 7, 6, 0, 1, 3, 9, 11, 0, 13, 15 };
+	static const unsigned char irqmap[16] = { 0, 8, 0, 2, 4, 5, 7, 6, 0, 1, 3, 9, 11, 0, 13, 15 };
 	unsigned int val = irqmap[irq];
 		
 	if (val) {
@@ -261,13 +259,13 @@ static int pirq_via_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
  */
 static int pirq_via586_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
-	static unsigned int pirqmap[4] = { 3, 2, 5, 1 };
+	static const unsigned int pirqmap[4] = { 3, 2, 5, 1 };
 	return read_config_nybble(router, 0x55, pirqmap[pirq-1]);
 }
 
 static int pirq_via586_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	static unsigned int pirqmap[4] = { 3, 2, 5, 1 };
+	static const unsigned int pirqmap[4] = { 3, 2, 5, 1 };
 	write_config_nybble(router, 0x55, pirqmap[pirq-1], irq);
 	return 1;
 }
@@ -279,13 +277,13 @@ static int pirq_via586_set(struct pci_dev *router, struct pci_dev *dev, int pirq
  */
 static int pirq_ite_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
-	static unsigned char pirqmap[4] = { 1, 0, 2, 3 };
+	static const unsigned char pirqmap[4] = { 1, 0, 2, 3 };
 	return read_config_nybble(router,0x43, pirqmap[pirq-1]);
 }
 
 static int pirq_ite_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	static unsigned char pirqmap[4] = { 1, 0, 2, 3 };
+	static const unsigned char pirqmap[4] = { 1, 0, 2, 3 };
 	write_config_nybble(router, 0x43, pirqmap[pirq-1], irq);
 	return 1;
 }
@@ -510,7 +508,7 @@ static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 
 static __init int intel_router_probe(struct irq_router *r, struct pci_dev *router, u16 device)
 {
-	static struct pci_device_id pirq_440gx[] = {
+	static struct pci_device_id __initdata pirq_440gx[] = {
 		{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443GX_0) },
 		{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443GX_2) },
 		{ },
@@ -593,7 +591,9 @@ static __init int via_router_probe(struct irq_router *r,
 	case PCI_DEVICE_ID_VIA_82C596:
 	case PCI_DEVICE_ID_VIA_82C686:
 	case PCI_DEVICE_ID_VIA_8231:
+	case PCI_DEVICE_ID_VIA_8233A:
 	case PCI_DEVICE_ID_VIA_8235:
+	case PCI_DEVICE_ID_VIA_8237:
 		/* FIXME: add new ones for 8233/5 */
 		r->name = "VIA";
 		r->get = pirq_via_get;
@@ -868,7 +868,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		for (i = 0; i < 16; i++) {
 			if (!(mask & (1 << i)))
 				continue;
-			if (pirq_penalty[i] < pirq_penalty[newirq] && can_request_irq(i, SA_SHIRQ))
+			if (pirq_penalty[i] < pirq_penalty[newirq] && can_request_irq(i, IRQF_SHARED))
 				newirq = i;
 		}
 	}
@@ -883,6 +883,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	((!(pci_probe & PCI_USE_PIRQ_MASK)) || ((1 << irq) & mask)) ) {
 		DBG(" -> got IRQ %d\n", irq);
 		msg = "Found";
+		eisa_set_level_irq(irq);
 	} else if (newirq && r->set && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
 		DBG(" -> assigning IRQ %d", newirq);
 		if (r->set(pirq_router_dev, dev, pirq, newirq)) {

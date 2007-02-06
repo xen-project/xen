@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2006 XenSource, Inc.
+ *  Copyright (c) 2006-2007 XenSource, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -86,6 +86,8 @@ static xmlNode *
 add_param_struct(xmlNode *);
 static xmlNode *
 add_struct_array(xmlNode *, const char *);
+static xmlNode *
+add_nested_struct(xmlNode *, const char *);
 static void
 add_struct_member(xmlNode *, const char *, const char *, const char *);
 static void
@@ -106,6 +108,9 @@ parse_structmap_value(xen_session *, xmlNode *, const abstract_type *,
                       void *);
 
 static size_t size_of_member(const abstract_type *);
+
+static const char *
+get_val_as_string(const struct abstract_type *, void *, char *);
 
 
 void
@@ -373,11 +378,18 @@ static void server_error_2(xen_session *session, const char *error_string,
 }
 
 
-static bool is_container_node(xmlNode *n, char *type)
+static bool is_node(xmlNode *n, char *type)
 {
     return
         n->type == XML_ELEMENT_NODE &&
-        0 == strcmp((char *)n->name, type) &&
+        0 == strcmp((char *)n->name, type);
+}
+
+
+static bool is_container_node(xmlNode *n, char *type)
+{
+    return
+        is_node(n, type) &&
         n->children != NULL &&
         n->children == n->last &&
         n->children->type == XML_ELEMENT_NODE;
@@ -390,13 +402,30 @@ static bool is_container_node(xmlNode *n, char *type)
  */
 static xmlChar *string_from_value(xmlNode *n, char *type)
 {
-    return
-        is_container_node(n, "value") &&
-        0 == strcmp((char *)n->children->name, type) ?
-          (n->children->children == NULL ?
-             xmlStrdup(BAD_CAST("")) :
-             xmlNodeGetContent(n->children->children)) :
-          NULL;
+    /*
+      <value><type>XYZ</type></value> is normal, but the XML-RPC spec also
+      allows <value>XYZ</value> where XYZ is to be interpreted as a string.
+    */
+
+    if (is_container_node(n, "value") &&
+        0 == strcmp((char *)n->children->name, type))
+    {
+        return
+            n->children->children == NULL ?
+                xmlStrdup(BAD_CAST("")) :
+                xmlNodeGetContent(n->children->children);
+    }
+    else if (0 == strcmp(type, "string") && is_node(n, "value"))
+    {
+        return
+            n->children == NULL ?
+                xmlStrdup(BAD_CAST("")) :
+                xmlNodeGetContent(n->children);
+    }
+    else
+    {
+        return NULL;
+    }
 }
 
 
@@ -557,8 +586,14 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         xmlChar *string = string_from_value(value_node, "double");
         if (string == NULL)
         {
+#if PERMISSIVE
+            fprintf(stderr,
+                    "Expected a Float from the server, but didn't get one\n");
+            ((double *)value)[slot] = 0.0;
+#else
             server_error(
                 s, "Expected a Float from the server, but didn't get one");
+#endif
         }
         else
         {
@@ -1144,37 +1179,12 @@ add_struct_value(const struct abstract_type *type, void *value,
     switch (type->typename)
     {
     case REF:
-    {
-        arbitrary_record_opt *val = *(arbitrary_record_opt **)value;
-        if (val != NULL)
-        {
-            if (val->is_record)
-            {
-                adder(node, key, "string", val->u.record->handle);
-            }
-            else
-            {
-                adder(node, key, "string", val->u.handle);
-            }
-        }
-    }
-    break;
-
     case STRING:
-    {
-        char *val = *(char **)value;
-        if (val != NULL)
-        {
-            adder(node, key, "string", val);
-        }
-    }
-    break;
-
     case INT:
+    case ENUM:
     {
-        int64_t val = *(int64_t *)value;
-        snprintf(buf, sizeof(buf), "%"PRId64, val);
-        adder(node, key, "string", buf);
+        const char *val_as_string = get_val_as_string(type, value, buf);
+        adder(node, key, "string", val_as_string);
     }
     break;
 
@@ -1190,13 +1200,6 @@ add_struct_value(const struct abstract_type *type, void *value,
     {
         bool val = *(bool *)value;
         adder(node, key, "boolean", val ? "1" : "0");
-    }
-    break;
-
-    case ENUM:
-    {
-        int val = *(int *)value;
-        adder(node, key, "string", type->enum_marshaller(val));
     }
     break;
 
@@ -1221,12 +1224,95 @@ add_struct_value(const struct abstract_type *type, void *value,
     break;
 
     case STRUCT:
-    case MAP:
     {
+        assert(false);
         /* XXX Nested structures aren't supported yet, but
            fortunately we don't need them, because we don't have
            any "deep create" calls.  This will need to be
-           fixed.  We don't need maps either. */
+           fixed. */
+    }
+    break;
+
+    case MAP:
+    {
+        size_t member_size = type->struct_size;
+        const struct abstract_type *l_type = type->members[0].type;
+        const struct abstract_type *r_type = type->members[1].type;
+        int l_offset = type->members[0].offset;
+        int r_offset = type->members[1].offset;
+
+        arbitrary_map *map_val = *(arbitrary_map **)value;
+
+        if (map_val != NULL)
+        {
+            xmlNode *struct_node = add_nested_struct(node, key);
+
+            for (size_t i = 0; i < map_val->size; i++)
+            {
+                void *contents = (void *)map_val->contents;
+                void *l_value = contents + (i * member_size) + l_offset;
+                void *r_value = contents + (i * member_size) + r_offset;
+
+                const char *l_value_as_string =
+                    get_val_as_string(l_type, l_value, buf);
+
+                add_struct_value(r_type, r_value, add_struct_member,
+                                 l_value_as_string, struct_node);
+            }
+        }
+    }
+    break;
+
+    default:
+        assert(false);
+    }
+}
+
+
+static const char *
+get_val_as_string(const struct abstract_type *type, void *value, char *buf)
+{
+    switch (type->typename)
+    {
+    case REF:
+    {
+        arbitrary_record_opt *val = *(arbitrary_record_opt **)value;
+        if (val != NULL)
+        {
+            if (val->is_record)
+            {
+                return val->u.record->handle;
+            }
+            else
+            {
+                return val->u.handle;
+            }
+        }
+        else
+        {
+            return NULL;
+        }
+    }
+    break;
+
+    case STRING:
+    {
+        return *(char **)value;
+    }
+    break;
+
+    case INT:
+    {
+        int64_t val = *(int64_t *)value;
+        snprintf(buf, sizeof(buf), "%"PRId64, val);
+        return buf;
+    }
+    break;
+
+    case ENUM:
+    {
+        int val = *(int *)value;
+        return type->enum_marshaller(val);
     }
     break;
 
@@ -1301,7 +1387,19 @@ add_struct_array(xmlNode *struct_node, const char *name)
     xmlNode *array_node = add_container(value_node,  "array");
 
     return add_container(array_node,  "data");
+}
 
+
+static xmlNode *
+add_nested_struct(xmlNode *struct_node, const char *name)
+{
+    xmlNode *member_node = add_container(struct_node, "member");
+
+    xmlNewChild(member_node, NULL, BAD_CAST "name", BAD_CAST name);
+
+    xmlNode *value_node = add_container(member_node, "value");
+
+    return add_container(value_node, "struct");
 }
 
 

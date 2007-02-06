@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
@@ -367,7 +367,13 @@ mount it read-write in a guest domain."
           fatal 'Failed to find an unused loop device'
         fi
 
-        do_or_die losetup "$loopdev" "$file"
+        cmode=`canonicalise_mode $mode`
+        if [ "$cmode" == 'r' ]
+        then
+          do_or_die losetup -r "$loopdev" "$file"
+        else
+          do_or_die losetup "$loopdev" "$file"
+        fi
         xenstore_write "$XENBUS_PATH/node" "$loopdev"
         write_dev "$loopdev"
         release_lock "block"

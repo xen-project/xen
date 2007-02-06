@@ -12,12 +12,9 @@
  *	<tomsoft@informatik.tu-chemnitz.de>
  *
  *	hacked by Andi Kleen for x86-64.
- * 
- *  $Id: hw_irq.h,v 1.24 2001/09/14 20:55:03 vojtech Exp $
  */
 
 #ifndef __ASSEMBLY__
-#include <linux/config.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
 #include <linux/profile.h>
@@ -129,14 +126,8 @@ asmlinkage void IRQ_NAME(nr); \
 __asm__( \
 "\n.p2align\n" \
 "IRQ" #nr "_interrupt:\n\t" \
-	"push $" #nr "-256 ; " \
+	"push $~(" #nr ") ; " \
 	"jmp common_interrupt");
-
-extern void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i);
-static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
-{
-	resend_irq_on_evtchn(h, i);
-}
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 

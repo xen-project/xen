@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #============================================================================
 # Default Xen network start/stop script.
 # Xend calls a network script when it starts.
@@ -194,7 +194,7 @@ This may be because you have reached the limit of the number of interfaces
 that the loopback driver supports.  If the loopback driver is a module, you
 may raise this limit by passing it as a parameter (nloopbacks=<N>); if the
 driver is compiled statically into the kernel, then you may set the parameter
-using loopback.nloopbacks=<N> on the domain 0 kernel command line.
+using netloop.nloopbacks=<N> on the domain 0 kernel command line.
 " >&2
             exit 1
         fi
