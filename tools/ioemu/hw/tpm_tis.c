@@ -517,7 +517,7 @@ static uint32_t tis_mem_readl(void *opaque, target_phys_addr_t addr)
 
 #ifdef DEBUG_TPM
     fprintf(logfile," read(%08x) = %08x\n",
-            addr,
+            (int)addr,
             val);
 #endif
 
@@ -538,7 +538,7 @@ static void tis_mem_writel(void *opaque, target_phys_addr_t addr, uint32_t val)
 
 #ifdef DEBUG_TPM
     fprintf(logfile,"write(%08x) = %08x\n",
-            addr,
+            (int)addr,
             val);
 #endif
 
@@ -757,10 +757,11 @@ static CPUWriteMemoryFunc *tis_writefn[3]={
 static void tpm_save(QEMUFile* f,void* opaque)
 {
     tpmState* s=(tpmState*)opaque;
+    uint8_t locty = s->active_loc;
     int c;
 
     /* need to wait for outstanding requests to complete */
-    if (IS_COMM_WITH_VTPM(s)) {
+    if (s->loc[locty].state == STATE_EXECUTION) {
         int repeats = 30; /* 30 seconds; really should be infty */
         while (repeats > 0 &&
                !(s->loc[s->active_loc].sts & STS_DATA_AVAILABLE)) {
@@ -775,6 +776,10 @@ static void tpm_save(QEMUFile* f,void* opaque)
             }
             sleep(1);
         }
+    }
+
+    if (IS_COMM_WITH_VTPM(s)) {
+        close_vtpm_channel(s, 1);
     }
 
     qemu_put_be32s(f,&s->offset);
@@ -993,7 +998,7 @@ static int TPM_Receive(tpmState *s, tpmBuffer *buffer)
         uint32_t size = tpm_get_size_from_buffer(buffer->buf);
         if (size + sizeof(buffer->instance) != off) {
             fprintf(logfile,"TPM: Packet size is bad! %d != %d\n",
-                    size + sizeof(buffer->instance),
+                    (int)(size + sizeof(buffer->instance)),
                     off);
         } else {
             uint32_t ret;
