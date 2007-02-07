@@ -1,0 +1,56 @@
+diff -pruN ../orig-linux-2.6.18/include/linux/sched.h ./include/linux/sched.h
+--- ../orig-linux-2.6.18/include/linux/sched.h	2006-09-20 04:42:06.000000000 +0100
++++ ./include/linux/sched.h	2007-02-07 01:10:24.000000000 +0000
+@@ -211,10 +211,15 @@ extern void update_process_times(int use
+ extern void scheduler_tick(void);
+ 
+ #ifdef CONFIG_DETECT_SOFTLOCKUP
++extern unsigned long softlockup_get_next_event(void);
+ extern void softlockup_tick(void);
+ extern void spawn_softlockup_task(void);
+ extern void touch_softlockup_watchdog(void);
+ #else
++static inline unsigned long softlockup_get_next_event(void)
++{
++	return MAX_JIFFY_OFFSET;
++}
+ static inline void softlockup_tick(void)
+ {
+ }
+diff -pruN ../orig-linux-2.6.18/kernel/softlockup.c ./kernel/softlockup.c
+--- ../orig-linux-2.6.18/kernel/softlockup.c	2006-09-20 04:42:06.000000000 +0100
++++ ./kernel/softlockup.c	2007-02-07 01:53:22.000000000 +0000
+@@ -40,6 +40,19 @@ void touch_softlockup_watchdog(void)
+ }
+ EXPORT_SYMBOL(touch_softlockup_watchdog);
+ 
++unsigned long softlockup_get_next_event(void)
++{
++	int this_cpu = smp_processor_id();
++	unsigned long touch_timestamp = per_cpu(touch_timestamp, this_cpu);
++
++	if (per_cpu(print_timestamp, this_cpu) == touch_timestamp ||
++		did_panic ||
++			!per_cpu(watchdog_task, this_cpu))
++		return MAX_JIFFY_OFFSET;
++
++	return min_t(long, 0, touch_timestamp + HZ - jiffies);
++}
++
+ /*
+  * This callback runs from the timer interrupt, and checks
+  * whether the watchdog thread has hung or not:
+diff -pruN ../orig-linux-2.6.18/kernel/timer.c ./kernel/timer.c
+--- ../orig-linux-2.6.18/kernel/timer.c	2006-09-20 04:42:06.000000000 +0100
++++ ./kernel/timer.c	2007-02-07 01:29:34.000000000 +0000
+@@ -485,7 +485,9 @@ unsigned long next_timer_interrupt(void)
+ 		if (hr_expires < 3)
+ 			return hr_expires + jiffies;
+ 	}
+-	hr_expires += jiffies;
++	hr_expires = min_t(unsigned long,
++			   softlockup_get_next_event(),
++			   hr_expires) + jiffies;
+ 
+ 	base = __get_cpu_var(tvec_bases);
+ 	spin_lock(&base->lock);
