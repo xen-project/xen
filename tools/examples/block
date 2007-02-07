@@ -367,13 +367,7 @@ mount it read-write in a guest domain."
           fatal 'Failed to find an unused loop device'
         fi
 
-        cmode=`canonicalise_mode $mode`
-        if [ "$cmode" == 'r' ]
-        then
-          do_or_die losetup -r "$loopdev" "$file"
-        else
-          do_or_die losetup "$loopdev" "$file"
-        fi
+        do_or_die losetup "$loopdev" "$file"
         xenstore_write "$XENBUS_PATH/node" "$loopdev"
         write_dev "$loopdev"
         release_lock "block"
