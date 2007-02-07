@@ -588,7 +588,7 @@ void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     int i = 0;
 
     data->shadow_gs = guest_state->shadow_gs;
-    data->vmxassist_enabled = v->arch.hvm_vmx.vmxassist_enabled;
+
     /* save msrs */
     data->flags = guest_flags;
     for (i = 0; i < VMX_MSR_COUNT; i++)
@@ -611,10 +611,7 @@ void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 
     guest_state->shadow_gs = data->shadow_gs;
 
-    /*XXX:no need to restore msrs, current!=vcpu as not called by arch_vmx_do_launch */
-/*    vmx_restore_guest_msrs(v);*/
-
-    v->arch.hvm_vmx.vmxassist_enabled = data->vmxassist_enabled;
+    v->arch.hvm_vmx.vmxassist_enabled = !(data->cr0 & X86_CR0_PE);
 
     hvm_set_guest_time(v, data->tsc);
 

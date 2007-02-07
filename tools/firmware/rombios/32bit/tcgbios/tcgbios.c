@@ -146,7 +146,7 @@ static tcpa_acpi_t tcpa_acpi;
 static int tpm_driver_to_use = TPM_INVALID_DRIVER;
 
 static
-uint32_t MA_IsTPMPresent()
+uint32_t MA_IsTPMPresent(void)
 {
 	uint32_t rc = 0;
 	unsigned int i;
@@ -263,11 +263,11 @@ void tcpa_acpi_init(void)
 {
 	struct acpi_20_rsdt *rsdt;
 	uint32_t length;
-	struct acpi_20_tcpa *tcpa;
+	struct acpi_20_tcpa *tcpa = (void *)0;
 	uint16_t found = 0;
 	uint16_t rsdp_off;
 	uint16_t off;
-	struct acpi_20_rsdp *rsdp;
+	struct acpi_20_rsdp *rsdp = (void *)0;
 
 	if (MA_IsTPMPresent() == 0) {
 		return;
@@ -732,8 +732,8 @@ void tcpa_ipl(Bit32u seg)
 void tcpa_measure_post(Bit32u from, Bit32u to)
 {
 	struct pcpes pcpes; /* PCClientPCREventStruc */
-	memset(&pcpes, 0x0, sizeof(pcpes));
 	int len = to - from;
+	memset(&pcpes, 0x0, sizeof(pcpes));
 
 	if (len > 0) {
 		sha1((unsigned char *)from,
@@ -986,7 +986,7 @@ uint32_t PassThroughToTPM32(struct pttti *pttti,
 {
 	uint32_t rc = 0;
 	uint8_t *cmd32;
-	uint32_t resbuflen;
+	uint32_t resbuflen = 0;
 
 	if (TCG_IsShutdownPreBootInterface() != 0) {
 		rc = (TCG_PC_TPMERROR |
@@ -1277,9 +1277,7 @@ typedef struct _sha1_ctx {
 } sha1_ctx;
 
 
-static inline uint32_t rol(val, rol)
-  uint32_t val;
-  uint16_t rol;
+static inline uint32_t rol(uint32_t val, uint16_t rol)
 {
 	return (val << rol) | (val >> (32 - rol));
 }

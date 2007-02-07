@@ -107,6 +107,9 @@ while not interrupted:
 
         (tsc, event, d1, d2, d3, d4, d5) = struct.unpack(TRCREC, line)
 
+        # Event field is 'uint32_t', not 'long'.
+        event &= 0xffffffff
+
 	#tsc = (tscH<<32) | tscL
 
 	#print i, tsc

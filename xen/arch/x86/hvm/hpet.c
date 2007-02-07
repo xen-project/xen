@@ -383,6 +383,9 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
 {
     HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
 
+    /* Write the proper value into the main counter */
+    hp->hpet.mc64 = hp->mc_offset + hvm_get_guest_time(hp->vcpu);
+
     /* Save the HPET registers */
     return hvm_save_entry(HPET, 0, h, &hp->hpet);
 }
@@ -406,7 +409,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load);
+HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load, 1, HVMSR_PER_DOM);
 
 void hpet_init(struct vcpu *v)
 {

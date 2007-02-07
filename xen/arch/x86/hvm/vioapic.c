@@ -125,7 +125,7 @@ static void vioapic_write_redirent(
     struct hvm_hw_vioapic *vioapic, unsigned int idx, int top_word, uint32_t val)
 {
     struct domain *d = vioapic_domain(vioapic);
-    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     union vioapic_redir_entry *pent, ent;
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
@@ -446,7 +446,7 @@ static int get_eoi_gsi(struct hvm_hw_vioapic *vioapic, int vector)
 void vioapic_update_EOI(struct domain *d, int vector)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
-    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     union vioapic_redir_entry *ent;
     int gsi;
 
@@ -486,39 +486,8 @@ static void ioapic_info(struct hvm_hw_vioapic *s)
     }
 
 }
-static void hvmirq_info(struct hvm_hw_irq *hvm_irq)
-{
-    int i;
-    printk("*****hvmirq state:*****\n");
-    for (i = 0; i < BITS_TO_LONGS(32*4); i++)
-        printk("hvmirq pci_intx[%d]:0x%lx.\n", i, hvm_irq->pci_intx[i]);
-
-    for (i = 0; i < BITS_TO_LONGS(16); i++)
-        printk("hvmirq isa_irq[%d]:0x%lx.\n", i, hvm_irq->isa_irq[i]);
-
-    for (i = 0; i < BITS_TO_LONGS(1); i++)
-        printk("hvmirq callback_irq_wire[%d]:0x%lx.\n", i, hvm_irq->callback_irq_wire[i]);
-
-    printk("hvmirq callback_via_type:0x%x.\n", hvm_irq->callback_via_type);
-    printk("hvmirq callback_via:0x%x.\n", hvm_irq->callback_via.gsi);
-    
-
-    for (i = 0; i < 4; i++)
-        printk("hvmirq pci_link_route[%d]:0x%"PRIx8".\n", i, hvm_irq->pci_link_route[i]);
-
-    for (i = 0; i < 4; i++)
-        printk("hvmirq pci_link_assert_count[%d]:0x%"PRIx8".\n", i, hvm_irq->pci_link_assert_count[i]);
-
-    for (i = 0; i < VIOAPIC_NUM_PINS; i++)
-        printk("hvmirq gsi_assert_count[%d]:0x%"PRIx8".\n", i, hvm_irq->gsi_assert_count[i]);
-
-    printk("hvmirq round_robin_prev_vcpu:0x%"PRIx8".\n", hvm_irq->round_robin_prev_vcpu);
-}
 #else
 static void ioapic_info(struct hvm_hw_vioapic *s)
-{
-}
-static void hvmirq_info(struct hvm_hw_irq *hvm_irq)
 {
 }
 #endif
@@ -533,16 +502,6 @@ static int ioapic_save(struct domain *d, hvm_domain_context_t *h)
     return ( hvm_save_entry(IOAPIC, 0, h, s) );
 }
 
-static int ioapic_save_irqs(struct domain *d, hvm_domain_context_t *h)
-{
-    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    hvmirq_info(hvm_irq);
-
-    /* save IRQ state*/
-    return ( hvm_save_entry(IRQ, 0, h, hvm_irq) );    
-}
-
-
 static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vioapic *s = domain_vioapic(d);
@@ -555,20 +514,7 @@ static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-static int ioapic_load_irqs(struct domain *d, hvm_domain_context_t *h)
-{
-    struct hvm_hw_irq *hvm_irq = &d->arch.hvm_domain.irq;
-
-    /* restore irq state */
-    if ( hvm_load_entry(IRQ, h, hvm_irq) != 0 )
-        return -EINVAL;
-
-    hvmirq_info(hvm_irq);
-    return 0;
-}
-
-HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load);
-HVM_REGISTER_SAVE_RESTORE(IRQ, ioapic_save_irqs, ioapic_load_irqs);
+HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load, 1, HVMSR_PER_DOM);
 
 void vioapic_init(struct domain *d)
 {

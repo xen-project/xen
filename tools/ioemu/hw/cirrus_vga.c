@@ -2571,7 +2571,8 @@ static void *set_vram_mapping(unsigned long begin, unsigned long end)
     return vram_pointer;
 }
 
-static int unset_vram_mapping(unsigned long begin, unsigned long end)
+static int unset_vram_mapping(unsigned long begin, unsigned long end, 
+                              void *mapping)
 {
     xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;
@@ -2591,11 +2592,13 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
         return -1;
     }
 
-    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
+    /* Drop our own references to the vram pages */
+    munmap(mapping, nr_extents * TARGET_PAGE_SIZE);
 
+    /* Now drop the guest's mappings */
+    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
     for (i = 0; i < nr_extents; i++)
         extent_start[i] = (begin + (i * TARGET_PAGE_SIZE)) >> TARGET_PAGE_BITS;
-
     unset_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
 
     free(extent_start);
@@ -2642,16 +2645,14 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
         } else {
         generic_io:
             if (s->cirrus_lfb_addr && s->cirrus_lfb_end && s->map_addr) {
-		int error;
-                void *old_vram = NULL;
+                void *old_vram;
 
-		error = unset_vram_mapping(s->cirrus_lfb_addr,
-					   s->cirrus_lfb_end);
-		if (!error)
-		    old_vram = vga_update_vram((VGAState *)s, NULL,
-                                               VGA_RAM_SIZE);
-                if (old_vram)
-                    munmap(old_vram, s->map_addr - s->map_end);
+                old_vram = vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
+
+                unset_vram_mapping(s->cirrus_lfb_addr,
+                                   s->cirrus_lfb_end, 
+                                   old_vram);
+
                 s->map_addr = s->map_end = 0;
             }
             s->cirrus_linear_write[0] = cirrus_linear_writeb;
@@ -3016,10 +3017,8 @@ void cirrus_stop_acc(CirrusVGAState *s)
         int error;
         s->map_addr = 0;
         error = unset_vram_mapping(s->cirrus_lfb_addr,
-                s->cirrus_lfb_end);
+                s->cirrus_lfb_end, s->vram_ptr);
         fprintf(stderr, "cirrus_stop_acc:unset_vram_mapping.\n");
-
-        munmap(s->vram_ptr, VGA_RAM_SIZE);
     }
 }
 

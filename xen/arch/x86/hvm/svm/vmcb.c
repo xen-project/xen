@@ -209,7 +209,8 @@ int svm_create_vmcb(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     int rc;
 
-    if ( (arch_svm->vmcb = alloc_vmcb()) == NULL )
+    if ( (arch_svm->vmcb == NULL) &&
+         (arch_svm->vmcb = alloc_vmcb()) == NULL )
     {
         printk("Failed to create a new VMCB\n");
         return -ENOMEM;

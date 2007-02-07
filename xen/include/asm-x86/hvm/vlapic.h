@@ -78,6 +78,8 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode);
 int  vlapic_init(struct vcpu *v);
 void vlapic_destroy(struct vcpu *v);
 
+void vlapic_reset(struct vlapic *vlapic);
+
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
 
 int vlapic_accept_pic_intr(struct vcpu *v);

@@ -747,7 +747,7 @@ ENTRY(hypervisor_callback)
 	jb   11f
 	cmpl $sysexit_ecrit,%eax
 	ja   11f
-	addl $0x34,%esp			# Remove cs...ebx from stack frame.
+	addl $OLDESP,%esp		# Remove eflags...ebx from stack frame.
 11:	push %esp
 	call evtchn_do_upcall
 	add  $4,%esp
@@ -777,18 +777,13 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # provides the number of bytes which have already been popped from the
 # interrupted stack frame.
 critical_region_fixup:
-	addl $critical_fixup_table-scrit,%eax
-	movzbl (%eax),%eax		# %eax contains num bytes popped
-	cmpb $0xff,%al                  # 0xff => vcpu_info critical region
+	movzbl critical_fixup_table-scrit(%eax),%ecx # %eax contains num bytes popped
+	cmpb $0xff,%cl                  # 0xff => vcpu_info critical region
 	jne  15f
-	GET_THREAD_INFO(%ebp)
-        xorl %eax,%eax
-15:	mov  %esp,%esi
-	add  %eax,%esi			# %esi points at end of src region
-	mov  %esp,%edi
-	add  $0x34,%edi			# %edi points at end of dst region
-	mov  %eax,%ecx
-	shr  $2,%ecx			# convert words to bytes
+	xorl %ecx,%ecx
+15:	leal (%esp,%ecx),%esi		# %esi points at end of src region
+	leal OLDESP(%esp),%edi		# %edi points at end of dst region
+	shrl $2,%ecx			# convert words to bytes
 	je   17f			# skip loop if nothing to copy
 16:	subl $4,%esi			# pre-decrementing copy loop
 	subl $4,%edi
@@ -798,6 +793,7 @@ critical_region_fixup:
 17:	movl %edi,%esp			# final %edi is top of merged stack
 	jmp  11b
 
+.section .rodata,"a"
 critical_fixup_table:
 	.byte 0xff,0xff,0xff		# testb $0xff,(%esi) = __TEST_PENDING
 	.byte 0xff,0xff			# jnz  14f
@@ -814,6 +810,7 @@ critical_fixup_table:
 	.byte 0x28			# iret
 	.byte 0xff,0xff,0xff,0xff	# movb $1,1(%esi)
 	.byte 0x00,0x00			# jmp  11b
+.previous
 
 # Hypervisor uses this for application faults while it executes.
 # We get here for two reasons:
@@ -1194,6 +1191,7 @@ ENTRY(fixup_4gb_segment)
 	jmp error_code
 
 .section .rodata,"a"
+.align 4
 #include "syscall_table.S"
 
 syscall_table_size=(.-sys_call_table)

@@ -424,7 +424,7 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 static void unbind_from_irq(unsigned int irq)
 {
 	struct evtchn_close close;
-	int evtchn = evtchn_from_irq(irq);
+	int cpu, evtchn = evtchn_from_irq(irq);
 
 	spin_lock(&irq_mapping_update_lock);
 
@@ -452,6 +452,10 @@ static void unbind_from_irq(unsigned int irq)
 
 		evtchn_to_irq[evtchn] = -1;
 		irq_info[irq] = IRQ_UNBOUND;
+
+		/* Zap stats across IRQ changes of use. */
+		for_each_possible_cpu(cpu)
+			kstat_cpu(cpu).irqs[irq] = 0;
 	}
 
 	spin_unlock(&irq_mapping_update_lock);

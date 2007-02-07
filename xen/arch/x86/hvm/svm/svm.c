@@ -591,6 +591,7 @@ void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
+    vmcb->kerngsbase = data->shadow_gs;
     /* MSR_LSTAR, MSR_STAR, MSR_CSTAR, MSR_SYSCALL_MASK, MSR_EFER */
     vmcb->lstar  = data->msr_items[0];
     vmcb->star   = data->msr_items[1];

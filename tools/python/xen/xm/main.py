@@ -1144,6 +1144,9 @@ def xm_sched_sedf(args):
     doms = filter(lambda x : domid_match(domid, x),
                         [parse_doms_info(dom)
                          for dom in getDomains(None, 'running')])
+    if domid is not None and doms == []: 
+        err("Domain '%s' does not exist." % domid)
+        usage('sched-sedf')
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
@@ -1207,6 +1210,9 @@ def xm_sched_credit(args):
                   for dom in getDomains(None, 'running')])
 
     if weight is None and cap is None:
+        if domid is not None and doms == []: 
+            err("Domain '%s' does not exist." % domid)
+            usage('sched-credit')
         # print header if we aren't setting any parameters
         print '%-33s %-2s %-6s %-4s' % ('Name','ID','Weight','Cap')
         

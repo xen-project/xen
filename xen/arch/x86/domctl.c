@@ -326,10 +326,6 @@ long arch_do_domctl(
         struct hvm_domain_context c;
         struct domain             *d;
 
-        c.cur = 0;
-        c.size = domctl->u.hvmcontext.size;
-        c.data = NULL;
-
         ret = -ESRCH;
         if ( (d = get_domain_by_id(domctl->domain)) == NULL )
             break;
@@ -338,19 +334,38 @@ long arch_do_domctl(
         if ( !is_hvm_domain(d) ) 
             goto gethvmcontext_out;
 
+        c.cur = 0;
+        c.size = hvm_save_size(d);
+        c.data = NULL;
+
+        if ( guest_handle_is_null(domctl->u.hvmcontext.buffer) )
+        {
+            /* Client is querying for the correct buffer size */
+            domctl->u.hvmcontext.size = c.size;
+            ret = 0;
+            goto gethvmcontext_out;            
+        }
+
+        /* Check that the client has a big enough buffer */
+        ret = -ENOSPC;
+        if ( domctl->u.hvmcontext.size < c.size ) 
+            goto gethvmcontext_out;
+
+        /* Allocate our own marshalling buffer */
         ret = -ENOMEM;
         if ( (c.data = xmalloc_bytes(c.size)) == NULL )
             goto gethvmcontext_out;
 
         ret = hvm_save(d, &c);
 
+        domctl->u.hvmcontext.size = c.cur;
         if ( copy_to_guest(domctl->u.hvmcontext.buffer, c.data, c.size) != 0 )
             ret = -EFAULT;
 
+    gethvmcontext_out:
         if ( copy_to_guest(u_domctl, domctl, 1) )
             ret = -EFAULT;
 
-    gethvmcontext_out:
         if ( c.data != NULL )
             xfree(c.data);
 

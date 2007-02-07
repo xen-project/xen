@@ -3875,11 +3875,9 @@ static inline void * emulate_map_dest(struct vcpu *v,
         goto page_fault;
     }
 
-    /* Attempted a write to a bad gfn? This should never happen:
-     * after all, we're here because this write is to a page table. */
-    BUG_ON(!mfn_valid(mfn));
+    if ( !mfn_valid(mfn) )
+        return NULL;
 
-    ASSERT(sh_mfn_is_a_page_table(mfn));
     *mfnp = mfn;
     return sh_map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
 
