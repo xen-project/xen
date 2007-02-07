@@ -252,12 +252,14 @@ int xc_domain_hvm_getcontext(int xc_handle,
     domctl.u.hvmcontext.size = size;
     set_xen_guest_handle(domctl.u.hvmcontext.buffer, ctxt_buf);
 
-    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
-        return ret;
+    if ( ctxt_buf ) 
+        if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+            return ret;
 
     ret = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(ctxt_buf, size);
+    if ( ctxt_buf ) 
+        unlock_pages(ctxt_buf, size);
 
     return (ret < 0 ? -1 : domctl.u.hvmcontext.size);
 }

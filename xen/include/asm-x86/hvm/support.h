@@ -221,23 +221,37 @@ typedef int (*hvm_save_handler) (struct domain *d,
 typedef int (*hvm_load_handler) (struct domain *d,
                                  hvm_domain_context_t *h);
 
-/* Init-time function to declare a pair of handlers for a type */
+/* Init-time function to declare a pair of handlers for a type,
+ * and the maximum buffer space needed to save this type of state */
 void hvm_register_savevm(uint16_t typecode,
                          const char *name, 
                          hvm_save_handler save_state,
-                         hvm_load_handler load_state);
+                         hvm_load_handler load_state,
+                         size_t size, int kind);
 
-/* Syntactic sugar around that function */
-#define HVM_REGISTER_SAVE_RESTORE(_x, _save, _load)                     \
-static int __hvm_register_##_x##_save_and_restore(void)                 \
-{                                                                       \
-    hvm_register_savevm(HVM_SAVE_CODE(_x), #_x, &_save, &_load);        \
-    return 0;                                                           \
-}                                                                       \
+/* The space needed for saving can be per-domain or per-vcpu: */
+#define HVMSR_PER_DOM  0
+#define HVMSR_PER_VCPU 1
+
+/* Syntactic sugar around that function: specify the max number of
+ * saves, and this calculates the size of buffer needed */
+#define HVM_REGISTER_SAVE_RESTORE(_x, _save, _load, _num, _k)             \
+static int __hvm_register_##_x##_save_and_restore(void)                   \
+{                                                                         \
+    hvm_register_savevm(HVM_SAVE_CODE(_x),                                \
+                        #_x,                                              \
+                        &_save,                                           \
+                        &_load,                                           \
+                        (_num) * (HVM_SAVE_LENGTH(_x)                     \
+                                  + sizeof (struct hvm_save_descriptor)), \
+                        _k);                                              \
+    return 0;                                                             \
+}                                                                         \
 __initcall(__hvm_register_##_x##_save_and_restore);
 
 
 /* Entry points for saving and restoring HVM domain state */
+size_t hvm_save_size(struct domain *d);
 int hvm_save(struct domain *d, hvm_domain_context_t *h);
 int hvm_load(struct domain *d, hvm_domain_context_t *h);
 

@@ -33,12 +33,6 @@
 #include "xg_save_restore.h"
 
 /*
- * Size of a buffer big enough to take the HVM state of a domain.
- * Ought to calculate this a bit more carefully, or maybe ask Xen.
- */
-#define HVM_CTXT_SIZE 8192
-
-/*
 ** Default values for important tuning parameters. Can override by passing
 ** non-zero replacement values to xc_hvm_save().
 **
@@ -286,6 +280,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long *pfn_batch = NULL;
 
     /* A copy of hvm domain context buffer*/
+    uint32_t hvm_buf_size;
     uint8_t *hvm_buf = NULL;
 
     /* Live mapping of shared info structure */
@@ -431,9 +426,15 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     page_array = (unsigned long *) malloc( sizeof(unsigned long) * max_pfn);
 
-    hvm_buf = malloc(HVM_CTXT_SIZE);
+    hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
+    if ( hvm_buf_size == -1 )
+    {
+        ERROR("Couldn't get HVM context size from Xen");
+        goto out;
+    }
+    hvm_buf = malloc(hvm_buf_size);
 
-    if (!to_send ||!to_skip ||!page_array ||!hvm_buf ) {
+    if (!to_send ||!to_skip ||!page_array ||!hvm_buf) {
         ERROR("Couldn't allocate memory");
         goto out;
     }
@@ -661,7 +662,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
-                                              HVM_CTXT_SIZE)) == -1) {
+                                              hvm_buf_size)) == -1) {
         ERROR("HVM:Could not get hvm buffer");
         goto out;
     }

@@ -35,13 +35,16 @@ static struct {
     hvm_save_handler save;
     hvm_load_handler load; 
     const char *name;
+    size_t size;
+    int kind;
 } hvm_sr_handlers [HVM_SAVE_CODE_MAX + 1] = {{NULL, NULL, "<?>"},};
 
 /* Init-time function to add entries to that list */
 void hvm_register_savevm(uint16_t typecode, 
                          const char *name,
                          hvm_save_handler save_state,
-                         hvm_load_handler load_state)
+                         hvm_load_handler load_state,
+                         size_t size, int kind)
 {
     ASSERT(typecode <= HVM_SAVE_CODE_MAX);
     ASSERT(hvm_sr_handlers[typecode].save == NULL);
@@ -49,6 +52,28 @@ void hvm_register_savevm(uint16_t typecode,
     hvm_sr_handlers[typecode].save = save_state;
     hvm_sr_handlers[typecode].load = load_state;
     hvm_sr_handlers[typecode].name = name;
+    hvm_sr_handlers[typecode].size = size;
+    hvm_sr_handlers[typecode].kind = kind;
+}
+
+size_t hvm_save_size(struct domain *d) 
+{
+    struct vcpu *v;
+    size_t sz;
+    int i;
+    
+    /* Basic overhead for header and footer */
+    sz = (2 * sizeof (struct hvm_save_descriptor)) + HVM_SAVE_LENGTH(HEADER);
+
+    /* Plus space for each thing we will be saving */
+    for ( i = 0; i <= HVM_SAVE_CODE_MAX; i++ ) 
+        if ( hvm_sr_handlers[i].kind == HVMSR_PER_VCPU )
+            for_each_vcpu(d, v)
+                sz += hvm_sr_handlers[i].size;
+        else 
+            sz += hvm_sr_handlers[i].size;
+
+    return sz;
 }
 
 

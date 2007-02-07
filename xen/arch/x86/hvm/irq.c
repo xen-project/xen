@@ -480,6 +480,9 @@ static int irq_load_link(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(PCI_IRQ, irq_save_pci, irq_load_pci);
-HVM_REGISTER_SAVE_RESTORE(ISA_IRQ, irq_save_isa, irq_load_isa);
-HVM_REGISTER_SAVE_RESTORE(PCI_LINK, irq_save_link, irq_load_link);
+HVM_REGISTER_SAVE_RESTORE(PCI_IRQ, irq_save_pci, irq_load_pci,
+                          1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(ISA_IRQ, irq_save_isa, irq_load_isa, 
+                          1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(PCI_LINK, irq_save_link, irq_load_link,
+                          1, HVMSR_PER_DOM);
