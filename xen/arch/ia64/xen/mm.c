@@ -525,7 +525,9 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 			   This can happen when domU tries to touch i/o
 			   port space.  Also prevents possible address
 			   aliasing issues.  */
-			printk("Warning: UC to WB for mpaddr=%lx\n", mpaddr);
+			if (!(mpaddr - IO_PORTS_PADDR < IO_PORTS_SIZE))
+				gdprintk(XENLOG_WARNING, "Warning: UC to WB "
+				         "for mpaddr=%lx\n", mpaddr);
 			pteval = (pteval & ~_PAGE_MA_MASK) | _PAGE_MA_WB;
 		}
 		break;
@@ -690,7 +692,6 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
     if (pte != NULL) {
         pte_t tmp_pte = *pte;// pte is volatile. copy the value.
         if (pte_present(tmp_pte)) {
-//printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
             if (entry != NULL)
                 p2m_entry_set(entry, pte, tmp_pte);
             return pte_val(tmp_pte);
@@ -698,14 +699,20 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
             return GPFN_INV_MASK;
     }
 
-    printk("%s: d 0x%p id %d current 0x%p id %d\n",
-           __func__, d, d->domain_id, current, current->vcpu_id);
-    if (mpaddr < d->arch.convmem_end)
-        printk("%s: non-allocated mpa 0x%lx (< 0x%lx)\n", __func__,
-               mpaddr, d->arch.convmem_end);
-    else
-        printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
-               mpaddr, d->arch.convmem_end);
+    if (mpaddr < d->arch.convmem_end) {
+        gdprintk(XENLOG_WARNING, "vcpu %d iip 0x%016lx: non-allocated mpa "
+                 "0x%lx (< 0x%lx)\n", current->vcpu_id, PSCB(current, iip),
+                 mpaddr, d->arch.convmem_end);
+    } else if (mpaddr - IO_PORTS_PADDR < IO_PORTS_SIZE) {
+        /* Log I/O port probing, but complain less loudly about it */
+        gdprintk(XENLOG_INFO, "vcpu %d iip 0x%016lx: bad I/O port access "
+                 "0x%lx\n ", current->vcpu_id, PSCB(current, iip),
+                 IO_SPACE_SPARSE_DECODING(mpaddr - IO_PORTS_PADDR));
+    } else {
+        gdprintk(XENLOG_WARNING, "vcpu %d iip 0x%016lx: bad mpa 0x%lx "
+                 "(=> 0x%lx)\n", current->vcpu_id, PSCB(current, iip),
+                 mpaddr, d->arch.convmem_end);
+    }
 
     if (entry != NULL)
         p2m_entry_set(entry, NULL, __pte(0));
