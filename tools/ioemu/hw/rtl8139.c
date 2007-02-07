@@ -3423,8 +3423,10 @@ void pci_rtl8139_init(PCIBus *bus, NICInfo *nd)
     pci_conf[0x0e] = 0x00; /* header_type */
     pci_conf[0x3d] = 1;    /* interrupt pin 0 */
     pci_conf[0x34] = 0xdc;
-    pci_conf[0x2c] = pci_conf[0x00]; // same as Vendor ID
-    pci_conf[0x2d] = pci_conf[0x01];
+    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
+    pci_conf[0x2d] = 0x58;
+    pci_conf[0x2e] = 0x01; /* subsystem device */
+    pci_conf[0x2f] = 0x00;
 
     s = &d->rtl8139;
 

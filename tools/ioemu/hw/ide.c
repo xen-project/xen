@@ -2502,6 +2502,10 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn)
     pci_conf[0x0a] = 0x01; // class_sub = PCI_IDE
     pci_conf[0x0b] = 0x01; // class_base = PCI_mass_storage
     pci_conf[0x0e] = 0x00; // header_type
+    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
+    pci_conf[0x2d] = 0x58;
+    pci_conf[0x2e] = 0x01; /* subsystem device */
+    pci_conf[0x2f] = 0x00;
 
     pci_register_io_region((PCIDevice *)d, 4, 0x10, 
                            PCI_ADDRESS_SPACE_IO, bmdma_map);
