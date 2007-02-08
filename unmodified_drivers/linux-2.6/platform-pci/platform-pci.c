@@ -118,14 +118,10 @@ unsigned long alloc_xen_mmio(unsigned long len)
 {
 	unsigned long addr;
 
-	addr = 0;
-	if (platform_mmio_alloc + len <= platform_mmiolen)
-	{
-		addr = platform_mmio + platform_mmio_alloc;
-		platform_mmio_alloc += len;
-	} else {
-		panic("ran out of xen mmio space");
-	}
+	addr = platform_mmio + platform_mmio_alloc;
+	platform_mmio_alloc += len;
+	BUG_ON(platform_mmio_alloc > platform_mmiolen);
+
 	return addr;
 }
 
@@ -182,16 +178,17 @@ static int get_hypercall_stubs(void)
 static uint64_t get_callback_via(struct pci_dev *pdev)
 {
 	u8 pin;
+	int irq;
+
 #ifdef __ia64__
-	int irq, rid;
 	for (irq = 0; irq < 16; irq++) {
 		if (isa_irq_to_vector(irq) == pdev->irq)
 			return irq; /* ISA IRQ */
 	}
 #else /* !__ia64__ */
-
-	if (pdev->irq < 16)
-		return pdev->irq; /* ISA IRQ */
+	irq = pdev->irq;
+	if (irq < 16)
+		return irq; /* ISA IRQ */
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
