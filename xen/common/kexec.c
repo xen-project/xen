@@ -6,7 +6,6 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
-#include <asm/kexec.h>
 #include <xen/lib.h>
 #include <xen/ctype.h>
 #include <xen/errno.h>
