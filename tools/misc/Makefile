@@ -41,5 +41,5 @@ clean:
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-$(TARGETS): %: %.o Makefile
+xenperf xc_shadow: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl
