@@ -382,10 +382,20 @@ struct hvm_hw_hpet {
 DECLARE_HVM_SAVE_TYPE(HPET, 12, struct hvm_hw_hpet);
 
 
+/*
+ * PM timer
+ */
+
+struct hvm_hw_pmtimer {
+    uint32_t timer;
+};
+
+DECLARE_HVM_SAVE_TYPE(PMTIMER, 13, struct hvm_hw_pmtimer);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 12
+#define HVM_SAVE_CODE_MAX 13
 
 
 /* 
