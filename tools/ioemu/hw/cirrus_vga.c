@@ -3339,6 +3339,10 @@ void pci_cirrus_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
     pci_conf[0x0a] = PCI_CLASS_SUB_VGA;
     pci_conf[0x0b] = PCI_CLASS_BASE_DISPLAY;
     pci_conf[0x0e] = PCI_CLASS_HEADERTYPE_00h;
+    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
+    pci_conf[0x2d] = 0x58;
+    pci_conf[0x2e] = 0x01; /* subsystem device */
+    pci_conf[0x2f] = 0x00;
 
     /* setup VGA */
     s = &d->cirrus_vga;

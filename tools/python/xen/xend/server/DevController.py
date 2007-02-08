@@ -153,9 +153,9 @@ class DevController:
         log.debug("Waiting for %s.", devid)
 
         if not self.hotplug:
-            return 
-        
-        status = self.waitForBackend(devid)
+            return
+
+        (status, err) = self.waitForBackend(devid)
 
         if status == Timeout:
             self.destroyDevice(devid, False)
@@ -165,25 +165,22 @@ class DevController:
 
         elif status == Error:
             self.destroyDevice(devid, False)
-            raise VmError("Device %s (%s) could not be connected. "
-                          "Backend device not found." %
-                          (devid, self.deviceClass))
-
+            if err is None:
+                raise VmError("Device %s (%s) could not be connected. "
+                              "Backend device not found." %
+                              (devid, self.deviceClass))
+            else:
+                raise VmError("Device %s (%s) could not be connected. "
+                              "%s" % (devid, self.deviceClass, err))
         elif status == Missing:
             # Don't try to destroy the device; it's already gone away.
             raise VmError("Device %s (%s) could not be connected. "
                           "Device not found." % (devid, self.deviceClass))
 
         elif status == Busy:
-            err = None
-            frontpath = self.frontendPath(devid)
-            backpath = xstransact.Read(frontpath, "backend")
-            if backpath:
-                err = xstransact.Read(backpath, HOTPLUG_ERROR_NODE)
-            if not err:
-                err = "Busy."
-                
             self.destroyDevice(devid, False)
+            if err is None:
+                err = "Busy."
             raise VmError("Device %s (%s) could not be connected.\n%s" %
                           (devid, self.deviceClass, err))
 
@@ -476,19 +473,36 @@ class DevController:
     def waitForBackend(self, devid):
 
         frontpath = self.frontendPath(devid)
+        # lookup a phantom 
+        phantomPath = xstransact.Read(frontpath, 'phantom_vbd')
+        if phantomPath is not None:
+            log.debug("Waiting for %s's phantom %s.", devid, phantomPath)
+            statusPath = phantomPath + '/' + HOTPLUG_STATUS_NODE
+            ev = Event()
+            result = { 'status': Timeout }
+            xswatch(statusPath, hotplugStatusCallback, ev, result)
+            ev.wait(DEVICE_CREATE_TIMEOUT)
+            err = xstransact.Read(statusPath, HOTPLUG_ERROR_NODE)
+            if result['status'] != 'Connected':
+                return (result['status'], err)
+            
         backpath = xstransact.Read(frontpath, "backend")
+
 
         if backpath:
             statusPath = backpath + '/' + HOTPLUG_STATUS_NODE
             ev = Event()
             result = { 'status': Timeout }
-            
+
             xswatch(statusPath, hotplugStatusCallback, ev, result)
 
             ev.wait(DEVICE_CREATE_TIMEOUT)
-            return result['status']
+
+            err = xstransact.Read(backpath, HOTPLUG_ERROR_NODE)
+
+            return (result['status'], err)
         else:
-            return Missing
+            return (Missing, None)
 
 
     def backendPath(self, backdom, devid):

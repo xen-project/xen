@@ -355,8 +355,9 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t target_mfn);
 static inline void 
 shadow_drop_references(struct domain *d, struct page_info *p)
 {
-    /* See the comment about locking in sh_remove_all_mappings */
-    sh_remove_all_mappings(d->vcpu[0], _mfn(page_to_mfn(p)));
+    if ( unlikely(shadow_mode_enabled(d)) )
+        /* See the comment about locking in sh_remove_all_mappings */
+        sh_remove_all_mappings(d->vcpu[0], _mfn(page_to_mfn(p)));
 }
 
 /* Remove all shadows of the guest mfn. */

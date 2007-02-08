@@ -46,6 +46,13 @@ then
   fi
 fi
 
+RET=0
+ip link show $bridge 1>/dev/null 2>&1 || RET=1
+if [ "$RET" -eq 1 ]
+then
+    fatal "Could not find bridge device $bridge"
+fi
+
 case "$command" in
     online)
 	setup_bridge_port "$vif"

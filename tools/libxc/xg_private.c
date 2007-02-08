@@ -210,8 +210,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 __attribute__((weak)) 
 int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
                    unsigned long nr_pfns, unsigned int store_evtchn,
-                   unsigned long *store_mfn, unsigned int console_evtchn,
-                   unsigned long *console_mfn,
+                   unsigned long *store_mfn,
                    unsigned int pae, unsigned int apic)
 {
     errno = ENOSYS;

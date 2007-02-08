@@ -11,7 +11,6 @@
 #include <asm/atomic.h>
 #include <asm/elf.h>
 #include <asm/percpu.h>
-#include <asm/kexec.h>
 #include <xen/types.h>
 #include <xen/irq.h>
 #include <asm/ipi.h>

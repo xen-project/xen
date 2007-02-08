@@ -106,7 +106,6 @@ void hvm_migrate_timers(struct vcpu *v)
     pit_migrate_timers(v);
     rtc_migrate_timers(v);
     hpet_migrate_timers(v);
-    pmtimer_migrate_timers(v);
     if ( vcpu_vlapic(v)->pt.enabled )
         migrate_timer(&vcpu_vlapic(v)->pt.timer, v->processor);
 }
@@ -170,7 +169,6 @@ void hvm_domain_destroy(struct domain *d)
 {
     pit_deinit(d);
     rtc_deinit(d);
-    pmtimer_deinit(d);
     hpet_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )

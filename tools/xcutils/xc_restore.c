@@ -45,14 +45,15 @@ main(int argc, char **argv)
          /* pass the memsize to xc_hvm_restore to find the store_mfn */
         store_mfn = hvm;
         ret = xc_hvm_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
-                &store_mfn, console_evtchn, &console_mfn, pae, apic);
+                &store_mfn, pae, apic);
     } else 
         ret = xc_linux_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
                 &store_mfn, console_evtchn, &console_mfn);
 
     if (ret == 0) {
 	printf("store-mfn %li\n", store_mfn);
-	printf("console-mfn %li\n", console_mfn);
+        if (!hvm)
+            printf("console-mfn %li\n", console_mfn);
 	fflush(stdout);
     }
 

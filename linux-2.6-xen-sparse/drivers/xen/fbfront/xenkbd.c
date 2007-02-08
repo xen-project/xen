@@ -29,10 +29,12 @@
 
 struct xenkbd_info
 {
-	struct input_dev *dev;
+	struct input_dev *kbd;
+	struct input_dev *ptr;
 	struct xenkbd_page *page;
 	int irq;
 	struct xenbus_device *xbdev;
+	char phys[32];
 };
 
 static int xenkbd_remove(struct xenbus_device *);
@@ -56,23 +58,36 @@ static irqreturn_t input_handler(int rq, void *dev_id, struct pt_regs *regs)
 	rmb();			/* ensure we see ring contents up to prod */
 	for (cons = page->in_cons; cons != prod; cons++) {
 		union xenkbd_in_event *event;
+		struct input_dev *dev;
 		event = &XENKBD_IN_RING_REF(page, cons);
 
+		dev = info->ptr;
 		switch (event->type) {
 		case XENKBD_TYPE_MOTION:
-			input_report_rel(info->dev, REL_X, event->motion.rel_x);
-			input_report_rel(info->dev, REL_Y, event->motion.rel_y);
+			input_report_rel(dev, REL_X, event->motion.rel_x);
+			input_report_rel(dev, REL_Y, event->motion.rel_y);
 			break;
 		case XENKBD_TYPE_KEY:
-			input_report_key(info->dev, event->key.keycode, event->key.pressed);
+			dev = NULL;
+			if (test_bit(event->key.keycode, info->kbd->keybit))
+				dev = info->kbd;
+			if (test_bit(event->key.keycode, info->ptr->keybit))
+				dev = info->ptr;
+			if (dev)
+				input_report_key(dev, event->key.keycode,
+						 event->key.pressed);
+			else
+				printk("xenkbd: unhandled keycode 0x%x\n",
+				       event->key.keycode);
 			break;
 		case XENKBD_TYPE_POS:
-			input_report_abs(info->dev, ABS_X, event->pos.abs_x);
-			input_report_abs(info->dev, ABS_Y, event->pos.abs_y);
+			input_report_abs(dev, ABS_X, event->pos.abs_x);
+			input_report_abs(dev, ABS_Y, event->pos.abs_y);
 			break;
 		}
+		if (dev)
+			input_sync(dev);
 	}
-	input_sync(info->dev);
 	mb();			/* ensure we got ring contents */
 	page->in_cons = cons;
 	notify_remote_via_irq(info->irq);
@@ -85,7 +100,7 @@ int __devinit xenkbd_probe(struct xenbus_device *dev,
 {
 	int ret, i;
 	struct xenkbd_info *info;
-	struct input_dev *input_dev;
+	struct input_dev *kbd, *ptr;
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
@@ -94,6 +109,7 @@ int __devinit xenkbd_probe(struct xenbus_device *dev,
 	}
 	dev->dev.driver_data = info;
 	info->xbdev = dev;
+	snprintf(info->phys, sizeof(info->phys), "xenbus/%s", dev->nodename);
 
 	info->page = (void *)__get_free_page(GFP_KERNEL);
 	if (!info->page)
@@ -101,32 +117,52 @@ int __devinit xenkbd_probe(struct xenbus_device *dev,
 	info->page->in_cons = info->page->in_prod = 0;
 	info->page->out_cons = info->page->out_prod = 0;
 
-	input_dev = input_allocate_device();
-	if (!input_dev)
+	/* keyboard */
+	kbd = input_allocate_device();
+	if (!kbd)
 		goto error_nomem;
+	kbd->name = "Xen Virtual Keyboard";
+	kbd->phys = info->phys;
+	kbd->id.bustype = BUS_PCI;
+	kbd->id.vendor = 0x5853;
+	kbd->id.product = 0xffff;
+	kbd->evbit[0] = BIT(EV_KEY);
+	for (i = KEY_ESC; i < KEY_UNKNOWN; i++)
+		set_bit(i, kbd->keybit);
+	for (i = KEY_OK; i < KEY_MAX; i++)
+		set_bit(i, kbd->keybit);
 
-	input_dev->evbit[0] = BIT(EV_KEY) | BIT(EV_REL) | BIT(EV_ABS);
-	input_dev->keybit[LONG(BTN_MOUSE)]
-		= BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
-	/* TODO additional buttons */
-	input_dev->relbit[0] = BIT(REL_X) | BIT(REL_Y);
-
-	/* FIXME not sure this is quite right */
-	for (i = 0; i < 256; i++)
-		set_bit(i, input_dev->keybit);
-
-	input_dev->name = "Xen Virtual Keyboard/Mouse";
-
-	input_set_abs_params(input_dev, ABS_X, 0, XENFB_WIDTH, 0, 0);
-	input_set_abs_params(input_dev, ABS_Y, 0, XENFB_HEIGHT, 0, 0);
-
-	ret = input_register_device(input_dev);
+	ret = input_register_device(kbd);
 	if (ret) {
-		input_free_device(input_dev);
-		xenbus_dev_fatal(dev, ret, "input_register_device");
+		input_free_device(kbd);
+		xenbus_dev_fatal(dev, ret, "input_register_device(kbd)");
 		goto error;
 	}
-	info->dev = input_dev;
+	info->kbd = kbd;
+
+	/* pointing device */
+	ptr = input_allocate_device();
+	if (!ptr)
+		goto error_nomem;
+	ptr->name = "Xen Virtual Pointer";
+	ptr->phys = info->phys;
+	ptr->id.bustype = BUS_PCI;
+	ptr->id.vendor = 0x5853;
+	ptr->id.product = 0xfffe;
+	ptr->evbit[0] = BIT(EV_KEY) | BIT(EV_REL) | BIT(EV_ABS);
+	for (i = BTN_LEFT; i <= BTN_TASK; i++)
+		set_bit(i, ptr->keybit);
+	ptr->relbit[0] = BIT(REL_X) | BIT(REL_Y);
+	input_set_abs_params(ptr, ABS_X, 0, XENFB_WIDTH, 0, 0);
+	input_set_abs_params(ptr, ABS_Y, 0, XENFB_HEIGHT, 0, 0);
+
+	ret = input_register_device(ptr);
+	if (ret) {
+		input_free_device(ptr);
+		xenbus_dev_fatal(dev, ret, "input_register_device(ptr)");
+		goto error;
+	}
+	info->ptr = ptr;
 
 	ret = xenkbd_connect_backend(dev, info);
 	if (ret < 0)
@@ -155,7 +191,8 @@ static int xenkbd_remove(struct xenbus_device *dev)
 	struct xenkbd_info *info = dev->dev.driver_data;
 
 	xenkbd_disconnect_backend(info);
-	input_unregister_device(info->dev);
+	input_unregister_device(info->kbd);
+	input_unregister_device(info->ptr);
 	free_page((unsigned long)info->page);
 	kfree(info);
 	return 0;

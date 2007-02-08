@@ -1416,7 +1416,7 @@ class XendDomainInfo:
                                       self.info['image'],
                                       self.info['devices'])
 
-            localtime = self.info.get('localtime', False)
+            localtime = self.info.get('platform_localtime', False)
             if localtime:
                 xc.domain_set_time_offset(self.domid)
 
@@ -1565,18 +1565,53 @@ class XendDomainInfo:
     # VM Destroy
     # 
 
+    def _prepare_phantom_paths(self):
+        # get associated devices to destroy
+        # build list of phantom devices to be removed after normal devices
+        plist = []
+        from xen.xend.xenstore.xstransact import xstransact
+        t = xstransact("%s/device/vbd" % GetDomainPath(self.domid))
+        for dev in t.list():
+            backend_phantom_vbd = xstransact.Read("%s/device/vbd/%s/phantom_vbd" \
+                                  % (self.dompath, dev))
+            if backend_phantom_vbd is not None:
+                frontend_phantom_vbd =  xstransact.Read("%s/frontend" \
+                                  % backend_phantom_vbd)
+                plist.append(backend_phantom_vbd)
+                plist.append(frontend_phantom_vbd)
+        return plist
+
+    def _cleanup_phantom_devs(self, plist):
+        # remove phantom devices
+        if not plist == []:
+            time.sleep(2)
+        for paths in plist:
+            if paths.find('backend') != -1:
+                from xen.xend.server import DevController
+                # Modify online status /before/ updating state (latter is watched by
+                # drivers, so this ordering avoids a race).
+                xstransact.Write(paths, 'online', "0")
+                xstransact.Write(paths, 'state', str(DevController.xenbusState['Closing']))
+            # force
+            xstransact.Remove(paths)
+
     def destroy(self):
         """Cleanup VM and destroy domain.  Nothrow guarantee."""
 
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
+        paths = self._prepare_phantom_paths()
+
         self._cleanupVm()
         if self.dompath is not None:
             self.destroyDomain()
 
+        self._cleanup_phantom_devs(paths)
 
     def destroyDomain(self):
         log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
+
+        paths = self._prepare_phantom_paths()
 
         try:
             if self.domid is not None:
@@ -1591,7 +1626,7 @@ class XendDomainInfo:
         XendDomain.instance().remove_domain(self)
 
         self.cleanupDomain()
-
+        self._cleanup_phantom_devs(paths)
 
     def resumeDomain(self):
         log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
@@ -2210,6 +2245,25 @@ class XendDomainInfo:
             config['devid'] = dev_control.createDevice(config)
 
         return dev_uuid
+
+    def create_phantom_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
+        """Create a VBD using a VDI from XendStorageRepository.
+
+        @param xenapi_vbd: vbd struct from the Xen API
+        @param vdi_image_path: VDI UUID
+        @rtype: string
+        @return: uuid of the device
+        """
+        xenapi_vbd['image'] = vdi_image_path
+        dev_uuid = self.info.phantom_device_add('tap', cfg_xenapi = xenapi_vbd)
+        if not dev_uuid:
+            raise XendError('Failed to create device')
+
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            _, config = self.info['devices'][dev_uuid]
+            config['devid'] = self.getDeviceController('tap').createDevice(config)
+
+        return config['devid']
 
     def create_vif(self, xenapi_vif):
         """Create VIF device from the passed struct in Xen API format.

@@ -69,7 +69,6 @@ read_exact(int fd, void *buf, size_t count)
 int xc_hvm_restore(int xc_handle, int io_fd,
                      uint32_t dom, unsigned long nr_pfns,
                      unsigned int store_evtchn, unsigned long *store_mfn,
-                     unsigned int console_evtchn, unsigned long *console_mfn,
                      unsigned int pae, unsigned int apic)
 {
     DECLARE_DOMCTL;
@@ -104,8 +103,8 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     memsize = (unsigned long long)*store_mfn;
     v_end = memsize << 20;
 
-    DPRINTF("xc_hvm_restore:dom=%d, nr_pfns=0x%lx, store_evtchn=%d, *store_mfn=%ld, console_evtchn=%d, *console_mfn=%ld, pae=%u, apic=%u.\n", 
-            dom, nr_pfns, store_evtchn, *store_mfn, console_evtchn, *console_mfn, pae, apic);
+    DPRINTF("xc_hvm_restore:dom=%d, nr_pfns=0x%lx, store_evtchn=%d, *store_mfn=%ld, pae=%u, apic=%u.\n", 
+            dom, nr_pfns, store_evtchn, *store_mfn, pae, apic);
 
     max_pfn = nr_pfns;
 

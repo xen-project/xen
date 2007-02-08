@@ -239,8 +239,11 @@ def restore(xd, fd, dominfo = None, paused = False):
 
         forkHelper(cmd, fd, handler.handler, True)
 
-        if handler.store_mfn is None or handler.console_mfn is None:
-            raise XendError('Could not read store/console MFN')
+        if handler.store_mfn is None:
+            raise XendError('Could not read store MFN')
+
+        if not is_hvm and handler.console_mfn is None:
+            raise XendError('Could not read console MFN')        
 
         dominfo.waitForDevices() # Wait for backends to set up
         if not paused:

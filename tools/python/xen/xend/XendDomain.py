@@ -800,7 +800,10 @@ class XendDomain:
                                 "support.")
 
             path = self._managed_check_point_path(dom_uuid)
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+            oflags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+            if hasattr(os, "O_LARGEFILE"):
+                oflags |= os.O_LARGEFILE
+            fd = os.open(path, oflags)
             try:
                 # For now we don't support 'live checkpoint' 
                 XendCheckpoint.save(fd, dominfo, False, False, path)
@@ -840,8 +843,11 @@ class XendDomain:
                 # Restore that replaces the existing XendDomainInfo
                 try:
                     log.debug('Current DomainInfo state: %d' % dominfo.state)
+                    oflags = os.O_RDONLY
+                    if hasattr(os, "O_LARGEFILE"):
+                        oflags |= os.O_LARGEFILE
                     XendCheckpoint.restore(self,
-                                           os.open(chkpath, os.O_RDONLY),
+                                           os.open(chkpath, oflags),
                                            dominfo,
                                            paused = start_paused)
                     os.unlink(chkpath)
@@ -1009,7 +1015,10 @@ class XendDomain:
         @raise XendError: Failure to restore domain
         """
         try:
-            fd = os.open(src, os.O_RDONLY)
+            oflags = os.O_RDONLY
+            if hasattr(os, "O_LARGEFILE"):
+                oflags |= os.O_LARGEFILE
+            fd = os.open(src, oflags)
             try:
                 return self.domain_restore_fd(fd, paused=paused)
             finally:
@@ -1193,7 +1202,10 @@ class XendDomain:
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot save privileged domain %i" % domid)
 
-            fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+            oflags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+            if hasattr(os, "O_LARGEFILE"):
+                oflags |= os.O_LARGEFILE
+            fd = os.open(dst, oflags)
             try:
                 # For now we don't support 'live checkpoint' 
                 XendCheckpoint.save(fd, dominfo, False, False, dst)

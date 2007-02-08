@@ -28,14 +28,15 @@ export LANG="POSIX"
 unset $(set | grep ^LC_ | cut -d= -f1)
 
 fatal() {
-  xenstore_write "$XENBUS_PATH"/hotplug-status error
+  xenstore_write "$XENBUS_PATH/hotplug-error" "$*" \
+                 "$XENBUS_PATH/hotplug-status" error
   log err "$@"
   exit 1
 }
 
 success() {
   # Tell DevController that backend is "connected"
-  xenstore_write "$XENBUS_PATH"/hotplug-status connected
+  xenstore_write "$XENBUS_PATH/hotplug-status" connected
 }
 
 do_or_die() {
