@@ -9,7 +9,7 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS  = xenperf xc_shadow
+TARGETS  = xenperf xc_shadow xen-detect
 
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf
