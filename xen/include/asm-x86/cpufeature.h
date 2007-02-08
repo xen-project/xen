@@ -93,6 +93,7 @@
 #define X86_FEATURE_LAHF_LM	(6*32+ 0) /* LAHF/SAHF in long mode */
 #define X86_FEATURE_CMP_LEGACY	(6*32+ 1) /* If yes HyperThreading not valid */
 #define X86_FEATURE_SVME        (6*32+ 2) /* Secure Virtual Machine */
+#define X86_FEATURE_FFXSR       (6*32+25) /* FFXSR instruction optimizations */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
