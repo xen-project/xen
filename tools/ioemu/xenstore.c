@@ -10,6 +10,7 @@
 
 #include "vl.h"
 #include "block_int.h"
+#include <unistd.h>
 
 static struct xs_handle *xsh = NULL;
 static char *hd_filename[MAX_DISKS];
@@ -52,11 +53,40 @@ void xenstore_check_new_media_present(int timeout)
     qemu_mod_timer(insert_timer, qemu_get_clock(rt_clock) + timeout);
 }
 
+static int waitForDevice(char *path, char *field, char *desired)
+{ 
+    char *buf = NULL, *stat = NULL;
+    unsigned int len;
+    int val = 1;
+
+    /* loop until we find a value in xenstore, return 
+     * if it was what we wanted, or not
+     */
+    while (1) {
+        if (pasprintf(&buf, "%s/%s", path, field) == -1)
+            goto done;
+        free(stat);
+        stat = xs_read(xsh, XBT_NULL, buf, &len);
+        if (stat == NULL) {
+            usleep(100000); /* 1/10th second, no path found */
+        } else {
+            val = strcmp(stat, desired);
+            goto done;
+        }
+    }
+
+done:
+    free(stat);
+    free(buf);
+    return val;
+}
+
 void xenstore_parse_domain_config(int domid)
 {
     char **e = NULL;
     char *buf = NULL, *path;
-    char *bpath = NULL, *dev = NULL, *params = NULL, *type = NULL;
+    char *fpath = NULL, *bpath = NULL,
+         *dev = NULL, *params = NULL, *type = NULL;
     int i;
     unsigned int len, num, hd_index;
 
@@ -120,7 +150,35 @@ void xenstore_parse_domain_config(int domid)
 	    hd_filename[hd_index] = params;	/* strdup() */
 	    params = NULL;		/* don't free params on re-use */
 	}
+        /* 
+         * check if device has a phantom vbd; the phantom is hooked
+         * to the frontend device (for ease of cleanup), so lookup 
+         * the frontend device, and see if there is a phantom_vbd
+         * if there is, we will use resolution as the filename
+         */
+	if (pasprintf(&buf, "%s/device/vbd/%s/phantom_vbd", path, e[i]) == -1)
+	    continue;
+	free(fpath);
+        fpath = xs_read(xsh, XBT_NULL, buf, &len);
+	if (fpath != NULL) {
+
+            if (waitForDevice(fpath, "hotplug-status", "connected")) {
+               continue;
+            }
+
+	    if (pasprintf(&buf, "%s/dev", fpath) == -1)
+	        continue;
+            params = xs_read(xsh, XBT_NULL, buf , &len);
+	    if (params != NULL) {
+                free(hd_filename[hd_index]);
+                hd_filename[hd_index] = params;
+                params = NULL;              /* don't free params on re-use */
+            }
+        }
 	bs_table[hd_index] = bdrv_new(dev);
+        /* re-establish buf */
+	if (pasprintf(&buf, "%s/params", bpath) == -1)
+	    continue;
 	/* check if it is a cdrom */
 	if (type && !strcmp(type, "cdrom")) {
 	    bdrv_set_type_hint(bs_table[hd_index], BDRV_TYPE_CDROM);

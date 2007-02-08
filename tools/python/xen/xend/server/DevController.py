@@ -473,6 +473,19 @@ class DevController:
     def waitForBackend(self, devid):
 
         frontpath = self.frontendPath(devid)
+        # lookup a phantom 
+        phantomPath = xstransact.Read(frontpath, 'phantom_vbd')
+        if phantomPath is not None:
+            log.debug("Waiting for %s's phantom %s.", devid, phantomPath)
+            statusPath = phantomPath + '/' + HOTPLUG_STATUS_NODE
+            ev = Event()
+            result = { 'status': Timeout }
+            xswatch(statusPath, hotplugStatusCallback, ev, result)
+            ev.wait(DEVICE_CREATE_TIMEOUT)
+            err = xstransact.Read(statusPath, HOTPLUG_ERROR_NODE)
+            if result['status'] != 'Connected':
+                return (result['status'], err)
+            
         backpath = xstransact.Read(frontpath, "backend")
 
 
