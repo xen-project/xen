@@ -25,6 +25,7 @@ int machine_kexec_load(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation);
 void machine_reboot_kexec(xen_kexec_image_t *image);
+void machine_kexec(xen_kexec_image_t *image);
 void kexec_crash(void);
 void kexec_crash_save_cpu(void);
 crash_xen_info_t *kexec_crash_save_info(void);

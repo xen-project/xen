@@ -15,10 +15,14 @@
 #include <xen/types.h>
 #include <xen/console.h>
 #include <xen/kexec.h>
-#include <asm/kexec.h>
 #include <xen/domain_page.h>
 #include <asm/fixmap.h>
 #include <asm/hvm/hvm.h>
+
+typedef void (*relocate_new_kernel_t)(
+                unsigned long indirection_page,
+                unsigned long page_list,
+                unsigned long start_address);
 
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
 {
@@ -92,6 +96,15 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
         __machine_reboot_kexec(image);
     }
     BUG();
+}
+
+void machine_kexec(xen_kexec_image_t *image)
+{
+    relocate_new_kernel_t rnk;
+
+    rnk = (relocate_new_kernel_t) image->page_list[1];
+    (*rnk)(image->indirection_page, (unsigned long)image->page_list, 
+           image->start_address);
 }
 
 /*
