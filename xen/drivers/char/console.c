@@ -223,7 +223,7 @@ int console_steal(int handle, void (*fn)(const char *))
     if ( (handle == -1) || (handle != sercon_handle) )
         return 0;
 
-    if ( serial_steal_fn == NULL )
+    if ( serial_steal_fn != NULL )
         return -EBUSY;
 
     serial_steal_fn = fn;
