@@ -618,7 +618,7 @@ int make_devtree(struct ft_cxt *root,
     }
 
     /* write a copy of the tree to a file */
-    if ((dtb_fd = open(DTB_FILE , O_RDWR)) == -1) {
+    if ((dtb_fd = open(DTB_FILE , O_CREAT|O_RDWR)) == -1) {
         PERROR("%s: failed to open file %s", __func__, DTB_FILE);
         goto error;
     }
