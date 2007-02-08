@@ -1416,7 +1416,7 @@ class XendDomainInfo:
                                       self.info['image'],
                                       self.info['devices'])
 
-            localtime = self.info.get('localtime', False)
+            localtime = self.info.get('platform_localtime', False)
             if localtime:
                 xc.domain_set_time_offset(self.domid)
 
