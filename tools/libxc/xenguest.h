@@ -142,4 +142,18 @@ int xc_set_hvm_param(
 int xc_get_hvm_param(
     int handle, domid_t dom, int param, unsigned long *value);
 
+/* PowerPC specific. */
+int xc_prose_build(int xc_handle,
+                   uint32_t domid,
+                   unsigned int mem_mb,
+                   const char *image_name,
+                   const char *ramdisk_name,
+                   const char *cmdline,
+                   const char *features,
+                   unsigned long flags,
+                   unsigned int store_evtchn,
+                   unsigned long *store_mfn,
+                   unsigned int console_evtchn,
+                   unsigned long *console_mfn);
+
 #endif /* XENGUEST_H */
