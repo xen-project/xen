@@ -2,10 +2,27 @@
  * Compatibility hypercall routines.
  */
 
+#include <xen/config.h>
+#include <xen/errno.h>
+#include <xen/softirq.h>
+#include <asm/asm_defns.h>
+#include <asm/apicdef.h>
+#include <asm/page.h>
 #include <asm/desc.h>
+#include <public/xen.h>
 
-.text
+#define GET_GUEST_REGS(reg)                     \
+        movq $~(STACK_SIZE-1),reg;              \
+        andq %rsp,reg;                          \
+        orq  $(STACK_SIZE-CPUINFO_sizeof),reg;
 
+#define GET_CURRENT(reg)         \
+        movq $STACK_SIZE-8, reg; \
+        orq  %rsp, reg;          \
+        andq $~7,reg;            \
+        movq (reg),reg;
+
+        ALIGN
 ENTRY(compat_hypercall)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
@@ -62,7 +79,7 @@ compat_skip_clobber:
         movl  %eax,UREGS_rax(%rsp)       # save the return value
 
 /* %rbx: struct vcpu */
-compat_test_all_events:
+ENTRY(compat_test_all_events)
         cli                             # tests must not race interrupts
 /*compat_test_softirqs:*/
         movl  VCPU_processor(%rbx),%eax
@@ -164,7 +181,7 @@ compat_failsafe_callback:
 .previous
 
 /* %rdx: trap_bounce, %rbx: struct vcpu */
-compat_post_handle_exception:
+ENTRY(compat_post_handle_exception)
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    compat_test_all_events
         call  compat_create_bounce_frame

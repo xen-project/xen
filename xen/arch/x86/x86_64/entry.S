@@ -319,7 +319,7 @@ create_bounce_frame:
 domain_crash_synchronous_string:
         .asciz "domain_crash_sync called from entry.S\n"
 
-domain_crash_synchronous:
+ENTRY(domain_crash_synchronous)
         # Get out of the guest-save area of the stack.
         GET_GUEST_REGS(%rax)
         movq  %rax,%rsp
@@ -357,7 +357,7 @@ ENTRY(ret_from_intr)
 
         ALIGN
 /* No special register assumptions. */
-handle_exception:
+ENTRY(handle_exception)
         SAVE_ALL
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
@@ -633,7 +633,3 @@ ENTRY(hypercall_args_table)
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
-
-#ifdef CONFIG_COMPAT
-#include "compat/entry.S"
-#endif

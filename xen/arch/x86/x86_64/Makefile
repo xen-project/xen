@@ -1,3 +1,5 @@
+subdir-y += compat
+
 obj-y += entry.o
 obj-y += compat_kexec.o
 obj-y += gpr_switch.o
@@ -13,7 +15,6 @@ ifeq ($(CONFIG_COMPAT),y)
 # extra dependencies
 compat.o:	../compat.c
 domctl.o:	../domctl.c
-entry.o:	compat/entry.S
 mm.o:		compat/mm.c
 physdev.o:	../physdev.c
 platform_hypercall.o: ../platform_hypercall.c
