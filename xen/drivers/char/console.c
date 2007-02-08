@@ -102,7 +102,7 @@ static void parse_guest_loglvl(char *s);
 custom_param("loglvl", parse_loglvl);
 custom_param("guest_loglvl", parse_guest_loglvl);
 
-static atomic_t print_everything = ATOMIC_INIT(1);
+static atomic_t print_everything = ATOMIC_INIT(0);
 
 #define ___parse_loglvl(s, ps, lvlstr, lvlnum)          \
     if ( !strncmp((s), (lvlstr), strlen(lvlstr)) ) {    \
@@ -569,9 +569,6 @@ void console_endboot(void)
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
-
-    /* Now we implement the logging thresholds. */
-    console_end_log_everything();
 }
 
 void console_start_log_everything(void)
