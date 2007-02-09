@@ -128,6 +128,8 @@ void elf_load_binary(struct elf_binary *elf)
 	filesz = elf_uval(elf, phdr, p_filesz);
 	memsz = elf_uval(elf, phdr, p_memsz);
 	dest = elf_get_ptr(elf, paddr);
+	elf_msg(elf, "%s: phdr %" PRIu64 " at 0x%p -> 0x%p\n",
+		__func__, i, dest, dest + filesz);
 	memcpy(dest, elf->image + offset, filesz);
 	memset(dest + filesz, 0, memsz - filesz);
     }
