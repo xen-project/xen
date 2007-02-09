@@ -13,16 +13,18 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <xen/string.h>
 
-char *
-strncpy(char *dest, const char *src, size_t n)
+size_t
+strlcpy(char *dest, const char *src, size_t n)
 {
+	size_t ret;
     char *dp;
 
     /* cases to consider:
@@ -34,7 +36,7 @@ strncpy(char *dest, const char *src, size_t n)
      */
 
     if (n <= 0) {
-        return dest;
+        return 0;
     }
   
     dp = dest;
@@ -43,12 +45,14 @@ strncpy(char *dest, const char *src, size_t n)
         *dp++ = *src;
         --n;
         ++src;
-    } while ((*src != '\0') && (n > 0));
+    } while ((*src != '\0') && (n > 1));
+
+    ret = n;
   
     /* clear remainder of buffer (if any);  ANSI semantics */
     while (n > 0) {
         *dp++ = '\0';
         --n;
     }
-    return dest;
+    return ret;
 }

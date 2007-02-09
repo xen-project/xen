@@ -27,5 +27,5 @@ obj-y += snprintf.o
 obj-y += strcmp.o
 obj-y += strlen.o
 obj-y += strncmp.o
-obj-y += strncpy.o
+obj-y += strlcpy.o
 obj-y += strnlen.o
