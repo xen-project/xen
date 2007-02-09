@@ -513,12 +513,28 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
         switch ( ins_subtype ) {
-        case 7: /* cmp $imm, m32/16 */
-            mmio_op->instr = INSTR_CMP;
+        case 0: /* add $imm, m32/16 */
+            mmio_op->instr = INSTR_ADD;
             return DECODE_success;
 
         case 1: /* or $imm, m32/16 */
             mmio_op->instr = INSTR_OR;
+            return DECODE_success;
+
+        case 4: /* and $imm, m32/16 */
+            mmio_op->instr = INSTR_AND;
+            return DECODE_success;
+
+        case 5: /* sub $imm, m32/16 */
+            mmio_op->instr = INSTR_SUB;
+            return DECODE_success;
+
+        case 6: /* xor $imm, m32/16 */
+            mmio_op->instr = INSTR_XOR;
+            return DECODE_success;
+
+        case 7: /* cmp $imm, m32/16 */
+            mmio_op->instr = INSTR_CMP;
             return DECODE_success;
 
         default:
