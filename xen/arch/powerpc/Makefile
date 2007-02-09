@@ -51,8 +51,6 @@ obj-$(builtin_dom0) += dom0.o
 
 obj-y += firmware_image.o
 
-obj-y += elf32.o
-
 # These are extra warnings like for the arch/ppc directory but may not
 # allow the rest of the tree to build.
 PPC_C_WARNINGS += -Wundef -Wmissing-prototypes -Wmissing-declarations

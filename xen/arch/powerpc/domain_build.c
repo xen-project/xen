@@ -20,7 +20,6 @@
 
 #include <xen/config.h>
 #include <xen/lib.h>
-#include <xen/elf.h>
 #include <xen/sched.h>
 #include <xen/init.h>
 #include <xen/ctype.h>
@@ -31,10 +30,8 @@
 #include <asm/processor.h>
 #include <asm/papr.h>
 #include <public/arch-powerpc.h>
+#include <public/libelf.h>
 #include "oftree.h"
-
-extern int parseelfimage_32(struct domain_setup_info *dsi);
-extern int loadelfimage_32(struct domain_setup_info *dsi);
 
 /* opt_dom0_mem: memory allocated to domain 0. */
 static unsigned int dom0_nrpages;
@@ -53,63 +50,18 @@ integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 static unsigned int opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
 
-int elf_sanity_check(const Elf_Ehdr *ehdr)
-{
-    if (IS_ELF(*ehdr))
-        /* we are happy with either */
-        if ((ehdr->e_ident[EI_CLASS] == ELFCLASS32
-             && ehdr->e_machine == EM_PPC)
-            || (ehdr->e_ident[EI_CLASS] == ELFCLASS64
-                && ehdr->e_machine == EM_PPC64)) {
-            if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB
-                && ehdr->e_type == ET_EXEC)
-                return 1;
-        }
-    printk("DOM0 image is not a Xen-compatible Elf image.\n");
-    return 0;
-}
-
 /* adapted from common/elf.c */
 #define RM_MASK(a,l) ((a) & ((1UL << (l)) - 1))
-
-static int rm_loadelfimage_64(struct domain_setup_info *dsi, ulong rma)
-{
-    char *elfbase = (char *)dsi->image_addr;
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)dsi->image_addr;
-    Elf64_Phdr *phdr;
-    int h;
-  
-    for (h = 0; h < ehdr->e_phnum; h++ ) 
-    {
-        phdr = (Elf64_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
-        if (!((phdr->p_type == PT_LOAD) &&
-             ((phdr->p_flags & (PF_W|PF_X)) != 0)))
-            continue;
-
-        if (phdr->p_filesz != 0)
-            memcpy((char *)(rma + RM_MASK(phdr->p_paddr, 42)),
-                   elfbase + phdr->p_offset, 
-                   phdr->p_filesz);
-        if (phdr->p_memsz > phdr->p_filesz)
-            memset((char *)(rma + RM_MASK(phdr->p_paddr, 42) + phdr->p_filesz),
-                   0, phdr->p_memsz - phdr->p_filesz);
-    }
-
-#ifdef NOT_YET
-    loadelfsymtab(dsi, 1);
-#endif
-
-    return 0;
-}
 
 int construct_dom0(struct domain *d,
                    unsigned long image_start, unsigned long image_len, 
                    unsigned long initrd_start, unsigned long initrd_len,
                    char *cmdline)
 {
+    struct elf_binary elf;
+    struct elf_dom_parms parms;
     int rc;
     struct vcpu *v = d->vcpu[0];
-    struct domain_setup_info dsi;
     ulong dst;
     u64 *ofh_tree;
     uint rma_nrpages = 1 << d->arch.rma_order;
@@ -117,11 +69,7 @@ int construct_dom0(struct domain *d,
     ulong rma = page_to_maddr(d->arch.rma_page);
     start_info_t *si;
     ulong eomem;
-    int am64 = 1;
     int preempt = 0;
-    ulong msr;
-    ulong pc;
-    ulong r2;
     int vcpu;
 
     /* Sanity! */
@@ -133,26 +81,27 @@ int construct_dom0(struct domain *d,
 
     cpu_init_vcpu(v);
 
-    memset(&dsi, 0, sizeof(struct domain_setup_info));
-    dsi.image_addr = image_start;
-    dsi.image_len  = image_len;
+    printk("*** LOADING DOMAIN 0 ***\n");
 
-    printk("Trying Dom0 as 64bit ELF\n");
-    if ((rc = parseelfimage(&dsi)) != 0) {
-        printk("Trying Dom0 as 32bit ELF\n");
-        if ((rc = parseelfimage_32(&dsi)) != 0)
-            return rc;
-        am64 = 0;
-    }
+    rc = elf_init(&elf, (void *)image_start, image_len);
+    if (rc)
+        return rc;
+#ifdef VERBOSE
+    elf_set_verbose(&elf);
+#endif
+    elf_parse_binary(&elf);
+    if (0 != (elf_xen_parse(&elf, &parms)))
+        return rc;
+
+    printk("Dom0 kernel: %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+            elf_64bit(&elf) ? "64-bit" : "32-bit",
+            elf.pstart, elf.pend);
 
     /* elf contains virtual addresses that can have the upper bits
      * masked while running in real mode, so we do the masking as well
      * as well */
-    dsi.v_kernstart = RM_MASK(dsi.v_kernstart, 42);
-    dsi.v_kernend = RM_MASK(dsi.v_kernend, 42);
-    dsi.v_kernentry = RM_MASK(dsi.v_kernentry, 42);
-
-    printk("*** LOADING DOMAIN 0 ***\n");
+    parms.virt_kend = RM_MASK(parms.virt_kend, 42);
+    parms.virt_entry = RM_MASK(parms.virt_entry, 42);
 
     /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
@@ -253,74 +202,55 @@ int construct_dom0(struct domain *d,
     printk("loading OFD: 0x%lx RMA: 0x%lx, 0x%lx\n", dst, dst - rma,
            oftree_len);
     memcpy((void *)dst, (void *)oftree, oftree_len);
-
     dst = ALIGN_UP(dst + oftree_len, PAGE_SIZE);
 
-    if (am64) {
-        ulong kbase;
-        ulong *fdesc;
+    /* Load the dom0 kernel. */
+    elf.dest = (void *)dst;
+    elf_load_binary(&elf);
+    v->arch.ctxt.pc = dst - rma;
+    dst = ALIGN_UP(dst + parms.virt_kend, PAGE_SIZE);
 
-        printk("loading 64-bit Dom0: 0x%lx, in RMA:0x%lx\n", dst, dst - rma);
-        rm_loadelfimage_64(&dsi, dst);
+    /* Load the initrd. */
+    if (initrd_len > 0) {
+        ASSERT((dst - rma) + image_len < eomem);
 
-        kbase = dst;
-        /* move dst to end of bss */
-        dst = ALIGN_UP(dsi.v_kernend + dst, PAGE_SIZE);
+        printk("loading initrd: 0x%lx, 0x%lx\n", dst, initrd_len);
+        memcpy((void *)dst, (void *)initrd_start, initrd_len);
 
-        if ( initrd_len > 0 ) {
-            ASSERT( (dst - rma) + image_len < eomem );
+        si->mod_start = dst - rma;
+        si->mod_len = image_len;
 
-            printk("loading initrd: 0x%lx, 0x%lx\n", dst, initrd_len);
-            memcpy((void *)dst, (void *)initrd_start, initrd_len);
-
-            si->mod_start = dst - rma;
-            si->mod_len = image_len;
-
-            dst = ALIGN_UP(dst + initrd_len, PAGE_SIZE);
-        } else {
-            printk("no initrd\n");
-            si->mod_start = 0;
-            si->mod_len = 0;
-        }
-        /* it may be a function descriptor */
-        fdesc = (ulong *)(dsi.v_kernstart + dsi.v_kernentry + kbase);
-
-        if (fdesc[2] == 0
-            && ((fdesc[0] >= dsi.v_kernstart)
-                && (fdesc[0] < dsi.v_kernend)) /* text entry is in range */
-            && ((fdesc[1] >= dsi.v_kernstart)  /* toc can be > image */
-                && (fdesc[1] < (dsi.v_kernend + (0x7fff * sizeof (ulong)))))) {
-            /* it is almost certainly a function descriptor */
-            pc = RM_MASK(fdesc[0], 42) + kbase - rma;
-            r2 = RM_MASK(fdesc[1], 42) + kbase - rma;
-        } else {
-            pc = ((ulong)fdesc) - rma;
-            r2 = 0;
-        }
-        msr = MSR_SF;
+        dst = ALIGN_UP(dst + initrd_len, PAGE_SIZE);
     } else {
-        printk("loading 32-bit Dom0: 0x%lx, in RMA:0x%lx\n",
-               dsi.v_kernstart + rma, dsi.v_kernstart);
-        dsi.v_start = rma;
-        loadelfimage_32(&dsi);
-
-        pc = dsi.v_kernentry;
-        r2 = 0;
-        msr = 0;
+        printk("no initrd\n");
+        si->mod_start = 0;
+        si->mod_len = 0;
     }
 
+    if (elf_64bit(&elf)) {
+        v->arch.ctxt.msr = MSR_SF;
+    } else {
+        v->arch.ctxt.msr = 0;
+    }
+    v->arch.ctxt.gprs[2] = 0;
     v->arch.ctxt.gprs[3] = si->mod_start;
     v->arch.ctxt.gprs[4] = si->mod_len;
+
+	printk("dom0 initial register state:\n"
+			"    pc %016lx msr %016lx\n"
+			"    r1 %016lx r2 %016lx r3 %016lx\n"
+			"    r4 %016lx r5 %016lx\n",
+			v->arch.ctxt.pc,
+			v->arch.ctxt.msr,
+			v->arch.ctxt.gprs[1],
+			v->arch.ctxt.gprs[2],
+			v->arch.ctxt.gprs[3],
+			v->arch.ctxt.gprs[4],
+			v->arch.ctxt.gprs[5]);
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
         strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
-
-    v->arch.ctxt.msr = msr;
-    v->arch.ctxt.pc = pc;
-    v->arch.ctxt.gprs[2] = r2;
-
-    printk("DOM: pc = 0x%lx, r2 = 0x%lx\n", pc, r2);
 
     ofd_dom0_fixup(d, *ofh_tree + rma, si);
 
