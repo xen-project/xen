@@ -36,6 +36,7 @@
 #include <xen/symbols.h>
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
+#include <xen/rcupdate.h>
 #include <acm/acm_hooks.h>
 #include <public/version.h>
 #include <asm/mpic.h>
@@ -176,6 +177,7 @@ static void __init start_of_day(void)
     register_keyhandler('D', key_ofdump , "Dump OF Devtree");
 
     timer_init();
+    rcu_init();
     serial_init_postirq();
     do_initcalls();
 }
@@ -240,6 +242,8 @@ static int kick_secondary_cpus(int maxcpus)
 
         /* For now everything is single core */
         cpu_set(cpuid, cpu_core_map[cpuid]);
+
+        rcu_online_cpu(cpuid);
 
         numa_set_node(cpuid, 0);
         numa_add_cpu(cpuid);
