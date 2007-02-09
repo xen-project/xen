@@ -49,15 +49,8 @@ GUEST_SRCS-y += $(LIBELF_SRCS)
 GUEST_SRCS-y += xc_dom_core.c xc_dom_boot.c
 GUEST_SRCS-y += xc_dom_elfloader.c
 GUEST_SRCS-y += xc_dom_binloader.c
-
-ifeq ($(CONFIG_POWERPC),y)
-# big endian boxes
-GUEST_SRCS-y += xc_dom_powerpc64.c
-else
-# little endian boxes
 GUEST_SRCS-y += xc_dom_x86.c
 GUEST_SRCS-y += xc_dom_ia64.c
-endif
 
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_compat_linux.c
 GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_compat_linux.c
