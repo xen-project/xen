@@ -55,6 +55,7 @@ DEFINE_XEN_GUEST_HANDLE(void);
 
 typedef unsigned long xen_pfn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
+#define PRIpfn "lx"
 #endif
 
 /* Arch specific VIRQs definition */
