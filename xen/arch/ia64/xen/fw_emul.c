@@ -33,6 +33,7 @@
 #include <xen/console.h>
 #include <xen/hypercall.h>
 #include <xen/softirq.h>
+#include <xen/time.h>
 
 static DEFINE_SPINLOCK(efi_time_services_lock);
 
@@ -675,6 +676,9 @@ efi_emulate_get_time(
 	struct page_info *tv_page = NULL;
 	struct page_info *tc_page = NULL;
 	efi_status_t status = 0;
+	efi_time_t *tvp;
+	struct tm timeptr;
+	unsigned long xtimesec;
 
 	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
 	if (*fault != IA64_NO_FAULT)
@@ -687,6 +691,17 @@ efi_emulate_get_time(
 
 	spin_lock(&efi_time_services_lock);
 	status = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
+	tvp = (efi_time_t *)tv;
+	xtimesec = mktime(tvp->year, tvp->month, tvp->day, tvp->hour,
+	                  tvp->minute, tvp->second);
+	xtimesec += current->domain->time_offset_seconds;
+	timeptr = gmtime(xtimesec);
+	tvp->second = timeptr.tm_sec;
+	tvp->minute = timeptr.tm_min;
+	tvp->hour   = timeptr.tm_hour;
+	tvp->day    = timeptr.tm_mday;
+	tvp->month  = timeptr.tm_mon + 1;
+	tvp->year   = timeptr.tm_year + 1900;
 	spin_unlock(&efi_time_services_lock);
 
 errout:
