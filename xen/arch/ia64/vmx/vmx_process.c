@@ -353,6 +353,18 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }
         }
 
+        /* avoid recursively walking (short format) VHPT */
+        if ((((vadr ^ vpta.val) << 3) >> (vpta.size + 3)) == 0) {
+            if (vpsr.ic) {
+                vcpu_set_isr(v, misr.val);
+                dtlb_fault(v, vadr);
+                return IA64_FAULT;
+            } else {
+                nested_dtlb(v);
+                return IA64_FAULT;
+            }
+        }
+            
         vmx_vcpu_thash(v, vadr, &vhpt_adr);
         if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
             /* VHPT successfully read.  */
