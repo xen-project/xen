@@ -34,8 +34,6 @@ extern void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
 extern int swiotlb_dma_supported(struct device *hwdev, u64 mask);
 extern void swiotlb_init(void);
 
-extern unsigned int dma_bits;
-
 #ifdef CONFIG_SWIOTLB
 extern int swiotlb;
 #else

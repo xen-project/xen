@@ -10,7 +10,7 @@
 /* Needed for arch/i386/kernel/swiotlb.c and arch/i386/kernel/pci-dma-xen.c */
 #include <asm/hypervisor.h>
 /* Needed for arch/i386/kernel/swiotlb.c */
-#include <asm-i386/mach-xen/asm/swiotlb.h>
+#include <asm/swiotlb.h>
 #endif
 
 #ifndef CONFIG_XEN
