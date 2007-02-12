@@ -862,8 +862,7 @@ cpu_init (void)
 	 * be fine).
 	 */
 #ifdef XEN
-	ia64_setreg(_IA64_REG_CR_DCR,  (  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
-			  | IA64_DCR_PP | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
+	ia64_setreg(_IA64_REG_CR_DCR, IA64_DEFAULT_DCR_BITS);
 #else
 	ia64_setreg(_IA64_REG_CR_DCR,  (  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));

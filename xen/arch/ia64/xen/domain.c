@@ -581,7 +581,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		er->dtrs[i].rid = v->arch.dtrs[i].rid;
 	}
 	er->event_callback_ip = v->arch.event_callback_ip;
-	er->dcr = PSCB(v,dcr);
+	er->dcr = v->arch.privregs ? PSCB(v,dcr) : 0;
 	er->iva = v->arch.iva;
 }
 
@@ -617,7 +617,6 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			             er->dtrs[i].rid);
 		}
 		v->arch.event_callback_ip = er->event_callback_ip;
-		PSCB(v,dcr) = er->dcr;
 		v->arch.iva = er->iva;
 	}
 
