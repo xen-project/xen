@@ -375,16 +375,6 @@ early_console_setup (char *cmdline)
 {
 	int earlycons = 0;
 
-#ifdef CONFIG_XEN
-#ifndef CONFIG_IA64_HP_SIM
-	if (is_running_on_xen()) {
-		extern struct console hpsim_cons;
-		hpsim_cons.flags |= CON_BOOT;
-		register_console(&hpsim_cons);
-		earlycons++;
-	}
-#endif
-#endif
 #ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 	{
 		extern int sn_serial_console_early_setup(void);
@@ -557,6 +547,45 @@ setup_arch (char **cmdline_p)
 #if !defined(CONFIG_VT) || !defined(CONFIG_DUMMY_CONSOLE)
 			conswitchp = NULL;
 #endif
+		}
+		
+		/*
+		 * If a console= is NOT specified, we assume using the
+		 * xencons console is desired.  By default, this is ttyS0
+		 * for dom0 and tty0 for domU.
+		 */
+		if (!strstr(*cmdline_p, "console=")) {
+			char *p, *q, name[5];
+			int offset = 0;
+
+			if (is_initial_xendomain())
+				strncpy(name, "ttyS", 4);
+			else
+				strncpy(name, "tty", 3);
+
+			p = strstr(*cmdline_p, "xencons=");
+
+			if (p) {
+				p += 8;
+				if (!strncmp(p, "ttyS", 4)) {
+					strncpy(name, p, 4);
+					p += 4;
+					offset = simple_strtol(p, &q, 10);
+					if (p == q)
+						offset = 0;
+				} else if (!strncmp(p, "tty", 3) ||
+				           !strncmp(p, "xvc", 3)) {
+					strncpy(name, p, 3);
+					p += 3;
+					offset = simple_strtol(p, &q, 10);
+					if (p == q)
+						offset = 0;
+				} else if (!strncmp(p, "off", 3))
+					offset = -1;
+			}
+
+			if (offset >= 0)
+				add_preferred_console(name, offset, NULL);
 		}
 	}
 	xencons_early_setup();
