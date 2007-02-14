@@ -690,6 +690,39 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         } else
             return DECODE_failure;
 
+    case 0xFE:
+    case 0xFF:
+    {
+        unsigned char ins_subtype = (opcode[1] >> 3) & 7;
+
+        if ( opcode[0] == 0xFE ) {
+            *op_size = BYTE;
+            GET_OP_SIZE_FOR_BYTE(size_reg);
+        } else {
+            GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+            size_reg = *op_size;
+        }
+
+        mmio_op->immediate = 1;
+        mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
+        mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
+
+        switch ( ins_subtype ) {
+        case 0: /* inc */
+            mmio_op->instr = INSTR_ADD;
+            return DECODE_success;
+
+        case 1: /* dec */
+            mmio_op->instr = INSTR_OR;
+            return DECODE_success;
+
+        default:
+            printk("%x/%x, This opcode isn't handled yet!\n",
+                   *opcode, ins_subtype);
+            return DECODE_failure;
+        }
+    }
+
     case 0x0F:
         break;
 
