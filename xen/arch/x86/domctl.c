@@ -412,6 +412,9 @@ long arch_do_domctl(
 
         ret = 0;
         put_domain(d);
+
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
     }
     break;
 
