@@ -398,6 +398,7 @@ long arch_do_domctl(
 
         put_domain(d);
     }
+    break;
 
     case XEN_DOMCTL_get_address_size:
     {
@@ -412,6 +413,7 @@ long arch_do_domctl(
         ret = 0;
         put_domain(d);
     }
+    break;
 
     default:
         ret = -ENOSYS;
