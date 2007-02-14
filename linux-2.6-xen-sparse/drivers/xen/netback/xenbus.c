@@ -217,7 +217,7 @@ static void frontend_changed(struct xenbus_device *dev,
 	switch (frontend_state) {
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
-			printk("%s: %s: prepare for reconnect\n",
+			printk(KERN_INFO "%s: %s: prepare for reconnect\n",
 			       __FUNCTION__, dev->nodename);
 			if (be->netif) {
 				netif_disconnect(be->netif);

@@ -1505,7 +1505,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 	int id, ref;
 
 	if (np->copying_receiver) {
-		printk("%s: fix me for copying receiver.\n", __FUNCTION__);
+		WPRINTK("%s: fix me for copying receiver.\n", __FUNCTION__);
 		return;
 	}
 
@@ -1555,8 +1555,8 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 		xfer++;
 	}
 
-	printk("%s: %d xfer, %d noxfer, %d unused\n",
-	       __FUNCTION__, xfer, noxfer, unused);
+	IPRINTK("%s: %d xfer, %d noxfer, %d unused\n",
+		__FUNCTION__, xfer, noxfer, unused);
 
 	if (xfer) {
 		/* Some pages are no longer absent... */
