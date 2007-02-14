@@ -314,6 +314,74 @@ io_port_init (void)
 	num_io_spaces = 1;
 }
 
+#ifdef XEN
+static int __init
+intel_tiger_console_setup(void)
+{
+	extern struct ns16550_defaults ns16550_com1, ns16550_com2;
+	efi_system_table_t *systab;
+	efi_config_table_t *tables;
+	struct acpi20_table_rsdp *rsdp = NULL;
+	struct acpi_table_xsdt *xsdt;
+	struct acpi_table_header *hdr;
+	int i;
+
+	/* Don't duplicate setup if an HCDP table is present */
+	if (efi.hcdp)
+		return -ENODEV;
+
+	/* Manually walk firmware provided tables to get to the XSDT.  */
+	systab = __va(ia64_boot_param->efi_systab);
+
+	if (!systab || systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
+		return -ENODEV;
+
+	tables = __va(systab->tables);
+
+	for (i = 0 ; i < (int)systab->nr_tables && !rsdp ; i++) {
+		if (efi_guidcmp(tables[i].guid, ACPI_20_TABLE_GUID) == 0)
+			rsdp =
+			     (struct acpi20_table_rsdp *)__va(tables[i].table);
+	}
+
+	if (!rsdp || strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1))
+		return -ENODEV;
+
+	xsdt = (struct acpi_table_xsdt *)__va(rsdp->xsdt_address);
+	hdr = &xsdt->header;
+
+	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1))
+		return -ENODEV;
+
+	/* Only looking for Intel systems */
+	if (strncmp(hdr->oem_id, "INTEL", 5))
+		return -ENODEV;
+
+	if (!strncmp(hdr->oem_table_id, "SR870BH2", 8)) {
+		/* Tiger 2 */
+		ns16550_com1.baud = BAUD_AUTO;
+		ns16550_com1.io_base = 0x3f8;
+		ns16550_com1.irq = 4;
+
+		ns16550_com2.baud = BAUD_AUTO;
+		ns16550_com2.io_base = 0x2f8;
+		ns16550_com2.irq = 3;
+
+		return 0;
+
+	} else if (!strncmp(hdr->oem_table_id, "SR870BN4", 8)) {
+		/* Tiger 4 */
+		ns16550_com1.baud = BAUD_AUTO;
+		ns16550_com1.io_base = 0x2f8;
+		ns16550_com1.irq = 3;
+		
+		return 0;
+	}
+
+	return -ENODEV;
+}
+#endif
+
 /**
  * early_console_setup - setup debugging console
  *
@@ -344,6 +412,10 @@ early_console_setup (char *cmdline)
 		earlycons++;
 #endif
 
+#ifdef XEN
+	if (!intel_tiger_console_setup())
+		earlycons++;
+#endif
 	return (earlycons) ? 0 : -1;
 }
 

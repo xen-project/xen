@@ -140,7 +140,7 @@ static int __init
 setup_serial_console(struct pcdp *pcdp, struct pcdp_uart *uart)
 {
 
-	ns16550_com1.baud = uart->baud;
+	ns16550_com1.baud = uart->baud ? uart->baud : BAUD_AUTO;
 	ns16550_com1.io_base = uart->addr.address;
 	if (uart->bits)
 		ns16550_com1.data_bits = uart->bits;

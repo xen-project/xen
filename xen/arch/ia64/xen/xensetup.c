@@ -147,7 +147,6 @@ void early_cmdline_parse(char **cmdline_p)
 }
 
 struct ns16550_defaults ns16550_com1 = {
-    .baud      = BAUD_AUTO,
     .data_bits = 8,
     .parity    = 'n',
     .stop_bits = 1
@@ -158,7 +157,6 @@ unsigned int ns16550_com1_polarity;
 unsigned int ns16550_com1_trigger;
 
 struct ns16550_defaults ns16550_com2 = {
-    .baud      = BAUD_AUTO,
     .data_bits = 8,
     .parity    = 'n',
     .stop_bits = 1
@@ -271,12 +269,7 @@ void start_kernel(void)
         hpsim_serial_init();
     else {
         ns16550_init(0, &ns16550_com1);
-        if (ns16550_com1.io_base == 0x3f8) {
-            /* Also init com2 for Tiger4. */
-            ns16550_com2.io_base = 0x2f8;
-            ns16550_com2.irq     = 3;
-            ns16550_init(1, &ns16550_com2);
-        }
+        ns16550_init(1, &ns16550_com2);
     }
     serial_init_preirq();
 
