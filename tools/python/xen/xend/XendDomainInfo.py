@@ -1569,16 +1569,17 @@ class XendDomainInfo:
         # get associated devices to destroy
         # build list of phantom devices to be removed after normal devices
         plist = []
-        from xen.xend.xenstore.xstransact import xstransact
-        t = xstransact("%s/device/vbd" % GetDomainPath(self.domid))
-        for dev in t.list():
-            backend_phantom_vbd = xstransact.Read("%s/device/vbd/%s/phantom_vbd" \
-                                  % (self.dompath, dev))
-            if backend_phantom_vbd is not None:
-                frontend_phantom_vbd =  xstransact.Read("%s/frontend" \
-                                  % backend_phantom_vbd)
-                plist.append(backend_phantom_vbd)
-                plist.append(frontend_phantom_vbd)
+        if self.domid is not None:
+            from xen.xend.xenstore.xstransact import xstransact
+            t = xstransact("%s/device/vbd" % GetDomainPath(self.domid))
+            for dev in t.list():
+                backend_phantom_vbd = xstransact.Read("%s/device/vbd/%s/phantom_vbd" \
+                                      % (self.dompath, dev))
+                if backend_phantom_vbd is not None:
+                    frontend_phantom_vbd =  xstransact.Read("%s/frontend" \
+                                      % backend_phantom_vbd)
+                    plist.append(backend_phantom_vbd)
+                    plist.append(frontend_phantom_vbd)
         return plist
 
     def _cleanup_phantom_devs(self, plist):
