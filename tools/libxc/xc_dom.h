@@ -7,6 +7,8 @@
 typedef uint64_t xen_vaddr_t;
 typedef uint64_t xen_paddr_t;
 
+#define PRIpfn PRI_xen_pfn
+
 struct xc_dom_seg {
     xen_vaddr_t vstart;
     xen_vaddr_t vend;
