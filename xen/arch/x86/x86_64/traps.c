@@ -16,7 +16,6 @@
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <asm/page.h>
-#include <asm/shadow.h>
 #include <asm/shared.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

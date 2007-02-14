@@ -21,7 +21,6 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <xen/shadow.h>
 #include <xen/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
@@ -29,6 +28,7 @@
 #include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/x86_emulate.h>
+#include <asm/paging.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
@@ -809,7 +809,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     if ( value_is_ptr )   /* get physical address of data */
     {
         if ( hvm_paging_enabled(current) )
-            p->data = shadow_gva_to_gpa(current, value);
+            p->data = paging_gva_to_gpa(current, value);
         else
             p->data = value; /* guest VA == guest PA */
     }
@@ -865,7 +865,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
     if ( value_is_ptr )
     {
         if ( hvm_paging_enabled(v) )
-            p->data = shadow_gva_to_gpa(v, value);
+            p->data = paging_gva_to_gpa(v, value);
         else
             p->data = value; /* guest VA == guest PA */
     }
@@ -981,7 +981,7 @@ void handle_mmio(unsigned long gpa)
         if ( ad_size == WORD )
             addr &= 0xFFFF;
         addr += hvm_get_segment_base(v, x86_seg_es);
-        if ( shadow_gva_to_gpa(v, addr) == gpa )
+        if ( paging_gva_to_gpa(v, addr) == gpa )
         {
             enum x86_segment seg;
 

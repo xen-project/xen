@@ -25,7 +25,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 
 #include <public/version.h>
 #include <public/libelf.h>
@@ -777,8 +777,8 @@ int construct_dom0(struct domain *d,
         (void)alloc_vcpu(d, i, i);
 
     /* Set up CR3 value for write_ptbase */
-    if ( shadow_mode_enabled(v->domain) )
-        shadow_update_paging_modes(v);
+    if ( paging_mode_enabled(v->domain) )
+        paging_update_paging_modes(v);
     else
         update_cr3(v);
 
@@ -918,8 +918,8 @@ int construct_dom0(struct domain *d,
     regs->eflags = X86_EFLAGS_IF;
 
     if ( opt_dom0_shadow )
-        if ( shadow_enable(d, SHM2_enable) == 0 ) 
-            shadow_update_paging_modes(v);
+        if ( paging_enable(d, PG_SH_enable) == 0 ) 
+            paging_update_paging_modes(v);
 
     if ( supervisor_mode_kernel )
     {

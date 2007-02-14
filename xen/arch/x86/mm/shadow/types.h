@@ -414,15 +414,9 @@ valid_gfn(gfn_t m)
 static inline mfn_t
 vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
 {
-    if ( !shadow_vcpu_mode_translate(v) )
+    if ( !paging_vcpu_mode_translate(v) )
         return _mfn(gfn_x(gfn));
-    return sh_gfn_to_mfn(v->domain, gfn_x(gfn));
-}
-
-static inline gfn_t
-mfn_to_gfn(struct domain *d, mfn_t mfn)
-{
-    return _gfn(sh_mfn_to_gfn(d, mfn));
+    return gfn_to_mfn(v->domain, gfn_x(gfn));
 }
 
 static inline paddr_t

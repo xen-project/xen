@@ -19,7 +19,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
@@ -42,7 +42,7 @@ long arch_do_domctl(
         d = get_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = shadow_domctl(d,
+            ret = paging_domctl(d,
                                 &domctl->u.shadow_op,
                                 guest_handle_cast(u_domctl, void));
             put_domain(d);

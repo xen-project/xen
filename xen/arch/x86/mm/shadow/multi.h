@@ -115,5 +115,5 @@ SHADOW_INTERNAL_NAME(sh_destroy_monitor_table, SHADOW_LEVELS, GUEST_LEVELS)
     (struct vcpu *v, mfn_t mmfn);
 #endif
 
-extern struct shadow_paging_mode 
+extern struct paging_mode 
 SHADOW_INTERNAL_NAME(sh_paging_mode, SHADOW_LEVELS, GUEST_LEVELS);
