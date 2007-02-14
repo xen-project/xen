@@ -7,7 +7,7 @@
 /* ------------------------------------------------------------------------ */
 
 uint64_t elf_access_unsigned(struct elf_binary * elf, const void *ptr,
-			     uint64_t offset, size_t size)
+                             uint64_t offset, size_t size)
 {
     int need_swap = elf_swap(elf);
     const uint8_t *u8;
@@ -15,27 +15,27 @@ uint64_t elf_access_unsigned(struct elf_binary * elf, const void *ptr,
     const uint32_t *u32;
     const uint64_t *u64;
 
-    switch (size)
+    switch ( size )
     {
     case 1:
-	u8 = ptr + offset;
-	return *u8;
+        u8 = ptr + offset;
+        return *u8;
     case 2:
-	u16 = ptr + offset;
-	return need_swap ? bswap_16(*u16) : *u16;
+        u16 = ptr + offset;
+        return need_swap ? bswap_16(*u16) : *u16;
     case 4:
-	u32 = ptr + offset;
-	return need_swap ? bswap_32(*u32) : *u32;
+        u32 = ptr + offset;
+        return need_swap ? bswap_32(*u32) : *u32;
     case 8:
-	u64 = ptr + offset;
-	return need_swap ? bswap_64(*u64) : *u64;
+        u64 = ptr + offset;
+        return need_swap ? bswap_64(*u64) : *u64;
     default:
-	return 0;
+        return 0;
     }
 }
 
 int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
-			  uint64_t offset, size_t size)
+                          uint64_t offset, size_t size)
 {
     int need_swap = elf_swap(elf);
     const int8_t *s8;
@@ -43,22 +43,22 @@ int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
     const int32_t *s32;
     const int64_t *s64;
 
-    switch (size)
+    switch ( size )
     {
     case 1:
-	s8 = ptr + offset;
-	return *s8;
+        s8 = ptr + offset;
+        return *s8;
     case 2:
-	s16 = ptr + offset;
-	return need_swap ? bswap_16(*s16) : *s16;
+        s16 = ptr + offset;
+        return need_swap ? bswap_16(*s16) : *s16;
     case 4:
-	s32 = ptr + offset;
-	return need_swap ? bswap_32(*s32) : *s32;
+        s32 = ptr + offset;
+        return need_swap ? bswap_32(*s32) : *s32;
     case 8:
-	s64 = ptr + offset;
-	return need_swap ? bswap_64(*s64) : *s64;
+        s64 = ptr + offset;
+        return need_swap ? bswap_64(*s64) : *s64;
     default:
-	return 0;
+        return 0;
     }
 }
 
@@ -88,11 +88,12 @@ const elf_shdr *elf_shdr_by_name(struct elf_binary *elf, const char *name)
     const char *sname;
     int i;
 
-    for (i = 0; i < count; i++) {
-	shdr = elf_shdr_by_index(elf, i);
-	sname = elf_section_name(elf, shdr);
-	if (sname && 0 == strcmp(sname, name))
-	    return shdr;
+    for ( i = 0; i < count; i++ )
+    {
+        shdr = elf_shdr_by_index(elf, i);
+        sname = elf_section_name(elf, shdr);
+        if ( sname && !strcmp(sname, name) )
+            return shdr;
     }
     return NULL;
 }
@@ -100,31 +101,35 @@ const elf_shdr *elf_shdr_by_name(struct elf_binary *elf, const char *name)
 const elf_shdr *elf_shdr_by_index(struct elf_binary *elf, int index)
 {
     uint64_t count = elf_shdr_count(elf);
-    const void *ptr = NULL;
+    const void *ptr;
 
-    if (index < count)
-	ptr = elf->image
-	    + elf_uval(elf, elf->ehdr, e_shoff)
-	    + elf_uval(elf, elf->ehdr, e_shentsize) * index;
+    if ( index >= count )
+        return NULL;
+
+    ptr = (elf->image
+           + elf_uval(elf, elf->ehdr, e_shoff)
+           + elf_uval(elf, elf->ehdr, e_shentsize) * index);
     return ptr;
 }
 
 const elf_phdr *elf_phdr_by_index(struct elf_binary *elf, int index)
 {
     uint64_t count = elf_uval(elf, elf->ehdr, e_phnum);
-    const void *ptr = NULL;
+    const void *ptr;
 
-    if (index < count)
-	ptr = elf->image
-	    + elf_uval(elf, elf->ehdr, e_phoff)
-	    + elf_uval(elf, elf->ehdr, e_phentsize) * index;
+    if ( index >= count )
+        return NULL;
+
+    ptr = (elf->image
+           + elf_uval(elf, elf->ehdr, e_phoff)
+           + elf_uval(elf, elf->ehdr, e_phentsize) * index);
     return ptr;
 }
 
 const char *elf_section_name(struct elf_binary *elf, const elf_shdr * shdr)
 {
-    if (NULL == elf->sec_strtab)
-	return "unknown";
+    if ( elf->sec_strtab == NULL )
+        return "unknown";
     return elf->sec_strtab + elf_uval(elf, shdr, sh_name);
 }
 
@@ -136,7 +141,7 @@ const void *elf_section_start(struct elf_binary *elf, const elf_shdr * shdr)
 const void *elf_section_end(struct elf_binary *elf, const elf_shdr * shdr)
 {
     return elf->image
-	+ elf_uval(elf, shdr, sh_offset) + elf_uval(elf, shdr, sh_size);
+        + elf_uval(elf, shdr, sh_offset) + elf_uval(elf, shdr, sh_size);
 }
 
 const elf_sym *elf_sym_by_name(struct elf_binary *elf, const char *symbol)
@@ -146,16 +151,16 @@ const elf_sym *elf_sym_by_name(struct elf_binary *elf, const char *symbol)
     const elf_sym *sym;
     uint64_t info, name;
 
-    for (; ptr < end; ptr += elf_size(elf, sym))
+    for ( ; ptr < end; ptr += elf_size(elf, sym) )
     {
-	sym = ptr;
-	info = elf_uval(elf, sym, st_info);
-	name = elf_uval(elf, sym, st_name);
-	if (ELF32_ST_BIND(info) != STB_GLOBAL)
-	    continue;
-	if (strcmp(elf->sym_strtab + name, symbol) != 0)
-	    continue;
-	return sym;
+        sym = ptr;
+        info = elf_uval(elf, sym, st_info);
+        name = elf_uval(elf, sym, st_name);
+        if ( ELF32_ST_BIND(info) != STB_GLOBAL )
+            continue;
+        if ( strcmp(elf->sym_strtab + name, symbol) )
+            continue;
+        return sym;
     }
     return NULL;
 }
@@ -192,9 +197,9 @@ uint64_t elf_note_numeric(struct elf_binary *elf, const elf_note * note)
     case 2:
     case 4:
     case 8:
-	return elf_access_unsigned(elf, desc, 0, descsz);
+        return elf_access_unsigned(elf, desc, 0, descsz);
     default:
-	return 0;
+        return 0;
     }
 }
 const elf_note *elf_note_next(struct elf_binary *elf, const elf_note * note)
@@ -211,9 +216,7 @@ int elf_is_elfbinary(const void *image)
 {
     const Elf32_Ehdr *ehdr = image;
 
-    if (IS_ELF(*ehdr))
-	return 1;
-    return 0;
+    return IS_ELF(*ehdr);
 }
 
 int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr)
@@ -223,3 +226,13 @@ int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr)
 
     return ((p_type == PT_LOAD) && (p_flags & (PF_W | PF_X)) != 0);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

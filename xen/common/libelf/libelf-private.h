@@ -12,9 +12,9 @@
 #include <public/libelf.h>
 
 #define elf_msg(elf, fmt, args ... ) \
-	if (elf->verbose) printk(fmt, ## args )
+   if (elf->verbose) printk(fmt, ## args )
 #define elf_err(elf, fmt, args ... ) \
-	printk(fmt, ## args )
+   printk(fmt, ## args )
 
 #define strtoull(str, end, base) simple_strtoull(str, end, base)
 #define bswap_16(x) swab16(x)
@@ -43,12 +43,12 @@
 #include "xc_private.h"
 
 #define elf_msg(elf, fmt, args ... ) \
-	if (elf->log && elf->verbose) fprintf(elf->log, fmt , ## args )
-#define elf_err(elf, fmt, args ... ) do {                 \
-	if (elf->log)                                     \
-            fprintf(elf->log, fmt , ## args );            \
-        xc_set_error(XC_INVALID_KERNEL, fmt , ## args );  \
-	} while (0)
+    if (elf->log && elf->verbose) fprintf(elf->log, fmt , ## args )
+#define elf_err(elf, fmt, args ... ) do {               \
+    if (elf->log)                                       \
+        fprintf(elf->log, fmt , ## args );              \
+    xc_set_error(XC_INVALID_KERNEL, fmt , ## args );    \
+} while (0)
 
 #define safe_strcpy(d,s)                        \
 do { strncpy((d),(s),sizeof((d))-1);            \
@@ -58,3 +58,13 @@ do { strncpy((d),(s),sizeof((d))-1);            \
 #endif
 
 #endif /* __LIBELF_PRIVATE_H_ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
