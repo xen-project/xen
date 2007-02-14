@@ -28,7 +28,6 @@ numnodes.h		-> linux/include/asm-ia64/numnodes.h
 param.h			-> linux/include/asm-ia64/param.h
 patch.h			-> linux/include/asm-ia64/patch.h
 pci.h			-> linux/include/asm-ia64/pci.h
-percpu.h		-> linux/include/asm-ia64/percpu.h
 rse.h			-> linux/include/asm-ia64/rse.h
 sal.h			-> linux/include/asm-ia64/sal.h
 sections.h		-> linux/include/asm-ia64/sections.h

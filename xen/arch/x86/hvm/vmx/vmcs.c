@@ -295,6 +295,11 @@ static void construct_vmcs(struct vcpu *v)
 
     vmx_vmcs_enter(v);
 
+    v->arch.hvm_vmx.cpu_cr2 = 0;
+    v->arch.hvm_vmx.cpu_cr3 = 0;
+    memset(&v->arch.hvm_vmx.msr_state, 0, sizeof(v->arch.hvm_vmx.msr_state));
+    v->arch.hvm_vmx.vmxassist_enabled = 0;
+
     /* VMCS controls. */
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
     __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
@@ -443,15 +448,18 @@ static void construct_vmcs(struct vcpu *v)
 
     vmx_vmcs_exit(v);
 
-    shadow_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
+    paging_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
 }
 
 int vmx_create_vmcs(struct vcpu *v)
 {
-    if ( (v->arch.hvm_vmx.vmcs = vmx_alloc_vmcs()) == NULL )
-        return -ENOMEM;
- 
-    __vmx_clear_vmcs(v);
+    if ( v->arch.hvm_vmx.vmcs == NULL )
+    {
+        if ( (v->arch.hvm_vmx.vmcs = vmx_alloc_vmcs()) == NULL )
+            return -ENOMEM;
+
+        __vmx_clear_vmcs(v);
+    }
 
     construct_vmcs(v);
 

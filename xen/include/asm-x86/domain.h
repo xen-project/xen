@@ -58,19 +58,22 @@ extern void toggle_guest_mode(struct vcpu *);
  */
 extern void hypercall_page_initialise(struct domain *d, void *);
 
+/************************************************/
+/*          shadow paging extension             */
+/************************************************/
 struct shadow_domain {
-    u32               mode;  /* flags to control shadow operation */
     spinlock_t        lock;  /* shadow domain lock */
     int               locker; /* processor which holds the lock */
     const char       *locker_function; /* Func that took it */
+    unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
+    struct list_head  pinned_shadows; 
+
+    /* Memory allocation */
     struct list_head  freelists[SHADOW_MAX_ORDER + 1]; 
     struct list_head  p2m_freelist;
-    struct list_head  p2m_inuse;
-    struct list_head  pinned_shadows;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
-    unsigned int      p2m_pages;    /* number of pages in p2m map */
-    unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
+    unsigned int      p2m_pages;    /* number of pages allocates to p2m */
 
     /* Shadow hashtable */
     struct shadow_page_info **hash_table;
@@ -83,6 +86,65 @@ struct shadow_domain {
     /* Shadow log-dirty mode stats */
     unsigned int fault_count;
     unsigned int dirty_count;
+};
+
+struct shadow_vcpu {
+#if CONFIG_PAGING_LEVELS >= 3
+    /* PAE guests: per-vcpu shadow top-level table */
+    l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
+    /* PAE guests: per-vcpu cache of the top-level *guest* entries */
+    l3_pgentry_t gl3e[4] __attribute__((__aligned__(32)));
+#endif
+    /* Non-PAE guests: pointer to guest top-level pagetable */
+    void *guest_vtable;
+    /* Last MFN that we emulated a write to. */
+    unsigned long last_emulated_mfn;
+    /* MFN of the last shadow that we shot a writeable mapping in */
+    unsigned long last_writeable_pte_smfn;
+};
+
+/************************************************/
+/*       p2m handling                           */
+/************************************************/
+
+struct p2m_domain {
+    /* Lock that protects updates to the p2m */
+    spinlock_t         lock;
+    int                locker;   /* processor which holds the lock */
+    const char        *locker_function; /* Func that took it */
+    
+    /* Pages used to construct the p2m */
+    struct list_head   pages;
+
+    /* Functions to call to get or free pages for the p2m */
+    struct page_info * (*alloc_page  )(struct domain *d);
+    void               (*free_page   )(struct domain *d, 
+                                       struct page_info *pg);
+
+    /* Highest guest frame that's ever been mapped in the p2m */
+    unsigned long max_mapped_pfn;
+};
+
+/************************************************/
+/*       common paging data structure           */
+/************************************************/
+struct paging_domain {
+    u32               mode;  /* flags to control paging operation */
+
+    /* extension for shadow paging support */
+    struct shadow_domain shadow;
+
+    /* Other paging assistance code will have structs here */
+};
+
+struct paging_vcpu {
+    /* Pointers to mode-specific entry points. */
+    struct paging_mode *mode;
+    /* HVM guest: paging enabled (CR0.PG)?  */
+    unsigned int translate_enabled:1;
+
+    /* paging support extension */
+    struct shadow_vcpu shadow;
 };
 
 struct arch_domain
@@ -108,12 +170,11 @@ struct arch_domain
 
     struct hvm_domain hvm_domain;
 
-    struct shadow_domain shadow;
+    struct paging_domain paging;
+    struct p2m_domain p2m ;
 
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
-    /* Highest guest frame that's ever been mapped in the p2m */
-    unsigned long max_mapped_pfn;
 
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     struct e820entry e820[3];
@@ -138,21 +199,6 @@ struct pae_l3_cache {
 struct pae_l3_cache { };
 #define pae_l3_cache_init(c) ((void)0)
 #endif
-
-struct shadow_vcpu {
-#if CONFIG_PAGING_LEVELS >= 3
-    /* PAE guests: per-vcpu shadow top-level table */
-    l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
-#endif
-    /* Pointers to mode-specific entry points. */
-    struct shadow_paging_mode *mode;
-    /* Last MFN that we emulated a write to. */
-    unsigned long last_emulated_mfn;
-    /* MFN of the last shadow that we shot a writeable mapping in */
-    unsigned long last_writeable_pte_smfn;
-    /* HVM guest: paging enabled (CR0.PG)?  */
-    unsigned int translate_enabled:1;
-};
 
 struct arch_vcpu
 {
@@ -200,12 +246,10 @@ struct arch_vcpu
     pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
     unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
 
-    void *guest_vtable;                 /* virtual addr of pagetable */
-
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
 
-    struct shadow_vcpu shadow;
+    struct paging_vcpu paging;
 } __cacheline_aligned;
 
 /* shorthands to improve code legibility */

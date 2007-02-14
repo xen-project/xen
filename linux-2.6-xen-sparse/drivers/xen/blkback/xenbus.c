@@ -344,7 +344,7 @@ static void frontend_changed(struct xenbus_device *dev,
 	switch (frontend_state) {
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
-			printk("%s: %s: prepare for reconnect\n",
+			printk(KERN_INFO "%s: %s: prepare for reconnect\n",
 			       __FUNCTION__, dev->nodename);
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
@@ -488,7 +488,8 @@ static int connect_ring(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "unknown fe protocol %s", protocol);
 		return -1;
 	}
-	printk("blkback: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
+	printk(KERN_INFO
+	       "blkback: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
 	       ring_ref, evtchn, be->blkif->blk_protocol, protocol);
 
 	/* Map the shared frame, irq etc. */

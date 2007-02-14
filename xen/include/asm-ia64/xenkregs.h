@@ -13,6 +13,10 @@
 #define IA64_PSR_VM_BIT		46
 #define IA64_PSR_VM	(__IA64_UL(1) << IA64_PSR_VM_BIT)
 
+#define IA64_DEFAULT_DCR_BITS	(IA64_DCR_PP | IA64_DCR_LC | IA64_DCR_DM | \
+				 IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | \
+				 IA64_DCR_DR | IA64_DCR_DA | IA64_DCR_DD)
+
 /* Interruption Function State */
 #define IA64_IFS_V_BIT		63
 #define IA64_IFS_V	(__IA64_UL(1) << IA64_IFS_V_BIT)

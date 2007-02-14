@@ -141,6 +141,9 @@ void vcpu_init_regs(struct vcpu *v)
 		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
 		/* Need to be expanded as macro */
 		regs->cr_ipsr = 0x501008826008;
+		/* lazy fp */
+		FP_PSR(v) = IA64_PSR_DFH;
+		regs->cr_ipsr |= IA64_PSR_DFH;
 	} else {
 		regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
 		    | IA64_PSR_BITS_TO_SET | IA64_PSR_BN;
@@ -148,6 +151,10 @@ void vcpu_init_regs(struct vcpu *v)
 				   | IA64_PSR_RI | IA64_PSR_IS);
 		// domain runs at PL2
 		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
+		// lazy fp 
+		PSCB(v, hpsr_dfh) = 1;
+		PSCB(v, hpsr_mfh) = 0;
+		regs->cr_ipsr |= IA64_PSR_DFH;
 	}
 	regs->cr_ifs = 1UL << 63;	/* or clear? */
 	regs->ar_fpsr = FPSR_DEFAULT;
@@ -265,8 +272,10 @@ IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm24)
 		      IA64_PSR_I | IA64_PSR_IC | IA64_PSR_DT |
 		      IA64_PSR_DFL | IA64_PSR_DFH))
 		return IA64_ILLOP_FAULT;
-	if (imm.dfh)
-		ipsr->dfh = 0;
+	if (imm.dfh) {
+		ipsr->dfh = PSCB(vcpu, hpsr_dfh);
+		PSCB(vcpu, vpsr_dfh) = 0;
+	}
 	if (imm.dfl)
 		ipsr->dfl = 0;
 	if (imm.pp) {
@@ -320,8 +329,10 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 	    IA64_PSR_DT | IA64_PSR_DFL | IA64_PSR_DFH;
 	if (imm24 & ~mask)
 		return IA64_ILLOP_FAULT;
-	if (imm.dfh)
+	if (imm.dfh) {
+		PSCB(vcpu, vpsr_dfh) = 1;
 		ipsr->dfh = 1;
+	} 
 	if (imm.dfl)
 		ipsr->dfl = 1;
 	if (imm.pp) {
@@ -386,8 +397,13 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 	//if (val & ~(IA64_PSR_PP | IA64_PSR_UP | IA64_PSR_SP))
 	//	return IA64_ILLOP_FAULT;
 	// however trying to set other bits can't be an error as it is in ssm
-	if (newpsr.dfh)
+	if (newpsr.dfh) {
 		ipsr->dfh = 1;
+		PSCB(vcpu, vpsr_dfh) = 1;
+	} else {
+		ipsr->dfh = PSCB(vcpu, hpsr_dfh);
+		PSCB(vcpu, vpsr_dfh) = 0;
+	}       
 	if (newpsr.dfl)
 		ipsr->dfl = 1;
 	if (newpsr.pp) {
@@ -466,6 +482,8 @@ IA64FAULT vcpu_get_psr(VCPU * vcpu, u64 * pval)
 		newpsr.pp = 1;
 	else
 		newpsr.pp = 0;
+	newpsr.dfh = PSCB(vcpu, vpsr_dfh);
+
 	*pval = *(unsigned long *)&newpsr;
 	*pval &= (MASK(0, 32) | MASK(35, 2));
 	return IA64_NO_FAULT;
@@ -483,7 +501,7 @@ BOOLEAN vcpu_get_psr_i(VCPU * vcpu)
 
 u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 {
-	u64 dcr = PSCBX(vcpu, dcr);
+	u64 dcr = PSCB(vcpu, dcr);
 	PSR psr;
 
 	//printk("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
@@ -497,6 +515,7 @@ u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 	psr.ia64_psr.ic = PSCB(vcpu, interrupt_collection_enabled);
 	psr.ia64_psr.i = !vcpu->vcpu_info->evtchn_upcall_mask;
 	psr.ia64_psr.bn = PSCB(vcpu, banknum);
+	psr.ia64_psr.dfh = PSCB(vcpu, vpsr_dfh);
 	psr.ia64_psr.dt = 1;
 	psr.ia64_psr.it = 1;
 	psr.ia64_psr.rt = 1;
@@ -513,10 +532,7 @@ u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 
 IA64FAULT vcpu_get_dcr(VCPU * vcpu, u64 * pval)
 {
-//verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
-	// Reads of cr.dcr on Xen always have the sign bit set, so
-	// a domain can differentiate whether it is running on SP or not
-	*pval = PSCBX(vcpu, dcr) | 0x8000000000000000L;
+	*pval = PSCB(vcpu, dcr);
 	return IA64_NO_FAULT;
 }
 
@@ -632,11 +648,7 @@ IA64FAULT vcpu_get_iha(VCPU * vcpu, u64 * pval)
 
 IA64FAULT vcpu_set_dcr(VCPU * vcpu, u64 val)
 {
-	// Reads of cr.dcr on SP always have the sign bit set, so
-	// a domain can differentiate whether it is running on SP or not
-	// Thus, writes of DCR should ignore the sign bit
-//verbose("vcpu_set_dcr: called\n");
-	PSCBX(vcpu, dcr) = val & ~0x8000000000000000L;
+	PSCB(vcpu, dcr) = val;
 	return IA64_NO_FAULT;
 }
 
@@ -1343,6 +1355,12 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 	if (psr.ia64_psr.cpl < 3)
 		psr.ia64_psr.cpl = 2;
 	int_enable = psr.ia64_psr.i;
+	if (psr.ia64_psr.dfh) {
+		PSCB(vcpu, vpsr_dfh) = 1;
+	} else {
+		psr.ia64_psr.dfh = PSCB(vcpu, hpsr_dfh);
+		PSCB(vcpu, vpsr_dfh) = 0;
+	}
 	if (psr.ia64_psr.ic)
 		PSCB(vcpu, interrupt_collection_enabled) = 1;
 	if (psr.ia64_psr.dt && psr.ia64_psr.rt && psr.ia64_psr.it)

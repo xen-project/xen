@@ -94,14 +94,12 @@ typedef struct RTCState {
     struct periodic_time pt;
 } RTCState;
 
-#define FREQUENCE_PMTIMER  3579545
+#define FREQUENCE_PMTIMER  3579545  /* Timer should run at 3.579545 MHz */
 typedef struct PMTState {
-    uint32_t pm1_timer;
-    uint32_t pm1_status;
-    uint64_t last_gtime;
-    struct timer timer;
-    uint64_t scale;
-    struct vcpu *vcpu;
+    struct hvm_hw_pmtimer pm;   /* 32bit timer value */
+    struct vcpu *vcpu;          /* Keeps sync with this vcpu's guest-time */
+    uint64_t last_gtime;        /* Last (guest) time we updated the timer */
+    uint64_t scale;             /* Multiplier to get from tsc to timer ticks */
 } PMTState;
 
 struct pl_time {    /* platform time */
@@ -134,8 +132,6 @@ void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
 int is_rtc_periodic_irq(void *opaque);
 void pmtimer_init(struct vcpu *v, int base);
-void pmtimer_migrate_timers(struct vcpu *v);
-void pmtimer_deinit(struct domain *d);
 
 void hpet_migrate_timers(struct vcpu *v);
 void hpet_init(struct vcpu *v);

@@ -15,6 +15,7 @@
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/asm-offsets.h>
+#include <asm-ia64/vmx_mm_def.h>
 
 #define ACCE_MOV_FROM_AR
 #define ACCE_MOV_FROM_RR
@@ -22,6 +23,7 @@
 #define ACCE_RSM
 #define ACCE_SSM
 #define ACCE_MOV_TO_PSR
+#define ACCE_THASH
 
 //mov r1=ar3
 GLOBAL_ENTRY(vmx_asm_mov_from_ar)
@@ -192,6 +194,13 @@ GLOBAL_ENTRY(vmx_asm_rsm)
     ;;   
     st8 [r17]=r19
     and r20=r20,r28
+    adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
+    ;;
+    ld8 r27=[r27]
+    ;;
+    tbit.nz p8,p0= r27,IA64_PSR_DFH_BIT
+    ;;
+    (p8) dep r20=-1,r20,IA64_PSR_DFH_BIT,1
     ;;
     mov cr.ipsr=r20
     tbit.nz p6,p0=r23,0
@@ -360,6 +369,14 @@ vmx_asm_mov_to_psr_1:
     add r20=r19,r20
     mov b0=r24
     ;;
+    adds r27=IA64_VCPU_FP_PSR_OFFSET,r21
+    ;;
+    ld8 r27=[r27]
+    ;;
+    tbit.nz p8,p0=r27,IA64_PSR_DFH_BIT
+    ;;
+    (p8) dep r20=-1,r20,IA64_PSR_DFH_BIT,1
+    ;;
     mov cr.ipsr=r20
     cmp.ne p6,p0=r0,r0
     ;;
@@ -403,6 +420,64 @@ ENTRY(vmx_asm_dispatch_vexirq)
     br.many vmx_dispatch_vexirq
 END(vmx_asm_dispatch_vexirq)
 
+// thash
+// TODO: add support when pta.vf = 1
+GLOBAL_ENTRY(vmx_asm_thash)
+#ifndef ACCE_THASH
+    br.many vmx_virtualization_fault_back
+#endif
+    extr.u r17=r25,20,7		// get r3 from opcode in r25 
+    extr.u r18=r25,6,7		// get r1 from opcode in r25
+    movl r20=asm_mov_from_reg
+    ;;
+    adds r30=vmx_asm_thash_back1-asm_mov_from_reg,r20
+    shladd r17=r17,4,r20	// get addr of MOVE_FROM_REG(r17)
+    adds r16=IA64_VPD_BASE_OFFSET,r21	// get vcpu.arch.priveregs
+    ;;
+    mov r24=b0
+    ;;
+    ld8 r16=[r16]		// get VPD addr
+    mov b0=r17
+    br.many b0			// r19 return value
+    ;;                                                     
+vmx_asm_thash_back1:
+    shr.u r23=r19,61		// get RR number
+    adds r25=VCPU_VRR0_OFS,r21	// get vcpu->arch.arch_vmx.vrr[0]'s addr
+    adds r16=IA64_VPD_VPTA_OFFSET,r16	// get vpta 
+    ;;
+    shladd r27=r23,3,r25	// get vcpu->arch.arch_vmx.vrr[r23]'s addr
+    ld8 r17=[r16]		// get PTA
+    mov r26=1
+    ;;
+    extr.u r29=r17,2,6		// get pta.size
+    ld8 r25=[r27]		// get vcpu->arch.arch_vmx.vrr[r23]'s value
+    ;;
+    extr.u r25=r25,2,6		// get rr.ps
+    shl r22=r26,r29		// 1UL << pta.size
+    ;;
+    shr.u r23=r19,r25		// vaddr >> rr.ps
+    adds r26=3,r29		// pta.size + 3 
+    shl r27=r17,3		// pta << 3 
+    ;;
+    shl r23=r23,3		// (vaddr >> rr.ps) << 3
+    shr.u r27=r27,r26		// (pta << 3) >> (pta.size+3)
+    movl r16=VRN_MASK
+    ;;
+    adds r22=-1,r22		// (1UL << pta.size) - 1
+    shl r27=r27,r29		// ((pta<<3)>>(pta.size+3))<<pta.size
+    and r19=r19,r16		// vaddr & VRN_MASK
+    ;;
+    and r22=r22,r23		// vhpt_offset 
+    or r19=r19,r27		// (vadr&VRN_MASK) |(((pta<<3)>>(pta.size + 3))<<pta.size) 
+    adds r26=asm_mov_to_reg-asm_mov_from_reg,r20
+    ;;
+    or r19=r19,r22		// calc pval
+    shladd r17=r18,4,r26
+    adds r30=vmx_resume_to_guest-asm_mov_from_reg,r20
+    ;;
+    mov b0=r17
+    br.many b0
+END(vmx_asm_thash)
 
 #define MOV_TO_REG0	\
 {;			\

@@ -162,7 +162,6 @@ struct arch_vcpu {
     unsigned long irr[4];	    /* Interrupt request register.  */
     unsigned long insvc[4];		/* Interrupt in service.  */
     unsigned long iva;
-    unsigned long dcr;
     unsigned long domain_itm;
     unsigned long domain_itm_last;
 
@@ -175,6 +174,7 @@ struct arch_vcpu {
     unsigned long metaphysical_rr4;		// from arch_domain (so is pinned)
     unsigned long metaphysical_saved_rr0;	// from arch_domain (so is pinned)
     unsigned long metaphysical_saved_rr4;	// from arch_domain (so is pinned)
+    unsigned long fp_psr;       // used for lazy float register
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
@@ -198,9 +198,6 @@ struct arch_vcpu {
     unsigned long       vhpt_maddr;
     struct page_info*   vhpt_page;
     unsigned long       vhpt_entries;
-#endif
-#ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
-    u32 tlbflush_timestamp;
 #endif
 #define INVALID_PROCESSOR       INT_MAX
     int last_processor;

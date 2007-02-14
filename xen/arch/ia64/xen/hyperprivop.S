@@ -252,6 +252,10 @@ ENTRY(hyper_ssm_i)
 	movl r27=~DELIVER_PSR_CLR;;
 	or r29=r29,r28;;
 	and r29=r29,r27;;
+	// set hpsr_dfh to ipsr
+	adds r28=XSI_HPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	ld1 r28=[r28];;
+	dep r29=r28,r29,IA64_PSR_DFH_BIT,1;;
 	mov cr.ipsr=r29;;
 	// set shared_mem ipsr (from ipsr in r30 with ipsr.ri already set)
 	extr.u r29=r30,IA64_PSR_CPL0_BIT,2;;
@@ -269,6 +273,12 @@ ENTRY(hyper_ssm_i)
 	movl r22=THIS_CPU(current_psr_i_addr)
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r22=[r22]
+	;;
+	adds r27=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	ld1 r28=[r27];;
+	st1 [r27]=r0
+	dep r30=r28,r30,IA64_PSR_DFH_BIT,1
+	;;
 	st8 [r21]=r30;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
@@ -607,6 +617,10 @@ ENTRY(fast_reflect)
 	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
 	or r29=r29,r28;;
 	and r29=r29,r27;;
+	// set hpsr_dfh to ipsr
+	adds r28=XSI_HPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	ld1 r28=[r28];;
+	dep r29=r28,r29,IA64_PSR_DFH_BIT,1;;
 	mov cr.ipsr=r29;;
 	// set shared_mem ipsr (from ipsr in r30 with ipsr.ri already set)
 	extr.u r29=r30,IA64_PSR_CPL0_BIT,2;;
@@ -629,7 +643,13 @@ ENTRY(fast_reflect)
 (p6)	dep r30=0,r30,IA64_PSR_I_BIT,1
 (p7)	dep r30=-1,r30,IA64_PSR_I_BIT,1 ;;
 	mov r22=1
-	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 
+	;;
+	adds r27=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	ld1 r28=[r27];;
+	st1 [r27]=r0
+	dep r30=r28,r30,IA64_PSR_DFH_BIT,1
+	;;
 	st8 [r21]=r30 ;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
@@ -1104,6 +1124,18 @@ just_do_rfi:
 	;;
 	or r21=r21,r20
 	;;
+	adds r20=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	tbit.z p8,p9 = r21, IA64_PSR_DFH_BIT
+	;;
+	(p9) mov r27=1;;
+	(p9) st1 [r20]=r27
+	;;
+	(p8) st1 [r20]=r0
+	(p8) adds r20=XSI_HPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	(p8) ld1 r27=[r20]
+	;;
+	(p8) dep r21=r27,r21, IA64_PSR_DFH_BIT, 1
+	;;
 	mov cr.ipsr=r21
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r21=[r20];;
@@ -1488,6 +1520,11 @@ ENTRY(hyper_get_psr)
 	ld8 r20=[r20];;
 	ld1 r21=[r20];;
 	dep r8=r21,r8,IA64_PSR_I_BIT,1
+	;;
+	// set vpsr.dfh
+	adds r20=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
+	ld1 r21=[r20];;
+	dep r8=r21,r8,IA64_PSR_DFH_BIT,1
 	;;
 	mov r25=cr.iip
 	extr.u r26=r24,41,2 ;;

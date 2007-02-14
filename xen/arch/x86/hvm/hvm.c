@@ -30,11 +30,10 @@
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
-#include <xen/shadow.h>
 #include <asm/current.h>
 #include <asm/e820.h>
 #include <asm/io.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -106,7 +105,6 @@ void hvm_migrate_timers(struct vcpu *v)
     pit_migrate_timers(v);
     rtc_migrate_timers(v);
     hpet_migrate_timers(v);
-    pmtimer_migrate_timers(v);
     if ( vcpu_vlapic(v)->pt.enabled )
         migrate_timer(&vcpu_vlapic(v)->pt.timer, v->processor);
 }
@@ -156,7 +154,7 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
-    rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
+    rc = paging_enable(d, PG_SH_enable|PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
         return rc;
 
@@ -170,7 +168,6 @@ void hvm_domain_destroy(struct domain *d)
 {
     pit_deinit(d);
     rtc_deinit(d);
-    pmtimer_deinit(d);
     hpet_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )
@@ -227,7 +224,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt);
+HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt,
+                          1, HVMSR_PER_VCPU);
 
 int hvm_vcpu_initialise(struct vcpu *v)
 {
@@ -271,6 +269,24 @@ void hvm_vcpu_destroy(struct vcpu *v)
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
+}
+
+
+void hvm_vcpu_reset(struct vcpu *v)
+{
+    vcpu_pause(v);
+
+    vlapic_reset(vcpu_vlapic(v));
+
+    hvm_funcs.vcpu_initialise(v);
+
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+
+    vcpu_unpause(v);
 }
 
 static void hvm_vcpu_down(void)
@@ -366,7 +382,7 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         if ( virt )
-            mfn = get_mfn_from_gpfn(shadow_gva_to_gfn(current, addr));
+            mfn = get_mfn_from_gpfn(paging_gva_to_gfn(current, addr));
         else
             mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
 
@@ -583,7 +599,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
         return;
     }
 
-    if ( current->arch.shadow.mode->guest_levels == 4 )
+    if ( current->arch.paging.mode->guest_levels == 4 )
     {
         pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
                                                        pregs->rsi,
@@ -624,19 +640,12 @@ void hvm_hypercall_page_initialise(struct domain *d,
  */
 int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 {
-    struct vcpu *bsp = current, *v;
-    struct domain *d = bsp->domain;
+    struct vcpu *v;
+    struct domain *d = current->domain;
     struct vcpu_guest_context *ctxt;
     int rc = 0;
 
     BUG_ON(!is_hvm_domain(d));
-
-    if ( bsp->vcpu_id != 0 )
-    {
-        gdprintk(XENLOG_ERR, "Not calling hvm_bringup_ap from BSP context.\n");
-        domain_crash(bsp->domain);
-        return -EINVAL;
-    }
 
     if ( (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
@@ -668,8 +677,8 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
         goto out;
     }
 
-    if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
-        vcpu_wake(d->vcpu[vcpuid]);
+    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        vcpu_wake(v);
     gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 
  out:

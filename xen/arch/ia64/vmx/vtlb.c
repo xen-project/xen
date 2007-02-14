@@ -248,6 +248,7 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
                   "tnat.nz p6,p7=r9;;"
                   "(p6) mov %0=1;"
                   "(p6) mov r9=r0;"
+                  "(p7) extr.u r9=r9,0,53;;"
                   "(p7) mov %0=r0;"
                   "(p7) st8 [%2]=r9;;"
                   "ssm psr.ic;;"
@@ -261,7 +262,7 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
  *  purge software guest tlb
  */
 
-void vtlb_purge(VCPU *v, u64 va, u64 ps)
+static void vtlb_purge(VCPU *v, u64 va, u64 ps)
 {
     thash_data_t *cur;
     u64 start, curadr, size, psbits, tag, rr_ps, num;
@@ -438,6 +439,15 @@ int vtr_find_overlap(VCPU *vcpu, u64 va, u64 ps, int is_data)
 void thash_purge_entries(VCPU *v, u64 va, u64 ps)
 {
     if(vcpu_quick_region_check(v->arch.tc_regions,va))
+        vtlb_purge(v, va, ps);
+    vhpt_purge(v, va, ps);
+}
+
+void thash_purge_entries_remote(VCPU *v, u64 va, u64 ps)
+{
+    u64 old_va = va;
+    va = REGION_OFFSET(va);
+    if (vcpu_quick_region_check(v->arch.tc_regions, old_va))
         vtlb_purge(v, va, ps);
     vhpt_purge(v, va, ps);
 }

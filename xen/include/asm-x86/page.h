@@ -208,8 +208,10 @@ typedef struct { u64 pfn; } pagetable_t;
 #define pagetable_get_paddr(x)  ((paddr_t)(x).pfn << PAGE_SHIFT)
 #define pagetable_get_page(x)   mfn_to_page((x).pfn)
 #define pagetable_get_pfn(x)    ((x).pfn)
+#define pagetable_get_mfn(x)    _mfn(((x).pfn))
 #define pagetable_is_null(x)    ((x).pfn == 0)
 #define pagetable_from_pfn(pfn) ((pagetable_t) { (pfn) })
+#define pagetable_from_mfn(mfn) ((pagetable_t) { mfn_x(mfn) })
 #define pagetable_from_page(pg) pagetable_from_pfn(page_to_mfn(pg))
 #define pagetable_from_paddr(p) pagetable_from_pfn((p)>>PAGE_SHIFT)
 #define pagetable_null()        pagetable_from_pfn(0)
@@ -276,9 +278,6 @@ typedef struct { u64 pfn; } pagetable_t;
 #define __linear_l4_table \
  ((l4_pgentry_t *)(__linear_l3_table + l3_linear_offset(LINEAR_PT_VIRT_START)))
 
-#define linear_l1_table __linear_l1_table
-#define linear_pg_table linear_l1_table
-#define linear_l2_table(v) ((l2_pgentry_t *)(v)->arch.guest_vtable)
 
 #ifndef __ASSEMBLY__
 #if CONFIG_PAGING_LEVELS == 3

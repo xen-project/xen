@@ -54,11 +54,7 @@ local_vhpt_flush(void)
 void
 vcpu_vhpt_flush(struct vcpu* v)
 {
-	/* increment flush clock before flush */
-	u32 flush_time = tlbflush_clock_inc_and_return();
 	__vhpt_flush(vcpu_vhpt_maddr(v));
-	/* this must be after flush */
-	tlbflush_update_time(&v->arch.tlbflush_timestamp, flush_time);
 	perfc_incrc(vcpu_vhpt_flush);
 }
 
@@ -177,7 +173,9 @@ pervcpu_vhpt_alloc(struct vcpu *v)
 void
 pervcpu_vhpt_free(struct vcpu *v)
 {
-	free_domheap_pages(v->arch.vhpt_page, VHPT_SIZE_LOG2 - PAGE_SHIFT);
+	if (likely(v->arch.vhpt_page != NULL))
+		free_domheap_pages(v->arch.vhpt_page,
+		                   VHPT_SIZE_LOG2 - PAGE_SHIFT);
 }
 #endif
 

@@ -32,6 +32,7 @@ extern volatile u32 tlbflush_clock;
 #define tlbflush_current_time() tlbflush_clock
 
 u32 tlbflush_clock_inc_and_return(void);
+void new_tlbflush_clock_period(void);
 
 static inline void
 tlbflush_update_time(volatile u32* time, u32 timestamp)

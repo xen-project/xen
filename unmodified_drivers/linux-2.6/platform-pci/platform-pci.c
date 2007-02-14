@@ -118,14 +118,10 @@ unsigned long alloc_xen_mmio(unsigned long len)
 {
 	unsigned long addr;
 
-	addr = 0;
-	if (platform_mmio_alloc + len <= platform_mmiolen)
-	{
-		addr = platform_mmio + platform_mmio_alloc;
-		platform_mmio_alloc += len;
-	} else {
-		panic("ran out of xen mmio space");
-	}
+	addr = platform_mmio + platform_mmio_alloc;
+	platform_mmio_alloc += len;
+	BUG_ON(platform_mmio_alloc > platform_mmiolen);
+
 	return addr;
 }
 
@@ -181,23 +177,19 @@ static int get_hypercall_stubs(void)
 
 static uint64_t get_callback_via(struct pci_dev *pdev)
 {
+	u8 pin;
+	int irq;
+
 #ifdef __ia64__
-	int irq, rid;
 	for (irq = 0; irq < 16; irq++) {
 		if (isa_irq_to_vector(irq) == pdev->irq)
-			return irq;
+			return irq; /* ISA IRQ */
 	}
-	/* use Requester-ID as callback_irq */
-	/* RID: '<#bus(8)><#dev(5)><#func(3)>' (cf. PCI-Express spec) */
-	rid = ((pdev->bus->number & 0xff) << 8) | pdev->devfn;
-	printk(KERN_INFO DRV_NAME ":use Requester-ID(%04x) as callback irq\n",
-	       rid);
-	return rid | IA64_CALLBACK_IRQ_RID;
 #else /* !__ia64__ */
-	u8 pin;
-
-	if (pdev->irq < 16)
-		return pdev->irq; /* ISA IRQ */
+	irq = pdev->irq;
+	if (irq < 16)
+		return irq; /* ISA IRQ */
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 	pin = pdev->pin;
@@ -211,7 +203,6 @@ static uint64_t get_callback_via(struct pci_dev *pdev)
 		((uint64_t)pdev->bus->number << 16) |
 		((uint64_t)(pdev->devfn & 0xff) << 8) |
 		((uint64_t)(pin - 1) & 3));
-#endif
 }
 
 /* Invalidate foreign mappings (e.g., in qemu-based device model). */

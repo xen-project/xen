@@ -84,9 +84,6 @@ mfn_to_local_pfn(unsigned long mfn)
 
 #endif /* !CONFIG_XEN */
 
-/* XXX to compile set_phys_to_machine(vaddr, FOREIGN_FRAME(m)) */
-#define FOREIGN_FRAME(m)        (INVALID_P2M_ENTRY)
-
 #define mfn_to_pfn(mfn) (mfn)
 #define pfn_to_mfn(pfn) (pfn)
 

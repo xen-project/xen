@@ -126,16 +126,11 @@ extern void dnat_page_consumption(VCPU * vcpu, uint64_t vadr);
 extern void data_page_not_present(VCPU * vcpu, u64 vadr);
 extern void inst_page_not_present(VCPU * vcpu, u64 vadr);
 extern void data_access_rights(VCPU * vcpu, u64 vadr);
+extern void vmx_ia64_set_dcr(VCPU * v);
 
 /**************************************************************************
  VCPU control register access routines
 **************************************************************************/
-
-static inline IA64FAULT vmx_vcpu_get_dcr(VCPU * vcpu, u64 * pval)
-{
-	*pval = VCPU(vcpu, dcr);
-	return IA64_NO_FAULT;
-}
 
 static inline IA64FAULT vmx_vcpu_get_itm(VCPU * vcpu, u64 * pval)
 {
@@ -230,20 +225,6 @@ static inline IA64FAULT vmx_vcpu_get_lrr0(VCPU * vcpu, u64 * pval)
 static inline IA64FAULT vmx_vcpu_get_lrr1(VCPU * vcpu, u64 * pval)
 {
 	*pval = VCPU(vcpu, lrr1);
-	return IA64_NO_FAULT;
-}
-
-static inline IA64FAULT vmx_vcpu_set_dcr(VCPU * vcpu, u64 val)
-{
-	u64 mdcr, mask;
-	VCPU(vcpu, dcr) = val;
-	/* All vDCR bits will go to mDCR, except for be/pp/dm bits */
-	mdcr = ia64_get_dcr();
-	/* Machine dcr.dm masked to handle guest ld.s on tr mapped page */
-	mask = IA64_DCR_BE | IA64_DCR_PP | IA64_DCR_DM;
-	mdcr = (mdcr & mask) | (val & (~mask));
-	ia64_set_dcr(mdcr);
-	VMX(vcpu, mdcr) = mdcr;
 	return IA64_NO_FAULT;
 }
 

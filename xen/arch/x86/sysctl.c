@@ -19,7 +19,6 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
-#include <asm/shadow.h>
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

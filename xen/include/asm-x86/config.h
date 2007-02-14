@@ -145,9 +145,9 @@
  * Compatibility guest area layout:
  *  0x0000000000000000 - 0x00000000f57fffff [3928MB,            PML4:0]
  *    Guest-defined use.
- *  0x0000000f58000000 - 0x00000000ffffffff [168MB,             PML4:0]
+ *  0x00000000f5800000 - 0x00000000ffffffff [168MB,             PML4:0]
  *    Read-only machine-to-phys translation table (GUEST ACCESSIBLE).
- *  0x0000000000000000 - 0x00000000ffffffff [508GB,             PML4:0]
+ *  0x0000000100000000 - 0x0000007fffffffff [508GB,             PML4:0]
  *    Unused.
  *  0x0000008000000000 - 0x000000ffffffffff [512GB, 2^39 bytes, PML4:1]
  *    Hypercall argument translation area.

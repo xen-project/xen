@@ -171,7 +171,12 @@ static void vtm_timer_fn(void *data)
     } else
         vtm->pending = 1;
 
-    update_last_itc(vtm, VCPU(vcpu, itm));  // update vITC
+    /*
+     * "+ 1" is for fixing oops message at timer_interrupt() on VTI guest. 
+     * If oops checking condition changed to timer_after_eq() on VTI guest,
+     * this parameter should be erased.
+     */
+    update_last_itc(vtm, VCPU(vcpu, itm) + 1);  // update vITC
 }
 
 void vtm_init(VCPU *vcpu)

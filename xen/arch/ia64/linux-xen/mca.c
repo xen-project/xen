@@ -84,6 +84,7 @@
 #include <xen/event.h>
 #include <xen/softirq.h>
 #include <asm/xenmca.h>
+#include <linux/shutdown.h>
 #endif
 
 #if defined(IA64_MCA_DEBUG_INFO)
@@ -684,16 +685,8 @@ fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_sta
 #ifdef XEN
 static spinlock_t init_dump_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t show_stack_lock = SPIN_LOCK_UNLOCKED;
-
-static void
-save_ksp (struct unw_frame_info *info, void *arg)
-{
-	current->arch._thread.ksp = (__u64)(info->sw) - 16;
-	wmb();
-}
-
-/* FIXME */
-int try_crashdump(struct pt_regs *a) { return 0; }
+static atomic_t num_stopped_cpus = ATOMIC_INIT(0);
+extern void show_stack (struct task_struct *, unsigned long *);
 
 #define CPU_FLUSH_RETRY_MAX 5
 static void
@@ -715,6 +708,35 @@ init_cache_flush (void)
 		}
 	}
 	printk("\nPAL cache flush failed. status=%ld\n",rval);
+}
+
+static void inline
+save_ksp (struct unw_frame_info *info)
+{
+	current->arch._thread.ksp = (__u64)(info->sw) - 16;
+	wmb();
+	init_cache_flush();
+}	
+
+static void
+freeze_cpu_osinit (struct unw_frame_info *info, void *arg)
+{
+	save_ksp(info);
+	atomic_inc(&num_stopped_cpus);
+	printk("%s: CPU%d init handler done\n",
+	       __FUNCTION__, smp_processor_id());
+	for (;;)
+		local_irq_disable();
+}
+
+/* FIXME */
+static void
+try_crashdump(struct unw_frame_info *info, void *arg)
+{ 
+	save_ksp(info);
+	printk("\nINIT dump complete.  Please reboot now.\n");
+	for (;;)
+		local_irq_disable();
 }
 #endif /* XEN */
 
@@ -741,7 +763,8 @@ init_handler_platform (pal_min_state_area_t *ms,
 	show_min_state(ms);
 
 #ifdef XEN
-	printk("Backtrace of current vcpu (vcpu_id %d)\n", current->vcpu_id);
+	printk("Backtrace of current vcpu (vcpu_id %d of domid %d)\n",
+	       current->vcpu_id, current->domain->domain_id);
 #else
 	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
 	fetch_min_state(ms, pt, sw);
@@ -749,20 +772,35 @@ init_handler_platform (pal_min_state_area_t *ms,
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
 #ifdef XEN
-	unw_init_running(save_ksp, NULL);
 	spin_unlock(&show_stack_lock);
-	wmb();
-	init_cache_flush();
 
 	if (spin_trylock(&init_dump_lock)) {
+		struct domain *d;
+		struct vcpu *v;
 #ifdef CONFIG_SMP
-		udelay(5*1000000);
+		int other_cpus = num_online_cpus() - 1;
+		int wait = 1000 * other_cpus;
+
+		while ((atomic_read(&num_stopped_cpus) != other_cpus) && wait--)
+			udelay(1000);
+		if (other_cpus && wait < 0)
+			printk("timeout %d\n", atomic_read(&num_stopped_cpus));
 #endif
-		if (try_crashdump(pt) == 0)
-			printk("\nINIT dump complete.  Please reboot now.\n");
+		if (opt_noreboot) {
+			/* this route is for dump routine */
+			unw_init_running(try_crashdump, pt);
+		} else {
+			for_each_domain(d) {
+				for_each_vcpu(d, v) {
+					printk("Backtrace of current vcpu "
+					       "(vcpu_id %d of domid %d)\n",
+					       v->vcpu_id, d->domain_id);
+					show_stack(v, NULL);
+				}
+			}
+		}
 	}
-	printk("%s: CPU%d init handler done\n",
-	       __FUNCTION__, smp_processor_id());
+	unw_init_running(freeze_cpu_osinit, NULL);
 #else /* XEN */
 #ifdef CONFIG_SMP
 	/* read_trylock() would be handy... */

@@ -605,9 +605,11 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			printk ("Domain0 halts the machine\n");
 			console_start_sync();
 			(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
+		} else {
+			set_bit(_VCPUF_down, &current->vcpu_flags);
+			vcpu_sleep_nosync(current);
+			status = PAL_STATUS_SUCCESS;
 		}
-		else
-			domain_shutdown(current->domain, SHUTDOWN_poweroff);
 		break;
 	    case PAL_HALT_LIGHT:
 		if (VMX_DOMAIN(current)) {
@@ -622,6 +624,9 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	    case PAL_PLATFORM_ADDR:
 		if (VMX_DOMAIN(current))
 			status = PAL_STATUS_SUCCESS;
+		break;
+	    case PAL_LOGICAL_TO_PHYSICAL:
+		/* Optional, no need to complain about being unimplemented */
 		break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",

@@ -37,7 +37,7 @@
 #include <asm/i387.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
@@ -331,6 +331,7 @@ int vcpu_initialise(struct vcpu *v)
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
 
+    paging_vcpu_init(v);
 
     if ( is_hvm_domain(d) )
     {
@@ -424,7 +425,7 @@ int arch_domain_create(struct domain *d)
     HYPERVISOR_COMPAT_VIRT_START(d) = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
-    shadow_domain_init(d);
+    paging_domain_init(d);
 
     if ( !is_idle_domain(d) )
     {
@@ -464,7 +465,7 @@ void arch_domain_destroy(struct domain *d)
         hvm_domain_destroy(d);
     }
 
-    shadow_final_teardown(d);
+    paging_final_teardown(d);
 
     free_xenheap_pages(
         d->arch.mm_perdomain_pt,
@@ -613,7 +614,7 @@ int arch_set_info_guest(
         {
             cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
 
-            if ( shadow_mode_refcounts(d)
+            if ( paging_mode_refcounts(d)
                  ? !get_page(mfn_to_page(cr3_pfn), d)
                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                       PGT_base_page_table) )
@@ -631,7 +632,7 @@ int arch_set_info_guest(
 
             cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
 
-            if ( shadow_mode_refcounts(d)
+            if ( paging_mode_refcounts(d)
                  ? !get_page(mfn_to_page(cr3_pfn), d)
                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                     PGT_l3_page_table) )
@@ -652,8 +653,8 @@ int arch_set_info_guest(
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-    if ( shadow_mode_enabled(d) )
-        shadow_update_paging_modes(v);
+    if ( paging_mode_enabled(d) )
+        paging_update_paging_modes(v);
 
     update_cr3(v);
 
@@ -1406,7 +1407,7 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
 
         if ( pfn != 0 )
         {
-            if ( shadow_mode_refcounts(d) )
+            if ( paging_mode_refcounts(d) )
                 put_page(mfn_to_page(pfn));
             else
                 put_page_and_type(mfn_to_page(pfn));
@@ -1427,7 +1428,7 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     pfn = pagetable_get_pfn(v->arch.guest_table);
     if ( pfn != 0 )
     {
-        if ( shadow_mode_refcounts(d) )
+        if ( paging_mode_refcounts(d) )
             put_page(mfn_to_page(pfn));
         else
             put_page_and_type(mfn_to_page(pfn));
@@ -1443,7 +1444,7 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     pfn = pagetable_get_pfn(v->arch.guest_table_user);
     if ( pfn != 0 )
     {
-        if ( shadow_mode_refcounts(d) )
+        if ( paging_mode_refcounts(d) )
             put_page(mfn_to_page(pfn));
         else
             put_page_and_type(mfn_to_page(pfn));
@@ -1464,8 +1465,8 @@ void domain_relinquish_resources(struct domain *d)
     for_each_vcpu ( d, v )
         vcpu_destroy_pagetables(v);
 
-    /* Tear down shadow mode stuff. */
-    shadow_teardown(d);
+    /* Tear down paging-assistance stuff. */
+    paging_teardown(d);
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as
@@ -1484,35 +1485,12 @@ void domain_relinquish_resources(struct domain *d)
 
 void arch_dump_domain_info(struct domain *d)
 {
-    if ( shadow_mode_enabled(d) )
-    {
-        printk("    shadow mode: ");
-        if ( d->arch.shadow.mode & SHM2_enable )
-            printk("enabled ");
-        if ( shadow_mode_refcounts(d) )
-            printk("refcounts ");
-        if ( shadow_mode_log_dirty(d) )
-            printk("log_dirty ");
-        if ( shadow_mode_translate(d) )
-            printk("translate ");
-        if ( shadow_mode_external(d) )
-            printk("external ");
-        printk("\n");
-    }
+    paging_dump_domain_info(d);
 }
 
 void arch_dump_vcpu_info(struct vcpu *v)
 {
-    if ( shadow_mode_enabled(v->domain) )
-    {
-        if ( v->arch.shadow.mode )
-            printk("    shadowed %u-on-%u, %stranslated\n",
-                   v->arch.shadow.mode->guest_levels,
-                   v->arch.shadow.mode->shadow_levels,
-                   shadow_vcpu_mode_translate(v) ? "" : "not ");
-        else
-            printk("    not shadowed\n");
-    }
+    paging_dump_vcpu_info(v);
 }
 
 /*

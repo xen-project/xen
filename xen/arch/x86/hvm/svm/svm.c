@@ -29,7 +29,8 @@
 #include <xen/domain_page.h>
 #include <asm/current.h>
 #include <asm/io.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
+#include <asm/p2m.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -491,9 +492,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
-        /*
-         * arch.shadow_table should now hold the next CR3 for shadow
-         */
         v->arch.hvm_svm.cpu_cr3 = c->cr3;
     }
 
@@ -560,7 +558,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->sysenter_esp = c->sysenter_esp;
     vmcb->sysenter_eip = c->sysenter_eip;
 
-    shadow_update_paging_modes(v);
+    paging_update_paging_modes(v);
     return 0;
  
  bad_cr3:
@@ -1095,7 +1093,7 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
                 "svm_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
                 va, (unsigned long)current->arch.hvm_svm.vmcb->rip,
                 (unsigned long)regs->error_code);
-    return shadow_fault(va, regs); 
+    return paging_fault(va, regs); 
 }
 
 
@@ -1199,6 +1197,8 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
         /* So far, we do not support 3DNow for the guest. */
         clear_bit(X86_FEATURE_3DNOW & 31, &edx);
         clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
+        /* no FFXSR instructions feature. */
+        clear_bit(X86_FEATURE_FFXSR & 31, &edx);
     }
     else if ( input == 0x80000007 || input == 0x8000000A )
     {
@@ -1728,7 +1728,7 @@ static int svm_set_cr0(unsigned long value)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if ( old_base_mfn )
             put_page(mfn_to_page(old_base_mfn));
-        shadow_update_paging_modes(v);
+        paging_update_paging_modes(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                     (unsigned long) (mfn << PAGE_SHIFT));
@@ -1751,7 +1751,7 @@ static int svm_set_cr0(unsigned long value)
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
-        shadow_update_paging_modes(v);
+        paging_update_paging_modes(v);
     }
     else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
     {
@@ -1761,7 +1761,7 @@ static int svm_set_cr0(unsigned long value)
             clear_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
         /* we should take care of this kind of situation */
-        shadow_update_paging_modes(v);
+        paging_update_paging_modes(v);
     }
 
     return 1;
@@ -1864,7 +1864,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 goto bad_cr3;
-            shadow_update_cr3(v);
+            paging_update_cr3(v);
         }
         else 
         {
@@ -1915,7 +1915,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 v->arch.guest_table = pagetable_from_pfn(mfn);
                 if ( old_base_mfn )
                     put_page(mfn_to_page(old_base_mfn));
-                shadow_update_paging_modes(v);
+                paging_update_paging_modes(v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
@@ -1944,7 +1944,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
          * all TLB entries except global entries.
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
-            shadow_update_paging_modes(v);
+            paging_update_paging_modes(v);
         break;
 
     case 8:
@@ -2287,7 +2287,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
         __update_guest_eip (vmcb, inst_len);
     }
 
-    shadow_invlpg(v, g_vaddr);
+    paging_invlpg(v, g_vaddr);
 }
 
 
@@ -2658,7 +2658,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     paddr_t gpa;
 
-    gpa = shadow_gva_to_gpa(current, gva);
+    gpa = paging_gva_to_gpa(current, gva);
     printk("gva = %lx, gpa=%"PRIpaddr", gCR3=%x\n", gva, gpa, (u32)vmcb->cr3);
     if( !svm_paging_enabled(v) || mmio_space(gpa) )
         return;
@@ -2679,7 +2679,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     shadow_sync_va(v, gva);
 
     gpte.l1 = 0;
-    __copy_from_user(&gpte, &linear_pg_table[ l1_linear_offset(gva) ],
+    __copy_from_user(&gpte, &__linear_l1_table[ l1_linear_offset(gva) ],
                      sizeof(gpte) );
     printk( "G-PTE = %x, flags=%x\n", gpte.l1, l1e_get_flags(gpte) );
 
@@ -2724,7 +2724,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if (svm_dbg_on && exit_reason == VMEXIT_EXCEPTION_PF) 
         {
             if (svm_paging_enabled(v) && 
-                !mmio_space(shadow_gva_to_gpa(current, vmcb->exitinfo2)))
+                !mmio_space(paging_gva_to_gpa(current, vmcb->exitinfo2)))
             {
                 printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
                        "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64", "
@@ -2734,7 +2734,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                        (u64)vmcb->exitinfo1,
                        (u64)vmcb->exitinfo2,
                        (u64)vmcb->exitintinfo.bytes,
-                       (u64)shadow_gva_to_gpa(current, vmcb->exitinfo2));
+                       (u64)paging_gva_to_gpa(current, vmcb->exitinfo2));
             }
             else 
             {

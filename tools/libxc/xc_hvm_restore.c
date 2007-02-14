@@ -41,11 +41,8 @@ static unsigned long hvirt_start;
 /* #levels of page tables used by the currrent guest */
 static unsigned int pt_levels;
 
-/* total number of pages used by the current guest */
-static unsigned long max_pfn;
-
-/* A table mapping each PFN to its new MFN. */
-static xen_pfn_t *p2m = NULL;
+/* A list of PFNs that exist, used when allocating memory to the guest */
+static xen_pfn_t *pfns = NULL;
 
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
@@ -67,9 +64,8 @@ read_exact(int fd, void *buf, size_t count)
 }
 
 int xc_hvm_restore(int xc_handle, int io_fd,
-                     uint32_t dom, unsigned long nr_pfns,
+                     uint32_t dom, unsigned long max_pfn,
                      unsigned int store_evtchn, unsigned long *store_mfn,
-                     unsigned int console_evtchn, unsigned long *console_mfn,
                      unsigned int pae, unsigned int apic)
 {
     DECLARE_DOMCTL;
@@ -91,7 +87,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     unsigned long long v_end, memsize;
     unsigned long shared_page_nr;
 
-    unsigned long mfn, pfn;
+    unsigned long pfn;
     unsigned int prev_pc, this_pc;
     int verify = 0;
 
@@ -100,22 +96,26 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 
     struct xen_add_to_physmap xatp;
 
+    /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
+    unsigned long nr_pages;
+
     /* hvm guest mem size (Mb) */
     memsize = (unsigned long long)*store_mfn;
     v_end = memsize << 20;
+    nr_pages = (unsigned long) memsize << (20 - PAGE_SHIFT);
 
-    DPRINTF("xc_hvm_restore:dom=%d, nr_pfns=0x%lx, store_evtchn=%d, *store_mfn=%ld, console_evtchn=%d, *console_mfn=%ld, pae=%u, apic=%u.\n", 
-            dom, nr_pfns, store_evtchn, *store_mfn, console_evtchn, *console_mfn, pae, apic);
+    DPRINTF("xc_hvm_restore:dom=%d, nr_pages=0x%lx, store_evtchn=%d, *store_mfn=%ld, pae=%u, apic=%u.\n", 
+            dom, nr_pages, store_evtchn, *store_mfn, pae, apic);
 
-    max_pfn = nr_pfns;
-
+    
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
         ERROR("Unable to get platform info.");
         return 1;
     }
 
-    DPRINTF("xc_hvm_restore start: max_pfn = %lx, max_mfn = %lx, hvirt_start=%lx, pt_levels=%d\n",
+    DPRINTF("xc_hvm_restore start: nr_pages = %lx, max_pfn = %lx, max_mfn = %lx, hvirt_start=%lx, pt_levels=%d\n",
+            nr_pages,
             max_pfn,
             max_mfn,
             hvirt_start,
@@ -128,30 +128,30 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     }
 
 
-    p2m = malloc(max_pfn * sizeof(xen_pfn_t));
-    if (p2m == NULL) {
+    pfns = malloc(max_pfn * sizeof(xen_pfn_t));
+    if (pfns == NULL) {
         ERROR("memory alloc failed");
         errno = ENOMEM;
         goto out;
     }
 
-    if(xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
+    if(xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(nr_pages)) != 0) {
         errno = ENOMEM;
         goto out;
     }
 
     for ( i = 0; i < max_pfn; i++ )
-        p2m[i] = i;
+        pfns[i] = i;
     for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < max_pfn; i++ )
-        p2m[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+        pfns[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
 
     /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
     rc = xc_domain_memory_populate_physmap(
-        xc_handle, dom, (max_pfn > 0xa0) ? 0xa0 : max_pfn,
-        0, 0, &p2m[0x00]);
-    if ( (rc == 0) && (max_pfn > 0xc0) )
+        xc_handle, dom, (nr_pages > 0xa0) ? 0xa0 : nr_pages,
+        0, 0, &pfns[0x00]);
+    if ( (rc == 0) && (nr_pages > 0xc0) )
         rc = xc_domain_memory_populate_physmap(
-            xc_handle, dom, max_pfn - 0xc0, 0, 0, &p2m[0xc0]);
+            xc_handle, dom, nr_pages - 0xc0, 0, 0, &pfns[0xc0]);
     if ( rc != 0 )
     {
         PERROR("Could not allocate memory for HVM guest.\n");
@@ -172,9 +172,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    for ( i = 0; i < max_pfn; i++)
-        p2m[i] = i;
-
     prev_pc = 0;
 
     n = 0;
@@ -182,7 +179,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 
         int j;
 
-        this_pc = (n * 100) / max_pfn;
+        this_pc = (n * 100) / nr_pages;
         if ( (this_pc - prev_pc) >= 5 )
         {
             PPRINTF("\b\b\b\b%3d%%", this_pc);
@@ -235,8 +232,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
             }
 
 
-            mfn = p2m[pfn];
-
             /* In verify mode, we use a copy; otherwise we work in place */
             page = verify ? (void *)buf : (region_base + i*PAGE_SIZE);
 
@@ -253,8 +248,8 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 
                     int v;
 
-                    DPRINTF("************** pfn=%lx mfn=%lx gotcs=%08lx "
-                            "actualcs=%08lx\n", pfn, p2m[pfn],
+                    DPRINTF("************** pfn=%lx gotcs=%08lx "
+                            "actualcs=%08lx\n", pfn, 
                             csum_page(region_base + i*PAGE_SIZE),
                             csum_page(buf));
 
@@ -362,7 +357,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
  out:
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
-    free(p2m);
+    free(pfns);
     free(hvm_buf);
 
     DPRINTF("Restore exit with rc=%d\n", rc);

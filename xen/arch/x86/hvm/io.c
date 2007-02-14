@@ -32,7 +32,7 @@
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vpt.h>

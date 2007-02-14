@@ -42,6 +42,7 @@
 #include <asm/vmx_vpd.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/vhpt.h>
+#include <asm/vcpu.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
@@ -67,6 +68,8 @@ static void init_switch_stack(struct vcpu *v);
    This is a Xen virtual address.  */
 DEFINE_PER_CPU(uint8_t *, current_psr_i_addr);
 DEFINE_PER_CPU(int *, current_psr_ic_addr);
+
+DEFINE_PER_CPU(struct vcpu *, fp_owner);
 
 #include <xen/sched-if.h>
 
@@ -135,12 +138,44 @@ static void flush_vtlb_for_context_switch(struct vcpu* prev, struct vcpu* next)
 	}
 }
 
+static void lazy_fp_switch(struct vcpu *prev, struct vcpu *next)
+{
+	/*
+	 * Implement eager save, lazy restore
+	 */
+	if (!is_idle_vcpu(prev)) {
+		if (VMX_DOMAIN(prev)) {
+			if (FP_PSR(prev) & IA64_PSR_MFH) {
+				__ia64_save_fpu(prev->arch._thread.fph);
+				__ia64_per_cpu_var(fp_owner) = prev;
+			}
+		} else {
+			if (PSCB(prev, hpsr_mfh)) {
+				__ia64_save_fpu(prev->arch._thread.fph);
+				__ia64_per_cpu_var(fp_owner) = prev;
+			}
+		}
+	}
+
+	if (!is_idle_vcpu(next)) {
+		if (VMX_DOMAIN(next)) {
+			FP_PSR(next) = IA64_PSR_DFH;
+			vcpu_regs(next)->cr_ipsr |= IA64_PSR_DFH;
+		} else {
+			PSCB(next, hpsr_dfh) = 1;
+			PSCB(next, hpsr_mfh) = 0;
+			vcpu_regs(next)->cr_ipsr |= IA64_PSR_DFH;
+		}
+	}
+}
+
 void schedule_tail(struct vcpu *prev)
 {
 	extern char ia64_ivt;
-	context_saved(prev);
 
+	context_saved(prev);
 	ia64_disable_vhpt_walker();
+
 	if (VMX_DOMAIN(current)) {
 		vmx_do_launch(current);
 		migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
@@ -148,7 +183,7 @@ void schedule_tail(struct vcpu *prev)
 	} else {
 		ia64_set_iva(&ia64_ivt);
 		load_region_regs(current);
-        	ia64_set_pta(vcpu_pta(current));
+		ia64_set_pta(vcpu_pta(current));
 		vcpu_load_kernel_regs(current);
 		__ia64_per_cpu_var(current_psr_i_addr) = &current->domain->
 		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
@@ -165,64 +200,65 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     local_irq_save(spsr);
 
-    if (!is_idle_domain(prev->domain)) 
-        __ia64_save_fpu(prev->arch._thread.fph);
-    if (!is_idle_domain(next->domain)) 
-        __ia64_load_fpu(next->arch._thread.fph);
-
     if (VMX_DOMAIN(prev)) {
-	vmx_save_state(prev);
-	if (!VMX_DOMAIN(next)) {
-	    /* VMX domains can change the physical cr.dcr.
-	     * Restore default to prevent leakage. */
-	    ia64_setreg(_IA64_REG_CR_DCR, (IA64_DCR_DP | IA64_DCR_DK
-	                   | IA64_DCR_DX | IA64_DCR_DR | IA64_DCR_PP
-	                   | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
-	}
+        vmx_save_state(prev);
+        if (!VMX_DOMAIN(next)) {
+            /* VMX domains can change the physical cr.dcr.
+             * Restore default to prevent leakage. */
+            ia64_setreg(_IA64_REG_CR_DCR, IA64_DEFAULT_DCR_BITS);
+        }
     }
     if (VMX_DOMAIN(next))
-	vmx_load_state(next);
+        vmx_load_state(next);
 
     ia64_disable_vhpt_walker();
-    /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
+    lazy_fp_switch(prev, current);
+
     prev = ia64_switch_to(next);
 
     /* Note: ia64_switch_to does not return here at vcpu initialization.  */
 
-    //cpu_set(smp_processor_id(), current->domain->domain_dirty_cpumask);
- 
-    if (VMX_DOMAIN(current)){
-	vmx_load_all_rr(current);
-	migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
-	              current->processor);
+    if (VMX_DOMAIN(current)) {
+        vmx_load_all_rr(current);
+        migrate_timer(&current->arch.arch_vmx.vtm.vtm_timer,
+                      current->processor);
     } else {
-	struct domain *nd;
-    	extern char ia64_ivt;
+        struct domain *nd;
+        extern char ia64_ivt;
 
-    	ia64_set_iva(&ia64_ivt);
+        ia64_set_iva(&ia64_ivt);
 
-	nd = current->domain;
-    	if (!is_idle_domain(nd)) {
-	    	load_region_regs(current);
-		ia64_set_pta(vcpu_pta(current));
-	    	vcpu_load_kernel_regs(current);
-		vcpu_set_next_timer(current);
-		if (vcpu_timer_expired(current))
-			vcpu_pend_timer(current);
-		__ia64_per_cpu_var(current_psr_i_addr) = &nd->shared_info->
-		  vcpu_info[current->vcpu_id].evtchn_upcall_mask;
-		__ia64_per_cpu_var(current_psr_ic_addr) =
-		  (int *)(nd->arch.shared_info_va + XSI_PSR_IC_OFS);
-    	} else {
-		/* When switching to idle domain, only need to disable vhpt
-		 * walker. Then all accesses happen within idle context will
-		 * be handled by TR mapping and identity mapping.
-		 */
-		__ia64_per_cpu_var(current_psr_i_addr) = NULL;
-		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
+        nd = current->domain;
+        if (!is_idle_domain(nd)) {
+            load_region_regs(current);
+            ia64_set_pta(vcpu_pta(current));
+            vcpu_load_kernel_regs(current);
+            vcpu_set_next_timer(current);
+            if (vcpu_timer_expired(current))
+                vcpu_pend_timer(current);
+            __ia64_per_cpu_var(current_psr_i_addr) = &nd->shared_info->
+                vcpu_info[current->vcpu_id].evtchn_upcall_mask;
+            __ia64_per_cpu_var(current_psr_ic_addr) =
+                (int *)(nd->arch.shared_info_va + XSI_PSR_IC_OFS);
+        } else {
+            /* When switching to idle domain, only need to disable vhpt
+             * walker. Then all accesses happen within idle context will
+             * be handled by TR mapping and identity mapping.
+             */
+            __ia64_per_cpu_var(current_psr_i_addr) = NULL;
+            __ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
     }
     local_irq_restore(spsr);
+
+    /* lazy fp */
+    if (current->processor != current->arch.last_processor) {
+        unsigned long *addr;
+        addr = (unsigned long *)per_cpu_addr(fp_owner,
+                                             current->arch.last_processor);
+        ia64_cmpxchg(acq, addr, current, 0, 8);
+    }
+   
     flush_vtlb_for_context_switch(prev, current);
     context_saved(prev);
 }
@@ -411,9 +447,6 @@ int vcpu_late_initialise(struct vcpu *v)
 		assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
 		                   virt_to_maddr(v->arch.privregs + i));
 
-	tlbflush_update_time(&v->arch.tlbflush_timestamp,
-	                     tlbflush_current_time());
-
 	return 0;
 }
 
@@ -519,6 +552,12 @@ void arch_domain_destroy(struct domain *d)
 	deallocate_rid_range(d);
 }
 
+int arch_vcpu_reset(struct vcpu *v)
+{
+	/* FIXME: Stub for now */
+	return 0;
+}
+
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
@@ -542,7 +581,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		er->dtrs[i].rid = v->arch.dtrs[i].rid;
 	}
 	er->event_callback_ip = v->arch.event_callback_ip;
-	er->dcr = v->arch.dcr;
+	er->dcr = PSCB(v,dcr);
 	er->iva = v->arch.iva;
 }
 
@@ -578,16 +617,18 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 			             er->dtrs[i].rid);
 		}
 		v->arch.event_callback_ip = er->event_callback_ip;
-		v->arch.dcr = er->dcr;
+		PSCB(v,dcr) = er->dcr;
 		v->arch.iva = er->iva;
 	}
 
 	if (test_bit(_VCPUF_initialised, &v->vcpu_flags))
 		return 0;
 
-	if (d->arch.is_vti)
-		vmx_final_setup_guest(v);
-	else {
+	if (d->arch.is_vti) {
+		rc = vmx_final_setup_guest(v);
+		if (rc != 0)
+			return rc;
+	} else {
 		rc = vcpu_late_initialise(v);
 		if (rc != 0)
 			return rc;
@@ -982,12 +1023,6 @@ int construct_dom0(struct domain *d,
 	unsigned long bp_mpa;
 	struct ia64_boot_param *bp;
 
-#ifdef VALIDATE_VT
-	unsigned int vmx_dom0 = 0;
-	unsigned long mfn;
-	struct page_info *page = NULL;
-#endif
-
 //printk("construct_dom0: starting\n");
 
 	/* Sanity! */
@@ -1020,23 +1055,6 @@ int construct_dom0(struct domain *d,
 		printk("Incompatible kernel binary\n");
 		return -1;
 	}
-
-#ifdef VALIDATE_VT
-	/* Temp workaround */
-	if (running_on_sim)
-	    dsi.xen_section_string = (char *)1;
-
-	/* Check whether dom0 is vti domain */
-	if ((!vmx_enabled) && !dsi.xen_section_string) {
-	    printk("Lack of hardware support for unmodified vmx dom0\n");
-	    panic("");
-	}
-
-	if (vmx_enabled && !dsi.xen_section_string) {
-	    printk("Dom0 is vmx domain!\n");
-	    vmx_dom0 = 1;
-	}
-#endif
 
 	p_start = parms.virt_base;
 	pkern_start = parms.virt_kstart;
@@ -1130,14 +1148,6 @@ int construct_dom0(struct domain *d,
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 
 	printk("Dom0: 0x%lx\n", (u64)dom0);
-
-#ifdef VALIDATE_VT
-	/* VMX specific construction for Dom0, if hardware supports VMX
-	 * and Dom0 is unmodified image
-	 */
-	if (vmx_dom0)
-	    vmx_final_setup_guest(v);
-#endif
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 

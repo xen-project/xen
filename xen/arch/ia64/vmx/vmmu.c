@@ -129,13 +129,15 @@ purge_machine_tc_by_domid(domid_t domid)
 #endif
 }
 
-static void init_domain_vhpt(struct vcpu *v)
+static int init_domain_vhpt(struct vcpu *v)
 {
     struct page_info *page;
     void * vbase;
     page = alloc_domheap_pages (NULL, VCPU_VHPT_ORDER, 0);
     if ( page == NULL ) {
-        panic_domain(vcpu_regs(v),"No enough contiguous memory for init_domain_vhpt\n");
+        printk("No enough contiguous memory for init_domain_vhpt\n");
+
+        return -1;
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VHPT_SIZE);
@@ -147,18 +149,36 @@ static void init_domain_vhpt(struct vcpu *v)
     VHPT(v,cch_sz) = VCPU_VHPT_SIZE - VHPT(v,hash_sz);
     thash_init(&(v->arch.vhpt),VCPU_VHPT_SHIFT-1);
     v->arch.arch_vmx.mpta = v->arch.vhpt.pta.val;
+
+    return 0;
 }
 
 
+static void free_domain_vhpt(struct vcpu *v)
+{
+    struct page_info *page;
 
-void init_domain_tlb(struct vcpu *v)
+    if (v->arch.vhpt.hash) {
+        page = virt_to_page(v->arch.vhpt.hash);
+        free_domheap_pages(page, VCPU_VHPT_ORDER);
+    }
+
+    return;
+}
+
+int init_domain_tlb(struct vcpu *v)
 {
     struct page_info *page;
     void * vbase;
-    init_domain_vhpt(v);
+
+    if (init_domain_vhpt(v) != 0)
+        return -1;
+
     page = alloc_domheap_pages (NULL, VCPU_VTLB_ORDER, 0);
     if ( page == NULL ) {
-        panic_domain(vcpu_regs(v),"No enough contiguous memory for init_domain_tlb\n");
+        printk("No enough contiguous memory for init_domain_tlb\n");
+        free_domain_vhpt(v);
+        return -1;
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VTLB_SIZE);
@@ -169,7 +189,10 @@ void init_domain_tlb(struct vcpu *v)
     VTLB(v,cch_buf) = (void *)((u64)vbase + VTLB(v,hash_sz));
     VTLB(v,cch_sz) = VCPU_VTLB_SIZE - VTLB(v,hash_sz);
     thash_init(&(v->arch.vtlb),VCPU_VTLB_SHIFT-1);
+    
+    return 0;
 }
+
 
 void free_domain_tlb(struct vcpu *v)
 {
@@ -179,10 +202,8 @@ void free_domain_tlb(struct vcpu *v)
         page = virt_to_page(v->arch.vtlb.hash);
         free_domheap_pages(page, VCPU_VTLB_ORDER);
     }
-    if ( v->arch.vhpt.hash) {
-        page = virt_to_page(v->arch.vhpt.hash);
-        free_domheap_pages(page, VCPU_VHPT_ORDER);
-    }
+
+    free_domain_vhpt(v);
 }
 
 /*
@@ -553,7 +574,8 @@ static void ptc_ga_remote_func (void *varg)
     mpta = ia64_get_pta();
     ia64_set_pta(v->arch.arch_vmx.mpta&(~1));
     ia64_srlz_d();
-    vmx_vcpu_ptc_l(v, REGION_OFFSET(vadr), args->ps);
+    vadr = PAGEALIGN(vadr, args->ps);
+    thash_purge_entries_remote(v, vadr, args->ps);
     VMX(v, vrr[0]) = oldrid; 
     VMX(v, psbits[0]) = oldpsbits;
     ia64_set_rr(0x0,moldrid);

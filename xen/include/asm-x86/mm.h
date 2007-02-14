@@ -246,6 +246,64 @@ pae_copy_root(struct vcpu *v, l3_pgentry_t *l3tab);
 
 int check_descriptor(const struct domain *, struct desc_struct *d);
 
+
+/******************************************************************************
+ * With shadow pagetables, the different kinds of address start 
+ * to get get confusing.
+ * 
+ * Virtual addresses are what they usually are: the addresses that are used 
+ * to accessing memory while the guest is running.  The MMU translates from 
+ * virtual addresses to machine addresses. 
+ * 
+ * (Pseudo-)physical addresses are the abstraction of physical memory the
+ * guest uses for allocation and so forth.  For the purposes of this code, 
+ * we can largely ignore them.
+ *
+ * Guest frame numbers (gfns) are the entries that the guest puts in its
+ * pagetables.  For normal paravirtual guests, they are actual frame numbers,
+ * with the translation done by the guest.  
+ * 
+ * Machine frame numbers (mfns) are the entries that the hypervisor puts
+ * in the shadow page tables.
+ *
+ * Elsewhere in the xen code base, the name "gmfn" is generally used to refer
+ * to a "machine frame number, from the guest's perspective", or in other
+ * words, pseudo-physical frame numbers.  However, in the shadow code, the
+ * term "gmfn" means "the mfn of a guest page"; this combines naturally with
+ * other terms such as "smfn" (the mfn of a shadow page), gl2mfn (the mfn of a
+ * guest L2 page), etc...
+ */
+
+/* With this defined, we do some ugly things to force the compiler to
+ * give us type safety between mfns and gfns and other integers.
+ * TYPE_SAFE(int foo) defines a foo_t, and _foo() and foo_x() functions 
+ * that translate beween int and foo_t.
+ * 
+ * It does have some performance cost because the types now have 
+ * a different storage attribute, so may not want it on all the time. */
+
+#ifndef NDEBUG
+#define TYPE_SAFETY 1
+#endif
+
+#ifdef TYPE_SAFETY
+#define TYPE_SAFE(_type,_name)                                  \
+typedef struct { _type _name; } _name##_t;                      \
+static inline _name##_t _##_name(_type n) { return (_name##_t) { n }; } \
+static inline _type _name##_x(_name##_t n) { return n._name; }
+#else
+#define TYPE_SAFE(_type,_name)                                          \
+typedef _type _name##_t;                                                \
+static inline _name##_t _##_name(_type n) { return n; }                 \
+static inline _type _name##_x(_name##_t n) { return n; }
+#endif
+
+TYPE_SAFE(unsigned long,mfn);
+
+/* Macro for printk formats: use as printk("%"PRI_mfn"\n", mfn_x(foo)); */
+#define PRI_mfn "05lx"
+
+
 /*
  * The MPT (machine->physical mapping table) is an array of word-sized
  * values, indexed on machine frame number. It is expected that guest OSes
@@ -269,13 +327,12 @@ int check_descriptor(const struct domain *, struct desc_struct *d);
 #endif
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
-
 #define mfn_to_gmfn(_d, mfn)                            \
-    ( (shadow_mode_translate(_d))                      \
+    ( (paging_mode_translate(_d))                       \
       ? get_gpfn_from_mfn(mfn)                          \
       : (mfn) )
 
-#define gmfn_to_mfn(_d, gpfn)  mfn_x(sh_gfn_to_mfn(_d, gpfn))
+#define gmfn_to_mfn(_d, gpfn)  mfn_x(gfn_to_mfn(_d, gpfn))
 
 #define INVALID_MFN             (~0UL)
 

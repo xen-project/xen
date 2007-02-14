@@ -99,7 +99,7 @@ inject_guest_interruption(VCPU *vcpu, u64 vec)
     pt_isr.ir = 0;
     VMX(vcpu,cr_isr) = pt_isr.val;
     collect_interruption(vcpu);
-
+    vmx_ia64_set_dcr(vcpu);
     vmx_vcpu_get_iva(vcpu,&viva);
     regs->cr_iip = viva + vec;
 }

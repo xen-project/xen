@@ -27,16 +27,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <xen/hvm/e820.h>
 
 #include "xc_private.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
-
-/*
- * Size of a buffer big enough to take the HVM state of a domain.
- * Ought to calculate this a bit more carefully, or maybe ask Xen.
- */
-#define HVM_CTXT_SIZE 8192
 
 /*
 ** Default values for important tuning parameters. Can override by passing
@@ -281,11 +276,11 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
-    /* A table containg the type of each PFN (/not/ MFN!). */
-    unsigned long *pfn_type = NULL;
-    unsigned long *pfn_batch = NULL;
+    /* A table containg the PFNs (/not/ MFN!) to map. */
+    xen_pfn_t *pfn_batch = NULL;
 
     /* A copy of hvm domain context buffer*/
+    uint32_t hvm_buf_size;
     uint8_t *hvm_buf = NULL;
 
     /* Live mapping of shared info structure */
@@ -295,7 +290,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned char *region_base = NULL;
 
     uint32_t nr_pfns, rec_size, nr_vcpus;
-    unsigned long *page_array = NULL;
 
     /* power of 2 order of max_pfn */
     int order_nr;
@@ -366,18 +360,12 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    max_pfn = live_shinfo->arch.max_pfn;
-
     DPRINTF("saved hvm domain info:max_memkb=0x%lx, max_mfn=0x%lx, nr_pages=0x%lx\n", info.max_memkb, max_mfn, info.nr_pages); 
 
-    /* nr_pfns: total pages excluding vga acc mem
-     * max_pfn: nr_pfns + 0x20 vga hole(0xa0~0xc0)
-     * getdomaininfo.tot_pages: all the allocated pages for this domain
-     */
     if (live) {
         ERROR("hvm domain doesn't support live migration now.\n");
         goto out;
-
+        
         if (xc_shadow_control(xc_handle, dom,
                               XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                               NULL, 0, NULL, 0, NULL) < 0) {
@@ -386,6 +374,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         /* excludes vga acc mem */
+        /* XXX will need to check whether acceleration is enabled here! */
         nr_pfns = info.nr_pages - 0x800;
 
         last_iter = 0;
@@ -401,8 +390,8 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("HVM Domain appears not to have suspended");
             goto out;
         }
-        nr_pfns = info.nr_pages;
-        DPRINTF("after suspend hvm domain nr_pages=0x%x.\n", nr_pfns);
+
+        nr_pfns = info.nr_pages; 
     }
 
     DPRINTF("after 1st handle hvm domain nr_pfns=0x%x, nr_pages=0x%lx, max_memkb=0x%lx, live=%d.\n",
@@ -411,10 +400,15 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             info.max_memkb,
             live);
 
-    nr_pfns = info.nr_pages;
-
-    /*XXX: caculate the VGA hole*/
-    max_pfn = nr_pfns + 0x20;
+    /* Calculate the highest PFN of "normal" memory:
+     * HVM memory is sequential except for the VGA and MMIO holes, and
+     * we have nr_pfns of it (which now excludes the cirrus video RAM) */
+    max_pfn = nr_pfns; 
+    /* Skip the VGA hole from 0xa0000 to 0xc0000 */
+    max_pfn += 0x20;   
+    /* Skip the MMIO hole: 256MB just below 4GB */
+    if ( max_pfn >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT) )
+        max_pfn += (HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT); 
 
     skip_this_iter = 0;/*XXX*/
     /* pretend we sent all the pages last iteration */
@@ -429,11 +423,16 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     to_send = malloc(BITMAP_SIZE);
     to_skip = malloc(BITMAP_SIZE);
 
-    page_array = (unsigned long *) malloc( sizeof(unsigned long) * max_pfn);
 
-    hvm_buf = malloc(HVM_CTXT_SIZE);
+    hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
+    if ( hvm_buf_size == -1 )
+    {
+        ERROR("Couldn't get HVM context size from Xen");
+        goto out;
+    }
+    hvm_buf = malloc(hvm_buf_size);
 
-    if (!to_send ||!to_skip ||!page_array ||!hvm_buf ) {
+    if (!to_send ||!to_skip ||!hvm_buf) {
         ERROR("Couldn't allocate memory");
         goto out;
     }
@@ -453,23 +452,13 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     analysis_phase(xc_handle, dom, max_pfn, to_skip, 0);
 
-    /* get all the HVM domain pfns */
-    for ( i = 0; i < max_pfn; i++)
-        page_array[i] = i;
-
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_type  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_type));
     pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
 
-    if ((pfn_type == NULL) || (pfn_batch == NULL)) {
-        ERROR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
+    if (pfn_batch == NULL) {
+        ERROR("failed to alloc memory for pfn_batch array");
         errno = ENOMEM;
-        goto out;
-    }
-
-    if (lock_pages(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type))) {
-        ERROR("Unable to lock");
         goto out;
     }
 
@@ -510,16 +499,15 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
 
-            /* load pfn_type[] with the mfn of all the pages we're doing in
+            /* load pfn_batch[] with the mfn of all the pages we're doing in
                this batch. */
             for (batch = 0; batch < MAX_BATCH_SIZE && N < max_pfn ; N++) {
 
                 int n = permute(N, max_pfn, order_nr);
 
                 if (debug) {
-                    DPRINTF("%d pfn= %08lx mfn= %08lx %d \n",
-                            iter, (unsigned long)n, page_array[n],
-                            test_bit(n, to_send));
+                    DPRINTF("%d pfn= %08lx %d \n",
+                            iter, (unsigned long)n, test_bit(n, to_send));
                 }
 
                 if (!last_iter && test_bit(n, to_send)&& test_bit(n, to_skip))
@@ -529,10 +517,12 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                       (test_bit(n, to_send) && last_iter)))
                     continue;
 
-                if (n >= 0xa0 && n < 0xc0) {
-/*                    DPRINTF("get a vga hole pfn= %x.\n", n);*/
+                /* Skip PFNs that aren't really there */
+                if ((n >= 0xa0 && n < 0xc0) /* VGA hole */
+                    || (n >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT)
+                        && n < (1ULL << 32) >> PAGE_SHIFT)) /* 4G MMIO hole */
                     continue;
-                }
+
                 /*
                 ** we get here if:
                 **  1. page is marked to_send & hasn't already been re-dirtied
@@ -540,7 +530,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 */
 
                 pfn_batch[batch] = n;
-                pfn_type[batch]  = page_array[n];
 
                 batch++;
             }
@@ -571,7 +560,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 ERROR("ERROR when writting to state file (4)");
                 goto out;
             }
-
 
             sent_this_iter += batch;
 
@@ -661,7 +649,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
-                                              HVM_CTXT_SIZE)) == -1) {
+                                              hvm_buf_size)) == -1) {
         ERROR("HVM:Could not get hvm buffer");
         goto out;
     }
@@ -722,9 +710,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     free(hvm_buf);
-    free(page_array);
-
-    free(pfn_type);
     free(pfn_batch);
     free(to_send);
     free(to_skip);

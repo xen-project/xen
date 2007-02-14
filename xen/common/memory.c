@@ -175,11 +175,13 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
     if ( unlikely(!page_is_removable(page)) )
     {
+        shadow_drop_references(d, page);
         /* We'll make this a guest-visible error in future, so take heed! */
-        gdprintk(XENLOG_INFO, "Dom%d freeing in-use page %lx (pseudophys %lx):"
-                " count=%lx type=%lx\n",
-                d->domain_id, mfn, get_gpfn_from_mfn(mfn),
-                (unsigned long)page->count_info, page->u.inuse.type_info);
+        if ( !page_is_removable(page) )
+            gdprintk(XENLOG_INFO, "Dom%d freeing in-use page %lx "
+                     "(pseudophys %lx): count=%lx type=%lx\n",
+                     d->domain_id, mfn, get_gpfn_from_mfn(mfn),
+                     (unsigned long)page->count_info, page->u.inuse.type_info);
     }
 
     guest_physmap_remove_page(d, gmfn, mfn);

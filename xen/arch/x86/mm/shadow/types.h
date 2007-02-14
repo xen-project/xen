@@ -414,15 +414,9 @@ valid_gfn(gfn_t m)
 static inline mfn_t
 vcpu_gfn_to_mfn(struct vcpu *v, gfn_t gfn)
 {
-    if ( !shadow_vcpu_mode_translate(v) )
+    if ( !paging_vcpu_mode_translate(v) )
         return _mfn(gfn_x(gfn));
-    return sh_gfn_to_mfn(v->domain, gfn_x(gfn));
-}
-
-static inline gfn_t
-mfn_to_gfn(struct domain *d, mfn_t mfn)
-{
-    return _gfn(sh_mfn_to_gfn(d, mfn));
+    return gfn_to_mfn(v->domain, gfn_x(gfn));
 }
 
 static inline paddr_t
@@ -453,10 +447,8 @@ struct shadow_walk_t
     guest_l2e_t *l2e;           /* Pointer to guest's level 2 entry */
     guest_l1e_t *l1e;           /* Pointer to guest's level 1 entry */
     guest_l1e_t eff_l1e;        /* Effective level 1 entry */
-#if GUEST_PAGING_LEVELS >= 3
 #if GUEST_PAGING_LEVELS >= 4
     mfn_t l4mfn;                /* MFN that the level 4 entry is in */
-#endif
     mfn_t l3mfn;                /* MFN that the level 3 entry is in */
 #endif
     mfn_t l2mfn;                /* MFN that the level 2 entry is in */

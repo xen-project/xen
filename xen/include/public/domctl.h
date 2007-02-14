@@ -390,7 +390,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
 #define XEN_DOMCTL_sethvmcontext   34
 typedef struct xen_domctl_hvmcontext {
     uint32_t size; /* IN/OUT: size of buffer / bytes filled */
-    XEN_GUEST_HANDLE(uint8_t) buffer; /* IN/OUT */
+    XEN_GUEST_HANDLE(uint8_t) buffer; /* IN/OUT: data, or call gethvmcontext 
+                                       * with NULL buffer to get size req'd */
 } xen_domctl_hvmcontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
 

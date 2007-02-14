@@ -84,10 +84,10 @@ restore_all_guest:
         jmp   restore_all_vm86
 1:
 #endif
-FLT1:   mov  UREGS_ds(%esp),%ds
-FLT2:   mov  UREGS_es(%esp),%es
-FLT3:   mov  UREGS_fs(%esp),%fs
-FLT4:   mov  UREGS_gs(%esp),%gs
+.Lft1:  mov  UREGS_ds(%esp),%ds
+.Lft2:  mov  UREGS_es(%esp),%es
+.Lft3:  mov  UREGS_fs(%esp),%fs
+.Lft4:  mov  UREGS_gs(%esp),%gs
 restore_all_vm86:
         popl %ebx
         popl %ecx
@@ -97,9 +97,9 @@ restore_all_vm86:
         popl %ebp
         popl %eax
         addl $4,%esp
-FLT5:   iret
+.Lft5:  iret
 .section .fixup,"ax"
-FIX5:   subl  $28,%esp
+.Lfx5:  subl  $28,%esp
         pushl 28(%esp)                 # error_code/entry_vector
         movl  %eax,UREGS_eax+4(%esp)
         movl  %ebp,UREGS_ebp+4(%esp)
@@ -108,7 +108,7 @@ FIX5:   subl  $28,%esp
         movl  %edx,UREGS_edx+4(%esp)
         movl  %ecx,UREGS_ecx+4(%esp)
         movl  %ebx,UREGS_ebx+4(%esp)
-FIX1:   SET_XEN_SEGMENTS(a)
+.Lfx1:  SET_XEN_SEGMENTS(a)
         movl  %eax,%fs
         movl  %eax,%gs
         sti
@@ -116,11 +116,11 @@ FIX1:   SET_XEN_SEGMENTS(a)
         pushfl                         # EFLAGS
         movl  $__HYPERVISOR_CS,%eax
         pushl %eax                     # CS
-        movl  $DBLFLT1,%eax
+        movl  $.Ldf1,%eax
         pushl %eax                     # EIP
         pushl %esi                     # error_code/entry_vector
         jmp   handle_exception
-DBLFLT1:GET_CURRENT(%ebx)
+.Ldf1:  GET_CURRENT(%ebx)
         jmp   test_all_events
 failsafe_callback:
         GET_CURRENT(%ebx)
@@ -142,14 +142,14 @@ failsafe_callback:
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
-        .long FLT1,FIX1
-        .long FLT2,FIX1
-        .long FLT3,FIX1
-        .long FLT4,FIX1
-        .long FLT5,FIX5
+        .long .Lft1,.Lfx1
+        .long .Lft2,.Lfx1
+        .long .Lft3,.Lfx1
+        .long .Lft4,.Lfx1
+        .long .Lft5,.Lfx5
 .previous
 .section __ex_table,"a"
-        .long DBLFLT1,failsafe_callback
+        .long .Ldf1,failsafe_callback
 .previous
 
         ALIGN
@@ -288,32 +288,33 @@ create_bounce_frame:
         testl $(2|X86_EFLAGS_VM),%ecx
         jz   ring1 /* jump if returning to an existing ring-1 activation */
         movl VCPU_kernel_sp(%ebx),%esi
-FLT6:   mov  VCPU_kernel_ss(%ebx),%gs
+.Lft6:  mov  VCPU_kernel_ss(%ebx),%gs
         testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
-        jz   nvm86_1
+        jz   .Lnvm86_1
         subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
         movl UREGS_es+4(%esp),%eax
-FLT7:   movl %eax,%gs:(%esi)
+.Lft7:  movl %eax,%gs:(%esi)
         movl UREGS_ds+4(%esp),%eax
-FLT8:   movl %eax,%gs:4(%esi)
+.Lft8:  movl %eax,%gs:4(%esi)
         movl UREGS_fs+4(%esp),%eax
-FLT9:   movl %eax,%gs:8(%esi)
+.Lft9:  movl %eax,%gs:8(%esi)
         movl UREGS_gs+4(%esp),%eax
-FLT10:  movl %eax,%gs:12(%esi)
-nvm86_1:subl $8,%esi        /* push SS/ESP (inter-priv iret) */
+.Lft10: movl %eax,%gs:12(%esi)
+.Lnvm86_1:
+        subl $8,%esi        /* push SS/ESP (inter-priv iret) */
         movl UREGS_esp+4(%esp),%eax
-FLT11:  movl %eax,%gs:(%esi) 
+.Lft11: movl %eax,%gs:(%esi)
         movl UREGS_ss+4(%esp),%eax
-FLT12:  movl %eax,%gs:4(%esi) 
+.Lft12: movl %eax,%gs:4(%esi)
         jmp 1f
 ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl UREGS_esp+4(%esp),%esi
-FLT13:  mov  UREGS_ss+4(%esp),%gs 
+.Lft13: mov  UREGS_ss+4(%esp),%gs
 1:      /* Construct a stack frame: EFLAGS, CS/EIP */
         movb TRAPBOUNCE_flags(%edx),%cl
         subl $12,%esi
         movl UREGS_eip+4(%esp),%eax
-FLT14:  movl %eax,%gs:(%esi) 
+.Lft14: movl %eax,%gs:(%esi)
         movl VCPU_vcpu_info(%ebx),%eax
         pushl VCPUINFO_upcall_mask(%eax)
         testb $TBF_INTERRUPT,%cl
@@ -324,49 +325,51 @@ FLT14:  movl %eax,%gs:(%esi)
         movw UREGS_cs+4(%esp),%ax        # Bits  0-15: CS
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
         testw $2,%ax
-        jnz  FLT15
+        jnz  .Lft15
         and  $~3,%ax                     # RPL 1 -> RPL 0
 #endif
-FLT15:  movl %eax,%gs:4(%esi) 
+.Lft15: movl %eax,%gs:4(%esi)
         test $0x00FF0000,%eax            # Bits 16-23: saved_upcall_mask
         setz %ch                         # %ch == !saved_upcall_mask
         movl UREGS_eflags+4(%esp),%eax
         andl $~X86_EFLAGS_IF,%eax
         shlb $1,%ch                      # Bit 9 (EFLAGS.IF)
         orb  %ch,%ah                     # Fold EFLAGS.IF into %eax
-FLT16:  movl %eax,%gs:8(%esi)
+.Lft16: movl %eax,%gs:8(%esi)
         test $TBF_EXCEPTION_ERRCODE,%cl
         jz   1f
         subl $4,%esi                    # push error_code onto guest frame
         movl TRAPBOUNCE_error_code(%edx),%eax
-FLT17:  movl %eax,%gs:(%esi)
+.Lft17: movl %eax,%gs:(%esi)
 1:      testb $TBF_FAILSAFE,%cl
         jz   2f
         subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
         testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
-        jz   nvm86_2
+        jz   .Lnvm86_2
         xorl %eax,%eax               # VM86: we write zero selector values
-FLT18:  movl %eax,%gs:(%esi) 
-FLT19:  movl %eax,%gs:4(%esi)
-FLT20:  movl %eax,%gs:8(%esi) 
-FLT21:  movl %eax,%gs:12(%esi)
+.Lft18: movl %eax,%gs:(%esi)
+.Lft19: movl %eax,%gs:4(%esi)
+.Lft20: movl %eax,%gs:8(%esi)
+.Lft21: movl %eax,%gs:12(%esi)
         jmp  2f
-nvm86_2:movl UREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
-FLT22:  movl %eax,%gs:(%esi) 
+.Lnvm86_2:
+        movl UREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
+.Lft22: movl %eax,%gs:(%esi)
         movl UREGS_es+4(%esp),%eax
-FLT23:  movl %eax,%gs:4(%esi)
+.Lft23: movl %eax,%gs:4(%esi)
         movl UREGS_fs+4(%esp),%eax
-FLT24:  movl %eax,%gs:8(%esi) 
+.Lft24: movl %eax,%gs:8(%esi)
         movl UREGS_gs+4(%esp),%eax
-FLT25:  movl %eax,%gs:12(%esi)
+.Lft25: movl %eax,%gs:12(%esi)
 2:      testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
-        jz   nvm86_3
+        jz   .Lnvm86_3
         xorl %eax,%eax      /* zero DS-GS, just as a real CPU would */
         movl %eax,UREGS_ds+4(%esp)
         movl %eax,UREGS_es+4(%esp)
         movl %eax,UREGS_fs+4(%esp)
         movl %eax,UREGS_gs+4(%esp)
-nvm86_3:/* Rewrite our stack frame and return to ring 1. */
+.Lnvm86_3:
+        /* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         andl $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
                 X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+4(%esp)
@@ -382,16 +385,16 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         movb $0,TRAPBOUNCE_flags(%edx)
         ret
 .section __ex_table,"a"
-        .long  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
-        .long  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
-        .long FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
-        .long FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
-        .long FLT14,domain_crash_synchronous , FLT15,domain_crash_synchronous
-        .long FLT16,domain_crash_synchronous , FLT17,domain_crash_synchronous
-        .long FLT18,domain_crash_synchronous , FLT19,domain_crash_synchronous
-        .long FLT20,domain_crash_synchronous , FLT21,domain_crash_synchronous
-        .long FLT22,domain_crash_synchronous , FLT23,domain_crash_synchronous
-        .long FLT24,domain_crash_synchronous , FLT25,domain_crash_synchronous
+        .long  .Lft6,domain_crash_synchronous ,  .Lft7,domain_crash_synchronous
+        .long  .Lft8,domain_crash_synchronous ,  .Lft9,domain_crash_synchronous
+        .long .Lft10,domain_crash_synchronous , .Lft11,domain_crash_synchronous
+        .long .Lft12,domain_crash_synchronous , .Lft13,domain_crash_synchronous
+        .long .Lft14,domain_crash_synchronous , .Lft15,domain_crash_synchronous
+        .long .Lft16,domain_crash_synchronous , .Lft17,domain_crash_synchronous
+        .long .Lft18,domain_crash_synchronous , .Lft19,domain_crash_synchronous
+        .long .Lft20,domain_crash_synchronous , .Lft21,domain_crash_synchronous
+        .long .Lft22,domain_crash_synchronous , .Lft23,domain_crash_synchronous
+        .long .Lft24,domain_crash_synchronous , .Lft25,domain_crash_synchronous
 .previous
 
 domain_crash_synchronous_string:

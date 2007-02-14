@@ -20,6 +20,7 @@ extern u64 cycle_to_ns(u64 cycle);
 #define VCPU(_v,_x)	(_v->arch.privregs->_x)
 #define PSCB(_v,_x)	VCPU(_v,_x)
 #define PSCBX(_v,_x)	(_v->arch._x)
+#define FP_PSR(_v)	PSCBX(_v, fp_psr)
 
 #define SPURIOUS_VECTOR 0xf
 

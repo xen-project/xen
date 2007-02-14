@@ -30,6 +30,23 @@
 #include <xen/platform-compat.h>
 #endif
 
+#if defined (__ia64__)
+unsigned long __hypercall(unsigned long a1, unsigned long a2,
+			  unsigned long a3, unsigned long a4,
+			  unsigned long a5, unsigned long cmd)
+{
+	unsigned long __res;
+	__asm__ __volatile__ (";;\n"
+		"mov r2=%1\n"
+		"break 0x1000 ;;\n"
+		"mov %0=r8 ;;\n"
+		: "=r"(__res) : "r"(cmd) : "r2", "r8", "memory");
+
+	return __res;
+}
+EXPORT_SYMBOL(__hypercall);
+#endif
+
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
 	BUG();

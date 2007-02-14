@@ -46,22 +46,22 @@ static const char *rel_names_i386[] = {
 };
 
 static int elf_reloc_i386(struct elf_binary *elf, int type,
-			  uint64_t addr, uint64_t value)
+                          uint64_t addr, uint64_t value)
 {
     void *ptr = elf_get_ptr(elf, addr);
     uint32_t *u32;
 
-    switch (type)
+    switch ( type )
     {
     case 1 /* R_386_32 */ :
-	u32 = ptr;
-	*u32 += elf->reloc_offset;
-	break;
+        u32 = ptr;
+        *u32 += elf->reloc_offset;
+        break;
     case 2 /* R_386_PC32 */ :
-	/* nothing */
-	break;
+        /* nothing */
+        break;
     default:
-	return -1;
+        return -1;
     }
     return 0;
 }
@@ -96,54 +96,57 @@ static const char *rel_names_x86_64[] = {
 };
 
 static int elf_reloc_x86_64(struct elf_binary *elf, int type,
-			    uint64_t addr, uint64_t value)
+                            uint64_t addr, uint64_t value)
 {
     void *ptr = elf_get_ptr(elf, addr);
     uint64_t *u64;
     uint32_t *u32;
     int32_t *s32;
 
-    switch (type)
+    switch ( type )
     {
     case 1 /* R_X86_64_64 */ :
-	u64 = ptr;
-	value += elf->reloc_offset;
-	*u64 = value;
-	break;
+        u64 = ptr;
+        value += elf->reloc_offset;
+        *u64 = value;
+        break;
     case 2 /* R_X86_64_PC32 */ :
-	u32 = ptr;
-	*u32 = value - addr;
-	if (*u32 != (uint32_t) (value - addr))
-	{
-	    elf_err(elf, "R_X86_64_PC32 overflow: 0x%" PRIx32 " != 0x%" PRIx32 "\n",
-		    *u32, (uint32_t) (value - addr));
-	    return -1;
-	}
-	break;
+        u32 = ptr;
+        *u32 = value - addr;
+        if ( *u32 != (uint32_t)(value - addr) )
+        {
+            elf_err(elf, "R_X86_64_PC32 overflow: 0x%" PRIx32
+                    " != 0x%" PRIx32 "\n",
+                    *u32, (uint32_t) (value - addr));
+            return -1;
+        }
+        break;
     case 10 /* R_X86_64_32 */ :
-	u32 = ptr;
-	value += elf->reloc_offset;
-	*u32 = value;
-	if (*u32 != value)
-	{
-	    elf_err(elf, "R_X86_64_32 overflow: 0x%" PRIx32 " != 0x%" PRIx64 "\n",
-		    *u32, value);
-	    return -1;
-	}
-	break;
+        u32 = ptr;
+        value += elf->reloc_offset;
+        *u32 = value;
+        if ( *u32 != value )
+        {
+            elf_err(elf, "R_X86_64_32 overflow: 0x%" PRIx32
+                    " != 0x%" PRIx64 "\n",
+                    *u32, value);
+            return -1;
+        }
+        break;
     case 11 /* R_X86_64_32S */ :
-	s32 = ptr;
-	value += elf->reloc_offset;
-	*s32 = value;
-	if (*s32 != (int64_t) value)
-	{
-	    elf_err(elf, "R_X86_64_32S overflow: 0x%" PRIx32 " != 0x%" PRIx64 "\n",
-		    *s32, (int64_t) value);
-	    return -1;
-	}
-	break;
+        s32 = ptr;
+        value += elf->reloc_offset;
+        *s32 = value;
+        if ( *s32 != (int64_t) value )
+        {
+            elf_err(elf, "R_X86_64_32S overflow: 0x%" PRIx32
+                    " != 0x%" PRIx64 "\n",
+                    *s32, (int64_t) value);
+            return -1;
+        }
+        break;
     default:
-	return -1;
+        return -1;
     }
     return 0;
 }
@@ -154,19 +157,19 @@ static struct relocs {
     const char **names;
     int count;
     int (*func) (struct elf_binary * elf, int type, uint64_t addr,
-		 uint64_t value);
+                 uint64_t value);
 } relocs[] =
 /* *INDENT-OFF* */
 {
     [EM_386] = {
-	.names = rel_names_i386,
-	.count = sizeof(rel_names_i386) / sizeof(rel_names_i386[0]),
-	.func = elf_reloc_i386,
+        .names = rel_names_i386,
+        .count = sizeof(rel_names_i386) / sizeof(rel_names_i386[0]),
+        .func = elf_reloc_i386,
     },
     [EM_X86_64] = {
-	.names = rel_names_x86_64,
-	.count = sizeof(rel_names_x86_64) / sizeof(rel_names_x86_64[0]),
-	.func = elf_reloc_x86_64,
+        .names = rel_names_x86_64,
+        .count = sizeof(rel_names_x86_64) / sizeof(rel_names_x86_64[0]),
+        .func = elf_reloc_x86_64,
     }
 };
 /* *INDENT-ON* */
@@ -175,18 +178,18 @@ static struct relocs {
 
 static const char *rela_name(int machine, int type)
 {
-    if (machine > sizeof(relocs) / sizeof(relocs[0]))
-	return "unknown mach";
-    if (!relocs[machine].names)
-	return "unknown mach";
-    if (type > relocs[machine].count)
-	return "unknown rela";
+    if ( machine > sizeof(relocs) / sizeof(relocs[0]) )
+        return "unknown mach";
+    if ( !relocs[machine].names )
+        return "unknown mach";
+    if ( type > relocs[machine].count )
+        return "unknown rela";
     return relocs[machine].names[type];
 }
 
 static int elf_reloc_section(struct elf_binary *elf,
-			     const elf_shdr * rels,
-			     const elf_shdr * sect, const elf_shdr * syms)
+                             const elf_shdr * rels,
+                             const elf_shdr * sect, const elf_shdr * syms)
 {
     const void *ptr, *end;
     const elf_shdr *shdr;
@@ -204,18 +207,18 @@ static int elf_reloc_section(struct elf_binary *elf,
     int machine;
 
     machine = elf_uval(elf, elf->ehdr, e_machine);
-    if (machine >= sizeof(relocs) / sizeof(relocs[0]) ||
-	NULL == relocs[machine].func)
+    if ( (machine >= (sizeof(relocs) / sizeof(relocs[0]))) ||
+         (relocs[machine].func == NULL) )
     {
-	elf_err(elf, "%s: can't handle machine %d\n",
-		__FUNCTION__, machine);
-	return -1;
+        elf_err(elf, "%s: can't handle machine %d\n",
+                __FUNCTION__, machine);
+        return -1;
     }
-    if (elf_swap(elf))
+    if ( elf_swap(elf) )
     {
-	elf_err(elf, "%s: non-native byte order, relocation not supported\n",
-		__FUNCTION__);
-	return -1;
+        elf_err(elf, "%s: non-native byte order, relocation not supported\n",
+                __FUNCTION__);
+        return -1;
     }
 
     s_type = elf_uval(elf, rels, sh_type);
@@ -223,89 +226,89 @@ static int elf_reloc_section(struct elf_binary *elf,
     ptr = elf_section_start(elf, rels);
     end = elf_section_end(elf, rels);
 
-    for (; ptr < end; ptr += rsize)
+    for ( ; ptr < end; ptr += rsize )
     {
-	switch (s_type)
-	{
-	case SHT_REL:
-	    rel = ptr;
-	    r_offset = elf_uval(elf, rel, r_offset);
-	    r_info = elf_uval(elf, rel, r_info);
-	    r_addend = 0;
-	    break;
-	case SHT_RELA:
-	    rela = ptr;
-	    r_offset = elf_uval(elf, rela, r_offset);
-	    r_info = elf_uval(elf, rela, r_info);
-	    r_addend = elf_uval(elf, rela, r_addend);
-	    break;
-	default:
-	    /* can't happen */
-	    return -1;
-	}
-	if (elf_64bit(elf))
-	{
-	    r_type = ELF64_R_TYPE(r_info);
-	    r_sym = ELF64_R_SYM(r_info);
-	}
-	else
-	{
-	    r_type = ELF32_R_TYPE(r_info);
-	    r_sym = ELF32_R_SYM(r_info);
-	}
+        switch ( s_type )
+        {
+        case SHT_REL:
+            rel = ptr;
+            r_offset = elf_uval(elf, rel, r_offset);
+            r_info = elf_uval(elf, rel, r_info);
+            r_addend = 0;
+            break;
+        case SHT_RELA:
+            rela = ptr;
+            r_offset = elf_uval(elf, rela, r_offset);
+            r_info = elf_uval(elf, rela, r_info);
+            r_addend = elf_uval(elf, rela, r_addend);
+            break;
+        default:
+            /* can't happen */
+            return -1;
+        }
+        if ( elf_64bit(elf) )
+        {
+            r_type = ELF64_R_TYPE(r_info);
+            r_sym = ELF64_R_SYM(r_info);
+        }
+        else
+        {
+            r_type = ELF32_R_TYPE(r_info);
+            r_sym = ELF32_R_SYM(r_info);
+        }
 
-	sym = elf_sym_by_index(elf, r_sym);
-	shndx = elf_uval(elf, sym, st_shndx);
-	switch (shndx)
-	{
-	case SHN_UNDEF:
-	    sname = "*UNDEF*";
-	    sbase = 0;
-	    break;
-	case SHN_COMMON:
-	    elf_err(elf, "%s: invalid section: %" PRId64 "\n",
-		    __FUNCTION__, shndx);
-	    return -1;
-	case SHN_ABS:
-	    sname = "*ABS*";
-	    sbase = 0;
-	    break;
-	default:
-	    shdr = elf_shdr_by_index(elf, shndx);
-	    if (NULL == shdr)
-	    {
-		elf_err(elf, "%s: invalid section: %" PRId64 "\n",
-			__FUNCTION__, shndx);
-		return -1;
-	    }
-	    sname = elf_section_name(elf, shdr);
-	    sbase = elf_uval(elf, shdr, sh_addr);
-	}
+        sym = elf_sym_by_index(elf, r_sym);
+        shndx = elf_uval(elf, sym, st_shndx);
+        switch ( shndx )
+        {
+        case SHN_UNDEF:
+            sname = "*UNDEF*";
+            sbase = 0;
+            break;
+        case SHN_COMMON:
+            elf_err(elf, "%s: invalid section: %" PRId64 "\n",
+                    __FUNCTION__, shndx);
+            return -1;
+        case SHN_ABS:
+            sname = "*ABS*";
+            sbase = 0;
+            break;
+        default:
+            shdr = elf_shdr_by_index(elf, shndx);
+            if ( shdr == NULL )
+            {
+                elf_err(elf, "%s: invalid section: %" PRId64 "\n",
+                        __FUNCTION__, shndx);
+                return -1;
+            }
+            sname = elf_section_name(elf, shdr);
+            sbase = elf_uval(elf, shdr, sh_addr);
+        }
 
-	addr = r_offset;
-	value = elf_uval(elf, sym, st_value);
-	value += r_addend;
+        addr = r_offset;
+        value = elf_uval(elf, sym, st_value);
+        value += r_addend;
 
-	if (elf->log && elf->verbose > 1)
-	{
-	    uint64_t st_name = elf_uval(elf, sym, st_name);
-	    const char *name = st_name ? elf->sym_strtab + st_name : "*NONE*";
+        if ( elf->log && (elf->verbose > 1) )
+        {
+            uint64_t st_name = elf_uval(elf, sym, st_name);
+            const char *name = st_name ? elf->sym_strtab + st_name : "*NONE*";
 
-	    elf_msg(elf,
-		    "%s: type %s [%d], off 0x%" PRIx64 ", add 0x%" PRIx64 ","
-		    " sym %s [0x%" PRIx64 "], sec %s [0x%" PRIx64 "]"
-		    "  ->  addr 0x%" PRIx64 " value 0x%" PRIx64 "\n",
-		    __FUNCTION__, rela_name(machine, r_type), r_type, r_offset,
-		    r_addend, name, elf_uval(elf, sym, st_value), sname, sbase,
-		    addr, value);
-	}
+            elf_msg(elf,
+                    "%s: type %s [%d], off 0x%" PRIx64 ", add 0x%" PRIx64 ","
+                    " sym %s [0x%" PRIx64 "], sec %s [0x%" PRIx64 "]"
+                    "  ->  addr 0x%" PRIx64 " value 0x%" PRIx64 "\n",
+                    __FUNCTION__, rela_name(machine, r_type), r_type, r_offset,
+                    r_addend, name, elf_uval(elf, sym, st_value), sname, sbase,
+                    addr, value);
+        }
 
-	if (-1 == relocs[machine].func(elf, r_type, addr, value))
-	{
-	    elf_err(elf, "%s: unknown/unsupported reloc type %s [%d]\n",
-		    __FUNCTION__, rela_name(machine, r_type), r_type);
-	    return -1;
-	}
+        if ( relocs[machine].func(elf, r_type, addr, value) == -1 )
+        {
+            elf_err(elf, "%s: unknown/unsupported reloc type %s [%d]\n",
+                    __FUNCTION__, rela_name(machine, r_type), r_type);
+            return -1;
+        }
     }
     return 0;
 }
@@ -316,30 +319,40 @@ int elf_reloc(struct elf_binary *elf)
     uint64_t i, count, type;
 
     count = elf_shdr_count(elf);
-    for (i = 0; i < count; i++)
+    for ( i = 0; i < count; i++ )
     {
-	rels = elf_shdr_by_index(elf, i);
-	type = elf_uval(elf, rels, sh_type);
-	if (type != SHT_REL && type != SHT_RELA)
-	    continue;
+        rels = elf_shdr_by_index(elf, i);
+        type = elf_uval(elf, rels, sh_type);
+        if ( (type != SHT_REL) && (type != SHT_RELA) )
+            continue;
 
-	sect = elf_shdr_by_index(elf, elf_uval(elf, rels, sh_info));
-	syms = elf_shdr_by_index(elf, elf_uval(elf, rels, sh_link));
-	if (NULL == sect || NULL == syms)
-	    continue;
+        sect = elf_shdr_by_index(elf, elf_uval(elf, rels, sh_info));
+        syms = elf_shdr_by_index(elf, elf_uval(elf, rels, sh_link));
+        if ( NULL == sect || NULL == syms )
+            continue;
 
-	if (!(elf_uval(elf, sect, sh_flags) & SHF_ALLOC))
-	{
-	    elf_msg(elf, "%s: relocations for %s, skipping\n",
-		    __FUNCTION__, elf_section_name(elf, sect));
-	    continue;
-	}
+        if ( !(elf_uval(elf, sect, sh_flags) & SHF_ALLOC) )
+        {
+            elf_msg(elf, "%s: relocations for %s, skipping\n",
+                    __FUNCTION__, elf_section_name(elf, sect));
+            continue;
+        }
 
-	elf_msg(elf, "%s: relocations for %s @ 0x%" PRIx64 "\n",
-		__FUNCTION__, elf_section_name(elf, sect),
-		elf_uval(elf, sect, sh_addr));
-	if (0 != elf_reloc_section(elf, rels, sect, syms))
-	    return -1;
+        elf_msg(elf, "%s: relocations for %s @ 0x%" PRIx64 "\n",
+                __FUNCTION__, elf_section_name(elf, sect),
+                elf_uval(elf, sect, sh_addr));
+        if ( elf_reloc_section(elf, rels, sect, syms) != 0 )
+            return -1;
     }
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

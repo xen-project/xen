@@ -79,36 +79,56 @@ static u64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000,0x1400,0x1800,
 
 
 void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
-                              u64 vector, REGS *regs)
+                              u64 vec, REGS *regs)
 {
-    u64 status;
+    u64 status, vector;
     VCPU *vcpu = current;
     u64 vpsr = VCPU(vcpu, vpsr);
-    vector=vec2off[vector];
+    
+    vector = vec2off[vec];
     if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
         panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
     }
-    else{ // handle fpswa emulation
+
+    switch (vec) {
+
+    case 25:	// IA64_DISABLED_FPREG_VECTOR
+
+        if (FP_PSR(vcpu) & IA64_PSR_DFH) {
+            FP_PSR(vcpu) = IA64_PSR_MFH;
+            if (__ia64_per_cpu_var(fp_owner) != vcpu)
+                __ia64_load_fpu(vcpu->arch._thread.fph);
+        }
+        if (!(VCPU(vcpu, vpsr) & IA64_PSR_DFH)) {
+            regs->cr_ipsr &= ~IA64_PSR_DFH;
+            return;
+        }
+
+        break;       
+        
+    case 32:	// IA64_FP_FAULT_VECTOR
+        // handle fpswa emulation
         // fp fault
-        if (vector == IA64_FP_FAULT_VECTOR) {
-            status = handle_fpu_swa(1, regs, isr);
-            if (!status) {
-                vcpu_increment_iip(vcpu);
-                return;
-            } else if (IA64_RETRY == status)
-                return;
-        }
+        status = handle_fpu_swa(1, regs, isr);
+        if (!status) {
+            vcpu_increment_iip(vcpu);
+            return;
+        } else if (IA64_RETRY == status)
+            return;
+        break;
+
+    case 33:	// IA64_FP_TRAP_VECTOR
         //fp trap
-        else if (vector == IA64_FP_TRAP_VECTOR) {
-            status = handle_fpu_swa(0, regs, isr);
-            if (!status)
-                return;
-            else if (IA64_RETRY == status) {
-                vcpu_decrement_iip(vcpu);
-                return;
-            }
+        status = handle_fpu_swa(0, regs, isr);
+        if (!status)
+            return;
+        else if (IA64_RETRY == status) {
+            vcpu_decrement_iip(vcpu);
+            return;
         }
-    }
+        break;
+    
+    } 
     VCPU(vcpu,isr)=isr;
     VCPU(vcpu,iipa) = regs->cr_iip;
     if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
@@ -194,7 +214,7 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
-void leave_hypervisor_tail(struct pt_regs *regs)
+void leave_hypervisor_tail(void)
 {
     struct domain *d = current->domain;
     struct vcpu *v = current;
@@ -207,17 +227,23 @@ void leave_hypervisor_tail(struct pt_regs *regs)
         local_irq_disable();
 
         if (v->vcpu_id == 0) {
-            int callback_irq =
+            unsigned long callback_irq =
                 d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+            /*
+             * val[63:56] == 1: val[55:0] is a delivery PCI INTx line:
+             *                  Domain = val[47:32], Bus  = val[31:16],
+             *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+             * val[63:56] == 0: val[55:0] is a delivery as GSI
+             */
             if (callback_irq != 0 && local_events_need_delivery()) {
                 /* change level for para-device callback irq */
                 /* use level irq to send discrete event */
-                if (callback_irq & IA64_CALLBACK_IRQ_RID) {
-                    /* case of using Requester-ID as callback irq */
-                    /* RID: '<#bus(8)><#dev(5)><#func(3)>' */
-                    int dev = (callback_irq >> 3) & 0x1f;
-                    viosapic_set_pci_irq(d, dev, 0, 1);
-                    viosapic_set_pci_irq(d, dev, 0, 0);
+                if ((uint8_t)(callback_irq >> 56) == 1) {
+                    /* case of using PCI INTx line as callback irq */
+                    int pdev = (callback_irq >> 11) & 0x1f;
+                    int pintx = callback_irq & 3;
+                    viosapic_set_pci_irq(d, pdev, pintx, 1);
+                    viosapic_set_pci_irq(d, pdev, pintx, 0);
                 } else {
                     /* case of using GSI as callback irq */
                     viosapic_set_irq(d, callback_irq, 1);
@@ -367,7 +393,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     
         if (!vpsr.ic)
             misr.ni = 1;
-        if(!vhpt_enabled(v, vadr, misr.rs?RSE_REF:DATA_REF)){
+        if (!vhpt_enabled(v, vadr, INST_REF)) {
             vcpu_set_isr(v, misr.val);
             alt_itlb(v, vadr);
             return IA64_FAULT;

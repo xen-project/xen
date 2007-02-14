@@ -99,6 +99,7 @@
 #include <xen/event.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
@@ -373,9 +374,6 @@ void write_ptbase(struct vcpu *v)
 /* Should be called after CR3 is updated.
  * Updates vcpu->arch.cr3 and, for HVM guests, vcpu->arch.hvm_vcpu.cpu_cr3.
  * 
- * Also updates other state derived from CR3 (vcpu->arch.guest_vtable,
- * shadow_vtable, etc).
- *
  * Uses values found in vcpu->arch.(guest_table and guest_table_user), and
  * for HVM guests, arch.monitor_table and hvm's guest CR3.
  *
@@ -385,9 +383,9 @@ void update_cr3(struct vcpu *v)
 {
     unsigned long cr3_mfn=0;
 
-    if ( shadow_mode_enabled(v->domain) )
+    if ( paging_mode_enabled(v->domain) )
     {
-        shadow_update_cr3(v);
+        paging_update_cr3(v);
         return;
     }
 
@@ -615,7 +613,7 @@ get_page_from_l1e(
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
     okay = (((l1e_get_flags(l1e) & _PAGE_RW) && 
-             !(unlikely(shadow_mode_external(d) && (d != current->domain))))
+             !(unlikely(paging_mode_external(d) && (d != current->domain))))
             ? get_page_and_type(page, d, PGT_writable_page)
             : get_page(page, d));
     if ( !okay )
@@ -804,9 +802,9 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     }
 
     /* Remember we didn't take a type-count of foreign writable mappings
-     * to shadow external domains */
+     * to paging-external domains */
     if ( (l1e_get_flags(l1e) & _PAGE_RW) && 
-         !(unlikely((e != d) && shadow_mode_external(e))) )
+         !(unlikely((e != d) && paging_mode_external(e))) )
     {
         put_page_and_type(page);
     }
@@ -975,6 +973,19 @@ static void pae_flush_pgd(
     intpte_t       _ol3e, _nl3e, _pl3e;
     l3_pgentry_t  *l3tab_ptr;
     struct pae_l3_cache *cache;
+
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        cpumask_t m = CPU_MASK_NONE;
+        /* Re-shadow this l3 table on any vcpus that are using it */
+        for_each_vcpu ( d, v )
+            if ( pagetable_get_pfn(v->arch.guest_table) == mfn )
+            {
+                paging_update_cr3(v);
+                cpus_or(m, m, v->vcpu_dirty_cpumask);
+            }
+        flush_tlb_mask(m);
+    }
 
     /* If below 4GB then the pgdir is not shadowed in low memory. */
     if ( !l3tab_needs_shadow(mfn) )
@@ -1259,20 +1270,13 @@ static inline int update_intpte(intpte_t *p,
 {
     int rv = 1;
 #ifndef PTE_UPDATE_WITH_CMPXCHG
-    if ( unlikely(shadow_mode_enabled(v->domain)) )
-        rv = shadow_write_guest_entry(v, p, new, _mfn(mfn));
-    else
-        rv = (!__copy_to_user(p, &new, sizeof(new)));
+    rv = paging_write_guest_entry(v, p, new, _mfn(mfn));
 #else
     {
         intpte_t t = old;
         for ( ; ; )
         {
-            if ( unlikely(shadow_mode_enabled(v->domain)) )
-                rv = shadow_cmpxchg_guest_entry(v, p, &t, new, _mfn(mfn));
-            else
-                rv = (!cmpxchg_user(p, t, new));
-
+            rv = paging_cmpxchg_guest_entry(v, p, &t, new, _mfn(mfn));
             if ( unlikely(rv == 0) )
             {
                 MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
@@ -1310,7 +1314,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return 0;
 
-    if ( unlikely(shadow_mode_refcounts(d)) )
+    if ( unlikely(paging_mode_refcounts(d)) )
         return UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, current);
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
@@ -1572,7 +1576,7 @@ void free_page_type(struct page_info *page, unsigned long type)
          */
         queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
 
-        if ( unlikely(shadow_mode_enabled(owner)) )
+        if ( unlikely(paging_mode_enabled(owner)) )
         {
             /* A page table is dirtied when its type count becomes zero. */
             mark_dirty(owner, page_to_mfn(page));
@@ -1771,7 +1775,7 @@ int new_guest_cr3(unsigned long mfn)
 #ifdef CONFIG_COMPAT
     if ( IS_COMPAT(d) )
     {
-        okay = shadow_mode_refcounts(d)
+        okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
             : mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
                            l4e_from_pfn(mfn, (_PAGE_PRESENT|_PAGE_RW|
@@ -1788,7 +1792,7 @@ int new_guest_cr3(unsigned long mfn)
         return 1;
     }
 #endif
-    okay = shadow_mode_refcounts(d)
+    okay = paging_mode_refcounts(d)
         ? get_page_from_pagenr(mfn, d)
         : get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
     if ( unlikely(!okay) )
@@ -1808,7 +1812,7 @@ int new_guest_cr3(unsigned long mfn)
 
     if ( likely(old_base_mfn != 0) )
     {
-        if ( shadow_mode_refcounts(d) )
+        if ( paging_mode_refcounts(d) )
             put_page(mfn_to_page(old_base_mfn));
         else
             put_page_and_type(mfn_to_page(old_base_mfn));
@@ -1861,7 +1865,7 @@ static int set_foreigndom(domid_t domid)
                 d->domain_id);
         okay = 0;
     }
-    else if ( unlikely(shadow_mode_translate(d)) )
+    else if ( unlikely(paging_mode_translate(d)) )
     {
         MEM_LOG("Cannot mix foreign mappings with translated domains");
         okay = 0;
@@ -2007,7 +2011,7 @@ int do_mmuext_op(
             if ( (op.cmd - MMUEXT_PIN_L1_TABLE) > (CONFIG_PAGING_LEVELS - 1) )
                 break;
 
-            if ( shadow_mode_refcounts(FOREIGNDOM) )
+            if ( paging_mode_refcounts(FOREIGNDOM) )
                 break;
 
             okay = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM);
@@ -2032,7 +2036,7 @@ int do_mmuext_op(
             break;
 
         case MMUEXT_UNPIN_TABLE:
-            if ( shadow_mode_refcounts(d) )
+            if ( paging_mode_refcounts(d) )
                 break;
 
             if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
@@ -2070,7 +2074,7 @@ int do_mmuext_op(
             }
             if (likely(mfn != 0))
             {
-                if ( shadow_mode_refcounts(d) )
+                if ( paging_mode_refcounts(d) )
                     okay = get_page_from_pagenr(mfn, d);
                 else
                     okay = get_page_and_type_from_pagenr(
@@ -2087,7 +2091,7 @@ int do_mmuext_op(
                 v->arch.guest_table_user = pagetable_from_pfn(mfn);
                 if ( old_mfn != 0 )
                 {
-                    if ( shadow_mode_refcounts(d) )
+                    if ( paging_mode_refcounts(d) )
                         put_page(mfn_to_page(old_mfn));
                     else
                         put_page_and_type(mfn_to_page(old_mfn));
@@ -2101,8 +2105,8 @@ int do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_LOCAL:
-            if ( !shadow_mode_enabled(d) 
-                 || shadow_invlpg(v, op.arg1.linear_addr) != 0 )
+            if ( !paging_mode_enabled(d) 
+                 || paging_invlpg(v, op.arg1.linear_addr) != 0 )
                 local_flush_tlb_one(op.arg1.linear_addr);
             break;
 
@@ -2149,7 +2153,7 @@ int do_mmuext_op(
             unsigned long ptr  = op.arg1.linear_addr;
             unsigned long ents = op.arg2.nr_ents;
 
-            if ( shadow_mode_external(d) )
+            if ( paging_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external "
                         "domain %u", d->domain_id);
@@ -2298,9 +2302,9 @@ int do_mmu_update(
             case PGT_l3_page_table:
             case PGT_l4_page_table:
             {
-                if ( shadow_mode_refcounts(d) )
+                if ( paging_mode_refcounts(d) )
                 {
-                    MEM_LOG("mmu update on shadow-refcounted domain!");
+                    MEM_LOG("mmu update on auto-refcounted domain!");
                     break;
                 }
 
@@ -2351,13 +2355,7 @@ int do_mmu_update(
                 if ( unlikely(!get_page_type(page, PGT_writable_page)) )
                     break;
 
-                if ( unlikely(shadow_mode_enabled(d)) )
-                    okay = shadow_write_guest_entry(v, va, req.val, _mfn(mfn));
-                else
-                {
-                    *(intpte_t *)va = req.val;
-                    okay = 1;
-                }
+                okay = paging_write_guest_entry(v, va, req.val, _mfn(mfn));
 
                 put_page_type(page);
             }
@@ -2380,9 +2378,9 @@ int do_mmu_update(
                 break;
             }
 
-            if ( unlikely(shadow_mode_translate(FOREIGNDOM)) )
+            if ( unlikely(paging_mode_translate(FOREIGNDOM)) )
             {
-                MEM_LOG("Mach-phys update on shadow-translate guest");
+                MEM_LOG("Mach-phys update on auto-translate guest");
                 break;
             }
 
@@ -2472,7 +2470,7 @@ static int create_grant_pte_mapping(
         goto failed;
     } 
 
-    if ( !shadow_mode_refcounts(d) )
+    if ( !paging_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
 
     put_page_type(page);
@@ -2578,7 +2576,7 @@ static int create_grant_va_mapping(
     if ( !okay )
             return GNTST_general_error;
 
-    if ( !shadow_mode_refcounts(d) )
+    if ( !paging_mode_refcounts(d) )
         put_page_from_l1e(ol1e, d);
 
     return GNTST_okay;
@@ -2704,7 +2702,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     perfc_incrc(calls_to_update_va);
 
-    if ( unlikely(!__addr_ok(va) && !shadow_mode_external(d)) )
+    if ( unlikely(!__addr_ok(va) && !paging_mode_external(d)) )
         return -EINVAL;
 
     LOCK_BIGLOCK(d);
@@ -2744,8 +2742,8 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            if ( !shadow_mode_enabled(d) 
-                 || (shadow_invlpg(current, va) != 0) ) 
+            if ( !paging_mode_enabled(d) 
+                 || (paging_invlpg(current, va) != 0) ) 
                 local_flush_tlb_one(va);
             break;
         case UVMF_ALL:
@@ -2980,7 +2978,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             break;
         }
 
-        if ( !shadow_mode_translate(d) || (mfn == 0) )
+        if ( !paging_mode_translate(d) || (mfn == 0) )
         {
             put_domain(d);
             return -EINVAL;
@@ -3235,17 +3233,12 @@ static int ptwr_emulated_update(
     if ( do_cmpxchg )
     {
         int okay;
+        intpte_t t = old;
         ol1e = l1e_from_intpte(old);
 
-        if ( shadow_mode_enabled(d) )
-        {
-            intpte_t t = old;
-            okay = shadow_cmpxchg_guest_entry(v, (intpte_t *) pl1e, 
-                                              &t, val, _mfn(mfn));
-            okay = (okay && t == old);
-        }
-        else 
-            okay = (cmpxchg((intpte_t *)pl1e, old, val) == old);
+        okay = paging_cmpxchg_guest_entry(v, (intpte_t *) pl1e, 
+                                          &t, val, _mfn(mfn));
+        okay = (okay && t == old);
 
         if ( !okay )
         {

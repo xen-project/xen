@@ -72,10 +72,17 @@ static DEFINE_SPINLOCK(console_lock);
  * Note, in the above algorithm, to disable rate limiting simply make
  * the lower threshold equal to the upper.
  */
+#ifdef NDEBUG
 #define XENLOG_UPPER_THRESHOLD       2 /* Do not print INFO and DEBUG  */
 #define XENLOG_LOWER_THRESHOLD       2 /* Always print ERR and WARNING */
 #define XENLOG_GUEST_UPPER_THRESHOLD 2 /* Do not print INFO and DEBUG  */
 #define XENLOG_GUEST_LOWER_THRESHOLD 0 /* Rate-limit ERR and WARNING   */
+#else
+#define XENLOG_UPPER_THRESHOLD       4 /* Do not discard anything      */
+#define XENLOG_LOWER_THRESHOLD       4 /* Print everything             */
+#define XENLOG_GUEST_UPPER_THRESHOLD 4 /* Do not discard anything      */
+#define XENLOG_GUEST_LOWER_THRESHOLD 4 /* Print everything             */
+#endif
 /*
  * The XENLOG_DEFAULT is the default given to printks that
  * do not have any print level associated with them.
@@ -102,7 +109,7 @@ static void parse_guest_loglvl(char *s);
 custom_param("loglvl", parse_loglvl);
 custom_param("guest_loglvl", parse_guest_loglvl);
 
-static atomic_t print_everything = ATOMIC_INIT(1);
+static atomic_t print_everything = ATOMIC_INIT(0);
 
 #define ___parse_loglvl(s, ps, lvlstr, lvlnum)          \
     if ( !strncmp((s), (lvlstr), strlen(lvlstr)) ) {    \
@@ -223,7 +230,7 @@ int console_steal(int handle, void (*fn)(const char *))
     if ( (handle == -1) || (handle != sercon_handle) )
         return 0;
 
-    if ( serial_steal_fn == NULL )
+    if ( serial_steal_fn != NULL )
         return -EBUSY;
 
     serial_steal_fn = fn;
@@ -569,9 +576,6 @@ void console_endboot(void)
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
-
-    /* Now we implement the logging thresholds. */
-    console_end_log_everything();
 }
 
 void console_start_log_everything(void)

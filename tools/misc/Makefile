@@ -9,7 +9,9 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS  = xenperf xc_shadow
+TARGETS-y := xenperf xc_shadow
+TARGETS-$(CONFIG_X86) += xen-detect
+TARGETS := $(TARGETS-y)
 
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xen-bugtool xen-python-path xend xenperf
@@ -41,5 +43,5 @@ clean:
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-$(TARGETS): %: %.o Makefile
+xenperf xc_shadow: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl

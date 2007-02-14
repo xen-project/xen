@@ -59,44 +59,18 @@ tlbflush_clock_inc_and_return(void)
     return t2;
 }
 
+static void
+tlbflush_clock_local_flush(void *unused)
+{
+    local_vhpt_flush();
+    local_flush_tlb_all();
+}
+
 void
 new_tlbflush_clock_period(void)
 {
-    /*
-     *XXX TODO
-     * If flushing all vcpu's vhpt takes too long, it can be done backgroundly.
-     * In such case tlbflush time comparison is done using only 31bit
-     * similar to linux jiffies comparison.
-     * vhpt should be flushed gradually before wraping 31bits.
-     *
-     * Sample calculation.
-     * Currently Xen/IA64 can create up to 64 domains at the same time.
-     * Vhpt size is currently 64KB. (This might be changed later though)
-     * Suppose each domains have 4 vcpus (or 16 vcpus).
-     * then the memory size which must be flushed is 16MB (64MB).
-     */    
-    struct domain* d;
-    struct vcpu* v;
-    /* flush all vhpt of vcpu of all existing domain. */
-    read_lock(&domlist_lock);
-    for_each_domain(d) {
-        for_each_vcpu(d, v) {
-            vcpu_purge_tr_entry(&PSCBX(v,dtlb));
-            vcpu_purge_tr_entry(&PSCBX(v,itlb));
-        }
-    }
-    smp_mb();
-    for_each_domain(d) {
-        for_each_vcpu(d, v) {
-            if (HAS_PERVCPU_VHPT(v->domain))
-                vcpu_vhpt_flush(v);
-        }
-    }
-    read_unlock(&domlist_lock);
-    /* unlock has release semantics */
-
     /* flush all vhpt of physical cpu and mTLB */
-    on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
+    on_each_cpu(tlbflush_clock_local_flush, NULL, 1, 1);
 
     /*
      * if global TLB shootdown is finished, increment tlbflush_time

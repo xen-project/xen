@@ -21,7 +21,6 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <xen/shadow.h>
 #include <xen/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
@@ -29,6 +28,7 @@
 #include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/x86_emulate.h>
+#include <asm/paging.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
@@ -513,12 +513,28 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
         switch ( ins_subtype ) {
-        case 7: /* cmp $imm, m32/16 */
-            mmio_op->instr = INSTR_CMP;
+        case 0: /* add $imm, m32/16 */
+            mmio_op->instr = INSTR_ADD;
             return DECODE_success;
 
         case 1: /* or $imm, m32/16 */
             mmio_op->instr = INSTR_OR;
+            return DECODE_success;
+
+        case 4: /* and $imm, m32/16 */
+            mmio_op->instr = INSTR_AND;
+            return DECODE_success;
+
+        case 5: /* sub $imm, m32/16 */
+            mmio_op->instr = INSTR_SUB;
+            return DECODE_success;
+
+        case 6: /* xor $imm, m32/16 */
+            mmio_op->instr = INSTR_XOR;
+            return DECODE_success;
+
+        case 7: /* cmp $imm, m32/16 */
+            mmio_op->instr = INSTR_CMP;
             return DECODE_success;
 
         default:
@@ -674,6 +690,39 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         } else
             return DECODE_failure;
 
+    case 0xFE:
+    case 0xFF:
+    {
+        unsigned char ins_subtype = (opcode[1] >> 3) & 7;
+
+        if ( opcode[0] == 0xFE ) {
+            *op_size = BYTE;
+            GET_OP_SIZE_FOR_BYTE(size_reg);
+        } else {
+            GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+            size_reg = *op_size;
+        }
+
+        mmio_op->immediate = 1;
+        mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
+        mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
+
+        switch ( ins_subtype ) {
+        case 0: /* inc */
+            mmio_op->instr = INSTR_ADD;
+            return DECODE_success;
+
+        case 1: /* dec */
+            mmio_op->instr = INSTR_SUB;
+            return DECODE_success;
+
+        default:
+            printk("%x/%x, This opcode isn't handled yet!\n",
+                   *opcode, ins_subtype);
+            return DECODE_failure;
+        }
+    }
+
     case 0x0F:
         break;
 
@@ -793,7 +842,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     if ( value_is_ptr )   /* get physical address of data */
     {
         if ( hvm_paging_enabled(current) )
-            p->data = shadow_gva_to_gpa(current, value);
+            p->data = paging_gva_to_gpa(current, value);
         else
             p->data = value; /* guest VA == guest PA */
     }
@@ -849,7 +898,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
     if ( value_is_ptr )
     {
         if ( hvm_paging_enabled(v) )
-            p->data = shadow_gva_to_gpa(v, value);
+            p->data = paging_gva_to_gpa(v, value);
         else
             p->data = value; /* guest VA == guest PA */
     }
@@ -965,7 +1014,7 @@ void handle_mmio(unsigned long gpa)
         if ( ad_size == WORD )
             addr &= 0xFFFF;
         addr += hvm_get_segment_base(v, x86_seg_es);
-        if ( shadow_gva_to_gpa(v, addr) == gpa )
+        if ( paging_gva_to_gpa(v, addr) == gpa )
         {
             enum x86_segment seg;
 

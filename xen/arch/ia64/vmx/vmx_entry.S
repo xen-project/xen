@@ -190,12 +190,8 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     PT_REGS_UNWIND_INFO(0)
     rsm psr.i
     ;;
-    alloc loc0=ar.pfs,0,1,1,0
-    ;;
-    adds out0=16,r12
     br.call.sptk.many b0=leave_hypervisor_tail
     ;;
-    mov ar.pfs=loc0
     adds r20=PT(PR)+16,r12
     adds r8=PT(EML_UNAT)+16,r12
     ;;
@@ -302,11 +298,9 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ;;
     mov ar.fpsr=r19
     mov ar.ccv=r18
-    ;;
-//rbs_switch
-    
     shr.u r18=r20,16
     ;;
+vmx_rbs_switch:    
     movl r19= THIS_CPU(ia64_phys_stacked_size_p8)
     ;;
     ld4 r19=[r19]
@@ -368,7 +362,7 @@ vmx_rse_clear_invalid:
     ;;
     mov cr.ipsr=r31
     mov cr.iip=r30
-    mov cr.ifs=r29
+(pNonSys) mov cr.ifs=r29
     mov ar.pfs=r27
     adds r18=IA64_VPD_BASE_OFFSET,r21
     ;;
@@ -425,148 +419,190 @@ ia64_vmm_entry_out:
 END(ia64_vmm_entry)
 
 
-#ifdef XEN_DBL_MAPPING  /* will be removed */
-
-#define VMX_PURGE_RR7	0
-#define VMX_INSERT_RR7	1
-/*
- * in0: old rr7
- * in1: virtual address of xen image
- * in2: virtual address of vhpt table
- */
-GLOBAL_ENTRY(vmx_purge_double_mapping)
-    alloc loc1 = ar.pfs,5,9,0,0
-    mov loc0 = rp
-    movl r8 = 1f
-    ;;
-    movl loc4 = KERNEL_TR_PAGE_SHIFT
-    movl loc5 = VCPU_TLB_SHIFT
-    mov loc6 = psr
-    movl loc7 = XEN_RR7_SWITCH_STUB
-    mov loc8 = (1<<VMX_PURGE_RR7)
-    ;;
-    srlz.i
-    ;;
-    rsm psr.i | psr.ic
-    ;;
-    srlz.i
-    ;;
-    mov ar.rsc = 0
-    mov b6 = loc7
-    mov rp = r8
-    ;;
-    br.sptk b6
-1:
-    mov ar.rsc = 3
-    mov rp = loc0
-    ;;
-    mov psr.l = loc6
-    ;;
-    srlz.i
-    ;;
-    br.ret.sptk rp
-END(vmx_purge_double_mapping)
 
 /*
- * in0: new rr7
- * in1: virtual address of xen image
- * in2: virtual address of vhpt table
- * in3: pte entry of xen image
- * in4: pte entry of vhpt table
- */
-GLOBAL_ENTRY(vmx_insert_double_mapping)
-    alloc loc1 = ar.pfs,5,9,0,0
-    mov loc0 = rp
-    movl loc2 = IA64_TR_XEN_IN_DOM // TR number for xen image
-    ;;
-    movl loc3 = IA64_TR_VHPT_IN_DOM	// TR number for vhpt table
-    movl r8 = 1f
-    movl loc4 = KERNEL_TR_PAGE_SHIFT
-    ;;
-    movl loc5 = VCPU_TLB_SHIFT
-    mov loc6 = psr
-    movl loc7 = XEN_RR7_SWITCH_STUB
-    ;;
-    srlz.i
-    ;;
-    rsm psr.i | psr.ic
-    mov loc8 = (1<<VMX_INSERT_RR7)
-    ;;
-    srlz.i
-    ;;
-    mov ar.rsc = 0
-    mov b6 = loc7
-    mov rp = r8
-    ;;
-    br.sptk b6
-1:
-    mov ar.rsc = 3
-    mov rp = loc0
-    ;;
-    mov psr.l = loc6
-    ;;
-    srlz.i
-    ;;
-    br.ret.sptk rp
-END(vmx_insert_double_mapping)
-
-    .align PAGE_SIZE
-/*
- * Stub to add double mapping for new domain, which shouldn't
- * access any memory when active. Before reaching this point,
- * both psr.i/ic is cleared and rse is set in lazy mode.
+ * ia64_leave_syscall(): Same as ia64_leave_kernel, except that it doesn't
+ *  need to switch to bank 0 and doesn't restore the scratch registers.
+ *  To avoid leaking kernel bits, the scratch registers are set to
+ *  the following known-to-be-safe values:
  *
- * in0: new rr7
- * in1: virtual address of xen image
- * in2: virtual address of vhpt table
- * in3: pte entry of xen image
- * in4: pte entry of vhpt table
- * loc2: TR number for xen image
- * loc3: TR number for vhpt table
- * loc4: page size for xen image
- * loc5: page size of vhpt table
- * loc7: free to use
- * loc8: purge or insert
- * r8: will contain old rid value
+ *        r1: restored (global pointer)
+ *        r2: cleared
+ *        r3: 1 (when returning to user-level)
+ *        r8-r11: restored (syscall return value(s))
+ *       r12: restored (user-level stack pointer)
+ *       r13: restored (user-level thread pointer)
+ *       r14: set to __kernel_syscall_via_epc
+ *       r15: restored (syscall #)
+ *       r16-r17: cleared
+ *       r18: user-level b6
+ *       r19: cleared
+ *       r20: user-level ar.fpsr
+ *       r21: user-level b0
+ *       r22: cleared
+ *       r23: user-level ar.bspstore
+ *       r24: user-level ar.rnat
+ *       r25: user-level ar.unat
+ *       r26: user-level ar.pfs
+ *       r27: user-level ar.rsc
+ *       r28: user-level ip
+ *       r29: user-level psr
+ *       r30: user-level cfm
+ *       r31: user-level pr
+ *        f6-f11: cleared
+ *        pr: restored (user-level pr)
+ *        b0: restored (user-level rp)
+ *        b6: restored
+ *        b7: set to __kernel_syscall_via_epc
+ *        ar.unat: restored (user-level ar.unat)
+ *        ar.pfs: restored (user-level ar.pfs)
+ *        ar.rsc: restored (user-level ar.rsc)
+ *        ar.rnat: restored (user-level ar.rnat)
+ *        ar.bspstore: restored (user-level ar.bspstore)
+ *        ar.fpsr: restored (user-level ar.fpsr)
+ *        ar.ccv: cleared
+ *        ar.csd: cleared
+ *        ar.ssd: cleared
  */
-GLOBAL_ENTRY(vmx_switch_rr7)
-    movl loc7 = (7<<61)
-    dep.z loc4 = loc4, 2, 6
-    dep.z loc5 = loc5, 2, 6
+GLOBAL_ENTRY(ia64_leave_hypercall)
+    PT_REGS_UNWIND_INFO(0)
+    /*
+     * work.need_resched etc. mustn't get changed by this CPU before it returns to
+     * user- or fsys-mode, hence we disable interrupts early on.
+     *
+     * p6 controls whether current_thread_info()->flags needs to be check for
+     * extra work.  We always check for extra work when returning to user-level.
+     * With CONFIG_PREEMPT, we also check for extra work when the preempt_count
+     * is 0.  After extra work processing has been completed, execution
+     * resumes at .work_processed_syscall with p6 set to 1 if the extra-work-check
+     * needs to be redone.
+     */
+(pUStk) rsm psr.i
+    cmp.eq pLvSys,p0=r0,r0		// pLvSys=1: leave from syscall
+(pUStk) cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
     ;;
-    tbit.nz p6,p7=loc8, VMX_INSERT_RR7
-    mov r8 = rr[loc7]
+    br.call.sptk.many b0=leave_hypervisor_tail
+.work_processed_syscall:
+    //clean up bank 1 registers
+    mov r16=r0
+    mov r17=r0
+    mov r18=r0
+    mov r19=r0
+    mov r20=r0
+    mov r21=r0
+    mov r22=r0
+    mov r23=r0
+    mov r24=r0
+    mov r25=r0
+    mov r26=r0
+    mov r27=r0
+    mov r28=r0
+    mov r29=r0
+    mov r30=r0
+    mov r31=r0
+    bsw.0
     ;;
-    mov rr[loc7] = in0
-(p6)mov cr.ifa = in1
-(p6)mov cr.itir = loc4
+    adds r2=PT(LOADRS)+16,r12
+    adds r3=PT(AR_BSPSTORE)+16,r12
+#ifndef XEN
+    adds r18=TI_FLAGS+IA64_TASK_SIZE,r13
     ;;
-    srlz.i
+(p6) ld4 r31=[r18]				// load current_thread_info()->flags
+#endif
     ;;
-(p6)itr.i itr[loc2] = in3
-(p7)ptr.i in1, loc4
+    ld8 r20=[r2],PT(B6)-PT(LOADRS)		// load ar.rsc value for "loadrs"
+    nop.i 0
     ;;
-(p6)itr.d dtr[loc2] = in3
-(p7)ptr.d in1, loc4
+//  mov r16=ar.bsp				// M2  get existing backing store pointer
+    ld8 r18=[r2],PT(R9)-PT(B6)		// load b6
+#ifndef XEN
+(p6)    and r15=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
+#endif
     ;;
-    srlz.i
+    ld8 r24=[r3],PT(R11)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
+#ifndef XEN
+(p6)    cmp4.ne.unc p6,p0=r15, r0		// any special work pending?
+(p6)    br.cond.spnt .work_pending_syscall
+#endif
     ;;
-(p6)mov cr.ifa = in2
-(p6)mov cr.itir = loc5
+    // start restoring the state saved on the kernel stack (struct pt_regs):
+    ld8 r9=[r2],PT(CR_IPSR)-PT(R9)
+    ld8 r11=[r3],PT(CR_IIP)-PT(R11)
+//(pNonSys) break 0		//      bug check: we shouldn't be here if pNonSys is TRUE!
     ;;
-(p6)itr.d dtr[loc3] = in4
-(p7)ptr.d in2, loc5
-    ;;
-    srlz.i
-    ;;
-    mov rr[loc7] = r8
-    ;;
-    srlz.i
-    br.sptk rp
-END(vmx_switch_rr7)
-    .align PAGE_SIZE
+    invala			// M0|1 invalidate ALAT
+    rsm psr.i | psr.ic	// M2   turn off interrupts and interruption collection
+    cmp.eq p9,p0=r0,r0	// A    set p9 to indicate that we should restore cr.ifs
 
+    ld8 r31=[r2],32		// M0|1 load cr.ipsr
+    ld8 r30=[r3],16		// M0|1 load cr.iip
+    ;;
+//  ld8 r29=[r2],16		// M0|1 load cr.ifs
+    ld8 r28=[r3],16		// M0|1 load ar.unat
+//(pUStk) add r14=IA64_TASK_THREAD_ON_USTACK_OFFSET,r13
+    ;;
+    ld8 r27=[r2],PT(B0)-PT(AR_PFS)	// M0|1 load ar.pfs
+(pKStk) mov r22=psr			// M2   read PSR now that interrupts are disabled
+    nop 0
+    ;;
+    ld8 r22=[r2],PT(AR_RNAT)-PT(B0) // M0|1 load b0
+    ld8 r26=[r3],PT(PR)-PT(AR_RSC)	// M0|1 load ar.rsc
+    mov f6=f0			// F    clear f6
+    ;;
+    ld8 r25=[r2],PT(AR_FPSR)-PT(AR_RNAT)	// M0|1 load ar.rnat (may be garbage)
+    ld8 r23=[r3],PT(R1)-PT(PR)		// M0|1 load predicates
+    mov f7=f0				// F    clear f7
+    ;;
+    ld8 r20=[r2],PT(R12)-PT(AR_FPSR)	// M0|1 load ar.fpsr
+    ld8.fill r1=[r3],16			// M0|1 load r1
+//(pUStk) mov r17=1				// A
+    ;;
+//(pUStk) st1 [r14]=r17				// M2|3
+    ld8.fill r13=[r3],16			// M0|1
+    mov f8=f0				// F    clear f8
+    ;;
+    ld8.fill r12=[r2]			// M0|1 restore r12 (sp)
+#ifdef XEN    
+    ld8.fill r2=[r3]			// M0|1
+#else    
+    ld8.fill r15=[r3]			// M0|1 restore r15
+#endif    
+    mov b6=r18				// I0   restore b6
+    mov ar.fpsr=r20
+//  addl r17=THIS_CPU(ia64_phys_stacked_size_p8),r0 // A
+    mov f9=f0					// F    clear f9
+//(pKStk) br.cond.dpnt.many skip_rbs_switch		// B
+
+//  srlz.d				// M0   ensure interruption collection is off (for cover)
+//  shr.u r18=r19,16		// I0|1 get byte size of existing "dirty" partition
+    mov r3=r21
+    cover				// B    add current frame into dirty partition & set cr.ifs
+    ;;
+//(pUStk) ld4 r17=[r17]			// M0|1 r17 = cpu_data->phys_stacked_size_p8
+    mov r19=ar.bsp			// M2   get new backing store pointer
+    addl r18=IA64_RBS_OFFSET, r3
+    ;;
+    mov r3=r0
+    sub r18=r19,r18     // get byte size of existing "dirty" partition
+    ;;
+    shl r20=r18,16     // set rsc.load 
+    mov f10=f0			// F    clear f10
+#ifdef XEN
+    mov r14=r0
 #else
+    movl r14=__kernel_syscall_via_epc // X
+#endif
+    ;;
+    mov.m ar.csd=r0			// M2   clear ar.csd
+    mov.m ar.ccv=r0			// M2   clear ar.ccv
+    mov b7=r14			// I0   clear b7 (hint with __kernel_syscall_via_epc)
+
+    mov.m ar.ssd=r0			// M2   clear ar.ssd
+    mov f11=f0			// F    clear f11
+    br.cond.sptk.many vmx_rbs_switch	// B
+END(ia64_leave_hypercall)
+
+
 /*
  * in0: new rr7
  * in1: virtual address of shared_info
@@ -707,5 +743,3 @@ GLOBAL_ENTRY(vmx_switch_rr7)
    srlz.d              // seralize restoration of psr.l
    br.ret.sptk.many rp
 END(vmx_switch_rr7)
-#endif
-

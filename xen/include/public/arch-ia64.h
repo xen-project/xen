@@ -37,6 +37,8 @@
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
+#define XEN_GUEST_HANDLE_64(name)       XEN_GUEST_HANDLE(name)
+#define uint64_aligned_t                uint64_t
 #define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
 #ifdef __XEN_TOOLS__
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
@@ -62,10 +64,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_ITC        VIRQ_ARCH_0 /* V. Virtual itc timer */
 #define VIRQ_MCA_CMC    VIRQ_ARCH_1 /* MCA cmc interrupt */
 #define VIRQ_MCA_CPE    VIRQ_ARCH_2 /* MCA cpe interrupt */
-
-/* Arch specific callback irq definition */
-/* using Requester-ID(RID) as callback irq */
-#define IA64_CALLBACK_IRQ_RID        (1 << 31)
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
@@ -289,7 +287,9 @@ struct mapped_regs {
             unsigned char *interrupt_mask_addr;
             int pending_interruption;
             unsigned char vpsr_pp;
-            unsigned char reserved5_2[3];
+            unsigned char vpsr_dfh;
+            unsigned char hpsr_dfh;
+            unsigned char hpsr_mfh;
             unsigned long reserved5_1[4];
             int metaphysical_mode; // 1 = use metaphys mapping, 0 = use virtual
             int banknum; // 0 or 1, which virtual register bank is active

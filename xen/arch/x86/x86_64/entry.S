@@ -56,10 +56,10 @@ restore_all_guest:
 /* No special register assumptions. */
 iret_exit_to_guest:
         addq  $8,%rsp
-FLT1:   iretq
+.Lft1:  iretq
 
 .section .fixup,"ax"
-FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
+.Lfx1:  popq  -15*8-8(%rsp)            # error_code/entry_vector
         SAVE_ALL                       # 15*8 bytes pushed
         movq  -8(%rsp),%rsi            # error_code/entry_vector
         sti                            # after stack abuse (-1024(%rsp))
@@ -68,11 +68,11 @@ FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
         pushq %rax                     # RSP
         pushf                          # RFLAGS
         pushq $__HYPERVISOR_CS         # CS
-        leaq  DBLFLT1(%rip),%rax
+        leaq  .Ldf1(%rip),%rax
         pushq %rax                     # RIP
         pushq %rsi                     # error_code/entry_vector
         jmp   handle_exception
-DBLFLT1:GET_CURRENT(%rbx)
+.Ldf1:  GET_CURRENT(%rbx)
         jmp   test_all_events
 failsafe_callback:
         GET_CURRENT(%rbx)
@@ -87,10 +87,10 @@ failsafe_callback:
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
-        .quad FLT1,FIX1
+        .quad .Lft1,.Lfx1
 .previous
 .section __ex_table,"a"
-        .quad DBLFLT1,failsafe_callback
+        .quad .Ldf1,failsafe_callback
 .previous
 
         ALIGN
@@ -249,9 +249,9 @@ create_bounce_frame:
 1:      movb  TRAPBOUNCE_flags(%rdx),%cl
         subq  $40,%rsi
         movq  UREGS_ss+8(%rsp),%rax
-FLT2:   movq  %rax,32(%rsi)             # SS
+.Lft2:  movq  %rax,32(%rsi)             # SS
         movq  UREGS_rsp+8(%rsp),%rax
-FLT3:   movq  %rax,24(%rsi)             # RSP
+.Lft3:  movq  %rax,24(%rsi)             # RSP
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
@@ -260,7 +260,7 @@ FLT3:   movq  %rax,24(%rsi)             # RSP
         popq  %rax
         shlq  $32,%rax                  # Bits 32-39: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-FLT4:   movq  %rax,8(%rsi)              # CS / saved_upcall_mask
+.Lft4:  movq  %rax,8(%rsi)              # CS / saved_upcall_mask
         shrq  $32,%rax
         testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
         setz  %ch                       # %ch == !saved_upcall_mask
@@ -268,30 +268,30 @@ FLT4:   movq  %rax,8(%rsi)              # CS / saved_upcall_mask
         andq  $~X86_EFLAGS_IF,%rax
         shlb  $1,%ch                    # Bit 9 (EFLAGS.IF)
         orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
-FLT5:   movq  %rax,16(%rsi)             # RFLAGS
+.Lft5:  movq  %rax,16(%rsi)             # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax
-FLT6:   movq  %rax,(%rsi)               # RIP
+.Lft6:  movq  %rax,(%rsi)               # RIP
         testb $TBF_EXCEPTION_ERRCODE,%cl
         jz    1f
         subq  $8,%rsi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
-FLT7:   movq  %rax,(%rsi)               # ERROR CODE
+.Lft7:  movq  %rax,(%rsi)               # ERROR CODE
 1:      testb $TBF_FAILSAFE,%cl
         jz    2f
         subq  $32,%rsi
         movl  %gs,%eax
-FLT8:   movq  %rax,24(%rsi)             # GS
+.Lft8:  movq  %rax,24(%rsi)             # GS
         movl  %fs,%eax
-FLT9:   movq  %rax,16(%rsi)             # FS
+.Lft9:  movq  %rax,16(%rsi)             # FS
         movl  %es,%eax
-FLT10:  movq  %rax,8(%rsi)              # ES
+.Lft10: movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
-FLT11:  movq  %rax,(%rsi)               # DS
+.Lft11: movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
         movq  UREGS_r11+8(%rsp),%rax
-FLT12:  movq  %rax,8(%rsi)              # R11
+.Lft12: movq  %rax,8(%rsi)              # R11
         movq  UREGS_rcx+8(%rsp),%rax
-FLT13:  movq  %rax,(%rsi)               # RCX
+.Lft13: movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */
@@ -308,18 +308,18 @@ FLT13:  movq  %rax,(%rsi)               # RCX
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section __ex_table,"a"
-        .quad  FLT2,domain_crash_synchronous ,  FLT3,domain_crash_synchronous
-        .quad  FLT4,domain_crash_synchronous ,  FLT5,domain_crash_synchronous
-        .quad  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
-        .quad  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
-        .quad FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
-        .quad FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
+        .quad  .Lft2,domain_crash_synchronous ,  .Lft3,domain_crash_synchronous
+        .quad  .Lft4,domain_crash_synchronous ,  .Lft5,domain_crash_synchronous
+        .quad  .Lft6,domain_crash_synchronous ,  .Lft7,domain_crash_synchronous
+        .quad  .Lft8,domain_crash_synchronous ,  .Lft9,domain_crash_synchronous
+        .quad .Lft10,domain_crash_synchronous , .Lft11,domain_crash_synchronous
+        .quad .Lft12,domain_crash_synchronous , .Lft13,domain_crash_synchronous
 .previous
 
 domain_crash_synchronous_string:
         .asciz "domain_crash_sync called from entry.S\n"
 
-domain_crash_synchronous:
+ENTRY(domain_crash_synchronous)
         # Get out of the guest-save area of the stack.
         GET_GUEST_REGS(%rax)
         movq  %rax,%rsp
@@ -357,7 +357,7 @@ ENTRY(ret_from_intr)
 
         ALIGN
 /* No special register assumptions. */
-handle_exception:
+ENTRY(handle_exception)
         SAVE_ALL
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
@@ -633,7 +633,3 @@ ENTRY(hypercall_args_table)
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
-
-#ifdef CONFIG_COMPAT
-#include "compat/entry.S"
-#endif

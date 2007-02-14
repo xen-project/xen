@@ -236,45 +236,16 @@ get_order (unsigned long size)
 #include <linux/kernel.h>
 #include <asm/hypervisor.h>
 #include <xen/features.h>	// to compile netback, netfront
+#include <asm/maddr.h>
 
-/*
- * XXX hack!
- * Linux/IA64 uses PG_arch_1.
- * This hack will be removed once PG_foreign bit is taken.
- * #include <xen/foreign_page.h>
- */
-#ifdef __ASM_XEN_FOREIGN_PAGE_H__
-# error "don't include include/xen/foreign_page.h!"
-#endif
-
-extern struct address_space xen_ia64_foreign_dummy_mapping;
-#define PageForeign(page)	\
-	((page)->mapping == &xen_ia64_foreign_dummy_mapping)
-
-#define SetPageForeign(page, dtor) do {				\
-	set_page_private((page), (unsigned long)(dtor));	\
-	(page)->mapping = &xen_ia64_foreign_dummy_mapping;	\
-	smp_rmb();						\
-} while (0)
-
-#define ClearPageForeign(page) do {	\
-	(page)->mapping = NULL;		\
-	smp_rmb();			\
-	set_page_private((page), 0);	\
-} while (0)
-
-#define PageForeignDestructor(page)	\
-	( (void (*) (struct page *)) page_private(page) )
-
-#define arch_free_page(_page,_order)			\
-({      int foreign = PageForeign(_page);               \
-	if (foreign)                                    \
-		(PageForeignDestructor(_page))(_page);  \
-	foreign;                                        \
+#define arch_free_page(_page, _order)		\
+({						\
+	int foreign = PageForeign(_page);	\
+	if (foreign)                            \
+		PageForeignDestructor(_page);   \
+	foreign;                                \
 })
 #define HAVE_ARCH_FREE_PAGE
-
-#include <asm/maddr.h>
 
 #endif /* CONFIG_XEN */
 #endif /* __ASSEMBLY__ */

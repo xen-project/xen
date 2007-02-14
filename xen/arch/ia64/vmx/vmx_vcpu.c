@@ -78,6 +78,22 @@ struct guest_psr_bundle guest_psr_buf[100];
 unsigned long guest_psr_index = 0;
 #endif
 
+
+void
+vmx_ia64_set_dcr(VCPU *v)   
+{
+    unsigned long dcr_bits = IA64_DEFAULT_DCR_BITS;
+
+    // if guest is runing on cpl > 0, set dcr.dm=1
+    // if geust is runing on cpl = 0, set dcr.dm=0
+    // because Guest OS may ld.s on tr mapped page.
+    if (!(VCPU(v, vpsr) & IA64_PSR_CPL))
+        dcr_bits &= ~IA64_DCR_DM;
+
+    ia64_set_dcr(dcr_bits);
+}
+
+
 void
 vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
 {
@@ -140,6 +156,9 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
         IA64_PSR_VM;
 
     regs->cr_ipsr = (regs->cr_ipsr & mask ) | ( value & (~mask) );
+
+    if (FP_PSR(vcpu) & IA64_PSR_DFH)
+        regs->cr_ipsr |= IA64_PSR_DFH;
 
     check_mm_mode_switch(vcpu, old_psr, new_psr);
     return ;
@@ -258,6 +277,7 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
     else
         vcpu_bsw0(vcpu);
     vmx_vcpu_set_psr(vcpu,psr);
+    vmx_ia64_set_dcr(vcpu);
     ifs=VCPU(vcpu,ifs);
     if(ifs>>63)
         regs->cr_ifs = ifs;

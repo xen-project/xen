@@ -271,6 +271,7 @@ extern thash_data_t *thash_find_next_overlap(thash_cb_t *hcb);
  *
  */
 extern void thash_purge_entries(struct vcpu *v, u64 va, u64 ps);
+extern void thash_purge_entries_remote(struct vcpu *v, u64 va, u64 ps);
 extern void thash_purge_and_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa, int type);
 
 /*
@@ -295,7 +296,7 @@ extern u64 machine_thash(PTA pta, u64 va);
 extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
-extern void init_domain_tlb(struct vcpu *d);
+extern int init_domain_tlb(struct vcpu *d);
 extern void free_domain_tlb(struct vcpu *v);
 extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);

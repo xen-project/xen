@@ -49,7 +49,7 @@
 
 #ifdef XEN
 /* Offset to IO port; do not catch error.  */
-#define IO_SPACE_SPARSE_DECODING(off)	((((off) >> 12) << 2) | (off & 0x3))
+#define IO_SPACE_SPARSE_DECODING(off)	((((off) >> 12) << 2) | ((off) & 0x3))
 #define IO_SPACE_SPARSE_PORTS_PER_PAGE	(0x4 << (PAGE_SHIFT - 12))
 #endif
 

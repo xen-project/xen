@@ -15,10 +15,14 @@
 #include <xen/types.h>
 #include <xen/console.h>
 #include <xen/kexec.h>
-#include <asm/kexec.h>
 #include <xen/domain_page.h>
 #include <asm/fixmap.h>
 #include <asm/hvm/hvm.h>
+
+typedef void (*relocate_new_kernel_t)(
+                unsigned long indirection_page,
+                unsigned long *page_list,
+                unsigned long start_address);
 
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
 {
@@ -40,8 +44,26 @@ int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
         else
         {
             /* Odd pages: va for previous ma. */
-            set_fixmap(fix_base + (k >> 1), prev_ma);
-            image->page_list[k] = fix_to_virt(fix_base + (k >> 1));
+            if ( IS_COMPAT(dom0) )
+            {
+
+                /*
+                 * The compatability bounce code sets up a page table
+                 * with a 1-1 mapping of the first 1G of memory so
+                 * VA==PA here.
+                 *
+                 * This Linux purgatory code still sets up separate
+                 * high and low mappings on the control page (entries
+                 * 0 and 1) but it is harmless if they are equal since
+                 * that PT is not live at the time.
+                 */
+                image->page_list[k] = prev_ma;
+            }
+            else
+            {
+                set_fixmap(fix_base + (k >> 1), prev_ma);
+                image->page_list[k] = fix_to_virt(fix_base + (k >> 1));
+            }
         }
     }
 
@@ -92,6 +114,31 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
         __machine_reboot_kexec(image);
     }
     BUG();
+}
+
+void machine_kexec(xen_kexec_image_t *image)
+{
+#ifdef CONFIG_COMPAT
+    if ( IS_COMPAT(dom0) )
+    {
+        extern void compat_machine_kexec(unsigned long rnk,
+                                         unsigned long indirection_page,
+                                         unsigned long *page_list,
+                                         unsigned long start_address);
+        compat_machine_kexec(image->page_list[1],
+                             image->indirection_page,
+                             image->page_list,
+                             image->start_address);
+    }
+    else
+#endif
+    {
+        relocate_new_kernel_t rnk;
+
+        rnk = (relocate_new_kernel_t) image->page_list[1];
+        (*rnk)(image->indirection_page, image->page_list,
+               image->start_address);
+    }
 }
 
 /*

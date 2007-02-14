@@ -24,5 +24,20 @@ void byte_to_hex(char *digits, uint8_t byte);
 void uuid_to_string(char *dest, uint8_t *uuid);
 int printf(const char *fmt, ...);
 
+static inline uint8_t mmio_readb(uint8_t *addr)
+{
+	return *(volatile uint8_t *)addr;
+}
+
+static inline uint16_t mmio_readw(uint16_t *addr)
+{
+	return *(volatile uint16_t *)addr;
+}
+
+static inline uint32_t mmio_readl(uint32_t *addr)
+{
+	return *(volatile uint32_t *)addr;
+}
+
 
 #endif

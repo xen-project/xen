@@ -174,6 +174,7 @@
     ;;                                          \
     st8 [r16]=r29,16;   /* save b0 */                           \
     st8 [r17]=r18,16;   /* save ar.rsc value for "loadrs" */                \
+    cmp.eq pNonSys,pSys=r0,r0   /* initialize pSys=0, pNonSys=1 */          \
     ;;                                          \
 .mem.offset 0,0; st8.spill [r16]=r20,16;    /* save original r1 */              \
 .mem.offset 8,0; st8.spill [r17]=r12,16;                            \

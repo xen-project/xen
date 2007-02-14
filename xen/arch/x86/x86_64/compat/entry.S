@@ -2,10 +2,27 @@
  * Compatibility hypercall routines.
  */
 
+#include <xen/config.h>
+#include <xen/errno.h>
+#include <xen/softirq.h>
+#include <asm/asm_defns.h>
+#include <asm/apicdef.h>
+#include <asm/page.h>
 #include <asm/desc.h>
+#include <public/xen.h>
 
-.text
+#define GET_GUEST_REGS(reg)                     \
+        movq $~(STACK_SIZE-1),reg;              \
+        andq %rsp,reg;                          \
+        orq  $(STACK_SIZE-CPUINFO_sizeof),reg;
 
+#define GET_CURRENT(reg)         \
+        movq $STACK_SIZE-8, reg; \
+        orq  %rsp, reg;          \
+        andq $~7,reg;            \
+        movq (reg),reg;
+
+        ALIGN
 ENTRY(compat_hypercall)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
@@ -62,7 +79,7 @@ compat_skip_clobber:
         movl  %eax,UREGS_rax(%rsp)       # save the return value
 
 /* %rbx: struct vcpu */
-compat_test_all_events:
+ENTRY(compat_test_all_events)
         cli                             # tests must not race interrupts
 /*compat_test_softirqs:*/
         movl  VCPU_processor(%rbx),%eax
@@ -123,10 +140,10 @@ compat_bad_hypercall:
 compat_restore_all_guest:
         RESTORE_ALL
         addq  $8,%rsp
-CFLT0:  iretq
+.Lft0:  iretq
 
 .section .fixup,"ax"
-CFIX0:  popq  -15*8-8(%rsp)            # error_code/entry_vector
+.Lfx0:  popq  -15*8-8(%rsp)            # error_code/entry_vector
         SAVE_ALL                       # 15*8 bytes pushed
         movq  -8(%rsp),%rsi            # error_code/entry_vector
         sti                            # after stack abuse (-1024(%rsp))
@@ -135,11 +152,11 @@ CFIX0:  popq  -15*8-8(%rsp)            # error_code/entry_vector
         pushq %rax                     # RSP
         pushfq                         # RFLAGS
         pushq $__HYPERVISOR_CS         # CS
-        leaq  CDBLFLT0(%rip),%rax
+        leaq  .Ldf0(%rip),%rax
         pushq %rax                     # RIP
         pushq %rsi                     # error_code/entry_vector
         jmp   handle_exception
-CDBLFLT0:GET_CURRENT(%rbx)
+.Ldf0:  GET_CURRENT(%rbx)
         jmp   compat_test_all_events
 compat_failsafe_callback:
         GET_CURRENT(%rbx)
@@ -157,14 +174,14 @@ compat_failsafe_callback:
         jmp   compat_test_all_events
 .previous
 .section __pre_ex_table,"a"
-	.quad CFLT0,CFIX0
+	.quad .Lft0,.Lfx0
 .previous
 .section __ex_table,"a"
-        .quad CDBLFLT0,compat_failsafe_callback
+        .quad .Ldf0,compat_failsafe_callback
 .previous
 
 /* %rdx: trap_bounce, %rbx: struct vcpu */
-compat_post_handle_exception:
+ENTRY(compat_post_handle_exception)
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    compat_test_all_events
         call  compat_create_bounce_frame
@@ -180,16 +197,16 @@ compat_create_bounce_frame:
         jz    1f
         /* Push new frame at registered guest-OS stack base. */
         movl  VCPU_kernel_sp(%rbx),%esi
-CFLT1:  mov   VCPU_kernel_ss(%rbx),%fs
+.Lft1:  mov   VCPU_kernel_ss(%rbx),%fs
         subl  $2*4,%esi
         movl  UREGS_rsp+8(%rsp),%eax
-CFLT2:  movl  %eax,%fs:(%rsi)
+.Lft2:  movl  %eax,%fs:(%rsi)
         movl  UREGS_ss+8(%rsp),%eax
-CFLT3:  movl  %eax,%fs:4(%rsi)
+.Lft3:  movl  %eax,%fs:4(%rsi)
         jmp   2f
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movl  UREGS_rsp+8(%rsp),%esi
-CFLT4:  mov   UREGS_ss+8(%rsp),%fs
+.Lft4:  mov   UREGS_ss+8(%rsp),%fs
 2:
         movb  TRAPBOUNCE_flags(%rdx),%cl
         subl  $3*4,%esi
@@ -201,7 +218,7 @@ CFLT4:  mov   UREGS_ss+8(%rsp),%fs
         popq  %rax
         shll  $16,%eax                  # Bits 16-23: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-CFLT5:  movl  %eax,%fs:4(%rsi)          # CS / saved_upcall_mask
+.Lft5:  movl  %eax,%fs:4(%rsi)          # CS / saved_upcall_mask
         shrl  $16,%eax
         testb %al,%al                   # Bits 0-7: saved_upcall_mask
         setz  %ch                       # %ch == !saved_upcall_mask
@@ -209,25 +226,25 @@ CFLT5:  movl  %eax,%fs:4(%rsi)          # CS / saved_upcall_mask
         andl  $~X86_EFLAGS_IF,%eax
         shlb  $1,%ch                    # Bit 9 (EFLAGS.IF)
         orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
-CFLT6:  movl  %eax,%fs:2*4(%rsi)        # EFLAGS
+.Lft6:  movl  %eax,%fs:2*4(%rsi)        # EFLAGS
         movl  UREGS_rip+8(%rsp),%eax
-CFLT7:  movl  %eax,%fs:(%rsi)           # EIP
+.Lft7:  movl  %eax,%fs:(%rsi)           # EIP
         testb $TBF_EXCEPTION_ERRCODE,%cl
         jz    1f
         subl  $4,%esi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
-CFLT8:  movl  %eax,%fs:(%rsi)           # ERROR CODE
+.Lft8:  movl  %eax,%fs:(%rsi)           # ERROR CODE
 1:
         testb $TBF_FAILSAFE,%cl
         jz    2f
         subl  $4*4,%esi
         movl  %gs,%eax
-CFLT9:  movl  %eax,%fs:3*4(%rsi)        # GS
-CFLT10: movl  %edi,%fs:2*4(%rsi)        # FS
+.Lft9:  movl  %eax,%fs:3*4(%rsi)        # GS
+.Lft10: movl  %edi,%fs:2*4(%rsi)        # FS
         movl  %es,%eax
-CFLT11: movl  %eax,%fs:1*4(%rsi)        # ES
+.Lft11: movl  %eax,%fs:1*4(%rsi)        # ES
         movl  %ds,%eax
-CFLT12: movl  %eax,%fs:0*4(%rsi)        # DS
+.Lft12: movl  %eax,%fs:0*4(%rsi)        # DS
 2:
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
@@ -236,7 +253,7 @@ CFLT12: movl  %eax,%fs:0*4(%rsi)        # DS
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
         mov   %fs,UREGS_ss+8(%rsp)
         movl  %esi,UREGS_rsp+8(%rsp)
-CFLT13: mov   %edi,%fs
+.Lft13: mov   %edi,%fs
         movzwl TRAPBOUNCE_cs(%rdx),%eax
         /* Null selectors (0-3) are not allowed. */
         testl $~3,%eax
@@ -247,18 +264,18 @@ CFLT13: mov   %edi,%fs
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section .fixup,"ax"
-CFIX13:
+.Lfx13:
         xorl  %edi,%edi
-        jmp   CFLT13
+        jmp   .Lft13
 .previous
 .section __ex_table,"a"
-        .quad  CFLT1,domain_crash_synchronous  ,  CFLT2,compat_crash_page_fault
-        .quad  CFLT3,compat_crash_page_fault_4 ,  CFLT4,domain_crash_synchronous
-        .quad  CFLT5,compat_crash_page_fault_4 ,  CFLT6,compat_crash_page_fault_8
-        .quad  CFLT7,compat_crash_page_fault   ,  CFLT8,compat_crash_page_fault
-        .quad  CFLT9,compat_crash_page_fault_12, CFLT10,compat_crash_page_fault_8
-        .quad CFLT11,compat_crash_page_fault_4 , CFLT12,compat_crash_page_fault
-        .quad CFLT13,CFIX13
+        .quad  .Lft1,domain_crash_synchronous  ,  .Lft2,compat_crash_page_fault
+        .quad  .Lft3,compat_crash_page_fault_4 ,  .Lft4,domain_crash_synchronous
+        .quad  .Lft5,compat_crash_page_fault_4 ,  .Lft6,compat_crash_page_fault_8
+        .quad  .Lft7,compat_crash_page_fault   ,  .Lft8,compat_crash_page_fault
+        .quad  .Lft9,compat_crash_page_fault_12, .Lft10,compat_crash_page_fault_8
+        .quad .Lft11,compat_crash_page_fault_4 , .Lft12,compat_crash_page_fault
+        .quad .Lft13,.Lfx13
 .previous
 
 compat_crash_page_fault_12:
@@ -268,17 +285,17 @@ compat_crash_page_fault_8:
 compat_crash_page_fault_4:
         addl  $4,%esi
 compat_crash_page_fault:
-CFLT14: mov   %edi,%fs
+.Lft14: mov   %edi,%fs
         movl  %esi,%edi
         call  show_page_walk
         jmp   domain_crash_synchronous
 .section .fixup,"ax"
-CFIX14:
+.Lfx14:
         xorl  %edi,%edi
-        jmp   CFLT14
+        jmp   .Lft14
 .previous
 .section __ex_table,"a"
-        .quad CFLT14,CFIX14
+        .quad .Lft14,.Lfx14
 .previous
 
 .section .rodata, "a", @progbits

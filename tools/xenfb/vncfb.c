@@ -57,7 +57,8 @@ unsigned char keycode_table[512];
 static void *kbd_layout;
 
 static int btnmap[] = {
-	BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_FORWARD, BTN_BACK
+	BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_SIDE,
+	BTN_EXTRA, BTN_FORWARD, BTN_BACK, BTN_TASK
 };
 
 static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
@@ -73,11 +74,12 @@ static void on_kbd_event(rfbBool down, rfbKeySym keycode, rfbClientPtr cl)
 	 */
 	rfbScreenInfoPtr server = cl->screen;
 	struct xenfb *xenfb = server->screenData;
+	int scancode;
 
-	if( keycode >= 'A' && keycode <= 'Z' )
+	if (keycode >= 'A' && keycode <= 'Z')
 		keycode += 'a' - 'A';
 
-	int scancode = keycode_table[keysym2scancode(kbd_layout, keycode)];
+	scancode = keycode_table[keysym2scancode(kbd_layout, keycode)];
 	if (scancode == 0)
 		return;
 	if (xenfb_send_key(xenfb, down, scancode) < 0)

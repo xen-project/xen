@@ -63,6 +63,7 @@
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
 #include <asm/xen/xencomm.h>
+#include <xen/xencons.h>
 #endif
 #include <linux/dma-mapping.h>
 
@@ -95,6 +96,12 @@ xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 static struct notifier_block xen_panic_block = {
 	xen_panic_event, NULL, 0 /* try to go last */
 };
+
+void xen_pm_power_off(void)
+{
+	local_irq_disable();
+	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
+}
 #endif
 
 extern void ia64_setup_printk_clock(void);
@@ -454,7 +461,9 @@ setup_arch (char **cmdline_p)
 
 		setup_xen_features();
 		/* Register a call for panic conditions. */
-		notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+		atomic_notifier_chain_register(&panic_notifier_list,
+		                               &xen_panic_block);
+		pm_power_off = xen_pm_power_off;
 	}
 #endif
 

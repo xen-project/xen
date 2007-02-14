@@ -1148,6 +1148,47 @@ class XendConfig(dict):
         # no valid device to add
         return ''
 
+    def phantom_device_add(self, dev_type, cfg_xenapi = None,
+                   target = None):
+        """Add a phantom tap device configuration in XenAPI struct format.
+        """
+
+        if target == None:
+            target = self
+        
+        if dev_type not in XendDevices.valid_devices() and \
+           dev_type not in XendDevices.pseudo_devices():        
+            raise XendConfigError("XendConfig: %s not a valid device type" %
+                            dev_type)
+
+        if cfg_xenapi == None:
+            raise XendConfigError("XendConfig: device_add requires some "
+                                  "config.")
+
+        if cfg_xenapi:
+            log.debug("XendConfig.phantom_device_add: %s" % str(cfg_xenapi))
+ 
+        if cfg_xenapi:
+            dev_info = {}            
+            if dev_type in ('vbd', 'tap'):
+                if dev_type == 'vbd':
+                    dev_info['uname'] = cfg_xenapi.get('image', '')
+                    dev_info['dev'] = '%s:disk' % cfg_xenapi.get('device')
+                elif dev_type == 'tap':
+                    if cfg_xenapi.get('image').find('tap:') == -1:
+                        dev_info['uname'] = 'tap:qcow:%s' % cfg_xenapi.get('image')
+                    dev_info['dev'] =  '/dev/%s' % cfg_xenapi.get('device')
+                    dev_info['uname'] = cfg_xenapi.get('image')
+                dev_info['mode'] = cfg_xenapi.get('mode')
+                dev_info['backend'] = '0'
+                dev_uuid = cfg_xenapi.get('uuid', uuid.createString())
+                dev_info['uuid'] = dev_uuid
+                self['devices'][dev_uuid] = (dev_type, dev_info)
+                self['vbd_refs'].append(dev_uuid)
+                return dev_uuid
+
+        return ''
+
     def console_add(self, protocol, location, other_config = {}):
         dev_uuid = uuid.createString()
         if protocol == 'vt100':
