@@ -977,6 +977,19 @@ static void pae_flush_pgd(
     l3_pgentry_t  *l3tab_ptr;
     struct pae_l3_cache *cache;
 
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        cpumask_t m = CPU_MASK_NONE;
+        /* Re-shadow this l3 table on any vcpus that are using it */
+        for_each_vcpu ( d, v )
+            if ( pagetable_get_pfn(v->arch.guest_table) == mfn )
+            {
+                paging_update_cr3(v);
+                cpus_or(m, m, v->vcpu_dirty_cpumask);
+            }
+        flush_tlb_mask(m);
+    }
+
     /* If below 4GB then the pgdir is not shadowed in low memory. */
     if ( !l3tab_needs_shadow(mfn) )
         return;
