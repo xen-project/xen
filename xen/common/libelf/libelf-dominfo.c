@@ -107,9 +107,9 @@ int elf_xen_parse_note(struct elf_binary *elf,
     if ((type >= sizeof(note_desc) / sizeof(note_desc[0])) ||
 	(NULL == note_desc[type].name))
     {
-	elf_err(elf, "%s: unknown xen elf note (0x%x)\n",
+	elf_msg(elf, "%s: unknown xen elf note (0x%x)\n",
 		__FUNCTION__, type);
-	return -1;
+	return 0;
     }
 
     if (note_desc[type].str)
