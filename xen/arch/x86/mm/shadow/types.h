@@ -447,10 +447,8 @@ struct shadow_walk_t
     guest_l2e_t *l2e;           /* Pointer to guest's level 2 entry */
     guest_l1e_t *l1e;           /* Pointer to guest's level 1 entry */
     guest_l1e_t eff_l1e;        /* Effective level 1 entry */
-#if GUEST_PAGING_LEVELS >= 3
 #if GUEST_PAGING_LEVELS >= 4
     mfn_t l4mfn;                /* MFN that the level 4 entry is in */
-#endif
     mfn_t l3mfn;                /* MFN that the level 3 entry is in */
 #endif
     mfn_t l2mfn;                /* MFN that the level 2 entry is in */

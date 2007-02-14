@@ -92,7 +92,11 @@ struct shadow_vcpu {
 #if CONFIG_PAGING_LEVELS >= 3
     /* PAE guests: per-vcpu shadow top-level table */
     l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
+    /* PAE guests: per-vcpu cache of the top-level *guest* entries */
+    l3_pgentry_t gl3e[4] __attribute__((__aligned__(32)));
 #endif
+    /* Non-PAE guests: pointer to guest top-level pagetable */
+    void *guest_vtable;
     /* Last MFN that we emulated a write to. */
     unsigned long last_emulated_mfn;
     /* MFN of the last shadow that we shot a writeable mapping in */
@@ -241,8 +245,6 @@ struct arch_vcpu
     pagetable_t shadow_table[4];        /* (MFN) shadow(s) of guest */
     pagetable_t monitor_table;          /* (MFN) hypervisor PT (for HVM) */
     unsigned long cr3;           	    /* (MA) value to install in HW CR3 */
-
-    void *guest_vtable;                 /* virtual addr of pagetable */
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;

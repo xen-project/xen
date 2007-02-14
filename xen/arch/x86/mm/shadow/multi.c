@@ -237,7 +237,8 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
     /* Get l4e from the top level table */
     gw->l4mfn = pagetable_get_mfn(v->arch.guest_table);
-    gw->l4e = (guest_l4e_t *)v->arch.guest_vtable + guest_l4_table_offset(va);
+    gw->l4e = (guest_l4e_t *)v->arch.paging.shadow.guest_vtable 
+        + guest_l4_table_offset(va);
     /* Walk down to the l3e */
     if ( !(guest_l4e_get_flags(*gw->l4e) & _PAGE_PRESENT) ) return 0;
     gw->l3mfn = vcpu_gfn_to_mfn(v, guest_l4e_get_gfn(*gw->l4e));
@@ -248,9 +249,8 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
     gw->l3e = ((guest_l3e_t *)sh_map_domain_page(gw->l3mfn))
         + guest_l3_table_offset(va);
 #else /* PAE only... */
-    /* Get l3e from the top level table */
-    gw->l3mfn = pagetable_get_mfn(v->arch.guest_table);
-    gw->l3e = (guest_l3e_t *)v->arch.guest_vtable + guest_l3_table_offset(va);
+    /* Get l3e from the cache of the guest's top level table */
+    gw->l3e = (guest_l3e_t *)&v->arch.paging.shadow.gl3e[guest_l3_table_offset(va)];
 #endif /* PAE or 64... */
     /* Walk down to the l2e */
     if ( !(guest_l3e_get_flags(*gw->l3e) & _PAGE_PRESENT) ) return 0;
@@ -264,7 +264,8 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 #else /* 32-bit only... */
     /* Get l2e from the top level table */
     gw->l2mfn = pagetable_get_mfn(v->arch.guest_table);
-    gw->l2e = (guest_l2e_t *)v->arch.guest_vtable + guest_l2_table_offset(va);
+    gw->l2e = (guest_l2e_t *)v->arch.paging.shadow.guest_vtable 
+        + guest_l2_table_offset(va);
 #endif /* All levels... */
     
     if ( !(guest_l2e_get_flags(*gw->l2e) & _PAGE_PRESENT) ) return 0;
@@ -357,8 +358,8 @@ static inline void print_gw(walk_t *gw)
     SHADOW_PRINTK("   l4e=%p\n", gw->l4e);
     if ( gw->l4e )
         SHADOW_PRINTK("   *l4e=%" SH_PRI_gpte "\n", gw->l4e->l4);
-#endif /* PAE or 64... */
     SHADOW_PRINTK("   l3mfn=%" PRI_mfn "\n", mfn_x(gw->l3mfn));
+#endif /* PAE or 64... */
     SHADOW_PRINTK("   l3e=%p\n", gw->l3e);
     if ( gw->l3e )
         SHADOW_PRINTK("   *l3e=%" SH_PRI_gpte "\n", gw->l3e->l3);
@@ -3169,8 +3170,7 @@ sh_update_linear_entries(struct vcpu *v)
 #else /* GUEST_PAGING_LEVELS == 3 */
         
         shadow_l3e = (shadow_l3e_t *)&v->arch.paging.shadow.l3table;
-        /* Always safe to use guest_vtable, because it's globally mapped */
-        guest_l3e = v->arch.guest_vtable;
+        guest_l3e = (guest_l3e_t *)&v->arch.paging.shadow.gl3e;
 
 #endif /* GUEST_PAGING_LEVELS */
         
@@ -3268,38 +3268,36 @@ sh_update_linear_entries(struct vcpu *v)
 }
 
 
-/* Removes vcpu->arch.guest_vtable and vcpu->arch.shadow_table[].
+/* Removes vcpu->arch.paging.shadow.guest_vtable and vcpu->arch.shadow_table[].
  * Does all appropriate management/bookkeeping/refcounting/etc...
  */
 static void
 sh_detach_old_tables(struct vcpu *v)
 {
-    struct domain *d = v->domain;
     mfn_t smfn;
     int i = 0;
 
     ////
-    //// vcpu->arch.guest_vtable
+    //// vcpu->arch.paging.shadow.guest_vtable
     ////
-    if ( v->arch.guest_vtable )
+
+#if GUEST_PAGING_LEVELS == 3
+    /* PAE guests don't have a mapping of the guest top-level table */
+    ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
+#else
+    if ( v->arch.paging.shadow.guest_vtable )
     {
-#if GUEST_PAGING_LEVELS == 4
+        struct domain *d = v->domain;
         if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-            sh_unmap_domain_page_global(v->arch.guest_vtable);
-#elif GUEST_PAGING_LEVELS == 3
-        if ( 1 || shadow_mode_external(d) || shadow_mode_translate(d) )
-            sh_unmap_domain_page_global(v->arch.guest_vtable);
-#elif GUEST_PAGING_LEVELS == 2
-        if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-            sh_unmap_domain_page_global(v->arch.guest_vtable);
-#endif
-        v->arch.guest_vtable = NULL;
+            sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+        v->arch.paging.shadow.guest_vtable = NULL;
     }
+#endif
+
 
     ////
     //// vcpu->arch.shadow_table[]
     ////
-
 
 #if GUEST_PAGING_LEVELS == 3
     /* PAE guests have four shadow_table entries */
@@ -3398,7 +3396,9 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     struct domain *d = v->domain;
     mfn_t gmfn;
 #if GUEST_PAGING_LEVELS == 3
+    guest_l3e_t *gl3e;
     u32 guest_idx=0;
+    int i;
 #endif
 
     /* Don't do anything on an uninitialised vcpu */
@@ -3457,55 +3457,54 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 
 
     ////
-    //// vcpu->arch.guest_vtable
+    //// vcpu->arch.paging.shadow.guest_vtable
     ////
 #if GUEST_PAGING_LEVELS == 4
     if ( shadow_mode_external(d) || shadow_mode_translate(d) )
     {
-        if ( v->arch.guest_vtable )
-            sh_unmap_domain_page_global(v->arch.guest_vtable);
-        v->arch.guest_vtable = sh_map_domain_page_global(gmfn);
+        if ( v->arch.paging.shadow.guest_vtable )
+            sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+        v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
     }
     else
-        v->arch.guest_vtable = __linear_l4_table;
+        v->arch.paging.shadow.guest_vtable = __linear_l4_table;
 #elif GUEST_PAGING_LEVELS == 3
-    if ( v->arch.guest_vtable )
-        sh_unmap_domain_page_global(v->arch.guest_vtable);
-    if ( shadow_mode_external(d) )
-    {
-        if ( paging_vcpu_mode_translate(v) ) 
-            /* Paging enabled: find where in the page the l3 table is */
-            guest_idx = guest_index((void *)hvm_get_guest_ctrl_reg(v, 3));
-        else
-            /* Paging disabled: l3 is at the start of a page (in the p2m) */ 
-            guest_idx = 0; 
-
-        // Ignore the low 2 bits of guest_idx -- they are really just
-        // cache control.
-        guest_idx &= ~3;
-
-        // XXX - why does this need a global map?
-        v->arch.guest_vtable =
-            (guest_l3e_t *)sh_map_domain_page_global(gmfn) + guest_idx;
-    }
+     /* On PAE guests we don't use a mapping of the guest's own top-level
+      * table.  We cache the current state of that table and shadow that,
+      * until the next CR3 write makes us refresh our cache. */
+     ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
+ 
+     if ( shadow_mode_external(d) && paging_vcpu_mode_translate(v) ) 
+         /* Paging enabled: find where in the page the l3 table is */
+         guest_idx = guest_index((void *)hvm_get_guest_ctrl_reg(v, 3));
     else
-        v->arch.guest_vtable = sh_map_domain_page_global(gmfn);
+        /* Paging disabled or PV: l3 is at the start of a page */ 
+        guest_idx = 0; 
+     
+     // Ignore the low 2 bits of guest_idx -- they are really just
+     // cache control.
+     guest_idx &= ~3;
+     
+     gl3e = ((guest_l3e_t *)sh_map_domain_page(gmfn)) + guest_idx;
+     for ( i = 0; i < 4 ; i++ )
+         v->arch.paging.shadow.gl3e[i] = gl3e[i];
+     sh_unmap_domain_page(gl3e);
 #elif GUEST_PAGING_LEVELS == 2
     if ( shadow_mode_external(d) || shadow_mode_translate(d) )
     {
-        if ( v->arch.guest_vtable )
-            sh_unmap_domain_page_global(v->arch.guest_vtable);
-        v->arch.guest_vtable = sh_map_domain_page_global(gmfn);
+        if ( v->arch.paging.shadow.guest_vtable )
+            sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+        v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
     }
     else
-        v->arch.guest_vtable = __linear_l2_table;
+        v->arch.paging.shadow.guest_vtable = __linear_l2_table;
 #else
 #error this should never happen
 #endif
 
 #if 0
-    printk("%s %s %d gmfn=%05lx guest_vtable=%p\n",
-           __func__, __FILE__, __LINE__, gmfn, v->arch.guest_vtable);
+    printk("%s %s %d gmfn=%05lx shadow.guest_vtable=%p\n",
+           __func__, __FILE__, __LINE__, gmfn, v->arch.paging.shadow.guest_vtable);
 #endif
 
     ////
@@ -3523,10 +3522,10 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     /* PAE guests have four shadow_table entries, based on the 
      * current values of the guest's four l3es. */
     {
-        int i, flush = 0;
+        int flush = 0;
         gfn_t gl2gfn;
         mfn_t gl2mfn;
-        guest_l3e_t *gl3e = (guest_l3e_t*)v->arch.guest_vtable;
+        guest_l3e_t *gl3e = (guest_l3e_t*)&v->arch.paging.shadow.gl3e;
         /* First, make all four entries read-only. */
         for ( i = 0; i < 4; i++ )
         {

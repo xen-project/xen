@@ -278,9 +278,6 @@ typedef struct { u64 pfn; } pagetable_t;
 #define __linear_l4_table \
  ((l4_pgentry_t *)(__linear_l3_table + l3_linear_offset(LINEAR_PT_VIRT_START)))
 
-#define linear_l1_table __linear_l1_table
-#define linear_pg_table linear_l1_table
-#define linear_l2_table(v) ((l2_pgentry_t *)(v)->arch.guest_vtable)
 
 #ifndef __ASSEMBLY__
 #if CONFIG_PAGING_LEVELS == 3

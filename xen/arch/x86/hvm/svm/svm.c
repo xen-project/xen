@@ -2679,7 +2679,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     shadow_sync_va(v, gva);
 
     gpte.l1 = 0;
-    __copy_from_user(&gpte, &linear_pg_table[ l1_linear_offset(gva) ],
+    __copy_from_user(&gpte, &__linear_l1_table[ l1_linear_offset(gva) ],
                      sizeof(gpte) );
     printk( "G-PTE = %x, flags=%x\n", gpte.l1, l1e_get_flags(gpte) );
 
