@@ -713,7 +713,7 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
             return DECODE_success;
 
         case 1: /* dec */
-            mmio_op->instr = INSTR_OR;
+            mmio_op->instr = INSTR_SUB;
             return DECODE_success;
 
         default:
