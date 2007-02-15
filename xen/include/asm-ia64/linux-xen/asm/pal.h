@@ -112,6 +112,9 @@ typedef u64				pal_cache_type_t;
 #define PAL_CACHE_TYPE_INSTRUCTION	1	/* Instruction cache */
 #define PAL_CACHE_TYPE_DATA		2	/* Data or unified cache */
 #define PAL_CACHE_TYPE_INSTRUCTION_DATA	3	/* Both Data & Instruction */
+#ifdef XEN
+#define PAL_CACHE_TYPE_COHERENT		4	/* Make I&D-cache coherent */
+#endif
 
 
 #define PAL_CACHE_FLUSH_INVALIDATE	1	/* Invalidate clean lines */

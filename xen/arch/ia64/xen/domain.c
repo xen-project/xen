@@ -138,6 +138,28 @@ static void flush_vtlb_for_context_switch(struct vcpu* prev, struct vcpu* next)
 	}
 }
 
+static void flush_cache_for_context_switch(struct vcpu *next)
+{
+	extern cpumask_t cpu_cache_coherent_map;
+	int cpu = smp_processor_id();
+
+	if (is_idle_vcpu(next) ||
+	    __test_and_clear_bit(cpu, &next->arch.cache_coherent_map)) {
+		if (cpu_test_and_clear(cpu, cpu_cache_coherent_map)) {
+			unsigned long flags;
+			u64 progress = 0;
+			s64 status;
+
+			local_irq_save(flags);
+			status = ia64_pal_cache_flush(4, 0, &progress, NULL);
+			local_irq_restore(flags);
+			if (status != 0)
+				panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
+					     "cache_type=4 status %lx", status);
+		}
+	}
+}
+
 static void lazy_fp_switch(struct vcpu *prev, struct vcpu *next)
 {
 	/*
@@ -260,6 +282,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     }
    
     flush_vtlb_for_context_switch(prev, current);
+    flush_cache_for_context_switch(current);
     context_saved(prev);
 }
 

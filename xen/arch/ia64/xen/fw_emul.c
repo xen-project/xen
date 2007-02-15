@@ -379,6 +379,28 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	return ((struct sal_ret_values) {status, r9, r10, r11});
 }
 
+cpumask_t cpu_cache_coherent_map;
+
+struct cache_flush_args {
+	u64 cache_type;
+	u64 operation;
+	u64 progress;
+	long status;
+};
+
+static void
+remote_pal_cache_flush(void *v)
+{
+	struct cache_flush_args *args = v;
+	long status;
+	u64 progress = args->progress;
+
+	status = ia64_pal_cache_flush(args->cache_type, args->operation,
+				      &progress, NULL);
+	if (status != 0)
+		args->status = status;
+}
+
 struct ia64_pal_retval
 xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 {
@@ -542,8 +564,26 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_register_info(in1, &r9, &r10);
 		break;
 	    case PAL_CACHE_FLUSH:
+		if (in3 != 0) /* Initially progress_indicator must be 0 */
+			panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
+				     "progress_indicator=%lx", in3);
+
 		/* Always call Host Pal in int=0 */
 		in2 &= ~PAL_CACHE_FLUSH_CHK_INTRS;
+
+		if (in1 != PAL_CACHE_TYPE_COHERENT) {
+			struct cache_flush_args args = {
+				.cache_type = in1,
+				.operation = in2,
+				.progress = 0,
+				.status = 0
+			};
+			smp_call_function(remote_pal_cache_flush,
+					  (void *)&args, 1, 1);
+			if (args.status != 0)
+				panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
+					     "remote status %lx", args.status);
+		}
 
 		/*
 		 * Call Host PAL cache flush
@@ -556,6 +596,13 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
 			             "status %lx", status);
 
+		if (in1 == PAL_CACHE_TYPE_COHERENT) {
+			int cpu = current->processor;
+			cpus_setall(current->arch.cache_coherent_map);
+			cpu_clear(cpu, current->arch.cache_coherent_map);
+			cpus_setall(cpu_cache_coherent_map);
+			cpu_clear(cpu, cpu_cache_coherent_map);
+		}
 		break;
 	    case PAL_PERF_MON_INFO:
 		{

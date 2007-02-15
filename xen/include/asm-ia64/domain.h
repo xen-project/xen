@@ -201,6 +201,7 @@ struct arch_vcpu {
 #endif
 #define INVALID_PROCESSOR       INT_MAX
     int last_processor;
+    cpumask_t cache_coherent_map;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
