@@ -82,7 +82,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         if(!(pte & _PAGE_PRESENT))
             continue; 
         
-        pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
+        pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
         
         if(pfn >= max_pfn) {
             /* This "page table page" is probably not one; bail. */
@@ -120,12 +120,12 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         if(!(pte & _PAGE_PRESENT))
             continue;
         
-        pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
+        pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
         
         if(p2m[pfn] == INVALID_P2M_ENTRY)
             p2m[pfn] = p2m_batch[nr_mfns++];
 
-        pte &= 0xffffff0000000fffULL;
+        pte &= ~MADDR_MASK_X86;
         pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
 
         if(pt_levels == 2)

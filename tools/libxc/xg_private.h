@@ -134,6 +134,13 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define PAGE_SHIFT_X86          12
 #define PAGE_SIZE_X86           (1UL << PAGE_SHIFT_X86)
 #define PAGE_MASK_X86           (~(PAGE_SIZE_X86-1))
+#if defined(__i386__)
+#define MADDR_BITS_X86          44
+#elif defined(__x86_64__)
+#define MADDR_BITS_X86          52
+#endif
+#define MFN_MASK_X86            ((1ULL << (MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
+#define MADDR_MASK_X86          (MFN_MASK_X86 << PAGE_SHIFT_X86)
 
 #define PAGE_SHIFT_IA64         14
 #define PAGE_SIZE_IA64          (1UL << PAGE_SHIFT_IA64)
