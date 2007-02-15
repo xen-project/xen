@@ -306,7 +306,7 @@ struct hvm_hw_pci_link {
      * the traditional 'barber's pole' mapping ((device + INTx#) & 3).
      * The router provides a programmable mapping from each link to a GSI.
      */
-    u8 route[4];
+    uint8_t route[4];
 };
 
 DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
