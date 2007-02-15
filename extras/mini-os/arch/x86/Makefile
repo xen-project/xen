@@ -3,9 +3,6 @@
 # It's is used for x86_32, x86_32y and x86_64
 #
 
-# Rebuild all after touching this/these extra file(s) (see mini-os.mk)
-SPEC_DEP = arch.mk
-
 # include arch.mk has to be before mini-os.mk!
 include arch.mk
 include ../../minios.mk
@@ -25,5 +22,5 @@ $(ARCH_LIB): $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
 	$(AR) rv $(ARCH_LIB) $(ARCH_OBJS)
 
 clean:
-	rm -f $(ARCH_LIB) $(ARCH_OBJS)
+	rm -f $(ARCH_LIB) $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
 

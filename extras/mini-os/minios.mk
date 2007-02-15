@@ -11,6 +11,7 @@ DEF_CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline
 DEF_CFLAGS += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
 
 DEF_ASFLAGS = -D__ASSEMBLY__
+DEF_LDFLAGS =
 
 ifeq ($(debug),y)
 DEF_CFLAGS += -g
@@ -23,21 +24,27 @@ endif
 # ARCH_... flags may be defined in arch/$(TARGET_ARCH_FAM/rules.mk
 CFLAGS := $(DEF_CFLAGS) $(ARCH_CFLAGS)
 ASFLAGS := $(DEF_ASFLAGS) $(ARCH_ASFLAGS)
+LDFLAGS := $(DEF_LDFLAGS) $(ARCH_LDFLAGS)
 
 # The path pointing to the architecture specific header files.
-ARCH_SPEC_INC := $(MINI-OS_ROOT)/include/$(TARGET_ARCH_FAM)
+ARCH_INC := $(MINI-OS_ROOT)/include/$(TARGET_ARCH_FAM)
+
+# Special build dependencies.
+# Rebuild all after touching this/these file(s)
+EXTRA_DEPS = $(MINI-OS_ROOT)/minios.mk \
+		$(MINI-OS_ROOT)/$(TARGET_ARCH_DIR)/arch.mk
 
 # Find all header files for checking dependencies.
 HDRS := $(wildcard $(MINI-OS_ROOT)/include/*.h)
 HDRS += $(wildcard $(MINI-OS_ROOT)/include/xen/*.h)
-HDRS += $(wildcard $(ARCH_SPEC_INC)/*.h)
+HDRS += $(wildcard $(ARCH_INC)/*.h)
 # For special wanted header directories.
 extra_heads := $(foreach dir,$(EXTRA_INC),$(wildcard $(dir)/*.h))
 HDRS += $(extra_heads)
 
 # Add the special header directories to the include paths.
 extra_incl := $(foreach dir,$(EXTRA_INC),-I$(MINI-OS_ROOT)/include/$(dir))
-override CPPFLAGS := -I$(MINI-OS_ROOT)/include $(CPPFLAGS) -I$(ARCH_SPEC_INC)	$(extra_incl)
+override CPPFLAGS := -I$(MINI-OS_ROOT)/include $(CPPFLAGS) -I$(ARCH_INC)	$(extra_incl)
 
 # The name of the architecture specific library.
 # This is on x86_32: libx86_32.a
@@ -51,10 +58,10 @@ HEAD_ARCH_OBJ := $(TARGET_ARCH).o
 HEAD_OBJ := $(TARGET_ARCH_DIR)/$(HEAD_ARCH_OBJ)
 
 
-%.o: %.c $(HDRS) Makefile $(SPEC_DEPENDS)
+%.o: %.c $(HDRS) Makefile $(EXTRA_DEPS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-%.o: %.S $(HDRS) Makefile $(SPEC_DEPENDS)
+%.o: %.S $(HDRS) Makefile $(EXTRA_DEPS)
 	$(CC) $(ASFLAGS) $(CPPFLAGS) -c $< -o $@
 
 
