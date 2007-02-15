@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Jimi Xenidis <jimix@watson.ibm.com>
@@ -35,6 +35,7 @@
 #define memguard_unguard_range(_p,_l)    ((void)0)
 
 extern unsigned long xenheap_phys_end;
+extern int boot_of_mem_avail(int pos, ulong *start, ulong *end);
 
 /*
  * Per-page-frame information.

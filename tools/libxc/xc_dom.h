@@ -7,11 +7,6 @@
 typedef uint64_t xen_vaddr_t;
 typedef uint64_t xen_paddr_t;
 
-/* FIXME: temporary hack ... */
-#ifndef PRIpfn
-#define PRIpfn "lx"
-#endif
-
 struct xc_dom_seg {
     xen_vaddr_t vstart;
     xen_vaddr_t vend;

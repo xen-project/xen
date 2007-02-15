@@ -966,7 +966,7 @@ static PyObject *pyxc_alloc_real_mode_area(XcObject *self,
         return NULL;
 
     if ( xc_alloc_real_mode_area(self->xc_handle, dom, log) )
-        return PyErr_SetFromErrno(xc_error);
+        return pyxc_error_to_exception();
 
     Py_INCREF(zero);
     return zero;
@@ -980,33 +980,32 @@ static PyObject *pyxc_prose_build(XcObject *self,
     char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
+    unsigned int mem_mb;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
-    void *arch_args = NULL;
     int unused;
 
     static char *kwd_list[] = { "dom", "store_evtchn",
-                                "console_evtchn", "image",
+                                "console_evtchn", "image", "memsize",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
-                                "features", "arch_args", NULL };
+                                "features", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssiss#", kwd_list,
-                                      &dom, &store_evtchn,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssis#", kwd_list,
+                                      &dom, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
-                                      &features, &arch_args, &unused) )
+                                      &features, &unused) )
         return NULL;
 
-    if ( xc_prose_build(self->xc_handle, dom, image,
+    if ( xc_prose_build(self->xc_handle, dom, mem_mb, image,
                         ramdisk, cmdline, features, flags,
                         store_evtchn, &store_mfn,
-                        console_evtchn, &console_mfn,
-                        arch_args) != 0 ) {
+                        console_evtchn, &console_mfn) != 0 ) {
         if (!errno)
              errno = EINVAL;
-        return PyErr_SetFromErrno(xc_error);
+        return pyxc_error_to_exception();
     }
     return Py_BuildValue("{s:i,s:i}", 
                          "store_mfn", store_mfn,

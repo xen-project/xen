@@ -87,11 +87,6 @@ static inline l2_pgentry_32_t l2e_from_paddr_32(paddr_t pa, unsigned int flags)
 #define l2_table_offset_32(a)         \
     (((a) >> L2_PAGETABLE_SHIFT_32) & (L2_PAGETABLE_ENTRIES_32 - 1))
 
-#define linear_l1_table_32                                                 \
-    ((l1_pgentry_32_t *)(LINEAR_PT_VIRT_START))
-
-#define linear_pg_table_32 linear_l1_table_32
-
 #endif /* __X86_PAGE_GUEST_H__ */
 
 /*

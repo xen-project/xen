@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- * Copyright (C) IBM Corporation 2006
+ * Copyright IBM Corporation 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Jimi Xenidis <jimix@watson.ibm.com>
@@ -36,29 +36,6 @@
 #include "flatdevtree_env.h"
 #include "flatdevtree.h"
 #include "utils.h"
-
-unsigned long get_rma_pages(void *devtree)
-{
-    void *rma;
-    uint64_t rma_reg[2];
-    int rc;
-
-    rma = ft_find_node(devtree, "/memory@0");
-    if (rma == NULL) {
-        DPRINTF("couldn't find /memory@0\n");
-        return 0;
-    }
-    rc = ft_get_prop(devtree, rma, "reg", rma_reg, sizeof(rma_reg));
-    if (rc < 0) {
-        DPRINTF("couldn't get /memory@0/reg\n");
-        return 0;
-    }
-    if (rma_reg[0] != 0) {
-        DPRINTF("RMA did not start at 0\n");
-        return 0;
-    }
-    return rma_reg[1] >> PAGE_SHIFT;
-}
 
 int get_rma_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
 		       unsigned long nr_pages)

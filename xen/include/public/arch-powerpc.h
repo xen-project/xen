@@ -56,6 +56,7 @@ DEFINE_XEN_GUEST_HANDLE(void);
 
 typedef unsigned long long xen_pfn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
+#define PRIpfn "llx"
 #endif
 
 /*
@@ -77,8 +78,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 typedef uint64_t xen_ulong_t;
 
-/* User-accessible registers: need to be saved/restored for every nested Xen
- * invocation. */
+/* User-accessible registers: nost of these need to be saved/restored
+ * for every nested Xen invocation. */
 struct cpu_user_regs
 {
     uint64_t gprs[32];
@@ -88,10 +89,13 @@ struct cpu_user_regs
     uint64_t srr1;
     uint64_t pc;
     uint64_t msr;
-    uint64_t fpscr;
+    uint64_t fpscr;             /* XXX Is this necessary */
     uint64_t xer;
-    uint64_t hid4;
+    uint64_t hid4;              /* debug only */
+    uint64_t dar;               /* debug only */
+    uint32_t dsisr;             /* debug only */
     uint32_t cr;
+    uint32_t __pad;             /* good spot for another 32bit reg */
     uint32_t entry_vector;
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
@@ -108,11 +112,19 @@ typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 struct arch_shared_info {
-    uint64_t pad[32];
+    uint64_t boot_timebase;
 };
 
 struct arch_vcpu_info {
 };
+
+#define RMA_SHARED_INFO 1
+#define RMA_START_INFO 2
+#define RMA_LAST_DOM0 2
+/* these are not used for dom0 so they should be last */
+#define RMA_CONSOLE 3
+#define RMA_STORE 4
+#define RMA_LAST_DOMU 4
 
 /* Support for multi-processor guests. */
 #define MAX_VIRT_CPUS 32

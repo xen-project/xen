@@ -30,11 +30,10 @@
 #include <xen/hypercall.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
-#include <xen/shadow.h>
 #include <asm/current.h>
 #include <asm/e820.h>
 #include <asm/io.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -155,7 +154,7 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
-    rc = shadow_enable(d, SHM2_refcounts|SHM2_translate|SHM2_external);
+    rc = paging_enable(d, PG_SH_enable|PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
         return rc;
 
@@ -383,7 +382,7 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         if ( virt )
-            mfn = get_mfn_from_gpfn(shadow_gva_to_gfn(current, addr));
+            mfn = get_mfn_from_gpfn(paging_gva_to_gfn(current, addr));
         else
             mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
 
@@ -600,7 +599,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
         return;
     }
 
-    if ( current->arch.shadow.mode->guest_levels == 4 )
+    if ( current->arch.paging.mode->guest_levels == 4 )
     {
         pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
                                                        pregs->rsi,

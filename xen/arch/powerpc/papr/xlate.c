@@ -72,6 +72,20 @@ static inline void pte_insert(union pte volatile *pte,
 }
 #endif
 
+/*
+ * POWER Arch 2.03 Sec 4.12.1 (Yes 970 is one)
+ *
+ *   when a tlbsync instruction has been executed by a processor in a
+ *   given partition, a ptesync instruction must be executed by that
+ *   processor before a tlbie or tlbsync instruction is executed by
+ *   another processor in that partition.
+ *
+ * So for now, here is a BFLock to deal with it, the lock should be per-domain.
+ *
+ * XXX Will need to audit all tlb usege soon enough.
+ */
+
+static DEFINE_SPINLOCK(native_tlbie_lock);
 static void pte_tlbie(union pte volatile *pte, ulong ptex)
 {
     ulong va;
@@ -91,6 +105,7 @@ static void pte_tlbie(union pte volatile *pte, ulong ptex)
     va = (pi << 12) | (vsid << 28);
     va &= ~(0xffffULL << 48);
 
+    spin_lock(&native_tlbie_lock);
 #ifndef FLUSH_THE_WHOLE_THING
     if (pte->bits.l) {
         va |= (pte->bits.rpn & 1);
@@ -114,7 +129,7 @@ static void pte_tlbie(union pte volatile *pte, ulong ptex)
         }
     }
 #endif
-
+    spin_unlock(&native_tlbie_lock);
 }
 
 long pte_enter(ulong flags, ulong ptex, ulong vsid, ulong rpn)

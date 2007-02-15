@@ -51,8 +51,6 @@ obj-$(builtin_dom0) += dom0.o
 
 obj-y += firmware_image.o
 
-obj-y += elf32.o
-
 # These are extra warnings like for the arch/ppc directory but may not
 # allow the rest of the tree to build.
 PPC_C_WARNINGS += -Wundef -Wmissing-prototypes -Wmissing-declarations
@@ -64,7 +62,7 @@ CFLAGS += $(PPC_C_WARNINGS)
 # objects into a single ELF segment and to not link in any additional
 # objects that gcc would normally like to
 #
-OMAGIC = -N -nodefaultlibs -nostartfiles
+OMAGIC = -nodefaultlibs -nostartfiles
 
 firmware: of_handler/built_in.o $(TARGET_SUBARCH)/memcpy.o of-devtree.o
 	$(CC) $(CFLAGS) $(OMAGIC) -e __ofh_start -Wl,-Ttext,0x0 $^ -o $@

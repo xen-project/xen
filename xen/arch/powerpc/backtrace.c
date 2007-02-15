@@ -198,7 +198,6 @@ void show_backtrace_regs(struct cpu_user_regs *regs)
     console_start_sync();
     
     show_registers(regs);
-    printk("dar 0x%016lx, dsisr 0x%08x\n", mfdar(), mfdsisr());
     printk("hid4 0x%016lx\n", regs->hid4);
     printk("---[ backtrace ]---\n");
     show_backtrace(regs->gprs[1], regs->lr, regs->pc);

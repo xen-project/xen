@@ -41,13 +41,12 @@
 #define SHADOW_AUDIT_ENTRIES        0x04  /* Check this walk's shadows */
 #define SHADOW_AUDIT_ENTRIES_FULL   0x08  /* Check every shadow */
 #define SHADOW_AUDIT_ENTRIES_MFNS   0x10  /* Check gfn-mfn map in shadows */
-#define SHADOW_AUDIT_P2M            0x20  /* Check the p2m table */
 
 #ifdef NDEBUG
 #define SHADOW_AUDIT                   0
 #define SHADOW_AUDIT_ENABLE            0
 #else
-#define SHADOW_AUDIT                0x15  /* Basic audit of all except p2m. */
+#define SHADOW_AUDIT                0x15  /* Basic audit of all */
 #define SHADOW_AUDIT_ENABLE         shadow_audit_enable
 extern int shadow_audit_enable;
 #endif
@@ -84,9 +83,9 @@ extern int shadow_audit_enable;
 #define SHADOW_DEBUG_PROPAGATE         1
 #define SHADOW_DEBUG_MAKE_SHADOW       1
 #define SHADOW_DEBUG_DESTROY_SHADOW    1
-#define SHADOW_DEBUG_P2M               0
 #define SHADOW_DEBUG_A_AND_D           1
 #define SHADOW_DEBUG_EMULATE           1
+#define SHADOW_DEBUG_P2M               1
 #define SHADOW_DEBUG_LOGDIRTY          0
 
 /******************************************************************************
@@ -108,36 +107,36 @@ extern int shadow_audit_enable;
 #error shadow.h currently requires CONFIG_SMP
 #endif
 
-#define shadow_lock_init(_d)                            \
-    do {                                                \
-        spin_lock_init(&(_d)->arch.shadow.lock);        \
-        (_d)->arch.shadow.locker = -1;                  \
-        (_d)->arch.shadow.locker_function = "nobody";   \
+#define shadow_lock_init(_d)                                   \
+    do {                                                       \
+        spin_lock_init(&(_d)->arch.paging.shadow.lock);        \
+        (_d)->arch.paging.shadow.locker = -1;                  \
+        (_d)->arch.paging.shadow.locker_function = "nobody";   \
     } while (0)
 
 #define shadow_locked_by_me(_d)                     \
-    (current->processor == (_d)->arch.shadow.locker)
+    (current->processor == (_d)->arch.paging.shadow.locker)
 
-#define shadow_lock(_d)                                                 \
-    do {                                                                \
-        if ( unlikely((_d)->arch.shadow.locker == current->processor) ) \
-        {                                                               \
-            printk("Error: shadow lock held by %s\n",                   \
-                   (_d)->arch.shadow.locker_function);                  \
-            BUG();                                                      \
-        }                                                               \
-        spin_lock(&(_d)->arch.shadow.lock);                             \
-        ASSERT((_d)->arch.shadow.locker == -1);                         \
-        (_d)->arch.shadow.locker = current->processor;                  \
-        (_d)->arch.shadow.locker_function = __func__;                   \
+#define shadow_lock(_d)                                                       \
+    do {                                                                      \
+        if ( unlikely((_d)->arch.paging.shadow.locker == current->processor) )\
+        {                                                                     \
+            printk("Error: shadow lock held by %s\n",                         \
+                   (_d)->arch.paging.shadow.locker_function);                 \
+            BUG();                                                            \
+        }                                                                     \
+        spin_lock(&(_d)->arch.paging.shadow.lock);                            \
+        ASSERT((_d)->arch.paging.shadow.locker == -1);                        \
+        (_d)->arch.paging.shadow.locker = current->processor;                 \
+        (_d)->arch.paging.shadow.locker_function = __func__;                  \
     } while (0)
 
-#define shadow_unlock(_d)                                       \
-    do {                                                        \
-        ASSERT((_d)->arch.shadow.locker == current->processor); \
-        (_d)->arch.shadow.locker = -1;                          \
-        (_d)->arch.shadow.locker_function = "nobody";           \
-        spin_unlock(&(_d)->arch.shadow.lock);                   \
+#define shadow_unlock(_d)                                              \
+    do {                                                               \
+        ASSERT((_d)->arch.paging.shadow.locker == current->processor); \
+        (_d)->arch.paging.shadow.locker = -1;                          \
+        (_d)->arch.paging.shadow.locker_function = "nobody";           \
+        spin_unlock(&(_d)->arch.paging.shadow.lock);                   \
     } while (0)
 
 
@@ -151,13 +150,6 @@ extern void shadow_audit_tables(struct vcpu *v);
 #else
 #define shadow_audit_tables(_v) do {} while(0)
 #endif
-
-#if SHADOW_AUDIT & SHADOW_AUDIT_P2M
-extern void shadow_audit_p2m(struct domain *d);
-#else
-#define shadow_audit_p2m(_d) do {} while(0)
-#endif
-
 
 /******************************************************************************
  * Macro for dealing with the naming of the internal names of the
@@ -304,7 +296,7 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
      * page.  When we're shadowing those kernels, we have to pin l3
      * shadows so they don't just evaporate on every context switch.
      * For all other guests, we'd rather use the up-pointer field in l3s. */ 
-    if ( unlikely((v->domain->arch.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL) 
+    if ( unlikely((v->domain->arch.paging.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL) 
                   && CONFIG_PAGING_LEVELS >= 4
                   && t == SH_type_l3_64_shadow) )
         return 1;
@@ -379,12 +371,11 @@ void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
 void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 /* Update the shadows in response to a pagetable write from Xen */
-extern int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, 
-                                   void *entry, u32 size);
+int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
 
 /* Update the shadows in response to a pagetable write from a HVM guest */
-extern void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn, 
-                                       void *entry, u32 size);
+void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn, 
+                                void *entry, u32 size);
 
 /* Remove all writeable mappings of a guest frame from the shadows.
  * Returns non-zero if we need to flush TLBs. 
@@ -393,6 +384,21 @@ extern void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
 extern int sh_remove_write_access(struct vcpu *v, mfn_t readonly_mfn,
                                   unsigned int level,
                                   unsigned long fault_addr);
+
+/* Allocate/free functions for passing to the P2M code. */
+struct page_info *shadow_alloc_p2m_page(struct domain *d);
+void shadow_free_p2m_page(struct domain *d, struct page_info *pg);
+
+/* Functions that atomically write PT/P2M entries and update state */
+void shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
+                            l1_pgentry_t *p, l1_pgentry_t new, 
+                            unsigned int level);
+int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
+                             intpte_t new, mfn_t gmfn);
+int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
+                               intpte_t *old, intpte_t new, mfn_t gmfn);
+
+
 
 /******************************************************************************
  * Flags used in the return value of the shadow_set_lXe() functions...
@@ -477,19 +483,6 @@ sh_unmap_domain_page_global(void *p)
     unmap_domain_page_global(p);
 }
 
-static inline mfn_t
-pagetable_get_mfn(pagetable_t pt)
-{
-    return _mfn(pagetable_get_pfn(pt));
-}
-
-static inline pagetable_t
-pagetable_from_mfn(mfn_t mfn)
-{
-    return pagetable_from_pfn(mfn_x(mfn));
-}
-
-
 /******************************************************************************
  * Log-dirty mode bitmap handling
  */
@@ -502,13 +495,13 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
     ASSERT(shadow_mode_log_dirty(d));
-    ASSERT(d->arch.shadow.dirty_bitmap != NULL);
+    ASSERT(d->arch.paging.shadow.dirty_bitmap != NULL);
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
     if ( likely(VALID_M2P(pfn))
-         && likely(pfn < d->arch.shadow.dirty_bitmap_size) 
-         && test_bit(pfn, d->arch.shadow.dirty_bitmap) )
+         && likely(pfn < d->arch.paging.shadow.dirty_bitmap_size) 
+         && test_bit(pfn, d->arch.paging.shadow.dirty_bitmap) )
         return 1;
 
     return 0;
@@ -612,7 +605,7 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
         sp->pinned = 1;
     }
     /* Put it at the head of the list of pinned shadows */
-    list_add(&sp->list, &v->domain->arch.shadow.pinned_shadows);
+    list_add(&sp->list, &v->domain->arch.paging.shadow.pinned_shadows);
     return 1;
 }
 

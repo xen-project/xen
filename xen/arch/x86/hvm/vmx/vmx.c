@@ -35,12 +35,13 @@
 #include <asm/types.h>
 #include <asm/msr.h>
 #include <asm/spinlock.h>
+#include <asm/paging.h>
+#include <asm/p2m.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vmx/cpu.h>
-#include <asm/shadow.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpic.h>
@@ -484,9 +485,6 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
-        /*
-         * arch.shadow_table should now hold the next CR3 for shadow
-         */
         v->arch.hvm_vmx.cpu_cr3 = c->cr3;
     }
 
@@ -556,7 +554,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     vmx_vmcs_exit(v);
 
-    shadow_update_paging_modes(v);
+    paging_update_paging_modes(v);
     return 0;
 
  bad_cr3:
@@ -1126,7 +1124,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     }
 #endif
 
-    result = shadow_fault(va, regs);
+    result = paging_fault(va, regs);
 
     TRACE_VMEXIT(2, result);
 #if 0
@@ -1277,7 +1275,7 @@ static void vmx_do_invlpg(unsigned long va)
      * We do the safest things first, then try to update the shadow
      * copying from guest
      */
-    shadow_invlpg(v, va);
+    paging_invlpg(v, va);
 }
 
 
@@ -1691,9 +1689,6 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
-        /*
-         * arch.shadow_table should now hold the next CR3 for shadow
-         */
         v->arch.hvm_vmx.cpu_cr3 = c->cr3;
     }
 
@@ -1753,7 +1748,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     __vmwrite(GUEST_LDTR_BASE, c->ldtr_base);
     __vmwrite(GUEST_LDTR_AR_BYTES, c->ldtr_arbytes.bytes);
 
-    shadow_update_paging_modes(v);
+    paging_update_paging_modes(v);
     return 0;
 
  bad_cr3:
@@ -1906,14 +1901,11 @@ static int vmx_set_cr0(unsigned long value)
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
             put_page(mfn_to_page(old_base_mfn));
-        shadow_update_paging_modes(v);
+        paging_update_paging_modes(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                     (unsigned long) (mfn << PAGE_SHIFT));
 
-        /*
-         * arch->shadow_table should hold the next CR3 for shadow
-         */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
                     v->arch.hvm_vmx.cpu_cr3, mfn);
     }
@@ -1981,7 +1973,7 @@ static int vmx_set_cr0(unsigned long value)
             vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
         }
-        shadow_update_paging_modes(v);
+        paging_update_paging_modes(v);
     }
 
     return 1;
@@ -2070,7 +2062,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 goto bad_cr3;
-            shadow_update_cr3(v);
+            paging_update_cr3(v);
         } else {
             /*
              * If different, make a shadow. Check if the PDBR is valid
@@ -2084,9 +2076,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             v->arch.guest_table = pagetable_from_pfn(mfn);
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
-            /*
-             * arch.shadow_table should now hold the next CR3 for shadow
-             */
             v->arch.hvm_vmx.cpu_cr3 = value;
             update_cr3(v);
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
@@ -2120,9 +2109,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
 
-                /*
-                 * arch->shadow_table should hold the next CR3 for shadow
-                 */
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
                             v->arch.hvm_vmx.cpu_cr3, mfn);
@@ -2148,7 +2134,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
          * all TLB entries except global entries.
          */
         if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
-            shadow_update_paging_modes(v);
+            paging_update_paging_modes(v);
         break;
 
     case 8:

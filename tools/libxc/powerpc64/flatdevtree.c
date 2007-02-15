@@ -14,7 +14,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright Pantelis Antoniou 2006
- * Copyright (C) IBM Corporation 2006
+ * Copyright IBM Corporation 2006, 2007
  * 2006 (c) MontaVista, Software, Inc.
  *
  * Authors: Pantelis Antoniou <pantelis@embeddedalley.com>
@@ -209,7 +209,7 @@ void ft_add_rsvmap(struct ft_cxt *cxt, u64 physaddr, u64 size)
 	((u64 *) cxt->pres)[0] = cpu_to_be64(physaddr);	/* phys = 0, size = 0, terminate */
 	((u64 *) cxt->pres)[1] = cpu_to_be64(size);
 
-	cxt->pres += 18;	/* advance */
+	cxt->pres += 16;	/* advance two u64s worth */
 
 	((u64 *) cxt->pres)[0] = 0;	/* phys = 0, size = 0, terminate */
 	((u64 *) cxt->pres)[1] = 0;
@@ -317,6 +317,9 @@ int ft_end_tree(struct ft_cxt *cxt)
 	/* the new strings start */
 	cxt->pstr_begin = cxt->p_begin + cxt->struct_size;
 	cxt->pstr = cxt->pstr_begin + cxt->strings_size;
+
+	/* mark the size of string structure in bph */
+	bph->size_dt_strings = cxt->strings_size;
 
 	return 0;
 }

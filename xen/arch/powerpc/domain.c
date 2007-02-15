@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
@@ -105,13 +105,13 @@ void arch_domain_destroy(struct domain *d)
 
 static void machine_fail(const char *s)
 {
-    printk("%s failed, manual powercycle required!\n", s);
+    printk("%s failed, manual powercycle required!\n"
+           "  spinning....\n", s);
     for (;;)
         sleep();
 }
 void machine_halt(void)
 {
-    printk("machine_halt called: spinning....\n");
     console_start_sync();
     printk("%s called\n", __func__);
     rtas_halt();
@@ -121,7 +121,6 @@ void machine_halt(void)
 
 void machine_restart(char * __unused)
 {
-    printk("machine_restart called: spinning....\n");
     console_start_sync();
     printk("%s called\n", __func__);
     rtas_reboot();
@@ -152,22 +151,32 @@ void vcpu_destroy(struct vcpu *v)
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 { 
+    struct domain *d = v->domain;
+
     memcpy(&v->arch.ctxt, &c.nat->user_regs, sizeof(c.nat->user_regs));
 
-    printk("Domain[%d].%d: initializing\n",
-           v->domain->domain_id, v->vcpu_id);
+    printk("Domain[%d].%d: initializing\n", d->domain_id, v->vcpu_id);
 
-    if (v->domain->arch.htab.order == 0)
-        panic("Page table never allocated for Domain: %d\n",
-              v->domain->domain_id);
-    if (v->domain->arch.rma_order == 0)
-        panic("RMA never allocated for Domain: %d\n",
-              v->domain->domain_id);
+    if (d->arch.htab.order == 0)
+        panic("Page table never allocated for Domain: %d\n", d->domain_id);
+    if (d->arch.rma_order == 0)
+        panic("RMA never allocated for Domain: %d\n", d->domain_id);
+
+    d->shared_info->wc_sec = dom0->shared_info->wc_sec;
+    d->shared_info->wc_nsec = dom0->shared_info->wc_nsec;
+    d->shared_info->arch.boot_timebase = dom0->shared_info->arch.boot_timebase;
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
     cpu_init_vcpu(v);
 
+    return 0;
+}
+
+int arch_vcpu_reset(struct vcpu *v)
+{
+    panic("%s: called for Dom%d[%d]\n",
+          __func__, v->domain->domain_id, v->vcpu_id);
     return 0;
 }
 

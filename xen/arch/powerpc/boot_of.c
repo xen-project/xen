@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  *          Hollis Blanchard <hollisb@us.ibm.com>
@@ -43,6 +43,14 @@ static ulong of_msr;
 static int of_out;
 static ulong eomem;
 
+/* Track memory during early boot with a limited per-page bitmap. We need an
+ * allocator to tell us where we can place RTAS, our copy of the device tree.
+ * We could examine the "available" properties in memory nodes, but we
+ * apparently can't depend on firmware to update those when we call "claim". So
+ * we need to track it ourselves.
+ * We can't dynamically allocate the bitmap, because we would need something
+ * to tell us where it's safe to allocate...
+ */
 #define MEM_AVAILABLE_PAGES ((32 << 20) >> PAGE_SHIFT)
 static DECLARE_BITMAP(mem_available_pages, MEM_AVAILABLE_PAGES);
 
@@ -530,6 +538,37 @@ static ulong boot_of_alloc(ulong size)
 
         pos = pos + i;
     }
+}
+
+int boot_of_mem_avail(int pos, ulong *startpage, ulong *endpage)
+{
+    ulong freebit;
+    ulong usedbit;
+
+    if (pos >= MEM_AVAILABLE_PAGES)
+        /* Stop iterating. */
+        return -1;
+
+    /* Find first free page. */
+    freebit = find_next_zero_bit(mem_available_pages, MEM_AVAILABLE_PAGES, pos);
+    if (freebit >= MEM_AVAILABLE_PAGES) {
+        /* We know everything after MEM_AVAILABLE_PAGES is still free. */
+        *startpage = MEM_AVAILABLE_PAGES << PAGE_SHIFT;
+        *endpage = ~0UL;
+        return freebit;
+    }
+    *startpage = freebit << PAGE_SHIFT;
+
+    /* Now find first used page after that. */
+    usedbit = find_next_bit(mem_available_pages, MEM_AVAILABLE_PAGES, freebit);
+    if (usedbit >= MEM_AVAILABLE_PAGES) {
+        /* We know everything after MEM_AVAILABLE_PAGES is still free. */
+        *endpage = ~0UL;
+        return usedbit;
+    }
+
+    *endpage = usedbit << PAGE_SHIFT;
+    return usedbit;
 }
 
 static ulong boot_of_mem_init(void)
@@ -1302,7 +1341,7 @@ multiboot_info_t __init *boot_of_init(
             __func__,
             r3, r4, vec, r6, r7, orig_msr);
 
-    if ((vec >= (ulong)_start) && (vec <= (ulong)_end)) {
+    if (is_kernel(vec)) {
         of_panic("Hmm.. OF[0x%lx] seems to have stepped on our image "
                 "that ranges: %p .. %p.\n",
                 vec, _start, _end);

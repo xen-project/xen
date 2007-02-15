@@ -17,6 +17,8 @@ PHDRS
 SECTIONS
 {
   . = 0x00400000;
+  PROVIDE(_text = .);
+  PROVIDE(_stext = .);
   /* Read-only sections, merged into text segment: */
   .interp         : { *(.interp) } :text
   .hash           : { *(.hash) }
@@ -111,17 +113,26 @@ SECTIONS
     SORT(CONSTRUCTORS)
   }
 
+  . = ALIGN(4096);
+  __init_begin = .;
+  _sinittext = .;
+  .init.text : { *(.init.text) } : text
+  _einittext = .;
+  .init.data : { *(.init.data) } : text
   . = ALIGN(32);
   __setup_start = .;
-  .init.setup : { *(.init.setup) }
+  .init.setup : { *(.init.setup) } : text
   __setup_end = .;
   __initcall_start = .;
-  .initcall.init : { *(.initcall1.init) }
+  .initcall.init : { *(.initcall1.init) } : text
   __initcall_end = .;
-  __inithcall_start = .;
-  .inithcall.text : { *(.inithcall.text) }
-  __inithcall_end = .;
-
+  __init_hcall_start = .;
+  .init_hcall.init : { *(.init_hcall.init) } : text
+  __init_hcall_end = .;
+  __builtin_cmdline : { *(__builtin_cmdline) } : text
+  . = ALIGN(4096);
+  __init_end = .;
+	
   __per_cpu_start = .;
   .data.percpu : { *(.data.percpu) }
   __per_cpu_data_end = .;

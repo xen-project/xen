@@ -23,10 +23,10 @@
 #include <xen/mm.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
-#include <xen/shadow.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
+#include <asm/paging.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -196,7 +196,7 @@ static int construct_vmcb(struct vcpu *v)
         read_cr4() & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
     vmcb->cr4 = arch_svm->cpu_shadow_cr4 | SVM_CR4_HOST_MASK;
 
-    shadow_update_paging_modes(v);
+    paging_update_paging_modes(v);
     vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
     arch_svm->vmcb->exception_intercepts = MONITOR_DEFAULT_EXCEPTION_BITMAP;

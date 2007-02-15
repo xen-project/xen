@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -34,9 +34,6 @@
 
 #define U(x) (x ## U)
 #define UL(x) (x ## UL)
-extern char _start[];
-extern char _end[];
-extern char _etext[];
 extern char __bss_start[];
 #endif
 

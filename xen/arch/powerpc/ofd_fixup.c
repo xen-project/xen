@@ -178,11 +178,20 @@ static ofdn_t ofd_cpus_props(void *m, struct domain *d)
     if (ofd_boot_cpu == -1)
         ofd_boot_cpu = c;
     while (c > 0) {
-        /* Since we are not MP yet we prune all but the booting cpu */
+        /* We do not use the OF tree to identify secondary processors
+         * so we must prune them from the tree */
         if (c == ofd_boot_cpu) {
+            ofdn_t p;
+
             ibm_pft_size[1] = d->arch.htab.log_num_ptes + LOG_PTE_SIZE;
             ofd_prop_add(m, c, "ibm,pft-size",
                          ibm_pft_size, sizeof (ibm_pft_size));
+
+            /* get rid of non-standard properties */
+            p = ofd_prop_find(m, c, "cpu#");
+            if (p > 0) {
+                ofd_prop_remove(m, c, p);
+            }
 
             /* FIXME: Check the the "l2-cache" property who's
              * contents is an orphaned phandle? */

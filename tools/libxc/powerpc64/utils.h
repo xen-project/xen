@@ -13,13 +13,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- * Copyright (C) IBM Corporation 2006
+ * Copyright IBM Corporation 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Jimi Xenidis <jimix@watson.ibm.com>
  */
 
-extern unsigned long get_rma_pages(void *devtree);
 extern int get_rma_page_array(int xc_handle, int domid, xen_pfn_t **page_array,
 			      unsigned long nr_pages);
 extern int install_image(int xc_handle, int domid, xen_pfn_t *page_array,

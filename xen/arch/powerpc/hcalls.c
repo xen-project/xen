@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -130,7 +130,7 @@ static void register_papr_hcall(ulong num, hcall_handler_t handler)
 
 static void init_papr_hcalls(void)
 {
-    inithcall_t *hcall;
+    init_hcall_t *hcall;
     int i;
 
     /* initialize PAPR hcall table */
@@ -140,7 +140,7 @@ static void init_papr_hcalls(void)
         register_papr_hcall(i, do_ni_papr_hypercall);
 
     /* register the PAPR hcalls */
-    for (hcall = &__inithcall_start; hcall < &__inithcall_end; hcall++) {
+    for (hcall = &__init_hcall_start; hcall < &__init_hcall_end; hcall++) {
         register_papr_hcall(hcall->number, hcall->handler);
     }
 }

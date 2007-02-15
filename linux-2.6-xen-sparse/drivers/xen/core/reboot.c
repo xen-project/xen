@@ -100,6 +100,7 @@ static void __shutdown_handler(void *unused)
 static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
+	extern void ctrl_alt_del(void);
 	char *str;
 	struct xenbus_transaction xbt;
 	int err;
@@ -129,7 +130,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	if (strcmp(str, "poweroff") == 0)
 		shutting_down = SHUTDOWN_POWEROFF;
 	else if (strcmp(str, "reboot") == 0)
-		kill_proc(1, SIGINT, 1); /* interrupt init */
+		ctrl_alt_del();
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
 	else if (strcmp(str, "halt") == 0)

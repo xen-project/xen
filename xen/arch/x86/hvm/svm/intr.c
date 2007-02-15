@@ -24,10 +24,10 @@
 #include <xen/lib.h>
 #include <xen/trace.h>
 #include <xen/errno.h>
-#include <xen/shadow.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
+#include <asm/paging.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>

@@ -153,7 +153,6 @@ int xc_prose_build(int xc_handle,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
                    unsigned int console_evtchn,
-                   unsigned long *console_mfn,
-                   void *arch_args);
+                   unsigned long *console_mfn);
 
 #endif /* XENGUEST_H */

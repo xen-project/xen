@@ -19,7 +19,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
@@ -42,7 +42,7 @@ long arch_do_domctl(
         d = get_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
-            ret = shadow_domctl(d,
+            ret = paging_domctl(d,
                                 &domctl->u.shadow_op,
                                 guest_handle_cast(u_domctl, void));
             put_domain(d);
@@ -398,6 +398,7 @@ long arch_do_domctl(
 
         put_domain(d);
     }
+    break;
 
     case XEN_DOMCTL_get_address_size:
     {
@@ -411,7 +412,11 @@ long arch_do_domctl(
 
         ret = 0;
         put_domain(d);
+
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
     }
+    break;
 
     default:
         ret = -ENOSYS;

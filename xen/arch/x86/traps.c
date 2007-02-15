@@ -46,7 +46,7 @@
 #include <xen/nmi.h>
 #include <xen/version.h>
 #include <xen/kexec.h>
-#include <asm/shadow.h>
+#include <asm/paging.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
@@ -860,8 +860,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( shadow_mode_external(d) && guest_mode(regs) )
-            return shadow_fault(addr, regs);
+        if ( paging_mode_external(d) && guest_mode(regs) )
+            return paging_fault(addr, regs);
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
@@ -876,8 +876,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          ptwr_do_page_fault(v, addr, regs) )
         return EXCRET_fault_fixed;
 
-    if ( shadow_mode_enabled(d) )
-        return shadow_fault(addr, regs);
+    if ( paging_mode_enabled(d) )
+        return paging_fault(addr, regs);
 
     return 0;
 }
