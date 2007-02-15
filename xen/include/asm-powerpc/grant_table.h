@@ -23,7 +23,7 @@
 
 #include <asm/mm.h>
 
-#define ORDER_GRANT_FRAMES 2
+#define INITIAL_NR_GRANT_FRAMES 4
 
 /*
  * Caller must own caller's BIGLOCK, is responsible for flushing the TLB, and

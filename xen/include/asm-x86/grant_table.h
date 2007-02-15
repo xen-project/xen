@@ -7,7 +7,7 @@
 #ifndef __ASM_GRANT_TABLE_H__
 #define __ASM_GRANT_TABLE_H__
 
-#define ORDER_GRANT_FRAMES 2
+#define INITIAL_NR_GRANT_FRAMES 4
 
 /*
  * Caller must own caller's BIGLOCK, is responsible for flushing the TLB, and
@@ -21,12 +21,12 @@ int destroy_grant_host_mapping(
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->shared + ((i) * PAGE_SIZE)),       \
+            virt_to_page((char *)(t)->shared[i]),                        \
             (d), XENSHARE_writable);                                     \
     } while ( 0 )
 
 #define gnttab_shared_mfn(d, t, i)                      \
-    ((virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i))
+    ((virt_to_maddr((t)->shared[i]) >> PAGE_SHIFT))
 
 #define gnttab_shared_gmfn(d, t, i)                     \
     (mfn_to_gmfn(d, gnttab_shared_mfn(d, t, i)))

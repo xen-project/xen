@@ -5,7 +5,7 @@
 #ifndef __ASM_GRANT_TABLE_H__
 #define __ASM_GRANT_TABLE_H__
 
-#define ORDER_GRANT_FRAMES 0
+#define INITIAL_NR_GRANT_FRAMES 1
 
 // for grant map/unmap
 int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);

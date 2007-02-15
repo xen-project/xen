@@ -52,9 +52,14 @@ struct active_grant_entry {
 #define GNTPIN_devr_inc      (1 << GNTPIN_devr_shift)
 #define GNTPIN_devr_mask     (0xFFU << GNTPIN_devr_shift)
 
-#define NR_GRANT_FRAMES      (1U << ORDER_GRANT_FRAMES)
-#define NR_GRANT_ENTRIES     \
-    ((NR_GRANT_FRAMES << PAGE_SHIFT) / sizeof(grant_entry_t))
+/* Initial size of a grant table. */
+#define INITIAL_NR_GRANT_ENTRIES ((INITIAL_NR_GRANT_FRAMES << PAGE_SHIFT) / \
+                                     sizeof(grant_entry_t))
+
+/* Default maximum size of a grant table. [POLICY] */
+#define DEFAULT_MAX_NR_GRANT_FRAMES   32
+/* The maximum size of a grant table. */
+extern unsigned int max_nr_grant_frames;
 
 /*
  * Tracks a mapping of another domain's grant reference. Each domain has a
@@ -71,14 +76,15 @@ struct grant_mapping {
 
 /* Per-domain grant information. */
 struct grant_table {
+    /* Table size. Number of frames shared with guest */
+    unsigned int          nr_grant_frames;
     /* Shared grant table (see include/public/grant_table.h). */
-    struct grant_entry   *shared;
+    struct grant_entry  **shared;
     /* Active grant table. */
-    struct active_grant_entry *active;
+    struct active_grant_entry **active;
     /* Mapping tracking table. */
-    struct grant_mapping *maptrack;
+    struct grant_mapping **maptrack;
     unsigned int          maptrack_head;
-    unsigned int          maptrack_order;
     unsigned int          maptrack_limit;
     unsigned int          map_count;
     /* Lock protecting updates to active and shared grant tables. */
@@ -95,5 +101,23 @@ void grant_table_destroy(
 void
 gnttab_release_mappings(
     struct domain *d);
+
+/* Increase the size of a domain's grant table.
+ * Caller must hold d's grant table lock.
+ */
+int
+gnttab_grow_table(struct domain *d, unsigned int req_nr_frames);
+
+/* Number of grant table frames. Caller must hold d's grant table lock. */
+static inline unsigned int nr_grant_frames(struct grant_table *gt)
+{
+    return gt->nr_grant_frames;
+}
+
+/* Number of grant table entries. Caller must hold d's grant table lock. */
+static inline unsigned int nr_grant_entries(struct grant_table *gt)
+{
+    return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_t);
+}
 
 #endif /* __XEN_GRANT_TABLE_H__ */

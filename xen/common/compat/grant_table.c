@@ -101,7 +101,7 @@ int compat_grant_table_op(unsigned int cmd,
                 rc = -EFAULT;
             else
             {
-                BUILD_BUG_ON((COMPAT_ARG_XLAT_SIZE - sizeof(*nat.setup)) / sizeof(*nat.setup->frame_list.p) < NR_GRANT_FRAMES);
+                BUG_ON((COMPAT_ARG_XLAT_SIZE - sizeof(*nat.setup)) / sizeof(*nat.setup->frame_list.p) < max_nr_grant_frames);
 #define XLAT_gnttab_setup_table_HNDL_frame_list(_d_, _s_) \
                 set_xen_guest_handle((_d_)->frame_list, (unsigned long *)(nat.setup + 1))
                 XLAT_gnttab_setup_table(nat.setup, &cmp.setup);
@@ -110,7 +110,6 @@ int compat_grant_table_op(unsigned int cmd,
             }
             if ( rc == 0 )
             {
-                BUG_ON(nat.setup->nr_frames > NR_GRANT_FRAMES);
 #define XLAT_gnttab_setup_table_HNDL_frame_list(_d_, _s_) \
                 do \
                 { \
