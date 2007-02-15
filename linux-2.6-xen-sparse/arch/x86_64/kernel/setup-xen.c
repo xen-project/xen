@@ -585,8 +585,6 @@ static void discover_ebda(void)
 void __init setup_arch(char **cmdline_p)
 {
 #ifdef CONFIG_XEN
-	struct xen_memory_map memmap;
-
 	/* Register a call for panic conditions. */
 	atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
@@ -895,6 +893,8 @@ void __init setup_arch(char **cmdline_p)
 	probe_roms();
 #ifdef CONFIG_XEN
 	if (is_initial_xendomain()) {
+		struct xen_memory_map memmap;
+
 		memmap.nr_entries = E820MAX;
 		set_xen_guest_handle(memmap.buffer, machine_e820.map);
 
