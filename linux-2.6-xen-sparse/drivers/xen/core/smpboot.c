@@ -349,8 +349,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	cpu_present_map  = cpumask_of_cpu(0);
-	cpu_online_map   = cpumask_of_cpu(0);
+	prefill_possible_map();
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

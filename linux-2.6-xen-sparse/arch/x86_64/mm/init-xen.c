@@ -279,8 +279,8 @@ static __init void set_pte_phys(unsigned long vaddr,
 	__flush_tlb_one(vaddr);
 }
 
-static void set_pte_phys_ma(unsigned long vaddr,
-			 unsigned long phys, pgprot_t prot)
+static __init void set_pte_phys_ma(unsigned long vaddr,
+				   unsigned long phys, pgprot_t prot)
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -361,9 +361,10 @@ __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 }
 
 /*
- * At this point it only supports vsyscall area.
+ * This only supports vsyscall area.
  */
-void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
+void __init
+__set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 {
 	unsigned long address = __fix_to_virt(idx);
 

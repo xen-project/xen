@@ -580,6 +580,8 @@ static void discover_ebda(void)
 	if (ebda_size > 64*1024)
 		ebda_size = 64*1024;
 }
+#else
+#define discover_ebda() ((void)0)
 #endif
 
 void __init setup_arch(char **cmdline_p)
@@ -673,9 +675,7 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
-#ifndef CONFIG_XEN
 	discover_ebda();
-#endif
 
 	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
@@ -1378,9 +1378,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
 
-#ifdef CONFIG_X86_XEN_GENAPIC
 	c->apicid = phys_pkg_id(0);
-#endif
 
 	/*
 	 * Vendor-specific initialization.  In this section we

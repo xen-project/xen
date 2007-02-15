@@ -499,8 +499,6 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	 * This is basically '__unlazy_fpu', except that we queue a
 	 * multicall to indicate FPU task switch, rather than
 	 * synchronously trapping to Xen.
-	 * This must be here to ensure both math_state_restore() and
-	 * kernel_fpu_begin() work consistently. 
 	 * The AMD workaround requires it to be after DS reload, or
 	 * after DS has been cleared, which we do in __prepare_arch_switch.
 	 */
@@ -579,7 +577,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		HYPERVISOR_set_segment_base(SEGBASE_GS_USER, next->gs); 
 
 	/* 
-	 * Switch the PDA and FPU contexts.
+	 * Switch the PDA context.
 	 */
 	prev->userrsp = read_pda(oldrsp); 
 	write_pda(oldrsp, next->userrsp); 

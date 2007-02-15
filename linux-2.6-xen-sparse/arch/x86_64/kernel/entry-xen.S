@@ -32,9 +32,6 @@
  */
 
 #define ASSEMBLY 1
-#ifdef CONFIG_DEBUG_INFO
-#undef CONFIG_DEBUG_INFO
-#endif
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/smp.h>
@@ -537,6 +534,7 @@ END(stub_rt_sigreturn)
  */ 
 
 retint_check:
+	CFI_DEFAULT_STACK
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	CFI_REMEMBER_STATE
