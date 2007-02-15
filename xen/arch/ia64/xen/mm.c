@@ -2077,10 +2077,10 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
                 mfn = virt_to_mfn(d->shared_info);
             break;
         case XENMAPSPACE_grant_table:
-            spin_lock(d->grant_table->lock);
-            if ( xatp.idx < nr_grant_frames(d->grant_table) )
+            spin_lock(&d->grant_table->lock);
+            if (xatp.idx < nr_grant_frames(d->grant_table))
                 mfn = virt_to_mfn(d->grant_table->shared) + xatp.idx;
-            spin_unlock(d->grant_table->lock);
+            spin_unlock(&d->grant_table->lock);
             break;
         default:
             break;
