@@ -881,6 +881,7 @@ void tpm_tis_init(SetIRQFunc *set_irq, void *opaque, int irq)
     s->Transmitlayer = -1;
     s->tpmTx.fd[0] = -1;
     s->tpmTx.fd[1] = -1;
+    s->aborting_locty = NO_LOCALITY;
 
     tpm_initialize_instance(s, s->vtpm_instance);
     memset(s->buffer.buf,0,sizeof(s->buffer.buf));
