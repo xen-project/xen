@@ -377,26 +377,6 @@ int xc_clear_domain_page(int xc_handle,
     return 0;
 }
 
-void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
-                   int xch, uint32_t dom, xen_pfn_t *parray,
-                   unsigned long vstart)
-{
-    char *va;
-    unsigned long chunksz, done, pa;
-
-    for ( done = 0; done < size; done += chunksz )
-    {
-        pa = dst + done - vstart;
-        va = xc_map_foreign_range(
-            xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
-        chunksz = size - done;
-        if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
-            chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
-        memcpy(va + (pa & (PAGE_SIZE-1)), src + done, chunksz);
-        munmap(va, PAGE_SIZE);
-    }
-}
-
 int xc_domctl(int xc_handle, struct xen_domctl *domctl)
 {
     return do_domctl(xc_handle, domctl);

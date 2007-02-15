@@ -139,92 +139,15 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define PAGE_SIZE_IA64          (1UL << PAGE_SHIFT_IA64)
 #define PAGE_MASK_IA64          (~(PAGE_SIZE_IA64-1))
 
-struct domain_setup_info
-{
-    uint64_t v_start;
-    uint64_t v_end;
-    uint64_t v_kernstart;
-    uint64_t v_kernend;
-    uint64_t v_kernentry;
-
-    uint64_t elf_paddr_offset;
-
 #define PAEKERN_no           0
 #define PAEKERN_yes          1
 #define PAEKERN_extended_cr3 2
 #define PAEKERN_bimodal      3
-    unsigned int  pae_kernel;
-
-    unsigned int  load_symtab;
-    unsigned long symtab_addr;
-    unsigned long symtab_len;
-
-    /*
-     * Only one of __elfnote_* or __xen_guest_string will be
-     * non-NULL.
-     *
-     * You should use the xen_elfnote_* accessors below in order to
-     * pickup the correct one and retain backwards compatibility.
-     */
-    const void *__elfnote_section, *__elfnote_section_end;
-    const char *__xen_guest_string;
-};
-
-typedef int (*parseimagefunc)(const char *image, unsigned long image_size,
-                              struct domain_setup_info *dsi);
-typedef int (*loadimagefunc)(const char *image, unsigned long image_size,
-                             int xch,
-                             uint32_t dom, xen_pfn_t *parray,
-                             struct domain_setup_info *dsi);
-
-/*
- * If an ELF note of the given type is found then the value contained
- * in the note is returned and *defined is set to non-zero. If no such
- * note is found then *defined is set to 0 and 0 is returned.
- */
-extern unsigned long long xen_elfnote_numeric(const struct domain_setup_info *dsi,
-					      int type, int *defined);
-
-/*
- * If an ELF note of the given type is found then the string contained
- * in the value is returned, otherwise NULL is returned.
- */
-extern const char * xen_elfnote_string(const struct domain_setup_info *dsi,
-				       int type);
-
-struct load_funcs
-{
-    parseimagefunc parseimage;
-    loadimagefunc loadimage;
-};
-
-#define mfn_mapper_queue_size 128
-
-typedef struct mfn_mapper {
-    int xc_handle;
-    int size;
-    int prot;
-    int error;
-    int max_queue_size;
-    void * addr;
-    privcmd_mmap_t ioctl;
-
-} mfn_mapper_t;
 
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
                             unsigned long dst_pfn, const char *src_page);
 
-void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
-                   int xch, uint32_t dom, xen_pfn_t *parray,
-                   unsigned long vstart);
-
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
-
-/* image loading */
-int probe_elf(const char *image, unsigned long image_size,
-              struct load_funcs *funcs);
-int probe_bin(const char *image, unsigned long image_size,
-              struct load_funcs *funcs);
 
 #endif /* XG_PRIVATE_H */
