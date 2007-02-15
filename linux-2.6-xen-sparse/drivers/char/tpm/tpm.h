@@ -26,13 +26,6 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 
-#ifdef CONFIG_XEN
-enum tpm_bufsize {
-	TPM_MIN_BUFFERSIZE = 2048,
-	TPM_MAX_BUFFERSIZE = 64 * 1024,
-};
-#endif
-
 enum tpm_timeout {
 	TPM_TIMEOUT = 5,	/* msecs */
 };
@@ -68,9 +61,6 @@ struct tpm_vendor_specific {
 	const u8 req_complete_mask;
 	const u8 req_complete_val;
 	const u8 req_canceled;
-#ifdef CONFIG_XEN
-	u32 buffersize;
-#endif
 	void __iomem *iobase;		/* ioremapped address */
 	unsigned long base;		/* TPM base address */
 
@@ -104,9 +94,6 @@ struct tpm_chip {
 	/* Data passed to and from the tpm via the read/write calls */
 	u8 *data_buffer;
 	atomic_t data_pending;
-#ifdef CONFIG_XEN
-	atomic_t data_position;
-#endif
 	struct semaphore buffer_mutex;
 
 	struct timer_list user_read_timer;	/* user needs to claim result */
@@ -138,17 +125,6 @@ static inline void tpm_write_index(int base, int index, int value)
 }
 
 #ifdef CONFIG_XEN
-static inline u32 get_chip_buffersize(struct tpm_chip *chip)
-{
-	u32 size = chip->vendor.buffersize;
-	if (size > TPM_MAX_BUFFERSIZE) {
-		return TPM_MAX_BUFFERSIZE;
-	} else if (size < TPM_MIN_BUFFERSIZE) {
-		return TPM_MIN_BUFFERSIZE;
-	}
-	return size;
-}
-
 static inline void *chip_get_private(const struct tpm_chip *chip)
 {
 	return chip->priv;
