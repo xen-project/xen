@@ -9,6 +9,8 @@ FILES   = tcgbios tpm_drivers
 OBJECTS = $(foreach f,$(FILES),$(f).o)
 
 CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
+CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
+CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 CFLAGS += -I../ -I../../ -DGCC_PROTOS
 
 .PHONY: all clean
