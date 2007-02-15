@@ -45,9 +45,6 @@ class orgTreeCtrl(wx.TreeCtrl):
                              validator, name)
         self.parent = parent
         orgs_root = self.AddRoot(text="Organization / Department")
-        rootfont = wx.Font(pointSize=12, family=wx.FONTFAMILY_DEFAULT,
-                          style=wx.FONTSTYLE_NORMAL, weight=wx.FONTWEIGHT_LIGHT)
-        self.SetItemFont(orgs_root, rootfont)
         self.SetItemBackgroundColour(orgs_root, wx.LIGHT_GREY)
 
 
@@ -276,6 +273,7 @@ class ConsPanel(wx.Panel):
     def RefreshMe(self):
         size=self.parent.GetSize()
         self.parent.Fit()
+        self.parent.SetSize(size + (1,1))
         self.parent.SetSize(size)
 
 
@@ -880,7 +878,7 @@ class ezFrame(wx.Frame):
 
     def _OpenSpec(self, event):
         filediag = wx.FileDialog(self, defaultFile="myspec.wld",
-                                wildcard="*.wld", style=wx.OPEN | wx.OVERWRITE_PROMPT,
+                                wildcard="*.wld", style=wx.OPEN,
                                 message="Select Workload Definition file name")
         ret = filediag.ShowModal()
         name = filediag.GetPath()
