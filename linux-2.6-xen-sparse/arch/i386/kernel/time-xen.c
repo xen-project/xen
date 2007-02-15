@@ -708,7 +708,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (delta_cpu > 0) {
 		do_div(delta_cpu, NS_PER_TICK);
 		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
-		if (user_mode(regs))
+		if (user_mode_vm(regs))
 			account_user_time(current, (cputime_t)delta_cpu);
 		else
 			account_system_time(current, HARDIRQ_OFFSET,
@@ -722,7 +722,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* Local timer processing (see update_process_times()). */
 	run_local_timers();
 	if (rcu_pending(cpu))
-		rcu_check_callbacks(cpu, user_mode(regs));
+		rcu_check_callbacks(cpu, user_mode_vm(regs));
 	scheduler_tick();
 	run_posix_cpu_timers(current);
 	profile_tick(CPU_PROFILING, regs);
