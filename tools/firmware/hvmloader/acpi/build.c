@@ -110,7 +110,9 @@ int construct_madt(struct acpi_20_madt *madt)
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
         lapic->length  = sizeof(*lapic);
-        lapic->acpi_processor_id = lapic->apic_id = LAPIC_ID(i);
+        /* Processor ID must match processor-object IDs in the DSDT. */
+        lapic->acpi_processor_id = i;
+        lapic->apic_id = LAPIC_ID(i);
         lapic->flags   = ACPI_LOCAL_APIC_ENABLED;
         offset += sizeof(*lapic);
         lapic++;
