@@ -67,7 +67,7 @@ char * __init machine_specific_memory_setup(void)
 	if ( rc == -ENOSYS ) {
 		memmap.nr_entries = 1;
 		map[0].addr = 0ULL;
-		map[0].size = PFN_PHYS(xen_start_info->nr_pages);
+		map[0].size = PFN_PHYS((unsigned long long)xen_start_info->nr_pages);
 		/* 8MB slack (to balance backend allocations). */
 		map[0].size += 8ULL << 20;
 		map[0].type = E820_RAM;
