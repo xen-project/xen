@@ -18,9 +18,8 @@
 #define VGABASE		((void __iomem *)0xffffffff800b8000UL)
 #endif
 
-static int max_ypos = 25, max_xpos = 80;
-
 #ifndef CONFIG_XEN
+static int max_ypos = 25, max_xpos = 80;
 static int current_ypos = 25, current_xpos = 0; 
 
 static void early_vga_write(struct console *con, const char *str, unsigned n)
@@ -154,10 +153,6 @@ static __init void early_serial_init(char *s)
 
 #else /* CONFIG_XEN */
 
-#undef SCREEN_INFO
-#define SCREEN_INFO screen_info
-extern struct screen_info screen_info;
-
 static void
 early_serial_write(struct console *con, const char *s, unsigned count)
 {
@@ -273,11 +268,13 @@ int __init setup_early_printk(char *opt)
 		early_serial_init(buf);
 		early_console = &early_serial_console;
 	} else if (!strncmp(buf, "vga", 3)
+#ifndef CONFIG_XEN
 	           && SCREEN_INFO.orig_video_isVGA == 1) {
 		max_xpos = SCREEN_INFO.orig_video_cols;
 		max_ypos = SCREEN_INFO.orig_video_lines;
-#ifndef CONFIG_XEN
 		current_ypos = SCREEN_INFO.orig_y;
+#else
+	           || !strncmp(buf, "xen", 3)) {
 #endif
 		early_console = &early_vga_console;
  	} else if (!strncmp(buf, "simnow", 6)) {
