@@ -419,6 +419,7 @@ class HVMImageHandler(ImageHandler):
 
             if not vnc_config.get('vncunused', 0) and \
                    vnc_config.get('vncdisplay', 0):
+                vncdisplay = vnc_config.get('vncdisplay')
                 ret.append('-vnc')
                 ret.append(str(vncdisplay))
             else:
