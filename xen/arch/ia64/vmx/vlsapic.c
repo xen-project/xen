@@ -672,7 +672,9 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
     if (targ == NULL)
         panic_domain(NULL, "Unknown IPI cpu\n");
 
-    if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+    if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags) ||
+        test_bit(_VCPUF_down, &targ->vcpu_flags)) {
+
         struct pt_regs *targ_regs = vcpu_regs(targ);
         struct vcpu_guest_context c;
 

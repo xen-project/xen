@@ -180,6 +180,9 @@
 
 #define EFI_MEMDESC_VERSION		1
 
+/* Additionnal OEM SAL.  */
+#define SAL_XEN_SAL_RETURN	0x02000000
+
 extern struct ia64_pal_retval xen_pal_emulator(u64, u64, u64, u64);
 extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsigned long in2, unsigned long in3, unsigned long in4, unsigned long in5, unsigned long in6, unsigned long in7);
 extern struct ia64_pal_retval pal_emulator_static (unsigned long);

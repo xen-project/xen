@@ -371,6 +371,10 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	    case SAL_UPDATE_PAL:
 		printk("*** CALLED SAL_UPDATE_PAL.  IGNORED...\n");
 		break;
+	    case SAL_XEN_SAL_RETURN:
+	        if (!test_and_set_bit(_VCPUF_down, &current->vcpu_flags))
+			vcpu_sleep_nosync(current);
+		break;
 	    default:
 		printk("*** CALLED SAL_ WITH UNKNOWN INDEX.  IGNORED...\n");
 		status = -1;
