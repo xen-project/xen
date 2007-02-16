@@ -90,9 +90,6 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
 
-/* Allows setting of maximum possible memory size  */
-unsigned long xen_override_max_pfn;
-
 static int xen_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block xen_panic_block = {
 	xen_panic_event, NULL, 0 /* try to go last */
@@ -717,7 +714,6 @@ void __init setup_arch(char **cmdline_p)
 	/* reserve ebda region */
 	if (ebda_addr)
 		reserve_bootmem_generic(ebda_addr, ebda_size);
-#endif
 
 #ifdef CONFIG_SMP
 	/*
@@ -729,6 +725,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Reserve SMP trampoline */
 	reserve_bootmem_generic(SMP_TRAMPOLINE_BASE, PAGE_SIZE);
+#endif
 #endif
 
 #ifdef CONFIG_ACPI_SLEEP
