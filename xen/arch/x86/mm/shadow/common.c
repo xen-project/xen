@@ -1070,7 +1070,7 @@ sh_alloc_p2m_pages(struct domain *d)
          * believed to be a concern.
          */
         page_set_owner(&pg[i], d);
-        pg->count_info = 1;
+        pg[i].count_info = 1;
         list_add_tail(&pg[i].list, &d->arch.paging.shadow.p2m_freelist);
     }
     return 1;
