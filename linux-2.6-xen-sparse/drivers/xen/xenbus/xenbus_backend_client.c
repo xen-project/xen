@@ -48,9 +48,8 @@ struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
 	
-	lock_vm_area(area);
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
-	unlock_vm_area(area);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status != GNTST_okay) {
 		free_vm_area(area);
@@ -76,7 +75,8 @@ int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 	
 	gnttab_set_map_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status != GNTST_okay) {
 		xenbus_dev_fatal(dev, op.status,
@@ -98,9 +98,8 @@ int xenbus_unmap_ring_vfree(struct xenbus_device *dev, struct vm_struct *area)
 	gnttab_set_unmap_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			    (grant_handle_t)area->phys_addr);
 
-	lock_vm_area(area);
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
-	unlock_vm_area(area);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status == GNTST_okay)
 		free_vm_area(area);
@@ -121,7 +120,8 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 
 	gnttab_set_unmap_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
 			    handle);
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status != GNTST_okay)
 		xenbus_dev_error(dev, op.status,

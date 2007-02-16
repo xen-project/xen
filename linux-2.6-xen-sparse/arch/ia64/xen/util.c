@@ -95,18 +95,6 @@ void free_vm_area(struct vm_struct *area)
 }
 EXPORT_SYMBOL_GPL(free_vm_area);
 
-void lock_vm_area(struct vm_struct *area)
-{
-	// nothing
-}
-EXPORT_SYMBOL_GPL(lock_vm_area);
-
-void unlock_vm_area(struct vm_struct *area)
-{
-	// nothing
-}
-EXPORT_SYMBOL_GPL(unlock_vm_area);
-
 /*
  * Local variables:
  *  c-file-style: "linux"
