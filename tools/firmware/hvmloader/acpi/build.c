@@ -205,8 +205,11 @@ int construct_processor_objects(uint8_t *buf)
     for ( i = 0; i < nr_cpus; i++ )
     {
         memcpy(p, pdat, sizeof(pdat));
+        /* ProcessorName */
         p[5] = hex[(i>>4)&15];
         p[6] = hex[(i>>0)&15];
+        /* ProcessorID */
+        p[7] = i;
         p += sizeof(pdat);
     }
 
