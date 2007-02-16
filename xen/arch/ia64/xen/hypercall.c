@@ -105,8 +105,8 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		if (test_and_clear_bit(_VCPUF_down,
 				       &targ->vcpu_flags)) {
 			vcpu_wake(targ);
-			printk ("arch_boot_vcpu: vcpu %d awaken\n",
-				targ->vcpu_id);
+			printk(XENLOG_INFO "arch_boot_vcpu: vcpu %d awaken\n",
+			       targ->vcpu_id);
 		}
 		else
 			printk ("arch_boot_vcpu: huu, already awaken!\n");

@@ -519,7 +519,7 @@ int arch_domain_create(struct domain *d)
 
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
 	d->arch.has_pervcpu_vhpt = opt_pervcpu_vhpt;
-	dprintk(XENLOG_WARNING, "%s:%d domain %d pervcpu_vhpt %d\n",
+	dprintk(XENLOG_INFO, "%s:%d domain %d pervcpu_vhpt %d\n",
 	        __func__, __LINE__, d->domain_id, d->arch.has_pervcpu_vhpt);
 #endif
 	if (tlb_track_create(d) < 0)
@@ -547,7 +547,7 @@ int arch_domain_create(struct domain *d)
 	d->arch.ioport_caps = rangeset_new(d, "I/O Ports",
 	                                   RANGESETF_prettyprint_hex);
 
-	printk ("arch_domain_create: domain=%p\n", d);
+	dprintk(XENLOG_DEBUG, "arch_domain_create: domain=%p\n", d);
 	return 0;
 
 fail_nomem:
@@ -765,7 +765,7 @@ domain_set_shared_info_va (unsigned long va)
 
 	/* Note: this doesn't work well if other cpus are already running.
 	   However this is part of the spec :-)  */
-	printk ("Domain set shared_info_va to 0x%016lx\n", va);
+	gdprintk(XENLOG_DEBUG, "Domain set shared_info_va to 0x%016lx\n", va);
 	d->arch.shared_info_va = va;
 
 	VCPU(v, interrupt_mask_addr) = (unsigned char *)va +

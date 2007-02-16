@@ -185,9 +185,9 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	d->arch.metaphysical_rr0 = allocate_metaphysical_rr(d, 0);
 	d->arch.metaphysical_rr4 = allocate_metaphysical_rr(d, 1);
 
-	printk("### domain %p: rid=%x-%x mp_rid=%x\n",
-	       d, d->arch.starting_rid, d->arch.ending_rid,
-	       d->arch.starting_mp_rid);
+	dprintk(XENLOG_DEBUG, "### domain %p: rid=%x-%x mp_rid=%x\n",
+		d, d->arch.starting_rid, d->arch.ending_rid,
+		d->arch.starting_mp_rid);
 	
 	return 1;
 }

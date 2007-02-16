@@ -29,7 +29,7 @@
 #define CONFIG_TLB_TRACK_DEBUG
 #ifdef CONFIG_TLB_TRACK_DEBUG
 # define tlb_track_printd(fmt, ...)     \
-    printk("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
+    dprintk(XENLOG_DEBUG, fmt, ##__VA_ARGS__)
 #else
 # define tlb_track_printd(fmt, ...)     do { } while (0)
 #endif
@@ -111,8 +111,8 @@ tlb_track_create(struct domain* d)
 
     smp_mb(); /* make initialization visible before use. */
     d->arch.tlb_track = tlb_track;
-    printk("%s:%d hash 0x%p hash_size %d \n",
-           __func__, __LINE__, tlb_track->hash, tlb_track->hash_size);
+    dprintk(XENLOG_DEBUG, "hash 0x%p hash_size %d\n",
+            tlb_track->hash, tlb_track->hash_size);
 
     return 0;
 

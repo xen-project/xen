@@ -198,15 +198,16 @@ print_md(efi_memory_desc_t *md)
 {
 	u64 size;
 	
-	printk("dom mem: type=%2u, attr=0x%016lx, range=[0x%016lx-0x%016lx) ",
+	printk(XENLOG_INFO "dom mem: type=%2u, attr=0x%016lx, "
+	       "range=[0x%016lx-0x%016lx) ",
 	       md->type, md->attribute, md->phys_addr,
 	       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
 
 	size = md->num_pages << EFI_PAGE_SHIFT;
 	if (size > ONE_MB)
-		printk ("(%luMB)\n", size >> 20);
+		printk("(%luMB)\n", size >> 20);
 	else
-		printk ("(%luKB)\n", size >> 10);
+		printk("(%luKB)\n", size >> 10);
 }
 
 static u32 lsapic_nbr;
@@ -754,11 +755,11 @@ dom_fw_init(struct domain *d,
 		}
 		printk("\n");
 	} else {
-		printk("DomainU EFI build up:");
+		printk(XENLOG_GUEST XENLOG_INFO "DomainU EFI build up:");
 
 		tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
 		tables->efi_tables[i].table = FW_ACPI_BASE_PADDR;
-		printk(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
+		printk(" ACPI 2.0=0x%lx", tables->efi_tables[i].table);
 		i++;
 		printk("\n");
 	}

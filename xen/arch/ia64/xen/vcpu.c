@@ -1017,7 +1017,8 @@ IA64FAULT vcpu_get_cmcv(VCPU * vcpu, u64 * pval)
 IA64FAULT vcpu_get_lrr0(VCPU * vcpu, u64 * pval)
 {
 	// fix this when setting values other than m-bit is supported
-	printk("vcpu_get_lrr0: Unmasked interrupts unsupported\n");
+	gdprintk(XENLOG_DEBUG,
+		 "vcpu_get_lrr0: Unmasked interrupts unsupported\n");
 	*pval = (1L << 16);
 	return IA64_NO_FAULT;
 }
@@ -1025,7 +1026,8 @@ IA64FAULT vcpu_get_lrr0(VCPU * vcpu, u64 * pval)
 IA64FAULT vcpu_get_lrr1(VCPU * vcpu, u64 * pval)
 {
 	// fix this when setting values other than m-bit is supported
-	printk("vcpu_get_lrr1: Unmasked interrupts unsupported\n");
+	gdprintk(XENLOG_DEBUG,
+		 "vcpu_get_lrr1: Unmasked interrupts unsupported\n");
 	*pval = (1L << 16);
 	return IA64_NO_FAULT;
 }
