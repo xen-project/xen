@@ -583,15 +583,17 @@ void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
     unsigned long guest_flags = guest_state->flags;
-    int i = 0;
 
     data->shadow_gs = guest_state->shadow_gs;
 
     /* save msrs */
     data->flags = guest_flags;
-    for (i = 0; i < VMX_MSR_COUNT; i++)
-        data->msr_items[i] = guest_state->msrs[i];
-    
+    data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
+    data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
+    data->msr_cstar        = guest_state->msrs[VMX_INDEX_MSR_CSTAR];
+    data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
+    data->msr_efer         = guest_state->msrs[VMX_INDEX_MSR_EFER];
+
     data->tsc = hvm_get_guest_time(v);
     
     dump_msr_state(guest_state);
@@ -599,13 +601,15 @@ void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 
 void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
-    int i = 0;
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
     guest_state->flags = data->flags;
-    for (i = 0; i < VMX_MSR_COUNT; i++)
-        guest_state->msrs[i] = data->msr_items[i];
+    guest_state->msrs[VMX_INDEX_MSR_LSTAR]        = data->msr_lstar;
+    guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
+    guest_state->msrs[VMX_INDEX_MSR_CSTAR]        = data->msr_cstar;
+    guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK] = data->msr_syscall_mask;
+    guest_state->msrs[VMX_INDEX_MSR_EFER]         = data->msr_efer;
 
     guest_state->shadow_gs = data->shadow_gs;
 
