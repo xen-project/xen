@@ -1329,6 +1329,7 @@ grant_table_create(
     memset(t->maptrack, 0, max_nr_maptrack_frames() * sizeof(t->maptrack[0]));
     if ( (t->maptrack[0] = alloc_xenheap_page()) == NULL )
         goto no_mem_3;
+    memset(t->maptrack[0], 0, PAGE_SIZE);
     t->maptrack_limit = PAGE_SIZE / sizeof(struct grant_mapping);
     for ( i = 0; i < t->maptrack_limit; i++ )
         t->maptrack[0][i].ref = i+1;
