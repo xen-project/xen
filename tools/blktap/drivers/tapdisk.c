@@ -48,6 +48,12 @@ static pid_t process;
 int connected_disks = 0;
 fd_list_entry_t *fd_start = NULL;
 
+int do_cow_read(struct disk_driver *dd, blkif_request_t *req, 
+		int sidx, uint64_t sector, int nr_secs);
+
+#define td_for_each_disk(tds, drv) \
+        for (drv = tds->disks; drv != NULL; drv = drv->next)
+
 void usage(void) 
 {
 	fprintf(stderr, "blktap-utils: v1.0.0\n");
@@ -78,10 +84,17 @@ void daemonize(void)
 static void unmap_disk(struct td_state *s)
 {
 	tapdev_info_t *info = s->ring_info;
-	struct tap_disk *drv = s->drv;
+	struct disk_driver *dd, *tmp;
 	fd_list_entry_t *entry;
 
-	drv->td_close(s);
+	dd = s->disks;
+	while (dd) {
+		tmp = dd->next;
+		dd->drv->td_close(dd);
+		free(dd->private);
+		free(dd);
+		dd = tmp;
+	}
 
 	if (info != NULL && info->mem > 0)
 	        munmap(info->mem, getpagesize() * BLKTAP_MMAP_REGION_SIZE);
@@ -96,7 +109,6 @@ static void unmap_disk(struct td_state *s)
 	free(s->fd_entry);
 	free(s->blkif);
 	free(s->ring_info);
-        free(s->private);
 	free(s);
 
 	return;
@@ -113,16 +125,19 @@ void sig_handler(int sig)
 static inline int LOCAL_FD_SET(fd_set *readfds)
 {
 	fd_list_entry_t *ptr;
+	struct disk_driver *dd;
 
 	ptr = fd_start;
 	while (ptr != NULL) {
 		if (ptr->tap_fd) {
 			FD_SET(ptr->tap_fd, readfds);
-			if (ptr->io_fd[READ]) 
-				FD_SET(ptr->io_fd[READ], readfds);
-			maxfds = (ptr->io_fd[READ] > maxfds ? 
-					ptr->io_fd[READ]: maxfds);
-			maxfds = (ptr->tap_fd > maxfds ? ptr->tap_fd: maxfds);
+			td_for_each_disk(ptr->s, dd) {
+				if (dd->io_fd[READ]) 
+					FD_SET(dd->io_fd[READ], readfds);
+				maxfds = (dd->io_fd[READ] > maxfds ? 
+					  dd->io_fd[READ] : maxfds);
+			}
+			maxfds = (ptr->tap_fd > maxfds ? ptr->tap_fd : maxfds);
 		}
 		ptr = ptr->next;
 	}
@@ -130,8 +145,7 @@ static inline int LOCAL_FD_SET(fd_set *readfds)
 	return 0;
 }
 
-static inline fd_list_entry_t *add_fd_entry(
-	int tap_fd, int io_fd[MAX_IOFD], struct td_state *s)
+static inline fd_list_entry_t *add_fd_entry(int tap_fd, struct td_state *s)
 {
 	fd_list_entry_t **pprev, *entry;
 	int i;
@@ -139,12 +153,10 @@ static inline fd_list_entry_t *add_fd_entry(
 	DPRINTF("Adding fd_list_entry\n");
 
 	/*Add to linked list*/
-	s->fd_entry = entry = malloc(sizeof(fd_list_entry_t));
+	s->fd_entry   = entry = malloc(sizeof(fd_list_entry_t));
 	entry->tap_fd = tap_fd;
-	for (i = 0; i < MAX_IOFD; i++)
-		entry->io_fd[i] = io_fd[i];
-	entry->s = s;
-	entry->next = NULL;
+	entry->s      = s;
+	entry->next   = NULL;
 
 	pprev = &fd_start;
 	while (*pprev != NULL)
@@ -171,7 +183,7 @@ static inline struct td_state *get_state(int cookie)
 static struct tap_disk *get_driver(int drivertype)
 {
 	/* blktapctrl has passed us the driver type */
-	
+
 	return dtypes[drivertype]->drv;
 }
 
@@ -183,12 +195,34 @@ static struct td_state *state_init(void)
 
 	s = malloc(sizeof(struct td_state));
 	blkif = s->blkif = malloc(sizeof(blkif_t));
-	s->ring_info = malloc(sizeof(tapdev_info_t));
+	s->ring_info = calloc(1, sizeof(tapdev_info_t));
 
-	for (i = 0; i < MAX_REQUESTS; i++)
-		blkif->pending_list[i].count = 0;
+	for (i = 0; i < MAX_REQUESTS; i++) {
+		blkif->pending_list[i].secs_pending = 0;
+		blkif->pending_list[i].submitting = 0;
+	}
 
 	return s;
+}
+
+static struct disk_driver *disk_init(struct td_state *s, struct tap_disk *drv)
+{
+	struct disk_driver *dd;
+
+	dd = calloc(1, sizeof(struct disk_driver));
+	if (!dd)
+		return NULL;
+	
+	dd->private = malloc(drv->private_data_size);
+	if (!dd->private) {
+		free(dd);
+		return NULL;
+	}
+
+	dd->drv      = drv;
+	dd->td_state = s;
+
+	return dd;
 }
 
 static int map_new_dev(struct td_state *s, int minor)
@@ -246,6 +280,51 @@ static int map_new_dev(struct td_state *s, int minor)
 	return -1;
 }
 
+static int open_disk(struct td_state *s, struct disk_driver *dd, char *path)
+{
+	int err;
+	struct disk_driver *d = dd;
+
+	err = dd->drv->td_open(dd, path);
+	if (err)
+		return err;
+
+	/* load backing files as necessary */
+	while (d->drv->td_has_parent(d)) {
+		struct disk_driver *new;
+		
+		new = calloc(1, sizeof(struct disk_driver));
+		if (!new)
+			goto fail;
+		new->drv      = d->drv;
+		new->td_state = s;
+		new->private  = malloc(new->drv->private_data_size);
+		if (!new->private) {
+			free(new);
+			goto fail;
+		}
+		
+		err = d->drv->td_get_parent(d, new);
+		if (err)
+			goto fail;
+
+		d = d->next = new;
+	}
+
+	return 0;
+
+ fail:
+	DPRINTF("failed opening disk\n");
+	while (dd) {
+		d = dd->next;
+		dd->drv->td_close(dd);
+		free(dd->private);
+		free(dd);
+		dd = d;
+	}
+	return err;
+}
+
 static int read_msg(char *buf)
 {
 	int length, len, msglen, tap_fd, *io_fd;
@@ -255,6 +334,7 @@ static int read_msg(char *buf)
 	msg_newdev_t *msg_dev;
 	msg_pid_t *msg_pid;
 	struct tap_disk *drv;
+	struct disk_driver *dd;
 	int ret = -1;
 	struct td_state *s = NULL;
 	fd_list_entry_t *entry;
@@ -289,20 +369,20 @@ static int read_msg(char *buf)
 			if (s == NULL)
 				goto params_done;
 
-			s->drv = drv;
-			s->private = malloc(drv->private_data_size);
-			if (s->private == NULL) {
+			s->disks = dd = disk_init(s, drv);
+			if (!dd) {
 				free(s);
 				goto params_done;
 			}
 
 			/*Open file*/
-			ret = drv->td_open(s, path);
-			io_fd = drv->td_get_fd(s);
+			ret = open_disk(s, dd, path);
+			if (ret)
+				goto params_done;
 
-			entry = add_fd_entry(0, io_fd, s);
+			entry = add_fd_entry(0, s);
 			entry->cookie = msg->cookie;
-			DPRINTF("Entered cookie %d\n",entry->cookie);
+			DPRINTF("Entered cookie %d\n", entry->cookie);
 			
 			memset(buf, 0x00, MSG_SIZE); 
 			
@@ -323,13 +403,12 @@ static int read_msg(char *buf)
 			free(path);
 			return 1;
 			
-			
-			
 		case CTLMSG_NEWDEV:
 			msg_dev = (msg_newdev_t *)(buf + sizeof(msg_hdr_t));
 
 			s = get_state(msg->cookie);
-			DPRINTF("Retrieving state, cookie %d.....[%s]\n",msg->cookie, (s == NULL ? "FAIL":"OK"));
+			DPRINTF("Retrieving state, cookie %d.....[%s]\n",
+				msg->cookie, (s == NULL ? "FAIL":"OK"));
 			if (s != NULL) {
 				ret = ((map_new_dev(s, msg_dev->devnum) 
 					== msg_dev->devnum ? 0: -1));
@@ -397,49 +476,75 @@ static inline void kick_responses(struct td_state *s)
 	}
 }
 
-void io_done(struct td_state *s, int sid)
+void io_done(struct disk_driver *dd, int sid)
 {
-	struct tap_disk *drv = s->drv;
+	struct tap_disk *drv = dd->drv;
 
 	if (!run) return; /*We have received signal to close*/
 
-	if (drv->td_do_callbacks(s, sid) > 0) kick_responses(s);
+	if (drv->td_do_callbacks(dd, sid) > 0) kick_responses(dd->td_state);
 
 	return;
 }
 
-int send_responses(struct td_state *s, int res, int idx, void *private)
+static inline uint64_t
+segment_start(blkif_request_t *req, int sidx)
 {
+	int i;
+	uint64_t start = req->sector_number;
+
+	for (i = 0; i < sidx; i++) 
+		start += (req->seg[i].last_sect - req->seg[i].first_sect + 1);
+
+	return start;
+}
+
+uint64_t sends, responds;
+int send_responses(struct disk_driver *dd, int res, 
+		   uint64_t sector, int nr_secs, int idx, void *private)
+{
+	pending_req_t   *preq;
 	blkif_request_t *req;
 	int responses_queued = 0;
+	struct td_state *s = dd->td_state;
 	blkif_t *blkif = s->blkif;
+	int sidx = (int)private, secs_done = nr_secs;
 
-	req   = &blkif->pending_list[idx].req;
-			
-	if ( (idx > MAX_REQUESTS-1) || 
-	    (blkif->pending_list[idx].count == 0) )
+	if ( (idx > MAX_REQUESTS-1) )
 	{
 		DPRINTF("invalid index returned(%u)!\n", idx);
 		return 0;
 	}
-	
-	if (res != 0) {
-	        blkif->pending_list[idx].status = BLKIF_RSP_ERROR;
+	preq = &blkif->pending_list[idx];
+	req  = &preq->req;
+
+	if (res == BLK_NOT_ALLOCATED) {
+		res = do_cow_read(dd, req, sidx, sector, nr_secs);
+		if (res >= 0) {
+			secs_done = res;
+			res = 0;
+		} else
+			secs_done = 0;
 	}
 
-	blkif->pending_list[idx].count--;
+	preq->secs_pending -= secs_done;
+
+	if (res == -EBUSY && preq->submitting) 
+		return -EBUSY;  /* propagate -EBUSY back to higher layers */
+	if (res) 
+		preq->status = BLKIF_RSP_ERROR;
 	
-	if (blkif->pending_list[idx].count == 0) 
+	if (!preq->submitting && preq->secs_pending == 0) 
 	{
 		blkif_request_t tmp;
 		blkif_response_t *rsp;
-		
-		tmp = blkif->pending_list[idx].req;
+
+		tmp = preq->req;
 		rsp = (blkif_response_t *)req;
 		
 		rsp->id = tmp.id;
 		rsp->operation = tmp.operation;
-		rsp->status = blkif->pending_list[idx].status;
+		rsp->status = preq->status;
 		
 		write_rsp_to_ring(s, rsp);
 		responses_queued++;
@@ -447,15 +552,51 @@ int send_responses(struct td_state *s, int res, int idx, void *private)
 	return responses_queued;
 }
 
+int do_cow_read(struct disk_driver *dd, blkif_request_t *req, 
+		int sidx, uint64_t sector, int nr_secs)
+{
+	char *page;
+	int ret, early;
+	uint64_t seg_start, seg_end;
+	struct td_state  *s = dd->td_state;
+	tapdev_info_t *info = s->ring_info;
+	struct disk_driver *parent = dd->next;
+	
+	seg_start = segment_start(req, sidx);
+	seg_end   = seg_start + req->seg[sidx].last_sect + 1;
+	
+	ASSERT(sector >= seg_start && sector + nr_secs <= seg_end);
+
+	page  = (char *)MMAP_VADDR(info->vstart, 
+				   (unsigned long)req->id, sidx);
+	page += (req->seg[sidx].first_sect << SECTOR_SHIFT);
+	page += ((sector - seg_start) << SECTOR_SHIFT);
+
+	if (!parent) {
+		memset(page, 0, nr_secs << SECTOR_SHIFT);
+		return nr_secs;
+	}
+
+	/* reissue request to backing file */
+	ret = parent->drv->td_queue_read(parent, sector, nr_secs,
+					 page, send_responses, 
+					 req->id, (void *)sidx);
+	if (ret > 0)
+		parent->early += ret;
+
+	return ((ret >= 0) ? 0 : ret);
+}
+
 static void get_io_request(struct td_state *s)
 {
-	RING_IDX          rp, rc, j, i, ret;
+	RING_IDX          rp, rc, j, i;
 	blkif_request_t  *req;
-	int idx, nsects;
+	int idx, nsects, ret;
 	uint64_t sector_nr;
 	char *page;
 	int early = 0; /* count early completions */
-	struct tap_disk *drv = s->drv;
+	struct disk_driver *dd = s->disks;
+	struct tap_disk *drv   = dd->drv;
 	blkif_t *blkif = s->blkif;
 	tapdev_info_t *info = s->ring_info;
 	int page_size = getpagesize();
@@ -466,23 +607,33 @@ static void get_io_request(struct td_state *s)
 	rmb();
 	for (j = info->fe_ring.req_cons; j != rp; j++)
 	{
-		int done = 0; 
+		int done = 0, start_seg = 0; 
 
 		req = NULL;
 		req = RING_GET_REQUEST(&info->fe_ring, j);
 		++info->fe_ring.req_cons;
 		
 		if (req == NULL) continue;
-		
+
 		idx = req->id;
-		ASSERT(blkif->pending_list[idx].count == 0);
-		memcpy(&blkif->pending_list[idx].req, req, sizeof(*req));
-		blkif->pending_list[idx].status = BLKIF_RSP_OKAY;
-		blkif->pending_list[idx].count = req->nr_segments;
 
-		sector_nr = req->sector_number;
+		if (info->busy.req) {
+			/* continue where we left off last time */
+			ASSERT(info->busy.req == req);
+			start_seg = info->busy.seg_idx;
+			sector_nr = segment_start(req, start_seg);
+			info->busy.seg_idx = 0;
+			info->busy.req     = NULL;
+		} else {
+			ASSERT(blkif->pending_list[idx].secs_pending == 0);
+			memcpy(&blkif->pending_list[idx].req, 
+			       req, sizeof(*req));
+			blkif->pending_list[idx].status = BLKIF_RSP_OKAY;
+			blkif->pending_list[idx].submitting = 1;
+			sector_nr = req->sector_number;
+		}
 
-		for (i = 0; i < req->nr_segments; i++) {
+		for (i = start_seg; i < req->nr_segments; i++) {
 			nsects = req->seg[i].last_sect - 
 				 req->seg[i].first_sect + 1;
 	
@@ -508,31 +659,37 @@ static void get_io_request(struct td_state *s)
 					(long long unsigned) sector_nr);
 				continue;
 			}
-			
+
+			blkif->pending_list[idx].secs_pending += nsects;
+
 			switch (req->operation) 
 			{
 			case BLKIF_OP_WRITE:
-				ret = drv->td_queue_write(s, sector_nr,
-						nsects, page, send_responses, 
-						idx, NULL);
-				if (ret > 0) early += ret;
+				ret = drv->td_queue_write(dd, sector_nr,
+							  nsects, page, 
+							  send_responses,
+							  idx, (void *)i);
+				if (ret > 0) dd->early += ret;
 				else if (ret == -EBUSY) {
-					/*
-					 * TODO: Sector is locked         *
-					 * Need to put req back on queue  *
-					 */
+					/* put req back on queue */
+					--info->fe_ring.req_cons;
+					info->busy.req     = req;
+					info->busy.seg_idx = i;
+					goto out;
 				}
 				break;
 			case BLKIF_OP_READ:
-				ret = drv->td_queue_read(s, sector_nr,
-						nsects, page, send_responses, 
-						idx, NULL);
-				if (ret > 0) early += ret;
+				ret = drv->td_queue_read(dd, sector_nr,
+							 nsects, page, 
+							 send_responses,
+							 idx, (void *)i);
+				if (ret > 0) dd->early += ret;
 				else if (ret == -EBUSY) {
-					/*
-					 * TODO: Sector is locked         *
-					 * Need to put req back on queue  *
-					 */
+					/* put req back on queue */
+					--info->fe_ring.req_cons;
+					info->busy.req     = req;
+					info->busy.seg_idx = i;
+					goto out;
 				}
 				break;
 			default:
@@ -541,14 +698,22 @@ static void get_io_request(struct td_state *s)
 			}
 			sector_nr += nsects;
 		}
+		blkif->pending_list[idx].submitting = 0;
+		/* force write_rsp_to_ring for synchronous case */
+		if (blkif->pending_list[idx].secs_pending == 0)
+			dd->early += send_responses(dd, 0, 0, 0, idx, (void *)0);
 	}
 
+ out:
 	/*Batch done*/
-	drv->td_submit(s);
-	
-	if (early > 0) 
-		io_done(s,10);
-		
+	td_for_each_disk(s, dd) {
+		dd->early += dd->drv->td_submit(dd);
+		if (dd->early > 0) {
+			io_done(dd, 10);
+			dd->early = 0;
+		}
+	}
+
 	return;
 }
 
@@ -558,10 +723,9 @@ int main(int argc, char *argv[])
 	char *p, *buf;
 	fd_set readfds, writefds;	
 	fd_list_entry_t *ptr;
-	struct tap_disk *drv;
 	struct td_state *s;
 	char openlogbuf[128];
-	
+
 	if (argc != 3) usage();
 
 	daemonize();
@@ -573,12 +737,12 @@ int main(int argc, char *argv[])
 	signal (SIGINT, sig_handler);
 
 	/*Open the control channel*/
-	fds[READ] = open(argv[1],O_RDWR|O_NONBLOCK);
+	fds[READ]  = open(argv[1],O_RDWR|O_NONBLOCK);
 	fds[WRITE] = open(argv[2],O_RDWR|O_NONBLOCK);
 
 	if ( (fds[READ] < 0) || (fds[WRITE] < 0) ) 
 	{
-		DPRINTF("FD open failed [%d,%d]\n",fds[READ], fds[WRITE]);
+		DPRINTF("FD open failed [%d,%d]\n", fds[READ], fds[WRITE]);
 		exit(-1);
 	}
 
@@ -608,11 +772,22 @@ int main(int argc, char *argv[])
 		{
 			ptr = fd_start;
 			while (ptr != NULL) {
-				if (FD_ISSET(ptr->tap_fd, &readfds)) 
+				int progress_made = 0;
+				struct disk_driver *dd;
+				tapdev_info_t *info = ptr->s->ring_info;
+
+				td_for_each_disk(ptr->s, dd) {
+					if (dd->io_fd[READ] &&
+					    FD_ISSET(dd->io_fd[READ], 
+						     &readfds)) {
+						io_done(dd, READ);
+						progress_made = 1;
+					}
+				}
+
+				if (FD_ISSET(ptr->tap_fd, &readfds) ||
+				    (info->busy.req && progress_made))
 					get_io_request(ptr->s);
-				if (ptr->io_fd[READ] && 
-						FD_ISSET(ptr->io_fd[READ], &readfds)) 
-					io_done(ptr->s, READ);
 
 				ptr = ptr->next;
 			}
@@ -628,11 +803,8 @@ int main(int argc, char *argv[])
 	ptr = fd_start;
 	while (ptr != NULL) {
 		s = ptr->s;
-		drv = s->drv;
 
 		unmap_disk(s);
-		drv->td_close(s);
-		free(s->private);
 		free(s->blkif);
 		free(s->ring_info);
 		free(s);

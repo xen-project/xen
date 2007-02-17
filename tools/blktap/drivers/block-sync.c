@@ -106,12 +106,23 @@ static int get_image_info(struct td_state *s, int fd)
 	return 0;
 }
 
+static inline void init_fds(struct disk_driver *dd)
+{
+	int i;
+	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
+	
+	for(i = 0; i < MAX_IOFD; i++)
+		dd->io_fd[i] = 0;
+
+	dd->io_fd[0] = prv->poll_pipe[0];
+}
+
 /* Open the disk file and initialize aio state. */
-int tdsync_open (struct td_state *s, const char *name)
+int tdsync_open (struct disk_driver *dd, const char *name)
 {
 	int i, fd, ret = 0;
-	struct tdsync_state *prv = (struct tdsync_state *)s->private;
-	s->private = prv;
+	struct td_state     *s   = dd->td_state;
+	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
 	
 	/* set up a pipe so that we can hand back a poll fd that won't fire.*/
 	ret = pipe(prv->poll_pipe);
@@ -138,16 +149,18 @@ int tdsync_open (struct td_state *s, const char *name)
 
         prv->fd = fd;
 
+	init_fds(dd);
 	ret = get_image_info(s, fd);
 done:
 	return ret;	
 }
 
- int tdsync_queue_read(struct td_state *s, uint64_t sector,
+ int tdsync_queue_read(struct disk_driver *dd, uint64_t sector,
 			       int nb_sectors, char *buf, td_callback_t cb,
 			       int id, void *private)
 {
-	struct tdsync_state *prv = (struct tdsync_state *)s->private;
+	struct td_state     *s   = dd->td_state;
+	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
 	int      size    = nb_sectors * s->sector_size;
 	uint64_t offset  = sector * (uint64_t)s->sector_size;
 	int ret;
@@ -162,16 +175,15 @@ done:
 		} 
 	} else ret = 0 - errno;
 		
-	cb(s, (ret < 0) ? ret: 0, id, private);
-	
-	return 1;
+	return cb(dd, (ret < 0) ? ret: 0, sector, nb_sectors, id, private);
 }
 
- int tdsync_queue_write(struct td_state *s, uint64_t sector,
+ int tdsync_queue_write(struct disk_driver *dd, uint64_t sector,
 			       int nb_sectors, char *buf, td_callback_t cb,
 			       int id, void *private)
 {
-	struct tdsync_state *prv = (struct tdsync_state *)s->private;
+	struct td_state     *s   = dd->td_state;
+	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
 	int      size    = nb_sectors * s->sector_size;
 	uint64_t offset  = sector * (uint64_t)s->sector_size;
 	int ret = 0;
@@ -186,34 +198,17 @@ done:
 		}
 	} else ret = 0 - errno;
 		
-	cb(s, (ret < 0) ? ret : 0, id, private);
-	
-	return 1;
+	return cb(dd, (ret < 0) ? ret : 0, sector, nb_sectors, id, private);
 }
  		
-int tdsync_submit(struct td_state *s)
+int tdsync_submit(struct disk_driver *dd)
 {
 	return 0;	
 }
 
-
-int *tdsync_get_fd(struct td_state *s)
+int tdsync_close(struct disk_driver *dd)
 {
-	struct tdsync_state *prv = (struct tdsync_state *)s->private;
-	
-	int *fds, i;
-
-	fds = malloc(sizeof(int) * MAX_IOFD);
-	/*initialise the FD array*/
-	for(i=0;i<MAX_IOFD;i++) fds[i] = 0;
-
-	fds[0] = prv->poll_pipe[0];
-	return fds;
-}
-
-int tdsync_close(struct td_state *s)
-{
-	struct tdsync_state *prv = (struct tdsync_state *)s->private;
+	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
 	
 	close(prv->fd);
 	close(prv->poll_pipe[0]);
@@ -222,21 +217,31 @@ int tdsync_close(struct td_state *s)
 	return 0;
 }
 
-int tdsync_do_callbacks(struct td_state *s, int sid)
+int tdsync_do_callbacks(struct disk_driver *dd, int sid)
 {
 	/* always ask for a kick */
 	return 1;
 }
 
-struct tap_disk tapdisk_sync = {
-	"tapdisk_sync",
-	sizeof(struct tdsync_state),
-	tdsync_open,
-	tdsync_queue_read,
-	tdsync_queue_write,
-	tdsync_submit,
-	tdsync_get_fd,
-	tdsync_close,
-	tdsync_do_callbacks,
-};
+int tdsync_has_parent(struct disk_driver *dd)
+{
+	return 0;
+}
 
+int tdsync_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+{
+	return -EINVAL;
+}
+
+struct tap_disk tapdisk_sync = {
+	.disk_type           = "tapdisk_sync",
+	.private_data_size   = sizeof(struct tdsync_state),
+	.td_open             = tdsync_open,
+	.td_queue_read       = tdsync_queue_read,
+	.td_queue_write      = tdsync_queue_write,
+	.td_submit           = tdsync_submit,
+	.td_has_parent       = tdsync_has_parent,
+	.td_get_parent       = tdsync_get_parent,
+	.td_close            = tdsync_close,
+	.td_do_callbacks     = tdsync_do_callbacks,
+};

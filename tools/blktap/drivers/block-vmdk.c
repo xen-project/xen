@@ -107,14 +107,25 @@ struct tdvmdk_state {
     	unsigned int cluster_sectors;
 };
 
+static inline void init_fds(struct disk_driver *dd)
+{
+        int i;
+	struct tdvmdk_state *prv = (struct tdvmdk_state *)dd->private;
+
+        for (i = 0; i < MAX_IOFD; i++)
+		dd->io_fd[i] = 0;
+
+        dd->io_fd[0] = prv->poll_pipe[0];
+}
 
 /* Open the disk file and initialize aio state. */
-static int tdvmdk_open (struct td_state *s, const char *name)
+static int tdvmdk_open (struct disk_driver *dd, const char *name)
 {
 	int ret, fd;
     	int l1_size, i;
     	uint32_t magic;
-	struct tdvmdk_state *prv = (struct tdvmdk_state *)s->private;
+	struct td_state     *s   = dd->td_state;
+	struct tdvmdk_state *prv = (struct tdvmdk_state *)dd->private;
 
 	/* set up a pipe so that we can hand back a poll fd that won't fire.*/
 	ret = pipe(prv->poll_pipe);
@@ -206,6 +217,7 @@ static int tdvmdk_open (struct td_state *s, const char *name)
     	if (!prv->l2_cache)
         	goto fail;
     	prv->fd = fd;
+	init_fds(dd);
 	DPRINTF("VMDK File opened successfully\n");
     	return 0;
 	
@@ -218,10 +230,9 @@ fail:
 	return -1;
 }
 
-static uint64_t get_cluster_offset(struct td_state *s, 
+static uint64_t get_cluster_offset(struct tdvmdk_state *prv, 
                                    uint64_t offset, int allocate)
 {
-	struct tdvmdk_state *prv = (struct tdvmdk_state *)s->private;
     	unsigned int l1_index, l2_offset, l2_index;
     	int min_index, i, j;
     	uint32_t min_count, *l2_table, tmp;
@@ -291,16 +302,17 @@ static uint64_t get_cluster_offset(struct td_state *s,
     	return cluster_offset;
 }
 
-static int tdvmdk_queue_read(struct td_state *s, uint64_t sector,
+static int tdvmdk_queue_read(struct disk_driver *dd, uint64_t sector,
 			       int nb_sectors, char *buf, td_callback_t cb,
 			       int id, void *private)
 {
-	struct tdvmdk_state *prv = (struct tdvmdk_state *)s->private;
+	struct tdvmdk_state *prv = (struct tdvmdk_state *)dd->private;
     	int index_in_cluster, n;
     	uint64_t cluster_offset;
     	int ret = 0;
+
     	while (nb_sectors > 0) {
-        	cluster_offset = get_cluster_offset(s, sector << 9, 0);
+        	cluster_offset = get_cluster_offset(prv, sector << 9, 0);
         	index_in_cluster = sector % prv->cluster_sectors;
         	n = prv->cluster_sectors - index_in_cluster;
         	if (n > nb_sectors)
@@ -321,27 +333,24 @@ static int tdvmdk_queue_read(struct td_state *s, uint64_t sector,
         	buf += n * 512;
     	}
 done:
-	cb(s, ret == -1 ? -1 : 0, id, private);
-	
-	return 1;
+	return cb(dd, ret == -1 ? -1 : 0, sector, nb_sectors, id, private);
 }
 
-static  int tdvmdk_queue_write(struct td_state *s, uint64_t sector,
+static  int tdvmdk_queue_write(struct disk_driver *dd, uint64_t sector,
 			       int nb_sectors, char *buf, td_callback_t cb,
 			       int id, void *private)
 {
-	struct tdvmdk_state *prv = (struct tdvmdk_state *)s->private;
+	struct tdvmdk_state *prv = (struct tdvmdk_state *)dd->private;
     	int index_in_cluster, n;
     	uint64_t cluster_offset;
     	int ret = 0;
-    	
 
     	while (nb_sectors > 0) {
         	index_in_cluster = sector & (prv->cluster_sectors - 1);
         	n = prv->cluster_sectors - index_in_cluster;
         	if (n > nb_sectors)
             		n = nb_sectors;
-        	cluster_offset = get_cluster_offset(s, sector << 9, 1);
+        	cluster_offset = get_cluster_offset(prv, sector << 9, 1);
         	if (!cluster_offset) {
             		ret = -1;
             		goto done;
@@ -358,33 +367,17 @@ static  int tdvmdk_queue_write(struct td_state *s, uint64_t sector,
         	buf += n * 512;
     	}
 done:
-	cb(s, ret == -1 ? -1 : 0, id, private);
-	
-	return 1;
+	return cb(dd, ret == -1 ? -1 : 0, sector, nb_sectors, id, private);
 }
  		
-static int tdvmdk_submit(struct td_state *s)
+static int tdvmdk_submit(struct disk_driver *dd)
 {
 	return 0;	
 }
 
-
-static int *tdvmdk_get_fd(struct td_state *s)
+static int tdvmdk_close(struct disk_driver *dd)
 {
-	struct tdvmdk_state *prv = (struct tdvmdk_state *)s->private;
-        int *fds, i;
-
-        fds = malloc(sizeof(int) * MAX_IOFD);
-        /*initialise the FD array*/
-        for (i=0;i<MAX_IOFD;i++) fds[i] = 0;
-
-        fds[0] = prv->poll_pipe[0];
-        return fds;
-}
-
-static int tdvmdk_close(struct td_state *s)
-{
-	struct tdvmdk_state *prv = (struct tdvmdk_state *)s->private;
+	struct tdvmdk_state *prv = (struct tdvmdk_state *)dd->private;
 	
     	safer_free(prv->l1_table);
     	safer_free(prv->l1_backup_table);
@@ -395,21 +388,31 @@ static int tdvmdk_close(struct td_state *s)
 	return 0;
 }
 
-static int tdvmdk_do_callbacks(struct td_state *s, int sid)
+static int tdvmdk_do_callbacks(struct disk_driver *dd, int sid)
 {
 	/* always ask for a kick */
 	return 1;
 }
 
-struct tap_disk tapdisk_vmdk = {
-	"tapdisk_vmdk",
-	sizeof(struct tdvmdk_state),
-	tdvmdk_open,
-	tdvmdk_queue_read,
-	tdvmdk_queue_write,
-	tdvmdk_submit,
-	tdvmdk_get_fd,
-	tdvmdk_close,
-	tdvmdk_do_callbacks,
-};
+static int tdvmdk_has_parent(struct disk_driver *dd)
+{
+	return 0;
+}
 
+static int tdvmdk_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+{
+	return -EINVAL;
+}
+
+struct tap_disk tapdisk_vmdk = {
+	.disk_type           = "tapdisk_vmdk",
+	.private_data_size   = sizeof(struct tdvmdk_state),
+	.td_open             = tdvmdk_open,
+	.td_queue_read       = tdvmdk_queue_read,
+	.td_queue_write      = tdvmdk_queue_write,
+	.td_submit           = tdvmdk_submit,
+	.td_has_parent       = tdvmdk_has_parent,
+	.td_get_parent       = tdvmdk_get_parent,
+	.td_close            = tdvmdk_close,
+	.td_do_callbacks     = tdvmdk_do_callbacks,
+};

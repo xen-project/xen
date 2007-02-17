@@ -311,8 +311,8 @@ int unregister_xenbus_watch(struct xs_handle *h, struct xenbus_watch *watch)
 	}
 
 	if (!xs_unwatch(h, watch->node, token))
-		DPRINTF("XENBUS Failed to release watch %s: %i\n",
-			watch->node, er);
+		DPRINTF("XENBUS Failed to release watch %s\n",
+			watch->node);
 
 	list_del(&watch->list);
 	
@@ -351,9 +351,9 @@ int xs_fire_next_watch(struct xs_handle *h)
 	
 	node  = res[XS_WATCH_PATH];
 	token = res[XS_WATCH_TOKEN];
-	
+
 	w = find_watch(token);
-	if (w)
+	if (w) 
 		w->callback(h, w, node);
 
 	free(res);
