@@ -508,7 +508,7 @@ int send_responses(struct disk_driver *dd, int res,
 	int responses_queued = 0;
 	struct td_state *s = dd->td_state;
 	blkif_t *blkif = s->blkif;
-	int sidx = (int)private, secs_done = nr_secs;
+	int sidx = (int)(long)private, secs_done = nr_secs;
 
 	if ( (idx > MAX_REQUESTS-1) )
 	{
@@ -580,7 +580,7 @@ int do_cow_read(struct disk_driver *dd, blkif_request_t *req,
 	/* reissue request to backing file */
 	ret = parent->drv->td_queue_read(parent, sector, nr_secs,
 					 page, send_responses, 
-					 req->id, (void *)sidx);
+					 req->id, (void *)(long)sidx);
 	if (ret > 0)
 		parent->early += ret;
 
@@ -668,7 +668,7 @@ static void get_io_request(struct td_state *s)
 				ret = drv->td_queue_write(dd, sector_nr,
 							  nsects, page, 
 							  send_responses,
-							  idx, (void *)i);
+							  idx, (void *)(long)i);
 				if (ret > 0) dd->early += ret;
 				else if (ret == -EBUSY) {
 					/* put req back on queue */
@@ -682,7 +682,7 @@ static void get_io_request(struct td_state *s)
 				ret = drv->td_queue_read(dd, sector_nr,
 							 nsects, page, 
 							 send_responses,
-							 idx, (void *)i);
+							 idx, (void *)(long)i);
 				if (ret > 0) dd->early += ret;
 				else if (ret == -EBUSY) {
 					/* put req back on queue */
