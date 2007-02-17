@@ -731,7 +731,7 @@ do_sigbus:
 	force_sig_info_fault(SIGBUS, BUS_ADRERR, address, tsk);
 }
 
-#ifndef CONFIG_X86_PAE
+#if !HAVE_SHARED_KERNEL_PMD
 void vmalloc_sync_all(void)
 {
 	/*

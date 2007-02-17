@@ -31,7 +31,9 @@ struct vm_struct *alloc_vm_area(unsigned long size)
 	}
 
 	/* Map page directories into every address space. */
+#ifdef CONFIG_X86
 	vmalloc_sync_all();
+#endif
 
 	return area;
 }
