@@ -22,7 +22,6 @@
 #ifndef _ASM_IA64_VT_H
 #define _ASM_IA64_VT_H
 
-#define RR7_SWITCH_SHIFT	12	/* 4k enough */
 #include <public/hvm/ioreq.h>
 #define vmx_user_mode(regs) (((struct ia64_psr *)&(regs)->cr_ipsr)->vm == 1)
 
@@ -60,27 +59,4 @@ static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {
     return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
 }
-
-static inline shared_iopage_t *get_sp(struct domain *d)
-{
-    return (shared_iopage_t *)d->arch.vmx_platform.shared_page_va;
-}
-
-typedef unsigned long (*vmx_mmio_read_t)(struct vcpu *v,
-                                         unsigned long addr,
-                                         unsigned long length);
-
-typedef void (*vmx_mmio_write_t)(struct vcpu *v,
-                                 unsigned long addr,
-                                 unsigned long length,
-                                 unsigned long val);
-
-typedef int (*vmx_mmio_check_t)(struct vcpu *v, unsigned long addr);
-
-struct vmx_mmio_handler {
-    vmx_mmio_check_t check_handler;
-    vmx_mmio_read_t read_handler;
-    vmx_mmio_write_t write_handler;
-};
-
 #endif /* _ASM_IA64_VT_H */
