@@ -65,6 +65,7 @@
 #define INSTR_XCHG  14
 #define INSTR_SUB   15
 #define INSTR_ADD   16
+#define INSTR_PUSH  17
 
 #define MAX_INST_LEN      15 /* Maximum instruction length = 15 bytes */
 

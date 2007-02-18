@@ -716,6 +716,11 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
             mmio_op->instr = INSTR_SUB;
             return DECODE_success;
 
+        case 6: /* push */
+            mmio_op->instr = INSTR_PUSH;
+            mmio_op->operand[0] = mmio_op->operand[1];
+            return DECODE_success;
+
         default:
             printk("%x/%x, This opcode isn't handled yet!\n",
                    *opcode, ins_subtype);
@@ -1129,6 +1134,21 @@ void handle_mmio(unsigned long gpa)
 
     case INSTR_XOR:
         mmio_operands(IOREQ_TYPE_XOR, gpa, mmio_op, op_size);
+        break;
+
+    case INSTR_PUSH:
+        if ( ad_size == WORD )
+        {
+            mmio_op->addr = (uint16_t)(regs->esp - op_size);
+            regs->esp = mmio_op->addr | (regs->esp & ~0xffff);
+        }
+        else
+        {
+            regs->esp -= op_size;
+            mmio_op->addr = regs->esp;
+        }
+        /* send the request and wait for the value */
+        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, op_size, 0, IOREQ_READ, df, 0);
         break;
 
     case INSTR_CMP:        /* Pass through */

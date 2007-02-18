@@ -686,6 +686,11 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             set_reg_value(size, index, 0, regs, p->data);
         }
         break;
+
+    case INSTR_PUSH:
+        mmio_opp->addr += hvm_get_segment_base(current, x86_seg_ss);
+        hvm_copy_to_guest_virt(mmio_opp->addr, &p->data, size);
+        break;
     }
 }
 
