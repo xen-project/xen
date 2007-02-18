@@ -44,7 +44,8 @@ void vmx_io_assist(struct vcpu *v)
      */
     vio = get_vio(v->domain, v->vcpu_id);
     if (!vio)
-	panic_domain(vcpu_regs(v),"Corruption: bad shared page: %lx\n", (unsigned long)vio);
+        panic_domain(vcpu_regs(v),"Corruption: bad shared page: %lx\n",
+                     (unsigned long)vio);
 
     p = &vio->vp_ioreq;
 
@@ -97,10 +98,4 @@ void vmx_send_assist_req(struct vcpu *v)
 
     /* the code under this line is completer phase... */
     vmx_io_assist(v);
-}
-
-/* Wake up a vcpu whihc is waiting for interrupts to come in */
-void vmx_prod_vcpu(struct vcpu *v)
-{
-    vcpu_unblock(v);
 }

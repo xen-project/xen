@@ -22,7 +22,6 @@
  *  Yaozu Dong (Eddie Dong) (Eddie.dong@intel.com)
  *  Xuefei Xu (Anthony Xu) (Anthony.xu@intel.com)
  */
-
 #include <xen/sched.h>
 #include <public/xen.h>
 #include <asm/ia64_int.h>
@@ -36,29 +35,6 @@
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx.h>
 #include <asm/vmx_phy_mode.h>
-//u64  fire_itc;
-//u64  fire_itc2;
-//u64  fire_itm;
-//u64  fire_itm2;
-/*
- * Copyright (c) 2005 Intel Corporation.
- *    Anthony Xu (anthony.xu@intel.com)
- *    Yaozu Dong (Eddie Dong) (Eddie.dong@intel.com)
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
- */
 
 /**************************************************************************
  VCPU general register access routines

@@ -31,7 +31,8 @@
 #include <asm/virt_event.h>
 #include <asm/vmx_phy_mode.h>
 
-void
+#ifdef BYPASS_VMAL_OPCODE
+static void
 ia64_priv_decoder(IA64_SLOT_TYPE slot_type, INST64 inst, u64 * cause)
 {
     *cause=0;
@@ -141,20 +142,21 @@ ia64_priv_decoder(IA64_SLOT_TYPE slot_type, INST64 inst, u64 * cause)
         break;
     }
 }
+#endif
 
-IA64FAULT vmx_emul_rsm(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_rsm(VCPU *vcpu, INST64 inst)
 {
     u64 imm24 = (inst.M44.i << 23) | (inst.M44.i2 << 21) | inst.M44.imm;
     return vmx_vcpu_reset_psr_sm(vcpu,imm24);
 }
 
-IA64FAULT vmx_emul_ssm(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ssm(VCPU *vcpu, INST64 inst)
 {
     u64 imm24 = (inst.M44.i << 23) | (inst.M44.i2 << 21) | inst.M44.imm;
     return vmx_vcpu_set_psr_sm(vcpu,imm24);
 }
 
-IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 {
     u64 tgt = inst.M33.r1;
     u64 val;
@@ -172,7 +174,7 @@ IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 /**
  * @todo Check for reserved bits and return IA64_RSVDREG_FAULT.
  */
-IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
 {
     u64 val;
 
@@ -187,7 +189,7 @@ IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
 Privileged operation emulation routines
 **************************************************************************/
 
-IA64FAULT vmx_emul_rfi(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_rfi(VCPU *vcpu, INST64 inst)
 {
     IA64_PSR  vpsr;
     REGS *regs;
@@ -209,7 +211,7 @@ IA64FAULT vmx_emul_rfi(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_rfi(vcpu);
 }
 
-IA64FAULT vmx_emul_bsw0(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_bsw0(VCPU *vcpu, INST64 inst)
 {
 #ifdef  CHECK_FAULT
     IA64_PSR  vpsr;
@@ -224,7 +226,7 @@ IA64FAULT vmx_emul_bsw0(VCPU *vcpu, INST64 inst)
    return vcpu_bsw0(vcpu);
 }
 
-IA64FAULT vmx_emul_bsw1(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_bsw1(VCPU *vcpu, INST64 inst)
 {
 #ifdef  CHECK_FAULT
     IA64_PSR  vpsr;
@@ -239,12 +241,12 @@ IA64FAULT vmx_emul_bsw1(VCPU *vcpu, INST64 inst)
     return vcpu_bsw1(vcpu);
 }
 
-IA64FAULT vmx_emul_cover(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_cover(VCPU *vcpu, INST64 inst)
 {
     return vmx_vcpu_cover(vcpu);
 }
 
-IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -278,7 +280,7 @@ IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_ptc_l(vcpu,r3,bits(r2,2,7));
 }
 
-IA64FAULT vmx_emul_ptc_e(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ptc_e(VCPU *vcpu, INST64 inst)
 {
     u64 r3;
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -303,7 +305,7 @@ IA64FAULT vmx_emul_ptc_e(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_ptc_e(vcpu,r3);
 }
 
-IA64FAULT vmx_emul_ptc_g(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ptc_g(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
 #ifdef  VMAL_NO_FAULT_CHECK    
@@ -336,7 +338,7 @@ IA64FAULT vmx_emul_ptc_g(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_ptc_g(vcpu,r3,bits(r2,2,7));
 }
 
-IA64FAULT vmx_emul_ptc_ga(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ptc_ga(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
 #ifdef  VMAL_NO_FAULT_CHECK    
@@ -369,7 +371,7 @@ IA64FAULT vmx_emul_ptc_ga(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_ptc_ga(vcpu,r3,bits(r2,2,7));
 }
 
-IA64FAULT ptr_fault_check(VCPU *vcpu, INST64 inst, u64 *pr2, u64 *pr3)
+static IA64FAULT ptr_fault_check(VCPU *vcpu, INST64 inst, u64 *pr2, u64 *pr3)
 {
     IA64FAULT	ret1, ret2;
 
@@ -403,7 +405,7 @@ IA64FAULT ptr_fault_check(VCPU *vcpu, INST64 inst, u64 *pr2, u64 *pr3)
    return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_emul_ptr_d(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ptr_d(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
     if ( ptr_fault_check(vcpu, inst, &r2, &r3 ) == IA64_FAULT )
@@ -411,7 +413,7 @@ IA64FAULT vmx_emul_ptr_d(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_ptr_d(vcpu,r3,bits(r2,2,7));
 }
 
-IA64FAULT vmx_emul_ptr_i(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ptr_i(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
     if ( ptr_fault_check(vcpu, inst, &r2, &r3 ) == IA64_FAULT )
@@ -420,7 +422,7 @@ IA64FAULT vmx_emul_ptr_i(VCPU *vcpu, INST64 inst)
 }
 
 
-IA64FAULT vmx_emul_thash(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_thash(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
 #ifdef  CHECK_FAULT
@@ -450,7 +452,7 @@ IA64FAULT vmx_emul_thash(VCPU *vcpu, INST64 inst)
 }
 
 
-IA64FAULT vmx_emul_ttag(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_ttag(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
 #ifdef  CHECK_FAULT
@@ -482,7 +484,7 @@ IA64FAULT vmx_emul_ttag(VCPU *vcpu, INST64 inst)
 }
 
 
-IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
 #ifdef  CHECK_FAULT
@@ -526,7 +528,7 @@ IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
     return(IA64_NO_FAULT);
 }
 
-IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
 #ifdef  CHECK_FAULT
@@ -564,7 +566,7 @@ IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
  * Insert translation register/cache
 ************************************/
 
-IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
 {
     u64 itir, ifa, pte, slot;
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -621,7 +623,7 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_itr_d(vcpu,slot,pte,itir,ifa));
 }
 
-IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
 {
     u64 itir, ifa, pte, slot;
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -678,7 +680,8 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
    return (vmx_vcpu_itr_i(vcpu,slot,pte,itir,ifa));
 }
 
-IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
+static IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst,
+                                 u64 *itir, u64 *ifa, u64 *pte)
 {
     IA64FAULT	ret1;
 
@@ -727,7 +730,7 @@ IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
    return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_emul_itc_d(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_itc_d(VCPU *vcpu, INST64 inst)
 {
     u64 itir, ifa, pte;
 
@@ -738,7 +741,7 @@ IA64FAULT vmx_emul_itc_d(VCPU *vcpu, INST64 inst)
    return (vmx_vcpu_itc_d(vcpu,pte,itir,ifa));
 }
 
-IA64FAULT vmx_emul_itc_i(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_itc_i(VCPU *vcpu, INST64 inst)
 {
     u64 itir, ifa, pte;
 
@@ -754,7 +757,7 @@ IA64FAULT vmx_emul_itc_i(VCPU *vcpu, INST64 inst)
  * Moves to semi-privileged registers
 *************************************/
 
-IA64FAULT vmx_emul_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
 {
     // I27 and M30 are identical for these fields
     u64 imm;
@@ -780,7 +783,7 @@ IA64FAULT vmx_emul_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_set_itc(vcpu, imm));
 }
 
-IA64FAULT vmx_emul_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 {
     // I26 and M29 are identical for these fields
     u64 r2;
@@ -808,7 +811,7 @@ IA64FAULT vmx_emul_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 }
 
 
-IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
 {
     // I27 and M30 are identical for these fields
     u64 r1;
@@ -840,7 +843,7 @@ IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
  * Moves to privileged registers
 ********************************/
 
-IA64FAULT vmx_emul_mov_to_pkr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_pkr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
 #ifdef  CHECK_FAULT
@@ -863,7 +866,7 @@ IA64FAULT vmx_emul_mov_to_pkr(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_set_pkr(vcpu,r3,r2));
 }
 
-IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
 #ifdef  CHECK_FAULT
@@ -886,7 +889,7 @@ IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_set_rr(vcpu,r3,r2));
 }
 
-IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
     return IA64_NO_FAULT;
@@ -910,7 +913,7 @@ IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_set_dbr(vcpu,r3,r2));
 }
 
-IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
     return IA64_NO_FAULT;
@@ -934,7 +937,7 @@ IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_set_ibr(vcpu,r3,r2));
 }
 
-IA64FAULT vmx_emul_mov_to_pmc(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_pmc(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
 #ifdef  CHECK_FAULT
@@ -957,7 +960,7 @@ IA64FAULT vmx_emul_mov_to_pmc(VCPU *vcpu, INST64 inst)
     return (vmx_vcpu_set_pmc(vcpu,r3,r2));
 }
 
-IA64FAULT vmx_emul_mov_to_pmd(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_pmd(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
 #ifdef  CHECK_FAULT
@@ -985,7 +988,7 @@ IA64FAULT vmx_emul_mov_to_pmd(VCPU *vcpu, INST64 inst)
  * Moves from privileged registers
  **********************************/
 
-IA64FAULT vmx_emul_mov_from_rr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_rr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
 #ifdef  CHECK_FAULT
@@ -1021,7 +1024,7 @@ IA64FAULT vmx_emul_mov_from_rr(VCPU *vcpu, INST64 inst)
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
-IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
 #ifdef  CHECK_FAULT
@@ -1058,7 +1061,7 @@ IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
-IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
 #ifdef  CHECK_FAULT
@@ -1095,7 +1098,7 @@ IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
-IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
 #ifdef  CHECK_FAULT
@@ -1132,7 +1135,7 @@ IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
-IA64FAULT vmx_emul_mov_from_pmc(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_pmc(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
 #ifdef  CHECK_FAULT
@@ -1169,7 +1172,7 @@ IA64FAULT vmx_emul_mov_from_pmc(VCPU *vcpu, INST64 inst)
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
-IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
 #ifdef  CHECK_FAULT
@@ -1197,7 +1200,7 @@ IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
-IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 {
     u64 r2;
     extern u64 cr_igfld_mask(int index, u64 value);
@@ -1275,7 +1278,7 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
     ((fault=vmx_vcpu_get_##cr(vcpu,&val))==IA64_NO_FAULT)?\
         vcpu_set_gr(vcpu, tgt, val,0):fault;
 
-IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
+static IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 {
     u64 tgt = inst.M33.r1;
     u64 val;

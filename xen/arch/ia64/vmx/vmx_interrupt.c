@@ -20,15 +20,15 @@
  *  Xiaoyan Feng (Fleming Feng)  <fleming.feng@intel.com>
  *  Xuefei Xu (Anthony Xu) (Anthony.xu@intel.com)
  */
-
-
 #include <xen/types.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx_pal_vsa.h>
+
 /* SDM vol2 5.5 - IVA based interruption handling */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
-void
+
+static void
 collect_interruption(VCPU *vcpu)
 {
     u64 ipsr;
@@ -92,14 +92,19 @@ inject_guest_interruption(VCPU *vcpu, u64 vec)
     u64 viva;
     REGS *regs;
     ISR pt_isr;
+
     perfc_incra(vmx_inject_guest_interruption, vec >> 8);
-    regs=vcpu_regs(vcpu);
-    // clear cr.isr.ri 
+
+    regs = vcpu_regs(vcpu);
+
+    // clear cr.isr.ir (incomplete register frame)
     pt_isr.val = VMX(vcpu,cr_isr);
     pt_isr.ir = 0;
     VMX(vcpu,cr_isr) = pt_isr.val;
+
     collect_interruption(vcpu);
     vmx_ia64_set_dcr(vcpu);
+
     vmx_vcpu_get_iva(vcpu,&viva);
     regs->cr_iip = viva + vec;
 }
