@@ -607,6 +607,14 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 	else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
+	if (is_initial_xendomain()) {
+		unsigned long addr = vma->vm_pgoff << PAGE_SHIFT;
+		size_t size = vma->vm_end - vma->vm_start;
+		unsigned long offset = HYPERVISOR_ioremap(addr, size);
+		if (IS_ERR_VALUE(offset))
+			return offset;
+	}
+
 	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
@@ -663,6 +671,14 @@ pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
 
 	vma->vm_pgoff += (unsigned long)addr >> PAGE_SHIFT;
 	vma->vm_page_prot = prot;
+
+	if (is_initial_xendomain()) {
+		unsigned long addr = vma->vm_pgoff << PAGE_SHIFT;
+		size_t size = vma->vm_end - vma->vm_start;
+		unsigned long offset = HYPERVISOR_ioremap(addr, size);
+		if (IS_ERR_VALUE(offset))
+			return offset;
+	}
 
 	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 			    size, vma->vm_page_prot))
