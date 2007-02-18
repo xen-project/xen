@@ -141,7 +141,7 @@ static int init_domain_vhpt(struct vcpu *v)
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VHPT_SIZE);
-    printk("Allocate domain vhpt at 0x%p\n", vbase);
+    printk(XENLOG_DEBUG "Allocate domain vhpt at 0x%p\n", vbase);
     
     VHPT(v,hash) = vbase;
     VHPT(v,hash_sz) = VCPU_VHPT_SIZE/2;
@@ -182,7 +182,7 @@ int init_domain_tlb(struct vcpu *v)
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VTLB_SIZE);
-    printk("Allocate domain vtlb at 0x%p\n", vbase);
+    printk(XENLOG_DEBUG "Allocate domain vtlb at 0x%p\n", vbase);
     
     VTLB(v,hash) = vbase;
     VTLB(v,hash_sz) = VCPU_VTLB_SIZE/2;

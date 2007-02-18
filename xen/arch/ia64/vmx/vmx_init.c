@@ -162,7 +162,8 @@ static vpd_t *alloc_vpd(void)
 		return NULL;
 	}
 
-	printk("vpd base: 0x%p, vpd size:%ld\n", vpd, sizeof(vpd_t));
+	printk(XENLOG_DEBUG "vpd base: 0x%p, vpd size:%ld\n",
+	       vpd, sizeof(vpd_t));
 	memset(vpd, 0, VPD_SIZE);
 	mregs = &vpd->vpd_low;
 
@@ -207,7 +208,7 @@ vmx_create_vp(struct vcpu *v)
 	extern char vmx_ia64_ivt;
 	/* ia64_ivt is function pointer, so need this tranlation */
 	ivt_base = (u64) &vmx_ia64_ivt;
-	printk("ivt_base: 0x%lx\n", ivt_base);
+	printk(XENLOG_DEBUG "ivt_base: 0x%lx\n", ivt_base);
 	ret = ia64_pal_vp_create((u64 *)vpd, (u64 *)ivt_base, 0);
 	if (ret != PAL_STATUS_SUCCESS){
 		panic_domain(vcpu_regs(v),"ia64_pal_vp_create failed. \n");
