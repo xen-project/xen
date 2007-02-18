@@ -33,7 +33,7 @@ CPPFLAGS+= -I$(BASEDIR)/include						\
 CFLAGS	+= $(CPPFLAGS)
 #CFLAGS  += -Wno-pointer-arith -Wredundant-decls
 CFLAGS	+= -DIA64 -DXEN -DLINUX_2_6
-CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127
+CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127,b2-b5
 CFLAGS	+= -g
 #CFLAGS  += -DVTI_DEBUG
 ifeq ($(xen_ia64_expose_p2m),y)
