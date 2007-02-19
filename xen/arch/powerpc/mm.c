@@ -416,7 +416,13 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     if (pfn & foreign_map_pfn) {
         t = PFN_TYPE_FOREIGN;
         mfn = foreign_to_mfn(d, pfn);
-    } else if (pfn >= max_page && pfn < (max_page + NR_GRANT_FRAMES)) {
+    } else if (pfn >= max_page && pfn <
+	       (max_page + nr_grant_frames(d->grant_table))) {
+        /* XXX access d->grant_table->nr_grant_frames without lock.
+         * Currently on powerpc dynamic expanding grant table is
+         * inhibited by setting max_nr_grant_frames = INITIAL_NR_GRANT_FRAMES
+         * so that this access is safe.
+         */
         /* Its a grant table access */
         t = PFN_TYPE_GNTTAB;
         mfn = gnttab_shared_mfn(d, d->grant_table, (pfn - max_page));
@@ -494,9 +500,15 @@ unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn)
     ulong gnttab_mfn;
     ulong rma_mfn;
 
+    /* XXX access d->grant_table->nr_grant_frames without lock.
+     * Currently on powerpc dynamic expanding grant table is
+     * inhibited by setting max_nr_grant_frames = INITIAL_NR_GRANT_FRAMES
+     * so that this access is safe.
+     */
     /* grant? */
     gnttab_mfn = gnttab_shared_mfn(d, d->grant_table, 0);
-    if (mfn >= gnttab_mfn && mfn < (gnttab_mfn + NR_GRANT_FRAMES))
+    if (mfn >= gnttab_mfn && mfn <
+	(gnttab_mfn + nr_grant_frames(d->grant_table)))
         return max_page + (mfn - gnttab_mfn);
 
     /* IO? */

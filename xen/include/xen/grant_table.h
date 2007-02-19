@@ -56,10 +56,14 @@ struct active_grant_entry {
 #define INITIAL_NR_GRANT_ENTRIES ((INITIAL_NR_GRANT_FRAMES << PAGE_SHIFT) / \
                                      sizeof(grant_entry_t))
 
+#ifndef DEFAULT_MAX_NR_GRANT_FRAMES /* to allow arch to override */
 /* Default maximum size of a grant table. [POLICY] */
 #define DEFAULT_MAX_NR_GRANT_FRAMES   32
+#endif
+#ifndef max_nr_grant_frames /* to allow arch to override */
 /* The maximum size of a grant table. */
 extern unsigned int max_nr_grant_frames;
+#endif
 
 /*
  * Tracks a mapping of another domain's grant reference. Each domain has a

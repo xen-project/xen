@@ -41,11 +41,11 @@ int destroy_grant_host_mapping(
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->shared + ((i) * PAGE_SIZE)),       \
+            virt_to_page((t)->shared[(i)]),                       \
             (d), XENSHARE_writable);                                     \
     } while ( 0 )
 
-#define gnttab_shared_mfn(d, t, i) (((ulong)((t)->shared) >> PAGE_SHIFT) + (i))
+#define gnttab_shared_mfn(d, t, i) (virt_to_mfn((t)->shared[(i)]))
 
 #define gnttab_shared_gmfn(d, t, i)                     \
     (mfn_to_gmfn(d, gnttab_shared_mfn(d, t, i)))

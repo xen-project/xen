@@ -35,8 +35,10 @@
 #include <xen/domain_page.h>
 #include <acm/acm_hooks.h>
 
+#ifndef max_nr_grant_frames
 unsigned int max_nr_grant_frames = DEFAULT_MAX_NR_GRANT_FRAMES;
 integer_param("gnttab_max_nr_frames", max_nr_grant_frames);
+#endif
 
 /* The maximum number of grant mappings is defined as a multiplier of the
  * maximum number of grant table entries. This defines the multiplier used.
