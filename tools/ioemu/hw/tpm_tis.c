@@ -769,6 +769,8 @@ static void tpm_save(QEMUFile* f,void* opaque)
             if (n > 0) {
                 if (IS_VALID_LOC(s->active_loc)) {
                     s->loc[s->active_loc].sts = STS_VALID | STS_DATA_AVAILABLE;
+                    s->loc[s->active_loc].state = STATE_COMPLETION;
+                    tis_raise_irq(s, s->active_loc, INT_DATA_AVAILABLE);
                 }
                 /* close the connection with the vTPM for good */
                 close_vtpm_channel(s, 1);
