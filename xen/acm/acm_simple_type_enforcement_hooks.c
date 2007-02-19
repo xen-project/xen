@@ -177,7 +177,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     ssidref_t ste_ssidref, ste_rssidref;
     struct domain **pd, *rdom;
     domid_t rdomid;
-    grant_entry_t sha_copy;
+    struct grant_entry *sha_copy;
     int port, i;
 
     read_lock(&domlist_lock); /* go by domain? or directly by global? event/grant list */
@@ -238,13 +238,13 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
             printkd("%s: Grant ... sharing for domain %x not setup!\n", __func__, (*pd)->domain_id);
             continue;
         }
-        for ( i = 0; i < NR_GRANT_ENTRIES; i++ ) {
+        for ( i = 0; i < nr_grant_frames((*pd)->grant_table); i++ ) {
             sha_copy =  (*pd)->grant_table->shared[i];
-            if ( sha_copy.flags ) {
+            if ( sha_copy->flags ) {
                 printkd("%s: grant dom (%hu) SHARED (%d) flags:(%hx) dom:(%hu) frame:(%lx)\n",
                         __func__, (*pd)->domain_id, i, sha_copy.flags, sha_copy.domid, 
                         (unsigned long)sha_copy.frame);
-                rdomid = sha_copy.domid;
+                rdomid = sha_copy->domid;
                 if ((rdom = get_domain_by_id(rdomid)) == NULL) {
                     printkd("%s: domain not found ERROR!\n", __func__);
                     goto out;
