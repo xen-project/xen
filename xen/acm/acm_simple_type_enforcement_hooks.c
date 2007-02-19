@@ -177,7 +177,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     ssidref_t ste_ssidref, ste_rssidref;
     struct domain **pd, *rdom;
     domid_t rdomid;
-    struct grant_entry *sha_copy;
+    struct grant_entry sha_copy;
     int port, i;
 
     read_lock(&domlist_lock); /* go by domain? or directly by global? event/grant list */
@@ -234,20 +234,18 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
             }
         } 
         /* b) check for grant table conflicts on shared pages */
-        if ((*pd)->grant_table->shared == NULL) {
-            printkd("%s: Grant ... sharing for domain %x not setup!\n", __func__, (*pd)->domain_id);
-            continue;
-        }
+        spin_lock(&(*pd)->grant_table->lock);
         for ( i = 0; i < nr_grant_frames((*pd)->grant_table); i++ ) {
-            sha_copy =  (*pd)->grant_table->shared[i];
-            if ( sha_copy->flags ) {
+#define SPP (PAGE_SIZE / sizeof(struct grant_entry))
+            sha_copy = (*pd)->grant_table->shared[i/SPP][i%SPP];
+            if ( sha_copy.flags ) {
                 printkd("%s: grant dom (%hu) SHARED (%d) flags:(%hx) dom:(%hu) frame:(%lx)\n",
                         __func__, (*pd)->domain_id, i, sha_copy.flags, sha_copy.domid, 
                         (unsigned long)sha_copy.frame);
-                rdomid = sha_copy->domid;
+                rdomid = sha_copy.domid;
                 if ((rdom = get_domain_by_id(rdomid)) == NULL) {
                     printkd("%s: domain not found ERROR!\n", __func__);
-                    goto out;
+                    goto out_gnttab;
                 };
                 /* rdom now has remote domain */
                 ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
@@ -257,12 +255,14 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 if (!have_common_type(ste_ssidref, ste_rssidref)) {
                     printkd("%s: Policy violation in grant table sharing domain %x -> domain %x.\n",
                             __func__, (*pd)->domain_id, rdomid);
-                    goto out;
+                    goto out_gnttab;
                 }
             }
         }
     }
     violation = 0;
+ out_gnttab:
+    spin_unlock(&(*pd)->grant_table->lock);
  out:
     read_unlock(&domlist_lock);
     return violation;
