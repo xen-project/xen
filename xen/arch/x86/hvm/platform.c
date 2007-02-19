@@ -1048,10 +1048,6 @@ void handle_mmio(unsigned long gpa)
         else
             dir = IOREQ_READ;
 
-        if ( addr & (size - 1) )
-            gdprintk(XENLOG_WARNING,
-                     "Unaligned ioport access: %lx, %d\n", addr, size);
-
         /*
          * In case of a movs spanning multiple pages, we break the accesses
          * up into multiple pages (the device model works with non-continguous
@@ -1065,8 +1061,6 @@ void handle_mmio(unsigned long gpa)
         if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
             unsigned long value = 0;
 
-            gdprintk(XENLOG_WARNING,
-                     "Single io request in a movs crossing page boundary.\n");
             mmio_op->flags |= OVERLAP;
 
             if ( dir == IOREQ_WRITE ) {
