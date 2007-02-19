@@ -31,6 +31,65 @@ static void print_numeric_note(const char *prefix, struct elf_binary *elf,
 	       prefix, 2+2*descsz, value, descsz);
 }
 
+static int print_notes(struct elf_binary *elf, const elf_note *start, const elf_note *end)
+{
+	const elf_note *note;
+	int notes_found = 0;
+
+	for ( note = start; note < end; note = elf_note_next(elf, note) )
+	{
+		if (0 != strcmp(elf_note_name(elf, note), "Xen"))
+			continue;
+
+		notes_found++;
+
+		switch(elf_uval(elf, note, type))
+		{
+		case XEN_ELFNOTE_INFO:
+			print_string_note("INFO", elf , note);
+			break;
+		case XEN_ELFNOTE_ENTRY:
+			print_numeric_note("ENTRY", elf , note);
+			break;
+		case XEN_ELFNOTE_HYPERCALL_PAGE:
+			print_numeric_note("HYPERCALL_PAGE", elf , note);
+			break;
+		case XEN_ELFNOTE_VIRT_BASE:
+			print_numeric_note("VIRT_BASE", elf , note);
+			break;
+		case XEN_ELFNOTE_PADDR_OFFSET:
+			print_numeric_note("PADDR_OFFSET", elf , note);
+			break;
+		case XEN_ELFNOTE_XEN_VERSION:
+			print_string_note("XEN_VERSION", elf , note);
+			break;
+		case XEN_ELFNOTE_GUEST_OS:
+			print_string_note("GUEST_OS", elf , note);
+			break;
+		case XEN_ELFNOTE_GUEST_VERSION:
+			print_string_note("GUEST_VERSION", elf , note);
+			break;
+		case XEN_ELFNOTE_LOADER:
+			print_string_note("LOADER", elf , note);
+			break;
+		case XEN_ELFNOTE_PAE_MODE:
+			print_string_note("PAE_MODE", elf , note);
+			break;
+		case XEN_ELFNOTE_FEATURES:
+			print_string_note("FEATURES", elf , note);
+			break;
+		case XEN_ELFNOTE_HV_START_LOW:
+			print_numeric_note("HV_START_LOW", elf, note);
+			break;
+		default:
+			printf("unknown note type %#x\n",
+			       (int)elf_uval(elf, note, type));
+			break;
+		}
+	}
+	return notes_found;
+}
+
 int main(int argc, char **argv)
 {
 	const char *f;
@@ -39,7 +98,7 @@ int main(int argc, char **argv)
 	struct stat st;
 	struct elf_binary elf;
 	const elf_shdr *shdr;
-	const elf_note *note, *end;
+	int notes_found = 0;
 
 	if (argc != 2)
 	{
@@ -85,59 +144,40 @@ int main(int argc, char **argv)
 	}
 	elf_set_logfile(&elf, stderr, 0);
 
-	count = elf_shdr_count(&elf);
+	count = elf_phdr_count(&elf);
 	for ( h=0; h < count; h++)
 	{
-		shdr = elf_shdr_by_index(&elf, h);
-		if (elf_uval(&elf, shdr, sh_type) != SHT_NOTE)
+		const elf_phdr *phdr;
+		phdr = elf_phdr_by_index(&elf, h);
+		if (elf_uval(&elf, phdr, p_type) != PT_NOTE)
 			continue;
-		end = elf_section_end(&elf, shdr);
-		for (note = elf_section_start(&elf, shdr);
-		     note < end;
-		     note = elf_note_next(&elf, note))
+
+		/* Some versions of binutils do not correctly set
+		 * p_offset for note segments.
+		 */
+		if (elf_uval(&elf, phdr, p_offset) == 0)
+			continue;
+
+		notes_found = print_notes(&elf,
+					  elf_segment_start(&elf, phdr),
+					  elf_segment_end(&elf, phdr));
+	}
+
+	if ( notes_found == 0 )
+	{
+		count = elf_shdr_count(&elf);
+		for ( h=0; h < count; h++)
 		{
-			if (0 != strcmp(elf_note_name(&elf, note), "Xen"))
+			const elf_shdr *shdr;
+			shdr = elf_shdr_by_index(&elf, h);
+			if (elf_uval(&elf, shdr, sh_type) != SHT_NOTE)
 				continue;
-			switch(elf_uval(&elf, note, type))
-			{
-			case XEN_ELFNOTE_INFO:
-				print_string_note("INFO", &elf , note);
-				break;
-			case XEN_ELFNOTE_ENTRY:
-				print_numeric_note("ENTRY", &elf , note);
-				break;
-			case XEN_ELFNOTE_HYPERCALL_PAGE:
-				print_numeric_note("HYPERCALL_PAGE", &elf , note);
-				break;
-			case XEN_ELFNOTE_VIRT_BASE:
-				print_numeric_note("VIRT_BASE", &elf , note);
-				break;
-			case XEN_ELFNOTE_PADDR_OFFSET:
-				print_numeric_note("PADDR_OFFSET", &elf , note);
-				break;
-			case XEN_ELFNOTE_XEN_VERSION:
-				print_string_note("XEN_VERSION", &elf , note);
-				break;
-			case XEN_ELFNOTE_GUEST_OS:
-				print_string_note("GUEST_OS", &elf , note);
-				break;
-			case XEN_ELFNOTE_GUEST_VERSION:
-				print_string_note("GUEST_VERSION", &elf , note);
-				break;
-			case XEN_ELFNOTE_LOADER:
-				print_string_note("LOADER", &elf , note);
-				break;
-			case XEN_ELFNOTE_PAE_MODE:
-				print_string_note("PAE_MODE", &elf , note);
-				break;
-			case XEN_ELFNOTE_FEATURES:
-				print_string_note("FEATURES", &elf , note);
-				break;
-			default:
-				printf("unknown note type %#x\n",
-				       (int)elf_uval(&elf, note, type));
-				break;
-			}
+			notes_found = print_notes(&elf,
+						  elf_section_start(&elf, shdr),
+						  elf_section_end(&elf, shdr));
+			if ( notes_found )
+				fprintf(stderr, "using notes from SHT_NOTE section\n");
+
 		}
 	}
 

@@ -134,6 +134,9 @@ const char *elf_section_name(struct elf_binary *elf, const elf_shdr * shdr);
 const void *elf_section_start(struct elf_binary *elf, const elf_shdr * shdr);
 const void *elf_section_end(struct elf_binary *elf, const elf_shdr * shdr);
 
+const void *elf_segment_start(struct elf_binary *elf, const elf_phdr * phdr);
+const void *elf_segment_end(struct elf_binary *elf, const elf_phdr * phdr);
+
 const elf_sym *elf_sym_by_name(struct elf_binary *elf, const char *symbol);
 const elf_sym *elf_sym_by_index(struct elf_binary *elf, int index);
 
