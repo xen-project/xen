@@ -1774,7 +1774,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        dprintk(XENLOG_WARNING, "GPF (%04x): %p -> %p\n",
+        dprintk(XENLOG_INFO, "GPF (%04x): %p -> %p\n",
                 regs->error_code, _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;
