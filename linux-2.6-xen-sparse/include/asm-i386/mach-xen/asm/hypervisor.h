@@ -46,15 +46,11 @@
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#if defined(__i386__)
-#  ifdef CONFIG_X86_PAE
-#   include <asm-generic/pgtable-nopud.h>
-#  else
-#   include <asm-generic/pgtable-nopmd.h>
-#  endif
-#endif
 
 extern shared_info_t *HYPERVISOR_shared_info;
+
+#define vcpu_info(cpu) (HYPERVISOR_shared_info->vcpu_info + (cpu))
+#define current_vcpu_info() vcpu_info(smp_processor_id())
 
 #ifdef CONFIG_X86_32
 extern unsigned long hypervisor_virt_start;

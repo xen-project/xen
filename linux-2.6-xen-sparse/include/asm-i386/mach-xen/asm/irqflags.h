@@ -12,12 +12,6 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef CONFIG_SMP
-#define __vcpu_id smp_processor_id()
-#else
-#define __vcpu_id 0
-#endif
-
 /* 
  * The use of 'barrier' in the following reflects their use as local-lock
  * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following
@@ -26,8 +20,7 @@
  * includes these barriers, for example.
  */
 
-#define __raw_local_save_flags()					\
-	(&HYPERVISOR_shared_info->vcpu_info[__vcpu_id])->evtchn_upcall_mask;
+#define __raw_local_save_flags() (current_vcpu_info()->evtchn_upcall_mask)
 
 #define raw_local_save_flags(flags) \
 		do { (flags) = __raw_local_save_flags(); } while (0)
@@ -36,7 +29,7 @@
 do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
+	_vcpu = current_vcpu_info();					\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if (unlikely(_vcpu->evtchn_upcall_pending))		\
@@ -46,9 +39,7 @@ do {									\
 
 #define raw_local_irq_disable()						\
 do {									\
-	vcpu_info_t *_vcpu;						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
-	_vcpu->evtchn_upcall_mask = 1;					\
+	current_vcpu_info()->evtchn_upcall_mask = 1;			\
 	barrier();							\
 } while (0)
 
@@ -56,7 +47,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
+	_vcpu = current_vcpu_info();					\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if (unlikely(_vcpu->evtchn_upcall_pending))			\

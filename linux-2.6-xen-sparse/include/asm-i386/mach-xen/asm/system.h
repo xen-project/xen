@@ -100,8 +100,7 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 #define write_cr0(x) \
 	__asm__ __volatile__("movl %0,%%cr0": :"r" (x))
 
-#define read_cr2() \
-	(HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
+#define read_cr2() (current_vcpu_info()->arch.cr2)
 #define write_cr2(x) \
 	__asm__ __volatile__("movl %0,%%cr2": :"r" (x))
 
