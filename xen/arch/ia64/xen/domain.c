@@ -521,6 +521,16 @@ int arch_domain_create(struct domain *d)
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
+	/*
+	 * grant_table_create() can't fully initialize grant table for domain
+	 * because it is called before arch_domain_create().
+	 * Here we complete the initialization which requires p2m table.
+	 */
+	spin_lock(&d->grant_table->lock);
+	for (i = 0; i < nr_grant_frames(d->grant_table); i++)
+		ia64_gnttab_create_shared_page(d, d->grant_table, i);
+	spin_unlock(&d->grant_table->lock);
+
 	d->arch.ioport_caps = rangeset_new(d, "I/O Ports",
 	                                   RANGESETF_prettyprint_hex);
 
