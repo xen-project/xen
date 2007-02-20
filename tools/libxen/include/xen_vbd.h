@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,9 @@
 
 #include "xen_common.h"
 #include "xen_vbd_decl.h"
+#include "xen_vbd_metrics_decl.h"
 #include "xen_vbd_mode.h"
+#include "xen_vbd_type.h"
 #include "xen_vdi_decl.h"
 #include "xen_vm_decl.h"
 
@@ -71,8 +73,8 @@ typedef struct xen_vbd_record
     char *image;
     bool bootable;
     enum xen_vbd_mode mode;
-    double io_read_kbs;
-    double io_write_kbs;
+    enum xen_vbd_type type;
+    struct xen_vbd_metrics_record_opt *metrics;
 } xen_vbd_record;
 
 /**
@@ -155,14 +157,14 @@ xen_vbd_record_opt_set_free(xen_vbd_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VBD.  !!!
+ * Get a record containing the current state of the given VBD.
  */
 extern bool
 xen_vbd_get_record(xen_session *session, xen_vbd_record **result, xen_vbd vbd);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VBD instance with the specified UUID.
  */
 extern bool
 xen_vbd_get_by_uuid(xen_session *session, xen_vbd *result, char *uuid);
@@ -225,17 +227,17 @@ xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd);
 
 
 /**
- * Get the io/read_kbs field of the given VBD.
+ * Get the type field of the given VBD.
  */
 extern bool
-xen_vbd_get_io_read_kbs(xen_session *session, double *result, xen_vbd vbd);
+xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd);
 
 
 /**
- * Get the io/write_kbs field of the given VBD.
+ * Get the metrics field of the given VBD.
  */
 extern bool
-xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd);
+xen_vbd_get_metrics(xen_session *session, xen_vbd_metrics *result, xen_vbd vbd);
 
 
 /**
@@ -257,6 +259,13 @@ xen_vbd_set_bootable(xen_session *session, xen_vbd vbd, bool bootable);
  */
 extern bool
 xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode);
+
+
+/**
+ * Set the type field of the given VBD.
+ */
+extern bool
+xen_vbd_set_type(xen_session *session, xen_vbd vbd, enum xen_vbd_type type);
 
 
 /**

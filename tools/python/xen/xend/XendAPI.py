@@ -209,6 +209,16 @@ def valid_vbd(func):
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('vbd', r),
                       'VBD', func, *args, **kwargs)
 
+def valid_vbd_metrics(func):
+    """Decorator to verify if ref is valid before calling method.
+
+    @param func: function with params: (self, session, ref, ...)
+    @rtype: callable object
+    """    
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vbd', r),
+                      'VBD_metrics', func, *args, **kwargs)
+
 def valid_vif(func):
     """Decorator to verify if vif_ref is valid before calling method.
 
@@ -378,6 +388,7 @@ class XendAPI(object):
             'network'      : valid_network,
             'VM'           : valid_vm,
             'VBD'          : valid_vbd,
+            'VBD_metrics'  : valid_vbd_metrics,
             'VIF'          : valid_vif,
             'VDI'          : valid_vdi,
             'VTPM'         : valid_vtpm,
@@ -1450,8 +1461,7 @@ class XendAPI(object):
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['io_read_kbs',
-                   'io_write_kbs']
+    VBD_attr_ro = ['metrics']
     VBD_attr_rw = ['VM',
                    'VDI',
                    'device',
@@ -1481,7 +1491,9 @@ class XendAPI(object):
         for k in cfg.keys():
             if k in valid_vbd_keys:
                 return_cfg[k] = cfg[k]
-                
+
+        return_cfg['metrics'] = vbd_ref
+
         return xen_api_success(return_cfg)
 
     def VBD_media_change(self, session, vbd_ref, vdi_ref):
@@ -1521,12 +1533,16 @@ class XendAPI(object):
         XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
         return xen_api_success_void()
 
-    # attributes (rw)
     def _VBD_get(self, vbd_ref, prop):
         return xen_api_success(
             XendDomain.instance().get_dev_property_by_uuid(
             'vbd', vbd_ref, prop))
 
+    # attributes (ro)
+    def VBD_get_metrics(self, _, vbd_ref):
+        return xen_api_success(vbd_ref)
+
+    # attributes (rw)
     def VBD_get_VM(self, session, vbd_ref):
         return self._VBD_get(vbd_ref, 'VM')
     
@@ -1545,12 +1561,6 @@ class XendAPI(object):
     def VBD_get_type(self, session, vbd_ref):
         return self._VBD_get(vbd_ref, 'type')
 
-    def VBD_get_io_read_kbs(self, session, vbd_ref):
-        return self._VBD_get(vbd_ref, 'io_read_kbs')
-    
-    def VBD_get_io_write_kbs(self, session, vbd_ref):
-        return self._VBD_get(vbd_ref, 'io_write_kbs')
-
     def VBD_set_bootable(self, session, vbd_ref, bootable):
         bootable = bool(bootable)
         xd = XendDomain.instance()
@@ -1564,6 +1574,30 @@ class XendAPI(object):
         vbds = [d.get_vbds() for d in XendDomain.instance().list('all')]
         vbds = reduce(lambda x, y: x + y, vbds)
         return xen_api_success(vbds)
+
+
+    # Xen API: Class VBD_metrics
+    # ----------------------------------------------------------------
+
+    VBD_metrics_attr_ro = ['io_read_kbs',
+                           'io_write_kbs']
+    VBD_metrics_attr_rw = []
+    VBD_methods = []
+
+    def VBD_metrics_get_record(self, _, ref):
+        vm = XendDomain.instance().get_vm_with_dev_uuid('vbd', ref)
+        if not vm:
+            return xen_api_error(['HANDLE_INVALID', 'VBD_metrics', ref])
+        return xen_api_success(
+            { 'io_read_kbs'  : vm.get_dev_property('vbd', ref, 'io_read_kbs'),
+              'io_write_kbs' : vm.get_dev_property('vbd', ref, 'io_write_kbs') })
+
+    def VBD_metrics_get_io_write_kbs(self, _, ref):
+        return self._VBD_get(ref, 'io_read_kbs')
+    
+    def VBD_metrics_get_io_write_kbs(self, session, vbd_ref):
+        return self._VBD_get(ref, 'io_write_kbs')
+
 
     # Xen API: Class VIF
     # ----------------------------------------------------------------
