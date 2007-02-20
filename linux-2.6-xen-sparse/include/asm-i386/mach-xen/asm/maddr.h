@@ -21,6 +21,7 @@ typedef unsigned long maddr_t;
 #ifdef CONFIG_XEN
 
 extern unsigned long *phys_to_machine_mapping;
+extern unsigned long  max_mapnr;
 
 #undef machine_to_phys_mapping
 extern unsigned long *machine_to_phys_mapping;
@@ -30,20 +31,20 @@ static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return pfn;
-	return phys_to_machine_mapping[(unsigned int)(pfn)] &
-		~FOREIGN_FRAME_BIT;
+	BUG_ON(max_mapnr && pfn >= max_mapnr);
+	return phys_to_machine_mapping[pfn] & ~FOREIGN_FRAME_BIT;
 }
 
 static inline int phys_to_machine_mapping_valid(unsigned long pfn)
 {
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return 1;
+	BUG_ON(max_mapnr && pfn >= max_mapnr);
 	return (phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
 }
 
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
-	extern unsigned long max_mapnr;
 	unsigned long pfn;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
@@ -92,7 +93,6 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
  */
 static inline unsigned long mfn_to_local_pfn(unsigned long mfn)
 {
-	extern unsigned long max_mapnr;
 	unsigned long pfn = mfn_to_pfn(mfn);
 	if ((pfn < max_mapnr)
 	    && !xen_feature(XENFEAT_auto_translated_physmap)
@@ -103,6 +103,7 @@ static inline unsigned long mfn_to_local_pfn(unsigned long mfn)
 
 static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
 {
+	BUG_ON(pfn >= max_mapnr);
 	if (xen_feature(XENFEAT_auto_translated_physmap)) {
 		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
 		return;
@@ -124,6 +125,20 @@ static inline paddr_t machine_to_phys(maddr_t machine)
 	return phys;
 }
 
+#ifdef CONFIG_X86_PAE
+static inline paddr_t pte_phys_to_machine(paddr_t phys)
+{
+	/*
+	 * In PAE mode, the NX bit needs to be dealt with in the value
+	 * passed to pfn_to_mfn(). On x86_64, we need to mask it off,
+	 * but for i386 the conversion to ulong for the argument will
+	 * clip it off.
+	 */
+	maddr_t machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+	machine = (machine << PAGE_SHIFT) | (phys & ~PHYSICAL_PAGE_MASK);
+	return machine;
+}
+
 static inline paddr_t pte_machine_to_phys(maddr_t machine)
 {
 	/*
@@ -136,6 +151,7 @@ static inline paddr_t pte_machine_to_phys(maddr_t machine)
 	phys = (phys << PAGE_SHIFT) | (machine & ~PHYSICAL_PAGE_MASK);
 	return phys;
 }
+#endif
 
 #else /* !CONFIG_XEN */
 
@@ -146,7 +162,6 @@ static inline paddr_t pte_machine_to_phys(maddr_t machine)
 #define phys_to_machine_mapping_valid(pfn) (1)
 #define phys_to_machine(phys) ((maddr_t)(phys))
 #define machine_to_phys(mach) ((paddr_t)(mach))
-#define pte_machine_to_phys(mach) ((paddr_t)(mach))
 
 #endif /* !CONFIG_XEN */
 
