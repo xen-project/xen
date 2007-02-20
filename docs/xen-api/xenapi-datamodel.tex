@@ -11767,34 +11767,15 @@ Each possible error code is documented in the following section.
 
 \subsection{Error Codes}
 
-\subsubsection{HOST\_CPU\_HANDLE\_INVALID}
+\subsubsection{HANDLE\_INVALID}
 
-You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
-deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}HOST_CPU_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{HOST\_HANDLE\_INVALID}
-
-You gave an invalid host handle.  The host may have recently been deleted. 
-The handle parameter echoes the bad value given.
+You gave an invalid handle.  The object may have recently been deleted. 
+The class parameter gives the type of reference given, and the handle
+parameter echoes the bad value given.
 
 \vspace{0.3cm}
 {\bf Signature:}
-\begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{HOST\_METRICS\_HANDLE\_INVALID}
-
-You gave an invalid host\_metrics handle.  The host\_metrics may have
-recently been deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}HOST_METRICS_HANDLE_INVALID(handle)\end{verbatim}
+\begin{verbatim}HANDLE_INVALID(class, handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{INTERNAL\_ERROR}
@@ -11854,18 +11835,7 @@ already attached to some other PIF, and so the creation failed.
 You attempted an operation that was not allowed.
 
 \vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}OPERATION_NOT_ALLOWED()\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{PIF\_HANDLE\_INVALID}
-
-You gave an invalid PIF handle.  The PIF may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}PIF_HANDLE_INVALID(handle)\end{verbatim}
+No parameters.
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{PIF\_IS\_PHYSICAL}
@@ -11877,16 +11847,6 @@ PIF handle you gave.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{PIF\_METRICS\_HANDLE\_INVALID}
-
-You gave an invalid PIF\_metrics handle.  The PIF\_metrics may have
-recently been deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}PIF_METRICS_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{SESSION\_AUTHENTICATION\_FAILED}
@@ -11910,26 +11870,6 @@ current connection.  The handle parameter echoes the bad value given.
 \begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
-\subsubsection{SR\_HANDLE\_INVALID}
-
-You gave an invalid SR handle.  The SR may have recently been deleted.  The
-handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}SR_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{TASK\_HANDLE\_INVALID}
-
-You gave an invalid task handle.  The task may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}TASK_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
 \subsubsection{VALUE\_NOT\_SUPPORTED}
 
 You attempted to set a value that is not supported by this implementation. 
@@ -11939,36 +11879,6 @@ returned.  Also returned is a developer-only diagnostic reason.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VBD\_HANDLE\_INVALID}
-
-You gave an invalid VBD handle.  The VBD may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VBD_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VDI\_HANDLE\_INVALID}
-
-You gave an invalid VDI handle.  The VDI may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VDI_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VIF\_HANDLE\_INVALID}
-
-You gave an invalid VIF handle.  The VIF may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VIF_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{VLAN\_TAG\_INVALID}
@@ -11991,36 +11901,6 @@ expected and actual VM state at the time of the call.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_HANDLE\_INVALID}
-
-You gave an invalid VM handle.  The VM may have recently been deleted.  The
-handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_METRICS\_HANDLE\_INVALID}
-
-You gave an invalid VM\_metrics handle.  The VM\_metrics may have recently
-been deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_METRICS_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VTPM\_HANDLE\_INVALID}
-
-You gave an invalid VTPM handle.  The VTPM may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VTPM_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 

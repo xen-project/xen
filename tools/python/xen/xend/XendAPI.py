@@ -141,11 +141,11 @@ def session_required(func):
 def _is_valid_ref(ref, validator):
     return type(ref) == str and validator(ref)
 
-def _check_ref(validator, errcode, func, api, session, ref, *args, **kwargs):
+def _check_ref(validator, clas, func, api, session, ref, *args, **kwargs):
     if _is_valid_ref(ref, validator):
         return func(api, session, ref, *args, **kwargs)
     else:
-        return xen_api_error([errcode, ref])
+        return xen_api_error(['HANDLE_INVALID', clas, ref])
 
 
 def valid_host(func):
@@ -156,7 +156,7 @@ def valid_host(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(XendNode.instance().is_valid_host,
-                      'HOST_HANDLE_INVALID', func, *args, **kwargs)
+                      'host', func, *args, **kwargs)
 
 def valid_host_metrics(func):
     """Decorator to verify if host_metrics_ref is valid before calling
@@ -167,7 +167,7 @@ def valid_host_metrics(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: r == XendNode.instance().host_metrics_uuid,
-                      'HOST_METRICS_HANDLE_INVALID', func, *args, **kwargs)
+                      'host_metrics', func, *args, **kwargs)
 
 def valid_host_cpu(func):
     """Decorator to verify if host_cpu_ref is valid before calling method.
@@ -177,7 +177,7 @@ def valid_host_cpu(func):
     """    
     return lambda *args, **kwargs: \
            _check_ref(XendNode.instance().is_valid_cpu,
-                      'HOST_CPU_HANDLE_INVALID', func, *args, **kwargs)
+                      'host_cpu', func, *args, **kwargs)
 
 def valid_vm(func):
     """Decorator to verify if vm_ref is valid before calling method.
@@ -187,7 +187,7 @@ def valid_vm(func):
     """    
     return lambda *args, **kwargs: \
            _check_ref(XendDomain.instance().is_valid_vm,
-                      'VM_HANDLE_INVALID', func, *args, **kwargs)
+                      'VM', func, *args, **kwargs)
 
 def valid_network(func):
     """Decorator to verify if network_ref is valid before calling method.
@@ -197,7 +197,7 @@ def valid_network(func):
     """    
     return lambda *args, **kwargs: \
            _check_ref(XendNode.instance().is_valid_network,
-                      'NETWORK_HANDLE_INVALID', func, *args, **kwargs)
+                      'network', func, *args, **kwargs)
 
 def valid_vbd(func):
     """Decorator to verify if vbd_ref is valid before calling method.
@@ -207,7 +207,7 @@ def valid_vbd(func):
     """    
     return lambda *args, **kwargs: \
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('vbd', r),
-                      'VBD_HANDLE_INVALID', func, *args, **kwargs)
+                      'VBD', func, *args, **kwargs)
 
 def valid_vif(func):
     """Decorator to verify if vif_ref is valid before calling method.
@@ -217,7 +217,7 @@ def valid_vif(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('vif', r),
-                      'VIF_HANDLE_INVALID', func, *args, **kwargs)
+                      'VIF', func, *args, **kwargs)
 
 def valid_vdi(func):
     """Decorator to verify if vdi_ref is valid before calling method.
@@ -227,7 +227,7 @@ def valid_vdi(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(XendNode.instance().is_valid_vdi,
-                      'VDI_HANDLE_INVALID', func, *args, **kwargs)
+                      'VDI', func, *args, **kwargs)
 
 def valid_vtpm(func):
     """Decorator to verify if vtpm_ref is valid before calling method.
@@ -237,7 +237,7 @@ def valid_vtpm(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('vtpm', r),
-                      'VTPM_HANDLE_INVALID', func, *args, **kwargs)
+                      'VTPM', func, *args, **kwargs)
 
 
 def valid_console(func):
@@ -249,7 +249,7 @@ def valid_console(func):
     return lambda *args, **kwargs: \
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('console',
                                                                    r),
-                      'CONSOLE_HANDLE_INVALID', func, *args, **kwargs)
+                      'console', func, *args, **kwargs)
 
 def valid_sr(func):
     """Decorator to verify if sr_ref is valid before calling method.
@@ -259,7 +259,7 @@ def valid_sr(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: XendNode.instance().is_valid_sr,
-                      'SR_HANDLE_INVALID', func, *args, **kwargs)
+                      'SR', func, *args, **kwargs)
 
 def valid_pif(func):
     """Decorator to verify if pif_ref is valid before calling
@@ -270,7 +270,7 @@ def valid_pif(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: r in XendNode.instance().pifs,
-                      'PIF_HANDLE_INVALID', func, *args, **kwargs)
+                      'PIF', func, *args, **kwargs)
 
 def valid_pif_metrics(func):
     """Decorator to verify if pif_metrics_ref is valid before calling
@@ -281,7 +281,7 @@ def valid_pif_metrics(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: r in XendNode.instance().pif_metrics,
-                      'PIF_METRICS_HANDLE_INVALID', func, *args, **kwargs)
+                      'PIF_metrics', func, *args, **kwargs)
 
 def valid_task(func):
     """Decorator to verify if task_ref is valid before calling
@@ -292,7 +292,7 @@ def valid_task(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(XendTaskManager.get_task,
-                      'TASK_HANDLE_INVALID', func, *args, **kwargs)
+                      'task', func, *args, **kwargs)
 
 def valid_debug(func):
     """Decorator to verify if task_ref is valid before calling
@@ -303,7 +303,7 @@ def valid_debug(func):
     """
     return lambda *args, **kwargs: \
            _check_ref(lambda r: r in XendAPI._debug,
-                      'TASK_HANDLE_INVALID', func, *args, **kwargs)
+                      'debug', func, *args, **kwargs)
 
 # -----------------------------
 # Bridge to Legacy XM API calls
@@ -908,7 +908,7 @@ class XendAPI(object):
                 return xen_api_success(
                     node.PIF_create_VLAN(ref, network, vlan))
             else:
-                return xen_api_error(['NETWORK_HANDLE_INVALID', network])
+                return xen_api_error(['HANDLE_INVALID', 'network', network])
         except NetworkAlreadyConnected, exn:
             return xen_api_error(['NETWORK_ALREADY_CONNECTED',
                                   network, exn.pif_uuid])
@@ -1352,7 +1352,7 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         if not xeninfo:
-            return xen_api_error(['VM_HANDLE_INVALID', vm_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VM', vm_ref])
         
         record = {
             'uuid': xeninfo.get_uuid(),
@@ -1469,10 +1469,10 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
         if not vm:
-            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
         cfg = vm.get_dev_xenapi_config('vbd', vbd_ref)
         if not cfg:
-            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
 
         valid_vbd_keys = self.VBD_attr_ro + self.VBD_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
@@ -1491,7 +1491,7 @@ class XendAPI(object):
     def VBD_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
         if not xendom.is_valid_vm(vbd_struct['VM']):
-            return xen_api_error(['VM_HANDLE_INVALID', vbd_struct['VM']])
+            return xen_api_error(['HANDLE_INVALID', 'VM', vbd_struct['VM']])
         
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
         vbd_ref = ''
@@ -1500,7 +1500,7 @@ class XendAPI(object):
             vdi_ref = vbd_struct.get('VDI')
             vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
             if not vdi:
-                return xen_api_error(['VDI_HANDLE_INVALID', vdi_ref])
+                return xen_api_error(['HANDLE_INVALID', 'VDI', vdi_ref])
             vdi_image = vdi.get_location()
             vbd_ref = XendTask.log_progress(0, 100,
                                             dom.create_vbd,
@@ -1516,7 +1516,7 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
         if not vm:
-            return xen_api_error(['VBD_HANDLE_INVALID', vbd_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
 
         XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
         return xen_api_success_void()
@@ -1586,10 +1586,10 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         if not vm:
-            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VIF', vif_ref])
         cfg = vm.get_dev_xenapi_config('vif', vif_ref)
         if not cfg:
-            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VIF', vif_ref])
         
         valid_vif_keys = self.VIF_attr_ro + self.VIF_attr_rw + \
                          self.Base_attr_ro + self.Base_attr_rw
@@ -1613,14 +1613,14 @@ class XendAPI(object):
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
-            return xen_api_error(['VM_HANDLE_INVALID', vif_struct['VM']])
+            return xen_api_error(['HANDLE_INVALID', 'VM', vif_struct['VM']])
 
 
     def VIF_destroy(self, session, vif_ref):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         if not vm:
-            return xen_api_error(['VIF_HANDLE_INVALID', vif_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VIF', vif_ref])
 
         vm.destroy_vif(vif_ref)
         return xen_api_success_void()
@@ -1766,7 +1766,7 @@ class XendAPI(object):
         sr_ref = vdi_struct.get('SR')
         xennode = XendNode.instance()
         if not xennode.is_valid_sr(sr_ref):
-            return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
+            return xen_api_error(['HANDLE_INVALID', 'SR', sr_ref])
 
         vdi_uuid = xennode.srs[sr_ref].create_vdi(vdi_struct)
         return xen_api_success(vdi_uuid)
@@ -1797,10 +1797,10 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
         valid_vtpm_keys = self.VTPM_attr_ro + self.VTPM_attr_rw + \
                           self.Base_attr_ro + self.Base_attr_rw
         return_cfg = {}
@@ -1815,10 +1815,10 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
         if not vm:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
         cfg = vm.get_dev_xenapi_config('vtpm', vtpm_ref)
         if not cfg:
-            return xen_api_error(['VTPM_HANDLE_INVALID', vtpm_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
         if not cfg.has_key('backend'):
             return xen_api_error(['VTPM backend not set'])
         return xen_api_success(cfg['backend'])
@@ -1841,7 +1841,7 @@ class XendAPI(object):
             tpmif.destroy_vtpmstate(dom.getName())
             return xen_api_success(True)
         else:
-            return xen_api_error(['VM_HANDLE_INVALID', vtpm_struct['VM']])
+            return xen_api_error(['HANDLE_INVALID', 'VM', vtpm_struct['VM']])
 
     # class methods
     def VTPM_create(self, session, vtpm_struct):
@@ -1855,7 +1855,7 @@ class XendAPI(object):
             except XendError:
                 return xen_api_error(XEND_ERROR_TODO)
         else:
-            return xen_api_error(['VM_HANDLE_INVALID', vtpm_struct['VM']])
+            return xen_api_error(['HANDLE_INVALID', 'VM', vtpm_struct['VM']])
 
     def VTPM_get_all(self, session):
         xendom = XendDomain.instance()
@@ -1897,10 +1897,10 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('console', console_ref)
         if not vm:
-            return xen_api_error(['CONSOLE_HANDLE_INVALID', console_ref])
+            return xen_api_error(['HANDLE_INVALID', 'console', console_ref])
         cfg = vm.get_dev_xenapi_config('console', console_ref)
         if not cfg:
-            return xen_api_error(['CONSOLE_HANDLE_INVALID', console_ref])
+            return xen_api_error(['HANDLE_INVALID', 'console', console_ref])
         
         valid_console_keys = self.console_attr_ro + self.console_attr_rw + \
                              self.Base_attr_ro + self.Base_attr_rw
@@ -1915,7 +1915,8 @@ class XendAPI(object):
     def console_create(self, session, console_struct):
         xendom = XendDomain.instance()
         if not xendom.is_valid_vm(console_struct['VM']):
-            return xen_api_error(['VM_HANDLE_INVALID', console_struct['VM']])
+            return xen_api_error(['HANDLE_INVALID', 'VM',
+                                  console_struct['VM']])
         
         dom = xendom.get_vm_by_uuid(console_struct['VM'])
         try:
@@ -1972,7 +1973,7 @@ class XendAPI(object):
         sr = XendNode.instance().get_sr(sr_ref)
         if sr:
             return xen_api_success(sr.get_record())
-        return xen_api_error(['SR_HANDLE_INVALID', sr_ref])
+        return xen_api_error(['HANDLE_INVALID', 'SR', sr_ref])
 
     # Attribute acceess
 
