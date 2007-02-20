@@ -533,6 +533,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         break;
 
     case INSTR_LODS:
+        set_reg_value(size, 0, 0, regs, p->data);
         sign = p->df ? -1 : 1;
         regs->esi += sign * p->count * p->size;
         if (mmio_opp->flags & REPZ)
