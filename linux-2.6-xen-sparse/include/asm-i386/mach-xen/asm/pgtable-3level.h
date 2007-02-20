@@ -145,21 +145,24 @@ static inline int pte_none(pte_t pte)
 	return !pte.pte_low && !pte.pte_high;
 }
 
-#define pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) |\
-		       (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)))
-#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
+#define __pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) | \
+			 ((_pte).pte_high << (32-PAGE_SHIFT)))
+#define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
+#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
 
 extern unsigned long long __supported_pte_mask;
 
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
-	return pfn_pte_ma(pfn_to_mfn(page_nr), pgprot);
+	return __pte((((unsigned long long)page_nr << PAGE_SHIFT) |
+			pgprot_val(pgprot)) & __supported_pte_mask);
 }
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	BUG(); panic("needs review");
-	return __pmd((((unsigned long long)page_nr << PAGE_SHIFT) | \
+	return __pmd((((unsigned long long)page_nr << PAGE_SHIFT) |
 			pgprot_val(pgprot)) & __supported_pte_mask);
 }
 

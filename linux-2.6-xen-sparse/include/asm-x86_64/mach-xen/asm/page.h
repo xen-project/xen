@@ -9,6 +9,13 @@
 #endif
 #include <xen/interface/xen.h> 
 
+/*
+ * Need to repeat this here in order to not include pgtable.h (which in turn
+ * depends on definitions made here), but to be able to use the symbolic
+ * below. The preprocessor will warn if the two definitions aren't identical.
+ */
+#define _PAGE_PRESENT	0x001
+
 #define arch_free_page(_page,_order)		\
 ({	int foreign = PageForeign(_page);	\
 	if (foreign)				\
@@ -95,28 +102,33 @@ typedef struct { unsigned long pgd; } pgd_t;
 
 typedef struct { unsigned long pgprot; } pgprot_t;
 
-#define pte_val(x)	(((x).pte & 1) ? pte_machine_to_phys((x).pte) : \
+#define pte_val(x)	(((x).pte & _PAGE_PRESENT) ? \
+			 pte_machine_to_phys((x).pte) : \
 			 (x).pte)
 #define pte_val_ma(x)	((x).pte)
 
 static inline unsigned long pmd_val(pmd_t x)
 {
 	unsigned long ret = x.pmd;
-	if (ret) ret = pte_machine_to_phys(ret);
+#ifdef CONFIG_XEN_COMPAT_030002
+	if (ret) ret = pte_machine_to_phys(ret) | _PAGE_PRESENT;
+#else
+	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
+#endif
 	return ret;
 }
 
 static inline unsigned long pud_val(pud_t x)
 {
 	unsigned long ret = x.pud;
-	if (ret) ret = pte_machine_to_phys(ret);
+	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
-	if (ret) ret = pte_machine_to_phys(ret);
+	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
@@ -124,25 +136,25 @@ static inline unsigned long pgd_val(pgd_t x)
 
 static inline pte_t __pte(unsigned long x)
 {
-	if (x & 1) x = phys_to_machine(x);
+	if (x & _PAGE_PRESENT) x = pte_phys_to_machine(x);
 	return ((pte_t) { (x) });
 }
 
 static inline pmd_t __pmd(unsigned long x)
 {
-	if ((x & 1)) x = phys_to_machine(x);
+	if (x & _PAGE_PRESENT) x = pte_phys_to_machine(x);
 	return ((pmd_t) { (x) });
 }
 
 static inline pud_t __pud(unsigned long x)
 {
-	if ((x & 1)) x = phys_to_machine(x);
+	if (x & _PAGE_PRESENT) x = pte_phys_to_machine(x);
 	return ((pud_t) { (x) });
 }
 
 static inline pgd_t __pgd(unsigned long x)
 {
-	if ((x & 1)) x = phys_to_machine(x);
+	if (x & _PAGE_PRESENT) x = pte_phys_to_machine(x);
 	return ((pgd_t) { (x) });
 }
 

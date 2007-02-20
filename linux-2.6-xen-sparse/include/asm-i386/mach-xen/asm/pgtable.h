@@ -315,18 +315,19 @@ static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
-	pte.pte_low &= _PAGE_CHG_MASK;
-	pte.pte_low |= pgprot_val(newprot);
-#ifdef CONFIG_X86_PAE
 	/*
-	 * Chop off the NX bit (if present), and add the NX portion of
-	 * the newprot (if present):
+	 * Since this might change the present bit (which controls whether
+	 * a pte_t object has undergone p2m translation), we must use
+	 * pte_val() on the input pte and __pte() for the return value.
 	 */
-	pte.pte_high &= ~(1 << (_PAGE_BIT_NX - 32));
-	pte.pte_high |= (pgprot_val(newprot) >> 32) & \
-					(__supported_pte_mask >> 32);
+	paddr_t pteval = pte_val(pte);
+
+	pteval &= _PAGE_CHG_MASK;
+	pteval |= pgprot_val(newprot);
+#ifdef CONFIG_X86_PAE
+	pteval &= __supported_pte_mask;
 #endif
-	return pte;
+	return __pte(pteval);
 }
 
 #define pmd_large(pmd) \
