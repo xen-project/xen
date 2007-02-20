@@ -151,6 +151,12 @@
 #define XEN_ELFNOTE_HV_START_LOW  12
 
 /*
+ * List of maddr_t-sized mask/value pairs describing how to recognize
+ * (non-present) L1 page table entries carrying valid MFNs (numeric).
+ */
+#define XEN_ELFNOTE_L1_MFN_VALID  13
+
+/*
  * System information exported through crash notes.
  *
  * The kexec / kdump code will create one XEN_ELFNOTE_CRASH_INFO 

@@ -12,6 +12,8 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
 
+#define _PAGE_PRESENT 0x1
+
 /*
  * References to members of the new_cpu_data structure.
  */
@@ -198,7 +200,9 @@ ENTRY(cpu_gdt_table)
 	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
 #ifdef CONFIG_X86_PAE
 	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "yes")
+	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .quad,  _PAGE_PRESENT,_PAGE_PRESENT)
 #else
 	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "no")
+	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .long,  _PAGE_PRESENT,_PAGE_PRESENT)
 #endif
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")

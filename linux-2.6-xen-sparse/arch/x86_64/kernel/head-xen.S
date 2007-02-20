@@ -25,6 +25,8 @@
 
 #include <xen/interface/elfnote.h>
 
+#define _PAGE_PRESENT 0x1
+
 	.section .bootstrap.text, "ax", @progbits
 	.code64
 #define VIRT_ENTRY_OFFSET 0x0
@@ -49,7 +51,7 @@ ENTRY(_stext)
 #define NEXT_PAGE(name) \
 	$page = $page + 1; \
 	.org $page * 0x1000; \
-	phys_/**/name = $page * 0x1000 + __PHYSICAL_START; \
+	phys_##name = $page * 0x1000 + __PHYSICAL_START; \
 ENTRY(name)
 
 NEXT_PAGE(init_level4_pgt)
@@ -181,5 +183,6 @@ ENTRY(empty_zero_page)
 #endif /* !CONFIG_XEN_COMPAT_030002 */
 	ELFNOTE(Xen, XEN_ELFNOTE_ENTRY,          .quad,  startup_64)
 	ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, .quad,  hypercall_page)
+	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .quad,  _PAGE_PRESENT,_PAGE_PRESENT)
 	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")
