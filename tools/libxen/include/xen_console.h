@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_console_decl.h"
 #include "xen_console_protocol.h"
+#include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
 
@@ -67,6 +68,7 @@ typedef struct xen_console_record
     enum xen_console_protocol protocol;
     char *location;
     struct xen_vm_record_opt *vm;
+    xen_string_string_map *other_config;
 } xen_console_record;
 
 /**
@@ -202,6 +204,37 @@ xen_console_get_location(xen_session *session, char **result, xen_console consol
  */
 extern bool
 xen_console_get_vm(xen_session *session, xen_vm *result, xen_console console);
+
+
+/**
+ * Get the other_config field of the given console.
+ */
+extern bool
+xen_console_get_other_config(xen_session *session, xen_string_string_map **result, xen_console console);
+
+
+/**
+ * Set the other_config field of the given console.
+ */
+extern bool
+xen_console_set_other_config(xen_session *session, xen_console console, xen_string_string_map *other_config);
+
+
+/**
+ * Add the given key-value pair to the other_config field of the given
+ * console.
+ */
+extern bool
+xen_console_add_to_other_config(xen_session *session, xen_console console, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * other_config field of the given console.  If the key is not in that Map,
+ * then do nothing.
+ */
+extern bool
+xen_console_remove_from_other_config(xen_session *session, xen_console console, char *key);
 
 
 #endif

@@ -24,6 +24,7 @@
 #include "xen_console.h"
 #include "xen_console_protocol_internal.h"
 #include "xen_internal.h"
+#include "xen_string_string_map.h"
 #include "xen_vm.h"
 
 
@@ -49,7 +50,10 @@ static const struct_member xen_console_record_struct_members[] =
           .offset = offsetof(xen_console_record, location) },
         { .key = "VM",
           .type = &abstract_type_ref,
-          .offset = offsetof(xen_console_record, vm) }
+          .offset = offsetof(xen_console_record, vm) },
+        { .key = "other_config",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_console_record, other_config) }
     };
 
 const abstract_type xen_console_record_abstract_type_ =
@@ -73,6 +77,7 @@ xen_console_record_free(xen_console_record *record)
     free(record->uuid);
     free(record->location);
     xen_vm_record_opt_free(record->vm);
+    xen_string_string_map_free(record->other_config);
     free(record);
 }
 
@@ -193,6 +198,73 @@ xen_console_get_vm(xen_session *session, xen_vm *result, xen_console console)
 
     *result = NULL;
     XEN_CALL_("console.get_VM");
+    return session->ok;
+}
+
+
+bool
+xen_console_get_other_config(xen_session *session, xen_string_string_map **result, xen_console console)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = console }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("console.get_other_config");
+    return session->ok;
+}
+
+
+bool
+xen_console_set_other_config(xen_session *session, xen_console console, xen_string_string_map *other_config)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = console },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)other_config }
+        };
+
+    xen_call_(session, "console.set_other_config", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_console_add_to_other_config(xen_session *session, xen_console console, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = console },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "console.add_to_other_config", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_console_remove_from_other_config(xen_session *session, xen_console console, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = console },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "console.remove_from_other_config", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
