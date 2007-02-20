@@ -31,6 +31,7 @@ Name & Description \\
 {\tt host\_cpu} & A physical CPU \\
 {\tt network} & A virtual network \\
 {\tt VIF} & A virtual network interface \\
+{\tt VIF\_metrics} & The metrics associated with a virtual network device \\
 {\tt PIF} & A physical network interface (note separate VLANs are represented as several PIFs) \\
 {\tt PIF\_metrics} & The metrics associated with a physical network interface \\
 {\tt SR} & A storage repository \\
@@ -6709,8 +6710,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to w
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF}
@@ -7008,13 +7008,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_read\_kbs}
+\subsubsection{RPC name:~get\_metrics}
 
 {\bf Overview:} 
-Get the io/read\_kbs field of the given VIF.
+Get the metrics field of the given VIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_read_kbs (session_id s, VIF ref self)\end{verbatim}
+\begin{verbatim} (VIF_metrics ref) get_metrics (session_id s, VIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -7032,39 +7032,7 @@ Get the io/read\_kbs field of the given VIF.
 
  \noindent {\bf Return Type:} 
 {\tt 
-float
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_write\_kbs}
-
-{\bf Overview:} 
-Get the io/write\_kbs field of the given VIF.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_write_kbs (session_id s, VIF ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VIF ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-float
+VIF\_metrics ref
 }
 
 
@@ -7193,6 +7161,185 @@ Get a record containing the current state of the given VIF.
  \noindent {\bf Return Type:} 
 {\tt 
 VIF record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: VIF\_metrics}
+\subsection{Fields for class: VIF\_metrics}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VIF\_metrics} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The metrics associated with a virtual network device.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: VIF\_metrics}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
+
+{\bf Overview:} 
+Get the io/read\_kbs field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_read_kbs (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
+
+{\bf Overview:} 
+Get the io/write\_kbs field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_write_kbs (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the VIF\_metrics instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VIF_metrics ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VIF\_metrics ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VIF_metrics record) get_record (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VIF\_metrics record
 }
 
 

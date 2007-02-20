@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_network_decl.h"
 #include "xen_vif_decl.h"
+#include "xen_vif_metrics_decl.h"
 #include "xen_vm_decl.h"
 
 
@@ -69,8 +70,7 @@ typedef struct xen_vif_record
     struct xen_vm_record_opt *vm;
     char *mac;
     int64_t mtu;
-    double io_read_kbs;
-    double io_write_kbs;
+    struct xen_vif_metrics_record_opt *metrics;
 } xen_vif_record;
 
 /**
@@ -223,17 +223,10 @@ xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif);
 
 
 /**
- * Get the io/read_kbs field of the given VIF.
+ * Get the metrics field of the given VIF.
  */
 extern bool
-xen_vif_get_io_read_kbs(xen_session *session, double *result, xen_vif vif);
-
-
-/**
- * Get the io/write_kbs field of the given VIF.
- */
-extern bool
-xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif);
+xen_vif_get_metrics(xen_session *session, xen_vif_metrics *result, xen_vif vif);
 
 
 /**

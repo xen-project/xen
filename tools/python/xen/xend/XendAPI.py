@@ -229,6 +229,16 @@ def valid_vif(func):
            _check_ref(lambda r: XendDomain.instance().is_valid_dev('vif', r),
                       'VIF', func, *args, **kwargs)
 
+def valid_vif_metrics(func):
+    """Decorator to verify if ref is valid before calling method.
+
+    @param func: function with params: (self, session, ref, ...)
+    @rtype: callable object
+    """    
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: XendDomain.instance().is_valid_dev('vif', r),
+                      'VIF_metrics', func, *args, **kwargs)
+
 def valid_vdi(func):
     """Decorator to verify if vdi_ref is valid before calling method.
 
@@ -390,6 +400,7 @@ class XendAPI(object):
             'VBD'          : valid_vbd,
             'VBD_metrics'  : valid_vbd_metrics,
             'VIF'          : valid_vif,
+            'VIF_metrics'  : valid_vif_metrics,
             'VDI'          : valid_vdi,
             'VTPM'         : valid_vtpm,
             'console'      : valid_console,
@@ -1592,18 +1603,17 @@ class XendAPI(object):
             { 'io_read_kbs'  : vm.get_dev_property('vbd', ref, 'io_read_kbs'),
               'io_write_kbs' : vm.get_dev_property('vbd', ref, 'io_write_kbs') })
 
-    def VBD_metrics_get_io_write_kbs(self, _, ref):
+    def VBD_metrics_get_io_read_kbs(self, _, ref):
         return self._VBD_get(ref, 'io_read_kbs')
     
-    def VBD_metrics_get_io_write_kbs(self, session, vbd_ref):
+    def VBD_metrics_get_io_write_kbs(self, session, ref):
         return self._VBD_get(ref, 'io_write_kbs')
 
 
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['io_read_kbs',
-                   'io_write_kbs']
+    VIF_attr_ro = ['metrics']
     VIF_attr_rw = ['device',
                    'network',
                    'VM',
@@ -1633,6 +1643,8 @@ class XendAPI(object):
             if k in valid_vif_keys:
                 return_cfg[k] = cfg[k]
             
+        return_cfg['metrics'] = vif_ref
+
         return xen_api_success(return_cfg)
 
     # class methods
@@ -1659,36 +1671,28 @@ class XendAPI(object):
         vm.destroy_vif(vif_ref)
         return xen_api_success_void()
 
+    def _VIF_get(self, ref, prop):
+        return xen_api_success(
+            XendDomain.instance().get_dev_property_by_uuid('vif', ref, prop))
+
     # getters/setters
+    def VIF_get_metrics(self, _, vif_ref):
+        return xen_api_success(vif_ref)
+
     def VIF_get_VM(self, session, vif_ref):
         xendom = XendDomain.instance()        
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)        
         return xen_api_success(vm.get_uuid())
     
     def VIF_get_MTU(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'MTU'))
+        return self._VIF_get(vif_ref, 'MTU')
+    
     def VIF_get_MAC(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'MAC'))
+        return self._VIF_get(vif_ref, 'MAC')
 
     def VIF_get_device(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'device'))
+        return self._VIF_get(vif_ref, 'device')
  
-    def VIF_get_io_read_kbs(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'io_read_kbs'))
-
-    def VIF_get_io_write_kbs(self, session, vif_ref):
-        xendom = XendDomain.instance()
-        return xen_api_success(xendom.get_dev_property_by_uuid('vif', vif_ref,
-                                                               'io_write_kbs'))
-
     def VIF_get_all(self, session):
         xendom = XendDomain.instance()
         vifs = [d.get_vifs() for d in XendDomain.instance().list('all')]
@@ -1696,6 +1700,29 @@ class XendAPI(object):
         return xen_api_success(vifs)
 
     
+    # Xen API: Class VIF_metrics
+    # ----------------------------------------------------------------
+
+    VIF_metrics_attr_ro = ['io_read_kbs',
+                           'io_write_kbs']
+    VIF_metrics_attr_rw = []
+    VIF_methods = []
+
+    def VIF_metrics_get_record(self, _, ref):
+        vm = XendDomain.instance().get_vm_with_dev_uuid('vif', ref)
+        if not vm:
+            return xen_api_error(['HANDLE_INVALID', 'VIF_metrics', ref])
+        return xen_api_success(
+            { 'io_read_kbs'  : vm.get_dev_property('vif', ref, 'io_read_kbs'),
+              'io_write_kbs' : vm.get_dev_property('vif', ref, 'io_write_kbs') })
+
+    def VIF_metrics_get_io_read_kbs(self, _, ref):
+        return self._VIF_get(ref, 'io_read_kbs')
+    
+    def VIF_metrics_get_io_write_kbs(self, session, ref):
+        return self._VIF_get(ref, 'io_write_kbs')
+
+
     # Xen API: Class VDI
     # ----------------------------------------------------------------
     VDI_attr_ro = ['VBDs',
