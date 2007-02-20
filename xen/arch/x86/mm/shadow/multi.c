@@ -3196,11 +3196,10 @@ sh_update_linear_entries(struct vcpu *v)
         int unmap_l2e = 0;
 
 #if GUEST_PAGING_LEVELS == 2
+
         /* Shadow l3 tables were built by sh_update_cr3 */
-        if ( shadow_mode_external(d) )
-            shadow_l3e = (shadow_l3e_t *)&v->arch.paging.shadow.l3table;
-        else
-            BUG(); /* PV 2-on-3 is not supported yet */
+        BUG_ON(!shadow_mode_external(d)); /* PV 2-on-3 is unsupported */
+        shadow_l3e = (shadow_l3e_t *)&v->arch.paging.shadow.l3table;
         
 #else /* GUEST_PAGING_LEVELS == 3 */
         

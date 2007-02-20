@@ -624,14 +624,23 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
-        char sig[5];
-        /* Signature (ud2; .ascii "dbg") indicates dump state and continue. */
-        if ( (__copy_from_user(sig, (char *)regs->eip, sizeof(sig)) == 0) &&
-             (memcmp(sig, "\xf\xb""dbg", sizeof(sig)) == 0) )
+        struct bug_frame bug;
+        if ( (__copy_from_user(&bug, (char *)regs->eip, sizeof(bug)) == 0) &&
+             (memcmp(bug.ud2, "\xf\xb",    sizeof(bug.ud2)) == 0) &&
+             (memcmp(bug.mov, BUG_MOV_STR, sizeof(bug.mov)) == 0) &&
+             (bug.ret == 0xc2) )
         {
-            show_execution_state(regs);
-            regs->eip += sizeof(sig);
-            return EXCRET_fault_fixed;
+            char *filename = (char *)bug.filename;
+            unsigned int line = bug.line & 0x7fff;
+            int is_bug = !(bug.line & 0x8000);
+            printk("Xen %s at %.50s:%d\n",
+                   is_bug ? "BUG" : "State Dump", filename, line);
+            if ( !is_bug )
+            {
+                show_execution_state(regs);
+                regs->eip += sizeof(bug);
+                return EXCRET_fault_fixed;
+            }
         }
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);

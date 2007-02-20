@@ -7,9 +7,10 @@
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 #include <xen/string.h>
+#include <asm/bug.h>
 
-extern void __bug(char *file, int line) __attribute__((noreturn));
-#define BUG() __bug(__FILE__, __LINE__)
+void __bug(char *file, int line) __attribute__((noreturn));
+
 #define BUG_ON(_p) do { if (_p) BUG(); } while ( 0 )
 
 /* Force a compilation error if condition is true */

@@ -565,11 +565,6 @@ void compat_show_guest_stack(struct cpu_user_regs *, int lines);
 #define compat_show_guest_stack(regs, lines) ((void)0)
 #endif
 
-/* Dumps current register and stack state. */
-#define dump_execution_state()                                              \
-    /* NB. Needs interrupts enabled else we end up in fatal_trap(). */      \
-    __asm__ __volatile__ ( "pushf ; sti ; ud2 ; .ascii \"dbg\" ; popf" )
-
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 

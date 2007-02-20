@@ -929,49 +929,7 @@ mfn_t shadow_alloc(struct domain *d,
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i <= SHADOW_MAX_ORDER; i++ )
         if ( !list_empty(&d->arch.paging.shadow.freelists[i]) )
-        {
-            sp = list_entry(d->arch.paging.shadow.freelists[i].next, 
-                            struct shadow_page_info, list);
-            list_del(&sp->list);
-            
-            /* We may have to halve the chunk a number of times. */
-            while ( i != order )
-            {
-                i--;
-                sp->order = i;
-                list_add_tail(&sp->list, &d->arch.paging.shadow.freelists[i]);
-                sp += 1 << i;
-            }
-            d->arch.paging.shadow.free_pages -= 1 << order;
-
-            /* Init page info fields and clear the pages */
-            for ( i = 0; i < 1<<order ; i++ ) 
-            {
-                /* Before we overwrite the old contents of this page, 
-                 * we need to be sure that no TLB holds a pointer to it. */
-                mask = d->domain_dirty_cpumask;
-                tlbflush_filter(mask, sp[i].tlbflush_timestamp);
-                if ( unlikely(!cpus_empty(mask)) )
-                {
-                    perfc_incrc(shadow_alloc_tlbflush);
-                    flush_tlb_mask(mask);
-                }
-                /* Now safe to clear the page for reuse */
-                p = sh_map_domain_page(shadow_page_to_mfn(sp+i));
-                ASSERT(p != NULL);
-                clear_page(p);
-                sh_unmap_domain_page(p);
-                INIT_LIST_HEAD(&sp[i].list);
-                sp[i].type = shadow_type;
-                sp[i].pinned = 0;
-                sp[i].logdirty = 0;
-                sp[i].count = 0;
-                sp[i].backpointer = backpointer;
-                sp[i].next_shadow = NULL;
-                perfc_incr(shadow_alloc_count);
-            }
-            return shadow_page_to_mfn(sp);
-        }
+            goto found;
     
     /* If we get here, we failed to allocate. This should never happen.
      * It means that we didn't call shadow_prealloc() correctly before
@@ -979,6 +937,49 @@ mfn_t shadow_alloc(struct domain *d,
      * we might free up higher-level pages that the caller is working on. */
     SHADOW_PRINTK("Can't allocate %i shadow pages!\n", 1 << order);
     BUG();
+
+ found:
+    sp = list_entry(d->arch.paging.shadow.freelists[i].next, 
+                    struct shadow_page_info, list);
+    list_del(&sp->list);
+            
+    /* We may have to halve the chunk a number of times. */
+    while ( i != order )
+    {
+        i--;
+        sp->order = i;
+        list_add_tail(&sp->list, &d->arch.paging.shadow.freelists[i]);
+        sp += 1 << i;
+    }
+    d->arch.paging.shadow.free_pages -= 1 << order;
+
+    /* Init page info fields and clear the pages */
+    for ( i = 0; i < 1<<order ; i++ ) 
+    {
+        /* Before we overwrite the old contents of this page, 
+         * we need to be sure that no TLB holds a pointer to it. */
+        mask = d->domain_dirty_cpumask;
+        tlbflush_filter(mask, sp[i].tlbflush_timestamp);
+        if ( unlikely(!cpus_empty(mask)) )
+        {
+            perfc_incrc(shadow_alloc_tlbflush);
+            flush_tlb_mask(mask);
+        }
+        /* Now safe to clear the page for reuse */
+        p = sh_map_domain_page(shadow_page_to_mfn(sp+i));
+        ASSERT(p != NULL);
+        clear_page(p);
+        sh_unmap_domain_page(p);
+        INIT_LIST_HEAD(&sp[i].list);
+        sp[i].type = shadow_type;
+        sp[i].pinned = 0;
+        sp[i].logdirty = 0;
+        sp[i].count = 0;
+        sp[i].backpointer = backpointer;
+        sp[i].next_shadow = NULL;
+        perfc_incr(shadow_alloc_count);
+    }
+    return shadow_page_to_mfn(sp);
 }
 
 
