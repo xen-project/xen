@@ -98,6 +98,9 @@ xencommize_mini_grant_table_op(struct xencomm_mini *xc_area, int *nbr_area,
 	case GNTTABOP_copy:
 		argsize = sizeof(struct gnttab_copy);
 		break;
+	case GNTTABOP_query_size:
+		argsize = sizeof(struct gnttab_query_size);
+		break;
 	default:
 		printk("%s: unknown mini grant table op %d\n", __func__, cmd);
 		BUG();
