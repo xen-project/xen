@@ -235,7 +235,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
         } 
         /* b) check for grant table conflicts on shared pages */
         spin_lock(&(*pd)->grant_table->lock);
-        for ( i = 0; i < nr_grant_frames((*pd)->grant_table); i++ ) {
+        for ( i = 0; i < nr_grant_entries((*pd)->grant_table); i++ ) {
 #define SPP (PAGE_SIZE / sizeof(struct grant_entry))
             sha_copy = (*pd)->grant_table->shared[i/SPP][i%SPP];
             if ( sha_copy.flags ) {
@@ -244,8 +244,9 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                         (unsigned long)sha_copy.frame);
                 rdomid = sha_copy.domid;
                 if ((rdom = get_domain_by_id(rdomid)) == NULL) {
+                    spin_unlock(&(*pd)->grant_table->lock);
                     printkd("%s: domain not found ERROR!\n", __func__);
-                    goto out_gnttab;
+                    goto out;
                 };
                 /* rdom now has remote domain */
                 ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
@@ -253,16 +254,16 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 ste_rssidref = ste_rssid->ste_ssidref;
                 put_domain(rdom);
                 if (!have_common_type(ste_ssidref, ste_rssidref)) {
+                    spin_unlock(&(*pd)->grant_table->lock);
                     printkd("%s: Policy violation in grant table sharing domain %x -> domain %x.\n",
                             __func__, (*pd)->domain_id, rdomid);
-                    goto out_gnttab;
+                    goto out;
                 }
             }
         }
+        spin_unlock(&(*pd)->grant_table->lock);
     }
     violation = 0;
- out_gnttab:
-    spin_unlock(&(*pd)->grant_table->lock);
  out:
     read_unlock(&domlist_lock);
     return violation;
