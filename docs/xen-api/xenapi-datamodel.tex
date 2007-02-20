@@ -61,7 +61,6 @@ VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
 host.metrics & host\_metrics.host & one-to-one\\
 PIF.metrics & PIF\_metrics.PIF & one-to-one\\
-VM.metrics & VM\_metrics.VM & one-to-one\\
 PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
@@ -1076,8 +1075,6 @@ $\mathit{RW}$ &  {\tt VCPUs/policy} & string & the name of the VCPU scheduling p
 $\mathit{RW}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & configuration parameters for the selected VCPU policy \\
 $\mathit{RW}$ &  {\tt VCPUs/max} & int & Max number of VCPUs \\
 $\mathit{RW}$ &  {\tt VCPUs/at\_startup} & int & Boot number of VCPUs \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
-$\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RW}$ &  {\tt actions/after\_shutdown} & on\_normal\_exit & action to take after the guest has shutdown itself \\
 $\mathit{RW}$ &  {\tt actions/after\_reboot} & on\_normal\_exit & action to take after the guest has rebooted itself \\
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
@@ -1102,7 +1099,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-th
 $\mathit{RO}_\mathit{run}$ &  {\tt tools\_version} & (string $\rightarrow$ string) Map & versions of installed paravirtualised drivers \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VM}
@@ -2545,70 +2542,6 @@ void
 
 
 
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VCPUs\_number}
-
-{\bf Overview:} 
-Get the VCPUs/number field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} int get_VCPUs_number (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-int
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VCPUs\_utilisation}
-
-{\bf Overview:} 
-Get the VCPUs/utilisation field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} ((int -> float) Map) get_VCPUs_utilisation (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-(int $\rightarrow$ float) Map
-}
-
-
-value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -4273,7 +4206,6 @@ The metrics associated with a VM.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & VM to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
@@ -4305,38 +4237,6 @@ Get the uuid field of the given VM\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VM}
-
-{\bf Overview:} 
-Get the VM field of the given VM\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (VM ref) get_VM (session_id s, VM_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-VM ref
 }
 
 

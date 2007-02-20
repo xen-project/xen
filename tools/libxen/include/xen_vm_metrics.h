@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,6 @@
 
 #include "xen_common.h"
 #include "xen_int_float_map.h"
-#include "xen_vm_decl.h"
 #include "xen_vm_metrics_decl.h"
 
 
@@ -64,7 +63,6 @@ typedef struct xen_vm_metrics_record
 {
     xen_vm_metrics handle;
     char *uuid;
-    struct xen_vm_record_opt *vm;
     int64_t memory_actual;
     int64_t vcpus_number;
     xen_int_float_map *vcpus_utilisation;
@@ -168,13 +166,6 @@ xen_vm_metrics_get_by_uuid(xen_session *session, xen_vm_metrics *result, char *u
  */
 extern bool
 xen_vm_metrics_get_uuid(xen_session *session, char **result, xen_vm_metrics vm_metrics);
-
-
-/**
- * Get the VM field of the given VM_metrics.
- */
-extern bool
-xen_vm_metrics_get_vm(xen_session *session, xen_vm *result, xen_vm_metrics vm_metrics);
 
 
 /**

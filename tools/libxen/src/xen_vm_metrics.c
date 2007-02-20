@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 #include "xen_common.h"
 #include "xen_int_float_map.h"
 #include "xen_internal.h"
-#include "xen_vm.h"
 #include "xen_vm_metrics.h"
 
 
@@ -41,9 +40,6 @@ static const struct_member xen_vm_metrics_record_struct_members[] =
         { .key = "uuid",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_metrics_record, uuid) },
-        { .key = "VM",
-          .type = &abstract_type_ref,
-          .offset = offsetof(xen_vm_metrics_record, vm) },
         { .key = "memory_actual",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_metrics_record, memory_actual) },
@@ -74,7 +70,6 @@ xen_vm_metrics_record_free(xen_vm_metrics_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    xen_vm_record_opt_free(record->vm);
     xen_int_float_map_free(record->vcpus_utilisation);
     free(record);
 }
@@ -116,23 +111,6 @@ xen_vm_metrics_get_by_uuid(xen_session *session, xen_vm_metrics *result, char *u
 
     *result = NULL;
     XEN_CALL_("VM_metrics.get_by_uuid");
-    return session->ok;
-}
-
-
-bool
-xen_vm_metrics_get_vm(xen_session *session, xen_vm *result, xen_vm_metrics vm_metrics)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm_metrics }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM_metrics.get_VM");
     return session->ok;
 }
 

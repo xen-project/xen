@@ -31,6 +31,7 @@
 #include "xen_vdi.h"
 #include "xen_console.h"
 #include "xen_vm.h"
+#include "xen_vm_metrics.h"
 
 
 static void usage()
@@ -61,6 +62,7 @@ typedef struct
 
 static xen_vm create_new_vm(xen_session *session, bool hvm);
 static void print_vm_power_state(xen_session *session, xen_vm vm);
+static void print_vm_metrics(xen_session *session, xen_vm vm);
 
 
 static size_t
@@ -245,12 +247,7 @@ int main(int argc, char **argv)
 
     printf("%s.\n", xen_vm_power_state_to_string(vm_record->power_state));
 
-    for (size_t i = 0; i < vm_record->vcpus_utilisation->size; i++)
-    {
-        printf("%"PRId64" -> %lf.\n",
-               vm_record->vcpus_utilisation->contents[i].key,
-               vm_record->vcpus_utilisation->contents[i].val);
-    }
+    print_vm_metrics(session, vm);
 
     xen_uuid_bytes_free(vm_uuid_bytes);
     xen_uuid_free(vm_uuid);
@@ -323,7 +320,6 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
             .memory_static_min = 128,
             .vcpus_policy = "credit",
             .vcpus_params = vcpus_params,
-            .vcpus_number = 2,
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
             .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
@@ -518,4 +514,36 @@ static void print_vm_power_state(xen_session *session, xen_vm vm)
            xen_vm_power_state_to_string(power_state));
 
     xen_uuid_free(vm_uuid);
+}
+
+
+/**
+ * Print the metrics for the given VM.
+ */
+static void print_vm_metrics(xen_session *session, xen_vm vm)
+{
+    xen_vm_metrics vm_metrics;
+    if (!xen_vm_get_metrics(session, &vm_metrics, vm))
+    {
+        print_error(session);
+        return;
+    }
+
+    xen_vm_metrics_record *vm_metrics_record;
+    if (!xen_vm_metrics_get_record(session, &vm_metrics_record, vm_metrics))
+    {
+        xen_vm_metrics_free(vm_metrics);
+        print_error(session);
+        return;
+    }
+
+    for (size_t i = 0; i < vm_metrics_record->vcpus_utilisation->size; i++)
+    {
+        printf("%"PRId64" -> %lf.\n",
+               vm_metrics_record->vcpus_utilisation->contents[i].key,
+               vm_metrics_record->vcpus_utilisation->contents[i].val);
+    }
+
+    xen_vm_metrics_record_free(vm_metrics_record);
+    xen_vm_metrics_free(vm_metrics);
 }
