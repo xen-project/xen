@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,8 +26,8 @@
 
 
 /*
- * The console class. 
- *  
+ * The console class.
+ * 
  * A console.
  */
 
@@ -65,7 +65,7 @@ typedef struct xen_console_record
     xen_console handle;
     char *uuid;
     enum xen_console_protocol protocol;
-    char *uri;
+    char *location;
     struct xen_vm_record_opt *vm;
 } xen_console_record;
 
@@ -191,10 +191,10 @@ xen_console_get_protocol(xen_session *session, enum xen_console_protocol *result
 
 
 /**
- * Get the uri field of the given console.
+ * Get the location field of the given console.
  */
 extern bool
-xen_console_get_uri(xen_session *session, char **result, xen_console console);
+xen_console_get_location(xen_session *session, char **result, xen_console console);
 
 
 /**

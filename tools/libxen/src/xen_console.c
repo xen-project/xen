@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -44,9 +44,9 @@ static const struct_member xen_console_record_struct_members[] =
         { .key = "protocol",
           .type = &xen_console_protocol_abstract_type_,
           .offset = offsetof(xen_console_record, protocol) },
-        { .key = "uri",
+        { .key = "location",
           .type = &abstract_type_string,
-          .offset = offsetof(xen_console_record, uri) },
+          .offset = offsetof(xen_console_record, location) },
         { .key = "VM",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_console_record, vm) }
@@ -71,7 +71,7 @@ xen_console_record_free(xen_console_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    free(record->uri);
+    free(record->location);
     xen_vm_record_opt_free(record->vm);
     free(record);
 }
@@ -164,7 +164,7 @@ xen_console_get_protocol(xen_session *session, enum xen_console_protocol *result
 
 
 bool
-xen_console_get_uri(xen_session *session, char **result, xen_console console)
+xen_console_get_location(xen_session *session, char **result, xen_console console)
 {
     abstract_value param_values[] =
         {
@@ -175,7 +175,7 @@ xen_console_get_uri(xen_session *session, char **result, xen_console console)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("console.get_uri");
+    XEN_CALL_("console.get_location");
     return session->ok;
 }
 

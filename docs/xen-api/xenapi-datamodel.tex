@@ -10885,7 +10885,7 @@ Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt protocol} & console\_protocol & the protocol used by this console \\
-$\mathit{RO}_\mathit{run}$ &  {\tt uri} & string & URI for the console service \\
+$\mathit{RO}_\mathit{run}$ &  {\tt location} & string & URI for the console service \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is attached \\
 \hline
 \end{longtable}
@@ -10954,13 +10954,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_uri}
+\subsubsection{RPC name:~get\_location}
 
 {\bf Overview:} 
-Get the uri field of the given console.
+Get the location field of the given console.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_uri (session_id s, console ref self)\end{verbatim}
+\begin{verbatim} string get_location (session_id s, console ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
