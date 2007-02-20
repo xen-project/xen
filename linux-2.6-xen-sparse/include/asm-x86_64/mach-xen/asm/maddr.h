@@ -97,7 +97,7 @@ static inline unsigned long mfn_to_local_pfn(unsigned long mfn)
 
 static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
 {
-	BUG_ON(pfn >= end_pfn);
+	BUG_ON(end_pfn && pfn >= end_pfn);
 	if (xen_feature(XENFEAT_auto_translated_physmap)) {
 		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
 		return;
