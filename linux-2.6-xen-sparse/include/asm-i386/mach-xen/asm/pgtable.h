@@ -433,12 +433,15 @@ extern void noexec_setup(const char *str);
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
-		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    BUG_ON(HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits))); \
-			} else {                                          \
-                            xen_l1_entry_update((__ptep), (__entry)); \
-			    flush_tlb_page((__vma), (__address));         \
-			}                                                 \
+			if ( likely((__vma)->vm_mm == current->mm) ) {	  \
+				BUG_ON(HYPERVISOR_update_va_mapping(__address, \
+					__entry,			  \
+					(unsigned long)(__vma)->vm_mm->cpu_vm_mask.bits| \
+					UVMF_INVLPG|UVMF_MULTI));	  \
+			} else {					  \
+				xen_l1_entry_update(__ptep, __entry);	  \
+				flush_tlb_page(__vma, __address);	  \
+			}						  \
 		}							  \
 	} while (0)
 

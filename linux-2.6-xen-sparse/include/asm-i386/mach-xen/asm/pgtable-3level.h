@@ -52,22 +52,14 @@ static inline int pte_exec_kernel(pte_t pte)
  */
 #define __HAVE_ARCH_SET_PTE_ATOMIC
 
-#if 1
-/* use writable pagetables */
 static inline void set_pte(pte_t *ptep, pte_t pte)
 {
 	ptep->pte_high = pte.pte_high;
 	smp_wmb();
 	ptep->pte_low = pte.pte_low;
 }
-# define set_pte_atomic(pteptr,pteval) \
+#define set_pte_atomic(pteptr,pteval) \
 		set_64bit((unsigned long long *)(pteptr),pte_val_ma(pteval))
-#else
-/* no writable pagetables */
-# define set_pte(pteptr,pteval)				\
-		xen_l1_entry_update((pteptr), (pteval))
-# define set_pte_atomic(pteptr,pteval) set_pte(pteptr,pteval)
-#endif
 
 #define set_pte_at(_mm,addr,ptep,pteval) do {				\
 	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
