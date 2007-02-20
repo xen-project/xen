@@ -3038,19 +3038,6 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va)
 }
 
 
-static paddr_t
-sh_gva_to_gpa(struct vcpu *v, unsigned long va)
-/* Called to translate a guest virtual address to what the *guest*
- * pagetables would map it to. */
-{
-    unsigned long gfn = sh_gva_to_gfn(v, va);
-    if ( gfn == INVALID_GFN )
-        return 0;
-    else
-        return (((paddr_t)gfn) << PAGE_SHIFT) + (va & ~PAGE_MASK);
-}
-
-
 static inline void
 sh_update_linear_entries(struct vcpu *v)
 /* Sync up all the linear mappings for this vcpu's pagetables */
@@ -4348,7 +4335,6 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
 struct paging_mode sh_paging_mode = {
     .page_fault                    = sh_page_fault, 
     .invlpg                        = sh_invlpg,
-    .gva_to_gpa                    = sh_gva_to_gpa,
     .gva_to_gfn                    = sh_gva_to_gfn,
     .update_cr3                    = sh_update_cr3,
     .update_paging_modes           = shadow_update_paging_modes,

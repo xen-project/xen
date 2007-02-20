@@ -815,7 +815,7 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
 }
 
 void send_pio_req(unsigned long port, unsigned long count, int size,
-                  long value, int dir, int df, int value_is_ptr)
+                  paddr_t value, int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
@@ -823,7 +823,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
     if ( size == 0 || count == 0 ) {
         printk("null pio request? port %lx, count %lx, "
-               "size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               "size %d, value %"PRIpaddr", dir %d, value_is_ptr %d.\n",
                port, count, size, value, dir, value_is_ptr);
     }
 
@@ -849,15 +849,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 
     p->io_count++;
 
-    if ( value_is_ptr )   /* get physical address of data */
-    {
-        if ( hvm_paging_enabled(current) )
-            p->data = paging_gva_to_gpa(current, value);
-        else
-            p->data = value; /* guest VA == guest PA */
-    }
-    else if ( dir == IOREQ_WRITE )
-        p->data = value;
+    p->data = value;
 
     if ( hvm_portio_intercept(p) )
     {
@@ -870,7 +862,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
 }
 
 static void send_mmio_req(unsigned char type, unsigned long gpa,
-                          unsigned long count, int size, long value,
+                          unsigned long count, int size, paddr_t value,
                           int dir, int df, int value_is_ptr)
 {
     struct vcpu *v = current;
@@ -879,7 +871,8 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     if ( size == 0 || count == 0 ) {
         printk("null mmio request? type %d, gpa %lx, "
-               "count %lx, size %d, value %lx, dir %d, value_is_ptr %d.\n",
+               "count %lx, size %d, value %"PRIpaddr"x, dir %d, "
+               "value_is_ptr %d.\n",
                type, gpa, count, size, value, dir, value_is_ptr);
     }
 
@@ -905,15 +898,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p->io_count++;
 
-    if ( value_is_ptr )
-    {
-        if ( hvm_paging_enabled(v) )
-            p->data = paging_gva_to_gpa(v, value);
-        else
-            p->data = value; /* guest VA == guest PA */
-    }
-    else
-        p->data = value;
+    p->data = value;
 
     if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) )
     {
@@ -959,6 +944,7 @@ static void mmio_operands(int type, unsigned long gpa,
 
 #define GET_REPEAT_COUNT() \
      (mmio_op->flags & REPZ ? (ad_size == WORD ? regs->ecx & 0xFFFF : regs->ecx) : 1)
+
 
 void handle_mmio(unsigned long gpa)
 {
@@ -1014,7 +1000,8 @@ void handle_mmio(unsigned long gpa)
     {
         unsigned long count = GET_REPEAT_COUNT();
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
-        unsigned long addr;
+        unsigned long addr, gfn; 
+        paddr_t paddr;
         int dir, size = op_size;
 
         ASSERT(count);
@@ -1024,7 +1011,9 @@ void handle_mmio(unsigned long gpa)
         if ( ad_size == WORD )
             addr &= 0xFFFF;
         addr += hvm_get_segment_base(v, x86_seg_es);
-        if ( paging_gva_to_gpa(v, addr) == gpa )
+        gfn = paging_gva_to_gfn(v, addr);
+        paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
+        if ( paddr == gpa )
         {
             enum x86_segment seg;
 
@@ -1044,9 +1033,23 @@ void handle_mmio(unsigned long gpa)
             default: domain_crash_synchronous();
             }
             addr += hvm_get_segment_base(v, seg);
+            gfn = paging_gva_to_gfn(v, addr);
+            paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
         }
         else
             dir = IOREQ_READ;
+
+        if ( gfn == INVALID_GFN ) 
+        {
+            /* The guest does not have the non-mmio address mapped. 
+             * Need to send in a page fault */
+            int errcode = 0;
+            /* IO read --> memory write */
+            if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
+            regs->eip -= inst_len; /* do not advance %eip */
+            hvm_inject_exception(TRAP_page_fault, errcode, addr);
+            return;
+        }
 
         /*
          * In case of a movs spanning multiple pages, we break the accesses
@@ -1065,10 +1068,27 @@ void handle_mmio(unsigned long gpa)
 
             if ( dir == IOREQ_WRITE ) {
                 if ( hvm_paging_enabled(v) )
-                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                {
+                    int rv = hvm_copy_from_guest_virt(&value, addr, size);
+                    if ( rv != 0 ) 
+                    {
+                        /* Failed on the page-spanning copy.  Inject PF into
+                         * the guest for the address where we failed */
+                        regs->eip -= inst_len; /* do not advance %eip */
+                        /* Must set CR2 at the failing address */ 
+                        addr += size - rv;
+                        gdprintk(XENLOG_DEBUG, "Pagefault on non-io side of a "
+                                 "page-spanning MMIO: va=%#lx\n", addr);
+                        hvm_inject_exception(TRAP_page_fault, 0, addr);
+                        return;
+                    }
+                }
                 else
-                    (void)hvm_copy_from_guest_phys(&value, addr, size);
-            } else
+                    (void) hvm_copy_from_guest_phys(&value, addr, size);
+            } else /* dir != IOREQ_WRITE */
+                /* Remember where to write the result, as a *VA*.
+                 * Must be a VA so we can handle the page overlap 
+                 * correctly in hvm_mmio_assist() */
                 mmio_op->addr = addr;
 
             if ( count != 1 )
@@ -1091,7 +1111,8 @@ void handle_mmio(unsigned long gpa)
 
             ASSERT(count);
 
-            send_mmio_req(IOREQ_TYPE_COPY, gpa, count, size, addr, dir, df, 1);
+            send_mmio_req(IOREQ_TYPE_COPY, gpa, count, size, 
+                          paddr, dir, df, 1);
         }
         break;
     }

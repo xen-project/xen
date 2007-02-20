@@ -89,7 +89,7 @@ static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
 /* Is this guest address an mmio one? (i.e. not defined in p2m map) */
 static inline int mmio_space(paddr_t gpa)
 {
-    unsigned long gfn = gpa >> PAGE_SHIFT;    
+    unsigned long gfn = gpa >> PAGE_SHIFT;
     return !mfn_valid(mfn_x(gfn_to_mfn_current(gfn)));
 }
 

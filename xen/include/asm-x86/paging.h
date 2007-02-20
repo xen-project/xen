@@ -115,7 +115,6 @@ struct paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
     int           (*invlpg                )(struct vcpu *v, unsigned long va);
-    paddr_t       (*gva_to_gpa            )(struct vcpu *v, unsigned long va);
     unsigned long (*gva_to_gfn            )(struct vcpu *v, unsigned long va);
     void          (*update_cr3            )(struct vcpu *v, int do_locking);
     void          (*update_paging_modes   )(struct vcpu *v);
@@ -190,18 +189,10 @@ static inline int paging_invlpg(struct vcpu *v, unsigned long va)
     return v->arch.paging.mode->invlpg(v, va);
 }
 
-/* Translate a guest virtual address to the physical address that the
- * *guest* pagetables would map it to. */
-static inline paddr_t paging_gva_to_gpa(struct vcpu *v, unsigned long va)
-{
-    if ( unlikely(!paging_vcpu_mode_translate(v)) )
-        return (paddr_t) va;
-
-    return v->arch.paging.mode->gva_to_gpa(v, va);
-}
-
 /* Translate a guest virtual address to the frame number that the
- * *guest* pagetables would map it to. */
+ * *guest* pagetables would map it to.  Returns INVALID_GFN if the guest 
+ * tables don't map this address. */
+#define INVALID_GFN (-1UL)
 static inline unsigned long paging_gva_to_gfn(struct vcpu *v, unsigned long va)
 {
     if ( unlikely(!paging_vcpu_mode_translate(v)) )

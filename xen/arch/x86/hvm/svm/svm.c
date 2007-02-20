@@ -1589,6 +1589,8 @@ static void svm_io_instruction(struct vcpu *v)
     if (info.fields.str)
     { 
         unsigned long addr, count;
+        paddr_t paddr;
+        unsigned long gfn;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
 
         if (!svm_get_io_address(v, regs, size, info, &count, &addr))
@@ -1606,6 +1608,20 @@ static void svm_io_instruction(struct vcpu *v)
             pio_opp->flags |= REPZ;
         }
 
+        /* Translate the address to a physical address */
+        gfn = paging_gva_to_gfn(v, addr);
+        if ( gfn == INVALID_GFN ) 
+        {
+            /* The guest does not have the RAM address mapped. 
+             * Need to send in a page fault */
+            int errcode = 0;
+            /* IO read --> memory write */
+            if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
+            svm_hvm_inject_exception(TRAP_page_fault, errcode, addr);
+            return;
+        }
+        paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
+
         /*
          * Handle string pio instructions that cross pages or that
          * are unaligned. See the comments in hvm_platform.c/handle_mmio()
@@ -1619,11 +1635,27 @@ static void svm_io_instruction(struct vcpu *v)
 
             if (dir == IOREQ_WRITE)   /* OUTS */
             {
-                if (hvm_paging_enabled(current))
-                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                if ( hvm_paging_enabled(current) )
+                {
+                    int rv = hvm_copy_from_guest_virt(&value, addr, size);
+                    if ( rv != 0 ) 
+                    {
+                        /* Failed on the page-spanning copy.  Inject PF into
+                         * the guest for the address where we failed. */
+                        addr += size - rv;
+                        gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
+                                 "of a page-spanning PIO: va=%#lx\n", addr);
+                        svm_hvm_inject_exception(TRAP_page_fault, 0, addr);
+                        return;
+                    }
+                }
                 else
-                    (void)hvm_copy_from_guest_phys(&value, addr, size);
-            }
+                    (void) hvm_copy_from_guest_phys(&value, addr, size);
+            } else /* dir != IOREQ_WRITE */
+                /* Remember where to write the result, as a *VA*.
+                 * Must be a VA so we can handle the page overlap 
+                 * correctly in hvm_pio_assist() */
+                pio_opp->addr = addr;
 
             if (count == 1)
                 regs->eip = vmcb->exitinfo2;
@@ -1645,7 +1677,7 @@ static void svm_io_instruction(struct vcpu *v)
             else    
                 regs->eip = vmcb->exitinfo2;
 
-            send_pio_req(port, count, size, addr, dir, df, 1);
+            send_pio_req(port, count, size, paddr, dir, df, 1);
         }
     } 
     else 
@@ -2718,7 +2750,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if (svm_dbg_on && exit_reason == VMEXIT_EXCEPTION_PF) 
         {
             if (svm_paging_enabled(v) && 
-                !mmio_space(paging_gva_to_gpa(current, vmcb->exitinfo2)))
+                !mmio_space(
+                    paging_gva_to_gfn(current, vmcb->exitinfo2) << PAGE_SHIFT))
             {
                 printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
                        "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64", "
@@ -2728,7 +2761,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                        (u64)vmcb->exitinfo1,
                        (u64)vmcb->exitinfo2,
                        (u64)vmcb->exitintinfo.bytes,
-                       (u64)paging_gva_to_gpa(current, vmcb->exitinfo2));
+                       (((u64)paging_gva_to_gfn(current, vmcb->exitinfo2)
+                        << PAGE_SHIFT) | (vmcb->exitinfo2 & ~PAGE_MASK)));
             }
             else 
             {
