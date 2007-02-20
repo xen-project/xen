@@ -2350,33 +2350,23 @@ x86_emulate(
 #endif
 
     case 0xc8 ... 0xcf: /* bswap */
-        dst.type  = OP_REG;
-        dst.reg   = decode_register(b & 7, &_regs, 0);
-        dst.val = *dst.reg;
+        dst.type = OP_REG;
+        dst.reg  = decode_register(
+            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
         switch ( dst.bytes = op_bytes )
         {
-        case 2:
-            dst.val = (((dst.val & 0x00FFUL) << 8) |
-                       ((dst.val & 0xFF00UL) >> 8));
+        default: /* case 2: */
+            /* Undefined behaviour. Writes zero on all tested CPUs. */
+            dst.val = 0;
             break;
         case 4:
-            dst.val = (((dst.val & 0x000000FFUL) << 24) |
-                       ((dst.val & 0x0000FF00UL) <<  8) |
-                       ((dst.val & 0x00FF0000UL) >>  8) |
-                       ((dst.val & 0xFF000000UL) >> 24));
-            break;
 #ifdef __x86_64__
-        case 8:
-            dst.val = (((dst.val & 0x00000000000000FFUL) << 56) |
-                       ((dst.val & 0x000000000000FF00UL) << 40) |
-                       ((dst.val & 0x0000000000FF0000UL) << 24) |
-                       ((dst.val & 0x00000000FF000000UL) <<  8) |
-                       ((dst.val & 0x000000FF00000000UL) >>  8) |
-                       ((dst.val & 0x0000FF0000000000UL) >> 24) |
-                       ((dst.val & 0x00FF000000000000UL) >> 40) |
-                       ((dst.val & 0xFF00000000000000UL) >> 56));
+            __asm__ ( "bswap %k0" : "=r" (dst.val) : "0" (*dst.reg) );
             break;
+        case 8:
 #endif
+            __asm__ ( "bswap %0" : "=r" (dst.val) : "0" (*dst.reg) );
+            break;
         }
         break;
     }
