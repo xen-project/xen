@@ -127,8 +127,19 @@ e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
 {
 	int i;
+
+#ifndef CONFIG_XEN
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i];
+#else
+	extern struct e820map machine_e820;
+
+	if (!is_initial_xendomain())
+		return 0;
+	for (i = 0; i < machine_e820.nr_map; i++) {
+		const struct e820entry *ei = &machine_e820.map[i];
+#endif
+
 		if (type && ei->type != type)
 			continue;
 		/* is the region (part) in overlap with the current region ?*/

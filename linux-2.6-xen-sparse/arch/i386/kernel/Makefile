@@ -98,4 +98,5 @@ n-obj-xen := i8259.o timers/ reboot.o smpboot.o trampoline.o
 obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
 obj-y := $(call cherrypickxen, $(obj-y))
 extra-y := $(call cherrypickxen, $(extra-y))
+%/head-xen.o %/head-xen.s: EXTRA_AFLAGS :=
 endif

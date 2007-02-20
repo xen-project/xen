@@ -147,7 +147,8 @@ static int get_image_info(struct td_state *s, int fd)
 	return 0;
 }
 
-static int send_responses(struct td_state *s, int res, int idx, void *private)
+static int send_responses(struct disk_driver *dd, int res, uint64_t sec, 
+			  int nr_secs, int idx, void *private)
 {
 	if (res < 0) DFPRINTF("AIO FAILURE: res [%d]!\n",res);
 	
@@ -159,7 +160,7 @@ static int send_responses(struct td_state *s, int res, int idx, void *private)
 
 int main(int argc, char *argv[])
 {
-	struct tap_disk *drv;
+	struct disk_driver dd;
 	struct td_state *s;
 	int ret = -1, fd, len;
 	fd_set readfds;
@@ -195,16 +196,17 @@ int main(int argc, char *argv[])
 	} else DFPRINTF("Qcow file created: size %llu sectors\n",
 			(long long unsigned)s->size);
 	
-	drv = &tapdisk_qcow;
-	s->private = malloc(drv->private_data_size);
+	dd.td_state = s;
+	dd.drv      = &tapdisk_qcow;
+	dd.private  = malloc(dd.drv->private_data_size);
 
         /*Open qcow file*/
-        if (drv->td_open(s, argv[1])!=0) {
+        if (dd.drv->td_open(&dd, argv[1])!=0) {
 		DFPRINTF("Unable to open Qcow file [%s]\n",argv[1]);
 		exit(-1);
 	}
 
-	io_fd = drv->td_get_fd(s);
+	io_fd = dd.io_fd;
 
 	/*Initialise the output string*/
 	memset(output,0x20,25);
@@ -245,9 +247,9 @@ int main(int argc, char *argv[])
 				len = (len >> 9) << 9;
 			}
 
-			ret = drv->td_queue_write(s, i >> 9,
-						  len >> 9, buf, 
-						  send_responses, 0, buf);
+			ret = dd.drv->td_queue_write(&dd, i >> 9,
+						     len >> 9, buf, 
+						     send_responses, 0, buf);
 				
 			if (!ret) submit_events++;
 				
@@ -261,7 +263,7 @@ int main(int argc, char *argv[])
 			debug_output(i,s->size << 9);
 			
 			if ((submit_events % 10 == 0) || complete) 
-				drv->td_submit(s);
+				dd.drv->td_submit(&dd);
 			timeout.tv_usec = 0;
 			
 		} else {
@@ -275,14 +277,14 @@ int main(int argc, char *argv[])
                 ret = select(maxfds + 1, &readfds, (fd_set *) 0,
                              (fd_set *) 0, &timeout);
 			     
-		if (ret > 0) drv->td_do_callbacks(s, 0);
+		if (ret > 0) dd.drv->td_do_callbacks(&dd, 0);
 		if (complete && (returned_events == submit_events)) 
 			running = 0;
 	}
 	memcpy(output+prev+1,"=",1);
 	DFPRINTF("\r%s     100%%\nTRANSFER COMPLETE\n\n", output);
-        drv->td_close(s);
-        free(s->private);
+        dd.drv->td_close(&dd);
+        free(dd.private);
         free(s);
 		
 	return 0;

@@ -44,7 +44,7 @@ static grub_daddr32_t sbmap(fsi_file_t *, grub_daddr32_t);
 
 /* read superblock and check fs magic */
 int
-ufs_mount(fsi_file_t *ffi)
+ufs_mount(fsi_file_t *ffi, const char *options)
 {
 	if (/*! IS_PC_SLICE_TYPE_SOLARIS(current_slice) || */
 	    !devread(ffi, UFS_SBLOCK, 0, UFS_SBSIZE, (char *)SUPERBLOCK) ||

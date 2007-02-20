@@ -79,16 +79,13 @@ tpmif_t *tpmif_find(domid_t domid, struct backend_info *bi)
 
 static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 {
-	int ret;
 	struct gnttab_map_grant_ref op;
 
 	gnttab_set_map_op(&op, (unsigned long)tpmif->tx_area->addr,
 			  GNTMAP_host_map, shared_page, tpmif->domid);
 
-	lock_vm_area(tpmif->tx_area);
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	unlock_vm_area(tpmif->tx_area);
-	BUG_ON(ret);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
@@ -104,15 +101,12 @@ static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 static void unmap_frontend_page(tpmif_t *tpmif)
 {
 	struct gnttab_unmap_grant_ref op;
-	int ret;
 
 	gnttab_set_unmap_op(&op, (unsigned long)tpmif->tx_area->addr,
 			    GNTMAP_host_map, tpmif->shmem_handle);
 
-	lock_vm_area(tpmif->tx_area);
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
-	unlock_vm_area(tpmif->tx_area);
-	BUG_ON(ret);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
+		BUG();
 }
 
 int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)

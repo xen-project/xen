@@ -43,6 +43,9 @@
  *   - The fd used for poll is an otherwise unused pipe, which allows poll to 
  *     be safely called without ever returning anything.
  * 
+ * NOTE: tapdisk uses the number of sectors submitted per request as a 
+ * ref count.  Plugins must use the callback function to communicate the
+ * completion--or error--of every sector submitted to them.
  */
 
 #ifndef TAPDISK_H_
@@ -65,39 +68,55 @@
 #define SECTOR_SHIFT             9
 #define DEFAULT_SECTOR_SIZE    512
 
+#define MAX_IOFD                 2
+
+#define BLK_NOT_ALLOCATED       99
+
+struct td_state;
+struct tap_disk;
+
+struct disk_driver {
+	int early;
+	void *private;
+	int io_fd[MAX_IOFD];
+	struct tap_disk *drv;
+	struct td_state *td_state;
+	struct disk_driver *next;
+};
+
 /* This structure represents the state of an active virtual disk.           */
 struct td_state {
-	void *private;
-	void *drv;
+	struct disk_driver *disks;
 	void *blkif;
 	void *image;
 	void *ring_info;
 	void *fd_entry;
-	char backing_file[1024]; /*Used by differencing disks, e.g. qcow*/
 	unsigned long      sector_size;
 	unsigned long long size;
 	unsigned int       info;
 };
 
 /* Prototype of the callback to activate as requests complete.              */
-typedef int (*td_callback_t)(struct td_state *s, int res, int id, void *prv);
+typedef int (*td_callback_t)(struct disk_driver *dd, int res, uint64_t sector,
+			     int nb_sectors, int id, void *private);
 
 /* Structure describing the interface to a virtual disk implementation.     */
 /* See note at the top of this file describing this interface.              */
 struct tap_disk {
 	const char *disk_type;
 	int private_data_size;
-	int (*td_open)        (struct td_state *s, const char *name);
-	int (*td_queue_read)  (struct td_state *s, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb,
+	int (*td_open)        (struct disk_driver *dd, const char *name);
+	int (*td_queue_read)  (struct disk_driver *dd, uint64_t sector,
+			       int nb_sectors, char *buf, td_callback_t cb, 
 			       int id, void *prv);
-	int (*td_queue_write) (struct td_state *s, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb,
+	int (*td_queue_write) (struct disk_driver *dd, uint64_t sector,
+			       int nb_sectors, char *buf, td_callback_t cb, 
 			       int id, void *prv);
-	int (*td_submit)      (struct td_state *s);
-	int *(*td_get_fd)      (struct td_state *s);
-	int (*td_close)       (struct td_state *s);
-	int (*td_do_callbacks)(struct td_state *s, int sid);
+	int (*td_submit)      (struct disk_driver *dd);
+	int (*td_has_parent)  (struct disk_driver *dd);
+	int (*td_get_parent)  (struct disk_driver *dd, struct disk_driver *p);
+	int (*td_close)       (struct disk_driver *dd);
+	int (*td_do_callbacks)(struct disk_driver *dd, int sid);
 };
 
 typedef struct disk_info {
@@ -119,14 +138,13 @@ extern struct tap_disk tapdisk_vmdk;
 extern struct tap_disk tapdisk_ram;
 extern struct tap_disk tapdisk_qcow;
 
-#define MAX_DISK_TYPES  20
-#define MAX_IOFD        2
+#define MAX_DISK_TYPES     20
 
-#define DISK_TYPE_AIO   0
-#define DISK_TYPE_SYNC  1
-#define DISK_TYPE_VMDK  2
-#define DISK_TYPE_RAM   3
-#define DISK_TYPE_QCOW  4
+#define DISK_TYPE_AIO      0
+#define DISK_TYPE_SYNC     1
+#define DISK_TYPE_VMDK     2
+#define DISK_TYPE_RAM      3
+#define DISK_TYPE_QCOW     4
 
 
 /*Define Individual Disk Parameters here */
@@ -197,12 +215,10 @@ typedef struct driver_list_entry {
 typedef struct fd_list_entry {
 	int cookie;
 	int  tap_fd;
-	int  io_fd[MAX_IOFD];
 	struct td_state *s;
 	struct fd_list_entry **pprev, *next;
 } fd_list_entry_t;
 
 int qcow_create(const char *filename, uint64_t total_size,
 		const char *backing_file, int flags);
-
 #endif /*TAPDISK_H_*/

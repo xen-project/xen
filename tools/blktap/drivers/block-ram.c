@@ -123,14 +123,25 @@ static int get_image_info(struct td_state *s, int fd)
 	return 0;
 }
 
-/* Open the disk file and initialize ram state. */
-int tdram_open (struct td_state *s, const char *name)
+static inline void init_fds(struct disk_driver *dd)
 {
-	int i, fd, ret = 0, count = 0;
-	struct tdram_state *prv = (struct tdram_state *)s->private;
-	uint64_t size;
+        int i;
+	struct tdram_state *prv = (struct tdram_state *)dd->private;
+
+        for(i =0 ; i < MAX_IOFD; i++)
+		dd->io_fd[i] = 0;
+
+        dd->io_fd[0] = prv->poll_pipe[0];
+}
+
+/* Open the disk file and initialize ram state. */
+int tdram_open (struct disk_driver *dd, const char *name)
+{
 	char *p;
-	s->private = prv;
+	uint64_t size;
+	int i, fd, ret = 0, count = 0;
+	struct td_state    *s     = dd->td_state;
+	struct tdram_state *prv   = (struct tdram_state *)dd->private;
 
 	connections++;
 	
@@ -209,88 +220,80 @@ int tdram_open (struct td_state *s, const char *name)
 		ret = 0;
 	} 
 
+	init_fds(dd);
 done:
 	return ret;
 }
 
- int tdram_queue_read(struct td_state *s, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb,
-			       int id, void *private)
+ int tdram_queue_read(struct disk_driver *dd, uint64_t sector,
+		      int nb_sectors, char *buf, td_callback_t cb,
+		      int id, void *private)
 {
-	struct tdram_state *prv = (struct tdram_state *)s->private;
+	struct td_state    *s   = dd->td_state;
+	struct tdram_state *prv = (struct tdram_state *)dd->private;
 	int      size    = nb_sectors * s->sector_size;
 	uint64_t offset  = sector * (uint64_t)s->sector_size;
-	int ret;
 
 	memcpy(buf, img + offset, size);
-	ret = size;
 
-	cb(s, (ret < 0) ? ret: 0, id, private);
-
-	return ret;
+	return cb(dd, 0, sector, nb_sectors, id, private);
 }
 
- int tdram_queue_write(struct td_state *s, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb,
-			       int id, void *private)
+int tdram_queue_write(struct disk_driver *dd, uint64_t sector,
+		      int nb_sectors, char *buf, td_callback_t cb,
+		      int id, void *private)
 {
-	struct tdram_state *prv = (struct tdram_state *)s->private;
+	struct td_state    *s   = dd->td_state;
+	struct tdram_state *prv = (struct tdram_state *)dd->private;
 	int      size    = nb_sectors * s->sector_size;
 	uint64_t offset  = sector * (uint64_t)s->sector_size;
-	int ret;
 	
-	/*We assume that write access is controlled at a higher level for multiple disks*/
+	/* We assume that write access is controlled
+	 * at a higher level for multiple disks */
 	memcpy(img + offset, buf, size);
-	ret = size;
 
-	cb(s, (ret < 0) ? ret : 0, id, private);
-
-	return ret;
+	return cb(dd, 0, sector, nb_sectors, id, private);
 }
  		
-int tdram_submit(struct td_state *s)
+int tdram_submit(struct disk_driver *dd)
 {
 	return 0;	
 }
 
-
-int *tdram_get_fd(struct td_state *s)
+int tdram_close(struct disk_driver *dd)
 {
-	struct tdram_state *prv = (struct tdram_state *)s->private;
-        int *fds, i;
-
-        fds = malloc(sizeof(int) * MAX_IOFD);
-        /*initialise the FD array*/
-        for(i=0;i<MAX_IOFD;i++) fds[i] = 0;
-
-        fds[0] = prv->poll_pipe[0];
-        return fds;	
-}
-
-int tdram_close(struct td_state *s)
-{
-	struct tdram_state *prv = (struct tdram_state *)s->private;
+	struct tdram_state *prv = (struct tdram_state *)dd->private;
 	
 	connections--;
 	
 	return 0;
 }
 
-int tdram_do_callbacks(struct td_state *s, int sid)
+int tdram_do_callbacks(struct disk_driver *dd, int sid)
 {
 	/* always ask for a kick */
 	return 1;
 }
 
-struct tap_disk tapdisk_ram = {
-	"tapdisk_ram",
-	sizeof(struct tdram_state),
-	tdram_open,
-	tdram_queue_read,
-	tdram_queue_write,
-	tdram_submit,
-	tdram_get_fd,
-	tdram_close,
-	tdram_do_callbacks,
-};
+int tdram_has_parent(struct disk_driver *dd)
+{
+	return 0;
+}
 
+int tdram_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+{
+	return -EINVAL;
+}
+
+struct tap_disk tapdisk_ram = {
+	.disk_type          = "tapdisk_ram",
+	.private_data_size  = sizeof(struct tdram_state),
+	.td_open            = tdram_open,
+	.td_queue_read      = tdram_queue_read,
+	.td_queue_write     = tdram_queue_write,
+	.td_submit          = tdram_submit,
+	.td_has_parent      = tdram_has_parent,
+	.td_get_parent      = tdram_get_parent,
+	.td_close           = tdram_close,
+	.td_do_callbacks    = tdram_do_callbacks,
+};

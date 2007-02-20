@@ -519,9 +519,6 @@ struct tpm_chip *init_vtpm(struct device *dev,
 	vtpms->tpmvd = tvd;
 	vtpms->tpm_private = tp;
 
-	if (tvd)
-		tpm_vtpm.buffersize = tvd->max_tx_size;
-
 	chip = tpm_register_hardware(dev, &tpm_vtpm);
 	if (!chip) {
 		rc = -ENODEV;

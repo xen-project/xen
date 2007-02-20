@@ -178,6 +178,28 @@ int elf_xen_parse_note(struct elf_binary *elf,
     return 0;
 }
 
+static int elf_xen_parse_notes(struct elf_binary *elf,
+                               struct elf_dom_parms *parms,
+                               const void *start, const void *end)
+{
+    int xen_elfnotes = 0;
+    const elf_note *note;
+
+    parms->elf_note_start = start;
+    parms->elf_note_end   = end;
+    for ( note = parms->elf_note_start;
+          (void *)note < parms->elf_note_end;
+          note = elf_note_next(elf, note) )
+    {
+        if ( strcmp(elf_note_name(elf, note), "Xen") )
+            continue;
+        if ( elf_xen_parse_note(elf, parms, note) )
+            return -1;
+        xen_elfnotes++;
+    }
+    return xen_elfnotes;
+}
+
 /* ------------------------------------------------------------------------ */
 /* __xen_guest section                                                      */
 
@@ -377,10 +399,10 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
 int elf_xen_parse(struct elf_binary *elf,
                   struct elf_dom_parms *parms)
 {
-    const elf_note *note;
     const elf_shdr *shdr;
+    const elf_phdr *phdr;
     int xen_elfnotes = 0;
-    int i, count;
+    int i, count, rc;
 
     memset(parms, 0, sizeof(*parms));
     parms->virt_base = UNSET_ADDR;
@@ -389,36 +411,79 @@ int elf_xen_parse(struct elf_binary *elf,
     parms->virt_hv_start_low = UNSET_ADDR;
     parms->elf_paddr_offset = UNSET_ADDR;
 
-    /* find and parse elf notes */
-    count = elf_shdr_count(elf);
+    /* Find and parse elf notes. */
+    count = elf_phdr_count(elf);
     for ( i = 0; i < count; i++ )
     {
-        shdr = elf_shdr_by_index(elf, i);
-        if ( !strcmp(elf_section_name(elf, shdr), "__xen_guest") )
-            parms->guest_info = elf_section_start(elf, shdr);
-        if ( elf_uval(elf, shdr, sh_type) != SHT_NOTE )
+        phdr = elf_phdr_by_index(elf, i);
+        if ( elf_uval(elf, phdr, p_type) != PT_NOTE )
             continue;
-        parms->elf_note_start = elf_section_start(elf, shdr);
-        parms->elf_note_end   = elf_section_end(elf, shdr);
-        for ( note = parms->elf_note_start;
-              (void *)note < parms->elf_note_end;
-              note = elf_note_next(elf, note) )
-        {
-            if ( strcmp(elf_note_name(elf, note), "Xen") )
-                continue;
-            if ( elf_xen_parse_note(elf, parms, note) )
-                return -1;
-            xen_elfnotes++;
-        }
+
+        /*
+         * Some versions of binutils do not correctly set p_offset for
+         * note segments.
+         */
+        if (elf_uval(elf, phdr, p_offset) == 0)
+             continue;
+
+        rc = elf_xen_parse_notes(elf, parms,
+                                 elf_segment_start(elf, phdr),
+                                 elf_segment_end(elf, phdr));
+        if ( rc == -1 )
+            return -1;
+
+        xen_elfnotes += rc;
     }
 
-    if ( !xen_elfnotes && parms->guest_info )
+    /*
+     * Fall back to any SHT_NOTE sections if no valid note segments
+     * were found.
+     */
+    if ( xen_elfnotes == 0 )
     {
-        parms->elf_note_start = NULL;
-        parms->elf_note_end   = NULL;
-        elf_msg(elf, "%s: __xen_guest: \"%s\"\n", __FUNCTION__,
-                parms->guest_info);
-        elf_xen_parse_guest_info(elf, parms);
+        count = elf_shdr_count(elf);
+        for ( i = 0; i < count; i++ )
+        {
+            shdr = elf_shdr_by_index(elf, i);
+
+            if ( elf_uval(elf, shdr, sh_type) != SHT_NOTE )
+                continue;
+
+            rc = elf_xen_parse_notes(elf, parms,
+                                     elf_section_start(elf, shdr),
+                                     elf_section_end(elf, shdr));
+
+            if ( rc == -1 )
+                return -1;
+
+            if ( xen_elfnotes == 0 && rc > 0 )
+                elf_msg(elf, "%s: using notes from SHT_NOTE section\n", __FUNCTION__);
+
+            xen_elfnotes += rc;
+        }
+
+    }
+
+    /*
+     * Finally fall back to the __xen_guest section.
+     */
+    if ( xen_elfnotes == 0 )
+    {
+        count = elf_shdr_count(elf);
+        for ( i = 0; i < count; i++ )
+        {
+            shdr = elf_shdr_by_name(elf, "__xen_guest");
+            if ( shdr )
+            {
+                parms->guest_info = elf_section_start(elf, shdr);
+                parms->elf_note_start = NULL;
+                parms->elf_note_end   = NULL;
+                elf_msg(elf, "%s: __xen_guest: \"%s\"\n", __FUNCTION__,
+                        parms->guest_info);
+                elf_xen_parse_guest_info(elf, parms);
+                break;
+            }
+        }
     }
 
     if ( elf_xen_note_check(elf, parms) != 0 )

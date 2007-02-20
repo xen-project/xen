@@ -27,14 +27,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Name (\APCL, 0x00010000)
     Name (\PUID, 0x00)
 
-    Scope (\_PR)
-    {
-        Processor (CPU0, 0x00, 0x00000000, 0x00) {}
-        Processor (CPU1, 0x01, 0x00000000, 0x00) {}
-        Processor (CPU2, 0x02, 0x00000000, 0x00) {}
-        Processor (CPU3, 0x03, 0x00000000, 0x00) {}
-    }
-
     /* Poweroff support - ties in with qemu emulation */
     Name (\_S5, Package (0x04)
     {

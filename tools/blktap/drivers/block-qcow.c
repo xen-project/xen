@@ -55,7 +55,6 @@
 
 /******AIO DEFINES******/
 #define REQUEST_ASYNC_FD 1
-#define MAX_QCOW_IDS  0xFFFF
 #define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ)
 
 struct pending_aio {
@@ -65,7 +64,6 @@ struct pending_aio {
 	int nb_sectors;
 	char *buf;
 	uint64_t sector;
-	int qcow_idx;
 };
 
 #define IOCB_IDX(_s, _io) ((_io) - (_s)->iocb_list)
@@ -115,9 +113,9 @@ typedef struct QCowHeader_ext {
 struct tdqcow_state {
         int fd;                        /*Main Qcow file descriptor */
 	uint64_t fd_end;               /*Store a local record of file length */
-	int bfd;                       /*Backing file descriptor*/
 	char *name;                    /*Record of the filename*/
-	int poll_pipe[2];              /*dummy fd for polling on */
+	uint32_t backing_file_size;
+	uint64_t backing_file_offset;
 	int encrypted;                 /*File contents are encrypted or plain*/
 	int cluster_bits;              /*Determines length of cluster as 
 					*indicated by file hdr*/
@@ -149,7 +147,6 @@ struct tdqcow_state {
 	AES_KEY aes_decrypt_key;       /*AES key*/
         /* libaio state */
         io_context_t       aio_ctx;
-	int		   nr_reqs [MAX_QCOW_IDS];
         struct iocb        iocb_list  [MAX_AIO_REQS];
         struct iocb       *iocb_free  [MAX_AIO_REQS];
         struct pending_aio pending_aio[MAX_AIO_REQS];
@@ -162,10 +159,11 @@ struct tdqcow_state {
 
 static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
 
-static int init_aio_state(struct td_state *bs)
+static int init_aio_state(struct disk_driver *dd)
 {
         int i;
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
+	struct td_state     *bs = dd->td_state;
+	struct tdqcow_state  *s = (struct tdqcow_state *)dd->private;
         long     ioidx;
 
         /*Initialize Locking bitmap*/
@@ -202,8 +200,7 @@ static int init_aio_state(struct td_state *bs)
 
         for (i=0;i<MAX_AIO_REQS;i++)
                 s->iocb_free[i] = &s->iocb_list[i];
-	for (i=0;i<MAX_QCOW_IDS;i++)
-		s->nr_reqs[i] = 0;
+
         DPRINTF("AIO state initialised\n");
 
         return 0;
@@ -238,7 +235,10 @@ static uint32_t gen_cksum(char *ptr, int len)
 
 	if(!md) return 0;
 
-	if (MD5((unsigned char *)ptr, len, md) != md) return 0;
+	if (MD5((unsigned char *)ptr, len, md) != md) {
+		free(md);
+		return 0;
+	}
 
 	memcpy(&ret, md, sizeof(uint32_t));
 	free(md);
@@ -247,26 +247,42 @@ static uint32_t gen_cksum(char *ptr, int len)
 
 static int get_filesize(char *filename, uint64_t *size, struct stat *st)
 {
-	int blockfd;
+	int fd;
+	QCowHeader header;
 
 	/*Set to the backing file size*/
+	fd = open(filename, O_RDONLY);
+	if (fd < 0)
+		return -1;
+	if (read(fd, &header, sizeof(header)) < sizeof(header)) {
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	
+	be32_to_cpus(&header.magic);
+	be64_to_cpus(&header.size);
+	if (header.magic == QCOW_MAGIC) {
+		*size = header.size >> SECTOR_SHIFT;
+		return 0;
+	}
+
 	if(S_ISBLK(st->st_mode)) {
-		blockfd = open(filename, O_RDONLY);
-		if (blockfd < 0)
+		fd = open(filename, O_RDONLY);
+		if (fd < 0)
 			return -1;
-		if (ioctl(blockfd,BLKGETSIZE,size)!=0) {
+		if (ioctl(fd,BLKGETSIZE,size)!=0) {
 			printf("Unable to get Block device size\n");
-			close(blockfd);
+			close(fd);
 			return -1;
 		}
-		close(blockfd);
+		close(fd);
 	} else *size = (st->st_size >> SECTOR_SHIFT);	
 	return 0;
 }
 
-static int qcow_set_key(struct td_state *bs, const char *key)
+static int qcow_set_key(struct tdqcow_state *s, const char *key)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
 	uint8_t keybuf[16];
 	int len, i;
 	
@@ -306,10 +322,9 @@ static int qcow_set_key(struct td_state *bs, const char *key)
 	return 0;
 }
 
-static int async_read(struct tdqcow_state *s, int fd, int size, 
-		     uint64_t offset,
-		     char *buf, td_callback_t cb,
-		     int id, uint64_t sector, int qcow_idx, void *private)
+static int async_read(struct tdqcow_state *s, int size, 
+		      uint64_t offset, char *buf, td_callback_t cb,
+		      int id, uint64_t sector, void *private)
 {
         struct   iocb *io;
         struct   pending_aio *pio;
@@ -325,9 +340,8 @@ static int async_read(struct tdqcow_state *s, int fd, int size,
 	pio->nb_sectors = size/512;
 	pio->buf = buf;
 	pio->sector = sector;
-	pio->qcow_idx = qcow_idx;
 
-        io_prep_pread(io, fd, buf, size, offset);
+        io_prep_pread(io, s->fd, buf, size, offset);
         io->data = (void *)ioidx;
 
         s->iocb_queue[s->iocb_queued++] = io;
@@ -335,10 +349,9 @@ static int async_read(struct tdqcow_state *s, int fd, int size,
         return 1;
 }
 
-static int async_write(struct tdqcow_state *s, int fd, int size, 
-		     uint64_t offset,
-		     char *buf, td_callback_t cb,
-		      int id, uint64_t sector, int qcow_idx, void *private)
+static int async_write(struct tdqcow_state *s, int size,
+		       uint64_t offset, char *buf, td_callback_t cb,
+		       int id, uint64_t sector, void *private)
 {
         struct   iocb *io;
         struct   pending_aio *pio;
@@ -354,9 +367,8 @@ static int async_write(struct tdqcow_state *s, int fd, int size,
 	pio->nb_sectors = size/512;
 	pio->buf = buf;
 	pio->sector = sector;
-	pio->qcow_idx = qcow_idx;
 
-        io_prep_pwrite(io, fd, buf, size, offset);
+        io_prep_pwrite(io, s->fd, buf, size, offset);
         io->data = (void *)ioidx;
 
         s->iocb_queue[s->iocb_queued++] = io;
@@ -381,17 +393,6 @@ static void aio_unlock(struct tdqcow_state *s, uint64_t sector)
 
 	--s->sector_lock[sector];
 	return;
-}
-
-/*TODO - Use a freelist*/
-static int get_free_idx(struct tdqcow_state *s)
-{
-	int i;
-	
-	for(i = 0; i < MAX_QCOW_IDS; i++) {
-		if(s->nr_reqs[i] == 0) return i;
-	}
-	return -1;
 }
 
 /* 
@@ -425,23 +426,23 @@ static int qtruncate(int fd, off_t length, int sparse)
 {
 	int ret, i; 
 	int current = 0, rem = 0;
-	int sectors = (length + DEFAULT_SECTOR_SIZE - 1)/DEFAULT_SECTOR_SIZE;
+	uint64_t sectors;
 	struct stat st;
-	char buf[DEFAULT_SECTOR_SIZE];
+	char *buf;
 
 	/* If length is greater than the current file len
 	 * we synchronously write zeroes to the end of the 
 	 * file, otherwise we truncate the length down
 	 */
-	memset(buf, 0x00, DEFAULT_SECTOR_SIZE);
 	ret = fstat(fd, &st);
-	if (ret == -1)
+	if (ret == -1) 
 		return -1;
 	if (S_ISBLK(st.st_mode))
 		return 0;
-
+	
+	sectors = (length + DEFAULT_SECTOR_SIZE - 1)/DEFAULT_SECTOR_SIZE;
 	current = (st.st_size + DEFAULT_SECTOR_SIZE - 1)/DEFAULT_SECTOR_SIZE;
-	rem = st.st_size % DEFAULT_SECTOR_SIZE;
+	rem     = st.st_size % DEFAULT_SECTOR_SIZE;
 
 	/* If we are extending this file, we write zeros to the end --
 	 * this tries to ensure that the extents allocated wind up being
@@ -449,28 +450,40 @@ static int qtruncate(int fd, off_t length, int sparse)
 	 */
 	if(st.st_size < sectors * DEFAULT_SECTOR_SIZE) {
 		/*We are extending the file*/
+		if ((ret = posix_memalign((void **)&buf, 
+					  512, DEFAULT_SECTOR_SIZE))) {
+			DPRINTF("posix_memalign failed: %d\n", ret);
+			return -1;
+		}
+		memset(buf, 0x00, DEFAULT_SECTOR_SIZE);
 		if (lseek(fd, 0, SEEK_END)==-1) {
-			fprintf(stderr, 
-				"Lseek EOF failed (%d), internal error\n",
+			DPRINTF("Lseek EOF failed (%d), internal error\n",
 				errno);
+			free(buf);
 			return -1;
 		}
 		if (rem) {
 			ret = write(fd, buf, rem);
-			if (ret != rem)
+			if (ret != rem) {
+				DPRINTF("write failed: ret = %d, err = %s\n",
+					ret, strerror(errno));
+				free(buf);
 				return -1;
+			}
 		}
 		for (i = current; i < sectors; i++ ) {
 			ret = write(fd, buf, DEFAULT_SECTOR_SIZE);
-			if (ret != DEFAULT_SECTOR_SIZE)
+			if (ret != DEFAULT_SECTOR_SIZE) {
+				DPRINTF("write failed: ret = %d, err = %s\n",
+					ret, strerror(errno));
+				free(buf);
 				return -1;
+			}
 		}
-		
+		free(buf);
 	} else if(sparse && (st.st_size > sectors * DEFAULT_SECTOR_SIZE))
-		if (ftruncate(fd, sectors * DEFAULT_SECTOR_SIZE)==-1) {
-			fprintf(stderr,
-				"Ftruncate failed (%d), internal error\n",
-                                errno);
+		if (ftruncate(fd, (off_t)sectors * DEFAULT_SECTOR_SIZE)==-1) {
+			DPRINTF("Ftruncate failed (%s)\n", strerror(errno));
 			return -1;
 		}
 	return 0;
@@ -490,12 +503,11 @@ static int qtruncate(int fd, off_t length, int sparse)
  *
  * return 0 if not allocated.
  */
-static uint64_t get_cluster_offset(struct td_state *bs,
+static uint64_t get_cluster_offset(struct tdqcow_state *s,
                                    uint64_t offset, int allocate,
                                    int compressed_size,
                                    int n_start, int n_end)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
 	int min_index, i, j, l1_index, l2_index, l2_sector, l1_sector;
 	char *tmp_ptr, *tmp_ptr2, *l2_ptr, *l1_ptr;
 	uint64_t l2_offset, *l2_table, cluster_offset, tmp;
@@ -550,8 +562,10 @@ static uint64_t get_cluster_offset(struct td_state *bs,
 		 * entry is written before blocks.
 		 */
 		lseek(s->fd, s->l1_table_offset + (l1_sector << 12), SEEK_SET);
-		if (write(s->fd, tmp_ptr, 4096) != 4096)
+		if (write(s->fd, tmp_ptr, 4096) != 4096) {
+			free(tmp_ptr);
 		 	return 0;
+		}
 		free(tmp_ptr);
 
 		new_l2_table = 1;
@@ -716,9 +730,10 @@ found:
 	return cluster_offset;
 }
 
-static void init_cluster_cache(struct td_state *bs)
+static void init_cluster_cache(struct disk_driver *dd)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
+	struct td_state     *bs = dd->td_state;
+	struct tdqcow_state *s  = (struct tdqcow_state *)dd->private;
 	uint32_t count = 0;
 	int i, cluster_entries;
 
@@ -727,22 +742,20 @@ static void init_cluster_cache(struct td_state *bs)
 		cluster_entries, s->cluster_size);
 
 	for (i = 0; i < bs->size; i += cluster_entries) {
-		if (get_cluster_offset(bs, i << 9, 0, 0, 0, 1)) count++;
+		if (get_cluster_offset(s, i << 9, 0, 0, 0, 1)) count++;
 		if (count >= L2_CACHE_SIZE) return;
 	}
 	DPRINTF("Finished cluster initialisation, added %d entries\n", count);
 	return;
 }
 
-static int qcow_is_allocated(struct td_state *bs, int64_t sector_num, 
+static int qcow_is_allocated(struct tdqcow_state *s, int64_t sector_num,
                              int nb_sectors, int *pnum)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
-
 	int index_in_cluster, n;
 	uint64_t cluster_offset;
 
-	cluster_offset = get_cluster_offset(bs, sector_num << 9, 0, 0, 0, 0);
+	cluster_offset = get_cluster_offset(s, sector_num << 9, 0, 0, 0, 0);
 	index_in_cluster = sector_num & (s->cluster_sectors - 1);
 	n = s->cluster_sectors - index_in_cluster;
 	if (n > nb_sectors)
@@ -800,11 +813,23 @@ static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset)
 	return 0;
 }
 
+static inline void init_fds(struct disk_driver *dd)
+{
+	int i;
+	struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
+
+	for(i = 0; i < MAX_IOFD; i++) 
+		dd->io_fd[i] = 0;
+
+	dd->io_fd[0] = s->poll_fd;
+}
+
 /* Open the disk file and initialize qcow state. */
-int tdqcow_open (struct td_state *bs, const char *name)
+int tdqcow_open (struct disk_driver *dd, const char *name)
 {
 	int fd, len, i, shift, ret, size, l1_table_size;
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
+	struct td_state     *bs = dd->td_state;
+	struct tdqcow_state *s  = (struct tdqcow_state *)dd->private;
 	char *buf;
 	QCowHeader *header;
 	QCowHeader_ext *exthdr;
@@ -812,10 +837,6 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	uint64_t final_cluster = 0;
 
  	DPRINTF("QCOW: Opening %s\n",name);
-	/* set up a pipe so that we can hand back a poll fd that won't fire.*/
-	ret = pipe(s->poll_pipe);
-	if (ret != 0)
-		return (0 - errno);
 
 	fd = open(name, O_RDWR | O_DIRECT | O_LARGEFILE);
 	if (fd < 0) {
@@ -826,7 +847,7 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	s->fd = fd;
 	asprintf(&s->name,"%s", name);
 
-	ASSERT(sizeof(header) < 512);
+	ASSERT(sizeof(QCowHeader) + sizeof(QCowHeader_ext) < 512);
 
 	ret = posix_memalign((void **)&buf, 512, 512);
 	if (ret != 0) goto fail;
@@ -861,7 +882,9 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	s->cluster_alloc = s->l2_size;
 	bs->size = header->size / 512;
 	s->cluster_offset_mask = (1LL << (63 - s->cluster_bits)) - 1;
-	
+	s->backing_file_offset = header->backing_file_offset;
+	s->backing_file_size   = header->backing_file_size;
+
 	/* read the level 1 table */
 	shift = s->cluster_bits + s->l2_bits;
 	s->l1_size = (header->size + (1LL << shift) - 1) >> shift;
@@ -887,7 +910,7 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	if (read(fd, s->l1_table, l1_table_size) != l1_table_size)
 		goto fail;
 
-	for(i = 0;i < s->l1_size; i++) {
+	for(i = 0; i < s->l1_size; i++) {
 		//be64_to_cpus(&s->l1_table[i]);
 		//DPRINTF("L1[%d] => %llu\n", i, s->l1_table[i]);
 		if (s->l1_table[i] > final_cluster)
@@ -907,41 +930,15 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	if(ret != 0) goto fail;
 	s->cluster_cache_offset = -1;
 
-	/* read the backing file name */
-	s->bfd = -1;
-	if (header->backing_file_offset != 0) {
-		DPRINTF("Reading backing file data\n");
-		len = header->backing_file_size;
-		if (len > 1023)
-			len = 1023;
-
-                /*TODO - Fix read size for O_DIRECT and use original fd!*/
-		fd = open(name, O_RDONLY | O_LARGEFILE);
-
-		lseek(fd, header->backing_file_offset, SEEK_SET);
-		if (read(fd, bs->backing_file, len) != len)
-			goto fail;
-		bs->backing_file[len] = '\0';
-		close(fd);
-		/***********************************/
-
-		/*Open backing file*/
-		fd = open(bs->backing_file, O_RDONLY | O_DIRECT | O_LARGEFILE);
-		if (fd < 0) {
-			DPRINTF("Unable to open backing file: %s\n",
-				bs->backing_file);
-			goto fail;
-		}
-		s->bfd = fd;
+	if (s->backing_file_offset != 0)
 		s->cluster_alloc = 1; /*Cannot use pre-alloc*/
-	}
 
         bs->sector_size = 512;
         bs->info = 0;
 	
 	/*Detect min_cluster_alloc*/
 	s->min_cluster_alloc = 1; /*Default*/
-	if (s->bfd == -1 && (s->l1_table_offset % 4096 == 0) ) {
+	if (s->backing_file_offset == 0 && s->l1_table_offset % 4096 == 0) {
 		/*We test to see if the xen magic # exists*/
 		exthdr = (QCowHeader_ext *)(buf + sizeof(QCowHeader));
 		be32_to_cpus(&exthdr->xmagic);
@@ -962,10 +959,11 @@ int tdqcow_open (struct td_state *bs, const char *name)
 	}
 
  end_xenhdr:
-	if (init_aio_state(bs)!=0) {
+	if (init_aio_state(dd)!=0) {
 		DPRINTF("Unable to initialise AIO state\n");
 		goto fail;
 	}
+	init_fds(dd);
 	s->fd_end = (final_cluster == 0 ? (s->l1_table_offset + l1_table_size) : 
 				(final_cluster + s->cluster_size));
 
@@ -981,213 +979,145 @@ fail:
 	return -1;
 }
 
- int tdqcow_queue_read(struct td_state *bs, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb,
-			       int id, void *private)
+int tdqcow_queue_read(struct disk_driver *dd, uint64_t sector,
+		      int nb_sectors, char *buf, td_callback_t cb,
+		      int id, void *private)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
-	int ret = 0, index_in_cluster, n, i, qcow_idx, asubmit = 0;
-	uint64_t cluster_offset;
+	struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
+	int ret = 0, index_in_cluster, n, i, rsp = 0;
+	uint64_t cluster_offset, sec, nr_secs;
+
+	sec     = sector;
+	nr_secs = nb_sectors;
 
 	/*Check we can get a lock*/
-	for (i = 0; i < nb_sectors; i++)
-		if (!aio_can_lock(s, sector + i)) {
-			DPRINTF("AIO_CAN_LOCK failed [%llu]\n", 
-				(long long) sector + i);
-			return -EBUSY;
-		}
-	
+	for (i = 0; i < nb_sectors; i++) 
+		if (!aio_can_lock(s, sector + i)) 
+			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
+
 	/*We store a local record of the request*/
-	qcow_idx = get_free_idx(s);
 	while (nb_sectors > 0) {
 		cluster_offset = 
-			get_cluster_offset(bs, sector << 9, 0, 0, 0, 0);
+			get_cluster_offset(s, sector << 9, 0, 0, 0, 0);
 		index_in_cluster = sector & (s->cluster_sectors - 1);
 		n = s->cluster_sectors - index_in_cluster;
 		if (n > nb_sectors)
 			n = nb_sectors;
 
-		if (s->iocb_free_count == 0 || !aio_lock(s, sector)) {
-			DPRINTF("AIO_LOCK or iocb_free_count (%d) failed" 
-				"[%llu]\n", s->iocb_free_count, 
-				(long long) sector);
-			return -ENOMEM;
-		}
+		if (s->iocb_free_count == 0 || !aio_lock(s, sector)) 
+			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
 		
-		if (!cluster_offset && (s->bfd > 0)) {
-			s->nr_reqs[qcow_idx]++;
-			asubmit += async_read(s, s->bfd, n * 512, sector << 9, 
-					      buf, cb, id, sector, 
-					      qcow_idx, private);
-		} else if(!cluster_offset) {
-			memset(buf, 0, 512 * n);
+		if(!cluster_offset) {
 			aio_unlock(s, sector);
+			ret = cb(dd, BLK_NOT_ALLOCATED, 
+				 sector, n, id, private);
+			if (ret == -EBUSY) {
+				/* mark remainder of request
+				 * as busy and try again later */
+				return cb(dd, -EBUSY, sector + n,
+					  nb_sectors - n, id, private);
+			} else rsp += ret;
 		} else if (cluster_offset & QCOW_OFLAG_COMPRESSED) {
+			aio_unlock(s, sector);
 			if (decompress_cluster(s, cluster_offset) < 0) {
-				ret = -1;
+				rsp += cb(dd, -EIO, sector, 
+					  nb_sectors, id, private);
 				goto done;
 			}
 			memcpy(buf, s->cluster_cache + index_in_cluster * 512, 
 			       512 * n);
-		} else {			
-			s->nr_reqs[qcow_idx]++;
-			asubmit += async_read(s, s->fd, n * 512, 
-					      (cluster_offset + 
-					       index_in_cluster * 512), 
-					      buf, cb, id, sector, 
-					      qcow_idx, private);
+			rsp += cb(dd, 0, sector, n, id, private);
+		} else {
+			async_read(s, n * 512, 
+				   (cluster_offset + index_in_cluster * 512),
+				   buf, cb, id, sector, private);
 		}
 		nb_sectors -= n;
 		sector += n;
 		buf += n * 512;
 	}
 done:
-        /*Callback if no async requests outstanding*/
-        if (!asubmit) return cb(bs, ret == -1 ? -1 : 0, id, private);
-
-	return 0;
+	return rsp;
 }
 
- int tdqcow_queue_write(struct td_state *bs, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb,
-			       int id, void *private)
+int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
+		       int nb_sectors, char *buf, td_callback_t cb,
+		       int id, void *private)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
-	int ret = 0, index_in_cluster, n, i, qcow_idx, asubmit = 0;
-	uint64_t cluster_offset;
+	struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
+	int ret = 0, index_in_cluster, n, i;
+	uint64_t cluster_offset, sec, nr_secs;
+
+	sec     = sector;
+	nr_secs = nb_sectors;
 
 	/*Check we can get a lock*/
 	for (i = 0; i < nb_sectors; i++)
-		if (!aio_can_lock(s, sector + i))  {
-			DPRINTF("AIO_CAN_LOCK failed [%llu]\n", 
-				(long long) (sector + i));
-			return -EBUSY;
-		}
+		if (!aio_can_lock(s, sector + i))  
+			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
 		   
 	/*We store a local record of the request*/
-	qcow_idx = get_free_idx(s);	
 	while (nb_sectors > 0) {
 		index_in_cluster = sector & (s->cluster_sectors - 1);
 		n = s->cluster_sectors - index_in_cluster;
 		if (n > nb_sectors)
 			n = nb_sectors;
 
-		if (s->iocb_free_count == 0 || !aio_lock(s, sector)){
-			DPRINTF("AIO_LOCK or iocb_free_count (%d) failed" 
-				"[%llu]\n", s->iocb_free_count, 
-				(long long) sector);
-			return -ENOMEM;
+		if (s->iocb_free_count == 0 || !aio_lock(s, sector))
+			return cb(dd, -EBUSY, sector, nb_sectors, id, private);
+
+		cluster_offset = get_cluster_offset(s, sector << 9, 1, 0,
+						    index_in_cluster, 
+						    index_in_cluster+n);
+		if (!cluster_offset) {
+			DPRINTF("Ooops, no write cluster offset!\n");
+			return cb(dd, -EIO, sector, nb_sectors, id, private);
 		}
 
-		if (!IS_ZERO(buf,n * 512)) {
-
-			cluster_offset = get_cluster_offset(bs, sector << 9, 
-							    1, 0, 
-							    index_in_cluster, 
-							    index_in_cluster+n
-				);
-			if (!cluster_offset) {
-				DPRINTF("Ooops, no write cluster offset!\n");
-				ret = -1;
-				goto done;
-			}
-
-			if (s->crypt_method) {
-				encrypt_sectors(s, sector, s->cluster_data, 
-						(unsigned char *)buf, n, 1,
-						&s->aes_encrypt_key);
-				s->nr_reqs[qcow_idx]++;
-				asubmit += async_write(s, s->fd, n * 512, 
-						       (cluster_offset + 
-							index_in_cluster*512), 
-						       (char *)s->cluster_data,
-						       cb, id, sector, 
-						       qcow_idx, private);
-			} else {
-				s->nr_reqs[qcow_idx]++;
-				asubmit += async_write(s, s->fd, n * 512, 
-						       (cluster_offset + 
-							index_in_cluster*512),
-						       buf, cb, id, sector, 
-						       qcow_idx, private);
-			}
+		if (s->crypt_method) {
+			encrypt_sectors(s, sector, s->cluster_data, 
+					(unsigned char *)buf, n, 1,
+					&s->aes_encrypt_key);
+			async_write(s, n * 512, 
+				    (cluster_offset + index_in_cluster*512),
+				    (char *)s->cluster_data, cb, id, sector, 
+				    private);
 		} else {
-			/*Write data contains zeros, but we must check to see 
-			  if cluster already allocated*/
-			cluster_offset = get_cluster_offset(bs, sector << 9, 
-							    0, 0, 
-							    index_in_cluster, 
-							    index_in_cluster+n
-				);	
-			if(cluster_offset) {
-				if (s->crypt_method) {
-					encrypt_sectors(s, sector, 
-							s->cluster_data, 
-							(unsigned char *)buf, 
-							n, 1,
-							&s->aes_encrypt_key);
-					s->nr_reqs[qcow_idx]++;
-					asubmit += async_write(s, s->fd, 
-							       n * 512, 
-							       (cluster_offset+
-								index_in_cluster * 512), 
-							       (char *)s->cluster_data, cb, id, sector, 
-							       qcow_idx, private);
-				} else {
-					s->nr_reqs[qcow_idx]++;
-					asubmit += async_write(s, s->fd, n*512,
-							       cluster_offset + index_in_cluster * 512, 
-							       buf, cb, id, sector, 
-							       qcow_idx, private);
-				}
-			}
-			else aio_unlock(s, sector);
+			async_write(s, n * 512, 
+				    (cluster_offset + index_in_cluster*512),
+				    buf, cb, id, sector, private);
 		}
+		
 		nb_sectors -= n;
 		sector += n;
 		buf += n * 512;
 	}
 	s->cluster_cache_offset = -1; /* disable compressed cache */
 
-done:
-	/*Callback if no async requests outstanding*/
-        if (!asubmit) return cb(bs, ret == -1 ? -1 : 0, id, private);
-
 	return 0;
 }
  		
-int tdqcow_submit(struct td_state *bs)
+int tdqcow_submit(struct disk_driver *dd)
 {
         int ret;
-        struct   tdqcow_state *prv = (struct tdqcow_state *)bs->private;
+        struct   tdqcow_state *prv = (struct tdqcow_state *)dd->private;
 
-        ret = io_submit(prv->aio_ctx, prv->iocb_queued, prv->iocb_queue);
+	if (!prv->iocb_queued)
+		return 0;
+
+	ret = io_submit(prv->aio_ctx, prv->iocb_queued, prv->iocb_queue);
 
         /* XXX: TODO: Handle error conditions here. */
 
         /* Success case: */
         prv->iocb_queued = 0;
 
-        return ret;
+        return 0;
 }
 
-
-int *tdqcow_get_fd(struct td_state *bs)
+int tdqcow_close(struct disk_driver *dd)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
-	int *fds, i;
-
-	fds = malloc(sizeof(int) * MAX_IOFD);
-	/*initialise the FD array*/
-	for(i=0;i<MAX_IOFD;i++) fds[i] = 0;
-
-	fds[0] = s->poll_fd;
-	return fds;
-}
-
-int tdqcow_close(struct td_state *bs)
-{
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
+	struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
 	uint32_t cksum, out;
 	int fd, offset;
 
@@ -1203,6 +1133,7 @@ int tdqcow_close(struct td_state *bs)
 		close(fd);
 	}
 
+	io_destroy(s->aio_ctx);
 	free(s->name);
 	free(s->l1_table);
 	free(s->l2_cache);
@@ -1212,11 +1143,11 @@ int tdqcow_close(struct td_state *bs)
 	return 0;
 }
 
-int tdqcow_do_callbacks(struct td_state *s, int sid)
+int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
 {
         int ret, i, rsp = 0,*ptr;
         struct io_event *ep;
-        struct tdqcow_state *prv = (struct tdqcow_state *)s->private;
+        struct tdqcow_state *prv = (struct tdqcow_state *)dd->private;
 
         if (sid > MAX_IOFD) return 1;
 	
@@ -1224,25 +1155,24 @@ int tdqcow_do_callbacks(struct td_state *s, int sid)
         ret = io_getevents(prv->aio_ctx, 0, MAX_AIO_REQS, prv->aio_events,
                            NULL);
 
-        for (ep=prv->aio_events, i = ret; i-->0; ep++) {
+        for (ep = prv->aio_events, i = ret; i-- > 0; ep++) {
                 struct iocb        *io  = ep->obj;
                 struct pending_aio *pio;
 
                 pio = &prv->pending_aio[(long)io->data];
 
 		aio_unlock(prv, pio->sector);
-		if (pio->id >= 0) {
-			if (prv->crypt_method)
-				encrypt_sectors(prv, pio->sector, 
-						(unsigned char *)pio->buf, 
-						(unsigned char *)pio->buf, 
-						pio->nb_sectors, 0, 
-						&prv->aes_decrypt_key);
-			prv->nr_reqs[pio->qcow_idx]--;
-			if (prv->nr_reqs[pio->qcow_idx] == 0) 
-			        rsp += pio->cb(s, ep->res == io->u.c.nbytes ? 0 : 1, pio->id, 
-					       pio->private);
-		} else if (pio->id == -2) free(pio->buf);
+
+		if (prv->crypt_method)
+			encrypt_sectors(prv, pio->sector, 
+					(unsigned char *)pio->buf, 
+					(unsigned char *)pio->buf, 
+					pio->nb_sectors, 0, 
+					&prv->aes_decrypt_key);
+
+		rsp += pio->cb(dd, ep->res == io->u.c.nbytes ? 0 : 1, 
+			       pio->sector, pio->nb_sectors,
+			       pio->id, pio->private);
 
                 prv->iocb_free[prv->iocb_free_count++] = io;
         }
@@ -1250,7 +1180,7 @@ int tdqcow_do_callbacks(struct td_state *s, int sid)
 }
 
 int qcow_create(const char *filename, uint64_t total_size,
-                      const char *backing_file, int sparse)
+		const char *backing_file, int sparse)
 {
 	int fd, header_size, backing_filename_len, l1_size, i;
 	int shift, length, adjust, flags = 0, ret = 0;
@@ -1391,9 +1321,8 @@ int qcow_create(const char *filename, uint64_t total_size,
 	return 0;
 }
 
-int qcow_make_empty(struct td_state *bs)
+int qcow_make_empty(struct tdqcow_state *s)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
 	uint32_t l1_length = s->l1_size * sizeof(uint64_t);
 
 	memset(s->l1_table, 0, l1_length);
@@ -1412,19 +1341,16 @@ int qcow_make_empty(struct td_state *bs)
 	return 0;
 }
 
-int qcow_get_cluster_size(struct td_state *bs)
+int qcow_get_cluster_size(struct tdqcow_state *s)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
-
 	return s->cluster_size;
 }
 
 /* XXX: put compressed sectors first, then all the cluster aligned
    tables to avoid losing bytes in alignment */
-int qcow_compress_cluster(struct td_state *bs, int64_t sector_num, 
+int qcow_compress_cluster(struct tdqcow_state *s, int64_t sector_num, 
                           const uint8_t *buf)
 {
-	struct tdqcow_state *s = (struct tdqcow_state *)bs->private;
 	z_stream strm;
 	int ret, out_len;
 	uint8_t *out_buf;
@@ -1463,7 +1389,7 @@ int qcow_compress_cluster(struct td_state *bs, int64_t sector_num,
 		/* could not compress: write normal cluster */
 		//tdqcow_queue_write(bs, sector_num, buf, s->cluster_sectors);
 	} else {
-		cluster_offset = get_cluster_offset(bs, sector_num << 9, 2, 
+		cluster_offset = get_cluster_offset(s, sector_num << 9, 2, 
                                             out_len, 0, 0);
 		cluster_offset &= s->cluster_offset_mask;
 		lseek(s->fd, cluster_offset, SEEK_SET);
@@ -1477,15 +1403,54 @@ int qcow_compress_cluster(struct td_state *bs, int64_t sector_num,
 	return 0;
 }
 
-struct tap_disk tapdisk_qcow = {
-	"tapdisk_qcow",
-	sizeof(struct tdqcow_state),
-	tdqcow_open,
-	tdqcow_queue_read,
-	tdqcow_queue_write,
-	tdqcow_submit,
-	tdqcow_get_fd,
-	tdqcow_close,
-	tdqcow_do_callbacks,
-};
+int tdqcow_has_parent(struct disk_driver *dd)
+{
+	struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
+	return (s->backing_file_offset ? 1 : 0);
+}
 
+int tdqcow_get_parent(struct disk_driver *cdd, struct disk_driver *pdd)
+{
+	off_t off;
+	char *buf, *filename;
+	int len, secs, ret = -1;
+	struct tdqcow_state *child  = (struct tdqcow_state *)cdd->private;
+
+	if (!child->backing_file_offset)
+		return -1;
+
+	/* read the backing file name */
+	len  = child->backing_file_size;
+	off  = child->backing_file_offset - (child->backing_file_offset % 512);
+	secs = (len + (child->backing_file_offset - off) + 511) >> 9;
+
+	if (posix_memalign((void **)&buf, 512, secs << 9)) 
+		return -1;
+
+	if (lseek(child->fd, off, SEEK_SET) == (off_t)-1)
+		goto out;
+
+	if (read(child->fd, buf, secs << 9) != secs << 9)
+		goto out;
+	filename      = buf + (child->backing_file_offset - off);
+	filename[len] = '\0';
+
+	/*Open backing file*/
+	ret = tdqcow_open(pdd, filename);
+ out:
+	free(buf);
+	return ret;
+}
+
+struct tap_disk tapdisk_qcow = {
+	.disk_type           = "tapdisk_qcow",
+	.private_data_size   = sizeof(struct tdqcow_state),
+	.td_open             = tdqcow_open,
+	.td_queue_read       = tdqcow_queue_read,
+	.td_queue_write      = tdqcow_queue_write,
+	.td_submit           = tdqcow_submit,
+	.td_has_parent       = tdqcow_has_parent,
+	.td_get_parent       = tdqcow_get_parent,
+	.td_close            = tdqcow_close,
+	.td_do_callbacks     = tdqcow_do_callbacks,
+};

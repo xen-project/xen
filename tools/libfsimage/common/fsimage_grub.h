@@ -38,7 +38,7 @@ extern C {
 
 typedef struct fsig_plugin_ops {
 	int fpo_version;
-	int (*fpo_mount)(fsi_file_t *);
+	int (*fpo_mount)(fsi_file_t *, const char *);
 	int (*fpo_dir)(fsi_file_t *, char *);
 	int (*fpo_read)(fsi_file_t *, char *, int);
 } fsig_plugin_ops_t;

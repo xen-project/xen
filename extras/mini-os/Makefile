@@ -44,10 +44,6 @@ ARCH_LINKS =
 # This can be overwritten from arch specific rules.
 EXTRA_INC =
 
-# Special build dependencies.
-# Build all after touching this/these file(s) (see minios.mk)
-SPEC_DEPENDS = minios.mk
-
 # Include the architecture family's special makerules.
 # This must be before include minios.mk!
 include $(TARGET_ARCH_DIR)/arch.mk
@@ -57,7 +53,6 @@ include minios.mk
 
 # Define some default flags for linking.
 LDLIBS := 
-LDFLAGS := 
 LDARCHLIB := -L$(TARGET_ARCH_DIR) -l$(ARCH_LIB_NAME)
 LDFLAGS_FINAL := -N -T $(TARGET_ARCH_DIR)/minios-$(TARGET_ARCH).lds
 

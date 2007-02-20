@@ -60,7 +60,7 @@
 static struct proc_dir_entry *balloon_pde;
 #endif
 
-static DECLARE_MUTEX(balloon_mutex);
+static DEFINE_MUTEX(balloon_mutex);
 
 /*
  * Protects atomic reservation decrease/increase against concurrent increases.
@@ -321,7 +321,7 @@ static void balloon_process(void *unused)
 	int need_sleep = 0;
 	long credit;
 
-	down(&balloon_mutex);
+	mutex_lock(&balloon_mutex);
 
 	do {
 		credit = current_target() - bs.current_pages;
@@ -340,7 +340,7 @@ static void balloon_process(void *unused)
 	if (current_target() != bs.current_pages)
 		mod_timer(&balloon_timer, jiffies + HZ);
 
-	up(&balloon_mutex);
+	mutex_unlock(&balloon_mutex);
 }
 
 /* Resets the Xen limit, sets new target, and kicks off processing. */

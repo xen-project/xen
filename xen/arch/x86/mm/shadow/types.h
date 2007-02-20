@@ -389,6 +389,7 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 #define SH_type_l1_shadow  SH_type_l1_64_shadow
 #define SH_type_fl1_shadow SH_type_fl1_64_shadow
 #define SH_type_l2_shadow  SH_type_l2_64_shadow
+#define SH_type_l2h_shadow SH_type_l2h_64_shadow
 #define SH_type_l3_shadow  SH_type_l3_64_shadow
 #define SH_type_l4_shadow  SH_type_l4_64_shadow
 #endif

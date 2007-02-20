@@ -102,7 +102,7 @@ int xc_vcpu_setaffinity(int xc_handle,
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu    = vcpu;
 
-    bitmap_64_to_byte(local, &cpumap, sizeof (cpumap));
+    bitmap_64_to_byte(local, &cpumap, sizeof(cpumap) * 8);
 
     set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
 
@@ -148,7 +148,7 @@ int xc_vcpu_getaffinity(int xc_handle,
     ret = do_domctl(xc_handle, &domctl);
 
     unlock_pages(local, sizeof (local));
-    bitmap_byte_to_64(cpumap, local, sizeof (local));
+    bitmap_byte_to_64(cpumap, local, sizeof(local) * 8);
  out:
     return ret;
 }

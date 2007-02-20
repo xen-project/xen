@@ -1,7 +1,7 @@
 diff -pruN ../orig-linux-2.6.18/include/linux/elfnote.h ./include/linux/elfnote.h
 --- ../orig-linux-2.6.18/include/linux/elfnote.h	2007-01-12 18:19:44.000000000 +0000
 +++ ./include/linux/elfnote.h	2007-01-12 18:21:02.000000000 +0000
-@@ -31,22 +31,24 @@
+@@ -31,22 +31,38 @@
  /*
   * Generate a structure with the same shape as Elf{32,64}_Nhdr (which
   * turn out to be the same size and shape), followed by the name and
@@ -25,9 +25,21 @@ diff -pruN ../orig-linux-2.6.18/include/linux/elfnote.h ./include/linux/elfnote.
 -2:.align 4
 -3:\desc
 -4:.align 4
--.popsection
++#ifdef __STDC__
++#define ELFNOTE(name, type, desctype, descdata...) \
++.pushsection .note.name			;	\
++  .align 4				;	\
++  .long 2f - 1f		/* namesz */	;	\
++  .long 4f - 3f		/* descsz */	;	\
++  .long type				;	\
++1:.asciz #name				;	\
++2:.align 4				;	\
++3:desctype descdata			;	\
++4:.align 4				;	\
+ .popsection
 -.endm
-+#define ELFNOTE(name, type, desctype, descdata)	\
++#else /* !__STDC__, i.e. -traditional */
++#define ELFNOTE(name, type, desctype, descdata) \
 +.pushsection .note.name			;	\
 +  .align 4				;	\
 +  .long 2f - 1f		/* namesz */	;	\
@@ -37,7 +49,8 @@ diff -pruN ../orig-linux-2.6.18/include/linux/elfnote.h ./include/linux/elfnote.
 +2:.align 4				;	\
 +3:desctype descdata			;	\
 +4:.align 4				;	\
-+.popsection				;
++.popsection
++#endif /* __STDC__ */
  #else	/* !__ASSEMBLER__ */
  #include <linux/elf.h>
  /*

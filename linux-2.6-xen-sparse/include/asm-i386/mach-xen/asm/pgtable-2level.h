@@ -38,8 +38,11 @@
 
 #define ptep_get_and_clear(mm,addr,xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
-#define pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
-#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
+#define __pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
+#define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
+#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 

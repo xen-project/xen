@@ -410,6 +410,11 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         GET_OP_SIZE_FOR_BYTE(size_reg);
         return reg_mem(size_reg, opcode, mmio_op, rex);
 
+    case 0x03: /* add m32/16, r32/16 */
+        mmio_op->instr = INSTR_ADD;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return mem_reg(*op_size, opcode, mmio_op, rex);
+
     case 0x0A: /* or m8, r8 */
         mmio_op->instr = INSTR_OR;
         *op_size = BYTE;
@@ -714,6 +719,11 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
 
         case 1: /* dec */
             mmio_op->instr = INSTR_SUB;
+            return DECODE_success;
+
+        case 6: /* push */
+            mmio_op->instr = INSTR_PUSH;
+            mmio_op->operand[0] = mmio_op->operand[1];
             return DECODE_success;
 
         default:
@@ -1038,10 +1048,6 @@ void handle_mmio(unsigned long gpa)
         else
             dir = IOREQ_READ;
 
-        if ( addr & (size - 1) )
-            gdprintk(XENLOG_WARNING,
-                     "Unaligned ioport access: %lx, %d\n", addr, size);
-
         /*
          * In case of a movs spanning multiple pages, we break the accesses
          * up into multiple pages (the device model works with non-continguous
@@ -1055,8 +1061,6 @@ void handle_mmio(unsigned long gpa)
         if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
             unsigned long value = 0;
 
-            gdprintk(XENLOG_WARNING,
-                     "Single io request in a movs crossing page boundary.\n");
             mmio_op->flags |= OVERLAP;
 
             if ( dir == IOREQ_WRITE ) {
@@ -1129,6 +1133,21 @@ void handle_mmio(unsigned long gpa)
 
     case INSTR_XOR:
         mmio_operands(IOREQ_TYPE_XOR, gpa, mmio_op, op_size);
+        break;
+
+    case INSTR_PUSH:
+        if ( ad_size == WORD )
+        {
+            mmio_op->addr = (uint16_t)(regs->esp - op_size);
+            regs->esp = mmio_op->addr | (regs->esp & ~0xffff);
+        }
+        else
+        {
+            regs->esp -= op_size;
+            mmio_op->addr = regs->esp;
+        }
+        /* send the request and wait for the value */
+        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, op_size, 0, IOREQ_READ, df, 0);
         break;
 
     case INSTR_CMP:        /* Pass through */

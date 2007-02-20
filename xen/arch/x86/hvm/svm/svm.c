@@ -362,7 +362,7 @@ static inline void __restore_debug_registers(struct vcpu *v)
 }
 
 
-int svm_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
+int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -571,17 +571,14 @@ void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    data->shadow_gs = vmcb->kerngsbase;
-    /* MSR_LSTAR, MSR_STAR, MSR_CSTAR, MSR_SYSCALL_MASK, MSR_EFER */    
-    data->msr_items[0] = vmcb->lstar;
-    data->msr_items[1] = vmcb->star;
-    data->msr_items[2] = vmcb->cstar;
-    data->msr_items[3] = vmcb->sfmask;
-    data->msr_items[4] = vmcb->efer;
+    data->shadow_gs        = vmcb->kerngsbase;
+    data->msr_lstar        = vmcb->lstar;
+    data->msr_star         = vmcb->star;
+    data->msr_cstar        = vmcb->cstar;
+    data->msr_syscall_mask = vmcb->sfmask;
+    data->msr_efer         = vmcb->efer;
 
     data->tsc = hvm_get_guest_time(v);
-
-    // dump_msr_state(guest_state);
 }
 
 
@@ -590,22 +587,19 @@ void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     vmcb->kerngsbase = data->shadow_gs;
-    /* MSR_LSTAR, MSR_STAR, MSR_CSTAR, MSR_SYSCALL_MASK, MSR_EFER */
-    vmcb->lstar  = data->msr_items[0];
-    vmcb->star   = data->msr_items[1];
-    vmcb->cstar  = data->msr_items[2];
-    vmcb->sfmask = data->msr_items[3];
-    vmcb->efer   = data->msr_items[4];
+    vmcb->lstar      = data->msr_lstar;
+    vmcb->star       = data->msr_star;
+    vmcb->cstar      = data->msr_cstar;
+    vmcb->sfmask     = data->msr_syscall_mask;
+    vmcb->efer       = data->msr_efer;
 
     hvm_set_guest_time(v, data->tsc);
-
-    // dump_msr_state(guest_state);
 }
 
 void svm_save_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
     svm_save_cpu_state(v, ctxt);
-    svm_vmcs_save(v, ctxt);
+    svm_vmcb_save(v, ctxt);
 }
 
 int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)

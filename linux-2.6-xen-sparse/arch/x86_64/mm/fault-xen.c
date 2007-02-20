@@ -411,8 +411,7 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	prefetchw(&mm->mmap_sem);
 
 	/* get the address */
-	address = HYPERVISOR_shared_info->vcpu_info[
-		smp_processor_id()].arch.cr2;
+	address = current_vcpu_info()->arch.cr2;
 
 	info.si_code = SEGV_MAPERR;
 

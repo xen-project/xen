@@ -1034,8 +1034,16 @@ e820_all_mapped(unsigned long s, unsigned long e, unsigned type)
 	u64 start = s;
 	u64 end = e;
 	int i;
+
+#ifndef CONFIG_XEN
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i];
+#else
+	if (!is_initial_xendomain())
+		return 0;
+	for (i = 0; i < machine_e820.nr_map; ++i) {
+		const struct e820entry *ei = &machine_e820.map[i];
+#endif
 		if (type && ei->type != type)
 			continue;
 		/* is the region (part) in overlap with the current region ?*/
@@ -1505,9 +1513,6 @@ e820_setup_gap(struct e820entry *e820, int nr_map)
  */
 static int __init request_standard_resources(void)
 {
-#ifdef CONFIG_XEN
-	struct xen_memory_map memmap;
-#endif
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
@@ -1516,13 +1521,6 @@ static int __init request_standard_resources(void)
 
 	printk("Setting up standard PCI resources\n");
 #ifdef CONFIG_XEN
-	memmap.nr_entries = E820MAX;
-	set_xen_guest_handle(memmap.buffer, machine_e820.map);
-
-	if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
-		BUG();
-	machine_e820.nr_map = memmap.nr_entries;
-
 	legacy_init_iomem_resources(machine_e820.map, machine_e820.nr_map,
 				    &code_resource, &data_resource);
 #else
@@ -1546,12 +1544,22 @@ subsys_initcall(request_standard_resources);
 
 static void __init register_memory(void)
 {
-
 #ifdef CONFIG_XEN
-	e820_setup_gap(machine_e820.map, machine_e820.nr_map);
-#else
-	e820_setup_gap(e820.map, e820.nr_map);
+	if (is_initial_xendomain()) {
+		struct xen_memory_map memmap;
+
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, machine_e820.map);
+
+		if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+			BUG();
+
+		machine_e820.nr_map = memmap.nr_entries;
+		e820_setup_gap(machine_e820.map, machine_e820.nr_map);
+	}
+	else
 #endif
+		e820_setup_gap(e820.map, e820.nr_map);
 }
 
 #ifdef CONFIG_MCA

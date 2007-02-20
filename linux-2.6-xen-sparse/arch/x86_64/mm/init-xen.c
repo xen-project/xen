@@ -77,7 +77,7 @@ extern unsigned long start_pfn;
 	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
 	__START_KERNEL_map)))
 
-static void early_make_page_readonly(void *va, unsigned int feature)
+static void __meminit early_make_page_readonly(void *va, unsigned int feature)
 {
 	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;
@@ -279,8 +279,8 @@ static __init void set_pte_phys(unsigned long vaddr,
 	__flush_tlb_one(vaddr);
 }
 
-static void set_pte_phys_ma(unsigned long vaddr,
-			 unsigned long phys, pgprot_t prot)
+static __init void set_pte_phys_ma(unsigned long vaddr,
+				   unsigned long phys, pgprot_t prot)
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -361,9 +361,10 @@ __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 }
 
 /*
- * At this point it only supports vsyscall area.
+ * This only supports vsyscall area.
  */
-void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
+void __init
+__set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 {
 	unsigned long address = __fix_to_virt(idx);
 
@@ -376,15 +377,6 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 }
 
 unsigned long __initdata table_start, table_end; 
-
-unsigned long get_machine_pfn(unsigned long addr)
-{
-	pud_t* pud = pud_offset_k(NULL, addr);
-	pmd_t* pmd = pmd_offset(pud, addr);
-	pte_t *pte = pte_offset_kernel(pmd, addr);
-
-	return pte_mfn(*pte);
-} 
 
 static __meminit void *alloc_static_page(unsigned long *phys)
 {
@@ -531,10 +523,6 @@ void __init xen_init_pt(void)
 {
 	unsigned long addr, *page;
 
-	memset((void *)init_level4_pgt,   0, PAGE_SIZE);
-	memset((void *)level3_kernel_pgt, 0, PAGE_SIZE);
-	memset((void *)level2_kernel_pgt, 0, PAGE_SIZE);
-
 	/* Find the initial pte page that was built for us. */
 	page = (unsigned long *)xen_start_info->pt_base;
 	addr = page[pgd_index(__START_KERNEL_map)];
@@ -595,7 +583,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-void __init extend_init_mapping(unsigned long tables_space)
+static void __init extend_init_mapping(unsigned long tables_space)
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;

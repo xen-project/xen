@@ -38,7 +38,7 @@ typedef struct fsi_plugin fsi_plugin_t;
 
 typedef struct fsi_plugin_ops {
 	int fpo_version;
-	int (*fpo_mount)(fsi_t *, const char *);
+	int (*fpo_mount)(fsi_t *, const char *, const char *);
 	int (*fpo_umount)(fsi_t *);
 	fsi_file_t *(*fpo_open)(fsi_t *, const char *);
 	ssize_t (*fpo_read)(fsi_file_t *, void *, size_t);

@@ -36,7 +36,7 @@
 
 static pthread_mutex_t fsi_lock = PTHREAD_MUTEX_INITIALIZER;
 
-fsi_t *fsi_open_fsimage(const char *path, uint64_t off)
+fsi_t *fsi_open_fsimage(const char *path, uint64_t off, const char *options)
 {
 	fsi_t *fsi = NULL;
 	int fd;
@@ -53,7 +53,7 @@ fsi_t *fsi_open_fsimage(const char *path, uint64_t off)
 	fsi->f_data = NULL;
 
 	pthread_mutex_lock(&fsi_lock);
-	err = find_plugin(fsi, path);
+	err = find_plugin(fsi, path, options);
 	pthread_mutex_unlock(&fsi_lock);
 	if (err != 0)
 		goto fail;

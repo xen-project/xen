@@ -214,15 +214,6 @@ static int setup_guest(int xc_handle,
             v_start, v_end,
             elf_uval(&elf, elf.ehdr, e_entry));
 
-    if ( (v_end - v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
-    {
-        PERROR("Initial guest OS requires too much space: "
-               "(%lluMB is greater than %lluMB limit)\n",
-               (unsigned long long)(v_end - v_start) >> 20,
-               ((unsigned long long)nr_pages << PAGE_SHIFT) >> 20);
-        goto error_out;
-    }
-
     if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
         PERROR("Could not allocate memory.\n");

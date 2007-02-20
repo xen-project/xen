@@ -210,7 +210,7 @@ static int allocate_xenbus_id(void)
     }
     nr_live_reqs++;
     req_info[o_probe].in_use = 1;
-    probe = o_probe + 1;
+    probe = (o_probe + 1) % NR_REQS;
     spin_unlock(&req_lock);
     init_waitqueue_head(&req_info[o_probe].waitq);
 

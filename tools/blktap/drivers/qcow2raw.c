@@ -55,8 +55,7 @@ static int read_complete = 0, write_complete = 0;
 static int returned_read_events = 0, returned_write_events = 0;
 static int submit_events = 0;
 static uint32_t read_idx = 0, write_idx = 0;
-struct tap_disk *drv1, *drv2;
-struct td_state *sqcow, *saio;
+struct disk_driver ddqcow, ddaio;
 static uint64_t prev = 0, written = 0;
 static char output[25];
 
@@ -100,7 +99,8 @@ static inline void LOCAL_FD_SET(fd_set *readfds)
 	return;
 }
 
-static int send_write_responses(struct td_state *s, int res, int idx, void *private)
+static int send_write_responses(struct disk_driver *dd, int res, uint64_t sec,
+				int nr_secs, int idx, void *private)
 {
 	if (res < 0) {
 		DFPRINTF("AIO FAILURE: res [%d]!\n",res);
@@ -112,12 +112,13 @@ static int send_write_responses(struct td_state *s, int res, int idx, void *priv
 	if (complete && (returned_write_events == submit_events)) 
 		write_complete = 1;
 
-	debug_output(written, s->size << 9);
+	debug_output(written, dd->td_state->size << 9);
 	free(private);
 	return 0;
 }
 
-static int send_read_responses(struct td_state *s, int res, int idx, void *private)
+static int send_read_responses(struct disk_driver *dd, int res, uint64_t sec,
+			       int nr_secs, int idx, void *private)
 {
 	int ret;
 
@@ -128,8 +129,8 @@ static int send_read_responses(struct td_state *s, int res, int idx, void *priva
 	if (complete && (returned_read_events == submit_events)) 
 		read_complete = 1;
 	
-	ret = drv2->td_queue_write(saio, idx, BLOCK_PROCESSSZ>>9, private, 
-				   send_write_responses, idx, private);
+	ret = ddaio.drv->td_queue_write(&ddaio, idx, BLOCK_PROCESSSZ>>9, private, 
+					send_write_responses, idx, private);
 	if (ret != 0) {
 		DFPRINTF("ERROR in submitting queue write!\n");
 		return 0;
@@ -137,7 +138,7 @@ static int send_read_responses(struct td_state *s, int res, int idx, void *priva
 
 	if ( (complete && returned_read_events == submit_events) || 
 	     (returned_read_events % 10 == 0) ) {
-		drv2->td_submit(saio);
+		ddaio.drv->td_submit(&ddaio);
 	}
 
 	return 0;
@@ -161,20 +162,20 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	sqcow = malloc(sizeof(struct td_state));
-	saio  = malloc(sizeof(struct td_state));
+	ddqcow.td_state = malloc(sizeof(struct td_state));
+	ddaio.td_state  = malloc(sizeof(struct td_state));
 	
 	/*Open qcow source file*/	
-	drv1 = &tapdisk_qcow;
-	sqcow->private = malloc(drv1->private_data_size);
+	ddqcow.drv = &tapdisk_qcow;
+	ddqcow.private = malloc(ddqcow.drv->private_data_size);
 
-        if (drv1->td_open(sqcow, argv[2])!=0) {
+        if (ddqcow.drv->td_open(&ddqcow, argv[2])!=0) {
 		DFPRINTF("Unable to open Qcow file [%s]\n",argv[2]);
 		exit(-1);
 	} else DFPRINTF("QCOW file opened, size %llu\n",
-		      (long long unsigned)sqcow->size);
+		      (long long unsigned)ddqcow.td_state->size);
 
-	qcowio_fd = drv1->td_get_fd(sqcow);
+	qcowio_fd = ddqcow.io_fd;
 
         /*Setup aio destination file*/
 	ret = stat(argv[1],&finfo);
@@ -191,12 +192,12 @@ int main(int argc, char *argv[])
 				       argv[1], 0 - errno);
 				exit(-1);
 			}
-			if (ftruncate(fd, (off_t)sqcow->size<<9) < 0) {
+			if (ftruncate(fd, (off_t)ddqcow.td_state->size<<9) < 0) {
 				DFPRINTF("Unable to create file "
 					"[%s] of size %llu (errno %d). "
 					 "Exiting...\n",
 					argv[1], 
-					(long long unsigned)sqcow->size<<9, 
+					(long long unsigned)ddqcow.td_state->size<<9, 
 					0 - errno);
 				close(fd);
 				exit(-1);
@@ -238,43 +239,43 @@ int main(int argc, char *argv[])
 				close(fd);
 				exit(-1);
 			}
-			if (size < sqcow->size<<9) {
+			if (size < ddqcow.td_state->size<<9) {
 				DFPRINTF("ERROR: Not enough space on device "
 					"%s (%lu bytes available, %llu bytes required\n",
 					argv[1], size, 
-					(long long unsigned)sqcow->size<<9);
+					(long long unsigned)ddqcow.td_state->size<<9);
 				close(fd);
 				exit(-1);				
 			}
 		} else {
-			if (ftruncate(fd, (off_t)sqcow->size<<9) < 0) {
+			if (ftruncate(fd, (off_t)ddqcow.td_state->size<<9) < 0) {
 				DFPRINTF("Unable to create file "
 					"[%s] of size %llu (errno %d). "
 					 "Exiting...\n",
 					argv[1], 
-					(long long unsigned)sqcow->size<<9, 
+					(long long unsigned)ddqcow.td_state->size<<9, 
 					 0 - errno);
 				close(fd);
 				exit(-1);
 			} else DFPRINTF("File [%s] truncated to length %llu "
 					"(%llu)\n", 
 				       argv[1], 
-				       (long long unsigned)sqcow->size<<9, 
-				       (long long unsigned)sqcow->size);
+				       (long long unsigned)ddqcow.td_state->size<<9, 
+				       (long long unsigned)ddqcow.td_state->size);
 		}
 		close(fd);
 	}
 
 	/*Open aio destination file*/	
-	drv2 = &tapdisk_aio;
-	saio->private = malloc(drv2->private_data_size);
+	ddaio.drv = &tapdisk_aio;
+	ddaio.private = malloc(ddaio.drv->private_data_size);
 
-        if (drv2->td_open(saio, argv[1])!=0) {
+        if (ddaio.drv->td_open(&ddaio, argv[1])!=0) {
 		DFPRINTF("Unable to open Qcow file [%s]\n", argv[1]);
 		exit(-1);
 	}
 
-	aio_fd = drv2->td_get_fd(saio);
+	aio_fd = ddaio.io_fd;
 
 	/*Initialise the output string*/
 	memset(output,0x20,25);
@@ -298,9 +299,9 @@ int main(int argc, char *argv[])
 			}
 		
 			/*Attempt to read 4k sized blocks*/
-			ret = drv1->td_queue_read(sqcow, i>>9,
-						  BLOCK_PROCESSSZ>>9, buf, 
-						  send_read_responses, i>>9, buf);
+			ret = ddqcow.drv->td_queue_read(&ddqcow, i>>9,
+							BLOCK_PROCESSSZ>>9, buf, 
+							send_read_responses, i>>9, buf);
 
 			if (ret < 0) {
 				DFPRINTF("UNABLE TO READ block [%llu]\n",
@@ -311,12 +312,12 @@ int main(int argc, char *argv[])
 				submit_events++;
 			}
 
-			if (i >= sqcow->size<<9) {
+			if (i >= ddqcow.td_state->size<<9) {
 				complete = 1;
 			}
 			
 			if ((submit_events % 10 == 0) || complete) 
-				drv1->td_submit(sqcow);
+				ddqcow.drv->td_submit(&ddqcow);
 			timeout.tv_usec = 0;
 			
 		} else {
@@ -332,9 +333,9 @@ int main(int argc, char *argv[])
 			     
 		if (ret > 0) {
 			if (FD_ISSET(qcowio_fd[0], &readfds)) 
-				drv1->td_do_callbacks(sqcow, 0);
+				ddqcow.drv->td_do_callbacks(&ddqcow, 0);
 			if (FD_ISSET(aio_fd[0], &readfds)) 
-				drv2->td_do_callbacks(saio, 0);
+				ddaio.drv->td_do_callbacks(&ddaio, 0);
 		}
 		if (complete && (returned_write_events == submit_events)) 
 			running = 0;

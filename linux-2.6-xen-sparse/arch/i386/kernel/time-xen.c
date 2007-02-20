@@ -222,8 +222,7 @@ int read_current_timer(unsigned long *timer_val)
 void init_cpu_khz(void)
 {
 	u64 __cpu_khz = 1000000ULL << 32;
-	struct vcpu_time_info *info;
-	info = &HYPERVISOR_shared_info->vcpu_info[0].time;
+	struct vcpu_time_info *info = &vcpu_info(0)->time;
 	do_div(__cpu_khz, info->tsc_to_system_mul);
 	if (info->tsc_shift < 0)
 		cpu_khz = __cpu_khz << -info->tsc_shift;
@@ -293,14 +292,13 @@ static void update_wallclock(void)
  * Reads a consistent set of time-base values from Xen, into a shadow data
  * area.
  */
-static void get_time_values_from_xen(void)
+static void get_time_values_from_xen(int cpu)
 {
-	shared_info_t           *s = HYPERVISOR_shared_info;
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &s->vcpu_info[smp_processor_id()].time;
-	dst = &per_cpu(shadow_time, smp_processor_id());
+	src = &vcpu_info(cpu)->time;
+	dst = &per_cpu(shadow_time, cpu);
 
 	do {
 		dst->version = src->version;
@@ -320,7 +318,7 @@ static inline int time_values_up_to_date(int cpu)
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &HYPERVISOR_shared_info->vcpu_info[cpu].time;
+	src = &vcpu_info(cpu)->time;
 	dst = &per_cpu(shadow_time, cpu);
 
 	rmb();
@@ -412,7 +410,7 @@ void do_gettimeofday(struct timeval *tv)
 			 * overflowed). Detect that and recalculate
 			 * with fresh values.
 			 */
-			get_time_values_from_xen();
+			get_time_values_from_xen(cpu);
 			continue;
 		}
 	} while (read_seqretry(&xtime_lock, seq) ||
@@ -456,7 +454,7 @@ int do_settimeofday(struct timespec *tv)
 		nsec = tv->tv_nsec - get_nsec_offset(shadow);
 		if (time_values_up_to_date(cpu))
 			break;
-		get_time_values_from_xen();
+		get_time_values_from_xen(cpu);
 	}
 	sec = tv->tv_sec;
 	__normalize_time(&sec, &nsec);
@@ -551,7 +549,7 @@ unsigned long long monotonic_clock(void)
 		barrier();
 		time = shadow->system_timestamp + get_nsec_offset(shadow);
 		if (!time_values_up_to_date(cpu))
-			get_time_values_from_xen();
+			get_time_values_from_xen(cpu);
 		barrier();
 	} while (local_time_version != shadow->version);
 
@@ -621,7 +619,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	write_seqlock(&xtime_lock);
 
 	do {
-		get_time_values_from_xen();
+		get_time_values_from_xen(cpu);
 
 		/* Obtain a consistent snapshot of elapsed wallclock cycles. */
 		delta = delta_cpu =
@@ -708,7 +706,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (delta_cpu > 0) {
 		do_div(delta_cpu, NS_PER_TICK);
 		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
-		if (user_mode(regs))
+		if (user_mode_vm(regs))
 			account_user_time(current, (cputime_t)delta_cpu);
 		else
 			account_system_time(current, HARDIRQ_OFFSET,
@@ -722,7 +720,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* Local timer processing (see update_process_times()). */
 	run_local_timers();
 	if (rcu_pending(cpu))
-		rcu_check_callbacks(cpu, user_mode(regs));
+		rcu_check_callbacks(cpu, user_mode_vm(regs));
 	scheduler_tick();
 	run_posix_cpu_timers(current);
 	profile_tick(CPU_PROFILING, regs);
@@ -921,7 +919,7 @@ void __init time_init(void)
 		return;
 	}
 #endif
-	get_time_values_from_xen();
+	get_time_values_from_xen(0);
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
@@ -1029,7 +1027,7 @@ void time_resume(void)
 {
 	init_cpu_khz();
 
-	get_time_values_from_xen();
+	get_time_values_from_xen(0);
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;

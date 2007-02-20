@@ -144,6 +144,17 @@ const void *elf_section_end(struct elf_binary *elf, const elf_shdr * shdr)
         + elf_uval(elf, shdr, sh_offset) + elf_uval(elf, shdr, sh_size);
 }
 
+const void *elf_segment_start(struct elf_binary *elf, const elf_phdr * phdr)
+{
+    return elf->image + elf_uval(elf, phdr, p_offset);
+}
+
+const void *elf_segment_end(struct elf_binary *elf, const elf_phdr * phdr)
+{
+    return elf->image
+        + elf_uval(elf, phdr, p_offset) + elf_uval(elf, phdr, p_filesz);
+}
+
 const elf_sym *elf_sym_by_name(struct elf_binary *elf, const char *symbol)
 {
     const void *ptr = elf_section_start(elf, elf->sym_tab);

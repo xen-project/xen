@@ -53,7 +53,7 @@ struct fsi_file {
 	void *ff_data;
 };
 
-int find_plugin(fsi_t *, const char *);
+int find_plugin(fsi_t *, const char *, const char *);
 
 #ifdef __cplusplus
 };

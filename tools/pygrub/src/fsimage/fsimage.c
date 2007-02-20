@@ -260,19 +260,20 @@ PyTypeObject fsimage_fs_type = {
 static PyObject *
 fsimage_open(PyObject *o, PyObject *args, PyObject *kwargs)
 {
-	static char *kwlist[] = { "name", "offset", NULL };
-	char * name;
+	static char *kwlist[] = { "name", "offset", "options", NULL };
+	char *name;
+	char *options = NULL;
 	uint64_t offset = 0;
 	fsimage_fs_t *fs;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|L", kwlist, 
-	    &name, &offset))
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|Ls", kwlist, 
+	    &name, &offset, &options))
 		return (NULL);
 
 	if ((fs = PyObject_NEW(fsimage_fs_t, &fsimage_fs_type)) == NULL)
 		return (NULL);
 
-	if ((fs->fs = fsi_open_fsimage(name, offset)) == NULL) {
+	if ((fs->fs = fsi_open_fsimage(name, offset, options)) == NULL) {
 		PyErr_SetFromErrno(PyExc_IOError);
 		return (NULL);
 	}
@@ -284,7 +285,8 @@ PyDoc_STRVAR(fsimage_open__doc__,
     "open(name, [offset=off]) - Open the given file as a filesystem image.\n"
     "\n"
     "name - name of file to open.\n"
-    "offset - offset of file system within file image.\n");
+    "offset - offset of file system within file image.\n"
+    "options - mount options string.\n");
 
 static struct PyMethodDef fsimage_module_methods[] = {
 	{ "open", (PyCFunction)fsimage_open,

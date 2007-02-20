@@ -9,6 +9,8 @@ TARGET = 32bitbios_flat.h
 
 CFLAGS += -fno-builtin -O2 -msoft-float -nostdlib
 CFLAGS += -I../ -DGCC_PROTOS
+CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
+CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
 
 SUBDIRS = tcgbios
 

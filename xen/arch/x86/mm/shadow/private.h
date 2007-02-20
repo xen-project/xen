@@ -269,12 +269,13 @@ static inline void shadow_check_page_struct_offsets(void) {
 #define SH_type_l1_64_shadow   (8U) /* shadowing a 64-bit L1 page */
 #define SH_type_fl1_64_shadow  (9U) /* L1 shadow for 64-bit 2M superpg */
 #define SH_type_l2_64_shadow  (10U) /* shadowing a 64-bit L2 page */
-#define SH_type_l3_64_shadow  (11U) /* shadowing a 64-bit L3 page */
-#define SH_type_l4_64_shadow  (12U) /* shadowing a 64-bit L4 page */
-#define SH_type_max_shadow    (12U)
-#define SH_type_p2m_table     (13U) /* in use as the p2m table */
-#define SH_type_monitor_table (14U) /* in use as a monitor table */
-#define SH_type_unused        (15U)
+#define SH_type_l2h_64_shadow (11U) /* shadowing a compat PAE L2 high page */
+#define SH_type_l3_64_shadow  (12U) /* shadowing a 64-bit L3 page */
+#define SH_type_l4_64_shadow  (13U) /* shadowing a 64-bit L4 page */
+#define SH_type_max_shadow    (13U)
+#define SH_type_p2m_table     (14U) /* in use as the p2m table */
+#define SH_type_monitor_table (15U) /* in use as a monitor table */
+#define SH_type_unused        (16U)
 
 /* 
  * What counts as a pinnable shadow?
@@ -325,12 +326,13 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
 #define SHF_L1_64   (1u << SH_type_l1_64_shadow)
 #define SHF_FL1_64  (1u << SH_type_fl1_64_shadow)
 #define SHF_L2_64   (1u << SH_type_l2_64_shadow)
+#define SHF_L2H_64  (1u << SH_type_l2h_64_shadow)
 #define SHF_L3_64   (1u << SH_type_l3_64_shadow)
 #define SHF_L4_64   (1u << SH_type_l4_64_shadow)
 
 #define SHF_32  (SHF_L1_32|SHF_FL1_32|SHF_L2_32)
 #define SHF_PAE (SHF_L1_PAE|SHF_FL1_PAE|SHF_L2_PAE|SHF_L2H_PAE)
-#define SHF_64  (SHF_L1_64|SHF_FL1_64|SHF_L2_64|SHF_L3_64|SHF_L4_64)
+#define SHF_64  (SHF_L1_64|SHF_FL1_64|SHF_L2_64|SHF_L2H_64|SHF_L3_64|SHF_L4_64)
 
 /* Used for hysteresis when automatically unhooking mappings on fork/exit */
 #define SHF_unhooked_mappings (1u<<31)
@@ -367,7 +369,6 @@ void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn);
 
 /* Install the xen mappings in various flavours of shadow */
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn);
-void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn);
 void sh_install_xen_entries_in_l2(struct vcpu *v, mfn_t gl2mfn, mfn_t sl2mfn);
 
 /* Update the shadows in response to a pagetable write from Xen */

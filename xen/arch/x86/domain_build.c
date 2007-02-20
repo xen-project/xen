@@ -262,13 +262,13 @@ int construct_dom0(struct domain *d,
 
     nr_pages = compute_dom0_nr_pages();
 
-    if (0 != (rc = elf_init(&elf, image_start, image_len)))
+    if ( (rc = elf_init(&elf, image_start, image_len)) != 0 )
         return rc;
 #ifdef VERBOSE
     elf_set_verbose(&elf);
 #endif
     elf_parse_binary(&elf);
-    if (0 != (elf_xen_parse(&elf, &parms)))
+    if ( (rc = elf_xen_parse(&elf, &parms)) != 0 )
         return rc;
 
     /* compatibility check */

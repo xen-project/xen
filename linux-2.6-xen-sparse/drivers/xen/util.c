@@ -30,6 +30,11 @@ struct vm_struct *alloc_vm_area(unsigned long size)
 		return NULL;
 	}
 
+	/* Map page directories into every address space. */
+#ifdef CONFIG_X86
+	vmalloc_sync_all();
+#endif
+
 	return area;
 }
 EXPORT_SYMBOL_GPL(alloc_vm_area);
@@ -42,29 +47,3 @@ void free_vm_area(struct vm_struct *area)
 	kfree(area);
 }
 EXPORT_SYMBOL_GPL(free_vm_area);
-
-void lock_vm_area(struct vm_struct *area)
-{
-	unsigned long i;
-	char c;
-
-	/*
-	 * Prevent context switch to a lazy mm that doesn't have this area
-	 * mapped into its page tables.
-	 */
-	preempt_disable();
-
-	/*
-	 * Ensure that the page tables are mapped into the current mm. The
-	 * page-fault path will copy the page directory pointers from init_mm.
-	 */
-	for (i = 0; i < area->size; i += PAGE_SIZE)
-		(void)__get_user(c, (char __user *)area->addr + i);
-}
-EXPORT_SYMBOL_GPL(lock_vm_area);
-
-void unlock_vm_area(struct vm_struct *area)
-{
-	preempt_enable();
-}
-EXPORT_SYMBOL_GPL(unlock_vm_area);

@@ -1147,7 +1147,7 @@ static int alloc_l4_table(struct page_info *page)
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
     {
-        if ( is_guest_l4_slot(i) &&
+        if ( is_guest_l4_slot(d, i) &&
              unlikely(!get_page_from_l4e(pl4e[i], pfn, d)) )
             goto fail;
 
@@ -1173,7 +1173,7 @@ static int alloc_l4_table(struct page_info *page)
  fail:
     MEM_LOG("Failure in alloc_l4_table: entry %d", i);
     while ( i-- > 0 )
-        if ( is_guest_l4_slot(i) )
+        if ( is_guest_l4_slot(d, i) )
             put_page_from_l4e(pl4e[i], pfn);
 
     return 0;
@@ -1248,12 +1248,13 @@ static void free_l3_table(struct page_info *page)
 
 static void free_l4_table(struct page_info *page)
 {
+    struct domain *d = page_get_owner(page);
     unsigned long pfn = page_to_mfn(page);
     l4_pgentry_t *pl4e = page_to_virt(page);
     int           i;
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
-        if ( is_guest_l4_slot(i) )
+        if ( is_guest_l4_slot(d, i) )
             put_page_from_l4e(pl4e[i], pfn);
 }
 
@@ -1480,13 +1481,14 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 #if CONFIG_PAGING_LEVELS >= 4
 
 /* Update the L4 entry at pl4e to new value nl4e. pl4e is within frame pfn. */
-static int mod_l4_entry(l4_pgentry_t *pl4e, 
+static int mod_l4_entry(struct domain *d,
+                        l4_pgentry_t *pl4e, 
                         l4_pgentry_t nl4e, 
                         unsigned long pfn)
 {
     l4_pgentry_t ol4e;
 
-    if ( unlikely(!is_guest_l4_slot(pgentry_ptr_to_slot(pl4e))) )
+    if ( unlikely(!is_guest_l4_slot(d, pgentry_ptr_to_slot(pl4e))) )
     {
         MEM_LOG("Illegal L4 update attempt in Xen-private area %p", pl4e);
         return 0;
@@ -1777,9 +1779,13 @@ int new_guest_cr3(unsigned long mfn)
     {
         okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
-            : mod_l4_entry(__va(pagetable_get_paddr(v->arch.guest_table)),
-                           l4e_from_pfn(mfn, (_PAGE_PRESENT|_PAGE_RW|
-                                              _PAGE_USER|_PAGE_ACCESSED)), 0);
+            : mod_l4_entry(
+                    d,
+                    __va(pagetable_get_paddr(v->arch.guest_table)),
+                    l4e_from_pfn(
+                        mfn,
+                        (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)),
+                    pagetable_get_pfn(v->arch.guest_table));
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
@@ -2339,7 +2345,7 @@ int do_mmu_update(
                     if ( !IS_COMPAT(FOREIGNDOM) )
                     {
                         l4_pgentry_t l4e = l4e_from_intpte(req.val);
-                        okay = mod_l4_entry(va, l4e, mfn);
+                        okay = mod_l4_entry(d, va, l4e, mfn);
                     }
                     break;
 #endif
@@ -2971,8 +2977,16 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
                 mfn = virt_to_mfn(d->shared_info);
             break;
         case XENMAPSPACE_grant_table:
-            if ( xatp.idx < NR_GRANT_FRAMES )
-                mfn = virt_to_mfn(d->grant_table->shared) + xatp.idx;
+            spin_lock(&d->grant_table->lock);
+
+            if ( (xatp.idx >= nr_grant_frames(d->grant_table)) &&
+                 (xatp.idx < max_nr_grant_frames) )
+                gnttab_grow_table(d, xatp.idx + 1);
+
+            if ( xatp.idx < nr_grant_frames(d->grant_table) )
+                mfn = virt_to_mfn(d->grant_table->shared[xatp.idx]);
+
+            spin_unlock(&d->grant_table->lock);
             break;
         default:
             break;

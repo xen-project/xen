@@ -90,9 +90,6 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
 
-/* Allows setting of maximum possible memory size  */
-unsigned long xen_override_max_pfn;
-
 static int xen_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block xen_panic_block = {
 	xen_panic_event, NULL, 0 /* try to go last */
@@ -580,13 +577,13 @@ static void discover_ebda(void)
 	if (ebda_size > 64*1024)
 		ebda_size = 64*1024;
 }
+#else
+#define discover_ebda() ((void)0)
 #endif
 
 void __init setup_arch(char **cmdline_p)
 {
 #ifdef CONFIG_XEN
-	struct xen_memory_map memmap;
-
 	/* Register a call for panic conditions. */
 	atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
@@ -675,9 +672,7 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
-#ifndef CONFIG_XEN
 	discover_ebda();
-#endif
 
 	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
@@ -719,7 +714,6 @@ void __init setup_arch(char **cmdline_p)
 	/* reserve ebda region */
 	if (ebda_addr)
 		reserve_bootmem_generic(ebda_addr, ebda_size);
-#endif
 
 #ifdef CONFIG_SMP
 	/*
@@ -731,6 +725,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Reserve SMP trampoline */
 	reserve_bootmem_generic(SMP_TRAMPOLINE_BASE, PAGE_SIZE);
+#endif
 #endif
 
 #ifdef CONFIG_ACPI_SLEEP
@@ -895,6 +890,8 @@ void __init setup_arch(char **cmdline_p)
 	probe_roms();
 #ifdef CONFIG_XEN
 	if (is_initial_xendomain()) {
+		struct xen_memory_map memmap;
+
 		memmap.nr_entries = E820MAX;
 		set_xen_guest_handle(memmap.buffer, machine_e820.map);
 
@@ -1378,9 +1375,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
 
-#ifdef CONFIG_X86_XEN_GENAPIC
 	c->apicid = phys_pkg_id(0);
-#endif
 
 	/*
 	 * Vendor-specific initialization.  In this section we

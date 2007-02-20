@@ -59,9 +59,11 @@ typedef l4_pgentry_t root_pgentry_t;
       !((_t) & PGT_pae_xen_l2) ||                      \
       ((_s) < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_d)) )
 #define is_guest_l3_slot(_s) (1)
-#define is_guest_l4_slot(_s)                   \
-    (((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT) || \
-     ((_s) > ROOT_PAGETABLE_LAST_XEN_SLOT))
+#define is_guest_l4_slot(_d, _s)                    \
+    ( IS_COMPAT(_d)                                 \
+      ? ((_s) == 0)                                 \
+      : (((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT) ||  \
+         ((_s) > ROOT_PAGETABLE_LAST_XEN_SLOT)))
 
 #define root_get_pfn              l4e_get_pfn
 #define root_get_flags            l4e_get_flags
@@ -89,12 +91,12 @@ typedef l4_pgentry_t root_pgentry_t;
  * Permit the NX bit if the hardware supports it.
  * Note that range [62:52] is available for software use on x86/64.
  */
-#define BASE_DISALLOW_MASK (0xFF000180U & ~_PAGE_NX)
+#define BASE_DISALLOW_MASK (0xFF800180U & ~_PAGE_NX)
 
 #define L1_DISALLOW_MASK (BASE_DISALLOW_MASK | _PAGE_GNTTAB)
 #define L2_DISALLOW_MASK (BASE_DISALLOW_MASK)
-#define L3_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
-#define L4_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
+#define L3_DISALLOW_MASK (BASE_DISALLOW_MASK)
+#define L4_DISALLOW_MASK (BASE_DISALLOW_MASK)
 
 #define COMPAT_L3_DISALLOW_MASK L3_DISALLOW_MASK
 

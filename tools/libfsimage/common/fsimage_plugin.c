@@ -185,7 +185,7 @@ fail:
 	return (ret);
 }
 
-int find_plugin(fsi_t *fsi, const char *path)
+int find_plugin(fsi_t *fsi, const char *path, const char *options)
 {
 	fsi_plugin_t *fp;
 	int ret = 0;
@@ -195,7 +195,7 @@ int find_plugin(fsi_t *fsi, const char *path)
 
 	for (fp = plugins; fp != NULL; fp = fp->fp_next) {
 		fsi->f_plugin = fp;
-		if (fp->fp_ops->fpo_mount(fsi, path) == 0)
+		if (fp->fp_ops->fpo_mount(fsi, path, options) == 0)
 			goto out;
 	}
 

@@ -278,10 +278,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(vm86_mode(regs)) || unlikely(!ring_3(regs)) )
-    {
-        dprintk(XENLOG_DEBUG, "Taken fault at bad CS %04x\n", regs->cs);
         goto fail;
-    }
 
     if ( !linearise_address((u16)regs->cs, regs->eip, (unsigned long *)&eip) )
     {

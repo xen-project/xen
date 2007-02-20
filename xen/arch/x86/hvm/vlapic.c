@@ -459,7 +459,7 @@ static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
 static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
                          unsigned int len, unsigned int *result)
 {
-    ASSERT((len == 4) && (offset > 0) && (offset <= APIC_TDCR));
+    ASSERT((len == 4) && (offset >= 0) && (offset <= APIC_TDCR));
 
     switch ( offset )
     {

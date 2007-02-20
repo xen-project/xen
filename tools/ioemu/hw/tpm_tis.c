@@ -769,6 +769,8 @@ static void tpm_save(QEMUFile* f,void* opaque)
             if (n > 0) {
                 if (IS_VALID_LOC(s->active_loc)) {
                     s->loc[s->active_loc].sts = STS_VALID | STS_DATA_AVAILABLE;
+                    s->loc[s->active_loc].state = STATE_COMPLETION;
+                    tis_raise_irq(s, s->active_loc, INT_DATA_AVAILABLE);
                 }
                 /* close the connection with the vTPM for good */
                 close_vtpm_channel(s, 1);
@@ -881,6 +883,7 @@ void tpm_tis_init(SetIRQFunc *set_irq, void *opaque, int irq)
     s->Transmitlayer = -1;
     s->tpmTx.fd[0] = -1;
     s->tpmTx.fd[1] = -1;
+    s->aborting_locty = NO_LOCALITY;
 
     tpm_initialize_instance(s, s->vtpm_instance);
     memset(s->buffer.buf,0,sizeof(s->buffer.buf));

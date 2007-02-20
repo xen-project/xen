@@ -170,7 +170,7 @@ static void __cpuinit MP_processor_info (struct mpc_config_processor *m)
 	cpu_set(cpu, cpu_present_map);
 }
 #else
-void __init MP_processor_info (struct mpc_config_processor *m)
+static void __cpuinit MP_processor_info (struct mpc_config_processor *m)
 {
 	num_processors++;
 }

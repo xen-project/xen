@@ -28,7 +28,7 @@
 #define __XEN_PUBLIC_ELFNOTE_H__
 
 /*
- * The notes should live in a SHT_NOTE segment and have "Xen" in the
+ * The notes should live in a PT_NOTE segment and have "Xen" in the
  * name field.
  *
  * Numeric types are either 4 or 8 bytes depending on the content of
@@ -149,6 +149,12 @@
  * hole starting at a higher address.
  */
 #define XEN_ELFNOTE_HV_START_LOW  12
+
+/*
+ * List of maddr_t-sized mask/value pairs describing how to recognize
+ * (non-present) L1 page table entries carrying valid MFNs (numeric).
+ */
+#define XEN_ELFNOTE_L1_MFN_VALID  13
 
 /*
  * System information exported through crash notes.

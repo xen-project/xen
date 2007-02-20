@@ -495,7 +495,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
         hstart = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
         he = ((const uint64_t *) spage)[hstart];
 
-        if ( ((he >> PAGE_SHIFT) & 0x0fffffff) == m2p_mfn0 ) {
+        if ( ((he >> PAGE_SHIFT) & MFN_MASK_X86) == m2p_mfn0 ) {
             /* hvirt starts with xen stuff... */
             xen_start = hstart;
         } else if ( hvirt_start != 0xf5800000 ) {
@@ -503,7 +503,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
             hstart = (0xf5800000 >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
             he = ((const uint64_t *) spage)[hstart];
 
-            if( ((he >> PAGE_SHIFT) & 0x0fffffff) == m2p_mfn0 )
+            if( ((he >> PAGE_SHIFT) & MFN_MASK_X86) == m2p_mfn0 )
                 xen_start = hstart;
         }
     }
@@ -532,7 +532,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
         if (pte & _PAGE_PRESENT) {
 
-            mfn = (pte >> PAGE_SHIFT) & 0xfffffff;
+            mfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
             if (!MFN_IS_IN_PSEUDOPHYS_MAP(mfn)) {
                 /* This will happen if the type info is stale which
                    is quite feasible under live migration */
@@ -541,7 +541,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
             } else
                 pfn = mfn_to_pfn(mfn);
 
-            pte &= 0xffffff0000000fffULL;
+            pte &= ~MADDR_MASK_X86;
             pte |= (uint64_t)pfn << PAGE_SHIFT;
         }
 
