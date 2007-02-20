@@ -715,7 +715,18 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
     case INSTR_PUSH:
         mmio_opp->addr += hvm_get_segment_base(current, x86_seg_ss);
-        hvm_copy_to_guest_virt(mmio_opp->addr, &p->data, size);
+        { 
+            unsigned long addr = mmio_opp->addr;
+            int rv = hvm_copy_to_guest_virt(addr, &p->data, size);
+            if ( rv != 0 ) 
+            {
+                addr += p->size - rv;
+                gdprintk(XENLOG_DEBUG, "Pagefault emulating PUSH from MMIO: "
+                         "va=%#lx\n", addr);
+                hvm_inject_exception(TRAP_page_fault, PFEC_write_access, addr);
+                return;
+            }
+        }
         break;
     }
 }
