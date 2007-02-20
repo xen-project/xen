@@ -519,6 +519,37 @@ do {                                                                    \
                      ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
 } while (0)
 
+static int __handle_rep_prefix(
+    struct cpu_user_regs *int_regs,
+    struct cpu_user_regs *ext_regs,
+    int ad_bytes)
+{
+    unsigned long ecx = ((ad_bytes == 2) ? (uint16_t)int_regs->ecx :
+                         (ad_bytes == 4) ? (uint32_t)int_regs->ecx :
+                         int_regs->ecx);
+
+    if ( ecx-- == 0 )
+    {
+        ext_regs->eip = int_regs->eip;
+        return 1;
+    }
+
+    if ( ad_bytes == 2 )
+        *(uint16_t *)&int_regs->ecx = ecx;
+    else if ( ad_bytes == 4 )
+        int_regs->ecx = (uint32_t)ecx;
+    else
+        int_regs->ecx = ecx;
+    int_regs->eip = ext_regs->eip;
+    return 0;
+}
+
+#define handle_rep_prefix()                                                \
+do {                                                                       \
+    if ( rep_prefix && __handle_rep_prefix(&_regs, ctxt->regs, ad_bytes) ) \
+        goto done;                                                         \
+} while (0)
+
 /*
  * Unsigned multiplication with double-word result.
  * IN:  Multiplicand=m[0], Multiplier=m[1]
@@ -1579,17 +1610,6 @@ x86_emulate(
     if ( twobyte )
         goto twobyte_special_insn;
 
-    if ( rep_prefix )
-    {
-        if ( _regs.ecx == 0 )
-        {
-            ctxt->regs->eip = _regs.eip;
-            goto done;
-        }
-        _regs.ecx--;
-        _regs.eip = ctxt->regs->eip;
-    }
-
     switch ( b )
     {
     case 0x27: /* daa */ {
@@ -1727,6 +1747,7 @@ x86_emulate(
         break;
 
     case 0x6c ... 0x6d: /* ins %dx,%es:%edi */
+        handle_rep_prefix();
         generate_exception_if(!mode_iopl(), EXC_GP);
         dst.type  = OP_MEM;
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
@@ -1741,6 +1762,7 @@ x86_emulate(
         break;
 
     case 0x6e ... 0x6f: /* outs %esi,%dx */
+        handle_rep_prefix();
         generate_exception_if(!mode_iopl(), EXC_GP);
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (rc = ops->read(ea.mem.seg, truncate_ea(_regs.esi),
@@ -1827,6 +1849,7 @@ x86_emulate(
         break;
 
     case 0xa4 ... 0xa5: /* movs */
+        handle_rep_prefix();
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
@@ -1841,6 +1864,7 @@ x86_emulate(
         break;
 
     case 0xaa ... 0xab: /* stos */
+        handle_rep_prefix();
         dst.type  = OP_MEM;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
@@ -1851,6 +1875,7 @@ x86_emulate(
         break;
 
     case 0xac ... 0xad: /* lods */
+        handle_rep_prefix();
         dst.type  = OP_REG;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.reg   = (unsigned long *)&_regs.eax;
