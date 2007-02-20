@@ -3,8 +3,9 @@
 
 RC=0
 
+PATH=/sbin:$PATH
 set -e
-ldconfig -v 2>&1 | grep -q libcrypto.so || RC=1
+ldconfig -p 2>&1 | grep -q libcrypto.so || RC=1
 
 if test ${RC} -ne 0; then
         echo
