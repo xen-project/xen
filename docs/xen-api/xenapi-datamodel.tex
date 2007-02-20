@@ -4424,6 +4424,7 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt supported\_bootloaders} & string Set & a list of the bootloaders installed on the machine \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RW}$ &  {\tt logging} & (string $\rightarrow$ string) Map & logging configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & physical network interfaces \\
@@ -4949,6 +4950,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_supported\_bootloaders}
+
+{\bf Overview:} 
+Get the supported\_bootloaders field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_supported_bootloaders (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

@@ -626,7 +626,8 @@ class XendAPI(object):
     host_attr_ro = ['software_version',
                     'resident_VMs',
                     'host_CPUs',
-                    'metrics']
+                    'metrics',
+                    'supported_bootloaders']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -678,6 +679,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
     def host_get_metrics(self, _, ref):
         return xen_api_success(XendNode.instance().host_metrics_uuid)
+    def host_get_supported_bootloaders(self, session, host_ref):
+        return xen_api_success(['pygrub'])
 
     # object methods
     def host_disable(self, session, host_ref):
@@ -707,7 +710,8 @@ class XendAPI(object):
                   'software_version': node.xen_version(),
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),
-                  'metrics': node.host_metrics_uuid}
+                  'metrics': node.host_metrics_uuid,
+                  'supported_bootloaders': 'pygrub'}
         return xen_api_success(record)
 
     # class methods
