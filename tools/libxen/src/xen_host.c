@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -155,37 +155,6 @@ xen_host_get_by_uuid(xen_session *session, xen_host *result, char *uuid)
 
     *result = NULL;
     XEN_CALL_("host.get_by_uuid");
-    return session->ok;
-}
-
-
-bool
-xen_host_create(xen_session *session, xen_host *result, xen_host_record *record)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &xen_host_record_abstract_type_,
-              .u.struct_val = record }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("host.create");
-    return session->ok;
-}
-
-
-bool
-xen_host_destroy(xen_session *session, xen_host host)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = host }
-        };
-
-    xen_call_(session, "host.destroy", param_values, 1, NULL, NULL);
     return session->ok;
 }
 

@@ -680,8 +680,6 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().host_metrics_uuid)
 
     # object methods
-    def host_destroy(self, session, host_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)    
     def host_disable(self, session, host_ref):
         XendDomain.instance().set_allow_new_domains(False)
         return xen_api_success_void()
@@ -715,8 +713,6 @@ class XendAPI(object):
     # class methods
     def host_get_all(self, session):
         return xen_api_success((XendNode.instance().uuid,))
-    def host_create(self, session, struct):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
     def host_get_by_name_label(self, session, name):
         if XendNode.instance().name == name:
             return xen_api_success((XendNode.instance().uuid,))

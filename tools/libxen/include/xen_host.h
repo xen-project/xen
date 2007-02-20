@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -174,20 +174,6 @@ xen_host_get_record(xen_session *session, xen_host_record **result, xen_host hos
  */
 extern bool
 xen_host_get_by_uuid(xen_session *session, xen_host *result, char *uuid);
-
-
-/**
- * Create a new host instance, and return its handle.
- */
-extern bool
-xen_host_create(xen_session *session, xen_host *result, xen_host_record *record);
-
-
-/**
- * Destroy the specified host instance.
- */
-extern bool
-xen_host_destroy(xen_session *session, xen_host host);
 
 
 /**
