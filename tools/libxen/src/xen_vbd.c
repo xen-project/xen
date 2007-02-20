@@ -22,6 +22,7 @@
 
 #include "xen_common.h"
 #include "xen_internal.h"
+#include "xen_string_string_map.h"
 #include "xen_vbd.h"
 #include "xen_vbd_metrics.h"
 #include "xen_vbd_mode_internal.h"
@@ -65,6 +66,12 @@ static const struct_member xen_vbd_record_struct_members[] =
         { .key = "type",
           .type = &xen_vbd_type_abstract_type_,
           .offset = offsetof(xen_vbd_record, type) },
+        { .key = "qos_algorithm_type",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vbd_record, qos_algorithm_type) },
+        { .key = "qos_algorithm_params",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vbd_record, qos_algorithm_params) },
         { .key = "metrics",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_vbd_record, metrics) }
@@ -92,6 +99,8 @@ xen_vbd_record_free(xen_vbd_record *record)
     xen_vm_record_opt_free(record->vm);
     xen_vdi_record_opt_free(record->vdi);
     free(record->device);
+    free(record->qos_algorithm_type);
+    xen_string_string_map_free(record->qos_algorithm_params);
     xen_vbd_metrics_record_opt_free(record->metrics);
     free(record);
 }
@@ -266,6 +275,40 @@ xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd)
 
 
 bool
+xen_vbd_get_qos_algorithm_type(xen_session *session, char **result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VBD.get_qos_algorithm_type");
+    return session->ok;
+}
+
+
+bool
+xen_vbd_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("VBD.get_qos_algorithm_params");
+    return session->ok;
+}
+
+
+bool
 xen_vbd_get_metrics(xen_session *session, xen_vbd_metrics *result, xen_vbd vbd)
 {
     abstract_value param_values[] =
@@ -342,6 +385,72 @@ xen_vbd_set_type(xen_session *session, xen_vbd vbd, enum xen_vbd_type type)
         };
 
     xen_call_(session, "VBD.set_type", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_set_qos_algorithm_type(xen_session *session, xen_vbd vbd, char *algorithm_type)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_string,
+              .u.string_val = algorithm_type }
+        };
+
+    xen_call_(session, "VBD.set_qos_algorithm_type", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_set_qos_algorithm_params(xen_session *session, xen_vbd vbd, xen_string_string_map *algorithm_params)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)algorithm_params }
+        };
+
+    xen_call_(session, "VBD.set_qos_algorithm_params", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_add_to_qos_algorithm_params(xen_session *session, xen_vbd vbd, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VBD.add_to_qos_algorithm_params", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_remove_from_qos_algorithm_params(xen_session *session, xen_vbd vbd, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VBD.remove_from_qos_algorithm_params", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

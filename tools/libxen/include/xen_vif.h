@@ -21,6 +21,7 @@
 
 #include "xen_common.h"
 #include "xen_network_decl.h"
+#include "xen_string_string_map.h"
 #include "xen_vif_decl.h"
 #include "xen_vif_metrics_decl.h"
 #include "xen_vm_decl.h"
@@ -70,6 +71,8 @@ typedef struct xen_vif_record
     struct xen_vm_record_opt *vm;
     char *mac;
     int64_t mtu;
+    char *qos_algorithm_type;
+    xen_string_string_map *qos_algorithm_params;
     struct xen_vif_metrics_record_opt *metrics;
 } xen_vif_record;
 
@@ -223,6 +226,20 @@ xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif);
 
 
 /**
+ * Get the qos/algorithm_type field of the given VIF.
+ */
+extern bool
+xen_vif_get_qos_algorithm_type(xen_session *session, char **result, xen_vif vif);
+
+
+/**
+ * Get the qos/algorithm_params field of the given VIF.
+ */
+extern bool
+xen_vif_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vif vif);
+
+
+/**
  * Get the metrics field of the given VIF.
  */
 extern bool
@@ -248,6 +265,37 @@ xen_vif_set_mac(xen_session *session, xen_vif vif, char *mac);
  */
 extern bool
 xen_vif_set_mtu(xen_session *session, xen_vif vif, int64_t mtu);
+
+
+/**
+ * Set the qos/algorithm_type field of the given VIF.
+ */
+extern bool
+xen_vif_set_qos_algorithm_type(xen_session *session, xen_vif vif, char *algorithm_type);
+
+
+/**
+ * Set the qos/algorithm_params field of the given VIF.
+ */
+extern bool
+xen_vif_set_qos_algorithm_params(xen_session *session, xen_vif vif, xen_string_string_map *algorithm_params);
+
+
+/**
+ * Add the given key-value pair to the qos/algorithm_params field of
+ * the given VIF.
+ */
+extern bool
+xen_vif_add_to_qos_algorithm_params(xen_session *session, xen_vif vif, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * qos/algorithm_params field of the given VIF.  If the key is not in that
+ * Map, then do nothing.
+ */
+extern bool
+xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char *key);
 
 
 #endif

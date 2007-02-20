@@ -20,6 +20,7 @@
 #define XEN_VBD_H
 
 #include "xen_common.h"
+#include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
 #include "xen_vbd_metrics_decl.h"
 #include "xen_vbd_mode.h"
@@ -74,6 +75,8 @@ typedef struct xen_vbd_record
     bool bootable;
     enum xen_vbd_mode mode;
     enum xen_vbd_type type;
+    char *qos_algorithm_type;
+    xen_string_string_map *qos_algorithm_params;
     struct xen_vbd_metrics_record_opt *metrics;
 } xen_vbd_record;
 
@@ -234,6 +237,20 @@ xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd);
 
 
 /**
+ * Get the qos/algorithm_type field of the given VBD.
+ */
+extern bool
+xen_vbd_get_qos_algorithm_type(xen_session *session, char **result, xen_vbd vbd);
+
+
+/**
+ * Get the qos/algorithm_params field of the given VBD.
+ */
+extern bool
+xen_vbd_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vbd vbd);
+
+
+/**
  * Get the metrics field of the given VBD.
  */
 extern bool
@@ -266,6 +283,37 @@ xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode);
  */
 extern bool
 xen_vbd_set_type(xen_session *session, xen_vbd vbd, enum xen_vbd_type type);
+
+
+/**
+ * Set the qos/algorithm_type field of the given VBD.
+ */
+extern bool
+xen_vbd_set_qos_algorithm_type(xen_session *session, xen_vbd vbd, char *algorithm_type);
+
+
+/**
+ * Set the qos/algorithm_params field of the given VBD.
+ */
+extern bool
+xen_vbd_set_qos_algorithm_params(xen_session *session, xen_vbd vbd, xen_string_string_map *algorithm_params);
+
+
+/**
+ * Add the given key-value pair to the qos/algorithm_params field of
+ * the given VBD.
+ */
+extern bool
+xen_vbd_add_to_qos_algorithm_params(xen_session *session, xen_vbd vbd, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * qos/algorithm_params field of the given VBD.  If the key is not in that
+ * Map, then do nothing.
+ */
+extern bool
+xen_vbd_remove_from_qos_algorithm_params(xen_session *session, xen_vbd vbd, char *key);
 
 
 /**

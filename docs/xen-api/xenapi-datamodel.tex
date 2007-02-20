@@ -6710,6 +6710,8 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to w
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
@@ -6993,6 +6995,211 @@ Set the MTU field of the given VIF.
 {\tt VIF ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_algorithm\_type}
+
+{\bf Overview:} 
+Get the qos/algorithm\_type field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_qos_algorithm_type (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_qos\_algorithm\_type}
+
+{\bf Overview:} 
+Set the qos/algorithm\_type field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_qos_algorithm_type (session_id s, VIF ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Get the qos/algorithm\_params field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_qos_algorithm_params (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Set the qos/algorithm\_params field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_qos_algorithm_params (session_id s, VIF ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Add the given key-value pair to the qos/algorithm\_params field of the
+given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_qos_algorithm_params (session_id s, VIF ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the
+qos/algorithm\_params field of the given VIF.  If the key is not in that
+Map, then do nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_qos_algorithm_params (session_id s, VIF ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
 
 \end{tabular}
 
@@ -9610,6 +9817,8 @@ $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD. \\
 \hline
 \end{longtable}
@@ -9994,6 +10203,211 @@ Set the type field of the given VBD.
 {\tt VBD ref } & self & reference to the object \\ \hline 
 
 {\tt vbd\_type } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_algorithm\_type}
+
+{\bf Overview:} 
+Get the qos/algorithm\_type field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_qos_algorithm_type (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_qos\_algorithm\_type}
+
+{\bf Overview:} 
+Set the qos/algorithm\_type field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_qos_algorithm_type (session_id s, VBD ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Get the qos/algorithm\_params field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_qos_algorithm_params (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Set the qos/algorithm\_params field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_qos_algorithm_params (session_id s, VBD ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Add the given key-value pair to the qos/algorithm\_params field of the
+given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_qos_algorithm_params (session_id s, VBD ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the
+qos/algorithm\_params field of the given VBD.  If the key is not in that
+Map, then do nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_qos_algorithm_params (session_id s, VBD ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
 
 \end{tabular}
 
