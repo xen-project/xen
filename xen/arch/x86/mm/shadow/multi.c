@@ -3932,8 +3932,7 @@ static int safe_not_to_verify_write(mfn_t gmfn, void *dst, void *src,
 #if (SHADOW_OPTIMIZATIONS & SHOPT_SKIP_VERIFY)
     struct page_info *pg = mfn_to_page(gmfn);
     if ( !(pg->shadow_flags & SHF_32) 
-         && bytes == 4 
-         && ((unsigned long)dst & 3) == 0 )
+         && ((unsigned long)dst & 7) == 0 )
     {
         /* Not shadowed 32-bit: aligned 64-bit writes that leave the
          * present bit unset are safe to ignore. */
@@ -3942,8 +3941,7 @@ static int safe_not_to_verify_write(mfn_t gmfn, void *dst, void *src,
             return 1;
     }
     else if ( !(pg->shadow_flags & (SHF_PAE|SHF_64)) 
-              && bytes == 8 
-              && ((unsigned long)dst & 7) == 0 )
+              && ((unsigned long)dst & 3) == 0 )
     {
         /* Not shadowed PAE/64-bit: aligned 32-bit writes that leave the
          * present bit unset are safe to ignore. */
