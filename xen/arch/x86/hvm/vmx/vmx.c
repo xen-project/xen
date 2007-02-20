@@ -1426,6 +1426,8 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
     if ( test_bit(4, &exit_qualification) ) { /* string instruction */
         unsigned long addr, count = 1, base;
+        paddr_t paddr;
+        unsigned long gfn;
         u32 ar_bytes, limit;
         int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
         int long_mode = 0;
@@ -1545,6 +1547,20 @@ static void vmx_io_instruction(unsigned long exit_qualification,
         }
 #endif
 
+        /* Translate the address to a physical address */
+        gfn = paging_gva_to_gfn(current, addr);
+        if ( gfn == INVALID_GFN ) 
+        {
+            /* The guest does not have the RAM address mapped. 
+             * Need to send in a page fault */
+            int errcode = 0;
+            /* IO read --> memory write */
+            if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
+            vmx_inject_exception(TRAP_page_fault, errcode, addr);
+            return;
+        }
+        paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
+
         /*
          * Handle string pio instructions that cross pages or that
          * are unaligned. See the comments in hvm_domain.c/handle_mmio()
@@ -1557,10 +1573,25 @@ static void vmx_io_instruction(unsigned long exit_qualification,
             if ( dir == IOREQ_WRITE )   /* OUTS */
             {
                 if ( hvm_paging_enabled(current) )
-                    (void)hvm_copy_from_guest_virt(&value, addr, size);
+                {
+                    int rv = hvm_copy_from_guest_virt(&value, addr, size);
+                    if ( rv != 0 ) 
+                    {
+                        /* Failed on the page-spanning copy.  Inject PF into
+                         * the guest for the address where we failed. */ 
+                        addr += size - rv;
+                        gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
+                                 "of a page-spanning PIO: va=%#lx\n", addr);
+                        vmx_inject_exception(TRAP_page_fault, 0, addr);
+                        return;
+                    }
+                }
                 else
-                    (void)hvm_copy_from_guest_phys(&value, addr, size);
-            } else
+                    (void) hvm_copy_from_guest_phys(&value, addr, size);
+            } else /* dir != IOREQ_WRITE */
+                /* Remember where to write the result, as a *VA*.
+                 * Must be a VA so we can handle the page overlap 
+                 * correctly in hvm_pio_assist() */
                 pio_opp->addr = addr;
 
             if ( count == 1 )
@@ -1580,7 +1611,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
             } else
                 regs->eip += inst_len;
 
-            send_pio_req(port, count, size, addr, dir, df, 1);
+            send_pio_req(port, count, size, paddr, dir, df, 1);
         }
     } else {
         if ( port == 0xe9 && dir == IOREQ_WRITE && size == 1 )

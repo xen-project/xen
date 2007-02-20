@@ -144,7 +144,7 @@ static inline int irq_masked(unsigned long eflags)
 #endif
 
 extern void send_pio_req(unsigned long port, unsigned long count, int size,
-                         long value, int dir, int df, int value_is_ptr);
+                         paddr_t value, int dir, int df, int value_is_ptr);
 extern void handle_mmio(unsigned long gpa);
 extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(struct vcpu *v);

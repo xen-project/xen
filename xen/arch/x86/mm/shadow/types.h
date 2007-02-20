@@ -244,6 +244,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 
 /* Type of the guest's frame numbers */
 TYPE_SAFE(u32,gfn)
+#undef INVALID_GFN
 #define INVALID_GFN ((u32)(-1u))
 #define SH_PRI_gfn "05x"
 
@@ -307,6 +308,7 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 
 /* Type of the guest's frame numbers */
 TYPE_SAFE(unsigned long,gfn)
+#undef INVALID_GFN
 #define INVALID_GFN ((unsigned long)(-1ul))
 #define SH_PRI_gfn "05lx"
 
@@ -467,7 +469,6 @@ struct shadow_walk_t
  */
 #define sh_page_fault              INTERNAL_NAME(sh_page_fault)
 #define sh_invlpg                  INTERNAL_NAME(sh_invlpg)
-#define sh_gva_to_gpa              INTERNAL_NAME(sh_gva_to_gpa)
 #define sh_gva_to_gfn              INTERNAL_NAME(sh_gva_to_gfn)
 #define sh_update_cr3              INTERNAL_NAME(sh_update_cr3)
 #define sh_rm_write_access_from_l1 INTERNAL_NAME(sh_rm_write_access_from_l1)
