@@ -554,6 +554,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             diff = (unsigned long) p->data & value;
             set_reg_value(size, index, 0, regs, diff);
         }
+        break;
 
     case INSTR_ADD:
         if (src & REGISTER) {
