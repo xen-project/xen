@@ -1,7 +1,7 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS-y = common ufs reiserfs
+SUBDIRS-y = common ufs reiserfs iso9660
 SUBDIRS-y += $(shell ./check-libext2fs)
 
 .PHONY: all

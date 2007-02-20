@@ -191,7 +191,7 @@ struct ext2_dir_entry
 
 
 /* ext2/super.c */
-#define log2(n) ffz(~(n))
+#define log2(n) grub_log2(n)
 
 #define EXT2_SUPER_MAGIC      0xEF53	/* include/linux/ext2_fs.h */
 #define EXT2_ROOT_INO              2	/* include/linux/ext2_fs.h */
@@ -231,93 +231,6 @@ struct ext2_dir_entry
 #define S_ISLNK(m)	(((m) & S_IFMT) == S_IFLNK)
 #define S_ISREG(m)      (((m) & S_IFMT) == S_IFREG)
 #define S_ISDIR(m)      (((m) & S_IFMT) == S_IFDIR)
-
-#if defined(__i386__) || defined(__x86_64__)
-/* include/asm-i386/bitops.h */
-/*
- * ffz = Find First Zero in word. Undefined if no zero exists,
- * so code should check against ~0UL first..
- */
-#ifdef __amd64
-#define BSF "bsfq"
-#else
-#define BSF "bsfl"
-#endif
-static __inline__ unsigned long
-ffz (unsigned long word)
-{
-  __asm__ (BSF " %1,%0"
-:	   "=r" (word)
-:	   "r" (~word));
-  return word;
-}
-
-#elif defined(__ia64__)
-
-typedef unsigned long __u64;
-
-#if __GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
-# define ia64_popcnt(x) __builtin_popcountl(x)
-#else
-# define ia64_popcnt(x)                                     \
-  ({                                                        \
-    __u64 ia64_intri_res;                                   \
-    asm ("popcnt %0=%1" : "=r" (ia64_intri_res) : "r" (x)); \
-    ia64_intri_res;                                         \
-  })
-#endif
-
-static __inline__ unsigned long
-ffz (unsigned long word)
-{
-  unsigned long result;
-
-  result = ia64_popcnt(word & (~word - 1));
-  return result;
-}
-
-#elif defined(__powerpc__)
-
-#ifdef __powerpc64__
-#define PPC_CNTLZL "cntlzd"
-#else
-#define PPC_CNTLZL "cntlzw"
-#endif
-#define BITS_PER_LONG (sizeof(long) * 8)
-
-static __inline__ int
-__ilog2(unsigned long x)
-{
-  int lz;
-
-  asm (PPC_CNTLZL " %0,%1" : "=r" (lz) : "r" (x));
-  return BITS_PER_LONG - 1 - lz;
-}
-
-static __inline__ unsigned long
-ffz (unsigned long word)
-{
-  if ((word = ~word) == 0)
-    return BITS_PER_LONG;
-  return __ilog2(word & -word);
-}
-
-#else /* Unoptimized */
-
-static __inline__ unsigned long
-ffz (unsigned long word)
-{
-  unsigned long result;
-
-  result = 0;
-  while(word & 1)
-    {
-      result++;
-      word >>= 1;
-    }
-  return result;
-}
-#endif
 
 /* check filesystem types and read superblock into memory buffer */
 int

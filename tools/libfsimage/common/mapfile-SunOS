@@ -19,6 +19,7 @@ libfsimage.so.1.0 {
 		fsig_init;
 		fsig_devread;
 		fsig_substring;
+		fsig_log2;
 		fsig_fs_buf;
 		fsig_file_alloc;
 		fsig_file_buf;
