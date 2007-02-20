@@ -63,6 +63,7 @@ struct domain
 	char *conspath;
 	int ring_ref;
 	evtchn_port_t local_port;
+	evtchn_port_t remote_port;
 	int xce_handle;
 	struct xencons_interface *interface;
 };
@@ -234,6 +235,9 @@ static int domain_create_ring(struct domain *dom)
 	if (err)
 		goto out;
 
+	if ((ring_ref == dom->ring_ref) && (remote_port == dom->remote_port))
+		goto out;
+
 	if (ring_ref != dom->ring_ref) {
 		if (dom->interface != NULL)
 			munmap(dom->interface, getpagesize());
@@ -249,6 +253,7 @@ static int domain_create_ring(struct domain *dom)
 	}
 
 	dom->local_port = -1;
+	dom->remote_port = -1;
 	if (dom->xce_handle != -1)
 		xc_evtchn_close(dom->xce_handle);
 
@@ -270,6 +275,7 @@ static int domain_create_ring(struct domain *dom)
 		goto out;
 	}
 	dom->local_port = rc;
+	dom->remote_port = remote_port;
 
 	if (dom->tty_fd == -1) {
 		dom->tty_fd = domain_create_tty(dom);
@@ -279,6 +285,7 @@ static int domain_create_ring(struct domain *dom)
 			xc_evtchn_close(dom->xce_handle);
 			dom->xce_handle = -1;
 			dom->local_port = -1;
+			dom->remote_port = -1;
 			goto out;
 		}
 	}
@@ -336,6 +343,7 @@ static struct domain *create_domain(int domid)
 
 	dom->ring_ref = -1;
 	dom->local_port = -1;
+	dom->remote_port = -1;
 	dom->interface = NULL;
 	dom->xce_handle = -1;
 
