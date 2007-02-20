@@ -2066,10 +2066,6 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
 
     ASSERT(!(all && fast));
 
-    /* Bail out now if the page is not shadowed */
-    if ( (pg->count_info & PGC_page_table) == 0 )
-        return;
-
     /* Although this is an externally visible function, we do not know
      * whether the shadow lock will be held when it is called (since it
      * can be called via put_page_type when we clear a shadow l1e).
@@ -2080,6 +2076,13 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx\n",
                    v->domain->domain_id, v->vcpu_id, mfn_x(gmfn));
 
+    /* Bail out now if the page is not shadowed */
+    if ( (pg->count_info & PGC_page_table) == 0 )
+    {
+        if ( do_locking ) shadow_unlock(v->domain);
+        return;
+    }
+
     /* Search for this shadow in all appropriate shadows */
     perfc_incrc(shadow_unshadow);
     sh_flags = pg->shadow_flags;
@@ -2088,15 +2091,22 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
      * This call to hash_foreach() looks dangerous but is in fact OK: each
      * call will remove at most one shadow, and terminate immediately when
      * it does remove it, so we never walk the hash after doing a deletion.  */
-#define DO_UNSHADOW(_type) do {                         \
-    t = (_type);                                        \
-    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);       \
-    if ( sh_type_is_pinnable(v, t) )                    \
-        sh_unpin(v, smfn);                              \
-    else                                                \
-        sh_remove_shadow_via_pointer(v, smfn);          \
-    if ( (pg->count_info & PGC_page_table) && !fast )   \
-        hash_foreach(v, masks[t], callbacks, smfn);     \
+#define DO_UNSHADOW(_type) do {                                 \
+    t = (_type);                                                \
+    smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);               \
+    if ( unlikely(!mfn_valid(smfn)) )                           \
+    {                                                           \
+        SHADOW_ERROR(": gmfn %#lx has flags 0x%"PRIx32          \
+                     " but no type-0x%"PRIx32" shadow\n",       \
+                     mfn_x(gmfn), sh_flags, t);                 \
+        break;                                                  \
+    }                                                           \
+    if ( sh_type_is_pinnable(v, t) )                            \
+        sh_unpin(v, smfn);                                      \
+    else                                                        \
+        sh_remove_shadow_via_pointer(v, smfn);                  \
+    if ( (pg->count_info & PGC_page_table) && !fast )           \
+        hash_foreach(v, masks[t], callbacks, smfn);             \
 } while (0)
 
     if ( sh_flags & SHF_L1_32 )   DO_UNSHADOW(SH_type_l1_32_shadow);
