@@ -35,7 +35,7 @@ extern C {
 typedef struct fsi fsi_t;
 typedef struct fsi_file fsi_file_t;
 
-fsi_t *fsi_open_fsimage(const char *, uint64_t);
+fsi_t *fsi_open_fsimage(const char *, uint64_t, const char *);
 void fsi_close_fsimage(fsi_t *);
 
 int fsi_file_exists(fsi_t *, const char *);

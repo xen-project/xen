@@ -633,7 +633,7 @@ journal_init (fsi_file_t *ffi)
 
 /* check filesystem types and read superblock into memory buffer */
 int
-reiserfs_mount (fsi_file_t *ffi)
+reiserfs_mount (fsi_file_t *ffi, const char *options)
 {
   struct reiserfs_super_block super;
   int superblock = REISERFS_DISK_OFFSET_IN_BYTES >> SECTOR_BITS;

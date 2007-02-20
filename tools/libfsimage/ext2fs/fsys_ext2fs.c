@@ -321,7 +321,7 @@ ffz (unsigned long word)
 
 /* check filesystem types and read superblock into memory buffer */
 int
-ext2fs_mount (fsi_file_t *ffi)
+ext2fs_mount (fsi_file_t *ffi, const char *options)
 {
   int retval = 1;
 

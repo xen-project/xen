@@ -161,7 +161,7 @@ fsig_substring(const char *s1, const char *s2)
 }
 
 static int
-fsig_mount(fsi_t *fsi, const char *path)
+fsig_mount(fsi_t *fsi, const char *path, const char *options)
 {
 	fsig_plugin_ops_t *ops = fsi->f_plugin->fp_data;
 	fsi_file_t *ffi;
@@ -178,7 +178,7 @@ fsig_mount(fsi_t *fsi, const char *path)
 
 	bzero(fsi->f_data, sizeof (fsig_data_t));
 
-	if (!ops->fpo_mount(ffi)) {
+	if (!ops->fpo_mount(ffi, options)) {
 		fsip_file_free(ffi);
 		free(fsi->f_data);
 		fsi->f_data = NULL;

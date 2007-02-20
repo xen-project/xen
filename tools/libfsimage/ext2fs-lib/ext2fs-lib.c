@@ -27,7 +27,7 @@
 #include <inttypes.h>
 
 static int
-ext2lib_mount(fsi_t *fsi, const char *name)
+ext2lib_mount(fsi_t *fsi, const char *name, const char *options)
 {
 	int err;
 	char opts[30] = "";
