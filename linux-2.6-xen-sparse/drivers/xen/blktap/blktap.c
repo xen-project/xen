@@ -1407,11 +1407,10 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	wmb(); /* blktap_poll() reads req_prod_pvt asynchronously */
 	info->ufe_ring.req_prod_pvt++;
 
-	if (operation == READ) {
+	if (operation == READ)
 		blkif->st_rd_sect += nr_sects;
-	} else if (operation == WRITE) {
+	else if (operation == WRITE)
 		blkif->st_wr_sect += nr_sects;
-	}
 
 	return;
 
