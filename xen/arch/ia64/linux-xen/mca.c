@@ -790,6 +790,7 @@ init_handler_platform (pal_min_state_area_t *ms,
 			/* this route is for dump routine */
 			unw_init_running(try_crashdump, pt);
 		} else {
+			rcu_read_lock(&domlist_read_lock);
 			for_each_domain(d) {
 				for_each_vcpu(d, v) {
 					printk("Backtrace of current vcpu "
@@ -798,6 +799,7 @@ init_handler_platform (pal_min_state_area_t *ms,
 					show_stack(v, NULL);
 				}
 			}
+			rcu_read_unlock(&domlist_read_lock);
 		}
 	}
 	unw_init_running(freeze_cpu_osinit, NULL);

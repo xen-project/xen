@@ -34,8 +34,10 @@ void audit_domain(struct domain *d)
 void audit_domains(void)
 {
     struct domain *d;
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
         audit_domain(d);
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 void audit_domains_key(unsigned char key)

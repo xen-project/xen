@@ -24,13 +24,18 @@
 #include <xen/shutdown.h>
 #include <xen/percpu.h>
 #include <xen/multicall.h>
+#include <xen/rcupdate.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
 
-/* Both these structures are protected by the domlist_lock. */
-DEFINE_RWLOCK(domlist_lock);
-struct domain *domain_hash[DOMAIN_HASH_SIZE];
+/* Protect updates/reads (resp.) of domain_list and domain_hash. */
+DEFINE_SPINLOCK(domlist_update_lock);
+DEFINE_RCU_READ_LOCK(domlist_read_lock);
+
+#define DOMAIN_HASH_SIZE 256
+#define DOMAIN_HASH(_id) ((int)(_id)&(DOMAIN_HASH_SIZE-1))
+static struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
 struct domain *dom0;
@@ -174,16 +179,20 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 
     if ( !is_idle_domain(d) )
     {
-        write_lock(&domlist_lock);
+        spin_lock(&domlist_update_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of domid. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
             if ( (*pd)->domain_id > d->domain_id )
                 break;
         d->next_in_list = *pd;
-        *pd = d;
         d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
-        domain_hash[DOMAIN_HASH(domid)] = d;
-        write_unlock(&domlist_lock);
+        /* Two rcu assignments are not atomic 
+         * Readers may see inconsistent domlist and hash table
+         * That is OK as long as each RCU reader-side critical section uses
+         * only one or them  */
+        rcu_assign_pointer(*pd, d);
+        rcu_assign_pointer(domain_hash[DOMAIN_HASH(domid)], d);
+        spin_unlock(&domlist_update_lock);
     }
 
     return d;
@@ -207,8 +216,8 @@ struct domain *get_domain_by_id(domid_t dom)
 {
     struct domain *d;
 
-    read_lock(&domlist_lock);
-    d = domain_hash[DOMAIN_HASH(dom)];
+    rcu_read_lock(&domlist_read_lock);
+    d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
     while ( d != NULL )
     {
         if ( d->domain_id == dom )
@@ -217,9 +226,9 @@ struct domain *get_domain_by_id(domid_t dom)
                 d = NULL;
             break;
         }
-        d = d->next_in_hashbucket;
+        d = rcu_dereference(d->next_in_hashbucket);
     }
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
 
     return d;
 }
@@ -314,6 +323,23 @@ void domain_pause_for_debugger(void)
     send_guest_global_virq(dom0, VIRQ_DEBUGGER);
 }
 
+/* Complete domain destroy after RCU readers are not holding 
+   old references */
+static void complete_domain_destroy(struct rcu_head *head)
+{
+    struct domain *d = container_of(head, struct domain, rcu);
+
+    rangeset_domain_destroy(d);
+
+    evtchn_destroy(d);
+    grant_table_destroy(d);
+
+    arch_domain_destroy(d);
+
+    free_domain(d);
+
+    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+}
 
 /* Release resources belonging to task @p. */
 void domain_destroy(struct domain *d)
@@ -331,27 +357,19 @@ void domain_destroy(struct domain *d)
         return;
 
     /* Delete from task list and task hashtable. */
-    write_lock(&domlist_lock);
+    spin_lock(&domlist_update_lock);
     pd = &domain_list;
     while ( *pd != d ) 
         pd = &(*pd)->next_in_list;
-    *pd = d->next_in_list;
+    rcu_assign_pointer(*pd, d->next_in_list);
     pd = &domain_hash[DOMAIN_HASH(d->domain_id)];
     while ( *pd != d ) 
         pd = &(*pd)->next_in_hashbucket;
-    *pd = d->next_in_hashbucket;
-    write_unlock(&domlist_lock);
+    rcu_assign_pointer(*pd, d->next_in_hashbucket);
+    spin_unlock(&domlist_update_lock);
 
-    rangeset_domain_destroy(d);
-
-    evtchn_destroy(d);
-    grant_table_destroy(d);
-
-    arch_domain_destroy(d);
-
-    free_domain(d);
-
-    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    /* schedule RCU asynchronous completion of domain destroy */
+    call_rcu(&d->rcu, complete_domain_destroy);
 }
 
 static void vcpu_pause_setup(struct vcpu *v)

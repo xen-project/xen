@@ -890,13 +890,17 @@ static void shadow_blow_all_tables(unsigned char c)
 {
     struct domain *d;
     printk("'%c' pressed -> blowing all shadow tables\n", c);
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain(d)
+    {
         if ( shadow_mode_enabled(d) && d->vcpu[0] != NULL )
         {
             shadow_lock(d);
             shadow_blow_tables(d);
             shadow_unlock(d);
         }
+    }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 /* Register this function in the Xen console keypress table */

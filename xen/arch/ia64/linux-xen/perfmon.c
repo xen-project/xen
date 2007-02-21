@@ -7225,7 +7225,6 @@ DEFINE_PER_CPU(pfm_context_t*, xenpfm_context);
 /*
  * note: some functions mask interrupt with this lock held
  * so that this lock can't be locked from interrupt handler.
- * lock order domlist_lock => xenpfm_context_lock
  */
 DEFINE_SPINLOCK(xenpfm_context_lock);
 
@@ -7507,10 +7506,8 @@ xenpfm_context_unload(void)
 		arg.error[cpu] = 0;
 
 	BUG_ON(in_irq());
-	read_lock(&domlist_lock);
 	spin_lock(&xenpfm_context_lock);
 	error = xenpfm_start_stop_locked(0);
-	read_unlock(&domlist_lock);
 	if (error) {
 		spin_unlock(&xenpfm_context_lock);
 		return error;
@@ -7688,10 +7685,11 @@ xenpfm_start_stop_locked(int is_start)
 	while (atomic_read(&arg.started) != cpus)
 		cpu_relax();
 
-	for_each_domain(d) {
+	rcu_read_lock(&domlist_read_lock);
+	for_each_domain(d)
 		for_each_vcpu(d, v)
 			xenpfm_start_stop_vcpu(v, is_start);
-	}
+	rcu_read_unlock(&domlist_read_lock);
 
 	arg.error[smp_processor_id()] = __xenpfm_start_stop(is_start);
 	atomic_inc(&arg.finished);
@@ -7716,11 +7714,9 @@ xenpfm_start_stop(int is_start)
 	int error;
 	
 	BUG_ON(in_irq());
-	read_lock(&domlist_lock);
 	spin_lock(&xenpfm_context_lock);
-	error =xenpfm_start_stop_locked(is_start);
+	error = xenpfm_start_stop_locked(is_start);
 	spin_unlock(&xenpfm_context_lock);
-	read_unlock(&domlist_lock);
 
 	return error;
 }

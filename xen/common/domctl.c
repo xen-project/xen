@@ -17,6 +17,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
+#include <xen/rcupdate.h>
 #include <xen/guest_access.h>
 #include <xen/bitmap.h>
 #include <asm/current.h>
@@ -140,12 +141,12 @@ static unsigned int default_vcpu0_location(void)
     cpumask_t      cpu_exclude_map;
 
     /* Do an initial CPU placement. Pick the least-populated CPU. */
-    read_lock(&domlist_lock);
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
         for_each_vcpu ( d, v )
         if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
             cnt[v->processor]++;
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
 
     /*
      * If we're on a HT system, we only auto-allocate to a non-primary HT. We 
@@ -480,7 +481,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( dom == DOMID_SELF )
             dom = current->domain->domain_id;
 
-        read_lock(&domlist_lock);
+        rcu_read_lock(&domlist_read_lock);
 
         for_each_domain ( d )
         {
@@ -490,12 +491,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( (d == NULL) || !get_domain(d) )
         {
-            read_unlock(&domlist_lock);
+            rcu_read_unlock(&domlist_read_lock);
             ret = -ESRCH;
             break;
         }
 
-        read_unlock(&domlist_lock);
+        rcu_read_unlock(&domlist_read_lock);
 
         getdomaininfo(d, &op->u.getdomaininfo);
 
