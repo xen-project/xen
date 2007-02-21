@@ -10,6 +10,7 @@
 #define __ASM_EVENT_H__
 
 #include <xen/shared.h>
+#include <asm/hvm/irq.h> /* cpu_has_pending_irq() */
 
 static inline void vcpu_kick(struct vcpu *v)
 {
@@ -37,9 +38,9 @@ static inline void vcpu_mark_events_pending(struct vcpu *v)
 static inline int local_events_need_delivery(void)
 {
     struct vcpu *v = current;
-    /* Note: Bitwise operations result in fast code with no branches. */
-    return (!!vcpu_info(v, evtchn_upcall_pending) &
-             !vcpu_info(v, evtchn_upcall_mask));
+    return ((vcpu_info(v, evtchn_upcall_pending) &&
+             !vcpu_info(v, evtchn_upcall_mask)) ||
+            (is_hvm_vcpu(v) && cpu_has_pending_irq(v)));
 }
 
 static inline int local_event_delivery_is_enabled(void)
