@@ -20,6 +20,7 @@
 #define XEN_VBD_H
 
 #include "xen_common.h"
+#include "xen_string_set.h"
 #include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
 #include "xen_vbd_metrics_decl.h"
@@ -77,6 +78,7 @@ typedef struct xen_vbd_record
     enum xen_vbd_type type;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
+    struct xen_string_set *qos_supported_algorithms;
     struct xen_vbd_metrics_record_opt *metrics;
 } xen_vbd_record;
 
@@ -248,6 +250,13 @@ xen_vbd_get_qos_algorithm_type(xen_session *session, char **result, xen_vbd vbd)
  */
 extern bool
 xen_vbd_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vbd vbd);
+
+
+/**
+ * Get the qos/supported_algorithms field of the given VBD.
+ */
+extern bool
+xen_vbd_get_qos_supported_algorithms(xen_session *session, struct xen_string_set **result, xen_vbd vbd);
 
 
 /**

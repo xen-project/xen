@@ -21,6 +21,7 @@
 
 #include "xen_common.h"
 #include "xen_network_decl.h"
+#include "xen_string_set.h"
 #include "xen_string_string_map.h"
 #include "xen_vif_decl.h"
 #include "xen_vif_metrics_decl.h"
@@ -73,6 +74,7 @@ typedef struct xen_vif_record
     int64_t mtu;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
+    struct xen_string_set *qos_supported_algorithms;
     struct xen_vif_metrics_record_opt *metrics;
 } xen_vif_record;
 
@@ -237,6 +239,13 @@ xen_vif_get_qos_algorithm_type(xen_session *session, char **result, xen_vif vif)
  */
 extern bool
 xen_vif_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vif vif);
+
+
+/**
+ * Get the qos/supported_algorithms field of the given VIF.
+ */
+extern bool
+xen_vif_get_qos_supported_algorithms(xen_session *session, struct xen_string_set **result, xen_vif vif);
 
 
 /**

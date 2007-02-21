@@ -6680,7 +6680,8 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this 
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
-$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
+$\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VIF \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
@@ -7181,6 +7182,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_supported\_algorithms}
+
+{\bf Overview:} 
+Get the qos/supported\_algorithms field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_qos_supported_algorithms (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -9787,8 +9820,9 @@ $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
-$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
-$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD. \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
+$\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VBD \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VBD}
@@ -10389,6 +10423,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_supported\_algorithms}
+
+{\bf Overview:} 
+Get the qos/supported\_algorithms field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_qos_supported_algorithms (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

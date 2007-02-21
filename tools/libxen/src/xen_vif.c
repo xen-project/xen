@@ -64,6 +64,9 @@ static const struct_member xen_vif_record_struct_members[] =
         { .key = "qos_algorithm_params",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vif_record, qos_algorithm_params) },
+        { .key = "qos_supported_algorithms",
+          .type = &abstract_type_string_set,
+          .offset = offsetof(xen_vif_record, qos_supported_algorithms) },
         { .key = "metrics",
           .type = &abstract_type_ref,
           .offset = offsetof(xen_vif_record, metrics) }
@@ -94,6 +97,7 @@ xen_vif_record_free(xen_vif_record *record)
     free(record->mac);
     free(record->qos_algorithm_type);
     xen_string_string_map_free(record->qos_algorithm_params);
+    xen_string_set_free(record->qos_supported_algorithms);
     xen_vif_metrics_record_opt_free(record->metrics);
     free(record);
 }
@@ -284,6 +288,23 @@ xen_vif_get_qos_algorithm_params(xen_session *session, xen_string_string_map **r
 
     *result = NULL;
     XEN_CALL_("VIF.get_qos_algorithm_params");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_qos_supported_algorithms(xen_session *session, struct xen_string_set **result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("VIF.get_qos_supported_algorithms");
     return session->ok;
 }
 
