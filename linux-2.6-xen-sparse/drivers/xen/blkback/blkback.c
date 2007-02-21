@@ -491,6 +491,12 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	for (i = 0; i < nbio; i++)
 		submit_bio(operation, biolist[i]);
 
+        if (operation == READ) {
+                blkif->st_rd_sect += preq.nr_sects;
+        } else if (operation == WRITE) {
+                blkif->st_wr_sect += preq.nr_sects;
+        }
+
 	return;
 
  fail_put_bio:
