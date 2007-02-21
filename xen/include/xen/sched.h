@@ -269,6 +269,21 @@ int construct_dom0(
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
 
+/*
+ * find_domain_rcu_lock() is more efficient than get_domain_by_id().
+ * This is the preferred function if the returned domain reference
+ * is short lived,  but it cannot be used if the domain reference needs 
+ * to be kept beyond the current scope (e.g., across a softirq).
+ * The returned domain reference must be discarded using domain_rcu_unlock().
+ */
+struct domain *find_domain_rcu_lock(domid_t dom);
+
+/* Finish a RCU critical region started by find_domain_rcu_lock(). */
+static inline void domain_rcu_unlock(struct domain *d)
+{
+    rcu_read_unlock(&domlist_read_lock);
+}
+
 struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 void domain_kill(struct domain *d);

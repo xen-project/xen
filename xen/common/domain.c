@@ -217,8 +217,10 @@ struct domain *get_domain_by_id(domid_t dom)
     struct domain *d;
 
     rcu_read_lock(&domlist_read_lock);
-    d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
-    while ( d != NULL )
+
+    for ( d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
+          d != NULL;
+          d = rcu_dereference(d->next_in_hashbucket) )
     {
         if ( d->domain_id == dom )
         {
@@ -226,11 +228,31 @@ struct domain *get_domain_by_id(domid_t dom)
                 d = NULL;
             break;
         }
-        d = rcu_dereference(d->next_in_hashbucket);
     }
+
     rcu_read_unlock(&domlist_read_lock);
 
     return d;
+}
+
+
+struct domain *find_domain_rcu_lock(domid_t dom)
+{
+    struct domain *d;
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for ( d = rcu_dereference(domain_hash[DOMAIN_HASH(dom)]);
+          d != NULL;
+          d = rcu_dereference(d->next_in_hashbucket) )
+    {
+        if ( d->domain_id == dom )
+            return d;
+    }
+
+    rcu_read_unlock(&domlist_read_lock);
+
+    return NULL;
 }
 
 
