@@ -989,10 +989,10 @@ static void parse_failure(xen_session *session, xmlNode *node)
         char **c = (char **)error_descriptions->contents;
         int n = error_descriptions->size;
 
-        char **strings = malloc(3 * sizeof(char *));
+        char **strings = malloc(n * sizeof(char *));
         for (int i = 0; i < n; i++)
         {
-            strings[i] = xen_strdup_(c[i]);
+            strings[i] = c[i];
         }
 
         session->error_description_count = n;
