@@ -618,40 +618,77 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
 asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
 {
-    int rc;
+    struct bug_frame bug;
+    struct bug_frame_str bug_str;
+    char *filename, *predicate, *eip = (char *)regs->eip;
+    int rc, id, lineno;
 
     DEBUGGER_trap_entry(TRAP_invalid_op, regs);
 
-    if ( unlikely(!guest_mode(regs)) )
+    if ( likely(guest_mode(regs)) )
     {
-        struct bug_frame bug;
-        if ( is_kernel(regs->eip) &&
-             (__copy_from_user(&bug, (char *)regs->eip, sizeof(bug)) == 0) &&
-             (memcmp(bug.ud2, "\xf\xb",    sizeof(bug.ud2)) == 0) &&
-             (memcmp(bug.mov, BUG_MOV_STR, sizeof(bug.mov)) == 0) &&
-             (bug.ret == 0xc2) )
-        {
-            char *filename = (char *)bug.filename;
-            unsigned int line = bug.line & 0x7fff;
-            int is_bug = !(bug.line & 0x8000);
-            printk("Xen %s at %.50s:%d\n",
-                   is_bug ? "BUG" : "State Dump", filename, line);
-            if ( !is_bug )
-            {
-                show_execution_state(regs);
-                regs->eip += sizeof(bug);
-                return EXCRET_fault_fixed;
-            }
-        }
-        DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
-        show_execution_state(regs);
-        panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
+        if ( (rc = emulate_forced_invalid_op(regs)) != 0 )
+            return rc;
+        return do_guest_trap(TRAP_invalid_op, regs, 0);
     }
 
-    if ( (rc = emulate_forced_invalid_op(regs)) != 0 )
-        return rc;
+    if ( !is_kernel(eip) ||
+         __copy_from_user(&bug, eip, sizeof(bug)) ||
+         memcmp(bug.ud2, "\xf\xb", sizeof(bug.ud2)) ||
+         (bug.ret != 0xc2) )
+        goto die;
 
-    return do_guest_trap(TRAP_invalid_op, regs, 0);
+    id = bug.id & 3;
+    if ( id == BUGFRAME_rsvd )
+        goto die;
+
+    if ( id == BUGFRAME_dump )
+    {
+        show_execution_state(regs);
+        regs->eip += sizeof(bug);
+        return EXCRET_fault_fixed;
+    }
+
+    /* BUG() or ASSERT(): decode the filename pointer and line number. */
+    ASSERT((id == BUGFRAME_bug) || (id == BUGFRAME_assert));
+    eip += sizeof(bug);
+    if ( !is_kernel(eip) ||
+         __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
+         memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
+        goto die;
+
+    filename = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
+    lineno   = bug.id >> 2;
+
+    if ( id == BUGFRAME_bug )
+    {
+        printk("Xen BUG at %.50s:%d\n", filename, lineno);
+        DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+        show_execution_state(regs);
+        panic("Xen BUG at %.50s:%d\n", filename, lineno);
+    }
+
+    /* ASSERT(): decode the predicate string pointer. */
+    ASSERT(id == BUGFRAME_assert);
+    eip += sizeof(bug_str);
+    if ( !is_kernel(eip) ||
+         __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
+         memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
+        goto die;
+
+    predicate = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
+    printk("Assertion '%s' failed at %.50s:%d\n",
+           predicate, filename, lineno);
+    DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+    show_execution_state(regs);
+    panic("Assertion '%s' failed at %.50s:%d\n",
+          predicate, filename, lineno);
+
+ die:
+    DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+    show_execution_state(regs);
+    panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
+    return 0;
 }
 
 asmlinkage int do_int3(struct cpu_user_regs *regs)
