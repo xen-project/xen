@@ -184,7 +184,7 @@ iso9660_dir (fsi_file_t *ffi, char *dirname)
 	  for (; idr->length.l > 0;
 	       idr = (struct iso_directory_record *)((char *)idr + idr->length.l) )
 	    {
-	      const char *name = idr->name;
+	      const char *name = (const char *)idr->name;
 	      unsigned int name_len = idr->name_len.l;
 
 	      file_type = (idr->flags.l & 2) ? ISO_DIRECTORY : ISO_REGULAR;
@@ -207,7 +207,7 @@ iso9660_dir (fsi_file_t *ffi, char *dirname)
 	      rr_len = (idr->length.l - idr->name_len.l
 			- sizeof(struct iso_directory_record)
 			+ sizeof(idr->name));
-	      rr_ptr.ptr = ((unsigned char *)idr + idr->name_len.l
+	      rr_ptr.ptr = ((char *)idr + idr->name_len.l
 			    + sizeof(struct iso_directory_record)
 			    - sizeof(idr->name));
 	      if (rr_ptr.i & 1)
@@ -237,7 +237,7 @@ iso9660_dir (fsi_file_t *ffi, char *dirname)
 			    rr_flag &= rr_ptr.rr->u.rr.flags.l;
 			  break;
 			case RRMAGIC('N', 'M'):
-			  name = rr_ptr.rr->u.nm.name;
+			  name = (const char *)rr_ptr.rr->u.nm.name;
 			  name_len = rr_ptr.rr->len - (4+sizeof(struct NM));
 			  rr_flag &= ~RR_FLAG_NM;
 			  break;
@@ -338,11 +338,11 @@ iso9660_dir (fsi_file_t *ffi, char *dirname)
 			  && (unsigned char *)name < RRCONT_BUF + ISO_SECTOR_SIZE )
 			{
 			  memcpy(NAME_BUF, name, name_len);
-			  name = NAME_BUF;
+			  name = (const char *)NAME_BUF;
 			}
-		      rr_ptr.ptr = RRCONT_BUF + ce_ptr->u.ce.offset.l;
+		      rr_ptr.ptr = (char *)RRCONT_BUF + ce_ptr->u.ce.offset.l;
 		      rr_len = ce_ptr->u.ce.size.l;
-		      if (!iso9660_devread(ffi, ce_ptr->u.ce.extent.l, 0, ISO_SECTOR_SIZE, RRCONT_BUF))
+		      if (!iso9660_devread(ffi, ce_ptr->u.ce.extent.l, 0, ISO_SECTOR_SIZE, (char *)RRCONT_BUF))
 			{
 			  errnum = 0;	/* this is not fatal. */
 			  break;
