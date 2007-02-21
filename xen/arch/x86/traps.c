@@ -625,7 +625,8 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
     if ( unlikely(!guest_mode(regs)) )
     {
         struct bug_frame bug;
-        if ( (__copy_from_user(&bug, (char *)regs->eip, sizeof(bug)) == 0) &&
+        if ( is_kernel(regs->eip) &&
+             (__copy_from_user(&bug, (char *)regs->eip, sizeof(bug)) == 0) &&
              (memcmp(bug.ud2, "\xf\xb",    sizeof(bug.ud2)) == 0) &&
              (memcmp(bug.mov, BUG_MOV_STR, sizeof(bug.mov)) == 0) &&
              (bug.ret == 0xc2) )
@@ -877,6 +878,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return 0;
     }
 
+    ASSERT(!in_irq());
+    ASSERT(regs->eflags & X86_EFLAGS_IF);
+
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
          guest_kernel_mode(v, regs) &&
          /* Do not check if access-protection fault since the page may 
@@ -903,8 +907,6 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
     int rc;
-
-    ASSERT(!in_irq());
 
     addr = read_cr2();
 
@@ -1916,6 +1918,8 @@ void unset_nmi_callback(void)
 
 asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 {
+    BUG_ON(!guest_mode(regs));
+
     setup_fpu(current);
 
     if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
