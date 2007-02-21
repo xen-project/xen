@@ -2911,8 +2911,11 @@ static int sh_page_fault(struct vcpu *v,
      * page is no longer a page table. This behaviour differs from native, but
      * it seems very unlikely that any OS grants user access to page tables.
      */
-    if ( (regs->error_code & PFEC_user_mode) ||
-         x86_emulate(&emul_ctxt.ctxt, emul_ops) )
+    r = X86EMUL_UNHANDLEABLE;
+    if ( !(regs->error_code & PFEC_user_mode) )
+        r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
+
+    if ( (r == X86EMUL_UNHANDLEABLE) || (r == X86EMUL_EXCEPTION) )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
@@ -3956,7 +3959,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     ASSERT(((vaddr & ~PAGE_MASK) + bytes) <= PAGE_SIZE);
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
-        return X86EMUL_PROPAGATE_FAULT;
+        return X86EMUL_EXCEPTION;
 
     skip = safe_not_to_verify_write(mfn, addr, src, bytes);
     memcpy(addr, src, bytes);
@@ -3968,7 +3971,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
-    return X86EMUL_CONTINUE;
+    return X86EMUL_OKAY;
 }
 
 int
@@ -3979,7 +3982,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     mfn_t mfn;
     void *addr;
     unsigned long prev;
-    int rv = X86EMUL_CONTINUE, skip;
+    int rv = X86EMUL_OKAY, skip;
 
     ASSERT(shadow_locked_by_me(v->domain));
     ASSERT(bytes <= sizeof(unsigned long));
@@ -3988,7 +3991,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
         return X86EMUL_UNHANDLEABLE;
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
-        return X86EMUL_PROPAGATE_FAULT;
+        return X86EMUL_EXCEPTION;
 
     skip = safe_not_to_verify_write(mfn, &new, &old, bytes);
 
@@ -4032,7 +4035,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     mfn_t mfn;
     void *addr;
     u64 old, new, prev;
-    int rv = X86EMUL_CONTINUE, skip;
+    int rv = X86EMUL_OKAY, skip;
 
     ASSERT(shadow_locked_by_me(v->domain));
 
@@ -4040,7 +4043,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
         return X86EMUL_UNHANDLEABLE;
 
     if ( (addr = emulate_map_dest(v, vaddr, sh_ctxt, &mfn)) == NULL )
-        return X86EMUL_PROPAGATE_FAULT;
+        return X86EMUL_EXCEPTION;
 
     old = (((u64) old_hi) << 32) | (u64) old_lo;
     new = (((u64) new_hi) << 32) | (u64) new_lo;
