@@ -2915,7 +2915,12 @@ static int sh_page_fault(struct vcpu *v,
     if ( !(regs->error_code & PFEC_user_mode) )
         r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
-    if ( (r == X86EMUL_UNHANDLEABLE) || (r == X86EMUL_EXCEPTION) )
+    /*
+     * NB. We do not unshadow on X86EMUL_EXCEPTION. It's not clear that it
+     * would be a good unshadow hint. If we *do* decide to unshadow-on-fault
+     * then it must be 'failable': we cannot require the unshadow to succeed.
+     */
+    if ( r == X86EMUL_UNHANDLEABLE )
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
