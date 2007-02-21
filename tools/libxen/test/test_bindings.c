@@ -222,6 +222,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    xen_string_set *supported_bootloaders;
+    if (!xen_host_get_supported_bootloaders(session, &supported_bootloaders,
+                                            host))
+    {
+        print_error(session);
+        free(dmesg);
+        xen_string_string_map_free(versions);
+        xen_host_free(host);
+        xen_vm_record_free(vm_record);
+        xen_uuid_bytes_free(vm_uuid_bytes);
+        xen_uuid_free(vm_uuid);
+        xen_vm_free(vm);
+        CLEANUP;
+        return 1;
+    }
+
     printf("%s.\n", vm_uuid);
 
     fprintf(stderr, "In bytes, the VM UUID is ");
@@ -241,24 +257,39 @@ int main(int argc, char **argv)
 
     printf("Host dmesg follows:\n%s\n\n", dmesg);
 
+    printf("Host supports the following bootloaders:");
+    for (size_t i = 0; i < supported_bootloaders->size; i++)
+    {
+        printf(" %s", supported_bootloaders->contents[i]);
+    }
+    printf("\n");
+
     printf("%s.\n", vm_record->uuid);
 
     printf("Resident on %s.\n", (char *)vm_record->resident_on->u.handle);
 
     printf("%s.\n", xen_vm_power_state_to_string(vm_record->power_state));
 
-    print_vm_metrics(session, vm);
-
     xen_uuid_bytes_free(vm_uuid_bytes);
     xen_uuid_free(vm_uuid);
-    xen_vm_free(vm);
 
     xen_vm_record_free(vm_record);
 
     xen_host_free(host);
     xen_string_string_map_free(versions);
     free(dmesg);
+    xen_string_set_free(supported_bootloaders);
 
+    print_vm_metrics(session, vm);
+    if (!session->ok)
+    {
+        /* Error has been logged, just clean up. */
+        xen_vm_free(vm);
+        CLEANUP;
+        return 1;
+    }
+
+    xen_vm_free(vm);
 
     xen_vm new_vm = create_new_vm(session, true);
     if (!session->ok)
