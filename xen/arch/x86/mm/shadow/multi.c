@@ -2901,18 +2901,35 @@ static int sh_page_fault(struct vcpu *v,
         goto not_a_shadow_fault;
 
     if ( is_hvm_domain(d) )
+    {
+        /*
+         * If we are in the middle of injecting an exception or interrupt then
+         * we should not emulate: it is not the instruction at %eip that caused
+         * the fault. Furthermore it is almost certainly the case the handler
+         * stack is currently considered to be a page table, so we should
+         * unshadow the faulting page before exiting.
+         */
+        if ( hvm_injection_pending(v) )
+        {
+            gdprintk(XENLOG_DEBUG, "write to pagetable during event "
+                     "injection: cr2=%#lx, mfn=%#lx\n", 
+                     va, mfn_x(gmfn));
+            sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+            goto done;
+        }
+
         hvm_store_cpu_guest_regs(v, regs, NULL);
+    }
+
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
                   (unsigned long)regs->eip, (unsigned long)regs->esp);
 
-    /* Check whether this looks like a stack operation. */
+    /*
+     * Check whether this looks like a stack operation.
+     * If so, forcibly unshadow and return.
+     */
     if ( (va & PAGE_MASK) == (regs->esp & PAGE_MASK) )
     {
-        /* Forcibly unshadow and return.  It's important to do this before
-         * we emulate: if the faulting stack operation was the guest handling
-         * an interrupt, then 
-         * (a) the instruction at %eip is irrelevant; and
-         * (b) we might inject some other fault and mask the real one */
         gdprintk(XENLOG_DEBUG, "guest stack is on a shadowed frame: "
                  "%%esp=%#lx, cr2=%#lx, mfn=%#lx\n", 
                  (unsigned long)regs->esp, va, mfn_x(gmfn));

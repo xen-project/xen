@@ -990,6 +990,18 @@ static void vmx_update_vtpr(struct vcpu *v, unsigned long value)
     /* VMX doesn't have a V_TPR field */
 }
 
+static int vmx_injection_pending(struct vcpu *v)
+{
+    unsigned int idtv_info_field;
+
+    ASSERT(v == current);
+
+    idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
+
+    return (v->arch.hvm_vmx.vector_injected ||
+            (idtv_info_field & INTR_INFO_VALID_MASK));
+}
+
 /* Setup HVM interfaces */
 static void vmx_setup_hvm_funcs(void)
 {
@@ -1025,6 +1037,8 @@ static void vmx_setup_hvm_funcs(void)
     hvm_funcs.init_ap_context = vmx_init_ap_context;
 
     hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
+
+    hvm_funcs.injection_pending = vmx_injection_pending;
 }
 
 int start_vmx(void)

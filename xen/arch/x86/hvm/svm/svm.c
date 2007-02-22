@@ -982,6 +982,12 @@ static void svm_hvm_inject_exception(
         v->arch.hvm_svm.vmcb->cr2 = v->arch.hvm_svm.cpu_cr2 = cr2;
 }
 
+static int svm_injection_pending(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    return (vmcb->vintr.fields.irq || vmcb->exitintinfo.fields.v);
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -1057,6 +1063,8 @@ int start_svm(void)
 
     hvm_funcs.init_ap_context = svm_init_ap_context;
     hvm_funcs.init_hypercall_page = svm_init_hypercall_page;
+
+    hvm_funcs.injection_pending = svm_injection_pending;
 
     hvm_enable();
 
