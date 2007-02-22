@@ -2909,7 +2909,7 @@ static int sh_page_fault(struct vcpu *v,
          * stack is currently considered to be a page table, so we should
          * unshadow the faulting page before exiting.
          */
-        if ( hvm_injection_pending(v) )
+        if ( unlikely(hvm_injection_pending(v)) )
         {
             gdprintk(XENLOG_DEBUG, "write to pagetable during event "
                      "injection: cr2=%#lx, mfn=%#lx\n", 
@@ -2925,16 +2925,20 @@ static int sh_page_fault(struct vcpu *v,
                   (unsigned long)regs->eip, (unsigned long)regs->esp);
 
     /*
-     * Check whether this looks like a stack operation.
-     * If so, forcibly unshadow and return.
+     * Check whether this looks like a stack operation. If so, unshadow the
+     * faulting page. We can allow this to fail: if it does fail then we
+     * carry on and emulate, otherwise we bail immediately. Failure is
+     * tolerated because this is only a heuristic (e.g., stack segment base
+     * address is ignored).
      */
-    if ( (va & PAGE_MASK) == (regs->esp & PAGE_MASK) )
+    if ( unlikely((va & PAGE_MASK) == (regs->esp & PAGE_MASK)) )
     {
         gdprintk(XENLOG_DEBUG, "guest stack is on a shadowed frame: "
                  "%%esp=%#lx, cr2=%#lx, mfn=%#lx\n", 
                  (unsigned long)regs->esp, va, mfn_x(gmfn));
-        sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
-        goto done;
+        sh_remove_shadows(v, gmfn, 0 /* thorough */, 0 /* can fail */);
+        if ( !(mfn_to_page(gmfn)->count_info & PGC_page_table) )
+            goto done;
     }
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
