@@ -275,6 +275,10 @@ hvm_emulate_write(enum x86_segment seg,
     unsigned long addr;
     int rc;
 
+    /* How many emulations could we save if we unshadowed on stack writes? */
+    if ( seg == x86_seg_ss )
+        perfc_incrc(shadow_fault_emulate_stack);
+
     rc = hvm_translate_linear_addr(
         seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
     if ( rc )

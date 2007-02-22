@@ -2924,23 +2924,6 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
                   (unsigned long)regs->eip, (unsigned long)regs->esp);
 
-    /*
-     * Check whether this looks like a stack operation. If so, unshadow the
-     * faulting page. We can allow this to fail: if it does fail then we
-     * carry on and emulate, otherwise we bail immediately. Failure is
-     * tolerated because this is only a heuristic (e.g., stack segment base
-     * address is ignored).
-     */
-    if ( unlikely((va & PAGE_MASK) == (regs->esp & PAGE_MASK)) )
-    {
-        gdprintk(XENLOG_DEBUG, "guest stack is on a shadowed frame: "
-                 "%%esp=%#lx, cr2=%#lx, mfn=%#lx\n", 
-                 (unsigned long)regs->esp, va, mfn_x(gmfn));
-        sh_remove_shadows(v, gmfn, 0 /* thorough */, 0 /* can fail */);
-        if ( !(mfn_to_page(gmfn)->count_info & PGC_page_table) )
-            goto done;
-    }
-
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
     /*
