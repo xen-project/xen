@@ -476,7 +476,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             s = initial_images_end;
         init_boot_pages(s, e);
 
-#if defined (CONFIG_X86_64)
+#if defined(CONFIG_X86_64)
         /*
          * x86/64 maps all registered RAM. Points to note:
          *  1. The initial pagetable already maps low 1GB, so skip that.
@@ -532,7 +532,12 @@ void __init __start_xen(multiboot_info_t *mbi)
         k = ((initial_images_end - initial_images_start) & ~PAGE_MASK) ? 1 : 0;
         k += (initial_images_end - initial_images_start) >> PAGE_SHIFT;
 
-        k = alloc_boot_low_pages(k, 1);
+#if defined(CONFIG_X86_32)
+        /* Must allocate within bootstrap 1:1 limits. */
+        k = alloc_boot_low_pages(k, 1); /* 0x0 - HYPERVISOR_VIRT_START */
+#else
+        k = alloc_boot_pages(k, 1);
+#endif
         if ( k == 0 )
             panic("Unable to allocate initial images memory\n");
 
