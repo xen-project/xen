@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,11 @@
 #define XEN_VBD_H
 
 #include "xen_common.h"
+#include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
+#include "xen_vbd_metrics_decl.h"
 #include "xen_vbd_mode.h"
+#include "xen_vbd_type.h"
 #include "xen_vdi_decl.h"
 #include "xen_vm_decl.h"
 
@@ -71,8 +74,10 @@ typedef struct xen_vbd_record
     char *image;
     bool bootable;
     enum xen_vbd_mode mode;
-    double io_read_kbs;
-    double io_write_kbs;
+    enum xen_vbd_type type;
+    char *qos_algorithm_type;
+    xen_string_string_map *qos_algorithm_params;
+    struct xen_vbd_metrics_record_opt *metrics;
 } xen_vbd_record;
 
 /**
@@ -155,14 +160,14 @@ xen_vbd_record_opt_set_free(xen_vbd_record_opt_set *set);
 
 
 /**
- * Get the current state of the given VBD.  !!!
+ * Get a record containing the current state of the given VBD.
  */
 extern bool
 xen_vbd_get_record(xen_session *session, xen_vbd_record **result, xen_vbd vbd);
 
 
 /**
- * Get a reference to the object with the specified UUID.  !!!
+ * Get a reference to the VBD instance with the specified UUID.
  */
 extern bool
 xen_vbd_get_by_uuid(xen_session *session, xen_vbd *result, char *uuid);
@@ -225,17 +230,31 @@ xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd);
 
 
 /**
- * Get the io/read_kbs field of the given VBD.
+ * Get the type field of the given VBD.
  */
 extern bool
-xen_vbd_get_io_read_kbs(xen_session *session, double *result, xen_vbd vbd);
+xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd);
 
 
 /**
- * Get the io/write_kbs field of the given VBD.
+ * Get the qos/algorithm_type field of the given VBD.
  */
 extern bool
-xen_vbd_get_io_write_kbs(xen_session *session, double *result, xen_vbd vbd);
+xen_vbd_get_qos_algorithm_type(xen_session *session, char **result, xen_vbd vbd);
+
+
+/**
+ * Get the qos/algorithm_params field of the given VBD.
+ */
+extern bool
+xen_vbd_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vbd vbd);
+
+
+/**
+ * Get the metrics field of the given VBD.
+ */
+extern bool
+xen_vbd_get_metrics(xen_session *session, xen_vbd_metrics *result, xen_vbd vbd);
 
 
 /**
@@ -257,6 +276,44 @@ xen_vbd_set_bootable(xen_session *session, xen_vbd vbd, bool bootable);
  */
 extern bool
 xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode);
+
+
+/**
+ * Set the type field of the given VBD.
+ */
+extern bool
+xen_vbd_set_type(xen_session *session, xen_vbd vbd, enum xen_vbd_type type);
+
+
+/**
+ * Set the qos/algorithm_type field of the given VBD.
+ */
+extern bool
+xen_vbd_set_qos_algorithm_type(xen_session *session, xen_vbd vbd, char *algorithm_type);
+
+
+/**
+ * Set the qos/algorithm_params field of the given VBD.
+ */
+extern bool
+xen_vbd_set_qos_algorithm_params(xen_session *session, xen_vbd vbd, xen_string_string_map *algorithm_params);
+
+
+/**
+ * Add the given key-value pair to the qos/algorithm_params field of
+ * the given VBD.
+ */
+extern bool
+xen_vbd_add_to_qos_algorithm_params(xen_session *session, xen_vbd vbd, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * qos/algorithm_params field of the given VBD.  If the key is not in that
+ * Map, then do nothing.
+ */
+extern bool
+xen_vbd_remove_from_qos_algorithm_params(xen_session *session, xen_vbd vbd, char *key);
 
 
 /**

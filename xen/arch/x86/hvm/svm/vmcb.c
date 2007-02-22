@@ -330,6 +330,9 @@ static void vmcb_dump(unsigned char ch)
     struct vcpu *v;
     
     printk("*********** VMCB Areas **************\n");
+
+    rcu_read_lock(&domlist_read_lock);
+
     for_each_domain ( d )
     {
         if ( !is_hvm_domain(d) )
@@ -341,6 +344,8 @@ static void vmcb_dump(unsigned char ch)
             svm_dump_vmcb("key_handler", v->arch.hvm_svm.vmcb);
         }
     }
+
+    rcu_read_unlock(&domlist_read_lock);
 
     printk("**************************************\n");
 }

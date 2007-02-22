@@ -7,7 +7,15 @@
 #include <asm/x86_32/bug.h>
 #endif
 
-#define BUG()                  __BUG(__FILE__, __LINE__)
-#define dump_execution_state() __BUG(__FILE__, __LINE__ | 0x8000)
+struct bug_frame {
+    unsigned char ud2[2];
+    unsigned char ret;
+    unsigned short id; /* BUGFRAME_??? */
+} __attribute__((packed));
+
+#define BUGFRAME_dump   0
+#define BUGFRAME_bug    1
+#define BUGFRAME_assert 2
+#define BUGFRAME_rsvd   3
 
 #endif /* __X86_BUG_H__ */

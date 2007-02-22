@@ -191,7 +191,7 @@ static int hvm_translate_linear_addr(
  gpf:
     /* Inject #GP(0). */
     hvm_inject_exception(TRAP_gp_fault, 0, 0);
-    return X86EMUL_PROPAGATE_FAULT;
+    return X86EMUL_EXCEPTION;
 }
 
 static int
@@ -216,7 +216,7 @@ hvm_read(enum x86_segment seg,
     //        In this case, that is only a user vs supervisor access check.
     //
     if ( (rc = hvm_copy_from_guest_virt(val, addr, bytes)) == 0 )
-        return X86EMUL_CONTINUE;
+        return X86EMUL_OKAY;
 
     /* If we got here, there was nothing mapped here, or a bad GFN 
      * was mapped here.  This should never happen: we're here because
@@ -226,7 +226,7 @@ hvm_read(enum x86_segment seg,
     if ( access_type == hvm_access_insn_fetch )
         errcode |= PFEC_insn_fetch;
     hvm_inject_exception(TRAP_page_fault, errcode, addr + bytes - rc);
-    return X86EMUL_PROPAGATE_FAULT;
+    return X86EMUL_EXCEPTION;
 }
 
 static int
@@ -259,7 +259,7 @@ hvm_emulate_insn_fetch(enum x86_segment seg,
     /* Hit the cache. Simple memcpy. */
     *val = 0;
     memcpy(val, &sh_ctxt->insn_buf[insn_off], bytes);
-    return X86EMUL_CONTINUE;
+    return X86EMUL_OKAY;
 }
 
 static int
@@ -352,10 +352,10 @@ pv_emulate_read(enum x86_segment seg,
     if ( (rc = copy_from_user((void *)val, (void *)offset, bytes)) != 0 )
     {
         propagate_page_fault(offset + bytes - rc, 0); /* read fault */
-        return X86EMUL_PROPAGATE_FAULT;
+        return X86EMUL_EXCEPTION;
     }
 
-    return X86EMUL_CONTINUE;
+    return X86EMUL_OKAY;
 }
 
 static int
@@ -890,13 +890,17 @@ static void shadow_blow_all_tables(unsigned char c)
 {
     struct domain *d;
     printk("'%c' pressed -> blowing all shadow tables\n", c);
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain(d)
+    {
         if ( shadow_mode_enabled(d) && d->vcpu[0] != NULL )
         {
             shadow_lock(d);
             shadow_blow_tables(d);
             shadow_unlock(d);
         }
+    }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 /* Register this function in the Xen console keypress table */

@@ -145,7 +145,7 @@ static void dump_domains(unsigned char key)
     printk("'%c' pressed -> dumping domain info (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now);
 
-    read_lock(&domlist_lock);
+    rcu_read_lock(&domlist_read_lock);
 
     for_each_domain ( d )
     {
@@ -196,7 +196,7 @@ static void dump_domains(unsigned char key)
         }
     }
 
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 static cpumask_t read_clocks_cpumask = CPU_MASK_NONE;

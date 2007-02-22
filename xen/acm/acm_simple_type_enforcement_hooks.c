@@ -175,36 +175,37 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     int violation = 1;
     struct ste_ssid *ste_ssid, *ste_rssid;
     ssidref_t ste_ssidref, ste_rssidref;
-    struct domain **pd, *rdom;
+    struct domain *d, *rdom;
     domid_t rdomid;
     struct grant_entry sha_copy;
     int port, i;
 
-    read_lock(&domlist_lock); /* go by domain? or directly by global? event/grant list */
+    rcu_read_lock(&domlist_read_lock);
+    /* go by domain? or directly by global? event/grant list */
     /* go through all domains and adjust policy as if this domain was started now */
-    pd = &domain_list;
-    for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list ) {
+    for_each_domain ( d )
+    {
         ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                             (struct acm_ssid_domain *)(*pd)->ssid);
+                             (struct acm_ssid_domain *)d->ssid);
         ste_ssidref = ste_ssid->ste_ssidref;
         traceprintk("%s: validating policy for eventch domain %x (ste-Ref=%x).\n",
-                    __func__, (*pd)->domain_id, ste_ssidref);
+                    __func__, d->domain_id, ste_ssidref);
         /* a) check for event channel conflicts */
         for (port=0; port < NR_EVTCHN_BUCKETS; port++) {
-            spin_lock(&(*pd)->evtchn_lock);
-            if ((*pd)->evtchn[port] == NULL) {
-                spin_unlock(&(*pd)->evtchn_lock);
+            spin_lock(&d->evtchn_lock);
+            if (d->evtchn[port] == NULL) {
+                spin_unlock(&d->evtchn_lock);
                 continue;
             }
-            if ((*pd)->evtchn[port]->state == ECS_INTERDOMAIN) {
-                rdom = (*pd)->evtchn[port]->u.interdomain.remote_dom;
+            if (d->evtchn[port]->state == ECS_INTERDOMAIN) {
+                rdom = d->evtchn[port]->u.interdomain.remote_dom;
                 rdomid = rdom->domain_id;
                 /* rdom now has remote domain */
                 ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                                       (struct acm_ssid_domain *)(rdom->ssid));
                 ste_rssidref = ste_rssid->ste_ssidref;
-            } else if ((*pd)->evtchn[port]->state == ECS_UNBOUND) {
-                rdomid = (*pd)->evtchn[port]->u.unbound.remote_domid;
+            } else if (d->evtchn[port]->state == ECS_UNBOUND) {
+                rdomid = d->evtchn[port]->u.unbound.remote_domid;
                 if ((rdom = get_domain_by_id(rdomid)) == NULL) {
                     printk("%s: Error finding domain to id %x!\n", __func__, rdomid);
                     goto out;
@@ -215,36 +216,36 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 ste_rssidref = ste_rssid->ste_ssidref;
                 put_domain(rdom);
             } else {
-                spin_unlock(&(*pd)->evtchn_lock);
+                spin_unlock(&d->evtchn_lock);
                 continue; /* port unused */
             }
-            spin_unlock(&(*pd)->evtchn_lock);
+            spin_unlock(&d->evtchn_lock);
 
             /* rdom now has remote domain */
             ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                                   (struct acm_ssid_domain *)(rdom->ssid));
             ste_rssidref = ste_rssid->ste_ssidref;
             traceprintk("%s: eventch: domain %x (ssidref %x) --> domain %x (rssidref %x) used (port %x).\n", 
-                        __func__, (*pd)->domain_id, ste_ssidref, rdom->domain_id, ste_rssidref, port);  
+                        __func__, d->domain_id, ste_ssidref, rdom->domain_id, ste_rssidref, port);  
             /* check whether on subj->ssid, obj->ssid share a common type*/
             if (!have_common_type(ste_ssidref, ste_rssidref)) {
                 printkd("%s: Policy violation in event channel domain %x -> domain %x.\n",
-                        __func__, (*pd)->domain_id, rdomid);
+                        __func__, d->domain_id, rdomid);
                 goto out;
             }
         } 
         /* b) check for grant table conflicts on shared pages */
-        spin_lock(&(*pd)->grant_table->lock);
-        for ( i = 0; i < nr_grant_entries((*pd)->grant_table); i++ ) {
+        spin_lock(&d->grant_table->lock);
+        for ( i = 0; i < nr_grant_entries(d->grant_table); i++ ) {
 #define SPP (PAGE_SIZE / sizeof(struct grant_entry))
-            sha_copy = (*pd)->grant_table->shared[i/SPP][i%SPP];
+            sha_copy = d->grant_table->shared[i/SPP][i%SPP];
             if ( sha_copy.flags ) {
                 printkd("%s: grant dom (%hu) SHARED (%d) flags:(%hx) dom:(%hu) frame:(%lx)\n",
-                        __func__, (*pd)->domain_id, i, sha_copy.flags, sha_copy.domid, 
+                        __func__, d->domain_id, i, sha_copy.flags, sha_copy.domid, 
                         (unsigned long)sha_copy.frame);
                 rdomid = sha_copy.domid;
                 if ((rdom = get_domain_by_id(rdomid)) == NULL) {
-                    spin_unlock(&(*pd)->grant_table->lock);
+                    spin_unlock(&d->grant_table->lock);
                     printkd("%s: domain not found ERROR!\n", __func__);
                     goto out;
                 };
@@ -254,18 +255,18 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 ste_rssidref = ste_rssid->ste_ssidref;
                 put_domain(rdom);
                 if (!have_common_type(ste_ssidref, ste_rssidref)) {
-                    spin_unlock(&(*pd)->grant_table->lock);
+                    spin_unlock(&d->grant_table->lock);
                     printkd("%s: Policy violation in grant table sharing domain %x -> domain %x.\n",
-                            __func__, (*pd)->domain_id, rdomid);
+                            __func__, d->domain_id, rdomid);
                     goto out;
                 }
             }
         }
-        spin_unlock(&(*pd)->grant_table->lock);
+        spin_unlock(&d->grant_table->lock);
     }
     violation = 0;
  out:
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
     return violation;
     /* returning "violation != 0" means that existing sharing between domains would not 
      * have been allowed if the new policy had been enforced before the sharing; for ste, 
@@ -281,7 +282,7 @@ ste_set_policy(u8 *buf, u32 buf_size)
     struct acm_ste_policy_buffer *ste_buf = (struct acm_ste_policy_buffer *)buf;
     void *ssidrefsbuf;
     struct ste_ssid *ste_ssid;
-    struct domain **pd;
+    struct domain *d;
     int i;
 
     if (buf_size < sizeof(struct acm_ste_policy_buffer))
@@ -326,15 +327,14 @@ ste_set_policy(u8 *buf, u32 buf_size)
     ste_bin_pol.ssidrefs = (domaintype_t *)ssidrefsbuf;
 
     /* clear all ste caches */
-    read_lock(&domlist_lock);
-    pd = &domain_list;
-    for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list ) {
+    rcu_read_lock(&domlist_read_lock);
+    for_each_domain ( d ) {
         ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                             (struct acm_ssid_domain *)(*pd)->ssid);
+                             (struct acm_ssid_domain *)(d)->ssid);
         for (i=0; i<ACM_TE_CACHE_SIZE; i++)
             ste_ssid->ste_cache[i].valid = ACM_STE_free;
     }
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
     return ACM_OK;
 
  error_free:
@@ -436,14 +436,14 @@ clean_id_from_cache(domid_t id)
 {
     struct ste_ssid *ste_ssid;
     int i;
-    struct domain **pd;
+    struct domain *d;
     struct acm_ssid_domain *ssid;
 
     printkd("deleting cache for dom %x.\n", id);
-    read_lock(&domlist_lock); /* look through caches of all domains */
-    pd = &domain_list;
-    for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list ) {
-        ssid = (struct acm_ssid_domain *)((*pd)->ssid);
+    rcu_read_lock(&domlist_read_lock);
+    /* look through caches of all domains */
+    for_each_domain ( d ) {
+        ssid = (struct acm_ssid_domain *)(d->ssid);
 
         if (ssid == NULL)
             continue; /* hanging domain structure, no ssid any more ... */
@@ -459,7 +459,7 @@ clean_id_from_cache(domid_t id)
                 ste_ssid->ste_cache[i].valid = ACM_STE_free;
     }
  out:
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 /***************************

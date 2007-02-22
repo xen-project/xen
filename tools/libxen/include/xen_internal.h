@@ -149,7 +149,10 @@ type__ ## _free(type__ handle)                  \
 type__ ## _set *                                                        \
 type__ ## _set_alloc(size_t size)                                       \
 {                                                                       \
-    return calloc(1, sizeof(type__ ## _set) + size * sizeof(type__));   \
+    type__ ## _set *result = calloc(1, sizeof(type__ ## _set) +         \
+                                    size * sizeof(type__));             \
+    result->size = size;                                                \
+    return result;                                                      \
 }                                                                       \
                                                                         \
 void                                                                    \

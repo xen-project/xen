@@ -194,19 +194,18 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
     int violation = 0, i, j;
     struct chwall_ssid *chwall_ssid;
     ssidref_t chwall_ssidref;
-    struct domain **pd;
+    struct domain *d;
 
-    write_lock(&domlist_lock);
+    spin_lock(&domlist_update_lock);
     /* go through all domains and adjust policy as if this domain was started now */
-    pd = &domain_list;
-    for (pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list)
+    for_each_domain ( d )
     {
         chwall_ssid =
             GET_SSIDP(ACM_CHINESE_WALL_POLICY,
-                      (struct acm_ssid_domain *) (*pd)->ssid);
+                      (struct acm_ssid_domain *)d->ssid);
         chwall_ssidref = chwall_ssid->chwall_ssidref;
         traceprintk("%s: validating policy for domain %x (chwall-REF=%x).\n",
-                    __func__, (*pd)->domain_id, chwall_ssidref);
+                    __func__, d->domain_id, chwall_ssidref);
         /* a) adjust types ref-count for running domains */
         for (i = 0; i < chwall_buf->chwall_max_types; i++)
             running_types[i] +=
@@ -247,7 +246,7 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
         }
     }
  out:
-    write_unlock(&domlist_lock);
+    spin_unlock(&domlist_update_lock);
     return violation;
     /* returning "violation != 0" means that the currently running set of domains would
      * not be possible if the new policy had been enforced before starting them; for chinese

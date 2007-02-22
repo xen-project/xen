@@ -441,6 +441,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         XLAT_vcpu_guest_context(c.cmp, &v->arch.guest_context);
 #endif
 
+    c(flags &= ~(VGCF_i387_valid|VGCF_in_kernel));
+    if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
+        c(flags |= VGCF_i387_valid);
+
     if ( is_hvm_vcpu(v) )
     {
         if ( !IS_COMPAT(v->domain) )
@@ -464,23 +468,21 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         /* IOPL privileges are virtualised: merge back into returned eflags. */
         BUG_ON((c(user_regs.eflags) & EF_IOPL) != 0);
         c(user_regs.eflags |= v->arch.iopl << 12);
-    }
 
-    c(flags &= ~(VGCF_i387_valid|VGCF_in_kernel));
-    if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
-        c(flags |= VGCF_i387_valid);
-    if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        c(flags |= VGCF_in_kernel);
-
-    if ( !IS_COMPAT(v->domain) )
-        c.nat->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
+        if ( !IS_COMPAT(v->domain) )
+            c.nat->ctrlreg[3] = xen_pfn_to_cr3(
+                pagetable_get_pfn(v->arch.guest_table));
 #ifdef CONFIG_COMPAT
-    else
-    {
-        l4_pgentry_t *l4e = __va(pagetable_get_paddr(v->arch.guest_table));
-        c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
-    }
+        else
+        {
+            l4_pgentry_t *l4e = __va(pagetable_get_paddr(v->arch.guest_table));
+            c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
+        }
 #endif
+
+        if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
+            c(flags |= VGCF_in_kernel);
+    }
 
     c(vm_assist = v->domain->vm_assist);
 #undef c

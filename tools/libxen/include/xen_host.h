@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,7 @@
 #include "xen_pbd_decl.h"
 #include "xen_pif_decl.h"
 #include "xen_sr_decl.h"
+#include "xen_string_set.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
@@ -73,6 +74,7 @@ typedef struct xen_host_record
     char *name_description;
     xen_string_string_map *software_version;
     xen_string_string_map *other_config;
+    struct xen_string_set *supported_bootloaders;
     struct xen_vm_record_opt_set *resident_vms;
     xen_string_string_map *logging;
     struct xen_pif_record_opt_set *pifs;
@@ -177,20 +179,6 @@ xen_host_get_by_uuid(xen_session *session, xen_host *result, char *uuid);
 
 
 /**
- * Create a new host instance, and return its handle.
- */
-extern bool
-xen_host_create(xen_session *session, xen_host *result, xen_host_record *record);
-
-
-/**
- * Destroy the specified host instance.
- */
-extern bool
-xen_host_destroy(xen_session *session, xen_host host);
-
-
-/**
  * Get all the host instances with the given label.
  */
 extern bool
@@ -230,6 +218,13 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
  */
 extern bool
 xen_host_get_other_config(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
+ * Get the supported_bootloaders field of the given host.
+ */
+extern bool
+xen_host_get_supported_bootloaders(xen_session *session, struct xen_string_set **result, xen_host host);
 
 
 /**

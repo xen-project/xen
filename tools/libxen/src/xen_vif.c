@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,9 @@
 #include "xen_common.h"
 #include "xen_internal.h"
 #include "xen_network.h"
+#include "xen_string_string_map.h"
 #include "xen_vif.h"
+#include "xen_vif_metrics.h"
 #include "xen_vm.h"
 
 
@@ -56,12 +58,15 @@ static const struct_member xen_vif_record_struct_members[] =
         { .key = "MTU",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vif_record, mtu) },
-        { .key = "io_read_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_vif_record, io_read_kbs) },
-        { .key = "io_write_kbs",
-          .type = &abstract_type_float,
-          .offset = offsetof(xen_vif_record, io_write_kbs) }
+        { .key = "qos_algorithm_type",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vif_record, qos_algorithm_type) },
+        { .key = "qos_algorithm_params",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vif_record, qos_algorithm_params) },
+        { .key = "metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_vif_record, metrics) }
     };
 
 const abstract_type xen_vif_record_abstract_type_ =
@@ -87,6 +92,9 @@ xen_vif_record_free(xen_vif_record *record)
     xen_network_record_opt_free(record->network);
     xen_vm_record_opt_free(record->vm);
     free(record->mac);
+    free(record->qos_algorithm_type);
+    xen_string_string_map_free(record->qos_algorithm_params);
+    xen_vif_metrics_record_opt_free(record->metrics);
     free(record);
 }
 
@@ -247,7 +255,7 @@ xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif)
 
 
 bool
-xen_vif_get_io_read_kbs(xen_session *session, double *result, xen_vif vif)
+xen_vif_get_qos_algorithm_type(xen_session *session, char **result, xen_vif vif)
 {
     abstract_value param_values[] =
         {
@@ -255,15 +263,16 @@ xen_vif_get_io_read_kbs(xen_session *session, double *result, xen_vif vif)
               .u.string_val = vif }
         };
 
-    abstract_type result_type = abstract_type_float;
+    abstract_type result_type = abstract_type_string;
 
-    XEN_CALL_("VIF.get_io_read_kbs");
+    *result = NULL;
+    XEN_CALL_("VIF.get_qos_algorithm_type");
     return session->ok;
 }
 
 
 bool
-xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif)
+xen_vif_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vif vif)
 {
     abstract_value param_values[] =
         {
@@ -271,9 +280,27 @@ xen_vif_get_io_write_kbs(xen_session *session, double *result, xen_vif vif)
               .u.string_val = vif }
         };
 
-    abstract_type result_type = abstract_type_float;
+    abstract_type result_type = abstract_type_string_string_map;
 
-    XEN_CALL_("VIF.get_io_write_kbs");
+    *result = NULL;
+    XEN_CALL_("VIF.get_qos_algorithm_params");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_metrics(xen_session *session, xen_vif_metrics *result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VIF.get_metrics");
     return session->ok;
 }
 
@@ -322,6 +349,72 @@ xen_vif_set_mtu(xen_session *session, xen_vif vif, int64_t mtu)
         };
 
     xen_call_(session, "VIF.set_MTU", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vif_set_qos_algorithm_type(xen_session *session, xen_vif vif, char *algorithm_type)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif },
+            { .type = &abstract_type_string,
+              .u.string_val = algorithm_type }
+        };
+
+    xen_call_(session, "VIF.set_qos_algorithm_type", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vif_set_qos_algorithm_params(xen_session *session, xen_vif vif, xen_string_string_map *algorithm_params)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)algorithm_params }
+        };
+
+    xen_call_(session, "VIF.set_qos_algorithm_params", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vif_add_to_qos_algorithm_params(xen_session *session, xen_vif vif, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VIF.add_to_qos_algorithm_params", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VIF.remove_from_qos_algorithm_params", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

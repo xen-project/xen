@@ -1277,6 +1277,7 @@ static void sedf_dump_cpu_state(int i)
     loop = 0;
     printk("\nnot on Q\n");
 
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
     {
         for_each_vcpu(d, ed)
@@ -1288,6 +1289,7 @@ static void sedf_dump_cpu_state(int i)
             }
         }
     }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 
@@ -1298,8 +1300,9 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
     struct domain      *d;
     int                 sumw[NR_CPUS] = { 0 };
     s_time_t            sumt[NR_CPUS] = { 0 };
- 
+
     /* Sum across all weights. */
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain( d )
     {
         for_each_vcpu( d, p )
@@ -1323,8 +1326,10 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
             }
         }
     }
+    rcu_read_unlock(&domlist_read_lock);
 
     /* Adjust all slices (and periods) to the new weight. */
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain( d )
     {
         for_each_vcpu ( d, p )
@@ -1341,6 +1346,7 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
             }
         }
     }
+    rcu_read_unlock(&domlist_read_lock);
 
     return 0;
 }

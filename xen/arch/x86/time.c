@@ -720,10 +720,10 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
     wc_nsec = _wc_nsec = (u32)y;
     spin_unlock(&wc_lock);
 
-    read_lock(&domlist_lock);
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
         update_domain_wallclock_time(d);
-    read_unlock(&domlist_lock);
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 static void local_time_calibration(void *unused)

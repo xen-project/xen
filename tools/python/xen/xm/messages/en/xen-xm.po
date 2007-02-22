@@ -19,7 +19,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2007-01-31 12:34+0000\n"
+"PO-Revision-Date: 2007-02-20 15:22+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -44,44 +44,8 @@ msgstr "Permission denied."
 msgid "VALUE_NOT_SUPPORTED"
 msgstr "Value \"%(2)s\" for %(1)s is not supported by this server.  The server said \"%(3)s\"."
 
-msgid "HOST_CPU_HANDLE_INVALID"
-msgstr "The host_cpu handle %(1)s is invalid."
-
-msgid "HOST_HANDLE_INVALID"
-msgstr "The host handle %(1)s is invalid."
-
-msgid "HOST_METRICS_HANDLE_INVALID"
-msgstr "The host_metrics handle %(1)s is invalid."
-
-msgid "PIF_HANDLE_INVALID"
-msgstr "The PIF handle %(1)s is invalid."
-
-msgid "PIF_METRICS_HANDLE_INVALID"
-msgstr "The PIF_METRICS handle %(1)s is invalid."
-
-msgid "SR_HANDLE_INVALID"
-msgstr "The SR handle %(1)s is invalid."
-
-msgid "TASK_HANDLE_INVALID"
-msgstr "The task handle %(1)s is invalid."
-
-msgid "VBD_HANDLE_INVALID"
-msgstr "The VBD handle %(1)s is invalid."
-
-msgid "VDI_HANDLE_INVALID"
-msgstr "The VDI handle %(1)s is invalid."
-
-msgid "VIF_HANDLE_INVALID"
-msgstr "The VIF handle %(1)s is invalid."
-
-msgid "VM_HANDLE_INVALID"
-msgstr "The VM handle %(1)s is invalid."
-
-msgid "VM_METRICS_HANDLE_INVALID"
-msgstr "The VM_metrics handle %(1)s is invalid."
-
-msgid "VTPM_HANDLE_INVALID"
-msgstr "The VTPM handle %(1)s is invalid."
+msgid "HANDLE_INVALID"
+msgstr "The %(1)s handle %(2)s is invalid."
 
 msgid "OPERATION_NOT_ALLOWED"
 msgstr "You attempted an operation that was not allowed."

@@ -16,6 +16,7 @@
 #include <xen/rangeset.h>
 #include <asm/domain.h>
 #include <xen/xenoprof.h>
+#include <xen/rcupdate.h>
 #include <xen/irq.h>
 
 #ifdef CONFIG_COMPAT
@@ -24,7 +25,6 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 #endif
 
 extern unsigned long volatile jiffies;
-extern rwlock_t domlist_lock;
 
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
@@ -193,6 +193,8 @@ struct domain
     /* OProfile support. */
     struct xenoprof *xenoprof;
     int32_t time_offset_seconds;
+
+    struct rcu_head rcu;
 };
 
 struct domain_setup_info
@@ -266,6 +268,21 @@ int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
+
+/*
+ * find_domain_rcu_lock() is more efficient than get_domain_by_id().
+ * This is the preferred function if the returned domain reference
+ * is short lived,  but it cannot be used if the domain reference needs 
+ * to be kept beyond the current scope (e.g., across a softirq).
+ * The returned domain reference must be discarded using domain_rcu_unlock().
+ */
+struct domain *find_domain_rcu_lock(domid_t dom);
+
+/* Finish a RCU critical region started by find_domain_rcu_lock(). */
+static inline void domain_rcu_unlock(struct domain *d)
+{
+    rcu_read_unlock(&domlist_read_lock);
+}
 
 struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
@@ -356,16 +373,17 @@ unsigned long hypercall_create_continuation(
         local_events_need_delivery()            \
     ))
 
-/* This domain_hash and domain_list are protected by the domlist_lock. */
-#define DOMAIN_HASH_SIZE 256
-#define DOMAIN_HASH(_id) ((int)(_id)&(DOMAIN_HASH_SIZE-1))
-extern struct domain *domain_hash[DOMAIN_HASH_SIZE];
+/* Protect updates/reads (resp.) of domain_list and domain_hash. */
+extern spinlock_t domlist_update_lock;
+extern rcu_read_lock_t domlist_read_lock;
+
 extern struct domain *domain_list;
 
+/* Caller must hold the domlist_read_lock or domlist_update_lock. */
 #define for_each_domain(_d)                     \
- for ( (_d) = domain_list;                      \
+ for ( (_d) = rcu_dereference(domain_list);     \
        (_d) != NULL;                            \
-       (_d) = (_d)->next_in_list )
+       (_d) = rcu_dereference((_d)->next_in_list )) \
 
 #define for_each_vcpu(_d,_v)                    \
  for ( (_v) = (_d)->vcpu[0];                    \

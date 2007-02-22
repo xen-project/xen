@@ -424,7 +424,7 @@ handle_exception:
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%esp)
         jz    exception_with_ints_disabled
         sti                             # re-enable interrupts
-        xorl  %eax,%eax
+1:      xorl  %eax,%eax
         movw  UREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
         pushl %edx                      # push the cpu_user_regs pointer
@@ -451,7 +451,7 @@ exception_with_ints_disabled:
         call  search_pre_exception_table
         addl  $4,%esp
         testl %eax,%eax                 # no fixup code for faulting EIP?
-        jz    FATAL_exception_with_ints_disabled
+        jz    1b
         movl  %eax,UREGS_eip(%esp)
         movl  %esp,%esi
         subl  $4,%esp

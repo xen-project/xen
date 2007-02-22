@@ -57,16 +57,19 @@ typedef struct fsig_plugin_ops {
 #define	disk_read_func (*fsig_disk_read_junk())
 #define	disk_read_hook (*fsig_disk_read_junk())
 #define	print_possibilities 0
+#define	noisy_printf
 
 #define	grub_memset memset
 #define	grub_memmove memmove
+#define grub_log2 fsig_log2
 
 extern char **fsig_disk_read_junk(void);
+unsigned long fsig_log2(unsigned long);
 
 #define	ERR_FSYS_CORRUPT 1
+#define	ERR_OUTSIDE_PART 1
 #define	ERR_SYMLINK_LOOP 1
 #define	ERR_FILELENGTH 1
-#define	ERR_BAD_FILETYPE 1
 #define	ERR_BAD_FILETYPE 1
 #define	ERR_FILE_NOT_FOUND 1
 

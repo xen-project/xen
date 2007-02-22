@@ -464,10 +464,10 @@ do{ __asm__ __volatile__ (                                              \
 
 #define mode_64bit() (def_ad_bytes == 8)
 
-#define fail_if(p)                              \
-do {                                            \
-    rc = (p) ? X86EMUL_UNHANDLEABLE : 0;        \
-    if ( rc ) goto done;                        \
+#define fail_if(p)                                      \
+do {                                                    \
+    rc = (p) ? X86EMUL_UNHANDLEABLE : X86EMUL_OKAY;     \
+    if ( rc ) goto done;                                \
 } while (0)
 
 /* In future we will be able to generate arbitrary exceptions. */
@@ -726,7 +726,7 @@ x86_emulate(
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
     unsigned int lock_prefix = 0, rep_prefix = 0;
-    int rc = 0;
+    int rc = X86EMUL_OKAY;
     struct operand src, dst;
 
     /* Data operand effective address (usually computed from ModRM). */
@@ -742,7 +742,7 @@ x86_emulate(
     {
         op_bytes = def_op_bytes = 4;
 #ifndef __x86_64__
-        return -1;
+        return X86EMUL_UNHANDLEABLE;
 #endif
     }
 
@@ -1593,7 +1593,7 @@ x86_emulate(
     *ctxt->regs = _regs;
 
  done:
-    return (rc == X86EMUL_UNHANDLEABLE) ? -1 : 0;
+    return rc;
 
  special_insn:
     dst.type = OP_NONE;
@@ -2383,5 +2383,5 @@ x86_emulate(
     }
     printk("\n");
 #endif
-    return -1;
+    return X86EMUL_UNHANDLEABLE;
 }

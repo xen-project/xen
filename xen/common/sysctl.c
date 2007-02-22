@@ -78,7 +78,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         struct xen_domctl_getdomaininfo info;
         u32 num_domains = 0;
 
-        read_lock(&domlist_lock);
+        rcu_read_lock(&domlist_read_lock);
 
         for_each_domain ( d )
         {
@@ -106,7 +106,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             num_domains++;
         }
         
-        read_unlock(&domlist_lock);
+        rcu_read_unlock(&domlist_read_lock);
         
         if ( ret != 0 )
             break;

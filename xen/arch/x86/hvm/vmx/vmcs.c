@@ -567,6 +567,9 @@ static void vmcs_dump(unsigned char ch)
     struct vcpu *v;
     
     printk("*********** VMCS Areas **************\n");
+
+    rcu_read_lock(&domlist_read_lock);
+
     for_each_domain ( d )
     {
         if ( !is_hvm_domain(d) )
@@ -580,6 +583,8 @@ static void vmcs_dump(unsigned char ch)
             vmx_vmcs_exit(v);
         }
     }
+
+    rcu_read_unlock(&domlist_read_lock);
 
     printk("**************************************\n");
 }

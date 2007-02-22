@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -58,6 +58,9 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "other_config",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_host_record, other_config) },
+        { .key = "supported_bootloaders",
+          .type = &abstract_type_string_set,
+          .offset = offsetof(xen_host_record, supported_bootloaders) },
         { .key = "resident_VMs",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_host_record, resident_vms) },
@@ -107,6 +110,7 @@ xen_host_record_free(xen_host_record *record)
     free(record->name_description);
     xen_string_string_map_free(record->software_version);
     xen_string_string_map_free(record->other_config);
+    xen_string_set_free(record->supported_bootloaders);
     xen_vm_record_opt_set_free(record->resident_vms);
     xen_string_string_map_free(record->logging);
     xen_pif_record_opt_set_free(record->pifs);
@@ -155,37 +159,6 @@ xen_host_get_by_uuid(xen_session *session, xen_host *result, char *uuid)
 
     *result = NULL;
     XEN_CALL_("host.get_by_uuid");
-    return session->ok;
-}
-
-
-bool
-xen_host_create(xen_session *session, xen_host *result, xen_host_record *record)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &xen_host_record_abstract_type_,
-              .u.struct_val = record }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("host.create");
-    return session->ok;
-}
-
-
-bool
-xen_host_destroy(xen_session *session, xen_host host)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = host }
-        };
-
-    xen_call_(session, "host.destroy", param_values, 1, NULL, NULL);
     return session->ok;
 }
 
@@ -271,6 +244,23 @@ xen_host_get_other_config(xen_session *session, xen_string_string_map **result, 
 
     *result = NULL;
     XEN_CALL_("host.get_other_config");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_supported_bootloaders(xen_session *session, struct xen_string_set **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("host.get_supported_bootloaders");
     return session->ok;
 }
 

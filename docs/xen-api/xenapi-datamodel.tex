@@ -31,11 +31,13 @@ Name & Description \\
 {\tt host\_cpu} & A physical CPU \\
 {\tt network} & A virtual network \\
 {\tt VIF} & A virtual network interface \\
+{\tt VIF\_metrics} & The metrics associated with a virtual network device \\
 {\tt PIF} & A physical network interface (note separate VLANs are represented as several PIFs) \\
 {\tt PIF\_metrics} & The metrics associated with a physical network interface \\
 {\tt SR} & A storage repository \\
 {\tt VDI} & A virtual disk image \\
 {\tt VBD} & A virtual block device \\
+{\tt VBD\_metrics} & The metrics associated with a virtual block device \\
 {\tt PBD} & The physical block devices through which hosts access SRs \\
 {\tt crashdump} & A VM crashdump \\
 {\tt VTPM} & A virtual TPM device \\
@@ -61,7 +63,6 @@ VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
 host.metrics & host\_metrics.host & one-to-one\\
 PIF.metrics & PIF\_metrics.PIF & one-to-one\\
-VM.metrics & VM\_metrics.VM & one-to-one\\
 PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
@@ -1076,8 +1077,6 @@ $\mathit{RW}$ &  {\tt VCPUs/policy} & string & the name of the VCPU scheduling p
 $\mathit{RW}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & configuration parameters for the selected VCPU policy \\
 $\mathit{RW}$ &  {\tt VCPUs/max} & int & Max number of VCPUs \\
 $\mathit{RW}$ &  {\tt VCPUs/at\_startup} & int & Boot number of VCPUs \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
-$\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RW}$ &  {\tt actions/after\_shutdown} & on\_normal\_exit & action to take after the guest has shutdown itself \\
 $\mathit{RW}$ &  {\tt actions/after\_reboot} & on\_normal\_exit & action to take after the guest has rebooted itself \\
 $\mathit{RW}$ &  {\tt actions/after\_crash} & on\_crash\_behaviour & action to take if the guest crashes \\
@@ -1102,7 +1101,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-th
 $\mathit{RO}_\mathit{run}$ &  {\tt tools\_version} & (string $\rightarrow$ string) Map & versions of installed paravirtualised drivers \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VM}
@@ -2545,70 +2544,6 @@ void
 
 
 
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VCPUs\_number}
-
-{\bf Overview:} 
-Get the VCPUs/number field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} int get_VCPUs_number (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-int
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VCPUs\_utilisation}
-
-{\bf Overview:} 
-Get the VCPUs/utilisation field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} ((int -> float) Map) get_VCPUs_utilisation (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-(int $\rightarrow$ float) Map
-}
-
-
-value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -4273,7 +4208,6 @@ The metrics associated with a VM.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & VM to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
@@ -4305,38 +4239,6 @@ Get the uuid field of the given VM\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VM}
-
-{\bf Overview:} 
-Get the VM field of the given VM\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (VM ref) get_VM (session_id s, VM_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-VM ref
 }
 
 
@@ -4522,6 +4424,7 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt supported\_bootloaders} & string Set & a list of the bootloaders installed on the machine \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RW}$ &  {\tt logging} & (string $\rightarrow$ string) Map & logging configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & physical network interfaces \\
@@ -5050,6 +4953,38 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_supported\_bootloaders}
+
+{\bf Overview:} 
+Get the supported\_bootloaders field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_supported_bootloaders (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_resident\_VMs}
 
 {\bf Overview:} 
@@ -5476,70 +5411,6 @@ host\_metrics ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new host instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (host ref) create (session_id s, host record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-host ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified host instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, host ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -6808,8 +6679,9 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to w
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF}
@@ -7107,13 +6979,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_read\_kbs}
+\subsubsection{RPC name:~get\_qos\_algorithm\_type}
 
 {\bf Overview:} 
-Get the io/read\_kbs field of the given VIF.
+Get the qos/algorithm\_type field of the given VIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_read_kbs (session_id s, VIF ref self)\end{verbatim}
+\begin{verbatim} string get_qos_algorithm_type (session_id s, VIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -7131,7 +7003,7 @@ Get the io/read\_kbs field of the given VIF.
 
  \noindent {\bf Return Type:} 
 {\tt 
-float
+string
 }
 
 
@@ -7139,13 +7011,47 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_write\_kbs}
+\subsubsection{RPC name:~set\_qos\_algorithm\_type}
 
 {\bf Overview:} 
-Get the io/write\_kbs field of the given VIF.
+Set the qos/algorithm\_type field of the given VIF.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_write_kbs (session_id s, VIF ref self)\end{verbatim}
+\begin{verbatim} void set_qos_algorithm_type (session_id s, VIF ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Get the qos/algorithm\_params field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_qos_algorithm_params (session_id s, VIF ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -7163,7 +7069,146 @@ Get the io/write\_kbs field of the given VIF.
 
  \noindent {\bf Return Type:} 
 {\tt 
-float
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Set the qos/algorithm\_params field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_qos_algorithm_params (session_id s, VIF ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Add the given key-value pair to the qos/algorithm\_params field of the
+given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_qos_algorithm_params (session_id s, VIF ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the
+qos/algorithm\_params field of the given VIF.  If the key is not in that
+Map, then do nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_qos_algorithm_params (session_id s, VIF ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_metrics}
+
+{\bf Overview:} 
+Get the metrics field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VIF_metrics ref) get_metrics (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VIF\_metrics ref
 }
 
 
@@ -7292,6 +7337,185 @@ Get a record containing the current state of the given VIF.
  \noindent {\bf Return Type:} 
 {\tt 
 VIF record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: VIF\_metrics}
+\subsection{Fields for class: VIF\_metrics}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VIF\_metrics} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The metrics associated with a virtual network device.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: VIF\_metrics}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
+
+{\bf Overview:} 
+Get the io/read\_kbs field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_read_kbs (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
+
+{\bf Overview:} 
+Get the io/write\_kbs field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_write_kbs (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the VIF\_metrics instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VIF_metrics ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VIF\_metrics ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VIF_metrics record) get_record (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VIF\_metrics record
 }
 
 
@@ -9562,8 +9786,9 @@ $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VBD}
@@ -9962,13 +10187,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_read\_kbs}
+\subsubsection{RPC name:~get\_qos\_algorithm\_type}
 
 {\bf Overview:} 
-Get the io/read\_kbs field of the given VBD.
+Get the qos/algorithm\_type field of the given VBD.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_read_kbs (session_id s, VBD ref self)\end{verbatim}
+\begin{verbatim} string get_qos_algorithm_type (session_id s, VBD ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -9986,7 +10211,7 @@ Get the io/read\_kbs field of the given VBD.
 
  \noindent {\bf Return Type:} 
 {\tt 
-float
+string
 }
 
 
@@ -9994,13 +10219,47 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_io\_write\_kbs}
+\subsubsection{RPC name:~set\_qos\_algorithm\_type}
 
 {\bf Overview:} 
-Get the io/write\_kbs field of the given VBD.
+Set the qos/algorithm\_type field of the given VBD.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} float get_io_write_kbs (session_id s, VBD ref self)\end{verbatim}
+\begin{verbatim} void set_qos_algorithm_type (session_id s, VBD ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Get the qos/algorithm\_params field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_qos_algorithm_params (session_id s, VBD ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -10018,7 +10277,146 @@ Get the io/write\_kbs field of the given VBD.
 
  \noindent {\bf Return Type:} 
 {\tt 
-float
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Set the qos/algorithm\_params field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_qos_algorithm_params (session_id s, VBD ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Add the given key-value pair to the qos/algorithm\_params field of the
+given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_qos_algorithm_params (session_id s, VBD ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_qos\_algorithm\_params}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the
+qos/algorithm\_params field of the given VBD.  If the key is not in that
+Map, then do nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_qos_algorithm_params (session_id s, VBD ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_metrics}
+
+{\bf Overview:} 
+Get the metrics field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VBD_metrics ref) get_metrics (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VBD\_metrics ref
 }
 
 
@@ -10147,6 +10545,185 @@ Get a record containing the current state of the given VBD.
  \noindent {\bf Return Type:} 
 {\tt 
 VBD record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: VBD\_metrics}
+\subsection{Fields for class: VBD\_metrics}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VBD\_metrics} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The metrics associated with a virtual block device.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: VBD\_metrics}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given VBD\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, VBD_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_read\_kbs}
+
+{\bf Overview:} 
+Get the io/read\_kbs field of the given VBD\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_read_kbs (session_id s, VBD_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_io\_write\_kbs}
+
+{\bf Overview:} 
+Get the io/write\_kbs field of the given VBD\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} float get_io_write_kbs (session_id s, VBD_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the VBD\_metrics instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VBD_metrics ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VBD\_metrics ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given VBD\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VBD_metrics record) get_record (session_id s, VBD_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VBD\_metrics record
 }
 
 
@@ -10985,8 +11562,9 @@ Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt protocol} & console\_protocol & the protocol used by this console \\
-$\mathit{RO}_\mathit{run}$ &  {\tt uri} & string & URI for the console service \\
+$\mathit{RO}_\mathit{run}$ &  {\tt location} & string & URI for the console service \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is attached \\
+$\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: console}
@@ -11054,13 +11632,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_uri}
+\subsubsection{RPC name:~get\_location}
 
 {\bf Overview:} 
-Get the uri field of the given console.
+Get the location field of the given console.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_uri (session_id s, console ref self)\end{verbatim}
+\begin{verbatim} string get_location (session_id s, console ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -11115,6 +11693,145 @@ VM ref
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_other\_config}
+
+{\bf Overview:} 
+Get the other\_config field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_other_config (session_id s, console ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_other\_config}
+
+{\bf Overview:} 
+Set the other\_config field of the given console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_other_config (session_id s, console ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_other\_config}
+
+{\bf Overview:} 
+Add the given key-value pair to the other\_config field of the given
+console.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_other_config (session_id s, console ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_other\_config}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the other\_config
+field of the given console.  If the key is not in that Map, then do
+nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_other_config (session_id s, console ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt console ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -11767,34 +12484,15 @@ Each possible error code is documented in the following section.
 
 \subsection{Error Codes}
 
-\subsubsection{HOST\_CPU\_HANDLE\_INVALID}
+\subsubsection{HANDLE\_INVALID}
 
-You gave an invalid host\_cpu handle.  The host\_cpu may have recently been
-deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}HOST_CPU_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{HOST\_HANDLE\_INVALID}
-
-You gave an invalid host handle.  The host may have recently been deleted. 
-The handle parameter echoes the bad value given.
+You gave an invalid handle.  The object may have recently been deleted. 
+The class parameter gives the type of reference given, and the handle
+parameter echoes the bad value given.
 
 \vspace{0.3cm}
 {\bf Signature:}
-\begin{verbatim}HOST_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{HOST\_METRICS\_HANDLE\_INVALID}
-
-You gave an invalid host\_metrics handle.  The host\_metrics may have
-recently been deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}HOST_METRICS_HANDLE_INVALID(handle)\end{verbatim}
+\begin{verbatim}HANDLE_INVALID(class, handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{INTERNAL\_ERROR}
@@ -11854,18 +12552,7 @@ already attached to some other PIF, and so the creation failed.
 You attempted an operation that was not allowed.
 
 \vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}OPERATION_NOT_ALLOWED()\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{PIF\_HANDLE\_INVALID}
-
-You gave an invalid PIF handle.  The PIF may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}PIF_HANDLE_INVALID(handle)\end{verbatim}
+No parameters.
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{PIF\_IS\_PHYSICAL}
@@ -11877,16 +12564,6 @@ PIF handle you gave.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{PIF\_METRICS\_HANDLE\_INVALID}
-
-You gave an invalid PIF\_metrics handle.  The PIF\_metrics may have
-recently been deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}PIF_METRICS_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{SESSION\_AUTHENTICATION\_FAILED}
@@ -11910,26 +12587,6 @@ current connection.  The handle parameter echoes the bad value given.
 \begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
-\subsubsection{SR\_HANDLE\_INVALID}
-
-You gave an invalid SR handle.  The SR may have recently been deleted.  The
-handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}SR_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{TASK\_HANDLE\_INVALID}
-
-You gave an invalid task handle.  The task may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}TASK_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
 \subsubsection{VALUE\_NOT\_SUPPORTED}
 
 You attempted to set a value that is not supported by this implementation. 
@@ -11939,36 +12596,6 @@ returned.  Also returned is a developer-only diagnostic reason.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VBD\_HANDLE\_INVALID}
-
-You gave an invalid VBD handle.  The VBD may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VBD_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VDI\_HANDLE\_INVALID}
-
-You gave an invalid VDI handle.  The VDI may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VDI_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VIF\_HANDLE\_INVALID}
-
-You gave an invalid VIF handle.  The VIF may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VIF_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{VLAN\_TAG\_INVALID}
@@ -11991,36 +12618,6 @@ expected and actual VM state at the time of the call.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_HANDLE\_INVALID}
-
-You gave an invalid VM handle.  The VM may have recently been deleted.  The
-handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_METRICS\_HANDLE\_INVALID}
-
-You gave an invalid VM\_metrics handle.  The VM\_metrics may have recently
-been deleted.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_METRICS_HANDLE_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VTPM\_HANDLE\_INVALID}
-
-You gave an invalid VTPM handle.  The VTPM may have recently been deleted. 
-The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VTPM_HANDLE_INVALID(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 

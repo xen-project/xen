@@ -362,7 +362,7 @@ ENTRY(handle_exception)
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
         sti
-        movq  %rsp,%rdi
+1:      movq  %rsp,%rdi
         movl  UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         GET_CURRENT(%rbx)
@@ -388,7 +388,7 @@ exception_with_ints_disabled:
         movq  %rsp,%rdi
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?
-        jz    FATAL_exception_with_ints_disabled
+        jz    1b
         movq  %rax,UREGS_rip(%rsp)
         subq  $8,UREGS_rsp(%rsp)        # add ec/ev to previous stack frame
         testb $15,UREGS_rsp(%rsp)       # return %rsp is now aligned?

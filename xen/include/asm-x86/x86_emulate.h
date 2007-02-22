@@ -46,26 +46,32 @@ enum x86_segment {
 };
 
 /*
+ * Return codes from state-accessor functions and from x86_emulate().
+ */
+ /* Completed successfully. State modified appropriately. */
+#define X86EMUL_OKAY           0
+ /* Unhandleable access or emulation. No state modified. */
+#define X86EMUL_UNHANDLEABLE   1
+ /* Exception raised and requires delivery. */
+#define X86EMUL_EXCEPTION      2
+ /* Retry the emulation for some reason. No state modified. */
+#define X86EMUL_RETRY          3
+ /* (cmpxchg accessor): CMPXCHG failed. Maps to X86EMUL_RETRY in caller. */
+#define X86EMUL_CMPXCHG_FAILED 3
+
+/*
  * These operations represent the instruction emulator's interface to memory.
  * 
  * NOTES:
  *  1. If the access fails (cannot emulate, or a standard access faults) then
  *     it is up to the memop to propagate the fault to the guest VM via
  *     some out-of-band mechanism, unknown to the emulator. The memop signals
- *     failure by returning X86EMUL_PROPAGATE_FAULT to the emulator, which will
+ *     failure by returning X86EMUL_EXCEPTION to the emulator, which will
  *     then immediately bail.
  *  2. Valid access sizes are 1, 2, 4 and 8 bytes. On x86/32 systems only
  *     cmpxchg8b_emulated need support 8-byte accesses.
  *  3. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
  */
-/* Access completed successfully: continue emulation as normal. */
-#define X86EMUL_CONTINUE        0
-/* Access is unhandleable: bail from emulation and return error to caller. */
-#define X86EMUL_UNHANDLEABLE    1
-/* Terminate emulation but return success to the caller. */
-#define X86EMUL_PROPAGATE_FAULT 2 /* propagate a generated fault to guest */
-#define X86EMUL_RETRY_INSTR     2 /* retry the instruction for some reason */
-#define X86EMUL_CMPXCHG_FAILED  2 /* cmpxchg did not see expected value */
 struct x86_emulate_ops
 {
     /*

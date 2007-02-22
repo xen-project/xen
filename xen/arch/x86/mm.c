@@ -3151,10 +3151,10 @@ static int ptwr_emulated_read(
     if ( (rc = copy_from_user((void *)val, (void *)addr, bytes)) != 0 )
     {
         propagate_page_fault(addr + bytes - rc, 0); /* read fault */
-        return X86EMUL_PROPAGATE_FAULT;
+        return X86EMUL_EXCEPTION;
     }
 
-    return X86EMUL_CONTINUE;
+    return X86EMUL_OKAY;
 }
 
 static int ptwr_emulated_update(
@@ -3190,7 +3190,7 @@ static int ptwr_emulated_update(
         if ( (rc = copy_from_user(&full, (void *)addr, sizeof(paddr_t))) != 0 )
         {
             propagate_page_fault(addr+sizeof(paddr_t)-rc, 0); /* read fault */
-            return X86EMUL_PROPAGATE_FAULT;
+            return X86EMUL_EXCEPTION;
         }
         /* Mask out bits provided by caller. */
         full &= ~((((paddr_t)1 << (bytes*8)) - 1) << (offset*8));
@@ -3273,7 +3273,7 @@ static int ptwr_emulated_update(
     /* Finally, drop the old PTE. */
     put_page_from_l1e(gl1e_to_ml1e(d, ol1e), d);
 
-    return X86EMUL_CONTINUE;
+    return X86EMUL_OKAY;
 }
 
 static int ptwr_emulated_write(
@@ -3333,6 +3333,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     struct page_info *page;
     l1_pgentry_t      pte;
     struct ptwr_emulate_ctxt ptwr_ctxt;
+    int rc;
 
     LOCK_BIGLOCK(d);
 
@@ -3357,7 +3358,9 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         IS_COMPAT(d) ? 32 : BITS_PER_LONG;
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
-    if ( x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops) )
+
+    rc = x86_emulate(&ptwr_ctxt.ctxt, &ptwr_emulate_ops);
+    if ( rc == X86EMUL_UNHANDLEABLE )
         goto bail;
 
     UNLOCK_BIGLOCK(d);

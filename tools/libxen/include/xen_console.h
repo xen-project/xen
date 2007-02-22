@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,12 +22,13 @@
 #include "xen_common.h"
 #include "xen_console_decl.h"
 #include "xen_console_protocol.h"
+#include "xen_string_string_map.h"
 #include "xen_vm_decl.h"
 
 
 /*
- * The console class. 
- *  
+ * The console class.
+ * 
  * A console.
  */
 
@@ -65,8 +66,9 @@ typedef struct xen_console_record
     xen_console handle;
     char *uuid;
     enum xen_console_protocol protocol;
-    char *uri;
+    char *location;
     struct xen_vm_record_opt *vm;
+    xen_string_string_map *other_config;
 } xen_console_record;
 
 /**
@@ -191,10 +193,10 @@ xen_console_get_protocol(xen_session *session, enum xen_console_protocol *result
 
 
 /**
- * Get the uri field of the given console.
+ * Get the location field of the given console.
  */
 extern bool
-xen_console_get_uri(xen_session *session, char **result, xen_console console);
+xen_console_get_location(xen_session *session, char **result, xen_console console);
 
 
 /**
@@ -202,6 +204,37 @@ xen_console_get_uri(xen_session *session, char **result, xen_console console);
  */
 extern bool
 xen_console_get_vm(xen_session *session, xen_vm *result, xen_console console);
+
+
+/**
+ * Get the other_config field of the given console.
+ */
+extern bool
+xen_console_get_other_config(xen_session *session, xen_string_string_map **result, xen_console console);
+
+
+/**
+ * Set the other_config field of the given console.
+ */
+extern bool
+xen_console_set_other_config(xen_session *session, xen_console console, xen_string_string_map *other_config);
+
+
+/**
+ * Add the given key-value pair to the other_config field of the given
+ * console.
+ */
+extern bool
+xen_console_add_to_other_config(xen_session *session, xen_console console, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * other_config field of the given console.  If the key is not in that Map,
+ * then do nothing.
+ */
+extern bool
+xen_console_remove_from_other_config(xen_session *session, xen_console console, char *key);
 
 
 #endif

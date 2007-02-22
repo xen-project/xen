@@ -16,18 +16,20 @@ void __bug(char *file, int line) __attribute__((noreturn));
 /* Force a compilation error if condition is true */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2 * !!(condition)]))
 
+#ifndef assert_failed
+#define assert_failed(p)                                        \
+do {                                                            \
+    printk("Assertion '%s' failed, line %d, file %s\n", #p ,    \
+                   __LINE__, __FILE__);                         \
+    BUG();                                                      \
+} while (0)
+#endif
+
 #ifndef NDEBUG
-#define ASSERT(_p)                                                      \
-    do {                                                                \
-        if ( unlikely(!(_p)) )                                          \
-        {                                                               \
-            printk("Assertion '%s' failed, line %d, file %s\n", #_p ,   \
-                   __LINE__, __FILE__);                                 \
-            BUG();                                                      \
-        }                                                               \
-    } while ( 0 )
+#define ASSERT(p) \
+    do { if ( unlikely(!(p)) ) assert_failed(p); } while (0)
 #else
-#define ASSERT(_p) ((void)0)
+#define ASSERT(p) ((void)0)
 #endif
 
 #define SWAP(_a, _b) \

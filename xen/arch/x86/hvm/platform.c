@@ -1136,6 +1136,7 @@ void handle_mmio(unsigned long gpa)
          * Since the source is always in (contiguous) mmio space we don't
          * need to break it up into pages.
          */
+        mmio_op->operand[0] = mk_operand(op_size, 0, 0, REGISTER);
         send_mmio_req(IOREQ_TYPE_COPY, gpa,
                       GET_REPEAT_COUNT(), op_size, 0, IOREQ_READ, df, 0);
         break;

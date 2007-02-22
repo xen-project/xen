@@ -47,6 +47,7 @@ struct backend_info
 	blkif_t *blkif;
 	struct xenbus_watch backend_watch;
 	int xenbus_id;
+	int group_added;
 };
 
 
@@ -112,6 +113,80 @@ static int blktap_name(blkif_t *blkif, char *buf)
 	return 0;
 }
 
+/****************************************************************
+ *  sysfs interface for VBD I/O requests
+ */
+
+#define VBD_SHOW(name, format, args...)					\
+	static ssize_t show_##name(struct device *_dev,			\
+				   struct device_attribute *attr,	\
+				   char *buf)				\
+	{								\
+		struct xenbus_device *dev = to_xenbus_device(_dev);	\
+		struct backend_info *be = dev->dev.driver_data;		\
+									\
+		return sprintf(buf, format, ##args);			\
+	}								\
+	DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
+
+VBD_SHOW(tap_oo_req,  "%d\n", be->blkif->st_oo_req);
+VBD_SHOW(tap_rd_req,  "%d\n", be->blkif->st_rd_req);
+VBD_SHOW(tap_wr_req,  "%d\n", be->blkif->st_wr_req);
+VBD_SHOW(tap_rd_sect, "%d\n", be->blkif->st_rd_sect);
+VBD_SHOW(tap_wr_sect, "%d\n", be->blkif->st_wr_sect);
+
+static struct attribute *tapstat_attrs[] = {
+	&dev_attr_tap_oo_req.attr,
+	&dev_attr_tap_rd_req.attr,
+	&dev_attr_tap_wr_req.attr,
+	&dev_attr_tap_rd_sect.attr,
+	&dev_attr_tap_wr_sect.attr,
+	NULL
+};
+
+static struct attribute_group tapstat_group = {
+	.name = "statistics",
+	.attrs = tapstat_attrs,
+};
+
+int xentap_sysfs_addif(struct xenbus_device *dev)
+{
+	int err;
+	struct backend_info *be = dev->dev.driver_data;
+	err = sysfs_create_group(&dev->dev.kobj, &tapstat_group);
+	if (!err)
+		be->group_added = 1;
+	return err;
+}
+
+void xentap_sysfs_delif(struct xenbus_device *dev)
+{
+	sysfs_remove_group(&dev->dev.kobj, &tapstat_group);
+}
+
+static int blktap_remove(struct xenbus_device *dev)
+{
+	struct backend_info *be = dev->dev.driver_data;
+
+	if (be->backend_watch.node) {
+		unregister_xenbus_watch(&be->backend_watch);
+		kfree(be->backend_watch.node);
+		be->backend_watch.node = NULL;
+	}
+	if (be->blkif) {
+		if (be->blkif->xenblkd)
+			kthread_stop(be->blkif->xenblkd);
+		signal_tapdisk(be->blkif->dev_num);
+		tap_blkif_free(be->blkif);
+		be->blkif = NULL;
+	}
+	if (be->group_added)
+		xentap_sysfs_delif(be->dev);
+	kfree(be);
+	dev->dev.driver_data = NULL;
+	return 0;
+}
+
 static void tap_update_blkif_status(blkif_t *blkif)
 { 
 	int err;
@@ -137,6 +212,13 @@ static void tap_update_blkif_status(blkif_t *blkif)
 		return;
 	}
 
+	err = xentap_sysfs_addif(blkif->be->dev);
+	if (err) {
+		xenbus_dev_fatal(blkif->be->dev, err, 
+				 "creating sysfs entries");
+		return;
+	}
+
 	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif, name);
 	if (IS_ERR(blkif->xenblkd)) {
 		err = PTR_ERR(blkif->xenblkd);
@@ -144,27 +226,6 @@ static void tap_update_blkif_status(blkif_t *blkif)
 		xenbus_dev_fatal(blkif->be->dev, err, "start xenblkd");
 		WPRINTK("Error starting thread\n");
 	}
-}
-
-static int blktap_remove(struct xenbus_device *dev)
-{
-	struct backend_info *be = dev->dev.driver_data;
-
-	if (be->backend_watch.node) {
-		unregister_xenbus_watch(&be->backend_watch);
-		kfree(be->backend_watch.node);
-		be->backend_watch.node = NULL;
-	}
-	if (be->blkif) {
-		if (be->blkif->xenblkd)
-			kthread_stop(be->blkif->xenblkd);
-		signal_tapdisk(be->blkif->dev_num);
-		tap_blkif_free(be->blkif);
-		be->blkif = NULL;
-	}
-	kfree(be);
-	dev->dev.driver_data = NULL;
-	return 0;
 }
 
 /**
