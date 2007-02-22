@@ -561,6 +561,9 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     snprintf(s, sizeof(s), "xen-%d.%d-ia64 ", major, minor);
     safe_strcat(*info, s);
 
+    snprintf(s, sizeof(s), "xen-%d.%d-ia64be ", major, minor);
+    safe_strcat(*info, s);
+
     if (vmx_enabled)
     {
         snprintf(s, sizeof(s), "hvm-%d.%d-ia64 ", major, minor);

@@ -91,6 +91,8 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 
 	regs->cr_iip = ((unsigned long)PSCBX(v, iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+	if (PSCB(v, dcr) & IA64_DCR_BE)
+		regs->cr_ipsr |= IA64_PSR_BE;
 
 	if (PSCB(v, hpsr_dfh))
 		regs->cr_ipsr |= IA64_PSR_DFH;  
@@ -154,6 +156,8 @@ void reflect_event(void)
 
 	regs->cr_iip = v->arch.event_callback_ip;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+	if (PSCB(v, dcr) & IA64_DCR_BE)
+		regs->cr_ipsr |= IA64_PSR_BE;
 
 	if (PSCB(v, hpsr_dfh))
 		regs->cr_ipsr |= IA64_PSR_DFH;

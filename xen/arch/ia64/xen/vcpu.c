@@ -326,7 +326,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 	// just handle psr.sp,pp and psr.i,ic (and user mask) for now
 	mask =
 	    IA64_PSR_PP | IA64_PSR_SP | IA64_PSR_I | IA64_PSR_IC | IA64_PSR_UM |
-	    IA64_PSR_DT | IA64_PSR_DFL | IA64_PSR_DFH;
+	    IA64_PSR_DT | IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_BE;
 	if (imm24 & ~mask)
 		return IA64_ILLOP_FAULT;
 	if (imm.dfh) {
@@ -370,10 +370,8 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 		ipsr->up = 1;
 		psr.up = 1;
 	}
-	if (imm.be) {
-		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
-		return IA64_ILLOP_FAULT;
-	}
+	if (imm.be)
+		ipsr->be = 1;
 	if (imm.dt)
 		vcpu_set_metaphysical_mode(vcpu, FALSE);
 	__asm__ __volatile(";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
@@ -450,10 +448,8 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 		vcpu_set_metaphysical_mode(vcpu, FALSE);
 	else
 		vcpu_set_metaphysical_mode(vcpu, TRUE);
-	if (newpsr.be) {
-		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
-		return IA64_ILLOP_FAULT;
-	}
+	if (newpsr.be)
+		ipsr->be = 1;
 	if (enabling_interrupts &&
 	    vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu, pending_interruption) = 1;
@@ -506,9 +502,6 @@ u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 
 	//printk("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
 	psr.i64 = prevpsr;
-	psr.ia64_psr.be = 0;
-	if (dcr & IA64_DCR_BE)
-		psr.ia64_psr.be = 1;
 	psr.ia64_psr.pp = 0;
 	if (dcr & IA64_DCR_PP)
 		psr.ia64_psr.pp = 1;
@@ -1376,10 +1369,6 @@ IA64FAULT vcpu_rfi(VCPU * vcpu)
 	psr.ia64_psr.it = 1;
 	psr.ia64_psr.bn = 1;
 	//psr.pk = 1;  // checking pkeys shouldn't be a problem but seems broken
-	if (psr.ia64_psr.be) {
-		printk("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
-		return IA64_ILLOP_FAULT;
-	}
 
 	ifs = PSCB(vcpu, ifs);
 	if (ifs & 0x8000000000000000UL) 
