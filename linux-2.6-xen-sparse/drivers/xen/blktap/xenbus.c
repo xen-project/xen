@@ -47,6 +47,7 @@ struct backend_info
 	blkif_t *blkif;
 	struct xenbus_watch backend_watch;
 	int xenbus_id;
+	int group_added;
 };
 
 
@@ -150,7 +151,12 @@ static struct attribute_group tapstat_group = {
 
 int xentap_sysfs_addif(struct xenbus_device *dev)
 {
-	return sysfs_create_group(&dev->dev.kobj, &tapstat_group);
+	int err;
+	struct backend_info *be = dev->dev.driver_data;
+	err = sysfs_create_group(&dev->dev.kobj, &tapstat_group);
+	if (!err)
+		be->group_added = 1;
+	return err;
 }
 
 void xentap_sysfs_delif(struct xenbus_device *dev)
@@ -174,7 +180,8 @@ static int blktap_remove(struct xenbus_device *dev)
 		tap_blkif_free(be->blkif);
 		be->blkif = NULL;
 	}
-	xentap_sysfs_delif(be->dev);
+	if (be->group_added)
+		xentap_sysfs_delif(be->dev);
 	kfree(be);
 	dev->dev.driver_data = NULL;
 	return 0;
