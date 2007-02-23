@@ -152,9 +152,9 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize aio state. */
-int tdaio_open (struct disk_driver *dd, const char *name)
+int tdaio_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
-	int i, fd, ret = 0;
+	int i, fd, ret = 0, o_flags;
 	struct td_state    *s   = dd->td_state;
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
@@ -187,12 +187,15 @@ int tdaio_open (struct disk_driver *dd, const char *name)
 		prv->iocb_free[i] = &prv->iocb_list[i];
 
 	/* Open the file */
-        fd = open(name, O_RDWR | O_DIRECT | O_LARGEFILE);
+	o_flags = O_DIRECT | O_LARGEFILE | 
+		((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
+        fd = open(name, o_flags);
 
         if ( (fd == -1) && (errno == EINVAL) ) {
 
                 /* Maybe O_DIRECT isn't supported. */
-                fd = open(name, O_RDWR | O_LARGEFILE);
+		o_flags &= ~O_DIRECT;
+                fd = open(name, o_flags);
                 if (fd != -1) DPRINTF("WARNING: Accessing image without"
                                      "O_DIRECT! (%s)\n", name);
 
@@ -280,6 +283,9 @@ int tdaio_submit(struct disk_driver *dd)
 	int ret;
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
+	if (!prv->iocb_queued)
+		return 0;
+
 	ret = io_submit(prv->aio_ctx, prv->iocb_queued, prv->iocb_queue);
 	
 	/* XXX: TODO: Handle error conditions here. */
@@ -324,12 +330,13 @@ int tdaio_do_callbacks(struct disk_driver *dd, int sid)
 	return rsp;
 }
 
-int tdaio_has_parent(struct disk_driver *dd)
+int tdaio_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
-	return 0;
+	return TD_NO_PARENT;
 }
 
-int tdaio_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+int tdaio_validate_parent(struct disk_driver *dd, 
+			  struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;
 }
@@ -341,8 +348,8 @@ struct tap_disk tapdisk_aio = {
 	.td_queue_read      = tdaio_queue_read,
 	.td_queue_write     = tdaio_queue_write,
 	.td_submit          = tdaio_submit,
-	.td_has_parent      = tdaio_has_parent,
-	.td_get_parent      = tdaio_get_parent,
 	.td_close           = tdaio_close,
 	.td_do_callbacks    = tdaio_do_callbacks,
+	.td_get_parent_id   = tdaio_get_parent_id,
+	.td_validate_parent = tdaio_validate_parent
 };

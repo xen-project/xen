@@ -42,10 +42,15 @@
  * 
  *   - The fd used for poll is an otherwise unused pipe, which allows poll to 
  *     be safely called without ever returning anything.
- * 
+ *
  * NOTE: tapdisk uses the number of sectors submitted per request as a 
  * ref count.  Plugins must use the callback function to communicate the
  * completion--or error--of every sector submitted to them.
+ *
+ * td_get_parent_id returns:
+ *     0 if parent id successfully retrieved
+ *     TD_NO_PARENT if no parent exists
+ *     -errno on error
  */
 
 #ifndef TAPDISK_H_
@@ -71,12 +76,23 @@
 #define MAX_IOFD                 2
 
 #define BLK_NOT_ALLOCATED       99
+#define TD_NO_PARENT             1
+
+typedef uint32_t td_flag_t;
+
+#define TD_RDONLY                1
 
 struct td_state;
 struct tap_disk;
 
+struct disk_id {
+	char *name;
+	int drivertype;
+};
+
 struct disk_driver {
 	int early;
+	char *name;
 	void *private;
 	int io_fd[MAX_IOFD];
 	struct tap_disk *drv;
@@ -105,18 +121,20 @@ typedef int (*td_callback_t)(struct disk_driver *dd, int res, uint64_t sector,
 struct tap_disk {
 	const char *disk_type;
 	int private_data_size;
-	int (*td_open)        (struct disk_driver *dd, const char *name);
-	int (*td_queue_read)  (struct disk_driver *dd, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb, 
-			       int id, void *prv);
-	int (*td_queue_write) (struct disk_driver *dd, uint64_t sector,
-			       int nb_sectors, char *buf, td_callback_t cb, 
-			       int id, void *prv);
-	int (*td_submit)      (struct disk_driver *dd);
-	int (*td_has_parent)  (struct disk_driver *dd);
-	int (*td_get_parent)  (struct disk_driver *dd, struct disk_driver *p);
-	int (*td_close)       (struct disk_driver *dd);
-	int (*td_do_callbacks)(struct disk_driver *dd, int sid);
+	int (*td_open)           (struct disk_driver *dd, 
+				  const char *name, td_flag_t flags);
+	int (*td_queue_read)     (struct disk_driver *dd, uint64_t sector,
+				  int nb_sectors, char *buf, td_callback_t cb,
+				  int id, void *prv);
+	int (*td_queue_write)    (struct disk_driver *dd, uint64_t sector,
+				  int nb_sectors, char *buf, td_callback_t cb, 
+				  int id, void *prv);
+	int (*td_submit)         (struct disk_driver *dd);
+	int (*td_close)          (struct disk_driver *dd);
+	int (*td_do_callbacks)   (struct disk_driver *dd, int sid);
+	int (*td_get_parent_id)  (struct disk_driver *dd, struct disk_id *id);
+	int (*td_validate_parent)(struct disk_driver *dd, 
+				  struct disk_driver *p, td_flag_t flags);
 };
 
 typedef struct disk_info {

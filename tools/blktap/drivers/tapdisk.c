@@ -81,6 +81,15 @@ void daemonize(void)
 	return;
 }
 
+static void free_driver(struct disk_driver *d)
+{
+	if (d->name)
+		free(d->name);
+	if (d->private)
+		free(d->private);
+	free(d);
+}
+
 static void unmap_disk(struct td_state *s)
 {
 	tapdev_info_t *info = s->ring_info;
@@ -91,8 +100,7 @@ static void unmap_disk(struct td_state *s)
 	while (dd) {
 		tmp = dd->next;
 		dd->drv->td_close(dd);
-		free(dd->private);
-		free(dd);
+		free_driver(dd);
 		dd = tmp;
 	}
 
@@ -112,7 +120,6 @@ static void unmap_disk(struct td_state *s)
 	free(s);
 
 	return;
-
 }
 
 void sig_handler(int sig)
@@ -205,26 +212,6 @@ static struct td_state *state_init(void)
 	return s;
 }
 
-static struct disk_driver *disk_init(struct td_state *s, struct tap_disk *drv)
-{
-	struct disk_driver *dd;
-
-	dd = calloc(1, sizeof(struct disk_driver));
-	if (!dd)
-		return NULL;
-	
-	dd->private = malloc(drv->private_data_size);
-	if (!dd->private) {
-		free(dd);
-		return NULL;
-	}
-
-	dd->drv      = drv;
-	dd->td_state = s;
-
-	return dd;
-}
-
 static int map_new_dev(struct td_state *s, int minor)
 {
 	int tap_fd;
@@ -280,49 +267,94 @@ static int map_new_dev(struct td_state *s, int minor)
 	return -1;
 }
 
-static int open_disk(struct td_state *s, struct disk_driver *dd, char *path)
+static struct disk_driver *disk_init(struct td_state *s, 
+				     struct tap_disk *drv, char *name)
+{
+	struct disk_driver *dd;
+
+	dd = calloc(1, sizeof(struct disk_driver));
+	if (!dd)
+		return NULL;
+	
+	dd->private = malloc(drv->private_data_size);
+	if (!dd->private) {
+		free(dd);
+		return NULL;
+	}
+
+	dd->drv      = drv;
+	dd->td_state = s;
+	dd->name     = name;
+
+	return dd;
+}
+
+static int open_disk(struct td_state *s, struct tap_disk *drv, char *path)
 {
 	int err;
-	struct disk_driver *d = dd;
+	char *dup;
+	struct disk_id id;
+	struct disk_driver *d;
 
-	err = dd->drv->td_open(dd, path);
+	dup = strdup(path);
+	if (!dup)
+		return -ENOMEM;
+
+	memset(&id, 0, sizeof(struct disk_id));
+	s->disks = d = disk_init(s, drv, dup);
+	if (!d)
+		return -ENOMEM;
+
+	err = drv->td_open(d, path, 0);
 	if (err)
-		return err;
+		goto fail;
 
 	/* load backing files as necessary */
-	while (d->drv->td_has_parent(d)) {
+	while ((err = d->drv->td_get_parent_id(d, &id)) == 0) {
 		struct disk_driver *new;
 		
-		new = calloc(1, sizeof(struct disk_driver));
+		if (id.drivertype > MAX_DISK_TYPES || 
+		    !get_driver(id.drivertype) || !id.name)
+			goto fail;
+
+		dup = strdup(id.name);
+		if (!dup)
+			goto fail;
+
+		new = disk_init(s, get_driver(id.drivertype), dup);
 		if (!new)
 			goto fail;
-		new->drv      = d->drv;
-		new->td_state = s;
-		new->private  = malloc(new->drv->private_data_size);
-		if (!new->private) {
-			free(new);
-			goto fail;
-		}
-		
-		err = d->drv->td_get_parent(d, new);
+
+		err = new->drv->td_open(new, new->name, TD_RDONLY);
 		if (err)
 			goto fail;
 
+		err = d->drv->td_validate_parent(d, new, 0);
+		if (err) {
+			d->next = new;
+			goto fail;
+		}
+
 		d = d->next = new;
+		free(id.name);
 	}
 
-	return 0;
+	if (err >= 0)
+		return 0;
 
  fail:
 	DPRINTF("failed opening disk\n");
-	while (dd) {
-		d = dd->next;
-		dd->drv->td_close(dd);
-		free(dd->private);
-		free(dd);
-		dd = d;
+	if (id.name)
+		free(id.name);
+	d = s->disks;
+	while (d) {
+		struct disk_driver *tmp = d->next;
+		d->drv->td_close(d);
+		free_driver(d);
+		d = tmp;
 	}
-	return err;
+	s->disks = NULL;
+	return -1;
 }
 
 static int read_msg(char *buf)
@@ -334,7 +366,6 @@ static int read_msg(char *buf)
 	msg_newdev_t *msg_dev;
 	msg_pid_t *msg_pid;
 	struct tap_disk *drv;
-	struct disk_driver *dd;
 	int ret = -1;
 	struct td_state *s = NULL;
 	fd_list_entry_t *entry;
@@ -369,14 +400,8 @@ static int read_msg(char *buf)
 			if (s == NULL)
 				goto params_done;
 
-			s->disks = dd = disk_init(s, drv);
-			if (!dd) {
-				free(s);
-				goto params_done;
-			}
-
 			/*Open file*/
-			ret = open_disk(s, dd, path);
+			ret = open_disk(s, drv, path);
 			if (ret)
 				goto params_done;
 
@@ -782,6 +807,19 @@ int main(int argc, char *argv[])
 						     &readfds)) {
 						io_done(dd, READ);
 						progress_made = 1;
+					}
+				}
+
+				/* completed io from above may have 
+				 * queued new requests on chained disks */
+				if (progress_made) {
+					td_for_each_disk(ptr->s, dd) {
+						dd->early += 
+							dd->drv->td_submit(dd);
+						if (dd->early > 0) {
+							io_done(dd, 10);
+							dd->early = 0;
+						}
 					}
 				}
 

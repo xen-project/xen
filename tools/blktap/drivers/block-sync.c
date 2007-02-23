@@ -118,9 +118,9 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize aio state. */
-int tdsync_open (struct disk_driver *dd, const char *name)
+int tdsync_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
-	int i, fd, ret = 0;
+	int i, fd, ret = 0, o_flags;
 	struct td_state     *s   = dd->td_state;
 	struct tdsync_state *prv = (struct tdsync_state *)dd->private;
 	
@@ -130,11 +130,14 @@ int tdsync_open (struct disk_driver *dd, const char *name)
 		return (0 - errno);
 	
 	/* Open the file */
-        fd = open(name, O_RDWR | O_DIRECT | O_LARGEFILE);
+	o_flags = O_DIRECT | O_LARGEFILE | 
+		((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
+        fd = open(name, o_flags);
 
         if ( (fd == -1) && (errno == EINVAL) ) {
 
                 /* Maybe O_DIRECT isn't supported. */
+		o_flags &= ~O_DIRECT;
                 fd = open(name, O_RDWR | O_LARGEFILE);
                 if (fd != -1) DPRINTF("WARNING: Accessing image without"
                                      "O_DIRECT! (%s)\n", name);
@@ -223,12 +226,13 @@ int tdsync_do_callbacks(struct disk_driver *dd, int sid)
 	return 1;
 }
 
-int tdsync_has_parent(struct disk_driver *dd)
+int tdsync_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
-	return 0;
+	return TD_NO_PARENT;
 }
 
-int tdsync_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+int tdsync_validate_parent(struct disk_driver *dd, 
+			   struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;
 }
@@ -240,8 +244,8 @@ struct tap_disk tapdisk_sync = {
 	.td_queue_read       = tdsync_queue_read,
 	.td_queue_write      = tdsync_queue_write,
 	.td_submit           = tdsync_submit,
-	.td_has_parent       = tdsync_has_parent,
-	.td_get_parent       = tdsync_get_parent,
 	.td_close            = tdsync_close,
 	.td_do_callbacks     = tdsync_do_callbacks,
+	.td_get_parent_id    = tdsync_get_parent_id,
+	.td_validate_parent  = tdsync_validate_parent
 };
