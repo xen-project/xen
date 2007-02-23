@@ -30,7 +30,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>

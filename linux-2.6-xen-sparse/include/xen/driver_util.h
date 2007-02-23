@@ -2,7 +2,6 @@
 #ifndef __ASM_XEN_DRIVER_UTIL_H__
 #define __ASM_XEN_DRIVER_UTIL_H__
 
-#include <linux/config.h>
 #include <linux/vmalloc.h>
 
 /* Allocate/destroy a 'vmalloc' VM area. */

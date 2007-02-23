@@ -6,7 +6,6 @@
 #ifndef __XEN_ASM_PCIFRONT_H__
 #define __XEN_ASM_PCIFRONT_H__
 
-#include <linux/config.h>
 #include <linux/spinlock.h>
 
 #ifdef __KERNEL__

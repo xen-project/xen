@@ -28,7 +28,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <linux/config.h>
 #include <linux/capability.h>
 #include <linux/stat.h>
 #include <linux/sysdev.h>

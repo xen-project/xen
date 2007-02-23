@@ -10,7 +10,6 @@
  *
  * Hacked to pieces for Xen by Chris Wright.
  */
-#include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/cpumask.h>
 #include <linux/string.h>

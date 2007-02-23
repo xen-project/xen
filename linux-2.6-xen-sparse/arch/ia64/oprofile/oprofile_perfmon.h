@@ -1,8 +1,6 @@
 #ifndef OPROFILE_PERFMON_H
 #define OPROFILE_PERFMON_H
 
-#include <linux/config.h>
-
 #ifdef CONFIG_PERFMON
 int __perfmon_init(void);
 void __perfmon_exit(void);

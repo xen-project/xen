@@ -34,7 +34,6 @@
 #ifndef __ASM_EVTCHN_H__
 #define __ASM_EVTCHN_H__
 
-#include <linux/config.h>
 #include <linux/interrupt.h>
 #include <asm/hypervisor.h>
 #include <asm/ptrace.h>
