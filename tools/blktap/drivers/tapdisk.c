@@ -306,8 +306,11 @@ static int open_disk(struct td_state *s, struct tap_disk *drv, char *path)
 		return -ENOMEM;
 
 	err = drv->td_open(d, path, 0);
-	if (err)
-		goto fail;
+	if (err) {
+		free_driver(d);
+		s->disks = NULL;
+		return -ENOMEM;
+	}
 
 	/* load backing files as necessary */
 	while ((err = d->drv->td_get_parent_id(d, &id)) == 0) {
