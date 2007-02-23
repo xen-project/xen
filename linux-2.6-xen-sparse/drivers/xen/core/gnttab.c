@@ -518,25 +518,26 @@ int gnttab_suspend(void)
 static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 {
 	struct xen_add_to_physmap xatp;
-	unsigned int i;
+	unsigned int i = end_idx;
 
 	/* Loop backwards, so that the first hypercall has the largest index,
 	 * ensuring that the table will grow only once.
 	 */
-	for (i = end_idx; i >= start_idx; i--) {
+	do {
 		xatp.domid = DOMID_SELF;
 		xatp.idx = i;
 		xatp.space = XENMAPSPACE_grant_table;
 		xatp.gpfn = (resume_frames >> PAGE_SHIFT) + i;
 		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
 			BUG();
-	}
+	} while (i-- > start_idx);
+
+	return 0;
 }
 
 int gnttab_resume(void)
 {
-	struct xen_add_to_physmap xatp;
-	unsigned int i, max_nr_gframes, nr_gframes;
+	unsigned int max_nr_gframes, nr_gframes;
 
 	nr_gframes = nr_grant_frames;
 	max_nr_gframes = max_nr_grant_frames();
