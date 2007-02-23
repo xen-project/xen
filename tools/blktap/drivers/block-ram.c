@@ -135,11 +135,11 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize ram state. */
-int tdram_open (struct disk_driver *dd, const char *name)
+int tdram_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
 	char *p;
 	uint64_t size;
-	int i, fd, ret = 0, count = 0;
+	int i, fd, ret = 0, count = 0, o_flags;
 	struct td_state    *s     = dd->td_state;
 	struct tdram_state *prv   = (struct tdram_state *)dd->private;
 
@@ -167,12 +167,15 @@ int tdram_open (struct disk_driver *dd, const char *name)
 	}
 
 	/* Open the file */
-        fd = open(name, O_RDWR | O_DIRECT | O_LARGEFILE);
+	o_flags = O_DIRECT | O_LARGEFILE | 
+		((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
+        fd = open(name, o_flags);
 
         if ((fd == -1) && (errno == EINVAL)) {
 
                 /* Maybe O_DIRECT isn't supported. */
-                fd = open(name, O_RDWR | O_LARGEFILE);
+		o_flags &= ~O_DIRECT;
+                fd = open(name, o_flags);
                 if (fd != -1) DPRINTF("WARNING: Accessing image without"
                                      "O_DIRECT! (%s)\n", name);
 
@@ -275,12 +278,13 @@ int tdram_do_callbacks(struct disk_driver *dd, int sid)
 	return 1;
 }
 
-int tdram_has_parent(struct disk_driver *dd)
+int tdram_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
-	return 0;
+	return TD_NO_PARENT;
 }
 
-int tdram_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+int tdram_validate_parent(struct disk_driver *dd, 
+			  struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;
 }
@@ -292,8 +296,8 @@ struct tap_disk tapdisk_ram = {
 	.td_queue_read      = tdram_queue_read,
 	.td_queue_write     = tdram_queue_write,
 	.td_submit          = tdram_submit,
-	.td_has_parent      = tdram_has_parent,
-	.td_get_parent      = tdram_get_parent,
 	.td_close           = tdram_close,
 	.td_do_callbacks    = tdram_do_callbacks,
+	.td_get_parent_id   = tdram_get_parent_id,
+	.td_validate_parent = tdram_validate_parent
 };

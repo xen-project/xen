@@ -2901,8 +2901,28 @@ static int sh_page_fault(struct vcpu *v,
         goto not_a_shadow_fault;
 
     if ( is_hvm_domain(d) )
+    {
+        /*
+         * If we are in the middle of injecting an exception or interrupt then
+         * we should not emulate: it is not the instruction at %eip that caused
+         * the fault. Furthermore it is almost certainly the case the handler
+         * stack is currently considered to be a page table, so we should
+         * unshadow the faulting page before exiting.
+         */
+        if ( unlikely(hvm_event_injection_faulted(v)) )
+        {
+            gdprintk(XENLOG_DEBUG, "write to pagetable during event "
+                     "injection: cr2=%#lx, mfn=%#lx\n", 
+                     va, mfn_x(gmfn));
+            sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+            goto done;
+        }
+
         hvm_store_cpu_guest_regs(v, regs, NULL);
-    SHADOW_PRINTK("emulate: eip=%#lx\n", (unsigned long)regs->eip);
+    }
+
+    SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
+                  (unsigned long)regs->eip, (unsigned long)regs->esp);
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 

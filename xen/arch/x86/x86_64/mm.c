@@ -44,7 +44,8 @@ struct page_info *alloc_xen_pagetable(void)
     if ( !early_boot )
         return alloc_domheap_page(NULL);
 
-    pfn = alloc_boot_pages(1, 1);
+    /* Early pagetables must come from low 1GB of memory. */
+    pfn = alloc_boot_low_pages(1, 1); /* 0x0 - 0x40000000 */
     return ((pfn == 0) ? NULL : mfn_to_page(pfn));
 }
 

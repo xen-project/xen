@@ -95,9 +95,10 @@ static unsigned long scrub_pages;
 static unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
-#define allocated_in_map(_pn)                 \
-( !! (alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & \
-     (1UL<<((_pn)&(PAGES_PER_MAPWORD-1)))) )
+#define allocated_in_map(_pn)                       \
+({  unsigned long ___pn = (_pn);                    \
+    !!(alloc_bitmap[___pn/PAGES_PER_MAPWORD] &      \
+       (1UL<<(___pn&(PAGES_PER_MAPWORD-1)))); })
 
 /*
  * Hint regarding bitwise arithmetic in map_{alloc,free}:
@@ -240,36 +241,65 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-unsigned long alloc_boot_pages_at(unsigned long nr_pfns, unsigned long pfn_at)
+int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
 {
     unsigned long i;
 
     for ( i = 0; i < nr_pfns; i++ )
-        if ( allocated_in_map(pfn_at + i) )
+        if ( allocated_in_map(first_pfn + i) )
              break;
 
-    if ( i == nr_pfns )
+    if ( i != nr_pfns )
+        return 0;
+
+    map_alloc(first_pfn, nr_pfns);
+    return 1;
+}
+
+unsigned long alloc_boot_low_pages(
+    unsigned long nr_pfns, unsigned long pfn_align)
+{
+    unsigned long pg, i;
+
+    /* Search forwards to obtain lowest available range. */
+    for ( pg = first_valid_mfn & ~(pfn_align-1);
+          (pg + nr_pfns) < max_page;
+          pg = (pg + i + pfn_align - 1) & ~(pfn_align - 1) )
     {
-        map_alloc(pfn_at, nr_pfns);
-        return pfn_at;
+        for ( i = 0; i < nr_pfns; i++ )
+            if ( allocated_in_map(pg+i) )
+                break;
+        if ( i == nr_pfns )
+        {
+            map_alloc(pg, nr_pfns);
+            return pg;
+        }
     }
 
     return 0;
 }
 
-unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
+unsigned long alloc_boot_pages(
+    unsigned long nr_pfns, unsigned long pfn_align)
 {
-    unsigned long pg;
+    unsigned long pg, i;
 
-    pg = first_valid_mfn & ~(pfn_align-1);
-    while ( (pg + nr_pfns) < max_page )
+    /* Search backwards to obtain highest available range. */
+    for ( pg = (max_page - nr_pfns) & ~(pfn_align - 1);
+          pg >= first_valid_mfn;
+          pg = (pg + i - nr_pfns) & ~(pfn_align - 1) )
     {
-        if ( alloc_boot_pages_at(nr_pfns, pg) != 0 )
-            break;
-        pg += pfn_align;
+        for ( i = 0; i < nr_pfns; i++ )
+            if ( allocated_in_map(pg+i) )
+                break;
+        if ( i == nr_pfns )
+        {
+            map_alloc(pg, nr_pfns);
+            return pg;
+        }
     }
 
-    return pg;
+    return 0;
 }
 
 

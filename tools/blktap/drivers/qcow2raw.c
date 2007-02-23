@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 	ddqcow.drv = &tapdisk_qcow;
 	ddqcow.private = malloc(ddqcow.drv->private_data_size);
 
-        if (ddqcow.drv->td_open(&ddqcow, argv[2])!=0) {
+        if (ddqcow.drv->td_open(&ddqcow, argv[2], TD_RDONLY)!=0) {
 		DFPRINTF("Unable to open Qcow file [%s]\n",argv[2]);
 		exit(-1);
 	} else DFPRINTF("QCOW file opened, size %llu\n",
@@ -270,7 +270,7 @@ int main(int argc, char *argv[])
 	ddaio.drv = &tapdisk_aio;
 	ddaio.private = malloc(ddaio.drv->private_data_size);
 
-        if (ddaio.drv->td_open(&ddaio, argv[1])!=0) {
+        if (ddaio.drv->td_open(&ddaio, argv[1], 0)!=0) {
 		DFPRINTF("Unable to open Qcow file [%s]\n", argv[1]);
 		exit(-1);
 	}

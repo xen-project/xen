@@ -56,6 +56,7 @@ PERFCOUNTER_CPU(shadow_fault_bail_user_supervisor,
 PERFCOUNTER_CPU(shadow_fault_emulate_read, "shadow_fault emulates a read")
 PERFCOUNTER_CPU(shadow_fault_emulate_write, "shadow_fault emulates a write")
 PERFCOUNTER_CPU(shadow_fault_emulate_failed, "shadow_fault emulator fails")
+PERFCOUNTER_CPU(shadow_fault_emulate_stack, "shadow_fault emulate stack write")
 PERFCOUNTER_CPU(shadow_fault_mmio,     "shadow_fault handled as mmio")
 PERFCOUNTER_CPU(shadow_fault_fixed,    "shadow_fault fixed fault")
 PERFCOUNTER_CPU(shadow_ptwr_emulate,   "shadow causes ptwr to emulate")
