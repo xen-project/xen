@@ -543,6 +543,18 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
             pte &= ~MADDR_MASK_X86;
             pte |= (uint64_t)pfn << PAGE_SHIFT;
+
+            /*
+             * PAE guest L3Es can contain these flags when running on
+             * a 64bit hypervisor. We zap these here to avoid any
+             * surprise at restore time...
+             */
+            if ( pt_levels == 3 &&
+                 type == XEN_DOMCTL_PFINFO_L3TAB &&
+                 pte & (_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED) )
+            {
+                pte &= ~(_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);
+            }
         }
 
         if (pt_levels == 2)
