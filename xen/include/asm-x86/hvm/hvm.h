@@ -135,7 +135,7 @@ struct hvm_function_table {
 
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
-    int  (*injection_pending)(struct vcpu *v);
+    int  (*event_injection_faulted)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -264,9 +264,9 @@ hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 
 int hvm_bringup_ap(int vcpuid, int trampoline_vector);
 
-static inline int hvm_injection_pending(struct vcpu *v)
+static inline int hvm_event_injection_faulted(struct vcpu *v)
 {
-    return hvm_funcs.injection_pending(v);
+    return hvm_funcs.event_injection_faulted(v);
 }
 
 #endif /* __ASM_X86_HVM_HVM_H__ */
