@@ -5768,17 +5768,17 @@ int unset_mm_mapping(int xc_handle, uint32_t domid,
     int err = 0;
     xc_dominfo_t info;
 
+    xc_domain_getinfo(xc_handle, domid, 1, &info);
+    if ((info.nr_pages - nr_pages) <= 0) {
+        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
+        err = -1;
+    }
+
     err = xc_domain_memory_decrease_reservation(xc_handle, domid,
                                                 nr_pages, 0, extent_start);
     if (err)
         fprintf(stderr, "Failed to decrease physmap\n");
 
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-
-    if ((info.nr_pages - nr_pages) <= 0) {
-        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
-        err = -1;
-    }
 
     if (xc_domain_setmaxmem(xc_handle, domid, (info.nr_pages - nr_pages) *
                             PAGE_SIZE/1024) != 0) {
