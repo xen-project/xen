@@ -17,6 +17,9 @@
 
 /* libxenstat API */
 
+#ifndef XENSTAT_H
+#define XENSTAT_H
+
 /* Opaque handles */
 typedef struct xenstat_handle xenstat_handle;
 typedef struct xenstat_domain xenstat_domain;
@@ -176,3 +179,5 @@ unsigned int xenstat_vbd_dev(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_oo_reqs(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_rd_reqs(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd);
+
+#endif /* XENSTAT_H */
