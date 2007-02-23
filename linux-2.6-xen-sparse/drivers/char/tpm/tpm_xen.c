@@ -641,7 +641,7 @@ static int tpm_xmit(struct tpm_private *tp,
 		}
 		gnttab_grant_foreign_access_ref( tx->ref,
 		                                 tp->backend_id,
-		                                 (tx->addr >> PAGE_SHIFT),
+		                                 virt_to_mfn(txb->data),
 		                                 0 /*RW*/);
 		wmb();
 	}
