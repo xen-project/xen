@@ -57,7 +57,11 @@
 extern shared_info_t *HYPERVISOR_shared_info;
 
 #define vcpu_info(cpu) (HYPERVISOR_shared_info->vcpu_info + (cpu))
+#ifdef CONFIG_SMP
 #define current_vcpu_info() vcpu_info(smp_processor_id())
+#else
+#define current_vcpu_info() vcpu_info(0)
+#endif
 
 #ifdef CONFIG_X86_32
 extern unsigned long hypervisor_virt_start;
