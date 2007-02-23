@@ -262,9 +262,9 @@ unsigned long alloc_boot_low_pages(
     unsigned long pg, i;
 
     /* Search forwards to obtain lowest available range. */
-    for ( pg = first_valid_mfn & ~(pfn_align-1);
-          (pg + nr_pfns) < max_page;
-          pg = (pg + i + pfn_align - 1) & ~(pfn_align - 1) )
+    for ( pg = first_valid_mfn & ~(pfn_align - 1);
+          (pg + nr_pfns) <= max_page;
+          pg = (pg + i + pfn_align) & ~(pfn_align - 1) )
     {
         for ( i = 0; i < nr_pfns; i++ )
             if ( allocated_in_map(pg+i) )
