@@ -322,78 +322,11 @@ static unsigned long avail[NR_ZONES][MAX_NUMNODES];
 
 static DEFINE_SPINLOCK(heap_lock);
 
-void end_boot_allocator(void)
-{
-    unsigned long i, j, k;
-    int curr_free, next_free;
-
-    memset(avail, 0, sizeof(avail));
-
-    for ( i = 0; i < NR_ZONES; i++ )
-        for ( j = 0; j < MAX_NUMNODES; j++ )
-            for ( k = 0; k <= MAX_ORDER; k++ )
-                INIT_LIST_HEAD(&heap[i][j][k]);
-
-    /* Pages that are free now go to the domain sub-allocator. */
-    if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
-        map_alloc(first_valid_mfn, 1);
-    for ( i = first_valid_mfn; i < max_page; i++ )
-    {
-        curr_free = next_free;
-        next_free = !allocated_in_map(i+1);
-        if ( next_free )
-            map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
-        if ( curr_free )
-            init_heap_pages(pfn_dom_zone_type(i), mfn_to_page(i), 1);
-    }
-
-    printk("Domain heap initialised: DMA width %u bits\n", dma_bitsize);
-}
-
-/* 
- * Hand the specified arbitrary page range to the specified heap zone
- * checking the node_id of the previous page.  If they differ and the
- * latter is not on a MAX_ORDER boundary, then we reserve the page by
- * not freeing it to the buddy allocator.
- */
-#define MAX_ORDER_ALIGNED (1UL << (MAX_ORDER))
-void init_heap_pages(
-    unsigned int zone, struct page_info *pg, unsigned long nr_pages)
-{
-    unsigned int nid_curr, nid_prev;
-    unsigned long i;
-
-    ASSERT(zone < NR_ZONES);
-
-    if ( likely(page_to_mfn(pg) != 0) )
-        nid_prev = phys_to_nid(page_to_maddr(pg-1));
-    else
-        nid_prev = phys_to_nid(page_to_maddr(pg));
-
-    for ( i = 0; i < nr_pages; i++ )
-    {
-        nid_curr = phys_to_nid(page_to_maddr(pg+i));
-
-        /*
-         * free pages of the same node, or if they differ, but are on a
-         * MAX_ORDER alignement boundary (which already get reserved)
-         */
-         if ( (nid_curr == nid_prev) || (page_to_maddr(pg+i) &
-                                         MAX_ORDER_ALIGNED) )
-             free_heap_pages(zone, pg+i, 0);
-         else
-             printk("Reserving non-aligned node boundary @ mfn %lu\n",
-                    page_to_mfn(pg+i));
-
-        nid_prev = nid_curr;
-    }
-}
-
 /* Allocate 2^@order contiguous pages. */
-struct page_info *alloc_heap_pages(unsigned int zone, unsigned int cpu,
-                                   unsigned int order)
+static struct page_info *alloc_heap_pages(
+    unsigned int zone, unsigned int cpu, unsigned int order)
 {
-    unsigned int i,j, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
+    unsigned int i, j, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
     unsigned int request = (1UL << order);
     struct page_info *pg;
 
@@ -452,13 +385,12 @@ struct page_info *alloc_heap_pages(unsigned int zone, unsigned int cpu,
     return pg;
 }
 
-
 /* Free 2^@order set of pages. */
-void free_heap_pages(
+static void free_heap_pages(
     unsigned int zone, struct page_info *pg, unsigned int order)
 {
     unsigned long mask;
-    int node = phys_to_nid(page_to_maddr(pg));
+    unsigned int node = phys_to_nid(page_to_maddr(pg));
 
     ASSERT(zone < NR_ZONES);
     ASSERT(order <= MAX_ORDER);
@@ -505,6 +437,87 @@ void free_heap_pages(
     spin_unlock(&heap_lock);
 }
 
+/*
+ * Hand the specified arbitrary page range to the specified heap zone
+ * checking the node_id of the previous page.  If they differ and the
+ * latter is not on a MAX_ORDER boundary, then we reserve the page by
+ * not freeing it to the buddy allocator.
+ */
+#define MAX_ORDER_ALIGNED (1UL << (MAX_ORDER))
+void init_heap_pages(
+    unsigned int zone, struct page_info *pg, unsigned long nr_pages)
+{
+    unsigned int nid_curr, nid_prev;
+    unsigned long i;
+
+    ASSERT(zone < NR_ZONES);
+
+    if ( likely(page_to_mfn(pg) != 0) )
+        nid_prev = phys_to_nid(page_to_maddr(pg-1));
+    else
+        nid_prev = phys_to_nid(page_to_maddr(pg));
+
+    for ( i = 0; i < nr_pages; i++ )
+    {
+        nid_curr = phys_to_nid(page_to_maddr(pg+i));
+
+        /*
+         * free pages of the same node, or if they differ, but are on a
+         * MAX_ORDER alignement boundary (which already get reserved)
+         */
+         if ( (nid_curr == nid_prev) || (page_to_maddr(pg+i) &
+                                         MAX_ORDER_ALIGNED) )
+             free_heap_pages(zone, pg+i, 0);
+         else
+             printk("Reserving non-aligned node boundary @ mfn %lu\n",
+                    page_to_mfn(pg+i));
+
+        nid_prev = nid_curr;
+    }
+}
+
+static unsigned long avail_heap_pages(
+    int zone, int node)
+{
+    unsigned int i, j, num_nodes = num_online_nodes();
+    unsigned long free_pages = 0;
+
+    for (i=0; i<NR_ZONES; i++)
+        if ( (zone == -1) || (zone == i) )
+            for (j=0; j < num_nodes; j++)
+                if ( (node == -1) || (node == j) )
+                    free_pages += avail[i][j];
+
+    return free_pages;
+}
+
+void end_boot_allocator(void)
+{
+    unsigned long i, j, k;
+    int curr_free, next_free;
+
+    memset(avail, 0, sizeof(avail));
+
+    for ( i = 0; i < NR_ZONES; i++ )
+        for ( j = 0; j < MAX_NUMNODES; j++ )
+            for ( k = 0; k <= MAX_ORDER; k++ )
+                INIT_LIST_HEAD(&heap[i][j][k]);
+
+    /* Pages that are free now go to the domain sub-allocator. */
+    if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
+        map_alloc(first_valid_mfn, 1);
+    for ( i = first_valid_mfn; i < max_page; i++ )
+    {
+        curr_free = next_free;
+        next_free = !allocated_in_map(i+1);
+        if ( next_free )
+            map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
+        if ( curr_free )
+            init_heap_pages(pfn_dom_zone_type(i), mfn_to_page(i), 1);
+    }
+
+    printk("Domain heap initialised: DMA width %u bits\n", dma_bitsize);
+}
 
 /*
  * Scrub all unallocated pages in all heap zones. This function is more
@@ -769,7 +782,7 @@ struct page_info *__alloc_domheap_pages(
     return pg;
 }
 
-inline struct page_info *alloc_domheap_pages(
+struct page_info *alloc_domheap_pages(
     struct domain *d, unsigned int order, unsigned int flags)
 {
     return __alloc_domheap_pages(d, smp_processor_id(), order, flags);
@@ -847,20 +860,6 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         put_domain(d);
 }
 
-
-unsigned long avail_heap_pages(int zone, int node)
-{
-    int i,j, num_nodes = num_online_nodes();
-    unsigned long free_pages = 0;
-   
-    for (i=0; i<NR_ZONES; i++)
-        if ( (zone == -1) || (zone == i) )
-            for (j=0; j < num_nodes; j++)
-                if ( (node == -1) || (node == j) )
-                    free_pages += avail[i][j];            
-
-    return free_pages;
-}
 
 unsigned long avail_domheap_pages(void)
 {

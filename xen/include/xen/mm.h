@@ -46,15 +46,6 @@ unsigned long alloc_boot_low_pages(
 int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns);
 void end_boot_allocator(void);
 
-/* Generic allocator. These functions are *not* interrupt-safe. */
-void init_heap_pages(
-    unsigned int zone, struct page_info *pg, unsigned long nr_pages);
-struct page_info *alloc_heap_pages(
-    unsigned int zone, unsigned int cpu, unsigned int order);
-void free_heap_pages(
-    unsigned int zone, struct page_info *pg, unsigned int order);
-void scrub_heap_pages(void);
-
 /* Xen suballocator. These functions are interrupt-safe. */
 void init_xenheap_pages(paddr_t ps, paddr_t pe);
 void *alloc_xenheap_pages(unsigned int order);
@@ -71,9 +62,10 @@ struct page_info *__alloc_domheap_pages(
     unsigned int memflags);
 void free_domheap_pages(struct page_info *pg, unsigned int order);
 unsigned long avail_domheap_pages(void);
-unsigned long avail_heap_pages(int zone, int node);
 #define alloc_domheap_page(d) (alloc_domheap_pages(d,0,0))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))
+
+void scrub_heap_pages(void);
 
 int assign_pages(
     struct domain *d,
