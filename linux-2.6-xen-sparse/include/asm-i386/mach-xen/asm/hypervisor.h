@@ -33,7 +33,6 @@
 #ifndef __HYPERVISOR_H__
 #define __HYPERVISOR_H__
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>

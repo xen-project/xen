@@ -37,7 +37,6 @@
 #ifndef __ASM_GNTTAB_H__
 #define __ASM_GNTTAB_H__
 
-#include <linux/config.h>
 #include <asm/hypervisor.h>
 #include <asm/maddr.h> /* maddr_t */
 #include <xen/interface/grant_table.h>

@@ -1,8 +1,6 @@
 #ifndef _ASM_SWIOTLB_H
 #define _ASM_SWIOTLB_H 1
 
-#include <linux/config.h>
-
 /* SWIOTLB interface */
 
 extern dma_addr_t swiotlb_map_single(struct device *hwdev, void *ptr, size_t size,

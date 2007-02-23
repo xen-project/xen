@@ -1,5 +1,4 @@
 
-#include <linux/config.h>
 #include <linux/proc_fs.h>
 #include <xen/xen_proc.h>
 

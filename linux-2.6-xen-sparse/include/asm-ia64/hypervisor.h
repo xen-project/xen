@@ -46,7 +46,6 @@ extern int running_on_xen;
 #endif /* CONFIG_XEN */
 
 #if defined(CONFIG_XEN) || defined(CONFIG_VMX_GUEST)
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>

@@ -29,7 +29,6 @@
 #ifndef __NETIF__BACKEND__COMMON_H__
 #define __NETIF__BACKEND__COMMON_H__
 
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>

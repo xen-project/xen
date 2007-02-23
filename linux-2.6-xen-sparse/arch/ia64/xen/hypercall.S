@@ -4,7 +4,6 @@
  * Copyright (C) 2005 Dan Magenheimer <dan.magenheimer@hp.com>
  */
 
-#include <linux/config.h>
 #include <asm/processor.h>
 #include <asm/asmmacro.h>
 

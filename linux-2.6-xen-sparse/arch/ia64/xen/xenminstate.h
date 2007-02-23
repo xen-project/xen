@@ -1,5 +1,3 @@
-#include <linux/config.h>
-
 #include <asm/cache.h>
 
 #ifdef CONFIG_XEN

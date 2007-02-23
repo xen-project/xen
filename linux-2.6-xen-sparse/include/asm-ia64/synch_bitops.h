@@ -7,8 +7,6 @@
  * when communicating with Xen or other guest OSes running on other CPUs.
  */
 
-#include <linux/config.h>
-
 #define ADDR (*(volatile long *) addr)
 
 static __inline__ void synch_set_bit(int nr, volatile void * addr)

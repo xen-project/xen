@@ -6,7 +6,6 @@
  * Copyright (c) 2002-2004, K A Fraser, B Dragovic
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>

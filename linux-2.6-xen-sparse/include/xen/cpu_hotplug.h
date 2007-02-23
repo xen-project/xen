@@ -1,7 +1,6 @@
 #ifndef __XEN_CPU_HOTPLUG_H__
 #define __XEN_CPU_HOTPLUG_H__
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/cpumask.h>
 

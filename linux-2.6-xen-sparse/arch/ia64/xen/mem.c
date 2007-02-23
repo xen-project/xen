@@ -15,7 +15,6 @@
  *                    VA Linux Systems Japan K.K.
  */
 
-#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/efi.h>
 
