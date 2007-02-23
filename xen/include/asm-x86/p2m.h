@@ -86,11 +86,11 @@ static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
     return mfn_x(gfn_to_mfn_current(pfn));
 }
 
-/* Is this guest address an mmio one? (i.e. not defined in p2m map) */
+/* Is this guest address an mmio one? */
 static inline int mmio_space(paddr_t gpa)
 {
-    unsigned long gfn = gpa >> PAGE_SHIFT;
-    return !mfn_valid(mfn_x(gfn_to_mfn_current(gfn)));
+    return (gpa >= 0xf0000000 /* 256MB hole just below 4GB */
+            || (gpa >= 0xa0000 && gpa < 0xc0000)); /* VGA hole */
 }
 
 /* Translate the frame number held in an l1e from guest to machine */
