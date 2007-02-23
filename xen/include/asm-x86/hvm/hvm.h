@@ -146,8 +146,7 @@ extern struct hvm_function_table hvm_funcs;
 static inline void
 hvm_disable(void)
 {
-    if ( hvm_funcs.disable )
-        hvm_funcs.disable();
+    hvm_funcs.disable();
 }
 
 int hvm_domain_initialise(struct domain *d);
@@ -225,9 +224,7 @@ void hvm_hypercall_page_initialise(struct domain *d,
 static inline unsigned long
 hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
 {
-    if ( hvm_funcs.get_guest_ctrl_reg )
-        return hvm_funcs.get_guest_ctrl_reg(v, num);
-    return 0;                   /* force to fail */
+    return hvm_funcs.get_guest_ctrl_reg(v, num);
 }
 
 static inline unsigned long

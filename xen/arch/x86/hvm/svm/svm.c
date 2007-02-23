@@ -988,6 +988,32 @@ static int svm_event_injection_faulted(struct vcpu *v)
     return vmcb->exitintinfo.fields.v;
 }
 
+static struct hvm_function_table svm_function_table = {
+    .disable              = stop_svm,
+    .vcpu_initialise      = svm_vcpu_initialise,
+    .vcpu_destroy         = svm_vcpu_destroy,
+    .store_cpu_guest_regs = svm_store_cpu_guest_regs,
+    .load_cpu_guest_regs  = svm_load_cpu_guest_regs,
+    .save_cpu_ctxt        = svm_save_vmcb_ctxt,
+    .load_cpu_ctxt        = svm_load_vmcb_ctxt,
+    .paging_enabled       = svm_paging_enabled,
+    .long_mode_enabled    = svm_long_mode_enabled,
+    .pae_enabled          = svm_pae_enabled,
+    .guest_x86_mode       = svm_guest_x86_mode,
+    .get_guest_ctrl_reg   = svm_get_ctrl_reg,
+    .get_segment_base     = svm_get_segment_base,
+    .get_segment_register = svm_get_segment_register,
+    .update_host_cr3      = svm_update_host_cr3,
+    .update_guest_cr3     = svm_update_guest_cr3,
+    .update_vtpr          = svm_update_vtpr,
+    .stts                 = svm_stts,
+    .set_tsc_offset       = svm_set_tsc_offset,
+    .inject_exception     = svm_hvm_inject_exception,
+    .init_ap_context      = svm_init_ap_context,
+    .init_hypercall_page  = svm_init_hypercall_page,
+    .event_injection_faulted = svm_event_injection_faulted
+};
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -1031,42 +1057,7 @@ int start_svm(void)
     if (cpu == 0)
         setup_vmcb_dump();
 
-    /* Setup HVM interfaces */
-    hvm_funcs.disable = stop_svm;
-
-    hvm_funcs.vcpu_initialise = svm_vcpu_initialise;
-    hvm_funcs.vcpu_destroy    = svm_vcpu_destroy;
-
-    hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
-    hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
-
-    hvm_funcs.save_cpu_ctxt = svm_save_vmcb_ctxt;
-    hvm_funcs.load_cpu_ctxt = svm_load_vmcb_ctxt;
-
-    hvm_funcs.paging_enabled = svm_paging_enabled;
-    hvm_funcs.long_mode_enabled = svm_long_mode_enabled;
-    hvm_funcs.pae_enabled = svm_pae_enabled;
-    hvm_funcs.guest_x86_mode = svm_guest_x86_mode;
-    hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
-    hvm_funcs.get_segment_base = svm_get_segment_base;
-    hvm_funcs.get_segment_register = svm_get_segment_register;
-
-    hvm_funcs.update_host_cr3 = svm_update_host_cr3;
-    hvm_funcs.update_guest_cr3 = svm_update_guest_cr3;
-    
-    hvm_funcs.update_vtpr = svm_update_vtpr;
-
-    hvm_funcs.stts = svm_stts;
-    hvm_funcs.set_tsc_offset = svm_set_tsc_offset;
-
-    hvm_funcs.inject_exception = svm_hvm_inject_exception;
-
-    hvm_funcs.init_ap_context = svm_init_ap_context;
-    hvm_funcs.init_hypercall_page = svm_init_hypercall_page;
-
-    hvm_funcs.event_injection_faulted = svm_event_injection_faulted;
-
-    hvm_enable();
+    hvm_enable(&svm_function_table);
 
     return 1;
 }

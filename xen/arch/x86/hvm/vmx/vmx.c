@@ -1000,44 +1000,31 @@ static int vmx_event_injection_faulted(struct vcpu *v)
     return (idtv_info_field & INTR_INFO_VALID_MASK);
 }
 
-/* Setup HVM interfaces */
-static void vmx_setup_hvm_funcs(void)
-{
-    hvm_funcs.disable = stop_vmx;
-
-    hvm_funcs.vcpu_initialise = vmx_vcpu_initialise;
-    hvm_funcs.vcpu_destroy    = vmx_vcpu_destroy;
-
-    hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
-    hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
-
-    hvm_funcs.save_cpu_ctxt = vmx_save_vmcs_ctxt;
-    hvm_funcs.load_cpu_ctxt = vmx_load_vmcs_ctxt;
-
-    hvm_funcs.paging_enabled = vmx_paging_enabled;
-    hvm_funcs.long_mode_enabled = vmx_long_mode_enabled;
-    hvm_funcs.pae_enabled = vmx_pae_enabled;
-    hvm_funcs.guest_x86_mode = vmx_guest_x86_mode;
-    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
-    hvm_funcs.get_segment_base = vmx_get_segment_base;
-    hvm_funcs.get_segment_register = vmx_get_segment_register;
-
-    hvm_funcs.update_host_cr3 = vmx_update_host_cr3;
-    hvm_funcs.update_guest_cr3 = vmx_update_guest_cr3;
-
-    hvm_funcs.update_vtpr = vmx_update_vtpr;
-
-    hvm_funcs.stts = vmx_stts;
-    hvm_funcs.set_tsc_offset = vmx_set_tsc_offset;
-
-    hvm_funcs.inject_exception = vmx_inject_exception;
-
-    hvm_funcs.init_ap_context = vmx_init_ap_context;
-
-    hvm_funcs.init_hypercall_page = vmx_init_hypercall_page;
-
-    hvm_funcs.event_injection_faulted = vmx_event_injection_faulted;
-}
+static struct hvm_function_table vmx_function_table = {
+    .disable              = stop_vmx,
+    .vcpu_initialise      = vmx_vcpu_initialise,
+    .vcpu_destroy         = vmx_vcpu_destroy,
+    .store_cpu_guest_regs = vmx_store_cpu_guest_regs,
+    .load_cpu_guest_regs  = vmx_load_cpu_guest_regs,
+    .save_cpu_ctxt        = vmx_save_vmcs_ctxt,
+    .load_cpu_ctxt        = vmx_load_vmcs_ctxt,
+    .paging_enabled       = vmx_paging_enabled,
+    .long_mode_enabled    = vmx_long_mode_enabled,
+    .pae_enabled          = vmx_pae_enabled,
+    .guest_x86_mode       = vmx_guest_x86_mode,
+    .get_guest_ctrl_reg   = vmx_get_ctrl_reg,
+    .get_segment_base     = vmx_get_segment_base,
+    .get_segment_register = vmx_get_segment_register,
+    .update_host_cr3      = vmx_update_host_cr3,
+    .update_guest_cr3     = vmx_update_guest_cr3,
+    .update_vtpr          = vmx_update_vtpr,
+    .stts                 = vmx_stts,
+    .set_tsc_offset       = vmx_set_tsc_offset,
+    .inject_exception     = vmx_inject_exception,
+    .init_ap_context      = vmx_init_ap_context,
+    .init_hypercall_page  = vmx_init_hypercall_page,
+    .event_injection_faulted = vmx_event_injection_faulted
+};
 
 int start_vmx(void)
 {
@@ -1095,9 +1082,7 @@ int start_vmx(void)
 
     vmx_save_host_msrs();
 
-    vmx_setup_hvm_funcs();
-
-    hvm_enable();
+    hvm_enable(&vmx_function_table);
 
     return 1;
 }

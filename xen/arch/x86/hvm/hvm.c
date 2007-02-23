@@ -49,18 +49,18 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-int hvm_enabled;
+int hvm_enabled __read_mostly;
 
-unsigned int opt_hvm_debug_level;
+unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
-struct hvm_function_table hvm_funcs;
+struct hvm_function_table hvm_funcs __read_mostly;
 
 /* I/O permission bitmap is globally shared by all HVM guests. */
 char __attribute__ ((__section__ (".bss.page_aligned")))
     hvm_io_bitmap[3*PAGE_SIZE];
 
-void hvm_enable(void)
+void hvm_enable(struct hvm_function_table *fns)
 {
     if ( hvm_enabled )
         return;
@@ -72,6 +72,7 @@ void hvm_enable(void)
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
     clear_bit(0x80, hvm_io_bitmap);
 
+    hvm_funcs   = *fns;
     hvm_enabled = 1;
 }
 
