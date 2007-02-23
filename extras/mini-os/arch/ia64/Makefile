@@ -37,7 +37,7 @@ ARCH_OBJS += __divdi3.o
 
 GEN_OFF_SRC := gen_off.c
 GEN_OFF_BIN := gen_off
-GEN_OFF_H   := $(ARCH_SPEC_INC)/offsets.h
+GEN_OFF_H   := $(ARCH_INC)/offsets.h
 
 all: $(ARCH_LIB)
 
