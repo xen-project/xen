@@ -104,22 +104,19 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     v_end = memsize << 20;
     nr_pages = (unsigned long) memsize << (20 - PAGE_SHIFT);
 
-    DPRINTF("xc_hvm_restore:dom=%d, nr_pages=0x%lx, store_evtchn=%d, *store_mfn=%ld, pae=%u, apic=%u.\n", 
+    DPRINTF("xc_hvm_restore:dom=%d, nr_pages=0x%lx, store_evtchn=%d, "
+            "*store_mfn=%ld, pae=%u, apic=%u.\n", 
             dom, nr_pages, store_evtchn, *store_mfn, pae, apic);
 
-    
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
         ERROR("Unable to get platform info.");
         return 1;
     }
 
-    DPRINTF("xc_hvm_restore start: nr_pages = %lx, max_pfn = %lx, max_mfn = %lx, hvirt_start=%lx, pt_levels=%d\n",
-            nr_pages,
-            max_pfn,
-            max_mfn,
-            hvirt_start,
-            pt_levels);
+    DPRINTF("xc_hvm_restore start: nr_pages = %lx, max_pfn = %lx, "
+            "max_mfn = %lx, hvirt_start=%lx, pt_levels=%d\n",
+            nr_pages, max_pfn, max_mfn, hvirt_start, pt_levels);
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for build dom0 op, but might as well do early */
@@ -220,6 +217,9 @@ int xc_hvm_restore(int xc_handle, int io_fd,
             void *page;
 
             pfn = region_pfn_type[i];
+            if ( pfn & XEN_DOMCTL_PFINFO_LTAB_MASK )
+                continue;
+
             if ( pfn > max_pfn )
             {
                 ERROR("pfn out of range");
