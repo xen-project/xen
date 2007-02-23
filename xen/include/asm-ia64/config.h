@@ -42,7 +42,7 @@
 #define CONFIG_IOSAPIC
 #define supervisor_mode_kernel (0)
 
-#define CONFIG_DMA_BITSIZE 30
+#define CONFIG_DMA_BITSIZE 32
 
 /* If PERFC is used, include privop maps.  */
 #ifdef PERF_COUNTERS

@@ -82,7 +82,7 @@
 /* Debug stack is restricted to 8kB by guard pages. */
 #define DEBUG_STACK_SIZE 8192
 
-#define CONFIG_DMA_BITSIZE 30
+#define CONFIG_DMA_BITSIZE 32
 
 #if defined(__x86_64__)
 

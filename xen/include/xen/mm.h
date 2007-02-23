@@ -74,20 +74,16 @@ int assign_pages(
     unsigned int memflags);
 
 /* memflags: */
-#define _MEMF_dma         0
-#define  MEMF_dma         (1U<<_MEMF_dma)
-#define _MEMF_no_refcount 1
+#define _MEMF_no_refcount 0
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
+#define _MEMF_bits        24
+#define  MEMF_bits(n)     ((n)<<_MEMF_bits)
 
 #ifdef CONFIG_PAGEALLOC_MAX_ORDER
 #define MAX_ORDER CONFIG_PAGEALLOC_MAX_ORDER
 #else
 #define MAX_ORDER 20 /* 2^20 contiguous pages */
 #endif
-
-/* DMA heap parameters. */
-extern unsigned int  dma_bitsize;
-extern unsigned long max_dma_mfn;
 
 /* Automatic page scrubbing for dead domains. */
 extern struct list_head page_scrub_list;

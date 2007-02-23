@@ -48,8 +48,8 @@ string_param("badpage", opt_badpage);
 /*
  * Bit width of the DMA heap.
  */
-unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
-unsigned long max_dma_mfn = (1UL << (CONFIG_DMA_BITSIZE - PAGE_SHIFT)) - 1;
+static unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
+static unsigned long max_dma_mfn = (1UL << (CONFIG_DMA_BITSIZE - PAGE_SHIFT)) - 1;
 static void parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
@@ -58,7 +58,7 @@ static void parse_dma_bits(char *s)
         dma_bitsize = BITS_PER_LONG + PAGE_SHIFT;
         max_dma_mfn = ~0UL;
     }
-    else if ( v > PAGE_SHIFT )
+    else if ( v > PAGE_SHIFT + 1 )
     {
         dma_bitsize = v;
         max_dma_mfn = (1UL << (dma_bitsize - PAGE_SHIFT)) - 1;
@@ -741,12 +741,22 @@ struct page_info *__alloc_domheap_pages(
     struct page_info *pg = NULL;
     cpumask_t mask;
     unsigned long i;
+    unsigned int bits = memflags >> _MEMF_bits, zone_hi;
 
     ASSERT(!in_irq());
 
-    if ( !(memflags & MEMF_dma) )
+    if ( bits && bits <= PAGE_SHIFT + 1 )
+        return NULL;
+
+    zone_hi = bits - PAGE_SHIFT - 1;
+    if ( zone_hi >= NR_ZONES )
+        zone_hi = NR_ZONES - 1;
+
+    if ( NR_ZONES + PAGE_SHIFT > dma_bitsize &&
+         (!bits || bits > dma_bitsize) )
     {
-        pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, NR_ZONES - 1, cpu, order);
+        pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, zone_hi, cpu, order);
+
         /* Failure? Then check if we can fall back to the DMA pool. */
         if ( unlikely(pg == NULL) &&
              ((order > MAX_ORDER) ||
@@ -759,7 +769,7 @@ struct page_info *__alloc_domheap_pages(
 
     if ( pg == NULL )
         if ( (pg = alloc_heap_pages(MEMZONE_XEN + 1,
-                                    dma_bitsize - PAGE_SHIFT - 1,
+                                    zone_hi,
                                     cpu, order)) == NULL )
             return NULL;
 

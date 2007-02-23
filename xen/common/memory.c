@@ -324,12 +324,12 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
          (exch.out.address_bits <
           (get_order_from_pages(max_page) + PAGE_SHIFT)) )
     {
-        if ( exch.out.address_bits < dma_bitsize )
+        if ( exch.out.address_bits <= PAGE_SHIFT )
         {
             rc = -ENOMEM;
             goto fail_early;
         }
-        memflags = MEMF_dma;
+        memflags = MEMF_bits(exch.out.address_bits);
     }
 
     if ( exch.in.extent_order <= exch.out.extent_order )
@@ -537,9 +537,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
              (reservation.address_bits <
               (get_order_from_pages(max_page) + PAGE_SHIFT)) )
         {
-            if ( reservation.address_bits < dma_bitsize )
+            if ( reservation.address_bits <= PAGE_SHIFT )
                 return start_extent;
-            args.memflags = MEMF_dma;
+            args.memflags = MEMF_bits(reservation.address_bits);
         }
 
         if ( likely(reservation.domid == DOMID_SELF) )
