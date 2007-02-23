@@ -53,16 +53,18 @@ unsigned long max_dma_mfn = (1UL << (CONFIG_DMA_BITSIZE - PAGE_SHIFT)) - 1;
 static void parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
-    if ( v >= (sizeof(long)*8 + PAGE_SHIFT) )
+    if ( v >= (BITS_PER_LONG + PAGE_SHIFT) )
     {
-        dma_bitsize = sizeof(long)*8 + PAGE_SHIFT;
+        dma_bitsize = BITS_PER_LONG + PAGE_SHIFT;
         max_dma_mfn = ~0UL;
     }
-    else
+    else if ( v > PAGE_SHIFT )
     {
         dma_bitsize = v;
         max_dma_mfn = (1UL << (dma_bitsize - PAGE_SHIFT)) - 1;
     }
+    else
+        printk("Invalid dma_bits value of %u ignored.\n", v);
 }
 custom_param("dma_bits", parse_dma_bits);
 
@@ -309,12 +311,13 @@ unsigned long alloc_boot_pages(
  */
 
 #define MEMZONE_XEN 0
-#define MEMZONE_DOM 1
-#define MEMZONE_DMADOM 2
-#define NR_ZONES    3
+#ifdef PADDR_BITS
+#define NR_ZONES    (PADDR_BITS - PAGE_SHIFT)
+#else
+#define NR_ZONES    (BITS_PER_LONG - PAGE_SHIFT)
+#endif
 
-#define pfn_dom_zone_type(_pfn)                                 \
-    (((_pfn) <= max_dma_mfn) ? MEMZONE_DMADOM : MEMZONE_DOM)
+#define pfn_dom_zone_type(_pfn) (fls(_pfn) - 1)
 
 static struct list_head heap[NR_ZONES][MAX_NUMNODES][MAX_ORDER+1];
 
@@ -324,15 +327,17 @@ static DEFINE_SPINLOCK(heap_lock);
 
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
-    unsigned int zone, unsigned int cpu, unsigned int order)
+    unsigned int zone_lo, unsigned zone_hi,
+    unsigned int cpu, unsigned int order)
 {
     unsigned int i, j, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
-    unsigned int request = (1UL << order);
+    unsigned int zone, request = (1UL << order);
     struct page_info *pg;
 
     ASSERT(node >= 0);
     ASSERT(node < num_nodes);
-    ASSERT(zone < NR_ZONES);
+    ASSERT(zone_lo <= zone_hi);
+    ASSERT(zone_hi < NR_ZONES);
 
     if ( unlikely(order > MAX_ORDER) )
         return NULL;
@@ -345,14 +350,17 @@ static struct page_info *alloc_heap_pages(
      * needless computation on fast-path */
     for ( i = 0; i < num_nodes; i++ )
     {
-        /* check if target node can support the allocation */
-        if ( avail[zone][node] >= request )
+        for ( zone = zone_hi; zone >= zone_lo; --zone )
         {
-            /* Find smallest order which can satisfy the request. */
-            for ( j = order; j <= MAX_ORDER; j++ )
+            /* check if target node can support the allocation */
+            if ( avail[zone][node] >= request )
             {
-                if ( !list_empty(&heap[zone][node][j]) )
-                    goto found;
+                /* Find smallest order which can satisfy the request. */
+                for ( j = order; j <= MAX_ORDER; j++ )
+                {
+                    if ( !list_empty(&heap[zone][node][j]) )
+                        goto found;
+                }
             }
         }
         /* pick next node, wrapping around if needed */
@@ -477,16 +485,17 @@ void init_heap_pages(
 }
 
 static unsigned long avail_heap_pages(
-    int zone, int node)
+    unsigned int zone_lo, unsigned int zone_hi, unsigned int node)
 {
-    unsigned int i, j, num_nodes = num_online_nodes();
+    unsigned int i, zone, num_nodes = num_online_nodes();
     unsigned long free_pages = 0;
 
-    for (i=0; i<NR_ZONES; i++)
-        if ( (zone == -1) || (zone == i) )
-            for (j=0; j < num_nodes; j++)
-                if ( (node == -1) || (node == j) )
-                    free_pages += avail[i][j];
+    if ( zone_hi >= NR_ZONES )
+        zone_hi = NR_ZONES - 1;
+    for ( zone = zone_lo; zone <= zone_hi; zone++ )
+        for ( i = 0; i < num_nodes; i++ )
+            if ( (node == -1) || (node == i) )
+                free_pages += avail[zone][i];
 
     return free_pages;
 }
@@ -606,7 +615,7 @@ void *alloc_xenheap_pages(unsigned int order)
     int i;
 
     local_irq_save(flags);
-    pg = alloc_heap_pages(MEMZONE_XEN, smp_processor_id(), order);
+    pg = alloc_heap_pages(MEMZONE_XEN, MEMZONE_XEN, smp_processor_id(), order);
     local_irq_restore(flags);
 
     if ( unlikely(pg == NULL) )
@@ -651,22 +660,26 @@ void free_xenheap_pages(void *v, unsigned int order)
 
 void init_domheap_pages(paddr_t ps, paddr_t pe)
 {
-    unsigned long s_tot, e_tot, s_dma, e_dma, s_nrm, e_nrm;
+    unsigned long s_tot, e_tot;
+    unsigned int zone;
 
     ASSERT(!in_irq());
 
     s_tot = round_pgup(ps) >> PAGE_SHIFT;
     e_tot = round_pgdown(pe) >> PAGE_SHIFT;
 
-    s_dma = min(s_tot, max_dma_mfn + 1);
-    e_dma = min(e_tot, max_dma_mfn + 1);
-    if ( s_dma < e_dma )
-        init_heap_pages(MEMZONE_DMADOM, mfn_to_page(s_dma), e_dma - s_dma);
+    zone = fls(s_tot);
+    BUG_ON(zone <= MEMZONE_XEN + 1);
+    for ( --zone; s_tot < e_tot; ++zone )
+    {
+        unsigned long end = e_tot;
 
-    s_nrm = max(s_tot, max_dma_mfn + 1);
-    e_nrm = max(e_tot, max_dma_mfn + 1);
-    if ( s_nrm < e_nrm )
-        init_heap_pages(MEMZONE_DOM, mfn_to_page(s_nrm), e_nrm - s_nrm);
+        BUILD_BUG_ON(NR_ZONES > BITS_PER_LONG);
+        if ( zone < BITS_PER_LONG - 1 && end > 1UL << (zone + 1) )
+            end = 1UL << (zone + 1);
+        init_heap_pages(zone, mfn_to_page(s_tot), end - s_tot);
+        s_tot = end;
+    }
 }
 
 
@@ -733,17 +746,21 @@ struct page_info *__alloc_domheap_pages(
 
     if ( !(memflags & MEMF_dma) )
     {
-        pg = alloc_heap_pages(MEMZONE_DOM, cpu, order);
+        pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, NR_ZONES - 1, cpu, order);
         /* Failure? Then check if we can fall back to the DMA pool. */
         if ( unlikely(pg == NULL) &&
              ((order > MAX_ORDER) ||
-              (avail_heap_pages(MEMZONE_DMADOM,-1) <
+              (avail_heap_pages(MEMZONE_XEN + 1,
+                                dma_bitsize - PAGE_SHIFT - 1,
+                                -1) <
                (dma_emergency_pool_pages + (1UL << order)))) )
             return NULL;
     }
 
     if ( pg == NULL )
-        if ( (pg = alloc_heap_pages(MEMZONE_DMADOM, cpu, order)) == NULL )
+        if ( (pg = alloc_heap_pages(MEMZONE_XEN + 1,
+                                    dma_bitsize - PAGE_SHIFT - 1,
+                                    cpu, order)) == NULL )
             return NULL;
 
     mask = pg->u.free.cpumask;
@@ -865,9 +882,14 @@ unsigned long avail_domheap_pages(void)
 {
     unsigned long avail_nrm, avail_dma;
     
-    avail_nrm = avail_heap_pages(MEMZONE_DOM,-1);
+    avail_nrm = avail_heap_pages(dma_bitsize - PAGE_SHIFT,
+                                 NR_ZONES - 1,
+                                 -1);
 
-    avail_dma = avail_heap_pages(MEMZONE_DMADOM,-1);
+    avail_dma = avail_heap_pages(MEMZONE_XEN + 1,
+                                 dma_bitsize - PAGE_SHIFT - 1,
+                                 -1);
+
     if ( avail_dma > dma_emergency_pool_pages )
         avail_dma -= dma_emergency_pool_pages;
     else
@@ -878,18 +900,36 @@ unsigned long avail_domheap_pages(void)
 
 unsigned long avail_nodeheap_pages(int node)
 {
-    return avail_heap_pages(-1, node);
+    return avail_heap_pages(0, NR_ZONES - 1, node);
 }
 
 static void pagealloc_keyhandler(unsigned char key)
 {
+    unsigned int zone = MEMZONE_XEN;
+    unsigned long total = 0;
+
     printk("Physical memory information:\n");
-    printk("    Xen heap: %lukB free\n"
-           "    DMA heap: %lukB free\n"
-           "    Dom heap: %lukB free\n",
-           avail_heap_pages(MEMZONE_XEN, -1) << (PAGE_SHIFT-10), 
-           avail_heap_pages(MEMZONE_DMADOM, -1) <<(PAGE_SHIFT-10), 
-           avail_heap_pages(MEMZONE_DOM, -1) <<(PAGE_SHIFT-10));
+    printk("    Xen heap: %lukB free\n",
+           avail_heap_pages(zone, zone, -1) << (PAGE_SHIFT-10));
+
+    while ( ++zone < NR_ZONES )
+    {
+        unsigned long n;
+
+        if ( zone == dma_bitsize - PAGE_SHIFT )
+        {
+            printk("    DMA heap: %lukB free\n", total << (PAGE_SHIFT-10));
+            total = 0;
+        }
+
+        if ( (n = avail_heap_pages(zone, zone, -1)) != 0 )
+        {
+            total += n;
+            printk("    heap[%02u]: %lukB free\n", zone, n << (PAGE_SHIFT-10));
+        }
+    }
+
+    printk("    Dom heap: %lukB free\n", total << (PAGE_SHIFT-10));
 }
 
 
