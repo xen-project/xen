@@ -262,6 +262,7 @@ static int setup_guest(int xc_handle,
     /* NB. evtchn_upcall_mask is unused: leave as zero. */
     memset(&shared_info->evtchn_mask[0], 0xff,
            sizeof(shared_info->evtchn_mask));
+    shared_info->arch.max_pfn = page_array[nr_pages - 1];
     munmap(shared_info, PAGE_SIZE);
 
     if ( v_end > HVM_BELOW_4G_RAM_END )
