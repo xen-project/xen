@@ -13,6 +13,7 @@
 #include <sys/time.h>
 
 #include "xc_private.h"
+#include "xc_dom.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
 

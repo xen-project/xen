@@ -146,6 +146,23 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define PAGE_SIZE_IA64          (1UL << PAGE_SHIFT_IA64)
 #define PAGE_MASK_IA64          (~(PAGE_SIZE_IA64-1))
 
+#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
+
+/* Size in bytes of the P2M (rounded up to the nearest PAGE_SIZE bytes) */
+#define P2M_SIZE        ROUNDUP((max_pfn * sizeof(xen_pfn_t)), PAGE_SHIFT)
+
+/* Number of xen_pfn_t in a page */
+#define fpp             (PAGE_SIZE/sizeof(xen_pfn_t))
+
+/* Number of entries in the pfn_to_mfn_frame_list_list */
+#define P2M_FLL_ENTRIES (((max_pfn)+(fpp*fpp)-1)/(fpp*fpp))
+
+/* Number of entries in the pfn_to_mfn_frame_list */
+#define P2M_FL_ENTRIES  (((max_pfn)+fpp-1)/fpp)
+
+/* Size in bytes of the pfn_to_mfn_frame_list     */
+#define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*sizeof(unsigned long))
+
 #define PAEKERN_no           0
 #define PAEKERN_yes          1
 #define PAEKERN_extended_cr3 2

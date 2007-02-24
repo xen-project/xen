@@ -11,6 +11,7 @@
 
 #include "xg_private.h"
 #include "xg_save_restore.h"
+#include "xc_dom.h"
 
 /* max mfn of the current host machine */
 static unsigned long max_mfn;

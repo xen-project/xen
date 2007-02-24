@@ -81,7 +81,6 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 */
 
 #define PFN_TO_KB(_pfn) ((_pfn) << (PAGE_SHIFT - 10))
-#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
 
 /*
@@ -94,25 +93,5 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 #define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
-/* Size in bytes of the P2M (rounded up to the nearest PAGE_SIZE bytes) */
-#define P2M_SIZE        ROUNDUP((max_pfn * sizeof(xen_pfn_t)), PAGE_SHIFT)
-
-/* Number of xen_pfn_t in a page */
-#define fpp             (PAGE_SIZE/sizeof(xen_pfn_t))
-
-/* Number of entries in the pfn_to_mfn_frame_list */
-#define P2M_FL_ENTRIES  (((max_pfn)+fpp-1)/fpp)
-
-/* Size in bytes of the pfn_to_mfn_frame_list     */
-#define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*sizeof(unsigned long))
-
-/* Number of entries in the pfn_to_mfn_frame_list_list */
-#define P2M_FLL_ENTRIES (((max_pfn)+(fpp*fpp)-1)/(fpp*fpp))
-
 /* Returns TRUE if the PFN is currently mapped */
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
-
-#define INVALID_P2M_ENTRY   (~0UL)
-
-
-
