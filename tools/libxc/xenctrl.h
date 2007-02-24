@@ -570,6 +570,11 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
+
+/**
+ * DEPRECATED.  Avoid using this, as it does not correctly account for PFNs
+ * without a backing MFN.
+ */
 int xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
                     unsigned long max_pfns);
 
