@@ -802,6 +802,12 @@ static int local_file_dump(void *args, char *buffer, unsigned int length)
         }
     }
 
+    if (length >= DUMP_INCREMENT*PAGE_SIZE) {
+        // Now dumping pages -- make sure we discard clean pages from
+        // the cache after each write
+        discard_file_cache(da->fd, 0 /* no flush */);
+    }
+
     return 0;
 }
 
@@ -821,6 +827,9 @@ xc_domain_dumpcore(int xc_handle,
 
     sts = xc_domain_dumpcore_via_callback(
         xc_handle, domid, &da, &local_file_dump);
+
+    /* flush and discard any remaining portion of the file from cache */
+    discard_file_cache(da.fd, 1/* flush first*/);
 
     close(da.fd);
 

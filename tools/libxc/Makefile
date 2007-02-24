@@ -59,6 +59,9 @@ CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I.
 
+# Needed for posix_fadvise64() in xc_linux.c
+CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
+
 # Define this to make it possible to run valgrind on code linked with these
 # libraries.
 #CFLAGS   += -DVALGRIND -O0 -ggdb3

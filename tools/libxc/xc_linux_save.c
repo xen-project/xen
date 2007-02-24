@@ -172,6 +172,28 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
         (new->tv_usec - old->tv_usec);
 }
 
+static int noncached_write(int fd, int live, void *buffer, int len) 
+{
+    static int write_count = 0;
+
+    int rc = write(fd,buffer,len);
+
+    if (!live) {
+        write_count += len;
+
+        if (write_count >= MAX_PAGECACHE_USAGE*PAGE_SIZE) {
+            int serrno = errno;
+
+            /* Time to discard cache - dont care if this fails */
+            discard_file_cache(fd, 0 /* no flush */);
+
+            write_count = 0;
+
+            errno = serrno;
+        }
+    }
+    return rc;
+}
 
 #ifdef ADAPTIVE_SAVE
 
@@ -205,7 +227,7 @@ static inline void initialize_mbit_rate()
 }
 
 
-static int ratewrite(int io_fd, void *buf, int n)
+static int ratewrite(int io_fd, int live, void *buf, int n)
 {
     static int budget = 0;
     static int burst_time_us = -1;
@@ -215,7 +237,7 @@ static int ratewrite(int io_fd, void *buf, int n)
     long long delta;
 
     if (START_MBIT_RATE == 0)
-        return write(io_fd, buf, n);
+        return noncached_write(io_fd, live, buf, n);
 
     budget -= n;
     if (budget < 0) {
@@ -251,13 +273,13 @@ static int ratewrite(int io_fd, void *buf, int n)
             }
         }
     }
-    return write(io_fd, buf, n);
+    return noncached_write(io_fd, live, buf, n);
 }
 
 #else /* ! ADAPTIVE SAVE */
 
 #define RATE_IS_MAX() (0)
-#define ratewrite(_io_fd, _buf, _n) write((_io_fd), (_buf), (_n))
+#define ratewrite(_io_fd, _live, _buf, _n) noncached_write((_io_fd), (_live), (_buf), (_n))
 #define initialize_mbit_rate()
 
 #endif
@@ -1082,7 +1104,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     if(race && !live) 
                         goto out; 
 
-                    if (ratewrite(io_fd, page, PAGE_SIZE) != PAGE_SIZE) {
+                    if (ratewrite(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE) {
                         ERROR("Error when writing to state file (4)"
                               " (errno %d)", errno);
                         goto out;
@@ -1091,7 +1113,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 }  else {
 
                     /* We have a normal page: just write it directly. */
-                    if (ratewrite(io_fd, spage, PAGE_SIZE) != PAGE_SIZE) {
+                    if (ratewrite(io_fd, live, spage, PAGE_SIZE) != PAGE_SIZE) {
                         ERROR("Error when writing to state file (5)"
                               " (errno %d)", errno);
                         goto out;
@@ -1261,6 +1283,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             DPRINTF("Warning - couldn't disable shadow mode");
         }
     }
+    else {
+        // flush last write and discard cache for file
+        discard_file_cache(io_fd, 1 /* flush */);
+    }            
 
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);

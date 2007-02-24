@@ -144,7 +144,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
     DECLARE_DOMCTL;
-    int rc = 1, i, n, pae_extended_cr3 = 0;
+    int rc = 1, i, n, m, pae_extended_cr3 = 0;
     unsigned long mfn, pfn;
     unsigned int prev_pc, this_pc;
     int verify = 0;
@@ -331,7 +331,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
      */
     prev_pc = 0;
 
-    n = 0;
+    n = m = 0;
     while (1) {
 
         int j, nr_mfns = 0; 
@@ -530,6 +530,17 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         munmap(region_base, j*PAGE_SIZE);
         n+= j; /* crude stats */
+
+        /* 
+         * Discard cache for portion of file read so far up to last
+         *  page boundary every 16MB or so.
+         */
+        m += j;
+        if ( m > MAX_PAGECACHE_USAGE )
+        {
+            discard_file_cache(io_fd, 0 /* no flush */);
+            m = 0;
+        }
     }
 
     /*
@@ -863,6 +874,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
     free(mmu);
     free(p2m);
     free(pfn_type);
+
+    /* discard cache for save file  */
+    discard_file_cache(io_fd, 1 /*flush*/);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
     
