@@ -303,6 +303,7 @@ static int write_msg(int fd, int msgtype, void *ptr, void *ptr2)
 		msg->type = CTLMSG_PARAMS;
 		msg->len = msglen;
 		msg->drivertype = blkif->drivertype;
+		msg->readonly = blkif->readonly;
 
 		gettimeofday(&timeout, NULL);
 		msg->cookie = blkif->cookie;
@@ -410,7 +411,6 @@ static int read_msg(int fd, int msgtype, void *ptr)
 	if (select(fd+1, &readfds,  (fd_set *) 0,
 		  (fd_set *) 0, &timeout) > 0) {
 		ret = read(fd, buf, msglen);
-		
 	}			
 	if (ret > 0) {
 		msg = (msg_hdr_t *)buf;

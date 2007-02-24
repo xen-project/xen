@@ -422,7 +422,7 @@ static int qtruncate(int fd, off_t length, int sparse)
 		return -1;
 	if (S_ISBLK(st.st_mode))
 		return 0;
-	
+
 	sectors = (length + DEFAULT_SECTOR_SIZE - 1)/DEFAULT_SECTOR_SIZE;
 	current = (st.st_size + DEFAULT_SECTOR_SIZE - 1)/DEFAULT_SECTOR_SIZE;
 	rem     = st.st_size % DEFAULT_SECTOR_SIZE;

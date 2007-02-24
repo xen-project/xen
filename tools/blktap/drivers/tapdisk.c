@@ -268,7 +268,8 @@ static int map_new_dev(struct td_state *s, int minor)
 }
 
 static struct disk_driver *disk_init(struct td_state *s, 
-				     struct tap_disk *drv, char *name)
+				     struct tap_disk *drv, 
+				     char *name, td_flag_t flags)
 {
 	struct disk_driver *dd;
 
@@ -285,14 +286,17 @@ static struct disk_driver *disk_init(struct td_state *s,
 	dd->drv      = drv;
 	dd->td_state = s;
 	dd->name     = name;
+	dd->flags    = flags;
 
 	return dd;
 }
 
-static int open_disk(struct td_state *s, struct tap_disk *drv, char *path)
+static int open_disk(struct td_state *s, 
+		     struct tap_disk *drv, char *path, td_flag_t flags)
 {
 	int err;
 	char *dup;
+	td_flag_t pflags;
 	struct disk_id id;
 	struct disk_driver *d;
 
@@ -301,16 +305,17 @@ static int open_disk(struct td_state *s, struct tap_disk *drv, char *path)
 		return -ENOMEM;
 
 	memset(&id, 0, sizeof(struct disk_id));
-	s->disks = d = disk_init(s, drv, dup);
+	s->disks = d = disk_init(s, drv, dup, flags);
 	if (!d)
 		return -ENOMEM;
 
-	err = drv->td_open(d, path, 0);
+	err = drv->td_open(d, path, flags);
 	if (err) {
 		free_driver(d);
 		s->disks = NULL;
 		return -ENOMEM;
 	}
+	pflags = flags | TD_RDONLY;
 
 	/* load backing files as necessary */
 	while ((err = d->drv->td_get_parent_id(d, &id)) == 0) {
@@ -324,11 +329,11 @@ static int open_disk(struct td_state *s, struct tap_disk *drv, char *path)
 		if (!dup)
 			goto fail;
 
-		new = disk_init(s, get_driver(id.drivertype), dup);
+		new = disk_init(s, get_driver(id.drivertype), dup, pflags);
 		if (!new)
 			goto fail;
 
-		err = new->drv->td_open(new, new->name, TD_RDONLY);
+		err = new->drv->td_open(new, new->name, pflags);
 		if (err)
 			goto fail;
 
@@ -341,6 +346,8 @@ static int open_disk(struct td_state *s, struct tap_disk *drv, char *path)
 		d = d->next = new;
 		free(id.name);
 	}
+
+	s->info |= ((flags & TD_RDONLY) ? VDISK_READONLY : 0);
 
 	if (err >= 0)
 		return 0;
@@ -404,7 +411,8 @@ static int read_msg(char *buf)
 				goto params_done;
 
 			/*Open file*/
-			ret = open_disk(s, drv, path);
+			ret = open_disk(s, drv, path, 
+					((msg->readonly) ? TD_RDONLY : 0));
 			if (ret)
 				goto params_done;
 
@@ -510,7 +518,8 @@ void io_done(struct disk_driver *dd, int sid)
 
 	if (!run) return; /*We have received signal to close*/
 
-	if (drv->td_do_callbacks(dd, sid) > 0) kick_responses(dd->td_state);
+	if (sid > MAX_IOFD || drv->td_do_callbacks(dd, sid) > 0)
+		kick_responses(dd->td_state);
 
 	return;
 }
@@ -661,6 +670,12 @@ static void get_io_request(struct td_state *s)
 			sector_nr = req->sector_number;
 		}
 
+		if ((dd->flags & TD_RDONLY) && 
+		    (req->operation == BLKIF_OP_WRITE)) {
+			blkif->pending_list[idx].status = BLKIF_RSP_ERROR;
+			goto send_response;
+		}
+
 		for (i = start_seg; i < req->nr_segments; i++) {
 			nsects = req->seg[i].last_sect - 
 				 req->seg[i].first_sect + 1;
@@ -726,10 +741,12 @@ static void get_io_request(struct td_state *s)
 			}
 			sector_nr += nsects;
 		}
+	send_response:
 		blkif->pending_list[idx].submitting = 0;
 		/* force write_rsp_to_ring for synchronous case */
 		if (blkif->pending_list[idx].secs_pending == 0)
-			dd->early += send_responses(dd, 0, 0, 0, idx, (void *)0);
+			dd->early += send_responses(dd, 0, 0, 0, idx, 
+						    (void *)(long)0);
 	}
 
  out:
@@ -737,7 +754,7 @@ static void get_io_request(struct td_state *s)
 	td_for_each_disk(s, dd) {
 		dd->early += dd->drv->td_submit(dd);
 		if (dd->early > 0) {
-			io_done(dd, 10);
+			io_done(dd, MAX_IOFD + 1);
 			dd->early = 0;
 		}
 	}
@@ -820,7 +837,8 @@ int main(int argc, char *argv[])
 						dd->early += 
 							dd->drv->td_submit(dd);
 						if (dd->early > 0) {
-							io_done(dd, 10);
+							io_done(dd, 
+								MAX_IOFD + 1);
 							dd->early = 0;
 						}
 					}

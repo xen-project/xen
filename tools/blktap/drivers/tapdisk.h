@@ -94,6 +94,7 @@ struct disk_driver {
 	int early;
 	char *name;
 	void *private;
+	td_flag_t flags;
 	int io_fd[MAX_IOFD];
 	struct tap_disk *drv;
 	struct td_state *td_state;
