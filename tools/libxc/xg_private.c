@@ -54,45 +54,45 @@ char *xc_read_image(const char *filename, unsigned long *size)
 #define CHUNK 1*1024*1024
     while(1)
     {
-	    if ( (tmp = realloc(image, *size + CHUNK)) == NULL )
-	    {
-		    PERROR("Could not allocate memory for kernel image");
-		    free(image);
-		    image = NULL;
-		    goto out;
-	    }
-	    image = tmp;
+        if ( (tmp = realloc(image, *size + CHUNK)) == NULL )
+        {
+            PERROR("Could not allocate memory for kernel image");
+            free(image);
+            image = NULL;
+            goto out;
+        }
+        image = tmp;
 
-	    bytes = gzread(kernel_gfd, image + *size, CHUNK);
-	    switch (bytes)
-	    {
-	    case -1:
-		    PERROR("Error reading kernel image");
-		    free(image);
-		    image = NULL;
-		    goto out;
-	    case 0: /* EOF */
-		    goto out;
-	    default:
-		    *size += bytes;
-		    break;
-	    }
+        bytes = gzread(kernel_gfd, image + *size, CHUNK);
+        switch (bytes)
+        {
+        case -1:
+            PERROR("Error reading kernel image");
+            free(image);
+            image = NULL;
+            goto out;
+        case 0: /* EOF */
+            goto out;
+        default:
+            *size += bytes;
+            break;
+        }
     }
 #undef CHUNK
 
  out:
     if ( *size == 0 )
     {
-	    PERROR("Could not read kernel image");
-	    free(image);
-	    image = NULL;
+        PERROR("Could not read kernel image");
+        free(image);
+        image = NULL;
     }
     else if ( image )
     {
-	    /* Shrink allocation to fit image. */
-	    tmp = realloc(image, *size);
-	    if ( tmp )
-		    image = tmp;
+        /* Shrink allocation to fit image. */
+        tmp = realloc(image, *size);
+        if ( tmp )
+            image = tmp;
     }
 
     if ( kernel_gfd != NULL )
@@ -189,29 +189,29 @@ unsigned long csum_page(void *page)
 }
 
 __attribute__((weak)) 
-int xc_hvm_build(int xc_handle,
-                 uint32_t domid,
-                 int memsize,
-                 const char *image_name)
+    int xc_hvm_build(int xc_handle,
+                     uint32_t domid,
+                     int memsize,
+                     const char *image_name)
 {
     errno = ENOSYS;
     return -1;
 }
 
 __attribute__((weak)) 
-int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                uint32_t max_factor, uint32_t flags,
-                int (*suspend)(int domid))
+    int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+                    uint32_t max_factor, uint32_t flags,
+                    int (*suspend)(int domid))
 {
     errno = ENOSYS;
     return -1;
 }
 
 __attribute__((weak)) 
-int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
-                   unsigned long max_pfn, unsigned int store_evtchn,
-                   unsigned long *store_mfn,
-                   unsigned int pae, unsigned int apic)
+    int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
+                       unsigned long max_pfn, unsigned int store_evtchn,
+                       unsigned long *store_mfn,
+                       unsigned int pae, unsigned int apic)
 {
     errno = ENOSYS;
     return -1;
@@ -228,3 +228,13 @@ __attribute__((weak)) int xc_set_hvm_param(
 {
     return -ENOSYS;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

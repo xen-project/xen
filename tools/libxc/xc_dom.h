@@ -158,9 +158,9 @@ int xc_dom_try_gunzip(struct xc_dom_image *dom, void **blob, size_t * size);
 int xc_dom_kernel_file(struct xc_dom_image *dom, const char *filename);
 int xc_dom_ramdisk_file(struct xc_dom_image *dom, const char *filename);
 int xc_dom_kernel_mem(struct xc_dom_image *dom, const void *mem,
-		      size_t memsize);
+                      size_t memsize);
 int xc_dom_ramdisk_mem(struct xc_dom_image *dom, const void *mem,
-		       size_t memsize);
+                       size_t memsize);
 
 int xc_dom_parse_image(struct xc_dom_image *dom);
 int xc_dom_build_image(struct xc_dom_image *dom);
@@ -169,7 +169,7 @@ int xc_dom_update_guest_p2m(struct xc_dom_image *dom);
 int xc_dom_boot_xen_init(struct xc_dom_image *dom, int xc, domid_t domid);
 int xc_dom_boot_mem_init(struct xc_dom_image *dom);
 void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
-			   xen_pfn_t count);
+                           xen_pfn_t count);
 int xc_dom_boot_image(struct xc_dom_image *dom);
 int xc_dom_compat_check(struct xc_dom_image *dom);
 
@@ -180,12 +180,12 @@ extern FILE *xc_dom_logfile;
 void xc_dom_loginit(void);
 int xc_dom_printf(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
 int xc_dom_panic_func(const char *file, int line, xc_error_code err,
-		      const char *fmt, ...)
+                      const char *fmt, ...)
     __attribute__ ((format(printf, 4, 5)));
 #define xc_dom_panic(err, fmt, args...) \
-	xc_dom_panic_func(__FILE__, __LINE__, err, fmt, ## args)
+    xc_dom_panic_func(__FILE__, __LINE__, err, fmt, ## args)
 #define xc_dom_trace(mark) \
-	xc_dom_printf("%s:%d: trace %s\n", __FILE__, __LINE__, mark)
+    xc_dom_printf("%s:%d: trace %s\n", __FILE__, __LINE__, mark)
 
 void xc_dom_log_memory_footprint(struct xc_dom_image *dom);
 
@@ -194,25 +194,25 @@ void xc_dom_log_memory_footprint(struct xc_dom_image *dom);
 void *xc_dom_malloc(struct xc_dom_image *dom, size_t size);
 void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size);
 void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
-			    const char *filename, size_t * size);
+                            const char *filename, size_t * size);
 char *xc_dom_strdup(struct xc_dom_image *dom, const char *str);
 
 /* --- alloc memory pool ------------------------------------------- */
 
 int xc_dom_alloc_page(struct xc_dom_image *dom, char *name);
 int xc_dom_alloc_segment(struct xc_dom_image *dom,
-			 struct xc_dom_seg *seg, char *name,
-			 xen_vaddr_t start, xen_vaddr_t size);
+                         struct xc_dom_seg *seg, char *name,
+                         xen_vaddr_t start, xen_vaddr_t size);
 
 /* --- misc bits --------------------------------------------------- */
 
 void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t first,
-			xen_pfn_t count);
+                        xen_pfn_t count);
 void xc_dom_unmap_one(struct xc_dom_image *dom, xen_pfn_t pfn);
 void xc_dom_unmap_all(struct xc_dom_image *dom);
 
 static inline void *xc_dom_seg_to_ptr(struct xc_dom_image *dom,
-				      struct xc_dom_seg *seg)
+                                      struct xc_dom_seg *seg)
 {
     xen_vaddr_t segsize = seg->vend - seg->vstart;
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
@@ -222,16 +222,13 @@ static inline void *xc_dom_seg_to_ptr(struct xc_dom_image *dom,
 }
 
 static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
-					xen_vaddr_t vaddr)
+                                        xen_vaddr_t vaddr)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
     xen_pfn_t page = (vaddr - dom->parms.virt_base) / page_size;
     unsigned int offset = (vaddr - dom->parms.virt_base) % page_size;
     void *ptr = xc_dom_pfn_to_ptr(dom, page, 0);
-
-    if (!ptr)
-	return NULL;
-    return ptr + offset;
+    return (ptr ? (ptr + offset) : NULL);
 }
 
 static inline int xc_dom_feature_translated(struct xc_dom_image *dom)
@@ -242,17 +239,26 @@ static inline int xc_dom_feature_translated(struct xc_dom_image *dom)
 static inline xen_pfn_t xc_dom_p2m_host(struct xc_dom_image *dom, xen_pfn_t pfn)
 {
     if (dom->shadow_enabled)
-	return pfn;
+        return pfn;
     return dom->p2m_host[pfn];
 }
 
 static inline xen_pfn_t xc_dom_p2m_guest(struct xc_dom_image *dom,
-					 xen_pfn_t pfn)
+                                         xen_pfn_t pfn)
 {
     if (xc_dom_feature_translated(dom))
-	return pfn;
+        return pfn;
     return dom->p2m_host[pfn];
 }
 
 /* --- arch bits --------------------------------------------------- */
 
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

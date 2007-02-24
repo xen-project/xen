@@ -33,9 +33,9 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
 static int start_info_ia64(struct xc_dom_image *dom)
 {
     start_info_ia64_t *start_info =
-	xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
+        xc_dom_pfn_to_ptr(dom, dom->start_info_pfn, 1);
     struct xen_ia64_boot_param_ia64 *bp =
-	(struct xen_ia64_boot_param_ia64 *)(start_info + 1);
+        (struct xen_ia64_boot_param_ia64 *)(start_info + 1);
 
     xc_dom_printf("%s\n", __FUNCTION__);
 
@@ -48,19 +48,19 @@ static int start_info_ia64(struct xc_dom_image *dom)
     start_info->console.domU.mfn = dom->console_pfn;
     start_info->console.domU.evtchn = dom->console_evtchn;
 
-    if (dom->ramdisk_blob)
+    if ( dom->ramdisk_blob )
     {
-	start_info->mod_start = dom->ramdisk_seg.vstart;
-	start_info->mod_len = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
-	bp->initrd_start = start_info->mod_start;
-	bp->initrd_size = start_info->mod_len;
+        start_info->mod_start = dom->ramdisk_seg.vstart;
+        start_info->mod_len = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+        bp->initrd_start = start_info->mod_start;
+        bp->initrd_size = start_info->mod_len;
     }
     bp->command_line = (dom->start_info_pfn << PAGE_SHIFT_IA64)
-	    + offsetof(start_info_t, cmd_line);
-    if (dom->cmdline)
+        + offsetof(start_info_t, cmd_line);
+    if ( dom->cmdline )
     {
-	strncpy((char *)start_info->cmd_line, dom->cmdline, MAX_GUEST_CMDLINE);
-	start_info->cmd_line[MAX_GUEST_CMDLINE - 1] = '\0';
+        strncpy((char *)start_info->cmd_line, dom->cmdline, MAX_GUEST_CMDLINE);
+        start_info->cmd_line[MAX_GUEST_CMDLINE - 1] = '\0';
     }
     return 0;
 }
@@ -74,7 +74,7 @@ static int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
 
     memset(shared_info, 0, sizeof(*shared_info));
     for (i = 0; i < MAX_VIRT_CPUS; i++)
-	shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+        shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     shared_info->arch.start_info_pfn = dom->start_info_pfn;
     return 0;
 }
@@ -91,14 +91,14 @@ static int vcpu_ia64(struct xc_dom_image *dom, void *ptr)
     memset(ctxt, 0, sizeof(*ctxt));
 
     ctxt->flags = 0;
-    ctxt->user_regs.cr_ipsr = 0;	/* all necessary bits filled by hypervisor */
+    ctxt->user_regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->user_regs.cr_iip = dom->parms.virt_entry;
     ctxt->user_regs.cr_ifs = (uint64_t) 1 << 63;
-#ifdef __ia64__			/* FIXME */
+#ifdef __ia64__   /* FIXME */
     ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
 #endif
     ctxt->user_regs.r28 = (dom->start_info_pfn << PAGE_SHIFT_IA64)
-	+ sizeof(start_info_ia64_t);
+        + sizeof(start_info_ia64_t);
     return 0;
 }
 
@@ -117,3 +117,13 @@ static void __init register_arch_hooks(void)
 {
     xc_dom_register_arch_hooks(&xc_dom_arch);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

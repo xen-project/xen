@@ -10,8 +10,8 @@
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999, 2002-2003 Hewlett-Packard Co.
- *	David Mosberger-Tang <davidm@hpl.hp.com>
- *	Stephane Eranian <eranian@hpl.hp.com>
+ *      David Mosberger-Tang <davidm@hpl.hp.com>
+ *      Stephane Eranian <eranian@hpl.hp.com>
  */
 
 /*
