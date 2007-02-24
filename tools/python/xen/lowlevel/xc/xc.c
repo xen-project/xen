@@ -936,6 +936,26 @@ static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
     return zero;
 }
 
+static PyObject *pyxc_domain_send_trigger(XcObject *self,
+                                          PyObject *args,
+                                          PyObject *kwds)
+{
+    uint32_t dom;
+    int trigger, vcpu = 0;
+
+    static char *kwd_list[] = { "domid", "trigger", "vcpu", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|i", kwd_list, 
+                                      &dom, &trigger, &vcpu) )
+        return NULL;
+
+    if (xc_domain_send_trigger(self->xc_handle, dom, trigger, vcpu) != 0)
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
 {
@@ -1337,6 +1357,15 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Set a domain's time offset to Dom0's localtime\n"
       " dom        [int]: Domain whose time offset is being set.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_send_trigger",
+      (PyCFunction)pyxc_domain_send_trigger,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Send trigger to a domain.\n"
+      " dom     [int]: Identifier of domain to be sent trigger.\n"
+      " trigger [int]: Trigger type number.\n"
+      " vcpu    [int]: VCPU to be sent trigger.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
 #ifdef __powerpc__

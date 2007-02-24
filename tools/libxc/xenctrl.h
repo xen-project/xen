@@ -414,6 +414,20 @@ int xc_sched_credit_domain_get(int xc_handle,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);
 
+/**
+ * This function sends a trigger to a domain.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain id to send trigger
+ * @parm trigger the trigger type
+ * @parm vcpu the vcpu number to send trigger 
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_send_trigger(int xc_handle,
+                           uint32_t domid,
+                           uint32_t trigger,
+                           uint32_t vcpu);
+
 /*
  * EVENT CHANNEL FUNCTIONS
  */

@@ -356,12 +356,14 @@ struct xen_domctl_ioport_permission {
 typedef struct xen_domctl_ioport_permission xen_domctl_ioport_permission_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_permission_t);
 
+
 #define XEN_DOMCTL_hypercall_init    22
 struct xen_domctl_hypercall_init {
     uint64_aligned_t  gmfn;           /* GMFN to be initialised */
 };
 typedef struct xen_domctl_hypercall_init xen_domctl_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
+
 
 #define XEN_DOMCTL_arch_setup        23
 #define _XEN_DOMAINSETUP_hvm_guest 0
@@ -379,15 +381,17 @@ typedef struct xen_domctl_arch_setup {
 } xen_domctl_arch_setup_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_arch_setup_t);
 
+
 #define XEN_DOMCTL_settimeoffset     24
 struct xen_domctl_settimeoffset {
     int32_t  time_offset_seconds; /* applied to domain wallclock time */
 };
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
+
  
-#define XEN_DOMCTL_gethvmcontext   33
-#define XEN_DOMCTL_sethvmcontext   34
+#define XEN_DOMCTL_gethvmcontext     33
+#define XEN_DOMCTL_sethvmcontext     34
 typedef struct xen_domctl_hvmcontext {
     uint32_t size; /* IN/OUT: size of buffer / bytes filled */
     XEN_GUEST_HANDLE(uint8_t) buffer; /* IN/OUT: data, or call gethvmcontext 
@@ -395,20 +399,35 @@ typedef struct xen_domctl_hvmcontext {
 } xen_domctl_hvmcontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
 
-#define XEN_DOMCTL_set_address_size 35
-#define XEN_DOMCTL_get_address_size 36
+
+#define XEN_DOMCTL_set_address_size  35
+#define XEN_DOMCTL_get_address_size  36
 typedef struct xen_domctl_address_size {
     uint32_t size;
 } xen_domctl_address_size_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_address_size_t);
 
-#define XEN_DOMCTL_real_mode_area     26
+
+#define XEN_DOMCTL_real_mode_area    26
 struct xen_domctl_real_mode_area {
     uint32_t log; /* log2 of Real Mode Area size */
 };
 typedef struct xen_domctl_real_mode_area xen_domctl_real_mode_area_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_real_mode_area_t);
 
+
+#define XEN_DOMCTL_sendtrigger       28
+#define XEN_DOMCTL_SENDTRIGGER_NMI    0
+#define XEN_DOMCTL_SENDTRIGGER_RESET  1
+#define XEN_DOMCTL_SENDTRIGGER_INIT   2
+struct xen_domctl_sendtrigger {
+    uint32_t  trigger;  /* IN */
+    uint32_t  vcpu;     /* IN */
+};
+typedef struct xen_domctl_sendtrigger xen_domctl_sendtrigger_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
+
+ 
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -437,6 +456,7 @@ struct xen_domctl {
         struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_address_size      address_size;
+        struct xen_domctl_sendtrigger       sendtrigger;
         uint8_t                             pad[128];
     } u;
 };

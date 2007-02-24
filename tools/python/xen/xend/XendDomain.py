@@ -43,6 +43,7 @@ from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
 from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
 from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
+from xen.xend.XendConstants import TRIGGER_TYPE
 from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
@@ -1433,6 +1434,33 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
+    def domain_send_trigger(self, domid, trigger_name, vcpu = 0):
+        """Send trigger to a domain.
+
+        @param domid: Domain ID or Name
+        @type domid: int or string.
+        @param trigger_name: trigger type name
+        @type trigger_name: string
+        @param vcpu: VCPU to send trigger (default is 0) 
+        @type vcpu: int
+        @raise XendError: failed to send trigger
+        @raise XendInvalidDomain: Domain is not valid        
+        @rtype: 0
+        """
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+        if trigger_name.lower() in TRIGGER_TYPE: 
+            trigger = TRIGGER_TYPE[trigger_name.lower()]
+        else:
+            raise XendError("Invalid trigger: %s", trigger_name)
+        try:
+            return xc.domain_send_trigger(dominfo.getDomid(),
+                                          trigger,
+                                          vcpu)
+        except Exception, ex:
+            raise XendError(str(ex))
+ 
 
 def instance():
     """Singleton constructor. Use this instead of the class constructor.

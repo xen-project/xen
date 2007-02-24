@@ -133,6 +133,8 @@ SUBCOMMAND_HELP = {
     'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
+    'trigger'     : ('<Domain> <nmi|reset|init> [<VCPU>]',
+                     'Send a trigger to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
                      'List the VCPUs for a domain or all domains.'),
     'vcpu-pin'    : ('<Domain> <VCPU> <CPUs>',
@@ -255,6 +257,7 @@ common_commands = [
     "shutdown",
     "start",
     "suspend",
+    "trigger",
     "top",
     "unpause",
     "uptime",
@@ -284,6 +287,7 @@ domain_commands = [
     "start",
     "suspend",
     "sysrq",
+    "trigger",
     "top",
     "unpause",
     "uptime",
@@ -1347,6 +1351,17 @@ def xm_sysrq(args):
     req = args[1]
     server.xend.domain.send_sysrq(dom, req)    
 
+def xm_trigger(args):
+    vcpu = 0
+    
+    arg_check(args, "trigger", 2, 3)
+    dom = args[0]
+    trigger = args[1]
+    if len(args) == 3:
+        vcpu = int(args[2])
+    
+    server.xend.domain.send_trigger(dom, trigger, vcpu)
+
 def xm_top(args):
     arg_check(args, "top", 0)
 
@@ -1668,6 +1683,7 @@ commands = {
     "shutdown": xm_shutdown,
     "start": xm_start,
     "sysrq": xm_sysrq,
+    "trigger": xm_trigger,
     "uptime": xm_uptime,
     "suspend": xm_suspend,
     "list": xm_list,

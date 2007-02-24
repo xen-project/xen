@@ -90,6 +90,7 @@ struct arch_vmx_struct {
     unsigned long   flags;
     unsigned long   xen_port;
     unsigned char   xtp;
+    unsigned char   pal_init_pending;
 #ifdef VTI_DEBUG
     unsigned long  ivt_current;
     struct ivt_debug ivt_debug[IVT_DEBUG_MAX];

@@ -303,6 +303,7 @@ xencomm_privcmd_domctl(privcmd_hypercall_t *hypercall)
 	case XEN_DOMCTL_hypercall_init:
 	case XEN_DOMCTL_arch_setup:
 	case XEN_DOMCTL_settimeoffset:
+	case XEN_DOMCTL_sendtrigger:
 		break;
 	default:
 		printk("%s: unknown domctl cmd %d\n", __func__, kern_op.cmd);
