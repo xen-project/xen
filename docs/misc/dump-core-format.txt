@@ -1,0 +1,225 @@
+xen dump-core format
+               Written by Isaku Yamahata <yamahata at valinux co jp>  Feb. 2007
+
+
+Introduction
+------------
+With xm dump-core command, the guest domain's core can be created as a file.
+Its format was changed to be based on ELF format because elf format is easily
+extensible and handy. This document describes the new format.
+In this document the new format is called new xen dump-core format,
+xen dump-core format or simply dump-core format. The file of xen dump-core
+format is called xen dump-core file or dump-core file.
+
+The usual process core file includes program headers and no section header.
+On the other hand the xen dump-core file includes no program headers and
+some sections because of its peculiar requirements.
+
+
+Reference
+---------
+For ELF format itself, see Tool Interface Standard(TIS) Executable and
+Linking Format(ELF) Specification version 1.2.
+For xen related structure, please see the xen header files.
+
+
+Elf header
+----------
+The elf header members are set as follows
+        e_ident[EI_OSABI] = ELFOSABI_SYSV = 0
+        e_type = ET_CORE = 4
+e_ident[EI_CLASS], e_ident[EI_DATA] and e_flags are set according
+to an architecture which a file is created. Other members are set as usual.
+
+
+Sections
+--------
+Currently the following sections are defined. Some sections are optional.
+
+".note.Xen" section
+        name            ".note.Xen"
+        type            SHT_NOTE
+        description
+                This section is used as note section to store xen dump-core
+                file specific informations. The each detailed informations are
+                described in note section. This section must exist.
+
+".xen_prstatus" section
+        name            ".xen_prstatus"
+        type            SHT_PROGBITS
+        structure       array of vcpu_guest_context_t
+        description
+                This section stores the array of vcpu_guest_context_t
+                which is obtained by XEN_DOMCTL_getvcpucontext hypercall
+                when the xen dump-core file is created.
+                The size of array is stored in xch_nr_vcpus member of header
+                note descriptor in .note.Xen note section.
+                This section must exist.
+
+".xen_shared_info" section
+        name            ".xen_shared_info"
+        type            SHT_PROGBITS
+        structure       shared_info_t
+        description
+                This section stores the contents of shared info page
+                of a domain. This section is optional. 
+
+".xen_p2m" section
+        name            ".xen_p2m"
+        type            SHT_PROGBITS
+        structure       array of struct xen_dumpcore_p2m
+                        struct xen_dumpcore_p2m {
+                            uint64_t    pfn;
+                            uint64_t    gmfn;
+                        };
+        description
+                This elements represents the frame number of the page
+                in .xen_pages section.
+                        pfn:    guest-specific pseudo-physical frame number
+                        gmfn:   machine physical frame number
+                The size of arrays is stored in xch_nr_pages member of header
+                note descriptor in .note.Xen note section.
+                There is no rule about the order. Analysis tools must no rely
+                on its order.
+                This section must exist when the domain is non auto
+                translated physmap mode. Currently x86 paravirtualized domain.
+
+".xen_pfn" section
+        name            ".xen_pfn"
+        type            SHT_PROGBITS
+        structure       array of uint64_t
+        description
+                This elements represents the frame number of the page
+                in .xen_pages section.
+                The size of arrays is stored in xch_nr_pages member of header
+                note descriptor in .note.Xen note section.
+                There is no rule about the order. Analysis tools must no rely
+                on its order.
+                This section must exist when the domain is auto translated
+                physmap mode. Currently x86 full virtualized domain and
+                ia64 domain.
+
+".xen_pages" section
+        name            ".xen_pages"
+        type            SHT_PROGBITS
+        structure       array of page where page is page size byte array
+        description
+                This section includes the contents of pages.
+                The corresponding address is described in .xen_p2m section
+                or .xen_pfn section.
+                The page size is stored in xch_page_size member of header note
+                descriptor in .note.Xen section.
+                The array size is stored in xch_nr_pages member of header note
+                descriptor in .note.Xen section.
+                This section must exist.
+
+
+".xen_ia64_mapped_regs" section
+        name            ".xen_ia64_mapped_regs"
+        type            SHT_PROGBITS
+        structure       array of mapped_regs_t
+        description
+                This section stores the array of mapped_regs_t.
+                The size of array is stored in xch_nr_vcpus member of header
+                note descriptor in .note.Xen note section.
+                This section is ia64 specific and must exist for ia64 domain.
+                This section must not exist for non-ia64 domain.
+
+
+note section
+------------
+The note types are defined in xen/include/public/elfnote.h.
+The note descriptors are defined in tools/libxc/xc_core.h
+Currently the following note informations are defined.
+
+
+elf note section
+
+"Xen" is used as elf note name in elf note info
+        namesz  4
+        name    "Xen" (null-terminated)
+
+
+Descriptors
+
+none note descriptor
+        type            XEN_ELFNOTE_DUMPCORE_NONE = 0x2000000
+        structure       struct xen_dumpcore_elfnote_none_desc {
+                               /* nothing is defined */
+                        };
+        description
+                This note descriptor is defined to just indicate that this
+                file is xen dump-core format without any specific information.
+                This note information must exist.
+
+header note descriptor
+        type            XEN_ELFNOTE_DUMPCORE_HEADER = 0x2000001
+        structure       struct xen_dumpcore_elfnote_header_desc {
+                                uint64_t    xch_magic;
+                                uint64_t    xch_nr_vcpus;
+                                uint64_t    xch_nr_pages;
+                                uint64_t    xch_page_size;
+                        };
+        description
+                This note descriptor stores basic information of the domain.
+                xch_magic       magic number
+                    XC_CORE_MAGIC = 0xF00FEBED for paravirtualized domain
+                    XC_CORE_MAGIC_HVM = 0xF00FEBEE for full virtualized domain
+                xch_nr_vcpus    the number of vcpus
+                xch_nr_pages    the number of pages
+                xch_page_size   guest OS's page size
+                This note information must exist.
+
+xen_version descriptor
+        type            XEN_ELFNOTE_DUMPCORE_XEN_VERSION = 0x2000002
+        structure       struct xen_dumpcore_elfnote_xen_version_desc {
+                                uint64_t                    major_version;
+                                uint64_t                    minor_version;
+                                xen_extraversion_t          extra_version;
+                                xen_compile_info_t          compile_info;
+                                xen_capabilities_info_t     capabilities;
+                                xen_changeset_info_t        changeset;
+                                xen_platform_parameters_t   platform_parameters;
+                                uint64_t                    pagesize;
+                        };
+        description
+                This note descriptor stores basic information about xen
+                hypervisor. The each members store the result of
+                __HYPERVISOR_xen_version hypercall.
+                major_version   16msb bit of the result of XENVER_version
+                minor_version   16lsb bit of the result of XENVER_version
+                        uint64_t is used to make struct
+                        xen_dumpcore_elfnote_xen_version_desc independent
+                        on 32bit/64bit instead of uint32_t.
+                extra_version   the result of XENVER_extraversion
+                compile_info    the result of XENVER_compile_info
+                capabilities    the result of XENVER_capabilities
+                changeset       the result of XENVER_changeset
+                platform_parameters
+                                the result of XENVER_platform_parameters
+                pagesize        the result of XENVER_pagesize
+                This note information must exist.
+
+format_version descriptor
+        type            XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION = 0x2000003
+        structure       struct xen_dumpcore_elfnote_format_version_desc {
+                                uint64_t    version;
+                        };
+        description
+                This note descriptor stores xen dump-core format version.
+                The 32msb bit is major version and the 32lsb bit is minor
+                version. 
+                The minor version will be incremented when the format
+                is changed in compatible way. e.g. new sections, new note
+                descriptors are added.
+                the major version will be incremented when the format is
+                changed in incompatible way.
+                This note information must exit. Analysis tools should check
+                this format version.
+                This note information must exist.
+
+
+Format version history
+----------------------
+The currently only (major, minor) = (0, 1) is used.
+[When the format is changed, it would be described here.]
