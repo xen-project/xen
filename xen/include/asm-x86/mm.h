@@ -398,8 +398,11 @@ int map_ldt_shadow_page(unsigned int);
 
 #ifdef CONFIG_COMPAT
 int setup_arg_xlat_area(struct vcpu *, l4_pgentry_t *);
+unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 #else
 # define setup_arg_xlat_area(vcpu, l4tab) 0
+# define domain_clamp_alloc_bitsize(d, b) (b)
 #endif
+
 
 #endif /* __ASM_X86_MM_H__ */

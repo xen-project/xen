@@ -179,6 +179,9 @@ struct arch_domain
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     struct e820entry e820[3];
     unsigned int nr_e820;
+
+    /* Maximum physical-address bitwidth supported by this guest. */
+    unsigned int physaddr_bitsize;
 } __cacheline_aligned;
 
 #ifdef CONFIG_X86_PAE

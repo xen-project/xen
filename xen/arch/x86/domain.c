@@ -255,7 +255,7 @@ static void release_compat_l4(struct vcpu *v)
 
 static inline int may_switch_mode(struct domain *d)
 {
-    return 1; /* XXX */
+    return (d->tot_pages == 0);
 }
 
 int switch_native(struct domain *d)
@@ -263,7 +263,7 @@ int switch_native(struct domain *d)
     l1_pgentry_t gdt_l1e;
     unsigned int vcpuid;
 
-    if ( !d )
+    if ( d == NULL )
         return -EINVAL;
     if ( !may_switch_mode(d) )
         return -EACCES;
@@ -283,6 +283,8 @@ int switch_native(struct domain *d)
             release_compat_l4(d->vcpu[vcpuid]);
     }
 
+    d->arch.physaddr_bitsize = 64;
+
     return 0;
 }
 
@@ -291,7 +293,7 @@ int switch_compat(struct domain *d)
     l1_pgentry_t gdt_l1e;
     unsigned int vcpuid;
 
-    if ( !d )
+    if ( d == NULL )
         return -EINVAL;
     if ( compat_disabled )
         return -ENOSYS;
@@ -312,6 +314,10 @@ int switch_compat(struct domain *d)
             && setup_compat_l4(d->vcpu[vcpuid]) != 0)
             return -ENOMEM;
     }
+
+    d->arch.physaddr_bitsize =
+        fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
+        + (PAGE_SIZE - 2);
 
     return 0;
 }

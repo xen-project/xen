@@ -764,19 +764,21 @@ struct page_info *__alloc_domheap_pages(
     struct page_info *pg = NULL;
     cpumask_t mask;
     unsigned long i;
-    unsigned int bits = memflags >> _MEMF_bits, zone_hi;
+    unsigned int bits = memflags >> _MEMF_bits, zone_hi = NR_ZONES - 1;
 
     ASSERT(!in_irq());
 
-    if ( bits && bits <= PAGE_SHIFT + 1 )
-        return NULL;
+    if ( bits )
+    {
+        bits = domain_clamp_alloc_bitsize(d, bits);
+        if ( bits <= (PAGE_SHIFT + 1) )
+            return NULL;
+        bits -= PAGE_SHIFT + 1;
+        if ( bits < zone_hi )
+            zone_hi = bits;
+    }
 
-    zone_hi = bits - PAGE_SHIFT - 1;
-    if ( zone_hi >= NR_ZONES )
-        zone_hi = NR_ZONES - 1;
-
-    if ( NR_ZONES + PAGE_SHIFT > dma_bitsize &&
-         (!bits || bits > dma_bitsize) )
+    if ( (zone_hi + PAGE_SHIFT) >= dma_bitsize )
     {
         pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, zone_hi, cpu, order);
 

@@ -357,7 +357,11 @@ int construct_dom0(struct domain *d,
 
         value = (parms.virt_hv_start_low + mask) & ~mask;
 #ifdef CONFIG_COMPAT
-        HYPERVISOR_COMPAT_VIRT_START(d) = max_t(unsigned int, m2p_compat_vstart, value);
+        HYPERVISOR_COMPAT_VIRT_START(d) =
+            max_t(unsigned int, m2p_compat_vstart, value);
+        d->arch.physaddr_bitsize = !IS_COMPAT(d) ? 64 :
+            fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
+            + (PAGE_SIZE - 2);
         if ( value > (!IS_COMPAT(d) ?
                       HYPERVISOR_VIRT_START :
                       __HYPERVISOR_COMPAT_VIRT_START) )

@@ -289,4 +289,7 @@ extern int steal_page(struct domain *d, struct page_info *page,
 /* XXX these just exist until we can stop #including x86 code */
 #define access_ok(addr,size) 1
 #define array_access_ok(addr,count,size) 1
+
+#define domain_clamp_alloc_bitsize(d, b) (b)
+
 #endif

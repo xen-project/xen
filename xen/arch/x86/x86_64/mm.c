@@ -409,6 +409,13 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
     return 0;
 }
 
+unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
+{
+    if ( d == NULL )
+        return bits;
+    return min(d->arch.physaddr_bitsize, bits);
+}
+
 #include "compat/mm.c"
 
 /*
