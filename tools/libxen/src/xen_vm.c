@@ -168,6 +168,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "other_config",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, other_config) },
+        { .key = "domid",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vm_record, domid) },
         { .key = "is_control_domain",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, is_control_domain) },
@@ -948,6 +951,22 @@ xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xe
 
     *result = NULL;
     XEN_CALL_("VM.get_other_config");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_domid(xen_session *session, int64_t *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("VM.get_domid");
     return session->ok;
 }
 

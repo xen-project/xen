@@ -1100,6 +1100,7 @@ $\mathit{RW}$ &  {\tt platform/enable\_audio} & bool & emulate audio \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt tools\_version} & (string $\rightarrow$ string) Map & versions of installed paravirtualised drivers \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt domid} & int & domain ID (if available, -1 otherwise) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
 \hline
@@ -3966,6 +3967,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_domid}
+
+{\bf Overview:} 
+Get the domid field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_domid (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

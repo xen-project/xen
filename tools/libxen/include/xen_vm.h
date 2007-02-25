@@ -146,6 +146,7 @@ typedef struct xen_vm_record
     char *pci_bus;
     xen_string_string_map *tools_version;
     xen_string_string_map *other_config;
+    int64_t domid;
     bool is_control_domain;
     struct xen_vm_metrics_record_opt *metrics;
 } xen_vm_record;
@@ -544,6 +545,13 @@ xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, x
  */
 extern bool
 xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xen_vm vm);
+
+
+/**
+ * Get the domid field of the given VM.
+ */
+extern bool
+xen_vm_get_domid(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**

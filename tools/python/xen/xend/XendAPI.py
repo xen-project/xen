@@ -1000,6 +1000,7 @@ class XendAPI(object):
                   'VTPMs',
                   'PCI_bus',
                   'tools_version',
+                  'domid',
                   'is_control_domain',
                   ]
                   
@@ -1240,6 +1241,10 @@ class XendAPI(object):
     def VM_get_other_config(self, session, vm_ref):
         return self.VM_get('other_config', session, vm_ref)        
 
+    def VM_get_domid(self, _, ref):
+        domid = XendDomain.instance().get_vm_by_uuid(ref).getDomid()
+        return xen_api_success(domid is None and -1 or domid)
+
     def VM_get_is_control_domain(self, session, vm_ref):
         xd = XendDomain.instance()
         return xen_api_success(
@@ -1396,7 +1401,9 @@ class XendAPI(object):
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         if not xeninfo:
             return xen_api_error(['HANDLE_INVALID', 'VM', vm_ref])
-        
+
+        domid = xeninfo.getDomid()
+
         record = {
             'uuid': xeninfo.get_uuid(),
             'power_state': xeninfo.get_power_state(),
@@ -1439,6 +1446,7 @@ class XendAPI(object):
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
             'other_config': xeninfo.info.get('other_config', {}),
+            'domid': domid is None and -1 or domid,
             'is_control_domain': xeninfo == xendom.privilegedDomain(),
         }
         return xen_api_success(record)
