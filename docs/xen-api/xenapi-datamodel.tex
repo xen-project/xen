@@ -9617,7 +9617,7 @@ $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-
 $\mathit{RW}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
 $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & list of crash dumps that refer to this disk \\
-$\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in multiples of sector\_size field) \\
+$\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in bytes). Note that, depending on storage backend type, requested size may not be respected exactly \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & amount of physical space that the disk image is currently taking up on the storage repository (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt sector\_size} & int & sector size of VDI (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
