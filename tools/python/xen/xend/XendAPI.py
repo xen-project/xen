@@ -25,6 +25,7 @@ import threading
 from xen.xend import XendDomain, XendDomainInfo, XendNode, XendDmesg
 from xen.xend import XendLogging, XendTaskManager
 
+from xen.xend.XendAPIVersion import *
 from xen.xend.XendAuthSessions import instance as auth_manager
 from xen.xend.XendError import *
 from xen.xend.XendClient import ERROR_INVALID_DOMAIN
@@ -104,20 +105,22 @@ def catch_typeerror(func):
         except TypeError, exn:
             #log.exception('catch_typeerror')
             if hasattr(func, 'api') and func.api in argcounts:
-                # Assume that if the exception was thrown inside this
-                # file, then it is due to an invalid call from the client,
-                # but if it was thrown elsewhere, then it's an internal
+                # Assume that if the argument count was wrong and if the
+                # exception was thrown inside this file, then it is due to an
+                # invalid call from the client, otherwise it's an internal
                 # error (which will be handled further up).
-                tb = sys.exc_info()[2]
-                try:
-                    sourcefile = traceback.extract_tb(tb)[-1][0]
-                    if sourcefile == inspect.getsourcefile(XendAPI):
-                        return xen_api_error(
-                            ['MESSAGE_PARAMETER_COUNT_MISMATCH',
-                             func.api, argcounts[func.api],
-                             len(args) + len(kwargs)])
-                finally:
-                    del tb
+                expected = argcounts[func.api]
+                actual = len(args) + len(kwargs)
+                if expected != actual:
+                    tb = sys.exc_info()[2]
+                    try:
+                        sourcefile = traceback.extract_tb(tb)[-1][0]
+                        if sourcefile == inspect.getsourcefile(XendAPI):
+                            return xen_api_error(
+                                ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                                 func.api, expected, actual])
+                    finally:
+                        del tb
             raise
 
     return f
@@ -627,7 +630,11 @@ class XendAPI(object):
                     'resident_VMs',
                     'host_CPUs',
                     'metrics',
-                    'supported_bootloaders']
+                    'supported_bootloaders',
+                    'API_version_major',
+                    'API_version_minor',
+                    'API_version_vendor',
+                    'API_version_vendor_implementation']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -671,6 +678,14 @@ class XendAPI(object):
         del node.other_config[key]
         node.save()
         return xen_api_success_void()
+    def host_get_API_version_major(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_MAJOR)
+    def host_get_API_version_minor(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_MINOR)
+    def host_get_API_version_vendor(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_VENDOR)
+    def host_get_API_version_vendor_implementation(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_VENDOR_IMPLEMENTATION)
     def host_get_software_version(self, session, host_ref):
         return xen_api_success(XendNode.instance().xen_version())
     def host_get_resident_VMs(self, session, host_ref):
@@ -707,7 +722,13 @@ class XendAPI(object):
         record = {'uuid': node.uuid,
                   'name_label': node.name,
                   'name_description': '',
+                  'API_version_major': XEN_API_VERSION_MAJOR,
+                  'API_version_minor': XEN_API_VERSION_MINOR,
+                  'API_version_vendor': XEN_API_VERSION_VENDOR,
+                  'API_version_vendor_implemention':
+                  XEN_API_VERSION_VENDOR_IMPLEMENTATION,
                   'software_version': node.xen_version(),
+                  'other_config': node.other_config,
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),
                   'metrics': node.host_metrics_uuid,
