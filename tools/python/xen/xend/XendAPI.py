@@ -725,7 +725,7 @@ class XendAPI(object):
                   'API_version_major': XEN_API_VERSION_MAJOR,
                   'API_version_minor': XEN_API_VERSION_MINOR,
                   'API_version_vendor': XEN_API_VERSION_VENDOR,
-                  'API_version_vendor_implemention':
+                  'API_version_vendor_implementation':
                   XEN_API_VERSION_VENDOR_IMPLEMENTATION,
                   'software_version': node.xen_version(),
                   'other_config': node.other_config,
