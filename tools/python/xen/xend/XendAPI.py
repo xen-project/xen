@@ -630,6 +630,7 @@ class XendAPI(object):
                     'resident_VMs',
                     'host_CPUs',
                     'metrics',
+                    'capabilities',
                     'supported_bootloaders',
                     'API_version_major',
                     'API_version_minor',
@@ -694,6 +695,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
     def host_get_metrics(self, _, ref):
         return xen_api_success(XendNode.instance().host_metrics_uuid)
+    def host_get_capabilities(self, session, host_ref):
+        return xen_api_success(XendNode.instance().get_capabilities())
     def host_get_supported_bootloaders(self, session, host_ref):
         return xen_api_success(['pygrub'])
 
@@ -732,6 +735,7 @@ class XendAPI(object):
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),
                   'metrics': node.host_metrics_uuid,
+                  'capabilities': node.get_capabilities(),
                   'supported_bootloaders': 'pygrub'}
         return xen_api_success(record)
 

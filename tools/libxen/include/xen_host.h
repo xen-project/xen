@@ -78,6 +78,7 @@ typedef struct xen_host_record
     xen_string_string_map *api_version_vendor_implementation;
     xen_string_string_map *software_version;
     xen_string_string_map *other_config;
+    struct xen_string_set *capabilities;
     struct xen_string_set *supported_bootloaders;
     struct xen_vm_record_opt_set *resident_vms;
     xen_string_string_map *logging;
@@ -250,6 +251,13 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
  */
 extern bool
 xen_host_get_other_config(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
+ * Get the capabilities field of the given host.
+ */
+extern bool
+xen_host_get_capabilities(xen_session *session, struct xen_string_set **result, xen_host host);
 
 
 /**

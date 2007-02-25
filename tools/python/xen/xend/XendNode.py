@@ -353,6 +353,9 @@ class XendNode:
     def get_uuid(self):
         return self.uuid
 
+    def get_capabilities(self):
+        return self.xc.xeninfo()['xen_caps'].split(" ")
+
     #
     # Host CPU Functions
     #
