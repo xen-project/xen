@@ -76,6 +76,9 @@ typedef struct xen_vbd_record
     bool bootable;
     enum xen_vbd_mode mode;
     enum xen_vbd_type type;
+    bool currently_attached;
+    int64_t status_code;
+    char *status_detail;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
     struct xen_string_set *qos_supported_algorithms;
@@ -236,6 +239,27 @@ xen_vbd_get_mode(xen_session *session, enum xen_vbd_mode *result, xen_vbd vbd);
  */
 extern bool
 xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd);
+
+
+/**
+ * Get the currently_attached field of the given VBD.
+ */
+extern bool
+xen_vbd_get_currently_attached(xen_session *session, bool *result, xen_vbd vbd);
+
+
+/**
+ * Get the status_code field of the given VBD.
+ */
+extern bool
+xen_vbd_get_status_code(xen_session *session, int64_t *result, xen_vbd vbd);
+
+
+/**
+ * Get the status_detail field of the given VBD.
+ */
+extern bool
+xen_vbd_get_status_detail(xen_session *session, char **result, xen_vbd vbd);
 
 
 /**

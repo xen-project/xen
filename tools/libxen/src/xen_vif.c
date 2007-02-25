@@ -58,6 +58,15 @@ static const struct_member xen_vif_record_struct_members[] =
         { .key = "MTU",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vif_record, mtu) },
+        { .key = "currently_attached",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vif_record, currently_attached) },
+        { .key = "status_code",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vif_record, status_code) },
+        { .key = "status_detail",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vif_record, status_detail) },
         { .key = "qos_algorithm_type",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vif_record, qos_algorithm_type) },
@@ -95,6 +104,7 @@ xen_vif_record_free(xen_vif_record *record)
     xen_network_record_opt_free(record->network);
     xen_vm_record_opt_free(record->vm);
     free(record->mac);
+    free(record->status_detail);
     free(record->qos_algorithm_type);
     xen_string_string_map_free(record->qos_algorithm_params);
     xen_string_set_free(record->qos_supported_algorithms);
@@ -254,6 +264,55 @@ xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif)
     abstract_type result_type = abstract_type_int;
 
     XEN_CALL_("VIF.get_MTU");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_currently_attached(xen_session *session, bool *result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VIF.get_currently_attached");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_status_code(xen_session *session, int64_t *result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("VIF.get_status_code");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_status_detail(xen_session *session, char **result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VIF.get_status_detail");
     return session->ok;
 }
 

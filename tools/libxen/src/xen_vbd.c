@@ -66,6 +66,15 @@ static const struct_member xen_vbd_record_struct_members[] =
         { .key = "type",
           .type = &xen_vbd_type_abstract_type_,
           .offset = offsetof(xen_vbd_record, type) },
+        { .key = "currently_attached",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_vbd_record, currently_attached) },
+        { .key = "status_code",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vbd_record, status_code) },
+        { .key = "status_detail",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vbd_record, status_detail) },
         { .key = "qos_algorithm_type",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vbd_record, qos_algorithm_type) },
@@ -102,6 +111,7 @@ xen_vbd_record_free(xen_vbd_record *record)
     xen_vm_record_opt_free(record->vm);
     xen_vdi_record_opt_free(record->vdi);
     free(record->device);
+    free(record->status_detail);
     free(record->qos_algorithm_type);
     xen_string_string_map_free(record->qos_algorithm_params);
     xen_string_set_free(record->qos_supported_algorithms);
@@ -274,6 +284,55 @@ xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd)
 
     abstract_type result_type = xen_vbd_type_abstract_type_;
     XEN_CALL_("VBD.get_type");
+    return session->ok;
+}
+
+
+bool
+xen_vbd_get_currently_attached(xen_session *session, bool *result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("VBD.get_currently_attached");
+    return session->ok;
+}
+
+
+bool
+xen_vbd_get_status_code(xen_session *session, int64_t *result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("VBD.get_status_code");
+    return session->ok;
+}
+
+
+bool
+xen_vbd_get_status_detail(xen_session *session, char **result, xen_vbd vbd)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VBD.get_status_detail");
     return session->ok;
 }
 

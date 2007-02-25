@@ -6844,6 +6844,9 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to w
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
+$\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the device currently attached (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_code} & int & error/success code associated with last attach-operation (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success information associated with last attach-operation status (erased on reboot) \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VIF \\
@@ -7142,6 +7145,102 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_currently\_attached}
+
+{\bf Overview:} 
+Get the currently\_attached field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_currently_attached (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_code}
+
+{\bf Overview:} 
+Get the status\_code field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_status_code (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_detail}
+
+{\bf Overview:} 
+Get the status\_detail field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_status_detail (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -9984,6 +10083,9 @@ $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the device currently attached (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_code} & int & error/success code associated with last attach-operation (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success information associated with last attach-operation status (erased on reboot) \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VBD \\
@@ -10383,6 +10485,102 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_currently\_attached}
+
+{\bf Overview:} 
+Get the currently\_attached field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_currently_attached (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_code}
+
+{\bf Overview:} 
+Get the status\_code field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_status_code (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_detail}
+
+{\bf Overview:} 
+Get the status\_detail field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_status_detail (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
