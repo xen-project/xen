@@ -2138,7 +2138,15 @@ class XendAPI(object):
     def debug_get_record(self, session, debug_ref):
         return xen_api_success({'uuid': debug_ref})
 
-             
+
+    def list_all_methods(self, _):
+        def _funcs():
+            return [getattr(XendAPI, x) for x in XendAPI.__dict__]
+
+        return xen_api_success([x.api for x in _funcs()
+                                if hasattr(x, 'api')])
+    list_all_methods.api = '_UNSUPPORTED_list_all_methods'
+
 
 class XendAPIAsyncProxy:
     """ A redirector for Async.Class.function calls to XendAPI

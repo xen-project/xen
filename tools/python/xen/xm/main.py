@@ -549,6 +549,10 @@ class Shell(cmd.Cmd):
     def __init__(self):
         cmd.Cmd.__init__(self)
         self.prompt = "xm> "
+        if serverType == SERVER_XEN_API:
+            res = server.xenapi._UNSUPPORTED_list_all_methods()
+            for f in res:
+                setattr(Shell, 'do_' + f, self.default)
 
     def default(self, line):
         words = shlex.split(line)
@@ -567,6 +571,16 @@ class Shell(cmd.Cmd):
             else:
                 print '*** Unknown command: %s' % words[0]
         return False
+
+    def completedefault(self, text, line, begidx, endidx):
+        cmd = line.split(' ')[0]
+        clas, func = cmd.split('.')
+        if begidx != len(cmd) + 1 or \
+           func.startswith('get_by_') or \
+           func == 'get_all':
+            return []
+        uuids = server.xenapi_request('%s.get_all' % clas, ())
+        return [u + " " for u in uuids if u.startswith(text)]
 
     def emptyline(self):
         pass
