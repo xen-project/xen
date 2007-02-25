@@ -30,6 +30,7 @@
 #include "xen_vdi_decl.h"
 #include "xen_vif_decl.h"
 #include "xen_vm_decl.h"
+#include "xen_vm_guest_metrics_decl.h"
 #include "xen_vm_metrics_decl.h"
 #include "xen_vm_power_state.h"
 #include "xen_vtpm_decl.h"
@@ -144,11 +145,11 @@ typedef struct xen_vm_record
     bool platform_clock_offset;
     bool platform_enable_audio;
     char *pci_bus;
-    xen_string_string_map *tools_version;
     xen_string_string_map *other_config;
     int64_t domid;
     bool is_control_domain;
     struct xen_vm_metrics_record_opt *metrics;
+    struct xen_vm_guest_metrics_record_opt *guest_metrics;
 } xen_vm_record;
 
 /**
@@ -534,13 +535,6 @@ xen_vm_get_pci_bus(xen_session *session, char **result, xen_vm vm);
 
 
 /**
- * Get the tools_version field of the given VM.
- */
-extern bool
-xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, xen_vm vm);
-
-
-/**
  * Get the other_config field of the given VM.
  */
 extern bool
@@ -566,6 +560,13 @@ xen_vm_get_is_control_domain(xen_session *session, bool *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_metrics(xen_session *session, xen_vm_metrics *result, xen_vm vm);
+
+
+/**
+ * Get the guest_metrics field of the given VM.
+ */
+extern bool
+xen_vm_get_guest_metrics(xen_session *session, xen_vm_guest_metrics *result, xen_vm vm);
 
 
 /**
