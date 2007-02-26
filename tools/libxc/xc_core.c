@@ -85,7 +85,7 @@ xc_core_strtab_init(void)
 {
     struct xc_core_strtab *strtab;
     char *strings;
-    strtab = malloc(sizeof(strtab));
+    strtab = malloc(sizeof(*strtab));
     if ( strtab == NULL )
         return NULL;
 
