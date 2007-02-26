@@ -155,7 +155,7 @@ SUBCOMMAND_HELP = {
                         'List virtual block devices for a domain.'),
     'network-attach':  ('<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] '
                         '[ip=<ip>] [script=<script>] [backend=<BackDomain>] '
-                        '[vifname=<name>]',
+                        '[vifname=<name>] [rate=<rate>] [model=<model>]',
                         'Create a new virtual network device.'),
     'network-detach':  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
@@ -1595,13 +1595,20 @@ def xm_block_configure(args):
 
 
 def xm_network_attach(args):
-    arg_check(args, 'network-attach', 1, 10000)
+    arg_check(args, 'network-attach', 1, 10)
 
     dom = args[0]
     vif = ['vif']
+    vif_params = ['type', 'mac', 'bridge', 'ip', 'script', \
+                  'backend', 'vifname', 'rate', 'model']
 
     for a in args[1:]:
-        vif.append(a.split("="))
+        vif_param = a.split("=")
+        if len(vif_param) != 2 or vif_param[1] == '' or \
+           vif_param[0] not in vif_params:
+            err("Invalid argument: %s" % a)
+            usage('network-attach')
+        vif.append(vif_param)
 
     server.xend.domain.device_create(dom, vif)
 
