@@ -302,6 +302,8 @@ class XendDomainInfo:
     @type store_mfn: int
     @ivar console_mfn: xenconsoled mfn
     @type console_mfn: int
+    @ivar notes: OS image notes
+    @type notes: dictionary
     @ivar vmWatch: reference to a watch on the xenstored vmpath
     @type vmWatch: xen.xend.xenstore.xswatch
     @ivar shutdownWatch: reference to watch on the xenstored domain shutdown
@@ -776,12 +778,28 @@ class XendDomainInfo:
 
         def f(n, v):
             if v is not None:
-                to_store[n] = str(v)
+                if type(v) == bool:
+                    to_store[n] = v and "1" or "0"
+                else:
+                    to_store[n] = str(v)
 
         f('console/port',     self.console_port)
         f('console/ring-ref', self.console_mfn)
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
+
+        # elfnotes
+        for n, v in self.info.get_notes().iteritems():
+            n = n.lower().replace('_', '-')
+            if n == 'features':
+                for v in v.split('|'):
+                    v = v.replace('_', '-')
+                    if v.startswith('!'):
+                        f('image/%s/%s' % (n, v[1:]), False)
+                    else:
+                        f('image/%s/%s' % (n, v), True)
+            else:
+                f('image/%s' % n, v)
 
         to_store.update(self._vcpuDomDetails())
 
@@ -1462,6 +1480,8 @@ class XendDomainInfo:
             self.store_mfn = channel_details['store_mfn']
             if 'console_mfn' in channel_details:
                 self.console_mfn = channel_details['console_mfn']
+            if 'notes' in channel_details:
+                self.info.set_notes(channel_details['notes'])
 
             self._introduceDomain()
 

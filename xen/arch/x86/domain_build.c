@@ -28,6 +28,7 @@
 #include <asm/paging.h>
 
 #include <public/version.h>
+#include <public/elfnote.h>
 #include <public/libelf.h>
 
 extern unsigned long initial_images_nrpages(void);

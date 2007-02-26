@@ -122,6 +122,31 @@ int xc_linux_build(int xc_handle, uint32_t domid,
     return rc;
 }
 
+int xc_dom_linux_build(int xc_handle,
+                       struct xc_dom_image *dom,
+                       uint32_t domid,
+                       unsigned int mem_mb,
+                       const char *image_name,
+                       const char *initrd_name,
+                       unsigned long flags,
+                       unsigned int store_evtchn,
+                       unsigned long *store_mfn,
+                       unsigned int console_evtchn, unsigned long *console_mfn)
+{
+    int rc;
+
+    if ( (rc = xc_dom_kernel_file(dom, image_name)) != 0 )
+        return rc;
+    if ( initrd_name && strlen(initrd_name) &&
+         ((rc = xc_dom_ramdisk_file(dom, initrd_name)) != 0) )
+        return rc;
+
+    return xc_linux_build_internal(dom, xc_handle, domid,
+                                   mem_mb, flags,
+                                   store_evtchn, store_mfn,
+                                   console_evtchn, console_mfn);
+}
+
 /*
  * Local variables:
  * mode: C

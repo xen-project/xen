@@ -729,6 +729,10 @@ class XendConfig(dict):
                 image['hvm'] = image_hvm
                 image['hvm']['devices'] = image_hvm_devices
 
+            notes = sxp.children(image_sxp, 'notes')
+            if notes:
+                image['notes'] = self.notes_from_sxp(notes[0])
+
             self['image'] = image
 
             for apikey, imgkey in XENAPI_HVM_CFG.items():
@@ -1363,6 +1367,9 @@ class XendConfig(dict):
                             
                     image.append([arg, val])
 
+        if 'notes' in self['image']:
+            image.append(self.notes_sxp(self['image']['notes']))
+
         return image
 
     def update_with_image_sxp(self, image_sxp, bootloader = False):
@@ -1420,6 +1427,10 @@ class XendConfig(dict):
             image['hvm'] = image_hvm
             image['hvm']['devices'] = image_hvm_devices
 
+        notes = sxp.children(image_sxp, 'notes')
+        if notes:
+            image['notes'] = self.notes_from_sxp(notes[0])
+
         self['image'] = image
 
         for apikey, imgkey in XENAPI_HVM_CFG.items():
@@ -1432,7 +1443,28 @@ class XendConfig(dict):
                     self[apikey] = val
         self._hvm_boot_params_from_sxp(image_sxp)
 
+    def set_notes(self, notes):
+        'Add parsed elfnotes to image'
+        self['image']['notes'] = notes
 
+    def get_notes(self):
+        try:
+            return self['image']['notes'] or {}
+        except KeyError:
+            return {}
+
+    def notes_from_sxp(self, nsxp):
+        notes = {}
+        for note in sxp.children(nsxp):
+            notes[note[0]] = note[1]
+        return notes
+
+    def notes_sxp(self, notes):
+        nsxp = ['notes']
+        for k, v in notes.iteritems():
+            nsxp.append([k, str(v)])
+        return nsxp
+        
     def _hvm_boot_params_from_sxp(self, image_sxp):
         boot = sxp.child_value(image_sxp, 'boot', None)
         if boot is not None:
