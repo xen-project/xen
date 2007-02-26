@@ -356,7 +356,6 @@ class XendDomainInfo:
         self.store_mfn = None
         self.console_port = None
         self.console_mfn = None
-        self.notes = {}
 
         self.vmWatch = None
         self.shutdownWatch = None
@@ -790,7 +789,7 @@ class XendDomainInfo:
         f('store/ring-ref',   self.store_mfn)
 
         # elfnotes
-        for n, v in self.notes.iteritems():
+        for n, v in self.info.get_notes().iteritems():
             n = n.lower().replace('_', '-')
             if n == 'features':
                 for v in v.split('|'):
@@ -1482,7 +1481,7 @@ class XendDomainInfo:
             if 'console_mfn' in channel_details:
                 self.console_mfn = channel_details['console_mfn']
             if 'notes' in channel_details:
-                self.notes = channel_details['notes']
+                self.info.set_notes(channel_details['notes'])
 
             self._introduceDomain()
 
