@@ -981,7 +981,6 @@ mfn_t shadow_alloc(struct domain *d,
         INIT_LIST_HEAD(&sp[i].list);
         sp[i].type = shadow_type;
         sp[i].pinned = 0;
-        sp[i].logdirty = 0;
         sp[i].count = 0;
         sp[i].backpointer = backpointer;
         sp[i].next_shadow = NULL;
@@ -1230,7 +1229,6 @@ static unsigned int sh_set_allocation(struct domain *d,
             {
                 sp[j].type = 0;  
                 sp[j].pinned = 0;
-                sp[j].logdirty = 0;
                 sp[j].count = 0;
                 sp[j].mbz = 0;
                 sp[j].tlbflush_timestamp = 0; /* Not in any TLB */
@@ -2558,7 +2556,7 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
     ASSERT(shadow_locked_by_me(d));
 
     /* Sanity check the call */
-    if ( d == current->domain || (d->arch.paging.mode & mode) )
+    if ( d == current->domain || (d->arch.paging.mode & mode) == mode )
     {
         return -EINVAL;
     }
@@ -2589,7 +2587,7 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
     ASSERT(shadow_locked_by_me(d));
 
     /* Sanity check the call */
-    if ( d == current->domain || !(d->arch.paging.mode & mode) )
+    if ( d == current->domain || !((d->arch.paging.mode & mode) == mode) )
     {
         return -EINVAL;
     }
@@ -2646,17 +2644,7 @@ static int shadow_test_enable(struct domain *d)
 
     domain_pause(d);
     shadow_lock(d);
-
-    if ( shadow_mode_enabled(d) )
-    {
-        SHADOW_ERROR("Don't support enabling test mode"
-                      " on already shadowed doms\n");
-        ret = -EINVAL;
-        goto out;
-    }
-
     ret = shadow_one_bit_enable(d, PG_SH_enable);
- out:
     shadow_unlock(d);
     domain_unpause(d);
 
@@ -2722,10 +2710,10 @@ static int shadow_log_dirty_enable(struct domain *d)
 
     if ( shadow_mode_enabled(d) )
     {
-        SHADOW_ERROR("Don't (yet) support enabling log-dirty"
-                      " on already shadowed doms\n");
-        ret = -EINVAL;
-        goto out;
+        /* This domain already has some shadows: need to clear them out 
+         * of the way to make sure that all references to guest memory are 
+         * properly write-protected */
+        shadow_blow_tables(d);
     }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL)
@@ -2917,11 +2905,17 @@ static int shadow_log_dirty_op(
 void sh_mark_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
-
-    ASSERT(shadow_locked_by_me(d));
+    int do_locking;
 
     if ( !shadow_mode_log_dirty(d) || !mfn_valid(gmfn) )
         return;
+
+    /* Although this is an externally visible function, we do not know
+     * whether the shadow lock will be held when it is called (since it
+     * can be called from __hvm_copy during emulation).
+     * If the lock isn't held, take it for the duration of the call. */
+    do_locking = !shadow_locked_by_me(d);
+    if ( do_locking ) shadow_lock(d);
 
     ASSERT(d->arch.paging.shadow.dirty_bitmap != NULL);
 
@@ -2962,13 +2956,8 @@ void sh_mark_dirty(struct domain *d, mfn_t gmfn)
                        mfn_to_page(gmfn)->count_info, 
                        mfn_to_page(gmfn)->u.inuse.type_info);
     }
-}
 
-void shadow_mark_dirty(struct domain *d, mfn_t gmfn)
-{
-    shadow_lock(d);
-    sh_mark_dirty(d, gmfn);
-    shadow_unlock(d);
+    if ( do_locking ) shadow_unlock(d);
 }
 
 /**************************************************************************/
@@ -2992,9 +2981,7 @@ int shadow_domctl(struct domain *d,
         if ( shadow_mode_log_dirty(d) )
             if ( (rc = shadow_log_dirty_disable(d)) != 0 ) 
                 return rc;
-        if ( is_hvm_domain(d) )
-            return -EINVAL;
-        if ( d->arch.paging.mode & PG_SH_enable )
+        if ( d->arch.paging.mode == PG_SH_enable )
             if ( (rc = shadow_test_disable(d)) != 0 ) 
                 return rc;
         return 0;

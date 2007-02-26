@@ -398,6 +398,8 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
 
         unmap_domain_page(p);
+        
+        mark_dirty(current->domain, mfn);
 
         addr += count;
         buf  += count;

@@ -101,14 +101,6 @@ get_fl1_shadow_status(struct vcpu *v, gfn_t gfn)
 /* Look for FL1 shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(v, gfn_x(gfn), SH_type_fl1_shadow);
-
-    if ( unlikely(shadow_mode_log_dirty(v->domain) && mfn_valid(smfn)) )
-    {
-        struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
-        if ( !(sp->logdirty) )
-            shadow_convert_to_log_dirty(v, smfn);
-    }
-
     return smfn;
 }
 
@@ -118,14 +110,6 @@ get_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 {
     mfn_t smfn = shadow_hash_lookup(v, mfn_x(gmfn), shadow_type);
     perfc_incrc(shadow_get_shadow_status);
-
-    if ( unlikely(shadow_mode_log_dirty(v->domain) && mfn_valid(smfn)) )
-    {
-        struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
-        if ( !(sp->logdirty) )
-            shadow_convert_to_log_dirty(v, smfn);
-    }
-
     return smfn;
 }
 
@@ -135,12 +119,6 @@ set_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
 {
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
-
-    if ( unlikely(shadow_mode_log_dirty(v->domain)) )
-        // mark this shadow as a log dirty shadow...
-        mfn_to_shadow_page(smfn)->logdirty = 1;
-    else
-        mfn_to_shadow_page(smfn)->logdirty = 0;
 
     shadow_hash_insert(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
@@ -155,12 +133,6 @@ set_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
     SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx, type=%08x, smfn=%05lx\n",
                    d->domain_id, v->vcpu_id, mfn_x(gmfn),
                    shadow_type, mfn_x(smfn));
-
-    if ( unlikely(shadow_mode_log_dirty(d)) )
-        // mark this shadow as a log dirty shadow...
-        mfn_to_shadow_page(smfn)->logdirty = 1;
-    else
-        mfn_to_shadow_page(smfn)->logdirty = 0;
 
 #ifdef CONFIG_COMPAT
     if ( !IS_COMPAT(d) || shadow_type != SH_type_l4_64_shadow )
@@ -3994,6 +3966,8 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
+    
+    sh_mark_dirty(v->domain, mfn);
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4047,6 +4021,8 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
 
+    sh_mark_dirty(v->domain, mfn);
+
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
     return rv;
@@ -4086,6 +4062,8 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( *(u32 *)addr == 0 )
         check_for_early_unshadow(v, mfn);
+
+    sh_mark_dirty(v->domain, mfn);
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);

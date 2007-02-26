@@ -229,8 +229,7 @@ struct shadow_page_info
     struct {
         unsigned int type:4;      /* What kind of shadow is this? */
         unsigned int pinned:1;    /* Is the shadow pinned? */
-        unsigned int logdirty:1;  /* Was it made in log-dirty mode? */
-        unsigned int count:26;    /* Reference count */
+        unsigned int count:27;    /* Reference count */
         u32 mbz;                  /* Must be zero: this is where the owner 
                                    * field lives in a non-shadow page */
     } __attribute__((packed));

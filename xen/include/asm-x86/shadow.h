@@ -87,12 +87,13 @@ void shadow_final_teardown(struct domain *d);
 
 /* Mark a page as dirty in the log-dirty bitmap: called when Xen 
  * makes changes to guest memory on its behalf. */
-void shadow_mark_dirty(struct domain *d, mfn_t gmfn);
+void sh_mark_dirty(struct domain *d, mfn_t gmfn);
 /* Cleaner version so we don't pepper shadow_mode tests all over the place */
 static inline void mark_dirty(struct domain *d, unsigned long gmfn)
 {
     if ( unlikely(shadow_mode_log_dirty(d)) )
-        shadow_mark_dirty(d, _mfn(gmfn));
+        /* See the comment about locking in sh_mark_dirty */
+        sh_mark_dirty(d, _mfn(gmfn));
 }
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
