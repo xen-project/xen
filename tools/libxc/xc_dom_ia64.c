@@ -113,9 +113,19 @@ static struct xc_dom_arch xc_dom_arch = {
     .vcpu = vcpu_ia64,
 };
 
+static struct xc_dom_arch xc_dom_arch_ia64be = {
+    .guest_type = "xen-3.0-ia64be",
+    .page_shift = PAGE_SHIFT_IA64,
+    .alloc_magic_pages = alloc_magic_pages,
+    .start_info = start_info_ia64,
+    .shared_info = shared_info_ia64,
+    .vcpu = vcpu_ia64,
+};
+
 static void __init register_arch_hooks(void)
 {
     xc_dom_register_arch_hooks(&xc_dom_arch);
+    xc_dom_register_arch_hooks(&xc_dom_arch_ia64be);
 }
 
 /*
