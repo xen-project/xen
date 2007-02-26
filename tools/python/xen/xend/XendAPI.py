@@ -824,18 +824,13 @@ class XendAPI(object):
 
     network_attr_ro = ['VIFs', 'PIFs']
     network_attr_rw = ['name_label',
-                       'name_description',
-                       'default_gateway',
-                       'default_netmask']
+                       'name_description']
     
     network_funcs = [('create', 'network')]
     
-    def network_create(self, _, name_label, name_description,
-                       default_gateway, default_netmask):
+    def network_create(self, _, name_label, name_description):
         return xen_api_success(
-            XendNode.instance().network_create(name_label, name_description,
-                                               default_gateway,
-                                               default_netmask))
+            XendNode.instance().network_create(name_label, name_description))
 
     def network_destroy(self, _, ref):
         return xen_api_success(XendNode.instance().network_destroy(ref))
@@ -856,12 +851,6 @@ class XendAPI(object):
     def network_get_name_description(self, _, ref):
         return xen_api_success(self._get_network(ref).name_description)
 
-    def network_get_default_gateway(self, _, ref):
-        return xen_api_success(self._get_network(ref).default_gateway)
-
-    def network_get_default_netmask(self, _, ref):
-        return xen_api_success(self._get_network(ref).default_netmask)
-
     def network_get_VIFs(self, _, ref):
         return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
 
@@ -873,13 +862,6 @@ class XendAPI(object):
 
     def network_set_name_description(self, _, ref, val):
         return xen_api_success(self._get_network(ref).set_name_description(val))
-
-    def network_set_default_gateway(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_default_gateway(val))
-
-    def network_set_default_netmask(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_default_netmask(val))
-
 
     # Xen API: Class PIF
     # ----------------------------------------------------------------

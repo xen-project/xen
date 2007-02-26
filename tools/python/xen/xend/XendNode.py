@@ -109,12 +109,9 @@ class XendNode:
             for net_uuid, network in saved_networks.items():
                 self.network_create(network.get('name_label'),
                                     network.get('name_description', ''),
-                                    network.get('default_gateway', ''),
-                                    network.get('default_netmask', ''),
                                     False, net_uuid)
         else:
-            gateway, netmask = linux_get_default_network()
-            self.network_create('net0', '', gateway, netmask, False)
+            self.network_create('net0', '', False)
 
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
@@ -168,15 +165,12 @@ class XendNode:
 
 
 
-    def network_create(self, name_label, name_description,
-                       default_gateway, default_netmask, persist = True,
+    def network_create(self, name_label, name_description, persist = True,
                        net_uuid = None):
         if net_uuid is None:
             net_uuid = uuid.createString()
         self.networks[net_uuid] = XendNetwork(net_uuid, name_label,
-                                              name_description,
-                                              default_gateway,
-                                              default_netmask)
+                                              name_description)
         if persist:
             self.save_networks()
         return net_uuid
