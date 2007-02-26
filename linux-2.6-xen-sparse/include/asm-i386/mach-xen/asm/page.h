@@ -139,7 +139,11 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
+#ifdef CONFIG_XEN_COMPAT_030002
+	if (ret) ret = machine_to_phys(ret) | _PAGE_PRESENT;
+#else
 	if (ret & _PAGE_PRESENT) ret = machine_to_phys(ret);
+#endif
 	return ret;
 }
 #define HPAGE_SHIFT	22
