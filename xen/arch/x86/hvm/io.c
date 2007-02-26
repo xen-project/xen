@@ -416,7 +416,6 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             printk("Error: %s unknown port size\n", __FUNCTION__);
             domain_crash_synchronous();
         }
-        TRACE_VMEXIT(3, regs->eax);
     }
 }
 

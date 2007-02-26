@@ -37,6 +37,7 @@
 #include <xen/kernel.h>
 #include <public/hvm/ioreq.h>
 #include <xen/domain_page.h>
+#include <asm/hvm/trace.h>
 
 /*
  * Most of this code is copied from vmx_io.c and modified 
@@ -108,6 +109,7 @@ asmlinkage void svm_intr_assist(void)
             if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )  
             {
                 vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+                HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
                 svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
                 return;
             }
@@ -128,7 +130,10 @@ asmlinkage void svm_intr_assist(void)
         if ( re_injecting && (pt = is_pt_irq(v, intr_vector, intr_type)) )
             ++pt->pending_intr_nr;
         /* let's inject this interrupt */
-        TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, intr_vector, 0);
+        if (re_injecting)
+            HVMTRACE_1D(REINJ_VIRQ, v, intr_vector);
+        else
+            HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
         svm_inject_extint(v, intr_vector);
         break;
     case APIC_DM_SMI:

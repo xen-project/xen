@@ -37,6 +37,7 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 #include <public/hvm/ioreq.h>
+#include <asm/hvm/trace.h>
 
 
 static inline void
@@ -162,8 +163,8 @@ asmlinkage void vmx_intr_assist(void)
     case APIC_DM_EXTINT:
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
+        HVMTRACE_2D(INJ_VIRQ, v, highest_vector, /*fake=*/ 0);
         vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
-        TRACE_3D(TRC_VMX_INTR, v->domain->domain_id, highest_vector, 0);
         break;
 
     case APIC_DM_SMI:

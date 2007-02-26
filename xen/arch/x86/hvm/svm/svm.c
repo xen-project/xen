@@ -48,6 +48,7 @@
 #include <asm/x86_emulate.h>
 #include <public/sched.h>
 #include <asm/hvm/vpt.h>
+#include <asm/hvm/trace.h>
 
 #define SVM_EXTRA_DEBUG
 
@@ -80,6 +81,11 @@ static inline void svm_inject_exception(struct vcpu *v, int trap,
 {
     eventinj_t event;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( trap == TRAP_page_fault )
+        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_svm.cpu_cr2, error_code);
+    else
+        HVMTRACE_2D(INJ_EXC, v, trap, error_code);
 
     event.bytes = 0;            
     event.fields.v = 1;
@@ -977,9 +983,9 @@ static void svm_hvm_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
 {
     struct vcpu *v = current;
-    svm_inject_exception(v, trapnr, (errcode != -1), errcode);
     if ( trapnr == TRAP_page_fault )
         v->arch.hvm_svm.vmcb->cr2 = v->arch.hvm_svm.cpu_cr2 = cr2;
+    svm_inject_exception(v, trapnr, (errcode != -1), errcode);
 }
 
 static int svm_event_injection_faulted(struct vcpu *v)
@@ -1209,13 +1215,17 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     regs->ecx = (unsigned long)ecx;
     regs->edx = (unsigned long)edx;
 
+    HVMTRACE_3D(CPUID, v, input,
+                ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
+
     inst_len = __get_instruction_length(vmcb, INSTR_CPUID, NULL);
     ASSERT(inst_len > 0);
     __update_guest_eip(vmcb, inst_len);
 }
 
-static inline unsigned long *get_reg_p(unsigned int gpreg, 
-                                       struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
+static inline unsigned long *get_reg_p(
+    unsigned int gpreg, 
+    struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
     unsigned long *reg_p = NULL;
     switch (gpreg)
@@ -1299,6 +1309,8 @@ static inline void set_reg(unsigned int gpreg, unsigned long value,
 static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    HVMTRACE_0D(DR_WRITE, v);
 
     v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
@@ -1579,6 +1591,11 @@ static void svm_io_instruction(struct vcpu *v)
     else 
         size = 1;
 
+    if (dir==IOREQ_READ)
+        HVMTRACE_2D(IO_READ,  v, port, size);
+    else
+        HVMTRACE_2D(IO_WRITE, v, port, size);
+
     HVM_DBG_LOG(DBG_LEVEL_IO, 
                 "svm_io_instruction: port 0x%x eip=%x:%"PRIx64", "
                 "exit_qualification = %"PRIx64,
@@ -1835,6 +1852,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         return;
     }
 
+    HVMTRACE_2D(CR_READ, v, cr, value);
+
     set_reg(gp, value, regs, vmcb);
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
@@ -1858,6 +1877,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     value = get_reg(gpreg, regs, vmcb);
+
+    HVMTRACE_2D(CR_WRITE, v, cr, value);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
     HVM_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
@@ -2152,6 +2173,7 @@ static inline void svm_do_msr_access(
         regs->edx = msr_content >> 32;
 
  done:
+        HVMTRACE_2D(MSR_READ, v, ecx, msr_content);
         HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                     ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
 
@@ -2160,6 +2182,8 @@ static inline void svm_do_msr_access(
     else
     {
         msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+
+        HVMTRACE_2D(MSR_WRITE, v, ecx, msr_content);
 
         switch (ecx)
         {
@@ -2198,9 +2222,12 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 
     /* Check for interrupt not handled or new interrupt. */
     if ( (vmcb->rflags & X86_EFLAGS_IF) &&
-         (vmcb->vintr.fields.irq || cpu_has_pending_irq(current)) )
+         (vmcb->vintr.fields.irq || cpu_has_pending_irq(current)) ) {
+        HVMTRACE_1D(HLT, current, /*int pending=*/ 1);
         return;
+    }
 
+    HVMTRACE_1D(HLT, current, /*int pending=*/ 0);
     hvm_hlt(vmcb->rflags);
 }
 
@@ -2311,6 +2338,8 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
         inst_len += length;
         __update_guest_eip (vmcb, inst_len);
     }
+
+    HVMTRACE_3D(INVLPG, v, (invlpga?1:0), g_vaddr, (invlpga?regs->ecx:0));
 
     paging_invlpg(v, g_vaddr);
 }
@@ -2427,6 +2456,8 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
 
     inst_len = __get_instruction_length(vmcb, INSTR_VMCALL, NULL);
     ASSERT(inst_len > 0);
+
+    HVMTRACE_1D(VMMCALL, v, regs->eax);
 
     if ( regs->eax & 0x80000000 )
     {
@@ -2723,7 +2754,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     unsigned int exit_reason;
     unsigned long eip;
     struct vcpu *v = current;
-    int error;
     int do_debug = 0;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -2731,6 +2761,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
+
+    HVMTRACE_2D(VMEXIT, v, vmcb->rip, exit_reason);
 
     if (exit_reason == VMEXIT_INVALID)
     {
@@ -2854,8 +2886,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 #endif /* SVM_EXTRA_DEBUG */
 
-    TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
-
     switch (exit_reason) 
     {
     case VMEXIT_EXCEPTION_DB:
@@ -2872,9 +2902,16 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     break;
 
     case VMEXIT_INTR:
+        /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
+        HVMTRACE_0D(INTR, v);
+        break;
     case VMEXIT_NMI:
+        /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
+        HVMTRACE_0D(NMI, v);
+        break;
     case VMEXIT_SMI:
-        /* Asynchronous events, handled when we STGI'd after the VMEXIT. */
+        /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
+        HVMTRACE_0D(SMI, v);
         break;
 
     case VMEXIT_INIT:
@@ -2914,16 +2951,14 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                     (unsigned long)regs->ecx, (unsigned long)regs->edx,
                     (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-        if (!(error = svm_do_page_fault(va, regs))) 
+        if ( svm_do_page_fault(va, regs) )
         {
-            /* Inject #PG using Interruption-Information Fields */
-            svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
-
-            v->arch.hvm_svm.cpu_cr2 = va;
-            vmcb->cr2 = va;
-            TRACE_3D(TRC_VMX_INTR, v->domain->domain_id,
-                     VMEXIT_EXCEPTION_PF, va);
+            HVMTRACE_2D(PF_XEN, v, va, regs->error_code);
+            break;
         }
+
+        v->arch.hvm_svm.cpu_cr2 = vmcb->cr2 = va;
+        svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
         break;
     }
 
@@ -3060,6 +3095,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 asmlinkage void svm_load_cr2(void)
 {
     struct vcpu *v = current;
+
+    // this is the last C code before the VMRUN instruction
+    HVMTRACE_0D(VMENTRY, v);
 
     local_irq_disable();
     asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
