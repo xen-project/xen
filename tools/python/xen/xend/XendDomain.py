@@ -32,7 +32,7 @@ import threading
 import xen.lowlevel.xc
 
 
-from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo, XendNode
+from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
@@ -875,10 +875,6 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create(config)
-            if XendNode.instance().xenschedinfo() == 'credit':
-                self.domain_sched_credit_set(dominfo.getDomid(),
-                                             dominfo.getWeight(),
-                                             dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()
@@ -895,10 +891,6 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create_from_dict(config_dict)
-            if XendNode.instance().xenschedinfo() == 'credit':
-                self.domain_sched_credit_set(dominfo.getDomid(),
-                                             dominfo.getWeight(),
-                                             dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()
@@ -952,10 +944,6 @@ class XendDomain:
                                  POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
-            if XendNode.instance().xenschedinfo() == 'credit':
-                self.domain_sched_credit_set(dominfo.getDomid(),
-                                             dominfo.getWeight(),
-                                             dominfo.getCap())
         finally:
             self.domains_lock.release()
         dominfo.waitForDevices()

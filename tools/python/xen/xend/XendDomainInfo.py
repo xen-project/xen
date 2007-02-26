@@ -398,11 +398,18 @@ class XendDomainInfo:
                 XendTask.log_progress(81, 90, self._registerWatches)
                 XendTask.log_progress(91, 100, self.refreshShutdown)
 
+                xendomains = XendDomain.instance()
+                xennode = XendNode.instance()
+
                 # save running configuration if XendDomains believe domain is
                 # persistent
                 if is_managed:
-                    xendomains = XendDomain.instance()
                     xendomains.managed_config_save(self)
+
+                if xennode.xenschedinfo() == 'credit':
+                    xendomains.domain_sched_credit_set(self.getDomid(),
+                                                       self.getWeight(),
+                                                       self.getCap())
             except:
                 log.exception('VM start failed')
                 self.destroy()
