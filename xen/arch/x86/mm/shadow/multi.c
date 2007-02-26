@@ -2394,7 +2394,8 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     gfn = guest_l1e_get_gfn(*new_gl1e);
     gmfn = vcpu_gfn_to_mfn(v, gfn);
 
-    mmio = (is_hvm_vcpu(v) && paging_vcpu_mode_translate(v) && !mfn_valid(gmfn));
+    mmio = (is_hvm_vcpu(v) && paging_vcpu_mode_translate(v) && 
+            mmio_space(gfn_to_paddr(gfn)));
     l1e_propagate_from_guest(v, new_gl1e, _mfn(INVALID_MFN), gmfn, &new_sl1e, 
                              ft_prefetch, mmio);
     
