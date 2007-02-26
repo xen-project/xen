@@ -157,6 +157,11 @@
 #define XEN_ELFNOTE_L1_MFN_VALID  13
 
 /*
+ * The number of the highest elfnote defined.
+ */
+#define XEN_ELFNOTE_MAX XEN_ELFNOTE_L1_MFN_VALID
+
+/*
  * System information exported through crash notes.
  *
  * The kexec / kdump code will create one XEN_ELFNOTE_CRASH_INFO 

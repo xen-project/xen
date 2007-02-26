@@ -119,13 +119,18 @@ int elf_xen_parse_note(struct elf_binary *elf,
         str = elf_note_desc(elf, note);
         elf_msg(elf, "%s: %s = \"%s\"\n", __FUNCTION__,
                 note_desc[type].name, str);
+        parms->elf_notes[type].type = XEN_ENT_STR;
+        parms->elf_notes[type].data.str = str;
     }
     else
     {
         val = elf_note_numeric(elf, note);
         elf_msg(elf, "%s: %s = 0x%" PRIx64 "\n", __FUNCTION__,
                 note_desc[type].name, val);
+        parms->elf_notes[type].type = XEN_ENT_LONG;
+        parms->elf_notes[type].data.num = val;
     }
+    parms->elf_notes[type].name = note_desc[type].name;
 
     switch ( type )
     {

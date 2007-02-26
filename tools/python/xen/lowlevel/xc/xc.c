@@ -18,6 +18,8 @@
 #include <arpa/inet.h>
 
 #include "xenctrl.h"
+#include <xen/elfnote.h>
+#include "xc_dom.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 
@@ -371,13 +373,17 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                   PyObject *args,
                                   PyObject *kwds)
 {
-    uint32_t dom;
+    uint32_t domid;
+    struct xc_dom_image *dom;
     char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
     unsigned int mem_mb;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
+    PyObject* elfnote_dict;
+    PyObject* elfnote = NULL;
+    int i;
 
     static char *kwd_list[] = { "domid", "store_evtchn", "memsize",
                                 "console_evtchn", "image",
@@ -386,22 +392,52 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                 "features", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssis", kwd_list,
-                                      &dom, &store_evtchn, &mem_mb,
+                                      &domid, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
                                       &features) )
         return NULL;
 
-    if ( xc_linux_build(self->xc_handle, dom, mem_mb, image,
-                        ramdisk, cmdline, features, flags,
-                        store_evtchn, &store_mfn,
-                        console_evtchn, &console_mfn) != 0 ) {
-        return pyxc_error_to_exception();
+    xc_dom_loginit();
+    if (!(dom = xc_dom_allocate(cmdline, features)))
+	return pyxc_error_to_exception();
+
+    if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
+			    ramdisk, flags, store_evtchn, &store_mfn,
+			    console_evtchn, &console_mfn) != 0 ) {
+	goto out;
     }
-    return Py_BuildValue("{s:i,s:i}", 
+
+    if (!(elfnote_dict = PyDict_New()))
+	goto out;
+    for (i = 0; i < XEN_ELFNOTE_MAX; i++) {
+	switch (dom->parms.elf_notes[i].type) {
+	case XEN_ENT_NONE:
+	    continue;
+	case XEN_ENT_LONG:
+	    elfnote = Py_BuildValue("k", dom->parms.elf_notes[i].data.num);
+	    break;
+	case XEN_ENT_STR:
+	    elfnote = Py_BuildValue("s", dom->parms.elf_notes[i].data.str);
+	    break;
+	}
+	PyDict_SetItemString(elfnote_dict,
+			     dom->parms.elf_notes[i].name,
+			     elfnote);
+	Py_DECREF(elfnote);
+    }
+
+    xc_dom_release(dom);
+
+    return Py_BuildValue("{s:i,s:i,s:N}", 
                          "store_mfn", store_mfn,
-                         "console_mfn", console_mfn);
+                         "console_mfn", console_mfn,
+			 "notes", elfnote_dict);
+
+  out:
+    xc_dom_release(dom);
+    return pyxc_error_to_exception();
 }
 
 static PyObject *pyxc_hvm_build(XcObject *self,
