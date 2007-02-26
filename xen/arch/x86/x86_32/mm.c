@@ -35,26 +35,27 @@ unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 
 static unsigned long mpt_size;
 
-struct page_info *alloc_xen_pagetable(void)
+void *alloc_xen_pagetable(void)
 {
     extern int early_boot;
     extern unsigned long xenheap_phys_start;
-    struct page_info *pg;
+    unsigned long mfn;
 
     if ( !early_boot )
     {
         void *v = alloc_xenheap_page();
-        return ((v == NULL) ? NULL : virt_to_page(v));
+        BUG_ON(v == NULL);
+        return v;
     }
 
-    pg = maddr_to_page(xenheap_phys_start);
+    mfn = xenheap_phys_start >> PAGE_SHIFT;
     xenheap_phys_start += PAGE_SIZE;
-    return pg;
+    return mfn_to_virt(mfn);
 }
 
-void free_xen_pagetable(struct page_info *pg)
+void free_xen_pagetable(void *v)
 {
-    free_xenheap_page(page_to_virt(pg));
+    free_xenheap_page(v);
 }
 
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v)

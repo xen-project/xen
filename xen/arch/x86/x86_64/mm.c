@@ -36,22 +36,27 @@
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
-struct page_info *alloc_xen_pagetable(void)
+void *alloc_xen_pagetable(void)
 {
     extern int early_boot;
-    unsigned long pfn;
+    unsigned long mfn;
 
     if ( !early_boot )
-        return alloc_domheap_page(NULL);
+    {
+        struct page_info *pg = alloc_domheap_page(NULL);
+        BUG_ON(pg == NULL);
+        return page_to_virt(pg);
+    }
 
     /* Early pagetables must come from low 1GB of memory. */
-    pfn = alloc_boot_low_pages(1, 1); /* 0x0 - 0x40000000 */
-    return ((pfn == 0) ? NULL : mfn_to_page(pfn));
+    mfn = alloc_boot_low_pages(1, 1); /* 0x0 - 0x40000000 */
+    BUG_ON(mfn == 0);
+    return mfn_to_virt(mfn);
 }
 
-void free_xen_pagetable(struct page_info *pg)
+void free_xen_pagetable(void *v)
 {
-    free_domheap_page(pg);
+    free_domheap_page(virt_to_page(v));
 }
 
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
@@ -63,7 +68,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     pl4e = &idle_pg_table[l4_table_offset(v)];
     if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
     {
-        pl3e = page_to_virt(alloc_xen_pagetable());
+        pl3e = alloc_xen_pagetable();
         clear_page(pl3e);
         l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
     }
@@ -71,7 +76,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(v);
     if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
     {
-        pl2e = page_to_virt(alloc_xen_pagetable());
+        pl2e = alloc_xen_pagetable();
         clear_page(pl2e);
         l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
     }

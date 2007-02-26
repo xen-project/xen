@@ -363,8 +363,8 @@ static inline int get_order_from_pages(unsigned long nr_pages)
 }
 
 /* Allocator functions for Xen pagetables. */
-struct page_info *alloc_xen_pagetable(void);
-void free_xen_pagetable(struct page_info *pg);
+void *alloc_xen_pagetable(void);
+void free_xen_pagetable(void *v);
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
 
 /* Map machine page range in Xen virtual address space. */
