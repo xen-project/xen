@@ -938,6 +938,9 @@ class XendDomainInfo:
         return self.info['vcpus_number']
 
     def setVCpuCount(self, vcpus):
+        if vcpus <= 0:
+            raise XendError('Invalid VCPUs')
+        
         self.info['vcpu_avail'] = (1 << vcpus) - 1
         if self.domid >= 0:
             self.storeVm('vcpu_avail', self.info['vcpu_avail'])
