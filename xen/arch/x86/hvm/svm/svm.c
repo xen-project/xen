@@ -502,15 +502,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
  skip_cr3:
-#if defined(__x86_64__) && 0
-    if (vmx_long_mode_enabled(v)) {
-        unsigned long vm_entry_value;
-        vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
-        vm_entry_value |= VM_ENTRY_IA32E_MODE;
-        __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
-    }
-#endif
-
     vmcb->cr4 = c->cr4 | SVM_CR4_HOST_MASK;
     v->arch.hvm_svm.cpu_shadow_cr4 = c->cr4;
     
