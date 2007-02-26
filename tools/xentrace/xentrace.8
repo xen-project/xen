@@ -1,4 +1,4 @@
-.TH XENTRACE 8 "11 March 2004" "Xen domain 0 utils"
+.TH XENTRACE 8 "22 February 2007" "Xen domain 0 utils"
 .SH NAME
 xentrace \- capture Xen trace buffer data
 .SH SYNOPSIS
@@ -59,10 +59,10 @@ gathered by xentrace:
 .PP
         0x0001f000          TRC_GEN
         0x0002f000          TRC_SCHED
-        0x0004f000          TRC_DOM0OP          
-        0x0008f000          TRC_VMX
-        0x000af000          TRC_MEM
-        0xfffff000          TRC_ALL 
+        0x0004f000          TRC_DOM0OP
+        0x0008f000          TRC_HVM
+        0x0010f000          TRC_MEM
+        0xfffff000          TRC_ALL
 
 
 .SS Event Subclasses (More Masks)
@@ -71,10 +71,8 @@ gathered by xentrace:
 .PP
         \fIID\fP                  \fIDescription\fP
 .PP
-        0x00081000          TRC_VMXEXIT
-        0x00082000          TRC_VMXTIMER
-        0x00084000          TRC_VMXINT
-        0x00088000          TRC_VMXIO
+        0x00081000          TRC_HVM_ENTRYEXIT
+        0x00082000          TRC_HVM_HANDLER
 
 
 .SS Events
@@ -82,7 +80,8 @@ gathered by xentrace:
 collects the following events from the trace buffer:
 .PP
         \fIID\fP                \fIDescription\fP
-.PP	
+.PP
+        0x0001f001         TRC_LOST_RECORDS
         0x0002f001         TRC_SCHED_DOM_ADD
         0x0002f002         TRC_SCHED_DOM_REM
         0x0002f003         TRC_SCHED_SLEEP
@@ -99,16 +98,33 @@ collects the following events from the trace buffer:
         0x0002f014         TRC_SCHED_SWITCH_INFPREV
         0x0002f015         TRC_SCHED_SWITCH_INFNEXT
 
-        0x000af001         TRC_MEM_PAGE_GRANT_MAP
-        0x000af002         TRC_MEM_PAGE_GRANT_UNMAP
-        0x000af003         TRC_MEM_PAGE_GRANT_TRANSFER
+        0x00081001         TRC_HVM_VMENTRY
+        0x00081002         TRC_HVM_VMEXIT
+        0x00082001         TRC_HVM_PF_XEN
+        0x00082002         TRC_HVM_PF_INJECT
+        0x00082003         TRC_HVM_INJ_EXC
+        0x00082004         TRC_HVM_INJ_VIRQ
+        0x00082005         TRC_HVM_REINJ_VIRQ
+        0x00082006         TRC_HVM_IO_READ
+        0x00082007         TRC_HVM_IO_WRITE
+        0x00082008         TRC_HVM_CR_READ
+        0x00082009         TRC_HVM_CR_WRITE
+        0x0008200A         TRC_HVM_DR_READ
+        0x0008200B         TRC_HVM_DR_WRITE
+        0x0008200C         TRC_HVM_MSR_READ
+        0x0008200D         TRC_HVM_MSR_WRITE
+        0x0008200E         TRC_HVM_CPUID
+        0x0008200F         TRC_HVM_INTR
+        0x00082010         TRC_HVM_NMI 
+        0x00082011         TRC_HVM_SMI 
+        0x00082012         TRC_HVM_VMMCALL
+        0x00082013         TRC_HVM_HLT
+        0x00082014         TRC_HVM_INVLPG
 
-        0x00081001         TRC_VMX_VMEXIT
-        0x00081002         TRC_VMX_VMENTRY
-        
-        0x00082001         TRC_VMX_TIMER_INTR
-        
-        0x00084001         TRC_VMX_INT
+        0x0010f001         TRC_MEM_PAGE_GRANT_MAP
+        0x0010f002         TRC_MEM_PAGE_GRANT_UNMAP
+        0x0010f003         TRC_MEM_PAGE_GRANT_TRANSFER
+
 .PP
 
 .SH AUTHOR

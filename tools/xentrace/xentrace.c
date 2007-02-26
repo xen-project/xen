@@ -350,8 +350,8 @@ int parse_evtmask(char *arg, struct argp_state *state)
         setup->evt_mask |= TRC_SCHED;
     } else if(strcmp(arg, "dom0op") == 0){ 
         setup->evt_mask |= TRC_DOM0OP;
-    } else if(strcmp(arg, "vmx") == 0){ 
-        setup->evt_mask |= TRC_VMX;
+    } else if(strcmp(arg, "hvm") == 0){ 
+        setup->evt_mask |= TRC_HVM;
     } else if(strcmp(arg, "all") == 0){ 
         setup->evt_mask |= TRC_ALL;
     } else {
