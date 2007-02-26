@@ -43,7 +43,7 @@ except ConsoleError, e:
 
 # Explicitly label the 1st resource
 ACMLabelResource(resource1, resourcelabel1)
-block_utils.block_attach(domain, resource1, "sdb1")
+block_utils.block_attach(domain, resource1, "xvda1")
 
 try:
 	run1 = console.runCmd("cat /proc/partitions")
@@ -54,10 +54,10 @@ except ConsoleError, e:
 ACMLabelResource(resource2, resourcelabel2)
 #Cannot call block_attach here since we legally may fail the command
 status, output = traceCommand("xm block-attach %s %s %s w" %
-                               (domain.getName(), resource2, "sdb2" ))
+                               (domain.getName(), resource2, "xvda2" ))
 
 for i in range(10):
-    if block_utils.get_state(domain, "sdb2") == 4:
+    if block_utils.get_state(domain, "xvda2") == 4:
         break
     time.sleep(1)
 
@@ -72,11 +72,11 @@ domain.closeConsole()
 # Stop the domain (nice shutdown)
 domain.stop()
 
-if not re.search("sdb1",run1["output"]):
-    FAIL("Labeled device 'sdb1' is not actually connected to the domU")
+if not re.search("xvda1",run1["output"]):
+    FAIL("Labeled device 'xvda1' is not actually connected to the domU")
 
-if not re.search("sdb1",run2["output"]):
-    FAIL("Labeled device 'sdb1' has disappeared?!")
+if not re.search("xvda1",run2["output"]):
+    FAIL("Labeled device 'xbvda1' has disappeared?!")
 
-if re.search("sdb2",run2["output"]):
-    FAIL("Labeled device 'sdb2' is connected to the domU but should not be")
+if re.search("xvda2",run2["output"]):
+    FAIL("Labeled device 'xvda2' is connected to the domU but should not be")
