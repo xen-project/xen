@@ -10,6 +10,7 @@
 #endif
 
 #undef ELFSIZE
+#include "elfnote.h"
 #include "elfstructs.h"
 #include "features.h"
 

@@ -280,7 +280,7 @@ elf_core_search_note(struct elf_core* ecore, const char* name, uint32_t type,
 
     n = ecore->note_sec;
     while (n < note_sec_end) {
-        const struct xen_elfnote *elfnote = (const struct xen_elfnote*)n;
+        const struct elfnote *elfnote = (const struct elfnote *)n;
         if (elfnote->namesz == strlen(name) + 1 &&
             strncmp(elfnote->name, name, elfnote->namesz) == 0 &&
             elfnote->type == type) {

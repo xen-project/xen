@@ -39,7 +39,7 @@
 #define XEN_DUMPCORE_ELFNOTE_NAME               "Xen"
 /* note numbers are defined in xen/elfnote.h */
 
-struct xen_elfnote {
+struct elfnote {
     uint32_t    namesz; /* Elf_Note note; */
     uint32_t    descsz;
     uint32_t    type;
@@ -88,22 +88,22 @@ struct xen_dumpcore_elfnote_format_version_desc {
 
 
 struct xen_dumpcore_elfnote_none {
-    struct xen_elfnote                          elfnote;
+    struct elfnote                              elfnote;
     struct xen_dumpcore_elfnote_none_desc       none;
 };
 
 struct xen_dumpcore_elfnote_header {
-    struct xen_elfnote                          elfnote;
+    struct elfnote                              elfnote;
     struct xen_dumpcore_elfnote_header_desc     header;
 };
 
 struct xen_dumpcore_elfnote_xen_version {
-    struct xen_elfnote                                  elfnote;
+    struct elfnote                                     elfnote;
     struct xen_dumpcore_elfnote_xen_version_desc        xen_version;
 };
 
 struct xen_dumpcore_elfnote_format_version {
-    struct xen_elfnote                                  elfnote;
+    struct elfnote                                      elfnote;
     struct xen_dumpcore_elfnote_format_version_desc     format_version;
 };
 

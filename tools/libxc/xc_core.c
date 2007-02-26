@@ -328,7 +328,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     Elf_Shdr *shdr;
 
     /* elf notes */
-    struct xen_elfnote elfnote;
+    struct elfnote elfnote;
     struct xen_dumpcore_elfnote_none_desc none;
     struct xen_dumpcore_elfnote_header_desc header;
     struct xen_dumpcore_elfnote_xen_version_desc xen_version;
