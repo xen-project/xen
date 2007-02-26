@@ -6044,9 +6044,14 @@ int main(int argc, char **argv)
     for(i = 1; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
-    
+
+#ifndef CONFIG_DM
     pstrcpy(parallel_devices[0], sizeof(parallel_devices[0]), "vc");
     for(i = 1; i < MAX_PARALLEL_PORTS; i++)
+#else
+    /* Xen steals IRQ7 for PCI. Disable LPT1 by default. */
+    for(i = 0; i < MAX_PARALLEL_PORTS; i++)
+#endif
         parallel_devices[i][0] = '\0';
     parallel_device_index = 0;
     

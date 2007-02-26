@@ -123,7 +123,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
             }
 
             Name(BUFA, ResourceTemplate() {
-                IRQ(Level, ActiveLow, Shared) { 5, 6, 10, 11 }
+                IRQ(Level, ActiveLow, Shared) { 5, 7, 10, 11 }
             })
 
             Name(BUFB, Buffer() {
@@ -643,22 +643,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         IRQNoFlags () {4}
                     })
                 }
-
-                Device (LTP1)
-                {
-                    Name (_HID, EisaId ("PNP0400"))
-                    Name (_UID, 0x02)
-                    Method (_STA, 0, NotSerialized)
-                    {
-                        Return (0x0F)
-                    }
-
-                    Name (_CRS, ResourceTemplate()
-                    {
-                        IO (Decode16, 0x0378, 0x0378, 0x08, 0x08)
-                        IRQNoFlags () {7}
-                    })
-                } 
             }
         }
     }

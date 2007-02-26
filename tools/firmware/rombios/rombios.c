@@ -9214,218 +9214,80 @@ pci_routing_table_structure:
   db 0 ;; pci bus number
   db 0x08 ;; pci device number (bit 7-3)
   db 0x61 ;; link value INTA#: pointer into PCI2ISA config space
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x62 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x63 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x60 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 0 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; second slot entry: 1st PCI slot
   db 0 ;; pci bus number
   db 0x10 ;; pci device number (bit 7-3)
   db 0x62 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x63 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x60 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x61 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 1 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; third slot entry: 2nd PCI slot
   db 0 ;; pci bus number
   db 0x18 ;; pci device number (bit 7-3)
   db 0x63 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x60 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x61 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x62 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 2 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; 4th slot entry: 3rd PCI slot
   db 0 ;; pci bus number
   db 0x20 ;; pci device number (bit 7-3)
   db 0x60 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x61 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x62 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x63 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 3 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; 5th slot entry: 4rd PCI slot
   db 0 ;; pci bus number
   db 0x28 ;; pci device number (bit 7-3)
   db 0x61 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x62 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x63 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x60 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 4 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; 6th slot entry: 5rd PCI slot
   db 0 ;; pci bus number
   db 0x30 ;; pci device number (bit 7-3)
   db 0x62 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x63 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x60 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x61 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 5 ;; physical slot (0 = embedded)
   db 0 ;; reserved
-
-pci_irq_list:
-  db 11, 10, 9, 5;
-
-pcibios_init_sel_reg:
-  push eax
-  mov eax, #0x800000
-  mov ax,  bx
-  shl eax, #8
-  and dl,  #0xfc
-  or  al,  dl
-  mov dx,  #0x0cf8
-  out dx,  eax
-  pop eax
-  ret
-  
-pcibios_init_set_elcr:
-  push ax
-  push cx
-  mov  dx, #0x04d0
-  test al, #0x08
-  jz   is_master_pic
-  inc  dx
-  and  al, #0x07
-is_master_pic:
-  mov  cl, al
-  mov  bl, #0x01
-  shl  bl, cl
-  in   al, dx
-  or   al, bl
-  out  dx, al
-  pop  cx
-  pop  ax
-  ret
-
-pcibios_init:
-  push ds
-  push bp
-  mov  ax, #0xf000
-  mov  ds, ax
-  mov  dx, #0x04d0 ;; reset ELCR1 + ELCR2
-  mov  al, #0x00
-  out  dx, al
-  inc  dx
-  out  dx, al
-  mov  si, #pci_routing_table_structure
-  mov  bh, [si+8]
-  mov  bl, [si+9]
-  mov  dl, #0x00
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  in   eax, dx
-  cmp  eax, [si+12] ;; check irq router
-  jne  pci_init_end
-  mov  dl, [si+34]
-  call pcibios_init_sel_reg
-  push bx ;; save irq router bus + devfunc
-  mov  dx, #0x0cfc
-  mov  ax, #0x8080
-  out  dx, ax ;; reset PIRQ route control
-  inc  dx
-  inc  dx
-  out  dx, ax
-  mov  ax, [si+6]
-  sub  ax, #0x20
-  shr  ax, #4
-  mov  cx, ax
-  add  si, #0x20 ;; set pointer to 1st entry
-  mov  bp, sp
-  mov  ax, #pci_irq_list
-  push ax
-  xor  ax, ax
-  push ax
-pci_init_loop1:
-  mov  bh, [si]
-  mov  bl, [si+1]
-pci_init_loop2:
-  mov  dl, #0x00
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  in   ax, dx
-  cmp  ax, #0xffff
-  jnz  pci_test_int_pin
-  test bl, #0x07
-  jz   next_pir_entry
-  jmp  next_pci_func
-pci_test_int_pin:
-  mov  dl, #0x3c
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfd
-  in   al, dx
-  and  al, #0x07
-  jz   next_pci_func
-  dec  al ;; determine pirq reg
-  mov  dl, #0x03
-  mul  al, dl
-  add  al, #0x02
-  xor  ah, ah
-  mov  bx, ax
-  mov  al, [si+bx]
-  mov  dl, al
-  mov  bx, [bp]
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  and  al, #0x03
-  add  dl, al
-  in   al, dx
-  cmp  al, #0x80
-  jb   pirq_found
-  mov  bx, [bp-2] ;; pci irq list pointer
-  mov  al, [bx]
-  out  dx, al
-  inc  bx
-  mov  [bp-2], bx
-  call pcibios_init_set_elcr
-pirq_found:
-  mov  bh, [si]
-  mov  bl, [si+1]
-  add  bl, [bp-3] ;; pci function number
-  mov  dl, #0x3c
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  out  dx, al
-next_pci_func:
-  inc  byte ptr[bp-3]
-  inc  bl
-  test bl, #0x07
-  jnz  pci_init_loop2
-next_pir_entry:
-  add  si, #0x10
-  mov  byte ptr[bp-3], #0x00
-  loop pci_init_loop1
-  mov  sp, bp
-  pop  bx
-pci_init_end:
-  pop  bp
-  pop  ds
-  ret
 #endif // BX_PCIBIOS
 
 ; parallel port detection: base address in DX, index in BX, timeout in CL
