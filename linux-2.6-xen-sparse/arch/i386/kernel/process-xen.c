@@ -60,9 +60,6 @@
 #include <asm/tlbflush.h>
 #include <asm/cpu.h>
 
-#include <asm/tlbflush.h>
-#include <asm/cpu.h>
-
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 static int hlt_counter;
