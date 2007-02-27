@@ -20,7 +20,6 @@
 #define XEN_HOST_METRICS_H
 
 #include "xen_common.h"
-#include "xen_host_decl.h"
 #include "xen_host_metrics_decl.h"
 
 
@@ -63,7 +62,6 @@ typedef struct xen_host_metrics_record
 {
     xen_host_metrics handle;
     char *uuid;
-    struct xen_host_record_opt *host;
     int64_t memory_total;
     int64_t memory_free;
 } xen_host_metrics_record;
@@ -167,13 +165,6 @@ xen_host_metrics_get_by_uuid(xen_session *session, xen_host_metrics *result, cha
  */
 extern bool
 xen_host_metrics_get_uuid(xen_session *session, char **result, xen_host_metrics host_metrics);
-
-
-/**
- * Get the host field of the given host_metrics.
- */
-extern bool
-xen_host_metrics_get_host(xen_session *session, xen_host *result, xen_host_metrics host_metrics);
 
 
 /**

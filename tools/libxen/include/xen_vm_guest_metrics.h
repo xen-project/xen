@@ -21,7 +21,6 @@
 
 #include "xen_common.h"
 #include "xen_string_string_map.h"
-#include "xen_vm_decl.h"
 #include "xen_vm_guest_metrics_decl.h"
 
 
@@ -64,7 +63,6 @@ typedef struct xen_vm_guest_metrics_record
 {
     xen_vm_guest_metrics handle;
     char *uuid;
-    struct xen_vm_record_opt *vm;
     xen_string_string_map *os_version;
     xen_string_string_map *pv_drivers_version;
     xen_string_string_map *memory;
@@ -176,13 +174,6 @@ xen_vm_guest_metrics_get_uuid(xen_session *session, char **result, xen_vm_guest_
 
 
 /**
- * Get the VM field of the given VM_guest_metrics.
- */
-extern bool
-xen_vm_guest_metrics_get_vm(xen_session *session, xen_vm *result, xen_vm_guest_metrics vm_guest_metrics);
-
-
-/**
  * Get the os_version field of the given VM_guest_metrics.
  */
 extern bool
@@ -225,7 +216,8 @@ xen_vm_guest_metrics_get_other(xen_session *session, xen_string_string_map **res
 
 
 /**
- * Return a list of all the VM_guest_metrics instances known to the system.
+ * Return a list of all the VM_guest_metrics instances known to the
+ * system.
  */
 extern bool
 xen_vm_guest_metrics_get_all(xen_session *session, struct xen_vm_guest_metrics_set **result);

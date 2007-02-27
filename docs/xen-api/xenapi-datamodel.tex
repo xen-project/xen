@@ -62,8 +62,6 @@ VBD.VM & VM.VBDs & one-to-many\\
 crashdump.VM & VM.crash\_dumps & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
-host.metrics & host\_metrics.host & one-to-one\\
-PIF.metrics & PIF\_metrics.PIF & one-to-one\\
 PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
@@ -4475,7 +4473,6 @@ The metrics reported by the guest (as opposed to inferred from outside).}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & VM to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt os\_version} & (string $\rightarrow$ string) Map & version of the OS \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PV\_drivers\_version} & (string $\rightarrow$ string) Map & version of the PV drivers \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory} & (string $\rightarrow$ string) Map & free/used/total memory \\
@@ -4531,38 +4528,6 @@ Get the uuid field of the given VM\_guest\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VM}
-
-{\bf Overview:} 
-Get the VM field of the given VM\_guest\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (VM ref) get_VM (session_id s, VM_guest_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-VM ref
 }
 
 
@@ -6109,7 +6074,6 @@ The metrics associated with a host.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & Host to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
 \hline
@@ -6161,38 +6125,6 @@ Get the uuid field of the given host\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_host}
-
-{\bf Overview:} 
-Get the host field of the given host\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (host ref) get_host (session_id s, host_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-host ref
 }
 
 
@@ -8783,7 +8715,6 @@ The metrics associated with a physical network interface.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt PIF} & PIF ref & PIF to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
@@ -8835,38 +8766,6 @@ Get the uuid field of the given PIF\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_PIF}
-
-{\bf Overview:} 
-Get the PIF field of the given PIF\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (PIF ref) get_PIF (session_id s, PIF_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-PIF ref
 }
 
 

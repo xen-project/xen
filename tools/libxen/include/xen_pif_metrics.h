@@ -20,7 +20,6 @@
 #define XEN_PIF_METRICS_H
 
 #include "xen_common.h"
-#include "xen_pif_decl.h"
 #include "xen_pif_metrics_decl.h"
 
 
@@ -63,7 +62,6 @@ typedef struct xen_pif_metrics_record
 {
     xen_pif_metrics handle;
     char *uuid;
-    struct xen_pif_record_opt *pif;
     double io_read_kbs;
     double io_write_kbs;
 } xen_pif_metrics_record;
@@ -166,13 +164,6 @@ xen_pif_metrics_get_by_uuid(xen_session *session, xen_pif_metrics *result, char 
  */
 extern bool
 xen_pif_metrics_get_uuid(xen_session *session, char **result, xen_pif_metrics pif_metrics);
-
-
-/**
- * Get the PIF field of the given PIF_metrics.
- */
-extern bool
-xen_pif_metrics_get_pif(xen_session *session, xen_pif *result, xen_pif_metrics pif_metrics);
 
 
 /**

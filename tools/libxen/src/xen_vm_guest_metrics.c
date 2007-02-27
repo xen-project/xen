@@ -23,7 +23,6 @@
 #include "xen_common.h"
 #include "xen_internal.h"
 #include "xen_string_string_map.h"
-#include "xen_vm.h"
 #include "xen_vm_guest_metrics.h"
 
 
@@ -41,9 +40,6 @@ static const struct_member xen_vm_guest_metrics_record_struct_members[] =
         { .key = "uuid",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_guest_metrics_record, uuid) },
-        { .key = "VM",
-          .type = &abstract_type_ref,
-          .offset = offsetof(xen_vm_guest_metrics_record, vm) },
         { .key = "os_version",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_guest_metrics_record, os_version) },
@@ -83,7 +79,6 @@ xen_vm_guest_metrics_record_free(xen_vm_guest_metrics_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    xen_vm_record_opt_free(record->vm);
     xen_string_string_map_free(record->os_version);
     xen_string_string_map_free(record->pv_drivers_version);
     xen_string_string_map_free(record->memory);
@@ -130,23 +125,6 @@ xen_vm_guest_metrics_get_by_uuid(xen_session *session, xen_vm_guest_metrics *res
 
     *result = NULL;
     XEN_CALL_("VM_guest_metrics.get_by_uuid");
-    return session->ok;
-}
-
-
-bool
-xen_vm_guest_metrics_get_vm(xen_session *session, xen_vm *result, xen_vm_guest_metrics vm_guest_metrics)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm_guest_metrics }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM_guest_metrics.get_VM");
     return session->ok;
 }
 

@@ -21,7 +21,6 @@
 #include <stdlib.h>
 
 #include "xen_common.h"
-#include "xen_host.h"
 #include "xen_host_metrics.h"
 #include "xen_internal.h"
 
@@ -40,9 +39,6 @@ static const struct_member xen_host_metrics_record_struct_members[] =
         { .key = "uuid",
           .type = &abstract_type_string,
           .offset = offsetof(xen_host_metrics_record, uuid) },
-        { .key = "host",
-          .type = &abstract_type_ref,
-          .offset = offsetof(xen_host_metrics_record, host) },
         { .key = "memory_total",
           .type = &abstract_type_int,
           .offset = offsetof(xen_host_metrics_record, memory_total) },
@@ -70,7 +66,6 @@ xen_host_metrics_record_free(xen_host_metrics_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    xen_host_record_opt_free(record->host);
     free(record);
 }
 
@@ -111,23 +106,6 @@ xen_host_metrics_get_by_uuid(xen_session *session, xen_host_metrics *result, cha
 
     *result = NULL;
     XEN_CALL_("host_metrics.get_by_uuid");
-    return session->ok;
-}
-
-
-bool
-xen_host_metrics_get_host(xen_session *session, xen_host *result, xen_host_metrics host_metrics)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = host_metrics }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("host_metrics.get_host");
     return session->ok;
 }
 

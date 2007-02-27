@@ -802,8 +802,7 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     host_metrics_attr_ro = ['memory_total',
-                            'memory_free',
-                            'host']
+                            'memory_free']
     host_metrics_attr_rw = []
     host_metrics_methods = []
 
@@ -816,13 +815,9 @@ class XendAPI(object):
     def host_metrics_get_record(self, _, ref):
         return xen_api_success({
             'uuid'         : ref,
-            'host'         : XendNode.instance().uuid,
             'memory_total' : self._host_metrics_get_memory_total(),
             'memory_free'  : self._host_metrics_get_memory_free(),
             })
-
-    def host_metrics_get_host(self, _, ref):
-        return xen_api_success(XendNode.instance().uuid)
 
     def host_metrics_get_memory_total(self, _, ref):
         return xen_api_success(self._host_metrics_get_memory_total())
@@ -968,8 +963,7 @@ class XendAPI(object):
     # Xen API: Class PIF_metrics
     # ----------------------------------------------------------------
 
-    PIF_metrics_attr_ro = ['PIF',
-                           'io_read_kbs',
+    PIF_metrics_attr_ro = ['io_read_kbs',
                            'io_write_kbs']
     PIF_metrics_attr_rw = []
     PIF_methods = []
@@ -982,9 +976,6 @@ class XendAPI(object):
 
     def PIF_metrics_get_record(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_record())
-
-    def PIF_metrics_get_PIF(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).pif.uuid)
 
     def PIF_metrics_get_io_read_kbs(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_io_read_kbs())
