@@ -136,6 +136,56 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     }
     return;
 }
+
+int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
+{
+    struct buffered_piopage *pio_page =
+        (void *)(current->domain->arch.hvm_domain.buffered_pio_va);
+    struct pio_buffer *piobuf;
+    uint32_t pointer, page_offset;
+
+    if (p->addr == 0x1F0)
+	piobuf = &pio_page->pio[PIO_BUFFER_IDE_PRIMARY];
+    else if (p->addr == 0x170)
+	piobuf = &pio_page->pio[PIO_BUFFER_IDE_SECONDARY];
+    else
+	return 0;
+
+    if (p->size != 2 && p->size != 4)
+        return 0;
+
+    pointer = piobuf->pointer;
+    page_offset = piobuf->page_offset;
+
+    /* sanity check */
+    if (page_offset + pointer < offsetof(struct buffered_piopage, buffer))
+	return 0;
+    if (page_offset + piobuf->data_end > PAGE_SIZE)
+	return 0;
+
+    if (pointer + p->size < piobuf->data_end) {
+        uint8_t *bufp = (uint8_t *)pio_page + page_offset + pointer;
+        if (p->dir == IOREQ_WRITE) {
+            if (likely(p->size == 4 && (((long)bufp & 3) == 0)))
+                *(uint32_t *)bufp = *val;
+            else
+                memcpy(bufp, val, p->size);
+        } else {
+            if (likely(p->size == 4 && (((long)bufp & 3) == 0))) {
+                *val = *(uint32_t *)bufp;
+            } else {
+                *val = 0;
+                memcpy(val, bufp, p->size);
+            }
+        }
+        piobuf->pointer += p->size;
+        p->state = STATE_IORESP_READY;
+        vmx_io_assist(current);
+        return 1;
+    }
+    return 0;
+}
+
 #define TO_LEGACY_IO(pa)  (((pa)>>12<<2)|((pa)&0x3))
 
 static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
@@ -160,6 +210,9 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->df = 0;
 
     p->io_count++;
+
+    if (vmx_ide_pio_intercept(p, val))
+        return;
 
     vmx_send_assist_req(v);
     if(dir==IOREQ_READ){ //read
