@@ -460,11 +460,13 @@ const struct argp_option cmd_opts[] =
 
     { .name = "cpu-mask", .key='c', .arg="c",
       .doc = 
-      "set cpu-mask " },
+      "Set cpu-mask." },
 
     { .name = "evt-mask", .key='e', .arg="e",
       .doc = 
-      "set evt-mask " },
+      "Set trace event mask.  This can accept a numerical (including hex) "
+      " argument or a symbolic name.  Symbolic names include: gen, sched, "
+      "dom0op, hvm, and all." },
 
     { .name = "trace-buf-size", .key='S', .arg="N",
       .doc =
