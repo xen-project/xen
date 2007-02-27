@@ -150,22 +150,6 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 	return body;
 }
 
-/* Emergency write. */
-void xenbus_debug_write(const char *str, unsigned int count)
-{
-	struct xsd_sockmsg msg = { 0 };
-
-	msg.type = XS_DEBUG;
-	msg.len = sizeof("print") + count + 1;
-
-	mutex_lock(&xs_state.request_mutex);
-	xb_write(&msg, sizeof(msg));
-	xb_write("print", sizeof("print"));
-	xb_write(str, count);
-	xb_write("", 1);
-	mutex_unlock(&xs_state.request_mutex);
-}
-
 void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 {
 	void *ret;
@@ -753,27 +737,38 @@ static int process_msg(void)
 	char *body;
 	int err;
 
+	err = xb_wait_for_data_to_read();
+	if (err)
+	    return err;
+
 	msg = kmalloc(sizeof(*msg), GFP_KERNEL);
 	if (msg == NULL)
 		return -ENOMEM;
 
+	/*
+	 * We are now committed to reading an entire message. Partial reads
+	 * across save/restore leave us out of sync with the xenstore daemon.
+	 */
+	down_read(&xs_state.suspend_mutex);
+
 	err = xb_read(&msg->hdr, sizeof(msg->hdr));
 	if (err) {
 		kfree(msg);
-		return err;
+		goto out;
 	}
 
 	body = kmalloc(msg->hdr.len + 1, GFP_KERNEL);
 	if (body == NULL) {
 		kfree(msg);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out;
 	}
 
 	err = xb_read(body, msg->hdr.len);
 	if (err) {
 		kfree(body);
 		kfree(msg);
-		return err;
+		goto out;
 	}
 	body[msg->hdr.len] = '\0';
 
@@ -782,7 +777,8 @@ static int process_msg(void)
 					 &msg->u.watch.vec_size);
 		if (IS_ERR(msg->u.watch.vec)) {
 			kfree(msg);
-			return PTR_ERR(msg->u.watch.vec);
+			err = PTR_ERR(msg->u.watch.vec);
+			goto out;
 		}
 
 		spin_lock(&watches_lock);
@@ -806,7 +802,9 @@ static int process_msg(void)
 		wake_up(&xs_state.reply_waitq);
 	}
 
-	return 0;
+ out:
+	up_read(&xs_state.suspend_mutex);
+	return err;
 }
 
 static int xenbus_thread(void *unused)

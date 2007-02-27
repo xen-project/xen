@@ -137,6 +137,14 @@ int xb_write(const void *data, unsigned len)
 	return 0;
 }
 
+int xb_wait_for_data_to_read(void)
+{
+	struct xenstore_domain_interface *intf = xen_store_interface;
+	return wait_event_interruptible(
+		xb_waitq,
+		intf->rsp_cons != intf->rsp_prod);
+}
+
 int xb_read(void *data, unsigned len)
 {
 	struct xenstore_domain_interface *intf = xen_store_interface;
@@ -147,9 +155,7 @@ int xb_read(void *data, unsigned len)
 		unsigned int avail;
 		const char *src;
 
-		rc = wait_event_interruptible(
-			xb_waitq,
-			intf->rsp_cons != intf->rsp_prod);
+		rc = xb_wait_for_data_to_read();
 		if (rc < 0)
 			return rc;
 
