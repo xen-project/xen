@@ -5972,6 +5972,7 @@ int main(int argc, char **argv)
     xen_pfn_t *page_array;
     extern void *shared_page;
     extern void *buffered_io_page;
+    extern void *buffered_pio_page;
 
     char qemu_dm_logfilename[64];
 
@@ -6575,6 +6576,10 @@ int main(int argc, char **argv)
     buffered_io_page =xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
                                        BUFFER_IO_PAGE_START >> PAGE_SHIFT);
+
+    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE,
+                                       BUFFER_PIO_PAGE_START >> PAGE_SHIFT);
 
     for (i = 0; i < tmp_nr_pages; i++)
         page_array[i] = i;
