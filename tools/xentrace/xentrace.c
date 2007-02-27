@@ -56,6 +56,7 @@ typedef struct settings_st {
     uint32_t evt_mask;
     uint32_t cpu_mask;
     unsigned long tbuf_size;
+    int discard:1;
 } settings_t;
 
 settings_t opts;
@@ -307,6 +308,13 @@ int monitor_tbufs(FILE *logfile)
     meta  = init_bufs_ptrs(tbufs_mapped, num, size);
     data  = init_rec_ptrs(meta, num);
 
+    if(opts.discard) {
+        for ( i = 0; (i < num) ; i++ )
+        {
+	    meta[i]->cons = meta[i]->prod;
+        }
+    }
+
     /* now, scan buffers for events */
     while ( !interrupted )
     {
@@ -413,6 +421,12 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
     }
     break;
 
+    case 'D': /* Discard traces currently in the buffer before beginning */
+    {
+        opts.discard=1;
+    }
+    break;
+
     case ARGP_KEY_ARG:
     {
         if ( state->arg_num == 0 )
@@ -457,6 +471,11 @@ const struct argp_option cmd_opts[] =
       "Set trace buffer size in pages (default " xstr(DEFAULT_TBUF_SIZE) "). "
       "N.B. that the trace buffer cannot be resized.  If it has "
       "already been set this boot cycle, this argument will be ignored." },
+
+    { .name = "discard-buffers", .key='D', .arg=NULL,
+      .flags=OPTION_ARG_OPTIONAL,
+      .doc = "Discard all records currently in the trace buffers before "
+      " beginning." },
 
     {0}
 };
