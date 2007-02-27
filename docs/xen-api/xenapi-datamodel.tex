@@ -6278,11 +6278,13 @@ all fields from the object
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & the host the CPU is in \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt number} & int & the number of the physical CPU within the host \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt vendor} & string & the vendor of the physical CPU \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt speed} & int & the speed of the physical CPU \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt modelname} & string & the model name of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt host} & host ref & the host the CPU is in \\
+$\mathit{RO}_\mathit{run}$ &  {\tt number} & int & the number of the physical CPU within the host \\
+$\mathit{RO}_\mathit{run}$ &  {\tt vendor} & string & the vendor of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt speed} & int & the speed of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt modelname} & string & the model name of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt stepping} & string & the stepping of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
 \end{longtable}
@@ -6479,6 +6481,70 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_stepping}
+
+{\bf Overview:} 
+Get the stepping field of the given host\_cpu.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_stepping (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_flags}
+
+{\bf Overview:} 
+Get the flags field of the given host\_cpu.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_flags (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_utilisation}
 
 {\bf Overview:} 
@@ -6508,70 +6574,6 @@ float
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new host\_cpu instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (host_cpu ref) create (session_id s, host_cpu record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-host\_cpu ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified host\_cpu instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, host_cpu ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

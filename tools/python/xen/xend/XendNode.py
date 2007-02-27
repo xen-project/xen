@@ -81,7 +81,7 @@ class XendNode:
         for cpu_uuid, cpu in saved_cpus.items():
             self.cpus[cpu_uuid] = cpu
 
-        # verify we have enough cpus here
+        cpuinfo = parse_proc_cpuinfo()
         physinfo = self.physinfo_dict()
         cpu_count = physinfo['nr_cpus']
         cpu_features = physinfo['hw_caps']
@@ -91,12 +91,23 @@ class XendNode:
         if cpu_count != len(self.cpus):
             self.cpus = {}
             for i in range(cpu_count):
-                cpu_uuid = uuid.createString()
-                cpu_info = {'uuid': cpu_uuid,
-                            'host': self.uuid,
-                            'number': i,
-                            'features': cpu_features}
-                self.cpus[cpu_uuid] = cpu_info
+                u = uuid.createString()
+                self.cpus[u] = {'uuid': u, 'number': i }
+
+        for u in self.cpus.keys():
+            log.error(self.cpus[u])
+            number = self.cpus[u]['number']
+            log.error(number)
+            log.error(cpuinfo)
+            self.cpus[u].update(
+                { 'host'     : self.uuid,
+                  'features' : cpu_features,
+                  'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
+                  'vendor'   : cpuinfo[number]['vendor_id'],
+                  'modelname': cpuinfo[number]['model name'],
+                  'stepping' : cpuinfo[number]['stepping'],
+                  'flags'    : cpuinfo[number]['flags'],
+                })
 
         self.pifs = {}
         self.pif_metrics = {}
@@ -368,18 +379,12 @@ class XendNode:
         else:
             raise XendError('Invalid CPU Reference')
 
-    def get_host_cpu_features(self, host_cpu_ref):
+    def get_host_cpu_field(self, ref, field):
         try:
-            return self.cpus[host_cpu_ref]['features']
+            return self.cpus[ref][field]
         except KeyError:
             raise XendError('Invalid CPU Reference')
 
-    def get_host_cpu_number(self, host_cpu_ref):
-        try:
-            return self.cpus[host_cpu_ref]['number']
-        except KeyError:
-            raise XendError('Invalid CPU Reference')        
-            
     def get_host_cpu_load(self, host_cpu_ref):
         host_cpu = self.cpus.get(host_cpu_ref)
         if not host_cpu:
@@ -540,6 +545,31 @@ class XendNode:
     def refreshBridges(self):
         for pif in self.pifs.values():
             pif.refresh(Brctl.get_state())
+
+
+def parse_proc_cpuinfo():
+    cpuinfo = {}
+    f = file('/proc/cpuinfo', 'r')
+    try:
+        p = -1
+        d = {}
+        for line in f:
+            keyvalue = line.split(':')
+            if len(keyvalue) != 2:
+                continue
+            key = keyvalue[0].strip()
+            val = keyvalue[1].strip()
+            if key == 'processor':
+                if p != -1:
+                    cpuinfo[p] = d
+                p = int(val)
+                d = {}
+            else:
+                d[key] = val
+        cpuinfo[p] = d
+        return cpuinfo
+    finally:
+        f.close()
 
 
 def instance():

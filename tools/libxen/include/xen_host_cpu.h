@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,8 +25,8 @@
 
 
 /*
- * The host_cpu class. 
- *  
+ * The host_cpu class.
+ * 
  * A physical CPU.
  */
 
@@ -68,6 +68,8 @@ typedef struct xen_host_cpu_record
     char *vendor;
     int64_t speed;
     char *modelname;
+    char *stepping;
+    char *flags;
     double utilisation;
 } xen_host_cpu_record;
 
@@ -165,20 +167,6 @@ xen_host_cpu_get_by_uuid(xen_session *session, xen_host_cpu *result, char *uuid)
 
 
 /**
- * Create a new host_cpu instance, and return its handle.
- */
-extern bool
-xen_host_cpu_create(xen_session *session, xen_host_cpu *result, xen_host_cpu_record *record);
-
-
-/**
- * Destroy the specified host_cpu instance.
- */
-extern bool
-xen_host_cpu_destroy(xen_session *session, xen_host_cpu host_cpu);
-
-
-/**
  * Get the uuid field of the given host_cpu.
  */
 extern bool
@@ -218,6 +206,20 @@ xen_host_cpu_get_speed(xen_session *session, int64_t *result, xen_host_cpu host_
  */
 extern bool
 xen_host_cpu_get_modelname(xen_session *session, char **result, xen_host_cpu host_cpu);
+
+
+/**
+ * Get the stepping field of the given host_cpu.
+ */
+extern bool
+xen_host_cpu_get_stepping(xen_session *session, char **result, xen_host_cpu host_cpu);
+
+
+/**
+ * Get the flags field of the given host_cpu.
+ */
+extern bool
+xen_host_cpu_get_flags(xen_session *session, char **result, xen_host_cpu host_cpu);
 
 
 /**

@@ -753,27 +753,44 @@ class XendAPI(object):
 
     host_cpu_attr_ro = ['host',
                         'number',
+                        'vendor',
+                        'speed',
+                        'modelname',
+                        'stepping',
+                        'flags',
                         'utilisation']
 
     # attributes
-    def host_cpu_get_host(self, session, host_cpu_ref):
+    def _host_cpu_get(self, ref, field):
+        return xen_api_success(
+            XendNode.instance().get_host_cpu_field(ref, field))
+
+    def host_cpu_get_host(self, _, ref):
         return xen_api_success(XendNode.instance().uuid)
-    def host_cpu_get_utilisation(self, session, host_cpu_ref):
-        util = XendNode.instance().get_host_cpu_load(host_cpu_ref)
-        return xen_api_success(util)
-    def host_cpu_get_number(self, session, host_cpu_ref):
-        num = XendNode.instance().get_host_cpu_number(host_cpu_ref)
-        return xen_api_success(num)
+    def host_cpu_get_number(self, _, ref):
+        return self._host_cpu_get(ref, 'number')
+    def host_cpu_get_vendor(self, _, ref):
+        return self._host_cpu_get(ref, 'vendor')
+    def host_cpu_get_speed(self, _, ref):
+        return self._host_cpu_get(ref, 'speed')
+    def host_cpu_get_modelname(self, _, ref):
+        return self._host_cpu_get(ref, 'modelname')
+    def host_cpu_get_stepping(self, _, ref):
+        return self._host_cpu_get(ref, 'stepping')
+    def host_cpu_get_flags(self, _, ref):
+        return self._host_cpu_get(ref, 'flags')
+    def host_cpu_get_utilisation(self, _, ref):
+        return xen_api_success(XendNode.instance().get_host_cpu_load(ref))
 
     # object methods
-    def host_cpu_destroy(self, session, host_cpu_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
-    def host_cpu_get_record(self, session, host_cpu_ref):
+    def host_cpu_get_record(self, _, ref):
         node = XendNode.instance()
-        record = {'uuid': host_cpu_ref,
-                  'host': node.uuid,
-                  'number': node.get_host_cpu_number(host_cpu_ref),
-                  'utilisation': node.get_host_cpu_load(host_cpu_ref)}
+        record = dict([(f, node.get_host_cpu_field(ref, f))
+                       for f in self.host_cpu_attr_ro
+                       if f not in ['uuid', 'host', 'utilisation']])
+        record['uuid'] = ref
+        record['host'] = node.uuid
+        record['utilisation'] = node.get_host_cpu_load(ref)
         return xen_api_success(record)
 
     # class methods
