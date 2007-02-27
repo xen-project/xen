@@ -513,7 +513,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     */
     if (pt_levels == 3 && type == XEN_DOMCTL_PFINFO_L2TAB) {
         int hstart;
-        unsigned long he;
+        uint64_t he;
 
         hstart = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
         he = ((const uint64_t *) spage)[hstart];
@@ -1101,8 +1101,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     race = 
                         canonicalize_pagetable(pagetype, pfn, spage, page); 
 
-                    if(race && !live) 
-                        goto out; 
+                    if(race && !live) {
+                        ERROR("Fatal PT race (pfn %lx, type %08lx)", pfn,
+                              pagetype);
+                        goto out;
+                    }
 
                     if (ratewrite(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE) {
                         ERROR("Error when writing to state file (4)"
