@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -211,6 +211,13 @@ xen_pbd_get_device_config(xen_session *session, xen_string_string_map **result, 
  */
 extern bool
 xen_pbd_get_currently_attached(xen_session *session, bool *result, xen_pbd pbd);
+
+
+/**
+ * Return a list of all the PBDs known to the system.
+ */
+extern bool
+xen_pbd_get_all(xen_session *session, struct xen_pbd_set **result);
 
 
 #endif

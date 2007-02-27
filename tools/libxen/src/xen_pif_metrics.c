@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -160,6 +160,18 @@ xen_pif_metrics_get_io_write_kbs(xen_session *session, double *result, xen_pif_m
     abstract_type result_type = abstract_type_float;
 
     XEN_CALL_("PIF_metrics.get_io_write_kbs");
+    return session->ok;
+}
+
+
+bool
+xen_pif_metrics_get_all(xen_session *session, struct xen_pif_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "PIF_metrics.get_all", NULL, 0, &result_type, result);
     return session->ok;
 }
 

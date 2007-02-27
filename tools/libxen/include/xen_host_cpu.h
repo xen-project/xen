@@ -229,4 +229,11 @@ extern bool
 xen_host_cpu_get_utilisation(xen_session *session, double *result, xen_host_cpu host_cpu);
 
 
+/**
+ * Return a list of all the host_cpus known to the system.
+ */
+extern bool
+xen_host_cpu_get_all(xen_session *session, struct xen_host_cpu_set **result);
+
+
 #endif

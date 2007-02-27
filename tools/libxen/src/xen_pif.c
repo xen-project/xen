@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -347,6 +347,18 @@ xen_pif_destroy(xen_session *session, xen_pif self)
         };
 
     xen_call_(session, "PIF.destroy", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_pif_get_all(xen_session *session, struct xen_pif_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "PIF.get_all", NULL, 0, &result_type, result);
     return session->ok;
 }
 

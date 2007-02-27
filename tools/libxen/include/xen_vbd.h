@@ -357,4 +357,11 @@ extern bool
 xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi);
 
 
+/**
+ * Return a list of all the VBDs known to the system.
+ */
+extern bool
+xen_vbd_get_all(xen_session *session, struct xen_vbd_set **result);
+
+
 #endif

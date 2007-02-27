@@ -552,6 +552,18 @@ xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi)
 
 
 bool
+xen_vbd_get_all(xen_session *session, struct xen_vbd_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VBD.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vbd_get_uuid(xen_session *session, char **result, xen_vbd vbd)
 {
     *result = session->ok ? xen_strdup_((char *)vbd) : NULL;

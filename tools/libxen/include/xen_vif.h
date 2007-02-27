@@ -331,4 +331,11 @@ extern bool
 xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char *key);
 
 
+/**
+ * Return a list of all the VIFs known to the system.
+ */
+extern bool
+xen_vif_get_all(xen_session *session, struct xen_vif_set **result);
+
+
 #endif

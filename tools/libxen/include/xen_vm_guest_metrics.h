@@ -224,4 +224,11 @@ extern bool
 xen_vm_guest_metrics_get_other(xen_session *session, xen_string_string_map **result, xen_vm_guest_metrics vm_guest_metrics);
 
 
+/**
+ * Return a list of all the VM_guest_metrics instances known to the system.
+ */
+extern bool
+xen_vm_guest_metrics_get_all(xen_session *session, struct xen_vm_guest_metrics_set **result);
+
+
 #endif

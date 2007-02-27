@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -265,6 +265,13 @@ xen_pif_create_vlan(xen_session *session, xen_pif *result, char *device, xen_net
  */
 extern bool
 xen_pif_destroy(xen_session *session, xen_pif self);
+
+
+/**
+ * Return a list of all the PIFs known to the system.
+ */
+extern bool
+xen_pif_get_all(xen_session *session, struct xen_pif_set **result);
 
 
 #endif

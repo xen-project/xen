@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -216,6 +216,18 @@ xen_pbd_get_currently_attached(xen_session *session, bool *result, xen_pbd pbd)
     abstract_type result_type = abstract_type_bool;
 
     XEN_CALL_("PBD.get_currently_attached");
+    return session->ok;
+}
+
+
+bool
+xen_pbd_get_all(xen_session *session, struct xen_pbd_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "PBD.get_all", NULL, 0, &result_type, result);
     return session->ok;
 }
 

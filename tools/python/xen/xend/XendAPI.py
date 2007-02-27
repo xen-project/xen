@@ -807,6 +807,9 @@ class XendAPI(object):
     host_metrics_attr_rw = []
     host_metrics_methods = []
 
+    def host_metrics_get_all(self, _):
+        return xen_api_success([XendNode.instance().host_metrics_uuid])
+
     def _host_metrics_get(self, ref, f):
         return xen_api_success(getattr(node, f)())
 
@@ -970,6 +973,9 @@ class XendAPI(object):
                            'io_write_kbs']
     PIF_metrics_attr_rw = []
     PIF_methods = []
+
+    def PIF_metrics_get_all(self, _):
+        return xen_api_success(XendNode.instance().pif_metrics.keys())
 
     def _PIF_metrics_get(self, ref):
         return XendNode.instance().pif_metrics[ref]

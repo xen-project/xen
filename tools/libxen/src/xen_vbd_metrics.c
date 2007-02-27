@@ -143,6 +143,18 @@ xen_vbd_metrics_get_io_write_kbs(xen_session *session, double *result, xen_vbd_m
 
 
 bool
+xen_vbd_metrics_get_all(xen_session *session, struct xen_vbd_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VBD_metrics.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vbd_metrics_get_uuid(xen_session *session, char **result, xen_vbd_metrics vbd_metrics)
 {
     *result = session->ok ? xen_strdup_((char *)vbd_metrics) : NULL;

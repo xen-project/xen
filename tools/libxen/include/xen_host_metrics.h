@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -188,6 +188,13 @@ xen_host_metrics_get_memory_total(xen_session *session, int64_t *result, xen_hos
  */
 extern bool
 xen_host_metrics_get_memory_free(xen_session *session, int64_t *result, xen_host_metrics host_metrics);
+
+
+/**
+ * Return a list of all the host_metrics instances known to the system.
+ */
+extern bool
+xen_host_metrics_get_all(xen_session *session, struct xen_host_metrics_set **result);
 
 
 #endif

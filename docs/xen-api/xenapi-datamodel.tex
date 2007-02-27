@@ -4248,6 +4248,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VM\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VM\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VM_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VM\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -4464,6 +4485,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt other} & (string $\rightarrow$ string) Map & 
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VM\_guest\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VM\_guest\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VM_guest_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VM\_guest\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -6073,6 +6115,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (byte
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: host\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the host\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((host_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(host\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -6289,6 +6352,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilis
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: host\_cpu}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the host\_cpus known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((host_cpu ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(host\_cpu ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -7100,6 +7184,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associa
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VIFs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VIF ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VIF ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -7906,6 +8011,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VIF\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VIF_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VIF\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -8166,6 +8292,27 @@ void
 \noindent{\bf Possible Error Codes:} {\tt PIF\_IS\_PHYSICAL}
 
 \vspace{0.6cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PIFs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -8642,6 +8789,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: PIF\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PIF\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -9561,6 +9729,27 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VDIs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VDI ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VDI ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -10371,6 +10560,27 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VBDs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VBD ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VBD ref) Set
+}
+
+
+references to all objects
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -11246,6 +11456,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VBD\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VBD\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VBD_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VBD\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -11427,6 +11658,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the SR curre
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: PBD}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PBDs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PBD ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PBD ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -12243,6 +12495,27 @@ $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & addit
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: console}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the consoles known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((console ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(console ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 

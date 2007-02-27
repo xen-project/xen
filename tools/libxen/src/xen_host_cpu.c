@@ -268,6 +268,18 @@ xen_host_cpu_get_utilisation(xen_session *session, double *result, xen_host_cpu 
 
 
 bool
+xen_host_cpu_get_all(xen_session *session, struct xen_host_cpu_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "host_cpu.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_host_cpu_get_uuid(xen_session *session, char **result, xen_host_cpu host_cpu)
 {
     *result = session->ok ? xen_strdup_((char *)host_cpu) : NULL;

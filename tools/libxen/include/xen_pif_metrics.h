@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -187,6 +187,13 @@ xen_pif_metrics_get_io_read_kbs(xen_session *session, double *result, xen_pif_me
  */
 extern bool
 xen_pif_metrics_get_io_write_kbs(xen_session *session, double *result, xen_pif_metrics pif_metrics);
+
+
+/**
+ * Return a list of all the PIF_metrics instances known to the system.
+ */
+extern bool
+xen_pif_metrics_get_all(xen_session *session, struct xen_pif_metrics_set **result);
 
 
 #endif

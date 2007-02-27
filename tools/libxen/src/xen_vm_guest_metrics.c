@@ -254,6 +254,18 @@ xen_vm_guest_metrics_get_other(xen_session *session, xen_string_string_map **res
 
 
 bool
+xen_vm_guest_metrics_get_all(xen_session *session, struct xen_vm_guest_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VM_guest_metrics.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vm_guest_metrics_get_uuid(xen_session *session, char **result, xen_vm_guest_metrics vm_guest_metrics)
 {
     *result = session->ok ? xen_strdup_((char *)vm_guest_metrics) : NULL;

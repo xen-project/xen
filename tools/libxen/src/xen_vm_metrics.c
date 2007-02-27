@@ -165,6 +165,18 @@ xen_vm_metrics_get_vcpus_utilisation(xen_session *session, xen_int_float_map **r
 
 
 bool
+xen_vm_metrics_get_all(xen_session *session, struct xen_vm_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VM_metrics.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vm_metrics_get_uuid(xen_session *session, char **result, xen_vm_metrics vm_metrics)
 {
     *result = session->ok ? xen_strdup_((char *)vm_metrics) : NULL;

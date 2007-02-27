@@ -143,6 +143,18 @@ xen_vif_metrics_get_io_write_kbs(xen_session *session, double *result, xen_vif_m
 
 
 bool
+xen_vif_metrics_get_all(xen_session *session, struct xen_vif_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VIF_metrics.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vif_metrics_get_uuid(xen_session *session, char **result, xen_vif_metrics vif_metrics)
 {
     *result = session->ok ? xen_strdup_((char *)vif_metrics) : NULL;

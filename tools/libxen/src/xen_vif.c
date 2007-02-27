@@ -500,6 +500,18 @@ xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char
 
 
 bool
+xen_vif_get_all(xen_session *session, struct xen_vif_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VIF.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vif_get_uuid(xen_session *session, char **result, xen_vif vif)
 {
     *result = session->ok ? xen_strdup_((char *)vif) : NULL;

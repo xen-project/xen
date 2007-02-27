@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -160,6 +160,18 @@ xen_host_metrics_get_memory_free(xen_session *session, int64_t *result, xen_host
     abstract_type result_type = abstract_type_int;
 
     XEN_CALL_("host_metrics.get_memory_free");
+    return session->ok;
+}
+
+
+bool
+xen_host_metrics_get_all(xen_session *session, struct xen_host_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "host_metrics.get_all", NULL, 0, &result_type, result);
     return session->ok;
 }
 
