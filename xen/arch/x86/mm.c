@@ -157,11 +157,8 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 
 static void queue_deferred_ops(struct domain *d, unsigned int ops)
 {
-    if ( d == current->domain )
-        this_cpu(percpu_mm_info).deferred_ops |= ops;
-    else
-        BUG_ON(!test_bit(_DOMF_paused, &d->domain_flags) ||
-               !cpus_empty(d->domain_dirty_cpumask));
+    ASSERT(d == current->domain);
+    this_cpu(percpu_mm_info).deferred_ops |= ops;
 }
 
 void __init init_frametable(void)
@@ -1576,7 +1573,10 @@ void free_page_type(struct page_info *page, unsigned long type)
          * (e.g., update_va_mapping()) or we could end up modifying a page
          * that is no longer a page table (and hence screw up ref counts).
          */
-        queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
+        if ( current->domain == owner )
+            queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
+        else
+            flush_tlb_mask(owner->domain_dirty_cpumask);
 
         if ( unlikely(paging_mode_enabled(owner)) )
         {
@@ -1950,13 +1950,17 @@ int do_mmuext_op(
     struct vcpu *v = current;
     struct domain *d = v->domain;
 
-    LOCK_BIGLOCK(d);
-
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
         if ( unlikely(!guest_handle_is_null(pdone)) )
             (void)copy_from_guest(&done, pdone, 1);
+    }
+
+    if ( unlikely(!guest_handle_okay(uops, count)) )
+    {
+        rc = -EFAULT;
+        goto out;
     }
 
     if ( !set_foreigndom(foreigndom) )
@@ -1965,11 +1969,7 @@ int do_mmuext_op(
         goto out;
     }
 
-    if ( unlikely(!guest_handle_okay(uops, count)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
+    LOCK_BIGLOCK(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2072,38 +2072,36 @@ int do_mmuext_op(
             break;
         
 #ifdef __x86_64__
-        case MMUEXT_NEW_USER_BASEPTR:
-            if ( IS_COMPAT(FOREIGNDOM) )
-            {
-                okay = 0;
-                break;
-            }
-            if (likely(mfn != 0))
+        case MMUEXT_NEW_USER_BASEPTR: {
+            unsigned long old_mfn;
+
+            if ( mfn != 0 )
             {
                 if ( paging_mode_refcounts(d) )
                     okay = get_page_from_pagenr(mfn, d);
                 else
                     okay = get_page_and_type_from_pagenr(
                         mfn, PGT_root_page_table, d);
-            }
-            if ( unlikely(!okay) )
-            {
-                MEM_LOG("Error while installing new mfn %lx", mfn);
-            }
-            else
-            {
-                unsigned long old_mfn =
-                    pagetable_get_pfn(v->arch.guest_table_user);
-                v->arch.guest_table_user = pagetable_from_pfn(mfn);
-                if ( old_mfn != 0 )
+                if ( unlikely(!okay) )
                 {
-                    if ( paging_mode_refcounts(d) )
-                        put_page(mfn_to_page(old_mfn));
-                    else
-                        put_page_and_type(mfn_to_page(old_mfn));
+                    MEM_LOG("Error while installing new mfn %lx", mfn);
+                    break;
                 }
             }
+
+            old_mfn = pagetable_get_pfn(v->arch.guest_table_user);
+            v->arch.guest_table_user = pagetable_from_pfn(mfn);
+
+            if ( old_mfn != 0 )
+            {
+                if ( paging_mode_refcounts(d) )
+                    put_page(mfn_to_page(old_mfn));
+                else
+                    put_page_and_type(mfn_to_page(old_mfn));
+            }
+
             break;
+        }
 #endif
         
         case MMUEXT_TLB_FLUSH_LOCAL:
@@ -2202,9 +2200,11 @@ int do_mmuext_op(
         guest_handle_add_offset(uops, 1);
     }
 
- out:
     process_deferred_ops();
 
+    UNLOCK_BIGLOCK(d);
+
+ out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
     {
@@ -2212,7 +2212,6 @@ int do_mmuext_op(
         copy_to_guest(pdone, &done, 1);
     }
 
-    UNLOCK_BIGLOCK(d);
     return rc;
 }
 
@@ -2233,8 +2232,6 @@ int do_mmu_update(
     unsigned long type_info;
     struct domain_mmap_cache mapcache, sh_mapcache;
 
-    LOCK_BIGLOCK(d);
-
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
@@ -2242,8 +2239,11 @@ int do_mmu_update(
             (void)copy_from_guest(&done, pdone, 1);
     }
 
-    domain_mmap_cache_init(&mapcache);
-    domain_mmap_cache_init(&sh_mapcache);
+    if ( unlikely(!guest_handle_okay(ureqs, count)) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
 
     if ( !set_foreigndom(foreigndom) )
     {
@@ -2251,14 +2251,13 @@ int do_mmu_update(
         goto out;
     }
 
+    domain_mmap_cache_init(&mapcache);
+    domain_mmap_cache_init(&sh_mapcache);
+
     perfc_incrc(calls_to_mmu_update);
     perfc_addc(num_page_updates, count);
 
-    if ( unlikely(!guest_handle_okay(ureqs, count)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
+    LOCK_BIGLOCK(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2342,12 +2341,11 @@ int do_mmu_update(
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
                 case PGT_l4_page_table:
-                    if ( !IS_COMPAT(FOREIGNDOM) )
-                    {
-                        l4_pgentry_t l4e = l4e_from_intpte(req.val);
-                        okay = mod_l4_entry(d, va, l4e, mfn);
-                    }
-                    break;
+                {
+                    l4_pgentry_t l4e = l4e_from_intpte(req.val);
+                    okay = mod_l4_entry(d, va, l4e, mfn);
+                }
+                break;
 #endif
                 }
 
@@ -2414,12 +2412,14 @@ int do_mmu_update(
         guest_handle_add_offset(ureqs, 1);
     }
 
- out:
     domain_mmap_cache_destroy(&mapcache);
     domain_mmap_cache_destroy(&sh_mapcache);
 
     process_deferred_ops();
 
+    UNLOCK_BIGLOCK(d);
+
+ out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
     {
@@ -2427,7 +2427,6 @@ int do_mmu_update(
         copy_to_guest(pdone, &done, 1);
     }
 
-    UNLOCK_BIGLOCK(d);
     return rc;
 }
 
