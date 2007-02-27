@@ -193,28 +193,14 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
         /* a) check for event channel conflicts */
         for (port=0; port < NR_EVTCHN_BUCKETS; port++) {
             spin_lock(&d->evtchn_lock);
-            if (d->evtchn[port] == NULL) {
+            if (d->evtchn[port] == NULL ||
+                d->evtchn[port]->state == ECS_UNBOUND) {
                 spin_unlock(&d->evtchn_lock);
                 continue;
             }
             if (d->evtchn[port]->state == ECS_INTERDOMAIN) {
                 rdom = d->evtchn[port]->u.interdomain.remote_dom;
                 rdomid = rdom->domain_id;
-                /* rdom now has remote domain */
-                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                                      (struct acm_ssid_domain *)(rdom->ssid));
-                ste_rssidref = ste_rssid->ste_ssidref;
-            } else if (d->evtchn[port]->state == ECS_UNBOUND) {
-                rdomid = d->evtchn[port]->u.unbound.remote_domid;
-                if ((rdom = get_domain_by_id(rdomid)) == NULL) {
-                    printk("%s: Error finding domain to id %x!\n", __func__, rdomid);
-                    goto out;
-                }
-                /* rdom now has remote domain */
-                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                                      (struct acm_ssid_domain *)(rdom->ssid));
-                ste_rssidref = ste_rssid->ste_ssidref;
-                put_domain(rdom);
             } else {
                 spin_unlock(&d->evtchn_lock);
                 continue; /* port unused */
