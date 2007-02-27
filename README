@@ -92,6 +92,8 @@ provided by your Linux distributor:
     * Development install of zlib (e.g., zlib-dev)
     * Development install of Python v2.3 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)
+    * Development install of openssl (e.g., openssl-dev)
+    * Development install of x11 (e.g. xorg-x11-dev)
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * hotplug or udev
