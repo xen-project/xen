@@ -80,6 +80,9 @@ struct xs_handle {
 	/* One request at a time. */
 	struct mutex request_mutex;
 
+	/* Protect xenbus reader thread against save/restore. */
+	struct mutex response_mutex;
+
 	/* Protect transactions against save/restore. */
 	struct rw_semaphore suspend_mutex;
 };
@@ -654,6 +657,7 @@ void xs_suspend(void)
 {
 	down_write(&xs_state.suspend_mutex);
 	mutex_lock(&xs_state.request_mutex);
+	mutex_lock(&xs_state.response_mutex);
 }
 
 void xs_resume(void)
@@ -661,6 +665,7 @@ void xs_resume(void)
 	struct xenbus_watch *watch;
 	char token[sizeof(watch) * 2 + 1];
 
+	mutex_unlock(&xs_state.response_mutex);
 	mutex_unlock(&xs_state.request_mutex);
 
 	/* No need for watches_lock: the suspend_mutex is sufficient. */
@@ -674,6 +679,7 @@ void xs_resume(void)
 
 void xs_suspend_cancel(void)
 {
+	mutex_unlock(&xs_state.response_mutex);
 	mutex_unlock(&xs_state.request_mutex);
 	up_write(&xs_state.suspend_mutex);
 }
@@ -737,19 +743,27 @@ static int process_msg(void)
 	char *body;
 	int err;
 
-	err = xb_wait_for_data_to_read();
-	if (err)
-	    return err;
+	/*
+	 * We must disallow save/restore while reading a xenstore message.
+	 * A partial read across s/r leaves us out of sync with xenstored.
+	 */
+	for (;;) {
+		err = xb_wait_for_data_to_read();
+		if (err)
+			return err;
+		mutex_lock(&xs_state.response_mutex);
+		if (xb_data_to_read())
+			break;
+		/* We raced with save/restore: pending data 'disappeared'. */
+		mutex_unlock(&xs_state.response_mutex);
+	}
+
 
 	msg = kmalloc(sizeof(*msg), GFP_KERNEL);
-	if (msg == NULL)
-		return -ENOMEM;
-
-	/*
-	 * We are now committed to reading an entire message. Partial reads
-	 * across save/restore leave us out of sync with the xenstore daemon.
-	 */
-	down_read(&xs_state.suspend_mutex);
+	if (msg == NULL) {
+		err = -ENOMEM;
+		goto out;
+	}
 
 	err = xb_read(&msg->hdr, sizeof(msg->hdr));
 	if (err) {
@@ -803,7 +817,7 @@ static int process_msg(void)
 	}
 
  out:
-	up_read(&xs_state.suspend_mutex);
+	mutex_unlock(&xs_state.response_mutex);
 	return err;
 }
 
@@ -833,6 +847,7 @@ int xs_init(void)
 	init_waitqueue_head(&xs_state.reply_waitq);
 
 	mutex_init(&xs_state.request_mutex);
+	mutex_init(&xs_state.response_mutex);
 	init_rwsem(&xs_state.suspend_mutex);
 
 	/* Initialize the shared memory rings to talk to xenstored */

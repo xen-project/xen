@@ -298,6 +298,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	unsigned int domid;
 	unsigned long mfn;
 	evtchn_port_t port;
+	int rc;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -341,17 +342,21 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		talloc_steal(domain->conn, domain);
 
 		fire_watches(conn, "@introduceDomain", false);
-	}
-	else {
-		int rc;
-
+	} else if (domain->mfn == mfn) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
 			xc_evtchn_unbind(xce_handle, domain->port);
 		rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
 		domain->port = (rc == -1) ? 0 : rc;
 		domain->remote_port = port;
+	} else {
+		send_error(conn, EINVAL);
+		return;
 	}
+
+	/* Rings must be quiesced. */
+	domain->interface->req_cons = domain->interface->req_prod = 0;
+	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;
 
 	send_ack(conn, XS_INTRODUCE);
 }

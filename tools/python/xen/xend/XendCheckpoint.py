@@ -230,11 +230,7 @@ def restore(xd, fd, dominfo = None, paused = False):
         if not is_hvm and handler.console_mfn is None:
             raise XendError('Could not read console MFN')        
 
-        dominfo.waitForDevices() # Wait for backends to set up
-        if not paused:
-            dominfo.unpause()
-
-         # get qemu state and create a tmp file for dm restore
+        # get qemu state and create a tmp file for dm restore
         if is_hvm:
             qemu_signature = read_exact(fd, len(QEMU_SIGNATURE),
                                         "invalid device model signature read")
@@ -257,6 +253,10 @@ def restore(xd, fd, dominfo = None, paused = False):
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
         
+        dominfo.waitForDevices() # Wait for backends to set up
+        if not paused:
+            dominfo.unpause()
+
         return dominfo
     except:
         dominfo.destroy()
