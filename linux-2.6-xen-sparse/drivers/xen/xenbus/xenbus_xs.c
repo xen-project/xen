@@ -77,6 +77,11 @@ struct xs_handle {
 	spinlock_t reply_lock;
 	wait_queue_head_t reply_waitq;
 
+	/*
+	 * Mutex ordering: transaction_mutex -> watch_mutex -> request_mutex.
+	 * response_mutex is never taken simultaneously with the other three.
+	 */
+
 	/* One request at a time. */
 	struct mutex request_mutex;
 
@@ -84,7 +89,10 @@ struct xs_handle {
 	struct mutex response_mutex;
 
 	/* Protect transactions against save/restore. */
-	struct rw_semaphore suspend_mutex;
+	struct rw_semaphore transaction_mutex;
+
+	/* Protect watch (de)register against save/restore. */
+	struct rw_semaphore watch_mutex;
 };
 
 static struct xs_handle xs_state;
@@ -160,7 +168,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	int err;
 
 	if (req_msg.type == XS_TRANSACTION_START)
-		down_read(&xs_state.suspend_mutex);
+		down_read(&xs_state.transaction_mutex);
 
 	mutex_lock(&xs_state.request_mutex);
 
@@ -176,7 +184,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	if ((req_msg.type == XS_TRANSACTION_END) ||
 	    ((req_msg.type == XS_TRANSACTION_START) &&
 	     (msg->type == XS_ERROR)))
-		up_read(&xs_state.suspend_mutex);
+		up_read(&xs_state.transaction_mutex);
 
 	return ret;
 }
@@ -427,11 +435,11 @@ int xenbus_transaction_start(struct xenbus_transaction *t)
 {
 	char *id_str;
 
-	down_read(&xs_state.suspend_mutex);
+	down_read(&xs_state.transaction_mutex);
 
 	id_str = xs_single(XBT_NIL, XS_TRANSACTION_START, "", NULL);
 	if (IS_ERR(id_str)) {
-		up_read(&xs_state.suspend_mutex);
+		up_read(&xs_state.transaction_mutex);
 		return PTR_ERR(id_str);
 	}
 
@@ -456,7 +464,7 @@ int xenbus_transaction_end(struct xenbus_transaction t, int abort)
 
 	err = xs_error(xs_single(t, XS_TRANSACTION_END, abortstr, NULL));
 
-	up_read(&xs_state.suspend_mutex);
+	up_read(&xs_state.transaction_mutex);
 
 	return err;
 }
@@ -589,7 +597,7 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 
 	sprintf(token, "%lX", (long)watch);
 
-	down_read(&xs_state.suspend_mutex);
+	down_read(&xs_state.watch_mutex);
 
 	spin_lock(&watches_lock);
 	BUG_ON(find_watch(token));
@@ -605,7 +613,7 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 		spin_unlock(&watches_lock);
 	}
 
-	up_read(&xs_state.suspend_mutex);
+	up_read(&xs_state.watch_mutex);
 
 	return err;
 }
@@ -619,7 +627,7 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 
 	sprintf(token, "%lX", (long)watch);
 
-	down_read(&xs_state.suspend_mutex);
+	down_read(&xs_state.watch_mutex);
 
 	spin_lock(&watches_lock);
 	BUG_ON(!find_watch(token));
@@ -632,7 +640,7 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 		       "XENBUS Failed to release watch %s: %i\n",
 		       watch->node, err);
 
-	up_read(&xs_state.suspend_mutex);
+	up_read(&xs_state.watch_mutex);
 
 	/* Cancel pending watch events. */
 	spin_lock(&watch_events_lock);
@@ -655,7 +663,8 @@ EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 
 void xs_suspend(void)
 {
-	down_write(&xs_state.suspend_mutex);
+	down_write(&xs_state.transaction_mutex);
+	down_write(&xs_state.watch_mutex);
 	mutex_lock(&xs_state.request_mutex);
 	mutex_lock(&xs_state.response_mutex);
 }
@@ -667,21 +676,23 @@ void xs_resume(void)
 
 	mutex_unlock(&xs_state.response_mutex);
 	mutex_unlock(&xs_state.request_mutex);
+	up_write(&xs_state.transaction_mutex);
 
-	/* No need for watches_lock: the suspend_mutex is sufficient. */
+	/* No need for watches_lock: the watch_mutex is sufficient. */
 	list_for_each_entry(watch, &watches, list) {
 		sprintf(token, "%lX", (long)watch);
 		xs_watch(watch->node, token);
 	}
 
-	up_write(&xs_state.suspend_mutex);
+	up_write(&xs_state.watch_mutex);
 }
 
 void xs_suspend_cancel(void)
 {
 	mutex_unlock(&xs_state.response_mutex);
 	mutex_unlock(&xs_state.request_mutex);
-	up_write(&xs_state.suspend_mutex);
+	up_write(&xs_state.watch_mutex);
+	up_write(&xs_state.transaction_mutex);
 }
 
 static int xenwatch_handle_callback(void *data)
@@ -848,7 +859,8 @@ int xs_init(void)
 
 	mutex_init(&xs_state.request_mutex);
 	mutex_init(&xs_state.response_mutex);
-	init_rwsem(&xs_state.suspend_mutex);
+	init_rwsem(&xs_state.transaction_mutex);
+	init_rwsem(&xs_state.watch_mutex);
 
 	/* Initialize the shared memory rings to talk to xenstored */
 	err = xb_init_comms();
