@@ -329,14 +329,15 @@ int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
 }
 
 /* Optionally flush file to disk and discard page cache */
-int discard_file_cache(int fd, int flush) 
+void discard_file_cache(int fd, int flush) 
 {
     off_t cur = 0;
+    int saved_errno = errno;
 
     if ( flush && (fsync(fd) < 0) )
     {
-        PERROR("Failed to flush file: %s", strerror(errno));
-        return -errno;
+        /*PERROR("Failed to flush file: %s", strerror(errno));*/
+        goto out;
     }
 
     /* 
@@ -354,11 +355,12 @@ int discard_file_cache(int fd, int flush)
     /* Discard from the buffer cache. */
     if ( posix_fadvise64(fd, 0, cur, POSIX_FADV_DONTNEED) < 0 )
     {
-        PERROR("Failed to discard cache: %s", strerror(errno));
-        return -errno;
+        /*PERROR("Failed to discard cache: %s", strerror(errno));*/
+        goto out;
     }
 
-    return 0;
+ out:
+    errno = saved_errno;
 }
 
 /*

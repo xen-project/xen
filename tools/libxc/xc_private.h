@@ -166,6 +166,6 @@ void bitmap_64_to_byte(uint8_t *bp, const uint64_t *lp, int nbits);
 void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);
 
 /* Optionally flush file to disk and discard page cache */
-int discard_file_cache(int fd, int flush);
+void discard_file_cache(int fd, int flush);
 
 #endif /* __XC_PRIVATE_H__ */

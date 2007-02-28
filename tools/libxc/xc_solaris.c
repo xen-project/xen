@@ -244,8 +244,7 @@ int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
 }
 
 /* Optionally flush file to disk and discard page cache */
-int discard_file_cache(int fd, int flush) 
+void discard_file_cache(int fd, int flush) 
 {
     // TODO: Implement for Solaris!
-    return 0;
 }

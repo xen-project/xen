@@ -178,20 +178,14 @@ static int noncached_write(int fd, int live, void *buffer, int len)
 
     int rc = write(fd,buffer,len);
 
-    if (!live) {
-        write_count += len;
+    write_count += len;
 
-        if (write_count >= MAX_PAGECACHE_USAGE*PAGE_SIZE) {
-            int serrno = errno;
-
-            /* Time to discard cache - dont care if this fails */
-            discard_file_cache(fd, 0 /* no flush */);
-
-            write_count = 0;
-
-            errno = serrno;
-        }
+    if (write_count >= MAX_PAGECACHE_USAGE*PAGE_SIZE) {
+        /* Time to discard cache - dont care if this fails */
+        discard_file_cache(fd, 0 /* no flush */);
+        write_count = 0;
     }
+
     return rc;
 }
 
@@ -1286,10 +1280,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             DPRINTF("Warning - couldn't disable shadow mode");
         }
     }
-    else {
-        // flush last write and discard cache for file
-        discard_file_cache(io_fd, 1 /* flush */);
-    }            
+
+    // flush last write and discard cache for file
+    discard_file_cache(io_fd, 1 /* flush */);
 
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
@@ -1300,10 +1293,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if (live_p2m_frame_list)
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
 
-    if(live_p2m)
+    if (live_p2m)
         munmap(live_p2m, P2M_SIZE);
 
-    if(live_m2p)
+    if (live_m2p)
         munmap(live_m2p, M2P_SIZE(max_mfn));
 
     free(pfn_type);
