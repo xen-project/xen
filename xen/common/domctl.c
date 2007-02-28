@@ -342,11 +342,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (d = domain_create(dom, domcr_flags)) == NULL )
             break;
 
-#ifdef CONFIG_COMPAT
-        if ( IS_COMPAT(current->domain) && ((ret = switch_compat(d)) != 0) )
-            break;
-#endif
-
         ret = 0;
 
         memcpy(d->handle, op->u.createdomain.handle,
