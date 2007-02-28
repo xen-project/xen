@@ -499,7 +499,7 @@ int arch_set_info_guest(
     struct domain *d = v->domain;
     unsigned long cr3_pfn = INVALID_MFN;
     unsigned long flags;
-    int i, rc, compat;
+    int i, rc = 0, compat;
 
     /* The context is a compat-mode one if *either* the calling domain 
      * or the target domain is compat-mode: if the caller is compat, it
