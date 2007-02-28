@@ -103,6 +103,9 @@ static int print_notes(struct elf_binary *elf, const elf_note *start, const elf_
 		case XEN_ELFNOTE_HV_START_LOW:
 			print_numeric_note("HV_START_LOW", elf , note);
 			break;
+		case XEN_ELFNOTE_SUSPEND_CANCEL:
+			print_numeric_note("SUSPEND_CANCEL", elf, note);
+			break;
 		case XEN_ELFNOTE_L1_MFN_VALID:
 			print_l1_mfn_valid_note("L1_MFN_VALID", elf , note);
 			break;

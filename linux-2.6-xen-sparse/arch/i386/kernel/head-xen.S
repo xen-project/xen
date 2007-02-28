@@ -206,3 +206,4 @@ ENTRY(cpu_gdt_table)
 	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .long,  _PAGE_PRESENT,_PAGE_PRESENT)
 #endif
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")
+	ELFNOTE(Xen, XEN_ELFNOTE_SUSPEND_CANCEL, .long,  1)

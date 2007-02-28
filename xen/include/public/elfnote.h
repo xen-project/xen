@@ -157,9 +157,14 @@
 #define XEN_ELFNOTE_L1_MFN_VALID  13
 
 /*
+ * Whether or not the guest supports cooperative suspend cancellation.
+ */
+#define XEN_ELFNOTE_SUSPEND_CANCEL 14
+
+/*
  * The number of the highest elfnote defined.
  */
-#define XEN_ELFNOTE_MAX XEN_ELFNOTE_L1_MFN_VALID
+#define XEN_ELFNOTE_MAX XEN_ELFNOTE_SUSPEND_CANCEL
 
 /*
  * System information exported through crash notes.
