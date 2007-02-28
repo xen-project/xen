@@ -2667,6 +2667,7 @@ static int sh_page_fault(struct vcpu *v,
                      * a not-present fault (by flipping two bits). */
                     ASSERT(regs->error_code & PFEC_page_present);
                     regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
+                    reset_early_unshadow(v);
                     perfc_incrc(shadow_fault_fast_gnp);
                     SHADOW_PRINTK("fast path not-present\n");
                     return 0;
@@ -3961,6 +3962,8 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
+    else
+        reset_early_unshadow(v);
     
     sh_mark_dirty(v->domain, mfn);
 
@@ -4015,6 +4018,8 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
+    else
+        reset_early_unshadow(v);
 
     sh_mark_dirty(v->domain, mfn);
 
@@ -4057,6 +4062,8 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( *(u32 *)addr == 0 )
         check_for_early_unshadow(v, mfn);
+    else
+        reset_early_unshadow(v);
 
     sh_mark_dirty(v->domain, mfn);
 
