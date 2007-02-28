@@ -2,6 +2,9 @@
 # Special makefile for ia64.
 #
 
+XEN_ROOT = ../../../..
+include $(XEN_ROOT)/Config.mk
+
 include arch.mk
 include ../../minios.mk
 
@@ -36,21 +39,21 @@ ARCH_OBJS += __udivdi3.o
 ARCH_OBJS += __divdi3.o
 
 GEN_OFF_SRC := gen_off.c
-GEN_OFF_BIN := gen_off
+GEN_OFF_ASM := gen_off.s
 GEN_OFF_H   := $(ARCH_INC)/offsets.h
 
 all: $(ARCH_LIB)
 
-$(GEN_OFF_BIN): $(GEN_OFF_SRC)
-	$(CC) -o $@ $(CPPFLAGS) $<
+$(GEN_OFF_ASM): $(GEN_OFF_SRC)
+	$(CC) -S -o $@ $(CPPFLAGS) $<
 
-$(GEN_OFF_H): $(GEN_OFF_BIN)
-	./$(GEN_OFF_BIN) > $(GEN_OFF_H)
+$(GEN_OFF_H): $(GEN_OFF_ASM)
+	sed -ne "/^->/ {s/->/#define /; p}" < $< > $@
 
 $(ARCH_LIB): $(GEN_OFF_H) $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
 	$(AR) rv $(ARCH_LIB) $(ARCH_OBJS)
 
 clean:
 	rm -f $(ARCH_LIB) $(ARCH_OBJS) $(HEAD_ARCH_OBJ)
-	rm -f $(GEN_OFF_BIN)
+	rm -f $(GEN_OFF_ASM)
 	rm -f $(GEN_OFF_H)

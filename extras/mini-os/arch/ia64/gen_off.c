@@ -25,19 +25,25 @@
  * SUCH DAMAGE.
  *
  */
-
-#include <stdio.h>
-#include <stddef.h>
-#include <string.h>
 #include "types.h"
 #include "sched.h"
 #include "xen/xen.h"
 #include "xen/arch-ia64.h"
 
+#define DEFINE(sym, val)					\
+  asm volatile("\n->" sym " %0 /* " #val " */": : "i" (val))
+#define DEFINE_STR2(sym, pfx, val)				\
+  asm volatile("\n->" sym " " pfx "%0" : : "i"(val));
+
 #define SZ(st,e) sizeof(((st *)0)->e)
-#define OFF(st,e,d,o) print_define(fp, #d, offsetof(st, e) + o, SZ(st, e))
+#define OFF(st,e,d,o)				\
+  DEFINE(#d, offsetof(st, e) + o);		\
+  DEFINE(#d "_sz", SZ(st,e ));			\
+  DEFINE_STR2(#d "_ld", "ld", SZ(st, e));	\
+  DEFINE_STR2(#d "_st", "st", SZ(st, e));			
+
 #define TFOFF(e,d) OFF(trap_frame_t, e, d, 0)
-#define SIZE(st,d) fprintf(fp, "#define %-30s\t0x%016lx\n", #d, sizeof(st))
+#define SIZE(st,d) DEFINE(#d, sizeof(st))
 
 #define SWOFF(e,d) OFF(struct thread, e, d, 0)
 
@@ -46,51 +52,9 @@
 /* mapped_regs_t from xen/arch-ia64.h */
 #define MR_OFF(e, d) OFF(mapped_regs_t, e, d, XMAPPEDREGS_OFS)
 
-void
-print_define(FILE *fp, char *name, uint64_t val, int size)
-{
-	char	ld_name[64];
-	char	st_name[64];
-	char	sz_name[64];
-
-	strcpy(ld_name, name);
-	strcat(ld_name, "_ld");
-	strcpy(st_name, name);
-	strcat(st_name, "_st");
-	strcpy(sz_name, name);
-	strcat(sz_name, "_sz");
-	fprintf(fp, "#define %-30s\t0x%016lx\n", name, val);
-	fprintf(fp, "#define %-30s\t%u\n", sz_name, size);
-	switch (size) {
-		case 1:
-			fprintf(fp, "#define %-30s\tld1\n", ld_name);
-			fprintf(fp, "#define %-30s\tst1\n", st_name);
-			break;
-		case 2:
-			fprintf(fp, "#define %-30s\tld2\n", ld_name);
-			fprintf(fp, "#define %-30s\tst2\n", st_name);
-			break;
-		case 4:
-			fprintf(fp, "#define %-30s\tld4\n", ld_name);
-			fprintf(fp, "#define %-30s\tst4\n", st_name);
-			break;
-		case 8:
-			fprintf(fp, "#define %-30s\tld8\n", ld_name);
-			fprintf(fp, "#define %-30s\tst8\n", st_name);
-			break;
-		default: ;
-	}
-	return;
-}
-
-
 int
 main(int argc, char ** argv)
 {
-	FILE		*fp;
-
-	fp = stdout;
-
 	TFOFF(cfm, TF_CFM);
 	TFOFF(pfs, TF_PFS);
 	TFOFF(bsp, TF_BSP);
@@ -173,5 +137,5 @@ main(int argc, char ** argv)
 	MR_OFF(bank1_regs[0], XSI_BANK1_R16_OFS);
 	MR_OFF(precover_ifs, XSI_PRECOVER_IFS_OFS);
 
-	return(0);
+	return 0;
 }
