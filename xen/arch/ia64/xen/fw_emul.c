@@ -22,6 +22,7 @@
 #include <linux/efi.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <asm/sn/sn_sal.h>
 #include <asm/xenmca.h>
 
 #include <public/sched.h>
@@ -131,6 +132,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
 	      unsigned long in6, unsigned long in7)
 {
+	struct ia64_sal_retval ret_stuff;
 	unsigned long r9  = 0;
 	unsigned long r10 = 0;
 	long r11 = 0;
@@ -375,8 +377,69 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	        if (!test_and_set_bit(_VCPUF_down, &current->vcpu_flags))
 			vcpu_sleep_nosync(current);
 		break;
+	    case SN_SAL_GET_MASTER_NASID:
+		status = -1;
+		if (current->domain == dom0) {
+			printk("*** Emulating SN_SAL_GET_MASTER_NASID ***\n");
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_MASTER_NASID,
+					0, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_GET_KLCONFIG_ADDR:
+		status = -1;
+		if (current->domain == dom0) {
+			printk("*** Emulating SN_SAL_GET_KLCONFIG_ADDR ***\n");
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_KLCONFIG_ADDR,
+					in1, 0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_GET_SAPIC_INFO:
+		status = -1;
+		if (current->domain == dom0) {
+			printk("*** Emulating SN_SAL_GET_SAPIC_INFO ***\n");
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SAPIC_INFO, in1,
+					0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_GET_SN_INFO:
+		status = -1;
+		if (current->domain == dom0) {
+			printk("*** Emulating SN_SAL_GET_SN_INFO ***\n");
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SN_INFO, in1,
+					0, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
+	    case SN_SAL_IOIF_GET_HUBDEV_INFO:
+		status = -1;
+		if (current->domain == dom0) {
+			printk("*** Emulating SN_SAL_IOIF_GET_HUBDEV_INFO ***\n");
+			SAL_CALL_NOLOCK(ret_stuff, SN_SAL_IOIF_GET_HUBDEV_INFO,
+					in1, in2, 0, 0, 0, 0, 0);
+			status = ret_stuff.status;
+			r9 = ret_stuff.v0;
+			r10 = ret_stuff.v1;
+			r11 = ret_stuff.v2;
+		}
+		break;
 	    default:
-		printk("*** CALLED SAL_ WITH UNKNOWN INDEX.  IGNORED...\n");
+		printk("*** CALLED SAL_ WITH UNKNOWN INDEX (%lx).  "
+		       "IGNORED...\n", index);
 		status = -1;
 		break;
 	}
