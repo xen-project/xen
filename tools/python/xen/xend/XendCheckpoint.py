@@ -54,7 +54,7 @@ def read_exact(fd, size, errmsg):
     return buf
 
 
-def save(fd, dominfo, network, live, dst):
+def save(fd, dominfo, network, live, dst, checkpoint=False):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
@@ -121,9 +121,11 @@ def save(fd, dominfo, network, live, dst):
             os.close(qemu_fd)
             os.remove("/tmp/xen.qemu-dm.%d" % dominfo.getDomid())
 
-        dominfo.destroyDomain()
-        dominfo.testDeviceComplete()
-
+        if checkpoint:
+            dominfo.resumeDomain()
+        else:
+            dominfo.destroyDomain()
+            dominfo.testDeviceComplete()
         try:
             dominfo.setName(domain_name)
         except VmError:

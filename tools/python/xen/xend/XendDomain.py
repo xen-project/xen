@@ -1172,7 +1172,7 @@ class XendDomain:
         XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
         sock.close()
 
-    def domain_save(self, domid, dst):
+    def domain_save(self, domid, dst, checkpoint):
         """Start saving a domain to file.
 
         @param domid: Domain ID or Name
@@ -1196,8 +1196,8 @@ class XendDomain:
                 oflags |= os.O_LARGEFILE
             fd = os.open(dst, oflags)
             try:
-                # For now we don't support 'live checkpoint' 
-                XendCheckpoint.save(fd, dominfo, False, False, dst)
+                XendCheckpoint.save(fd, dominfo, False, False, dst,
+                                    checkpoint=checkpoint)
             finally:
                 os.close(fd)
         except OSError, ex:

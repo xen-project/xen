@@ -102,7 +102,7 @@ SUBCOMMAND_HELP = {
     'reboot'      : ('<Domain> [-wa]', 'Reboot a domain.'),
     'restore'     : ('<CheckpointFile> [-p]',
                      'Restore a domain from a saved state.'),
-    'save'        : ('<Domain> <CheckpointFile>',
+    'save'        : ('[-c] <Domain> <CheckpointFile>',
                      'Save a domain state to restore later.'),
     'shutdown'    : ('<Domain> [-waRH]', 'Shutdown a domain.'),
     'top'         : ('', 'Monitor a host and the domains in real time.'),
@@ -231,6 +231,9 @@ SUBCOMMAND_OPTIONS = {
     ),
     'resume': (
       ('-p', '--paused', 'Do not unpause domain after resuming it'),
+    ),
+    'save': (
+      ('-c', '--checkpoint', 'Leave domain running after creating snapshot'),
     ),
    'restore': (
       ('-p', '--paused', 'Do not unpause domain after restoring it'),
@@ -604,21 +607,37 @@ def xm_shell(args):
 #########################################################################
 
 def xm_save(args):
-    arg_check(args, "save", 2)
+    arg_check(args, "save", 2, 3)
 
     try:
-        dominfo = parse_doms_info(server.xend.domain(args[0]))
+        (options, params) = getopt.gnu_getopt(args, 'c', ['checkpoint'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    checkpoint = False
+    for (k, v) in options:
+        if k in ['-c', '--checkpoint']:
+            checkpoint = True
+
+    if len(params) != 2:
+        err("Wrong number of parameters")
+        usage('save')
+        sys.exit(1)
+
+    try:
+        dominfo = parse_doms_info(server.xend.domain(params[0]))
     except xmlrpclib.Fault, ex:
         raise ex
     
     domid = dominfo['domid']
-    savefile = os.path.abspath(args[1])
+    savefile = os.path.abspath(params[1])
 
     if not os.access(os.path.dirname(savefile), os.W_OK):
         err("xm save: Unable to create file %s" % savefile)
         sys.exit(1)
     
-    server.xend.domain.save(domid, savefile)
+    server.xend.domain.save(domid, savefile, checkpoint)
     
 def xm_restore(args):
     arg_check(args, "restore", 1, 2)
