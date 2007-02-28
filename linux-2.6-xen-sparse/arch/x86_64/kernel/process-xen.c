@@ -117,7 +117,7 @@ void exit_idle(void)
  * to poll the ->need_resched flag instead of waiting for the
  * cross-CPU IPI to arrive. Use this option with caution.
  */
-static void poll_idle(void)
+static void poll_idle (void)
 {
 	local_irq_enable();
 
@@ -179,9 +179,7 @@ void cpu_idle (void)
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
 			rmb();
-			idle = pm_idle;
-			if (!idle)
-				idle = xen_idle;
+			idle = xen_idle; /* no alternatives */
 			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
 			enter_idle();
