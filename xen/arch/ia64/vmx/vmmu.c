@@ -590,6 +590,7 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
     struct domain *d = vcpu->domain;
     struct vcpu *v;
     struct ptc_ga_args args;
+    int proc;
 
     args.vadr = va;
     vcpu_get_rr(vcpu, va, &args.rid);
@@ -599,20 +600,21 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
             continue;
 
         args.vcpu = v;
-        if (v->processor != vcpu->processor) {
-            int proc;
+again: /* Try again if VCPU has migrated.  */
+        proc = v->processor;
+        if (proc != vcpu->processor) {
             /* Flush VHPT on remote processors.  */
-            do {
-                proc = v->processor;
-                smp_call_function_single(v->processor, 
-                    &ptc_ga_remote_func, &args, 0, 1);
-                /* Try again if VCPU has migrated.  */
-            } while (proc != v->processor);
-        }
-        else if(v == vcpu)
+            smp_call_function_single(v->processor,
+                                     &ptc_ga_remote_func, &args, 0, 1);
+            if (proc != v->processor)
+                goto again;
+        } else if (v == vcpu) {
             vmx_vcpu_ptc_l(v, va, ps);
-        else
+        } else {
             ptc_ga_remote_func(&args);
+            if (proc != v->processor)
+                goto again;
+        }
     }
     return IA64_NO_FAULT;
 }
