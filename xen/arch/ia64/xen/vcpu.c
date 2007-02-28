@@ -383,12 +383,10 @@ IA64FAULT vcpu_set_psr_sm(VCPU * vcpu, u64 imm24)
 
 IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 {
-	struct ia64_psr psr, newpsr, *ipsr;
+	struct ia64_psr newpsr, *ipsr;
 	REGS *regs = vcpu_regs(vcpu);
 	u64 enabling_interrupts = 0;
 
-	// TODO: All of these bits need to be virtualized
-	__asm__ __volatile("mov %0=psr;;":"=r"(psr)::"memory");
 	newpsr = *(struct ia64_psr *)&val;
 	ipsr = (struct ia64_psr *)&regs->cr_ipsr;
 	// just handle psr.up and psr.pp for now
@@ -406,21 +404,15 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 		ipsr->dfl = 1;
 	if (newpsr.pp) {
 		ipsr->pp = 1;
-		psr.pp = 1;
 		PSCB(vcpu, vpsr_pp) = 1;
 	} else {
 		ipsr->pp = 1;
-		psr.pp = 1;
 		PSCB(vcpu, vpsr_pp) = 0;
 	}
-	if (newpsr.up) {
+	if (newpsr.up)
 		ipsr->up = 1;
-		psr.up = 1;
-	}
-	if (newpsr.sp) {
+	if (newpsr.sp)
 		ipsr->sp = 1;
-		psr.sp = 1;
-	}
 	if (newpsr.i) {
 		if (vcpu->vcpu_info->evtchn_upcall_mask)
 			enabling_interrupts = 1;
@@ -428,22 +420,14 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 	}
 	if (newpsr.ic)
 		PSCB(vcpu, interrupt_collection_enabled) = 1;
-	if (newpsr.mfl) {
+	if (newpsr.mfl)
 		ipsr->mfl = 1;
-		psr.mfl = 1;
-	}
-	if (newpsr.mfh) {
+	if (newpsr.mfh)
 		ipsr->mfh = 1;
-		psr.mfh = 1;
-	}
-	if (newpsr.ac) {
+	if (newpsr.ac)
 		ipsr->ac = 1;
-		psr.ac = 1;
-	}
-	if (newpsr.up) {
+	if (newpsr.up)
 		ipsr->up = 1;
-		psr.up = 1;
-	}
 	if (newpsr.dt && newpsr.rt)
 		vcpu_set_metaphysical_mode(vcpu, FALSE);
 	else
