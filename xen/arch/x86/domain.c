@@ -497,18 +497,26 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+    unsigned long cr3_pfn = INVALID_MFN;
+    unsigned long flags;
+    int i, rc, compat;
+
+    /* The context is a compat-mode one if *either* the calling domain 
+     * or the target domain is compat-mode: if the caller is compat, it
+     * won't know to make a native context, and if the target is compat,
+     * the tools will have made a compat-mode context for it. */
+    compat = IS_COMPAT(d) || IS_COMPAT(current->domain);
+
 #ifdef CONFIG_COMPAT
-#define c(fld) (!IS_COMPAT(d) ? (c.nat->fld) : (c.cmp->fld))
+#define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
 #else
 #define c(fld) (c.nat->fld)
 #endif
-    unsigned long cr3_pfn = INVALID_MFN;
-    unsigned long flags = c(flags);
-    int i, rc;
+    flags = c(flags);
 
     if ( !is_hvm_vcpu(v) )
     {
-        if ( !IS_COMPAT(d) )
+        if ( !compat )
         {
             fixup_guest_stack_selector(d, c.nat->user_regs.ss);
             fixup_guest_stack_selector(d, c.nat->kernel_ss);
@@ -560,7 +568,7 @@ int arch_set_info_guest(
     if ( (flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
-    if ( !IS_COMPAT(v->domain) )
+    if ( !compat )
         memcpy(&v->arch.guest_context, c.nat, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
@@ -602,7 +610,7 @@ int arch_set_info_guest(
 
     if ( !is_hvm_vcpu(v) )
     {
-        if ( !IS_COMPAT(d) )
+        if ( !compat )
             rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
 #ifdef CONFIG_COMPAT
         else
@@ -620,7 +628,7 @@ int arch_set_info_guest(
         if ( rc != 0 )
             return rc;
 
-        if ( !IS_COMPAT(d) )
+        if ( !compat )
         {
             cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
 
