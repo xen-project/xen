@@ -182,7 +182,6 @@ sn_pcidev_info_get(struct pci_dev *dev)
 	}
 	return NULL;
 }
-#endif
 
 /* Older PROM flush WAR
  *
@@ -362,7 +361,6 @@ sn_pci_window_fixup(struct pci_dev *dev, unsigned int count,
 	controller->window = new_window;
 }
 
-#ifndef XEN
 void sn_pci_unfixup_slot(struct pci_dev *dev)
 {
 	struct pci_dev *host_pci_dev = SN_PCIDEV_INFO(dev)->host_pci_dev;
@@ -658,7 +656,9 @@ void sn_bus_free_sysdata(void)
 static int __init sn_io_early_init(void)
 {
 	int i, j;
+#ifndef XEN
 	struct pci_dev *pci_dev = NULL;
+#endif
 
 	if (!ia64_platform_is("sn2") || IS_RUNNING_ON_FAKE_PROM())
 		return 0;
