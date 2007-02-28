@@ -6,12 +6,6 @@
 
 #if defined(CONFIG_HOTPLUG_CPU)
 
-#if defined(CONFIG_X86)
-void cpu_initialize_context(unsigned int cpu);
-#else
-#define cpu_initialize_context(cpu)	((void)0)
-#endif
-
 int cpu_up_check(unsigned int cpu);
 void init_xenbus_allowed_cpumask(void);
 int smp_suspend(void);

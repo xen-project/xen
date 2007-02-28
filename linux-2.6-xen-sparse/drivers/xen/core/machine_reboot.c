@@ -97,6 +97,9 @@ static void post_suspend(int suspend_cancelled)
 			pfn_to_mfn(xen_start_info->store_mfn);
 		xen_start_info->console.domU.mfn =
 			pfn_to_mfn(xen_start_info->console.domU.mfn);
+	} else {
+		extern cpumask_t cpu_initialized_map;
+		cpu_initialized_map = cpumask_of_cpu(0);
 	}
 	
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
@@ -147,13 +150,20 @@ int __xen_suspend(void)
 	}
 #endif
 
-	err = smp_suspend();
-	if (err)
-		return err;
+	for (;;) {
+		err = smp_suspend();
+		if (err)
+			return err;
 
-	xenbus_suspend();
+		xenbus_suspend();
+		preempt_disable();
 
-	preempt_disable();
+		if (num_online_cpus() == 1)
+			break;
+
+		preempt_enable();
+		xenbus_suspend_cancel();
+	}
 
 	mm_pin_all();
 	local_irq_disable();
