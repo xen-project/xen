@@ -140,15 +140,6 @@ struct hvm_function_table {
 
 extern struct hvm_function_table hvm_funcs;
 
-/*
- * For convenience, we use short hands.
- */
-static inline void
-hvm_disable(void)
-{
-    hvm_funcs.disable();
-}
-
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_destroy(struct domain *d);
 

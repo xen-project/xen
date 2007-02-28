@@ -258,6 +258,7 @@ extern char hvm_io_bitmap[];
 extern int hvm_enabled;
 
 void hvm_enable(struct hvm_function_table *);
+void hvm_disable(void);
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
 int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);

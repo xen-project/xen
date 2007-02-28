@@ -76,6 +76,12 @@ void hvm_enable(struct hvm_function_table *fns)
     hvm_enabled = 1;
 }
 
+void hvm_disable(void)
+{
+    if ( hvm_enabled )
+        hvm_funcs.disable();
+}
+
 void hvm_stts(struct vcpu *v)
 {
     /* FPU state already dirty? Then no need to setup_fpu() lazily. */
