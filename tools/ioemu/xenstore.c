@@ -16,6 +16,9 @@ static struct xs_handle *xsh = NULL;
 static char *hd_filename[MAX_DISKS];
 static QEMUTimer *insert_timer = NULL;
 
+#define UWAIT_MAX (30*1000000) /* thirty seconds */
+#define UWAIT     (100000)     /* 1/10th second  */
+
 static int pasprintf(char **buf, const char *fmt, ...)
 {
     va_list ap;
@@ -53,32 +56,20 @@ void xenstore_check_new_media_present(int timeout)
     qemu_mod_timer(insert_timer, qemu_get_clock(rt_clock) + timeout);
 }
 
-static int waitForDevice(char *path, char *field, char *desired)
+static void waitForDevice(char *fn)
 { 
-    char *buf = NULL, *stat = NULL;
-    unsigned int len;
-    int val = 1;
+    struct stat sbuf;
+    int status;
+    int uwait = UWAIT_MAX;
 
-    /* loop until we find a value in xenstore, return 
-     * if it was what we wanted, or not
-     */
-    while (1) {
-        if (pasprintf(&buf, "%s/%s", path, field) == -1)
-            goto done;
-        free(stat);
-        stat = xs_read(xsh, XBT_NULL, buf, &len);
-        if (stat == NULL) {
-            usleep(100000); /* 1/10th second, no path found */
-        } else {
-            val = strcmp(stat, desired);
-            goto done;
-        }
-    }
+    do {
+        status = stat(fn, &sbuf);
+        if (!status) break;
+        usleep(UWAIT);
+        uwait -= UWAIT;
+    } while (uwait > 0);
 
-done:
-    free(stat);
-    free(buf);
-    return val;
+    return;
 }
 
 void xenstore_parse_domain_config(int domid)
@@ -161,11 +152,6 @@ void xenstore_parse_domain_config(int domid)
 	free(fpath);
         fpath = xs_read(xsh, XBT_NULL, buf, &len);
 	if (fpath != NULL) {
-
-            if (waitForDevice(fpath, "hotplug-status", "connected")) {
-               continue;
-            }
-
 	    if (pasprintf(&buf, "%s/dev", fpath) == -1)
 	        continue;
             params = xs_read(xsh, XBT_NULL, buf , &len);
@@ -173,6 +159,11 @@ void xenstore_parse_domain_config(int domid)
                 free(hd_filename[hd_index]);
                 hd_filename[hd_index] = params;
                 params = NULL;              /* don't free params on re-use */
+                /* 
+                 * wait for device, on timeout silently fail because we will 
+                 * fail to open below
+                 */
+                waitForDevice(hd_filename[hd_index]);
             }
         }
 	bs_table[hd_index] = bdrv_new(dev);
