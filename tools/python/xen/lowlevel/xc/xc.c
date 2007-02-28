@@ -23,6 +23,8 @@
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
 #define PyMODINIT_FUNC DL_EXPORT(void)
@@ -419,10 +421,13 @@ static PyObject *pyxc_linux_build(XcObject *self,
 	goto out;
     }
 
-    if (!(elfnote_dict = PyDict_New()))
+    if ( !(elfnote_dict = PyDict_New()) )
 	goto out;
-    for (i = 0; i <= XEN_ELFNOTE_MAX; i++) {
-	switch (dom->parms.elf_notes[i].type) {
+    
+    for ( i = 0; i < ARRAY_SIZE(dom->parms.elf_notes); i++ )
+    {
+	switch ( dom->parms.elf_notes[i].type )
+        {
 	case XEN_ENT_NONE:
 	    continue;
 	case XEN_ENT_LONG:
