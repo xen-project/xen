@@ -489,11 +489,7 @@ void shadow_demote(struct vcpu *v, mfn_t gmfn, u32 type)
 {
     struct page_info *page = mfn_to_page(gmfn);
 
-#ifdef CONFIG_COMPAT
-    if ( !IS_COMPAT(v->domain) || type != SH_type_l4_64_shadow )
-#endif
-        ASSERT(test_bit(_PGC_page_table, &page->count_info));
-
+    ASSERT(test_bit(_PGC_page_table, &page->count_info));
     ASSERT(test_bit(type, &page->shadow_flags));
 
     clear_bit(type, &page->shadow_flags);
@@ -1625,6 +1621,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
         break;
     case SH_type_l2h_64_shadow:
         ASSERT( IS_COMPAT(v->domain) );
+        /* Fall through... */
     case SH_type_l2_64_shadow:
         SHADOW_INTERNAL_NAME(sh_destroy_l2_shadow, 4, 4)(v, smfn);
         break;

@@ -229,6 +229,10 @@ static int setup_compat_l4(struct vcpu *v)
 
     if ( !pg )
         return -ENOMEM;
+
+    /* This page needs to look like a pagetable so that it can be shadowed */
+    pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated;
+
     l4tab = copy_page(page_to_virt(pg), idle_pg_table);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_page(pg, __PAGE_HYPERVISOR);

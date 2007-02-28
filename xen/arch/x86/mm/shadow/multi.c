@@ -3368,16 +3368,11 @@ sh_set_toplevel_shadow(struct vcpu *v,
     
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
     /* Once again OK to unhook entries from this table if we see fork/exit */
-#if CONFIG_PAGING_LEVELS == 4
-    if ( IS_COMPAT(d) )
-        ASSERT(!sh_mfn_is_a_page_table(gmfn));
-    else
-#endif
-        ASSERT(sh_mfn_is_a_page_table(gmfn));
+    ASSERT(sh_mfn_is_a_page_table(gmfn));
     mfn_to_page(gmfn)->shadow_flags &= ~SHF_unhooked_mappings;
 #endif
 
-    /* Pin the shadow and put it (back) on the list of top-level shadows */
+    /* Pin the shadow and put it (back) on the list of pinned shadows */
     if ( sh_pin(v, smfn) == 0 )
     {
         SHADOW_ERROR("can't pin %#lx as toplevel shadow\n", mfn_x(smfn));
