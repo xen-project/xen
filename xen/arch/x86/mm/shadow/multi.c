@@ -2522,7 +2522,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
         if ( !(flags & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
         {
             perfc_incrc(shadow_early_unshadow);
-            sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
+            sh_remove_shadows(v, gmfn, 0, 0 /* Slow, can fail to unshadow */ );
         } 
     }
     v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
