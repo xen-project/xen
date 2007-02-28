@@ -1662,10 +1662,31 @@ class XendDomainInfo:
     def resumeDomain(self):
         log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
 
+        if self.domid is None:
+            return
         try:
-            if self.domid is not None:
-                xc.domain_resume(self.domid)
-                ResumeDomain(self.domid)
+            # could also fetch a parsed note from xenstore
+            fast = self.info.get_notes().get('SUSPEND_CANCEL') and 1 or 0
+            if not fast:
+                self._releaseDevices()
+                self.testDeviceComplete()
+                self.testvifsComplete()
+                log.debug("XendDomainInfo.resumeDomain: devices released")
+
+                self._resetChannels()
+
+                self._removeDom('control/shutdown')
+                self._removeDom('device-misc/vif/nextDeviceID')
+
+                self._createChannels()
+                self._introduceDomain()
+                self._storeDomDetails()
+
+                self._createDevices()
+                log.debug("XendDomainInfo.resumeDomain: devices created")
+
+            xc.domain_resume(self.domid, fast)
+            ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
 

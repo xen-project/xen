@@ -243,10 +243,12 @@ int xc_domain_destroy(int xc_handle,
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the domain id to resume
+ * @parm fast use cooperative resume (guest must support this)
  * return 0 on success, -1 on failure
  */
 int xc_domain_resume(int xc_handle,
-                      uint32_t domid);
+		     uint32_t domid,
+		     int fast);
 
 /**
  * This function will shutdown a domain. This is intended for use in

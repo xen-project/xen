@@ -178,7 +178,17 @@ static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
 
 static PyObject *pyxc_domain_resume(XcObject *self, PyObject *args)
 {
-    return dom_op(self, args, xc_domain_resume);
+    uint32_t dom;
+    int fast;
+
+    if (!PyArg_ParseTuple(args, "ii", &dom, &fast))
+        return NULL;
+
+    if (xc_domain_resume(self->xc_handle, dom, fast) != 0)
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
 }
 
 static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
@@ -1124,7 +1134,8 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_resume,
       METH_VARARGS, "\n"
       "Resume execution of a suspended domain.\n"
-      " dom [int]: Identifier of domain to be resumed.\n\n"
+      " dom [int]: Identifier of domain to be resumed.\n"
+      " fast [int]: Use cooperative resume.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_shutdown", 

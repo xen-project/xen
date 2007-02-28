@@ -137,23 +137,6 @@ def save(fd, dominfo, network, live, dst):
         log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
 
-        dominfo._releaseDevices()
-        dominfo.testDeviceComplete()
-        dominfo.testvifsComplete()
-        log.debug("XendCheckpoint.save: devices released")
-
-        dominfo._resetChannels()
-
-        dominfo._removeDom('control/shutdown')
-        dominfo._removeDom('device-misc/vif/nextDeviceID')
-
-        dominfo._createChannels()
-        dominfo._introduceDomain()
-        dominfo._storeDomDetails()
-
-        dominfo._createDevices()
-        log.debug("XendCheckpoint.save: devices created")
-
         dominfo.resumeDomain()
         log.debug("XendCheckpoint.save: resumeDomain")
 
