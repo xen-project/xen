@@ -411,7 +411,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
 
     if (!(elfnote_dict = PyDict_New()))
 	goto out;
-    for (i = 0; i < XEN_ELFNOTE_MAX; i++) {
+    for (i = 0; i <= XEN_ELFNOTE_MAX; i++) {
 	switch (dom->parms.elf_notes[i].type) {
 	case XEN_ENT_NONE:
 	    continue;
