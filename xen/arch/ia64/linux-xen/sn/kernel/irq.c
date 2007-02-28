@@ -223,6 +223,8 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 struct hw_interrupt_type irq_type_sn = {
 #ifndef XEN
 	.name		= "SN hub",
+#else
+	.typename	= "SN hub",
 #endif
 	.startup	= sn_startup_irq,
 	.shutdown	= sn_shutdown_irq,
@@ -242,19 +244,24 @@ unsigned int sn_local_vector_to_irq(u8 vector)
 
 void sn_irq_init(void)
 {
-#ifndef XEN
 	int i;
 	irq_desc_t *base_desc = irq_desc;
 
+#ifndef XEN
 	ia64_first_device_vector = IA64_SN2_FIRST_DEVICE_VECTOR;
 	ia64_last_device_vector = IA64_SN2_LAST_DEVICE_VECTOR;
+#endif
 
 	for (i = 0; i < NR_IRQS; i++) {
+#ifdef XEN
+		if (base_desc[i].handler == &no_irq_type) {
+			base_desc[i].handler = &irq_type_sn;
+#else
 		if (base_desc[i].chip == &no_irq_type) {
 			base_desc[i].chip = &irq_type_sn;
+#endif
 		}
 	}
-#endif
 }
 
 #ifndef XEN

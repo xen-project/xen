@@ -20,9 +20,7 @@
 #include <asm/sn/module.h>
 #include <asm/sn/pcibr_provider.h>
 #include <asm/sn/pcibus_provider_defs.h>
-#ifndef XEN
 #include <asm/sn/pcidev.h>
-#endif
 #include <asm/sn/simulator.h>
 #include <asm/sn/sn_sal.h>
 #ifndef XEN
@@ -41,6 +39,7 @@
 extern void sn_init_cpei_timer(void);
 extern void register_sn_procfs(void);
 #ifdef XEN
+#define pci_dev_get(dev)	do{}while(0)
 extern void sn_irq_lh_init(void);
 #endif
 
@@ -65,7 +64,6 @@ int sn_ioif_inited;		/* SN I/O infrastructure initialized? */
 
 struct sn_pcibus_provider *sn_pci_provider[PCIIO_ASIC_MAX_TYPES];	/* indexed by asic type */
 
-#ifndef XEN
 static int max_segment_number;		 /* Default highest segment number */
 static int max_pcibus_number = 255;	/* Default highest pci bus number */
 
@@ -97,7 +95,6 @@ static struct sn_pcibus_provider sn_pci_default_provider = {
 	.dma_unmap = sn_default_pci_unmap,
 	.bus_fixup = sn_default_pci_bus_fixup,
 };
-#endif
 
 /*
  * Retrieve the DMA Flush List given nasid, widget, and device.
@@ -148,7 +145,6 @@ static inline u64 sal_get_pcibus_info(u64 segment, u64 busnum, u64 address)
 	return ret_stuff.v0;
 }
 
-#ifndef XEN
 /*
  * Retrieve the pci device information given the bus and device|function number.
  */
@@ -168,6 +164,7 @@ sal_get_pcidev_info(u64 segment, u64 bus_number, u64 devfn, u64 pci_dev,
 	return ret_stuff.v0;
 }
 
+#ifndef XEN
 /*
  * sn_pcidev_info_get() - Retrieve the pcidev_info struct for the specified
  *			  device.
@@ -185,6 +182,7 @@ sn_pcidev_info_get(struct pci_dev *dev)
 	}
 	return NULL;
 }
+#endif
 
 /* Older PROM flush WAR
  *
@@ -364,6 +362,7 @@ sn_pci_window_fixup(struct pci_dev *dev, unsigned int count,
 	controller->window = new_window;
 }
 
+#ifndef XEN
 void sn_pci_unfixup_slot(struct pci_dev *dev)
 {
 	struct pci_dev *host_pci_dev = SN_PCIDEV_INFO(dev)->host_pci_dev;
@@ -372,7 +371,9 @@ void sn_pci_unfixup_slot(struct pci_dev *dev)
 	pci_dev_put(host_pci_dev);
 	pci_dev_put(dev);
 }
+#endif
 
+#ifndef XEN
 /*
  * sn_pci_fixup_slot() - This routine sets up a slot's resources
  * consistent with the Linux PCI abstraction layer.  Resources acquired
@@ -437,10 +438,12 @@ void sn_pci_fixup_slot(struct pci_dev *dev)
 		addr = ((addr << 4) >> 4) | __IA64_UNCACHED_OFFSET;
 		dev->resource[idx].start = addr;
 		dev->resource[idx].end = addr + size;
+#ifndef XEN
 		if (dev->resource[idx].flags & IORESOURCE_IO)
 			dev->resource[idx].parent = &ioport_resource;
 		else
 			dev->resource[idx].parent = &iomem_resource;
+#endif
 	}
 	/* Create a pci_window in the pci_controller struct for
 	 * each device resource.
@@ -480,6 +483,7 @@ void sn_pci_fixup_slot(struct pci_dev *dev)
 		kfree(sn_irq_info);
 	}
 }
+#endif
 
 /*
  * sn_pci_controller_fixup() - This routine sets up a bus's resources
@@ -512,6 +516,7 @@ void sn_pci_controller_fixup(int segment, int busnum, struct pci_bus *bus)
 	controller = &sn_controller->pci_controller;
 	controller->segment = segment;
 
+#ifndef XEN
 	if (bus == NULL) {
  		bus = pci_scan_bus(busnum, &pci_root_ops, controller);
  		if (bus == NULL)
@@ -533,6 +538,7 @@ void sn_pci_controller_fixup(int segment, int busnum, struct pci_bus *bus)
 	if (prom_bussoft_ptr->bs_asic_type == PCIIO_ASIC_TYPE_PPB)
 		goto error_return; /* no further fixup necessary */
 
+#endif
 	provider = sn_pci_provider[prom_bussoft_ptr->bs_asic_type];
 	if (provider == NULL)
 		goto error_return; /* no provider registerd for this asic */
@@ -562,14 +568,18 @@ void sn_pci_controller_fixup(int segment, int busnum, struct pci_bus *bus)
 	controller->window[0].resource.start = prom_bussoft_ptr->bs_legacy_io;
 	controller->window[0].resource.end =
 	    controller->window[0].resource.start + 0xffff;
+#ifndef XEN
 	controller->window[0].resource.parent = &ioport_resource;
+#endif
 	controller->window[1].offset = prom_bussoft_ptr->bs_legacy_mem;
 	controller->window[1].resource.name = "legacy_mem";
 	controller->window[1].resource.flags = IORESOURCE_MEM;
 	controller->window[1].resource.start = prom_bussoft_ptr->bs_legacy_mem;
 	controller->window[1].resource.end =
 	    controller->window[1].resource.start + (1024 * 1024) - 1;
+#ifndef XEN
 	controller->window[1].resource.parent = &iomem_resource;
+#endif
 	controller->windows = 2;
 
 	/*
@@ -608,6 +618,7 @@ error_return:
 	return;
 }
 
+#ifndef XEN
 void sn_bus_store_sysdata(struct pci_dev *dev)
 {
 	struct sysdata_el *element;
@@ -644,17 +655,14 @@ void sn_bus_free_sysdata(void)
 
 #define PCI_BUSES_TO_SCAN 256
 
-static int __init sn_pci_init(void)
+static int __init sn_io_early_init(void)
 {
-#ifndef XEN
 	int i, j;
 	struct pci_dev *pci_dev = NULL;
-#endif
 
 	if (!ia64_platform_is("sn2") || IS_RUNNING_ON_FAKE_PROM())
 		return 0;
 
-#ifndef XEN
 	/*
 	 * prime sn_pci_provider[].  Individial provider init routines will
 	 * override their respective default entries.
@@ -663,6 +671,7 @@ static int __init sn_pci_init(void)
 	for (i = 0; i < PCIIO_ASIC_MAX_TYPES; i++)
 		sn_pci_provider[i] = &sn_pci_default_provider;
 
+#ifndef XEN
 	pcibr_init_provider();
 	tioca_init_provider();
 	tioce_init_provider();
@@ -683,7 +692,7 @@ static int __init sn_pci_init(void)
 #ifdef CONFIG_PROC_FS
 	register_sn_procfs();
 #endif
-
+#endif
 	/* busses are not known yet ... */
 	for (i = 0; i <= max_segment_number; i++)
 		for (j = 0; j <= max_pcibus_number; j++)
@@ -695,6 +704,7 @@ static int __init sn_pci_init(void)
 	 * information.
 	 */
 
+#ifndef XEN
 	while ((pci_dev =
 		pci_get_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL)
 		sn_pci_fixup_slot(pci_dev);
@@ -769,9 +779,9 @@ void sn_generate_path(struct pci_bus *pci_bus, char *address)
 #endif
 
 #ifdef XEN
-__initcall(sn_pci_init);
+__initcall(sn_io_early_init);
 #else
-subsys_initcall(sn_pci_init);
+subsys_initcall(sn_io_early_init);
 #endif
 #ifndef XEN
 EXPORT_SYMBOL(sn_pci_fixup_slot);
