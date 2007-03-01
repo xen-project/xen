@@ -534,6 +534,7 @@ complete_dom0_memmap(struct domain *d,
 		u64 start = md->phys_addr;
 		u64 size = md->num_pages << EFI_PAGE_SHIFT;
 		u64 end = start + size;
+		u64 mpaddr;
 		unsigned long flags;
 
 		switch (md->type) {
@@ -566,10 +567,22 @@ complete_dom0_memmap(struct domain *d,
 			break;
 
 		case EFI_MEMORY_MAPPED_IO_PORT_SPACE:
+			flags = ASSIGN_writable;	/* dummy - zero */
+			if (md->attribute & EFI_MEMORY_UC)
+				flags |= ASSIGN_nocache;
+
+			if (start > 0x1ffffffff0000000UL) {
+				mpaddr = 0x4000000000000UL - size;
+				printk(XENLOG_INFO "Remapping IO ports from "
+				       "%lx to %lx\n", start, mpaddr);
+			} else
+				mpaddr = start;
+
 			/* Map into dom0.  */
-			assign_domain_mmio_page(d, start, size);
+			assign_domain_mmio_page(d, mpaddr, start, size, flags);
 			/* Copy descriptor.  */
 			*dom_md = *md;
+			dom_md->phys_addr = mpaddr;
 			dom_md->virt_addr = 0;
 			num_mds++;
 			break;
@@ -652,8 +665,12 @@ complete_dom0_memmap(struct domain *d,
 		if (domain_page_mapped(d, addr))
 			continue;
 		
-		if (efi_mmio(addr, PAGE_SIZE))
-			assign_domain_mmio_page(d, addr, PAGE_SIZE);
+		if (efi_mmio(addr, PAGE_SIZE)) {
+			unsigned long flags;
+			flags = ASSIGN_writable | ASSIGN_nocache;
+			assign_domain_mmio_page(d, addr, addr,
+						PAGE_SIZE, flags);
+		}
 	}
 	return num_mds;
 }

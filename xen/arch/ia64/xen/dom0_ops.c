@@ -299,13 +299,17 @@ dom0vp_ioremap(struct domain *d, unsigned long mpaddr, unsigned long size)
     if (size == 0)
         size = PAGE_SIZE;
 
+    if (size == 0)
+        printk(XENLOG_WARNING "ioremap(): Trying to map %lx, size 0\n", mpaddr);
+
     end = PAGE_ALIGN(mpaddr + size);
 
     if (!iomem_access_permitted(d, mpaddr >> PAGE_SHIFT,
                                 (end >> PAGE_SHIFT) - 1))
         return -EPERM;
 
-    return assign_domain_mmio_page(d, mpaddr, size);
+    return assign_domain_mmio_page(d, mpaddr, mpaddr, size,
+                                   ASSIGN_writable | ASSIGN_nocache);
 }
 
 unsigned long

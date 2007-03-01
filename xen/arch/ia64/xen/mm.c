@@ -1044,9 +1044,11 @@ efi_mmio(unsigned long physaddr, unsigned long size)
 }
 
 unsigned long
-assign_domain_mmio_page(struct domain *d,
-                        unsigned long mpaddr, unsigned long size)
+assign_domain_mmio_page(struct domain *d, unsigned long mpaddr,
+                        unsigned long phys_addr, unsigned long size,
+                        unsigned long flags)
 {
+    unsigned long end = PAGE_ALIGN(mpaddr + size);
     if (size == 0) {
         gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, d, mpaddr, size);
@@ -1058,7 +1060,12 @@ assign_domain_mmio_page(struct domain *d,
 #endif
         return -EINVAL;
     }
-    assign_domain_same_page(d, mpaddr, size, ASSIGN_writable | ASSIGN_nocache);
+
+    for (mpaddr &= PAGE_MASK; mpaddr < end;
+         mpaddr += PAGE_SIZE, phys_addr += PAGE_SIZE) {
+        __assign_domain_page(d, mpaddr, phys_addr, flags);
+    }
+
     return mpaddr;
 }
 

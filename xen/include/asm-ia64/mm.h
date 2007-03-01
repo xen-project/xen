@@ -433,7 +433,7 @@ struct p2m_entry;
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr, struct p2m_entry* entry);
 extern void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr);
 extern volatile pte_t *lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr);
-extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
+extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long phys_addr, unsigned long size, unsigned long flags);
 extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);
 int domain_page_mapped(struct domain *d, unsigned long mpaddr);
 int efi_mmio(unsigned long physaddr, unsigned long size);
