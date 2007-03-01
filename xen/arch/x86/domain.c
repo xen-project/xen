@@ -630,10 +630,11 @@ int arch_set_info_guest(
         {
             cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
 
-            if ( paging_mode_refcounts(d)
-                 ? !get_page(mfn_to_page(cr3_pfn), d)
-                 : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                      PGT_base_page_table) )
+            if ( !mfn_valid(cr3_pfn) ||
+                 (paging_mode_refcounts(d)
+                  ? !get_page(mfn_to_page(cr3_pfn), d)
+                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                       PGT_base_page_table)) )
             {
                 destroy_gdt(v);
                 return -EINVAL;
@@ -648,10 +649,11 @@ int arch_set_info_guest(
 
             cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
 
-            if ( paging_mode_refcounts(d)
-                 ? !get_page(mfn_to_page(cr3_pfn), d)
-                 : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                    PGT_l3_page_table) )
+            if ( !mfn_valid(cr3_pfn) ||
+                 (paging_mode_refcounts(d)
+                  ? !get_page(mfn_to_page(cr3_pfn), d)
+                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                       PGT_l3_page_table)) )
             {
                 destroy_gdt(v);
                 return -EINVAL;
