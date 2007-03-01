@@ -227,10 +227,8 @@ __gnttab_map_grant_ref(
         return;
     }
 
-    if ( unlikely((rd = get_domain_by_id(op->dom)) == NULL) )
+    if ( unlikely((rd = rcu_lock_domain_by_id(op->dom)) == NULL) )
     {
-        if ( rd != NULL )
-            put_domain(rd);
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", op->dom);
         op->status = GNTST_bad_domain;
         return;
@@ -238,7 +236,7 @@ __gnttab_map_grant_ref(
 
     if ( unlikely((handle = get_maptrack_handle(ld->grant_table)) == -1) )
     {
-        put_domain(rd);
+        rcu_unlock_domain(rd);
         gdprintk(XENLOG_INFO, "Failed to obtain maptrack handle.\n");
         op->status = GNTST_no_device_space;
         return;
@@ -368,7 +366,7 @@ __gnttab_map_grant_ref(
     op->handle       = handle;
     op->status       = GNTST_okay;
 
-    put_domain(rd);
+    rcu_unlock_domain(rd);
     return;
 
  undo_out:
@@ -395,7 +393,7 @@ __gnttab_map_grant_ref(
     spin_unlock(&rd->grant_table->lock);
     op->status = rc;
     put_maptrack_handle(ld->grant_table, handle);
-    put_domain(rd);
+    rcu_unlock_domain(rd);
 }
 
 static long
@@ -455,7 +453,7 @@ __gnttab_unmap_grant_ref(
     ref   = map->ref;
     flags = map->flags;
 
-    if ( unlikely((rd = get_domain_by_id(dom)) == NULL) )
+    if ( unlikely((rd = rcu_lock_domain_by_id(dom)) == NULL) )
     {
         /* This can happen when a grant is implicitly unmapped. */
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", dom);
@@ -536,7 +534,7 @@ __gnttab_unmap_grant_ref(
  unmap_out:
     op->status = rc;
     spin_unlock(&rd->grant_table->lock);
-    put_domain(rd);
+    rcu_unlock_domain(rd);
 }
 
 static long
@@ -658,7 +656,7 @@ gnttab_setup_table(
         goto out;
     }
 
-    if ( unlikely((d = get_domain_by_id(dom)) == NULL) )
+    if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
     {
         gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
         op.status = GNTST_bad_domain;
@@ -689,7 +687,7 @@ gnttab_setup_table(
  setup_unlock_out:
     spin_unlock(&d->grant_table->lock);
 
-    put_domain(d);
+    rcu_unlock_domain(d);
 
  out:
     if ( unlikely(copy_to_guest(uop, &op, 1)) )
@@ -726,7 +724,7 @@ gnttab_query_size(
         goto query_out;
     }
 
-    if ( unlikely((d = get_domain_by_id(dom)) == NULL) )
+    if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
     {
         gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
         op.status = GNTST_bad_domain;
@@ -741,7 +739,7 @@ gnttab_query_size(
 
     spin_unlock(&d->grant_table->lock);
 
-    put_domain(d);
+    rcu_unlock_domain(d);
 
  query_out:
     if ( unlikely(copy_to_guest(uop, &op, 1)) )
@@ -869,7 +867,7 @@ gnttab_transfer(
         }
 
         /* Find the target domain. */
-        if ( unlikely((e = get_domain_by_id(gop.domid)) == NULL) )
+        if ( unlikely((e = rcu_lock_domain_by_id(gop.domid)) == NULL) )
         {
             gdprintk(XENLOG_INFO, "gnttab_transfer: can't find domain %d\n",
                     gop.domid);
@@ -897,7 +895,7 @@ gnttab_transfer(
                         "or is dying (%lx)\n",
                         e->tot_pages, e->max_pages, gop.ref, e->domain_flags);
             spin_unlock(&e->page_alloc_lock);
-            put_domain(e);
+            rcu_unlock_domain(e);
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
             gop.status = GNTST_general_error;
@@ -925,7 +923,7 @@ gnttab_transfer(
 
         spin_unlock(&e->grant_table->lock);
 
-        put_domain(e);
+        rcu_unlock_domain(e);
 
         gop.status = GNTST_okay;
 
@@ -1092,7 +1090,7 @@ __gnttab_copy(
         sd = current->domain;
         get_knownalive_domain(sd);
     }
-    else if ( (sd = get_domain_by_id(op->source.domid)) == NULL )
+    else if ( (sd = rcu_lock_domain_by_id(op->source.domid)) == NULL )
     {
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->source.domid);
@@ -1103,7 +1101,7 @@ __gnttab_copy(
         dd = current->domain;
         get_knownalive_domain(dd);
     }
-    else if ( (dd = get_domain_by_id(op->dest.domid)) == NULL )
+    else if ( (dd = rcu_lock_domain_by_id(op->dest.domid)) == NULL )
     {
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->dest.domid);
@@ -1173,9 +1171,9 @@ __gnttab_copy(
     if ( have_d_grant )
         __release_grant_for_copy(dd, op->dest.u.ref, 0);
     if ( sd )
-        put_domain(sd);
+        rcu_unlock_domain(sd);
     if ( dd )
-        put_domain(dd);
+        rcu_unlock_domain(dd);
     op->status = rc;
 }
 
@@ -1397,7 +1395,7 @@ gnttab_release_mappings(
                 "flags:(%x) dom:(%hu)\n",
                 handle, ref, map->flags, map->domid);
 
-        rd = get_domain_by_id(map->domid);
+        rd = rcu_lock_domain_by_id(map->domid);
         if ( rd == NULL )
         {
             /* Nothing to clear up... */
@@ -1453,7 +1451,7 @@ gnttab_release_mappings(
 
         spin_unlock(&rd->grant_table->lock);
 
-        put_domain(rd);
+        rcu_unlock_domain(rd);
 
         map->flags = 0;
     }

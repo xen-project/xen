@@ -39,13 +39,13 @@ long arch_do_domctl(
     {
         struct domain *d;
         ret = -ESRCH;
-        d = get_domain_by_id(domctl->domain);
+        d = rcu_lock_domain_by_id(domctl->domain);
         if ( d != NULL )
         {
             ret = paging_domctl(d,
                                 &domctl->u.shadow_op,
                                 guest_handle_cast(u_domctl, void));
-            put_domain(d);
+            rcu_unlock_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 
     }
@@ -62,7 +62,7 @@ long arch_do_domctl(
             break;
 
         ret = -ESRCH;
-        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
+        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
         if ( np == 0 )
@@ -72,7 +72,7 @@ long arch_do_domctl(
         else
             ret = ioports_deny_access(d, fp, fp + np - 1);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -86,7 +86,7 @@ long arch_do_domctl(
         ret = -EINVAL;
 
         if ( unlikely(!mfn_valid(mfn)) ||
-             unlikely((d = get_domain_by_id(dom)) == NULL) )
+             unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
             break;
 
         page = mfn_to_page(mfn);
@@ -119,7 +119,7 @@ long arch_do_domctl(
             put_page(page);
         }
 
-        put_domain(d);
+        rcu_unlock_domain(d);
 
         copy_to_guest(u_domctl, domctl, 1);
     }
@@ -134,13 +134,13 @@ long arch_do_domctl(
         uint32_t *arr32;
         ret = -ESRCH;
 
-        if ( unlikely((d = get_domain_by_id(dom)) == NULL) )
+        if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
             break;
 
         if ( unlikely(num > 1024) )
         {
             ret = -E2BIG;
-            put_domain(d);
+            rcu_unlock_domain(d);
             break;
         }
 
@@ -210,14 +210,14 @@ long arch_do_domctl(
 
         free_xenheap_page(arr32);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = get_domain_by_id(domctl->domain);
+        struct domain *d = rcu_lock_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         uint64_t mfn;
         struct list_head *list_ent;
@@ -248,14 +248,14 @@ long arch_do_domctl(
             domctl->u.getmemlist.num_pfns = i;
             copy_to_guest(u_domctl, domctl, 1);
 
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
     }
     break;
 
     case XEN_DOMCTL_hypercall_init:
     {
-        struct domain *d = get_domain_by_id(domctl->domain);
+        struct domain *d = rcu_lock_domain_by_id(domctl->domain);
         unsigned long gmfn = domctl->u.hypercall_init.gmfn;
         unsigned long mfn;
         void *hypercall_page;
@@ -270,7 +270,7 @@ long arch_do_domctl(
         if ( !mfn_valid(mfn) ||
              !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
         {
-            put_domain(d);
+            rcu_unlock_domain(d);
             break;
         }
 
@@ -282,7 +282,7 @@ long arch_do_domctl(
 
         put_page_and_type(mfn_to_page(mfn));
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -296,7 +296,7 @@ long arch_do_domctl(
         c.data = NULL;
         
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -317,7 +317,7 @@ long arch_do_domctl(
         if ( c.data != NULL )
             xfree(c.data);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -327,7 +327,7 @@ long arch_do_domctl(
         struct domain             *d;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -369,7 +369,7 @@ long arch_do_domctl(
         if ( c.data != NULL )
             xfree(c.data);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -378,7 +378,7 @@ long arch_do_domctl(
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
         switch ( domctl->u.address_size.size )
@@ -396,7 +396,7 @@ long arch_do_domctl(
             break;
         }
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -405,13 +405,13 @@ long arch_do_domctl(
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(domctl->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
 
         domctl->u.address_size.size = BITS_PER_GUEST_LONG(d);
 
         ret = 0;
-        put_domain(d);
+        rcu_unlock_domain(d);
 
         if ( copy_to_guest(u_domctl, domctl, 1) )
             ret = -EFAULT;

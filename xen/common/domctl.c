@@ -74,10 +74,10 @@ static inline int is_free_domid(domid_t dom)
     if ( dom >= DOMID_FIRST_RESERVED )
         return 0;
 
-    if ( (d = get_domain_by_id(dom)) == NULL )
+    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
         return 1;
 
-    put_domain(d);
+    rcu_unlock_domain(d);
     return 0;
 }
 
@@ -197,7 +197,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_setvcpucontext:
     {
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
         vcpu_guest_context_u c = { .nat = NULL };
         unsigned int vcpu = op->u.vcpucontext.vcpu;
         struct vcpu *v;
@@ -243,13 +243,13 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     svc_out:
         xfree(c.nat);
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_pausedomain:
     {
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -259,14 +259,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 domain_pause_by_systemcontroller(d);
                 ret = 0;
             }
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
     }
     break;
 
     case XEN_DOMCTL_unpausedomain:
     {
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -277,14 +277,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
             }
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
     }
     break;
 
     case XEN_DOMCTL_resumedomain:
     {
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
         struct vcpu *v;
 
         ret = -ESRCH;
@@ -294,7 +294,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             if ( test_and_clear_bit(_DOMF_shutdown, &d->domain_flags) )
                 for_each_vcpu ( d, v )
                     vcpu_wake(v);
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
     }
     break;
@@ -363,7 +363,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(op->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
         /* Needed, for example, to ensure writable p.t. state is synced. */
@@ -392,13 +392,13 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     maxvcpu_out:
         domain_unpause(d);
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_destroydomain:
     {
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
@@ -408,7 +408,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 domain_kill(d);
                 ret = 0;
             }
-            put_domain(d);
+            rcu_unlock_domain(d);
         }
     }
     break;
@@ -417,7 +417,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getvcpuaffinity:
     {
         domid_t dom = op->domain;
-        struct domain *d = get_domain_by_id(dom);
+        struct domain *d = rcu_lock_domain_by_id(dom);
         struct vcpu *v;
         cpumask_t new_affinity;
 
@@ -447,7 +447,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
 
     vcpuaffinity_out:
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -456,14 +456,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(op->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = sched_adjust(d, &op->u.scheduler_op);
         if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -510,7 +510,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu         *v;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(op->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -555,7 +555,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     getvcpucontext_out:
         xfree(c.nat);
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -566,7 +566,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct vcpu_runstate_info runstate;
 
         ret = -ESRCH;
-        if ( (d = get_domain_by_id(op->domain)) == NULL )
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
 
         ret = -EINVAL;
@@ -590,7 +590,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             ret = -EFAULT;
 
     getvcpuinfo_out:
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -600,7 +600,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned long new_max;
 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -615,7 +615,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
         spin_unlock(&d->page_alloc_lock);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -623,12 +623,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
             memcpy(d->handle, op->u.setdomainhandle.handle,
                    sizeof(xen_domain_handle_t));
-            put_domain(d);
+            rcu_unlock_domain(d);
             ret = 0;
         }
     }
@@ -638,14 +638,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
             if ( op->u.setdebugging.enable )
                 set_bit(_DOMF_debugging, &d->domain_flags);
             else
                 clear_bit(_DOMF_debugging, &d->domain_flags);
-            put_domain(d);
+            rcu_unlock_domain(d);
             ret = 0;
         }
     }
@@ -661,7 +661,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -670,7 +670,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         else
             ret = irq_deny_access(d, pirq);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -685,7 +685,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
@@ -694,7 +694,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
     }
     break;
 
@@ -703,11 +703,11 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
 
         ret = -ESRCH;
-        d = get_domain_by_id(op->domain);
+        d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
             d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
-            put_domain(d);
+            rcu_unlock_domain(d);
             ret = 0;
         }
     }
