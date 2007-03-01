@@ -185,6 +185,17 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 	send_error(conn, ENOENT);
 }
 
+void conn_delete_all_watches(struct connection *conn)
+{
+	struct watch *watch;
+
+	while ((watch = list_top(&conn->watches, struct watch, list))) {
+		list_del(&watch->list);
+		talloc_free(watch);
+		domain_watch_dec(conn);
+	}
+}
+
 #ifdef TESTING
 void dump_watches(struct connection *conn)
 {

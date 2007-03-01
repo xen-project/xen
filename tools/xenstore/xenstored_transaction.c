@@ -23,6 +23,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <time.h>
+#include <assert.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -209,6 +210,21 @@ void do_transaction_end(struct connection *conn, const char *arg)
 		generation++;
 	}
 	send_ack(conn, XS_TRANSACTION_END);
+}
+
+void conn_delete_all_transactions(struct connection *conn)
+{
+	struct transaction *trans;
+
+	while ((trans = list_top(&conn->transaction_list,
+				 struct transaction, list))) {
+		list_del(&trans->list);
+		talloc_free(trans);
+	}
+
+	assert(conn->transaction == NULL);
+
+	conn->transaction_started = 0;
 }
 
 /*

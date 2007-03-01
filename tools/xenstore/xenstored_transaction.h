@@ -33,4 +33,7 @@ void add_change_node(struct transaction *trans, const char *node,
 
 /* Return tdb context to use for this connection. */
 TDB_CONTEXT *tdb_transaction_context(struct transaction *trans);
+
+void conn_delete_all_transactions(struct connection *conn);
+
 #endif /* _XENSTORED_TRANSACTION_H */

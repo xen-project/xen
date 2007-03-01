@@ -30,4 +30,6 @@ void fire_watches(struct connection *conn, const char *name, bool recurse);
 
 void dump_watches(struct connection *conn);
 
+void conn_delete_all_watches(struct connection *conn);
+
 #endif /* _XENSTORED_WATCH_H */
