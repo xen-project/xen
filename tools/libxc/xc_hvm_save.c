@@ -339,14 +339,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
     shared_info_frame = info.shared_info_frame;
 
-    /* A cheesy test to see whether the domain contains valid state. */
-    if (ctxt.ctrlreg[3] == 0)
-    {
-        ERROR("Domain is not in a valid HVM guest state");
-        goto out;
-    }
-
-   /* cheesy sanity check */
+    /* cheesy sanity check */
     if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
         ERROR("Invalid HVM state record -- pfn count out of range: %lu",
             (info.max_memkb >> (PAGE_SHIFT - 10)));
