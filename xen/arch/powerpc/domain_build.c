@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
@@ -61,12 +61,12 @@ int construct_dom0(struct domain *d,
     struct elf_binary elf;
     struct elf_dom_parms parms;
     int rc;
-    struct vcpu *v = d->vcpu[0];
+    struct vcpu *v;
     ulong dst;
     u64 *ofh_tree;
-    uint rma_nrpages = 1 << d->arch.rma_order;
-    ulong rma_sz = rma_size(d->arch.rma_order);
-    ulong rma = page_to_maddr(d->arch.rma_page);
+    uint rma_nrpages = 1 << cpu_default_rma_order_pages();
+    ulong rma_sz;
+    ulong rma;
     ulong eomem;
     int preempt = 0;
     int vcpu;
@@ -76,12 +76,9 @@ int construct_dom0(struct domain *d,
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
-    BUG_ON(d->vcpu[0] == NULL);
 
     if (image_len == 0)
         panic("No Dom0 image supplied\n");
-
-    cpu_init_vcpu(v);
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
@@ -105,9 +102,6 @@ int construct_dom0(struct domain *d,
     parms.virt_kend = RM_MASK(parms.virt_kend, 42);
     parms.virt_entry = RM_MASK(parms.virt_entry, 42);
 
-    /* By default DOM0 is allocated all available memory. */
-    d->max_pages = ~0U;
-
     /* default is the max(1/16th of memory, CONFIG_MIN_DOM0_PAGES) */
     if (dom0_nrpages == 0) {
         dom0_nrpages = total_pages >> 4;
@@ -116,7 +110,21 @@ int construct_dom0(struct domain *d,
             dom0_nrpages = CONFIG_MIN_DOM0_PAGES;
     }
 
-    /* make sure we are at least as big as the RMA */
+    /* DOM0 has to be at least RMA size. */
+    if (dom0_nrpages < rma_nrpages) {
+        dom0_nrpages = rma_nrpages;
+        printk("Forcing DOM0 memory size to %u MiB\n", 
+                ((rma_nrpages << PAGE_SHIFT) >> 20));
+    }
+
+    d->max_pages = dom0_nrpages;
+    if (0 > allocate_rma(d, cpu_default_rma_order_pages()))
+        panic("Error allocating domain 0 RMA\n");
+
+    rma_sz = rma_size(d->arch.rma_order);
+    rma = page_to_maddr(d->arch.rma_page);
+
+    /* If we are bigger than RMA, allocate extents. */
     if (dom0_nrpages > rma_nrpages)
         dom0_nrpages = allocate_extents(d, dom0_nrpages, rma_nrpages);
 
@@ -139,15 +147,6 @@ int construct_dom0(struct domain *d,
     eomem = ((ulong)d->shared_info) - rma;
     printk("shared_info: 0x%lx,%p\n", eomem, d->shared_info);
 
-    /* OF usually sits here:
-     *   - Linux needs it to be loaded before the vmlinux or initrd
-     *   - AIX demands it to be @ 32M.
-     */
-    dst = (32 << 20);
-
-    /* put stack below everything */
-    v->arch.ctxt.gprs[1] = dst - STACK_FRAME_OVERHEAD;
-
     /* startup secondary processors */
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();
@@ -161,13 +160,26 @@ int construct_dom0(struct domain *d,
 #endif
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
 
-    for (vcpu = 1; vcpu < opt_dom0_max_vcpus; vcpu++) {
+    for (vcpu = 0; vcpu < opt_dom0_max_vcpus; vcpu++) {
         if (NULL == alloc_vcpu(dom0, vcpu, vcpu))
             panic("Error creating domain 0 vcpu %d\n", vcpu);
         /* for now we pin Dom0 VCPUs to their coresponding CPUs */
         if (cpu_isset(vcpu, cpu_online_map))
             dom0->vcpu[vcpu]->cpu_affinity = cpumask_of_cpu(vcpu);
     }
+
+    /* Init VCPU0. */
+    v = d->vcpu[0];
+    cpu_init_vcpu(v);
+
+    /* OF usually sits here:
+     *   - Linux needs it to be loaded before the vmlinux or initrd
+     *   - AIX demands it to be @ 32M.
+     */
+    dst = (32 << 20);
+
+    /* Put stack below everything. */
+    v->arch.ctxt.gprs[1] = dst - STACK_FRAME_OVERHEAD;
 
     /* copy relative to Xen */
     dst += rma;

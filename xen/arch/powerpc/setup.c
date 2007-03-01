@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  *          Amos Waterland <apw@us.ibm.com>
@@ -375,11 +375,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
     dom0 = domain_create(0, 0);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
-    dom0->max_pages = ~0U;
-    if (0 > allocate_rma(dom0, cpu_default_rma_order_pages()))
-        panic("Error allocating domain 0 RMA\n");
-    if (NULL == alloc_vcpu(dom0, 0, 0))
-        panic("Error creating domain 0 vcpu 0\n");
 
     /* The Interrupt Controller will route everything to CPU 0 so we
      * need to make sure Dom0's vVCPU 0 is pinned to the CPU */
