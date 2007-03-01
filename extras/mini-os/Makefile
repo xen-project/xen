@@ -4,8 +4,6 @@
 # Makefile and a arch.mk.
 #
 
-pae ?= n
-
 XEN_ROOT = ../..
 include $(XEN_ROOT)/Config.mk
 
@@ -35,6 +33,7 @@ TARGET_ARCH_DIR := arch/$(TARGET_ARCH_FAM)
 export TARGET_ARCH
 export TARGET_ARCH_DIR
 export TARGET_ARCH_FAM
+export XEN_TARGET_X86_PAE 
 
 # This is used for architecture specific links.
 # This can be overwritten from arch specific rules.
