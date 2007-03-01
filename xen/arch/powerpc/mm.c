@@ -384,8 +384,8 @@ int allocate_rma(struct domain *d, unsigned int order)
         clear_page((void *)page_to_maddr(&d->arch.rma_page[i]));
     }
 
-    d->shared_info = (shared_info_t *)
-        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
+    /* shared_info uses last page of RMA */
+    d->shared_info = (shared_info_t *) (rma_base + rma_sz - PAGE_SIZE);
 
     /* if there are already running vcpus, adjust v->vcpu_info */
     /* XXX untested */

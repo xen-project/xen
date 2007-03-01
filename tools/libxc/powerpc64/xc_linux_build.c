@@ -33,7 +33,6 @@
 #include <xc_private.h>
 #include <xg_private.h>
 #include <xenctrl.h>
-#include <xen/arch-powerpc.h>
 
 #include "flatdevtree_env.h"
 #include "flatdevtree.h"
@@ -256,10 +255,9 @@ int xc_linux_build(int xc_handle,
     }
 
     /* determine shared_info, console, and store paddr */
-    shared_info_paddr = (rma_pages << PAGE_SHIFT) -
-                        (RMA_SHARED_INFO * PAGE_SIZE);
-    console_paddr = (rma_pages << PAGE_SHIFT) - (RMA_CONSOLE * PAGE_SIZE);
-    store_paddr = (rma_pages << PAGE_SHIFT) - (RMA_STORE * PAGE_SIZE);
+    shared_info_paddr = (rma_pages << PAGE_SHIFT) - PAGE_SIZE;
+    console_paddr = shared_info_paddr - PAGE_SIZE;
+    store_paddr = console_paddr - PAGE_SIZE;
 
     /* map paddrs to mfns */
     *store_mfn = page_array[(xen_pfn_t)(store_paddr >> PAGE_SHIFT)];

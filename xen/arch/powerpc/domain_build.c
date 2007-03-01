@@ -67,10 +67,12 @@ int construct_dom0(struct domain *d,
     uint rma_nrpages = 1 << d->arch.rma_order;
     ulong rma_sz = rma_size(d->arch.rma_order);
     ulong rma = page_to_maddr(d->arch.rma_page);
-    start_info_t *si;
     ulong eomem;
     int preempt = 0;
     int vcpu;
+    ulong mod_start = 0;
+    ulong mod_len = 0;
+    ulong shared_info_addr;
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -134,24 +136,8 @@ int construct_dom0(struct domain *d,
 
     ASSERT( image_len < rma_sz );
 
-    si = (start_info_t *)(rma_addr(&d->arch, RMA_START_INFO) + rma);
-    printk("xen_start_info: %p\n", si);
-
-    snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-powerpc%d%s",
-            xen_major_version(), xen_minor_version(), BITS_PER_LONG, "HV");
-    si->flags = SIF_PRIVILEGED | SIF_INITDOMAIN;
-
-    si->shared_info = ((ulong)d->shared_info) - rma;
-    printk("shared_info: 0x%lx,%p\n", si->shared_info, d->shared_info);
-
-    eomem = si->shared_info;
-
-    /* number of pages accessible */
-    si->nr_pages = rma_sz >> PAGE_SHIFT;
-
-    si->pt_base = 0;
-    si->nr_pt_frames = 0;
-    si->mfn_list = 0;
+    eomem = ((ulong)d->shared_info) - rma;
+    printk("shared_info: 0x%lx,%p\n", eomem, d->shared_info);
 
     /* OF usually sits here:
      *   - Linux needs it to be loaded before the vmlinux or initrd
@@ -217,14 +203,12 @@ int construct_dom0(struct domain *d,
         printk("loading initrd: 0x%lx, 0x%lx\n", dst, initrd_len);
         memcpy((void *)dst, (void *)initrd_start, initrd_len);
 
-        si->mod_start = dst - rma;
-        si->mod_len = image_len;
+        mod_start = dst - rma;
+        mod_len = image_len;
 
         dst = ALIGN_UP(dst + initrd_len, PAGE_SIZE);
     } else {
         printk("no initrd\n");
-        si->mod_start = 0;
-        si->mod_len = 0;
     }
 
     if (elf_64bit(&elf)) {
@@ -233,8 +217,8 @@ int construct_dom0(struct domain *d,
         v->arch.ctxt.msr = 0;
     }
     v->arch.ctxt.gprs[2] = 0;
-    v->arch.ctxt.gprs[3] = si->mod_start;
-    v->arch.ctxt.gprs[4] = si->mod_len;
+    v->arch.ctxt.gprs[3] = mod_start;
+    v->arch.ctxt.gprs[4] = mod_len;
 
 	printk("dom0 initial register state:\n"
 			"    pc %016lx msr %016lx\n"
@@ -248,11 +232,10 @@ int construct_dom0(struct domain *d,
 			v->arch.ctxt.gprs[4],
 			v->arch.ctxt.gprs[5]);
 
-    memset(si->cmd_line, 0, sizeof(si->cmd_line));
-    if ( cmdline != NULL )
-        strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
+    /* convert xen pointer shared_info into guest physical */
+    shared_info_addr = (ulong)d->shared_info - page_to_maddr(d->arch.rma_page);
 
-    ofd_dom0_fixup(d, *ofh_tree + rma, si);
+    ofd_dom0_fixup(d, *ofh_tree + rma, cmdline, shared_info_addr);
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 

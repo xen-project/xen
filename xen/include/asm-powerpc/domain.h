@@ -109,9 +109,4 @@ extern void load_float(struct vcpu *);
 
 #define rma_size(rma_order) (1UL << ((rma_order) + PAGE_SHIFT))
 
-static inline ulong rma_addr(struct arch_domain *ad, int type)
-{
-    return rma_size(ad->rma_order) - (type * PAGE_SIZE);
-}
-
 #endif

@@ -28,7 +28,8 @@ extern ulong oftree_len;
 extern ulong oftree_end;
 extern ofdn_t ofd_boot_cpu;
 
-extern int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si);
+extern int ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
+                          ulong shared_info);
 extern void ofd_memory_props(void *m, struct domain *d);
 
 extern int firmware_image_start[0];
