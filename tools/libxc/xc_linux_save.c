@@ -696,6 +696,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long needed_to_fix = 0;
     unsigned long total_sent    = 0;
 
+    uint64_t vcpumap = 1ULL;
 
     /* If no explicit control parameters given, use defaults */
     if(!max_iters)
@@ -716,24 +717,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         return 1;
     }
 
-    if (lock_pages(&ctxt, sizeof(ctxt))) {
-        ERROR("Unable to lock ctxt");
-        return 1;
-    }
-
-    /* Only have to worry about vcpu 0 even for SMP */
     if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
         ERROR("Could not get vcpu context");
         goto out;
     }
     shared_info_frame = info.shared_info_frame;
-
-    /* A cheesy test to see whether the domain contains valid state. */
-    if (ctxt.ctrlreg[3] == 0)
-    {
-        ERROR("Domain is not in a valid Linux guest OS state");
-        goto out;
-    }
 
     /* Map the shared info frame */
     if(!(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
@@ -1194,6 +1182,32 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     DPRINTF("All memory is saved\n");
 
+    {
+        struct {
+            int minustwo;
+            int max_vcpu_id;
+            uint64_t vcpumap;
+        } chunk = { -2, info.max_vcpu_id };
+
+        if (info.max_vcpu_id >= 64) {
+            ERROR("Too many VCPUS in guest!");
+            goto out;
+        }
+
+        for (i = 1; i <= info.max_vcpu_id; i++) {
+            xc_vcpuinfo_t vinfo;
+            if ((xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) &&
+                vinfo.online)
+                vcpumap |= 1ULL << i;
+        }
+
+        chunk.vcpumap = vcpumap;
+        if(!write_exact(io_fd, &chunk, sizeof(chunk))) {
+            ERROR("Error when writing to state file (errno %d)", errno);
+            goto out;
+        }
+    }
+
     /* Zero terminate */
     i = 0;
     if (!write_exact(io_fd, &i, sizeof(int))) {
@@ -1240,30 +1254,43 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /* Canonicalise each GDT frame number. */
-    for ( i = 0; (512*i) < ctxt.gdt_ents; i++ ) {
-        if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
-            ERROR("GDT frame is not in range of pseudophys map");
+    for (i = 0; i <= info.max_vcpu_id; i++) {
+        if (!(vcpumap & (1ULL << i)))
+            continue;
+
+        if ((i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt)) {
+            ERROR("No context for VCPU%d", i);
+            goto out;
+        }
+
+        /* Canonicalise each GDT frame number. */
+        for ( j = 0; (512*j) < ctxt.gdt_ents; j++ ) {
+            if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[j]) ) {
+                ERROR("GDT frame is not in range of pseudophys map");
+                goto out;
+            }
+        }
+
+        /* Canonicalise the page table base pointer. */
+        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
+            ERROR("PT base is not in range of pseudophys map");
+            goto out;
+        }
+        ctxt.ctrlreg[3] = 
+            xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
+
+        if (!write_exact(io_fd, &ctxt, sizeof(ctxt))) {
+            ERROR("Error when writing to state file (1) (errno %d)", errno);
             goto out;
         }
     }
-
-    /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
-        ERROR("PT base is not in range of pseudophys map");
-        goto out;
-    }
-    ctxt.ctrlreg[3] = 
-        xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
 
     /*
      * Reset the MFN to be a known-invalid value. See map_frame_list_list().
      */
     memcpy(page, live_shinfo, PAGE_SIZE);
     ((shared_info_t *)page)->arch.pfn_to_mfn_frame_list_list = 0;
-
-    if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
-        !write_exact(io_fd, page, PAGE_SIZE)) {
+    if (!write_exact(io_fd, page, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1) (errno %d)", errno);
         goto out;
     }
