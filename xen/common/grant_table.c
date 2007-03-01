@@ -1086,26 +1086,16 @@ __gnttab_copy(
                  "only allow copy-by-mfn for DOMID_SELF.\n");
 
     if ( op->source.domid == DOMID_SELF )
-    {
-        sd = current->domain;
-        get_knownalive_domain(sd);
-    }
+        sd = rcu_lock_current_domain();
     else if ( (sd = rcu_lock_domain_by_id(op->source.domid)) == NULL )
-    {
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->source.domid);
-    }
 
     if ( op->dest.domid == DOMID_SELF )
-    {
-        dd = current->domain;
-        get_knownalive_domain(dd);
-    }
+        dd = rcu_lock_current_domain();
     else if ( (dd = rcu_lock_domain_by_id(op->dest.domid)) == NULL )
-    {
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->dest.domid);
-    }
 
     if ( src_is_gref )
     {

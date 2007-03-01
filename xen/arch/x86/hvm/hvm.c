@@ -836,20 +836,14 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if ( a.domid == DOMID_SELF )
-        {
-            get_knownalive_domain(current->domain);
-            d = current->domain;
-        }
+            d = rcu_lock_current_domain();
         else if ( IS_PRIV(current->domain) )
-        {
             d = rcu_lock_domain_by_id(a.domid);
-            if ( d == NULL )
-                return -ESRCH;
-        }
         else
-        {
             return -EPERM;
-        }
+
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )

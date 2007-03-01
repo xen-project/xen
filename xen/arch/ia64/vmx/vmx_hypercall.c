@@ -122,8 +122,7 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if (a.domid == DOMID_SELF) {
-            get_knownalive_domain(current->domain);
-            d = current->domain;
+            d = get_current_domain();
         }
         else if (IS_PRIV(current->domain)) {
             d = get_domain_by_id(a.domid);

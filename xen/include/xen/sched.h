@@ -258,6 +258,14 @@ static inline void get_knownalive_domain(struct domain *d)
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
 
+/* Obtain a reference to the currently-running domain. */
+static inline struct domain *get_current_domain(void)
+{
+    struct domain *d = current->domain;
+    get_knownalive_domain(d);
+    return d;
+}
+
 struct domain *domain_create(domid_t domid, unsigned int domcr_flags);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
 #define _DOMCRF_hvm 0
@@ -282,6 +290,12 @@ struct domain *rcu_lock_domain_by_id(domid_t dom);
 static inline void rcu_unlock_domain(struct domain *d)
 {
     rcu_read_unlock(&domlist_read_lock);
+}
+
+static inline struct domain *rcu_lock_current_domain(void)
+{
+    rcu_read_lock(&domlist_read_lock);
+    return current->domain;
 }
 
 struct domain *get_domain_by_id(domid_t dom);

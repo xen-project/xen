@@ -434,7 +434,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             spin_unlock(&d2->evtchn_lock);
         put_domain(d2);
     }
-    
+
     spin_unlock(&d1->evtchn_lock);
 
     return rc;

@@ -80,11 +80,15 @@ void share_xen_page_with_guest(
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
     ASSERT(page->count_info == 0);
-    page->count_info |= PGC_allocated | 1;
 
-    if ( unlikely(d->xenheap_pages++ == 0) )
-        get_knownalive_domain(d);
-    list_add_tail(&page->list, &d->xenpage_list);
+    /* Only add to the allocation list if the domain isn't dying. */
+    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    {
+        page->count_info |= PGC_allocated | 1;
+        if ( unlikely(d->xenheap_pages++ == 0) )
+            get_knownalive_domain(d);
+        list_add_tail(&page->list, &d->xenpage_list);
+    }
 
     spin_unlock(&d->page_alloc_lock);
 }

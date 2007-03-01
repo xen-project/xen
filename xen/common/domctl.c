@@ -484,14 +484,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 break;
         }
 
-        if ( (d == NULL) || !get_domain(d) )
+        if ( d == NULL )
         {
             rcu_read_unlock(&domlist_read_lock);
             ret = -ESRCH;
             break;
         }
-
-        rcu_read_unlock(&domlist_read_lock);
 
         getdomaininfo(d, &op->u.getdomaininfo);
 
@@ -499,7 +497,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( copy_to_guest(u_domctl, op, 1) )
             ret = -EFAULT;
 
-        put_domain(d);
+        rcu_read_unlock(&domlist_read_lock);
     }
     break;
 
