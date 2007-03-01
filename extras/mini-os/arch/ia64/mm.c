@@ -130,3 +130,7 @@ map_frames(unsigned long* frames, unsigned long n)
 	return (void*) __va(frames[0] << PAGE_SHIFT);
 }
 
+void arch_init_p2m(unsigned long max_pfn)
+{
+    printk("Warn: p2m map not implemented.\n");
+}

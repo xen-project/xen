@@ -55,6 +55,7 @@ static __inline__ int get_order(unsigned long size)
 
 void arch_init_demand_mapping_area(unsigned long max_pfn);
 void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p);
+void arch_init_p2m(unsigned long max_pfn_p);
 
 void *map_frames(unsigned long *f, unsigned long n);
 
