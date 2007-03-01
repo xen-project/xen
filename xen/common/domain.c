@@ -236,7 +236,7 @@ struct domain *get_domain_by_id(domid_t dom)
 }
 
 
-struct domain *find_domain_rcu_lock(domid_t dom)
+struct domain *rcu_lock_domain_by_id(domid_t dom)
 {
     struct domain *d;
 
