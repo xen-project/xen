@@ -2966,7 +2966,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = get_domain_by_id(xatp.domid)) == NULL )
+        else if ( (d = rcu_lock_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
         switch ( xatp.space )
@@ -2993,7 +2993,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         if ( !paging_mode_translate(d) || (mfn == 0) )
         {
-            put_domain(d);
+            rcu_unlock_domain(d);
             return -EINVAL;
         }
 
@@ -3021,7 +3021,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         UNLOCK_BIGLOCK(d);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
 
         break;
     }
@@ -3045,14 +3045,14 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = get_domain_by_id(fmap.domid)) == NULL )
+        else if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
             return -ESRCH;
 
         rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,
                              fmap.map.nr_entries) ? -EFAULT : 0;
         d->arch.nr_e820 = fmap.map.nr_entries;
 
-        put_domain(d);
+        rcu_unlock_domain(d);
         return rc;
     }
 

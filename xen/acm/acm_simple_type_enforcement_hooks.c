@@ -230,7 +230,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                         __func__, d->domain_id, i, sha_copy.flags, sha_copy.domid, 
                         (unsigned long)sha_copy.frame);
                 rdomid = sha_copy.domid;
-                if ((rdom = get_domain_by_id(rdomid)) == NULL) {
+                if ((rdom = rcu_lock_domain_by_id(rdomid)) == NULL) {
                     spin_unlock(&d->grant_table->lock);
                     printkd("%s: domain not found ERROR!\n", __func__);
                     goto out;
@@ -239,7 +239,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                                       (struct acm_ssid_domain *)(rdom->ssid));
                 ste_rssidref = ste_rssid->ste_ssidref;
-                put_domain(rdom);
+                rcu_unlock_domain(rdom);
                 if (!have_common_type(ste_ssidref, ste_rssidref)) {
                     spin_unlock(&d->grant_table->lock);
                     printkd("%s: Policy violation in grant table sharing domain %x -> domain %x.\n",
@@ -494,8 +494,8 @@ ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
     if (id1 == DOMID_SELF) id1 = current->domain->domain_id;
     if (id2 == DOMID_SELF) id2 = current->domain->domain_id;
 
-    subj = get_domain_by_id(id1);
-    obj  = get_domain_by_id(id2);
+    subj = rcu_lock_domain_by_id(id1);
+    obj  = rcu_lock_domain_by_id(id2);
     if ((subj == NULL) || (obj == NULL)) {
         ret = ACM_ACCESS_DENIED;
         goto out;
@@ -517,9 +517,9 @@ ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
     }
   out:
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     if (subj != NULL)
-        put_domain(subj);
+        rcu_unlock_domain(subj);
     return ret;
 }
 
@@ -539,7 +539,7 @@ ste_pre_eventchannel_interdomain(domid_t id)
     if (id == DOMID_SELF) id = current->domain->domain_id;
 
     subj = current->domain;
-    obj  = get_domain_by_id(id);
+    obj  = rcu_lock_domain_by_id(id);
     if (obj == NULL) {
         ret = ACM_ACCESS_DENIED;
         goto out;
@@ -563,7 +563,7 @@ ste_pre_eventchannel_interdomain(domid_t id)
     }
  out:
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     return ret;
 }
 
@@ -582,7 +582,7 @@ ste_pre_grant_map_ref (domid_t id) {
     }
     atomic_inc(&ste_bin_pol.gt_eval_count);
     subj = current->domain;
-    obj = get_domain_by_id(id);
+    obj = rcu_lock_domain_by_id(id);
 
     if (share_common_type(subj, obj)) {
         cache_result(subj, obj);
@@ -593,7 +593,7 @@ ste_pre_grant_map_ref (domid_t id) {
         ret = ACM_ACCESS_DENIED;
     }
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     return ret;
 }
 
@@ -620,7 +620,7 @@ ste_pre_grant_setup (domid_t id) {
     }
     /* b) check types */
     subj = current->domain;
-    obj = get_domain_by_id(id);
+    obj = rcu_lock_domain_by_id(id);
 
     if (share_common_type(subj, obj)) {
         cache_result(subj, obj);
@@ -630,7 +630,7 @@ ste_pre_grant_setup (domid_t id) {
         ret = ACM_ACCESS_DENIED;
     }
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     return ret;
 }
 

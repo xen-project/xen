@@ -711,7 +711,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -734,7 +734,7 @@ static int hvmop_set_pci_intx_level(
     }
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -754,7 +754,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -777,7 +777,7 @@ static int hvmop_set_isa_irq_level(
     }
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -797,7 +797,7 @@ static int hvmop_set_pci_link_route(
     if ( (op.link > 3) || (op.isa_irq > 15) )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -809,7 +809,7 @@ static int hvmop_set_pci_link_route(
     hvm_set_pci_link_route(d, op.link, op.isa_irq);
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -842,7 +842,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
         else if ( IS_PRIV(current->domain) )
         {
-            d = get_domain_by_id(a.domid);
+            d = rcu_lock_domain_by_id(a.domid);
             if ( d == NULL )
                 return -ESRCH;
         }
@@ -899,7 +899,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
 
     param_fail:
-        put_domain(d);
+        rcu_unlock_domain(d);
         break;
     }
 

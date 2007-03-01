@@ -501,9 +501,12 @@ int arch_set_info_guest(
     unsigned long flags;
     int i, rc = 0, compat;
 
-    /* The context is a compat-mode one if the target domain is compat-mode;
-     * we expect the tools to DTRT even in compat-mode callers. */
-    compat = IS_COMPAT(d);
+    /*
+     * HVM domain builder always builds caller-bitsize vcpu context.
+     * The PV builder is smarter and builds the appropriate type of context for
+     * the target domain. So the compat check here differs in the two cases.
+     */
+    compat = is_hvm_domain(d) ? IS_COMPAT(current->domain) : IS_COMPAT(d);
 
 #ifdef CONFIG_COMPAT
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))

@@ -504,7 +504,7 @@ static inline void
 buffered_pio_write(IDEState *s, uint32_t addr, int size)
 {
     struct pio_buffer *piobuf = piobuf_by_addr(addr);
-    uint32_t data_end;
+    int data_end;
 
     if (!piobuf)
         return;
@@ -523,7 +523,7 @@ static inline void
 buffered_pio_read(IDEState *s, uint32_t addr, int size)
 {
     struct pio_buffer *piobuf = piobuf_by_addr(addr);
-    uint32_t data_end;
+    int data_end;
 
     if (!piobuf)
         return;
