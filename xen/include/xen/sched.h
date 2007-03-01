@@ -292,10 +292,15 @@ static inline void rcu_unlock_domain(struct domain *d)
     rcu_read_unlock(&domlist_read_lock);
 }
 
+static inline struct domain *rcu_lock_domain(struct domain *d)
+{
+    rcu_read_lock(d);
+    return d;
+}
+
 static inline struct domain *rcu_lock_current_domain(void)
 {
-    rcu_read_lock(&domlist_read_lock);
-    return current->domain;
+    return rcu_lock_domain(current->domain);
 }
 
 struct domain *get_domain_by_id(domid_t dom);

@@ -1853,7 +1853,7 @@ static void process_deferred_ops(void)
 
     if ( unlikely(info->foreign != NULL) )
     {
-        put_domain(info->foreign);
+        rcu_unlock_domain(info->foreign);
         info->foreign = NULL;
     }
 }
@@ -1885,8 +1885,7 @@ static int set_foreigndom(domid_t domid)
         switch ( domid )
         {
         case DOMID_IO:
-            get_knownalive_domain(dom_io);
-            info->foreign = dom_io;
+            info->foreign = rcu_lock_domain(dom_io);
             break;
         default:
             MEM_LOG("Dom %u cannot set foreign dom", d->domain_id);
@@ -1896,18 +1895,16 @@ static int set_foreigndom(domid_t domid)
     }
     else
     {
-        info->foreign = e = get_domain_by_id(domid);
+        info->foreign = e = rcu_lock_domain_by_id(domid);
         if ( e == NULL )
         {
             switch ( domid )
             {
             case DOMID_XEN:
-                get_knownalive_domain(dom_xen);
-                info->foreign = dom_xen;
+                info->foreign = rcu_lock_domain(dom_xen);
                 break;
             case DOMID_IO:
-                get_knownalive_domain(dom_io);
-                info->foreign = dom_io;
+                info->foreign = rcu_lock_domain(dom_io);
                 break;
             default:
                 MEM_LOG("Unknown domain '%u'", domid);
@@ -2043,6 +2040,12 @@ int do_mmuext_op(
             /* A page is dirtied when its pin status is set. */
             mark_dirty(d, mfn);
            
+            /* We can race domain destruction (domain_relinquish_resources). */
+            if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) &&
+                 test_bit(_DOMF_dying, &FOREIGNDOM->domain_flags) &&
+                 test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+                put_page_and_type(page);
+
             break;
 
         case MMUEXT_UNPIN_TABLE:
