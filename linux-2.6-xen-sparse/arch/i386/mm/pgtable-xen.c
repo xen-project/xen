@@ -671,9 +671,6 @@ void mm_pin_all(void)
 {
 	struct page *page;
 
-	/* Only pgds on the pgd_list please: none hidden in the slab cache. */
-	kmem_cache_shrink(pgd_cache);
-
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
 
