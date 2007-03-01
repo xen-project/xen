@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
  */
 
 #ifndef _ASM_SHADOW_H_
@@ -58,4 +59,8 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
 {
     return (1ULL << (d->arch.htab.order + PAGE_SHIFT)) >> 20;
 }
+
+#define guest_physmap_max_mem_pages(d, n) (0)
+
 #endif
+

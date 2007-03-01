@@ -121,6 +121,8 @@ static inline void shadow_remove_all_shadows(struct vcpu *v, mfn_t gmfn)
     sh_remove_shadows(v, gmfn, 0 /* Be thorough */, 1 /* Must succeed */);
 }
 
+#define guest_physmap_max_mem_pages(d, n) (0)
+
 #endif /* _XEN_SHADOW_H */
 
 /*

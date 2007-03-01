@@ -61,6 +61,8 @@ shadow_mark_page_dirty(struct domain *d, unsigned long gpfn)
         return 0;
 }
 
+#define guest_physmap_max_mem_pages(d, n) (0)
+
 #endif // _XEN_SHADOW_H
 
 /*
