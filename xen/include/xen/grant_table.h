@@ -120,4 +120,26 @@ static inline unsigned int nr_grant_entries(struct grant_table *gt)
     return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_t);
 }
 
+static inline unsigned int
+num_act_frames_from_sha_frames(const unsigned int num)
+{
+    /* How many frames are needed for the active grant table,
+     * given the size of the shared grant table?
+     *
+     * act_per_page = PAGE_SIZE / sizeof(active_grant_entry_t);
+     * sha_per_page = PAGE_SIZE / sizeof(grant_entry_t);
+     * num_sha_entries = num * sha_per_page;
+     * num_act_frames = (num_sha_entries + (act_per_page-1)) / act_per_page;
+     */
+    return ((num * (PAGE_SIZE / sizeof(grant_entry_t))) +
+            ((PAGE_SIZE / sizeof(struct active_grant_entry))-1))
+           / (PAGE_SIZE / sizeof(struct active_grant_entry));
+}
+
+static inline unsigned int
+nr_active_grant_frames(struct grant_table *gt)
+{
+    return num_act_frames_from_sha_frames(nr_grant_frames(gt));
+}
+
 #endif /* __XEN_GRANT_TABLE_H__ */
