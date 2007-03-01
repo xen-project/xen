@@ -501,11 +501,9 @@ int arch_set_info_guest(
     unsigned long flags;
     int i, rc = 0, compat;
 
-    /* The context is a compat-mode one if *either* the calling domain 
-     * or the target domain is compat-mode: if the caller is compat, it
-     * won't know to make a native context, and if the target is compat,
-     * the tools will have made a compat-mode context for it. */
-    compat = IS_COMPAT(d) || IS_COMPAT(current->domain);
+    /* The context is a compat-mode one if the target domain is compat-mode;
+     * we expect the tools to DTRT even in compat-mode callers. */
+    compat = IS_COMPAT(d);
 
 #ifdef CONFIG_COMPAT
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
