@@ -192,6 +192,19 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     DPRINTF("xc_linux_restore start: max_pfn = %lx\n", max_pfn);
 
+    /*
+     * XXX For now, 32bit dom0's can only save/restore 32bit domUs
+     * on 64bit hypervisors.
+     */
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = dom;
+    domctl.cmd    = XEN_DOMCTL_set_address_size;
+    domctl.u.address_size.size = sizeof(unsigned long) * 8;
+    rc = do_domctl(xc_handle, &domctl);
+    if ( rc != 0 ) {
+	ERROR("Unable to set guest address size.");
+	goto out;
+    }
 
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
