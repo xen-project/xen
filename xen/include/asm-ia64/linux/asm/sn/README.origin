@@ -18,7 +18,8 @@ shubio.h		-> linux/include/asm-ia64/sn/shubio.h
 simulator.h		-> linux/include/asm-ia64/sn/simulator.h
 sn_cpuid.h		-> linux/include/asm-ia64/sn/sn_cpuid.h
 sn_feature_sets.h	-> linux/include/asm-ia64/sn/sn_feature_sets.h
-sn_sal.h		-> linux/include/asm-ia64/sn/sn_sal.h
 tiocp.h			-> linux/include/asm-ia64/sn/tiocp.h
 xbow.h			-> linux/arch/ia64/sn/include/xtalk/xbow.h
 xwidgetdev.h		-> linux/arch/ia64/sn/include/xtalk/xwidgetdev.h
+# from 2.6.20
+sn_sal.h		-> linux/include/asm-ia64/sn/sn_sal.h
