@@ -488,14 +488,14 @@ class XendDomain:
         @type domid: int or string
         @return: Found domain.
         @rtype: XendDomainInfo
-        @raise XendError: If domain is not found.
+        @raise XendInvalidDomain: If domain is not found.
         """
         self.domains_lock.acquire()
         try:
             self._refresh(refresh_shutdown = False)
             dom = self.domain_lookup_nr(domid)
             if not dom:
-                raise XendError("No domain named '%s'." % str(domid))
+                raise XendInvalidDomain("No domain named '%s'." % str(domid))
             return dom
         finally:
             self.domains_lock.release()

@@ -43,8 +43,6 @@ def fixup_sxpr(sexpr):
 
 def lookup(domid):
     info = XendDomain.instance().domain_lookup(domid)
-    if not info:
-        raise XendInvalidDomain(str(domid))
     return info
 
 def dispatch(domid, fn, args):
