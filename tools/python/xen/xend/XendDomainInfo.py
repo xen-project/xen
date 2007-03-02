@@ -780,7 +780,8 @@ class XendDomainInfo:
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
-            'memory/target':      str(self.info['memory_static_min'] * 1024)
+            'memory/target':      str(self.info['memory_static_min'] * 1024),
+            'control/platform-feature-multiprocessor-suspend': str(1)
             }
 
         def f(n, v):
