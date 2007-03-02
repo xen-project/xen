@@ -97,6 +97,10 @@ class XendNode:
         for u in self.cpus.keys():
             log.error(self.cpus[u])
             number = self.cpus[u]['number']
+            # We can run off the end of the cpuinfo list if domain0 does not
+            # have #vcpus == #pcpus. In that case we just replicate pcpu0 info.
+            if not cpuinfo.has_key(number):
+                number = 0
             log.error(number)
             log.error(cpuinfo)
             self.cpus[u].update(
