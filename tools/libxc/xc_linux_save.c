@@ -34,7 +34,7 @@ static unsigned long max_mfn;
 /* virtual starting address of the hypervisor */
 static unsigned long hvirt_start;
 
-/* #levels of page tables used by the currrent guest */
+/* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
 /* total number of pages used by the current guest */
@@ -491,7 +491,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** reserved hypervisor mappings. This depends on the current
     ** page table type as well as the number of paging levels.
     */
-    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
+    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2) ? 4 : 8);
 
     if (pt_levels == 2 && type == XEN_DOMCTL_PFINFO_L2TAB)
         xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT);
@@ -1278,6 +1278,18 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
         ctxt.ctrlreg[3] = 
             xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
+
+        /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
+        if ( (pt_levels == 4) && ctxt.ctrlreg[1] )
+        {
+            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[1])) ) {
+                ERROR("PT base is not in range of pseudophys map");
+                goto out;
+            }
+            /* Least-significant bit means 'valid PFN'. */
+            ctxt.ctrlreg[1] = 1 |
+                xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[1])));
+        }
 
         if (!write_exact(io_fd, &ctxt, sizeof(ctxt))) {
             ERROR("Error when writing to state file (1) (errno %d)", errno);
