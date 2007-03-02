@@ -81,15 +81,6 @@ struct page_info
 
 };
 
-struct page_extents {
-    /* Each frame can be threaded onto a doubly-linked list. */
-    struct list_head pe_list;
-
-    /* page extent */
-    struct page_info *pg;
-    uint order;
-};
-
  /* The following page types are MUTUALLY EXCLUSIVE. */
 #define PGT_none            (0UL<<29) /* no special uses of this page */
 #define PGT_RMA             (1UL<<29) /* This page is an RMA page? */
@@ -145,6 +136,7 @@ extern struct page_info *frame_table;
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
+void init_machine_to_phys_table(void);
 void free_rma_check(struct page_info *page);
 
 static inline void put_page(struct page_info *page)
@@ -226,14 +218,12 @@ typedef struct {
 } vm_assist_info_t;
 extern vm_assist_info_t vm_assist_info[];
 
-
-/* hope that accesses to this will fail spectacularly */
-#undef machine_to_phys_mapping
+extern unsigned long *machine_phys_mapping;
+#define machine_to_phys_mapping  (machine_phys_mapping)
 #define INVALID_M2P_ENTRY        (~0UL)
 
-/* do nothing, its all calculated */
-#define set_gpfn_from_mfn(mfn, pfn) do { } while (0)
-#define get_gpfn_from_mfn(mfn) (mfn)
+#define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
+#define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 extern unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn);
 
@@ -243,7 +233,6 @@ extern unsigned long paddr_to_maddr(unsigned long paddr);
 #define INVALID_MFN (~0U)
 
 #define PFN_TYPE_NONE 0
-#define PFN_TYPE_RMA 1
 #define PFN_TYPE_LOGICAL 2
 #define PFN_TYPE_IO 3
 #define PFN_TYPE_FOREIGN 4
@@ -258,7 +247,6 @@ static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gmfn)
     mfn = pfn2mfn(d, gmfn, &mtype);
     if (mfn != INVALID_MFN) {
         switch (mtype) {
-        case PFN_TYPE_RMA:
         case PFN_TYPE_LOGICAL:
             break;
         default:
@@ -280,10 +268,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 extern int allocate_rma(struct domain *d, unsigned int order_pages);
 extern uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages);
-extern void free_extents(struct domain *d);
-
-extern int arch_domain_add_extent(struct domain *d, struct page_info *page,
-        int order);
 
 extern int steal_page(struct domain *d, struct page_info *page,
                         unsigned int memflags);

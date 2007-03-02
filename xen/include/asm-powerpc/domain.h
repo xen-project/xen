@@ -38,9 +38,6 @@ struct arch_domain {
     struct page_info *rma_page;
     uint rma_order;
 
-    /* list of extents beyond RMA */
-    struct list_head extent_list;
-
     uint foreign_mfn_count;
     uint *foreign_mfns;
 

@@ -16,6 +16,8 @@
  * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -27,7 +29,9 @@
 #include <xen/shadow.h>
 #include <xen/domain.h>
 #include <xen/version.h>
+#include <xen/shadow.h>
 #include <asm/processor.h>
+#include <asm/platform.h>
 #include <asm/papr.h>
 #include <public/arch-powerpc.h>
 #include <public/libelf.h>
@@ -73,6 +77,7 @@ int construct_dom0(struct domain *d,
     ulong mod_start = 0;
     ulong mod_len = 0;
     ulong shared_info_addr;
+    uint extent_size = 1 << cpu_extent_order();
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -110,12 +115,31 @@ int construct_dom0(struct domain *d,
             dom0_nrpages = CONFIG_MIN_DOM0_PAGES;
     }
 
-    /* DOM0 has to be at least RMA size. */
+    /* Dom0 has to be at least RMA size. */
     if (dom0_nrpages < rma_nrpages) {
         dom0_nrpages = rma_nrpages;
-        printk("Forcing DOM0 memory size to %u MiB\n", 
+        printk("Increasing DOM0 memory size to %u MiB for RMA.\n", 
                 ((rma_nrpages << PAGE_SHIFT) >> 20));
     }
+
+    /* Ensure Dom0 is cpu_extent_order aligned. Round up if 
+       not and let user know we did so. */
+    if (dom0_nrpages != ALIGN_UP(dom0_nrpages, extent_size)) {
+        dom0_nrpages = ALIGN_UP(dom0_nrpages, extent_size);
+        printk("Increasing DOM0 memory size to %u MiB for large pages.\n", 
+                ((dom0_nrpages << PAGE_SHIFT) >> 20));
+    }
+
+    /* XXX Dom0 currently can't extend past the IO hole. */
+    if (dom0_nrpages > (platform_iohole_base() >> PAGE_SHIFT)) {
+        dom0_nrpages = (platform_iohole_base() >> PAGE_SHIFT);
+        printk("Limiting DOM0 memory size to %u MiB to avoid IO hole.\n", 
+                ((dom0_nrpages << PAGE_SHIFT) >> 20));
+    }
+
+    /* Set Dom0 max mem, triggering p2m table creation. */
+    if ((guest_physmap_max_mem_pages(d, dom0_nrpages)) != 0)
+        panic("Failed to set DOM0 max mem pages value\n");
 
     d->max_pages = dom0_nrpages;
     if (0 > allocate_rma(d, cpu_default_rma_order_pages()))
