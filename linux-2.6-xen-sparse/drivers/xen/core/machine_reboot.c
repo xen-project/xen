@@ -1,4 +1,3 @@
-#define __KERNEL_SYSCALLS__
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -7,6 +6,7 @@
 #include <linux/reboot.h>
 #include <linux/sysrq.h>
 #include <linux/stringify.h>
+#include <linux/stop_machine.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <xen/evtchn.h>
@@ -18,6 +18,7 @@
 #include <xen/gnttab.h>
 #include <xen/xencons.h>
 #include <xen/cpu_hotplug.h>
+#include <xen/interface/vcpu.h>
 
 #if defined(__i386__) || defined(__x86_64__)
 
@@ -98,7 +99,6 @@ static void post_suspend(int suspend_cancelled)
 		xen_start_info->console.domU.mfn =
 			pfn_to_mfn(xen_start_info->console.domU.mfn);
 	} else {
-		extern cpumask_t cpu_initialized_map;
 		cpu_initialized_map = cpumask_of_cpu(0);
 	}
 	
@@ -133,11 +133,71 @@ static void post_suspend(int suspend_cancelled)
 
 #endif
 
-int __xen_suspend(void)
+static int take_machine_down(void *p_fast_suspend)
+{
+	int fast_suspend = *(int *)p_fast_suspend;
+	int suspend_cancelled, err, cpu;
+	extern void time_resume(void);
+
+	if (fast_suspend) {
+		preempt_disable();
+	} else {
+		for (;;) {
+			err = smp_suspend();
+			if (err)
+				return err;
+
+			xenbus_suspend();
+			preempt_disable();
+
+			if (num_online_cpus() == 1)
+				break;
+
+			preempt_enable();
+			xenbus_suspend_cancel();
+		}
+	}
+
+	mm_pin_all();
+	local_irq_disable();
+	preempt_enable();
+	gnttab_suspend();
+	pre_suspend();
+
+	/*
+	 * This hypercall returns 1 if suspend was cancelled or the domain was
+	 * merely checkpointed, and 0 if it is resuming in a new domain.
+	 */
+	suspend_cancelled = HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
+
+	post_suspend(suspend_cancelled);
+	gnttab_resume();
+	if (!suspend_cancelled)
+		irq_resume();
+	time_resume();
+	switch_idle_mm();
+	local_irq_enable();
+
+	if (fast_suspend && !suspend_cancelled) {
+		/*
+		 * In fast-suspend mode the APs may not be brought back online
+		 * when we resume. In that case we do it here.
+		 */
+		for_each_online_cpu(cpu) {
+			if (cpu == 0)
+				continue;
+			cpu_set_initialized(cpu);
+			err = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+			BUG_ON(err);
+		}
+	}
+
+	return suspend_cancelled;
+}
+
+int __xen_suspend(int fast_suspend)
 {
 	int err, suspend_cancelled;
-
-	extern void time_resume(void);
 
 	BUG_ON(smp_processor_id() != 0);
 	BUG_ON(in_interrupt());
@@ -150,48 +210,17 @@ int __xen_suspend(void)
 	}
 #endif
 
-	for (;;) {
-		err = smp_suspend();
-		if (err)
-			return err;
-
+	if (fast_suspend) {
 		xenbus_suspend();
-		preempt_disable();
-
-		if (num_online_cpus() == 1)
-			break;
-
-		preempt_enable();
-		xenbus_suspend_cancel();
+		err = stop_machine_run(take_machine_down, &fast_suspend, 0);
+	} else {
+		err = take_machine_down(&fast_suspend);
 	}
 
-	mm_pin_all();
-	local_irq_disable();
-	preempt_enable();
+	if (err < 0)
+		return err;
 
-	gnttab_suspend();
-
-	pre_suspend();
-
-	/*
-	 * This hypercall returns 1 if suspend was cancelled or the domain was
-	 * merely checkpointed, and 0 if it is resuming in a new domain.
-	 */
-	suspend_cancelled = HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
-
-	post_suspend(suspend_cancelled);
-
-	gnttab_resume();
-
-	if (!suspend_cancelled)
-		irq_resume();
-
-	time_resume();
-
-	switch_idle_mm();
-
-	local_irq_enable();
-
+	suspend_cancelled = err;
 	if (!suspend_cancelled) {
 		xencons_resume();
 		xenbus_resume();
@@ -199,7 +228,8 @@ int __xen_suspend(void)
 		xenbus_suspend_cancel();
 	}
 
-	smp_resume();
+	if (!fast_suspend)
+		smp_resume();
 
-	return err;
+	return 0;
 }

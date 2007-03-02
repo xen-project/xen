@@ -4,6 +4,13 @@
 #include <linux/kernel.h>
 #include <linux/cpumask.h>
 
+#if defined(CONFIG_X86)
+extern cpumask_t cpu_initialized_map;
+#define cpu_set_initialized(cpu) cpu_set(cpu, cpu_initialized_map)
+#else
+#define cpu_set_initialized(cpu) ((void)0)
+#endif
+
 #if defined(CONFIG_HOTPLUG_CPU)
 
 int cpu_up_check(unsigned int cpu);
