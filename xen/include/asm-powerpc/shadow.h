@@ -32,6 +32,8 @@
       ? machine_to_phys_mapping[(mfn)]                 \
       : (mfn) )
 
+extern int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max);
+
 extern void guest_physmap_add_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn);
 
@@ -59,8 +61,6 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
 {
     return (1ULL << (d->arch.htab.order + PAGE_SHIFT)) >> 20;
 }
-
-#define guest_physmap_max_mem_pages(d, n) (0)
 
 #endif
 

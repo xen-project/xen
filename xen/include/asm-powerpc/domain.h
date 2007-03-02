@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -46,6 +46,9 @@ struct arch_domain {
 
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
+
+    u32 *p2m; /* Array of 32-bit MFNs supports 44 bits of physical memory. */
+    ulong p2m_entries;
 
     uint large_page_sizes;
     uint large_page_order[4];

@@ -239,7 +239,9 @@ extern unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn);
 
 extern unsigned long paddr_to_maddr(unsigned long paddr);
 
-#define INVALID_MFN (~0UL)
+/* INVALID_MFN can be any value that fails mfn_valid(). */
+#define INVALID_MFN (~0U)
+
 #define PFN_TYPE_NONE 0
 #define PFN_TYPE_RMA 1
 #define PFN_TYPE_LOGICAL 2

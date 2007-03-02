@@ -16,6 +16,8 @@
  * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <stdarg.h>
@@ -311,6 +313,7 @@ void domain_relinquish_resources(struct domain *d)
     relinquish_memory(d, &d->page_list);
     free_extents(d);
     xfree(d->arch.foreign_mfns);
+    xfree(d->arch.p2m);
     return;
 }
 

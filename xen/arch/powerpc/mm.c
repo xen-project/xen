@@ -536,6 +536,47 @@ unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn)
     return INVALID_M2P_ENTRY;
 }
 
+/* NB: caller holds d->page_alloc lock, sets d->max_pages = new_max */
+int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max_pages)
+{
+    u32 *p2m_array = NULL;
+    u32 *p2m_old = NULL;
+    ulong i;
+
+    /* XXX We probably could, but right now we don't shrink the p2m array.
+     * NB: d->max_pages >= d->arch.p2m_entries */
+    if (new_max_pages < d->max_pages) {
+        printk("Can't shrink DOM%d max memory pages\n", d->domain_id);
+        return -EINVAL;
+    }
+
+    /* Allocate one u32 per page. */
+    p2m_array = xmalloc_array(u32, new_max_pages);
+    if (p2m_array == NULL)
+        return -ENOMEM;
+
+    /* Copy old mappings into new array. */
+    if (d->arch.p2m != NULL) {
+        /* XXX This could take a long time; we should use a continuation. */
+        memcpy(p2m_array, d->arch.p2m, d->arch.p2m_entries * sizeof(u32));
+        p2m_old = d->arch.p2m;
+    }
+
+    /* Mark new mfns as invalid. */
+    for (i = d->arch.p2m_entries; i < new_max_pages; i++)
+        p2m_array[i] = INVALID_MFN;
+
+    /* Set new p2m pointer and size. */
+    d->arch.p2m = p2m_array;
+    d->arch.p2m_entries = new_max_pages;
+
+    /* Free old p2m array if present. */
+    if (p2m_old)
+        xfree(p2m_old);
+
+    return 0;
+}
+
 void guest_physmap_add_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn)
 {
