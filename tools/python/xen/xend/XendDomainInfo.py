@@ -1503,7 +1503,7 @@ class XendDomainInfo:
             self.info['start_time'] = time.time()
 
             self._stateSet(DOM_STATE_RUNNING)
-        except RuntimeError, exn:
+        except (RuntimeError, VmError), exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
             self.image.cleanupBootloading()
             raise VmError(str(exn))
