@@ -175,11 +175,15 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	struct watch_adapter *watch, *tmp_watch;
 	int err, rc = len;
 
-	if ((len + u->len) > sizeof(u->u.buffer))
-		return -EINVAL;
+	if ((len + u->len) > sizeof(u->u.buffer)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
-	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0)
-		return -EFAULT;
+	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0) {
+		rc = -EFAULT;
+		goto out;
+	}
 
 	u->len += len;
 	if ((u->len < sizeof(u->u.msg)) ||
