@@ -247,12 +247,12 @@ static inline int acm_pre_domctl(struct xen_domctl *op, void **ssid)
             if (*ssid == NULL) {
                 printk("%s: Warning. Destroying domain without ssid pointer.\n", 
                        __func__);
-                domain_rcu_lock(d);
+                rcu_unlock_domain(d);
                 return -EACCES;
             }
             d->ssid = NULL; /* make sure it's not used any more */
              /* no policy-specific hook */
-            domain_rcu_lock(d);
+            rcu_unlock_domain(d);
             ret = 0;
         }
         break;
