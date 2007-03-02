@@ -27,6 +27,7 @@
 #include <xen/perfc.h>
 #include <asm/init.h>
 #include <asm/page.h>
+#include <asm/platform.h>
 #include <asm/string.h>
 #include <public/arch-powerpc.h>
 
@@ -426,7 +427,7 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
         /* Its a grant table access */
         t = PFN_TYPE_GNTTAB;
         mfn = gnttab_shared_mfn(d, d->grant_table, (pfn - max_page));
-    } else if (d->is_privileged && cpu_io_mfn(pfn)) {
+    } else if (d->is_privileged && platform_io_mfn(pfn)) {
         t = PFN_TYPE_IO;
         mfn = pfn;
     } else {
@@ -512,7 +513,7 @@ unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn)
         return max_page + (mfn - gnttab_mfn);
 
     /* IO? */
-    if (d->is_privileged && cpu_io_mfn(mfn))
+    if (d->is_privileged && platform_io_mfn(mfn))
         return mfn;
 
     rma_mfn = page_to_mfn(d->arch.rma_page);

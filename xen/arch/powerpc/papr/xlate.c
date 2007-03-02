@@ -29,6 +29,7 @@
 #include <asm/current.h>
 #include <asm/papr.h>
 #include <asm/hcalls.h>
+#include <asm/platform.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) printk(fmt)
@@ -536,7 +537,7 @@ long pte_remove(ulong flags, ulong ptex, ulong avpn, ulong *hi, ulong *lo)
 
     if (lpte.bits.v) {
         ulong mfn = lpte.bits.rpn;
-        if (!cpu_io_mfn(mfn)) {
+        if (!platform_io_mfn(mfn)) {
             struct page_info *pg = mfn_to_page(mfn);
             struct domain *f = page_get_owner(pg);
             
