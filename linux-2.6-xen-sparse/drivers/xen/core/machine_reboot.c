@@ -210,6 +210,10 @@ int __xen_suspend(int fast_suspend)
 	}
 #endif
 
+	/* If we are definitely UP then 'slow mode' is actually faster. */
+	if (num_possible_cpus() == 1)
+		fast_suspend = 0;
+
 	if (fast_suspend) {
 		xenbus_suspend();
 		err = stop_machine_run(take_machine_down, &fast_suspend, 0);
