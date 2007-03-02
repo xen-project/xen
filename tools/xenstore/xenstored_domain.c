@@ -320,6 +320,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	unsigned long mfn;
 	evtchn_port_t port;
 	int rc;
+	struct xenstore_domain_interface *interface;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -344,19 +345,21 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	domain = find_domain_by_domid(domid);
 
 	if (domain == NULL) {
+		interface = xc_map_foreign_range(
+			*xc_handle, domid,
+			getpagesize(), PROT_READ|PROT_WRITE, mfn);
+		if (!interface) {
+			send_error(conn, errno);
+			return;
+		}
 		/* Hang domain off "in" until we're finished. */
 		domain = new_domain(in, domid, port);
 		if (!domain) {
+			munmap(interface, getpagesize());
 			send_error(conn, errno);
 			return;
 		}
-		domain->interface = xc_map_foreign_range(
-			*xc_handle, domid,
-			getpagesize(), PROT_READ|PROT_WRITE, mfn);
-		if (!domain->interface) {
-			send_error(conn, errno);
-			return;
-		}
+		domain->interface = interface;
 		domain->mfn = mfn;
 
 		/* Now domain belongs to its connection. */
