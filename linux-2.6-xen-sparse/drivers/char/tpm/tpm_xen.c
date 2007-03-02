@@ -437,7 +437,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 	return 0;
 }
 
-static int tpmfront_resume(struct tpm_private *tp)
+static int tpmfront_suspend_finish(struct tpm_private *tp)
 {
 	tp->is_suspended = 0;
 	/* Allow applications to send again. */
@@ -448,7 +448,7 @@ static int tpmfront_resume(struct tpm_private *tp)
 static int tpmfront_suspend_cancel(struct xenbus_device *dev)
 {
 	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
-	return tpmfront_resume(tp);
+	return tpmfront_suspend_finish(tp);
 }
 
 static int tpmfront_resume(struct xenbus_device *dev)
@@ -691,7 +691,7 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 	 * This also removes the suspend state.
 	 */
 	if (is_connected == 1 && tp->is_suspended == 1)
-		tpmfront_resume(tp);
+		tpmfront_suspend_finish(tp);
 
 	if (is_connected != tp->is_connected) {
 		tp->is_connected = is_connected;
