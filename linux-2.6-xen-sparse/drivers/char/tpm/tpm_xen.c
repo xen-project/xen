@@ -421,7 +421,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 	mutex_lock(&suspend_lock);
 	tp->is_suspended = 1;
 
-	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 300; ctr++) {
+	for (ctr = 0; atomic_read(&tp->tx_busy); ctr++) {
 		if ((ctr % 10) == 0)
 			printk("TPM-FE [INFO]: Waiting for outstanding "
 			       "request.\n");
@@ -430,17 +430,22 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 		 */
 		interruptible_sleep_on_timeout(&tp->wait_q, 100);
 	}
-	xenbus_switch_state(dev, XenbusStateClosing);
-
-	if (atomic_read(&tp->tx_busy)) {
-		/*
-		 * A temporary work-around.
-		 */
-		printk("TPM-FE [WARNING]: Resetting busy flag.");
-		atomic_set(&tp->tx_busy, 0);
-	}
 
 	return 0;
+}
+
+static int __tpmfront_suspend_cancel(struct tpm_private *tp)
+{
+	tp->is_suspended = 0;
+	/* unlock, so apps can send again */
+	mutex_unlock(&suspend_lock);
+	return 0;
+}
+
+static int tpmfront_suspend_cancel(struct xenbus_device *dev)
+{
+	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
+	return __tpmfront_suspend_cancel(tp);
 }
 
 static int tpmfront_resume(struct xenbus_device *dev)
@@ -484,6 +489,7 @@ static struct xenbus_driver tpmfront = {
 	.resume = tpmfront_resume,
 	.otherend_changed = backend_changed,
 	.suspend = tpmfront_suspend,
+	.suspend_cancel = tpmfront_suspend_cancel,
 };
 
 static void __init init_tpm_xenbus(void)
@@ -689,9 +695,7 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 	 * This also removes the suspend state.
 	 */
 	if (is_connected == 1 && tp->is_suspended == 1) {
-		tp->is_suspended = 0;
-		/* unlock, so apps can resume sending */
-		mutex_unlock(&suspend_lock);
+		__tpmfront_suspend_cancel(tp);
 	}
 
 	if (is_connected != tp->is_connected) {
