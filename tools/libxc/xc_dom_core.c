@@ -721,9 +721,6 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     }
     page_size = XC_DOM_PAGE_SIZE(dom);
 
-    /* 4MB align virtual base address */
-    dom->parms.virt_base &= ~(((uint64_t)1<<22)-1);
-
     /* load kernel */
     if ( xc_dom_alloc_segment(dom, &dom->kernel_seg, "kernel",
                               dom->kernel_seg.vstart,
