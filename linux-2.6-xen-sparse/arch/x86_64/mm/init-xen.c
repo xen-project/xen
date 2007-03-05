@@ -309,36 +309,26 @@ static __init void set_pte_phys_ma(unsigned long vaddr,
 
 		pmd = (pmd_t *) spp_getpage(); 
 		make_page_readonly(pmd, XENFEAT_writable_page_tables);
-
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
-
 		if (pmd != pmd_offset(pud, 0)) {
 			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pud,0));
 			return;
 		}
 	}
 	pmd = pmd_offset(pud, vaddr);
-
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
 		make_page_readonly(pte, XENFEAT_writable_page_tables);
-
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
 			printk("PAGETABLE BUG #02!\n");
 			return;
 		}
 	}
-
 	new_pte = pfn_pte_ma(phys >> PAGE_SHIFT, prot);
-	pte = pte_offset_kernel(pmd, vaddr);
 
-	/* 
-	 * Note that the pte page is already RO, thus we want to use
-	 * xen_l1_entry_update(), not set_pte().
-	 */
-	xen_l1_entry_update(pte, 
-			    pfn_pte_ma(phys >> PAGE_SHIFT, prot));
+	pte = pte_offset_kernel(pmd, vaddr);
+	set_pte(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -667,9 +657,9 @@ static void __init extend_init_mapping(unsigned long tables_space)
 	}
 }
 
-static unsigned long __init find_early_table_space(unsigned long end)
+static void __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, ptes, tables, fixmap_tables;
+	unsigned long puds, pmds, ptes, tables;
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
@@ -679,16 +669,7 @@ static unsigned long __init find_early_table_space(unsigned long end)
 		round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
 
-	/* Also reserve pages for fixmaps that need to be set up early.
-	 * Their pud is shared with the kernel pud.
-	 */
-	pmds = (PMD_SIZE - 1 - FIXADDR_START) >> PMD_SHIFT;
-	ptes = (PTE_SIZE - 1 - FIXADDR_START) >> PAGE_SHIFT;
-
-	fixmap_tables = round_up(pmds * 8, PAGE_SIZE) +
-		round_up(ptes * 8, PAGE_SIZE);
-
-	extend_init_mapping(tables + fixmap_tables);
+	extend_init_mapping(tables);
 
 	table_start = start_pfn;
 	table_end = table_start + (tables>>PAGE_SHIFT);
@@ -696,8 +677,58 @@ static unsigned long __init find_early_table_space(unsigned long end)
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
 		end, table_start << PAGE_SHIFT,
 		(table_start << PAGE_SHIFT) + tables);
+}
 
-	return table_end + (fixmap_tables>>PAGE_SHIFT);
+static void xen_finish_init_mapping(void)
+{
+	unsigned long i, start, end;
+
+	/* Re-vector virtual addresses pointing into the initial
+	   mapping to the just-established permanent ones. */
+	xen_start_info = __va(__pa(xen_start_info));
+	xen_start_info->pt_base = (unsigned long)
+		__va(__pa(xen_start_info->pt_base));
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		phys_to_machine_mapping =
+			__va(__pa(xen_start_info->mfn_list));
+		xen_start_info->mfn_list = (unsigned long)
+			phys_to_machine_mapping;
+	}
+	if (xen_start_info->mod_start)
+		xen_start_info->mod_start = (unsigned long)
+			__va(__pa(xen_start_info->mod_start));
+
+	/* Destroy the Xen-created mappings beyond the kernel image as
+	 * well as the temporary mappings created above. Prevents
+	 * overlap with modules area (if init mapping is very big).
+	 */
+	start = PAGE_ALIGN((unsigned long)_end);
+	end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
+	for (; start < end; start += PAGE_SIZE)
+		WARN_ON(HYPERVISOR_update_va_mapping(
+			start, __pte_ma(0), 0));
+
+	/* Initialise all fixmap pagetables. Use 'start_pfn' allocator. */
+	table_end = ~0UL;
+	for (i = 0; i < __end_of_fixed_addresses; i++)
+		__set_fixmap(i, 0, __pgprot(0));
+	table_end = start_pfn;
+
+	/* Switch to the real shared_info page, and clear the
+	 * dummy page. */
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	memset(empty_zero_page, 0, sizeof(empty_zero_page));
+
+	/* Setup mapping of lower 1st MB */
+	for (i = 0; i < NR_FIX_ISAMAPS; i++)
+		if (is_initial_xendomain())
+			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+		else
+			__set_fixmap(FIX_ISAMAP_BEGIN - i,
+				     virt_to_mfn(empty_zero_page)
+				     << PAGE_SHIFT,
+				     PAGE_KERNEL_RO);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
@@ -705,7 +736,7 @@ static unsigned long __init find_early_table_space(unsigned long end)
    physical memory. To access them they are temporarily mapped. */
 void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 { 
-	unsigned long next, table_rsrv_end = 0;
+	unsigned long next;
 
 	Dprintk("init_memory_mapping\n");
 
@@ -716,7 +747,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 	 * discovered.
 	 */
 	if (!after_bootmem)
-		table_rsrv_end = find_early_table_space(end);
+		find_early_table_space(end);
 
 	start = (unsigned long)__va(start);
 	end = (unsigned long)__va(end);
@@ -744,50 +775,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 
 	if (!after_bootmem) {
 		BUG_ON(start_pfn != table_end);
-		table_end = table_rsrv_end;
-
-		/* Re-vector virtual addresses pointing into the initial
-		   mapping to the just-established permanent ones. */
-		xen_start_info = __va(__pa(xen_start_info));
-		xen_start_info->pt_base = (unsigned long)
-			__va(__pa(xen_start_info->pt_base));
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			phys_to_machine_mapping =
-				__va(__pa(xen_start_info->mfn_list));
-			xen_start_info->mfn_list = (unsigned long)
-				phys_to_machine_mapping;
-		}
-		if (xen_start_info->mod_start)
-			xen_start_info->mod_start = (unsigned long)
-				__va(__pa(xen_start_info->mod_start));
-
-		/* Destroy the Xen-created mappings beyond the kernel image as
-		 * well as the temporary mappings created above. Prevents
-		 * overlap with modules area (if init mapping is very big).
-		 */
-		start = PAGE_ALIGN((unsigned long)_end);
-		end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
-		for (; start < end; start += PAGE_SIZE)
-			WARN_ON(HYPERVISOR_update_va_mapping(
-				start, __pte_ma(0), 0));
-
-		/* Switch to the real shared_info page, and clear the
-		 * dummy page. */
-		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-		HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-
-		/* Setup mapping of lower 1st MB */
-		for (next = 0; next < NR_FIX_ISAMAPS; next++)
-			if (is_initial_xendomain())
-				set_fixmap(FIX_ISAMAP_BEGIN - next, next * PAGE_SIZE);
-			else
-				__set_fixmap(FIX_ISAMAP_BEGIN - next,
-					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
-					     PAGE_KERNEL_RO);
-
-		BUG_ON(start_pfn > table_end);
-		table_end = start_pfn;
+		xen_finish_init_mapping();
 	}
 
 	__flush_tlb_all();
