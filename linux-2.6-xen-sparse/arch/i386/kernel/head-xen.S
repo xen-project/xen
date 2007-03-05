@@ -12,8 +12,6 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
 
-#define _PAGE_PRESENT 0x1
-
 /*
  * References to members of the new_cpu_data structure.
  */

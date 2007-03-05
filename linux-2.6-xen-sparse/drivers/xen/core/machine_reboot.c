@@ -59,23 +59,6 @@ EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);
 
-/* Ensure we run on the idle task page tables so that we will
-   switch page tables before running user space. This is needed
-   on architectures with separate kernel and user page tables
-   because the user page table pointer is not saved/restored. */
-static void switch_idle_mm(void)
-{
-	struct mm_struct *mm = current->active_mm;
-
-	if (mm == &init_mm)
-		return;
-
-	atomic_inc(&init_mm.mm_count);
-	switch_mm(mm, &init_mm, current);
-	current->active_mm = &init_mm;
-	mmdrop(mm);
-}
-
 static void pre_suspend(void)
 {
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
@@ -99,7 +82,9 @@ static void post_suspend(int suspend_cancelled)
 		xen_start_info->console.domU.mfn =
 			pfn_to_mfn(xen_start_info->console.domU.mfn);
 	} else {
+#ifdef CONFIG_SMP
 		cpu_initialized_map = cpumask_of_cpu(0);
+#endif
 	}
 	
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
@@ -172,10 +157,25 @@ static int take_machine_down(void *p_fast_suspend)
 
 	post_suspend(suspend_cancelled);
 	gnttab_resume();
-	if (!suspend_cancelled)
+	if (!suspend_cancelled) {
 		irq_resume();
+#ifdef __x86_64__
+		/*
+		 * Older versions of Xen do not save/restore the user %cr3.
+		 * We do it here just in case, but there's no need if we are
+		 * in fast-suspend mode as that implies a new enough Xen.
+		 */
+		if (!fast_suspend) {
+			struct mmuext_op op;
+			op.cmd = MMUEXT_NEW_USER_BASEPTR;
+			op.arg1.mfn = pfn_to_mfn(__pa(__user_pgd(
+				current->active_mm->pgd)) >> PAGE_SHIFT);
+			if (HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF))
+				BUG();
+		}
+#endif
+	}
 	time_resume();
-	switch_idle_mm();
 	local_irq_enable();
 
 	if (fast_suspend && !suspend_cancelled) {
@@ -209,6 +209,10 @@ int __xen_suspend(int fast_suspend)
 		return -EOPNOTSUPP;
 	}
 #endif
+
+	/* If we are definitely UP then 'slow mode' is actually faster. */
+	if (num_possible_cpus() == 1)
+		fast_suspend = 0;
 
 	if (fast_suspend) {
 		xenbus_suspend();

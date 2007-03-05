@@ -113,14 +113,13 @@ void __exit tpmif_exit(void);
 
 
 static inline int
-tx_buffer_copy(struct tx_buffer *txb, const u8 * src, int len,
+tx_buffer_copy(struct tx_buffer *txb, const u8 *src, int len,
                int isuserbuffer)
 {
 	int copied = len;
 
-	if (len > txb->size) {
+	if (len > txb->size)
 		copied = txb->size;
-	}
 	if (isuserbuffer) {
 		if (copy_from_user(txb->data, src, copied))
 			return -EFAULT;
@@ -133,18 +132,20 @@ tx_buffer_copy(struct tx_buffer *txb, const u8 * src, int len,
 
 static inline struct tx_buffer *tx_buffer_alloc(void)
 {
-	struct tx_buffer *txb = kzalloc(sizeof (struct tx_buffer),
-					GFP_KERNEL);
+	struct tx_buffer *txb;
 
-	if (txb) {
-		txb->len = 0;
-		txb->size = PAGE_SIZE;
-		txb->data = (unsigned char *)__get_free_page(GFP_KERNEL);
-		if (txb->data == NULL) {
-			kfree(txb);
-			txb = NULL;
-		}
+	txb = kzalloc(sizeof(struct tx_buffer), GFP_KERNEL);
+	if (!txb)
+		return NULL;
+
+	txb->len = 0;
+	txb->size = PAGE_SIZE;
+	txb->data = (unsigned char *)__get_free_page(GFP_KERNEL);
+	if (txb->data == NULL) {
+		kfree(txb);
+		txb = NULL;
 	}
+
 	return txb;
 }
 
@@ -160,37 +161,41 @@ static inline void tx_buffer_free(struct tx_buffer *txb)
 /**************************************************************
  Utility function for the tpm_private structure
 **************************************************************/
-static inline void tpm_private_init(struct tpm_private *tp)
+static void tpm_private_init(struct tpm_private *tp)
 {
 	spin_lock_init(&tp->tx_lock);
 	init_waitqueue_head(&tp->wait_q);
 	atomic_set(&tp->refcnt, 1);
 }
 
-static inline void tpm_private_put(void)
+static void tpm_private_put(void)
 {
-	if ( atomic_dec_and_test(&my_priv->refcnt)) {
-		tpmif_free_tx_buffers(my_priv);
-		kfree(my_priv);
-		my_priv = NULL;
-	}
+	if (!atomic_dec_and_test(&my_priv->refcnt))
+		return;
+
+	tpmif_free_tx_buffers(my_priv);
+	kfree(my_priv);
+	my_priv = NULL;
 }
 
 static struct tpm_private *tpm_private_get(void)
 {
 	int err;
-	if (!my_priv) {
-		my_priv = kzalloc(sizeof(struct tpm_private), GFP_KERNEL);
-		if (my_priv) {
-			tpm_private_init(my_priv);
-			err = tpmif_allocate_tx_buffers(my_priv);
-			if (err < 0) {
-				tpm_private_put();
-			}
-		}
-	} else {
+
+	if (my_priv) {
 		atomic_inc(&my_priv->refcnt);
+		return my_priv;
 	}
+
+	my_priv = kzalloc(sizeof(struct tpm_private), GFP_KERNEL);
+	if (!my_priv)
+		return NULL;
+
+	tpm_private_init(my_priv);
+	err = tpmif_allocate_tx_buffers(my_priv);
+	if (err < 0)
+		tpm_private_put();
+
 	return my_priv;
 }
 
@@ -379,10 +384,8 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		return -ENOMEM;
 
 	tp->chip = init_vtpm(&dev->dev, &tvd, tp);
-
-	if (IS_ERR(tp->chip)) {
+	if (IS_ERR(tp->chip))
 		return PTR_ERR(tp->chip);
-	}
 
 	err = xenbus_scanf(XBT_NIL, dev->nodename,
 	                   "handle", "%i", &handle);
@@ -401,6 +404,7 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		tpm_private_put();
 		return err;
 	}
+
 	return 0;
 }
 
@@ -417,30 +421,34 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 {
 	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
 	u32 ctr;
-	/* lock, so no app can send */
+
+	/* Take the lock, preventing any application from sending. */
 	mutex_lock(&suspend_lock);
 	tp->is_suspended = 1;
 
-	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 300; ctr++) {
+	for (ctr = 0; atomic_read(&tp->tx_busy); ctr++) {
 		if ((ctr % 10) == 0)
 			printk("TPM-FE [INFO]: Waiting for outstanding "
 			       "request.\n");
-		/*
-		 * Wait for a request to be responded to.
-		 */
+		/* Wait for a request to be responded to. */
 		interruptible_sleep_on_timeout(&tp->wait_q, 100);
-	}
-	xenbus_switch_state(dev, XenbusStateClosing);
-
-	if (atomic_read(&tp->tx_busy)) {
-		/*
-		 * A temporary work-around.
-		 */
-		printk("TPM-FE [WARNING]: Resetting busy flag.");
-		atomic_set(&tp->tx_busy, 0);
 	}
 
 	return 0;
+}
+
+static int tpmfront_suspend_finish(struct tpm_private *tp)
+{
+	tp->is_suspended = 0;
+	/* Allow applications to send again. */
+	mutex_unlock(&suspend_lock);
+	return 0;
+}
+
+static int tpmfront_suspend_cancel(struct xenbus_device *dev)
+{
+	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
+	return tpmfront_suspend_finish(tp);
 }
 
 static int tpmfront_resume(struct xenbus_device *dev)
@@ -484,6 +492,7 @@ static struct xenbus_driver tpmfront = {
 	.resume = tpmfront_resume,
 	.otherend_changed = backend_changed,
 	.suspend = tpmfront_suspend,
+	.suspend_cancel = tpmfront_suspend_cancel,
 };
 
 static void __init init_tpm_xenbus(void)
@@ -514,9 +523,8 @@ static void tpmif_free_tx_buffers(struct tpm_private *tp)
 {
 	unsigned int i;
 
-	for (i = 0; i < TPMIF_TX_RING_SIZE; i++) {
+	for (i = 0; i < TPMIF_TX_RING_SIZE; i++)
 		tx_buffer_free(tp->tx_buffers[i]);
-	}
 }
 
 static void tpmif_rx_action(unsigned long priv)
@@ -536,9 +544,8 @@ static void tpmif_rx_action(unsigned long priv)
 	received = tx->size;
 
 	buffer = kmalloc(received, GFP_ATOMIC);
-	if (NULL == buffer) {
+	if (!buffer)
 		goto exit;
-	}
 
 	for (i = 0; i < TPMIF_TX_RING_SIZE && offset < received; i++) {
 		struct tx_buffer *txb = tp->tx_buffers[i];
@@ -547,9 +554,8 @@ static void tpmif_rx_action(unsigned long priv)
 
 		tx = &tp->tx->ring[i].req;
 		tocopy = tx->size;
-		if (tocopy > PAGE_SIZE) {
+		if (tocopy > PAGE_SIZE)
 			tocopy = PAGE_SIZE;
-		}
 
 		memcpy(&buffer[offset], txb->data, tocopy);
 
@@ -607,12 +613,13 @@ static int tpm_xmit(struct tpm_private *tp,
 		struct tx_buffer *txb = tp->tx_buffers[i];
 		int copied;
 
-		if (NULL == txb) {
+		if (!txb) {
 			DPRINTK("txb (i=%d) is NULL. buffers initilized?\n"
 				"Not transmitting anything!\n", i);
 			spin_unlock_irq(&tp->tx_lock);
 			return -EFAULT;
 		}
+
 		copied = tx_buffer_copy(txb, &buf[offset], count,
 		                        isuserbuffer);
 		if (copied < 0) {
@@ -624,25 +631,26 @@ static int tpm_xmit(struct tpm_private *tp,
 		offset += copied;
 
 		tx = &tp->tx->ring[i].req;
-
 		tx->addr = virt_to_machine(txb->data);
 		tx->size = txb->len;
 
-		DPRINTK("First 4 characters sent by TPM-FE are 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		DPRINTK("First 4 characters sent by TPM-FE are "
+			"0x%02x 0x%02x 0x%02x 0x%02x\n",
 		        txb->data[0],txb->data[1],txb->data[2],txb->data[3]);
 
-		/* get the granttable reference for this page */
+		/* Get the granttable reference for this page. */
 		tx->ref = gnttab_claim_grant_reference(&gref_head);
-
-		if (-ENOSPC == tx->ref) {
+		if (tx->ref == -ENOSPC) {
 			spin_unlock_irq(&tp->tx_lock);
-			DPRINTK(" Grant table claim reference failed in func:%s line:%d file:%s\n", __FUNCTION__, __LINE__, __FILE__);
+			DPRINTK("Grant table claim reference failed in "
+				"func:%s line:%d file:%s\n",
+				__FUNCTION__, __LINE__, __FILE__);
 			return -ENOSPC;
 		}
-		gnttab_grant_foreign_access_ref( tx->ref,
-		                                 tp->backend_id,
-		                                 virt_to_mfn(txb->data),
-		                                 0 /*RW*/);
+		gnttab_grant_foreign_access_ref(tx->ref,
+						tp->backend_id,
+						virt_to_mfn(txb->data),
+						0 /*RW*/);
 		wmb();
 	}
 
@@ -660,15 +668,10 @@ static int tpm_xmit(struct tpm_private *tp,
 
 static void tpmif_notify_upperlayer(struct tpm_private *tp)
 {
-	/*
-	 * Notify upper layer about the state of the connection
-	 * to the BE.
-	 */
-	if (tp->is_connected) {
-		vtpm_vd_status(tp->chip, TPM_VD_STATUS_CONNECTED);
-	} else {
-		vtpm_vd_status(tp->chip, TPM_VD_STATUS_DISCONNECTED);
-	}
+	/* Notify upper layer about the state of the connection to the BE. */
+	vtpm_vd_status(tp->chip, (tp->is_connected
+				  ? TPM_VD_STATUS_CONNECTED
+				  : TPM_VD_STATUS_DISCONNECTED));
 }
 
 
@@ -679,20 +682,16 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 	 * should disconnect - assumption is that we will resume
 	 * The mutex keeps apps from sending.
 	 */
-	if (is_connected == 0 && tp->is_suspended == 1) {
+	if (is_connected == 0 && tp->is_suspended == 1)
 		return;
-	}
 
 	/*
 	 * Unlock the mutex if we are connected again
 	 * after being suspended - now resuming.
 	 * This also removes the suspend state.
 	 */
-	if (is_connected == 1 && tp->is_suspended == 1) {
-		tp->is_suspended = 0;
-		/* unlock, so apps can resume sending */
-		mutex_unlock(&suspend_lock);
-	}
+	if (is_connected == 1 && tp->is_suspended == 1)
+		tpmfront_suspend_finish(tp);
 
 	if (is_connected != tp->is_connected) {
 		tp->is_connected = is_connected;
@@ -710,33 +709,24 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 
 static int __init tpmif_init(void)
 {
-	long rc = 0;
 	struct tpm_private *tp;
 
 	if (is_initial_xendomain())
 		return -EPERM;
 
 	tp = tpm_private_get();
-	if (!tp) {
-		rc = -ENOMEM;
-		goto failexit;
-	}
+	if (!tp)
+		return -ENOMEM;
 
 	IPRINTK("Initialising the vTPM driver.\n");
-	if ( gnttab_alloc_grant_references ( TPMIF_TX_RING_SIZE,
-	                                     &gref_head ) < 0) {
-		rc = -EFAULT;
-		goto gnttab_alloc_failed;
+	if (gnttab_alloc_grant_references(TPMIF_TX_RING_SIZE,
+					  &gref_head) < 0) {
+		tpm_private_put();
+		return -EFAULT;
 	}
 
 	init_tpm_xenbus();
 	return 0;
-
-gnttab_alloc_failed:
-	tpm_private_put();
-failexit:
-
-	return (int)rc;
 }
 
 

@@ -40,6 +40,9 @@
 
 /*#define NETBE_DEBUG_INTERRUPT*/
 
+/* extra field used in struct page */
+#define netif_page_index(pg) (*(long *)&(pg)->mapping)
+
 struct netbk_rx_meta {
 	skb_frag_t frag;
 	int id;
@@ -352,7 +355,7 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		copy_gop->flags = GNTCOPY_dest_gref;
 		if (PageForeign(page)) {
 			struct pending_tx_info *src_pend =
-				&pending_tx_info[page->index];
+				&pending_tx_info[netif_page_index(page)];
 			copy_gop->source.domid = src_pend->netif->domid;
 			copy_gop->source.u.ref = src_pend->req.gref;
 			copy_gop->flags |= GNTCOPY_source_gref;
@@ -1327,7 +1330,7 @@ static void netif_page_release(struct page *page)
 	/* Ready for next use. */
 	init_page_count(page);
 
-	netif_idx_release(page->index);
+	netif_idx_release(netif_page_index(page));
 }
 
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
@@ -1457,7 +1460,7 @@ static int __init netback_init(void)
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
 		page = mmap_pages[i];
 		SetPageForeign(page, netif_page_release);
-		page->index = i;
+		netif_page_index(page) = i;
 	}
 
 	pending_cons = 0;

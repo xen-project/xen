@@ -252,14 +252,14 @@
 #define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
 #define SetPageForeign(page, dtor) do {		\
 	set_bit(PG_foreign, &(page)->flags);	\
-	(page)->mapping = (void *)dtor;		\
+	(page)->index = (long)(dtor);		\
 } while (0)
 #define ClearPageForeign(page) do {		\
 	clear_bit(PG_foreign, &(page)->flags);	\
-	(page)->mapping = NULL;			\
+	(page)->index = 0;			\
 } while (0)
 #define PageForeignDestructor(page)		\
-	( (void (*) (struct page *)) (page)->mapping )(page)
+	( (void (*) (struct page *)) (page)->index )(page)
 
 struct page;	/* forward declaration */
 

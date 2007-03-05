@@ -473,26 +473,24 @@ typedef struct shared_info shared_info_t;
 #endif
 
 /*
- * Start-of-day memory layout for the initial domain (DOM0):
+ * Start-of-day memory layout:
  *  1. The domain is started within contiguous virtual-memory region.
- *  2. The contiguous region begins and ends on an aligned 4MB boundary.
- *  3. The region start corresponds to the load address of the OS image.
- *     If the load address is not 4MB aligned then the address is rounded down.
- *  4. This the order of bootstrap elements in the initial virtual region:
+ *  2. The contiguous region ends on an aligned 4MB boundary.
+ *  3. This the order of bootstrap elements in the initial virtual region:
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
  *      c. list of allocated page frames [mfn_list, nr_pages]
  *      d. start_info_t structure        [register ESI (x86)]
  *      e. bootstrap page tables         [pt_base, CR3 (x86)]
  *      f. bootstrap stack               [register ESP (x86)]
- *  5. Bootstrap elements are packed together, but each is 4kB-aligned.
- *  6. The initial ram disk may be omitted.
- *  7. The list of page frames forms a contiguous 'pseudo-physical' memory
+ *  4. Bootstrap elements are packed together, but each is 4kB-aligned.
+ *  5. The initial ram disk may be omitted.
+ *  6. The list of page frames forms a contiguous 'pseudo-physical' memory
  *     layout for the domain. In particular, the bootstrap virtual-memory
  *     region is a 1:1 mapping to the first section of the pseudo-physical map.
- *  8. All bootstrap elements are mapped read-writable for the guest OS. The
+ *  7. All bootstrap elements are mapped read-writable for the guest OS. The
  *     only exception is the bootstrap page table, which is mapped read-only.
- *  9. There is guaranteed to be at least 512kB padding after the final
+ *  8. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
  */

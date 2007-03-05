@@ -25,8 +25,6 @@
 
 #include <xen/interface/elfnote.h>
 
-#define _PAGE_PRESENT 0x1
-
 	.section .bootstrap.text, "ax", @progbits
 	.code64
 #define VIRT_ENTRY_OFFSET 0x0

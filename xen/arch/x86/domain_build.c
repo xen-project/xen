@@ -374,9 +374,6 @@ int construct_dom0(struct domain *d,
     if ( parms.f_required[0] /* Huh? -- kraxel */ )
             panic("Domain 0 requires an unsupported hypervisor feature.\n");
 
-    /* Align load address to 4MB boundary. */
-    v_start = parms.virt_base & ~((1UL<<22)-1);
-
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 
@@ -384,6 +381,7 @@ int construct_dom0(struct domain *d,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
+    v_start          = parms.virt_base;
     vkern_start      = parms.virt_kstart;
     vkern_end        = parms.virt_kend;
     vinitrd_start    = round_pgup(vkern_end);

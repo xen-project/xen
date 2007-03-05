@@ -20,6 +20,14 @@
 #define LARGE_PAGE_SIZE (1UL << PMD_SHIFT)
 
 #ifdef __KERNEL__
+
+/*
+ * Need to repeat this here in order to not include pgtable.h (which in turn
+ * depends on definitions made here), but to be able to use the symbolic
+ * below. The preprocessor will warn if the two definitions aren't identical.
+ */
+#define _PAGE_PRESENT	0x001
+
 #ifndef __ASSEMBLY__
 
 #include <linux/string.h>
@@ -28,13 +36,6 @@
 #include <asm/bug.h>
 #include <xen/interface/xen.h>
 #include <xen/features.h>
-
-/*
- * Need to repeat this here in order to not include pgtable.h (which in turn
- * depends on definitions made here), but to be able to use the symbolic
- * below. The preprocessor will warn if the two definitions aren't identical.
- */
-#define _PAGE_PRESENT	0x001
 
 #define arch_free_page(_page,_order)		\
 ({	int foreign = PageForeign(_page);	\
