@@ -106,7 +106,7 @@ diff -pruN ../orig-linux-2.6.18/fs/aio.c ./fs/aio.c
 +	return pollflags;
 +}
 +
-+static struct file_operations aioq_fops = {
++static const struct file_operations aioq_fops = {
 +	.release	= aio_queue_fd_close,
 +	.poll		= aio_queue_fd_poll
 +};
@@ -201,7 +201,7 @@ diff -pruN ../orig-linux-2.6.18/fs/eventpoll.c ./fs/eventpoll.c
  		   int maxevents, long timeout);
  static int eventpollfs_delete_dentry(struct dentry *dentry);
 -static struct inode *ep_eventpoll_inode(void);
-+static struct inode *ep_eventpoll_inode(struct file_operations *fops);
++static struct inode *ep_eventpoll_inode(const struct file_operations *fops);
  static int eventpollfs_get_sb(struct file_system_type *fs_type,
  			      int flags, const char *dev_name,
  			      void *data, struct vfsmount *mnt);
@@ -221,7 +221,7 @@ diff -pruN ../orig-linux-2.6.18/fs/eventpoll.c ./fs/eventpoll.c
 -static int ep_getfd(int *efd, struct inode **einode, struct file **efile,
 -		    struct eventpoll *ep)
 +int ep_getfd(int *efd, struct inode **einode, struct file **efile,
-+		    struct eventpoll *ep, struct file_operations *fops)
++		    struct eventpoll *ep, const struct file_operations *fops)
  {
  	struct qstr this;
  	char name[32];
@@ -248,7 +248,7 @@ diff -pruN ../orig-linux-2.6.18/fs/eventpoll.c ./fs/eventpoll.c
  
  
 -static struct inode *ep_eventpoll_inode(void)
-+static struct inode *ep_eventpoll_inode(struct file_operations *fops)
++static struct inode *ep_eventpoll_inode(const struct file_operations *fops)
  {
  	int error = -ENOMEM;
  	struct inode *inode = new_inode(eventpoll_mnt->mnt_sb);
@@ -288,7 +288,7 @@ diff -pruN ../orig-linux-2.6.18/include/linux/eventpoll.h ./include/linux/eventp
 + */
 +struct eventpoll;
 +int ep_getfd(int *efd, struct inode **einode, struct file **efile,
-+             struct eventpoll *ep, struct file_operations *fops);
++             struct eventpoll *ep, const struct file_operations *fops);
  #else
  
  static inline void eventpoll_init_file(struct file *file) {}

@@ -354,7 +354,7 @@ static unsigned int xenbus_dev_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-static struct file_operations xenbus_dev_file_ops = {
+static const struct file_operations xenbus_dev_file_ops = {
 	.read = xenbus_dev_read,
 	.write = xenbus_dev_write,
 	.open = xenbus_dev_open,
