@@ -691,6 +691,14 @@ void __init setup_arch(char **cmdline_p)
 	contig_initmem_init(0, end_pfn);
 #endif
 
+#ifdef CONFIG_XEN
+	/*
+	 * Reserve kernel, physmap, start info, initial page tables, and
+	 * direct mapping.
+	 */
+	reserve_bootmem_generic(__pa_symbol(&_text),
+	                        (table_end << PAGE_SHIFT) - __pa_symbol(&_text));
+#else
 	/* Reserve direct mapping */
 	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
 				(table_end - table_start) << PAGE_SHIFT);
@@ -699,12 +707,6 @@ void __init setup_arch(char **cmdline_p)
 	reserve_bootmem_generic(__pa_symbol(&_text),
 				__pa_symbol(&_end) - __pa_symbol(&_text));
 
-#ifdef CONFIG_XEN
-	/* reserve physmap, start info and initial page tables */
-	reserve_bootmem_generic(__pa_symbol(&_end),
-				(table_start << PAGE_SHIFT) -
-				__pa_symbol(&_end));
-#else
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
 	 * enabling clean reboots, SMP operation, laptop functions.
