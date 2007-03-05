@@ -410,6 +410,7 @@ static inline void __set_pte(pte_t *dst, pte_t val)
 
 static inline int make_readonly(unsigned long paddr)
 {
+	extern char __vsyscall_0;
 	int readonly = 0;
 
 	/* Make new page tables read-only. */
@@ -426,9 +427,12 @@ static inline int make_readonly(unsigned long paddr)
 	/*
 	 * No need for writable mapping of kernel image. This also ensures that
 	 * page and descriptor tables embedded inside don't have writable
-	 * mappings. 
+	 * mappings. Exclude the vsyscall area here, allowing alternative
+	 * instruction patching to work.
 	 */
-	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end)))
+	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end))
+	    && !(paddr >= __pa_symbol(&__vsyscall_0)
+	         && paddr < __pa_symbol(&__vsyscall_0) + PAGE_SIZE))
 		readonly = 1;
 
 	return readonly;

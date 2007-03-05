@@ -62,7 +62,6 @@ time-y				+= ../../i386/kernel/time-xen.o
 pci-dma-y			+= ../../i386/kernel/pci-dma-xen.o
 microcode-$(subst m,y,$(CONFIG_MICROCODE))  := ../../i386/kernel/microcode-xen.o
 quirks-y			:= ../../i386/kernel/quirks-xen.o
-alternative-y			:= ../../i386/kernel/alternative-xen.o
 
 n-obj-xen := i8259.o reboot.o i8237.o smpboot.o trampoline.o
 
