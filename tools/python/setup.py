@@ -44,7 +44,14 @@ acm = Extension("acm",
                libraries          = libraries,
                sources            = [ "xen/lowlevel/acm/acm.c" ])
 
-modules = [ xc, xs, acm ]
+ptsname = Extension("ptsname",
+               extra_compile_args = extra_compile_args,
+               include_dirs       = include_dirs + [ "ptsname" ],
+               library_dirs       = library_dirs,
+               libraries          = libraries,
+               sources            = [ "ptsname/ptsname.c" ])
+
+modules = [ xc, xs, acm, ptsname ]
 if os.uname()[0] == 'SunOS':
     modules.append(scf)
 
