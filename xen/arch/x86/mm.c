@@ -424,7 +424,10 @@ void invalidate_shadow_ldt(struct vcpu *v)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
+    if ( v == current )
+        queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
+    else
+        flush_tlb_mask(v->domain->domain_dirty_cpumask);
 }
 
 
