@@ -64,9 +64,6 @@ ENTRY(startup_32)
 
 	pushl %eax		# fake return address
 	jmp start_kernel
-L6:
-	jmp L6			# main should never return here, but
-				# just in case, we know what happens.
 
 #define HYPERCALL_PAGE_OFFSET 0x1000
 .org HYPERCALL_PAGE_OFFSET
