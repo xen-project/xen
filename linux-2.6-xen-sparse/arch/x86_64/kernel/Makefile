@@ -61,7 +61,6 @@ ifdef CONFIG_XEN
 time-y				+= ../../i386/kernel/time-xen.o
 pci-dma-y			+= ../../i386/kernel/pci-dma-xen.o
 microcode-$(subst m,y,$(CONFIG_MICROCODE))  := ../../i386/kernel/microcode-xen.o
-intel_cacheinfo-y		:= ../../i386/kernel/cpu/intel_cacheinfo-xen.o
 quirks-y			:= ../../i386/kernel/quirks-xen.o
 alternative-y			:= ../../i386/kernel/alternative-xen.o
 
