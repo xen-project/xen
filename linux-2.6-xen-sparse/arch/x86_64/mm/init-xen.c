@@ -1132,7 +1132,7 @@ int kern_addr_valid(unsigned long addr)
 	if (pgd_none(*pgd))
 		return 0;
 
-	pud = pud_offset_k(pgd, addr);
+	pud = pud_offset(pgd, addr);
 	if (pud_none(*pud))
 		return 0; 
 
