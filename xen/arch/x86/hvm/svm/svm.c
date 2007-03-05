@@ -258,15 +258,23 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             goto gp_fault;
         }
 
+        /* 
+         * update the VMCB's EFER with the intended value along with
+         * that crucial EFER.SVME bit =)
+         */
+        vmcb->efer = msr_content | EFER_SVME;
+
 #ifdef __x86_64__
-        /* LME: 0 -> 1 */
-        if ( (msr_content & EFER_LME) 
-             && !svm_lme_is_set(v) )
+
+        /*
+         * Check for EFER.LME transitions from 0->1 or 1->0.  Do the
+         * sanity checks and then make sure that both EFER.LME and
+         * EFER.LMA are cleared.
+         */
+        if ( (msr_content & EFER_LME) && !svm_lme_is_set(v) )
         {
-            /* 
-             * setting EFER.LME is illegal if the guest currently has
-             * enabled or CR4.PAE is not set
-             */
+            /* EFER.LME transition from 0 to 1 */
+            
             if ( svm_paging_enabled(v) ||
                  !svm_cr4_pae_is_set(v) )
             {
@@ -274,18 +282,26 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                          "in paging mode or PAE bit is not set\n");
                 goto gp_fault;
             }
-            
-            v->arch.hvm_svm.cpu_shadow_efer |= EFER_LME;
-        }
 
-        /* We have already recorded that we want LME, so it will be set 
-         * next time CR0 gets updated. So we clear that bit and continue.
-         */
-        if ((msr_content ^ vmcb->efer) & EFER_LME)
-            msr_content &= ~EFER_LME;  
-        /* No update for LME/LMA since it have no effect */
-#endif
-        vmcb->efer = msr_content | EFER_SVME;
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
+        }
+        else if ( !(msr_content & EFER_LME) && svm_lme_is_set(v) )
+        {
+            /* EFER.LME transistion from 1 to 0 */
+            
+            if ( svm_paging_enabled(v) )
+            {
+                gdprintk(XENLOG_WARNING, 
+                         "Trying to clear EFER.LME while paging enabled\n");
+                goto gp_fault;
+            }
+
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
+        }
+#endif /* __x86_64__ */
+
+        /* update the guest EFER's shadow with the intended value */
+        v->arch.hvm_svm.cpu_shadow_efer = msr_content;
         break;
 
 #ifdef __x86_64__
