@@ -187,8 +187,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     switch ((u32)regs->ecx)
     {
     case MSR_EFER:
-        msr_content = vmcb->efer;
-        msr_content &= ~EFER_SVME;
+        msr_content = v->arch.hvm_svm.cpu_shadow_efer;
         break;
 
 #ifdef __x86_64__
