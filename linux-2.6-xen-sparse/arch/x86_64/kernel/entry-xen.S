@@ -116,19 +116,21 @@ NMI_MASK = 0x80000000
 	CFI_ADJUST_CFA_OFFSET	-(6*8)
 	.endm
 
-	.macro	CFI_DEFAULT_STACK start=1
+	.macro	CFI_DEFAULT_STACK start=1,adj=0
 	.if \start
 	CFI_STARTPROC	simple
-	CFI_DEF_CFA	rsp,SS+8
+	CFI_DEF_CFA	rsp,SS+8-(\adj*ARGOFFSET)
 	.else
-	CFI_DEF_CFA_OFFSET SS+8
+	CFI_DEF_CFA_OFFSET SS+8-(\adj*ARGOFFSET)
 	.endif
+	.if \adj == 0
 	CFI_REL_OFFSET	r15,R15
 	CFI_REL_OFFSET	r14,R14
 	CFI_REL_OFFSET	r13,R13
 	CFI_REL_OFFSET	r12,R12
 	CFI_REL_OFFSET	rbp,RBP
 	CFI_REL_OFFSET	rbx,RBX
+	.endif
 	CFI_REL_OFFSET	r11,R11
 	CFI_REL_OFFSET	r10,R10
 	CFI_REL_OFFSET	r9,R9
@@ -363,8 +365,8 @@ ENTRY(int_ret_from_sys_call)
 	CFI_REL_OFFSET	r9,R9-ARGOFFSET
 	CFI_REL_OFFSET	r10,R10-ARGOFFSET
 	CFI_REL_OFFSET	r11,R11-ARGOFFSET
-	TRACE_IRQS_OFF
         XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
 	testb $3,CS-ARGOFFSET(%rsp)
         jnz 1f
         /* Need to set the proper %ss (not NULL) for ring 3 iretq */
@@ -534,7 +536,7 @@ END(stub_rt_sigreturn)
  */ 
 
 retint_check:
-	CFI_DEFAULT_STACK
+	CFI_DEFAULT_STACK adj=1
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
 	CFI_REMEMBER_STATE
@@ -838,6 +840,7 @@ ENTRY(error_entry)
 	CFI_REL_OFFSET	r15,R15
 #if 0        
 	cmpl $__KERNEL_CS,CS(%rsp)
+	CFI_REMEMBER_STATE
 	je  error_kernelspace
 #endif        
 error_call_handler:
@@ -864,7 +867,7 @@ error_exit:
 	TRACE_IRQS_IRETQ
 	jmp   retint_restore_args
 
-error_kernelspace:
+#if 0
          /*
          * We need to re-write the logic here because we don't do iretq to 
          * to return to user mode. It's still possible that we get trap/fault
@@ -872,7 +875,8 @@ error_kernelspace:
          * for example).
          *
          */           
-#if 0
+	CFI_RESTORE_STATE
+error_kernelspace:
 	incl %ebx
        /* There are two places in the kernel that can potentially fault with
           usergs. Handle them here. The exception handlers after
@@ -888,11 +892,13 @@ error_kernelspace:
 	cmpq $gs_change,RIP(%rsp)
         je   error_swapgs
 	jmp  error_sti
-#endif        
+#endif
+	CFI_ENDPROC
 END(error_entry)
 	
 ENTRY(hypervisor_callback)
 	zeroentry do_hypervisor_callback
+END(hypervisor_callback)
         
 /*
  * Copied from arch/xen/i386/kernel/entry.S
@@ -909,48 +915,66 @@ ENTRY(hypervisor_callback)
 # existing activation in its critical region -- if so, we pop the current
 # activation and restart the handler using the previous one.
 ENTRY(do_hypervisor_callback)   # do_hypervisor_callback(struct *pt_regs)
+	CFI_STARTPROC
 # Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
 # see the correct pointer to the pt_regs
 	movq %rdi, %rsp            # we don't return, adjust the stack frame
-11:	movq %gs:pda_irqstackptr,%rax
-	incl %gs:pda_irqcount
-	cmovzq %rax,%rsp
-	pushq %rdi
+	CFI_ENDPROC
+	CFI_DEFAULT_STACK
+11:	incl %gs:pda_irqcount
+	movq %rsp,%rbp
+	CFI_DEF_CFA_REGISTER rbp
+	cmovzq %gs:pda_irqstackptr,%rsp
+	pushq %rbp			# backlink for old unwinder
 	call evtchn_do_upcall
 	popq %rsp
+	CFI_DEF_CFA_REGISTER rsp
 	decl %gs:pda_irqcount
 	jmp  error_exit
+	CFI_ENDPROC
+END(do_hypervisor_callback)
 
 #ifdef CONFIG_X86_LOCAL_APIC
 KPROBE_ENTRY(nmi)
 	zeroentry do_nmi_callback
 ENTRY(do_nmi_callback)
+	CFI_STARTPROC
         addq $8, %rsp
+	CFI_ENDPROC
+	CFI_DEFAULT_STACK
         call do_nmi
         orl  $NMI_MASK,EFLAGS(%rsp)
         RESTORE_REST
         XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
         GET_THREAD_INFO(%rcx)
         jmp  retint_restore_args
+	CFI_ENDPROC
 	.previous .text
+END(nmi)
 #endif
 
         ALIGN
 restore_all_enable_events:  
+	CFI_DEFAULT_STACK adj=1
+	TRACE_IRQS_ON
 	XEN_UNBLOCK_EVENTS(%rsi)        # %rsi is already set up...
 
 scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%rsi)
+	CFI_REMEMBER_STATE
 	jnz  14f			# process more events if necessary...
 	XEN_PUT_VCPU_INFO(%rsi)
         RESTORE_ARGS 0,8,0
         HYPERVISOR_IRET 0
         
+	CFI_RESTORE_STATE
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_PUT_VCPU_INFO(%rsi)
 	SAVE_REST
         movq %rsp,%rdi                  # set the argument again
 	jmp  11b
+	CFI_ENDPROC
 ecrit:  /**** END OF CRITICAL REGION ****/
 # At this point, unlike on x86-32, we don't do the fixup to simplify the 
 # code and the stack frame is more complex on x86-64.
@@ -970,8 +994,12 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # We distinguish between categories by comparing each saved segment register
 # with its current contents: any discrepancy means we in category 1.
 ENTRY(failsafe_callback)
+	_frame (RIP-0x30)
+	CFI_REL_OFFSET rcx, 0
+	CFI_REL_OFFSET r11, 8
 	movw %ds,%cx
 	cmpw %cx,0x10(%rsp)
+	CFI_REMEMBER_STATE
 	jne 1f
 	movw %es,%cx
 	cmpw %cx,0x18(%rsp)
@@ -984,17 +1012,26 @@ ENTRY(failsafe_callback)
 	jne 1f
 	/* All segments match their saved values => Category 2 (Bad IRET). */
 	movq (%rsp),%rcx
+	CFI_RESTORE rcx
 	movq 8(%rsp),%r11
+	CFI_RESTORE r11
 	addq $0x30,%rsp
+	CFI_ADJUST_CFA_OFFSET -0x30
 	movq $11,%rdi	/* SIGSEGV */
 	jmp do_exit			
+	CFI_RESTORE_STATE
 1:	/* Segment mismatch => Category 1 (Bad segment). Retry the IRET. */
 	movq (%rsp),%rcx
+	CFI_RESTORE rcx
 	movq 8(%rsp),%r11
+	CFI_RESTORE r11
 	addq $0x30,%rsp
+	CFI_ADJUST_CFA_OFFSET -0x30
 	pushq $0
+	CFI_ADJUST_CFA_OFFSET 8
 	SAVE_ALL
 	jmp error_exit
+	CFI_ENDPROC
 #if 0	      
         .section __ex_table,"a"
         .align 8
@@ -1117,12 +1154,12 @@ END(device_not_available)
 
 	/* runs on exception stack */
 KPROBE_ENTRY(debug)
- 	INTR_FRAME
-/*	pushq $0
+/* 	INTR_FRAME
+	pushq $0
 	CFI_ADJUST_CFA_OFFSET 8	*/
 	zeroentry do_debug
-/*	paranoid_exit */
-	CFI_ENDPROC
+/*	paranoidexit
+	CFI_ENDPROC */
 END(debug)
 	.previous .text
 
@@ -1144,12 +1181,12 @@ END(nmi)
 #endif        
 
 KPROBE_ENTRY(int3)
- 	INTR_FRAME
-/* 	pushq $0
+/* 	INTR_FRAME
+ 	pushq $0
  	CFI_ADJUST_CFA_OFFSET 8 */
  	zeroentry do_int3
-/* 	jmp paranoid_exit1 */
- 	CFI_ENDPROC
+/* 	jmp paranoid_exit1
+ 	CFI_ENDPROC */
 END(int3)
 	.previous .text
 
@@ -1193,9 +1230,11 @@ END(segment_not_present)
 
 	/* runs on exception stack */
 ENTRY(stack_segment)
-	XCPT_FRAME
+/*	XCPT_FRAME
+	paranoidentry do_stack_segment */
 	errorentry do_stack_segment
-	CFI_ENDPROC
+/*	jmp paranoid_exit1
+	CFI_ENDPROC */
 END(stack_segment)
 
 KPROBE_ENTRY(general_protection)

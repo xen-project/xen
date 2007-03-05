@@ -9,6 +9,7 @@
 #include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
+#include <asm/dwarf2.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
 
@@ -70,7 +71,9 @@ L6:
 #define HYPERCALL_PAGE_OFFSET 0x1000
 .org HYPERCALL_PAGE_OFFSET
 ENTRY(hypercall_page)
+	CFI_STARTPROC
 .skip 0x1000
+	CFI_ENDPROC
 
 /*
  * Real beginning of normal "text" segment

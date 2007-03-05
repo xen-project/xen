@@ -368,6 +368,7 @@ sysexit_scrit:	/**** START OF SYSEXIT CRITICAL REGION ****/
 	movl ESI(%esp), %esi
 	sysexit
 14:	__DISABLE_INTERRUPTS
+	TRACE_IRQS_OFF
 sysexit_ecrit:	/**** END OF SYSEXIT CRITICAL REGION ****/
 	push %esp
 	call evtchn_do_upcall
@@ -427,11 +428,13 @@ restore_nocheck:
 restore_nocheck:
 	movl EFLAGS(%esp), %eax
 	testl $(VM_MASK|NMI_MASK), %eax
+	CFI_REMEMBER_STATE
 	jnz hypervisor_iret
 	shr $9, %eax			# EAX[0] == IRET_EFLAGS.IF
 	GET_VCPU_INFO
 	andb evtchn_upcall_mask(%esi),%al
 	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
+	CFI_REMEMBER_STATE
 	jnz restore_all_enable_events	#        != 0 => enable event delivery
 #endif
 	TRACE_IRQS_IRET
@@ -455,8 +458,8 @@ iret_exc:
 	.long 1b,iret_exc
 .previous
 
-#ifndef CONFIG_XEN
 	CFI_RESTORE_STATE
+#ifndef CONFIG_XEN
 ldt_ss:
 	larl OLDSS(%esp), %eax
 	jnz restore_nocheck
@@ -485,14 +488,36 @@ ldt_ss:
 	.align 4
 	.long 1b,iret_exc
 .previous
-	CFI_ENDPROC
 #else
+        ALIGN
+restore_all_enable_events:
+	TRACE_IRQS_ON
+	__ENABLE_INTERRUPTS
+scrit:	/**** START OF CRITICAL REGION ****/
+	__TEST_PENDING
+	jnz  14f			# process more events if necessary...
+	RESTORE_REGS
+	addl $4, %esp
+	CFI_ADJUST_CFA_OFFSET -4
+1:	iret
+.section __ex_table,"a"
+	.align 4
+	.long 1b,iret_exc
+.previous
+14:	__DISABLE_INTERRUPTS
+	TRACE_IRQS_OFF
+	jmp  11f
+ecrit:  /**** END OF CRITICAL REGION ****/
+
+	CFI_RESTORE_STATE
 hypervisor_iret:
 	andl $~NMI_MASK, EFLAGS(%esp)
 	RESTORE_REGS
 	addl $4, %esp
+	CFI_ADJUST_CFA_OFFSET -4
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 #endif
+	CFI_ENDPROC
 
 	# perform work that needs to be done immediately before resumption
 	ALIGN
@@ -736,7 +761,9 @@ error_code:
 # critical region we know that the entire frame is present and correct
 # so we can simply throw away the new one.
 ENTRY(hypervisor_callback)
+	RING0_INT_FRAME
 	pushl %eax
+	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
 	movl EIP(%esp),%eax
 	cmpl $scrit,%eax
@@ -749,26 +776,13 @@ ENTRY(hypervisor_callback)
 	ja   11f
 	addl $OLDESP,%esp		# Remove eflags...ebx from stack frame.
 11:	push %esp
+	CFI_ADJUST_CFA_OFFSET 4
 	call evtchn_do_upcall
 	add  $4,%esp
+	CFI_ADJUST_CFA_OFFSET -4
 	jmp  ret_from_intr
+	CFI_ENDPROC
 
-        ALIGN
-restore_all_enable_events:
-	__ENABLE_INTERRUPTS
-scrit:	/**** START OF CRITICAL REGION ****/
-	__TEST_PENDING
-	jnz  14f			# process more events if necessary...
-	RESTORE_REGS
-	addl $4, %esp
-1:	iret
-.section __ex_table,"a"
-	.align 4
-	.long 1b,iret_exc
-.previous
-14:	__DISABLE_INTERRUPTS
-	jmp  11b
-ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
 # just-interrupted frame. How we do this depends on where in the critical
 # region the interrupted handler was executing, and so how many saved
@@ -835,6 +849,7 @@ ENTRY(failsafe_callback)
 	addl $16,%esp		# EAX != 0 => Category 2 (Bad IRET)
 	jmp iret_exc
 5:	addl $16,%esp		# EAX == 0 => Category 1 (Bad segment)
+	RING0_INT_FRAME
 	pushl $0
 	SAVE_ALL
 	jmp ret_from_exception
@@ -860,6 +875,7 @@ ENTRY(failsafe_callback)
 	.long 4b,9b;		\
 .previous
 #endif
+	CFI_ENDPROC
 
 ENTRY(coprocessor_error)
 	RING0_INT_FRAME
@@ -1187,8 +1203,11 @@ ENDPROC(arch_unwind_init_running)
 #endif
 
 ENTRY(fixup_4gb_segment)
+	RING0_EC_FRAME
 	pushl $do_fixup_4gb_segment
+	CFI_ADJUST_CFA_OFFSET 4
 	jmp error_code
+	CFI_ENDPROC
 
 .section .rodata,"a"
 .align 4
