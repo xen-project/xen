@@ -34,6 +34,41 @@ extern void arch_svm_do_resume(struct vcpu *v);
 
 extern u64 root_vmcb_pa[NR_CPUS];
 
+static inline int svm_long_mode_enabled(struct vcpu *v)
+{
+    u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;
+    return guest_efer & EFER_LMA;
+}
+
+static inline int svm_lme_is_set(struct vcpu *v)
+{
+    u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;
+    return guest_efer & EFER_LME;
+}
+
+static inline int svm_cr4_pae_is_set(struct vcpu *v)
+{
+    unsigned long guest_cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+    return guest_cr4 & X86_CR4_PAE;
+}
+
+static inline int svm_paging_enabled(struct vcpu *v)
+{
+    unsigned long guest_cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+    return (guest_cr0 & X86_CR0_PE) && (guest_cr0 & X86_CR0_PG);
+}
+
+static inline int svm_pae_enabled(struct vcpu *v)
+{
+    unsigned long guest_cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+    return svm_paging_enabled(v) && (guest_cr4 & X86_CR4_PAE);
+}
+
+static inline int svm_pgbit_test(struct vcpu *v)
+{
+    return v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PG;
+}
+
 #define SVM_REG_EAX (0) 
 #define SVM_REG_ECX (1) 
 #define SVM_REG_EDX (2) 

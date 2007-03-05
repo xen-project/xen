@@ -24,8 +24,10 @@
 #include <asm/msr.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
+
 
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
         int inst_len);
@@ -133,13 +135,15 @@ static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb,
 #define sib operand [1]
 
 
-unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb, 
-        struct cpu_user_regs *regs, const u8 prefix, int inst_len,
-        const u8 *operand, u8 *size)
+unsigned long get_effective_addr_modrm64(struct cpu_user_regs *regs, 
+                                         const u8 prefix, int inst_len,
+                                         const u8 *operand, u8 *size)
 {
     unsigned long effective_addr = (unsigned long) -1;
     u8 length, modrm_mod, modrm_rm;
     u32 disp = 0;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "get_effective_addr_modrm64(): prefix = %x, "
             "length = %d, operand[0,1] = %x %x.\n", prefix, *size, operand [0],
@@ -198,7 +202,7 @@ unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb,
 
 #if __x86_64__
         /* 64-bit mode */
-        if (vmcb->cs.attr.fields.l && (vmcb->efer & EFER_LMA))
+        if (vmcb->cs.attr.fields.l && svm_long_mode_enabled(v))
             return vmcb->rip + inst_len + *size + disp;
 #endif
         return disp;
@@ -310,7 +314,7 @@ unsigned int decode_src_reg(u8 prefix, u8 m)
 }
 
 
-unsigned long svm_rip2pointer(struct vmcb_struct *vmcb)
+unsigned long svm_rip2pointer(struct vcpu *v)
 {
     /*
      * The following is subtle. Intuitively this code would be something like:
@@ -322,8 +326,9 @@ unsigned long svm_rip2pointer(struct vmcb_struct *vmcb)
      * %cs is update, but fortunately, base contain the valid base address
      * no matter what kind of addressing is used.
      */
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long p = vmcb->cs.base + vmcb->rip;
-    if (!(vmcb->cs.attr.fields.l && vmcb->efer & EFER_LMA))
+    if (!(vmcb->cs.attr.fields.l && svm_long_mode_enabled(v)))
         return (u32)p; /* mask to 32 bits */
     /* NB. Should mask to 16 bits if in real mode or 16-bit protected mode. */
     return p;
@@ -410,10 +415,11 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
  * The caller can either pass a NULL pointer to the guest_eip_buf, or a pointer
  * to enough bytes to satisfy the instruction including prefix bytes.
  */
-int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
+int __get_instruction_length_from_list(struct vcpu *v,
         enum instruction_index *list, unsigned int list_count, 
         u8 *guest_eip_buf, enum instruction_index *match)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned int inst_len = 0;
     unsigned int i;
     unsigned int j;
@@ -429,7 +435,7 @@ int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
     }
     else
     {
-        inst_copy_from_guest(buffer, svm_rip2pointer(vmcb), MAX_INST_LEN);
+        inst_copy_from_guest(buffer, svm_rip2pointer(v), MAX_INST_LEN);
         buf = buffer;
     }
 

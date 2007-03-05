@@ -148,35 +148,6 @@ static void svm_store_cpu_guest_regs(
     }
 }
 
-static int svm_lme_is_set(struct vcpu *v)
-{
-    u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;
-    return guest_efer & EFER_LME;
-}
-
-static int svm_cr4_pae_is_set(struct vcpu *v)
-{
-    unsigned long guest_cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
-    return guest_cr4 & X86_CR4_PAE;
-}
-
-static int svm_paging_enabled(struct vcpu *v)
-{
-    unsigned long guest_cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
-    return (guest_cr0 & X86_CR0_PE) && (guest_cr0 & X86_CR0_PG);
-}
-
-static int svm_pae_enabled(struct vcpu *v)
-{
-    unsigned long guest_cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
-    return svm_paging_enabled(v) && (guest_cr4 & X86_CR4_PAE);
-}
-
-static int svm_long_mode_enabled(struct vcpu *v)
-{
-    u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;
-    return guest_efer & EFER_LMA;
-}
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
@@ -657,7 +628,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( (vmcb->efer & EFER_LMA) && vmcb->cs.attr.fields.l )
+    if ( svm_long_mode_enabled(v) && vmcb->cs.attr.fields.l )
         return 8;
 
     if ( svm_realmode(v) )
@@ -707,7 +678,7 @@ static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
     int long_mode = 0;
 
 #ifdef __x86_64__
-    long_mode = vmcb->cs.attr.fields.l && (vmcb->efer & EFER_LMA);
+    long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
 #endif
     switch ( seg )
     {
@@ -1140,7 +1111,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
         printk("Huh? We got a GP Fault with an invalid IDTR!\n");
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(vmcb));
+        svm_dump_inst(svm_rip2pointer(v));
         domain_crash(v->domain);
         return;
     }
@@ -1235,7 +1206,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     HVMTRACE_3D(CPUID, v, input,
                 ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
 
-    inst_len = __get_instruction_length(vmcb, INSTR_CPUID, NULL);
+    inst_len = __get_instruction_length(v, INSTR_CPUID, NULL);
     ASSERT(inst_len > 0);
     __update_guest_eip(vmcb, inst_len);
 }
@@ -1338,15 +1309,16 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 }
 
 
-static void svm_get_prefix_info(
-    struct vmcb_struct *vmcb, 
-    unsigned int dir, svm_segment_register_t **seg, unsigned int *asize)
+static void svm_get_prefix_info(struct vcpu *v, unsigned int dir, 
+                                svm_segment_register_t **seg, 
+                                unsigned int *asize)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned char inst[MAX_INST_LEN];
     int i;
 
     memset(inst, 0, MAX_INST_LEN);
-    if (inst_copy_from_guest(inst, svm_rip2pointer(vmcb), sizeof(inst)) 
+    if (inst_copy_from_guest(inst, svm_rip2pointer(v), sizeof(inst)) 
         != MAX_INST_LEN) 
     {
         gdprintk(XENLOG_ERR, "get guest instruction failed\n");
@@ -1426,7 +1398,7 @@ static inline int svm_get_io_address(
 
 #ifdef __x86_64__
     /* If we're in long mode, we shouldn't check the segment presence & limit */
-    long_mode = vmcb->cs.attr.fields.l && vmcb->efer & EFER_LMA;
+    long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
 #endif
 
     /* d field of cs.attr is 1 for 32-bit, 0 for 16 or 64 bit. 
@@ -1445,7 +1417,7 @@ static inline int svm_get_io_address(
         isize --;
 
     if (isize > 1) 
-        svm_get_prefix_info(vmcb, info.fields.type, &seg, &asize);
+        svm_get_prefix_info(v, info.fields.type, &seg, &asize);
 
     if (info.fields.type == IOREQ_WRITE)
     {
@@ -1876,12 +1848,6 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 }
 
 
-static inline int svm_pgbit_test(struct vcpu *v)
-{
-    return v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PG;
-}
-
-
 /*
  * Write to control registers
  */
@@ -2046,7 +2012,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     ASSERT(vmcb);
 
-    inst_copy_from_guest(buffer, svm_rip2pointer(vmcb), sizeof(buffer));
+    inst_copy_from_guest(buffer, svm_rip2pointer(v), sizeof(buffer));
 
     /* get index to first actual instruction byte - as we will need to know 
        where the prefix lives later on */
@@ -2055,12 +2021,12 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     if ( type == TYPE_MOV_TO_CR )
     {
         inst_len = __get_instruction_length_from_list(
-            vmcb, list_a, ARR_SIZE(list_a), &buffer[index], &match);
+            v, list_a, ARR_SIZE(list_a), &buffer[index], &match);
     }
     else /* type == TYPE_MOV_FROM_CR */
     {
         inst_len = __get_instruction_length_from_list(
-            vmcb, list_b, ARR_SIZE(list_b), &buffer[index], &match);
+            v, list_b, ARR_SIZE(list_b), &buffer[index], &match);
     }
 
     ASSERT(inst_len > 0);
@@ -2095,7 +2061,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     case INSTR_LMSW:
         if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(vmcb));
+            svm_dump_inst(svm_rip2pointer(v));
         
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
@@ -2114,7 +2080,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     case INSTR_SMSW:
         if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(vmcb));
+            svm_dump_inst(svm_rip2pointer(v));
         value = v->arch.hvm_svm.cpu_shadow_cr0;
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         set_reg(gpreg, value, regs, vmcb);
@@ -2190,7 +2156,7 @@ static inline void svm_do_msr_access(
         HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                     ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
 
-        inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
+        inst_len = __get_instruction_length(v, INSTR_RDMSR, NULL);
     }
     else
     {
@@ -2222,7 +2188,7 @@ static inline void svm_do_msr_access(
             break;
         }
 
-        inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
+        inst_len = __get_instruction_length(v, INSTR_WRMSR, NULL);
     }
 
     __update_guest_eip(vmcb, inst_len);
@@ -2245,8 +2211,9 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 }
 
 
-static void svm_vmexit_do_invd(struct vmcb_struct *vmcb)
+static void svm_vmexit_do_invd(struct vcpu *v)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
     
     /* Invalidate the cache - we can't really do that safely - maybe we should 
@@ -2259,7 +2226,7 @@ static void svm_vmexit_do_invd(struct vmcb_struct *vmcb)
      */
     printk("INVD instruction intercepted - ignored\n");
     
-    inst_len = __get_instruction_length(vmcb, INSTR_INVD, NULL);
+    inst_len = __get_instruction_length(v, INSTR_INVD, NULL);
     __update_guest_eip(vmcb, inst_len);
 }    
         
@@ -2311,7 +2278,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
      * Unknown how many bytes the invlpg instruction will take.  Use the
      * maximum instruction length here
      */
-    if (inst_copy_from_guest(opcode, svm_rip2pointer(vmcb), length) < length)
+    if (inst_copy_from_guest(opcode, svm_rip2pointer(v), length) < length)
     {
         gdprintk(XENLOG_ERR, "Error reading memory %d bytes\n", length);
         domain_crash(v->domain);
@@ -2320,7 +2287,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
     if (invlpga)
     {
-        inst_len = __get_instruction_length(vmcb, INSTR_INVLPGA, opcode);
+        inst_len = __get_instruction_length(v, INSTR_INVLPGA, opcode);
         ASSERT(inst_len > 0);
         __update_guest_eip(vmcb, inst_len);
 
@@ -2334,7 +2301,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
     {
         /* What about multiple prefix codes? */
         prefix = (is_prefix(opcode[0])?opcode[0]:0);
-        inst_len = __get_instruction_length(vmcb, INSTR_INVLPG, opcode);
+        inst_len = __get_instruction_length(v, INSTR_INVLPG, opcode);
         ASSERT(inst_len > 0);
 
         inst_len--;
@@ -2345,7 +2312,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
          * displacement to get effective address and length in bytes.  Assume
          * the system in either 32- or 64-bit mode.
          */
-        g_vaddr = get_effective_addr_modrm64(vmcb, regs, prefix, inst_len,
+        g_vaddr = get_effective_addr_modrm64(regs, prefix, inst_len,
                                              &opcode[inst_len], &length);
 
         inst_len += length;
@@ -2466,7 +2433,7 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
     ASSERT(vmcb);
     ASSERT(regs);
 
-    inst_len = __get_instruction_length(vmcb, INSTR_VMCALL, NULL);
+    inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
     ASSERT(inst_len > 0);
 
     HVMTRACE_1D(VMMCALL, v, regs->eax);
@@ -2876,7 +2843,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
             svm_dump_vmcb(__func__, vmcb);
             svm_dump_regs(__func__, regs);
-            svm_dump_inst(svm_rip2pointer(vmcb));
+            svm_dump_inst(svm_rip2pointer(v));
         }
 
 #if defined(__i386__)
@@ -2978,7 +2945,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         /* Debug info to hopefully help debug WHY the guest double-faulted. */
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(vmcb));
+        svm_dump_inst(svm_rip2pointer(v));
         svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
 
@@ -2988,7 +2955,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVD:
-        svm_vmexit_do_invd(vmcb);
+        svm_vmexit_do_invd(v);
         break;
 
     case VMEXIT_GDTR_WRITE:

@@ -76,7 +76,7 @@ enum instruction_index {
 };
 
 
-extern unsigned long get_effective_addr_modrm64(struct vmcb_struct *vmcb, 
+extern unsigned long get_effective_addr_modrm64(
         struct cpu_user_regs *regs, const u8 prefix, int inst_len,
         const u8 *operand, u8 *size);
 extern unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb, 
@@ -85,17 +85,17 @@ extern unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb,
 extern OPERATING_MODE get_operating_mode (struct vmcb_struct *vmcb);
 extern unsigned int decode_dest_reg(u8 prefix, u8 modrm);
 extern unsigned int decode_src_reg(u8 prefix, u8 modrm);
-extern unsigned long svm_rip2pointer(struct vmcb_struct *vmcb);
-extern int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
+extern unsigned long svm_rip2pointer(struct vcpu *v);
+extern int __get_instruction_length_from_list(struct vcpu *v,
         enum instruction_index *list, unsigned int list_count, 
         u8 *guest_eip_buf, enum instruction_index *match);
 
 
-static inline int __get_instruction_length(struct vmcb_struct *vmcb, 
+static inline int __get_instruction_length(struct vcpu *v, 
         enum instruction_index instr, u8 *guest_eip_buf)
 {
     return __get_instruction_length_from_list(
-        vmcb, &instr, 1, guest_eip_buf, NULL);
+        v, &instr, 1, guest_eip_buf, NULL);
 }
 
 
