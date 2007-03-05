@@ -676,7 +676,8 @@ void __init setup_arch(char **cmdline_p)
 
 	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
-	/* dmi_scan_machine(); */
+	if (is_initial_xendomain())
+		dmi_scan_machine();
 
 #ifdef CONFIG_ACPI_NUMA
 	/*
@@ -1626,13 +1627,6 @@ struct seq_operations cpuinfo_op = {
 	.stop =	c_stop,
 	.show =	show_cpuinfo,
 };
-
-static int __init run_dmi_scan(void)
-{
-	dmi_scan_machine();
-	return 0;
-}
-core_initcall(run_dmi_scan);
 
 #if defined(CONFIG_INPUT_PCSPKR) || defined(CONFIG_INPUT_PCSPKR_MODULE)
 #include <linux/platform_device.h>

@@ -214,7 +214,11 @@ static __init void *spp_getpage(void)
 	void *ptr;
 	if (after_bootmem)
 		ptr = (void *) get_zeroed_page(GFP_ATOMIC); 
-	else
+	else if (start_pfn < table_end) {
+		ptr = __va(start_pfn << PAGE_SHIFT);
+		start_pfn++;
+		memset(ptr, 0, PAGE_SIZE);
+	} else
 		ptr = alloc_bootmem_pages(PAGE_SIZE);
 	if (!ptr || ((unsigned long)ptr & ~PAGE_MASK))
 		panic("set_pte_phys: cannot allocate page data %s\n", after_bootmem?"after bootmem":"");
@@ -438,17 +442,34 @@ static inline int make_readonly(unsigned long paddr)
 	return readonly;
 }
 
+#ifndef CONFIG_XEN
 /* Must run before zap_low_mappings */
 __init void *early_ioremap(unsigned long addr, unsigned long size)
 {
-	return ioremap(addr, size);
+	unsigned long map = round_down(addr, LARGE_PAGE_SIZE);
+
+	/* actually usually some more */
+	if (size >= LARGE_PAGE_SIZE) {
+		printk("SMBIOS area too long %lu\n", size);
+		return NULL;
+	}
+	set_pmd(temp_mappings[0].pmd,  __pmd(map | _KERNPG_TABLE | _PAGE_PSE));
+	map += LARGE_PAGE_SIZE;
+	set_pmd(temp_mappings[1].pmd,  __pmd(map | _KERNPG_TABLE | _PAGE_PSE));
+	__flush_tlb();
+	return temp_mappings[0].address + (addr & (LARGE_PAGE_SIZE-1));
 }
 
 /* To avoid virtual aliases later */
 __init void early_iounmap(void *addr, unsigned long size)
 {
-	iounmap(addr);
+	if ((void *)round_down((unsigned long)addr, LARGE_PAGE_SIZE) != temp_mappings[0].address)
+		printk("early_iounmap: bad address %p\n", addr);
+	set_pmd(temp_mappings[0].pmd, __pmd(0));
+	set_pmd(temp_mappings[1].pmd, __pmd(0));
+	__flush_tlb();
 }
+#endif
 
 static void __meminit
 phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
@@ -646,9 +667,9 @@ static void __init extend_init_mapping(unsigned long tables_space)
 	}
 }
 
-static void __init find_early_table_space(unsigned long end)
+static unsigned long __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, ptes, tables; 
+	unsigned long puds, pmds, ptes, tables, fixmap_tables;
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
@@ -658,7 +679,16 @@ static void __init find_early_table_space(unsigned long end)
 		round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
 
-	extend_init_mapping(tables);
+	/* Also reserve pages for fixmaps that need to be set up early.
+	 * Their pud is shared with the kernel pud.
+	 */
+	pmds = (PMD_SIZE - 1 - FIXADDR_START) >> PMD_SHIFT;
+	ptes = (PTE_SIZE - 1 - FIXADDR_START) >> PAGE_SHIFT;
+
+	fixmap_tables = round_up(pmds * 8, PAGE_SIZE) +
+		round_up(ptes * 8, PAGE_SIZE);
+
+	extend_init_mapping(tables + fixmap_tables);
 
 	table_start = start_pfn;
 	table_end = table_start + (tables>>PAGE_SHIFT);
@@ -666,6 +696,8 @@ static void __init find_early_table_space(unsigned long end)
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
 		end, table_start << PAGE_SHIFT,
 		(table_start << PAGE_SHIFT) + tables);
+
+	return table_end + (fixmap_tables>>PAGE_SHIFT);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
@@ -673,7 +705,7 @@ static void __init find_early_table_space(unsigned long end)
    physical memory. To access them they are temporarily mapped. */
 void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 { 
-	unsigned long next; 
+	unsigned long next, table_rsrv_end = 0;
 
 	Dprintk("init_memory_mapping\n");
 
@@ -684,7 +716,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 	 * discovered.
 	 */
 	if (!after_bootmem)
-		find_early_table_space(end);
+		table_rsrv_end = find_early_table_space(end);
 
 	start = (unsigned long)__va(start);
 	end = (unsigned long)__va(end);
@@ -712,6 +744,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 
 	if (!after_bootmem) {
 		BUG_ON(start_pfn != table_end);
+		table_end = table_rsrv_end;
 
 		/* Re-vector virtual addresses pointing into the initial
 		   mapping to the just-established permanent ones. */
@@ -737,6 +770,24 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 		for (; start < end; start += PAGE_SIZE)
 			WARN_ON(HYPERVISOR_update_va_mapping(
 				start, __pte_ma(0), 0));
+
+		/* Switch to the real shared_info page, and clear the
+		 * dummy page. */
+		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+		HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+
+		/* Setup mapping of lower 1st MB */
+		for (next = 0; next < NR_FIX_ISAMAPS; next++)
+			if (is_initial_xendomain())
+				set_fixmap(FIX_ISAMAP_BEGIN - next, next * PAGE_SIZE);
+			else
+				__set_fixmap(FIX_ISAMAP_BEGIN - next,
+					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
+					     PAGE_KERNEL_RO);
+
+		BUG_ON(start_pfn > table_end);
+		table_end = start_pfn;
 	}
 
 	__flush_tlb_all();
@@ -815,7 +866,6 @@ size_zones(unsigned long *z, unsigned long *h,
 void __init paging_init(void)
 {
 	unsigned long zones[MAX_NR_ZONES], holes[MAX_NR_ZONES];
-	int i;
 
 	memory_present(0, 0, end_pfn);
 	sparse_init();
@@ -823,22 +873,7 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	/* Switch to the real shared_info page, and clear the
-	 * dummy page. */
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
-
 	init_mm.context.pinned = 1;
-
-	/* Setup mapping of lower 1st MB */
-	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (is_initial_xendomain())
-			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
-		else
-			__set_fixmap(FIX_ISAMAP_BEGIN - i,
-				     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
-				     PAGE_KERNEL_RO);
 }
 #endif
 
