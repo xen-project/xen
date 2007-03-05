@@ -18,8 +18,9 @@ build:
 
 .PHONY: install
 ifndef XEN_PYTHON_NATIVE_INSTALL
+install: LIBPATH=$(shell PYTHONPATH=xen/util python -c "import auxbin; print auxbin.libpath()")
 install: install-messages
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix="" --force
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix="" --force --install-lib="$(DESTDIR)$(LIBPATH)/python"
 else
 install: install-messages
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
