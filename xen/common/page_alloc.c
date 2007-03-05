@@ -342,8 +342,8 @@ static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned zone_hi,
     unsigned int cpu, unsigned int order)
 {
-    unsigned int i, j, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
-    unsigned int zone, request = (1UL << order);
+    int i, j, zone, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
+    unsigned long request = 1UL << order;
     struct page_info *pg;
 
     ASSERT(node >= 0);
@@ -426,7 +426,7 @@ static void free_heap_pages(
     /* Merge chunks as far as possible. */
     while ( order < MAX_ORDER )
     {
-        mask = 1 << order;
+        mask = 1UL << order;
 
         if ( (page_to_mfn(pg) & mask) )
         {
