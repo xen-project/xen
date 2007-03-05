@@ -102,13 +102,10 @@ static void __meminit early_make_page_readonly(void *va, unsigned int feature)
 		BUG();
 }
 
-void make_page_readonly(void *va, unsigned int feature)
+static void __make_page_readonly(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (xen_feature(feature))
-		return;
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
@@ -120,16 +117,13 @@ void make_page_readonly(void *va, unsigned int feature)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT), feature);
+		__make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
-void make_page_writable(void *va, unsigned int feature)
+static void __make_page_writable(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (xen_feature(feature))
-		return;
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
@@ -141,7 +135,19 @@ void make_page_writable(void *va, unsigned int feature)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT), feature);
+		__make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
+}
+
+void make_page_readonly(void *va, unsigned int feature)
+{
+	if (!xen_feature(feature))
+		__make_page_readonly(va);
+}
+
+void make_page_writable(void *va, unsigned int feature)
+{
+	if (!xen_feature(feature))
+		__make_page_writable(va);
 }
 
 void make_pages_readonly(void *va, unsigned nr, unsigned int feature)
@@ -150,7 +156,7 @@ void make_pages_readonly(void *va, unsigned nr, unsigned int feature)
 		return;
 
 	while (nr-- != 0) {
-		make_page_readonly(va, feature);
+		__make_page_readonly(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
@@ -161,7 +167,7 @@ void make_pages_writable(void *va, unsigned nr, unsigned int feature)
 		return;
 
 	while (nr-- != 0) {
-		make_page_writable(va, feature);
+		__make_page_writable(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
@@ -1028,11 +1034,6 @@ void __init mem_init(void)
 
 void free_init_pages(char *what, unsigned long begin, unsigned long end)
 {
-#ifdef __DO_LATER__
-	/*
-	 * Some pages can be pinned, but some are not. Unpinning such pages 
-	 * triggers BUG(). 
-	 */
 	unsigned long addr;
 
 	if (begin >= end)
@@ -1044,25 +1045,27 @@ void free_init_pages(char *what, unsigned long begin, unsigned long end)
 		init_page_count(virt_to_page(addr));
 		memset((void *)(addr & ~(PAGE_SIZE-1)),
 		       POISON_FREE_INITMEM, PAGE_SIZE); 
-		make_page_writable(
-			__va(__pa(addr)), XENFEAT_writable_page_tables);
-		/*
-		 * Make pages from __PAGE_OFFSET address as well
-		 */
-		make_page_writable(
-			(void *)addr, XENFEAT_writable_page_tables);
+		if (addr >= __START_KERNEL_map) {
+			/* make_readonly() reports all kernel addresses. */
+			__make_page_writable(__va(__pa(addr)));
+			if (HYPERVISOR_update_va_mapping(addr, __pte(0), 0)) {
+				pgd_t *pgd = pgd_offset_k(addr);
+				pud_t *pud = pud_offset(pgd, addr);
+				pmd_t *pmd = pmd_offset(pud, addr);
+				pte_t *pte = pte_offset_kernel(pmd, addr);
+
+				xen_l1_entry_update(pte, __pte(0)); /* fallback */
+			}
+		}
 		free_page(addr);
 		totalram_pages++;
 	}
-#endif
 }
 
 void free_initmem(void)
 {
-#ifdef __DO_LATER__
 	memset(__initdata_begin, POISON_FREE_INITDATA,
 		__initdata_end - __initdata_begin);
-#endif
 	free_init_pages("unused kernel memory",
 			(unsigned long)(&__init_begin),
 			(unsigned long)(&__init_end));
