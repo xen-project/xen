@@ -2090,26 +2090,26 @@ class XendDomainInfo:
         return self.info.get('tools_version', {})
     
     def get_on_shutdown(self):
-        after_shutdown = self.info.get('action_after_shutdown')
+        after_shutdown = self.info.get('actions_after_shutdown')
         if not after_shutdown or after_shutdown not in XEN_API_ON_NORMAL_EXIT:
             return XEN_API_ON_NORMAL_EXIT[-1]
         return after_shutdown
 
     def get_on_reboot(self):
-        after_reboot = self.info.get('action_after_reboot')
+        after_reboot = self.info.get('actions_after_reboot')
         if not after_reboot or after_reboot not in XEN_API_ON_NORMAL_EXIT:
             return XEN_API_ON_NORMAL_EXIT[-1]
         return after_reboot
 
     def get_on_suspend(self):
         # TODO: not supported        
-        after_suspend = self.info.get('action_after_suspend') 
+        after_suspend = self.info.get('actions_after_suspend') 
         if not after_suspend or after_suspend not in XEN_API_ON_NORMAL_EXIT:
             return XEN_API_ON_NORMAL_EXIT[-1]
         return after_suspend        
 
     def get_on_crash(self):
-        after_crash = self.info.get('action_after_crash')
+        after_crash = self.info.get('actions_after_crash')
         if not after_crash or after_crash not in XEN_API_ON_CRASH_BEHAVIOUR:
             return XEN_API_ON_CRASH_BEHAVIOUR[0]
         return after_crash
