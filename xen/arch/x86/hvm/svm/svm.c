@@ -1787,7 +1787,7 @@ static int svm_set_cr0(unsigned long value)
     {
         if ( svm_long_mode_enabled(v) )
         {
-            vmcb->efer &= ~EFER_LMA;
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
             v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
         }
         /* we should take care of this kind of situation */
