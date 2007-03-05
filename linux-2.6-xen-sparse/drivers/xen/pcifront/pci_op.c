@@ -239,17 +239,12 @@ static void free_root_bus_devs(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
 
-	down_write(&pci_bus_sem);
 	while (!list_empty(&bus->devices)) {
-		dev = container_of(bus->devices.next, struct pci_dev, bus_list);
-		up_write(&pci_bus_sem);
-
+		dev = container_of(bus->devices.next, struct pci_dev,
+				   bus_list);
 		dev_dbg(&dev->dev, "removing device\n");
 		pci_remove_bus_device(dev);
-
-		down_write(&pci_bus_sem);
 	}
-	up_write(&pci_bus_sem);
 }
 
 void pcifront_free_roots(struct pcifront_device *pdev)
