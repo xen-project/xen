@@ -24,8 +24,8 @@ SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-SUBDIRS-y += python
-SUBDIRS-y += pygrub
+SUBDIRS-$(PYTHON_TOOLS) += python
+SUBDIRS-$(PYTHON_TOOLS) += pygrub
 endif
 
 .PHONY: all
