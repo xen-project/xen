@@ -22,7 +22,7 @@ import xen.lowlevel.xc
 
 from xen.util import Brctl
 
-from xen.xend import uuid
+from xen.xend import uuid, arch
 from xen.xend.XendError import *
 from xen.xend.XendOptions import instance as xendoptions
 from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
@@ -98,20 +98,37 @@ class XendNode:
             log.error(self.cpus[u])
             number = self.cpus[u]['number']
             # We can run off the end of the cpuinfo list if domain0 does not
-            # have #vcpus == #pcpus. In that case we just replicate pcpu0 info.
+            # have #vcpus == #pcpus. In that case we just replicate one that's
+            # in the hash table.
             if not cpuinfo.has_key(number):
-                number = 0
+                number = cpuinfo.keys()[0]
             log.error(number)
             log.error(cpuinfo)
-            self.cpus[u].update(
-                { 'host'     : self.uuid,
-                  'features' : cpu_features,
-                  'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
-                  'vendor'   : cpuinfo[number]['vendor_id'],
-                  'modelname': cpuinfo[number]['model name'],
-                  'stepping' : cpuinfo[number]['stepping'],
-                  'flags'    : cpuinfo[number]['flags'],
-                })
+            if arch.type == "x86":
+                self.cpus[u].update(
+                    { 'host'     : self.uuid,
+                      'features' : cpu_features,
+                      'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
+                      'vendor'   : cpuinfo[number]['vendor_id'],
+                      'modelname': cpuinfo[number]['model name'],
+                      'stepping' : cpuinfo[number]['stepping'],
+                      'flags'    : cpuinfo[number]['flags'],
+                    })
+            elif arch.type == "ia64":
+                self.cpus[u].update(
+                    { 'host'     : self.uuid,
+                      'features' : cpu_features,
+                      'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
+                      'vendor'   : cpuinfo[number]['vendor'],
+                      'modelname': cpuinfo[number]['family'],
+                      'stepping' : cpuinfo[number]['model'],
+                      'flags'    : cpuinfo[number]['features'],
+                    })
+            else:
+                self.cpus[u].update(
+                    { 'host'     : self.uuid,
+                      'features' : cpu_features,
+                    })
 
         self.pifs = {}
         self.pif_metrics = {}
