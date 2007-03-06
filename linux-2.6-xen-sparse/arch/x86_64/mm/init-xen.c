@@ -708,19 +708,22 @@ static void xen_finish_init_mapping(void)
 		WARN_ON(HYPERVISOR_update_va_mapping(
 			start, __pte_ma(0), 0));
 
-	/* Initialise all fixmap pagetables. Use 'start_pfn' allocator. */
+	/* Allocate pte's for initial fixmaps from 'start_pfn' allocator. */
 	table_end = ~0UL;
-	for (i = 0; i < __end_of_fixed_addresses; i++)
-		__set_fixmap(i, 0, __pgprot(0));
-	table_end = start_pfn;
 
-	/* Switch to the real shared_info page, and clear the
-	 * dummy page. */
+	/*
+	 * Prefetch pte's for the bt_ioremap() area. It gets used before the
+	 * boot-time allocator is online, so allocate-on-demand would fail.
+	 */
+	for (i = FIX_BTMAP_END; i <= FIX_BTMAP_BEGIN; i++)
+		__set_fixmap(i, 0, __pgprot(0));
+
+	/* Switch to the real shared_info page, and clear the dummy page. */
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
-	/* Setup mapping of lower 1st MB */
+	/* Set up mapping of lowest 1MB of physical memory. */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (is_initial_xendomain())
 			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
@@ -729,6 +732,9 @@ static void xen_finish_init_mapping(void)
 				     virt_to_mfn(empty_zero_page)
 				     << PAGE_SHIFT,
 				     PAGE_KERNEL_RO);
+
+	/* Disable the 'start_pfn' allocator. */
+	table_end = start_pfn;
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
