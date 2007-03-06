@@ -2977,8 +2977,16 @@ int shadow_domctl(struct domain *d,
 
     if ( unlikely(d == current->domain) )
     {
-        gdprintk(XENLOG_INFO, "Don't try to do a shadow op on yourself!\n");
+        gdprintk(XENLOG_INFO, "Dom %u tried to do a shadow op on itself.\n",
+                 d->domain_id);
         return -EINVAL;
+    }
+
+    if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
+    {
+        gdprintk(XENLOG_INFO, "Ignoring shadow op on dying domain %u\n",
+                 d->domain_id);
+        return 0;
     }
 
     switch ( sc->op )
