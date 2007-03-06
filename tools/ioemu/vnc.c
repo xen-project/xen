@@ -1445,7 +1445,7 @@ int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sock
 
 int vnc_start_viewer(int port)
 {
-    int pid;
+    int pid, i, open_max;
     char s[16];
 
     sprintf(s, ":%d", port);
@@ -1456,6 +1456,12 @@ int vnc_start_viewer(int port)
 	exit(1);
 
     case 0:	/* child */
+	open_max = sysconf(_SC_OPEN_MAX);
+	for (i = 0; i < open_max; i++)
+	    if (i != STDIN_FILENO &&
+		i != STDOUT_FILENO &&
+		i != STDERR_FILENO)
+		close(i);
 	execlp("vncviewer", "vncviewer", s, NULL);
 	fprintf(stderr, "vncviewer execlp failed\n");
 	exit(1);
