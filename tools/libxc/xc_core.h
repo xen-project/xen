@@ -116,10 +116,10 @@ struct xen_dumpcore_p2m {
 struct xc_core_strtab;
 struct xc_core_section_headers;
 
-Elf_Shdr*
+Elf64_Shdr*
 xc_core_shdr_get(struct xc_core_section_headers *sheaders);
 int
-xc_core_shdr_set(Elf_Shdr *shdr,
+xc_core_shdr_set(Elf64_Shdr *shdr,
                  struct xc_core_strtab *strtab,
                  const char *name, uint32_t type,
                  uint64_t offset, uint64_t size,

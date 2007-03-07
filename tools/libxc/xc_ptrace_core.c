@@ -192,7 +192,7 @@ pread_exact(int fd, void* buffer, size_t size, off_t offset)
 struct elf_core
 {
     int         domfd;
-    Elf_Ehdr    ehdr;
+    Elf64_Ehdr  ehdr;
 
     char*       shdr;
     
@@ -241,6 +241,8 @@ elf_core_init(struct elf_core* ecore, int domfd)
     
     /* check elf header */
     if (!IS_ELF(ecore->ehdr) || ecore->ehdr.e_type != ET_CORE)
+        goto out;
+    if (ecore->ehdr.e_ident[EI_CLASS] != ELFCLASS64)
         goto out;
     /* check elf header more: EI_DATA, EI_VERSION, e_machine... */
 
@@ -294,7 +296,7 @@ elf_core_search_note(struct elf_core* ecore, const char* name, uint32_t type,
 }
 
 static int
-elf_core_alloc_read_sec(struct elf_core* ecore, const Elf_Shdr* shdr,
+elf_core_alloc_read_sec(struct elf_core* ecore, const Elf64_Shdr* shdr,
                         char** buf)
 {
     int ret;
@@ -309,19 +311,19 @@ elf_core_alloc_read_sec(struct elf_core* ecore, const Elf_Shdr* shdr,
     return ret;
 }
 
-static Elf_Shdr*
+static Elf64_Shdr*
 elf_core_shdr_by_index(struct elf_core* ecore, uint16_t index)
 {
     if (index >= ecore->ehdr.e_shnum)
         return NULL;
-    return (Elf_Shdr*)(ecore->shdr + ecore->ehdr.e_shentsize * index);
+    return (Elf64_Shdr*)(ecore->shdr + ecore->ehdr.e_shentsize * index);
 }
 
 static int
 elf_core_alloc_read_sec_by_index(struct elf_core* ecore, uint16_t index,
                                  char** buf, uint64_t* size)
 {
-    Elf_Shdr* shdr = elf_core_shdr_by_index(ecore, index);
+    Elf64_Shdr* shdr = elf_core_shdr_by_index(ecore, index);
     if (shdr == NULL)
         return -1;
     if (size != NULL)
@@ -329,14 +331,14 @@ elf_core_alloc_read_sec_by_index(struct elf_core* ecore, uint16_t index,
     return elf_core_alloc_read_sec(ecore, shdr, buf);
 }
 
-static Elf_Shdr*
+static Elf64_Shdr*
 elf_core_shdr_by_name(struct elf_core* ecore, const char* name)
 {
     const char* s;
     for (s = ecore->shdr;
          s < ecore->shdr + ecore->ehdr.e_shentsize * ecore->ehdr.e_shnum;
          s += ecore->ehdr.e_shentsize) {
-        Elf_Shdr* shdr = (Elf_Shdr*)s;
+        Elf64_Shdr* shdr = (Elf64_Shdr*)s;
 
         if (strncmp(ecore->shstrtab + shdr->sh_name, name, strlen(name)) == 0)
             return shdr;
@@ -348,7 +350,7 @@ elf_core_shdr_by_name(struct elf_core* ecore, const char* name)
 static int
 elf_core_read_sec_by_name(struct elf_core* ecore, const char* name, char* buf)
 {
-    Elf_Shdr* shdr = elf_core_shdr_by_name(ecore, name);
+    Elf64_Shdr* shdr = elf_core_shdr_by_name(ecore, name);
     return pread_exact(ecore->domfd, buf, shdr->sh_size, shdr->sh_offset);
     
 }
@@ -357,7 +359,7 @@ static int
 elf_core_alloc_read_sec_by_name(struct elf_core* ecore, const char* name,
                                 char** buf, uint64_t* size)
 {
-    Elf_Shdr* shdr = elf_core_shdr_by_name(ecore, name);
+    Elf64_Shdr* shdr = elf_core_shdr_by_name(ecore, name);
     if (shdr == NULL)
         return -1;
     if (size != NULL)
@@ -508,8 +510,8 @@ xc_waitdomain_core_elf(
     struct xen_dumpcore_elfnote_xen_version *xen_version;
     struct xen_dumpcore_elfnote_format_version *format_version;
 
-    Elf_Shdr* table_shdr;
-    Elf_Shdr* pages_shdr;
+    Elf64_Shdr* table_shdr;
+    Elf64_Shdr* pages_shdr;
 
     if (elf_core_init(&ecore, domfd) < 0)
         goto out;

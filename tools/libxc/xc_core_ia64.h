@@ -42,7 +42,7 @@ int
 xc_core_arch_context_get_shdr(struct xc_core_arch_context* arch_ctxt, 
                               struct xc_core_section_headers *sheaders,
                               struct xc_core_strtab *strtab,
-                              unsigned long *filesz, unsigned long offset);
+                              uint64_t *filesz, uint64_t offset);
 int
 xc_core_arch_context_dump(struct xc_core_arch_context* arch_ctxt,
                           void* args, dumpcore_rtn_t dump_rtn);

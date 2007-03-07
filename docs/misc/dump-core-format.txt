@@ -26,11 +26,12 @@ For xen related structure, please see the xen header files.
 Elf header
 ----------
 The elf header members are set as follows
+        e_ident[EI_CLASS] = ELFCLASS64 = 2
         e_ident[EI_OSABI] = ELFOSABI_SYSV = 0
         e_type = ET_CORE = 4
-e_ident[EI_CLASS], e_ident[EI_DATA] and e_flags are set according
-to an architecture which a file is created. Other members are set as usual.
-
+ELFCLASS64 is always used independent of architecture.
+e_ident[EI_DATA] and e_flags are set according to the dumping system's
+architecture. Other members are set as usual.
 
 Sections
 --------
@@ -221,5 +222,10 @@ format_version descriptor
 
 Format version history
 ----------------------
-The currently only (major, minor) = (0, 1) is used.
+Currently only (major, minor) = (0, 1) is used.
 [When the format is changed, it would be described here.]
+
+(0, 1) update
+- EI_CLASS member of elf header was changed to ELFCLASS64 independent of
+  architecture. This is mainly for x86_32pae.
+  The format version isn't bumped because analysis tools can distinguish it.
