@@ -137,7 +137,7 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 })
 
 #define write_cr4(x) \
-	__asm__ __volatile__("movl %0,%%cr4": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr4": :"r" (x))
 
 /*
  * Clear and set 'TS' bit respectively

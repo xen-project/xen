@@ -31,6 +31,28 @@ static void print_numeric_note(const char *prefix, struct elf_binary *elf,
 	       prefix, 2+2*descsz, value, descsz);
 }
 
+static void print_l1_mfn_valid_note(const char *prefix, struct elf_binary *elf,
+				    const elf_note *note)
+{
+	int descsz = elf_uval(elf, note, descsz);
+	const uint32_t *desc32 = elf_note_desc(elf, note);
+	const uint64_t *desc64 = elf_note_desc(elf, note);
+
+	/* XXX should be able to cope with a list of values. */
+	switch ( descsz / 2 )
+	{
+	case 8:
+		printf("%s: mask=%#"PRIx64" value=%#"PRIx64"\n", prefix,
+		       desc64[0], desc64[1]);
+		break;
+	case 4:
+		printf("%s: mask=%#"PRIx32" value=%#"PRIx32"\n", prefix,
+		       desc32[0],desc32[1]);
+		break;
+	}
+
+}
+
 static int print_notes(struct elf_binary *elf, const elf_note *start, const elf_note *end)
 {
 	const elf_note *note;
@@ -79,7 +101,13 @@ static int print_notes(struct elf_binary *elf, const elf_note *start, const elf_
 			print_string_note("FEATURES", elf , note);
 			break;
 		case XEN_ELFNOTE_HV_START_LOW:
-			print_numeric_note("HV_START_LOW", elf, note);
+			print_numeric_note("HV_START_LOW", elf , note);
+			break;
+		case XEN_ELFNOTE_SUSPEND_CANCEL:
+			print_numeric_note("SUSPEND_CANCEL", elf, note);
+			break;
+		case XEN_ELFNOTE_L1_MFN_VALID:
+			print_l1_mfn_valid_note("L1_MFN_VALID", elf , note);
 			break;
 		default:
 			printf("unknown note type %#x\n",

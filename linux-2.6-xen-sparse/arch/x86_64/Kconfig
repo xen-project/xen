@@ -450,7 +450,7 @@ config CALGARY_IOMMU
 	bool "IBM Calgary IOMMU support"
 	default y
 	select SWIOTLB
-	depends on PCI && EXPERIMENTAL
+	depends on PCI && !X86_64_XEN && EXPERIMENTAL
 	help
 	  Support for hardware IOMMUs in IBM's xSeries x366 and x460
 	  systems. Needed to run systems with more than 3GB of memory

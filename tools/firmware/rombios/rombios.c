@@ -890,7 +890,7 @@ static void           int14_function();
 static void           int15_function();
 static void           int16_function();
 static void           int17_function();
-static void           int19_function();
+static void           int18_function();
 static void           int1a_function();
 static void           int70_function();
 static void           int74_function();
@@ -1835,6 +1835,38 @@ keyboard_panic(status)
   
   BX_PANIC("Keyboard error:%u\n",status);
 }
+
+//--------------------------------------------------------------------------
+// machine_reset
+//--------------------------------------------------------------------------
+  void
+machine_reset()
+{
+  /* Frob the keyboard reset line to reset the processor */
+  outb(0x64, 0x60); /* Map the flags register at data port (0x60) */
+  outb(0x60, 0x14); /* Set the flags to system|disable */
+  outb(0x64, 0xfe); /* Pulse output 0 (system reset) low */
+  BX_PANIC("Couldn't reset the machine\n");
+}
+
+//--------------------------------------------------------------------------
+// clobber_entry_point
+//    Because PV drivers in HVM guests detach some of the emulated devices, 
+//    it is not safe to do a soft reboot by just dropping to real mode and
+//    jumping at ffff:0000. -- the boot drives might have disappeared!
+//    This rather foul function overwrites(!) the BIOS entry point 
+//    to point at machine-reset, which will cause the Xen tools to
+//    rebuild the whole machine from scratch.
+//--------------------------------------------------------------------------
+  void 
+clobber_entry_point() 
+{
+    /* The instruction at the entry point is one byte (0xea) for the
+     * jump opcode, then two bytes of address, then two of segment. 
+     * Overwrite the address bytes.*/
+    write_word(0xffff, 0x0001, machine_reset); 
+}
+
 
 //--------------------------------------------------------------------------
 // shutdown_status_panic
@@ -7626,7 +7658,7 @@ int17_function(regs, ds, iret_addr)
 }
 
 void
-int19_function(seq_nr)
+int18_function(seq_nr)
 Bit16u seq_nr;
 {
   Bit16u ebda_seg=read_word(0x0040,0x000E);
@@ -7702,8 +7734,8 @@ ASM_START
     push cx
     push dx
 
-    mov  dl, _int19_function.bootdrv + 2[bp]
-    mov  ax, _int19_function.bootseg + 2[bp]
+    mov  dl, _int18_function.bootdrv + 2[bp]
+    mov  ax, _int18_function.bootseg + 2[bp]
     mov  es, ax         ;; segment
     mov  bx, #0x0000    ;; offset
     mov  ah, #0x02      ;; function 2, read diskette sector
@@ -7714,7 +7746,7 @@ ASM_START
     int  #0x13          ;; read sector
     jnc  int19_load_done
     mov  ax, #0x0001
-    mov  _int19_function.status + 2[bp], ax
+    mov  _int18_function.status + 2[bp], ax
 
 int19_load_done:
     pop  dx
@@ -7789,13 +7821,13 @@ ASM_START
     ;; Build an iret stack frame that will take us to the boot vector.
     ;; iret pops ip, then cs, then flags, so push them in the opposite order.
     pushf
-    mov  ax, _int19_function.bootseg + 0[bp] 
+    mov  ax, _int18_function.bootseg + 0[bp] 
     push ax
-    mov  ax, _int19_function.bootip + 0[bp] 
+    mov  ax, _int18_function.bootip + 0[bp] 
     push ax
     ;; Set the magic number in ax and the boot drive in dl.
     mov  ax, #0xaa55
-    mov  dl, _int19_function.bootdrv + 0[bp]
+    mov  dl, _int18_function.bootdrv + 0[bp]
     ;; Zero some of the other registers.
     xor  bx, bx
     mov  ds, bx
@@ -8272,6 +8304,8 @@ int18_handler: ;; Boot Failure recovery: try the next device.
   mov  ss, ax
 
   ;; Get the boot sequence number out of the IPL memory
+  ;; The first time we do this it will have been set to -1 so 
+  ;; we will start from device 0.
   mov  bx, #IPL_SEG 
   mov  ds, bx                     ;; Set segment
   mov  bx, IPL_SEQUENCE_OFFSET    ;; BX is now the sequence number
@@ -8279,43 +8313,33 @@ int18_handler: ;; Boot Failure recovery: try the next device.
   mov  IPL_SEQUENCE_OFFSET, bx    ;; Write it back
   mov  ds, ax                     ;; and reset the segment to zero. 
 
-  ;; Carry on in the INT 19h handler, using the new sequence number
+  ;; Call the C code for the next boot device
   push bx
+  call _int18_function
 
-  jmp  int19_next_boot
+  ;; Boot failed: invoke the boot recovery function...
+  int  #0x18
 
 ;----------
 ;- INT19h -
 ;----------
 int19_relocated: ;; Boot function, relocated
-
-  ;; int19 was beginning to be really complex, so now it
-  ;; just calls a C function that does the work
-
-  push bp
-  mov  bp, sp
-  
-  ;; Reset SS and SP
+  ;;
+  ;; *** Warning: INT 19h resets the whole machine *** 
+  ;;
+  ;; Because PV drivers in HVM guests detach some of the emulated devices, 
+  ;; it is not safe to do a soft reboot by just dropping to real mode and
+  ;; invoking INT 19h -- the boot drives might have disappeared!
+  ;; If the user asks for a soft reboot, the only thing we can do is 
+  ;; reset the whole machine.  When it comes back up, the normal BIOS 
+  ;; boot sequence will start, which is more or less the required behaviour.
+  ;; 
+  ;; Reset SP and SS
   mov  ax, #0xfffe
   mov  sp, ax
   xor  ax, ax
   mov  ss, ax
-
-  ;; Start from the first boot device (0, in AX)
-  mov  bx, #IPL_SEG 
-  mov  ds, bx                     ;; Set segment to write to the IPL memory
-  mov  IPL_SEQUENCE_OFFSET, ax    ;; Save the sequence number 
-  mov  ds, ax                     ;; and reset the segment.
-
-  push ax
-
-int19_next_boot:
-
-  ;; Call the C code for the next boot device
-  call _int19_function
-
-  ;; Boot failed: invoke the boot recovery function
-  int  #0x18
+  call _machine_reset
 
 ;----------
 ;- INT1Ch -
@@ -9214,218 +9238,80 @@ pci_routing_table_structure:
   db 0 ;; pci bus number
   db 0x08 ;; pci device number (bit 7-3)
   db 0x61 ;; link value INTA#: pointer into PCI2ISA config space
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x62 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x63 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x60 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 0 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; second slot entry: 1st PCI slot
   db 0 ;; pci bus number
   db 0x10 ;; pci device number (bit 7-3)
   db 0x62 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x63 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x60 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x61 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 1 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; third slot entry: 2nd PCI slot
   db 0 ;; pci bus number
   db 0x18 ;; pci device number (bit 7-3)
   db 0x63 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x60 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x61 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x62 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 2 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; 4th slot entry: 3rd PCI slot
   db 0 ;; pci bus number
   db 0x20 ;; pci device number (bit 7-3)
   db 0x60 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x61 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x62 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x63 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 3 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; 5th slot entry: 4rd PCI slot
   db 0 ;; pci bus number
   db 0x28 ;; pci device number (bit 7-3)
   db 0x61 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x62 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x63 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x60 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 4 ;; physical slot (0 = embedded)
   db 0 ;; reserved
   ;; 6th slot entry: 5rd PCI slot
   db 0 ;; pci bus number
   db 0x30 ;; pci device number (bit 7-3)
   db 0x62 ;; link value INTA#
-  dw 0x0c60 ;; IRQ bitmap INTA# 
+  dw 0x0ca0 ;; IRQ bitmap INTA# 
   db 0x63 ;; link value INTB#
-  dw 0x0c60 ;; IRQ bitmap INTB# 
+  dw 0x0ca0 ;; IRQ bitmap INTB# 
   db 0x60 ;; link value INTC#
-  dw 0x0c60 ;; IRQ bitmap INTC# 
+  dw 0x0ca0 ;; IRQ bitmap INTC# 
   db 0x61 ;; link value INTD#
-  dw 0x0c60 ;; IRQ bitmap INTD#
+  dw 0x0ca0 ;; IRQ bitmap INTD#
   db 5 ;; physical slot (0 = embedded)
   db 0 ;; reserved
-
-pci_irq_list:
-  db 11, 10, 9, 5;
-
-pcibios_init_sel_reg:
-  push eax
-  mov eax, #0x800000
-  mov ax,  bx
-  shl eax, #8
-  and dl,  #0xfc
-  or  al,  dl
-  mov dx,  #0x0cf8
-  out dx,  eax
-  pop eax
-  ret
-  
-pcibios_init_set_elcr:
-  push ax
-  push cx
-  mov  dx, #0x04d0
-  test al, #0x08
-  jz   is_master_pic
-  inc  dx
-  and  al, #0x07
-is_master_pic:
-  mov  cl, al
-  mov  bl, #0x01
-  shl  bl, cl
-  in   al, dx
-  or   al, bl
-  out  dx, al
-  pop  cx
-  pop  ax
-  ret
-
-pcibios_init:
-  push ds
-  push bp
-  mov  ax, #0xf000
-  mov  ds, ax
-  mov  dx, #0x04d0 ;; reset ELCR1 + ELCR2
-  mov  al, #0x00
-  out  dx, al
-  inc  dx
-  out  dx, al
-  mov  si, #pci_routing_table_structure
-  mov  bh, [si+8]
-  mov  bl, [si+9]
-  mov  dl, #0x00
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  in   eax, dx
-  cmp  eax, [si+12] ;; check irq router
-  jne  pci_init_end
-  mov  dl, [si+34]
-  call pcibios_init_sel_reg
-  push bx ;; save irq router bus + devfunc
-  mov  dx, #0x0cfc
-  mov  ax, #0x8080
-  out  dx, ax ;; reset PIRQ route control
-  inc  dx
-  inc  dx
-  out  dx, ax
-  mov  ax, [si+6]
-  sub  ax, #0x20
-  shr  ax, #4
-  mov  cx, ax
-  add  si, #0x20 ;; set pointer to 1st entry
-  mov  bp, sp
-  mov  ax, #pci_irq_list
-  push ax
-  xor  ax, ax
-  push ax
-pci_init_loop1:
-  mov  bh, [si]
-  mov  bl, [si+1]
-pci_init_loop2:
-  mov  dl, #0x00
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  in   ax, dx
-  cmp  ax, #0xffff
-  jnz  pci_test_int_pin
-  test bl, #0x07
-  jz   next_pir_entry
-  jmp  next_pci_func
-pci_test_int_pin:
-  mov  dl, #0x3c
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfd
-  in   al, dx
-  and  al, #0x07
-  jz   next_pci_func
-  dec  al ;; determine pirq reg
-  mov  dl, #0x03
-  mul  al, dl
-  add  al, #0x02
-  xor  ah, ah
-  mov  bx, ax
-  mov  al, [si+bx]
-  mov  dl, al
-  mov  bx, [bp]
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  and  al, #0x03
-  add  dl, al
-  in   al, dx
-  cmp  al, #0x80
-  jb   pirq_found
-  mov  bx, [bp-2] ;; pci irq list pointer
-  mov  al, [bx]
-  out  dx, al
-  inc  bx
-  mov  [bp-2], bx
-  call pcibios_init_set_elcr
-pirq_found:
-  mov  bh, [si]
-  mov  bl, [si+1]
-  add  bl, [bp-3] ;; pci function number
-  mov  dl, #0x3c
-  call pcibios_init_sel_reg
-  mov  dx, #0x0cfc
-  out  dx, al
-next_pci_func:
-  inc  byte ptr[bp-3]
-  inc  bl
-  test bl, #0x07
-  jnz  pci_init_loop2
-next_pir_entry:
-  add  si, #0x10
-  mov  byte ptr[bp-3], #0x00
-  loop pci_init_loop1
-  mov  sp, bp
-  pop  bx
-pci_init_end:
-  pop  bp
-  pop  ds
-  ret
 #endif // BX_PCIBIOS
 
 ; parallel port detection: base address in DX, index in BX, timeout in CL
@@ -9747,6 +9633,8 @@ normal_post:
 
   call _log_bios_start
 
+  call _clobber_entry_point
+
   ;; set all interrupts to default handler
   mov  bx, #0x0000    ;; offset index
   mov  cx, #0x0100    ;; counter (256 interrupts)
@@ -9995,8 +9883,10 @@ post_default_ints:
   call _tcpa_calling_int19h          /* specs: 8.2.3 step 1 */
   call _tcpa_add_event_separators    /* specs: 8.2.3 step 2 */
 #endif
-  int  #0x19
-  //JMP_EP(0x0064) ; INT 19h location
+
+  ;; Start the boot sequence.   See the comments in int19_relocated 
+  ;; for why we use INT 18h instead of INT 19h here.
+  int  #0x18
 
 #if BX_TCGBIOS
   call _tcpa_returned_int19h         /* specs: 8.2.3 step 3/7 */

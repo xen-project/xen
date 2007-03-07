@@ -101,14 +101,6 @@ get_fl1_shadow_status(struct vcpu *v, gfn_t gfn)
 /* Look for FL1 shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(v, gfn_x(gfn), SH_type_fl1_shadow);
-
-    if ( unlikely(shadow_mode_log_dirty(v->domain) && mfn_valid(smfn)) )
-    {
-        struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
-        if ( !(sp->logdirty) )
-            shadow_convert_to_log_dirty(v, smfn);
-    }
-
     return smfn;
 }
 
@@ -118,14 +110,6 @@ get_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 {
     mfn_t smfn = shadow_hash_lookup(v, mfn_x(gmfn), shadow_type);
     perfc_incrc(shadow_get_shadow_status);
-
-    if ( unlikely(shadow_mode_log_dirty(v->domain) && mfn_valid(smfn)) )
-    {
-        struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
-        if ( !(sp->logdirty) )
-            shadow_convert_to_log_dirty(v, smfn);
-    }
-
     return smfn;
 }
 
@@ -135,12 +119,6 @@ set_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
 {
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
-
-    if ( unlikely(shadow_mode_log_dirty(v->domain)) )
-        // mark this shadow as a log dirty shadow...
-        mfn_to_shadow_page(smfn)->logdirty = 1;
-    else
-        mfn_to_shadow_page(smfn)->logdirty = 0;
 
     shadow_hash_insert(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
@@ -155,12 +133,6 @@ set_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
     SHADOW_PRINTK("d=%d, v=%d, gmfn=%05lx, type=%08x, smfn=%05lx\n",
                    d->domain_id, v->vcpu_id, mfn_x(gmfn),
                    shadow_type, mfn_x(smfn));
-
-    if ( unlikely(shadow_mode_log_dirty(d)) )
-        // mark this shadow as a log dirty shadow...
-        mfn_to_shadow_page(smfn)->logdirty = 1;
-    else
-        mfn_to_shadow_page(smfn)->logdirty = 0;
 
 #ifdef CONFIG_COMPAT
     if ( !IS_COMPAT(d) || shadow_type != SH_type_l4_64_shadow )
@@ -2394,7 +2366,8 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     gfn = guest_l1e_get_gfn(*new_gl1e);
     gmfn = vcpu_gfn_to_mfn(v, gfn);
 
-    mmio = (is_hvm_vcpu(v) && paging_vcpu_mode_translate(v) && !mfn_valid(gmfn));
+    mmio = (is_hvm_vcpu(v) && paging_vcpu_mode_translate(v) && 
+            mmio_space(gfn_to_paddr(gfn)));
     l1e_propagate_from_guest(v, new_gl1e, _mfn(INVALID_MFN), gmfn, &new_sl1e, 
                              ft_prefetch, mmio);
     
@@ -2549,7 +2522,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
         if ( !(flags & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
         {
             perfc_incrc(shadow_early_unshadow);
-            sh_remove_shadows(v, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
+            sh_remove_shadows(v, gmfn, 0, 0 /* Slow, can fail to unshadow */ );
         } 
     }
     v->arch.paging.shadow.last_emulated_mfn = mfn_x(gmfn);
@@ -2694,6 +2667,7 @@ static int sh_page_fault(struct vcpu *v,
                      * a not-present fault (by flipping two bits). */
                     ASSERT(regs->error_code & PFEC_page_present);
                     regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
+                    reset_early_unshadow(v);
                     perfc_incrc(shadow_fault_fast_gnp);
                     SHADOW_PRINTK("fast path not-present\n");
                     return 0;
@@ -2901,8 +2875,28 @@ static int sh_page_fault(struct vcpu *v,
         goto not_a_shadow_fault;
 
     if ( is_hvm_domain(d) )
+    {
+        /*
+         * If we are in the middle of injecting an exception or interrupt then
+         * we should not emulate: it is not the instruction at %eip that caused
+         * the fault. Furthermore it is almost certainly the case the handler
+         * stack is currently considered to be a page table, so we should
+         * unshadow the faulting page before exiting.
+         */
+        if ( unlikely(hvm_event_injection_faulted(v)) )
+        {
+            gdprintk(XENLOG_DEBUG, "write to pagetable during event "
+                     "injection: cr2=%#lx, mfn=%#lx\n", 
+                     va, mfn_x(gmfn));
+            sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+            goto done;
+        }
+
         hvm_store_cpu_guest_regs(v, regs, NULL);
-    SHADOW_PRINTK("emulate: eip=%#lx\n", (unsigned long)regs->eip);
+    }
+
+    SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", 
+                  (unsigned long)regs->eip, (unsigned long)regs->esp);
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
@@ -3375,16 +3369,11 @@ sh_set_toplevel_shadow(struct vcpu *v,
     
 #if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
     /* Once again OK to unhook entries from this table if we see fork/exit */
-#if CONFIG_PAGING_LEVELS == 4
-    if ( IS_COMPAT(d) )
-        ASSERT(!sh_mfn_is_a_page_table(gmfn));
-    else
-#endif
-        ASSERT(sh_mfn_is_a_page_table(gmfn));
+    ASSERT(sh_mfn_is_a_page_table(gmfn));
     mfn_to_page(gmfn)->shadow_flags &= ~SHF_unhooked_mappings;
 #endif
 
-    /* Pin the shadow and put it (back) on the list of top-level shadows */
+    /* Pin the shadow and put it (back) on the list of pinned shadows */
     if ( sh_pin(v, smfn) == 0 )
     {
         SHADOW_ERROR("can't pin %#lx as toplevel shadow\n", mfn_x(smfn));
@@ -3973,6 +3962,10 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
+    else
+        reset_early_unshadow(v);
+    
+    sh_mark_dirty(v->domain, mfn);
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4025,6 +4018,10 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( likely(bytes >= 4) && (*(u32 *)addr == 0) && is_lo_pte(vaddr) )
         check_for_early_unshadow(v, mfn);
+    else
+        reset_early_unshadow(v);
+
+    sh_mark_dirty(v->domain, mfn);
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4065,6 +4062,10 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     /* If we are writing zeros to this page, might want to unshadow */
     if ( *(u32 *)addr == 0 )
         check_for_early_unshadow(v, mfn);
+    else
+        reset_early_unshadow(v);
+
+    sh_mark_dirty(v->domain, mfn);
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);

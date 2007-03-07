@@ -374,8 +374,6 @@ void iounmap(volatile void __iomem *addr)
 }
 EXPORT_SYMBOL(iounmap);
 
-#ifdef __i386__
-
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	unsigned long offset, last_addr;
@@ -443,5 +441,3 @@ void __init bt_iounmap(void *addr, unsigned long size)
 		--nrpages;
 	}
 }
-
-#endif /* __i386__ */

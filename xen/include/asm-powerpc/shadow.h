@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005, 2006
+ * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
  */
 
 #ifndef _ASM_SHADOW_H_
@@ -30,6 +31,8 @@
     ( (shadow_mode_translate(_d))                      \
       ? machine_to_phys_mapping[(mfn)]                 \
       : (mfn) )
+
+extern int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max);
 
 extern void guest_physmap_add_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn);
@@ -58,4 +61,6 @@ static inline unsigned int shadow_get_allocation(struct domain *d)
 {
     return (1ULL << (d->arch.htab.order + PAGE_SHIFT)) >> 20;
 }
+
 #endif
+

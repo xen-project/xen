@@ -10,6 +10,7 @@
 #endif
 
 #undef ELFSIZE
+#include "elfnote.h"
 #include "elfstructs.h"
 #include "features.h"
 
@@ -174,12 +175,28 @@ int elf_reloc(struct elf_binary *elf);
 
 #define UNSET_ADDR          ((uint64_t)-1)
 
+enum xen_elfnote_type {
+    XEN_ENT_NONE = 0,
+    XEN_ENT_LONG = 1,
+    XEN_ENT_STR  = 2
+};
+
+struct xen_elfnote {
+    enum xen_elfnote_type type;
+    const char *name;
+    union {
+	const char *str;
+	uint64_t num;
+    } data;
+};
+
 struct elf_dom_parms {
     /* raw */
     const char *guest_info;
     const void *elf_note_start;
     const void *elf_note_end;
-
+    struct xen_elfnote elf_notes[XEN_ELFNOTE_MAX + 1];
+  
     /* parsed */
     char guest_os[16];
     char guest_ver[16];

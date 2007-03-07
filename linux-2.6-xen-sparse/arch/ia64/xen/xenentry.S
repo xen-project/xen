@@ -8,8 +8,6 @@
  *	Dan Magenheimer <dan.magenheimer@.hp.com>
  */
 
-#include <linux/config.h>
-
 #include <asm/asmmacro.h>
 #include <asm/cache.h>
 #include <asm/errno.h>

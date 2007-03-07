@@ -25,6 +25,7 @@
 #include <asm/processor.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/i387.h>
+#include <asm/hvm/trace.h>
 
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_vmentry(void);
@@ -294,6 +295,11 @@ static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
       __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
 
     __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+
+    if (trap == TRAP_page_fault)
+        HVMTRACE_2D(PF_INJECT, v, v->arch.hvm_vmx.cpu_cr2, error_code);
+    else
+        HVMTRACE_2D(INJ_EXC, v, trap, error_code);
 }
 
 static inline void vmx_inject_hw_exception(

@@ -642,6 +642,21 @@ int xc_domain_iomem_permission(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_send_trigger(int xc_handle,
+                           uint32_t domid,
+                           uint32_t trigger,
+                           uint32_t vcpu)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_sendtrigger;
+    domctl.domain = domid;
+    domctl.u.sendtrigger.trigger = trigger;
+    domctl.u.sendtrigger.vcpu = vcpu;
+
+    return do_domctl(xc_handle, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C

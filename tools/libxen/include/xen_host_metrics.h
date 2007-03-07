@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,7 +20,6 @@
 #define XEN_HOST_METRICS_H
 
 #include "xen_common.h"
-#include "xen_host_decl.h"
 #include "xen_host_metrics_decl.h"
 
 
@@ -63,7 +62,6 @@ typedef struct xen_host_metrics_record
 {
     xen_host_metrics handle;
     char *uuid;
-    struct xen_host_record_opt *host;
     int64_t memory_total;
     int64_t memory_free;
 } xen_host_metrics_record;
@@ -170,13 +168,6 @@ xen_host_metrics_get_uuid(xen_session *session, char **result, xen_host_metrics 
 
 
 /**
- * Get the host field of the given host_metrics.
- */
-extern bool
-xen_host_metrics_get_host(xen_session *session, xen_host *result, xen_host_metrics host_metrics);
-
-
-/**
  * Get the memory/total field of the given host_metrics.
  */
 extern bool
@@ -188,6 +179,13 @@ xen_host_metrics_get_memory_total(xen_session *session, int64_t *result, xen_hos
  */
 extern bool
 xen_host_metrics_get_memory_free(xen_session *session, int64_t *result, xen_host_metrics host_metrics);
+
+
+/**
+ * Return a list of all the host_metrics instances known to the system.
+ */
+extern bool
+xen_host_metrics_get_all(xen_session *session, struct xen_host_metrics_set **result);
 
 
 #endif

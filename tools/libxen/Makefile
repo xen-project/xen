@@ -57,8 +57,8 @@ test/test_hvm_bindings: test/test_hvm_bindings.o libxenapi.so
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/include/xen/api
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/api
+	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_PROG) libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
 	ln -sf libxenapi.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so.$(MAJOR)
 	ln -sf libxenapi.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenapi.so

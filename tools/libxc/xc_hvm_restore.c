@@ -86,6 +86,8 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     uint8_t *hvm_buf = NULL;
     unsigned long long v_end, memsize;
     unsigned long shared_page_nr;
+    shared_info_t *shared_info = NULL;
+    xen_pfn_t arch_max_pfn;
 
     unsigned long pfn;
     unsigned int prev_pc, this_pc;
@@ -104,22 +106,19 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     v_end = memsize << 20;
     nr_pages = (unsigned long) memsize << (20 - PAGE_SHIFT);
 
-    DPRINTF("xc_hvm_restore:dom=%d, nr_pages=0x%lx, store_evtchn=%d, *store_mfn=%ld, pae=%u, apic=%u.\n", 
+    DPRINTF("xc_hvm_restore:dom=%d, nr_pages=0x%lx, store_evtchn=%d, "
+            "*store_mfn=%ld, pae=%u, apic=%u.\n", 
             dom, nr_pages, store_evtchn, *store_mfn, pae, apic);
 
-    
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
         ERROR("Unable to get platform info.");
         return 1;
     }
 
-    DPRINTF("xc_hvm_restore start: nr_pages = %lx, max_pfn = %lx, max_mfn = %lx, hvirt_start=%lx, pt_levels=%d\n",
-            nr_pages,
-            max_pfn,
-            max_mfn,
-            hvirt_start,
-            pt_levels);
+    DPRINTF("xc_hvm_restore start: nr_pages = %lx, max_pfn = %lx, "
+            "max_mfn = %lx, hvirt_start=%lx, pt_levels=%d\n",
+            nr_pages, max_pfn, max_mfn, hvirt_start, pt_levels);
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for build dom0 op, but might as well do early */
@@ -144,6 +143,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         pfns[i] = i;
     for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < max_pfn; i++ )
         pfns[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+    arch_max_pfn = pfns[max_pfn - 1];/* used later */
 
     /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
     rc = xc_domain_memory_populate_physmap(
@@ -220,6 +220,9 @@ int xc_hvm_restore(int xc_handle, int io_fd,
             void *page;
 
             pfn = region_pfn_type[i];
+            if ( pfn & XEN_DOMCTL_PFINFO_LTAB_MASK )
+                continue;
+
             if ( pfn > max_pfn )
             {
                 ERROR("pfn out of range");
@@ -350,6 +353,14 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         ERROR("setting the shared-info pfn failed!\n");
         goto out;
     }
+    if ( (xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp) != 0) ||
+         ((shared_info = xc_map_foreign_range(
+             xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
+             shared_info_frame)) == NULL) )
+        goto out;
+    /* shared_info.arch.max_pfn is used by dump-core */
+    shared_info->arch.max_pfn = arch_max_pfn;
+    munmap(shared_info, PAGE_SIZE);
 
     rc = 0;
     goto out;

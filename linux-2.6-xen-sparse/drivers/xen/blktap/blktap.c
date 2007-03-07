@@ -335,7 +335,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg);
 static unsigned int blktap_poll(struct file *file, poll_table *wait);
 
-static struct file_operations blktap_fops = {
+static const struct file_operations blktap_fops = {
 	.owner   = THIS_MODULE,
 	.poll    = blktap_poll,
 	.ioctl   = blktap_ioctl,

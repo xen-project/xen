@@ -73,4 +73,13 @@ extern char __bss_start[];
 
 #include <asm/powerpc64/config.h>
 
+/*
+ * Disallow grant table growing tempralily because pfn2mfn() and
+ * mfn_to_gmfn() depends on the fact that grant table is machine-address
+ * contiguous. Grant table growing breaks the assumption.
+ */
+#ifndef max_nr_grant_frames
+#define max_nr_grant_frames INITIAL_NR_GRANT_FRAMES
+#endif
+
 #endif

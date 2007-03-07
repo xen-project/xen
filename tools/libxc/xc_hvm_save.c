@@ -265,7 +265,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 {
     xc_dominfo_t info;
 
-    int rc = 1, i, last_iter, iter = 0;
+    int rc = 1, i, j, last_iter, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
     int sent_last_iter, skip_this_iter;
@@ -289,7 +289,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
 
-    uint32_t nr_pfns, rec_size, nr_vcpus;
+    uint32_t rec_size, nr_vcpus;
 
     /* power of 2 order of max_pfn */
     int order_nr;
@@ -339,14 +339,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
     shared_info_frame = info.shared_info_frame;
 
-    /* A cheesy test to see whether the domain contains valid state. */
-    if (ctxt.ctrlreg[3] == 0)
-    {
-        ERROR("Domain is not in a valid HVM guest state");
-        goto out;
-    }
-
-   /* cheesy sanity check */
+    /* cheesy sanity check */
     if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
         ERROR("Invalid HVM state record -- pfn count out of range: %lu",
             (info.max_memkb >> (PAGE_SHIFT - 10)));
@@ -360,7 +353,8 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    DPRINTF("saved hvm domain info:max_memkb=0x%lx, max_mfn=0x%lx, nr_pages=0x%lx\n", info.max_memkb, max_mfn, info.nr_pages); 
+    DPRINTF("saved hvm domain info:max_memkb=0x%lx, max_mfn=0x%lx, "
+            "nr_pages=0x%lx\n", info.max_memkb, max_mfn, info.nr_pages); 
 
     if (live) {
         ERROR("hvm domain doesn't support live migration now.\n");
@@ -372,10 +366,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("Couldn't enable shadow mode");
             goto out;
         }
-
-        /* excludes vga acc mem */
-        /* XXX will need to check whether acceleration is enabled here! */
-        nr_pfns = info.nr_pages - 0x800;
 
         last_iter = 0;
         DPRINTF("hvm domain live migration debug start: logdirty enable.\n");
@@ -390,20 +380,15 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("HVM Domain appears not to have suspended");
             goto out;
         }
-
-        nr_pfns = info.nr_pages; 
     }
 
-    DPRINTF("after 1st handle hvm domain nr_pfns=0x%x, nr_pages=0x%lx, max_memkb=0x%lx, live=%d.\n",
-            nr_pfns,
-            info.nr_pages,
-            info.max_memkb,
-            live);
+    DPRINTF("after 1st handle hvm domain nr_pages=0x%lx, "
+            "max_memkb=0x%lx, live=%d.\n",
+            info.nr_pages, info.max_memkb, live);
 
     /* Calculate the highest PFN of "normal" memory:
-     * HVM memory is sequential except for the VGA and MMIO holes, and
-     * we have nr_pfns of it (which now excludes the cirrus video RAM) */
-    max_pfn = nr_pfns; 
+     * HVM memory is sequential except for the VGA and MMIO holes. */
+    max_pfn = info.nr_pages;
     /* Skip the VGA hole from 0xa0000 to 0xc0000 */
     max_pfn += 0x20;   
     /* Skip the MMIO hole: 256MB just below 4GB */
@@ -556,9 +541,16 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            if (ratewrite(io_fd, region_base, PAGE_SIZE * batch) != PAGE_SIZE * batch) {
-                ERROR("ERROR when writting to state file (4)");
-                goto out;
+            for ( j = 0; j < batch; j++ )
+            {
+                if ( pfn_batch[j] & XEN_DOMCTL_PFINFO_LTAB_MASK )
+                    continue;
+                if ( ratewrite(io_fd, region_base + j*PAGE_SIZE,
+                               PAGE_SIZE) != PAGE_SIZE )
+                {
+                    ERROR("ERROR when writing to state file (4)");
+                    goto out;
+                }
             }
 
             sent_this_iter += batch;

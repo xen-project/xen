@@ -41,8 +41,8 @@ HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 # Do not depend on auto-generated header files.
-HDRS := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
-HDRS := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
+AHDRS := $(filter-out %/include/xen/compile.h,$(HDRS))
+HDRS  := $(filter-out %/asm-offsets.h,$(AHDRS))
 
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
@@ -110,12 +110,12 @@ _clean_%/: FORCE
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.S $(HDRS) Makefile
+%.o: %.S $(AHDRS) Makefile
 	$(CC) $(AFLAGS) -c $< -o $@
 
 %.i: %.c $(HDRS) Makefile
 	$(CPP) $(CFLAGS) $< -o $@
 
 # -std=gnu{89,99} gets confused by # as an end-of-line comment marker
-%.s: %.S $(HDRS) Makefile
+%.s: %.S $(AHDRS) Makefile
 	$(CPP) $(AFLAGS) $< -o $@

@@ -1,17 +1,17 @@
 #ifndef __XEN_CPU_HOTPLUG_H__
 #define __XEN_CPU_HOTPLUG_H__
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/cpumask.h>
 
-#if defined(CONFIG_HOTPLUG_CPU)
-
-#if defined(CONFIG_X86)
-void cpu_initialize_context(unsigned int cpu);
+#if defined(CONFIG_X86) && defined(CONFIG_SMP)
+extern cpumask_t cpu_initialized_map;
+#define cpu_set_initialized(cpu) cpu_set(cpu, cpu_initialized_map)
 #else
-#define cpu_initialize_context(cpu)	((void)0)
+#define cpu_set_initialized(cpu) ((void)0)
 #endif
+
+#if defined(CONFIG_HOTPLUG_CPU)
 
 int cpu_up_check(unsigned int cpu);
 void init_xenbus_allowed_cpumask(void);

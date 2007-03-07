@@ -302,6 +302,8 @@ class XendDomainInfo:
     @type store_mfn: int
     @ivar console_mfn: xenconsoled mfn
     @type console_mfn: int
+    @ivar notes: OS image notes
+    @type notes: dictionary
     @ivar vmWatch: reference to a watch on the xenstored vmpath
     @type vmWatch: xen.xend.xenstore.xswatch
     @ivar shutdownWatch: reference to watch on the xenstored domain shutdown
@@ -396,11 +398,18 @@ class XendDomainInfo:
                 XendTask.log_progress(81, 90, self._registerWatches)
                 XendTask.log_progress(91, 100, self.refreshShutdown)
 
+                xendomains = XendDomain.instance()
+                xennode = XendNode.instance()
+
                 # save running configuration if XendDomains believe domain is
                 # persistent
                 if is_managed:
-                    xendomains = XendDomain.instance()
                     xendomains.managed_config_save(self)
+
+                if xennode.xenschedinfo() == 'credit':
+                    xendomains.domain_sched_credit_set(self.getDomid(),
+                                                       self.getWeight(),
+                                                       self.getCap())
             except:
                 log.exception('VM start failed')
                 self.destroy()
@@ -771,17 +780,34 @@ class XendDomainInfo:
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
-            'memory/target':      str(self.info['memory_static_min'] * 1024)
+            'memory/target':      str(self.info['memory_static_min'] * 1024),
+            'control/platform-feature-multiprocessor-suspend': str(1)
             }
 
         def f(n, v):
             if v is not None:
-                to_store[n] = str(v)
+                if type(v) == bool:
+                    to_store[n] = v and "1" or "0"
+                else:
+                    to_store[n] = str(v)
 
         f('console/port',     self.console_port)
         f('console/ring-ref', self.console_mfn)
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
+
+        # elfnotes
+        for n, v in self.info.get_notes().iteritems():
+            n = n.lower().replace('_', '-')
+            if n == 'features':
+                for v in v.split('|'):
+                    v = v.replace('_', '-')
+                    if v.startswith('!'):
+                        f('image/%s/%s' % (n, v[1:]), False)
+                    else:
+                        f('image/%s/%s' % (n, v), True)
+            else:
+                f('image/%s' % n, v)
 
         to_store.update(self._vcpuDomDetails())
 
@@ -913,6 +939,9 @@ class XendDomainInfo:
         return self.info['vcpus_number']
 
     def setVCpuCount(self, vcpus):
+        if vcpus <= 0:
+            raise XendError('Invalid VCPUs')
+        
         self.info['vcpu_avail'] = (1 << vcpus) - 1
         if self.domid >= 0:
             self.storeVm('vcpu_avail', self.info['vcpu_avail'])
@@ -1462,6 +1491,8 @@ class XendDomainInfo:
             self.store_mfn = channel_details['store_mfn']
             if 'console_mfn' in channel_details:
                 self.console_mfn = channel_details['console_mfn']
+            if 'notes' in channel_details:
+                self.info.set_notes(channel_details['notes'])
 
             self._introduceDomain()
 
@@ -1472,7 +1503,7 @@ class XendDomainInfo:
             self.info['start_time'] = time.time()
 
             self._stateSet(DOM_STATE_RUNNING)
-        except RuntimeError, exn:
+        except (RuntimeError, VmError), exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
             self.image.cleanupBootloading()
             raise VmError(str(exn))
@@ -1632,10 +1663,31 @@ class XendDomainInfo:
     def resumeDomain(self):
         log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
 
+        if self.domid is None:
+            return
         try:
-            if self.domid is not None:
-                xc.domain_resume(self.domid)
-                ResumeDomain(self.domid)
+            # could also fetch a parsed note from xenstore
+            fast = self.info.get_notes().get('SUSPEND_CANCEL') and 1 or 0
+            if not fast:
+                self._releaseDevices()
+                self.testDeviceComplete()
+                self.testvifsComplete()
+                log.debug("XendDomainInfo.resumeDomain: devices released")
+
+                self._resetChannels()
+
+                self._removeDom('control/shutdown')
+                self._removeDom('device-misc/vif/nextDeviceID')
+
+                self._createChannels()
+                self._introduceDomain()
+                self._storeDomDetails()
+
+                self._createDevices()
+                log.debug("XendDomainInfo.resumeDomain: devices created")
+
+            xc.domain_resume(self.domid, fast)
+            ResumeDomain(self.domid)
         except:
             log.exception("XendDomainInfo.resume: xc.domain_resume failed on domain %s." % (str(self.domid)))
 
@@ -2038,26 +2090,26 @@ class XendDomainInfo:
         return self.info.get('tools_version', {})
     
     def get_on_shutdown(self):
-        after_shutdown = self.info.get('action_after_shutdown')
+        after_shutdown = self.info.get('actions_after_shutdown')
         if not after_shutdown or after_shutdown not in XEN_API_ON_NORMAL_EXIT:
             return XEN_API_ON_NORMAL_EXIT[-1]
         return after_shutdown
 
     def get_on_reboot(self):
-        after_reboot = self.info.get('action_after_reboot')
+        after_reboot = self.info.get('actions_after_reboot')
         if not after_reboot or after_reboot not in XEN_API_ON_NORMAL_EXIT:
             return XEN_API_ON_NORMAL_EXIT[-1]
         return after_reboot
 
     def get_on_suspend(self):
         # TODO: not supported        
-        after_suspend = self.info.get('action_after_suspend') 
+        after_suspend = self.info.get('actions_after_suspend') 
         if not after_suspend or after_suspend not in XEN_API_ON_NORMAL_EXIT:
             return XEN_API_ON_NORMAL_EXIT[-1]
         return after_suspend        
 
     def get_on_crash(self):
-        after_crash = self.info.get('action_after_crash')
+        after_crash = self.info.get('actions_after_crash')
         if not after_crash or after_crash not in XEN_API_ON_CRASH_BEHAVIOUR:
             return XEN_API_ON_CRASH_BEHAVIOUR[0]
         return after_crash

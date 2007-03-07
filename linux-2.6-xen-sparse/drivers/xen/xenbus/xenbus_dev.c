@@ -32,7 +32,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/uio.h>
@@ -174,17 +173,22 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	void *reply;
 	char *path, *token;
 	struct watch_adapter *watch, *tmp_watch;
-	int err;
+	int err, rc = len;
 
-	if ((len + u->len) > sizeof(u->u.buffer))
-		return -EINVAL;
+	if ((len + u->len) > sizeof(u->u.buffer)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
-	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0)
-		return -EFAULT;
+	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0) {
+		rc = -EFAULT;
+		goto out;
+	}
 
 	u->len += len;
-	if (u->len < (sizeof(u->u.msg) + u->u.msg.len))
-		return len;
+	if ((u->len < sizeof(u->u.msg)) ||
+	    (u->len < (sizeof(u->u.msg) + u->u.msg.len)))
+		return rc;
 
 	msg_type = u->u.msg.type;
 
@@ -202,14 +206,17 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_SET_PERMS:
 		if (msg_type == XS_TRANSACTION_START) {
 			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
-			if (!trans)
-				return -ENOMEM;
+			if (!trans) {
+				rc = -ENOMEM;
+				goto out;
+			}
 		}
 
 		reply = xenbus_dev_request_and_reply(&u->u.msg);
 		if (IS_ERR(reply)) {
 			kfree(trans);
-			return PTR_ERR(reply);
+			rc = PTR_ERR(reply);
+			goto out;
 		}
 
 		if (msg_type == XS_TRANSACTION_START) {
@@ -232,8 +239,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_UNWATCH:
 		path = u->u.buffer + sizeof(u->u.msg);
 		token = memchr(path, 0, u->u.msg.len);
-		if (token == NULL)
-			return -EILSEQ;
+		if (token == NULL) {
+			rc = -EILSEQ;
+			goto out;
+		}
 		token++;
 
 		if (msg_type == XS_WATCH) {
@@ -252,7 +261,8 @@ static ssize_t xenbus_dev_write(struct file *filp,
 			err = register_xenbus_watch(&watch->watch);
 			if (err) {
 				free_watch_adapter(watch);
-				return err;
+				rc = err;
+				goto out;
 			}
 			
 			list_add(&watch->list, &u->watches);
@@ -266,7 +276,6 @@ static ssize_t xenbus_dev_write(struct file *filp,
                                                  &u->watches, list) {
 				if (!strcmp(watch->token, token) &&
 				    !strcmp(watch->watch.node, path))
-					break;
 				{
 					unregister_xenbus_watch(&watch->watch);
 					list_del(&watch->list);
@@ -279,11 +288,13 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		break;
 
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
+		break;
 	}
 
+ out:
 	u->len = 0;
-	return len;
+	return rc;
 }
 
 static int xenbus_dev_open(struct inode *inode, struct file *filp)
@@ -343,7 +354,7 @@ static unsigned int xenbus_dev_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-static struct file_operations xenbus_dev_file_ops = {
+static const struct file_operations xenbus_dev_file_ops = {
 	.read = xenbus_dev_read,
 	.write = xenbus_dev_write,
 	.open = xenbus_dev_open,

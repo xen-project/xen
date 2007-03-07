@@ -82,6 +82,16 @@ MINIMUM_RESTART_TIME = 20
 RESTART_IN_PROGRESS = 'xend/restart_in_progress'
 LAST_SHUTDOWN_REASON = 'xend/last_shutdown_reason'
 
+TRIGGER_NMI   = 0
+TRIGGER_RESET = 1
+TRIGGER_INIT  = 2
+
+TRIGGER_TYPE = {
+    "nmi"   : TRIGGER_NMI,
+    "reset" : TRIGGER_RESET,
+    "init"  : TRIGGER_INIT
+}
+
 #
 # Device migration stages (eg. XendDomainInfo, XendCheckpoint, server.tpmif)
 #

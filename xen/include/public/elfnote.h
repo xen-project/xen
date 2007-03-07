@@ -157,6 +157,16 @@
 #define XEN_ELFNOTE_L1_MFN_VALID  13
 
 /*
+ * Whether or not the guest supports cooperative suspend cancellation.
+ */
+#define XEN_ELFNOTE_SUSPEND_CANCEL 14
+
+/*
+ * The number of the highest elfnote defined.
+ */
+#define XEN_ELFNOTE_MAX XEN_ELFNOTE_SUSPEND_CANCEL
+
+/*
  * System information exported through crash notes.
  *
  * The kexec / kdump code will create one XEN_ELFNOTE_CRASH_INFO 
@@ -174,6 +184,41 @@
  * See xen/include/xen/elfcore.h for more information.
  */
 #define XEN_ELFNOTE_CRASH_REGS 0x1000002
+
+
+/*
+ * xen dump-core none note.
+ * xm dump-core code will create one XEN_ELFNOTE_DUMPCORE_NONE
+ * in its dump file to indicate that the file is xen dump-core
+ * file. This note doesn't have any other information.
+ * See tools/libxc/xc_core.h for more information.
+ */
+#define XEN_ELFNOTE_DUMPCORE_NONE               0x2000000
+
+/*
+ * xen dump-core header note.
+ * xm dump-core code will create one XEN_ELFNOTE_DUMPCORE_HEADER
+ * in its dump file.
+ * See tools/libxc/xc_core.h for more information.
+ */
+#define XEN_ELFNOTE_DUMPCORE_HEADER             0x2000001
+
+/*
+ * xen dump-core xen version note.
+ * xm dump-core code will create one XEN_ELFNOTE_DUMPCORE_XEN_VERSION
+ * in its dump file. It contains the xen version obtained via the
+ * XENVER hypercall.
+ * See tools/libxc/xc_core.h for more information.
+ */
+#define XEN_ELFNOTE_DUMPCORE_XEN_VERSION        0x2000002
+
+/*
+ * xen dump-core format version note.
+ * xm dump-core code will create one XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION
+ * in its dump file. It contains a format version identifier.
+ * See tools/libxc/xc_core.h for more information.
+ */
+#define XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION     0x2000003
 
 #endif /* __XEN_PUBLIC_ELFNOTE_H__ */
 

@@ -25,6 +25,7 @@ import threading
 from xen.xend import XendDomain, XendDomainInfo, XendNode, XendDmesg
 from xen.xend import XendLogging, XendTaskManager
 
+from xen.xend.XendAPIVersion import *
 from xen.xend.XendAuthSessions import instance as auth_manager
 from xen.xend.XendError import *
 from xen.xend.XendClient import ERROR_INVALID_DOMAIN
@@ -104,20 +105,22 @@ def catch_typeerror(func):
         except TypeError, exn:
             #log.exception('catch_typeerror')
             if hasattr(func, 'api') and func.api in argcounts:
-                # Assume that if the exception was thrown inside this
-                # file, then it is due to an invalid call from the client,
-                # but if it was thrown elsewhere, then it's an internal
+                # Assume that if the argument count was wrong and if the
+                # exception was thrown inside this file, then it is due to an
+                # invalid call from the client, otherwise it's an internal
                 # error (which will be handled further up).
-                tb = sys.exc_info()[2]
-                try:
-                    sourcefile = traceback.extract_tb(tb)[-1][0]
-                    if sourcefile == inspect.getsourcefile(XendAPI):
-                        return xen_api_error(
-                            ['MESSAGE_PARAMETER_COUNT_MISMATCH',
-                             func.api, argcounts[func.api],
-                             len(args) + len(kwargs)])
-                finally:
-                    del tb
+                expected = argcounts[func.api]
+                actual = len(args) + len(kwargs)
+                if expected != actual:
+                    tb = sys.exc_info()[2]
+                    try:
+                        sourcefile = traceback.extract_tb(tb)[-1][0]
+                        if sourcefile == inspect.getsourcefile(XendAPI):
+                            return xen_api_error(
+                                ['MESSAGE_PARAMETER_COUNT_MISMATCH',
+                                 func.api, expected, actual])
+                    finally:
+                        del tb
             raise
 
     return f
@@ -627,7 +630,12 @@ class XendAPI(object):
                     'resident_VMs',
                     'host_CPUs',
                     'metrics',
-                    'supported_bootloaders']
+                    'capabilities',
+                    'supported_bootloaders',
+                    'API_version_major',
+                    'API_version_minor',
+                    'API_version_vendor',
+                    'API_version_vendor_implementation']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -671,6 +679,14 @@ class XendAPI(object):
         del node.other_config[key]
         node.save()
         return xen_api_success_void()
+    def host_get_API_version_major(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_MAJOR)
+    def host_get_API_version_minor(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_MINOR)
+    def host_get_API_version_vendor(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_VENDOR)
+    def host_get_API_version_vendor_implementation(self, _, ref):
+        return xen_api_success(XEN_API_VERSION_VENDOR_IMPLEMENTATION)
     def host_get_software_version(self, session, host_ref):
         return xen_api_success(XendNode.instance().xen_version())
     def host_get_resident_VMs(self, session, host_ref):
@@ -679,6 +695,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
     def host_get_metrics(self, _, ref):
         return xen_api_success(XendNode.instance().host_metrics_uuid)
+    def host_get_capabilities(self, session, host_ref):
+        return xen_api_success(XendNode.instance().get_capabilities())
     def host_get_supported_bootloaders(self, session, host_ref):
         return xen_api_success(['pygrub'])
 
@@ -707,10 +725,17 @@ class XendAPI(object):
         record = {'uuid': node.uuid,
                   'name_label': node.name,
                   'name_description': '',
+                  'API_version_major': XEN_API_VERSION_MAJOR,
+                  'API_version_minor': XEN_API_VERSION_MINOR,
+                  'API_version_vendor': XEN_API_VERSION_VENDOR,
+                  'API_version_vendor_implementation':
+                  XEN_API_VERSION_VENDOR_IMPLEMENTATION,
                   'software_version': node.xen_version(),
+                  'other_config': node.other_config,
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),
                   'metrics': node.host_metrics_uuid,
+                  'capabilities': node.get_capabilities(),
                   'supported_bootloaders': 'pygrub'}
         return xen_api_success(record)
 
@@ -728,27 +753,44 @@ class XendAPI(object):
 
     host_cpu_attr_ro = ['host',
                         'number',
+                        'vendor',
+                        'speed',
+                        'modelname',
+                        'stepping',
+                        'flags',
                         'utilisation']
 
     # attributes
-    def host_cpu_get_host(self, session, host_cpu_ref):
+    def _host_cpu_get(self, ref, field):
+        return xen_api_success(
+            XendNode.instance().get_host_cpu_field(ref, field))
+
+    def host_cpu_get_host(self, _, ref):
         return xen_api_success(XendNode.instance().uuid)
-    def host_cpu_get_utilisation(self, session, host_cpu_ref):
-        util = XendNode.instance().get_host_cpu_load(host_cpu_ref)
-        return xen_api_success(util)
-    def host_cpu_get_number(self, session, host_cpu_ref):
-        num = XendNode.instance().get_host_cpu_number(host_cpu_ref)
-        return xen_api_success(num)
+    def host_cpu_get_number(self, _, ref):
+        return self._host_cpu_get(ref, 'number')
+    def host_cpu_get_vendor(self, _, ref):
+        return self._host_cpu_get(ref, 'vendor')
+    def host_cpu_get_speed(self, _, ref):
+        return self._host_cpu_get(ref, 'speed')
+    def host_cpu_get_modelname(self, _, ref):
+        return self._host_cpu_get(ref, 'modelname')
+    def host_cpu_get_stepping(self, _, ref):
+        return self._host_cpu_get(ref, 'stepping')
+    def host_cpu_get_flags(self, _, ref):
+        return self._host_cpu_get(ref, 'flags')
+    def host_cpu_get_utilisation(self, _, ref):
+        return xen_api_success(XendNode.instance().get_host_cpu_load(ref))
 
     # object methods
-    def host_cpu_destroy(self, session, host_cpu_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
-    def host_cpu_get_record(self, session, host_cpu_ref):
+    def host_cpu_get_record(self, _, ref):
         node = XendNode.instance()
-        record = {'uuid': host_cpu_ref,
-                  'host': node.uuid,
-                  'number': node.get_host_cpu_number(host_cpu_ref),
-                  'utilisation': node.get_host_cpu_load(host_cpu_ref)}
+        record = dict([(f, node.get_host_cpu_field(ref, f))
+                       for f in self.host_cpu_attr_ro
+                       if f not in ['uuid', 'host', 'utilisation']])
+        record['uuid'] = ref
+        record['host'] = node.uuid
+        record['utilisation'] = node.get_host_cpu_load(ref)
         return xen_api_success(record)
 
     # class methods
@@ -760,10 +802,12 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     host_metrics_attr_ro = ['memory_total',
-                            'memory_free',
-                            'host']
+                            'memory_free']
     host_metrics_attr_rw = []
     host_metrics_methods = []
+
+    def host_metrics_get_all(self, _):
+        return xen_api_success([XendNode.instance().host_metrics_uuid])
 
     def _host_metrics_get(self, ref, f):
         return xen_api_success(getattr(node, f)())
@@ -771,13 +815,9 @@ class XendAPI(object):
     def host_metrics_get_record(self, _, ref):
         return xen_api_success({
             'uuid'         : ref,
-            'host'         : XendNode.instance().uuid,
             'memory_total' : self._host_metrics_get_memory_total(),
             'memory_free'  : self._host_metrics_get_memory_free(),
             })
-
-    def host_metrics_get_host(self, _, ref):
-        return xen_api_success(XendNode.instance().uuid)
 
     def host_metrics_get_memory_total(self, _, ref):
         return xen_api_success(self._host_metrics_get_memory_total())
@@ -799,18 +839,13 @@ class XendAPI(object):
 
     network_attr_ro = ['VIFs', 'PIFs']
     network_attr_rw = ['name_label',
-                       'name_description',
-                       'default_gateway',
-                       'default_netmask']
+                       'name_description']
     
     network_funcs = [('create', 'network')]
     
-    def network_create(self, _, name_label, name_description,
-                       default_gateway, default_netmask):
+    def network_create(self, _, name_label, name_description):
         return xen_api_success(
-            XendNode.instance().network_create(name_label, name_description,
-                                               default_gateway,
-                                               default_netmask))
+            XendNode.instance().network_create(name_label, name_description))
 
     def network_destroy(self, _, ref):
         return xen_api_success(XendNode.instance().network_destroy(ref))
@@ -831,12 +866,6 @@ class XendAPI(object):
     def network_get_name_description(self, _, ref):
         return xen_api_success(self._get_network(ref).name_description)
 
-    def network_get_default_gateway(self, _, ref):
-        return xen_api_success(self._get_network(ref).default_gateway)
-
-    def network_get_default_netmask(self, _, ref):
-        return xen_api_success(self._get_network(ref).default_netmask)
-
     def network_get_VIFs(self, _, ref):
         return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
 
@@ -848,13 +877,6 @@ class XendAPI(object):
 
     def network_set_name_description(self, _, ref, val):
         return xen_api_success(self._get_network(ref).set_name_description(val))
-
-    def network_set_default_gateway(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_default_gateway(val))
-
-    def network_set_default_netmask(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_default_netmask(val))
-
 
     # Xen API: Class PIF
     # ----------------------------------------------------------------
@@ -941,20 +963,19 @@ class XendAPI(object):
     # Xen API: Class PIF_metrics
     # ----------------------------------------------------------------
 
-    PIF_metrics_attr_ro = ['PIF',
-                           'io_read_kbs',
+    PIF_metrics_attr_ro = ['io_read_kbs',
                            'io_write_kbs']
     PIF_metrics_attr_rw = []
     PIF_methods = []
+
+    def PIF_metrics_get_all(self, _):
+        return xen_api_success(XendNode.instance().pif_metrics.keys())
 
     def _PIF_metrics_get(self, ref):
         return XendNode.instance().pif_metrics[ref]
 
     def PIF_metrics_get_record(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_record())
-
-    def PIF_metrics_get_PIF(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).pif.uuid)
 
     def PIF_metrics_get_io_read_kbs(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_io_read_kbs())
@@ -979,6 +1000,7 @@ class XendAPI(object):
                   'VTPMs',
                   'PCI_bus',
                   'tools_version',
+                  'domid',
                   'is_control_domain',
                   ]
                   
@@ -1219,6 +1241,10 @@ class XendAPI(object):
     def VM_get_other_config(self, session, vm_ref):
         return self.VM_get('other_config', session, vm_ref)        
 
+    def VM_get_domid(self, _, ref):
+        domid = XendDomain.instance().get_vm_by_uuid(ref).getDomid()
+        return xen_api_success(domid is None and -1 or domid)
+
     def VM_get_is_control_domain(self, session, vm_ref):
         xd = XendDomain.instance()
         return xen_api_success(
@@ -1375,7 +1401,9 @@ class XendAPI(object):
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         if not xeninfo:
             return xen_api_error(['HANDLE_INVALID', 'VM', vm_ref])
-        
+
+        domid = xeninfo.getDomid()
+
         record = {
             'uuid': xeninfo.get_uuid(),
             'power_state': xeninfo.get_power_state(),
@@ -1418,6 +1446,7 @@ class XendAPI(object):
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
             'other_config': xeninfo.info.get('other_config', {}),
+            'domid': domid is None and -1 or domid,
             'is_control_domain': xeninfo == xendom.privilegedDomain(),
         }
         return xen_api_success(record)
@@ -2117,7 +2146,15 @@ class XendAPI(object):
     def debug_get_record(self, session, debug_ref):
         return xen_api_success({'uuid': debug_ref})
 
-             
+
+    def list_all_methods(self, _):
+        def _funcs():
+            return [getattr(XendAPI, x) for x in XendAPI.__dict__]
+
+        return xen_api_success([x.api for x in _funcs()
+                                if hasattr(x, 'api')])
+    list_all_methods.api = '_UNSUPPORTED_list_all_methods'
+
 
 class XendAPIAsyncProxy:
     """ A redirector for Async.Class.function calls to XendAPI

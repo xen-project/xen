@@ -258,6 +258,14 @@ static inline void get_knownalive_domain(struct domain *d)
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
 
+/* Obtain a reference to the currently-running domain. */
+static inline struct domain *get_current_domain(void)
+{
+    struct domain *d = current->domain;
+    get_knownalive_domain(d);
+    return d;
+}
+
 struct domain *domain_create(domid_t domid, unsigned int domcr_flags);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
 #define _DOMCRF_hvm 0
@@ -270,18 +278,29 @@ int construct_dom0(
     char *cmdline);
 
 /*
- * find_domain_rcu_lock() is more efficient than get_domain_by_id().
+ * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
  * This is the preferred function if the returned domain reference
  * is short lived,  but it cannot be used if the domain reference needs 
  * to be kept beyond the current scope (e.g., across a softirq).
- * The returned domain reference must be discarded using domain_rcu_unlock().
+ * The returned domain reference must be discarded using rcu_unlock_domain().
  */
-struct domain *find_domain_rcu_lock(domid_t dom);
+struct domain *rcu_lock_domain_by_id(domid_t dom);
 
-/* Finish a RCU critical region started by find_domain_rcu_lock(). */
-static inline void domain_rcu_unlock(struct domain *d)
+/* Finish a RCU critical region started by rcu_lock_domain_by_id(). */
+static inline void rcu_unlock_domain(struct domain *d)
 {
     rcu_read_unlock(&domlist_read_lock);
+}
+
+static inline struct domain *rcu_lock_domain(struct domain *d)
+{
+    rcu_read_lock(d);
+    return d;
+}
+
+static inline struct domain *rcu_lock_current_domain(void)
+{
+    return rcu_lock_domain(current->domain);
 }
 
 struct domain *get_domain_by_id(domid_t dom);

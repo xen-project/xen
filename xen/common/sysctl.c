@@ -86,15 +86,8 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
                 continue;
             if ( num_domains == op->u.getdomaininfolist.max_domains )
                 break;
-            if ( (d == NULL) || !get_domain(d) )
-            {
-                ret = -ESRCH;
-                break;
-            }
 
             getdomaininfo(d, &info);
-
-            put_domain(d);
 
             if ( copy_to_guest_offset(op->u.getdomaininfolist.buffer,
                                       num_domains, &info, 1) )

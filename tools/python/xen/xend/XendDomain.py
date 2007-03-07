@@ -32,7 +32,7 @@ import threading
 import xen.lowlevel.xc
 
 
-from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo, XendNode
+from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
 from xen.xend.XendConfig import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
@@ -43,6 +43,7 @@ from xen.xend.XendConstants import XS_VMROOT
 from xen.xend.XendConstants import DOM_STATE_HALTED, DOM_STATE_PAUSED
 from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
 from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
+from xen.xend.XendConstants import TRIGGER_TYPE
 from xen.xend.XendDevices import XendDevices
 
 from xen.xend.xenstore.xstransact import xstransact
@@ -487,14 +488,14 @@ class XendDomain:
         @type domid: int or string
         @return: Found domain.
         @rtype: XendDomainInfo
-        @raise XendError: If domain is not found.
+        @raise XendInvalidDomain: If domain is not found.
         """
         self.domains_lock.acquire()
         try:
             self._refresh(refresh_shutdown = False)
             dom = self.domain_lookup_nr(domid)
             if not dom:
-                raise XendError("No domain named '%s'." % str(domid))
+                raise XendInvalidDomain("No domain named '%s'." % str(domid))
             return dom
         finally:
             self.domains_lock.release()
@@ -874,10 +875,6 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create(config)
-            if XendNode.instance().xenschedinfo() == 'credit':
-                self.domain_sched_credit_set(dominfo.getDomid(),
-                                             dominfo.getWeight(),
-                                             dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()
@@ -894,10 +891,6 @@ class XendDomain:
             self._refresh()
 
             dominfo = XendDomainInfo.create_from_dict(config_dict)
-            if XendNode.instance().xenschedinfo() == 'credit':
-                self.domain_sched_credit_set(dominfo.getDomid(),
-                                             dominfo.getWeight(),
-                                             dominfo.getCap())
             return dominfo
         finally:
             self.domains_lock.release()
@@ -951,10 +944,6 @@ class XendDomain:
                                  POWER_STATE_NAMES[dominfo.state])
             
             dominfo.start(is_managed = True)
-            if XendNode.instance().xenschedinfo() == 'credit':
-                self.domain_sched_credit_set(dominfo.getDomid(),
-                                             dominfo.getWeight(),
-                                             dominfo.getCap())
         finally:
             self.domains_lock.release()
         dominfo.waitForDevices()
@@ -1183,7 +1172,7 @@ class XendDomain:
         XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
         sock.close()
 
-    def domain_save(self, domid, dst):
+    def domain_save(self, domid, dst, checkpoint):
         """Start saving a domain to file.
 
         @param domid: Domain ID or Name
@@ -1207,8 +1196,8 @@ class XendDomain:
                 oflags |= os.O_LARGEFILE
             fd = os.open(dst, oflags)
             try:
-                # For now we don't support 'live checkpoint' 
-                XendCheckpoint.save(fd, dominfo, False, False, dst)
+                XendCheckpoint.save(fd, dominfo, False, False, dst,
+                                    checkpoint=checkpoint)
             finally:
                 os.close(fd)
         except OSError, ex:
@@ -1433,6 +1422,33 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
+    def domain_send_trigger(self, domid, trigger_name, vcpu = 0):
+        """Send trigger to a domain.
+
+        @param domid: Domain ID or Name
+        @type domid: int or string.
+        @param trigger_name: trigger type name
+        @type trigger_name: string
+        @param vcpu: VCPU to send trigger (default is 0) 
+        @type vcpu: int
+        @raise XendError: failed to send trigger
+        @raise XendInvalidDomain: Domain is not valid        
+        @rtype: 0
+        """
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+        if trigger_name.lower() in TRIGGER_TYPE: 
+            trigger = TRIGGER_TYPE[trigger_name.lower()]
+        else:
+            raise XendError("Invalid trigger: %s", trigger_name)
+        try:
+            return xc.domain_send_trigger(dominfo.getDomid(),
+                                          trigger,
+                                          vcpu)
+        except Exception, ex:
+            raise XendError(str(ex))
+ 
 
 def instance():
     """Singleton constructor. Use this instead of the class constructor.

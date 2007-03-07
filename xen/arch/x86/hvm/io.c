@@ -33,6 +33,8 @@
 #include <asm/msr.h>
 #include <asm/apic.h>
 #include <asm/paging.h>
+#include <asm/shadow.h>
+#include <asm/p2m.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vpt.h>
@@ -414,7 +416,6 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             printk("Error: %s unknown port size\n", __FUNCTION__);
             domain_crash_synchronous();
         }
-        TRACE_VMEXIT(3, regs->eax);
     }
 }
 
@@ -739,6 +740,7 @@ void hvm_io_assist(struct vcpu *v)
     ioreq_t *p;
     struct cpu_user_regs *regs;
     struct hvm_io_op *io_opp;
+    unsigned long gmfn;
 
     io_opp = &v->arch.hvm_vcpu.io_op;
     regs   = &io_opp->io_context;
@@ -763,6 +765,13 @@ void hvm_io_assist(struct vcpu *v)
     /* Copy register changes back into current guest state. */
     hvm_load_cpu_guest_regs(v, regs);
     memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
+
+    /* Has memory been dirtied? */
+    if ( p->dir == IOREQ_READ && p->data_is_ptr ) 
+    {
+        gmfn = get_mfn_from_gpfn(paging_gva_to_gfn(v, p->data));
+        mark_dirty(v->domain, gmfn);
+    }
 }
 
 /*

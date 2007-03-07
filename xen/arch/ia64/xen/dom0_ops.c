@@ -174,6 +174,46 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         put_domain(d);
     }
     break;
+
+    case XEN_DOMCTL_sendtrigger:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        d = get_domain_by_id(op->domain);
+        if ( d == NULL )
+            break;
+
+        ret = -EINVAL;
+        if ( op->u.sendtrigger.vcpu >= MAX_VIRT_CPUS )
+            goto sendtrigger_out;
+
+        ret = -ESRCH;
+        if ( (v = d->vcpu[op->u.sendtrigger.vcpu]) == NULL )
+            goto sendtrigger_out;
+
+        ret = 0;
+        switch (op->u.sendtrigger.trigger)
+        {
+        case XEN_DOMCTL_SENDTRIGGER_INIT:
+        {
+            if (VMX_DOMAIN(v))
+                vmx_pend_pal_init(d);
+            else
+                ret = -ENOSYS;
+        }
+        break;
+
+        default:
+            ret = -ENOSYS;
+        }
+
+    sendtrigger_out:
+        put_domain(d);
+    }
+    break;
+
     default:
         printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;

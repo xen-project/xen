@@ -81,9 +81,29 @@ struct buffered_iopage {
 };            /* sizeof this structure must be in one page */
 typedef struct buffered_iopage buffered_iopage_t;
 
+#if defined(__ia64__)
+struct pio_buffer {
+    uint32_t page_offset;
+    uint32_t pointer;
+    uint32_t data_end;
+    uint32_t buf_size;
+    void *opaque;
+};
+
+#define PIO_BUFFER_IDE_PRIMARY   0 /* I/O port = 0x1F0 */
+#define PIO_BUFFER_IDE_SECONDARY 1 /* I/O port = 0x170 */
+#define PIO_BUFFER_ENTRY_NUM     2
+struct buffered_piopage {
+    struct pio_buffer pio[PIO_BUFFER_ENTRY_NUM];
+    uint8_t buffer[1];
+};
+#endif /* defined(__ia64__) */
+
+#if defined(__i386__) || defined(__x86_64__)
 #define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000001f40
 #define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
 #define ACPI_PM_TMR_BLK_ADDRESS             (ACPI_PM1A_EVT_BLK_ADDRESS + 0x08)
+#endif /* defined(__i386__) || defined(__x86_64__) */
 
 #endif /* _IOREQ_H_ */
 

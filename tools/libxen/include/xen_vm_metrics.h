@@ -189,4 +189,11 @@ extern bool
 xen_vm_metrics_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, xen_vm_metrics vm_metrics);
 
 
+/**
+ * Return a list of all the VM_metrics instances known to the system.
+ */
+extern bool
+xen_vm_metrics_get_all(xen_session *session, struct xen_vm_metrics_set **result);
+
+
 #endif

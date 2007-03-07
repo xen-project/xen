@@ -13,14 +13,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2006
+ * Copyright IBM Corp. 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
  */
 
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <asm/platform.h>
 #include <public/xen.h>
 #include "of-devtree.h"
 #include "oftree.h"
@@ -87,19 +89,34 @@ static void ofd_memory_extent_nodes(void *m, struct domain *d)
     ulong start;
     ulong size;
     ofdn_t n;
-    struct page_extents *pe;
     ulong cur_pfn = 1UL << d->arch.rma_order;
 
-    start = cur_pfn << PAGE_SHIFT;
-    size = 0;
-    list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
+    /* if dom0 > 2G, shift ram past IO hole */
+    if ((d->tot_pages << PAGE_SHIFT) > platform_iohole_base()) {
+        /* memory@RMA up to IO hole */
+        start = cur_pfn << PAGE_SHIFT;
+        size = platform_iohole_base() - (cur_pfn << PAGE_SHIFT);
+        n = ofd_memory_node_create(m, OFD_ROOT, "", memory, memory,
+                                   start, size);
 
-        size += 1UL << (pe->order + PAGE_SHIFT);
-        if (pe->order != cpu_extent_order())
-            panic("we don't handle this yet\n");
+        BUG_ON(n <= 0);
+
+        /* XXX Our p2m translation currnetly doesn't allow dom0 memory above
+         * the IO hole. */
+#if 0
+        /* remaining memory shifted up to memory@IOHOLE_END */
+        start = platform_iohole_base()+platform_iohole_size();
+        size = (d->tot_pages << PAGE_SHIFT) - platform_iohole_base();
+        n = ofd_memory_node_create(m, OFD_ROOT, "", memory, memory,
+                                   start, size);
+#endif
+    } else {
+        /* we fit beneath the IO hole as one chunk */
+        start = cur_pfn << PAGE_SHIFT;
+        size = (d->tot_pages - cur_pfn) << PAGE_SHIFT;
+        n = ofd_memory_node_create(m, OFD_ROOT, "", memory, memory,
+                                   start, size);
     }
-    n = ofd_memory_node_create(m, OFD_ROOT, "", memory, memory,
-                               start, size);
     BUG_ON(n <= 0);
 }
 

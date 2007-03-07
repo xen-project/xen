@@ -20,6 +20,7 @@
 #define XEN_VBD_H
 
 #include "xen_common.h"
+#include "xen_string_set.h"
 #include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
 #include "xen_vbd_metrics_decl.h"
@@ -75,8 +76,12 @@ typedef struct xen_vbd_record
     bool bootable;
     enum xen_vbd_mode mode;
     enum xen_vbd_type type;
+    bool currently_attached;
+    int64_t status_code;
+    char *status_detail;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
+    struct xen_string_set *qos_supported_algorithms;
     struct xen_vbd_metrics_record_opt *metrics;
 } xen_vbd_record;
 
@@ -237,6 +242,27 @@ xen_vbd_get_type(xen_session *session, enum xen_vbd_type *result, xen_vbd vbd);
 
 
 /**
+ * Get the currently_attached field of the given VBD.
+ */
+extern bool
+xen_vbd_get_currently_attached(xen_session *session, bool *result, xen_vbd vbd);
+
+
+/**
+ * Get the status_code field of the given VBD.
+ */
+extern bool
+xen_vbd_get_status_code(xen_session *session, int64_t *result, xen_vbd vbd);
+
+
+/**
+ * Get the status_detail field of the given VBD.
+ */
+extern bool
+xen_vbd_get_status_detail(xen_session *session, char **result, xen_vbd vbd);
+
+
+/**
  * Get the qos/algorithm_type field of the given VBD.
  */
 extern bool
@@ -248,6 +274,13 @@ xen_vbd_get_qos_algorithm_type(xen_session *session, char **result, xen_vbd vbd)
  */
 extern bool
 xen_vbd_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vbd vbd);
+
+
+/**
+ * Get the qos/supported_algorithms field of the given VBD.
+ */
+extern bool
+xen_vbd_get_qos_supported_algorithms(xen_session *session, struct xen_string_set **result, xen_vbd vbd);
 
 
 /**
@@ -322,6 +355,13 @@ xen_vbd_remove_from_qos_algorithm_params(xen_session *session, xen_vbd vbd, char
  */
 extern bool
 xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi);
+
+
+/**
+ * Return a list of all the VBDs known to the system.
+ */
+extern bool
+xen_vbd_get_all(xen_session *session, struct xen_vbd_set **result);
 
 
 #endif

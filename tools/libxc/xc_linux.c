@@ -328,6 +328,41 @@ int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
     return dorw(xce_handle, (char *)&port, sizeof(port), 1);
 }
 
+/* Optionally flush file to disk and discard page cache */
+void discard_file_cache(int fd, int flush) 
+{
+    off_t cur = 0;
+    int saved_errno = errno;
+
+    if ( flush && (fsync(fd) < 0) )
+    {
+        /*PERROR("Failed to flush file: %s", strerror(errno));*/
+        goto out;
+    }
+
+    /* 
+     * Calculate last page boundary of amount written so far 
+     * unless we are flushing in which case entire cache
+     * is discarded.
+     */
+    if ( !flush )
+    {
+        if ( (cur = lseek(fd, 0, SEEK_CUR)) == (off_t)-1 )
+            cur = 0;
+        cur &= ~(PAGE_SIZE-1);
+    }
+
+    /* Discard from the buffer cache. */
+    if ( posix_fadvise64(fd, 0, cur, POSIX_FADV_DONTNEED) < 0 )
+    {
+        /*PERROR("Failed to discard cache: %s", strerror(errno));*/
+        goto out;
+    }
+
+ out:
+    errno = saved_errno;
+}
+
 /*
  * Local variables:
  * mode: C

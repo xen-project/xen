@@ -1,42 +1,40 @@
-0x0001f001	CPU%(cpu)d	%(tsc)d		lost_records        0x%(1)08x
+0x00000000  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  unknown (0x%(event)016x)  [ 0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x ]
 
-0x0002f001	CPU%(cpu)d	%(tsc)d		sched_add_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x0002f002	CPU%(cpu)d	%(tsc)d		sched_rem_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x0002f003	CPU%(cpu)d	%(tsc)d		domain_sleep		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x0002f004	CPU%(cpu)d	%(tsc)d		domain_wake		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x0002f005	CPU%(cpu)d	%(tsc)d		do_yield		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x0002f006	CPU%(cpu)d	%(tsc)d		do_block		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
-0x0002f007	CPU%(cpu)d	%(tsc)d		domain_shutdown		[ domid = 0x%(1)08x, edomid = 0x%(2)08x, reason = 0x%(3)08x ]
-0x0002f008	CPU%(cpu)d	%(tsc)d		sched_ctl
-0x0002f009	CPU%(cpu)d	%(tsc)d		sched_adjdom		[ domid = 0x%(1)08x ]
-0x0002f00a	CPU%(cpu)d	%(tsc)d		__enter_scheduler	[ prev<domid:edomid> = 0x%(1)08x : 0x%(2)08x, next<domid:edomid> = 0x%(3)08x : 0x%(4)08x ]
-0x0002f00B	CPU%(cpu)d	%(tsc)d		s_timer_fn
-0x0002f00c	CPU%(cpu)d	%(tsc)d		t_timer_fn
-0x0002f00d	CPU%(cpu)d	%(tsc)d		dom_timer_fn
+0x0001f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  lost_records        0x%(1)08x
 
-0x00080001	CPU%(cpu)d	%(tsc)d		VMX_VMEXIT		[ domid = 0x%(1)08x, eip = 0x%(2)08x, reason = 0x%(3)08x ]
-0x00084001	CPU%(cpu)d	%(tsc)d		VMX_INTR		[ domid = 0x%(1)08x, trap = 0x%(2)08x, va = 0x%(3)08x ]
+0x0002f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_add_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x0002f002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_rem_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x0002f003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_sleep		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x0002f004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_wake		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x0002f005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_yield		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x0002f006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x0002f007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown		[ domid = 0x%(1)08x, edomid = 0x%(2)08x, reason = 0x%(3)08x ]
+0x0002f008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_ctl
+0x0002f009  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_adjdom		[ domid = 0x%(1)08x ]
+0x0002f00a  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  __enter_scheduler	[ prev<domid:edomid> = 0x%(1)08x : 0x%(2)08x, next<domid:edomid> = 0x%(3)08x : 0x%(4)08x ]
+0x0002f00B  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  s_timer_fn
+0x0002f00c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  t_timer_fn
+0x0002f00d  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  dom_timer_fn
 
-0x00081001	CPU%(cpu)d	%(tsc)d		VMEXIT_0		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082001	CPU%(cpu)d	%(tsc)d		VMENTRY_0		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081002	CPU%(cpu)d	%(tsc)d		VMEXIT_1		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082002	CPU%(cpu)d	%(tsc)d		VMENTRY_1		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081003	CPU%(cpu)d	%(tsc)d		VMEXIT_2		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082003	CPU%(cpu)d	%(tsc)d		VMENTRY_2		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081004	CPU%(cpu)d	%(tsc)d		VMEXIT_3		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082004	CPU%(cpu)d	%(tsc)d		VMENTRY_3		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081005	CPU%(cpu)d	%(tsc)d		VMEXIT_4		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082005	CPU%(cpu)d	%(tsc)d		VMENTRY_4		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081006	CPU%(cpu)d	%(tsc)d		VMEXIT_5		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082006	CPU%(cpu)d	%(tsc)d		VMENTRY_5		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081007	CPU%(cpu)d	%(tsc)d		VMEXIT_6		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082007	CPU%(cpu)d	%(tsc)d		VMENTRY_6		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-
-0x00081008	CPU%(cpu)d	%(tsc)d		VMEXIT_7		0x%(1)08x 0x%(2)08x 0x%(3)08x
-0x00082008	CPU%(cpu)d	%(tsc)d		VMENTRY_7		0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
+0x00081001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMENTRY     [ dom:vcpu = 0x%(1)08x ]
+0x00081002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMEXIT      [ dom:vcpu = 0x%(1)08x, rIP  = 0x%(2)08x, exitcode = 0x%(3)08x ]
+0x00082001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  PF_XEN      [ dom:vcpu = 0x%(1)08x, virt = 0x%(2)08x, errorcode = 0x%(3)02x ]
+0x00082002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  PF_INJECT   [ dom:vcpu = 0x%(1)08x, virt = 0x%(2)08x, errorcode = 0x%(3)02x ]
+0x00082003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INJ_EXC     [ dom:vcpu = 0x%(1)08x, vector = 0x%(2)02x, errorcode = 0x%(3)04x ]
+0x00082004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INJ_VIRQ    [ dom:vcpu = 0x%(1)08x, vector = 0x%(2)02x, fake = %(3)d ]
+0x00082005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  REINJ_VIRQ  [ dom:vcpu = 0x%(1)08x, vector = 0x%(2)02x ]
+0x00082006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IO_READ     [ dom:vcpu = 0x%(1)08x, port = 0x%(2)04x, size = %(3)d ]
+0x00082007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  IO_WRITE    [ dom:vcpu = 0x%(1)08x, port = 0x%(2)04x, size = %(3)d ]
+0x00082008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CR_READ     [ dom:vcpu = 0x%(1)08x, CR# = %(2)d, value = 0x%(3)08x ]
+0x00082009  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CR_WRITE    [ dom:vcpu = 0x%(1)08x, CR# = %(2)d, value = 0x%(3)08x ]
+0x0008200A  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  DR_READ     [ dom:vcpu = 0x%(1)08x ]
+0x0008200B  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  DR_WRITE    [ dom:vcpu = 0x%(1)08x ]
+0x0008200C  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MSR_READ    [ dom:vcpu = 0x%(1)08x, MSR# = 0x%(2)08x, value = 0x%(3)08x ]
+0x0008200D  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  MSR_WRITE   [ dom:vcpu = 0x%(1)08x, MSR# = 0x%(2)08x, value = 0x%(3)08x ]
+0x0008200E  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  CPUID       [ dom:vcpu = 0x%(1)08x, func = 0x%(2)08x, eax:ebx = 0x%(3)016x, ecx:edx = 0x%(4)016x ]
+0x0008200F  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INTR        [ dom:vcpu = 0x%(1)08x, vector = 0x%(2)02x ]
+0x00082010  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  NMI         [ dom:vcpu = 0x%(1)08x ]
+0x00082011  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  SMI         [ dom:vcpu = 0x%(1)08x ]
+0x00082012  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  VMMCALL     [ dom:vcpu = 0x%(1)08x, func = 0x%(2)08x ]
+0x00082013  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  HLT         [ dom:vcpu = 0x%(1)08x, intpending = %(2)d ]
+0x00082014  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  INVLPG      [ dom:vcpu = 0x%(1)08x, virt = 0x%(2)08x, invlpga = %(3)d, asid = 0x%(4)02x ]

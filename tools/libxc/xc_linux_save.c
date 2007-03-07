@@ -13,6 +13,7 @@
 #include <sys/time.h>
 
 #include "xc_private.h"
+#include "xc_dom.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
 
@@ -33,7 +34,7 @@ static unsigned long max_mfn;
 /* virtual starting address of the hypervisor */
 static unsigned long hvirt_start;
 
-/* #levels of page tables used by the currrent guest */
+/* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
 /* total number of pages used by the current guest */
@@ -171,6 +172,22 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
         (new->tv_usec - old->tv_usec);
 }
 
+static int noncached_write(int fd, int live, void *buffer, int len) 
+{
+    static int write_count = 0;
+
+    int rc = write(fd,buffer,len);
+
+    write_count += len;
+
+    if (write_count >= MAX_PAGECACHE_USAGE*PAGE_SIZE) {
+        /* Time to discard cache - dont care if this fails */
+        discard_file_cache(fd, 0 /* no flush */);
+        write_count = 0;
+    }
+
+    return rc;
+}
 
 #ifdef ADAPTIVE_SAVE
 
@@ -204,7 +221,7 @@ static inline void initialize_mbit_rate()
 }
 
 
-static int ratewrite(int io_fd, void *buf, int n)
+static int ratewrite(int io_fd, int live, void *buf, int n)
 {
     static int budget = 0;
     static int burst_time_us = -1;
@@ -214,7 +231,7 @@ static int ratewrite(int io_fd, void *buf, int n)
     long long delta;
 
     if (START_MBIT_RATE == 0)
-        return write(io_fd, buf, n);
+        return noncached_write(io_fd, live, buf, n);
 
     budget -= n;
     if (budget < 0) {
@@ -250,13 +267,13 @@ static int ratewrite(int io_fd, void *buf, int n)
             }
         }
     }
-    return write(io_fd, buf, n);
+    return noncached_write(io_fd, live, buf, n);
 }
 
 #else /* ! ADAPTIVE SAVE */
 
 #define RATE_IS_MAX() (0)
-#define ratewrite(_io_fd, _buf, _n) write((_io_fd), (_buf), (_n))
+#define ratewrite(_io_fd, _live, _buf, _n) noncached_write((_io_fd), (_live), (_buf), (_n))
 #define initialize_mbit_rate()
 
 #endif
@@ -474,7 +491,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** reserved hypervisor mappings. This depends on the current
     ** page table type as well as the number of paging levels.
     */
-    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
+    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2) ? 4 : 8);
 
     if (pt_levels == 2 && type == XEN_DOMCTL_PFINFO_L2TAB)
         xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT);
@@ -490,7 +507,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     */
     if (pt_levels == 3 && type == XEN_DOMCTL_PFINFO_L2TAB) {
         int hstart;
-        unsigned long he;
+        uint64_t he;
 
         hstart = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
         he = ((const uint64_t *) spage)[hstart];
@@ -543,6 +560,18 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
             pte &= ~MADDR_MASK_X86;
             pte |= (uint64_t)pfn << PAGE_SHIFT;
+
+            /*
+             * PAE guest L3Es can contain these flags when running on
+             * a 64bit hypervisor. We zap these here to avoid any
+             * surprise at restore time...
+             */
+            if ( pt_levels == 3 &&
+                 type == XEN_DOMCTL_PFINFO_L3TAB &&
+                 pte & (_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED) )
+            {
+                pte &= ~(_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);
+            }
         }
 
         if (pt_levels == 2)
@@ -667,6 +696,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long needed_to_fix = 0;
     unsigned long total_sent    = 0;
 
+    uint64_t vcpumap = 1ULL;
 
     /* If no explicit control parameters given, use defaults */
     if(!max_iters)
@@ -687,24 +717,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         return 1;
     }
 
-    if (lock_pages(&ctxt, sizeof(ctxt))) {
-        ERROR("Unable to lock ctxt");
-        return 1;
-    }
-
-    /* Only have to worry about vcpu 0 even for SMP */
     if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
         ERROR("Could not get vcpu context");
         goto out;
     }
     shared_info_frame = info.shared_info_frame;
-
-    /* A cheesy test to see whether the domain contains valid state. */
-    if (ctxt.ctrlreg[3] == 0)
-    {
-        ERROR("Domain is not in a valid Linux guest OS state");
-        goto out;
-    }
 
     /* Map the shared info frame */
     if(!(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
@@ -1066,10 +1083,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     race = 
                         canonicalize_pagetable(pagetype, pfn, spage, page); 
 
-                    if(race && !live) 
-                        goto out; 
+                    if(race && !live) {
+                        ERROR("Fatal PT race (pfn %lx, type %08lx)", pfn,
+                              pagetype);
+                        goto out;
+                    }
 
-                    if (ratewrite(io_fd, page, PAGE_SIZE) != PAGE_SIZE) {
+                    if (ratewrite(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE) {
                         ERROR("Error when writing to state file (4)"
                               " (errno %d)", errno);
                         goto out;
@@ -1078,7 +1098,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 }  else {
 
                     /* We have a normal page: just write it directly. */
-                    if (ratewrite(io_fd, spage, PAGE_SIZE) != PAGE_SIZE) {
+                    if (ratewrite(io_fd, live, spage, PAGE_SIZE) != PAGE_SIZE) {
                         ERROR("Error when writing to state file (5)"
                               " (errno %d)", errno);
                         goto out;
@@ -1162,6 +1182,32 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     DPRINTF("All memory is saved\n");
 
+    {
+        struct {
+            int minustwo;
+            int max_vcpu_id;
+            uint64_t vcpumap;
+        } chunk = { -2, info.max_vcpu_id };
+
+        if (info.max_vcpu_id >= 64) {
+            ERROR("Too many VCPUS in guest!");
+            goto out;
+        }
+
+        for (i = 1; i <= info.max_vcpu_id; i++) {
+            xc_vcpuinfo_t vinfo;
+            if ((xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) &&
+                vinfo.online)
+                vcpumap |= 1ULL << i;
+        }
+
+        chunk.vcpumap = vcpumap;
+        if(!write_exact(io_fd, &chunk, sizeof(chunk))) {
+            ERROR("Error when writing to state file (errno %d)", errno);
+            goto out;
+        }
+    }
+
     /* Zero terminate */
     i = 0;
     if (!write_exact(io_fd, &i, sizeof(int))) {
@@ -1208,30 +1254,55 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /* Canonicalise each GDT frame number. */
-    for ( i = 0; (512*i) < ctxt.gdt_ents; i++ ) {
-        if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) ) {
-            ERROR("GDT frame is not in range of pseudophys map");
+    for (i = 0; i <= info.max_vcpu_id; i++) {
+        if (!(vcpumap & (1ULL << i)))
+            continue;
+
+        if ((i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt)) {
+            ERROR("No context for VCPU%d", i);
+            goto out;
+        }
+
+        /* Canonicalise each GDT frame number. */
+        for ( j = 0; (512*j) < ctxt.gdt_ents; j++ ) {
+            if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[j]) ) {
+                ERROR("GDT frame is not in range of pseudophys map");
+                goto out;
+            }
+        }
+
+        /* Canonicalise the page table base pointer. */
+        if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
+            ERROR("PT base is not in range of pseudophys map");
+            goto out;
+        }
+        ctxt.ctrlreg[3] = 
+            xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
+
+        /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
+        if ( (pt_levels == 4) && ctxt.ctrlreg[1] )
+        {
+            if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[1])) ) {
+                ERROR("PT base is not in range of pseudophys map");
+                goto out;
+            }
+            /* Least-significant bit means 'valid PFN'. */
+            ctxt.ctrlreg[1] = 1 |
+                xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[1])));
+        }
+
+        if (!write_exact(io_fd, &ctxt, sizeof(ctxt))) {
+            ERROR("Error when writing to state file (1) (errno %d)", errno);
             goto out;
         }
     }
-
-    /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
-        ERROR("PT base is not in range of pseudophys map");
-        goto out;
-    }
-    ctxt.ctrlreg[3] = 
-        xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
 
     /*
      * Reset the MFN to be a known-invalid value. See map_frame_list_list().
      */
     memcpy(page, live_shinfo, PAGE_SIZE);
     ((shared_info_t *)page)->arch.pfn_to_mfn_frame_list_list = 0;
-
-    if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
-        !write_exact(io_fd, page, PAGE_SIZE)) {
+    if (!write_exact(io_fd, page, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1) (errno %d)", errno);
         goto out;
     }
@@ -1249,6 +1320,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
+    // flush last write and discard cache for file
+    discard_file_cache(io_fd, 1 /* flush */);
+
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
 
@@ -1258,10 +1332,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if (live_p2m_frame_list)
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
 
-    if(live_p2m)
+    if (live_p2m)
         munmap(live_p2m, P2M_SIZE);
 
-    if(live_m2p)
+    if (live_m2p)
         munmap(live_m2p, M2P_SIZE(max_mfn));
 
     free(pfn_type);

@@ -41,6 +41,13 @@
 #define INFO     1
 #define PROGRESS 0
 
+/*
+** Define max dirty page cache to permit during save/restore -- need to balance 
+** keeping cache usage down with CPU impact of invalidating too often.
+** (Currently 16MB)
+*/
+#define MAX_PAGECACHE_USAGE (4*1024)
+
 #if INFO
 #define IPRINTF(_f, _a...) printf(_f , ## _a)
 #else
@@ -157,5 +164,8 @@ int xc_waitdomain_core(int xc_handle, int domain, int *status,
 
 void bitmap_64_to_byte(uint8_t *bp, const uint64_t *lp, int nbits);
 void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);
+
+/* Optionally flush file to disk and discard page cache */
+void discard_file_cache(int fd, int flush);
 
 #endif /* __XC_PRIVATE_H__ */

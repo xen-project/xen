@@ -379,6 +379,8 @@ void init_mm(void)
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));
     printk("MM: done\n");
 
+    arch_init_p2m(max_pfn);
+    
     arch_init_demand_mapping_area(max_pfn);
 }
 

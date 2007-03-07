@@ -180,4 +180,11 @@ extern bool
 xen_vbd_metrics_get_io_write_kbs(xen_session *session, double *result, xen_vbd_metrics vbd_metrics);
 
 
+/**
+ * Return a list of all the VBD_metrics instances known to the system.
+ */
+extern bool
+xen_vbd_metrics_get_all(xen_session *session, struct xen_vbd_metrics_set **result);
+
+
 #endif

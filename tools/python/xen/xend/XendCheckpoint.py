@@ -54,7 +54,7 @@ def read_exact(fd, size, errmsg):
     return buf
 
 
-def save(fd, dominfo, network, live, dst):
+def save(fd, dominfo, network, live, dst, checkpoint=False):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
@@ -121,9 +121,11 @@ def save(fd, dominfo, network, live, dst):
             os.close(qemu_fd)
             os.remove("/tmp/xen.qemu-dm.%d" % dominfo.getDomid())
 
-        dominfo.destroyDomain()
-        dominfo.testDeviceComplete()
-
+        if checkpoint:
+            dominfo.resumeDomain()
+        else:
+            dominfo.destroyDomain()
+            dominfo.testDeviceComplete()
         try:
             dominfo.setName(domain_name)
         except VmError:
@@ -136,23 +138,6 @@ def save(fd, dominfo, network, live, dst):
     except Exception, exn:
         log.exception("Save failed on domain %s (%s).", domain_name,
                       dominfo.getDomid())
-
-        dominfo._releaseDevices()
-        dominfo.testDeviceComplete()
-        dominfo.testvifsComplete()
-        log.debug("XendCheckpoint.save: devices released")
-
-        dominfo._resetChannels()
-
-        dominfo._removeDom('control/shutdown')
-        dominfo._removeDom('device-misc/vif/nextDeviceID')
-
-        dominfo._createChannels()
-        dominfo._introduceDomain()
-        dominfo._storeDomDetails()
-
-        dominfo._createDevices()
-        log.debug("XendCheckpoint.save: devices created")
 
         dominfo.resumeDomain()
         log.debug("XendCheckpoint.save: resumeDomain")
@@ -245,11 +230,7 @@ def restore(xd, fd, dominfo = None, paused = False):
         if not is_hvm and handler.console_mfn is None:
             raise XendError('Could not read console MFN')        
 
-        dominfo.waitForDevices() # Wait for backends to set up
-        if not paused:
-            dominfo.unpause()
-
-         # get qemu state and create a tmp file for dm restore
+        # get qemu state and create a tmp file for dm restore
         if is_hvm:
             qemu_signature = read_exact(fd, len(QEMU_SIGNATURE),
                                         "invalid device model signature read")
@@ -272,6 +253,10 @@ def restore(xd, fd, dominfo = None, paused = False):
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
         
+        dominfo.waitForDevices() # Wait for backends to set up
+        if not paused:
+            dominfo.unpause()
+
         return dominfo
     except:
         dominfo.destroy()

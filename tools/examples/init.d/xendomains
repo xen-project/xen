@@ -58,18 +58,7 @@ else
 	_SMSG=(done failed failed missed failed skipped unused failed failed)
 	_RC_UNUSED=6
     fi
-    if test -e /lib/lsb/init-functions; then
-	# LSB    
-    	. /lib/lsb/init-functions
-	echo_rc()
-	{
-	    if test ${_RC_RV} = 0; then
-		log_success_msg "  [${_SMSG[${_RC_RV}]}] "
-	    else
-		log_failure_msg "  [${_SMSG[${_RC_RV}]}] "
-	    fi
-	}
-    elif test -e /etc/init.d/functions; then
+    if test -e /etc/init.d/functions; then
 	# REDHAT
 	. /etc/init.d/functions
 	echo_rc()
@@ -81,6 +70,24 @@ else
 		failure "  [${_SMSG[${_RC_RV}]}] "
 	    fi
 	}
+    elif test -e /lib/lsb/init-functions; then
+	# LSB    
+    	. /lib/lsb/init-functions
+        if alias log_success_msg >/dev/null 2>/dev/null; then
+	  echo_rc()
+	  {
+	       echo "  [${_SMSG[${_RC_RV}]}] "
+	  }
+        else
+	  echo_rc()
+	  {
+	    if test ${_RC_RV} = 0; then
+		log_success_msg "  [${_SMSG[${_RC_RV}]}] "
+	    else
+		log_failure_msg "  [${_SMSG[${_RC_RV}]}] "
+	    fi
+	  }
+        fi
     else    
 	# emulate it
 	echo_rc()

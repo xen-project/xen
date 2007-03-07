@@ -119,10 +119,11 @@ static inline void init_fds(struct disk_driver *dd)
 }
 
 /* Open the disk file and initialize aio state. */
-static int tdvmdk_open (struct disk_driver *dd, const char *name)
+static int tdvmdk_open (struct disk_driver *dd, 
+			const char *name, td_flag_t flags)
 {
 	int ret, fd;
-    	int l1_size, i;
+    	int l1_size, i, o_flags;
     	uint32_t magic;
 	struct td_state     *s   = dd->td_state;
 	struct tdvmdk_state *prv = (struct tdvmdk_state *)dd->private;
@@ -133,12 +134,15 @@ static int tdvmdk_open (struct disk_driver *dd, const char *name)
 		return -1;
 	
 	/* Open the file */
-        fd = open(name, O_RDWR | O_LARGEFILE); 
+	o_flags = O_DIRECT | O_LARGEFILE | 
+		((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
+        fd = open(name, o_flags); 
 
         if ( (fd == -1) && (errno == EINVAL) ) {
 
                 /* Maybe O_DIRECT isn't supported. */
-                fd = open(name, O_RDWR | O_LARGEFILE);
+		o_flags &= ~O_DIRECT;
+                fd = open(name, o_flags);
                 if (fd != -1) DPRINTF("WARNING: Accessing image without"
                                      "O_DIRECT! (%s)\n", name);
 
@@ -394,12 +398,13 @@ static int tdvmdk_do_callbacks(struct disk_driver *dd, int sid)
 	return 1;
 }
 
-static int tdvmdk_has_parent(struct disk_driver *dd)
+static int tdvmdk_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 {
-	return 0;
+	return TD_NO_PARENT;
 }
 
-static int tdvmdk_get_parent(struct disk_driver *dd, struct disk_driver *parent)
+static int tdvmdk_validate_parent(struct disk_driver *dd, 
+				  struct disk_driver *parent, td_flag_t flags)
 {
 	return -EINVAL;
 }
@@ -411,8 +416,8 @@ struct tap_disk tapdisk_vmdk = {
 	.td_queue_read       = tdvmdk_queue_read,
 	.td_queue_write      = tdvmdk_queue_write,
 	.td_submit           = tdvmdk_submit,
-	.td_has_parent       = tdvmdk_has_parent,
-	.td_get_parent       = tdvmdk_get_parent,
 	.td_close            = tdvmdk_close,
 	.td_do_callbacks     = tdvmdk_do_callbacks,
+	.td_get_parent_id    = tdvmdk_get_parent_id,
+	.td_validate_parent  = tdvmdk_validate_parent
 };

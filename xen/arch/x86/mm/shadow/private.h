@@ -229,8 +229,7 @@ struct shadow_page_info
     struct {
         unsigned int type:4;      /* What kind of shadow is this? */
         unsigned int pinned:1;    /* Is the shadow pinned? */
-        unsigned int logdirty:1;  /* Was it made in log-dirty mode? */
-        unsigned int count:26;    /* Reference count */
+        unsigned int count:27;    /* Reference count */
         u32 mbz;                  /* Must be zero: this is where the owner 
                                    * field lives in a non-shadow page */
     } __attribute__((packed));
@@ -540,7 +539,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     /* We remember the first shadow entry that points to each shadow. */
     if ( entry_pa != 0 
-         && sh_type_is_pinnable(v, sp->type) 
+         && !sh_type_is_pinnable(v, sp->type) 
          && sp->up == 0 ) 
         sp->up = entry_pa;
     
@@ -560,7 +559,7 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     /* If this is the entry in the up-pointer, remove it */
     if ( entry_pa != 0 
-         && sh_type_is_pinnable(v, sp->type) 
+         && !sh_type_is_pinnable(v, sp->type) 
          && sp->up == entry_pa ) 
         sp->up = 0;
 

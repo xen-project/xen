@@ -27,7 +27,7 @@
 #include <xen/percpu.h>
 #include <asm/processor.h>
 
-extern unsigned int timebase_freq;
+extern s64 timebase_freq;
 #define CLOCK_TICK_RATE timebase_freq
 
 #define watchdog_disable() ((void)0)

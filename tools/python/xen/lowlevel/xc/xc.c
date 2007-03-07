@@ -18,8 +18,12 @@
 #include <arpa/inet.h>
 
 #include "xenctrl.h"
+#include <xen/elfnote.h>
+#include "xc_dom.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -176,7 +180,17 @@ static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
 
 static PyObject *pyxc_domain_resume(XcObject *self, PyObject *args)
 {
-    return dom_op(self, args, xc_domain_resume);
+    uint32_t dom;
+    int fast;
+
+    if (!PyArg_ParseTuple(args, "ii", &dom, &fast))
+        return NULL;
+
+    if (xc_domain_resume(self->xc_handle, dom, fast) != 0)
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
 }
 
 static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
@@ -371,13 +385,17 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                   PyObject *args,
                                   PyObject *kwds)
 {
-    uint32_t dom;
+    uint32_t domid;
+    struct xc_dom_image *dom;
     char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
     unsigned int mem_mb;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
+    PyObject* elfnote_dict;
+    PyObject* elfnote = NULL;
+    int i;
 
     static char *kwd_list[] = { "domid", "store_evtchn", "memsize",
                                 "console_evtchn", "image",
@@ -386,22 +404,55 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                 "features", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssis", kwd_list,
-                                      &dom, &store_evtchn, &mem_mb,
+                                      &domid, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
                                       &features) )
         return NULL;
 
-    if ( xc_linux_build(self->xc_handle, dom, mem_mb, image,
-                        ramdisk, cmdline, features, flags,
-                        store_evtchn, &store_mfn,
-                        console_evtchn, &console_mfn) != 0 ) {
-        return pyxc_error_to_exception();
+    xc_dom_loginit();
+    if (!(dom = xc_dom_allocate(cmdline, features)))
+	return pyxc_error_to_exception();
+
+    if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
+			    ramdisk, flags, store_evtchn, &store_mfn,
+			    console_evtchn, &console_mfn) != 0 ) {
+	goto out;
     }
-    return Py_BuildValue("{s:i,s:i}", 
+
+    if ( !(elfnote_dict = PyDict_New()) )
+	goto out;
+    
+    for ( i = 0; i < ARRAY_SIZE(dom->parms.elf_notes); i++ )
+    {
+	switch ( dom->parms.elf_notes[i].type )
+        {
+	case XEN_ENT_NONE:
+	    continue;
+	case XEN_ENT_LONG:
+	    elfnote = Py_BuildValue("k", dom->parms.elf_notes[i].data.num);
+	    break;
+	case XEN_ENT_STR:
+	    elfnote = Py_BuildValue("s", dom->parms.elf_notes[i].data.str);
+	    break;
+	}
+	PyDict_SetItemString(elfnote_dict,
+			     dom->parms.elf_notes[i].name,
+			     elfnote);
+	Py_DECREF(elfnote);
+    }
+
+    xc_dom_release(dom);
+
+    return Py_BuildValue("{s:i,s:i,s:N}", 
                          "store_mfn", store_mfn,
-                         "console_mfn", console_mfn);
+                         "console_mfn", console_mfn,
+			 "notes", elfnote_dict);
+
+  out:
+    xc_dom_release(dom);
+    return pyxc_error_to_exception();
 }
 
 static PyObject *pyxc_hvm_build(XcObject *self,
@@ -936,6 +987,26 @@ static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
     return zero;
 }
 
+static PyObject *pyxc_domain_send_trigger(XcObject *self,
+                                          PyObject *args,
+                                          PyObject *kwds)
+{
+    uint32_t dom;
+    int trigger, vcpu = 0;
+
+    static char *kwd_list[] = { "domid", "trigger", "vcpu", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|i", kwd_list, 
+                                      &dom, &trigger, &vcpu) )
+        return NULL;
+
+    if (xc_domain_send_trigger(self->xc_handle, dom, trigger, vcpu) != 0)
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
 {
@@ -1068,7 +1139,8 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_resume,
       METH_VARARGS, "\n"
       "Resume execution of a suspended domain.\n"
-      " dom [int]: Identifier of domain to be resumed.\n\n"
+      " dom [int]: Identifier of domain to be resumed.\n"
+      " fast [int]: Use cooperative resume.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_shutdown", 
@@ -1337,6 +1409,15 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Set a domain's time offset to Dom0's localtime\n"
       " dom        [int]: Domain whose time offset is being set.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_send_trigger",
+      (PyCFunction)pyxc_domain_send_trigger,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Send trigger to a domain.\n"
+      " dom     [int]: Identifier of domain to be sent trigger.\n"
+      " trigger [int]: Trigger type number.\n"
+      " vcpu    [int]: VCPU to be sent trigger.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
 #ifdef __powerpc__

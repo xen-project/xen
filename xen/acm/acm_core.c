@@ -260,7 +260,7 @@ int
 acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
 {
     struct acm_ssid_domain *ssid;
-    struct domain *subj = get_domain_by_id(id);
+    struct domain *subj = rcu_lock_domain_by_id(id);
     int ret1, ret2;
  
     if (subj == NULL)
@@ -270,7 +270,7 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
     }
     if ((ssid = xmalloc(struct acm_ssid_domain)) == NULL)
     {
-        put_domain(subj);
+        rcu_unlock_domain(subj);
         return ACM_INIT_SSID_ERROR;
     }
 
@@ -302,12 +302,12 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
         printk("%s: ERROR instantiating individual ssids for domain 0x%02x.\n",
                __func__, subj->domain_id);
         acm_free_domain_ssid(ssid);
-        put_domain(subj);
+        rcu_unlock_domain(subj);
         return ACM_INIT_SSID_ERROR;
     }
     printkd("%s: assigned domain %x the ssidref=%x.\n",
            __func__, id, ssid->ssidref);
-    put_domain(subj);
+    rcu_unlock_domain(subj);
     return ACM_OK;
 }
 

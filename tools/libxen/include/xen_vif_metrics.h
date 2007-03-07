@@ -180,4 +180,11 @@ extern bool
 xen_vif_metrics_get_io_write_kbs(xen_session *session, double *result, xen_vif_metrics vif_metrics);
 
 
+/**
+ * Return a list of all the VIF_metrics instances known to the system.
+ */
+extern bool
+xen_vif_metrics_get_all(xen_session *session, struct xen_vif_metrics_set **result);
+
+
 #endif

@@ -33,12 +33,15 @@
 #include <xc_private.h>
 #include <xg_private.h>
 #include <xenctrl.h>
-#include <xen/arch-powerpc.h>
 
 #include "flatdevtree_env.h"
 #include "flatdevtree.h"
 #include "utils.h"
 #include "mk_flatdevtree.h"
+
+/* Use 16MB extents to match PowerPC's large page size. */
+#define EXTENT_SHIFT 24
+#define EXTENT_ORDER (EXTENT_SHIFT - PAGE_SHIFT)
 
 #define INITRD_ADDR (24UL << 20)
 #define DEVTREE_ADDR (16UL << 20)
@@ -151,6 +154,50 @@ static int check_memory_config(int rma_log, unsigned int mem_mb)
     return 1;
 }
 
+static int alloc_memory(int xc_handle, domid_t domid, ulong nr_pages,
+                        ulong rma_pages)
+{
+    xen_pfn_t *extent_pfn_arry;
+    ulong nr_extents;
+    ulong start_pfn = rma_pages;
+    int i;
+    int j;
+    int rc = 0;
+
+    nr_extents = (nr_pages - rma_pages) >> EXTENT_ORDER;
+    DPRINTF("allocating memory in %lu chunks of %luMB\n", nr_extents,
+            1UL >> (20 - EXTENT_ORDER));
+
+    /* populate_physmap requires an array of PFNs that determine where the
+     * guest mapping of the new MFNs. */
+    extent_pfn_arry = malloc((1<<EXTENT_ORDER) * sizeof(xen_pfn_t));
+    if (extent_pfn_arry == NULL) {
+        PERROR("Couldn't allocate extent PFN array.\n");
+        return -ENOMEM;
+    }
+
+    /* Now allocate the remaining memory as large-order extents. */
+    for (i = 0; i < nr_extents; i++) {
+        /* Initialize the extent PFN array. */
+        for (j = 0; j < (1 << EXTENT_ORDER); j++)
+            extent_pfn_arry[j] = start_pfn++;
+
+        DPRINTF("populate_physmap(Dom%u, order %u, starting_pfn %llx)\n",
+                domid, EXTENT_ORDER, extent_pfn_arry[0]);
+
+        if (xc_domain_memory_populate_physmap(xc_handle, domid, 1, EXTENT_ORDER,
+                                               0, extent_pfn_arry))
+        {
+            PERROR("Could not allocate extents\n");
+            rc = -1;
+            break;
+        }
+    }
+
+    free(extent_pfn_arry);
+    return rc;
+}
+
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
                    unsigned int mem_mb,
@@ -176,9 +223,6 @@ int xc_linux_build(int xc_handle,
     u64 shared_info_paddr;
     u64 store_paddr;
     u64 console_paddr;
-    u32 remaining_kb;
-    u32 extent_order;
-    u64 nr_extents;
     int rma_log = 26;  /* 64MB RMA */
     int rc = 0;
     int op;
@@ -201,36 +245,26 @@ int xc_linux_build(int xc_handle,
         goto out;
     }
     
-    /* alloc RMA */
+    /* Allocate the RMA. */
+    DPRINTF("RMA: 0x%lx pages\n", rma_pages);
     if (xc_alloc_real_mode_area(xc_handle, domid, rma_log)) {
         rc = -1;
         goto out;
     }
 
-    /* subtract already allocated RMA to determine remaining KB to alloc */
-    remaining_kb = (nr_pages - rma_pages) * (PAGE_SIZE / 1024);
-    DPRINTF("totalmem - RMA = %dKB\n", remaining_kb);
-
-    /* to allocate in 16MB chunks, we need to determine the order of 
-     * the number of PAGE_SIZE pages contained in 16MB. */
-    extent_order = 24 - 12; /* extent_order = log2((1 << 24) - (1 << 12)) */
-    nr_extents = (remaining_kb / (PAGE_SIZE/1024)) >> extent_order;
-    DPRINTF("allocating memory in %llu chunks of %luMB\n", nr_extents,
-            (((1 << extent_order) >> 10) * PAGE_SIZE) >> 10);
-
-    /* now allocate the remaining memory as large-order allocations */
-    DPRINTF("increase_reservation(%u, %llu, %u)\n", domid, nr_extents, extent_order);
-    if (xc_domain_memory_increase_reservation(xc_handle, domid, nr_extents, 
-                                              extent_order, 0, NULL)) {
-        rc = -1;
-        goto out;
-    }
-
+    /* Get the MFN mapping (for RMA only -- we only load data into the RMA). */
     if (get_rma_page_array(xc_handle, domid, &page_array, rma_pages)) {
         rc = -1;
         goto out;
     }
 
+    /* Allocate the non-RMA memory. */
+    rc = alloc_memory(xc_handle, domid, nr_pages, rma_pages);
+    if (rc) {
+        goto out;
+    }
+
+    /* Load kernel. */
     DPRINTF("loading image '%s'\n", image_name);
     if (load_elf_kernel(xc_handle, domid, image_name, &dsi, page_array)) {
         rc = -1;
@@ -238,6 +272,7 @@ int xc_linux_build(int xc_handle,
     }
     kern_addr = 0;
 
+    /* Load initrd. */
     if (initrd_name && initrd_name[0] != '\0') {
         DPRINTF("loading initrd '%s'\n", initrd_name);
         if (load_initrd(xc_handle, domid, page_array, initrd_name,
@@ -250,16 +285,15 @@ int xc_linux_build(int xc_handle,
     /* fetch the current shadow_memory value for this domain */
     op = XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION;
     if (xc_shadow_control(xc_handle, domid, op, NULL, 0, 
-                          &shadow_mb, 0, NULL) < 0 ) {
+                          &shadow_mb, 0, NULL) < 0) {
         rc = -1;
         goto out;
     }
 
     /* determine shared_info, console, and store paddr */
-    shared_info_paddr = (rma_pages << PAGE_SHIFT) -
-                        (RMA_SHARED_INFO * PAGE_SIZE);
-    console_paddr = (rma_pages << PAGE_SHIFT) - (RMA_CONSOLE * PAGE_SIZE);
-    store_paddr = (rma_pages << PAGE_SHIFT) - (RMA_STORE * PAGE_SIZE);
+    shared_info_paddr = (rma_pages << PAGE_SHIFT) - PAGE_SIZE;
+    console_paddr = shared_info_paddr - PAGE_SIZE;
+    store_paddr = console_paddr - PAGE_SIZE;
 
     /* map paddrs to mfns */
     *store_mfn = page_array[(xen_pfn_t)(store_paddr >> PAGE_SHIFT)];
@@ -286,16 +320,17 @@ int xc_linux_build(int xc_handle,
                       devtree_addr, devtree.bph->totalsize)) {
         DPRINTF("couldn't load flattened device tree.\n");
         rc = -1;
-        goto out;
+        goto out2;
     }
 
     if (init_boot_vcpu(xc_handle, domid, &dsi, devtree_addr, kern_addr)) {
         rc = -1;
-        goto out;
+        goto out2;
     }
 
-out:
+out2:
     free_devtree(&devtree);
+out:
     free_page_array(page_array);
     return rc;
 }

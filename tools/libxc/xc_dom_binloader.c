@@ -95,7 +95,7 @@ struct xen_bin_image_table
 
 /* Flags we test for */
 #define FLAGS_MASK     ((~ 0) & (~ XEN_MULTIBOOT_FLAG_ALIGN4K) & \
-				(~ XEN_MULTIBOOT_FLAG_PAE_MASK))
+    (~ XEN_MULTIBOOT_FLAG_PAE_MASK))
 #define FLAGS_REQUIRED XEN_MULTIBOOT_FLAG_ADDRSVALID
 
 /* --------------------------------------------------------------------- */
@@ -108,19 +108,17 @@ static struct xen_bin_image_table *find_table(struct xc_dom_image *dom)
 
     probe_ptr = dom->kernel_blob;
     probe_end = dom->kernel_blob + dom->kernel_size - sizeof(*table);
-    if ((void*)probe_end > dom->kernel_blob + 8192)
+    if ( (void*)probe_end > (dom->kernel_blob + 8192) )
         probe_end = dom->kernel_blob + 8192;
 
-    for (table = NULL; probe_ptr < probe_end; probe_ptr++)
+    for ( table = NULL; probe_ptr < probe_end; probe_ptr++ )
     {
-        if (XEN_MULTIBOOT_MAGIC3 == *probe_ptr)
+        if ( *probe_ptr == XEN_MULTIBOOT_MAGIC3 )
         {
             table = (struct xen_bin_image_table *) probe_ptr;
             /* Checksum correct? */
-            if (0 == table->magic + table->flags + table->checksum)
-            {
+            if ( (table->magic + table->flags + table->checksum) == 0 )
                 return table;
-            }
         }
     }
     return NULL;
@@ -128,12 +126,7 @@ static struct xen_bin_image_table *find_table(struct xc_dom_image *dom)
 
 static int xc_dom_probe_bin_kernel(struct xc_dom_image *dom)
 {
-    struct xen_bin_image_table *table;
-
-    table = find_table(dom);
-    if (!table)
-        return -EINVAL;
-    return 0;
+    return find_table(dom) ? 0 : -EINVAL;
 }
 
 static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
@@ -147,7 +140,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     uint32_t pae_flags;
 
     image_info = find_table(dom);
-    if (!image_info)
+    if ( !image_info )
         return -EINVAL;
 
     xc_dom_printf("%s: multiboot header fields\n", __FUNCTION__);
@@ -159,7 +152,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     xc_dom_printf("  entry_addr:    0x%" PRIx32 "\n", image_info->entry_addr);
 
     /* Check the flags */
-    if ( FLAGS_REQUIRED != (image_info->flags & FLAGS_MASK) )
+    if ( (image_info->flags & FLAGS_MASK) != FLAGS_REQUIRED )
     {
         xc_dom_panic(XC_INVALID_KERNEL,
                      "%s: xen_bin_image_table flags required "
@@ -169,7 +162,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     }
 
     /* Sanity check on the addresses */
-    if ( image_info->header_addr < image_info->load_addr ||
+    if ( (image_info->header_addr < image_info->load_addr) ||
          ((char *) image_info - image) <
          (image_info->header_addr - image_info->load_addr) )
     {
@@ -187,7 +180,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     xc_dom_printf("  load_end_addr: 0x%" PRIx32 "\n", load_end_addr);
     xc_dom_printf("  bss_end_addr:  0x%" PRIx32 "\n", bss_end_addr);
 
-    if ( start_addr + image_size < load_end_addr )
+    if ( (start_addr + image_size) < load_end_addr )
     {
         xc_dom_panic(XC_INVALID_KERNEL, "%s: Invalid load_end_addr.\n",
                      __FUNCTION__);
@@ -209,25 +202,26 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     pae_flags = image_info->flags & XEN_MULTIBOOT_FLAG_PAE_MASK;
     switch (pae_flags >> XEN_MULTIBOOT_FLAG_PAE_SHIFT) {
     case 0:
-	dom->guest_type = "xen-3.0-x86_32";
-	break;
+        dom->guest_type = "xen-3.0-x86_32";
+        break;
     case 1:
-	dom->guest_type = "xen-3.0-x86_32p";
-	break;
+        dom->guest_type = "xen-3.0-x86_32p";
+        break;
     case 2:
-	dom->guest_type = "xen-3.0-x86_64";
-	break;
+        dom->guest_type = "xen-3.0-x86_64";
+        break;
     case 3:
-	/* Kernel detects PAE at runtime.  So try to figure whenever
-	 * xen supports PAE and advertise a PAE-capable kernel in case
-	 * it does. */
-	dom->guest_type = "xen-3.0-x86_32";
-	if (strstr(dom->xen_caps, "xen-3.0-x86_32p")) {
-	    xc_dom_printf("%s: PAE fixup\n", __FUNCTION__);
-	    dom->guest_type = "xen-3.0-x86_32p";
-	    dom->parms.pae  = 2;
-	}
-	break;
+        /* Kernel detects PAE at runtime.  So try to figure whenever
+         * xen supports PAE and advertise a PAE-capable kernel in case
+         * it does. */
+        dom->guest_type = "xen-3.0-x86_32";
+        if ( strstr(dom->xen_caps, "xen-3.0-x86_32p") )
+        {
+            xc_dom_printf("%s: PAE fixup\n", __FUNCTION__);
+            dom->guest_type = "xen-3.0-x86_32p";
+            dom->parms.pae  = 2;
+        }
+        break;
     }
     return 0;
 }
@@ -242,10 +236,9 @@ static int xc_dom_load_bin_kernel(struct xc_dom_image *dom)
     uint32_t load_end_addr;
     uint32_t bss_end_addr;
     uint32_t skip, text_size, bss_size;
-    uint32_t pae_flags;
 
     image_info = find_table(dom);
-    if (!image_info)
+    if ( !image_info )
         return -EINVAL;
 
     start_addr = image_info->header_addr - ((char *)image_info - image);
@@ -266,10 +259,6 @@ static int xc_dom_load_bin_kernel(struct xc_dom_image *dom)
     memcpy(dest, image + skip, text_size);
     memset(dest + text_size, 0, bss_size);
 
-    pae_flags = image_info->flags & XEN_MULTIBOOT_FLAG_PAE_MASK;
-    if (3 == (pae_flags >> XEN_MULTIBOOT_FLAG_PAE_SHIFT) && dom->guest_xc > 0)
-    {
-    }
     return 0;
 }
 
@@ -289,6 +278,10 @@ static void __init register_loader(void)
 
 /*
  * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
  * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
  * End:
  */

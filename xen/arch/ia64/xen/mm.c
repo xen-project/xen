@@ -435,11 +435,15 @@ share_xen_page_with_guest(struct page_info *page,
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
     ASSERT(page->count_info == 0);
-    page->count_info |= PGC_allocated | 1;
 
-    if ( unlikely(d->xenheap_pages++ == 0) )
-        get_knownalive_domain(d);
-    list_add_tail(&page->list, &d->xenpage_list);
+    /* Only add to the allocation list if the domain isn't dying. */
+    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    {
+        page->count_info |= PGC_allocated | 1;
+        if ( unlikely(d->xenheap_pages++ == 0) )
+            get_knownalive_domain(d);
+        list_add_tail(&page->list, &d->xenpage_list);
+    }
 
     // grant_table_destroy() releases these pages.
     // but it doesn't clear their m2p entry. So there might remain stale
@@ -2066,8 +2070,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         if (xatp.domid == DOMID_SELF) {
-            d = current->domain;
-            get_knownalive_domain(d);
+            d = get_current_domain();
         }
         else if (!IS_PRIV(current->domain))
             return -EPERM;

@@ -134,19 +134,11 @@ struct hvm_function_table {
                             int vcpuid, int trampoline_vector);
 
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
+
+    int  (*event_injection_faulted)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;
-
-/*
- * For convenience, we use short hands.
- */
-static inline void
-hvm_disable(void)
-{
-    if ( hvm_funcs.disable )
-        hvm_funcs.disable();
-}
 
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_destroy(struct domain *d);
@@ -223,9 +215,7 @@ void hvm_hypercall_page_initialise(struct domain *d,
 static inline unsigned long
 hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
 {
-    if ( hvm_funcs.get_guest_ctrl_reg )
-        return hvm_funcs.get_guest_ctrl_reg(v, num);
-    return 0;                   /* force to fail */
+    return hvm_funcs.get_guest_ctrl_reg(v, num);
 }
 
 static inline unsigned long
@@ -261,5 +251,10 @@ hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 }
 
 int hvm_bringup_ap(int vcpuid, int trampoline_vector);
+
+static inline int hvm_event_injection_faulted(struct vcpu *v)
+{
+    return hvm_funcs.event_injection_faulted(v);
+}
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

@@ -9,3 +9,5 @@ EXTRA_CFLAGS += -I$(M)/include -I$(M)/compat-include -DHAVE_XEN_PLATFORM_COMPAT_
 ifeq ($(ARCH),ia64)
   EXTRA_CFLAGS += -DCONFIG_VMX_GUEST
 endif
+
+EXTRA_CFLAGS += -include $(srctree)/include/linux/autoconf.h

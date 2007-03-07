@@ -33,6 +33,7 @@ obj-y += of-devwalk.o
 obj-y += ofd_fixup.o
 obj-y += ofd_fixup_memory.o
 obj-y += physdev.o
+obj-y += platform.o
 obj-y += rtas.o
 obj-y += setup.o
 obj-y += shadow.o

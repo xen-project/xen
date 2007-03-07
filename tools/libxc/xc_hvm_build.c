@@ -11,6 +11,8 @@
 #include "xg_private.h"
 #include "xc_private.h"
 
+#include <xen/foreign/x86_32.h>
+#include <xen/foreign/x86_64.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 #include <xen/hvm/e820.h>
@@ -18,6 +20,15 @@
 #include <xen/libelf.h>
 
 #define SCRATCH_PFN 0xFFFFF
+
+/* Need to provide the right flavour of vcpu context for Xen */
+typedef union
+{
+    vcpu_guest_context_x86_64_t c64;
+    vcpu_guest_context_x86_32_t c32;   
+    vcpu_guest_context_t c;
+} vcpu_guest_context_either_t;
+
 
 int xc_set_hvm_param(
     int handle, domid_t dom, int param, unsigned long value)
@@ -182,7 +193,7 @@ loadelfimage(struct elf_binary *elf, int xch, uint32_t dom, unsigned long *parra
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
-                       vcpu_guest_context_t *ctxt)
+                       vcpu_guest_context_either_t *ctxt)
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
@@ -193,12 +204,19 @@ static int setup_guest(int xc_handle,
     struct elf_binary elf;
     uint64_t v_start, v_end;
     int rc;
+    xen_capabilities_info_t caps;
 
     if (0 != elf_init(&elf, image, image_size))
         goto error_out;
     elf_parse_binary(&elf);
     v_start = 0;
     v_end = (unsigned long long)memsize << 20;
+
+    if (xc_version(xc_handle, XENVER_capabilities, &caps) != 0)
+    {
+        PERROR("Could not get Xen capabilities\n");
+        goto error_out;
+    }
 
     if ( (elf.pstart & (PAGE_SIZE - 1)) != 0 )
     {
@@ -262,6 +280,7 @@ static int setup_guest(int xc_handle,
     /* NB. evtchn_upcall_mask is unused: leave as zero. */
     memset(&shared_info->evtchn_mask[0], 0xff,
            sizeof(shared_info->evtchn_mask));
+    shared_info->arch.max_pfn = page_array[nr_pages - 1];
     munmap(shared_info, PAGE_SIZE);
 
     if ( v_end > HVM_BELOW_4G_RAM_END )
@@ -281,7 +300,11 @@ static int setup_guest(int xc_handle,
 
     free(page_array);
 
-    ctxt->user_regs.eip = elf_uval(&elf, elf.ehdr, e_entry);
+    /* Set [er]ip in the way that's right for Xen */
+    if ( strstr(caps, "x86_64") )
+        ctxt->c64.user_regs.rip = elf_uval(&elf, elf.ehdr, e_entry); 
+    else
+        ctxt->c32.user_regs.eip = elf_uval(&elf, elf.ehdr, e_entry);
 
     return 0;
 
@@ -297,7 +320,7 @@ static int xc_hvm_build_internal(int xc_handle,
                                  unsigned long image_size)
 {
     struct xen_domctl launch_domctl;
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_either_t ctxt;
     int rc;
 
     if ( (image == NULL) || (image_size == 0) )
@@ -322,7 +345,7 @@ static int xc_hvm_build_internal(int xc_handle,
     memset(&launch_domctl, 0, sizeof(launch_domctl));
     launch_domctl.domain = (domid_t)domid;
     launch_domctl.u.vcpucontext.vcpu   = 0;
-    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt);
+    set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt.c);
     launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
     rc = xc_domctl(xc_handle, &launch_domctl);
 

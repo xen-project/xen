@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,6 @@
 
 #include "xen_common.h"
 #include "xen_internal.h"
-#include "xen_pif.h"
 #include "xen_pif_metrics.h"
 
 
@@ -40,9 +39,6 @@ static const struct_member xen_pif_metrics_record_struct_members[] =
         { .key = "uuid",
           .type = &abstract_type_string,
           .offset = offsetof(xen_pif_metrics_record, uuid) },
-        { .key = "PIF",
-          .type = &abstract_type_ref,
-          .offset = offsetof(xen_pif_metrics_record, pif) },
         { .key = "io_read_kbs",
           .type = &abstract_type_float,
           .offset = offsetof(xen_pif_metrics_record, io_read_kbs) },
@@ -70,7 +66,6 @@ xen_pif_metrics_record_free(xen_pif_metrics_record *record)
     }
     free(record->handle);
     free(record->uuid);
-    xen_pif_record_opt_free(record->pif);
     free(record);
 }
 
@@ -116,23 +111,6 @@ xen_pif_metrics_get_by_uuid(xen_session *session, xen_pif_metrics *result, char 
 
 
 bool
-xen_pif_metrics_get_pif(xen_session *session, xen_pif *result, xen_pif_metrics pif_metrics)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = pif_metrics }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("PIF_metrics.get_PIF");
-    return session->ok;
-}
-
-
-bool
 xen_pif_metrics_get_io_read_kbs(xen_session *session, double *result, xen_pif_metrics pif_metrics)
 {
     abstract_value param_values[] =
@@ -160,6 +138,18 @@ xen_pif_metrics_get_io_write_kbs(xen_session *session, double *result, xen_pif_m
     abstract_type result_type = abstract_type_float;
 
     XEN_CALL_("PIF_metrics.get_io_write_kbs");
+    return session->ok;
+}
+
+
+bool
+xen_pif_metrics_get_all(xen_session *session, struct xen_pif_metrics_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "PIF_metrics.get_all", NULL, 0, &result_type, result);
     return session->ok;
 }
 

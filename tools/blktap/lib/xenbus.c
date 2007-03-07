@@ -177,8 +177,11 @@ static void ueblktap_setup(struct xs_handle *h, char *bepath)
 	}
 
 	/* Check to see if device is to be opened read-only. */
-	asprintf(&path, "%s/%s", bepath, "read-only");
-	if (xs_exists(h, path))
+	deverr = xs_gather(h, bepath, "mode", NULL, &path, NULL);
+	if (deverr) {
+		DPRINTF("ERROR: could not find read/write mode\n");
+		goto fail;
+	} else if (path[0] == 'r')
 		be->readonly = 1;
 
 	if (be->blkif == NULL) {

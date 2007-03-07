@@ -137,6 +137,17 @@ int xb_write(const void *data, unsigned len)
 	return 0;
 }
 
+int xb_data_to_read(void)
+{
+	struct xenstore_domain_interface *intf = xen_store_interface;
+	return (intf->rsp_cons != intf->rsp_prod);
+}
+
+int xb_wait_for_data_to_read(void)
+{
+	return wait_event_interruptible(xb_waitq, xb_data_to_read());
+}
+
 int xb_read(void *data, unsigned len)
 {
 	struct xenstore_domain_interface *intf = xen_store_interface;
@@ -147,9 +158,7 @@ int xb_read(void *data, unsigned len)
 		unsigned int avail;
 		const char *src;
 
-		rc = wait_event_interruptible(
-			xb_waitq,
-			intf->rsp_cons != intf->rsp_prod);
+		rc = xb_wait_for_data_to_read();
 		if (rc < 0)
 			return rc;
 
@@ -191,7 +200,19 @@ int xb_read(void *data, unsigned len)
 /* Set up interrupt handler off store event channel. */
 int xb_init_comms(void)
 {
+	struct xenstore_domain_interface *intf = xen_store_interface;
 	int err;
+
+	if (intf->req_prod != intf->req_cons)
+		printk(KERN_ERR "XENBUS request ring is not quiescent "
+		       "(%08x:%08x)!\n", intf->req_cons, intf->req_prod);
+
+	if (intf->rsp_prod != intf->rsp_cons) {
+		printk(KERN_WARNING "XENBUS response ring is not quiescent "
+		       "(%08x:%08x): fixing up\n",
+		       intf->rsp_cons, intf->rsp_prod);
+		intf->rsp_cons = intf->rsp_prod;
+	}
 
 	if (xenbus_irq)
 		unbind_from_irqhandler(xenbus_irq, &xb_waitq);

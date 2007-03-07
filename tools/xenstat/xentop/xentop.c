@@ -50,7 +50,11 @@
 #define KEY_ESCAPE '\x1B'
 
 #ifdef HOST_SunOS
-/* Old curses library on Solaris takes non-const strings. */
+/* Old curses library on Solaris takes non-const strings. Also, ERR interferes
+ * with curse's definition.
+ */
+#undef ERR
+#define ERR (-1)
 #define curses_str_t char *
 #else
 #define curses_str_t const char *
@@ -912,11 +916,19 @@ void do_vbd(xenstat_domain *domain)
 	num_vbds = xenstat_domain_num_vbds(domain);
 
 	for (i=0 ; i< num_vbds; i++) {
+		char details[20];
+
 		vbd = xenstat_domain_vbd(domain,i);
-				
-		print("VBD %4u [%2x:%2x]  OO: %8llu   RD: %8llu   WR: %8llu\n",
-		      xenstat_vbd_dev(vbd),
-		      MAJOR(xenstat_vbd_dev(vbd)), MINOR(xenstat_vbd_dev(vbd)),
+
+#ifdef __sun__
+		details[0] = '\0';
+#else
+		snprintf(details, 20, "[%2x:%2x] ", MAJOR(xenstat_vbd_dev(vbd)),
+		         MINOR(xenstat_vbd_dev(vbd)));
+#endif
+
+		print("VBD %4d %s OO: %8llu   RD: %8llu   WR: %8llu\n",
+		      xenstat_vbd_dev(vbd), details,
 		      xenstat_vbd_oo_reqs(vbd),
 		      xenstat_vbd_rd_reqs(vbd),
 		      xenstat_vbd_wr_reqs(vbd));

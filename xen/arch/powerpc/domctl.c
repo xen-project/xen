@@ -13,9 +13,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -50,7 +51,6 @@ long arch_do_domctl(struct xen_domctl *domctl,
         struct domain *d = get_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         uint64_t mfn;
-        struct list_head *list_ent;
 
         ret = -EINVAL;
         if ( d != NULL )
@@ -58,18 +58,20 @@ long arch_do_domctl(struct xen_domctl *domctl,
             ret = 0;
 
             spin_lock(&d->page_alloc_lock);
-            list_ent = d->page_list.next;
-            for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
-            {
-                mfn = page_to_mfn(list_entry(
-                    list_ent, struct page_info, list));
-                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                          i, &mfn, 1) )
+            for (i = 0; i < max_pfns; i++) {
+                /* bail if index is beyond p2m size */
+                if (i >= d->arch.p2m_entries)
+                    break;
+
+                /* translate */
+                mfn = d->arch.p2m[i];
+
+                if (copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                          i, &mfn, 1))
                 {
                     ret = -EFAULT;
                     break;
                 }
-                list_ent = mfn_to_page(mfn)->list.next;
             }
             spin_unlock(&d->page_alloc_lock);
 

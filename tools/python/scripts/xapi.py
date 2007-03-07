@@ -569,7 +569,7 @@ def xapi_vdi_list(args, async = False):
     if not is_long:
         print VDI_LIST_FORMAT % {'name_label': 'VDI Label',
                                  'uuid' : 'UUID',
-                                 'virtual_size': 'Sectors',
+                                 'virtual_size': 'Bytes',
                                  'sector_size': 'Sector Size'}
         
         for vdi in vdis:
@@ -628,7 +628,7 @@ def xapi_vdi_create(args, async = False):
     sr = srs[0]
     cfg['SR'] = sr
 
-    size = (cfg['virtual_size'] * cfg['sector_size'])/MB
+    size = cfg['virtual_size']/MB
     print 'Creating VDI of size: %dMB ..' % size,
     uuid = execute(server, 'VDI.create', (session, cfg), async = async)
     if async:

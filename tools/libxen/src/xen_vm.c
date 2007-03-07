@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@
 #include "xen_console.h"
 #include "xen_crashdump.h"
 #include "xen_host.h"
-#include "xen_int_float_map.h"
 #include "xen_internal.h"
 #include "xen_on_crash_behaviour_internal.h"
 #include "xen_on_normal_exit_internal.h"
@@ -33,6 +32,7 @@
 #include "xen_vdi.h"
 #include "xen_vif.h"
 #include "xen_vm.h"
+#include "xen_vm_guest_metrics.h"
 #include "xen_vm_metrics.h"
 #include "xen_vm_power_state_internal.h"
 #include "xen_vtpm.h"
@@ -100,12 +100,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "VCPUs_at_startup",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, vcpus_at_startup) },
-        { .key = "VCPUs_number",
-          .type = &abstract_type_int,
-          .offset = offsetof(xen_vm_record, vcpus_number) },
-        { .key = "VCPUs_utilisation",
-          .type = &abstract_type_int_float_map,
-          .offset = offsetof(xen_vm_record, vcpus_utilisation) },
         { .key = "actions_after_shutdown",
           .type = &xen_on_normal_exit_abstract_type_,
           .offset = offsetof(xen_vm_record, actions_after_shutdown) },
@@ -169,18 +163,21 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "PCI_bus",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, pci_bus) },
-        { .key = "tools_version",
-          .type = &abstract_type_string_string_map,
-          .offset = offsetof(xen_vm_record, tools_version) },
         { .key = "other_config",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, other_config) },
+        { .key = "domid",
+          .type = &abstract_type_int,
+          .offset = offsetof(xen_vm_record, domid) },
         { .key = "is_control_domain",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vm_record, is_control_domain) },
         { .key = "metrics",
           .type = &abstract_type_ref,
-          .offset = offsetof(xen_vm_record, metrics) }
+          .offset = offsetof(xen_vm_record, metrics) },
+        { .key = "guest_metrics",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_vm_record, guest_metrics) }
     };
 
 const abstract_type xen_vm_record_abstract_type_ =
@@ -208,7 +205,6 @@ xen_vm_record_free(xen_vm_record *record)
     xen_host_record_opt_free(record->resident_on);
     free(record->vcpus_policy);
     xen_string_string_map_free(record->vcpus_params);
-    xen_int_float_map_free(record->vcpus_utilisation);
     xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
@@ -223,9 +219,9 @@ xen_vm_record_free(xen_vm_record *record)
     xen_string_string_map_free(record->hvm_boot_params);
     free(record->platform_serial);
     free(record->pci_bus);
-    xen_string_string_map_free(record->tools_version);
     xen_string_string_map_free(record->other_config);
     xen_vm_metrics_record_opt_free(record->metrics);
+    xen_vm_guest_metrics_record_opt_free(record->guest_metrics);
     free(record);
 }
 
@@ -580,39 +576,6 @@ xen_vm_get_vcpus_at_startup(xen_session *session, int64_t *result, xen_vm vm)
 
 
 bool
-xen_vm_get_vcpus_number(xen_session *session, int64_t *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_int;
-
-    XEN_CALL_("VM.get_VCPUs_number");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_int_float_map;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_utilisation");
-    return session->ok;
-}
-
-
-bool
 xen_vm_get_actions_after_shutdown(xen_session *session, enum xen_on_normal_exit *result, xen_vm vm)
 {
     abstract_value param_values[] =
@@ -960,23 +923,6 @@ xen_vm_get_pci_bus(xen_session *session, char **result, xen_vm vm)
 
 
 bool
-xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string_string_map;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_tools_version");
-    return session->ok;
-}
-
-
-bool
 xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xen_vm vm)
 {
     abstract_value param_values[] =
@@ -989,6 +935,22 @@ xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xe
 
     *result = NULL;
     XEN_CALL_("VM.get_other_config");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_domid(xen_session *session, int64_t *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_int;
+
+    XEN_CALL_("VM.get_domid");
     return session->ok;
 }
 
@@ -1022,6 +984,23 @@ xen_vm_get_metrics(xen_session *session, xen_vm_metrics *result, xen_vm vm)
 
     *result = NULL;
     XEN_CALL_("VM.get_metrics");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_guest_metrics(xen_session *session, xen_vm_guest_metrics *result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_guest_metrics");
     return session->ok;
 }
 

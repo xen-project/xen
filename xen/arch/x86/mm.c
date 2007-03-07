@@ -157,11 +157,8 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 
 static void queue_deferred_ops(struct domain *d, unsigned int ops)
 {
-    if ( d == current->domain )
-        this_cpu(percpu_mm_info).deferred_ops |= ops;
-    else
-        BUG_ON(!test_bit(_DOMF_paused, &d->domain_flags) ||
-               !cpus_empty(d->domain_dirty_cpumask));
+    ASSERT(d == current->domain);
+    this_cpu(percpu_mm_info).deferred_ops |= ops;
 }
 
 void __init init_frametable(void)
@@ -266,11 +263,15 @@ void share_xen_page_with_guest(
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
     ASSERT(page->count_info == 0);
-    page->count_info |= PGC_allocated | 1;
 
-    if ( unlikely(d->xenheap_pages++ == 0) )
-        get_knownalive_domain(d);
-    list_add_tail(&page->list, &d->xenpage_list);
+    /* Only add to the allocation list if the domain isn't dying. */
+    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    {
+        page->count_info |= PGC_allocated | 1;
+        if ( unlikely(d->xenheap_pages++ == 0) )
+            get_knownalive_domain(d);
+        list_add_tail(&page->list, &d->xenpage_list);
+    }
 
     spin_unlock(&d->page_alloc_lock);
 }
@@ -423,7 +424,10 @@ void invalidate_shadow_ldt(struct vcpu *v)
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
+    if ( v == current )
+        queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
+    else
+        flush_tlb_mask(v->domain->domain_dirty_cpumask);
 }
 
 
@@ -1576,7 +1580,10 @@ void free_page_type(struct page_info *page, unsigned long type)
          * (e.g., update_va_mapping()) or we could end up modifying a page
          * that is no longer a page table (and hence screw up ref counts).
          */
-        queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
+        if ( current->domain == owner )
+            queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
+        else
+            flush_tlb_mask(owner->domain_dirty_cpumask);
 
         if ( unlikely(paging_mode_enabled(owner)) )
         {
@@ -1849,7 +1856,7 @@ static void process_deferred_ops(void)
 
     if ( unlikely(info->foreign != NULL) )
     {
-        put_domain(info->foreign);
+        rcu_unlock_domain(info->foreign);
         info->foreign = NULL;
     }
 }
@@ -1881,8 +1888,7 @@ static int set_foreigndom(domid_t domid)
         switch ( domid )
         {
         case DOMID_IO:
-            get_knownalive_domain(dom_io);
-            info->foreign = dom_io;
+            info->foreign = rcu_lock_domain(dom_io);
             break;
         default:
             MEM_LOG("Dom %u cannot set foreign dom", d->domain_id);
@@ -1892,18 +1898,16 @@ static int set_foreigndom(domid_t domid)
     }
     else
     {
-        info->foreign = e = get_domain_by_id(domid);
+        info->foreign = e = rcu_lock_domain_by_id(domid);
         if ( e == NULL )
         {
             switch ( domid )
             {
             case DOMID_XEN:
-                get_knownalive_domain(dom_xen);
-                info->foreign = dom_xen;
+                info->foreign = rcu_lock_domain(dom_xen);
                 break;
             case DOMID_IO:
-                get_knownalive_domain(dom_io);
-                info->foreign = dom_io;
+                info->foreign = rcu_lock_domain(dom_io);
                 break;
             default:
                 MEM_LOG("Unknown domain '%u'", domid);
@@ -1950,13 +1954,17 @@ int do_mmuext_op(
     struct vcpu *v = current;
     struct domain *d = v->domain;
 
-    LOCK_BIGLOCK(d);
-
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
         if ( unlikely(!guest_handle_is_null(pdone)) )
             (void)copy_from_guest(&done, pdone, 1);
+    }
+
+    if ( unlikely(!guest_handle_okay(uops, count)) )
+    {
+        rc = -EFAULT;
+        goto out;
     }
 
     if ( !set_foreigndom(foreigndom) )
@@ -1965,11 +1973,7 @@ int do_mmuext_op(
         goto out;
     }
 
-    if ( unlikely(!guest_handle_okay(uops, count)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
+    LOCK_BIGLOCK(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2039,6 +2043,12 @@ int do_mmuext_op(
             /* A page is dirtied when its pin status is set. */
             mark_dirty(d, mfn);
            
+            /* We can race domain destruction (domain_relinquish_resources). */
+            if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) &&
+                 test_bit(_DOMF_dying, &FOREIGNDOM->domain_flags) &&
+                 test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+                put_page_and_type(page);
+
             break;
 
         case MMUEXT_UNPIN_TABLE:
@@ -2072,38 +2082,36 @@ int do_mmuext_op(
             break;
         
 #ifdef __x86_64__
-        case MMUEXT_NEW_USER_BASEPTR:
-            if ( IS_COMPAT(FOREIGNDOM) )
-            {
-                okay = 0;
-                break;
-            }
-            if (likely(mfn != 0))
+        case MMUEXT_NEW_USER_BASEPTR: {
+            unsigned long old_mfn;
+
+            if ( mfn != 0 )
             {
                 if ( paging_mode_refcounts(d) )
                     okay = get_page_from_pagenr(mfn, d);
                 else
                     okay = get_page_and_type_from_pagenr(
                         mfn, PGT_root_page_table, d);
-            }
-            if ( unlikely(!okay) )
-            {
-                MEM_LOG("Error while installing new mfn %lx", mfn);
-            }
-            else
-            {
-                unsigned long old_mfn =
-                    pagetable_get_pfn(v->arch.guest_table_user);
-                v->arch.guest_table_user = pagetable_from_pfn(mfn);
-                if ( old_mfn != 0 )
+                if ( unlikely(!okay) )
                 {
-                    if ( paging_mode_refcounts(d) )
-                        put_page(mfn_to_page(old_mfn));
-                    else
-                        put_page_and_type(mfn_to_page(old_mfn));
+                    MEM_LOG("Error while installing new mfn %lx", mfn);
+                    break;
                 }
             }
+
+            old_mfn = pagetable_get_pfn(v->arch.guest_table_user);
+            v->arch.guest_table_user = pagetable_from_pfn(mfn);
+
+            if ( old_mfn != 0 )
+            {
+                if ( paging_mode_refcounts(d) )
+                    put_page(mfn_to_page(old_mfn));
+                else
+                    put_page_and_type(mfn_to_page(old_mfn));
+            }
+
             break;
+        }
 #endif
         
         case MMUEXT_TLB_FLUSH_LOCAL:
@@ -2202,9 +2210,11 @@ int do_mmuext_op(
         guest_handle_add_offset(uops, 1);
     }
 
- out:
     process_deferred_ops();
 
+    UNLOCK_BIGLOCK(d);
+
+ out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
     {
@@ -2212,7 +2222,6 @@ int do_mmuext_op(
         copy_to_guest(pdone, &done, 1);
     }
 
-    UNLOCK_BIGLOCK(d);
     return rc;
 }
 
@@ -2233,8 +2242,6 @@ int do_mmu_update(
     unsigned long type_info;
     struct domain_mmap_cache mapcache, sh_mapcache;
 
-    LOCK_BIGLOCK(d);
-
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
@@ -2242,8 +2249,11 @@ int do_mmu_update(
             (void)copy_from_guest(&done, pdone, 1);
     }
 
-    domain_mmap_cache_init(&mapcache);
-    domain_mmap_cache_init(&sh_mapcache);
+    if ( unlikely(!guest_handle_okay(ureqs, count)) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
 
     if ( !set_foreigndom(foreigndom) )
     {
@@ -2251,14 +2261,13 @@ int do_mmu_update(
         goto out;
     }
 
+    domain_mmap_cache_init(&mapcache);
+    domain_mmap_cache_init(&sh_mapcache);
+
     perfc_incrc(calls_to_mmu_update);
     perfc_addc(num_page_updates, count);
 
-    if ( unlikely(!guest_handle_okay(ureqs, count)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
+    LOCK_BIGLOCK(d);
 
     for ( i = 0; i < count; i++ )
     {
@@ -2342,12 +2351,11 @@ int do_mmu_update(
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
                 case PGT_l4_page_table:
-                    if ( !IS_COMPAT(FOREIGNDOM) )
-                    {
-                        l4_pgentry_t l4e = l4e_from_intpte(req.val);
-                        okay = mod_l4_entry(d, va, l4e, mfn);
-                    }
-                    break;
+                {
+                    l4_pgentry_t l4e = l4e_from_intpte(req.val);
+                    okay = mod_l4_entry(d, va, l4e, mfn);
+                }
+                break;
 #endif
                 }
 
@@ -2414,12 +2422,14 @@ int do_mmu_update(
         guest_handle_add_offset(ureqs, 1);
     }
 
- out:
     domain_mmap_cache_destroy(&mapcache);
     domain_mmap_cache_destroy(&sh_mapcache);
 
     process_deferred_ops();
 
+    UNLOCK_BIGLOCK(d);
+
+ out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
     {
@@ -2427,7 +2437,6 @@ int do_mmu_update(
         copy_to_guest(pdone, &done, 1);
     }
 
-    UNLOCK_BIGLOCK(d);
     return rc;
 }
 
@@ -2961,13 +2970,10 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         if ( xatp.domid == DOMID_SELF )
-        {
-            d = current->domain;
-            get_knownalive_domain(d);
-        }
+            d = rcu_lock_current_domain();
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = get_domain_by_id(xatp.domid)) == NULL )
+        else if ( (d = rcu_lock_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
         switch ( xatp.space )
@@ -2994,7 +3000,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         if ( !paging_mode_translate(d) || (mfn == 0) )
         {
-            put_domain(d);
+            rcu_unlock_domain(d);
             return -EINVAL;
         }
 
@@ -3022,7 +3028,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         UNLOCK_BIGLOCK(d);
 
-        put_domain(d);
+        rcu_unlock_domain(d);
 
         break;
     }
@@ -3040,20 +3046,17 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if ( fmap.domid == DOMID_SELF )
-        {
-            d = current->domain;
-            get_knownalive_domain(d);
-        }
+            d = rcu_lock_current_domain();
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
-        else if ( (d = get_domain_by_id(fmap.domid)) == NULL )
+        else if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
             return -ESRCH;
 
         rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,
                              fmap.map.nr_entries) ? -EFAULT : 0;
         d->arch.nr_e820 = fmap.map.nr_entries;
 
-        put_domain(d);
+        rcu_unlock_domain(d);
         return rc;
     }
 
@@ -3401,7 +3404,7 @@ int map_pages_to_xen(
             {
                 local_flush_tlb_pge();
                 if ( !(l2e_get_flags(ol2e) & _PAGE_PSE) )
-                    free_xen_pagetable(l2e_get_page(ol2e));
+                    free_xen_pagetable(mfn_to_virt(l2e_get_pfn(ol2e)));
             }
 
             virt    += 1UL << L2_PAGETABLE_SHIFT;
@@ -3413,20 +3416,20 @@ int map_pages_to_xen(
             /* Normal page mapping. */
             if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
             {
-                pl1e = page_to_virt(alloc_xen_pagetable());
+                pl1e = alloc_xen_pagetable();
                 clear_page(pl1e);
-                l2e_write(pl2e, l2e_from_page(virt_to_page(pl1e),
-                                              __PAGE_HYPERVISOR));
+                l2e_write(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                                             __PAGE_HYPERVISOR));
             }
             else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
             {
-                pl1e = page_to_virt(alloc_xen_pagetable());
+                pl1e = alloc_xen_pagetable();
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
                     l1e_write(&pl1e[i],
                               l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
                                            l2e_get_flags(*pl2e) & ~_PAGE_PSE));
-                l2e_write(pl2e, l2e_from_page(virt_to_page(pl1e),
-                                              __PAGE_HYPERVISOR));
+                l2e_write(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                                             __PAGE_HYPERVISOR));
                 local_flush_tlb_pge();
             }
 

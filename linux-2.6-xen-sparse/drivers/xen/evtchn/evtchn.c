@@ -31,7 +31,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -407,7 +406,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static struct file_operations evtchn_fops = {
+static const struct file_operations evtchn_fops = {
 	.owner   = THIS_MODULE,
 	.read    = evtchn_read,
 	.write   = evtchn_write,

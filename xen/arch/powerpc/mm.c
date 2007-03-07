@@ -17,6 +17,7 @@
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Jimi Xenidis <jimix@watson.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
  */
 
 #include <xen/config.h>
@@ -27,7 +28,9 @@
 #include <xen/perfc.h>
 #include <asm/init.h>
 #include <asm/page.h>
+#include <asm/platform.h>
 #include <asm/string.h>
+#include <asm/platform.h>
 #include <public/arch-powerpc.h>
 
 #ifdef VERBOSE
@@ -43,6 +46,9 @@ struct page_info *frame_table;
 unsigned long max_page;
 unsigned long total_pages;
 
+/* machine to phys mapping to used by all domains */
+unsigned long *machine_phys_mapping;
+
 void __init init_frametable(void)
 {
     unsigned long p;
@@ -56,6 +62,24 @@ void __init init_frametable(void)
         panic("Not enough memory for frame table\n");
 
     frame_table = (struct page_info *)(p << PAGE_SHIFT);
+    for (i = 0; i < nr_pages; i += 1)
+        clear_page((void *)((p + i) << PAGE_SHIFT));
+}
+
+/* Array of PFNs, indexed by MFN. */
+void __init init_machine_to_phys_table(void)
+{
+    unsigned long p;
+    unsigned long nr_pages;
+    int i;
+
+    nr_pages = PFN_UP(max_page * sizeof(unsigned long));
+
+    p = alloc_boot_pages(nr_pages, 1);
+    if (p == 0)
+        panic("Not enough memory for machine phys mapping table\n");
+
+    machine_phys_mapping = (unsigned long *)(p << PAGE_SHIFT);
     for (i = 0; i < nr_pages; i += 1)
         clear_page((void *)((p + i) << PAGE_SHIFT));
 }
@@ -80,11 +104,15 @@ void share_xen_page_with_guest(
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
     ASSERT(page->count_info == 0);
-    page->count_info |= PGC_allocated | 1;
 
-    if ( unlikely(d->xenheap_pages++ == 0) )
-        get_knownalive_domain(d);
-    list_add_tail(&page->list, &d->xenpage_list);
+    /* Only add to the allocation list if the domain isn't dying. */
+    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    {
+        page->count_info |= PGC_allocated | 1;
+        if ( unlikely(d->xenheap_pages++ == 0) )
+            get_knownalive_domain(d);
+        list_add_tail(&page->list, &d->xenpage_list);
+    }
 
     spin_unlock(&d->page_alloc_lock);
 }
@@ -285,46 +313,16 @@ extern void copy_page(void *dp, void *sp)
     }
 }
 
-/* XXX should probably replace with faster data structure */
-static uint add_extent(struct domain *d, struct page_info *pg, uint order)
-{
-    struct page_extents *pe;
-
-    pe = xmalloc(struct page_extents);
-    if (pe == NULL)
-        return -ENOMEM;
-
-    pe->pg = pg;
-    pe->order = order;
-
-    list_add_tail(&pe->pe_list, &d->arch.extent_list);
-
-    return 0;
-}
-
-void free_extents(struct domain *d)
-{
-    /* we just need to free the memory behind list */
-    struct list_head *list;
-    struct list_head *ent;
-    struct list_head *next;
-
-    list = &d->arch.extent_list;
-    ent = list->next;
-
-    while (ent != list) {
-        next = ent->next;
-        xfree(ent);
-        ent = next;
-    }
-}
-
+/* Allocate (rma_nrpages - nrpages) more memory for domain in proper size. */
 uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages)
 {
+    struct page_info *pg;
+    ulong mfn;
+    ulong gpfn = rma_nrpages; /* starting PFN at end of RMA */
     uint ext_order;
     uint ext_nrpages;
     uint total_nrpages;
-    struct page_info *pg;
+    int i;
 
     ext_order = cpu_extent_order();
     ext_nrpages = 1 << ext_order;
@@ -332,16 +330,20 @@ uint allocate_extents(struct domain *d, uint nrpages, uint rma_nrpages)
     total_nrpages = rma_nrpages;
 
     /* We only allocate in nr_extsz chunks so if you are not divisible
-     * you get more than you asked for */
+     * you get more than you asked for. */
     while (total_nrpages < nrpages) {
         pg = alloc_domheap_pages(d, ext_order, 0);
         if (pg == NULL)
             return total_nrpages;
 
-        if (add_extent(d, pg, ext_order) < 0) {
-            free_domheap_pages(pg, ext_order);
-            return total_nrpages;
-        }
+        /* Build p2m mapping for newly allocated extent. */
+        mfn = page_to_mfn(pg);
+        for (i = 0; i < (1 << ext_order); i++)
+            guest_physmap_add_page(d, gpfn + i, mfn + i);
+
+        /* Bump starting PFN by extent size pages. */
+        gpfn += ext_nrpages;
+
         total_nrpages += ext_nrpages;
     }
 
@@ -353,6 +355,7 @@ int allocate_rma(struct domain *d, unsigned int order)
     struct vcpu *v;
     ulong rma_base;
     ulong rma_sz;
+    ulong mfn;
     int i;
 
     if (d->arch.rma_page)
@@ -374,14 +377,18 @@ int allocate_rma(struct domain *d, unsigned int order)
     printk("allocated RMA for Dom[%d]: 0x%lx[0x%lx]\n",
            d->domain_id, rma_base, rma_sz);
 
+    mfn = page_to_mfn(d->arch.rma_page);
+
     for (i = 0; i < (1 << d->arch.rma_order); i++ ) {
-        /* Add in any extra CPUs that need flushing because of this page. */
         d->arch.rma_page[i].count_info |= PGC_page_RMA;
         clear_page((void *)page_to_maddr(&d->arch.rma_page[i]));
+
+        /* Set up p2m mapping for RMA. */
+        guest_physmap_add_page(d, i, mfn+i);
     }
 
-    d->shared_info = (shared_info_t *)
-        (rma_addr(&d->arch, RMA_SHARED_INFO) + rma_base);
+    /* shared_info uses last page of RMA */
+    d->shared_info = (shared_info_t *) (rma_base + rma_sz - PAGE_SIZE);
 
     /* if there are already running vcpus, adjust v->vcpu_info */
     /* XXX untested */
@@ -401,9 +408,6 @@ void free_rma_check(struct page_info *page)
 
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 {
-    ulong rma_base_mfn = page_to_mfn(d->arch.rma_page);
-    ulong rma_size_mfn = 1UL << d->arch.rma_order;
-    struct page_extents *pe;
     ulong mfn = INVALID_MFN;
     int t = PFN_TYPE_NONE;
     ulong foreign_map_pfn = 1UL << cpu_foreign_map_order();
@@ -412,31 +416,23 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
     if (pfn & foreign_map_pfn) {
         t = PFN_TYPE_FOREIGN;
         mfn = foreign_to_mfn(d, pfn);
-    } else if (pfn >= max_page && pfn < (max_page + NR_GRANT_FRAMES)) {
+    } else if (pfn >= max_page && pfn <
+	       (max_page + nr_grant_frames(d->grant_table))) {
+        /* XXX access d->grant_table->nr_grant_frames without lock.
+         * Currently on powerpc dynamic expanding grant table is
+         * inhibited by setting max_nr_grant_frames = INITIAL_NR_GRANT_FRAMES
+         * so that this access is safe.
+         */
         /* Its a grant table access */
         t = PFN_TYPE_GNTTAB;
         mfn = gnttab_shared_mfn(d, d->grant_table, (pfn - max_page));
-    } else if (d->is_privileged && cpu_io_mfn(pfn)) {
+    } else if (d->is_privileged && platform_io_mfn(pfn)) {
         t = PFN_TYPE_IO;
         mfn = pfn;
     } else {
-        if (pfn < rma_size_mfn) {
-            t = PFN_TYPE_RMA;
-            mfn = pfn + rma_base_mfn;
-        } else {
-            ulong cur_pfn = rma_size_mfn;
-
-            list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
-                uint pe_pages = 1UL << pe->order;
-                uint end_pfn = cur_pfn + pe_pages;
-
-                if (pfn >= cur_pfn && pfn < end_pfn) {
-                    t = PFN_TYPE_LOGICAL;
-                    mfn = page_to_mfn(pe->pg) + (pfn - cur_pfn);
-                    break;
-                }
-                cur_pfn += pe_pages;
-            }
+        if (pfn < d->arch.p2m_entries) {
+            t = PFN_TYPE_LOGICAL;
+            mfn = d->arch.p2m[pfn];
         }
 #ifdef DEBUG
         if (t != PFN_TYPE_NONE &&
@@ -485,58 +481,123 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
 
 unsigned long mfn_to_gmfn(struct domain *d, unsigned long mfn)
 {
-    struct page_extents *pe;
-    ulong cur_pfn;
+    struct page_info *pg = mfn_to_page(mfn);
     ulong gnttab_mfn;
-    ulong rma_mfn;
 
+    /* is this our mfn? */
+    if (page_get_owner(pg) != d)
+        return INVALID_M2P_ENTRY;
+
+    /* XXX access d->grant_table->nr_grant_frames without lock.
+     * Currently on powerpc dynamic expanding grant table is
+     * inhibited by setting max_nr_grant_frames = INITIAL_NR_GRANT_FRAMES
+     * so that this access is safe.
+     */
     /* grant? */
     gnttab_mfn = gnttab_shared_mfn(d, d->grant_table, 0);
-    if (mfn >= gnttab_mfn && mfn < (gnttab_mfn + NR_GRANT_FRAMES))
+    if (mfn >= gnttab_mfn && mfn <
+	(gnttab_mfn + nr_grant_frames(d->grant_table)))
         return max_page + (mfn - gnttab_mfn);
 
     /* IO? */
-    if (d->is_privileged && cpu_io_mfn(mfn))
+    if (d->is_privileged && platform_io_mfn(mfn))
         return mfn;
 
-    rma_mfn = page_to_mfn(d->arch.rma_page);
-    if (mfn >= rma_mfn &&
-        mfn < (rma_mfn + (1 << d->arch.rma_order)))
-        return mfn - rma_mfn;
+    /* check m2p table */
+    return get_gpfn_from_mfn(mfn);
+}
 
-    /* Extent? */
-    cur_pfn = 1UL << d->arch.rma_order;
-    list_for_each_entry (pe, &d->arch.extent_list, pe_list) {
-        uint pe_pages = 1UL << pe->order;
-        uint b_mfn = page_to_mfn(pe->pg);
-        uint e_mfn = b_mfn + pe_pages;
+/* NB: caller holds d->page_alloc lock, sets d->max_pages = new_max */
+int guest_physmap_max_mem_pages(struct domain *d, unsigned long new_max_pages)
+{
+    u32 *p2m_array = NULL;
+    u32 *p2m_old = NULL;
+    ulong i;
 
-        if (mfn >= b_mfn && mfn < e_mfn) {
-            return cur_pfn + (mfn - b_mfn);
-        }
-        cur_pfn += pe_pages;
+    /* XXX We probably could, but right now we don't shrink the p2m array.
+     * NB: d->max_pages >= d->arch.p2m_entries */
+    if (new_max_pages < d->max_pages) {
+        printk("Can't shrink DOM%d max memory pages\n", d->domain_id);
+        return -EINVAL;
     }
-    return INVALID_M2P_ENTRY;
+
+    /* Allocate one u32 per page. */
+    p2m_array = xmalloc_array(u32, new_max_pages);
+    if (p2m_array == NULL)
+        return -ENOMEM;
+
+    /* Copy old mappings into new array. */
+    if (d->arch.p2m != NULL) {
+        /* XXX This could take a long time; we should use a continuation. */
+        memcpy(p2m_array, d->arch.p2m, d->arch.p2m_entries * sizeof(u32));
+        p2m_old = d->arch.p2m;
+    }
+
+    /* Mark new mfns as invalid. */
+    for (i = d->arch.p2m_entries; i < new_max_pages; i++)
+        p2m_array[i] = INVALID_MFN;
+
+    /* Set new p2m pointer and size. */
+    d->arch.p2m = p2m_array;
+    d->arch.p2m_entries = new_max_pages;
+
+    /* Free old p2m array if present. */
+    if (p2m_old)
+        xfree(p2m_old);
+
+    return 0;
 }
 
 void guest_physmap_add_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn)
 {
-    printk("%s(%d, 0x%lx, 0x%lx)\n", __func__, d->domain_id, gpfn, mfn);
+    if (page_get_owner(mfn_to_page(mfn)) != d) {
+        printk("Won't map foreign MFN 0x%lx for DOM%d\n", mfn, d->domain_id);
+        return;
+    }
+
+    /* Check that pfn is within guest table. */
+    if (gpfn >= d->arch.p2m_entries) {
+        printk("Won't map invalid PFN 0x%lx for DOM%d\n", gpfn, d->domain_id);
+        return;
+    }
+
+    /* Warn if there is an existing mapping. */
+    /* XXX: probably shouldn't let this happen, but
+       current interface doesn't throw errors.  =( */
+    if (d->arch.p2m[gpfn] != INVALID_MFN)
+        printk("Ack! PFN aliased. PFN%lx, old MFN=%x, new MFN=%lx\n",
+                gpfn, d->arch.p2m[gpfn], mfn);
+
+    /* PFN and MFN ok, map in p2m table. */
+    d->arch.p2m[gpfn] = mfn;
+
+    /* Map in m2p table. */
+    set_gpfn_from_mfn(mfn, gpfn);
 }
+
 void guest_physmap_remove_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn)
 {
-    panic("%s\n", __func__);
+    if (page_get_owner(mfn_to_page(mfn)) != d) {
+        printk("Won't unmap foreign MFN 0x%lx for DOM%d\n", mfn, d->domain_id);
+        return;
+    }
+
+    /* check that pfn is within guest table */
+    if (gpfn >= d->arch.p2m_entries) {
+        printk("Won't unmap invalid PFN 0x%lx for DOM%d\n", gpfn, d->domain_id);
+        return;
+    }
+
+    /* PFN and MFN ok, unmap from p2m table. */
+    d->arch.p2m[gpfn] = INVALID_MFN;
+
+    /* Unmap from m2p table. */
+    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
 }
+
 void shadow_drop_references(
     struct domain *d, struct page_info *page)
 {
-}
-
-int arch_domain_add_extent(struct domain *d, struct page_info *page, int order)
-{
-    if (add_extent(d, page, order) < 0)
-        return -ENOMEM;
-    return 0;
 }

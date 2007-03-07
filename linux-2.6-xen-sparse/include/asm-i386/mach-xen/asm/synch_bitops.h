@@ -7,8 +7,6 @@
  * when communicating with Xen or other guest OSes running on other CPUs.
  */
 
-#include <linux/config.h>
-
 #ifdef HAVE_XEN_PLATFORM_COMPAT_H
 #include <xen/platform-compat.h>
 #endif

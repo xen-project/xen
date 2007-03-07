@@ -403,19 +403,6 @@ static inline int pmd_large(pmd_t pte) {
 /* to find an entry in a page-table-directory. */
 #define pud_index(address) (((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
 #define pud_offset(pgd, address) ((pud_t *) pgd_page(*(pgd)) + pud_index(address))
-static inline pud_t *__pud_offset_k(pud_t *pud, unsigned long address)
-{ 
-	return pud + pud_index(address);
-} 
-
-/* Find correct pud via the hidden fourth level page level: */
-
-/* This accesses the reference page table of the boot cpu. 
-   Other CPUs get synced lazily via the page fault handler. */
-static inline pud_t *pud_offset_k(pgd_t *pgd, unsigned long address)
-{
-	return pud_offset(pgd_offset_k(address), address);
-}
 
 /* PMD  - Level 2 access */
 #define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))

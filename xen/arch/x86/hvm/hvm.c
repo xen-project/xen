@@ -49,18 +49,18 @@
 #include <public/version.h>
 #include <public/memory.h>
 
-int hvm_enabled;
+int hvm_enabled __read_mostly;
 
-unsigned int opt_hvm_debug_level;
+unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
-struct hvm_function_table hvm_funcs;
+struct hvm_function_table hvm_funcs __read_mostly;
 
 /* I/O permission bitmap is globally shared by all HVM guests. */
 char __attribute__ ((__section__ (".bss.page_aligned")))
     hvm_io_bitmap[3*PAGE_SIZE];
 
-void hvm_enable(void)
+void hvm_enable(struct hvm_function_table *fns)
 {
     if ( hvm_enabled )
         return;
@@ -72,7 +72,14 @@ void hvm_enable(void)
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
     clear_bit(0x80, hvm_io_bitmap);
 
+    hvm_funcs   = *fns;
     hvm_enabled = 1;
+}
+
+void hvm_disable(void)
+{
+    if ( hvm_enabled )
+        hvm_funcs.disable();
 }
 
 void hvm_stts(struct vcpu *v)
@@ -397,6 +404,8 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
 
         unmap_domain_page(p);
+        
+        mark_dirty(current->domain, mfn);
 
         addr += count;
         buf  += count;
@@ -702,7 +711,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -725,7 +734,7 @@ static int hvmop_set_pci_intx_level(
     }
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -745,7 +754,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -768,7 +777,7 @@ static int hvmop_set_isa_irq_level(
     }
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -788,7 +797,7 @@ static int hvmop_set_pci_link_route(
     if ( (op.link > 3) || (op.isa_irq > 15) )
         return -EINVAL;
 
-    d = get_domain_by_id(op.domid);
+    d = rcu_lock_domain_by_id(op.domid);
     if ( d == NULL )
         return -ESRCH;
 
@@ -800,7 +809,7 @@ static int hvmop_set_pci_link_route(
     hvm_set_pci_link_route(d, op.link, op.isa_irq);
 
  out:
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -827,20 +836,14 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             return -EINVAL;
 
         if ( a.domid == DOMID_SELF )
-        {
-            get_knownalive_domain(current->domain);
-            d = current->domain;
-        }
+            d = rcu_lock_current_domain();
         else if ( IS_PRIV(current->domain) )
-        {
-            d = get_domain_by_id(a.domid);
-            if ( d == NULL )
-                return -ESRCH;
-        }
+            d = rcu_lock_domain_by_id(a.domid);
         else
-        {
             return -EPERM;
-        }
+
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -890,7 +893,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         }
 
     param_fail:
-        put_domain(d);
+        rcu_unlock_domain(d);
         break;
     }
 

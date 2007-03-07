@@ -1565,12 +1565,51 @@ CharDriverState *qemu_chr_open_stdio(void)
     return chr;
 }
 
-int store_console_dev(int domid, char *pts)
+/*
+ * Create a store entry for a device (e.g., monitor, serial/parallel lines).
+ * The entry is <domain-path><storeString>/tty and the value is the name
+ * of the pty associated with the device.
+ */
+static int store_dev_info(char *devName, int domid,
+                          CharDriverState *cState, char *storeString)
 {
     int xc_handle;
     struct xs_handle *xs;
     char *path;
+    char *newpath;
+    FDCharDriver *s;
+    char *pts;
 
+    /* Check for valid arguments (at least, prevent segfaults). */
+    if ((devName == NULL) || (cState == NULL) || (storeString == NULL)) {
+        fprintf(logfile, "%s - invalid arguments\n", __FUNCTION__);
+        return EINVAL;
+    }
+
+    /*
+     * Only continue if we're talking to a pty
+     * Actually, the following code works for any CharDriverState using
+     * FDCharDriver, but we really only care about pty's here
+     */
+    if (strcmp(devName, "pty"))
+        return 0;
+
+    s = cState->opaque;
+    if (s == NULL) {
+        fprintf(logfile, "%s - unable to retrieve fd for '%s'/'%s'\n",
+                __FUNCTION__, storeString, devName);
+        return EBADF;
+    }
+
+    pts = ptsname(s->fd_in);
+    if (pts == NULL) {
+        fprintf(logfile, "%s - unable to determine ptsname '%s'/'%s', "
+                "error %d (%s)\n",
+                __FUNCTION__, storeString, devName, errno, strerror(errno));
+        return errno;
+    }
+
+    /* We now have everything we need to set the xenstore entry. */
     xs = xs_daemon_open();
     if (xs == NULL) {
         fprintf(logfile, "Could not contact XenStore\n");
@@ -1588,14 +1627,19 @@ int store_console_dev(int domid, char *pts)
         fprintf(logfile, "xs_get_domain_path() error\n");
         return -1;
     }
-    path = realloc(path, strlen(path) + strlen("/console/tty") + 1);
-    if (path == NULL) {
+    newpath = realloc(path, (strlen(path) + strlen(storeString) +
+                             strlen("/tty") + 1));
+    if (newpath == NULL) {
+        free(path); /* realloc errors leave old block */
         fprintf(logfile, "realloc error\n");
         return -1;
     }
-    strcat(path, "/console/tty");
+    path = newpath;
+
+    strcat(path, storeString);
+    strcat(path, "/tty");
     if (!xs_write(xs, XBT_NULL, path, pts, strlen(pts))) {
-        fprintf(logfile, "xs_write for console fail");
+        fprintf(logfile, "xs_write for '%s' fail", storeString);
         return -1;
     }
 
@@ -1622,7 +1666,6 @@ CharDriverState *qemu_chr_open_pty(void)
     tcsetattr(slave_fd, TCSAFLUSH, &tty);
     
     fprintf(stderr, "char device redirected to %s\n", ptsname(master_fd));
-    store_console_dev(domid, ptsname(master_fd));
 
     return qemu_chr_open_fd(master_fd, master_fd);
 }
@@ -3207,6 +3250,14 @@ static int net_tap_init(VLANState *vlan, const char *ifname1,
         pid = fork();
         if (pid >= 0) {
             if (pid == 0) {
+                int open_max = sysconf(_SC_OPEN_MAX), i;
+                for (i = 0; i < open_max; i++)
+                    if (i != STDIN_FILENO &&
+                        i != STDOUT_FILENO &&
+                        i != STDERR_FILENO &&
+                        i != fd)
+                        close(i);
+
                 parg = args;
                 *parg++ = (char *)setup_script;
                 *parg++ = ifname;
@@ -5768,17 +5819,17 @@ int unset_mm_mapping(int xc_handle, uint32_t domid,
     int err = 0;
     xc_dominfo_t info;
 
+    xc_domain_getinfo(xc_handle, domid, 1, &info);
+    if ((info.nr_pages - nr_pages) <= 0) {
+        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
+        err = -1;
+    }
+
     err = xc_domain_memory_decrease_reservation(xc_handle, domid,
                                                 nr_pages, 0, extent_start);
     if (err)
         fprintf(stderr, "Failed to decrease physmap\n");
 
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-
-    if ((info.nr_pages - nr_pages) <= 0) {
-        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
-        err = -1;
-    }
 
     if (xc_domain_setmaxmem(xc_handle, domid, (info.nr_pages - nr_pages) *
                             PAGE_SIZE/1024) != 0) {
@@ -5972,6 +6023,7 @@ int main(int argc, char **argv)
     xen_pfn_t *page_array;
     extern void *shared_page;
     extern void *buffered_io_page;
+    extern void *buffered_pio_page;
 
     char qemu_dm_logfilename[64];
 
@@ -6044,9 +6096,14 @@ int main(int argc, char **argv)
     for(i = 1; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
-    
+
+#ifndef CONFIG_DM
     pstrcpy(parallel_devices[0], sizeof(parallel_devices[0]), "vc");
     for(i = 1; i < MAX_PARALLEL_PORTS; i++)
+#else
+    /* Xen steals IRQ7 for PCI. Disable LPT1 by default. */
+    for(i = 0; i < MAX_PARALLEL_PORTS; i++)
+#endif
         parallel_devices[i][0] = '\0';
     parallel_device_index = 0;
     
@@ -6571,6 +6628,10 @@ int main(int argc, char **argv)
                                        PROT_READ|PROT_WRITE,
                                        BUFFER_IO_PAGE_START >> PAGE_SHIFT);
 
+    buffered_pio_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+                                       PROT_READ|PROT_WRITE,
+                                       BUFFER_PIO_PAGE_START >> PAGE_SHIFT);
+
     for (i = 0; i < tmp_nr_pages; i++)
         page_array[i] = i;
 	
@@ -6684,16 +6745,23 @@ int main(int argc, char **argv)
         fprintf(stderr, "qemu: could not open monitor device '%s'\n", monitor_device);
         exit(1);
     }
+    store_dev_info(monitor_device, domid, monitor_hd, "/monitor");
     monitor_init(monitor_hd, !nographic);
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_devices[i][0] != '\0') {
+            char buf[16];
             serial_hds[i] = qemu_chr_open(serial_devices[i]);
             if (!serial_hds[i]) {
                 fprintf(stderr, "qemu: could not open serial device '%s'\n", 
                         serial_devices[i]);
                 exit(1);
             }
+            snprintf(buf, sizeof(buf), "/serial/%d", i);
+            store_dev_info(serial_devices[i], domid, serial_hds[i], buf);
+            if (i == 0) /* serial 0 is also called the console */
+                store_dev_info(serial_devices[i], domid,
+                               serial_hds[i], "/console");
             if (!strcmp(serial_devices[i], "vc"))
                 qemu_chr_printf(serial_hds[i], "serial%d console\r\n", i);
         }
@@ -6701,12 +6769,15 @@ int main(int argc, char **argv)
 
     for(i = 0; i < MAX_PARALLEL_PORTS; i++) {
         if (parallel_devices[i][0] != '\0') {
+            char buf[16];
             parallel_hds[i] = qemu_chr_open(parallel_devices[i]);
             if (!parallel_hds[i]) {
                 fprintf(stderr, "qemu: could not open parallel device '%s'\n", 
                         parallel_devices[i]);
                 exit(1);
             }
+            snprintf(buf, sizeof(buf), "/parallel/%d", i);
+            store_dev_info(parallel_devices[i], domid, parallel_hds[i], buf);
             if (!strcmp(parallel_devices[i], "vc"))
                 qemu_chr_printf(parallel_hds[i], "parallel%d console\r\n", i);
         }

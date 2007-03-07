@@ -229,6 +229,10 @@ static int setup_compat_l4(struct vcpu *v)
 
     if ( !pg )
         return -ENOMEM;
+
+    /* This page needs to look like a pagetable so that it can be shadowed */
+    pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated;
+
     l4tab = copy_page(page_to_virt(pg), idle_pg_table);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_page(pg, __PAGE_HYPERVISOR);
@@ -255,7 +259,7 @@ static void release_compat_l4(struct vcpu *v)
 
 static inline int may_switch_mode(struct domain *d)
 {
-    return 1; /* XXX */
+    return (d->tot_pages == 0);
 }
 
 int switch_native(struct domain *d)
@@ -263,7 +267,7 @@ int switch_native(struct domain *d)
     l1_pgentry_t gdt_l1e;
     unsigned int vcpuid;
 
-    if ( !d )
+    if ( d == NULL )
         return -EINVAL;
     if ( !may_switch_mode(d) )
         return -EACCES;
@@ -283,6 +287,8 @@ int switch_native(struct domain *d)
             release_compat_l4(d->vcpu[vcpuid]);
     }
 
+    d->arch.physaddr_bitsize = 64;
+
     return 0;
 }
 
@@ -291,7 +297,7 @@ int switch_compat(struct domain *d)
     l1_pgentry_t gdt_l1e;
     unsigned int vcpuid;
 
-    if ( !d )
+    if ( d == NULL )
         return -EINVAL;
     if ( compat_disabled )
         return -ENOSYS;
@@ -312,6 +318,10 @@ int switch_compat(struct domain *d)
             && setup_compat_l4(d->vcpu[vcpuid]) != 0)
             return -ENOMEM;
     }
+
+    d->arch.physaddr_bitsize =
+        fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
+        + (PAGE_SIZE - 2);
 
     return 0;
 }
@@ -487,18 +497,24 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+    unsigned long cr3_pfn = INVALID_MFN;
+    unsigned long flags;
+    int i, rc = 0, compat;
+
+    /* The context is a compat-mode one if the target domain is compat-mode;
+     * we expect the tools to DTRT even in compat-mode callers. */
+    compat = IS_COMPAT(d);
+
 #ifdef CONFIG_COMPAT
-#define c(fld) (!IS_COMPAT(d) ? (c.nat->fld) : (c.cmp->fld))
+#define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
 #else
 #define c(fld) (c.nat->fld)
 #endif
-    unsigned long cr3_pfn = INVALID_MFN;
-    unsigned long flags = c(flags);
-    int i, rc;
+    flags = c(flags);
 
     if ( !is_hvm_vcpu(v) )
     {
-        if ( !IS_COMPAT(d) )
+        if ( !compat )
         {
             fixup_guest_stack_selector(d, c.nat->user_regs.ss);
             fixup_guest_stack_selector(d, c.nat->kernel_ss);
@@ -550,7 +566,7 @@ int arch_set_info_guest(
     if ( (flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
-    if ( !IS_COMPAT(v->domain) )
+    if ( !compat )
         memcpy(&v->arch.guest_context, c.nat, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
@@ -592,7 +608,7 @@ int arch_set_info_guest(
 
     if ( !is_hvm_vcpu(v) )
     {
-        if ( !IS_COMPAT(d) )
+        if ( !compat )
             rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
 #ifdef CONFIG_COMPAT
         else
@@ -610,20 +626,46 @@ int arch_set_info_guest(
         if ( rc != 0 )
             return rc;
 
-        if ( !IS_COMPAT(d) )
+        if ( !compat )
         {
             cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[3]));
 
-            if ( paging_mode_refcounts(d)
-                 ? !get_page(mfn_to_page(cr3_pfn), d)
-                 : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                      PGT_base_page_table) )
+            if ( !mfn_valid(cr3_pfn) ||
+                 (paging_mode_refcounts(d)
+                  ? !get_page(mfn_to_page(cr3_pfn), d)
+                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                       PGT_base_page_table)) )
             {
                 destroy_gdt(v);
                 return -EINVAL;
             }
 
             v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
+
+#ifdef __x86_64__
+            if ( c.nat->ctrlreg[1] )
+            {
+                cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[1]));
+
+                if ( !mfn_valid(cr3_pfn) ||
+                     (paging_mode_refcounts(d)
+                      ? !get_page(mfn_to_page(cr3_pfn), d)
+                      : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                           PGT_base_page_table)) )
+                {
+                    cr3_pfn = pagetable_get_pfn(v->arch.guest_table);
+                    v->arch.guest_table = pagetable_null();
+                    if ( paging_mode_refcounts(d) )
+                        put_page(mfn_to_page(cr3_pfn));
+                    else
+                        put_page_and_type(mfn_to_page(cr3_pfn));
+                    destroy_gdt(v);
+                    return -EINVAL;
+                }
+
+                v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
+            }
+#endif
         }
 #ifdef CONFIG_COMPAT
         else
@@ -632,10 +674,11 @@ int arch_set_info_guest(
 
             cr3_pfn = gmfn_to_mfn(d, compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
 
-            if ( paging_mode_refcounts(d)
-                 ? !get_page(mfn_to_page(cr3_pfn), d)
-                 : !get_page_and_type(mfn_to_page(cr3_pfn), d,
-                                    PGT_l3_page_table) )
+            if ( !mfn_valid(cr3_pfn) ||
+                 (paging_mode_refcounts(d)
+                  ? !get_page(mfn_to_page(cr3_pfn), d)
+                  : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                       PGT_l3_page_table)) )
             {
                 destroy_gdt(v);
                 return -EINVAL;

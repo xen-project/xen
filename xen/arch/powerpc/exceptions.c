@@ -35,7 +35,9 @@
 extern ulong ppc_do_softirq(ulong orig_msr);
 extern void do_timer(struct cpu_user_regs *regs);
 extern void do_dec(struct cpu_user_regs *regs);
-extern void program_exception(struct cpu_user_regs *regs, unsigned long cookie);
+extern void program_exception(struct cpu_user_regs *regs,
+                              unsigned long cookie);
+extern int reprogram_timer(s_time_t timeout); 
 
 int hdec_sample = 0;
 
@@ -43,7 +45,20 @@ void do_timer(struct cpu_user_regs *regs)
 {
     /* Set HDEC high so it stops firing and can be reprogrammed by
      * set_preempt() */
-    mthdec(INT_MAX);
+    /* FIXME! HACK ALERT!
+     *
+     * We have a bug in that if we switch domains in schedule() we
+     * switch right away regardless of whatever else is pending.  This
+     * means that if the timer goes off while in schedule(), the next
+     * domain will be preempted by the interval defined below.  So
+     * until we fix our cotnext_switch(), the follow workaround will
+     * make sure that the domain we switch to does not run for to long
+     * so we can continue to service the other timers in the timer
+     * queue and that the value is long enough to escape this
+     * particular timer event.
+     */
+    reprogram_timer(NOW() + MILLISECS(1));
+
     raise_softirq(TIMER_SOFTIRQ);
 }
 

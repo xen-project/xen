@@ -390,6 +390,8 @@ void vmx_setup_platform(struct domain *d)
 	spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
 	d->arch.hvm_domain.buffered_io_va =
 		(unsigned long)__va(__gpa_to_mpa(d, BUFFER_IO_PAGE_START));
+	d->arch.hvm_domain.buffered_pio_va =
+		(unsigned long)__va(__gpa_to_mpa(d, BUFFER_PIO_PAGE_START));
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 

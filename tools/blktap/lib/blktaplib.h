@@ -173,6 +173,7 @@ typedef struct msg_hdr {
 	uint16_t   len;
 	uint16_t   drivertype;
 	uint16_t   cookie;
+	uint8_t    readonly;
 } msg_hdr_t;
 
 typedef struct msg_newdev {

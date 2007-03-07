@@ -119,6 +119,12 @@ while not interrupted:
 	elif tsc < last_tsc[cpu]:
 	    print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
 
+	# provide relative TSC
+	if last_tsc[cpu] > 0:
+		reltsc = tsc - last_tsc[cpu]
+	else:
+		reltsc = 0
+
 	last_tsc[cpu] = tsc
 
 	if mhz:
@@ -127,6 +133,7 @@ while not interrupted:
         args = {'cpu'   : cpu,
                 'tsc'   : tsc,
                 'event' : event,
+                'reltsc': reltsc,
                 '1'     : d1,
                 '2'     : d2,
                 '3'     : d3,

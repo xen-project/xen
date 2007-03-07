@@ -22,7 +22,7 @@ import xen.lowlevel.xc
 
 from xen.util import Brctl
 
-from xen.xend import uuid
+from xen.xend import uuid, arch
 from xen.xend.XendError import *
 from xen.xend.XendOptions import instance as xendoptions
 from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
@@ -81,7 +81,7 @@ class XendNode:
         for cpu_uuid, cpu in saved_cpus.items():
             self.cpus[cpu_uuid] = cpu
 
-        # verify we have enough cpus here
+        cpuinfo = parse_proc_cpuinfo()
         physinfo = self.physinfo_dict()
         cpu_count = physinfo['nr_cpus']
         cpu_features = physinfo['hw_caps']
@@ -91,12 +91,44 @@ class XendNode:
         if cpu_count != len(self.cpus):
             self.cpus = {}
             for i in range(cpu_count):
-                cpu_uuid = uuid.createString()
-                cpu_info = {'uuid': cpu_uuid,
-                            'host': self.uuid,
-                            'number': i,
-                            'features': cpu_features}
-                self.cpus[cpu_uuid] = cpu_info
+                u = uuid.createString()
+                self.cpus[u] = {'uuid': u, 'number': i }
+
+        for u in self.cpus.keys():
+            log.error(self.cpus[u])
+            number = self.cpus[u]['number']
+            # We can run off the end of the cpuinfo list if domain0 does not
+            # have #vcpus == #pcpus. In that case we just replicate one that's
+            # in the hash table.
+            if not cpuinfo.has_key(number):
+                number = cpuinfo.keys()[0]
+            log.error(number)
+            log.error(cpuinfo)
+            if arch.type == "x86":
+                self.cpus[u].update(
+                    { 'host'     : self.uuid,
+                      'features' : cpu_features,
+                      'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
+                      'vendor'   : cpuinfo[number]['vendor_id'],
+                      'modelname': cpuinfo[number]['model name'],
+                      'stepping' : cpuinfo[number]['stepping'],
+                      'flags'    : cpuinfo[number]['flags'],
+                    })
+            elif arch.type == "ia64":
+                self.cpus[u].update(
+                    { 'host'     : self.uuid,
+                      'features' : cpu_features,
+                      'speed'    : int(float(cpuinfo[number]['cpu MHz'])),
+                      'vendor'   : cpuinfo[number]['vendor'],
+                      'modelname': cpuinfo[number]['family'],
+                      'stepping' : cpuinfo[number]['model'],
+                      'flags'    : cpuinfo[number]['features'],
+                    })
+            else:
+                self.cpus[u].update(
+                    { 'host'     : self.uuid,
+                      'features' : cpu_features,
+                    })
 
         self.pifs = {}
         self.pif_metrics = {}
@@ -109,12 +141,9 @@ class XendNode:
             for net_uuid, network in saved_networks.items():
                 self.network_create(network.get('name_label'),
                                     network.get('name_description', ''),
-                                    network.get('default_gateway', ''),
-                                    network.get('default_netmask', ''),
                                     False, net_uuid)
         else:
-            gateway, netmask = linux_get_default_network()
-            self.network_create('net0', '', gateway, netmask, False)
+            self.network_create('net0', '', False)
 
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
@@ -168,15 +197,12 @@ class XendNode:
 
 
 
-    def network_create(self, name_label, name_description,
-                       default_gateway, default_netmask, persist = True,
+    def network_create(self, name_label, name_description, persist = True,
                        net_uuid = None):
         if net_uuid is None:
             net_uuid = uuid.createString()
         self.networks[net_uuid] = XendNetwork(net_uuid, name_label,
-                                              name_description,
-                                              default_gateway,
-                                              default_netmask)
+                                              name_description)
         if persist:
             self.save_networks()
         return net_uuid
@@ -353,6 +379,9 @@ class XendNode:
     def get_uuid(self):
         return self.uuid
 
+    def get_capabilities(self):
+        return self.xc.xeninfo()['xen_caps'].split(" ")
+
     #
     # Host CPU Functions
     #
@@ -371,18 +400,12 @@ class XendNode:
         else:
             raise XendError('Invalid CPU Reference')
 
-    def get_host_cpu_features(self, host_cpu_ref):
+    def get_host_cpu_field(self, ref, field):
         try:
-            return self.cpus[host_cpu_ref]['features']
+            return self.cpus[ref][field]
         except KeyError:
             raise XendError('Invalid CPU Reference')
 
-    def get_host_cpu_number(self, host_cpu_ref):
-        try:
-            return self.cpus[host_cpu_ref]['number']
-        except KeyError:
-            raise XendError('Invalid CPU Reference')        
-            
     def get_host_cpu_load(self, host_cpu_ref):
         host_cpu = self.cpus.get(host_cpu_ref)
         if not host_cpu:
@@ -543,6 +566,31 @@ class XendNode:
     def refreshBridges(self):
         for pif in self.pifs.values():
             pif.refresh(Brctl.get_state())
+
+
+def parse_proc_cpuinfo():
+    cpuinfo = {}
+    f = file('/proc/cpuinfo', 'r')
+    try:
+        p = -1
+        d = {}
+        for line in f:
+            keyvalue = line.split(':')
+            if len(keyvalue) != 2:
+                continue
+            key = keyvalue[0].strip()
+            val = keyvalue[1].strip()
+            if key == 'processor':
+                if p != -1:
+                    cpuinfo[p] = d
+                p = int(val)
+                d = {}
+            else:
+                d[key] = val
+        cpuinfo[p] = d
+        return cpuinfo
+    finally:
+        f.close()
 
 
 def instance():

@@ -102,7 +102,7 @@ SUBCOMMAND_HELP = {
     'reboot'      : ('<Domain> [-wa]', 'Reboot a domain.'),
     'restore'     : ('<CheckpointFile> [-p]',
                      'Restore a domain from a saved state.'),
-    'save'        : ('<Domain> <CheckpointFile>',
+    'save'        : ('[-c] <Domain> <CheckpointFile>',
                      'Save a domain state to restore later.'),
     'shutdown'    : ('<Domain> [-waRH]', 'Shutdown a domain.'),
     'top'         : ('', 'Monitor a host and the domains in real time.'),
@@ -133,6 +133,8 @@ SUBCOMMAND_HELP = {
     'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
+    'trigger'     : ('<Domain> <nmi|reset|init> [<VCPU>]',
+                     'Send a trigger to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
                      'List the VCPUs for a domain or all domains.'),
     'vcpu-pin'    : ('<Domain> <VCPU> <CPUs>',
@@ -153,7 +155,7 @@ SUBCOMMAND_HELP = {
                         'List virtual block devices for a domain.'),
     'network-attach':  ('<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] '
                         '[ip=<ip>] [script=<script>] [backend=<BackDomain>] '
-                        '[vifname=<name>]',
+                        '[vifname=<name>] [rate=<rate>] [model=<model>]',
                         'Create a new virtual network device.'),
     'network-detach':  ('<Domain> <DevId> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
@@ -230,6 +232,9 @@ SUBCOMMAND_OPTIONS = {
     'resume': (
       ('-p', '--paused', 'Do not unpause domain after resuming it'),
     ),
+    'save': (
+      ('-c', '--checkpoint', 'Leave domain running after creating snapshot'),
+    ),
    'restore': (
       ('-p', '--paused', 'Do not unpause domain after restoring it'),
     ),
@@ -255,6 +260,7 @@ common_commands = [
     "shutdown",
     "start",
     "suspend",
+    "trigger",
     "top",
     "unpause",
     "uptime",
@@ -284,6 +290,7 @@ domain_commands = [
     "start",
     "suspend",
     "sysrq",
+    "trigger",
     "top",
     "unpause",
     "uptime",
@@ -545,6 +552,10 @@ class Shell(cmd.Cmd):
     def __init__(self):
         cmd.Cmd.__init__(self)
         self.prompt = "xm> "
+        if serverType == SERVER_XEN_API:
+            res = server.xenapi._UNSUPPORTED_list_all_methods()
+            for f in res:
+                setattr(Shell, 'do_' + f, self.default)
 
     def default(self, line):
         words = shlex.split(line)
@@ -563,6 +574,16 @@ class Shell(cmd.Cmd):
             else:
                 print '*** Unknown command: %s' % words[0]
         return False
+
+    def completedefault(self, text, line, begidx, endidx):
+        cmd = line.split(' ')[0]
+        clas, func = cmd.split('.')
+        if begidx != len(cmd) + 1 or \
+           func.startswith('get_by_') or \
+           func == 'get_all':
+            return []
+        uuids = server.xenapi_request('%s.get_all' % clas, ())
+        return [u + " " for u in uuids if u.startswith(text)]
 
     def emptyline(self):
         pass
@@ -586,21 +607,37 @@ def xm_shell(args):
 #########################################################################
 
 def xm_save(args):
-    arg_check(args, "save", 2)
+    arg_check(args, "save", 2, 3)
 
     try:
-        dominfo = parse_doms_info(server.xend.domain(args[0]))
+        (options, params) = getopt.gnu_getopt(args, 'c', ['checkpoint'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    checkpoint = False
+    for (k, v) in options:
+        if k in ['-c', '--checkpoint']:
+            checkpoint = True
+
+    if len(params) != 2:
+        err("Wrong number of parameters")
+        usage('save')
+        sys.exit(1)
+
+    try:
+        dominfo = parse_doms_info(server.xend.domain(params[0]))
     except xmlrpclib.Fault, ex:
         raise ex
     
     domid = dominfo['domid']
-    savefile = os.path.abspath(args[1])
+    savefile = os.path.abspath(params[1])
 
     if not os.access(os.path.dirname(savefile), os.W_OK):
         err("xm save: Unable to create file %s" % savefile)
         sys.exit(1)
     
-    server.xend.domain.save(domid, savefile)
+    server.xend.domain.save(domid, savefile, checkpoint)
     
 def xm_restore(args):
     arg_check(args, "restore", 1, 2)
@@ -1347,6 +1384,17 @@ def xm_sysrq(args):
     req = args[1]
     server.xend.domain.send_sysrq(dom, req)    
 
+def xm_trigger(args):
+    vcpu = 0
+    
+    arg_check(args, "trigger", 2, 3)
+    dom = args[0]
+    trigger = args[1]
+    if len(args) == 3:
+        vcpu = int(args[2])
+    
+    server.xend.domain.send_trigger(dom, trigger, vcpu)
+
 def xm_top(args):
     arg_check(args, "top", 0)
 
@@ -1566,13 +1614,20 @@ def xm_block_configure(args):
 
 
 def xm_network_attach(args):
-    arg_check(args, 'network-attach', 1, 10000)
+    arg_check(args, 'network-attach', 1, 10)
 
     dom = args[0]
     vif = ['vif']
+    vif_params = ['type', 'mac', 'bridge', 'ip', 'script', \
+                  'backend', 'vifname', 'rate', 'model']
 
     for a in args[1:]:
-        vif.append(a.split("="))
+        vif_param = a.split("=")
+        if len(vif_param) != 2 or vif_param[1] == '' or \
+           vif_param[0] not in vif_params:
+            err("Invalid argument: %s" % a)
+            usage('network-attach')
+        vif.append(vif_param)
 
     server.xend.domain.device_create(dom, vif)
 
@@ -1668,6 +1723,7 @@ commands = {
     "shutdown": xm_shutdown,
     "start": xm_start,
     "sysrq": xm_sysrq,
+    "trigger": xm_trigger,
     "uptime": xm_uptime,
     "suspend": xm_suspend,
     "list": xm_list,

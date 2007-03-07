@@ -21,7 +21,7 @@
 #include <asm/smpboot.h>
 #include <asm/hardirq.h>
 #include <asm/ipi.h>
-#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
 #include <mach_apic.h>
 
 /*

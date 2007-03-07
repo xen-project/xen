@@ -270,6 +270,18 @@ xen_console_remove_from_other_config(xen_session *session, xen_console console, 
 
 
 bool
+xen_console_get_all(xen_session *session, struct xen_console_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "console.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_console_get_uuid(xen_session *session, char **result, xen_console console)
 {
     *result = session->ok ? xen_strdup_((char *)console) : NULL;

@@ -238,6 +238,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    xen_string_set *capabilities;
+    if (!xen_host_get_capabilities(session, &capabilities, host))
+    {
+        print_error(session);
+        free(dmesg);
+        xen_string_set_free(supported_bootloaders);
+        xen_string_string_map_free(versions);
+        xen_host_free(host);
+        xen_vm_record_free(vm_record);
+        xen_uuid_bytes_free(vm_uuid_bytes);
+        xen_uuid_free(vm_uuid);
+        xen_vm_free(vm);
+        CLEANUP;
+        return 1;
+    }
+
     printf("%s.\n", vm_uuid);
 
     fprintf(stderr, "In bytes, the VM UUID is ");
@@ -264,6 +280,13 @@ int main(int argc, char **argv)
     }
     printf("\n");
 
+    printf("Host has the following capabilities:");
+    for (size_t i = 0; i < capabilities->size; i++)
+    {
+        printf(" %s", capabilities->contents[i]);
+    }
+    printf("\n");
+
     printf("%s.\n", vm_record->uuid);
 
     printf("Resident on %s.\n", (char *)vm_record->resident_on->u.handle);
@@ -279,6 +302,7 @@ int main(int argc, char **argv)
     xen_string_string_map_free(versions);
     free(dmesg);
     xen_string_set_free(supported_bootloaders);
+    xen_string_set_free(capabilities);
 
     print_vm_metrics(session, vm);
     if (!session->ok)

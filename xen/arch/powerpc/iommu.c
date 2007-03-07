@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
@@ -62,7 +62,6 @@ int iommu_put(u32 buid, ulong ioba, union tce tce)
         mfn = pfn2mfn(d, gmfn, &mtype);
         if (mfn != INVALID_MFN) {
             switch (mtype) {
-            case PFN_TYPE_RMA:
             case PFN_TYPE_LOGICAL:
                 break;
             case PFN_TYPE_FOREIGN:

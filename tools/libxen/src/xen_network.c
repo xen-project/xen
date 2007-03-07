@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -52,13 +52,7 @@ static const struct_member xen_network_record_struct_members[] =
           .offset = offsetof(xen_network_record, vifs) },
         { .key = "PIFs",
           .type = &abstract_type_ref_set,
-          .offset = offsetof(xen_network_record, pifs) },
-        { .key = "default_gateway",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_network_record, default_gateway) },
-        { .key = "default_netmask",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_network_record, default_netmask) }
+          .offset = offsetof(xen_network_record, pifs) }
     };
 
 const abstract_type xen_network_record_abstract_type_ =
@@ -84,8 +78,6 @@ xen_network_record_free(xen_network_record *record)
     free(record->name_description);
     xen_vif_record_opt_set_free(record->vifs);
     xen_pif_record_opt_set_free(record->pifs);
-    free(record->default_gateway);
-    free(record->default_netmask);
     free(record);
 }
 
@@ -247,40 +239,6 @@ xen_network_get_pifs(xen_session *session, struct xen_pif_set **result, xen_netw
 
 
 bool
-xen_network_get_default_gateway(xen_session *session, char **result, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("network.get_default_gateway");
-    return session->ok;
-}
-
-
-bool
-xen_network_get_default_netmask(xen_session *session, char **result, xen_network network)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = network }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("network.get_default_netmask");
-    return session->ok;
-}
-
-
-bool
 xen_network_set_name_label(xen_session *session, xen_network network, char *label)
 {
     abstract_value param_values[] =
@@ -308,38 +266,6 @@ xen_network_set_name_description(xen_session *session, xen_network network, char
         };
 
     xen_call_(session, "network.set_name_description", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_network_set_default_gateway(xen_session *session, xen_network network, char *default_gateway)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = network },
-            { .type = &abstract_type_string,
-              .u.string_val = default_gateway }
-        };
-
-    xen_call_(session, "network.set_default_gateway", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_network_set_default_netmask(xen_session *session, xen_network network, char *default_netmask)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = network },
-            { .type = &abstract_type_string,
-              .u.string_val = default_netmask }
-        };
-
-    xen_call_(session, "network.set_default_netmask", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

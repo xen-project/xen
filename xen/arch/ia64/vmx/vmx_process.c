@@ -229,6 +229,14 @@ void leave_hypervisor_tail(void)
         if (v->vcpu_id == 0) {
             unsigned long callback_irq =
                 d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ];
+
+            if ( v->arch.arch_vmx.pal_init_pending ) {
+                /*inject INIT interruption to guest pal*/
+                v->arch.arch_vmx.pal_init_pending = 0;
+                deliver_pal_init(v);
+                return;
+            }
+
             /*
              * val[63:56] == 1: val[55:0] is a delivery PCI INTx line:
              *                  Domain = val[47:32], Bus  = val[31:16],

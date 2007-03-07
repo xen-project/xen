@@ -91,6 +91,20 @@ int xc_linux_build(int xc_handle,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn);
 
+/** The same interface, but the dom structure is managed by the caller */
+struct xc_dom_image;
+int xc_dom_linux_build(int xc_handle,
+		       struct xc_dom_image *dom,
+		       uint32_t domid,
+		       unsigned int mem_mb,
+		       const char *image_name,
+		       const char *ramdisk_name,
+		       unsigned long flags,
+		       unsigned int store_evtchn,
+		       unsigned long *store_mfn,
+		       unsigned int console_evtchn,
+		       unsigned long *console_mfn);
+
 /**
  * This function will create a domain for a paravirtualized Linux
  * using buffers for kernel and initrd

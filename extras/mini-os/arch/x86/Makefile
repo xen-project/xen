@@ -4,6 +4,7 @@
 #
 
 # include arch.mk has to be before mini-os.mk!
+
 include arch.mk
 include ../../minios.mk
 

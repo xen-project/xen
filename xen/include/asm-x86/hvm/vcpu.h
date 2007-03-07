@@ -45,8 +45,6 @@ struct hvm_vcpu {
     /* Flags */
     int                 flag_dr_dirty;
 
-    unsigned long       hvm_trace_values[5];
-
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;

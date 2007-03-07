@@ -237,4 +237,11 @@ extern bool
 xen_console_remove_from_other_config(xen_session *session, xen_console console, char *key);
 
 
+/**
+ * Return a list of all the consoles known to the system.
+ */
+extern bool
+xen_console_get_all(xen_session *session, struct xen_console_set **result);
+
+
 #endif

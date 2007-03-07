@@ -24,8 +24,9 @@
 #include <asm/viosapic.h>
 struct mmio_list;
 typedef struct virtual_platform_def {
-    unsigned long          buffered_io_va;
-    spinlock_t             buffered_io_lock;
+    unsigned long       buffered_io_va;
+    spinlock_t          buffered_io_lock;
+    unsigned long       buffered_pio_va;
     unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned long       params[HVM_NR_PARAMS];

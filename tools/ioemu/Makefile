@@ -65,10 +65,10 @@ common  de-ch  es     fo  fr-ca  hu     ja  mk  nl-be      pt  sl     tr
 
 install-doc: $(DOCS)
 	mkdir -p "$(DESTDIR)$(docdir)"
-	$(INSTALL) -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
+	$(INSTALL_DATA) qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
 ifndef CONFIG_WIN32
 	mkdir -p "$(DESTDIR)$(mandir)/man1"
-	$(INSTALL) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
+	$(INSTALL_DATA) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
 endif
 
 install: all $(if $(BUILD_DOCS),install-doc)
@@ -77,12 +77,12 @@ install: all $(if $(BUILD_DOCS),install-doc)
 #	mkdir -p "$(DESTDIR)$(datadir)"
 #	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
 #			video.x openbios-sparc32 linux_boot.bin; do \
-#		$(INSTALL) -m 644 $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
+#		$(INSTALL_DATA) $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
 #	done
 ifndef CONFIG_WIN32
 	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
 	for x in $(KEYMAPS); do \
-		$(INSTALL) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
+		$(INSTALL_DATA) $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
 	done
 endif
 	for d in $(TARGET_DIRS); do \

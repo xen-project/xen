@@ -238,8 +238,11 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
 
 notSupportedRE = re.compile(r'method "(.*)" is not supported')
 def _is_not_supported(exn):
-    m = notSupportedRE.search(exn[0])
-    return m is not None
+    try:
+        m = notSupportedRE.search(exn[0])
+        return m is not None
+    except TypeError, e:
+        return False
 
 
 # This is a XML-RPC server that sits on a Unix domain socket.

@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * Copyright (C) IBM Corp. 2005
+ * Copyright IBM Corp. 2005, 2007
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -38,14 +38,14 @@ struct arch_domain {
     struct page_info *rma_page;
     uint rma_order;
 
-    /* list of extents beyond RMA */
-    struct list_head extent_list;
-
     uint foreign_mfn_count;
     uint *foreign_mfns;
 
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
+
+    u32 *p2m; /* Array of 32-bit MFNs supports 44 bits of physical memory. */
+    ulong p2m_entries;
 
     uint large_page_sizes;
     uint large_page_order[4];
@@ -108,10 +108,5 @@ extern void save_float(struct vcpu *);
 extern void load_float(struct vcpu *);
 
 #define rma_size(rma_order) (1UL << ((rma_order) + PAGE_SHIFT))
-
-static inline ulong rma_addr(struct arch_domain *ad, int type)
-{
-    return rma_size(ad->rma_order) - (type * PAGE_SIZE);
-}
 
 #endif

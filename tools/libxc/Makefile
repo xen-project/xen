@@ -6,6 +6,8 @@ MINOR    = 0
 
 CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c
+CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
+CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c
 CTRL_SRCS-y       += xc_misc.c
@@ -56,6 +58,9 @@ GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_compat_linux.c
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I.
+
+# Needed for posix_fadvise64() in xc_linux.c
+CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
 
 # Define this to make it possible to run valgrind on code linked with these
 # libraries.

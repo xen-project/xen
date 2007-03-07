@@ -60,9 +60,6 @@
 #include <asm/tlbflush.h>
 #include <asm/cpu.h>
 
-#include <asm/tlbflush.h>
-#include <asm/cpu.h>
-
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 static int hlt_counter;
@@ -104,7 +101,7 @@ EXPORT_SYMBOL(enable_hlt);
  * to poll the ->work.need_resched flag instead of waiting for the
  * cross-CPU IPI to arrive. Use this option with caution.
  */
-static void poll_idle(void)
+static void poll_idle (void)
 {
 	local_irq_enable();
 
@@ -172,10 +169,7 @@ void cpu_idle(void)
 				__get_cpu_var(cpu_idle_state) = 0;
 
 			rmb();
-			idle = pm_idle;
-
-			if (!idle)
-				idle = xen_idle;
+			idle = xen_idle; /* no alternatives */
 
 			if (cpu_is_offline(cpu))
 				play_dead();

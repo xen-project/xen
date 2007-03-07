@@ -54,26 +54,29 @@ ifeq ($(ACM_SECURITY),y)
 all: build
 
 .PHONY: install
-install: all $(ACM_CONFIG_FILE)
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
-	$(INSTALL_PROG) -p $(ACM_INST_TOOLS) $(DESTDIR)/usr/sbin
-	$(INSTALL_PROG) -p $(ACM_EZPOLICY) $(DESTDIR)/usr/sbin
-	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_CONFIG_DIR)
-	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_POLICY_DIR)
-	$(INSTALL_DATA) -p policies/$(ACM_SCHEMA) $(DESTDIR)$(ACM_POLICY_DIR)
-	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_POLICY_DIR)/example
-	for i in $(ACM_EXAMPLES); do \
-		$(INSTALL_DIR) -p $(DESTDIR)$(ACM_POLICY_DIR)/example/$$i; \
-		$(INSTALL_DATA) -p policies/example/$$i/client_v1-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR)/example/$$i; \
-	done
-	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_SCRIPT_DIR)
-	$(INSTALL_PROG) -p $(ACM_SCRIPTS) $(DESTDIR)$(ACM_SCRIPT_DIR)
-	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
-	$(INSTALL_DATA) -p $(ACM_INST_HTML) $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
-	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_SECGEN_CGIDIR)
-	$(INSTALL_PROG) -p $(ACM_INST_CGI) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
 ifndef XEN_PYTHON_NATIVE_INSTALL
-	python python/setup.py install --home="$(DESTDIR)/usr"
+install: LIBPATH=$(shell PYTHONPATH=../python/xen/util python -c "import auxbin; print auxbin.libpath()")
+endif
+install: all $(ACM_CONFIG_FILE)
+	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(ACM_INST_TOOLS) $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(ACM_EZPOLICY) $(DESTDIR)/usr/sbin
+	$(INSTALL_DIR) $(DESTDIR)$(ACM_CONFIG_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)
+	$(INSTALL_DATA) policies/$(ACM_SCHEMA) $(DESTDIR)$(ACM_POLICY_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)/example
+	for i in $(ACM_EXAMPLES); do \
+		$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)/example/$$i; \
+		$(INSTALL_DATA) policies/example/$$i/client_v1-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR)/example/$$i; \
+	done
+	$(INSTALL_DIR) $(DESTDIR)$(ACM_SCRIPT_DIR)
+	$(INSTALL_PROG) $(ACM_SCRIPTS) $(DESTDIR)$(ACM_SCRIPT_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
+	$(INSTALL_DATA) $(ACM_INST_HTML) $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
+	$(INSTALL_PROG) $(ACM_INST_CGI) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
+ifndef XEN_PYTHON_NATIVE_INSTALL
+	python python/setup.py install --home="$(DESTDIR)/usr" --install-lib="$(DESTDIR)$(LIBPATH)/python"
 else
 	python python/setup.py install --root="$(DESTDIR)"
 endif

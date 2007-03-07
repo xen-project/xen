@@ -32,7 +32,7 @@
 static int cpu_has_hdec = 1;
 ulong ticks_per_usec;
 unsigned long cpu_khz;
-unsigned int timebase_freq;
+s64 timebase_freq;
 
 s_time_t get_s_time(void)
 {

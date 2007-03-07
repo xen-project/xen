@@ -16,6 +16,8 @@
  * Copyright IBM Corp. 2005, 2006, 2007
  *
  * Authors: Jimi Xenidis <jimix@watson.ibm.com>
+ *          Ryan Harper <ryanh@us.ibm.com>
+ *          Hollis Blanchard <hollisb@us.ibm.com>
  */
 
 #include <stdarg.h>
@@ -85,8 +87,6 @@ int arch_domain_create(struct domain *d)
 
     d->arch.large_page_sizes = cpu_large_page_orders(
         d->arch.large_page_order, ARRAY_SIZE(d->arch.large_page_order));
-
-    INIT_LIST_HEAD(&d->arch.extent_list);
 
     d->arch.foreign_mfn_count = 1024;
     d->arch.foreign_mfns = xmalloc_array(uint, d->arch.foreign_mfn_count);
@@ -309,8 +309,8 @@ void domain_relinquish_resources(struct domain *d)
 {
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
-    free_extents(d);
     xfree(d->arch.foreign_mfns);
+    xfree(d->arch.p2m);
     return;
 }
 

@@ -11,6 +11,7 @@
 
 #include "xg_private.h"
 #include "xg_save_restore.h"
+#include "xc_dom.h"
 
 /* max mfn of the current host machine */
 static unsigned long max_mfn;
@@ -18,7 +19,7 @@ static unsigned long max_mfn;
 /* virtual starting address of the hypervisor */
 static unsigned long hvirt_start;
 
-/* #levels of page tables used by the currrent guest */
+/* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
 /* total number of pages used by the current guest */
@@ -143,7 +144,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
     DECLARE_DOMCTL;
-    int rc = 1, i, n, pae_extended_cr3 = 0;
+    int rc = 1, i, j, n, m, pae_extended_cr3 = 0;
     unsigned long mfn, pfn;
     unsigned int prev_pc, this_pc;
     int verify = 0;
@@ -186,11 +187,26 @@ int xc_linux_restore(int xc_handle, int io_fd,
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins;
 
+    uint64_t vcpumap = 1ULL;
+    unsigned int max_vcpu_id = 0;
 
     max_pfn = nr_pfns;
 
     DPRINTF("xc_linux_restore start: max_pfn = %lx\n", max_pfn);
 
+    /*
+     * XXX For now, 32bit dom0's can only save/restore 32bit domUs
+     * on 64bit hypervisors.
+     */
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = dom;
+    domctl.cmd    = XEN_DOMCTL_set_address_size;
+    domctl.u.address_size.size = sizeof(unsigned long) * 8;
+    rc = do_domctl(xc_handle, &domctl);
+    if ( rc != 0 ) {
+	ERROR("Unable to set guest address size.");
+	goto out;
+    }
 
     if(!get_platform_info(xc_handle, dom,
                           &max_mfn, &hvirt_start, &pt_levels)) {
@@ -330,7 +346,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
      */
     prev_pc = 0;
 
-    n = 0;
+    n = m = 0;
     while (1) {
 
         int j, nr_mfns = 0; 
@@ -352,6 +368,16 @@ int xc_linux_restore(int xc_handle, int io_fd,
         if (j == -1) {
             verify = 1;
             DPRINTF("Entering page verify mode\n");
+            continue;
+        }
+
+        if (j == -2) {
+            if (!read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
+                (max_vcpu_id >= 64) ||
+                !read_exact(io_fd, &vcpumap, sizeof(uint64_t))) {
+                ERROR("Error when reading max_vcpu_id");
+                goto out;
+            }
             continue;
         }
 
@@ -529,6 +555,17 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         munmap(region_base, j*PAGE_SIZE);
         n+= j; /* crude stats */
+
+        /* 
+         * Discard cache for portion of file read so far up to last
+         *  page boundary every 16MB or so.
+         */
+        m += j;
+        if ( m > MAX_PAGECACHE_USAGE )
+        {
+            discard_file_cache(io_fd, 0 /* no flush */);
+            m = 0;
+        }
     }
 
     /*
@@ -751,64 +788,112 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
     }
 
-    if (!read_exact(io_fd, &ctxt, sizeof(ctxt)) ||
-        !read_exact(io_fd, shared_info_page, PAGE_SIZE)) {
-        ERROR("Error when reading ctxt or shared info page");
-        goto out;
-    }
+    for (i = 0; i <= max_vcpu_id; i++) {
+        if (!(vcpumap & (1ULL << i)))
+            continue;
 
-    /* Uncanonicalise the suspend-record frame number and poke resume rec. */
-    pfn = ctxt.user_regs.edx;
-    if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
-        ERROR("Suspend record frame number is bad");
-        goto out;
-    }
-    ctxt.user_regs.edx = mfn = p2m[pfn];
-    start_info = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
-    start_info->nr_pages    = max_pfn;
-    start_info->shared_info = shared_info_frame << PAGE_SHIFT;
-    start_info->flags       = 0;
-    *store_mfn = start_info->store_mfn       = p2m[start_info->store_mfn];
-    start_info->store_evtchn                 = store_evtchn;
-    start_info->console.domU.mfn    = p2m[start_info->console.domU.mfn];
-    start_info->console.domU.evtchn = console_evtchn;
-    *console_mfn                    = start_info->console.domU.mfn;
-    munmap(start_info, PAGE_SIZE);
-
-    /* Uncanonicalise each GDT frame number. */
-    if (ctxt.gdt_ents > 8192) {
-        ERROR("GDT entry count out of range");
-        goto out;
-    }
-
-    for (i = 0; (512*i) < ctxt.gdt_ents; i++) {
-        pfn = ctxt.gdt_frames[i];
-        if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
-            ERROR("GDT frame number is bad");
+        if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
+            ERROR("Error when reading ctxt %d", i);
             goto out;
         }
-        ctxt.gdt_frames[i] = p2m[pfn];
+
+        if (i == 0) {
+            /*
+             * Uncanonicalise the suspend-record frame number and poke
+             * resume record.
+             */
+            pfn = ctxt.user_regs.edx;
+            if ((pfn >= max_pfn) ||
+                (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
+                ERROR("Suspend record frame number is bad");
+                goto out;
+            }
+            ctxt.user_regs.edx = mfn = p2m[pfn];
+            start_info = xc_map_foreign_range(
+                xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
+            start_info->nr_pages = max_pfn;
+            start_info->shared_info = shared_info_frame << PAGE_SHIFT;
+            start_info->flags = 0;
+            *store_mfn = start_info->store_mfn = p2m[start_info->store_mfn];
+            start_info->store_evtchn = store_evtchn;
+            start_info->console.domU.mfn = p2m[start_info->console.domU.mfn];
+            start_info->console.domU.evtchn = console_evtchn;
+            *console_mfn = start_info->console.domU.mfn;
+            munmap(start_info, PAGE_SIZE);
+        }
+
+        /* Uncanonicalise each GDT frame number. */
+        if (ctxt.gdt_ents > 8192) {
+            ERROR("GDT entry count out of range");
+            goto out;
+        }
+
+        for (j = 0; (512*j) < ctxt.gdt_ents; j++) {
+            pfn = ctxt.gdt_frames[j];
+            if ((pfn >= max_pfn) ||
+                (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
+                ERROR("GDT frame number is bad");
+                goto out;
+            }
+            ctxt.gdt_frames[j] = p2m[pfn];
+        }
+
+        /* Uncanonicalise the page table base pointer. */
+        pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
+
+        if (pfn >= max_pfn) {
+            ERROR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
+                  pfn, max_pfn, pfn_type[pfn]);
+            goto out;
+        }
+
+        if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
+             ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
+            ERROR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
+                  pfn, max_pfn, pfn_type[pfn],
+                  (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+            goto out;
+        }
+
+        ctxt.ctrlreg[3] = xen_pfn_to_cr3(p2m[pfn]);
+
+        /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
+        if ( (pt_levels == 4) && ctxt.ctrlreg[1] )
+        {
+            pfn = xen_cr3_to_pfn(ctxt.ctrlreg[1]);
+
+            if (pfn >= max_pfn) {
+                ERROR("User PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
+                      pfn, max_pfn, pfn_type[pfn]);
+                goto out;
+            }
+
+            if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
+                 ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
+                ERROR("User PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
+                      pfn, max_pfn, pfn_type[pfn],
+                      (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+                goto out;
+            }
+
+            ctxt.ctrlreg[1] = xen_pfn_to_cr3(p2m[pfn]);
+        }
+
+        domctl.cmd = XEN_DOMCTL_setvcpucontext;
+        domctl.domain = (domid_t)dom;
+        domctl.u.vcpucontext.vcpu = i;
+        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
+        rc = xc_domctl(xc_handle, &domctl);
+        if (rc != 0) {
+            ERROR("Couldn't build vcpu%d", i);
+            goto out;
+        }
     }
 
-    /* Uncanonicalise the page table base pointer. */
-    pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
-
-    if (pfn >= max_pfn) {
-        ERROR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
-            pfn, max_pfn, pfn_type[pfn]);
+    if (!read_exact(io_fd, shared_info_page, PAGE_SIZE)) {
+        ERROR("Error when reading shared info page");
         goto out;
     }
-
-    if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-         ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
-        ERROR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
-            pfn, max_pfn, pfn_type[pfn],
-            (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
-        goto out;
-    }
-
-    ctxt.ctrlreg[3] = xen_pfn_to_cr3(p2m[pfn]);
 
     /* clear any pending events and the selector */
     memset(&(shared_info->evtchn_pending[0]), 0,
@@ -845,23 +930,15 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     DPRINTF("Domain ready to be built.\n");
 
-    domctl.cmd = XEN_DOMCTL_setvcpucontext;
-    domctl.domain = (domid_t)dom;
-    domctl.u.vcpucontext.vcpu   = 0;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
-    rc = xc_domctl(xc_handle, &domctl);
-
-    if (rc != 0) {
-        ERROR("Couldn't build the domain");
-        goto out;
-    }
-
  out:
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
     free(mmu);
     free(p2m);
     free(pfn_type);
+
+    /* discard cache for save file  */
+    discard_file_cache(io_fd, 1 /*flush*/);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
     

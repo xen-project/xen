@@ -20,6 +20,14 @@
 #define LARGE_PAGE_SIZE (1UL << PMD_SHIFT)
 
 #ifdef __KERNEL__
+
+/*
+ * Need to repeat this here in order to not include pgtable.h (which in turn
+ * depends on definitions made here), but to be able to use the symbolic
+ * below. The preprocessor will warn if the two definitions aren't identical.
+ */
+#define _PAGE_PRESENT	0x001
+
 #ifndef __ASSEMBLY__
 
 #include <linux/string.h>
@@ -28,13 +36,6 @@
 #include <asm/bug.h>
 #include <xen/interface/xen.h>
 #include <xen/features.h>
-
-/*
- * Need to repeat this here in order to not include pgtable.h (which in turn
- * depends on definitions made here), but to be able to use the symbolic
- * below. The preprocessor will warn if the two definitions aren't identical.
- */
-#define _PAGE_PRESENT	0x001
 
 #define arch_free_page(_page,_order)		\
 ({	int foreign = PageForeign(_page);	\
@@ -139,7 +140,11 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
+#ifdef CONFIG_XEN_COMPAT_030002
+	if (ret) ret = machine_to_phys(ret) | _PAGE_PRESENT;
+#else
 	if (ret & _PAGE_PRESENT) ret = machine_to_phys(ret);
+#endif
 	return ret;
 }
 #define HPAGE_SHIFT	22
@@ -220,8 +225,6 @@ extern int page_is_ram(unsigned long pagenr);
 	(VM_READ | VM_WRITE | \
 	((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \
 		 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
-
-#define __HAVE_ARCH_GATE_AREA 1
 
 #include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>

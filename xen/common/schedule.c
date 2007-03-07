@@ -430,12 +430,12 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         ret = -ESRCH;
-        d = get_domain_by_id(sched_remote_shutdown.domain_id);
+        d = rcu_lock_domain_by_id(sched_remote_shutdown.domain_id);
         if ( d == NULL )
             break;
 
         domain_shutdown(d, (u8)sched_remote_shutdown.reason);
-        put_domain(d);
+        rcu_unlock_domain(d);
         ret = 0;
 
         break;

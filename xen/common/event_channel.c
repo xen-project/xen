@@ -112,7 +112,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = get_domain_by_id(dom)) == NULL )
+    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
     spin_lock(&d->evtchn_lock);
@@ -130,7 +130,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
  out:
     spin_unlock(&d->evtchn_lock);
 
-    put_domain(d);
+    rcu_unlock_domain(d);
 
     return rc;
 }
@@ -150,7 +150,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
 
-    if ( (rd = get_domain_by_id(rdom)) == NULL )
+    if ( (rd = rcu_lock_domain_by_id(rdom)) == NULL )
         return -ESRCH;
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
@@ -198,7 +198,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     if ( ld != rd )
         spin_unlock(&rd->evtchn_lock);
     
-    put_domain(rd);
+    rcu_unlock_domain(rd);
 
     return rc;
 }
@@ -434,7 +434,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             spin_unlock(&d2->evtchn_lock);
         put_domain(d2);
     }
-    
+
     spin_unlock(&d1->evtchn_lock);
 
     return rc;
@@ -598,7 +598,7 @@ static long evtchn_status(evtchn_status_t *status)
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = get_domain_by_id(dom)) == NULL )
+    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
     spin_lock(&d->evtchn_lock);
@@ -645,7 +645,7 @@ static long evtchn_status(evtchn_status_t *status)
 
  out:
     spin_unlock(&d->evtchn_lock);
-    put_domain(d);
+    rcu_unlock_domain(d);
     return rc;
 }
 
@@ -746,13 +746,13 @@ static long evtchn_reset(evtchn_reset_t *r)
     else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( (d = get_domain_by_id(dom)) == NULL )
+    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
         return -ESRCH;
 
     for ( i = 0; port_is_valid(d, i); i++ )
         (void)__evtchn_close(d, i);
 
-    put_domain(d);
+    rcu_unlock_domain(d);
 
     return 0;
 }

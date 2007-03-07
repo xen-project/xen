@@ -569,6 +569,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     xen_pfn_t *pfn_list;
     shared_iopage_t *sp;
     void *ioreq_buffer_page;
+    void *pio_buffer_page;
     unsigned long dom_memsize = memsize << 20;
     unsigned long nr_pages = memsize << (20 - PAGE_SHIFT);
     unsigned long vcpus;
@@ -628,9 +629,10 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 
     pfn_list[0] = IO_PAGE_START >> PAGE_SHIFT;
     pfn_list[1] = STORE_PAGE_START >> PAGE_SHIFT;
-    pfn_list[2] = BUFFER_IO_PAGE_START >> PAGE_SHIFT; 
+    pfn_list[2] = BUFFER_IO_PAGE_START >> PAGE_SHIFT;
+    pfn_list[3] = BUFFER_PIO_PAGE_START >> PAGE_SHIFT;
 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom, 3,
+    rc = xc_domain_memory_populate_physmap(xc_handle, dom, 4,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate IO page or store page or buffer io page.\n");
@@ -684,6 +686,12 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
                                              pfn_list[2]); 
     memset(ioreq_buffer_page,0,PAGE_SIZE);
     munmap(ioreq_buffer_page, PAGE_SIZE);
+
+    pio_buffer_page = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                           PROT_READ | PROT_WRITE,
+                                           pfn_list[3]);
+    memset(pio_buffer_page,0,PAGE_SIZE);
+    munmap(pio_buffer_page, PAGE_SIZE);
     free(pfn_list);
     return 0;
 

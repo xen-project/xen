@@ -357,7 +357,11 @@ int construct_dom0(struct domain *d,
 
         value = (parms.virt_hv_start_low + mask) & ~mask;
 #ifdef CONFIG_COMPAT
-        HYPERVISOR_COMPAT_VIRT_START(d) = max_t(unsigned int, m2p_compat_vstart, value);
+        HYPERVISOR_COMPAT_VIRT_START(d) =
+            max_t(unsigned int, m2p_compat_vstart, value);
+        d->arch.physaddr_bitsize = !IS_COMPAT(d) ? 64 :
+            fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
+            + (PAGE_SIZE - 2);
         if ( value > (!IS_COMPAT(d) ?
                       HYPERVISOR_VIRT_START :
                       __HYPERVISOR_COMPAT_VIRT_START) )
@@ -370,9 +374,6 @@ int construct_dom0(struct domain *d,
     if ( parms.f_required[0] /* Huh? -- kraxel */ )
             panic("Domain 0 requires an unsupported hypervisor feature.\n");
 
-    /* Align load address to 4MB boundary. */
-    v_start = parms.virt_base & ~((1UL<<22)-1);
-
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 
@@ -380,6 +381,7 @@ int construct_dom0(struct domain *d,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
+    v_start          = parms.virt_base;
     vkern_start      = parms.virt_kstart;
     vkern_end        = parms.virt_kend;
     vinitrd_start    = round_pgup(vkern_end);
@@ -429,11 +431,14 @@ int construct_dom0(struct domain *d,
     if ( (1UL << order) > nr_pages )
         panic("Domain 0 allocation is too small for kernel image.\n");
 
-    /*
-     * Allocate from DMA pool: on i386 this ensures that our low-memory 1:1
-     * mapping covers the allocation.
-     */
-    if ( (page = alloc_domheap_pages(d, order, MEMF_dma)) == NULL )
+#ifdef __i386__
+    /* Ensure that our low-memory 1:1 mapping covers the allocation. */
+    page = alloc_domheap_pages(d, order,
+                               MEMF_bits(30 + (v_start >> 31)));
+#else
+    page = alloc_domheap_pages(d, order, 0);
+#endif
+    if ( page == NULL )
         panic("Not enough RAM for domain 0 allocation.\n");
     alloc_spfn = page_to_mfn(page);
     alloc_epfn = alloc_spfn + d->tot_pages;

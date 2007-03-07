@@ -629,7 +629,7 @@ static unsigned int vtpm_op_poll(struct file *file,
 	return flags;
 }
 
-static struct file_operations vtpm_ops = {
+static const struct file_operations vtpm_ops = {
 	.owner = THIS_MODULE,
 	.llseek = no_llseek,
 	.open = vtpm_op_open,

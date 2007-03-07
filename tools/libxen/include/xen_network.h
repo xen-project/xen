@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,8 +26,8 @@
 
 
 /*
- * The network class. 
- *  
+ * The network class.
+ * 
  * A virtual network.
  */
 
@@ -68,8 +68,6 @@ typedef struct xen_network_record
     char *name_description;
     struct xen_vif_record_opt_set *vifs;
     struct xen_pif_record_opt_set *pifs;
-    char *default_gateway;
-    char *default_netmask;
 } xen_network_record;
 
 /**
@@ -222,20 +220,6 @@ xen_network_get_pifs(xen_session *session, struct xen_pif_set **result, xen_netw
 
 
 /**
- * Get the default_gateway field of the given network.
- */
-extern bool
-xen_network_get_default_gateway(xen_session *session, char **result, xen_network network);
-
-
-/**
- * Get the default_netmask field of the given network.
- */
-extern bool
-xen_network_get_default_netmask(xen_session *session, char **result, xen_network network);
-
-
-/**
  * Set the name/label field of the given network.
  */
 extern bool
@@ -247,20 +231,6 @@ xen_network_set_name_label(xen_session *session, xen_network network, char *labe
  */
 extern bool
 xen_network_set_name_description(xen_session *session, xen_network network, char *description);
-
-
-/**
- * Set the default_gateway field of the given network.
- */
-extern bool
-xen_network_set_default_gateway(xen_session *session, xen_network network, char *default_gateway);
-
-
-/**
- * Set the default_netmask field of the given network.
- */
-extern bool
-xen_network_set_default_netmask(xen_session *session, xen_network network, char *default_netmask);
 
 
 /**

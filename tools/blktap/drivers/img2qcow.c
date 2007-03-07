@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
 	dd.private  = malloc(dd.drv->private_data_size);
 
         /*Open qcow file*/
-        if (dd.drv->td_open(&dd, argv[1])!=0) {
+        if (dd.drv->td_open(&dd, argv[1], 0)!=0) {
 		DFPRINTF("Unable to open Qcow file [%s]\n",argv[1]);
 		exit(-1);
 	}

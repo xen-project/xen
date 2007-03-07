@@ -24,10 +24,13 @@ static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
 {
 	struct page *page = virt_to_page(pt);
 	unsigned long pfn = page_to_pfn(page);
+	int rc;
 
-	BUG_ON(HYPERVISOR_update_va_mapping(
-		       (unsigned long)__va(pfn << PAGE_SHIFT),
-		       pfn_pte(pfn, flags), 0));
+	rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)__va(pfn << PAGE_SHIFT),
+		pfn_pte(pfn, flags), 0);
+	if (rc)
+		BUG();
 }
 
 static void mm_walk(struct mm_struct *mm, pgprot_t flags)

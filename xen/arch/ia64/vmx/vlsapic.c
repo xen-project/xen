@@ -498,6 +498,18 @@ chk_irq_exit:
 }
 
 /*
+ * Set a INIT interruption request to vcpu[0] of target domain.
+ * The INIT interruption is injected into each vcpu by guest firmware.
+ */
+void vmx_pend_pal_init(struct domain *d)
+{
+    VCPU *vcpu;
+
+    vcpu = d->vcpu[0];
+    vcpu->arch.arch_vmx.pal_init_pending = 1;
+}
+
+/*
  * Only coming from virtualization fault.
  */
 void guest_write_eoi(VCPU *vcpu)
@@ -641,6 +653,14 @@ static void vlsapic_deliver_ipi(VCPU *vcpu, uint64_t dm, uint64_t vector)
         panic_domain(NULL, "Deliver reserved IPI!\n");
         break;
     }
+}
+
+/*
+ * Deliver the INIT interruption to guest.
+ */
+void deliver_pal_init(VCPU *vcpu)
+{
+    vlsapic_deliver_ipi(vcpu, SAPIC_INIT, 0);
 }
 
 /*

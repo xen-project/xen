@@ -236,7 +236,7 @@ struct domain *get_domain_by_id(domid_t dom)
 }
 
 
-struct domain *find_domain_rcu_lock(domid_t dom)
+struct domain *rcu_lock_domain_by_id(domid_t dom)
 {
     struct domain *d;
 
@@ -345,8 +345,7 @@ void domain_pause_for_debugger(void)
     send_guest_global_virq(dom0, VIRQ_DEBUGGER);
 }
 
-/* Complete domain destroy after RCU readers are not holding 
-   old references */
+/* Complete domain destroy after RCU readers are not holding old references. */
 static void complete_domain_destroy(struct rcu_head *head)
 {
     struct domain *d = container_of(head, struct domain, rcu);
@@ -390,7 +389,7 @@ void domain_destroy(struct domain *d)
     rcu_assign_pointer(*pd, d->next_in_hashbucket);
     spin_unlock(&domlist_update_lock);
 
-    /* schedule RCU asynchronous completion of domain destroy */
+    /* Schedule RCU asynchronous completion of domain destroy. */
     call_rcu(&d->rcu, complete_domain_destroy);
 }
 

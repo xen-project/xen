@@ -66,16 +66,19 @@ static void __netif_down(netif_t *netif)
 static int net_open(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	if (netif_carrier_ok(dev))
+	if (netback_carrier_ok(netif)) {
 		__netif_up(netif);
+		netif_start_queue(dev);
+	}
 	return 0;
 }
 
 static int net_close(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	if (netif_carrier_ok(dev))
+	if (netback_carrier_ok(netif))
 		__netif_down(netif);
+	netif_stop_queue(dev);
 	return 0;
 }
 
@@ -138,8 +141,6 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	netif_carrier_off(dev);
-
 	netif = netdev_priv(dev);
 	memset(netif, 0, sizeof(*netif));
 	netif->domid  = domid;
@@ -147,6 +148,8 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle)
 	atomic_set(&netif->refcnt, 1);
 	init_waitqueue_head(&netif->waiting_to_free);
 	netif->dev = dev;
+
+	netback_carrier_off(netif);
 
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
@@ -285,7 +288,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	netif_get(netif);
 
 	rtnl_lock();
-	netif_carrier_on(netif->dev);
+	netback_carrier_on(netif);
 	if (netif_running(netif->dev))
 		__netif_up(netif);
 	rtnl_unlock();
@@ -302,9 +305,10 @@ err_rx:
 
 void netif_disconnect(netif_t *netif)
 {
-	if (netif_carrier_ok(netif->dev)) {
+	if (netback_carrier_ok(netif)) {
 		rtnl_lock();
-		netif_carrier_off(netif->dev);
+		netback_carrier_off(netif);
+		netif_carrier_off(netif->dev); /* discard queued packets */
 		if (netif_running(netif->dev))
 			__netif_down(netif);
 		rtnl_unlock();

@@ -326,7 +326,7 @@ static ofdn_t ofd_rtas_props(void *m)
 }
 #endif
 
-static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
+static ofdn_t ofd_xen_props(void *m, struct domain *d, ulong shared_info)
 {
     ofdn_t n;
     static const char path[] = "/xen";
@@ -349,19 +349,25 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
         ASSERT(xl < sizeof (xen));
         ofd_prop_add(m, n, "version", xen, xl + 1);
 
-        val[0] = (ulong)si - page_to_maddr(d->arch.rma_page);
+        /* convert xen pointer to guest physical */
+        val[0] = shared_info;
         val[1] = PAGE_SIZE;
-        ofd_prop_add(m, n, "start-info", val, sizeof (val));
+        ofd_prop_add(m, n, "shared-info", val, sizeof (val));
 
-        val[1] =  RMA_LAST_DOM0 * PAGE_SIZE;
-        val[0] =  rma_size(d->arch.rma_order) - val[1];
+        /* reserve PAGE_SIZE @ addr shared info */
         ofd_prop_add(m, n, "reserved", val, sizeof (val));
+
+        /* flags |= SIF_PROVILEDGED; */
+        ofd_prop_add(m, n, "privileged", NULL, 0);
+
+        /* flags |= SIF_INITDOMAIN; */
+        ofd_prop_add(m, n, "initdomain", NULL, 0);
 
         /* tell dom0 that Xen depends on it to have power control */
         if (!rtas_entry)
             ofd_prop_add(m, n, "power-control", NULL, 0);
 
-        /* tell dom0 where ranted pages go in the linear map */
+        /* tell dom0 where granted pages go in the linear map */
         val[0] = cpu_foreign_map_order();
         val[1] = d->arch.foreign_mfn_count;
         ofd_prop_add(m, n, "foreign-map", val, sizeof (val));
@@ -375,7 +381,8 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, start_info_t *si)
     return n;
 }
 
-int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si)
+int ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
+                   ulong shared_info)
 {
     void *m;
     const ofdn_t n = OFD_ROOT;
@@ -401,13 +408,13 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, start_info_t *si)
     ofd_cpus_props(m, d);
 
     printk("Add /chosen props\n");
-    ofd_chosen_props(m, (char *)si->cmd_line);
+    ofd_chosen_props(m, cmdline);
 
     printk("fix /memory props\n");
     ofd_memory_props(m, d);
 
     printk("fix /xen props\n");
-    ofd_xen_props(m, d, si);
+    ofd_xen_props(m, d, shared_info);
 
     printk("Remove original /dart\n");
     ofd_prune_path(m, "/dart");

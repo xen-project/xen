@@ -116,9 +116,6 @@ extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif
 
-#define TRACE_VMEXIT(index, value)                              \
-    current->arch.hvm_vcpu.hvm_trace_values[index] = (value)
-
 /*
  * Save/restore support 
  */
@@ -260,7 +257,8 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h);
 extern char hvm_io_bitmap[];
 extern int hvm_enabled;
 
-void hvm_enable(void);
+void hvm_enable(struct hvm_function_table *);
+void hvm_disable(void);
 
 int hvm_copy_to_guest_phys(paddr_t paddr, void *buf, int size);
 int hvm_copy_from_guest_phys(void *buf, paddr_t paddr, int size);

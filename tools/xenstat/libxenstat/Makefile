@@ -14,7 +14,6 @@
 
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
-LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
 
 prefix=/usr
 includedir=$(prefix)/include
@@ -29,26 +28,40 @@ MINOR=0
 LIB=src/libxenstat.a
 SHLIB=src/libxenstat.so.$(MAJOR).$(MINOR)
 SHLIB_LINKS=src/libxenstat.so.$(MAJOR) src/libxenstat.so
-OBJECTS=src/xenstat.o
+OBJECTS-y=src/xenstat.o
+OBJECTS-$(CONFIG_Linux) += src/xenstat_linux.o
+OBJECTS-$(CONFIG_SunOS) += src/xenstat_solaris.o
 SONAME_FLAGS=-Wl,$(SONAME_LDFLAG) -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
 CFLAGS+=-Isrc -I$(XEN_LIBXC) -I$(XEN_XENSTORE)
 LDFLAGS+=-Lsrc -L$(XEN_XENSTORE)/ -L$(XEN_LIBXC)/
+LDLIBS-y = -lxenstore -lxenctrl
+LDLIBS-$(CONFIG_SunOS) += -lkstat
+ARLIBS-y = $(XEN_XENSTORE)/libxenstore.so $(XEN_LIBXC)/libxenctrl.so
+ARLIBS-x86_64 = /usr/lib/amd64/libkstat.so
+ARLIBS-x86_32 = /usr/lib/libkstat.so
+ARLIBS-$(CONFIG_SunOS) += $(ARLIBS-$(XEN_TARGET_ARCH))
 
 .PHONY: all
 all: $(LIB)
 
-$(LIB): $(OBJECTS)
-	$(AR) rc $@ $^ $(XEN_XENSTORE)/libxenstore.so $(XEN_LIBXC)/libxenctrl.so
+$(LIB): $(OBJECTS-y)
+	$(AR) rc $@ $^ $(ARLIBS-y)
 	$(RANLIB) $@
 
-$(SHLIB): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_CFLAGS) -o $@ $(OBJECTS) \
-		-lxenstore -lxenctrl
+$(SHLIB): $(OBJECTS-y)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) $(SHLIB_CFLAGS) -o $@ \
+	    $(OBJECTS-y) $(LDLIBS-y)
 
-src/xenstat.o: src/xenstat.c src/xenstat.h
+src/xenstat.o: src/xenstat.c src/xenstat.h src/xenstat_priv.h
+	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
+
+src/xenstat_linux.o: src/xenstat_linux.c src/xenstat_priv.h
+	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
+
+src/xenstat_solaris.o: src/xenstat_solaris.c src/xenstat_priv.h
 	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
 
 src/libxenstat.so.$(MAJOR): $(LIB)
@@ -140,5 +153,5 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS) \
+	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
 	      $(BINDINGS) $(BINDINGSRC)

@@ -145,6 +145,10 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
             paging_write_p2m_entry(d, gfn, p2m_entry, new_entry, 4);
             break;
         case PGT_l2_page_table:
+#if CONFIG_PAGING_LEVELS == 3
+            /* for PAE mode, PDPE only has PCD/PWT/P bits available */
+            new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)), _PAGE_PRESENT);
+#endif
             paging_write_p2m_entry(d, gfn, p2m_entry, new_entry, 3);
             break;
         case PGT_l1_page_table:

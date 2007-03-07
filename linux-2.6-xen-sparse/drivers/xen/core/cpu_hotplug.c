@@ -1,4 +1,3 @@
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -122,29 +121,19 @@ arch_initcall(setup_vcpu_hotplug_event);
 
 int smp_suspend(void)
 {
-	int i, err;
+	int cpu, err;
 
-	lock_cpu_hotplug();
-
-	/*
-	 * Take all other CPUs offline. We hold the hotplug mutex to
-	 * avoid other processes bringing up CPUs under our feet.
-	 */
-	while (num_online_cpus() > 1) {
-		unlock_cpu_hotplug();
-		for_each_online_cpu(i) {
-			if (i == 0)
-				continue;
-			err = cpu_down(i);
-			if (err) {
-				printk(KERN_CRIT "Failed to take all CPUs "
-				       "down: %d.\n", err);
-				for_each_possible_cpu(i)
-					vcpu_hotplug(i);
-				return err;
-			}
+	for_each_online_cpu(cpu) {
+		if (cpu == 0)
+			continue;
+		err = cpu_down(cpu);
+		if (err) {
+			printk(KERN_CRIT "Failed to take all CPUs "
+			       "down: %d.\n", err);
+			for_each_possible_cpu(cpu)
+				vcpu_hotplug(cpu);
+			return err;
 		}
-		lock_cpu_hotplug();
 	}
 
 	return 0;
@@ -153,11 +142,6 @@ int smp_suspend(void)
 void smp_resume(void)
 {
 	int cpu;
-
-	for_each_possible_cpu(cpu)
-		cpu_initialize_context(cpu);
-
-	unlock_cpu_hotplug();
 
 	for_each_possible_cpu(cpu)
 		vcpu_hotplug(cpu);

@@ -21,6 +21,7 @@
 
 #include "xen_common.h"
 #include "xen_network_decl.h"
+#include "xen_string_set.h"
 #include "xen_string_string_map.h"
 #include "xen_vif_decl.h"
 #include "xen_vif_metrics_decl.h"
@@ -71,8 +72,12 @@ typedef struct xen_vif_record
     struct xen_vm_record_opt *vm;
     char *mac;
     int64_t mtu;
+    bool currently_attached;
+    int64_t status_code;
+    char *status_detail;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
+    struct xen_string_set *qos_supported_algorithms;
     struct xen_vif_metrics_record_opt *metrics;
 } xen_vif_record;
 
@@ -226,6 +231,27 @@ xen_vif_get_mtu(xen_session *session, int64_t *result, xen_vif vif);
 
 
 /**
+ * Get the currently_attached field of the given VIF.
+ */
+extern bool
+xen_vif_get_currently_attached(xen_session *session, bool *result, xen_vif vif);
+
+
+/**
+ * Get the status_code field of the given VIF.
+ */
+extern bool
+xen_vif_get_status_code(xen_session *session, int64_t *result, xen_vif vif);
+
+
+/**
+ * Get the status_detail field of the given VIF.
+ */
+extern bool
+xen_vif_get_status_detail(xen_session *session, char **result, xen_vif vif);
+
+
+/**
  * Get the qos/algorithm_type field of the given VIF.
  */
 extern bool
@@ -237,6 +263,13 @@ xen_vif_get_qos_algorithm_type(xen_session *session, char **result, xen_vif vif)
  */
 extern bool
 xen_vif_get_qos_algorithm_params(xen_session *session, xen_string_string_map **result, xen_vif vif);
+
+
+/**
+ * Get the qos/supported_algorithms field of the given VIF.
+ */
+extern bool
+xen_vif_get_qos_supported_algorithms(xen_session *session, struct xen_string_set **result, xen_vif vif);
 
 
 /**
@@ -296,6 +329,13 @@ xen_vif_add_to_qos_algorithm_params(xen_session *session, xen_vif vif, char *key
  */
 extern bool
 xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char *key);
+
+
+/**
+ * Return a list of all the VIFs known to the system.
+ */
+extern bool
+xen_vif_get_all(xen_session *session, struct xen_vif_set **result);
 
 
 #endif

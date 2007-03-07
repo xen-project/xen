@@ -507,6 +507,18 @@ xen_vdi_resize(xen_session *session, xen_vdi vdi, int64_t size)
 
 
 bool
+xen_vdi_get_all(xen_session *session, struct xen_vdi_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "VDI.get_all", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_vdi_get_uuid(xen_session *session, char **result, xen_vdi vdi)
 {
     *result = session->ok ? xen_strdup_((char *)vdi) : NULL;

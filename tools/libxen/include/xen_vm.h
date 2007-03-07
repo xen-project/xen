@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 #include "xen_console_decl.h"
 #include "xen_crashdump_decl.h"
 #include "xen_host_decl.h"
-#include "xen_int_float_map.h"
 #include "xen_on_crash_behaviour.h"
 #include "xen_on_normal_exit.h"
 #include "xen_string_string_map.h"
@@ -31,6 +30,7 @@
 #include "xen_vdi_decl.h"
 #include "xen_vif_decl.h"
 #include "xen_vm_decl.h"
+#include "xen_vm_guest_metrics_decl.h"
 #include "xen_vm_metrics_decl.h"
 #include "xen_vm_power_state.h"
 #include "xen_vtpm_decl.h"
@@ -124,8 +124,6 @@ typedef struct xen_vm_record
     xen_string_string_map *vcpus_params;
     int64_t vcpus_max;
     int64_t vcpus_at_startup;
-    int64_t vcpus_number;
-    xen_int_float_map *vcpus_utilisation;
     enum xen_on_normal_exit actions_after_shutdown;
     enum xen_on_normal_exit actions_after_reboot;
     enum xen_on_crash_behaviour actions_after_crash;
@@ -147,10 +145,11 @@ typedef struct xen_vm_record
     bool platform_clock_offset;
     bool platform_enable_audio;
     char *pci_bus;
-    xen_string_string_map *tools_version;
     xen_string_string_map *other_config;
+    int64_t domid;
     bool is_control_domain;
     struct xen_vm_metrics_record_opt *metrics;
+    struct xen_vm_guest_metrics_record_opt *guest_metrics;
 } xen_vm_record;
 
 /**
@@ -389,20 +388,6 @@ xen_vm_get_vcpus_at_startup(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
- * Get the VCPUs/number field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_number(xen_session *session, int64_t *result, xen_vm vm);
-
-
-/**
- * Get the VCPUs/utilisation field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, xen_vm vm);
-
-
-/**
  * Get the actions/after_shutdown field of the given VM.
  */
 extern bool
@@ -550,17 +535,17 @@ xen_vm_get_pci_bus(xen_session *session, char **result, xen_vm vm);
 
 
 /**
- * Get the tools_version field of the given VM.
- */
-extern bool
-xen_vm_get_tools_version(xen_session *session, xen_string_string_map **result, xen_vm vm);
-
-
-/**
  * Get the other_config field of the given VM.
  */
 extern bool
 xen_vm_get_other_config(xen_session *session, xen_string_string_map **result, xen_vm vm);
+
+
+/**
+ * Get the domid field of the given VM.
+ */
+extern bool
+xen_vm_get_domid(xen_session *session, int64_t *result, xen_vm vm);
 
 
 /**
@@ -575,6 +560,13 @@ xen_vm_get_is_control_domain(xen_session *session, bool *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_metrics(xen_session *session, xen_vm_metrics *result, xen_vm vm);
+
+
+/**
+ * Get the guest_metrics field of the given VM.
+ */
+extern bool
+xen_vm_get_guest_metrics(xen_session *session, xen_vm_guest_metrics *result, xen_vm vm);
 
 
 /**

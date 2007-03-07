@@ -28,6 +28,7 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
+#include "xenstored_transaction.h"
 #include "xenstored_watch.h"
 #include "xenstored_test.h"
 
@@ -289,6 +290,26 @@ static struct domain *find_domain_by_domid(unsigned int domid)
 	return NULL;
 }
 
+static void domain_conn_reset(struct domain *domain)
+{
+	struct connection *conn = domain->conn;
+	struct buffered_data *out;
+
+	conn_delete_all_watches(conn);
+	conn_delete_all_transactions(conn);
+
+	while ((out = list_top(&conn->out_list, struct buffered_data, list))) {
+		list_del(&out->list);
+		talloc_free(out);
+	}
+
+	talloc_free(conn->in->buffer);
+	memset(conn->in, 0, sizeof(*conn->in));
+	conn->in->inhdr = true;
+
+	domain->interface->req_cons = domain->interface->req_prod = 0;
+	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;
+}
 
 /* domid, mfn, evtchn, path */
 void do_introduce(struct connection *conn, struct buffered_data *in)
@@ -298,6 +319,8 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	unsigned int domid;
 	unsigned long mfn;
 	evtchn_port_t port;
+	int rc;
+	struct xenstore_domain_interface *interface;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -322,36 +345,40 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	domain = find_domain_by_domid(domid);
 
 	if (domain == NULL) {
+		interface = xc_map_foreign_range(
+			*xc_handle, domid,
+			getpagesize(), PROT_READ|PROT_WRITE, mfn);
+		if (!interface) {
+			send_error(conn, errno);
+			return;
+		}
 		/* Hang domain off "in" until we're finished. */
 		domain = new_domain(in, domid, port);
 		if (!domain) {
+			munmap(interface, getpagesize());
 			send_error(conn, errno);
 			return;
 		}
-		domain->interface = xc_map_foreign_range(
-			*xc_handle, domid,
-			getpagesize(), PROT_READ|PROT_WRITE, mfn);
-		if (!domain->interface) {
-			send_error(conn, errno);
-			return;
-		}
+		domain->interface = interface;
 		domain->mfn = mfn;
 
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
 		fire_watches(conn, "@introduceDomain", false);
-	}
-	else {
-		int rc;
-
+	} else if ((domain->mfn == mfn) && (domain->conn != conn)) {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
 			xc_evtchn_unbind(xce_handle, domain->port);
 		rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
 		domain->port = (rc == -1) ? 0 : rc;
 		domain->remote_port = port;
+	} else {
+		send_error(conn, EINVAL);
+		return;
 	}
+
+	domain_conn_reset(domain);
 
 	send_ack(conn, XS_INTRODUCE);
 }

@@ -22,10 +22,8 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 #include <asm/cache.h>
-
+#include <asm/dwarf2.h>
 #include <xen/interface/elfnote.h>
-
-#define _PAGE_PRESENT 0x1
 
 	.section .bootstrap.text, "ax", @progbits
 	.code64
@@ -42,6 +40,7 @@ ENTRY(_start)
 	/* rsi is pointer to startup info structure.
 	   pass it to C */
 	movq %rsi,%rdi
+	pushq $0		# fake return address
 	jmp x86_64_start_kernel
 
 ENTRY(stext)
@@ -82,7 +81,25 @@ NEXT_PAGE(level2_kernel_pgt)
 	.fill	512,8,0
 
 NEXT_PAGE(hypercall_page)
-	.fill	512,8,0
+	CFI_STARTPROC
+	.rept 0x1000 / 0x20
+	.skip 1 /* push %rcx */
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET	rcx,0
+	.skip 2 /* push %r11 */
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET	rcx,0
+	.skip 5 /* mov $#,%eax */
+	.skip 2 /* syscall */
+	.skip 2 /* pop %r11 */
+	CFI_ADJUST_CFA_OFFSET -8
+	CFI_RESTORE r11
+	.skip 1 /* pop %rcx */
+	CFI_ADJUST_CFA_OFFSET -8
+	CFI_RESTORE rcx
+	.align 0x20,0 /* ret */
+	.endr
+	CFI_ENDPROC
 
 #undef NEXT_PAGE
 
@@ -186,3 +203,4 @@ ENTRY(empty_zero_page)
 	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .quad,  _PAGE_PRESENT,_PAGE_PRESENT)
 	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")
+	ELFNOTE(Xen, XEN_ELFNOTE_SUSPEND_CANCEL, .long,  1)

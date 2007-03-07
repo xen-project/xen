@@ -169,13 +169,9 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
  * (2) should be used only for guests which cannot handle the special
  * new return code. (1) is always safe (but slower).
  */
-int xc_domain_resume(int xc_handle, uint32_t domid)
+int xc_domain_resume(int xc_handle, uint32_t domid, int fast)
 {
-    /*
-     * XXX: Implement a way to select between options (1) and (2).
-     * Or expose the options as two different methods to Python.
-     */
-    return (0
+    return (fast
             ? xc_domain_resume_cooperative(xc_handle, domid)
             : xc_domain_resume_any(xc_handle, domid));
 }

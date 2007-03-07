@@ -102,13 +102,10 @@ static void __meminit early_make_page_readonly(void *va, unsigned int feature)
 		BUG();
 }
 
-void make_page_readonly(void *va, unsigned int feature)
+static void __make_page_readonly(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (xen_feature(feature))
-		return;
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
@@ -120,16 +117,13 @@ void make_page_readonly(void *va, unsigned int feature)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT), feature);
+		__make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
-void make_page_writable(void *va, unsigned int feature)
+static void __make_page_writable(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (xen_feature(feature))
-		return;
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
@@ -141,7 +135,19 @@ void make_page_writable(void *va, unsigned int feature)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT), feature);
+		__make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
+}
+
+void make_page_readonly(void *va, unsigned int feature)
+{
+	if (!xen_feature(feature))
+		__make_page_readonly(va);
+}
+
+void make_page_writable(void *va, unsigned int feature)
+{
+	if (!xen_feature(feature))
+		__make_page_writable(va);
 }
 
 void make_pages_readonly(void *va, unsigned nr, unsigned int feature)
@@ -150,7 +156,7 @@ void make_pages_readonly(void *va, unsigned nr, unsigned int feature)
 		return;
 
 	while (nr-- != 0) {
-		make_page_readonly(va, feature);
+		__make_page_readonly(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
@@ -161,7 +167,7 @@ void make_pages_writable(void *va, unsigned nr, unsigned int feature)
 		return;
 
 	while (nr-- != 0) {
-		make_page_writable(va, feature);
+		__make_page_writable(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
@@ -208,7 +214,11 @@ static __init void *spp_getpage(void)
 	void *ptr;
 	if (after_bootmem)
 		ptr = (void *) get_zeroed_page(GFP_ATOMIC); 
-	else
+	else if (start_pfn < table_end) {
+		ptr = __va(start_pfn << PAGE_SHIFT);
+		start_pfn++;
+		memset(ptr, 0, PAGE_SIZE);
+	} else
 		ptr = alloc_bootmem_pages(PAGE_SIZE);
 	if (!ptr || ((unsigned long)ptr & ~PAGE_MASK))
 		panic("set_pte_phys: cannot allocate page data %s\n", after_bootmem?"after bootmem":"");
@@ -299,36 +309,26 @@ static __init void set_pte_phys_ma(unsigned long vaddr,
 
 		pmd = (pmd_t *) spp_getpage(); 
 		make_page_readonly(pmd, XENFEAT_writable_page_tables);
-
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
-
 		if (pmd != pmd_offset(pud, 0)) {
 			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pud,0));
 			return;
 		}
 	}
 	pmd = pmd_offset(pud, vaddr);
-
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
 		make_page_readonly(pte, XENFEAT_writable_page_tables);
-
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
 			printk("PAGETABLE BUG #02!\n");
 			return;
 		}
 	}
-
 	new_pte = pfn_pte_ma(phys >> PAGE_SHIFT, prot);
-	pte = pte_offset_kernel(pmd, vaddr);
 
-	/* 
-	 * Note that the pte page is already RO, thus we want to use
-	 * xen_l1_entry_update(), not set_pte().
-	 */
-	xen_l1_entry_update(pte, 
-			    pfn_pte_ma(phys >> PAGE_SHIFT, prot));
+	pte = pte_offset_kernel(pmd, vaddr);
+	set_pte(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -404,6 +404,7 @@ static inline void __set_pte(pte_t *dst, pte_t val)
 
 static inline int make_readonly(unsigned long paddr)
 {
+	extern char __vsyscall_0;
 	int readonly = 0;
 
 	/* Make new page tables read-only. */
@@ -420,25 +421,45 @@ static inline int make_readonly(unsigned long paddr)
 	/*
 	 * No need for writable mapping of kernel image. This also ensures that
 	 * page and descriptor tables embedded inside don't have writable
-	 * mappings. 
+	 * mappings. Exclude the vsyscall area here, allowing alternative
+	 * instruction patching to work.
 	 */
-	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end)))
+	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end))
+	    && !(paddr >= __pa_symbol(&__vsyscall_0)
+	         && paddr < __pa_symbol(&__vsyscall_0) + PAGE_SIZE))
 		readonly = 1;
 
 	return readonly;
 }
 
+#ifndef CONFIG_XEN
 /* Must run before zap_low_mappings */
 __init void *early_ioremap(unsigned long addr, unsigned long size)
 {
-	return ioremap(addr, size);
+	unsigned long map = round_down(addr, LARGE_PAGE_SIZE);
+
+	/* actually usually some more */
+	if (size >= LARGE_PAGE_SIZE) {
+		printk("SMBIOS area too long %lu\n", size);
+		return NULL;
+	}
+	set_pmd(temp_mappings[0].pmd,  __pmd(map | _KERNPG_TABLE | _PAGE_PSE));
+	map += LARGE_PAGE_SIZE;
+	set_pmd(temp_mappings[1].pmd,  __pmd(map | _KERNPG_TABLE | _PAGE_PSE));
+	__flush_tlb();
+	return temp_mappings[0].address + (addr & (LARGE_PAGE_SIZE-1));
 }
 
 /* To avoid virtual aliases later */
 __init void early_iounmap(void *addr, unsigned long size)
 {
-	iounmap(addr);
+	if ((void *)round_down((unsigned long)addr, LARGE_PAGE_SIZE) != temp_mappings[0].address)
+		printk("early_iounmap: bad address %p\n", addr);
+	set_pmd(temp_mappings[0].pmd, __pmd(0));
+	set_pmd(temp_mappings[1].pmd, __pmd(0));
+	__flush_tlb();
 }
+#endif
 
 static void __meminit
 phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
@@ -638,7 +659,7 @@ static void __init extend_init_mapping(unsigned long tables_space)
 
 static void __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, ptes, tables; 
+	unsigned long puds, pmds, ptes, tables;
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
@@ -658,12 +679,70 @@ static void __init find_early_table_space(unsigned long end)
 		(table_start << PAGE_SHIFT) + tables);
 }
 
+static void xen_finish_init_mapping(void)
+{
+	unsigned long i, start, end;
+
+	/* Re-vector virtual addresses pointing into the initial
+	   mapping to the just-established permanent ones. */
+	xen_start_info = __va(__pa(xen_start_info));
+	xen_start_info->pt_base = (unsigned long)
+		__va(__pa(xen_start_info->pt_base));
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		phys_to_machine_mapping =
+			__va(__pa(xen_start_info->mfn_list));
+		xen_start_info->mfn_list = (unsigned long)
+			phys_to_machine_mapping;
+	}
+	if (xen_start_info->mod_start)
+		xen_start_info->mod_start = (unsigned long)
+			__va(__pa(xen_start_info->mod_start));
+
+	/* Destroy the Xen-created mappings beyond the kernel image as
+	 * well as the temporary mappings created above. Prevents
+	 * overlap with modules area (if init mapping is very big).
+	 */
+	start = PAGE_ALIGN((unsigned long)_end);
+	end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
+	for (; start < end; start += PAGE_SIZE)
+		WARN_ON(HYPERVISOR_update_va_mapping(
+			start, __pte_ma(0), 0));
+
+	/* Allocate pte's for initial fixmaps from 'start_pfn' allocator. */
+	table_end = ~0UL;
+
+	/*
+	 * Prefetch pte's for the bt_ioremap() area. It gets used before the
+	 * boot-time allocator is online, so allocate-on-demand would fail.
+	 */
+	for (i = FIX_BTMAP_END; i <= FIX_BTMAP_BEGIN; i++)
+		__set_fixmap(i, 0, __pgprot(0));
+
+	/* Switch to the real shared_info page, and clear the dummy page. */
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	memset(empty_zero_page, 0, sizeof(empty_zero_page));
+
+	/* Set up mapping of lowest 1MB of physical memory. */
+	for (i = 0; i < NR_FIX_ISAMAPS; i++)
+		if (is_initial_xendomain())
+			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+		else
+			__set_fixmap(FIX_ISAMAP_BEGIN - i,
+				     virt_to_mfn(empty_zero_page)
+				     << PAGE_SHIFT,
+				     PAGE_KERNEL_RO);
+
+	/* Disable the 'start_pfn' allocator. */
+	table_end = start_pfn;
+}
+
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
    This runs before bootmem is initialized and gets pages directly from the 
    physical memory. To access them they are temporarily mapped. */
 void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 { 
-	unsigned long next; 
+	unsigned long next;
 
 	Dprintk("init_memory_mapping\n");
 
@@ -702,31 +781,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 
 	if (!after_bootmem) {
 		BUG_ON(start_pfn != table_end);
-
-		/* Re-vector virtual addresses pointing into the initial
-		   mapping to the just-established permanent ones. */
-		xen_start_info = __va(__pa(xen_start_info));
-		xen_start_info->pt_base = (unsigned long)
-			__va(__pa(xen_start_info->pt_base));
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			phys_to_machine_mapping =
-				__va(__pa(xen_start_info->mfn_list));
-			xen_start_info->mfn_list = (unsigned long)
-				phys_to_machine_mapping;
-		}
-		if (xen_start_info->mod_start)
-			xen_start_info->mod_start = (unsigned long)
-				__va(__pa(xen_start_info->mod_start));
-
-		/* Destroy the Xen-created mappings beyond the kernel image as
-		 * well as the temporary mappings created above. Prevents
-		 * overlap with modules area (if init mapping is very big).
-		 */
-		start = PAGE_ALIGN((unsigned long)_end);
-		end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
-		for (; start < end; start += PAGE_SIZE)
-			WARN_ON(HYPERVISOR_update_va_mapping(
-				start, __pte_ma(0), 0));
+		xen_finish_init_mapping();
 	}
 
 	__flush_tlb_all();
@@ -805,7 +860,6 @@ size_zones(unsigned long *z, unsigned long *h,
 void __init paging_init(void)
 {
 	unsigned long zones[MAX_NR_ZONES], holes[MAX_NR_ZONES];
-	int i;
 
 	memory_present(0, 0, end_pfn);
 	sparse_init();
@@ -813,22 +867,7 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	/* Switch to the real shared_info page, and clear the
-	 * dummy page. */
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
-
 	init_mm.context.pinned = 1;
-
-	/* Setup mapping of lower 1st MB */
-	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (is_initial_xendomain())
-			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
-		else
-			__set_fixmap(FIX_ISAMAP_BEGIN - i,
-				     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
-				     PAGE_KERNEL_RO);
 }
 #endif
 
@@ -1028,11 +1067,6 @@ void __init mem_init(void)
 
 void free_init_pages(char *what, unsigned long begin, unsigned long end)
 {
-#ifdef __DO_LATER__
-	/*
-	 * Some pages can be pinned, but some are not. Unpinning such pages 
-	 * triggers BUG(). 
-	 */
 	unsigned long addr;
 
 	if (begin >= end)
@@ -1044,25 +1078,27 @@ void free_init_pages(char *what, unsigned long begin, unsigned long end)
 		init_page_count(virt_to_page(addr));
 		memset((void *)(addr & ~(PAGE_SIZE-1)),
 		       POISON_FREE_INITMEM, PAGE_SIZE); 
-		make_page_writable(
-			__va(__pa(addr)), XENFEAT_writable_page_tables);
-		/*
-		 * Make pages from __PAGE_OFFSET address as well
-		 */
-		make_page_writable(
-			(void *)addr, XENFEAT_writable_page_tables);
+		if (addr >= __START_KERNEL_map) {
+			/* make_readonly() reports all kernel addresses. */
+			__make_page_writable(__va(__pa(addr)));
+			if (HYPERVISOR_update_va_mapping(addr, __pte(0), 0)) {
+				pgd_t *pgd = pgd_offset_k(addr);
+				pud_t *pud = pud_offset(pgd, addr);
+				pmd_t *pmd = pmd_offset(pud, addr);
+				pte_t *pte = pte_offset_kernel(pmd, addr);
+
+				xen_l1_entry_update(pte, __pte(0)); /* fallback */
+			}
+		}
 		free_page(addr);
 		totalram_pages++;
 	}
-#endif
 }
 
 void free_initmem(void)
 {
-#ifdef __DO_LATER__
 	memset(__initdata_begin, POISON_FREE_INITDATA,
 		__initdata_end - __initdata_begin);
-#endif
 	free_init_pages("unused kernel memory",
 			(unsigned long)(&__init_begin),
 			(unsigned long)(&__init_end));
@@ -1125,7 +1161,7 @@ int kern_addr_valid(unsigned long addr)
 	if (pgd_none(*pgd))
 		return 0;
 
-	pud = pud_offset_k(pgd, addr);
+	pud = pud_offset(pgd, addr);
 	if (pud_none(*pud))
 		return 0; 
 

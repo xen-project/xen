@@ -1206,6 +1206,7 @@ static int __init boot_of_cpus(void)
     s32 cpuid;
     u32 cpu_clock[2];
     extern uint cpu_hard_id[NR_CPUS];
+    u32 tbf;
 
     /* Look up which CPU we are running on right now and get all info
      * from there */
@@ -1220,12 +1221,12 @@ static int __init boot_of_cpus(void)
 
     cpu_node = bootcpu_node;
 
-    result = of_getprop(cpu_node, "timebase-frequency", &timebase_freq,
-            sizeof(timebase_freq));
+    result = of_getprop(cpu_node, "timebase-frequency", &tbf, sizeof(tbf));
+    timebase_freq = tbf;
     if (result == OF_FAILURE) {
         of_panic("Couldn't get timebase frequency!\n");
     }
-    of_printf("OF: timebase-frequency = %d Hz\n", timebase_freq);
+    of_printf("OF: timebase-frequency = %ld Hz\n", timebase_freq);
 
     result = of_getprop(cpu_node, "clock-frequency",
                         &cpu_clock, sizeof(cpu_clock));

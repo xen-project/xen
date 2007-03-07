@@ -6,7 +6,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -48,7 +47,7 @@ cpumask_t cpu_online_map;
 EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
-static cpumask_t cpu_initialized_map;
+cpumask_t cpu_initialized_map;
 
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_data);
@@ -186,7 +185,7 @@ static void cpu_bringup_and_idle(void)
 	cpu_idle();
 }
 
-void cpu_initialize_context(unsigned int cpu)
+static void cpu_initialize_context(unsigned int cpu)
 {
 	vcpu_guest_context_t ctxt;
 	struct task_struct *idle = idle_task(cpu);
@@ -196,7 +195,7 @@ void cpu_initialize_context(unsigned int cpu)
 	struct Xgt_desc_struct *gdt_descr = &per_cpu(cpu_gdt_descr, cpu);
 #endif
 
-	if (cpu == 0)
+	if (cpu_test_and_set(cpu, cpu_initialized_map))
 		return;
 
 	memset(&ctxt, 0, sizeof(ctxt));
@@ -418,10 +417,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (rc)
 		return rc;
 
-	if (!cpu_isset(cpu, cpu_initialized_map)) {
-		cpu_set(cpu, cpu_initialized_map);
-		cpu_initialize_context(cpu);
-	}
+	cpu_initialize_context(cpu);
 
 	if (num_online_cpus() == 1)
 		alternatives_smp_switch(1);

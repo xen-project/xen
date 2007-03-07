@@ -100,7 +100,7 @@ int lock_pages(void *addr, size_t len)
 void unlock_pages(void *addr, size_t len)
 {
 #ifndef __sun__
-	safe_munlock(addr, len);
+    safe_munlock(addr, len);
 #endif
 }
 

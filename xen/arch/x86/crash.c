@@ -25,7 +25,7 @@
 #include <xen/sched.h>
 #include <public/xen.h>
 #include <asm/shared.h>
-#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
 
 static atomic_t waiting_for_crash_ipi;
 static unsigned int crashing_cpu;

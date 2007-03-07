@@ -335,4 +335,11 @@ extern bool
 xen_vdi_resize(xen_session *session, xen_vdi vdi, int64_t size);
 
 
+/**
+ * Return a list of all the VDIs known to the system.
+ */
+extern bool
+xen_vdi_get_all(xen_session *session, struct xen_vdi_set **result);
+
+
 #endif

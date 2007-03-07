@@ -72,8 +72,13 @@ typedef struct xen_host_record
     char *uuid;
     char *name_label;
     char *name_description;
+    int64_t api_version_major;
+    int64_t api_version_minor;
+    char *api_version_vendor;
+    xen_string_string_map *api_version_vendor_implementation;
     xen_string_string_map *software_version;
     xen_string_string_map *other_config;
+    struct xen_string_set *capabilities;
     struct xen_string_set *supported_bootloaders;
     struct xen_vm_record_opt_set *resident_vms;
     xen_string_string_map *logging;
@@ -207,6 +212,34 @@ xen_host_get_name_description(xen_session *session, char **result, xen_host host
 
 
 /**
+ * Get the API_version/major field of the given host.
+ */
+extern bool
+xen_host_get_api_version_major(xen_session *session, int64_t *result, xen_host host);
+
+
+/**
+ * Get the API_version/minor field of the given host.
+ */
+extern bool
+xen_host_get_api_version_minor(xen_session *session, int64_t *result, xen_host host);
+
+
+/**
+ * Get the API_version/vendor field of the given host.
+ */
+extern bool
+xen_host_get_api_version_vendor(xen_session *session, char **result, xen_host host);
+
+
+/**
+ * Get the API_version/vendor_implementation field of the given host.
+ */
+extern bool
+xen_host_get_api_version_vendor_implementation(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
  * Get the software_version field of the given host.
  */
 extern bool
@@ -218,6 +251,13 @@ xen_host_get_software_version(xen_session *session, xen_string_string_map **resu
  */
 extern bool
 xen_host_get_other_config(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
+ * Get the capabilities field of the given host.
+ */
+extern bool
+xen_host_get_capabilities(xen_session *session, struct xen_string_set **result, xen_host host);
 
 
 /**

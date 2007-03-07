@@ -26,6 +26,7 @@ Name & Description \\
 {\tt task} & A long-running asynchronous task \\
 {\tt VM} & A virtual machine (or 'guest') \\
 {\tt VM\_metrics} & The metrics associated with a VM \\
+{\tt VM\_guest\_metrics} & The metrics reported by the guest (as opposed to inferred from outside) \\
 {\tt host} & A physical host \\
 {\tt host\_metrics} & The metrics associated with a host \\
 {\tt host\_cpu} & A physical CPU \\
@@ -61,8 +62,6 @@ VBD.VM & VM.VBDs & one-to-many\\
 crashdump.VM & VM.crash\_dumps & one-to-many\\
 VIF.VM & VM.VIFs & one-to-many\\
 VIF.network & network.VIFs & one-to-many\\
-host.metrics & host\_metrics.host & one-to-one\\
-PIF.metrics & PIF\_metrics.PIF & one-to-one\\
 PIF.host & host.PIFs & one-to-many\\
 PIF.network & network.PIFs & one-to-many\\
 SR.VDIs & VDI.SR & many-to-one\\
@@ -1098,10 +1097,11 @@ $\mathit{RW}$ &  {\tt platform/localtime} & bool & set RTC to local time \\
 $\mathit{RW}$ &  {\tt platform/clock\_offset} & bool & timeshift applied to guest's clock \\
 $\mathit{RW}$ &  {\tt platform/enable\_audio} & bool & emulate audio \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
-$\mathit{RO}_\mathit{run}$ &  {\tt tools\_version} & (string $\rightarrow$ string) Map & versions of installed paravirtualised drivers \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt domid} & int & domain ID (if available, -1 otherwise) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt guest\_metrics} & VM\_guest\_metrics ref & metrics associated with the running guest \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VM}
@@ -3800,38 +3800,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_tools\_version}
-
-{\bf Overview:} 
-Get the tools\_version field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} ((string -> string) Map) get_tools_version (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-(string $\rightarrow$ string) Map
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_other\_config}
 
 {\bf Overview:} 
@@ -3969,6 +3937,38 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_domid}
+
+{\bf Overview:} 
+Get the domid field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_domid (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_is\_control\_domain}
 
 {\bf Overview:} 
@@ -4026,6 +4026,38 @@ Get the metrics field of the given VM.
  \noindent {\bf Return Type:} 
 {\tt 
 VM\_metrics ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_guest\_metrics}
+
+{\bf Overview:} 
+Get the guest\_metrics field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM_guest_metrics ref) get_guest_metrics (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM\_guest\_metrics ref
 }
 
 
@@ -4214,6 +4246,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VM\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VM\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VM_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VM\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -4409,6 +4462,338 @@ all fields from the object
 
 \vspace{1cm}
 \newpage
+\section{Class: VM\_guest\_metrics}
+\subsection{Fields for class: VM\_guest\_metrics}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VM\_guest\_metrics} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+The metrics reported by the guest (as opposed to inferred from outside).}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt os\_version} & (string $\rightarrow$ string) Map & version of the OS \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PV\_drivers\_version} & (string $\rightarrow$ string) Map & version of the PV drivers \\
+$\mathit{RO}_\mathit{run}$ &  {\tt memory} & (string $\rightarrow$ string) Map & free/used/total memory \\
+$\mathit{RO}_\mathit{run}$ &  {\tt disks} & (string $\rightarrow$ string) Map & disk configuration/free space \\
+$\mathit{RO}_\mathit{run}$ &  {\tt networks} & (string $\rightarrow$ string) Map & network configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt other} & (string $\rightarrow$ string) Map & anything else \\
+\hline
+\end{longtable}
+\subsection{Additional RPCs associated with class: VM\_guest\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VM\_guest\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VM_guest_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VM\_guest\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_os\_version}
+
+{\bf Overview:} 
+Get the os\_version field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_os_version (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PV\_drivers\_version}
+
+{\bf Overview:} 
+Get the PV\_drivers\_version field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_PV_drivers_version (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_memory}
+
+{\bf Overview:} 
+Get the memory field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_memory (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_disks}
+
+{\bf Overview:} 
+Get the disks field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_disks (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_networks}
+
+{\bf Overview:} 
+Get the networks field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_networks (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_other}
+
+{\bf Overview:} 
+Get the other field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_other (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the VM\_guest\_metrics instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM_guest_metrics ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM\_guest\_metrics ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM_guest_metrics record) get_record (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM\_guest\_metrics record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
 \section{Class: host}
 \subsection{Fields for class: host}
 \begin{longtable}{|lllp{0.38\textwidth}|}
@@ -4422,8 +4807,13 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
+$\mathit{RO}_\mathit{run}$ &  {\tt API\_version/major} & int & major version number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt API\_version/minor} & int & minor version number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt API\_version/vendor} & string & identification of vendor \\
+$\mathit{RO}_\mathit{run}$ &  {\tt API\_version/vendor\_implementation} & (string $\rightarrow$ string) Map & details of vendor implementation \\
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+$\mathit{RO}_\mathit{run}$ &  {\tt capabilities} & string Set & Xen capabilities \\
 $\mathit{RO}_\mathit{run}$ &  {\tt supported\_bootloaders} & string Set & a list of the bootloaders installed on the machine \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RW}$ &  {\tt logging} & (string $\rightarrow$ string) Map & logging configuration \\
@@ -4784,6 +5174,134 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_API\_version\_major}
+
+{\bf Overview:} 
+Get the API\_version/major field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_API_version_major (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_API\_version\_minor}
+
+{\bf Overview:} 
+Get the API\_version/minor field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_API_version_minor (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_API\_version\_vendor}
+
+{\bf Overview:} 
+Get the API\_version/vendor field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_API_version_vendor (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_API\_version\_vendor\_implementation}
+
+{\bf Overview:} 
+Get the API\_version/vendor\_implementation field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_API_version_vendor_implementation (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_software\_version}
 
 {\bf Overview:} 
@@ -4950,6 +5468,38 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_capabilities}
+
+{\bf Overview:} 
+Get the capabilities field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_capabilities (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -5524,12 +6074,32 @@ The metrics associated with a host.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & Host to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: host\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the host\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((host_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(host\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -5555,38 +6125,6 @@ Get the uuid field of the given host\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_host}
-
-{\bf Overview:} 
-Get the host field of the given host\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (host ref) get_host (session_id s, host_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-host ref
 }
 
 
@@ -5735,15 +6273,38 @@ all fields from the object
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & the host the CPU is in \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt number} & int & the number of the physical CPU within the host \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt vendor} & string & the vendor of the physical CPU \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt speed} & int & the speed of the physical CPU \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt modelname} & string & the model name of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt host} & host ref & the host the CPU is in \\
+$\mathit{RO}_\mathit{run}$ &  {\tt number} & int & the number of the physical CPU within the host \\
+$\mathit{RO}_\mathit{run}$ &  {\tt vendor} & string & the vendor of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt speed} & int & the speed of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt modelname} & string & the model name of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt stepping} & string & the stepping of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: host\_cpu}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the host\_cpus known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((host_cpu ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(host\_cpu ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -5936,6 +6497,70 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_stepping}
+
+{\bf Overview:} 
+Get the stepping field of the given host\_cpu.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_stepping (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_flags}
+
+{\bf Overview:} 
+Get the flags field of the given host\_cpu.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_flags (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_utilisation}
 
 {\bf Overview:} 
@@ -5965,70 +6590,6 @@ float
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new host\_cpu instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (host_cpu ref) create (session_id s, host_cpu record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-host\_cpu ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified host\_cpu instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, host_cpu ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt host\_cpu ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -6114,8 +6675,6 @@ $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vifs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & list of connected pifs \\
-$\mathit{RW}$ &  {\tt default\_gateway} & string & default gateway IP address. Used for auto-configuring guests with fixed IP setting \\
-$\mathit{RW}$ &  {\tt default\_netmask} & string & default netmask. Used for auto-configuring guests with fixed IP setting \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: network}
@@ -6368,138 +6927,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_default\_gateway}
-
-{\bf Overview:} 
-Get the default\_gateway field of the given network.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_default_gateway (session_id s, network ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_default\_gateway}
-
-{\bf Overview:} 
-Set the default\_gateway field of the given network.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_default_gateway (session_id s, network ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_default\_netmask}
-
-{\bf Overview:} 
-Get the default\_netmask field of the given network.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_default_netmask (session_id s, network ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_default\_netmask}
-
-{\bf Overview:} 
-Set the default\_netmask field of the given network.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_default_netmask (session_id s, network ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt network ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
@@ -6679,12 +7106,37 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt network} & network ref & virtual network to w
 $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & virtual machine to which this vif is connected \\
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of virtual interface, as exposed to guest \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
+$\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the device currently attached (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_code} & int & error/success code associated with last attach-operation (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success information associated with last attach-operation status (erased on reboot) \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
-$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
+$\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VIF \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VIFs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VIF ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VIF ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -6979,6 +7431,102 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_currently\_attached}
+
+{\bf Overview:} 
+Get the currently\_attached field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_currently_attached (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_code}
+
+{\bf Overview:} 
+Get the status\_code field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_status_code (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_detail}
+
+{\bf Overview:} 
+Get the status\_detail field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_status_detail (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_qos\_algorithm\_type}
 
 {\bf Overview:} 
@@ -7184,6 +7732,38 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_supported\_algorithms}
+
+{\bf Overview:} 
+Get the qos/supported\_algorithms field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_qos_supported_algorithms (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_metrics}
 
 {\bf Overview:} 
@@ -7363,6 +7943,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VIF\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VIF_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VIF\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -7623,6 +8224,27 @@ void
 \noindent{\bf Possible Error Codes:} {\tt PIF\_IS\_PHYSICAL}
 
 \vspace{0.6cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PIFs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -8093,12 +8715,32 @@ The metrics associated with a physical network interface.}} \\
 Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt PIF} & PIF ref & PIF to which these metrics apply \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: PIF\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PIF\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PIF_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PIF\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -8124,38 +8766,6 @@ Get the uuid field of the given PIF\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_PIF}
-
-{\bf Overview:} 
-Get the PIF field of the given PIF\_metrics.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (PIF ref) get_PIF (session_id s, PIF_metrics ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-PIF ref
 }
 
 
@@ -8942,7 +9552,7 @@ $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-
 $\mathit{RW}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
 $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & list of crash dumps that refer to this disk \\
-$\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in multiples of sector\_size field) \\
+$\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in bytes). Note that, depending on storage backend type, requested size may not be respected exactly \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & amount of physical space that the disk image is currently taking up on the storage repository (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt sector\_size} & int & sector size of VDI (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
@@ -9015,6 +9625,27 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VDIs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VDI ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VDI ref) Set
+}
+
+
+references to all objects
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -9786,9 +10417,13 @@ $\mathit{RW}$ &  {\tt device} & string & device seen by the guest e.g. hda1 \\
 $\mathit{RW}$ &  {\tt bootable} & bool & true if this VBD is bootable \\
 $\mathit{RW}$ &  {\tt mode} & vbd\_mode & the mode the VBD should be mounted with \\
 $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (e.g. disk or CD) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the device currently attached (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_code} & int & error/success code associated with last attach-operation (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success information associated with last attach-operation status (erased on reboot) \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
-$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & Paramters for chosen QoS algorithm \\
-$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD. \\
+$\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
+$\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VBD \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VBD}
@@ -9824,6 +10459,27 @@ void
 
 
 
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VBDs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VBD ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VBD ref) Set
+}
+
+
+references to all objects
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -10187,6 +10843,102 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_currently\_attached}
+
+{\bf Overview:} 
+Get the currently\_attached field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_currently_attached (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_code}
+
+{\bf Overview:} 
+Get the status\_code field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_status_code (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_status\_detail}
+
+{\bf Overview:} 
+Get the status\_detail field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_status_detail (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_qos\_algorithm\_type}
 
 {\bf Overview:} 
@@ -10392,6 +11144,38 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_qos\_supported\_algorithms}
+
+{\bf Overview:} 
+Get the qos/supported\_algorithms field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_qos_supported_algorithms (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_metrics}
 
 {\bf Overview:} 
@@ -10571,6 +11355,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VBD\_metrics}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the VBD\_metrics instances known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((VBD_metrics ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(VBD\_metrics ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -10752,6 +11557,27 @@ $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the SR curre
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: PBD}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PBDs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PBD ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PBD ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -11568,6 +12394,27 @@ $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & addit
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: console}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the consoles known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((console ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(console ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 

@@ -326,7 +326,7 @@ class XendQCoWStorageRepo(XendStorageRepository):
             image = self.images[image_uuid]
             image_cfg = {
                 'sector_size': sector_size,
-                'virtual_size': sector_count,
+                'virtual_size': size_bytes,
                 'type': vdi_struct.get('type', 'system'),
                 'name_label': vdi_struct.get('name_label', ''),
                 'name_description': vdi_struct.get('name_description', ''),

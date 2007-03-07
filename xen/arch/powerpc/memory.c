@@ -176,6 +176,7 @@ void memory_init(module_t *mod, int mcount)
     DBG("total_pages: 0x%016lx\n", total_pages);
 
     init_frametable();
+    init_machine_to_phys_table();
 
     numa_initmem_init(0, max_page);
 

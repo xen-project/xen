@@ -177,7 +177,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     ssidref_t ste_ssidref, ste_rssidref;
     struct domain *d, *rdom;
     domid_t rdomid;
-    struct grant_entry sha_copy;
+    struct active_grant_entry *act;
     int port, i;
 
     rcu_read_lock(&domlist_read_lock);
@@ -185,78 +185,75 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     /* go through all domains and adjust policy as if this domain was started now */
     for_each_domain ( d )
     {
+        struct evtchn *ports;
+        unsigned int bucket;
         ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                              (struct acm_ssid_domain *)d->ssid);
         ste_ssidref = ste_ssid->ste_ssidref;
         traceprintk("%s: validating policy for eventch domain %x (ste-Ref=%x).\n",
                     __func__, d->domain_id, ste_ssidref);
         /* a) check for event channel conflicts */
-        for (port=0; port < NR_EVTCHN_BUCKETS; port++) {
+        for (bucket = 0; bucket < NR_EVTCHN_BUCKETS; bucket++) {
             spin_lock(&d->evtchn_lock);
-            if (d->evtchn[port] == NULL) {
+            ports = d->evtchn[bucket];
+            if (ports == NULL) {
                 spin_unlock(&d->evtchn_lock);
-                continue;
+                break;
             }
-            if (d->evtchn[port]->state == ECS_INTERDOMAIN) {
-                rdom = d->evtchn[port]->u.interdomain.remote_dom;
-                rdomid = rdom->domain_id;
+
+            for (port=0; port < EVTCHNS_PER_BUCKET; port++) {
+                if (ports[port].state == ECS_INTERDOMAIN) {
+                    rdom = ports[port].u.interdomain.remote_dom;
+                    rdomid = rdom->domain_id;
+                } else {
+                    continue; /* port unused */
+                }
+
                 /* rdom now has remote domain */
-                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
+                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,
                                       (struct acm_ssid_domain *)(rdom->ssid));
                 ste_rssidref = ste_rssid->ste_ssidref;
-            } else if (d->evtchn[port]->state == ECS_UNBOUND) {
-                rdomid = d->evtchn[port]->u.unbound.remote_domid;
-                if ((rdom = get_domain_by_id(rdomid)) == NULL) {
-                    printk("%s: Error finding domain to id %x!\n", __func__, rdomid);
+                traceprintk("%s: eventch: domain %x (ssidref %x) --> "
+                            "domain %x (rssidref %x) used (port %x).\n",
+                            __func__, d->domain_id, ste_ssidref,
+                            rdom->domain_id, ste_rssidref, port);
+                /* check whether on subj->ssid, obj->ssid share a common type*/
+                if (!have_common_type(ste_ssidref, ste_rssidref)) {
+                    printkd("%s: Policy violation in event channel domain "
+                            "%x -> domain %x.\n",
+                            __func__, d->domain_id, rdomid);
+                    spin_unlock(&d->evtchn_lock);
                     goto out;
                 }
-                /* rdom now has remote domain */
-                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                                      (struct acm_ssid_domain *)(rdom->ssid));
-                ste_rssidref = ste_rssid->ste_ssidref;
-                put_domain(rdom);
-            } else {
-                spin_unlock(&d->evtchn_lock);
-                continue; /* port unused */
             }
             spin_unlock(&d->evtchn_lock);
-
-            /* rdom now has remote domain */
-            ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                                  (struct acm_ssid_domain *)(rdom->ssid));
-            ste_rssidref = ste_rssid->ste_ssidref;
-            traceprintk("%s: eventch: domain %x (ssidref %x) --> domain %x (rssidref %x) used (port %x).\n", 
-                        __func__, d->domain_id, ste_ssidref, rdom->domain_id, ste_rssidref, port);  
-            /* check whether on subj->ssid, obj->ssid share a common type*/
-            if (!have_common_type(ste_ssidref, ste_rssidref)) {
-                printkd("%s: Policy violation in event channel domain %x -> domain %x.\n",
-                        __func__, d->domain_id, rdomid);
-                goto out;
-            }
         } 
+
         /* b) check for grant table conflicts on shared pages */
         spin_lock(&d->grant_table->lock);
-        for ( i = 0; i < nr_grant_entries(d->grant_table); i++ ) {
-#define SPP (PAGE_SIZE / sizeof(struct grant_entry))
-            sha_copy = d->grant_table->shared[i/SPP][i%SPP];
-            if ( sha_copy.flags ) {
-                printkd("%s: grant dom (%hu) SHARED (%d) flags:(%hx) dom:(%hu) frame:(%lx)\n",
-                        __func__, d->domain_id, i, sha_copy.flags, sha_copy.domid, 
-                        (unsigned long)sha_copy.frame);
-                rdomid = sha_copy.domid;
-                if ((rdom = get_domain_by_id(rdomid)) == NULL) {
+        for ( i = 0; i < nr_active_grant_frames(d->grant_table); i++ ) {
+#define APP (PAGE_SIZE / sizeof(struct active_grant_entry))
+            act = &d->grant_table->active[i/APP][i%APP];
+            if ( act->pin != 0 ) {
+                printkd("%s: grant dom (%hu) SHARED (%d) pin (%d)  "
+                        "dom:(%hu) frame:(%lx)\n",
+                        __func__, d->domain_id, i, act->pin,
+                        act->domid, (unsigned long)act->frame);
+                rdomid = act->domid;
+                if ((rdom = rcu_lock_domain_by_id(rdomid)) == NULL) {
                     spin_unlock(&d->grant_table->lock);
                     printkd("%s: domain not found ERROR!\n", __func__);
                     goto out;
-                };
+                }
                 /* rdom now has remote domain */
-                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
+                ste_rssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,
                                       (struct acm_ssid_domain *)(rdom->ssid));
                 ste_rssidref = ste_rssid->ste_ssidref;
-                put_domain(rdom);
+                rcu_unlock_domain(rdom);
                 if (!have_common_type(ste_ssidref, ste_rssidref)) {
                     spin_unlock(&d->grant_table->lock);
-                    printkd("%s: Policy violation in grant table sharing domain %x -> domain %x.\n",
+                    printkd("%s: Policy violation in grant table "
+                            "sharing domain %x -> domain %x.\n",
                             __func__, d->domain_id, rdomid);
                     goto out;
                 }
@@ -508,8 +505,8 @@ ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
     if (id1 == DOMID_SELF) id1 = current->domain->domain_id;
     if (id2 == DOMID_SELF) id2 = current->domain->domain_id;
 
-    subj = get_domain_by_id(id1);
-    obj  = get_domain_by_id(id2);
+    subj = rcu_lock_domain_by_id(id1);
+    obj  = rcu_lock_domain_by_id(id2);
     if ((subj == NULL) || (obj == NULL)) {
         ret = ACM_ACCESS_DENIED;
         goto out;
@@ -531,9 +528,9 @@ ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
     }
   out:
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     if (subj != NULL)
-        put_domain(subj);
+        rcu_unlock_domain(subj);
     return ret;
 }
 
@@ -553,7 +550,7 @@ ste_pre_eventchannel_interdomain(domid_t id)
     if (id == DOMID_SELF) id = current->domain->domain_id;
 
     subj = current->domain;
-    obj  = get_domain_by_id(id);
+    obj  = rcu_lock_domain_by_id(id);
     if (obj == NULL) {
         ret = ACM_ACCESS_DENIED;
         goto out;
@@ -577,7 +574,7 @@ ste_pre_eventchannel_interdomain(domid_t id)
     }
  out:
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     return ret;
 }
 
@@ -596,7 +593,7 @@ ste_pre_grant_map_ref (domid_t id) {
     }
     atomic_inc(&ste_bin_pol.gt_eval_count);
     subj = current->domain;
-    obj = get_domain_by_id(id);
+    obj = rcu_lock_domain_by_id(id);
 
     if (share_common_type(subj, obj)) {
         cache_result(subj, obj);
@@ -607,7 +604,7 @@ ste_pre_grant_map_ref (domid_t id) {
         ret = ACM_ACCESS_DENIED;
     }
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     return ret;
 }
 
@@ -634,7 +631,7 @@ ste_pre_grant_setup (domid_t id) {
     }
     /* b) check types */
     subj = current->domain;
-    obj = get_domain_by_id(id);
+    obj = rcu_lock_domain_by_id(id);
 
     if (share_common_type(subj, obj)) {
         cache_result(subj, obj);
@@ -644,7 +641,7 @@ ste_pre_grant_setup (domid_t id) {
         ret = ACM_ACCESS_DENIED;
     }
     if (obj != NULL)
-        put_domain(obj);
+        rcu_unlock_domain(obj);
     return ret;
 }
 

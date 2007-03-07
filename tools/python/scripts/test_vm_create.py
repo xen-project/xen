@@ -39,7 +39,7 @@ vm_cfg = {
 vdi_cfg = {
     'name_label': 'API_VDI',
     'name_description': '',
-    'virtual_size': 100 * 1024,
+    'virtual_size': 100 * 1024 * 1024,
     'sector_size': 1024,
     'type': 'system',
     'parent': '',
