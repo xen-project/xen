@@ -339,7 +339,7 @@ static void init_heap_block(heap_by_zone_and_order_t *heap_block)
 
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
-    unsigned int zone_lo, unsigned zone_hi,
+    unsigned int zone_lo, unsigned int zone_hi,
     unsigned int cpu, unsigned int order)
 {
     unsigned int i, j, zone;
@@ -357,25 +357,24 @@ static struct page_info *alloc_heap_pages(
 
     spin_lock(&heap_lock);
 
-    /* start with requested node, but exhaust all node memory
-     * in requested zone before failing, only calc new node
-     * value if we fail to find memory in target node, this avoids
-     * needless computation on fast-path */
+    /*
+     * Start with requested node, but exhaust all node memory in requested 
+     * zone before failing, only calc new node value if we fail to find memory 
+     * in target node, this avoids needless computation on fast-path.
+     */
     for ( i = 0; i < num_nodes; i++ )
     {
-        for ( zone = zone_hi; zone-- > zone_lo; )
-        {
-            /* check if target node can support the allocation */
-            if ( avail[node] && (avail[node][zone] >= request) )
-            {
-                /* Find smallest order which can satisfy the request. */
-                for ( j = order; j <= MAX_ORDER; j++ )
-                {
-                    if ( !list_empty(&heap(node, zone, j)) )
-                        goto found;
-                }
-            }
-        }
+        zone = zone_hi;
+        do {
+            /* Check if target node can support the allocation. */
+            if ( !avail[node] || (avail[node][zone] < request) )
+                continue;
+
+            /* Find smallest order which can satisfy the request. */
+            for ( j = order; j <= MAX_ORDER; j++ )
+                if ( !list_empty(&heap(node, zone, j)) )
+                    goto found;
+        } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
         /* Pick next node, wrapping around if needed. */
         if ( ++node == num_nodes )
