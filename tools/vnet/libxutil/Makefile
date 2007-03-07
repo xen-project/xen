@@ -71,7 +71,7 @@ check-for-zlib:
 
 .PHONY: install
 install: build
-	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
+	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/$(LIBDIR)
 	ln -sf libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxutil.so.$(MAJOR)

@@ -41,8 +41,8 @@ install: check
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemuinstall
-	$(INSTALL_DIR) -p $(DESTDIR)/var/xen/dump
-	$(INSTALL_DIR) -p $(DESTDIR)/var/log/xen
+	$(INSTALL_DIR) $(DESTDIR)/var/xen/dump
+	$(INSTALL_DIR) $(DESTDIR)/var/log/xen
 
 .PHONY: clean
 clean: check_clean

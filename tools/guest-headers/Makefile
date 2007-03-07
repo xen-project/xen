@@ -13,7 +13,7 @@ check:
 
 install-Linux:
 	mkdir -p $(DESTDIR)/usr/include/xen/linux
-	install -m0644 $(linuxsparsetree)/include/xen/public/*.h $(DESTDIR)/usr/include/xen/linux
+	$(INSTALL_DATA) $(linuxsparsetree)/include/xen/public/*.h $(DESTDIR)/usr/include/xen/linux
 
 install-SunOS:
 

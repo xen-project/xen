@@ -1,12 +1,9 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += -I$(XEN_LIBXC) -I$(XEN_XENSTORE) -I$(XEN_ROOT)/linux-2.6-xen-sparse/include -I$(XEN_ROOT)/tools/ioemu
+CFLAGS  += -I$(XEN_LIBXC) -I$(XEN_XENSTORE)
+CFLAGS  += -I$(XEN_ROOT)/linux-2.6-xen-sparse/include -I$(XEN_ROOT)/tools/ioemu
 LDFLAGS += -L$(XEN_LIBXC) -L$(XEN_XENSTORE)
-
-INSTALL         = install
-INSTALL_PROG    = $(INSTALL) -m0755
-INSTALL_DIR     = $(INSTALL) -d -m0755
 
 .PHONY: all
 all: build
@@ -16,7 +13,7 @@ build:
 	$(MAKE) vncfb sdlfb
 
 install: all
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)/xen/bin
+	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 	$(INSTALL_PROG) vncfb $(DESTDIR)/usr/$(LIBDIR)/xen/bin/xen-vncfb
 	$(INSTALL_PROG) sdlfb $(DESTDIR)/usr/$(LIBDIR)/xen/bin/xen-sdlfb
 
