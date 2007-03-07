@@ -38,7 +38,7 @@
 #include <xen/balloon.h>
 #include <xen/interface/memory.h>
 
-/*#define NETBE_DEBUG_INTERRUPT*/
+#define NETBE_DEBUG_INTERRUPT
 
 /* extra field used in struct page */
 #define netif_page_index(pg) (*(long *)&(pg)->mapping)
@@ -234,7 +234,7 @@ static inline int netbk_queue_full(netif_t *netif)
 static void tx_queue_callback(unsigned long data)
 {
 	netif_t *netif = (netif_t *)data;
-	if (netif_schedulable(netif->dev))
+	if (netif_schedulable(netif))
 		netif_wake_queue(netif->dev);
 }
 
@@ -245,7 +245,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
-	if (unlikely(!netif_schedulable(dev) || netbk_queue_full(netif)))
+	if (unlikely(!netif_schedulable(netif) || netbk_queue_full(netif)))
 		goto drop;
 
 	/*
@@ -684,7 +684,7 @@ static void net_rx_action(unsigned long unused)
 		}
 
 		if (netif_queue_stopped(netif->dev) &&
-		    netif_schedulable(netif->dev) &&
+		    netif_schedulable(netif) &&
 		    !netbk_queue_full(netif))
 			netif_wake_queue(netif->dev);
 
@@ -742,7 +742,7 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
 
 	spin_lock_irq(&net_schedule_list_lock);
 	if (!__on_net_schedule_list(netif) &&
-	    likely(netif_schedulable(netif->dev))) {
+	    likely(netif_schedulable(netif))) {
 		list_add_tail(&netif->list, &net_schedule_list);
 		netif_get(netif);
 	}
@@ -1340,7 +1340,7 @@ irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 	add_to_net_schedule_list_tail(netif);
 	maybe_schedule_tx_action();
 
-	if (netif_schedulable(netif->dev) && !netbk_queue_full(netif))
+	if (netif_schedulable(netif) && !netbk_queue_full(netif))
 		netif_wake_queue(netif->dev);
 
 	return IRQ_HANDLED;

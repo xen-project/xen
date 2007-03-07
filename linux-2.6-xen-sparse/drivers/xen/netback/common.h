@@ -99,8 +99,20 @@ typedef struct netif_st {
 	struct net_device *dev;
 	struct net_device_stats stats;
 
+	unsigned int carrier;
+
 	wait_queue_head_t waiting_to_free;
 } netif_t;
+
+/*
+ * Implement our own carrier flag: the network stack's version causes delays
+ * when the carrier is re-enabled (in particular, dev_activate() may not
+ * immediately be called, which can cause packet loss; also the etherbridge
+ * can be rather lazy in activating its port).
+ */
+#define netback_carrier_on(netif)	((netif)->carrier = 1)
+#define netback_carrier_off(netif)	((netif)->carrier = 0)
+#define netback_carrier_ok(netif)	((netif)->carrier)
 
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
@@ -120,7 +132,8 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 
 void netif_xenbus_init(void);
 
-#define netif_schedulable(dev) (netif_running(dev) && netif_carrier_ok(dev))
+#define netif_schedulable(netif)				\
+	(netif_running((netif)->dev) && netback_carrier_ok(netif))
 
 void netif_schedule_work(netif_t *netif);
 void netif_deschedule_work(netif_t *netif);
