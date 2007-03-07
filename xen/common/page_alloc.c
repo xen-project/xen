@@ -342,7 +342,8 @@ static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned zone_hi,
     unsigned int cpu, unsigned int order)
 {
-    int i, j, zone, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
+    unsigned int i, j, zone;
+    unsigned int node = cpu_to_node(cpu), num_nodes = num_online_nodes();
     unsigned long request = 1UL << order;
     struct page_info *pg;
 
@@ -362,7 +363,7 @@ static struct page_info *alloc_heap_pages(
      * needless computation on fast-path */
     for ( i = 0; i < num_nodes; i++ )
     {
-        for ( zone = zone_hi; zone >= zone_lo; --zone )
+        for ( zone = zone_hi; zone-- > zone_lo; )
         {
             /* check if target node can support the allocation */
             if ( avail[node] && (avail[node][zone] >= request) )
