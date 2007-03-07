@@ -50,6 +50,7 @@
 #include <xen/guest_access.h>
 #include <asm/tlb_track.h>
 #include <asm/perfmon.h>
+#include <public/vcpu.h>
 
 unsigned long dom0_size = 512*1024*1024;
 
@@ -262,6 +263,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
                 vcpu_info[current->vcpu_id].evtchn_upcall_mask;
             __ia64_per_cpu_var(current_psr_ic_addr) =
                 (int *)(nd->arch.shared_info_va + XSI_PSR_IC_OFS);
+            /* steal time accounting */
+            if (!guest_handle_is_null(runstate_guest(current)))
+                __copy_to_guest(runstate_guest(current), &current->runstate, 1);
         } else {
             /* When switching to idle domain, only need to disable vhpt
              * walker. Then all accesses happen within idle context will
@@ -1255,6 +1259,45 @@ void sync_vcpu_execstate(struct vcpu *v)
 //	if (VMX_DOMAIN(v))
 //		vmx_save_state(v);
 	// FIXME SMP: Anything else needed here for SMP?
+}
+
+/* This function is taken from xen/arch/x86/domain.c */
+long
+arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
+{
+	long rc = 0;
+
+	switch (cmd) {
+	case VCPUOP_register_runstate_memory_area:
+	{
+		struct vcpu_register_runstate_memory_area area;
+		struct vcpu_runstate_info runstate;
+
+		rc = -EFAULT;
+		if (copy_from_guest(&area, arg, 1))
+			break;
+
+		if (!guest_handle_okay(area.addr.h, 1))
+			break;
+
+		rc = 0;
+		runstate_guest(v) = area.addr.h;
+
+		if (v == current) {
+			__copy_to_guest(runstate_guest(v), &v->runstate, 1);
+		} else {
+			vcpu_runstate_get(v, &runstate);
+			__copy_to_guest(runstate_guest(v), &runstate, 1);
+		}
+
+		break;
+	}
+	default:
+		rc = -ENOSYS;
+		break;
+	}
+
+	return rc;
 }
 
 static void parse_dom0_mem(char *s)

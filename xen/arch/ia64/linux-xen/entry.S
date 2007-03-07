@@ -1509,7 +1509,7 @@ ia64_hypercall_table:
 	data8 do_ni_hypercall		/* do_vm_assist */
 	data8 do_ni_hypercall		/* do_update_va_mapping_othe */
 	data8 do_ni_hypercall		/* (x86 only) */
-	data8 do_ni_hypercall		/* do_vcpu_op */
+	data8 do_vcpu_op		/* do_vcpu_op */
 	data8 do_ni_hypercall		/* (x86_64 only) */    /* 25 */
 	data8 do_ni_hypercall		/* do_mmuext_op */
 	data8 do_ni_hypercall		/* do_acm_op */
