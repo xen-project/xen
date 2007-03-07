@@ -205,6 +205,18 @@ static void contiguous_bitmap_clear(
 #define MAX_CONTIG_ORDER 7
 static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
 
+/* Width of DMA addresses. 30 bits is a b44 limitation. */
+#define DEFAULT_DMA_BITS 30
+static unsigned int xen_ia64_dma_bits = DEFAULT_DMA_BITS;
+
+static int __init
+setup_dma_bits(char *str)
+{
+	xen_ia64_dma_bits = simple_strtoul(str, NULL, 0);
+	return 0;
+}
+__setup("xen_ia64_dma_bits=", setup_dma_bits);
+
 /* Ensure multi-page extents are contiguous in machine memory. */
 int
 __xen_create_contiguous_region(unsigned long vstart,
@@ -233,6 +245,15 @@ __xen_create_contiguous_region(unsigned long vstart,
 		 },
 		.nr_exchanged = 0
 	};
+
+	/*
+	 * XXX xen/ia64 vmm bug work around
+	 * the c/s 13366:ed73ff8440d8 of xen-unstable.hg revealed that
+	 * XENMEM_exchange has been broken on Xen/ia64.
+	 * This is work around for it until the right fix.
+	 */
+	if (address_bits < xen_ia64_dma_bits)
+		return -ENOSYS;
 
 	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
