@@ -38,7 +38,7 @@
 #include <xen/balloon.h>
 #include <xen/interface/memory.h>
 
-#define NETBE_DEBUG_INTERRUPT
+/*define NETBE_DEBUG_INTERRUPT*/
 
 /* extra field used in struct page */
 #define netif_page_index(pg) (*(long *)&(pg)->mapping)
