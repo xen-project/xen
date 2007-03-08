@@ -781,7 +781,6 @@ class XendDomainInfo:
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_static_min'] * 1024),
-            'control/platform-feature-multiprocessor-suspend': str(1)
             }
 
         def f(n, v):
@@ -795,6 +794,9 @@ class XendDomainInfo:
         f('console/ring-ref', self.console_mfn)
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
+
+        if arch.type == "x86":
+            f('control/platform-feature-multiprocessor-suspend', True)
 
         # elfnotes
         for n, v in self.info.get_notes().iteritems():
