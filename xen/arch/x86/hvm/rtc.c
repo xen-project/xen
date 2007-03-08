@@ -174,6 +174,11 @@ static void rtc_copy_date(RTCState *s)
 {
     const struct tm *tm = &s->current_tm;
 
+    if (s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds) {
+        s->current_tm = gmtime(get_localtime(s->pt.vcpu->domain));
+        s->time_offset_seconds = s->pt.vcpu->domain->time_offset_seconds;
+    }
+
     s->hw.cmos_data[RTC_SECONDS] = to_bcd(s, tm->tm_sec);
     s->hw.cmos_data[RTC_MINUTES] = to_bcd(s, tm->tm_min);
     if ( s->hw.cmos_data[RTC_REG_B] & RTC_24H )
@@ -211,9 +216,15 @@ static int get_days_in_month(int month, int year)
 }
 
 /* update 'tm' to the next second */
-static void rtc_next_second(struct tm *tm)
+static void rtc_next_second(RTCState *s)
 {
+    struct tm *tm = &s->current_tm;
     int days_in_month;
+
+    if (s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds) {
+        s->current_tm = gmtime(get_localtime(s->pt.vcpu->domain));
+        s->time_offset_seconds = s->pt.vcpu->domain->time_offset_seconds;
+    }
 
     tm->tm_sec++;
     if ((unsigned)tm->tm_sec >= 60) {
@@ -258,7 +269,7 @@ static void rtc_update_second(void *opaque)
     }
     else
     {
-        rtc_next_second(&s->current_tm);
+        rtc_next_second(s);
         
         if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
             s->hw.cmos_data[RTC_REG_A] |= RTC_UIP;
