@@ -552,6 +552,34 @@ xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi)
 
 
 bool
+xen_vbd_plug(xen_session *session, xen_vbd self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "VBD.plug", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_unplug(xen_session *session, xen_vbd self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "VBD.unplug", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vbd_get_all(xen_session *session, struct xen_vbd_set **result)
 {
 

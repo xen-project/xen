@@ -332,6 +332,22 @@ xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char
 
 
 /**
+ * Hotplug the specified VIF, dynamically attaching it to the running
+ * VM
+ */
+extern bool
+xen_vif_plug(xen_session *session, xen_vif self);
+
+
+/**
+ * Hot-unplug the specified VIF, dynamically unattaching it from the
+ * running VM
+ */
+extern bool
+xen_vif_unplug(xen_session *session, xen_vif self);
+
+
+/**
  * Return a list of all the VIFs known to the system.
  */
 extern bool

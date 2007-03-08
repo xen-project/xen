@@ -7118,6 +7118,71 @@ $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associa
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: VIF}
+\subsubsection{RPC name:~plug}
+
+{\bf Overview:} 
+Hotplug the specified VIF, dynamically attaching it to the running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void plug (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & The VIF to hotplug \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~unplug}
+
+{\bf Overview:} 
+Hot-unplug the specified VIF, dynamically unattaching it from the running
+VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void unplug (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & The VIF to hot-unplug \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -10449,6 +10514,71 @@ devices, detach the VBD and attach a new one.
 {\tt VBD ref } & vbd & The vbd representing the CDROM-like device \\ \hline 
 
 {\tt VDI ref } & vdi & The new VDI to 'insert' \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~plug}
+
+{\bf Overview:} 
+Hotplug the specified VBD, dynamically attaching it to the running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void plug (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & The VBD to hotplug \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~unplug}
+
+{\bf Overview:} 
+Hot-unplug the specified VBD, dynamically unattaching it from the running
+VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void unplug (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & The VBD to hot-unplug \\ \hline 
 
 \end{tabular}
 
