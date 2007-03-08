@@ -12,6 +12,7 @@
 #define XCFLAGS_LIVE      1
 #define XCFLAGS_DEBUG     2
 #define XCFLAGS_HVM       4
+#define XCFLAGS_STDVGA    8
 
 
 /**

@@ -74,9 +74,13 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
 
         image_cfg = dominfo.info.get('image', {})
         hvm = image_cfg.has_key('hvm')
+        stdvga = 0
 
         if hvm:
             log.info("save hvm domain")
+            if image_cfg['hvm']['devices']['stdvga'] == 1:
+                stdvga = 1
+
         # xc_save takes three customization parameters: maxit, max_f, and
         # flags the last controls whether or not save is 'live', while the
         # first two further customize behaviour when 'live' save is
@@ -84,7 +88,8 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         # libxenguest; see the comments and/or code in xc_linux_save() for
         # more information.
         cmd = [xen.util.auxbin.pathTo(XC_SAVE), str(fd),
-               str(dominfo.getDomid()), "0", "0", str(int(live) | (int(hvm) << 2)) ]
+               str(dominfo.getDomid()), "0", "0", 
+               str(int(live) | (int(hvm) << 2) | (int(stdvga) << 3)) ]
         log.debug("[xc_save]: %s", string.join(cmd))
 
         def saveInputHandler(line, tochild):

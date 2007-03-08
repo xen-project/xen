@@ -101,6 +101,9 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
     unsigned long nr_pages;
 
+    /* The size of an array big enough to contain all guest pfns */
+    unsigned long pfn_array_size = max_pfn + 1;
+
     /* hvm guest mem size (Mb) */
     memsize = (unsigned long long)*store_mfn;
     v_end = memsize << 20;
@@ -127,7 +130,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     }
 
 
-    pfns = malloc(max_pfn * sizeof(xen_pfn_t));
+    pfns = malloc(pfn_array_size * sizeof(xen_pfn_t));
     if (pfns == NULL) {
         ERROR("memory alloc failed");
         errno = ENOMEM;
@@ -139,11 +142,11 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    for ( i = 0; i < max_pfn; i++ )
+    for ( i = 0; i < pfn_array_size; i++ )
         pfns[i] = i;
-    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < max_pfn; i++ )
+    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < pfn_array_size; i++ )
         pfns[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-    arch_max_pfn = pfns[max_pfn - 1];/* used later */
+    arch_max_pfn = pfns[max_pfn];/* used later */
 
     /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
     rc = xc_domain_memory_populate_physmap(
@@ -297,29 +300,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     *store_mfn = (v_end >> PAGE_SHIFT) - 2;
     DPRINTF("hvm restore:calculate new store_mfn=0x%lx,v_end=0x%llx..\n", *store_mfn, v_end);
 
-    /* restore hvm context including pic/pit/shpage */
-    if (!read_exact(io_fd, &rec_len, sizeof(uint32_t))) {
-        ERROR("error read hvm context size!\n");
-        goto out;
-    }
-
-    hvm_buf = malloc(rec_len);
-    if (hvm_buf == NULL) {
-        ERROR("memory alloc for hvm context buffer failed");
-        errno = ENOMEM;
-        goto out;
-    }
-
-    if (!read_exact(io_fd, hvm_buf, rec_len)) {
-        ERROR("error read hvm buffer!\n");
-        goto out;
-    }
-
-    if (( rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len))) {
-        ERROR("error set hvm buffer!\n");
-        goto out;
-    }
-
     if (!read_exact(io_fd, &nr_vcpus, sizeof(uint32_t))) {
         ERROR("error read nr vcpu !\n");
         goto out;
@@ -345,6 +325,29 @@ int xc_hvm_restore(int xc_handle, int io_fd,
             ERROR("Could not set vcpu context, rc=%d", rc);
             goto out;
         }
+    }
+
+    /* restore hvm context including pic/pit/shpage */
+    if (!read_exact(io_fd, &rec_len, sizeof(uint32_t))) {
+        ERROR("error read hvm context size!\n");
+        goto out;
+    }
+
+    hvm_buf = malloc(rec_len);
+    if (hvm_buf == NULL) {
+        ERROR("memory alloc for hvm context buffer failed");
+        errno = ENOMEM;
+        goto out;
+    }
+
+    if (!read_exact(io_fd, hvm_buf, rec_len)) {
+        ERROR("error read hvm buffer!\n");
+        goto out;
+    }
+
+    if (( rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len))) {
+        ERROR("error set hvm buffer!\n");
+        goto out;
     }
 
     /* Shared-info pfn */
