@@ -27,11 +27,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <xen/hvm/e820.h>
 
 #include "xc_private.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
+
+#include <xen/hvm/e820.h>
+#include <xen/hvm/params.h>
 
 /*
 ** Default values for important tuning parameters. Can override by passing
@@ -49,11 +51,28 @@ static unsigned long max_mfn;
 /* virtual starting address of the hypervisor */
 static unsigned long hvirt_start;
 
-/* #levels of page tables used by the currrent guest */
+/* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
 /* total number of pages used by the current guest */
 static unsigned long max_pfn;
+
+int xc_hvm_drain_io(int handle, domid_t dom)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_drain_io_t arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_drain_io;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domid = dom;
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
+        return -1;
+    rc = do_xen_hypercall(handle, &hypercall);
+    unlock_pages(&arg, sizeof(arg));
+    return rc;
+}
 
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track

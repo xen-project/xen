@@ -396,17 +396,41 @@ typedef struct PCIIDEState {
 
 #ifdef DMA_MULTI_THREAD
 
+static pthread_t ide_dma_thread;
 static int file_pipes[2];
 
 static void ide_dma_loop(BMDMAState *bm);
 static void dma_thread_loop(BMDMAState *bm);
 
+extern int suspend_requested;
 static void *dma_thread_func(void* opaque)
 {
     BMDMAState* req;
+    fd_set fds;
+    int rv, nfds = file_pipes[0] + 1;
+    struct timeval tm;
 
-    while (read(file_pipes[0], &req, sizeof(req))) {
-        dma_thread_loop(req);
+    while (1) {
+
+        /* Wait at most a second for the pipe to become readable */
+        FD_ZERO(&fds);
+        FD_SET(file_pipes[0], &fds);
+        tm.tv_sec = 1;
+        tm.tv_usec = 0;
+        rv = select(nfds, &fds, NULL, NULL, &tm);
+        
+        if (rv != 0) {
+            if (read(file_pipes[0], &req, sizeof(req)) == 0)
+                return NULL;
+            dma_thread_loop(req);
+        } else {
+            if (suspend_requested)  {
+                /* Need to tidy up the DMA thread so that we don't end up 
+                 * finishing operations after the domain's ioreqs are 
+                 * drained and its state saved */
+                return NULL;
+            }
+        }
     }
 
     return NULL;
@@ -414,23 +438,40 @@ static void *dma_thread_func(void* opaque)
 
 static void dma_create_thread(void)
 {
-    pthread_t tid;
     int rt;
+    pthread_attr_t a;
 
     if (pipe(file_pipes) != 0) {
         fprintf(stderr, "create pipe failed\n");
         exit(1);
     }
 
-    if ((rt = pthread_create(&tid, NULL, dma_thread_func, NULL))) {
+    if ((rt = pthread_attr_init(&a))
+        || (rt = pthread_attr_setdetachstate(&a, PTHREAD_CREATE_JOINABLE))) {
+        fprintf(stderr, "Oops, dma thread attr setup failed, errno=%d\n", rt);
+        exit(1);
+    }    
+    
+    if ((rt = pthread_create(&ide_dma_thread, &a, dma_thread_func, NULL))) {
         fprintf(stderr, "Oops, dma thread creation failed, errno=%d\n", rt);
         exit(1);
     }
+}
 
-    if ((rt = pthread_detach(tid))) {
-        fprintf(stderr, "Oops, dma thread detachment failed, errno=%d\n", rt);
-        exit(1);
+void ide_stop_dma_thread(void)
+{
+    int rc;
+    /* Make sure the IDE DMA thread is stopped */
+    if ( (rc = pthread_join(ide_dma_thread, NULL)) != 0 )
+    {
+        fprintf(stderr, "Oops, error collecting IDE DMA thread (%s)\n", 
+                strerror(rc));
     }
+}
+
+#else
+void ide_stop_dma_thread(void)
+{
 }
 #endif /* DMA_MULTI_THREAD */
 

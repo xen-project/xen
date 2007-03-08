@@ -281,6 +281,14 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
+    /* Paranoia: clean pages. */
+    if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-1) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-2) ) {
+        ERROR("error clearing comms frames!\n");
+        goto out;
+    }
+
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
