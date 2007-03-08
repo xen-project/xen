@@ -33,6 +33,7 @@
 #include <xen/interface/acm_ops.h>
 #include <xen/interface/hvm/params.h>
 #include <xen/interface/xenoprof.h>
+#include <xen/interface/vcpu.h>
 #include <asm/hypercall.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
@@ -362,4 +363,21 @@ xencomm_hypercall_perfmon_op(unsigned long cmd, void* arg, unsigned long count)
 	return xencomm_arch_hypercall_perfmon_op(cmd,
 	                                         xencomm_create_inline(arg),
 	                                         count);
+}
+
+long
+xencomm_hypercall_vcpu_op(int cmd, int cpu, void *arg)
+{
+	switch (cmd) {
+	case VCPUOP_register_runstate_memory_area:
+		xencommize_memory_reservation((xen_memory_reservation_t *)arg);
+		break;
+
+	default:
+		printk("%s: unknown vcpu op %d\n", __func__, cmd);
+		return -ENOSYS;
+	}
+
+	return xencomm_arch_hypercall_vcpu_op(cmd, cpu,
+					      xencomm_create_inline(arg));
 }

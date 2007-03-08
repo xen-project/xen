@@ -205,6 +205,12 @@ xencomm_arch_hypercall_hvm_op(int cmd, void *arg)
 	return _hypercall2(unsigned long, hvm_op, cmd, arg);
 }
 
+static inline long
+xencomm_arch_hypercall_vcpu_op(int cmd, int cpu, void *arg)
+{
+	return _hypercall3(long, vcpu_op, cmd, cpu, arg);
+}
+
 static inline int
 HYPERVISOR_physdev_op(int cmd, void *arg)
 {
@@ -405,5 +411,6 @@ xencomm_arch_hypercall_perfmon_op(unsigned long cmd,
 #endif
 
 #define HYPERVISOR_suspend xencomm_hypercall_suspend
+#define HYPERVISOR_vcpu_op xencomm_hypercall_vcpu_op
 
 #endif /* __HYPERCALL_H__ */

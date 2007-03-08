@@ -51,6 +51,8 @@ extern int xencomm_hypercall_xenoprof_op(int op, void *arg);
 extern int xencomm_hypercall_perfmon_op(unsigned long cmd, void* arg,
                                         unsigned long count);
 
+extern long xencomm_hypercall_vcpu_op(int cmd, int cpu, void *arg);
+
 /* Using mini xencomm.  */
 extern int xencomm_mini_hypercall_console_io(int cmd, int count, char *str);
 
