@@ -47,7 +47,7 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
 static PyObject *pyxc_error_to_exception(void)
 {
     PyObject *pyerr;
-    const xc_error const *err = xc_get_last_error();
+    const xc_error *err = xc_get_last_error();
     const char *desc = xc_error_code_to_desc(err->code);
 
     if (err->code == XC_ERROR_NONE)

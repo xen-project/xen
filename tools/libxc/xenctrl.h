@@ -770,19 +770,19 @@ typedef struct {
  * data pointed to are only valid until the next call to
  * libxc.
  */
-const xc_error const *xc_get_last_error(void);
+const xc_error *xc_get_last_error(void);
 
 /*
  * Clear the last error
  */
 void xc_clear_last_error(void);
 
-typedef void (*xc_error_handler)(const xc_error const* err);
+typedef void (*xc_error_handler)(const xc_error * const err);
 
 /*
  * The default error handler which prints to stderr
  */
-void xc_default_error_handler(const xc_error const* err);
+void xc_default_error_handler(const xc_error * const err);
 
 /*
  * Convert an error code into a text description
