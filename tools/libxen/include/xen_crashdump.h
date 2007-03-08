@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -162,20 +162,6 @@ xen_crashdump_get_by_uuid(xen_session *session, xen_crashdump *result, char *uui
 
 
 /**
- * Create a new crashdump instance, and return its handle.
- */
-extern bool
-xen_crashdump_create(xen_session *session, xen_crashdump *result, xen_crashdump_record *record);
-
-
-/**
- * Destroy the specified crashdump instance.
- */
-extern bool
-xen_crashdump_destroy(xen_session *session, xen_crashdump crashdump);
-
-
-/**
  * Get the uuid field of the given crashdump.
  */
 extern bool
@@ -194,6 +180,13 @@ xen_crashdump_get_vm(xen_session *session, xen_vm *result, xen_crashdump crashdu
  */
 extern bool
 xen_crashdump_get_vdi(xen_session *session, xen_vdi *result, xen_crashdump crashdump);
+
+
+/**
+ * Destroy the specified crashdump
+ */
+extern bool
+xen_crashdump_destroy(xen_session *session, xen_crashdump self);
 
 
 /**

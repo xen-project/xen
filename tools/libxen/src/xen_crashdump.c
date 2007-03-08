@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -115,37 +115,6 @@ xen_crashdump_get_by_uuid(xen_session *session, xen_crashdump *result, char *uui
 
 
 bool
-xen_crashdump_create(xen_session *session, xen_crashdump *result, xen_crashdump_record *record)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &xen_crashdump_record_abstract_type_,
-              .u.struct_val = record }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("crashdump.create");
-    return session->ok;
-}
-
-
-bool
-xen_crashdump_destroy(xen_session *session, xen_crashdump crashdump)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = crashdump }
-        };
-
-    xen_call_(session, "crashdump.destroy", param_values, 1, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_crashdump_get_vm(xen_session *session, xen_vm *result, xen_crashdump crashdump)
 {
     abstract_value param_values[] =
@@ -175,6 +144,20 @@ xen_crashdump_get_vdi(xen_session *session, xen_vdi *result, xen_crashdump crash
 
     *result = NULL;
     XEN_CALL_("crashdump.get_VDI");
+    return session->ok;
+}
+
+
+bool
+xen_crashdump_destroy(xen_session *session, xen_crashdump self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "crashdump.destroy", param_values, 1, NULL, NULL);
     return session->ok;
 }
 

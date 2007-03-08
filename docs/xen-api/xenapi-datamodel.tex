@@ -11885,6 +11885,38 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 \hline
 \end{longtable}
 \subsection{Additional RPCs associated with class: crashdump}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified crashdump.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & The crashdump to destroy \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -11999,70 +12031,6 @@ VDI ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new crashdump instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (crashdump ref) create (session_id s, crashdump record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt crashdump record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-crashdump ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified crashdump instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, crashdump ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt crashdump ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
