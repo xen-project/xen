@@ -1129,6 +1129,7 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
         SHADOW_ERROR("Odd p2m page count c=%#x t=%"PRtype_info"\n",
                      pg->count_info, pg->u.inuse.type_info);
     }
+    pg->count_info = 0;
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
@@ -1243,6 +1244,9 @@ static unsigned int sh_set_allocation(struct domain *d,
             list_del(&sp->list);
             d->arch.paging.shadow.free_pages -= 1<<SHADOW_MAX_ORDER;
             d->arch.paging.shadow.total_pages -= 1<<SHADOW_MAX_ORDER;
+            for ( j = 0; j < 1<<SHADOW_MAX_ORDER; j++ ) 
+                /* Keep the page allocator happy */
+                ((struct page_info *)sp)[j].count_info = 0;
             free_domheap_pages((struct page_info *)sp, SHADOW_MAX_ORDER);
         }
 
