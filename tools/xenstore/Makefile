@@ -168,16 +168,16 @@ tarball: clean
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
-	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)/var/run/xenstored
+	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
+	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
+	$(INSTALL_DIR) $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
 	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so.$(MAJOR)
 	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenstore.so

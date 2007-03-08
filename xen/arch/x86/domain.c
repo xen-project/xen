@@ -641,6 +641,31 @@ int arch_set_info_guest(
             }
 
             v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
+
+#ifdef __x86_64__
+            if ( c.nat->ctrlreg[1] )
+            {
+                cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c.nat->ctrlreg[1]));
+
+                if ( !mfn_valid(cr3_pfn) ||
+                     (paging_mode_refcounts(d)
+                      ? !get_page(mfn_to_page(cr3_pfn), d)
+                      : !get_page_and_type(mfn_to_page(cr3_pfn), d,
+                                           PGT_base_page_table)) )
+                {
+                    cr3_pfn = pagetable_get_pfn(v->arch.guest_table);
+                    v->arch.guest_table = pagetable_null();
+                    if ( paging_mode_refcounts(d) )
+                        put_page(mfn_to_page(cr3_pfn));
+                    else
+                        put_page_and_type(mfn_to_page(cr3_pfn));
+                    destroy_gdt(v);
+                    return -EINVAL;
+                }
+
+                v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
+            }
+#endif
         }
 #ifdef CONFIG_COMPAT
         else

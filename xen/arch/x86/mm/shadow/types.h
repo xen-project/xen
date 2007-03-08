@@ -235,7 +235,7 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 
 #if GUEST_PAGING_LEVELS == 2
 
-#include "page-guest32.h"
+#include "../page-guest32.h"
 
 #define GUEST_L1_PAGETABLE_ENTRIES     1024
 #define GUEST_L2_PAGETABLE_ENTRIES     1024

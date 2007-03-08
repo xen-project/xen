@@ -21,7 +21,8 @@ from xen.util import mkdir
 from XendLogging import log
 from XendError import VmError
 
-import pty, ptsname, termios, fcntl
+import pty, termios, fcntl
+from xen.lowlevel import ptsname
 
 def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
                ramdisk = '', kernel_args = ''):

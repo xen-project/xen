@@ -49,7 +49,7 @@ string_param("badpage", opt_badpage);
  * Bit width of the DMA heap.
  */
 static unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
-static unsigned long max_dma_mfn = (1UL << (CONFIG_DMA_BITSIZE - PAGE_SHIFT)) - 1;
+static unsigned long max_dma_mfn = (1UL<<(CONFIG_DMA_BITSIZE-PAGE_SHIFT))-1;
 static void parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
@@ -339,11 +339,13 @@ static void init_heap_block(heap_by_zone_and_order_t *heap_block)
 
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
-    unsigned int zone_lo, unsigned zone_hi,
+    unsigned int zone_lo, unsigned int zone_hi,
     unsigned int cpu, unsigned int order)
 {
-    unsigned int i, j, node = cpu_to_node(cpu), num_nodes = num_online_nodes();
-    unsigned int zone, request = (1UL << order);
+    unsigned int i, j, zone;
+    unsigned int node = cpu_to_node(cpu), num_nodes = num_online_nodes();
+    unsigned long request = 1UL << order;
+    cpumask_t extra_cpus_mask, mask;
     struct page_info *pg;
 
     ASSERT(node >= 0);
@@ -356,25 +358,24 @@ static struct page_info *alloc_heap_pages(
 
     spin_lock(&heap_lock);
 
-    /* start with requested node, but exhaust all node memory
-     * in requested zone before failing, only calc new node
-     * value if we fail to find memory in target node, this avoids
-     * needless computation on fast-path */
+    /*
+     * Start with requested node, but exhaust all node memory in requested 
+     * zone before failing, only calc new node value if we fail to find memory 
+     * in target node, this avoids needless computation on fast-path.
+     */
     for ( i = 0; i < num_nodes; i++ )
     {
-        for ( zone = zone_hi; zone >= zone_lo; --zone )
-        {
-            /* check if target node can support the allocation */
-            if ( avail[node] && (avail[node][zone] >= request) )
-            {
-                /* Find smallest order which can satisfy the request. */
-                for ( j = order; j <= MAX_ORDER; j++ )
-                {
-                    if ( !list_empty(&heap(node, zone, j)) )
-                        goto found;
-                }
-            }
-        }
+        zone = zone_hi;
+        do {
+            /* Check if target node can support the allocation. */
+            if ( !avail[node] || (avail[node][zone] < request) )
+                continue;
+
+            /* Find smallest order which can satisfy the request. */
+            for ( j = order; j <= MAX_ORDER; j++ )
+                if ( !list_empty(&heap(node, zone, j)) )
+                    goto found;
+        } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
         /* Pick next node, wrapping around if needed. */
         if ( ++node == num_nodes )
@@ -403,6 +404,29 @@ static struct page_info *alloc_heap_pages(
 
     spin_unlock(&heap_lock);
 
+    cpus_clear(mask);
+
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        /* Reference count must continuously be zero for free pages. */
+        BUG_ON(pg[i].count_info != 0);
+
+        /* Add in any extra CPUs that need flushing because of this page. */
+        cpus_andnot(extra_cpus_mask, pg[i].u.free.cpumask, mask);
+        tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
+        cpus_or(mask, mask, extra_cpus_mask);
+
+        /* Initialise fields which have other uses for free pages. */
+        pg[i].u.inuse.type_info = 0;
+        page_set_owner(&pg[i], NULL);
+    }
+
+    if ( unlikely(!cpus_empty(mask)) )
+    {
+        perfc_incrc(need_flush_tlb_flush);
+        flush_tlb_mask(mask);
+    }
+
     return pg;
 }
 
@@ -411,12 +435,27 @@ static void free_heap_pages(
     unsigned int zone, struct page_info *pg, unsigned int order)
 {
     unsigned long mask;
-    unsigned int node = phys_to_nid(page_to_maddr(pg));
+    unsigned int i, node = phys_to_nid(page_to_maddr(pg));
+    struct domain *d;
 
     ASSERT(zone < NR_ZONES);
     ASSERT(order <= MAX_ORDER);
     ASSERT(node >= 0);
     ASSERT(node < num_online_nodes());
+
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        BUG_ON(pg[i].count_info != 0);
+        if ( (d = page_get_owner(&pg[i])) != NULL )
+        {
+            pg[i].tlbflush_timestamp = tlbflush_current_time();
+            pg[i].u.free.cpumask     = d->domain_dirty_cpumask;
+        }
+        else
+        {
+            cpus_clear(pg[i].u.free.cpumask);
+        }
+    }
 
     spin_lock(&heap_lock);
 
@@ -426,7 +465,7 @@ static void free_heap_pages(
     /* Merge chunks as far as possible. */
     while ( order < MAX_ORDER )
     {
-        mask = 1 << order;
+        mask = 1UL << order;
 
         if ( (page_to_mfn(pg) & mask) )
         {
@@ -554,7 +593,7 @@ void end_boot_allocator(void)
 /*
  * Scrub all unallocated pages in all heap zones. This function is more
  * convoluted than appears necessary because we do not want to continuously
- * hold the lock or disable interrupts while scrubbing very large memory areas.
+ * hold the lock while scrubbing very large memory areas.
  */
 void scrub_heap_pages(void)
 {
@@ -575,7 +614,7 @@ void scrub_heap_pages(void)
         if ( (mfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
             printk(".");
 
-        spin_lock_irq(&heap_lock);
+        spin_lock(&heap_lock);
 
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(mfn) )
@@ -595,7 +634,7 @@ void scrub_heap_pages(void)
             }
         }
 
-        spin_unlock_irq(&heap_lock);
+        spin_unlock(&heap_lock);
     }
 
     printk("done.\n");
@@ -609,8 +648,6 @@ void scrub_heap_pages(void)
 
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
 {
-    unsigned long flags;
-
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
     if ( pe <= ps )
@@ -625,33 +662,21 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
     if ( !IS_XEN_HEAP_FRAME(maddr_to_page(pe)) )
         pe -= PAGE_SIZE;
 
-    local_irq_save(flags);
     init_heap_pages(MEMZONE_XEN, maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
-    local_irq_restore(flags);
 }
 
 
 void *alloc_xenheap_pages(unsigned int order)
 {
-    unsigned long flags;
     struct page_info *pg;
-    int i;
 
-    local_irq_save(flags);
+    ASSERT(!in_irq());
+
     pg = alloc_heap_pages(MEMZONE_XEN, MEMZONE_XEN, smp_processor_id(), order);
-    local_irq_restore(flags);
-
     if ( unlikely(pg == NULL) )
         goto no_memory;
 
     memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
-
-    for ( i = 0; i < (1 << order); i++ )
-    {
-        pg[i].count_info        = 0;
-        pg[i].u.inuse._domain   = 0;
-        pg[i].u.inuse.type_info = 0;
-    }
 
     return page_to_virt(pg);
 
@@ -663,16 +688,14 @@ void *alloc_xenheap_pages(unsigned int order)
 
 void free_xenheap_pages(void *v, unsigned int order)
 {
-    unsigned long flags;
+    ASSERT(!in_irq());
 
     if ( v == NULL )
         return;
 
-    memguard_guard_range(v, 1 << (order + PAGE_SHIFT));    
+    memguard_guard_range(v, 1 << (order + PAGE_SHIFT));
 
-    local_irq_save(flags);
     free_heap_pages(MEMZONE_XEN, virt_to_page(v), order);
-    local_irq_restore(flags);
 }
 
 
@@ -762,8 +785,6 @@ struct page_info *__alloc_domheap_pages(
     unsigned int memflags)
 {
     struct page_info *pg = NULL;
-    cpumask_t mask;
-    unsigned long i;
     unsigned int bits = memflags >> _MEMF_bits, zone_hi = NR_ZONES - 1;
 
     ASSERT(!in_irq());
@@ -792,38 +813,10 @@ struct page_info *__alloc_domheap_pages(
             return NULL;
     }
 
-    if ( pg == NULL )
-        if ( (pg = alloc_heap_pages(MEMZONE_XEN + 1,
-                                    zone_hi,
-                                    cpu, order)) == NULL )
-            return NULL;
-
-    mask = pg->u.free.cpumask;
-    tlbflush_filter(mask, pg->tlbflush_timestamp);
-
-    pg->count_info        = 0;
-    pg->u.inuse._domain   = 0;
-    pg->u.inuse.type_info = 0;
-
-    for ( i = 1; i < (1 << order); i++ )
-    {
-        /* Add in any extra CPUs that need flushing because of this page. */
-        cpumask_t extra_cpus_mask;
-        cpus_andnot(extra_cpus_mask, pg[i].u.free.cpumask, mask);
-        tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
-        cpus_or(mask, mask, extra_cpus_mask);
-
-        pg[i].count_info        = 0;
-        pg[i].u.inuse._domain   = 0;
-        pg[i].u.inuse.type_info = 0;
-        page_set_owner(&pg[i], NULL);
-    }
-
-    if ( unlikely(!cpus_empty(mask)) )
-    {
-        perfc_incrc(need_flush_tlb_flush);
-        flush_tlb_mask(mask);
-    }
+    if ( (pg == NULL) &&
+         ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
+                                 cpu, order)) == NULL) )
+         return NULL;
 
     if ( (d != NULL) && assign_pages(d, pg, order, memflags) )
     {
@@ -867,10 +860,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
         for ( i = 0; i < (1 << order); i++ )
         {
-            shadow_drop_references(d, &pg[i]);
-            ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
-            pg[i].tlbflush_timestamp  = tlbflush_current_time();
-            pg[i].u.free.cpumask      = d->domain_dirty_cpumask;
+            BUG_ON((pg[i].u.inuse.type_info & PGT_count_mask) != 0);
             list_del(&pg[i].list);
         }
 
@@ -892,6 +882,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
              */
             for ( i = 0; i < (1 << order); i++ )
             {
+                page_set_owner(&pg[i], NULL);
                 spin_lock(&page_scrub_lock);
                 list_add(&pg[i].list, &page_scrub_list);
                 scrub_pages++;
@@ -902,8 +893,6 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
     else
     {
         /* Freeing anonymous domain-heap pages. */
-        for ( i = 0; i < (1 << order); i++ )
-            cpus_clear(pg[i].u.free.cpumask);
         free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         drop_dom_ref = 0;
     }

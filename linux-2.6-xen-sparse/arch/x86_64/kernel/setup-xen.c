@@ -676,7 +676,8 @@ void __init setup_arch(char **cmdline_p)
 
 	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
-	/* dmi_scan_machine(); */
+	if (is_initial_xendomain())
+		dmi_scan_machine();
 
 #ifdef CONFIG_ACPI_NUMA
 	/*
@@ -691,6 +692,14 @@ void __init setup_arch(char **cmdline_p)
 	contig_initmem_init(0, end_pfn);
 #endif
 
+#ifdef CONFIG_XEN
+	/*
+	 * Reserve kernel, physmap, start info, initial page tables, and
+	 * direct mapping.
+	 */
+	reserve_bootmem_generic(__pa_symbol(&_text),
+	                        (table_end << PAGE_SHIFT) - __pa_symbol(&_text));
+#else
 	/* Reserve direct mapping */
 	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
 				(table_end - table_start) << PAGE_SHIFT);
@@ -699,12 +708,6 @@ void __init setup_arch(char **cmdline_p)
 	reserve_bootmem_generic(__pa_symbol(&_text),
 				__pa_symbol(&_end) - __pa_symbol(&_text));
 
-#ifdef CONFIG_XEN
-	/* reserve physmap, start info and initial page tables */
-	reserve_bootmem_generic(__pa_symbol(&_end),
-				(table_start << PAGE_SHIFT) -
-				__pa_symbol(&_end));
-#else
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
 	 * enabling clean reboots, SMP operation, laptop functions.
@@ -1625,19 +1628,15 @@ struct seq_operations cpuinfo_op = {
 	.show =	show_cpuinfo,
 };
 
-static int __init run_dmi_scan(void)
-{
-	dmi_scan_machine();
-	return 0;
-}
-core_initcall(run_dmi_scan);
-
 #if defined(CONFIG_INPUT_PCSPKR) || defined(CONFIG_INPUT_PCSPKR_MODULE)
 #include <linux/platform_device.h>
 static __init int add_pcspkr(void)
 {
 	struct platform_device *pd;
 	int ret;
+
+	if (!is_initial_xendomain())
+		return 0;
 
 	pd = platform_device_alloc("pcspkr", -1);
 	if (!pd)

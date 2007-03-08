@@ -248,7 +248,7 @@ static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma)
 }
 #endif
 
-static struct file_operations privcmd_file_ops = {
+static const struct file_operations privcmd_file_ops = {
 	.ioctl = privcmd_ioctl,
 	.mmap  = privcmd_mmap,
 };

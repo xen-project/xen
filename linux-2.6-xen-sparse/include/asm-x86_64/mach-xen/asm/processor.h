@@ -246,11 +246,13 @@ DECLARE_PER_CPU(struct tss_struct,init_tss);
 
 
 extern struct cpuinfo_x86 boot_cpu_data;
+#ifndef CONFIG_X86_NO_TSS
 /* Save the original ist values for checking stack pointers during debugging */
 struct orig_ist {
 	unsigned long ist[7];
 };
 DECLARE_PER_CPU(struct orig_ist, orig_ist);
+#endif
 
 #ifdef CONFIG_X86_VSMP
 #define ARCH_MIN_TASKALIGN	(1 << INTERNODE_CACHE_SHIFT)

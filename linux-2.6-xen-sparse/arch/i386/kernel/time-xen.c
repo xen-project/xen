@@ -1022,16 +1022,21 @@ void halt(void)
 }
 EXPORT_SYMBOL(halt);
 
-/* No locking required. We are only CPU running, and interrupts are off. */
+/* No locking required. Interrupts are disabled on all CPUs. */
 void time_resume(void)
 {
+	unsigned int cpu;
+
 	init_cpu_khz();
 
-	get_time_values_from_xen(0);
+	for_each_online_cpu(cpu) {
+		get_time_values_from_xen(cpu);
+		per_cpu(processed_system_time, cpu) =
+			per_cpu(shadow_time, 0).system_timestamp;
+		init_missing_ticks_accounting(cpu);
+	}
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
-	per_cpu(processed_system_time, 0) = processed_system_time;
-	init_missing_ticks_accounting(0);
 
 	update_wallclock();
 }

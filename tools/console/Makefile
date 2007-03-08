@@ -30,7 +30,7 @@ xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 
 .PHONY: install
 install: $(BIN)
-	$(INSTALL_DIR) -p $(DESTDIR)/$(DAEMON_INSTALL_DIR)
+	$(INSTALL_DIR) $(DESTDIR)/$(DAEMON_INSTALL_DIR)
 	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(DAEMON_INSTALL_DIR)
-	$(INSTALL_DIR) -p $(DESTDIR)/$(CLIENT_INSTALL_DIR)
+	$(INSTALL_DIR) $(DESTDIR)/$(CLIENT_INSTALL_DIR)
 	$(INSTALL_PROG) xenconsole $(DESTDIR)/$(CLIENT_INSTALL_DIR)

@@ -2912,7 +2912,16 @@ void sh_mark_dirty(struct domain *d, mfn_t gmfn)
      * can be called from __hvm_copy during emulation).
      * If the lock isn't held, take it for the duration of the call. */
     do_locking = !shadow_locked_by_me(d);
-    if ( do_locking ) shadow_lock(d);
+    if ( do_locking ) 
+    { 
+        shadow_lock(d);
+        /* Check the mode again with the lock held */ 
+        if ( unlikely(!shadow_mode_log_dirty(d)) )
+        {
+            shadow_unlock(d);
+            return;
+        }
+    }
 
     ASSERT(d->arch.paging.shadow.dirty_bitmap != NULL);
 
@@ -2968,8 +2977,16 @@ int shadow_domctl(struct domain *d,
 
     if ( unlikely(d == current->domain) )
     {
-        gdprintk(XENLOG_INFO, "Don't try to do a shadow op on yourself!\n");
+        gdprintk(XENLOG_INFO, "Dom %u tried to do a shadow op on itself.\n",
+                 d->domain_id);
         return -EINVAL;
+    }
+
+    if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
+    {
+        gdprintk(XENLOG_INFO, "Ignoring shadow op on dying domain %u\n",
+                 d->domain_id);
+        return 0;
     }
 
     switch ( sc->op )

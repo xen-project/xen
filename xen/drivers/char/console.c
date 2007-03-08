@@ -399,6 +399,8 @@ static void __putstr(const char *str)
         vga_putchar(c);
         putchar_console_ring(c);
     }
+
+    send_guest_global_virq(dom0, VIRQ_CON_RING);
 }
 
 static int printk_prefix_check(char *p, char **pp)

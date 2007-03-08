@@ -153,7 +153,7 @@ struct xc_core_section_headers {
     uint16_t    num;
     uint16_t    num_max;
 
-    Elf_Shdr   *shdrs;
+    Elf64_Shdr  *shdrs;
 };
 #define SHDR_INIT       16
 #define SHDR_INC        4
@@ -184,14 +184,14 @@ xc_core_shdr_free(struct xc_core_section_headers *sheaders)
     free(sheaders);
 }
 
-Elf_Shdr*
+Elf64_Shdr*
 xc_core_shdr_get(struct xc_core_section_headers *sheaders)
 {
-    Elf_Shdr *shdr;
+    Elf64_Shdr *shdr;
 
     if ( sheaders->num == sheaders->num_max )
     {
-        Elf_Shdr *shdrs;
+        Elf64_Shdr *shdrs;
         if ( sheaders->num_max + SHDR_INC < sheaders->num_max )
         {
             errno = E2BIG;
@@ -212,7 +212,7 @@ xc_core_shdr_get(struct xc_core_section_headers *sheaders)
 }
 
 int
-xc_core_shdr_set(Elf_Shdr *shdr,
+xc_core_shdr_set(Elf64_Shdr *shdr,
                  struct xc_core_strtab *strtab,
                  const char *name, uint32_t type,
                  uint64_t offset, uint64_t size,
@@ -317,15 +317,15 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
     uint64_t *pfn_array = NULL;
 
-    Elf_Ehdr ehdr;
-    unsigned long filesz;
-    unsigned long offset;
-    unsigned long fixup;
+    Elf64_Ehdr ehdr;
+    uint64_t filesz;
+    uint64_t offset;
+    uint64_t fixup;
 
     struct xc_core_strtab *strtab = NULL;
     uint16_t strtab_idx;
     struct xc_core_section_headers *sheaders = NULL;
-    Elf_Shdr *shdr;
+    Elf64_Shdr *shdr;
 
     /* elf notes */
     struct elfnote elfnote;
@@ -460,7 +460,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     ehdr.e_ident[EI_MAG1] = ELFMAG1;
     ehdr.e_ident[EI_MAG2] = ELFMAG2;
     ehdr.e_ident[EI_MAG3] = ELFMAG3;
-    ehdr.e_ident[EI_CLASS] = ELFCLASS;
+    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
     ehdr.e_ident[EI_DATA] = ELF_ARCH_DATA;
     ehdr.e_ident[EI_VERSION] = EV_CURRENT;
     ehdr.e_ident[EI_OSABI] = ELFOSABI_SYSV;
@@ -474,9 +474,9 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     ehdr.e_shoff = sizeof(ehdr);
     ehdr.e_flags = ELF_CORE_EFLAGS;
     ehdr.e_ehsize = sizeof(ehdr);
-    ehdr.e_phentsize = sizeof(Elf_Phdr);
+    ehdr.e_phentsize = sizeof(Elf64_Phdr);
     ehdr.e_phnum = 0;
-    ehdr.e_shentsize = sizeof(Elf_Shdr);
+    ehdr.e_shentsize = sizeof(Elf64_Shdr);
     /* ehdr.e_shnum and ehdr.e_shstrndx aren't known here yet. fill it later*/
 
     /* create section header */

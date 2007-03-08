@@ -245,11 +245,10 @@ static int xenfb_wait_for_state(struct xs_handle *xsh, const char *dir,
 	unsigned state, dummy;
 	char **vec;
 
+	awaited |= 1 << XenbusStateUnknown;
+
 	for (;;) {
 		state = xenfb_read_state(xsh, dir);
-		if (state < 0)
-			return -1;
-
 		if ((1 << state) & awaited)
 			return state;
 

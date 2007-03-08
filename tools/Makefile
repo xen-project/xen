@@ -24,9 +24,8 @@ SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-SUBDIRS-y += python
-SUBDIRS-y += pygrub
-SUBDIRS-y += ptsname
+SUBDIRS-$(PYTHON_TOOLS) += python
+SUBDIRS-$(PYTHON_TOOLS) += pygrub
 endif
 
 .PHONY: all
@@ -42,8 +41,8 @@ install: check
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemuinstall
-	$(INSTALL_DIR) -p $(DESTDIR)/var/xen/dump
-	$(INSTALL_DIR) -p $(DESTDIR)/var/log/xen
+	$(INSTALL_DIR) $(DESTDIR)/var/xen/dump
+	$(INSTALL_DIR) $(DESTDIR)/var/log/xen
 
 .PHONY: clean
 clean: check_clean

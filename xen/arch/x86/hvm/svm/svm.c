@@ -49,6 +49,7 @@
 #include <public/sched.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/trace.h>
+#include <asm/hap.h>
 
 #define SVM_EXTRA_DEBUG
 
@@ -75,6 +76,10 @@ static void *root_vmcb[NR_CPUS] __read_mostly;
 
 /* physical address of above for host VMSAVE/VMLOAD */
 u64 root_vmcb_pa[NR_CPUS] __read_mostly;
+
+/* hardware assisted paging bits */
+extern int opt_hap_enabled;
+extern int hap_capable_system;
 
 static inline void svm_inject_exception(struct vcpu *v, int trap, 
                                         int ev, int error_code)
@@ -148,31 +153,6 @@ static void svm_store_cpu_guest_regs(
     }
 }
 
-static int svm_paging_enabled(struct vcpu *v)
-{
-    unsigned long cr0;
-
-    cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
-
-    return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
-}
-
-static int svm_pae_enabled(struct vcpu *v)
-{
-    unsigned long cr4;
-
-    if(!svm_paging_enabled(v))
-        return 0;
-
-    cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
-
-    return (cr4 & X86_CR4_PAE);
-}
-
-static int svm_long_mode_enabled(struct vcpu *v)
-{
-    return test_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
-}
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
@@ -183,8 +163,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     switch ((u32)regs->ecx)
     {
     case MSR_EFER:
-        msr_content = vmcb->efer;
-        msr_content &= ~EFER_SVME;
+        msr_content = v->arch.hvm_svm.cpu_shadow_efer;
         break;
 
 #ifdef __x86_64__
@@ -255,30 +234,54 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             goto gp_fault;
         }
 
+        /* 
+         * update the VMCB's EFER with the intended value along with
+         * that crucial EFER.SVME bit =)
+         */
+        vmcb->efer = msr_content | EFER_SVME;
+
 #ifdef __x86_64__
-        /* LME: 0 -> 1 */
-        if ( msr_content & EFER_LME &&
-             !test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
+
+        /*
+         * Check for EFER.LME transitions from 0->1 or 1->0.  Do the
+         * sanity checks and then make sure that both EFER.LME and
+         * EFER.LMA are cleared. (EFER.LME can't be set in the vmcb
+         * until the guest also sets CR0.PG, since even if the guest has
+         * paging "disabled", the vmcb's CR0 always has PG set.)
+         */
+        if ( (msr_content & EFER_LME) && !svm_lme_is_set(v) )
         {
+            /* EFER.LME transition from 0 to 1 */
+            
             if ( svm_paging_enabled(v) ||
-                 !test_bit(SVM_CPU_STATE_PAE_ENABLED,
-                           &v->arch.hvm_svm.cpu_state) )
+                 !svm_cr4_pae_is_set(v) )
             {
                 gdprintk(XENLOG_WARNING, "Trying to set LME bit when "
                          "in paging mode or PAE bit is not set\n");
                 goto gp_fault;
             }
-            set_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state);
+
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
+        }
+        else if ( !(msr_content & EFER_LME) && svm_lme_is_set(v) )
+        {
+            /* EFER.LME transistion from 1 to 0 */
+            
+            if ( svm_paging_enabled(v) )
+            {
+                gdprintk(XENLOG_WARNING, 
+                         "Trying to clear EFER.LME while paging enabled\n");
+                goto gp_fault;
+            }
+
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
         }
 
-        /* We have already recorded that we want LME, so it will be set 
-         * next time CR0 gets updated. So we clear that bit and continue.
-         */
-        if ((msr_content ^ vmcb->efer) & EFER_LME)
-            msr_content &= ~EFER_LME;  
-        /* No update for LME/LMA since it have no effect */
-#endif
-        vmcb->efer = msr_content | EFER_SVME;
+#endif /* __x86_64__ */
+
+        /* update the guest EFER's shadow with the intended value */
+        v->arch.hvm_svm.cpu_shadow_efer = msr_content;
+
         break;
 
 #ifdef __x86_64__
@@ -468,22 +471,25 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
             c->cr4);
 #endif
 
-    if (!svm_paging_enabled(v)) {
+    if ( !svm_paging_enabled(v) ) 
+    {
         printk("%s: paging not enabled.", __func__);
         goto skip_cr3;
     }
 
-    if (c->cr3 == v->arch.hvm_svm.cpu_cr3) {
+    if ( c->cr3 == v->arch.hvm_svm.cpu_cr3 ) 
+    {
         /*
          * This is simple TLB flush, implying the guest has
          * removed some translation or changed page attributes.
          * We simply invalidate the shadow.
          */
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
+        if ( mfn != pagetable_get_pfn(v->arch.guest_table) ) 
             goto bad_cr3;
-        }
-    } else {
+    } 
+    else 
+    {
         /*
          * If different, make a shadow. Check if the PDBR is valid
          * first.
@@ -491,9 +497,9 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
         /* current!=vcpu as not called by arch_vmx_do_launch */
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
+        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
             goto bad_cr3;
-        }
+
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
@@ -631,7 +637,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( (vmcb->efer & EFER_LMA) && vmcb->cs.attr.fields.l )
+    if ( svm_long_mode_enabled(v) && vmcb->cs.attr.fields.l )
         return 8;
 
     if ( svm_realmode(v) )
@@ -681,7 +687,7 @@ static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
     int long_mode = 0;
 
 #ifdef __x86_64__
-    long_mode = vmcb->cs.attr.fields.l && (vmcb->efer & EFER_LMA);
+    long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
 #endif
     switch ( seg )
     {
@@ -905,6 +911,10 @@ static void arch_svm_do_launch(struct vcpu *v)
 {
     svm_do_launch(v);
 
+    if ( paging_mode_hap(v->domain) ) {
+        v->arch.hvm_svm.vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+    }
+
     if ( v->vcpu_id != 0 )
     {
         cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
@@ -1011,6 +1021,21 @@ static struct hvm_function_table svm_function_table = {
     .event_injection_faulted = svm_event_injection_faulted
 };
 
+void svm_npt_detect(void)
+{
+    u32 eax, ebx, ecx, edx;
+
+    /* check CPUID for nested paging support */
+    cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
+    if ( edx & 0x01 ) { /* nested paging */
+        hap_capable_system = 1;
+    }
+    else if ( opt_hap_enabled ) {
+        printk(" nested paging is not supported by this CPU.\n");
+        hap_capable_system = 0; /* no nested paging, we disable flag. */
+    }
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -1040,6 +1065,8 @@ int start_svm(void)
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
     printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
+
+    svm_npt_detect();
 
     /* Initialize the HSA for this core */
     phys_hsa = (u64) virt_to_maddr(hsa[cpu]);
@@ -1076,6 +1103,18 @@ void arch_svm_do_resume(struct vcpu *v)
         reset_stack_and_jump( svm_asm_do_resume );
     }
 }
+
+static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
+{
+    if (mmio_space(gpa)) {
+        handle_mmio(gpa);
+        return 1;
+    }
+
+    /* We should not reach here. Otherwise, P2M table is not correct.*/
+    return 0;
+}
+
 
 static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
 {
@@ -1114,7 +1153,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
         printk("Huh? We got a GP Fault with an invalid IDTR!\n");
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(vmcb));
+        svm_dump_inst(svm_rip2pointer(v));
         domain_crash(v->domain);
         return;
     }
@@ -1209,7 +1248,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     HVMTRACE_3D(CPUID, v, input,
                 ((uint64_t)eax << 32) | ebx, ((uint64_t)ecx << 32) | edx);
 
-    inst_len = __get_instruction_length(vmcb, INSTR_CPUID, NULL);
+    inst_len = __get_instruction_length(v, INSTR_CPUID, NULL);
     ASSERT(inst_len > 0);
     __update_guest_eip(vmcb, inst_len);
 }
@@ -1312,15 +1351,16 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 }
 
 
-static void svm_get_prefix_info(
-    struct vmcb_struct *vmcb, 
-    unsigned int dir, svm_segment_register_t **seg, unsigned int *asize)
+static void svm_get_prefix_info(struct vcpu *v, unsigned int dir, 
+                                svm_segment_register_t **seg, 
+                                unsigned int *asize)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned char inst[MAX_INST_LEN];
     int i;
 
     memset(inst, 0, MAX_INST_LEN);
-    if (inst_copy_from_guest(inst, svm_rip2pointer(vmcb), sizeof(inst)) 
+    if (inst_copy_from_guest(inst, svm_rip2pointer(v), sizeof(inst)) 
         != MAX_INST_LEN) 
     {
         gdprintk(XENLOG_ERR, "get guest instruction failed\n");
@@ -1400,7 +1440,7 @@ static inline int svm_get_io_address(
 
 #ifdef __x86_64__
     /* If we're in long mode, we shouldn't check the segment presence & limit */
-    long_mode = vmcb->cs.attr.fields.l && vmcb->efer & EFER_LMA;
+    long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
 #endif
 
     /* d field of cs.attr is 1 for 32-bit, 0 for 16 or 64 bit. 
@@ -1419,7 +1459,7 @@ static inline int svm_get_io_address(
         isize --;
 
     if (isize > 1) 
-        svm_get_prefix_info(vmcb, info.fields.type, &seg, &asize);
+        svm_get_prefix_info(v, info.fields.type, &seg, &asize);
 
     if (info.fields.type == IOREQ_WRITE)
     {
@@ -1702,6 +1742,52 @@ static void svm_io_instruction(struct vcpu *v)
     }
 }
 
+static int npt_set_cr0(unsigned long value) 
+{
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+  
+    ASSERT(vmcb);
+
+    /* ET is reserved and should be always be 1*/
+    value |= X86_CR0_ET;
+
+    /* Check whether the guest is about to turn on long mode. 
+     * If it is, set EFER.LME and EFER.LMA.  Update the shadow EFER.LMA
+     * bit too, so svm_long_mode_enabled() will work.
+     */
+    if ( (value & X86_CR0_PG) && svm_lme_is_set(v) &&
+         (vmcb->cr4 & X86_CR4_PAE) && (vmcb->cr0 & X86_CR0_PE) )
+    {
+        v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
+        vmcb->efer |= EFER_LMA | EFER_LME;
+    }
+
+    /* Whenever CR0.PG is cleared under long mode, LMA will be cleared 
+     * immediatly. We emulate this process for svm_long_mode_enabled().
+     */
+    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
+    {
+        if ( svm_long_mode_enabled(v) )
+        {
+            v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
+        }
+    }
+    
+    vmcb->cr0 = value | X86_CR0_WP;
+    v->arch.hvm_svm.cpu_shadow_cr0 = value;
+
+    /* TS cleared? Then initialise FPU now. */
+    if ( !(value & X86_CR0_TS) ) {
+        setup_fpu(v);
+        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+    }
+    
+    paging_update_paging_modes(v);
+    
+    return 1;
+}
+
 static int svm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
@@ -1727,7 +1813,8 @@ static int svm_set_cr0(unsigned long value)
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
 
-    if ((value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled) 
+    if ( ((value & (X86_CR0_PE | X86_CR0_PG)) == (X86_CR0_PE | X86_CR0_PG))
+         && !paging_enabled ) 
     {
         /* The guest CR3 must be pointing to the guest physical. */
         mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
@@ -1740,18 +1827,16 @@ static int svm_set_cr0(unsigned long value)
         }
 
 #if defined(__x86_64__)
-        if (test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state) 
-            && !test_bit(SVM_CPU_STATE_PAE_ENABLED, 
-                         &v->arch.hvm_svm.cpu_state))
+        if ( svm_lme_is_set(v) && !svm_cr4_pae_is_set(v) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
         }
 
-        if (test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
+        if ( svm_lme_is_set(v) )
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
-            set_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
+            v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
             vmcb->efer |= EFER_LMA | EFER_LME;
         }
 #endif  /* __x86_64__ */
@@ -1790,14 +1875,93 @@ static int svm_set_cr0(unsigned long value)
     {
         if ( svm_long_mode_enabled(v) )
         {
-            vmcb->efer &= ~EFER_LMA;
-            clear_bit(SVM_CPU_STATE_LMA_ENABLED, &v->arch.hvm_svm.cpu_state);
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
+            v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
         }
         /* we should take care of this kind of situation */
         paging_update_paging_modes(v);
     }
 
     return 1;
+}
+
+//
+// nested paging functions
+//
+
+static int npt_mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
+{  
+    unsigned long value;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vlapic *vlapic = vcpu_vlapic(v);
+
+    ASSERT(vmcb);
+
+    value = get_reg(gpreg, regs, vmcb);
+
+    switch (cr) {
+    case 0:
+        return npt_set_cr0(value);
+
+    case 3:
+        vmcb->cr3 = value;
+        v->arch.hvm_svm.cpu_cr3 = value;
+        break;
+
+    case 4: /* CR4 */
+        vmcb->cr4 = value;
+        v->arch.hvm_svm.cpu_shadow_cr4 = value;
+        paging_update_paging_modes(v);
+        break;
+
+    case 8:
+        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
+        vmcb->vintr.fields.tpr = value & 0x0F;
+        break;
+
+    default:
+        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
+        domain_crash(v->domain);
+        return 0;
+    }
+    
+    return 1;
+}
+
+static void npt_mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
+{
+    unsigned long value = 0;
+    struct vcpu *v = current;
+    struct vmcb_struct *vmcb;
+    struct vlapic *vlapic = vcpu_vlapic(v);
+
+    vmcb = v->arch.hvm_svm.vmcb;
+    ASSERT(vmcb);
+
+    switch(cr) {
+    case 0:
+        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr0;
+        break;
+    case 2:
+        value = vmcb->cr2;
+        break;
+    case 3:
+        value = (unsigned long) v->arch.hvm_svm.cpu_cr3;
+        break;
+    case 4:
+        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
+       break;
+    case 8:
+        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
+        value = (value & 0xF0) >> 4;
+        break;
+    default:
+        domain_crash(v->domain);
+        return;
+    }
+    
+    set_reg(gp, value, regs, vmcb);
 }
 
 /*
@@ -1848,12 +2012,6 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     set_reg(gp, value, regs, vmcb);
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
-}
-
-
-static inline int svm_pgbit_test(struct vcpu *v)
-{
-    return v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PG;
 }
 
 
@@ -1933,7 +2091,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         old_cr = v->arch.hvm_svm.cpu_shadow_cr4;
         if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
         {
-            set_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
             if ( svm_pgbit_test(v) )
             {
                 /* The guest is a 32-bit PAE guest. */
@@ -1962,15 +2119,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                             v->arch.hvm_svm.cpu_cr3, mfn);
 #endif
             }
-        }
-        else if (value & X86_CR4_PAE) {
-            set_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
-        } else {
-            if (test_bit(SVM_CPU_STATE_LMA_ENABLED,
-                         &v->arch.hvm_svm.cpu_state)) {
+        } 
+        else if ( !(value & X86_CR4_PAE) )
+        {
+            if ( svm_long_mode_enabled(v) )
+            {
                 svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             }
-            clear_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
 
         v->arch.hvm_svm.cpu_shadow_cr4 = value;
@@ -2024,7 +2179,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     ASSERT(vmcb);
 
-    inst_copy_from_guest(buffer, svm_rip2pointer(vmcb), sizeof(buffer));
+    inst_copy_from_guest(buffer, svm_rip2pointer(v), sizeof(buffer));
 
     /* get index to first actual instruction byte - as we will need to know 
        where the prefix lives later on */
@@ -2033,12 +2188,12 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     if ( type == TYPE_MOV_TO_CR )
     {
         inst_len = __get_instruction_length_from_list(
-            vmcb, list_a, ARR_SIZE(list_a), &buffer[index], &match);
+            v, list_a, ARR_SIZE(list_a), &buffer[index], &match);
     }
     else /* type == TYPE_MOV_FROM_CR */
     {
         inst_len = __get_instruction_length_from_list(
-            vmcb, list_b, ARR_SIZE(list_b), &buffer[index], &match);
+            v, list_b, ARR_SIZE(list_b), &buffer[index], &match);
     }
 
     ASSERT(inst_len > 0);
@@ -2055,12 +2210,18 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     {
     case INSTR_MOV2CR:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
-        result = mov_to_cr(gpreg, cr, regs);
+        if ( paging_mode_hap(v->domain) )
+            result = npt_mov_to_cr(gpreg, cr, regs);
+        else
+            result = mov_to_cr(gpreg, cr, regs);
         break;
 
     case INSTR_MOVCR2:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
-        mov_from_cr(cr, gpreg, regs);
+        if ( paging_mode_hap(v->domain) )
+            npt_mov_from_cr(cr, gpreg, regs);
+        else
+            mov_from_cr(cr, gpreg, regs);
         break;
 
     case INSTR_CLTS:
@@ -2073,7 +2234,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 
     case INSTR_LMSW:
         if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(vmcb));
+            svm_dump_inst(svm_rip2pointer(v));
         
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
@@ -2087,12 +2248,15 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         if (svm_dbg_on)
             printk("CR0-LMSW CR0 - New value=%lx\n", value);
 
-        result = svm_set_cr0(value);
+        if ( paging_mode_hap(v->domain) )
+            result = npt_set_cr0(value);
+        else
+            result = svm_set_cr0(value);
         break;
 
     case INSTR_SMSW:
         if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(vmcb));
+            svm_dump_inst(svm_rip2pointer(v));
         value = v->arch.hvm_svm.cpu_shadow_cr0;
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         set_reg(gpreg, value, regs, vmcb);
@@ -2168,7 +2332,7 @@ static inline void svm_do_msr_access(
         HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                     ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
 
-        inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
+        inst_len = __get_instruction_length(v, INSTR_RDMSR, NULL);
     }
     else
     {
@@ -2200,7 +2364,7 @@ static inline void svm_do_msr_access(
             break;
         }
 
-        inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
+        inst_len = __get_instruction_length(v, INSTR_WRMSR, NULL);
     }
 
     __update_guest_eip(vmcb, inst_len);
@@ -2223,8 +2387,9 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 }
 
 
-static void svm_vmexit_do_invd(struct vmcb_struct *vmcb)
+static void svm_vmexit_do_invd(struct vcpu *v)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
     
     /* Invalidate the cache - we can't really do that safely - maybe we should 
@@ -2237,7 +2402,7 @@ static void svm_vmexit_do_invd(struct vmcb_struct *vmcb)
      */
     printk("INVD instruction intercepted - ignored\n");
     
-    inst_len = __get_instruction_length(vmcb, INSTR_INVD, NULL);
+    inst_len = __get_instruction_length(v, INSTR_INVD, NULL);
     __update_guest_eip(vmcb, inst_len);
 }    
         
@@ -2289,7 +2454,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
      * Unknown how many bytes the invlpg instruction will take.  Use the
      * maximum instruction length here
      */
-    if (inst_copy_from_guest(opcode, svm_rip2pointer(vmcb), length) < length)
+    if (inst_copy_from_guest(opcode, svm_rip2pointer(v), length) < length)
     {
         gdprintk(XENLOG_ERR, "Error reading memory %d bytes\n", length);
         domain_crash(v->domain);
@@ -2298,7 +2463,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 
     if (invlpga)
     {
-        inst_len = __get_instruction_length(vmcb, INSTR_INVLPGA, opcode);
+        inst_len = __get_instruction_length(v, INSTR_INVLPGA, opcode);
         ASSERT(inst_len > 0);
         __update_guest_eip(vmcb, inst_len);
 
@@ -2312,7 +2477,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
     {
         /* What about multiple prefix codes? */
         prefix = (is_prefix(opcode[0])?opcode[0]:0);
-        inst_len = __get_instruction_length(vmcb, INSTR_INVLPG, opcode);
+        inst_len = __get_instruction_length(v, INSTR_INVLPG, opcode);
         ASSERT(inst_len > 0);
 
         inst_len--;
@@ -2323,7 +2488,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
          * displacement to get effective address and length in bytes.  Assume
          * the system in either 32- or 64-bit mode.
          */
-        g_vaddr = get_effective_addr_modrm64(vmcb, regs, prefix, inst_len,
+        g_vaddr = get_effective_addr_modrm64(regs, prefix, inst_len,
                                              &opcode[inst_len], &length);
 
         inst_len += length;
@@ -2369,7 +2534,11 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
 
     vmcb->cr4 = SVM_CR4_HOST_MASK;
     v->arch.hvm_svm.cpu_shadow_cr4 = 0;
-    clear_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
+
+    if ( paging_mode_hap(v->domain) ) {
+        vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+    }
 
     /* This will jump to ROMBIOS */
     vmcb->rip = 0xFFF0;
@@ -2445,7 +2614,7 @@ static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
     ASSERT(vmcb);
     ASSERT(regs);
 
-    inst_len = __get_instruction_length(vmcb, INSTR_VMCALL, NULL);
+    inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
     ASSERT(inst_len > 0);
 
     HVMTRACE_1D(VMMCALL, v, regs->eax);
@@ -2855,7 +3024,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
             svm_dump_vmcb(__func__, vmcb);
             svm_dump_regs(__func__, regs);
-            svm_dump_inst(svm_rip2pointer(vmcb));
+            svm_dump_inst(svm_rip2pointer(v));
         }
 
 #if defined(__i386__)
@@ -2957,7 +3126,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         /* Debug info to hopefully help debug WHY the guest double-faulted. */
         svm_dump_vmcb(__func__, vmcb);
         svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(vmcb));
+        svm_dump_inst(svm_rip2pointer(v));
         svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
 
@@ -2967,7 +3136,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVD:
-        svm_vmexit_do_invd(vmcb);
+        svm_vmexit_do_invd(v);
         break;
 
     case VMEXIT_GDTR_WRITE:
@@ -3053,6 +3222,15 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_SHUTDOWN:
         hvm_triple_fault();
         break;
+
+    case VMEXIT_NPF:
+    {
+        regs->error_code = vmcb->exitinfo1;
+        if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) ) {
+            domain_crash(v->domain);
+        }
+        break;
+    }
 
     default:
     exit_and_crash:

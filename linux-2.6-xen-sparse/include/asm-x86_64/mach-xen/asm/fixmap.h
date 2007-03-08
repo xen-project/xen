@@ -53,6 +53,11 @@ enum fixed_addresses {
 #define NR_FIX_ISAMAPS	256
 	FIX_ISAMAP_END,
 	FIX_ISAMAP_BEGIN = FIX_ISAMAP_END + NR_FIX_ISAMAPS - 1,
+	__end_of_permanent_fixed_addresses,
+	/* temporary boot-time mappings, used before ioremap() is functional */
+#define NR_FIX_BTMAPS	16
+	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+	FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
 	__end_of_fixed_addresses
 };
 

@@ -33,6 +33,8 @@
 #include <xen/timer.h>
 #include <xen/cache.h>
 #include <xen/prefetch.h>
+#include <xen/irq.h>
+#include <xen/smp.h>
 
 /*
  * XMALLOC_DEBUG:
@@ -175,6 +177,8 @@ void *_xmalloc(size_t size, size_t align)
     struct xmalloc_hdr *i;
     unsigned long flags;
 
+    ASSERT(!in_irq());
+
     /* We currently always return cacheline aligned. */
     BUG_ON(align > SMP_CACHE_BYTES);
 
@@ -212,6 +216,8 @@ void xfree(void *p)
 {
     unsigned long flags;
     struct xmalloc_hdr *i, *tmp, *hdr;
+
+    ASSERT(!in_irq());
 
     if ( p == NULL )
         return;

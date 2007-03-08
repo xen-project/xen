@@ -787,7 +787,7 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 };
 #else
-extern struct file_operations mem_fops;
+extern const struct file_operations mem_fops;
 #endif
 
 static const struct file_operations kmem_fops = {

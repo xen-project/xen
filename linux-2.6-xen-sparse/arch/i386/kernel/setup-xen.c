@@ -1847,6 +1847,9 @@ static __init int add_pcspkr(void)
 	struct platform_device *pd;
 	int ret;
 
+	if (!is_initial_xendomain())
+		return 0;
+
 	pd = platform_device_alloc("pcspkr", -1);
 	if (!pd)
 		return -ENOMEM;

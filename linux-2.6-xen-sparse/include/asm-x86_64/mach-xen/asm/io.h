@@ -150,8 +150,10 @@ static inline void __iomem * ioremap (unsigned long offset, unsigned long size)
 	return __ioremap(offset, size, 0);
 }
 
-extern void *early_ioremap(unsigned long addr, unsigned long size);
-extern void early_iounmap(void *addr, unsigned long size);
+extern void *bt_ioremap(unsigned long addr, unsigned long size);
+extern void bt_iounmap(void *addr, unsigned long size);
+#define early_ioremap bt_ioremap
+#define early_iounmap bt_iounmap
 
 /*
  * This one maps high address device memory and turns off caching for that area.

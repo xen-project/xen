@@ -303,14 +303,6 @@ enum VMEXIT_EXITCODE
     VMEXIT_INVALID          =  -1
 };
 
-enum {
-    SVM_CPU_STATE_PG_ENABLED=0,
-    SVM_CPU_STATE_PAE_ENABLED,
-    SVM_CPU_STATE_LME_ENABLED,      
-    SVM_CPU_STATE_LMA_ENABLED,
-    SVM_CPU_STATE_ASSIST_ENABLED,
-};  
-
 /* Definitions of segment state are borrowed by the generic HVM code. */
 typedef segment_attributes_t svm_segment_attributes_t;
 typedef segment_register_t svm_segment_register_t;
@@ -457,12 +449,12 @@ struct arch_svm_struct {
     int                 saved_irq_vector;
     u32                 launch_core;
     
-    unsigned long       flags;      /* VMCB flags */
-    unsigned long       cpu_shadow_cr0; /* Guest value for CR0 */
-    unsigned long       cpu_shadow_cr4; /* Guest value for CR4 */
+    unsigned long       flags;            /* VMCB flags */
+    unsigned long       cpu_shadow_cr0;   /* Guest value for CR0 */
+    unsigned long       cpu_shadow_cr4;   /* Guest value for CR4 */
+    unsigned long       cpu_shadow_efer;  /* Guest value for EFER */
     unsigned long       cpu_cr2;
     unsigned long       cpu_cr3;
-    unsigned long       cpu_state;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

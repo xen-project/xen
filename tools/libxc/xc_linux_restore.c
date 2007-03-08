@@ -19,7 +19,7 @@ static unsigned long max_mfn;
 /* virtual starting address of the hypervisor */
 static unsigned long hvirt_start;
 
-/* #levels of page tables used by the currrent guest */
+/* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
 /* total number of pages used by the current guest */
@@ -856,6 +856,28 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
 
         ctxt.ctrlreg[3] = xen_pfn_to_cr3(p2m[pfn]);
+
+        /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
+        if ( (pt_levels == 4) && ctxt.ctrlreg[1] )
+        {
+            pfn = xen_cr3_to_pfn(ctxt.ctrlreg[1]);
+
+            if (pfn >= max_pfn) {
+                ERROR("User PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
+                      pfn, max_pfn, pfn_type[pfn]);
+                goto out;
+            }
+
+            if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
+                 ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
+                ERROR("User PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
+                      pfn, max_pfn, pfn_type[pfn],
+                      (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+                goto out;
+            }
+
+            ctxt.ctrlreg[1] = xen_pfn_to_cr3(p2m[pfn]);
+        }
 
         domctl.cmd = XEN_DOMCTL_setvcpucontext;
         domctl.domain = (domid_t)dom;

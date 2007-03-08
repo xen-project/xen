@@ -539,7 +539,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     /* We remember the first shadow entry that points to each shadow. */
     if ( entry_pa != 0 
-         && sh_type_is_pinnable(v, sp->type) 
+         && !sh_type_is_pinnable(v, sp->type) 
          && sp->up == 0 ) 
         sp->up = entry_pa;
     
@@ -559,7 +559,7 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     /* If this is the entry in the up-pointer, remove it */
     if ( entry_pa != 0 
-         && sh_type_is_pinnable(v, sp->type) 
+         && !sh_type_is_pinnable(v, sp->type) 
          && sp->up == entry_pa ) 
         sp->up = 0;
 

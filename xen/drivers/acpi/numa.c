@@ -22,10 +22,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  */
-#if 0
-#include <linux/module.h>
-#include <linux/kernel.h>
-#endif
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/types.h>
@@ -34,7 +30,6 @@
 #include <xen/numa.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acmacros.h>
-#include <asm/page.h> /* __va() */
 
 #define ACPI_NUMA	0x80000000
 #define _COMPONENT	ACPI_NUMA
@@ -106,7 +101,7 @@ static int __init acpi_parse_slit(unsigned long phys_addr, unsigned long size)
 	if (!phys_addr || !size)
 		return -EINVAL;
 
-	slit = (struct acpi_table_slit *)__va(phys_addr);
+	slit = (struct acpi_table_slit *)__acpi_map_table(phys_addr, size);
 
 	/* downcast just for %llu vs %lu for i386/ia64  */
 	localities = (u32) slit->localities;
@@ -159,7 +154,7 @@ static int __init acpi_parse_srat(unsigned long phys_addr, unsigned long size)
 	if (!phys_addr || !size)
 		return -EINVAL;
 
-	srat = (struct acpi_table_srat *)__va(phys_addr);
+	srat = (struct acpi_table_srat *)__acpi_map_table(phys_addr, size);
 
 	return 0;
 }

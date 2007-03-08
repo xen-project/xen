@@ -9,10 +9,9 @@
 #include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
+#include <asm/dwarf2.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
-
-#define _PAGE_PRESENT 0x1
 
 /*
  * References to members of the new_cpu_data structure.
@@ -65,14 +64,13 @@ ENTRY(startup_32)
 
 	pushl %eax		# fake return address
 	jmp start_kernel
-L6:
-	jmp L6			# main should never return here, but
-				# just in case, we know what happens.
 
 #define HYPERCALL_PAGE_OFFSET 0x1000
 .org HYPERCALL_PAGE_OFFSET
 ENTRY(hypercall_page)
+	CFI_STARTPROC
 .skip 0x1000
+	CFI_ENDPROC
 
 /*
  * Real beginning of normal "text" segment

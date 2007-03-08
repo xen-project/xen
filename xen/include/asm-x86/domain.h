@@ -104,6 +104,21 @@ struct shadow_vcpu {
 };
 
 /************************************************/
+/*            hardware assisted paging          */
+/************************************************/
+struct hap_domain {
+    spinlock_t        lock;
+    int               locker;
+    const char       *locker_function;
+    
+    struct list_head  freelists;
+    struct list_head  p2m_freelist;
+    unsigned int      total_pages;  /* number of pages allocated */
+    unsigned int      free_pages;   /* number of pages on freelists */
+    unsigned int      p2m_pages;    /* number of pages allocates to p2m */
+};
+
+/************************************************/
 /*       p2m handling                           */
 /************************************************/
 
@@ -135,6 +150,7 @@ struct paging_domain {
     struct shadow_domain shadow;
 
     /* Other paging assistance code will have structs here */
+    struct hap_domain    hap;
 };
 
 struct paging_vcpu {
