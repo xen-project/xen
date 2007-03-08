@@ -504,7 +504,6 @@ static struct tpm_vendor_specific tpm_vtpm = {
 };
 
 struct tpm_chip *init_vtpm(struct device *dev,
-                           struct tpm_virtual_device *tvd,
                            struct tpm_private *tp)
 {
 	long rc;
@@ -516,7 +515,6 @@ struct tpm_chip *init_vtpm(struct device *dev,
 		return ERR_PTR(-ENOMEM);
 
 	vtpm_state_init(vtpms);
-	vtpms->tpmvd = tvd;
 	vtpms->tpm_private = tp;
 
 	chip = tpm_register_hardware(dev, &tpm_vtpm);
