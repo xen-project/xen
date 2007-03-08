@@ -161,7 +161,8 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
-    rc = paging_enable(d, PG_SH_enable|PG_refcounts|PG_translate|PG_external);
+    /* paging support will be determined inside paging.c */
+    rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
         return rc;
 
