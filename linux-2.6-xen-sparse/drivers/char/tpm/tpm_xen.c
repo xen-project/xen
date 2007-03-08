@@ -369,10 +369,6 @@ static void backend_changed(struct xenbus_device *dev,
 	}
 }
 
-struct tpm_virtual_device tvd = {
-	.max_tx_size = PAGE_SIZE * TPMIF_TX_RING_SIZE,
-};
-
 static int tpmfront_probe(struct xenbus_device *dev,
                           const struct xenbus_device_id *id)
 {
@@ -383,7 +379,7 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	if (!tp)
 		return -ENOMEM;
 
-	tp->chip = init_vtpm(&dev->dev, &tvd, tp);
+	tp->chip = init_vtpm(&dev->dev, tp);
 	if (IS_ERR(tp->chip))
 		return PTR_ERR(tp->chip);
 
@@ -500,11 +496,6 @@ static void __init init_tpm_xenbus(void)
 	xenbus_register_frontend(&tpmfront);
 }
 
-static void __exit exit_tpm_xenbus(void)
-{
-	xenbus_unregister_driver(&tpmfront);
-}
-
 static int tpmif_allocate_tx_buffers(struct tpm_private *tp)
 {
 	unsigned int i;
@@ -530,13 +521,11 @@ static void tpmif_free_tx_buffers(struct tpm_private *tp)
 static void tpmif_rx_action(unsigned long priv)
 {
 	struct tpm_private *tp = (struct tpm_private *)priv;
-
 	int i = 0;
 	unsigned int received;
 	unsigned int offset = 0;
 	u8 *buffer;
-	tpmif_tx_request_t *tx;
-	tx = &tp->tx->ring[i].req;
+	tpmif_tx_request_t *tx = &tp->tx->ring[i].req;
 
 	atomic_set(&tp->tx_busy, 0);
 	wake_up_interruptible(&tp->wait_q);
@@ -545,7 +534,7 @@ static void tpmif_rx_action(unsigned long priv)
 
 	buffer = kmalloc(received, GFP_ATOMIC);
 	if (!buffer)
-		goto exit;
+		return;
 
 	for (i = 0; i < TPMIF_TX_RING_SIZE && offset < received; i++) {
 		struct tx_buffer *txb = tp->tx_buffers[i];
@@ -566,10 +555,6 @@ static void tpmif_rx_action(unsigned long priv)
 
 	vtpm_vd_recv(tp->chip, buffer, received, tp->tx_remember);
 	kfree(buffer);
-
-exit:
-
-	return;
 }
 
 
@@ -729,13 +714,6 @@ static int __init tpmif_init(void)
 	return 0;
 }
 
-
-void __exit tpmif_exit(void)
-{
-	exit_tpm_xenbus();
-	tpm_private_put();
-	gnttab_free_grant_references(gref_head);
-}
 
 module_init(tpmif_init);
 
