@@ -380,7 +380,7 @@ void hvm_triple_fault(void)
  */
 static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
 {
-    unsigned long mfn;
+    unsigned long gfn, mfn;
     char *p;
     int count, todo;
 
@@ -390,9 +390,11 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         if ( virt )
-            mfn = get_mfn_from_gpfn(paging_gva_to_gfn(current, addr));
+            gfn = paging_gva_to_gfn(current, addr);
         else
-            mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
+            gfn = addr >> PAGE_SHIFT;
+        
+        mfn = get_mfn_from_gpfn(gfn);
 
         if ( mfn == INVALID_MFN )
             return todo;
@@ -400,14 +402,15 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 
         if ( dir )
+        {
             memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
+            mark_dirty(current->domain, gfn);
+        }
         else
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
 
         unmap_domain_page(p);
         
-        mark_dirty(current->domain, mfn);
-
         addr += count;
         buf  += count;
         todo -= count;
