@@ -560,6 +560,9 @@ void send_guest_global_virq(struct domain *d, int virq)
 
     ASSERT(virq_is_global(virq));
 
+    if ( unlikely(d == NULL) )
+        return;
+
     v = d->vcpu[0];
     if ( unlikely(v == NULL) )
         return;
