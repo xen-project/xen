@@ -433,23 +433,11 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
 {
     vcpu_guest_context_x86_32_t *ctxt = ptr;
     xen_pfn_t cr3_pfn;
-    int i;
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
-
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
-    {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS_X86_32;
-    }
-
-    /* No callback handlers. */
-    ctxt->event_callback_cs = FLAT_KERNEL_CS_X86_32;
-    ctxt->failsafe_callback_cs = FLAT_KERNEL_CS_X86_32;
 
     ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_32;
     ctxt->user_regs.es = FLAT_KERNEL_DS_X86_32;
@@ -464,9 +452,8 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
         dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
-    ctxt->kernel_ss = FLAT_KERNEL_SS_X86_32;
-    ctxt->kernel_sp =
-        dom->parms.virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 
     ctxt->flags = VGCF_in_kernel_X86_32;
     if ( dom->parms.pae == 2 /* extended_cr3 */ ||
@@ -485,19 +472,11 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
 {
     vcpu_guest_context_x86_64_t *ctxt = ptr;
     xen_pfn_t cr3_pfn;
-    int i;
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
-
-    /* Virtual IDT is empty at start-of-day. */
-    for ( i = 0; i < 256; i++ )
-    {
-        ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS_X86_64;
-    }
 
     ctxt->user_regs.ds = FLAT_KERNEL_DS_X86_64;
     ctxt->user_regs.es = FLAT_KERNEL_DS_X86_64;
@@ -512,9 +491,8 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
         dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.rflags = 1 << 9; /* Interrupt Enable */
 
-    ctxt->kernel_ss = FLAT_KERNEL_SS_X86_64;
-    ctxt->kernel_sp =
-        dom->parms.virt_base + (dom->bootstack_pfn + 1) * PAGE_SIZE_X86;
+    ctxt->kernel_ss = ctxt->user_regs.ss;
+    ctxt->kernel_sp = ctxt->user_regs.esp;
 
     ctxt->flags = VGCF_in_kernel_X86_64;
     cr3_pfn = xc_dom_p2m_guest(dom, dom->pgtables_seg.pfn);
