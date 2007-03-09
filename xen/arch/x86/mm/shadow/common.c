@@ -2386,7 +2386,6 @@ int shadow_enable(struct domain *d, u32 mode)
 
     /* Sanity check the arguments */
     if ( (d == current->domain) ||
-         d->vcpu[0] == NULL ||
          shadow_mode_enabled(d) ||
          ((mode & PG_translate) && !(mode & PG_refcounts)) ||
          ((mode & PG_external) && !(mode & PG_translate)) )
