@@ -890,6 +890,9 @@ static size_t size_of_member(const abstract_type *type)
     case REF:
         return sizeof(arbitrary_record_opt *);
 
+    case STRUCT:
+        return type->struct_size;
+
     default:
         assert(false);
     }
@@ -1215,7 +1218,8 @@ add_struct_value(const struct abstract_type *type, void *value,
 
             for (size_t i = 0; i < set_val->size; i++)
             {
-                void *member_value = set_val->contents + (i * member_size);
+                void *member_value = (char *)set_val->contents +
+                                     (i * member_size);
                 add_struct_value(member_type, member_value,
                                  add_unnamed_value, NULL, data_node);
             }
