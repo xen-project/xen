@@ -1926,7 +1926,7 @@ class XendAPI(object):
                  XendDomain.POWER_STATE_NAMES[dom.state]])
             from xen.xend.server import tpmif
             tpmif.destroy_vtpmstate(dom.getName())
-            return xen_api_success(True)
+            return xen_api_success_void()
         else:
             return xen_api_error(['HANDLE_INVALID', 'VM', vtpm_struct['VM']])
 

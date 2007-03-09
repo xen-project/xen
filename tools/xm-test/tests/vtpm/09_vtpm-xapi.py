@@ -113,7 +113,7 @@ if not re.search("PCR-00:",run["output"]):
     FAIL("1. Virtual TPM is not working correctly on /dev/vtpm on backend side: \n%s" % run["output"])
 
 try:
-    rc = session.xenapi.VTPM.destroy(vtpm_uuid)
+    session.xenapi.VTPM.destroy(vtpm_uuid)
     #Should never get here
     FAIL("Could destroy vTPM while VM is running")
 except:
@@ -124,7 +124,7 @@ if rc:
     FAIL("Could not suspend VM")
 
 try:
-    rc = session.xenapi.VTPM.destroy(vtpm_uuid)
+    session.xenapi.VTPM.destroy(vtpm_uuid)
     #May not throw an exception in 'suspend' state
 except:
     pass
@@ -150,8 +150,9 @@ if not re.search("PCR-00:",run["output"]):
 
 domain.stop()
 
-rc = session.xenapi.VTPM.destroy(vtpm_uuid)
-if not rc:
+try:
+    session.xenapi.VTPM.destroy(vtpm_uuid)
+except:
     FAIL("Could NOT destroy vTPM while domain is halted.")
 
 domain.destroy()
