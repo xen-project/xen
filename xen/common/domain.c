@@ -102,9 +102,6 @@ struct vcpu *alloc_vcpu(
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
 
-    /* VCPUs by default have a 100Hz ticker. */
-    v->periodic_period = MILLISECS(10);
-
     if ( (vcpu_id != 0) && !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 

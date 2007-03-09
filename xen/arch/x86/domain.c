@@ -350,6 +350,9 @@ int vcpu_initialise(struct vcpu *v)
     }
     else
     {
+        /* PV guests by default have a 100Hz ticker. */
+        v->periodic_period = MILLISECS(10);
+
         /* PV guests get an emulated PIT too for video BIOSes to use. */
         if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
             pit_init(v, cpu_khz);
