@@ -1754,13 +1754,13 @@ class XendAPI(object):
 
     # Xen API: Class VDI
     # ----------------------------------------------------------------
-    VDI_attr_ro = ['VBDs',
+    VDI_attr_ro = ['SR',
+                   'VBDs',
                    'physical_utilisation',
                    'sector_size',
                    'type']
     VDI_attr_rw = ['name_label',
                    'name_description',
-                   'SR',
                    'virtual_size',
                    'sharable',
                    'read_only']
@@ -1811,9 +1811,6 @@ class XendAPI(object):
     def VDI_set_name_description(self, session, vdi_ref, value):
         self._get_VDI(vdi_ref).name_description = value
         return xen_api_success_void()
-
-    def VDI_set_SR(self, session, vdi_ref, value):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
     def VDI_set_virtual_size(self, session, vdi_ref, value):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)

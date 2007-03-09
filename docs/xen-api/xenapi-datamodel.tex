@@ -9583,7 +9583,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
-$\mathit{RW}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
 $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & list of crash dumps that refer to this disk \\
 $\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in bytes). Note that, depending on storage backend type, requested size may not be respected exactly \\
@@ -9876,40 +9876,6 @@ SR ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_SR}
-
-{\bf Overview:} 
-Set the SR field of the given VDI.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_SR (session_id s, VDI ref self, SR ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & reference to the object \\ \hline 
-
-{\tt SR ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

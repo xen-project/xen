@@ -293,13 +293,6 @@ xen_vdi_set_name_description(xen_session *session, xen_vdi vdi, char *descriptio
 
 
 /**
- * Set the SR field of the given VDI.
- */
-extern bool
-xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr);
-
-
-/**
  * Set the virtual_size field of the given VDI.
  */
 extern bool

@@ -410,22 +410,6 @@ xen_vdi_set_name_description(xen_session *session, xen_vdi vdi, char *descriptio
 
 
 bool
-xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi },
-            { .type = &abstract_type_string,
-              .u.string_val = sr }
-        };
-
-    xen_call_(session, "VDI.set_SR", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vdi_set_virtual_size(xen_session *session, xen_vdi vdi, int64_t virtual_size)
 {
     abstract_value param_values[] =
