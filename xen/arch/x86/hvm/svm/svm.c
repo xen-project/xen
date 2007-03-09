@@ -107,22 +107,10 @@ static inline void svm_inject_exception(struct vcpu *v, int trap,
 static void stop_svm(void)
 {
     u32 eax, edx;    
-    int cpu = smp_processor_id();
-
     /* We turn off the EFER_SVME bit. */
     rdmsr(MSR_EFER, eax, edx);
     eax &= ~EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
- 
-    /* release the HSA */
-    free_host_save_area(hsa[cpu]);
-    hsa[cpu] = NULL;
-    wrmsr(MSR_K8_VM_HSAVE_PA, 0, 0 );
-
-    /* free up the root vmcb */
-    free_vmcb(root_vmcb[cpu]);
-    root_vmcb[cpu] = NULL;
-    root_vmcb_pa[cpu] = 0;
 }
 
 static void svm_store_cpu_guest_regs(
@@ -1058,8 +1046,9 @@ int start_svm(void)
         return 0;
     }
 
-    if (!(hsa[cpu] = alloc_host_save_area()))
-        return 0;
+    if (!hsa[cpu])
+        if (!(hsa[cpu] = alloc_host_save_area()))
+            return 0;
     
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
@@ -1074,8 +1063,9 @@ int start_svm(void)
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
   
-    if (!(root_vmcb[cpu] = alloc_vmcb())) 
-        return 0;
+    if (!root_vmcb[cpu])
+        if (!(root_vmcb[cpu] = alloc_vmcb())) 
+            return 0;
     root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
 
     if (cpu == 0)

@@ -79,11 +79,6 @@ struct host_save_area *alloc_host_save_area(void)
     return hsa;
 }
 
-void free_host_save_area(struct host_save_area *hsa)
-{
-    free_xenheap_page(hsa);
-}
-
 static int construct_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
