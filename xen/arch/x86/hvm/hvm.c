@@ -446,7 +446,7 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         if ( dir )
         {
             memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
-            mark_dirty(current->domain, gfn);
+            mark_dirty(current->domain, mfn);
         }
         else
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
