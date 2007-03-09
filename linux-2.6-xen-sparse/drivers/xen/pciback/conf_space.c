@@ -357,7 +357,7 @@ int pciback_config_add_field_offset(struct pci_dev *dev,
 	void *tmp;
 
 	/* silently ignore duplicate fields */
-	if (pciback_field_is_dup(dev, field->offset))
+	if (pciback_field_is_dup(dev, field->offset + offset))
 		goto out;
 
 	cfg_entry = kmalloc(sizeof(*cfg_entry), GFP_KERNEL);
