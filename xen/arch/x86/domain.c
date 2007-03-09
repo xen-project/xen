@@ -457,8 +457,10 @@ int arch_domain_create(struct domain *d)
  fail:
     free_xenheap_page(d->shared_info);
 #ifdef __x86_64__
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
+    if ( d->arch.mm_perdomain_l2 )
+        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
+    if ( d->arch.mm_perdomain_l3 )
+        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
     return rc;
