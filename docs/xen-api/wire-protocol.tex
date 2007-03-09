@@ -30,8 +30,13 @@ These types are mapped onto XML-RPC types in a straight-forward manner:
   \item Floats, Bools, DateTimes and Strings map directly to the XML-RPC {\tt
   double}, {\tt boolean}, {\tt dateTime.iso8601}, and {\tt string} elements.
 
-  \item all our ``{\tt ref\_}'' types (e.g.\ {\tt ref\_vm} in the above
-  example) map to XML-RPC's {\tt String} type.  The string itself is the OSF
+  \item all ``{\tt ref\_}'' types are opaque references, encoded as the
+  XML-RPC's {\tt String} type. Users of the API should not make assumptions
+  about the concrete form of these strings and should not expect them to
+  remain valid after the client's session with the server has terminated.
+
+  \item fields named ``{\tt uuid}'' of type ``{\tt String}'' are mapped to
+  the XML-RPC {\tt String} type. The string itself is the OSF
   DCE UUID presentation format (as output by {\tt uuidgen}, etc).
 
   \item ints are all assumed to be 64-bit in our API and are encoded as a
@@ -82,6 +87,32 @@ These types are mapped onto XML-RPC types in a straight-forward manner:
 
   \item our {\tt Void} type is transmitted as an empty string.
 
+\end{itemize}
+
+\subsection{Note on References vs UUIDs}
+
+References are opaque types --- encoded as XML-RPC strings on the wire --- understood
+only by the particular server which generated them. Servers are free to choose
+any concrete representation they find convenient; clients should not make any 
+assumptions or attempt to parse the string contents. References are not guaranteed
+to be permanent identifiers for objects; clients should not assume that references 
+generated during one session are valid for any future session. References do not
+allow objects to be compared for equality. Two references to the same object are
+not guaranteed to be textually identical.
+
+UUIDs are intended to be permanent names for objects. They are
+guaranteed to be in the OSF DCE UUID presentation format (as output by {\tt uuidgen}.
+Clients may store UUIDs on disk and use them to lookup objects in subsequent sessions
+with the server. Clients may also test equality on objects by comparing UUID strings.
+
+The API provides mechanisms
+for translating between UUIDs and opaque references. Each class that contains a UUID
+field provides:
+\begin{itemize}
+\item  A ``{\tt get\_by\_uuid}'' method that takes a UUID, $u$, and returns an opaque reference
+to the server-side object that has UUID=$u$; 
+\item A {\tt get\_uuid} function (a regular ``field getter'' RPC) that takes an opaque reference,
+$r$, and returns the UUID of the server-side object that is referenced by $r$.
 \end{itemize}
 
 \subsection{Return Values/Status Codes}
@@ -138,7 +169,7 @@ may look like this:
 
 \subsection{Transport Layer}
 
-We ought to support at least
+The following transport layers are currently supported:
 \begin{itemize}
 \item HTTP/S for remote administration
 \item HTTP over Unix domain sockets for local administration
@@ -247,13 +278,12 @@ call takes the session token as the only parameter)
 \begin{verbatim}
 >>> all_vms = host.get_resident_VMs(session)['Value']
 >>> all_vms
-['b7b92d9e-d442-4710-92a5-ab039fd7d89b', '23e1e837-abbf-4675-b077-d4007989b0cc',
-  '2045dbc0-0734-4eea-9cb2-b8218c6b5bf2', '3202ae18-a046-4c32-9fda-e32e9631866e']
+['OpaqueRef:1', 'OpaqueRef:2', 'OpaqueRef:3', 'OpaqueRef:4' ]
 \end{verbatim}
 
-The VM references here are UUIDs, though they may not be that simple in the
-future, and you should treat them as opaque strings.  Once a reference to a VM
-has been acquired a lifecycle operation may be invoked:
+The VM references here have the form {\tt OpaqueRef:X}, though they may not be 
+that simple in the future, and you should treat them as opaque strings.  
+Once a reference to a VM has been acquired a lifecycle operation may be invoked:
 
 \begin{verbatim}
 >>> xen.VM.start(session, all_vms[3], False)
