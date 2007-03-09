@@ -606,7 +606,8 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	}
 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		iobmp_op.bitmap   = (char *)next->io_bitmap_ptr;
+		set_xen_guest_handle(iobmp_op.bitmap,
+				     (char *)next->io_bitmap_ptr);
 		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iobitmap;
