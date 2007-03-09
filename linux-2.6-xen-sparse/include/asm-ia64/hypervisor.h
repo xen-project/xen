@@ -51,7 +51,7 @@ extern int running_on_xen;
 #include <linux/version.h>
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
+#include <xen/interface/platform.h>
 #include <xen/interface/event_channel.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>

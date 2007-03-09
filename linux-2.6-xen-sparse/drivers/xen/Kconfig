@@ -13,7 +13,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00030203
+	default 0x00030205
 
 menu "XEN"
 

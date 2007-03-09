@@ -120,9 +120,9 @@ HYPERVISOR_set_timer_op(u64 timeout)
 }
 
 static inline int
-xencomm_arch_hypercall_dom0_op(struct xencomm_handle *op)
+xencomm_arch_hypercall_platform_op(struct xencomm_handle *op)
 {
-	return _hypercall1(int, dom0_op, op);
+	return _hypercall1(int, platform_op, op);
 }
 
 static inline int

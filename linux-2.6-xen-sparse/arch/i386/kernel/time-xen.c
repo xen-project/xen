@@ -435,7 +435,7 @@ int do_settimeofday(struct timespec *tv)
 	s64 nsec;
 	unsigned int cpu;
 	struct shadow_time_info *shadow;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
@@ -460,11 +460,11 @@ int do_settimeofday(struct timespec *tv)
 	__normalize_time(&sec, &nsec);
 
 	if (is_initial_xendomain() && !independent_wallclock) {
-		op.cmd = DOM0_SETTIME;
+		op.cmd = XENPF_settime;
 		op.u.settime.secs        = sec;
 		op.u.settime.nsecs       = nsec;
 		op.u.settime.system_time = shadow->system_timestamp;
-		HYPERVISOR_dom0_op(&op);
+		HYPERVISOR_platform_op(&op);
 		update_wallclock();
 	} else if (independent_wallclock) {
 		nsec -= shadow->system_timestamp;
@@ -488,7 +488,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 {
 	time_t sec;
 	s64 nsec;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	if (!ntp_synced() || independent_wallclock || !is_initial_xendomain())
 		return;
@@ -499,11 +499,11 @@ static void sync_xen_wallclock(unsigned long dummy)
 	nsec = xtime.tv_nsec + ((jiffies - wall_jiffies) * (u64)NS_PER_TICK);
 	__normalize_time(&sec, &nsec);
 
-	op.cmd = DOM0_SETTIME;
+	op.cmd = XENPF_settime;
 	op.u.settime.secs        = sec;
 	op.u.settime.nsecs       = nsec;
 	op.u.settime.system_time = processed_system_time;
-	HYPERVISOR_dom0_op(&op);
+	HYPERVISOR_platform_op(&op);
 
 	update_wallclock();
 
