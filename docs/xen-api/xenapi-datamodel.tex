@@ -231,7 +231,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt this\_user} & user ref & Currently connected 
 $\mathit{RO}_\mathit{run}$ &  {\tt last\_active} & int & Timestamp for last time session was active \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: session}
+\subsection{RPCs associated with class: session}
 \subsubsection{RPC name:~login\_with\_password}
 
 {\bf Overview:} 
@@ -505,7 +505,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has f
 $\mathit{RO}_\mathit{run}$ &  {\tt allowed\_operations} & (task\_allowed\_operations) Set & Operations allowed on this task \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: task}
+\subsection{RPCs associated with class: task}
 \subsubsection{RPC name:~cancel}
 
 {\bf Overview:} 
@@ -1104,7 +1104,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associat
 $\mathit{RO}_\mathit{run}$ &  {\tt guest\_metrics} & VM\_guest\_metrics ref & metrics associated with the running guest \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VM}
+\subsection{RPCs associated with class: VM}
 \subsubsection{RPC name:~clone}
 
 {\bf Overview:} 
@@ -4247,7 +4247,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VM\_metrics}
+\subsection{RPCs associated with class: VM\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -4483,7 +4483,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt networks} & (string $\rightarrow$ string) Map
 $\mathit{RO}_\mathit{run}$ &  {\tt other} & (string $\rightarrow$ string) Map & anything else \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VM\_guest\_metrics}
+\subsection{RPCs associated with class: VM\_guest\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -4827,7 +4827,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physi
 $\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host. \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: host}
+\subsection{RPCs associated with class: host}
 \subsubsection{RPC name:~disable}
 
 {\bf Overview:} 
@@ -6080,7 +6080,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (by
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: host\_metrics}
+\subsection{RPCs associated with class: host\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -6285,7 +6285,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical C
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: host\_cpu}
+\subsection{RPCs associated with class: host\_cpu}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -6679,7 +6679,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vif
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & list of connected pifs \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: network}
+\subsection{RPCs associated with class: network}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -7117,7 +7117,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & sup
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VIF}
+\subsection{RPCs associated with class: VIF}
 \subsubsection{RPC name:~plug}
 
 {\bf Overview:} 
@@ -8009,7 +8009,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VIF\_metrics}
+\subsection{RPCs associated with class: VIF\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -8215,7 +8215,7 @@ $\mathit{RW}$ &  {\tt VLAN} & int & VLAN tag for all traffic passing through thi
 $\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & PIF\_metrics ref & metrics associated with this PIF. \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: PIF}
+\subsection{RPCs associated with class: PIF}
 \subsubsection{RPC name:~create\_VLAN}
 
 {\bf Overview:} 
@@ -8786,7 +8786,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: PIF\_metrics}
+\subsection{RPCs associated with class: PIF\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -8993,7 +8993,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt type} & string & type of the storage reposito
 $\mathit{RO}_\mathit{ins}$ &  {\tt location} & string & a string that uniquely determines the location of the storage repository; the format of this string depends on the repository's type \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: SR}
+\subsection{RPCs associated with class: SR}
 \subsubsection{RPC name:~clone}
 
 {\bf Overview:} 
@@ -9627,7 +9627,7 @@ $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VDI}
+\subsection{RPCs associated with class: VDI}
 \subsubsection{RPC name:~snapshot}
 
 {\bf Overview:} 
@@ -10493,7 +10493,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & sup
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VBD}
+\subsection{RPCs associated with class: VBD}
 \subsubsection{RPC name:~media\_change}
 
 {\bf Overview:} 
@@ -11486,7 +11486,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VBD\_metrics}
+\subsection{RPCs associated with class: VBD\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -11688,7 +11688,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt device\_config} & (string $\rightarrow$ strin
 $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the SR currently attached on this host? \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: PBD}
+\subsection{RPCs associated with class: PBD}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -12016,7 +12016,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: crashdump}
+\subsection{RPCs associated with class: crashdump}
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
@@ -12248,7 +12248,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt backend} & VM ref & the domain where the backend is located \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VTPM}
+\subsection{RPCs associated with class: VTPM}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -12493,7 +12493,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is at
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: console}
+\subsection{RPCs associated with class: console}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -12928,7 +12928,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt short\_name} & string & short name (e.g. user
 $\mathit{RW}$ &  {\tt fullname} & string & full name \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: user}
+\subsection{RPCs associated with class: user}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -13193,7 +13193,7 @@ all fields from the object
 \section{Class: debug}
 \subsection{Fields for class: debug}
 {\bf Class debug has no fields.}
-\subsection{Additional RPCs associated with class: debug}
+\subsection{RPCs associated with class: debug}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
