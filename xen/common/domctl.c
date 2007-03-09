@@ -360,7 +360,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         unsigned int i, max = op->u.max_vcpus.max, cpu;
 
         ret = -EINVAL;
-        if ( max > MAX_VIRT_CPUS || max == 0 )
+        if ( max > MAX_VIRT_CPUS )
             break;
 
         ret = -ESRCH;
