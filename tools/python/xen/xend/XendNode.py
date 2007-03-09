@@ -453,6 +453,12 @@ class XendNode:
                 return pif.network
         raise Exception('Bridge %s is not connected to a network' % bridge)
 
+    #
+    # Debug keys.
+    #
+
+    def send_debug_keys(self, keys):
+        return self.xc.send_debug_keys(keys)
 
     #
     # Getting host information.
