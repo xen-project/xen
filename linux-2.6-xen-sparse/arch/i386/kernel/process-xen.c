@@ -307,7 +307,8 @@ void exit_thread(void)
 	if (unlikely(test_thread_flag(TIF_IO_BITMAP))) {
 		struct task_struct *tsk = current;
 		struct thread_struct *t = &tsk->thread;
-		struct physdev_set_iobitmap set_iobitmap = { 0 };
+		struct physdev_set_iobitmap set_iobitmap;
+		memset(&set_iobitmap, 0, sizeof(set_iobitmap));
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;

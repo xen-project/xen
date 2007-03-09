@@ -600,7 +600,7 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 	int    g, u, m, rc;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
-		return 0;
+		return;
 
 	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
 		if (pgd_none(*pgd))

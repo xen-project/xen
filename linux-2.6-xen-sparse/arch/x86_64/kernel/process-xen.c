@@ -304,7 +304,8 @@ void exit_thread(void)
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
 #endif
 #ifdef CONFIG_XEN
-		struct physdev_set_iobitmap iobmp_op = { 0 };
+		struct physdev_set_iobitmap iobmp_op;
+		memset(&iobmp_op, 0, sizeof(iobmp_op));
 #endif
 
 		kfree(t->io_bitmap_ptr);
