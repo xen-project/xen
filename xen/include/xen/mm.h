@@ -92,6 +92,11 @@ extern struct list_head page_scrub_list;
         if ( !list_empty(&page_scrub_list) )    \
             raise_softirq(PAGE_SCRUB_SOFTIRQ);  \
     } while ( 0 )
+#define page_scrub_kick()                                               \
+    do {                                                                \
+        if ( !list_empty(&page_scrub_list) )                            \
+            cpumask_raise_softirq(cpu_online_map, PAGE_SCRUB_SOFTIRQ);  \
+    } while ( 0 )
 unsigned long avail_scrub_pages(void);
 
 #include <asm/mm.h>

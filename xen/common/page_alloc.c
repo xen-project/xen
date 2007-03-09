@@ -970,6 +970,8 @@ __initcall(pagealloc_keyhandler_init);
  * PAGE SCRUBBING
  */
 
+static DEFINE_PER_CPU(struct timer, page_scrub_timer);
+
 static void page_scrub_softirq(void)
 {
     struct list_head *ent;
@@ -978,7 +980,7 @@ static void page_scrub_softirq(void)
     int               i;
     s_time_t          start = NOW();
 
-    /* Aim to do 1ms of work (ten percent of a 10ms jiffy). */
+    /* Aim to do 1ms of work every 10ms. */
     do {
         spin_lock(&page_scrub_lock);
 
@@ -1014,6 +1016,13 @@ static void page_scrub_softirq(void)
             free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, 0);
         }
     } while ( (NOW() - start) < MILLISECS(1) );
+
+    set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(10));
+}
+
+static void page_scrub_timer_fn(void *unused)
+{
+    page_scrub_schedule_work();
 }
 
 unsigned long avail_scrub_pages(void)
@@ -1049,6 +1058,10 @@ __initcall(register_heap_trigger);
 
 static __init int page_scrub_init(void)
 {
+    int cpu;
+    for_each_cpu ( cpu )
+        init_timer(&per_cpu(page_scrub_timer, cpu),
+                   page_scrub_timer_fn, NULL, cpu);
     open_softirq(PAGE_SCRUB_SOFTIRQ, page_scrub_softirq);
     return 0;
 }

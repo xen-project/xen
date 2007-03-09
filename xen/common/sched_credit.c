@@ -186,6 +186,8 @@
 struct csched_pcpu {
     struct list_head runq;
     uint32_t runq_sort_last;
+    struct timer ticker;
+    unsigned int tick;
 };
 
 /*
@@ -245,7 +247,7 @@ struct csched_private {
  */
 static struct csched_private csched_priv;
 
-
+static void csched_tick(void *_cpu);
 
 static inline int
 __cycle_cpu(int cpu, const cpumask_t *mask)
@@ -362,12 +364,13 @@ csched_pcpu_init(int cpu)
     if ( csched_priv.master >= csched_priv.ncpus )
         csched_priv.master = cpu;
 
+    init_timer(&spc->ticker, csched_tick, (void *)(unsigned long)cpu, cpu);
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = csched_priv.runq_sort;
     per_cpu(schedule_data, cpu).sched_priv = spc;
 
     /* Start off idling... */
-    BUG_ON( !is_idle_vcpu(per_cpu(schedule_data, cpu).curr) );
+    BUG_ON(!is_idle_vcpu(per_cpu(schedule_data, cpu).curr));
     cpu_set(cpu, csched_priv.idlers);
 
     spin_unlock_irqrestore(&csched_priv.lock, flags);
@@ -1013,8 +1016,13 @@ csched_acct(void)
 }
 
 static void
-csched_tick(unsigned int cpu)
+csched_tick(void *_cpu)
 {
+    unsigned int cpu = (unsigned long)_cpu;
+    struct csched_pcpu *spc = CSCHED_PCPU(cpu);
+
+    spc->tick++;
+
     /*
      * Accounting for running VCPU
      */
@@ -1028,7 +1036,7 @@ csched_tick(unsigned int cpu)
      * we could distribute or at the very least cycle the duty.
      */
     if ( (csched_priv.master == cpu) &&
-         (per_cpu(schedule_data, cpu).tick % CSCHED_TICKS_PER_ACCT) == 0 )
+         (spc->tick % CSCHED_TICKS_PER_ACCT) == 0 )
     {
         csched_acct();
     }
@@ -1041,6 +1049,8 @@ csched_tick(unsigned int cpu)
      * once per accounting period (currently 30 milliseconds).
      */
     csched_runq_sort(cpu);
+
+    set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
 }
 
 static struct csched_vcpu *
@@ -1248,8 +1258,7 @@ csched_dump_pcpu(int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    printk(" tick=%lu, sort=%d, sibling=0x%lx, core=0x%lx\n",
-            per_cpu(schedule_data, cpu).tick,
+    printk(" sort=%d, sibling=0x%lx, core=0x%lx\n",
             spc->runq_sort_last,
             cpu_sibling_map[cpu].bits[0],
             cpu_core_map[cpu].bits[0]);
@@ -1341,6 +1350,22 @@ csched_init(void)
     CSCHED_STATS_RESET();
 }
 
+/* Tickers cannot be kicked until SMP subsystem is alive. */
+static __init int csched_start_tickers(void)
+{
+    struct csched_pcpu *spc;
+    unsigned int cpu;
+
+    for_each_online_cpu ( cpu )
+    {
+        spc = CSCHED_PCPU(cpu);
+        set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
+    }
+
+    return 0;
+}
+__initcall(csched_start_tickers);
+
 
 struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
@@ -1359,7 +1384,6 @@ struct scheduler sched_credit_def = {
     .adjust         = csched_dom_cntl,
 
     .pick_cpu       = csched_cpu_pick,
-    .tick           = csched_tick,
     .do_schedule    = csched_schedule,
 
     .dump_cpu_state = csched_dump_pcpu,

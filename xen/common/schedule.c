@@ -45,8 +45,8 @@ boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
 /* Various timer handlers. */
 static void s_timer_fn(void *unused);
-static void t_timer_fn(void *unused);
-static void vcpu_timer_fn(void *data);
+static void vcpu_periodic_timer_fn(void *data);
+static void vcpu_singleshot_timer_fn(void *data);
 static void poll_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
@@ -65,9 +65,6 @@ static struct scheduler ops;
 #define SCHED_OP(fn, ...)                                 \
          (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \
           : (typeof(ops.fn(__VA_ARGS__)))0 )
-
-/* Per-CPU periodic timer sends an event to the currently-executing domain. */
-static DEFINE_PER_CPU(struct timer, t_timer);
 
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
@@ -114,8 +111,12 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
         cpus_setall(v->cpu_affinity);
 
     /* Initialise the per-domain timers. */
-    init_timer(&v->timer, vcpu_timer_fn, v, v->processor);
-    init_timer(&v->poll_timer, poll_timer_fn, v, v->processor);
+    init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
+               v, v->processor);
+    init_timer(&v->singleshot_timer, vcpu_singleshot_timer_fn,
+               v, v->processor);
+    init_timer(&v->poll_timer, poll_timer_fn,
+               v, v->processor);
 
     /* Idle VCPUs are scheduled immediately. */
     if ( is_idle_domain(d) )
@@ -132,7 +133,8 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
 
 void sched_destroy_vcpu(struct vcpu *v)
 {
-    kill_timer(&v->timer);
+    kill_timer(&v->periodic_timer);
+    kill_timer(&v->singleshot_timer);
     kill_timer(&v->poll_timer);
     SCHED_OP(destroy_vcpu, v);
 }
@@ -223,10 +225,29 @@ static void vcpu_migrate(struct vcpu *v)
     vcpu_wake(v);
 }
 
+/*
+ * Force a VCPU through a deschedule/reschedule path.
+ * For example, using this when setting the periodic timer period means that
+ * most periodic-timer state need only be touched from within the scheduler
+ * which can thus be done without need for synchronisation.
+ */
+void vcpu_force_reschedule(struct vcpu *v)
+{
+    vcpu_schedule_lock_irq(v);
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
+        set_bit(_VCPUF_migrating, &v->vcpu_flags);
+    vcpu_schedule_unlock_irq(v);
+
+    if ( test_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    {
+        vcpu_sleep_nosync(v);
+        vcpu_migrate(v);
+    }
+}
+
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
     cpumask_t online_affinity;
-    unsigned long flags;
 
     if ( (v->domain->domain_id == 0) && opt_dom0_vcpus_pin )
         return -EINVAL;
@@ -235,13 +256,13 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
     if ( cpus_empty(online_affinity) )
         return -EINVAL;
 
-    vcpu_schedule_lock_irqsave(v, flags);
+    vcpu_schedule_lock_irq(v);
 
     v->cpu_affinity = *affinity;
     if ( !cpu_isset(v->processor, v->cpu_affinity) )
         set_bit(_VCPUF_migrating, &v->vcpu_flags);
 
-    vcpu_schedule_unlock_irqrestore(v, flags);
+    vcpu_schedule_unlock_irq(v);
 
     if ( test_bit(_VCPUF_migrating, &v->vcpu_flags) )
     {
@@ -458,7 +479,7 @@ long do_set_timer_op(s_time_t timeout)
 
     if ( timeout == 0 )
     {
-        stop_timer(&v->timer);
+        stop_timer(&v->singleshot_timer);
     }
     else if ( unlikely(timeout < 0) || /* overflow into 64th bit? */
               unlikely((offset > 0) && ((uint32_t)(offset >> 50) != 0)) )
@@ -474,14 +495,20 @@ long do_set_timer_op(s_time_t timeout)
          * timeout in this case can burn a lot of CPU. We therefore go for a
          * reasonable middleground of triggering a timer event in 100ms.
          */
-        gdprintk(XENLOG_INFO, "Warning: huge timeout set by domain %d (vcpu %d):"
-                " %"PRIx64"\n",
+        gdprintk(XENLOG_INFO, "Warning: huge timeout set by domain %d "
+                "(vcpu %d): %"PRIx64"\n",
                 v->domain->domain_id, v->vcpu_id, (uint64_t)timeout);
-        set_timer(&v->timer, NOW() + MILLISECS(100));
+        set_timer(&v->singleshot_timer, NOW() + MILLISECS(100));
     }
     else
     {
-        set_timer(&v->timer, timeout);
+        if ( v->singleshot_timer.cpu != smp_processor_id() )
+        {
+            stop_timer(&v->singleshot_timer);
+            v->singleshot_timer.cpu = smp_processor_id();
+        }
+
+        set_timer(&v->singleshot_timer, timeout);
     }
 
     return 0;
@@ -538,6 +565,28 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
     }
 
     return 0;
+}
+
+static void vcpu_periodic_timer_work(struct vcpu *v)
+{
+    s_time_t now = NOW();
+    uint64_t periodic_next_event;
+
+    ASSERT(!active_timer(&v->periodic_timer));
+
+    if ( v->periodic_period == 0 )
+        return;
+
+    periodic_next_event = v->periodic_last_event + v->periodic_period;
+    if ( now > periodic_next_event )
+    {
+        send_timer_event(v);
+        v->periodic_last_event = now;
+        periodic_next_event = now + v->periodic_period;
+    }
+
+    v->periodic_timer.cpu = smp_processor_id();
+    set_timer(&v->periodic_timer, periodic_next_event);
 }
 
 /* 
@@ -606,14 +655,13 @@ static void schedule(void)
 
     perfc_incrc(sched_ctx);
 
-    prev->sleep_tick = sd->tick;
+    stop_timer(&prev->periodic_timer);
 
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_vcpu(next) )
     {
         update_vcpu_system_time(next);
-        if ( next->sleep_tick != sd->tick )
-            send_timer_event(next);
+        vcpu_periodic_timer_work(next);
     }
 
     TRACE_4D(TRC_SCHED_SWITCH,
@@ -631,13 +679,6 @@ void context_saved(struct vcpu *prev)
         vcpu_migrate(prev);
 }
 
-/****************************************************************************
- * Timers: the scheduler utilises a number of timers
- * - s_timer: per CPU timer for preemption and scheduling decisions
- * - t_timer: per CPU periodic timer to send timer interrupt to current dom
- * - dom_timer: per domain timer to specifiy timeout values
- ****************************************************************************/
-
 /* The scheduler timer: force a run through the scheduler */
 static void s_timer_fn(void *unused)
 {
@@ -645,28 +686,15 @@ static void s_timer_fn(void *unused)
     perfc_incrc(sched_irq);
 }
 
-/* Periodic tick timer: send timer event to current domain */
-static void t_timer_fn(void *unused)
+/* Per-VCPU periodic timer function: sends a virtual timer interrupt. */
+static void vcpu_periodic_timer_fn(void *data)
 {
-    struct vcpu *v   = current;
-
-    this_cpu(schedule_data).tick++;
-
-    if ( !is_idle_vcpu(v) )
-    {
-        update_vcpu_system_time(v);
-        send_timer_event(v);
-    }
-
-    page_scrub_schedule_work();
-
-    SCHED_OP(tick, smp_processor_id());
-
-    set_timer(&this_cpu(t_timer), NOW() + MILLISECS(10));
+    struct vcpu *v = data;
+    vcpu_periodic_timer_work(v);
 }
 
-/* Per-VCPU timer function: sends a virtual timer interrupt. */
-static void vcpu_timer_fn(void *data)
+/* Per-VCPU single-shot timer function: sends a virtual timer interrupt. */
+static void vcpu_singleshot_timer_fn(void *data)
 {
     struct vcpu *v = data;
     send_timer_event(v);
@@ -691,7 +719,6 @@ void __init scheduler_init(void)
     {
         spin_lock_init(&per_cpu(schedule_data, i).schedule_lock);
         init_timer(&per_cpu(schedule_data, i).s_timer, s_timer_fn, NULL, i);
-        init_timer(&per_cpu(t_timer, i), t_timer_fn, NULL, i);
     }
 
     for ( i = 0; schedulers[i] != NULL; i++ )
@@ -706,16 +733,6 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(init);
-}
-
-/*
- * Start a scheduler for each CPU
- * This has to be done *after* the timers, e.g., APICs, have been initialised
- */
-void schedulers_start(void) 
-{   
-    t_timer_fn(0);
-    smp_call_function((void *)t_timer_fn, NULL, 1, 1);
 }
 
 void dump_runq(unsigned char key)

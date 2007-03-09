@@ -102,6 +102,9 @@ struct vcpu *alloc_vcpu(
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
 
+    /* VCPUs by default have a 100Hz ticker. */
+    v->periodic_period = MILLISECS(10);
+
     if ( (vcpu_id != 0) && !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 
@@ -266,6 +269,9 @@ void domain_kill(struct domain *d)
     gnttab_release_mappings(d);
     domain_relinquish_resources(d);
     put_domain(d);
+
+    /* Kick page scrubbing after domain_relinquish_resources(). */
+    page_scrub_kick();
 
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
@@ -586,6 +592,61 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         vcpu_runstate_get(v, &runstate);
         if ( copy_to_guest(arg, &runstate, 1) )
             rc = -EFAULT;
+        break;
+    }
+
+    case VCPUOP_set_periodic_timer:
+    {
+        struct vcpu_set_periodic_timer set;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&set, arg, 1) )
+            break;
+
+        rc = -EINVAL;
+        if ( set.period_ns < MILLISECS(1) )
+            break;
+
+        v->periodic_period = set.period_ns;
+        vcpu_force_reschedule(v);
+
+        break;
+    }
+
+    case VCPUOP_stop_periodic_timer:
+    {
+        v->periodic_period = 0;
+        vcpu_force_reschedule(v);
+        break;
+    }
+
+    case VCPUOP_set_singleshot_timer:
+    {
+        struct vcpu_set_singleshot_timer set;
+
+        if ( v != current )
+            return -EINVAL;
+
+        if ( copy_from_guest(&set, arg, 1) )
+            return -EFAULT;
+
+        if ( v->singleshot_timer.cpu != smp_processor_id() )
+        {
+            stop_timer(&v->singleshot_timer);
+            v->singleshot_timer.cpu = smp_processor_id();
+        }
+
+        set_timer(&v->singleshot_timer, set.timeout_abs_ns);
+
+        break;
+    }
+
+    case VCPUOP_stop_singleshot_timer:
+    {
+        if ( v != current )
+            return -EINVAL;
+
+        stop_timer(&v->singleshot_timer);
         break;
     }
 
