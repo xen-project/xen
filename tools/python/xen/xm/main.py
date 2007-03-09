@@ -133,6 +133,7 @@ SUBCOMMAND_HELP = {
     'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
+    'debug-keys'  : ('<Keys>', 'Send debug keys to Xen.'),
     'trigger'     : ('<Domain> <nmi|reset|init> [<VCPU>]',
                      'Send a trigger to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
@@ -260,7 +261,6 @@ common_commands = [
     "shutdown",
     "start",
     "suspend",
-    "trigger",
     "top",
     "unpause",
     "uptime",
@@ -300,6 +300,7 @@ domain_commands = [
     ]
 
 host_commands = [
+    "debug-keys",
     "dmesg",
     "info",
     "log",
@@ -1395,6 +1396,10 @@ def xm_trigger(args):
     
     server.xend.domain.send_trigger(dom, trigger, vcpu)
 
+def xm_debug_keys(args):
+    arg_check(args, "debug-keys", 1)
+    server.xend.node.send_debug_keys(str(args[0]))
+
 def xm_top(args):
     arg_check(args, "top", 0)
 
@@ -1738,6 +1743,7 @@ commands = {
     "pause": xm_pause,
     "unpause": xm_unpause,
     # host commands
+    "debug-keys": xm_debug_keys,
     "dmesg": xm_dmesg,
     "info": xm_info,
     "log": xm_log,

@@ -467,6 +467,8 @@ int xc_readconsolering(int xc_handle,
                        unsigned int *pnr_chars,
                        int clear);
 
+int xc_send_debug_keys(int xc_handle, char *keys);
+
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);

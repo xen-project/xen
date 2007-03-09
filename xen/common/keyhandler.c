@@ -47,7 +47,7 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
     irq_keyhandler_t *h;
 
-    if ( key_table[key].flags & KEYHANDLER_IRQ_CALLBACK )
+    if ( !in_irq() || (key_table[key].flags & KEYHANDLER_IRQ_CALLBACK) )
     {
         console_start_log_everything();
         if ( (h = key_table[key].u.irq_handler) != NULL )

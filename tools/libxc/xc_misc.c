@@ -33,6 +33,25 @@ int xc_readconsolering(int xc_handle,
     return ret;
 }
 
+int xc_send_debug_keys(int xc_handle, char *keys)
+{
+    int ret, len = strlen(keys);
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_debug_keys;
+    set_xen_guest_handle(sysctl.u.debug_keys.keys, keys);
+    sysctl.u.debug_keys.nr_keys = len;
+
+    if ( (ret = lock_pages(keys, len)) != 0 )
+        return ret;
+
+    ret = do_sysctl(xc_handle, &sysctl);
+
+    unlock_pages(keys, len);
+
+    return ret;
+}
+
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *put_info)
 {
