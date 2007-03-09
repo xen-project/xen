@@ -80,8 +80,7 @@ Currently the following sections are defined. Some sections are optional.
                         gmfn:   machine physical frame number
                 The size of arrays is stored in xch_nr_pages member of header
                 note descriptor in .note.Xen note section.
-                There is no rule about the order. Analysis tools must no rely
-                on its order.
+                The entryies are stored in pfn-ascending order.
                 This section must exist when the domain is non auto
                 translated physmap mode. Currently x86 paravirtualized domain.
 
@@ -94,8 +93,7 @@ Currently the following sections are defined. Some sections are optional.
                 in .xen_pages section.
                 The size of arrays is stored in xch_nr_pages member of header
                 note descriptor in .note.Xen note section.
-                There is no rule about the order. Analysis tools must no rely
-                on its order.
+                The entries are stored in ascending order.
                 This section must exist when the domain is auto translated
                 physmap mode. Currently x86 full virtualized domain and
                 ia64 domain.
@@ -226,6 +224,8 @@ Currently only (major, minor) = (0, 1) is used.
 [When the format is changed, it would be described here.]
 
 (0, 1) update
+- .xen_p2m, .xen_pfn section
+  Arrays must be in pfn ascending order for efficient looking up.
 - EI_CLASS member of elf header was changed to ELFCLASS64 independent of
   architecture. This is mainly for x86_32pae.
   The format version isn't bumped because analysis tools can distinguish it.

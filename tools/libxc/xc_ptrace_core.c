@@ -390,7 +390,6 @@ map_gmfn_to_offset_elf(unsigned long gmfn)
 {
     /* 
      * linear search
-     * There is no gurantee that those tables are sorted.
      */
     unsigned long i;
     if (current_is_auto_translated_physmap) {
