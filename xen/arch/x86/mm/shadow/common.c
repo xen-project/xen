@@ -802,7 +802,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     v = current;
     if ( v->domain != d )
         v = d->vcpu[0];
-    ASSERT(v != NULL);
+    ASSERT(v != NULL); /* Shouldn't have enabled shadows if we've no vcpus  */
 
     /* Stage one: walk the list of pinned pages, unpinning them */
     perfc_incrc(shadow_prealloc_1);
@@ -861,7 +861,9 @@ static void shadow_blow_tables(struct domain *d)
     struct vcpu *v = d->vcpu[0];
     mfn_t smfn;
     int i;
-    
+
+    ASSERT(v != NULL);
+
     /* Pass one: unpin all pinned pages */
     list_for_each_backwards_safe(l,t, &d->arch.paging.shadow.pinned_shadows)
     {
@@ -2384,6 +2386,7 @@ int shadow_enable(struct domain *d, u32 mode)
 
     /* Sanity check the arguments */
     if ( (d == current->domain) ||
+         d->vcpu[0] == NULL ||
          shadow_mode_enabled(d) ||
          ((mode & PG_translate) && !(mode & PG_refcounts)) ||
          ((mode & PG_external) && !(mode & PG_translate)) )
@@ -2991,6 +2994,13 @@ int shadow_domctl(struct domain *d,
         gdprintk(XENLOG_INFO, "Ignoring shadow op on dying domain %u\n",
                  d->domain_id);
         return 0;
+    }
+
+    if ( unlikely(d->vcpu[0] == NULL) )
+    {
+        SHADOW_ERROR("Shadow op on a domain (%u) with no vcpus\n",
+                     d->domain_id);
+        return -EINVAL;
     }
 
     switch ( sc->op )
