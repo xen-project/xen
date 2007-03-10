@@ -1284,12 +1284,12 @@ class XendAPI(object):
         return xen_api_todo()
     
     def VM_set_actions_after_shutdown(self, session, vm_ref, action):
-        if action not in XEN_API_ON_NORMAL_EXIST:
+        if action not in XEN_API_ON_NORMAL_EXIT:
             return xen_api_error(['VM_ON_NORMAL_EXIT_INVALID', vm_ref])
         return self.VM_set('actions_after_shutdown', session, vm_ref, action)
     
     def VM_set_actions_after_reboot(self, session, vm_ref, action):
-        if action not in XEN_API_ON_NORMAL_EXIST:
+        if action not in XEN_API_ON_NORMAL_EXIT:
             return xen_api_error(['VM_ON_NORMAL_EXIT_INVALID', vm_ref])
         return self.VM_set('actions_after_reboot', session, vm_ref, action)
     
