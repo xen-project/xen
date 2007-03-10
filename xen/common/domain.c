@@ -546,16 +546,12 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     {
     case VCPUOP_initialise:
         if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
-        {
-            rc = -ENOMEM;
-            break;
-        }
+            return -ENOMEM;
 
         if ( copy_from_guest(ctxt, arg, 1) )
         {
             xfree(ctxt);
-            rc = -EFAULT;
-            break;
+            return -EFAULT;
         }
 
         LOCK_BIGLOCK(d);
@@ -569,9 +565,11 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
     case VCPUOP_up:
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            rc = -EINVAL;
-        else if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+            return -EINVAL;
+
+        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
             vcpu_wake(v);
+
         break;
 
     case VCPUOP_down:
@@ -596,13 +594,11 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     {
         struct vcpu_set_periodic_timer set;
 
-        rc = -EFAULT;
         if ( copy_from_guest(&set, arg, 1) )
-            break;
+            return -EFAULT;
 
-        rc = -EINVAL;
         if ( set.period_ns < MILLISECS(1) )
-            break;
+            return -EINVAL;
 
         v->periodic_period = set.period_ns;
         vcpu_force_reschedule(v);

@@ -110,7 +110,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     else
         cpus_setall(v->cpu_affinity);
 
-    /* Initialise the per-domain timers. */
+    /* Initialise the per-vcpu timers. */
     init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
                v, v->processor);
     init_timer(&v->singleshot_timer, vcpu_singleshot_timer_fn,
@@ -471,7 +471,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
 #ifndef COMPAT
 
-/* Per-domain one-shot-timer hypercall. */
+/* Per-vcpu oneshot-timer hypercall. */
 long do_set_timer_op(s_time_t timeout)
 {
     struct vcpu *v = current;
