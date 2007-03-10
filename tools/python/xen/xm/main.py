@@ -25,6 +25,7 @@ import atexit
 import cmd
 import os
 import pprint
+import readline
 import shlex
 import sys
 import re
@@ -558,6 +559,10 @@ class Shell(cmd.Cmd):
             for f in res:
                 setattr(Shell, 'do_' + f, self.default)
 
+    def preloop(self):
+        cmd.Cmd.preloop(self)
+        readline.set_completer_delims(' ')
+
     def default(self, line):
         words = shlex.split(line)
         if len(words) > 0 and words[0] == 'xm':
@@ -577,9 +582,9 @@ class Shell(cmd.Cmd):
         return False
 
     def completedefault(self, text, line, begidx, endidx):
-        cmd = line.split(' ')[0]
-        clas, func = cmd.split('.')
-        if begidx != len(cmd) + 1 or \
+        words = shlex.split(line[:begidx])
+        clas, func = words[0].split('.')
+        if len(words) > 1 or \
            func.startswith('get_by_') or \
            func == 'get_all':
             return []
