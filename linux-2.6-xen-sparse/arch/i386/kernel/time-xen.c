@@ -1008,6 +1008,7 @@ static void stop_hz_timer(void)
 	}
 
 	singleshot.timeout_abs_ns = jiffies_to_st(j);
+	singleshot.flags = 0;
 	rc = HYPERVISOR_vcpu_op(VCPUOP_set_singleshot_timer, cpu, &singleshot);
 #ifdef XEN_COMPAT_030004
 	if (rc) {

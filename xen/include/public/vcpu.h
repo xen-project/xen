@@ -150,10 +150,16 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_set_periodic_timer_t);
 #define VCPUOP_set_singleshot_timer  8 /* arg == vcpu_set_singleshot_timer_t */
 #define VCPUOP_stop_singleshot_timer 9 /* arg == NULL */
 struct vcpu_set_singleshot_timer {
-    uint64_t timeout_abs_ns;
+    uint64_t timeout_abs_ns;   /* Absolute system time value in nanoseconds. */
+    uint32_t flags;            /* VCPU_SSHOTTMR_??? */
 };
 typedef struct vcpu_set_singleshot_timer vcpu_set_singleshot_timer_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
+
+/* Flags to VCPUOP_set_singleshot_timer. */
+ /* Require the timeout to be in the future (return -ETIME if it's passed). */
+#define _VCPU_SSHOTTMR_future (0)
+#define VCPU_SSHOTTMR_future  (1U << _VCPU_SSHOTTMR_future)
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 

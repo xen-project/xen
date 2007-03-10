@@ -623,6 +623,10 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&set, arg, 1) )
             return -EFAULT;
 
+        if ( (set.flags & VCPU_SSHOTTMR_future) &&
+             (set.timeout_abs_ns < NOW()) )
+            return -ETIME;
+
         if ( v->singleshot_timer.cpu != smp_processor_id() )
         {
             stop_timer(&v->singleshot_timer);
