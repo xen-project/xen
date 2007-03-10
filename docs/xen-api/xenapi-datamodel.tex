@@ -1141,7 +1141,8 @@ void
 
 \vspace{0.3cm}
 
-\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}, {\tt
+VM\_HVM\_REQUIRED}
 
 \vspace{0.6cm}
 \subsubsection{RPC name:~pause}
@@ -13335,6 +13336,15 @@ expected and actual VM state at the time of the call.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_HVM\_REQUIRED}
+
+HVM is required for this operation
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 

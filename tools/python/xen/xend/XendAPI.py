@@ -1465,10 +1465,13 @@ class XendAPI(object):
                                      start_paused = start_paused)
     
     def VM_start(self, session, vm_ref, start_paused):
-        return XendTask.log_progress(0, 100, do_vm_func,
-                                     "domain_start", vm_ref,
-                                     start_paused = start_paused)
-    
+        try:
+            return XendTask.log_progress(0, 100, do_vm_func,
+                                         "domain_start", vm_ref,
+                                         start_paused = start_paused)
+        except HVMRequired, exn:
+            return xen_api_error(['VM_HVM_REQUIRED', vm_ref])
+
     def VM_suspend(self, session, vm_ref):
         return XendTask.log_progress(0, 100, do_vm_func,
                                      "domain_suspend", vm_ref)

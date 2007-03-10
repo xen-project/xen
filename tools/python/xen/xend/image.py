@@ -24,7 +24,7 @@ import signal
 
 import xen.lowlevel.xc
 from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
-from xen.xend.XendError import VmError, XendError
+from xen.xend.XendError import VmError, XendError, HVMRequired
 from xen.xend.XendLogging import log
 from xen.xend.XendOptions import instance as xenopts
 from xen.xend.server.netif import randomMAC
@@ -274,8 +274,7 @@ class HVMImageHandler(ImageHandler):
 
         info = xc.xeninfo()
         if 'hvm' not in info['xen_caps']:
-            raise VmError("HVM guest support is unavailable: is VT/AMD-V "
-                          "supported by your CPU and enabled in your BIOS?")
+            raise HVMRequired()
 
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.device_model = vmConfig['platform'].get('device_model')
