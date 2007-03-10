@@ -1892,7 +1892,7 @@ def _run_cmd(cmd, cmd_name, args):
             err("Domain '%s' does not exist." % ex.faultString)
         else:
             err(ex.faultString)
-        _usage(cmd_name)
+            _usage(cmd_name)
     except xmlrpclib.ProtocolError, ex:
         if ex.errcode == -1:
             print  >>sys.stderr, (
