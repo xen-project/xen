@@ -142,6 +142,8 @@ void free_vcpu_struct(struct vcpu *v)
 
 int vcpu_initialise(struct vcpu *v)
 {
+    /* Guests by default have a 100Hz ticker. */
+    v->periodic_period = MILLISECS(10);
     return 0;
 }
 
