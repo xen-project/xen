@@ -666,8 +666,7 @@ static void parse_into(xen_session *s, xmlNode *value_node,
     {
         if (!is_container_node(value_node, "value") ||
             value_node->children->type != XML_ELEMENT_NODE ||
-            0 != strcmp((char *)value_node->children->name, "struct") ||
-            value_node->children->children == NULL)
+            0 != strcmp((char *)value_node->children->name, "struct"))
         {
             server_error(s,
                          "Expected Map from the server, but didn't get it");
