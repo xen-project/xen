@@ -151,7 +151,6 @@ XENAPI_CFG_TYPES = {
     'actions_after_shutdown': str,
     'actions_after_reboot': str,
     'actions_after_crash': str,
-    'tpm_backend': int,    
     'PV_bootloader': str,
     'PV_kernel': str,
     'PV_ramdisk': str,
