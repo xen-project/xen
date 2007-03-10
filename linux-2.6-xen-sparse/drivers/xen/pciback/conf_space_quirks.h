@@ -30,6 +30,6 @@ void pciback_config_field_free(struct config_field *field);
 
 int pciback_config_quirk_release(struct pci_dev *dev);
 
-int pciback_field_is_dup(struct pci_dev *dev, int reg);
+int pciback_field_is_dup(struct pci_dev *dev, unsigned int reg);
 
 #endif

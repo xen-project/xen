@@ -349,16 +349,12 @@ void pciback_config_free_dev(struct pci_dev *dev)
 
 int pciback_config_add_field_offset(struct pci_dev *dev,
 				    struct config_field *field,
-				    unsigned int offset)
+				    unsigned int base_offset)
 {
 	int err = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry;
 	void *tmp;
-
-	/* silently ignore duplicate fields */
-	if (pciback_field_is_dup(dev, field->offset + offset))
-		goto out;
 
 	cfg_entry = kmalloc(sizeof(*cfg_entry), GFP_KERNEL);
 	if (!cfg_entry) {
@@ -368,7 +364,12 @@ int pciback_config_add_field_offset(struct pci_dev *dev,
 
 	cfg_entry->data = NULL;
 	cfg_entry->field = field;
-	cfg_entry->base_offset = offset;
+	cfg_entry->base_offset = base_offset;
+
+	/* silently ignore duplicate fields */
+	err = pciback_field_is_dup(dev,OFFSET(cfg_entry));
+	if (err)
+		goto out;
 
 	if (field->init) {
 		tmp = field->init(dev, OFFSET(cfg_entry));
