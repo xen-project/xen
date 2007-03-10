@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005 XenSource Ltd
+# Copyright (C) 2005-2007 XenSource Ltd
 #============================================================================
 
 
@@ -36,13 +36,12 @@ xc = xen.lowlevel.xc.xc()
 MAX_GUEST_CMDLINE = 1024
 
 
-def create(vm, vmConfig, imageConfig, deviceConfig):
+def create(vm, vmConfig):
     """Create an image handler for a vm.
 
     @return ImageHandler instance
     """
-    return findImageHandlerClass(imageConfig)(vm, vmConfig, imageConfig,
-                                              deviceConfig)
+    return findImageHandlerClass(vmConfig)(vm, vmConfig)
 
 
 class ImageHandler:
@@ -65,7 +64,7 @@ class ImageHandler:
     ostype = None
 
 
-    def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
+    def __init__(self, vm, vmConfig):
         self.vm = vm
 
         self.bootloader = False
@@ -73,9 +72,9 @@ class ImageHandler:
         self.ramdisk = None
         self.cmdline = None
 
-        self.configure(vmConfig, imageConfig, deviceConfig)
+        self.configure(vmConfig)
 
-    def configure(self, vmConfig, imageConfig, _):
+    def configure(self, vmConfig):
         """Config actions common to all unix-like domains."""
         if '_temp_using_bootloader' in vmConfig:
             self.bootloader = True
@@ -262,13 +261,13 @@ class HVMImageHandler(ImageHandler):
 
     ostype = "hvm"
 
-    def __init__(self, vm, vmConfig, imageConfig, deviceConfig):
-        ImageHandler.__init__(self, vm, vmConfig, imageConfig, deviceConfig)
+    def __init__(self, vm, vmConfig):
+        ImageHandler.__init__(self, vm, vmConfig)
         self.shutdownWatch = None
         self.rebootFeatureWatch = None
 
-    def configure(self, vmConfig, imageConfig, deviceConfig):
-        ImageHandler.configure(self, vmConfig, imageConfig, deviceConfig)
+    def configure(self, vmConfig):
+        ImageHandler.configure(self, vmConfig)
 
         if not self.kernel:
             self.kernel = '/usr/lib/xen/boot/hvmloader'
@@ -279,13 +278,13 @@ class HVMImageHandler(ImageHandler):
                           "supported by your CPU and enabled in your BIOS?")
 
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
-        self.device_model = imageConfig['hvm'].get('device_model')
+        self.device_model = vmConfig['platform'].get('device_model')
         if not self.device_model:
             raise VmError("hvm: missing device model")
         
-        self.display = imageConfig['hvm'].get('display')
-        self.xauthority = imageConfig['hvm'].get('xauthority')
-        self.vncconsole = imageConfig['hvm'].get('vncconsole')
+        self.display = vmConfig['platform'].get('display')
+        self.xauthority = vmConfig['platform'].get('xauthority')
+        self.vncconsole = vmConfig['platform'].get('vncconsole')
 
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
@@ -293,9 +292,9 @@ class HVMImageHandler(ImageHandler):
 
         self.pid = None
 
-        self.pae  = imageConfig['hvm'].get('pae', 0)
-        self.apic  = imageConfig['hvm'].get('apic', 0)
-        self.acpi  = imageConfig['hvm']['devices'].get('acpi', 0)
+        self.pae  = int(vmConfig['platform'].get('pae',  0))
+        self.apic = int(vmConfig['platform'].get('apic', 0))
+        self.acpi = int(vmConfig['platform'].get('acpi', 0))
         
 
     def buildDomain(self):
@@ -331,11 +330,10 @@ class HVMImageHandler(ImageHandler):
                    'localtime', 'serial', 'stdvga', 'isa',
                    'acpi', 'usb', 'usbdevice', 'keymap' ]
         
-        hvmDeviceConfig = vmConfig['image']['hvm']['devices']
         ret = ['-vcpus', str(self.vm.getVCpuCount())]
 
         for a in dmargs:
-            v = hvmDeviceConfig.get(a)
+            v = vmConfig['platform'].get(a)
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
@@ -395,14 +393,14 @@ class HVMImageHandler(ImageHandler):
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
         #
-        if vmConfig['image'].get('nographic'):
+        if vmConfig['platform'].get('nographic'):
             # skip vnc init if nographic is set
             ret.append('-nographic')
             return ret
 
         vnc_config = {}
-        has_vnc = int(vmConfig['image'].get('vnc', 0)) != 0
-        has_sdl = int(vmConfig['image'].get('sdl', 0)) != 0
+        has_vnc = int(vmConfig['platform'].get('vnc', 0)) != 0
+        has_sdl = int(vmConfig['platform'].get('sdl', 0)) != 0
         for dev_uuid in vmConfig['console_refs']:
             dev_type, dev_info = vmConfig['devices'][dev_uuid]
             if dev_type == 'vfb':
@@ -414,8 +412,8 @@ class HVMImageHandler(ImageHandler):
             if not vnc_config:
                 for key in ('vncunused', 'vnclisten', 'vncdisplay',
                             'vncpasswd'):
-                    if key in vmConfig['image']:
-                        vnc_config[key] = vmConfig['image'][key]
+                    if key in vmConfig['platform']:
+                        vnc_config[key] = vmConfig['platform'][key]
 
             if not vnc_config.get('vncunused', 0) and \
                    vnc_config.get('vncdisplay', 0):
@@ -634,9 +632,7 @@ def findImageHandlerClass(image):
     @param image config
     @return ImageHandler subclass or None
     """
-    image_type = image['type']
-    if image_type is None:
-        raise VmError('missing image type')
+    image_type = image.image_type()
     try:
         return _handlers[arch.type][image_type]
     except KeyError:

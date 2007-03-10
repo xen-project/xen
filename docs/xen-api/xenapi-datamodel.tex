@@ -1058,12 +1058,8 @@ $\mathit{RW}$ &  {\tt PV/args} & string & kernel command-line arguments \\
 $\mathit{RW}$ &  {\tt PV/bootloader\_args} & string & miscellaneous arguments for the bootloader \\
 $\mathit{RW}$ &  {\tt HVM/boot\_policy} & string & HVM boot policy \\
 $\mathit{RW}$ &  {\tt HVM/boot\_params} & (string $\rightarrow$ string) Map & HVM boot params \\
-$\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
-$\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
-$\mathit{RW}$ &  {\tt platform/localtime} & bool & set RTC to local time \\
-$\mathit{RW}$ &  {\tt platform/clock\_offset} & bool & timeshift applied to guest's clock \\
-$\mathit{RW}$ &  {\tt platform/enable\_audio} & bool & emulate audio \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
+$\mathit{RW}$ &  {\tt platform} & (string $\rightarrow$ string) Map & platform-specific configuration \\
+$\mathit{RW}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt domid} & int & domain ID (if available, -1 otherwise) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
@@ -3407,13 +3403,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_std\_VGA}
+\subsubsection{RPC name:~get\_platform}
 
 {\bf Overview:} 
-Get the platform/std\_VGA field of the given VM.
+Get the platform field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_std_VGA (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} ((string -> string) Map) get_platform (session_id s, VM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3431,7 +3427,7 @@ Get the platform/std\_VGA field of the given VM.
 
  \noindent {\bf Return Type:} 
 {\tt 
-bool
+(string $\rightarrow$ string) Map
 }
 
 
@@ -3439,13 +3435,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_std\_VGA}
+\subsubsection{RPC name:~set\_platform}
 
 {\bf Overview:} 
-Set the platform/std\_VGA field of the given VM.
+Set the platform field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_std_VGA (session_id s, VM ref self, bool value)\end{verbatim}
+\begin{verbatim} void set_platform (session_id s, VM ref self, (string -> string) Map value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3457,7 +3453,7 @@ Set the platform/std\_VGA field of the given VM.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline 
 
-{\tt bool } & value & New value to set \\ \hline 
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
 
 \end{tabular}
 
@@ -3473,13 +3469,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_serial}
+\subsubsection{RPC name:~add\_to\_platform}
 
 {\bf Overview:} 
-Get the platform/serial field of the given VM.
+Add the given key-value pair to the platform field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_platform_serial (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} void add_to_platform (session_id s, VM ref self, string key, string value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3491,39 +3487,9 @@ Get the platform/serial field of the given VM.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline 
 
-\end{tabular}
+{\tt string } & key & Key to add \\ \hline 
 
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_serial}
-
-{\bf Overview:} 
-Set the platform/serial field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_serial (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
+{\tt string } & value & Value to add \\ \hline 
 
 \end{tabular}
 
@@ -3539,13 +3505,14 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_localtime}
+\subsubsection{RPC name:~remove\_from\_platform}
 
 {\bf Overview:} 
-Get the platform/localtime field of the given VM.
+Remove the given key and its corresponding value from the platform field of
+the given VM.  If the key is not in that Map, then do nothing.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_localtime (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} void remove_from_platform (session_id s, VM ref self, string key)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3557,171 +3524,7 @@ Get the platform/localtime field of the given VM.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline 
 
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-bool
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_localtime}
-
-{\bf Overview:} 
-Set the platform/localtime field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_localtime (session_id s, VM ref self, bool value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt bool } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_clock\_offset}
-
-{\bf Overview:} 
-Get the platform/clock\_offset field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_clock_offset (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-bool
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_clock\_offset}
-
-{\bf Overview:} 
-Set the platform/clock\_offset field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_clock_offset (session_id s, VM ref self, bool value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt bool } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_enable\_audio}
-
-{\bf Overview:} 
-Get the platform/enable\_audio field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_enable_audio (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-bool
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_enable\_audio}
-
-{\bf Overview:} 
-Set the platform/enable\_audio field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_enable_audio (session_id s, VM ref self, bool value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt bool } & value & New value to set \\ \hline 
+{\tt string } & key & Key to remove \\ \hline 
 
 \end{tabular}
 
@@ -3766,6 +3569,40 @@ string
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PCI\_bus}
+
+{\bf Overview:} 
+Set the PCI\_bus field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PCI_bus (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

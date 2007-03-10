@@ -106,11 +106,7 @@ typedef struct xen_vm_record
     char *pv_bootloader_args;
     char *hvm_boot_policy;
     xen_string_string_map *hvm_boot_params;
-    bool platform_std_vga;
-    char *platform_serial;
-    bool platform_localtime;
-    bool platform_clock_offset;
-    bool platform_enable_audio;
+    xen_string_string_map *platform;
     char *pci_bus;
     xen_string_string_map *other_config;
     int64_t domid;
@@ -460,38 +456,10 @@ xen_vm_get_hvm_boot_params(xen_session *session, xen_string_string_map **result,
 
 
 /**
- * Get the platform/std_VGA field of the given VM.
+ * Get the platform field of the given VM.
  */
 extern bool
-xen_vm_get_platform_std_vga(xen_session *session, bool *result, xen_vm vm);
-
-
-/**
- * Get the platform/serial field of the given VM.
- */
-extern bool
-xen_vm_get_platform_serial(xen_session *session, char **result, xen_vm vm);
-
-
-/**
- * Get the platform/localtime field of the given VM.
- */
-extern bool
-xen_vm_get_platform_localtime(xen_session *session, bool *result, xen_vm vm);
-
-
-/**
- * Get the platform/clock_offset field of the given VM.
- */
-extern bool
-xen_vm_get_platform_clock_offset(xen_session *session, bool *result, xen_vm vm);
-
-
-/**
- * Get the platform/enable_audio field of the given VM.
- */
-extern bool
-xen_vm_get_platform_enable_audio(xen_session *session, bool *result, xen_vm vm);
+xen_vm_get_platform(xen_session *session, xen_string_string_map **result, xen_vm vm);
 
 
 /**
@@ -732,38 +700,32 @@ xen_vm_remove_from_hvm_boot_params(xen_session *session, xen_vm vm, char *key);
 
 
 /**
- * Set the platform/std_VGA field of the given VM.
+ * Set the platform field of the given VM.
  */
 extern bool
-xen_vm_set_platform_std_vga(xen_session *session, xen_vm vm, bool std_vga);
+xen_vm_set_platform(xen_session *session, xen_vm vm, xen_string_string_map *platform);
 
 
 /**
- * Set the platform/serial field of the given VM.
+ * Add the given key-value pair to the platform field of the given VM.
  */
 extern bool
-xen_vm_set_platform_serial(xen_session *session, xen_vm vm, char *serial);
+xen_vm_add_to_platform(xen_session *session, xen_vm vm, char *key, char *value);
 
 
 /**
- * Set the platform/localtime field of the given VM.
+ * Remove the given key and its corresponding value from the platform
+ * field of the given VM.  If the key is not in that Map, then do nothing.
  */
 extern bool
-xen_vm_set_platform_localtime(xen_session *session, xen_vm vm, bool localtime);
+xen_vm_remove_from_platform(xen_session *session, xen_vm vm, char *key);
 
 
 /**
- * Set the platform/clock_offset field of the given VM.
+ * Set the PCI_bus field of the given VM.
  */
 extern bool
-xen_vm_set_platform_clock_offset(xen_session *session, xen_vm vm, bool clock_offset);
-
-
-/**
- * Set the platform/enable_audio field of the given VM.
- */
-extern bool
-xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_audio);
+xen_vm_set_pci_bus(xen_session *session, xen_vm vm, char *pci_bus);
 
 
 /**
