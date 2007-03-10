@@ -110,7 +110,7 @@ parse_structmap_value(xen_session *, xmlNode *, const abstract_type *,
 static size_t size_of_member(const abstract_type *);
 
 static const char *
-get_val_as_string(const struct abstract_type *, void *, char *);
+get_val_as_string(const struct abstract_type *, void *, char *, size_t);
 
 
 void
@@ -1185,7 +1185,8 @@ add_struct_value(const struct abstract_type *type, void *value,
     case INT:
     case ENUM:
     {
-        const char *val_as_string = get_val_as_string(type, value, buf);
+        const char *val_as_string =
+            get_val_as_string(type, value, buf, sizeof(buf));
         adder(node, key, "string", val_as_string);
     }
     break;
@@ -1257,7 +1258,7 @@ add_struct_value(const struct abstract_type *type, void *value,
                 void *r_value = contents + (i * member_size) + r_offset;
 
                 const char *l_value_as_string =
-                    get_val_as_string(l_type, l_value, buf);
+                    get_val_as_string(l_type, l_value, buf, sizeof(buf));
 
                 add_struct_value(r_type, r_value, add_struct_member,
                                  l_value_as_string, struct_node);
@@ -1273,7 +1274,8 @@ add_struct_value(const struct abstract_type *type, void *value,
 
 
 static const char *
-get_val_as_string(const struct abstract_type *type, void *value, char *buf)
+get_val_as_string(const struct abstract_type *type, void *value, char *buf,
+                  size_t bufsize)
 {
     switch (type->typename)
     {
@@ -1307,7 +1309,7 @@ get_val_as_string(const struct abstract_type *type, void *value, char *buf)
     case INT:
     {
         int64_t val = *(int64_t *)value;
-        snprintf(buf, sizeof(buf), "%"PRId64, val);
+        snprintf(buf, bufsize, "%"PRId64, val);
         return buf;
     }
     break;
