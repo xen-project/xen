@@ -1564,7 +1564,7 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
-        if self.info.has_hvm():
+        if self.info.is_hvm():
             self.image = image.create(self, self.info)
             if self.image:
                 self.image.createDeviceModel(True)
