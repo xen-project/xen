@@ -52,7 +52,7 @@ void arch_print_info(void);		/* in common.c */
 /* Size of xen_ia64_boot_param.command_line */
 #define COMMAND_LINE_SIZE       512
 
-struct xen_ia64_boot_param* ia64_boot_paramP;
+extern struct xen_ia64_boot_param* ia64_boot_paramP;
 extern struct xen_ia64_boot_param ia64BootParamG;
 extern char boot_cmd_line[];
 extern efi_system_table_t* efiSysTableP;

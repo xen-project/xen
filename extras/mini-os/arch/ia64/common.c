@@ -59,6 +59,9 @@ shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)XSI_BASE;
 
 struct machine_fw machineFwG;
 
+/* This pointer is initialized in ia64.S with the address of the boot param
+ * area passed by the bootloader. */
+struct xen_ia64_boot_param* ia64_boot_paramP;
 
 struct xen_ia64_boot_param ia64BootParamG;
 char boot_cmd_line[COMMAND_LINE_SIZE+1];
@@ -104,6 +107,7 @@ map_pal_code(void)
 	xen_set_virtual_psr_ic(1);
 }
 
+/* In ivt.S */
 extern char hypervisor_callback;
 
 static void
@@ -139,7 +143,6 @@ init_start_info(start_info_t* xen_start_info)
 static void
 init_boot_params(void)
 {
-	/* ia64_boot_paramP is initialised in ia64.S!  */
 	ia64BootParamG.command_line = SWAP(ia64_boot_paramP->command_line);
 	ia64BootParamG.efi_systab = SWAP(ia64_boot_paramP->efi_systab);
 	ia64BootParamG.efi_memmap = SWAP(ia64_boot_paramP->efi_memmap);
