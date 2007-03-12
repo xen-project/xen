@@ -27,7 +27,7 @@
 #include <asm/hypervisor.h>
 
 #ifndef ARCH_HAS_VALID_PHYS_ADDR_RANGE
-static inline int valid_phys_addr_range(unsigned long addr, size_t *count)
+static inline int valid_phys_addr_range(unsigned long addr, size_t count)
 {
 	return 1;
 }
@@ -44,7 +44,7 @@ static ssize_t read_mem(struct file * file, char __user * buf,
 	ssize_t read = 0, sz;
 	void __iomem *v;
 
-	if (!valid_phys_addr_range(p, &count))
+	if (!valid_phys_addr_range(p, count))
 		return -EFAULT;
 
 	while (count > 0) {
@@ -95,7 +95,7 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	ssize_t written = 0, sz;
 	void __iomem *v;
 
-	if (!valid_phys_addr_range(p, &count))
+	if (!valid_phys_addr_range(p, count))
 		return -EFAULT;
 
 	while (count > 0) {
