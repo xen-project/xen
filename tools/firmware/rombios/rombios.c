@@ -7792,10 +7792,11 @@ ASM_END
 
     bootdrv = (Bit8u)(status>>8);
     bootseg = read_word(ebda_seg,&EbdaData->cdemu.load_segment);
-    /* Canonicalize bootseg:bootip */
 #if BX_TCGBIOS
     tcpa_add_bootdevice((Bit32u)1L, (Bit32u)0L);
 #endif
+
+    /* Canonicalize bootseg:bootip */
     bootip = (bootseg & 0x0fff) << 4;
     bootseg &= 0xf000;
     break;
@@ -7812,8 +7813,6 @@ ASM_END
 #if BX_TCGBIOS
   tcpa_ipl((Bit32u)bootseg);               /* specs: 8.2.3 steps 4 and 5 */
 #endif
-  /* Debugging info */
-  printf("Booting from %x:%x\n", bootseg, bootip);
   
   /* Jump to the boot vector */
 ASM_START
