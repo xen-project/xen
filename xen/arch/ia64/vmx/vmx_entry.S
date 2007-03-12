@@ -477,6 +477,11 @@ GLOBAL_ENTRY(ia64_leave_hypercall)
      * resumes at .work_processed_syscall with p6 set to 1 if the extra-work-check
      * needs to be redone.
      */
+    ;;
+    adds r16=PT(R8)+16,r12
+    ;;
+    st8 [r16]=r8
+    ;;
 (pUStk) rsm psr.i
     cmp.eq pLvSys,p0=r0,r0		// pLvSys=1: leave from syscall
 (pUStk) cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
@@ -484,6 +489,11 @@ GLOBAL_ENTRY(ia64_leave_hypercall)
     br.call.sptk.many b0=leave_hypervisor_tail
 .work_processed_syscall:
     //clean up bank 1 registers
+    ;;
+    adds r16=PT(R8)+16,r12
+    ;;
+    ld8 r8=[r16]
+    ;;
     mov r16=r0
     mov r17=r0
     mov r18=r0
