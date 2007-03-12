@@ -38,23 +38,47 @@
 #define VMXASSIST_PHYSICAL_ADDRESS    0x000D0000
 #define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
 
-/* invoke SVM's paged realmode support */
-#define SVM_VMMCALL_RESET_TO_REALMODE 0x80000001
-
-/*
- * C runtime start off
- */
 asm(
     "    .text                       \n"
     "    .globl _start               \n"
     "_start:                         \n"
+    /* C runtime kickoff. */
     "    cld                         \n"
     "    cli                         \n"
-    "    lgdt gdt_desr               \n"
-    "    movl $stack_top, %esp       \n"
-    "    movl %esp, %ebp             \n"
+    "    movl $stack_top,%esp        \n"
+    "    movl %esp,%ebp              \n"
     "    call main                   \n"
-    "    ud2                         \n"
+    /* Relocate real-mode trampoline to 0x0. */
+    "    mov  $trampoline_start,%esi \n"
+    "    xor  %edi,%edi              \n"
+    "    mov  $trampoline_end,%ecx   \n"
+    "    sub  %esi,%ecx              \n"
+    "    rep  movsb                  \n"
+    /* Load real-mode compatible segment state (base 0x0000, limit 0xffff). */
+    "    lgdt gdt_desr               \n"
+    "    mov  $0x0010,%ax            \n"
+    "    mov  %ax,%ds                \n"
+    "    mov  %ax,%es                \n"
+    "    mov  %ax,%fs                \n"
+    "    mov  %ax,%gs                \n"
+    "    mov  %ax,%ss                \n"
+    "    ljmp $0x8,$0x0              \n"
+    /* Enter real mode, reload all segment registers and IDT. */
+    "trampoline_start: .code16       \n"
+    "    mov  %cr0,%eax              \n"
+    "    and  $0xfe,%al              \n"
+    "    mov  %eax,%cr0              \n"
+    "    ljmp $0,$1f-trampoline_start\n"
+    "1:  xor  %ax,%ax                \n"
+    "    mov  %ax,%ds                \n"
+    "    mov  %ax,%es                \n"
+    "    mov  %ax,%fs                \n"
+    "    mov  %ax,%gs                \n"
+    "    mov  %ax,%ss                \n"
+    "    lidt 1f-trampoline_start    \n"
+    "    ljmp $0xf000,$0xfff0        \n"
+    "1:  .word 0x3ff,0,0             \n"
+    "trampoline_end:   .code32       \n"
     "                                \n"
     "gdt_desr:                       \n"
     "    .word gdt_end - gdt - 1     \n"
@@ -63,8 +87,8 @@ asm(
     "    .align 8                    \n"
     "gdt:                            \n"
     "    .quad 0x0000000000000000    \n"
-    "    .quad 0x00CF92000000FFFF    \n"
-    "    .quad 0x00CF9A000000FFFF    \n"
+    "    .quad 0x00009a000000ffff    \n" /* Ring 0 code, base 0 limit 0xffff */
+    "    .quad 0x000092000000ffff    \n" /* Ring 0 data, base 0 limit 0xffff */
     "gdt_end:                        \n"
     "                                \n"
     "    .bss                        \n"
@@ -81,19 +105,6 @@ cirrus_check(void)
 {
     outw(0x3C4, 0x9206);
     return inb(0x3C5) == 0x12;
-}
-
-static int
-vmmcall(int function, int edi, int esi, int edx, int ecx, int ebx)
-{
-    int eax;
-
-    __asm__ __volatile__ (
-        ".byte 0x0F,0x01,0xD9"
-        : "=a" (eax)
-        : "a"(function),
-        "b"(ebx), "c"(ecx), "d"(edx), "D"(edi), "S"(esi) );
-    return eax;
 }
 
 static int
@@ -349,13 +360,7 @@ int main(void)
         ASSERT((ACPI_PHYSICAL_ADDRESS + acpi_sz) <= 0xF0000);
     }
 
-    if ( check_amd() )
-    {
-        /* AMD implies this is SVM */
-        printf("SVM go ...\n");
-        vmmcall(SVM_VMMCALL_RESET_TO_REALMODE, 0, 0, 0, 0, 0);
-    }
-    else
+    if ( !check_amd() )
     {
         printf("Loading VMXAssist ...\n");
         memcpy((void *)VMXASSIST_PHYSICAL_ADDRESS,
@@ -368,7 +373,7 @@ int main(void)
             );
     }
 
-    printf("Failed to invoke ROMBIOS\n");
+    printf("Invoking ROMBIOS ...\n");
     return 0;
 }
 
