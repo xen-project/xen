@@ -2090,18 +2090,33 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             break;
         case XENMAPSPACE_grant_table:
             spin_lock(&d->grant_table->lock);
+
+            if ((xatp.idx >= nr_grant_frames(d->grant_table)) &&
+                (xatp.idx < max_nr_grant_frames))
+                gnttab_grow_table(d, xatp.idx + 1);
+
             if (xatp.idx < nr_grant_frames(d->grant_table))
-                mfn = virt_to_mfn(d->grant_table->shared) + xatp.idx;
+                mfn = virt_to_mfn(d->grant_table->shared[xatp.idx]);
+
             spin_unlock(&d->grant_table->lock);
             break;
         default:
             break;
         }
 
+        if (mfn == 0) {
+            put_domain(d);
+            return -EINVAL;
+        }
+
         LOCK_BIGLOCK(d);
 
-        /* Remove previously mapped page if it was present. */
+        /* Check remapping necessity */
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
+        if (mfn == prev_mfn)
+            goto out;
+
+        /* Remove previously mapped page if it was present. */
         if (prev_mfn && mfn_valid(prev_mfn)) {
             if (IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)))
                 /* Xen heap frames are simply unhooked from this phys slot. */
@@ -2113,12 +2128,31 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);
-        if (gpfn != INVALID_M2P_ENTRY)
+        if (gpfn != INVALID_M2P_ENTRY) {
+            /*
+             * guest_physmap_remove_page() (for IPF) descrements page
+             * counter and unset PGC_allocated flag,
+             * so pre-increment page counter and post-set flag inserted
+             */
+            /* pre-increment page counter */
+            if (!get_page(mfn_to_page(mfn), d))
+                goto out;
+
             guest_physmap_remove_page(d, gpfn, mfn);
+
+            /* post-set PGC_allocated flag */
+            if ((mfn_to_page(mfn)->count_info & PGC_count_mask) != 1) {
+                /* no one but us is using this page */
+                put_page(mfn_to_page(mfn));
+                goto out;
+            }
+            set_bit(_PGC_allocated, &mfn_to_page(mfn)->count_info);
+        }
 
         /* Map at new location. */
         guest_physmap_add_page(d, xatp.gpfn, mfn);
 
+    out:
         UNLOCK_BIGLOCK(d);
         
         put_domain(d);
