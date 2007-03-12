@@ -41,6 +41,8 @@ defines = [ "__i386__",
             "VGCF_failsafe_disables_events",
             "_VGCF_syscall_disables_events",
             "VGCF_syscall_disables_events",
+            "_VGCF_online",
+            "VGCF_online",
 
             # ia64
             "VGCF_EXTRA_REGS",

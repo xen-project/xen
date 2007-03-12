@@ -126,6 +126,8 @@ struct vcpu_guest_context {
 #define VGCF_failsafe_disables_events  (1<<_VGCF_failsafe_disables_events)
 #define _VGCF_syscall_disables_events  4
 #define VGCF_syscall_disables_events   (1<<_VGCF_syscall_disables_events)
+#define _VGCF_online                   5
+#define VGCF_online                    (1<<_VGCF_online)
     unsigned long flags;                    /* VGCF_* flags                 */
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */

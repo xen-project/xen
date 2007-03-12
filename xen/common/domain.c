@@ -102,7 +102,7 @@ struct vcpu *alloc_vcpu(
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
 
-    if ( (vcpu_id != 0) && !is_idle_domain(d) )
+    if ( !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
