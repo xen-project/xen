@@ -45,7 +45,13 @@ unsigned long __hypercall(unsigned long a1, unsigned long a2,
 	return __res;
 }
 EXPORT_SYMBOL(__hypercall);
-#endif
+
+int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
+{
+	return xencomm_mini_hypercall_grant_table_op(cmd, uop, count);
+}
+EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
+#endif /* __ia64__ */
 
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
