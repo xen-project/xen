@@ -84,7 +84,7 @@ static void post_suspend(int suspend_cancelled)
 			pfn_to_mfn(xen_start_info->console.domU.mfn);
 	} else {
 #ifdef CONFIG_SMP
-		cpu_initialized_map = cpumask_of_cpu(0);
+		cpu_initialized_map = cpu_online_map;
 #endif
 	}
 
@@ -179,20 +179,6 @@ static int take_machine_down(void *p_fast_suspend)
 	}
 	time_resume();
 	local_irq_enable();
-
-	if (fast_suspend && !suspend_cancelled) {
-		/*
-		 * In fast-suspend mode the APs may not be brought back online
-		 * when we resume. In that case we do it here.
-		 */
-		for_each_online_cpu(cpu) {
-			if (cpu == 0)
-				continue;
-			cpu_set_initialized(cpu);
-			err = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
-			BUG_ON(err);
-		}
-	}
 
 	return suspend_cancelled;
 }
