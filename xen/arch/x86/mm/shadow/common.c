@@ -2813,7 +2813,11 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
        This is pretty heavy handed, but this is a rare operation
        (it might happen a dozen times during boot and then never
        again), so it doesn't matter too much. */
-    shadow_blow_tables(d);
+    if ( d->arch.paging.shadow.has_fast_mmio_entries )
+    {
+        shadow_blow_tables(d);
+        d->arch.paging.shadow.has_fast_mmio_entries = 0;
+    }
 #endif
 
     shadow_unlock(d);

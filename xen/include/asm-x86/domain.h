@@ -79,6 +79,9 @@ struct shadow_domain {
     struct shadow_page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
 
+    /* Fast MMIO path heuristic */
+    int has_fast_mmio_entries;
+
     /* Shadow log-dirty bitmap */
     unsigned long *dirty_bitmap;
     unsigned int dirty_bitmap_size;  /* in pages, bit per page */
