@@ -676,8 +676,9 @@ class XendAPI(object):
         return xen_api_success_void()
     def host_remove_from_other_config(self, session, host_ref, key):
         node = XendNode.instance()
-        del node.other_config[key]
-        node.save()
+        if key in node.other_config:
+            del node.other_config[key]
+            node.save()
         return xen_api_success_void()
     def host_get_API_version_major(self, _, ref):
         return xen_api_success(XEN_API_VERSION_MAJOR)
@@ -998,7 +999,6 @@ class XendAPI(object):
                   'VIFs',
                   'VBDs',
                   'VTPMs',
-                  'PCI_bus',
                   'tools_version',
                   'domid',
                   'is_control_domain',
@@ -1024,12 +1024,8 @@ class XendAPI(object):
                   'PV_bootloader_args',
                   'HVM_boot_policy',
                   'HVM_boot_params',
-                  'platform_std_VGA',
-                  'platform_serial',
-                  'platform_localtime',
-                  'platform_clock_offset',
-                  'platform_enable_audio',
-                  'platform_keymap',
+                  'platform',
+                  'PCI_bus',
                   'other_config']
 
     VM_methods = [('clone', 'VM'),
@@ -1042,6 +1038,10 @@ class XendAPI(object):
                   ('hard_reboot', None),
                   ('suspend', None),
                   ('resume', None),
+                  ('add_to_HVM_boot_params', None),
+                  ('remove_from_HVM_boot_params', None),
+                  ('add_to_platform', None),
+                  ('remove_from_platform', None),
                   ('add_to_other_config', None),
                   ('remove_from_other_config', None)]
     
@@ -1071,13 +1071,7 @@ class XendAPI(object):
         'PV_bootloader_args',
         'HVM_boot_policy',
         'HVM_boot_params',
-        'platform_std_VGA',
-        'platform_serial',
-        'platform_localtime',
-        'platform_clock_offset',
-        'platform_enable_audio',
-        'platform_keymap',
-        'grub_cmdline',
+        'platform',
         'PCI_bus',
         'other_config']
         
@@ -1089,7 +1083,10 @@ class XendAPI(object):
         xd = XendDomain.instance()
         dominfo = xd.get_vm_by_uuid(vm_ref)
         dominfo.info[name] = value
-        xd.managed_config_save(dominfo)
+        return self._VM_save(dominfo)
+
+    def _VM_save(self, dominfo):
+        XendDomain.instance().managed_config_save(dominfo)
         return xen_api_success_void()
 
     # attributes (ro)
@@ -1135,10 +1132,6 @@ class XendAPI(object):
     def VM_get_consoles(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_consoles())
-    
-    def VM_get_PCI_bus(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return dom.get_pci_bus()
     
     def VM_get_tools_version(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1214,29 +1207,16 @@ class XendAPI(object):
     def VM_get_HVM_boot_params(self, session, vm_ref):
         return self.VM_get('HVM_boot_params', session, vm_ref)
     
-    def VM_get_platform_std_VGA(self, session, vm_ref):
+    def VM_get_platform(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_platform_std_vga())
+        return xen_api_success(dom.get_platform())
     
-    def VM_get_platform_serial(self, session, vm_ref):
+    def VM_get_PCI_bus(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_platform_serial())        
+        return dom.get_pci_bus()
     
-    def VM_get_platform_localtime(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_platform_localtime())
-    
-    def VM_get_platform_clock_offset(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_platform_clock_offset())        
-    
-    def VM_get_platform_enable_audio(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_platform_enable_audio())        
-    
-    def VM_get_platform_keymap(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_platform_keymap())
+    def VM_set_PCI_bus(self, session, vm_ref, val):
+        return self.VM_set('PCI_bus', session, vm_ref, val)
     
     def VM_get_other_config(self, session, vm_ref):
         return self.VM_get('other_config', session, vm_ref)        
@@ -1253,7 +1233,7 @@ class XendAPI(object):
     def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.setName(label)
-        return xen_api_success_void()
+        return self._VM_save(dom)
     
     def VM_set_name_description(self, session, vm_ref, desc):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1284,12 +1264,12 @@ class XendAPI(object):
         return xen_api_todo()
     
     def VM_set_actions_after_shutdown(self, session, vm_ref, action):
-        if action not in XEN_API_ON_NORMAL_EXIST:
+        if action not in XEN_API_ON_NORMAL_EXIT:
             return xen_api_error(['VM_ON_NORMAL_EXIT_INVALID', vm_ref])
         return self.VM_set('actions_after_shutdown', session, vm_ref, action)
     
     def VM_set_actions_after_reboot(self, session, vm_ref, action):
-        if action not in XEN_API_ON_NORMAL_EXIST:
+        if action not in XEN_API_ON_NORMAL_EXIT:
             return xen_api_error(['VM_ON_NORMAL_EXIT_INVALID', vm_ref])
         return self.VM_set('actions_after_reboot', session, vm_ref, action)
     
@@ -1319,14 +1299,16 @@ class XendAPI(object):
         if 'HVM_boot_params' not in dom.info:
             dom.info['HVM_boot_params'] = {}
         dom.info['HVM_boot_params'][key] = value
-        return xen_api_success_void()
+        return self._VM_save(dom)
 
     def VM_remove_from_HVM_boot_params(self, session, vm_ref, key):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         if 'HVM_boot_params' in dom.info \
                and key in dom.info['HVM_boot_params']:
             del dom.info['HVM_boot_params'][key]
-        return xen_api_success_void()
+            return self._VM_save(dom)
+        else:
+            return xen_api_success_void()
 
     def VM_set_PV_bootloader(self, session, vm_ref, value):
         return self.VM_set('PV_bootloader', session, vm_ref, value)
@@ -1343,40 +1325,42 @@ class XendAPI(object):
     def VM_set_PV_bootloader_args(self, session, vm_ref, value):
         return self.VM_set('PV_bootloader_args', session, vm_ref, value)
 
-    def VM_set_platform_std_VGA(self, session, vm_ref, value):
-        return self.VM_set('platform_std_vga', session, vm_ref, value)
+    def VM_set_platform(self, session, vm_ref, value):
+        return self.VM_set('platform', session, vm_ref, value)
     
-    def VM_set_platform_serial(self, session, vm_ref, value):
-        return self.VM_set('platform_serial', session, vm_ref, value)
+    def VM_add_to_platform(self, session, vm_ref, key, value):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        plat = dom.get_platform()
+        plat[key] = value
+        return self.VM_set_platform(session, vm_ref, plat)
 
-    def VM_set_platform_keymap(self, session, vm_ref, value):
-        return self.VM_set('platform_keymap', session, vm_ref, value)
-    
-    def VM_set_platform_localtime(self, session, vm_ref, value):
-        return self.VM_set('platform_localtime', session, vm_ref, value)
-    
-    def VM_set_platform_clock_offset(self, session, vm_ref, value):
-        return self.VM_set('platform_clock_offset', session, vm_ref, value)
-    
-    def VM_set_platform_enable_audio(self, session, vm_ref, value):
-        return self.VM_set('platform_enable_audio', session, vm_ref, value)
-    
+    def VM_remove_from_platform(self, session, vm_ref, key):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        plat = dom.get_platform()
+        if key in plat:
+            del plat[key]
+            return self.VM_set_platform(session, vm_ref, plat)
+        else:
+            return xen_api_success_void()
+
     def VM_set_other_config(self, session, vm_ref, value):
-        return self.VM_set('otherconfig', session, vm_ref, value)
+        return self.VM_set('other_config', session, vm_ref, value)
 
     def VM_add_to_other_config(self, session, vm_ref, key, value):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        if dom and 'otherconfig' in dom.info:
-            dom.info['otherconfig'][key] = value
-        return xen_api_success_void()
+        if dom and 'other_config' in dom.info:
+            dom.info['other_config'][key] = value
+        return self._VM_save(dom)
 
     def VM_remove_from_other_config(self, session, vm_ref, key):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        if dom and 'otherconfig' in dom.info \
-               and key in dom.info['otherconfig']:
-            del dom.info['otherconfig'][key]
-        return xen_api_success_void()        
-    
+        if dom and 'other_config' in dom.info \
+               and key in dom.info['other_config']:
+            del dom.info['other_config'][key]
+            return self._VM_save(dom)
+        else:
+            return xen_api_success_void()
+
     # class methods
     def VM_get_all(self, session):
         refs = [d.get_uuid() for d in XendDomain.instance().list('all')]
@@ -1437,12 +1421,7 @@ class XendAPI(object):
             'PV_bootloader_args': xeninfo.info.get('PV_bootloader_args'),
             'HVM_boot_policy': xeninfo.info.get('HVM_boot_policy'),
             'HVM_boot_params': xeninfo.info.get('HVM_boot_params'),
-            'platform_std_VGA': xeninfo.get_platform_std_vga(),
-            'platform_serial': xeninfo.get_platform_serial(),
-            'platform_localtime': xeninfo.get_platform_localtime(),
-            'platform_clock_offset': xeninfo.get_platform_clock_offset(),
-            'platform_enable_audio': xeninfo.get_platform_enable_audio(),
-            'platform_keymap': xeninfo.get_platform_keymap(),
+            'platform': xeninfo.get_platform(),
             'PCI_bus': xeninfo.get_pci_bus(),
             'tools_version': xeninfo.get_tools_version(),
             'other_config': xeninfo.info.get('other_config', {}),
@@ -1486,10 +1465,13 @@ class XendAPI(object):
                                      start_paused = start_paused)
     
     def VM_start(self, session, vm_ref, start_paused):
-        return XendTask.log_progress(0, 100, do_vm_func,
-                                     "domain_start", vm_ref,
-                                     start_paused = start_paused)
-    
+        try:
+            return XendTask.log_progress(0, 100, do_vm_func,
+                                         "domain_start", vm_ref,
+                                         start_paused = start_paused)
+        except HVMRequired, exn:
+            return xen_api_error(['VM_HVM_REQUIRED', vm_ref])
+
     def VM_suspend(self, session, vm_ref):
         return XendTask.log_progress(0, 100, do_vm_func,
                                      "domain_suspend", vm_ref)
@@ -1754,13 +1736,13 @@ class XendAPI(object):
 
     # Xen API: Class VDI
     # ----------------------------------------------------------------
-    VDI_attr_ro = ['VBDs',
+    VDI_attr_ro = ['SR',
+                   'VBDs',
                    'physical_utilisation',
                    'sector_size',
                    'type']
     VDI_attr_rw = ['name_label',
                    'name_description',
-                   'SR',
                    'virtual_size',
                    'sharable',
                    'read_only']
@@ -1811,9 +1793,6 @@ class XendAPI(object):
     def VDI_set_name_description(self, session, vdi_ref, value):
         self._get_VDI(vdi_ref).name_description = value
         return xen_api_success_void()
-
-    def VDI_set_SR(self, session, vdi_ref, value):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
 
     def VDI_set_virtual_size(self, session, vdi_ref, value):
         return xen_api_error(XEND_ERROR_UNSUPPORTED)
@@ -1929,7 +1908,7 @@ class XendAPI(object):
                  XendDomain.POWER_STATE_NAMES[dom.state]])
             from xen.xend.server import tpmif
             tpmif.destroy_vtpmstate(dom.getName())
-            return xen_api_success(True)
+            return xen_api_success_void()
         else:
             return xen_api_error(['HANDLE_INVALID', 'VM', vtpm_struct['VM']])
 

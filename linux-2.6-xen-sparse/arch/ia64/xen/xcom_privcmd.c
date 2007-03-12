@@ -22,7 +22,7 @@
 #include <linux/gfp.h>
 #include <linux/module.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
+#include <xen/interface/platform.h>
 #define __XEN__
 #include <xen/interface/domctl.h>
 #include <xen/interface/sysctl.h>
@@ -40,25 +40,25 @@
 #define ROUND_DIV(v,s) (((v) + (s) - 1) / (s))
 
 static int
-xencomm_privcmd_dom0_op(privcmd_hypercall_t *hypercall)
+xencomm_privcmd_platform_op(privcmd_hypercall_t *hypercall)
 {
-	dom0_op_t kern_op;
-	dom0_op_t __user *user_op = (dom0_op_t __user *)hypercall->arg[0];
+	struct xen_platform_op kern_op;
+	struct xen_platform_op __user *user_op = (struct xen_platform_op __user *)hypercall->arg[0];
 	struct xencomm_handle *op_desc;
 	struct xencomm_handle *desc = NULL;
 	int ret = 0;
 
-	if (copy_from_user(&kern_op, user_op, sizeof(dom0_op_t)))
+	if (copy_from_user(&kern_op, user_op, sizeof(struct xen_platform_op)))
 		return -EFAULT;
 
-	if (kern_op.interface_version != DOM0_INTERFACE_VERSION)
+	if (kern_op.interface_version != XENPF_INTERFACE_VERSION)
 		return -EACCES;
 
 	op_desc = xencomm_create_inline(&kern_op);
 
 	switch (kern_op.cmd) {
 	default:
-		printk("%s: unknown dom0 cmd %d\n", __func__, kern_op.cmd);
+		printk("%s: unknown platform cmd %d\n", __func__, kern_op.cmd);
 		return -ENOSYS;
 	}
 
@@ -67,10 +67,10 @@ xencomm_privcmd_dom0_op(privcmd_hypercall_t *hypercall)
 		return ret;
 	}
 
-	ret = xencomm_arch_hypercall_dom0_op(op_desc);
+	ret = xencomm_arch_hypercall_platform_op(op_desc);
 
 	/* FIXME: should we restore the handle?  */
-	if (copy_to_user(user_op, &kern_op, sizeof(dom0_op_t)))
+	if (copy_to_user(user_op, &kern_op, sizeof(struct xen_platform_op)))
 		ret = -EFAULT;
 
 	if (desc)
@@ -638,8 +638,8 @@ int
 privcmd_hypercall(privcmd_hypercall_t *hypercall)
 {
 	switch (hypercall->op) {
-	case __HYPERVISOR_dom0_op:
-		return xencomm_privcmd_dom0_op(hypercall);
+	case __HYPERVISOR_platform_op:
+		return xencomm_privcmd_platform_op(hypercall);
 	case __HYPERVISOR_domctl:
 		return xencomm_privcmd_domctl(hypercall);
 	case __HYPERVISOR_sysctl:

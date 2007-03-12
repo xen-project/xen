@@ -146,6 +146,48 @@ void hvm_do_resume(struct vcpu *v)
     }
 }
 
+/* Called from the tools when saving a domain to make sure the io
+ * request-response ring is entirely empty. */
+static int hvmop_drain_io(
+    XEN_GUEST_HANDLE(xen_hvm_drain_io_t) uop)
+{
+    struct xen_hvm_drain_io op;
+    struct domain *d;
+    struct vcpu *v;
+    ioreq_t *p;
+    int rc;
+
+    if ( copy_from_guest(&op, uop, 1) )
+        return -EFAULT;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    d = rcu_lock_domain_by_id(op.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    rc = -EINVAL;
+    /* Can't do this to yourself, or to a domain without an ioreq ring */
+    if ( d == current->domain || !is_hvm_domain(d) || get_sp(d) == NULL )
+        goto out;
+
+    rc = 0;
+
+    domain_pause(d);  /* It's not safe to do this to running vcpus */
+    for_each_vcpu(d, v)
+    {
+        p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+        if ( p->state == STATE_IORESP_READY )
+            hvm_io_assist(v);
+    }
+    domain_unpause(d);
+
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -161,7 +203,8 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
-    rc = paging_enable(d, PG_SH_enable|PG_refcounts|PG_translate|PG_external);
+    /* paging support will be determined inside paging.c */
+    rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
         return rc;
 
@@ -379,7 +422,7 @@ void hvm_triple_fault(void)
  */
 static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
 {
-    unsigned long mfn;
+    unsigned long gfn, mfn;
     char *p;
     int count, todo;
 
@@ -389,9 +432,11 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
 
         if ( virt )
-            mfn = get_mfn_from_gpfn(paging_gva_to_gfn(current, addr));
+            gfn = paging_gva_to_gfn(current, addr);
         else
-            mfn = get_mfn_from_gpfn(addr >> PAGE_SHIFT);
+            gfn = addr >> PAGE_SHIFT;
+        
+        mfn = get_mfn_from_gpfn(gfn);
 
         if ( mfn == INVALID_MFN )
             return todo;
@@ -399,14 +444,15 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
 
         if ( dir )
+        {
             memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
+            mark_dirty(current->domain, mfn);
+        }
         else
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
 
         unmap_domain_page(p);
         
-        mark_dirty(current->domain, mfn);
-
         addr += count;
         buf  += count;
         todo -= count;
@@ -911,6 +957,12 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = hvmop_set_pci_link_route(
             guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
         break;
+
+    case HVMOP_drain_io:
+        rc = hvmop_drain_io(
+            guest_handle_cast(arg, xen_hvm_drain_io_t));
+        break;
+
 
     default:
     {

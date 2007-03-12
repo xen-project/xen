@@ -460,7 +460,6 @@ struct arch_svm_struct {
 struct vmcb_struct *alloc_vmcb(void);
 struct host_save_area *alloc_host_save_area(void);
 void free_vmcb(struct vmcb_struct *vmcb);
-void free_host_save_area(struct host_save_area *hsa);
 
 int  svm_create_vmcb(struct vcpu *v);
 void svm_destroy_vmcb(struct vcpu *v);

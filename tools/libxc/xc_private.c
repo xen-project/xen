@@ -23,7 +23,7 @@ void xc_default_error_handler(const xc_error const *err)
     fprintf(stderr, "ERROR %s: %s\n", desc, err->message);
 }
 
-const xc_error const *xc_get_last_error(void)
+const xc_error *xc_get_last_error(void)
 {
     return &last_error;
 }

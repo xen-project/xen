@@ -92,6 +92,7 @@ typedef struct RTCState {
     struct timer second_timer;
     struct timer second_timer2;
     struct periodic_time pt;
+    int32_t time_offset_seconds;
 } RTCState;
 
 #define FREQUENCE_PMTIMER  3579545  /* Timer should run at 3.579545 MHz */

@@ -396,17 +396,41 @@ typedef struct PCIIDEState {
 
 #ifdef DMA_MULTI_THREAD
 
+static pthread_t ide_dma_thread;
 static int file_pipes[2];
 
 static void ide_dma_loop(BMDMAState *bm);
 static void dma_thread_loop(BMDMAState *bm);
 
+extern int suspend_requested;
 static void *dma_thread_func(void* opaque)
 {
     BMDMAState* req;
+    fd_set fds;
+    int rv, nfds = file_pipes[0] + 1;
+    struct timeval tm;
 
-    while (read(file_pipes[0], &req, sizeof(req))) {
-        dma_thread_loop(req);
+    while (1) {
+
+        /* Wait at most a second for the pipe to become readable */
+        FD_ZERO(&fds);
+        FD_SET(file_pipes[0], &fds);
+        tm.tv_sec = 1;
+        tm.tv_usec = 0;
+        rv = select(nfds, &fds, NULL, NULL, &tm);
+        
+        if (rv != 0) {
+            if (read(file_pipes[0], &req, sizeof(req)) == 0)
+                return NULL;
+            dma_thread_loop(req);
+        } else {
+            if (suspend_requested)  {
+                /* Need to tidy up the DMA thread so that we don't end up 
+                 * finishing operations after the domain's ioreqs are 
+                 * drained and its state saved */
+                return NULL;
+            }
+        }
     }
 
     return NULL;
@@ -414,23 +438,40 @@ static void *dma_thread_func(void* opaque)
 
 static void dma_create_thread(void)
 {
-    pthread_t tid;
     int rt;
+    pthread_attr_t a;
 
     if (pipe(file_pipes) != 0) {
         fprintf(stderr, "create pipe failed\n");
         exit(1);
     }
 
-    if ((rt = pthread_create(&tid, NULL, dma_thread_func, NULL))) {
+    if ((rt = pthread_attr_init(&a))
+        || (rt = pthread_attr_setdetachstate(&a, PTHREAD_CREATE_JOINABLE))) {
+        fprintf(stderr, "Oops, dma thread attr setup failed, errno=%d\n", rt);
+        exit(1);
+    }    
+    
+    if ((rt = pthread_create(&ide_dma_thread, &a, dma_thread_func, NULL))) {
         fprintf(stderr, "Oops, dma thread creation failed, errno=%d\n", rt);
         exit(1);
     }
+}
 
-    if ((rt = pthread_detach(tid))) {
-        fprintf(stderr, "Oops, dma thread detachment failed, errno=%d\n", rt);
-        exit(1);
+void ide_stop_dma_thread(void)
+{
+    int rc;
+    /* Make sure the IDE DMA thread is stopped */
+    if ( (rc = pthread_join(ide_dma_thread, NULL)) != 0 )
+    {
+        fprintf(stderr, "Oops, error collecting IDE DMA thread (%s)\n", 
+                strerror(rc));
     }
+}
+
+#else
+void ide_stop_dma_thread(void)
+{
 }
 #endif /* DMA_MULTI_THREAD */
 
@@ -2602,6 +2643,120 @@ void pci_cmd646_ide_init(PCIBus *bus, BlockDriverState **hd_table,
 #endif /* DMA_MULTI_THREAD */
 }
 
+static void pci_ide_save(QEMUFile* f, void *opaque)
+{
+    PCIIDEState *d = opaque;
+    int i;
+
+    for(i = 0; i < 2; i++) {
+        BMDMAState *bm = &d->bmdma[i];
+        qemu_put_8s(f, &bm->cmd);
+        qemu_put_8s(f, &bm->status);
+        qemu_put_be32s(f, &bm->addr);
+        /* XXX: if a transfer is pending, we do not save it yet */
+    }
+
+    /* per IDE interface data */
+    for(i = 0; i < 2; i++) {
+        IDEState *s = &d->ide_if[i * 2];
+        uint8_t drive1_selected;
+        qemu_put_8s(f, &s->cmd);
+        drive1_selected = (s->cur_drive != s);
+        qemu_put_8s(f, &drive1_selected);
+    }
+
+    /* per IDE drive data */
+    for(i = 0; i < 4; i++) {
+        IDEState *s = &d->ide_if[i];
+        qemu_put_be32s(f, &s->mult_sectors);
+        qemu_put_be32s(f, &s->identify_set);
+        if (s->identify_set) {
+            qemu_put_buffer(f, (const uint8_t *)s->identify_data, 512);
+        }
+        qemu_put_8s(f, &s->write_cache);
+        qemu_put_8s(f, &s->feature);
+        qemu_put_8s(f, &s->error);
+        qemu_put_be32s(f, &s->nsector);
+        qemu_put_8s(f, &s->sector);
+        qemu_put_8s(f, &s->lcyl);
+        qemu_put_8s(f, &s->hcyl);
+        qemu_put_8s(f, &s->hob_feature);
+        qemu_put_8s(f, &s->hob_nsector);
+        qemu_put_8s(f, &s->hob_sector);
+        qemu_put_8s(f, &s->hob_lcyl);
+        qemu_put_8s(f, &s->hob_hcyl);
+        qemu_put_8s(f, &s->select);
+        qemu_put_8s(f, &s->status);
+        qemu_put_8s(f, &s->lba48);
+
+        qemu_put_8s(f, &s->sense_key);
+        qemu_put_8s(f, &s->asc);
+        /* XXX: if a transfer is pending, we do not save it yet */
+    }
+}
+
+static int pci_ide_load(QEMUFile* f, void *opaque, int version_id)
+{
+    PCIIDEState *d = opaque;
+    int ret, i;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    for(i = 0; i < 2; i++) {
+        BMDMAState *bm = &d->bmdma[i];
+        qemu_get_8s(f, &bm->cmd);
+        qemu_get_8s(f, &bm->status);
+        qemu_get_be32s(f, &bm->addr);
+        /* XXX: if a transfer is pending, we do not save it yet */
+    }
+
+    /* per IDE interface data */
+    for(i = 0; i < 2; i++) {
+        IDEState *s = &d->ide_if[i * 2];
+        uint8_t drive1_selected;
+        qemu_get_8s(f, &s->cmd);
+        qemu_get_8s(f, &drive1_selected);
+        s->cur_drive = &d->ide_if[i * 2 + (drive1_selected != 0)];
+    }
+
+    /* per IDE drive data */
+    for(i = 0; i < 4; i++) {
+        IDEState *s = &d->ide_if[i];
+        qemu_get_be32s(f, &s->mult_sectors);
+        qemu_get_be32s(f, &s->identify_set);
+        if (s->identify_set) {
+            qemu_get_buffer(f, (uint8_t *)s->identify_data, 512);
+        }
+        qemu_get_8s(f, &s->write_cache);
+        qemu_get_8s(f, &s->feature);
+        qemu_get_8s(f, &s->error);
+        qemu_get_be32s(f, &s->nsector);
+        qemu_get_8s(f, &s->sector);
+        qemu_get_8s(f, &s->lcyl);
+        qemu_get_8s(f, &s->hcyl);
+        qemu_get_8s(f, &s->hob_feature);
+        qemu_get_8s(f, &s->hob_nsector);
+        qemu_get_8s(f, &s->hob_sector);
+        qemu_get_8s(f, &s->hob_lcyl);
+        qemu_get_8s(f, &s->hob_hcyl);
+        qemu_get_8s(f, &s->select);
+        qemu_get_8s(f, &s->status);
+        qemu_get_8s(f, &s->lba48);
+
+        qemu_get_8s(f, &s->sense_key);
+        qemu_get_8s(f, &s->asc);
+        /* XXX: if a transfer is pending, we do not save it yet */
+        if (s->status & (DRQ_STAT|BUSY_STAT)) {
+            /* Tell the guest that its transfer has gone away */
+            ide_abort_command(s);
+            ide_set_irq(s);
+        }
+    }
+    return 0;
+}
+
+
 /* hd_table must contain 4 block drivers */
 /* NOTE: for the PIIX3, the IRQs and IOports are hardcoded */
 void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn)
@@ -2643,6 +2798,7 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn)
     buffered_pio_init();
 
     register_savevm("ide_pci", 0, 1, generic_pci_save, generic_pci_load, d);
+    register_savevm("ide", 0, 1, pci_ide_save, pci_ide_load, d);
 
 #ifdef DMA_MULTI_THREAD    
     dma_create_thread();

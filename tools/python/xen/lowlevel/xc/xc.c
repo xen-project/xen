@@ -47,7 +47,7 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
 static PyObject *pyxc_error_to_exception(void)
 {
     PyObject *pyerr;
-    const xc_error const *err = xc_get_last_error();
+    const xc_error *err = xc_get_last_error();
     const char *desc = xc_error_code_to_desc(err->code);
 
     if (err->code == XC_ERROR_NONE)
@@ -1007,6 +1007,24 @@ static PyObject *pyxc_domain_send_trigger(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_send_debug_keys(XcObject *self,
+                                      PyObject *args,
+                                      PyObject *kwds)
+{
+    char *keys;
+
+    static char *kwd_list[] = { "keys", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "s", kwd_list, &keys) )
+        return NULL;
+
+    if ( xc_send_debug_keys(self->xc_handle, keys) != 0 )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
 {
@@ -1419,6 +1437,12 @@ static PyMethodDef pyxc_methods[] = {
       " trigger [int]: Trigger type number.\n"
       " vcpu    [int]: VCPU to be sent trigger.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "send_debug_keys",
+      (PyCFunction)pyxc_send_debug_keys,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Inject debug keys into Xen.\n"
+      " keys    [str]: String of keys to inject.\n" },
 
 #ifdef __powerpc__
     { "arch_alloc_real_mode_area", 

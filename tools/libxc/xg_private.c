@@ -229,6 +229,11 @@ __attribute__((weak)) int xc_set_hvm_param(
     return -ENOSYS;
 }
 
+__attribute__((weak)) int xc_hvm_drain_io(int handle, domid_t dom)
+{
+    return -ENOSYS;
+}
+
 /*
  * Local variables:
  * mode: C

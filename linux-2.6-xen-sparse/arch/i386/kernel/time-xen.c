@@ -435,7 +435,7 @@ int do_settimeofday(struct timespec *tv)
 	s64 nsec;
 	unsigned int cpu;
 	struct shadow_time_info *shadow;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
@@ -460,11 +460,11 @@ int do_settimeofday(struct timespec *tv)
 	__normalize_time(&sec, &nsec);
 
 	if (is_initial_xendomain() && !independent_wallclock) {
-		op.cmd = DOM0_SETTIME;
+		op.cmd = XENPF_settime;
 		op.u.settime.secs        = sec;
 		op.u.settime.nsecs       = nsec;
 		op.u.settime.system_time = shadow->system_timestamp;
-		HYPERVISOR_dom0_op(&op);
+		HYPERVISOR_platform_op(&op);
 		update_wallclock();
 	} else if (independent_wallclock) {
 		nsec -= shadow->system_timestamp;
@@ -488,7 +488,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 {
 	time_t sec;
 	s64 nsec;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	if (!ntp_synced() || independent_wallclock || !is_initial_xendomain())
 		return;
@@ -499,11 +499,11 @@ static void sync_xen_wallclock(unsigned long dummy)
 	nsec = xtime.tv_nsec + ((jiffies - wall_jiffies) * (u64)NS_PER_TICK);
 	__normalize_time(&sec, &nsec);
 
-	op.cmd = DOM0_SETTIME;
+	op.cmd = XENPF_settime;
 	op.u.settime.secs        = sec;
 	op.u.settime.nsecs       = nsec;
 	op.u.settime.system_time = processed_system_time;
-	HYPERVISOR_dom0_op(&op);
+	HYPERVISOR_platform_op(&op);
 
 	update_wallclock();
 
@@ -907,6 +907,10 @@ static void setup_cpu0_timer_irq(void)
 	BUG_ON(per_cpu(timer_irq, 0) < 0);
 }
 
+static struct vcpu_set_periodic_timer xen_set_periodic_tick = {
+	.period_ns = NS_PER_TICK
+};
+
 void __init time_init(void)
 {
 #ifdef CONFIG_HPET_TIMER
@@ -919,6 +923,10 @@ void __init time_init(void)
 		return;
 	}
 #endif
+
+	HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, 0,
+			   &xen_set_periodic_tick);
+
 	get_time_values_from_xen(0);
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
@@ -976,8 +984,10 @@ EXPORT_SYMBOL(jiffies_to_st);
  */
 static void stop_hz_timer(void)
 {
+	struct vcpu_set_singleshot_timer singleshot;
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
+	int rc;
 
 	cpu_set(cpu, nohz_cpu_mask);
 
@@ -997,8 +1007,16 @@ static void stop_hz_timer(void)
 		j = jiffies + 1;
 	}
 
-	if (HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0)
-		BUG();
+	singleshot.timeout_abs_ns = jiffies_to_st(j);
+	singleshot.flags = 0;
+	rc = HYPERVISOR_vcpu_op(VCPUOP_set_singleshot_timer, cpu, &singleshot);
+#ifdef XEN_COMPAT_030004
+	if (rc) {
+		BUG_ON(rc != -ENOSYS);
+		rc = HYPERVISOR_set_timer_op(singleshot.timeout_abs_ns);
+	}
+#endif
+	BUG_ON(rc);
 }
 
 static void start_hz_timer(void)
@@ -1030,6 +1048,8 @@ void time_resume(void)
 	init_cpu_khz();
 
 	for_each_online_cpu(cpu) {
+		HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+				   &xen_set_periodic_tick);
 		get_time_values_from_xen(cpu);
 		per_cpu(processed_system_time, cpu) =
 			per_cpu(shadow_time, 0).system_timestamp;
@@ -1049,6 +1069,9 @@ int local_setup_timer(unsigned int cpu)
 	int seq, irq;
 
 	BUG_ON(cpu == 0);
+
+	HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+			   &xen_set_periodic_tick);
 
 	do {
 		seq = read_seqbegin(&xtime_lock);

@@ -12,7 +12,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2006 XenSource Ltd
+# Copyright (C) 2006-2007 XenSource Ltd
 #============================================================================
 
 import logging
@@ -111,22 +111,18 @@ XENAPI_CFG_TO_LEGACY_CFG = {
     'actions_after_shutdown': 'on_poweroff',
     'actions_after_reboot': 'on_reboot',
     'actions_after_crash': 'on_crash', 
-    'platform_localtime': 'localtime',
     'PV_bootloader': 'bootloader',
     'PV_bootloader_args': 'bootloader_args',
 }
 
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 
-# Mapping from XendConfig configuration keys to the old
-# legacy configuration keys that are found in the 'image'
-# SXP object.
-XENAPI_HVM_CFG = {
-    'platform_std_vga': 'stdvga',
-    'platform_serial' : 'serial',
-    'platform_localtime': 'localtime',
-    'platform_keymap' : 'keymap'
-}    
+# Platform configuration keys.
+XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'device_model', 'display', 'fda',
+                        'fdb', 'keymap', 'isa', 'localtime', 'nographic',
+                        'pae', 'serial', 'sdl', 'soundhw','stdvga', 'usb',
+                        'usbdevice', 'vnc', 'vncconsole', 'vncdisplay',
+                        'vnclisten', 'vncpasswd', 'vncunused', 'xauthority']
 
 # List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
@@ -151,7 +147,6 @@ XENAPI_CFG_TYPES = {
     'actions_after_shutdown': str,
     'actions_after_reboot': str,
     'actions_after_crash': str,
-    'tpm_backend': int,    
     'PV_bootloader': str,
     'PV_kernel': str,
     'PV_ramdisk': str,
@@ -159,15 +154,10 @@ XENAPI_CFG_TYPES = {
     'PV_bootloader_args': str,
     'HVM_boot_policy': str,
     'HVM_boot_params': dict,
-    'platform_std_vga': bool0,
-    'platform_serial': str,
-    'platform_localtime': bool0,
-    'platform_clock_offset': bool0,
-    'platform_enable_audio': bool0,
-    'platform_keymap': str,
-    'pci_bus': str,
+    'PCI_bus': str,
+    'platform': dict,
     'tools_version': dict,
-    'otherconfig': dict,
+    'other_config': dict,
 }
 
 # List of legacy configuration keys that have no equivalent in the
@@ -237,44 +227,7 @@ LEGACY_XENSTORE_VM_PARAMS = [
     'on_xend_stop',
 ]
 
-LEGACY_IMAGE_CFG = [
-    ('root', str),
-    ('ip', str),
-    ('nographic', int),
-    ('vnc', int),
-    ('sdl', int),
-    ('vncdisplay', int),
-    ('vncunused', int),
-    ('vncpasswd', str),
-    ('vnclisten', str),
-]
-
-LEGACY_IMAGE_HVM_CFG = [
-    ('device_model', str),
-    ('display', str),
-    ('xauthority', str),
-    ('vncconsole', int),
-    ('pae', int),
-    ('apic', int),
-]
-
-LEGACY_IMAGE_HVM_DEVICES_CFG = [
-    ('acpi', int),    
-    ('boot', str),
-    ('fda', str),
-    ('fdb', str),
-    ('isa', int),
-    ('keymap', str),    
-    ('localtime', int),    
-    ('serial', str),
-    ('stdvga', int),
-    ('soundhw', str),
-    ('usb', int),
-    ('usbdevice', str),    
-    ('vcpus', int),
-]
-
-LEGACY_DM = '/usr/lib/xen/bin/qemu-dm'
+DEFAULT_DM = '/usr/lib/xen/bin/qemu-dm'
 
 ##
 ## Config Choices
@@ -316,7 +269,6 @@ class XendConfig(dict):
             self._sxp_to_xapi_unsupported(sxp_obj)
         elif xapi:
             self.update_with_xenapi_config(xapi)
-            self._add_xapi_unsupported(xapi)
         elif dominfo:
             # output from xc.domain_getinfo
             self._dominfo_to_xapi(dominfo)
@@ -363,7 +315,6 @@ class XendConfig(dict):
             'memory_dynamic_max': 0,
             'memory_actual': 0,
             'devices': {},
-            'image': {},
             'security': None,
             'on_xend_start': 'ignore',
             'on_xend_stop': 'ignore',
@@ -377,6 +328,7 @@ class XendConfig(dict):
             'vbd_refs': [],
             'vtpm_refs': [],
             'other_config': {},
+            'platform': {}
         }
         
         return defaults
@@ -417,12 +369,23 @@ class XendConfig(dict):
         if 'name_label' not in self:
             self['name_label'] = 'Domain-' + self['uuid']
 
+    def _platform_sanity_check(self):
+        if self.is_hvm():
+            if 'device_model' not in self['platform']:
+                self['platform']['device_model'] = DEFAULT_DM
+
+            # Compatibility hack, can go away soon.
+            if 'soundhw' not in self['platform'] and \
+               self['platform'].get('enable_audio'):
+                self['platform']['soundhw'] = 'sb16'
+
     def validate(self):
         self._uuid_sanity_check()
         self._name_sanity_check()
         self._memory_sanity_check()
         self._actions_sanity_check()
         self._vcpus_sanity_check()
+        self._platform_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
@@ -497,6 +460,18 @@ class XendConfig(dict):
                 except (TypeError, ValueError), e:
                     log.warn("Unable to parse key %s: %s: %s" %
                              (key, str(val), e))
+
+        if 'platform' not in cfg:
+            cfg['platform'] = {}
+        localtime = sxp.child_value(sxp_cfg, 'localtime')
+        if localtime is not None:
+            cfg['platform']['localtime'] = localtime
+
+        # Compatibility hack -- can go soon.
+        for key in XENAPI_PLATFORM_CFG:
+            val = sxp.child_value(sxp_cfg, "platform_" + key, None)
+            if val is not None:
+                self['platform'][key] = val
 
         # Compatibility hack -- can go soon.
         boot_order = sxp.child_value(sxp_cfg, 'HVM_boot')
@@ -652,10 +627,9 @@ class XendConfig(dict):
             self.update_with_image_sxp(image_sxp)
 
         # Convert Legacy HVM parameters to Xen API configuration
-        self['platform_std_vga'] = bool0(cfg.get('stdvga', 0))
-        self['platform_serial'] = str(cfg.get('serial', ''))
-        self['platform_localtime'] = bool0(cfg.get('localtime', 0))
-        self['platform_enable_audio'] = bool0(cfg.get('soundhw', 0))
+        for key in XENAPI_PLATFORM_CFG:
+            if key in cfg:
+                self['platform'][key] = cfg[key]
 
         # make sure a sane maximum is set
         if self['memory_static_max'] <= 0:
@@ -672,7 +646,7 @@ class XendConfig(dict):
         self['vtpm_refs'] = cfg.get('vtpm_refs', [])
 
         # coalesce hvm vnc frame buffer with vfb config
-        if self['image']['type'] == 'hvm' and self['image'].get('vnc', 0):
+        if self.is_hvm() and self['platform'].get('vnc', 0):
             # add vfb device if it isn't there already
             has_rfb = False
             for console_uuid in self['console_refs']:
@@ -685,11 +659,11 @@ class XendConfig(dict):
 
             if not has_rfb:
                 dev_config = ['vfb']
-                # copy VNC related params from image config to vfb dev conf
+                # copy VNC related params from platform config to vfb dev conf
                 for key in ['vncpasswd', 'vncunused', 'vncdisplay',
                             'vnclisten']:
-                    if key in self['image']:
-                        dev_config.append([key, self['image'][key]])
+                    if key in self['platform']:
+                        dev_config.append([key, self['platform'][key]])
 
                 self.device_add('vfb', cfg_sxp = dev_config)
 
@@ -706,39 +680,19 @@ class XendConfig(dict):
         # the image (as well as HVM images)
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
         if image_sxp:
-            image = {}
-            image['type'] = sxp.name(image_sxp)
-            for arg, conv in LEGACY_IMAGE_CFG:
-                val = sxp.child_value(image_sxp, arg, None)
-                if val != None:
-                    image[arg] = conv(val)
-
-            image_hvm = {}
-            for arg, conv in LEGACY_IMAGE_HVM_CFG:
-                val = sxp.child_value(image_sxp, arg, None)
-                if val != None:
-                    image_hvm[arg] = conv(val)
-                    
-            image_hvm_devices = {}
-            for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
-                val = sxp.child_value(image_sxp, arg, None)
-                if val != None:
-                    image_hvm_devices[arg] = conv(val)
-
-            if image_hvm or image_hvm_devices:
-                image['hvm'] = image_hvm
-                image['hvm']['devices'] = image_hvm_devices
-
+            image_type = sxp.name(image_sxp)
+            if image_type != 'hvm' and image_type != 'linux':
+                self['platform']['image_type'] = image_type
+            
+            for key in XENAPI_PLATFORM_CFG:
+                val = sxp.child_value(image_sxp, key, None)
+                if val is not None:
+                    self['platform'][key] = val
+            
             notes = sxp.children(image_sxp, 'notes')
             if notes:
-                image['notes'] = self.notes_from_sxp(notes[0])
+                self['notes'] = self.notes_from_sxp(notes[0])
 
-            self['image'] = image
-
-            for apikey, imgkey in XENAPI_HVM_CFG.items():
-                val = sxp.child_value(image_sxp, imgkey, None)
-                if val != None:
-                    self[apikey] = val
             self._hvm_boot_params_from_sxp(image_sxp)
 
         # extract backend value
@@ -773,33 +727,6 @@ class XendConfig(dict):
         _set_cfg_if_exists('shutdown_reason')
         _set_cfg_if_exists('up_time')
         _set_cfg_if_exists('status') # TODO, deprecated  
-
-    def _add_xapi_unsupported(self, xapi_dict):
-        """Updates the configuration object with entries that are not
-        officially supported by the Xen API but is required for
-        the rest of Xend to function.
-        """
-
-        # populate image
-        if 'image' in xapi_dict:
-            self['image'].update(xapi_dict['image'])
-        else:
-            hvm = self['HVM_boot_policy'] != ''
-            self['image']['type'] = hvm and 'hvm' or 'linux'
-            if hvm:
-                self['image']['hvm'] = {'devices': {}}
-                for xapi, cfgapi in XENAPI_HVM_CFG.items():
-                    if xapi in self:
-                        self['image']['hvm']['devices'][cfgapi] = self[xapi]
-
-                # currently unsupported options
-                self['image']['hvm']['device_model'] = LEGACY_DM
-                self['image']['vnc'] = 0
-                self['image']['hvm']['pae'] = 1
-
-                if self['platform_enable_audio']:
-                    self['image']['hvm']['devices']['soundhw'] = 'sb16'
-
 
     def _get_old_state_string(self):
         """Returns the old xm state string.
@@ -890,9 +817,7 @@ class XendConfig(dict):
             if self.has_key(legacy) and self[legacy] not in (None, []):
                 sxpr.append([legacy, self[legacy]])
 
-        if 'image' in self and self['image']:
-            sxpr.append(['image', self.image_sxpr()])
-
+        sxpr.append(['image', self.image_sxpr()])
         sxpr.append(['status', domain.state])
         sxpr.append(['memory_dynamic_min',  self.get('memory_dynamic_min')])
         sxpr.append(['memory_dynamic_max',  self.get('memory_dynamic_max')])
@@ -1339,7 +1264,7 @@ class XendConfig(dict):
     def image_sxpr(self):
         """Returns a backwards compatible image SXP expression that is
         used in xenstore's /vm/<uuid>/image value and xm list."""
-        image = [self['image'].get('type', 'linux')]
+        image = [self.image_type()]
         if self.has_key('PV_kernel'):
             image.append(['kernel', self['PV_kernel']])
         if self.has_key('PV_ramdisk') and self['PV_ramdisk']:
@@ -1347,28 +1272,12 @@ class XendConfig(dict):
         if self.has_key('PV_args') and self['PV_args']:
             image.append(['args', self['PV_args']])
 
-        for arg, conv in LEGACY_IMAGE_CFG:
-            if self['image'].has_key(arg):
-                image.append([arg, self['image'][arg]])
+        for key in XENAPI_PLATFORM_CFG:
+            if key in self['platform']:
+                image.append([key, self['platform'][key]])
 
-        if 'hvm' in self['image']:
-            for arg, conv in LEGACY_IMAGE_HVM_CFG:
-                if self['image']['hvm'].get(arg):
-                    image.append([arg, conv(self['image']['hvm'][arg])])
-
-        if 'hvm' in self['image'] and 'devices' in self['image']['hvm']:
-            for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
-                val = self['image']['hvm']['devices'].get(arg)
-                if val != None:
-                    try:
-                        if conv: val = conv(val)
-                    except (ValueError, TypeError):
-                        if type(val) == bool: val = int(val)
-                            
-                    image.append([arg, val])
-
-        if 'notes' in self['image']:
-            image.append(self.notes_sxp(self['image']['notes']))
+        if 'notes' in self:
+            image.append(self.notes_sxp(self['notes']))
 
         return image
 
@@ -1399,57 +1308,24 @@ class XendConfig(dict):
             self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
             self['PV_args'] = kernel_args
 
-        # Store image SXP in python dictionary format
-        image = {}
-        image['type'] = sxp.name(image_sxp)
-        for arg, conv in LEGACY_IMAGE_CFG:
-            val = sxp.child_value(image_sxp, arg, None)
-            if val != None:
-                image[arg] = conv(val)
-
-        image_hvm = {}
-        for arg, conv in LEGACY_IMAGE_HVM_CFG:
-            val = sxp.child_value(image_sxp, arg, None)
-            if val != None:
-                image_hvm[arg] = conv(val)
-                    
-        image_hvm_devices = {}
-        for arg, conv in LEGACY_IMAGE_HVM_DEVICES_CFG:
-            val = sxp.child_value(image_sxp, arg, None)
-            if val != None:
-                try:
-                    image_hvm_devices[arg] = conv(val)
-                except (ValueError, TypeError):
-                    image_hvm_devices[arg] = val
-                        
-
-        if image_hvm or image_hvm_devices:
-            image['hvm'] = image_hvm
-            image['hvm']['devices'] = image_hvm_devices
+        for key in XENAPI_PLATFORM_CFG:
+            val = sxp.child_value(image_sxp, key, None)
+            if val is not None:
+                self['platform'][key] = val
 
         notes = sxp.children(image_sxp, 'notes')
         if notes:
-            image['notes'] = self.notes_from_sxp(notes[0])
+            self['notes'] = self.notes_from_sxp(notes[0])
 
-        self['image'] = image
-
-        for apikey, imgkey in XENAPI_HVM_CFG.items():
-            val = sxp.child_value(image_sxp, imgkey, None)
-            if val != None:
-                type_conv = XENAPI_CFG_TYPES[apikey]
-                if callable(type_conv):
-                    self[apikey] = type_conv(val)
-                else:
-                    self[apikey] = val
         self._hvm_boot_params_from_sxp(image_sxp)
 
     def set_notes(self, notes):
         'Add parsed elfnotes to image'
-        self['image']['notes'] = notes
+        self['notes'] = notes
 
     def get_notes(self):
         try:
-            return self['image']['notes'] or {}
+            return self['notes'] or {}
         except KeyError:
             return {}
 
@@ -1471,11 +1347,9 @@ class XendConfig(dict):
             self['HVM_boot_policy'] = 'BIOS order'
             self['HVM_boot_params'] = { 'order' : boot }
 
+    def is_hvm(self):
+        return self['HVM_boot_policy'] != ''
 
-#
-# debugging 
-#
-
-if __name__ == "__main__":
-    pass
-    
+    def image_type(self):
+        stored_type = self['platform'].get('image_type')
+        return stored_type or (self.is_hvm() and 'hvm' or 'linux')

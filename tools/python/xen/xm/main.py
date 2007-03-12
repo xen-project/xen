@@ -25,6 +25,7 @@ import atexit
 import cmd
 import os
 import pprint
+import readline
 import shlex
 import sys
 import re
@@ -133,6 +134,7 @@ SUBCOMMAND_HELP = {
     'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
+    'debug-keys'  : ('<Keys>', 'Send debug keys to Xen.'),
     'trigger'     : ('<Domain> <nmi|reset|init> [<VCPU>]',
                      'Send a trigger to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
@@ -260,7 +262,6 @@ common_commands = [
     "shutdown",
     "start",
     "suspend",
-    "trigger",
     "top",
     "unpause",
     "uptime",
@@ -300,6 +301,7 @@ domain_commands = [
     ]
 
 host_commands = [
+    "debug-keys",
     "dmesg",
     "info",
     "log",
@@ -557,6 +559,10 @@ class Shell(cmd.Cmd):
             for f in res:
                 setattr(Shell, 'do_' + f, self.default)
 
+    def preloop(self):
+        cmd.Cmd.preloop(self)
+        readline.set_completer_delims(' ')
+
     def default(self, line):
         words = shlex.split(line)
         if len(words) > 0 and words[0] == 'xm':
@@ -576,9 +582,9 @@ class Shell(cmd.Cmd):
         return False
 
     def completedefault(self, text, line, begidx, endidx):
-        cmd = line.split(' ')[0]
-        clas, func = cmd.split('.')
-        if begidx != len(cmd) + 1 or \
+        words = shlex.split(line[:begidx])
+        clas, func = words[0].split('.')
+        if len(words) > 1 or \
            func.startswith('get_by_') or \
            func == 'get_all':
             return []
@@ -1395,6 +1401,10 @@ def xm_trigger(args):
     
     server.xend.domain.send_trigger(dom, trigger, vcpu)
 
+def xm_debug_keys(args):
+    arg_check(args, "debug-keys", 1)
+    server.xend.node.send_debug_keys(str(args[0]))
+
 def xm_top(args):
     arg_check(args, "top", 0)
 
@@ -1738,6 +1748,7 @@ commands = {
     "pause": xm_pause,
     "unpause": xm_unpause,
     # host commands
+    "debug-keys": xm_debug_keys,
     "dmesg": xm_dmesg,
     "info": xm_info,
     "log": xm_log,
@@ -1881,7 +1892,7 @@ def _run_cmd(cmd, cmd_name, args):
             err("Domain '%s' does not exist." % ex.faultString)
         else:
             err(ex.faultString)
-        _usage(cmd_name)
+            _usage(cmd_name)
     except xmlrpclib.ProtocolError, ex:
         if ex.errcode == -1:
             print  >>sys.stderr, (

@@ -145,6 +145,12 @@ long arch_do_domctl(
         }
 
         arr32 = alloc_xenheap_page();
+        if ( !arr32 )
+        {
+            ret = -ENOMEM;
+            put_domain(d);
+            break;
+        }
  
         ret = 0;
         for ( n = 0; n < num; )
@@ -157,7 +163,7 @@ long arch_do_domctl(
                                         domctl->u.getpageframeinfo2.array,
                                         n, k) )
             {
-                ret = -EINVAL;
+                ret = -EFAULT;
                 break;
             }
      
@@ -201,7 +207,7 @@ long arch_do_domctl(
             if ( copy_to_guest_offset(domctl->u.getpageframeinfo2.array,
                                       n, arr32, k) )
             {
-                ret = -EINVAL;
+                ret = -EFAULT;
                 break;
             }
 

@@ -577,7 +577,28 @@ int main_loop(void)
         destroy_hvm_domain();
     else {
         char qemu_file[20];
+        ioreq_t *req;
+        int rc;
+
         sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
+        xc_domain_pause(xc_handle, domid);
+
+        /* Pull all outstanding ioreqs through the system */
+        handle_buffered_io(env);
+        main_loop_wait(1); /* For the select() on events */
+        
+        /* Stop the IDE thread */
+        ide_stop_dma_thread();
+
+        /* Make sure that all outstanding IO responses are handled too */ 
+        if ( xc_hvm_drain_io(xc_handle, domid) != 0 )
+        {
+            fprintf(stderr, "error clearing ioreq rings (%s)\n", 
+                    strerror(errno));
+            return -1;
+        }
+
+        /* Save the device state */
         if (qemu_savevm(qemu_file) < 0)
             fprintf(stderr, "qemu save fail.\n");
     }

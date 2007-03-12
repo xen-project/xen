@@ -95,15 +95,12 @@ class XendNode:
                 self.cpus[u] = {'uuid': u, 'number': i }
 
         for u in self.cpus.keys():
-            log.error(self.cpus[u])
             number = self.cpus[u]['number']
             # We can run off the end of the cpuinfo list if domain0 does not
             # have #vcpus == #pcpus. In that case we just replicate one that's
             # in the hash table.
             if not cpuinfo.has_key(number):
                 number = cpuinfo.keys()[0]
-            log.error(number)
-            log.error(cpuinfo)
             if arch.type == "x86":
                 self.cpus[u].update(
                     { 'host'     : self.uuid,
@@ -453,6 +450,12 @@ class XendNode:
                 return pif.network
         raise Exception('Bridge %s is not connected to a network' % bridge)
 
+    #
+    # Debug keys.
+    #
+
+    def send_debug_keys(self, keys):
+        return self.xc.send_debug_keys(keys)
 
     #
     # Getting host information.

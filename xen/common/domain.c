@@ -267,6 +267,9 @@ void domain_kill(struct domain *d)
     domain_relinquish_resources(d);
     put_domain(d);
 
+    /* Kick page scrubbing after domain_relinquish_resources(). */
+    page_scrub_kick();
+
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
@@ -543,16 +546,12 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     {
     case VCPUOP_initialise:
         if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
-        {
-            rc = -ENOMEM;
-            break;
-        }
+            return -ENOMEM;
 
         if ( copy_from_guest(ctxt, arg, 1) )
         {
             xfree(ctxt);
-            rc = -EFAULT;
-            break;
+            return -EFAULT;
         }
 
         LOCK_BIGLOCK(d);
@@ -566,9 +565,11 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
     case VCPUOP_up:
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            rc = -EINVAL;
-        else if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+            return -EINVAL;
+
+        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
             vcpu_wake(v);
+
         break;
 
     case VCPUOP_down:
@@ -586,6 +587,63 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         vcpu_runstate_get(v, &runstate);
         if ( copy_to_guest(arg, &runstate, 1) )
             rc = -EFAULT;
+        break;
+    }
+
+    case VCPUOP_set_periodic_timer:
+    {
+        struct vcpu_set_periodic_timer set;
+
+        if ( copy_from_guest(&set, arg, 1) )
+            return -EFAULT;
+
+        if ( set.period_ns < MILLISECS(1) )
+            return -EINVAL;
+
+        v->periodic_period = set.period_ns;
+        vcpu_force_reschedule(v);
+
+        break;
+    }
+
+    case VCPUOP_stop_periodic_timer:
+    {
+        v->periodic_period = 0;
+        vcpu_force_reschedule(v);
+        break;
+    }
+
+    case VCPUOP_set_singleshot_timer:
+    {
+        struct vcpu_set_singleshot_timer set;
+
+        if ( v != current )
+            return -EINVAL;
+
+        if ( copy_from_guest(&set, arg, 1) )
+            return -EFAULT;
+
+        if ( (set.flags & VCPU_SSHOTTMR_future) &&
+             (set.timeout_abs_ns < NOW()) )
+            return -ETIME;
+
+        if ( v->singleshot_timer.cpu != smp_processor_id() )
+        {
+            stop_timer(&v->singleshot_timer);
+            v->singleshot_timer.cpu = smp_processor_id();
+        }
+
+        set_timer(&v->singleshot_timer, set.timeout_abs_ns);
+
+        break;
+    }
+
+    case VCPUOP_stop_singleshot_timer:
+    {
+        if ( v != current )
+            return -EINVAL;
+
+        stop_timer(&v->singleshot_timer);
         break;
     }
 

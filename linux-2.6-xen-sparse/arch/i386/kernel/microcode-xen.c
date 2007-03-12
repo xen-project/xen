@@ -71,12 +71,12 @@ static int do_microcode_update (const void __user *ubuf, size_t len)
 		return -ENOMEM;
 
 	if (copy_from_user(kbuf, ubuf, len) == 0) {
-		dom0_op_t op;
+		struct xen_platform_op op;
 
-		op.cmd = DOM0_MICROCODE;
+		op.cmd = XENPF_microcode_update;
 		set_xen_guest_handle(op.u.microcode.data, kbuf);
 		op.u.microcode.length = len;
-		err = HYPERVISOR_dom0_op(&op);
+		err = HYPERVISOR_platform_op(&op);
 	} else
 		err = -EFAULT;
 

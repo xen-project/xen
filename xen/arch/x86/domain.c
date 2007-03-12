@@ -350,6 +350,9 @@ int vcpu_initialise(struct vcpu *v)
     }
     else
     {
+        /* PV guests by default have a 100Hz ticker. */
+        v->periodic_period = MILLISECS(10);
+
         /* PV guests get an emulated PIT too for video BIOSes to use. */
         if ( !is_idle_domain(d) && (v->vcpu_id == 0) )
             pit_init(v, cpu_khz);
@@ -457,8 +460,10 @@ int arch_domain_create(struct domain *d)
  fail:
     free_xenheap_page(d->shared_info);
 #ifdef __x86_64__
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
+    if ( d->arch.mm_perdomain_l2 )
+        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
+    if ( d->arch.mm_perdomain_l3 )
+        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
     return rc;

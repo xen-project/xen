@@ -57,14 +57,14 @@ type $t_1$ to values of type $t_2$.
 \end{itemize}
 
 Note that there are a number of cases where {\em Ref}s are {\em doubly
-linked\/}---e.g.\ a VM has a field called {\tt groups} of type
-$(\mathit{VMGroup}~\mathit{Ref})~\mathit{Set}$; this field lists
-the VMGroups that a particular VM is part of. Similarly, the VMGroups
-class has a field called {\tt VMs} of type $(\mathit{VM}~{\mathit
-Ref})~\mathit{Set}$ that contains the VMs that are part of a particular
-VMGroup. These two fields are {\em bound together\/}, in the sense that
-adding a new VMGroup to a VM causes the VMs field of the corresponding
-VMGroup object to be updated automatically.
+linked\/}---e.g.\ a VM has a field called {\tt VIFs} of type
+$(\mathit{VIF}~\mathit{Ref})~\mathit{Set}$; this field lists
+the network interfaces attached to a particular VM. Similarly, the VIF
+class has a field called {\tt VM} of type $(\mathit{VM}~{\mathit
+Ref})$ which references the VM to which the interface is connected.
+These two fields are {\em bound together\/}, in the sense that
+creating a new VIF causes the {\tt VIFs} field of the corresponding
+VM object to be updated automatically.
 
 The API reference explicitly lists the fields that are
 bound together in this way. It also contains a diagram that shows

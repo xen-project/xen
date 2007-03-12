@@ -19,7 +19,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2007-02-20 15:22+0000\n"
+"PO-Revision-Date: 2007-03-10 23:17+0000\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -61,3 +61,6 @@ msgstr "The VLAN tag you gave (%(1)s) is invalid -- it must be between 0 and 409
 
 msgid "VM_BAD_POWER_STATE"
 msgstr "The VM must be %(2)s to perform the requested operation (it is currently %(3)s)."
+
+msgid "VM_HVM_REQUIRED"
+msgstr "HVM guest support is unavailable: is VT/AMD-V supported by your CPU and enabled in your BIOS?"

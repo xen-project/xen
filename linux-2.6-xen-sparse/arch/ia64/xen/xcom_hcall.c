@@ -21,7 +21,7 @@
 #include <linux/gfp.h>
 #include <linux/module.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
+#include <xen/interface/platform.h>
 #include <xen/interface/memory.h>
 #include <xen/interface/xencomm.h>
 #include <xen/interface/version.h>

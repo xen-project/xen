@@ -543,8 +543,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
     domain0_ready = 1;
 
-    schedulers_start();
-
     domain_unpause_by_systemcontroller(dom0);
 
     startup_cpu_idle_loop();

@@ -79,11 +79,6 @@ struct host_save_area *alloc_host_save_area(void)
     return hsa;
 }
 
-void free_host_save_area(struct host_save_area *hsa)
-{
-    free_xenheap_page(hsa);
-}
-
 static int construct_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
@@ -201,6 +196,13 @@ static int construct_vmcb(struct vcpu *v)
 
     arch_svm->vmcb->exception_intercepts = MONITOR_DEFAULT_EXCEPTION_BITMAP;
 
+    if ( paging_mode_hap(v->domain) ) {
+        vmcb->cr0 = arch_svm->cpu_shadow_cr0;
+        vmcb->np_enable = 1; /* enable nested paging */
+        vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
+        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_PG;
+    }
+
     return 0;
 }
 
@@ -310,7 +312,8 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
     printk("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
            (unsigned long long) vmcb->kerngsbase,
            (unsigned long long) vmcb->g_pat);
-    
+    printk("H_CR3 = 0x%016llx\n", (unsigned long long)vmcb->h_cr3);
+
     /* print out all the selectors */
     svm_dump_sel("CS", &vmcb->cs);
     svm_dump_sel("DS", &vmcb->ds);

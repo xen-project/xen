@@ -500,6 +500,34 @@ xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char
 
 
 bool
+xen_vif_plug(xen_session *session, xen_vif self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "VIF.plug", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vif_unplug(xen_session *session, xen_vif self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "VIF.unplug", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vif_get_all(xen_session *session, struct xen_vif_set **result)
 {
 

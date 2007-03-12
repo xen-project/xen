@@ -231,7 +231,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt this\_user} & user ref & Currently connected 
 $\mathit{RO}_\mathit{run}$ &  {\tt last\_active} & int & Timestamp for last time session was active \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: session}
+\subsection{RPCs associated with class: session}
 \subsubsection{RPC name:~login\_with\_password}
 
 {\bf Overview:} 
@@ -505,7 +505,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has f
 $\mathit{RO}_\mathit{run}$ &  {\tt allowed\_operations} & (task\_allowed\_operations) Set & Operations allowed on this task \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: task}
+\subsection{RPCs associated with class: task}
 \subsubsection{RPC name:~cancel}
 
 {\bf Overview:} 
@@ -1022,40 +1022,7 @@ references to objects with match names
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VM} \\
 \multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
-virtual machine (or 'guest').
-
-VM booting is controlled by setting one of the two mutually exclusive
-groups: "PV", and "HVM".  If HVM.boot\_policy is the empty string, then
-paravirtual domain building and booting will be used; otherwise the VM will
-be loaded as an HVM domain, and booted using an emulated BIOS.
-
-When paravirtual booting is in use, the PV/bootloader field indicates the
-bootloader to use.  It may be "pygrub", in which case the platform's
-default installation of pygrub will be used, or a full path within the
-control domain to some other bootloader.  The other fields, PV/kernel,
-PV/ramdisk, PV/args and PV/bootloader\_args will be passed to the
-bootloader unmodified, and interpretation of those fields is then specific
-to the bootloader itself, including the possibility that the bootloader
-will ignore some or all of those given values. Finally the paths of all
-bootable disks are added to the bootloader commandline (a disk is bootable
-if its VBD has the bootable flag set). There may be zero, one or many
-bootable disks; the bootloader decides which disk (if any) to boot from.
-
-If the bootloader is pygrub, then the menu.lst is parsed if present in the
-guest's filesystem, otherwise the specified kernel and ramdisk are used, or
-an autodetected kernel is used if nothing is specified and autodetection is
-possible.  PV/args is appended to the kernel command line, no matter which
-mechanism is used for finding the kernel.
-
-If PV/bootloader is empty but PV/kernel is specified, then the kernel and
-ramdisk values will be treated as paths within the control domain.  If both
-PV/bootloader and PV/kernel are empty, then the behaviour is as if
-PV/bootloader was specified as "pygrub".
-
-When using HVM booting, HVM/boot\_policy and HVM/boot\_params specify the
-boot handling.  Only one policy is currently defined: "BIOS order".  In
-this case, HVM/boot\_params should contain one key-value pair "order" = "N"
-where N is the string that will be passed to QEMU.}} \\
+virtual machine (or 'guest').}} \\
 \hline
 Quals & Field & Type & Description \\
 \hline
@@ -1091,12 +1058,8 @@ $\mathit{RW}$ &  {\tt PV/args} & string & kernel command-line arguments \\
 $\mathit{RW}$ &  {\tt PV/bootloader\_args} & string & miscellaneous arguments for the bootloader \\
 $\mathit{RW}$ &  {\tt HVM/boot\_policy} & string & HVM boot policy \\
 $\mathit{RW}$ &  {\tt HVM/boot\_params} & (string $\rightarrow$ string) Map & HVM boot params \\
-$\mathit{RW}$ &  {\tt platform/std\_VGA} & bool & emulate standard VGA instead of cirrus logic \\
-$\mathit{RW}$ &  {\tt platform/serial} & string & redirect serial port to pty \\
-$\mathit{RW}$ &  {\tt platform/localtime} & bool & set RTC to local time \\
-$\mathit{RW}$ &  {\tt platform/clock\_offset} & bool & timeshift applied to guest's clock \\
-$\mathit{RW}$ &  {\tt platform/enable\_audio} & bool & emulate audio \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
+$\mathit{RW}$ &  {\tt platform} & (string $\rightarrow$ string) Map & platform-specific configuration \\
+$\mathit{RW}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt domid} & int & domain ID (if available, -1 otherwise) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
@@ -1104,7 +1067,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associat
 $\mathit{RO}_\mathit{run}$ &  {\tt guest\_metrics} & VM\_guest\_metrics ref & metrics associated with the running guest \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VM}
+\subsection{RPCs associated with class: VM}
 \subsubsection{RPC name:~clone}
 
 {\bf Overview:} 
@@ -1178,7 +1141,8 @@ void
 
 \vspace{0.3cm}
 
-\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}, {\tt
+VM\_HVM\_REQUIRED}
 
 \vspace{0.6cm}
 \subsubsection{RPC name:~pause}
@@ -1362,8 +1326,10 @@ void
 
 
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~hard\_reboot}
 
 {\bf Overview:} 
@@ -3438,13 +3404,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_std\_VGA}
+\subsubsection{RPC name:~get\_platform}
 
 {\bf Overview:} 
-Get the platform/std\_VGA field of the given VM.
+Get the platform field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_std_VGA (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} ((string -> string) Map) get_platform (session_id s, VM ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3462,7 +3428,7 @@ Get the platform/std\_VGA field of the given VM.
 
  \noindent {\bf Return Type:} 
 {\tt 
-bool
+(string $\rightarrow$ string) Map
 }
 
 
@@ -3470,13 +3436,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_std\_VGA}
+\subsubsection{RPC name:~set\_platform}
 
 {\bf Overview:} 
-Set the platform/std\_VGA field of the given VM.
+Set the platform field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_std_VGA (session_id s, VM ref self, bool value)\end{verbatim}
+\begin{verbatim} void set_platform (session_id s, VM ref self, (string -> string) Map value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3488,7 +3454,7 @@ Set the platform/std\_VGA field of the given VM.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline 
 
-{\tt bool } & value & New value to set \\ \hline 
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
 
 \end{tabular}
 
@@ -3504,13 +3470,13 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_serial}
+\subsubsection{RPC name:~add\_to\_platform}
 
 {\bf Overview:} 
-Get the platform/serial field of the given VM.
+Add the given key-value pair to the platform field of the given VM.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_platform_serial (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} void add_to_platform (session_id s, VM ref self, string key, string value)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3522,39 +3488,9 @@ Get the platform/serial field of the given VM.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline 
 
-\end{tabular}
+{\tt string } & key & Key to add \\ \hline 
 
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_serial}
-
-{\bf Overview:} 
-Set the platform/serial field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_serial (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
+{\tt string } & value & Value to add \\ \hline 
 
 \end{tabular}
 
@@ -3570,13 +3506,14 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_localtime}
+\subsubsection{RPC name:~remove\_from\_platform}
 
 {\bf Overview:} 
-Get the platform/localtime field of the given VM.
+Remove the given key and its corresponding value from the platform field of
+the given VM.  If the key is not in that Map, then do nothing.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_localtime (session_id s, VM ref self)\end{verbatim}
+\begin{verbatim} void remove_from_platform (session_id s, VM ref self, string key)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -3588,171 +3525,7 @@ Get the platform/localtime field of the given VM.
 {\bf type} & {\bf name} & {\bf description} \\ \hline
 {\tt VM ref } & self & reference to the object \\ \hline 
 
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-bool
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_localtime}
-
-{\bf Overview:} 
-Set the platform/localtime field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_localtime (session_id s, VM ref self, bool value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt bool } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_clock\_offset}
-
-{\bf Overview:} 
-Get the platform/clock\_offset field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_clock_offset (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-bool
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_clock\_offset}
-
-{\bf Overview:} 
-Set the platform/clock\_offset field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_clock_offset (session_id s, VM ref self, bool value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt bool } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_platform\_enable\_audio}
-
-{\bf Overview:} 
-Get the platform/enable\_audio field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} bool get_platform_enable_audio (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-bool
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_platform\_enable\_audio}
-
-{\bf Overview:} 
-Set the platform/enable\_audio field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_platform_enable_audio (session_id s, VM ref self, bool value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt bool } & value & New value to set \\ \hline 
+{\tt string } & key & Key to remove \\ \hline 
 
 \end{tabular}
 
@@ -3797,6 +3570,40 @@ string
 
 
 value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_PCI\_bus}
+
+{\bf Overview:} 
+Set the PCI\_bus field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_PCI_bus (session_id s, VM ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+{\tt string } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -4245,7 +4052,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VM\_metrics}
+\subsection{RPCs associated with class: VM\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -4481,7 +4288,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt networks} & (string $\rightarrow$ string) Map
 $\mathit{RO}_\mathit{run}$ &  {\tt other} & (string $\rightarrow$ string) Map & anything else \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VM\_guest\_metrics}
+\subsection{RPCs associated with class: VM\_guest\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -4825,7 +4632,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physi
 $\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host. \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: host}
+\subsection{RPCs associated with class: host}
 \subsubsection{RPC name:~disable}
 
 {\bf Overview:} 
@@ -6078,7 +5885,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (by
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: host\_metrics}
+\subsection{RPCs associated with class: host\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -6283,7 +6090,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical C
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: host\_cpu}
+\subsection{RPCs associated with class: host\_cpu}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -6677,7 +6484,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VIFs} & (VIF ref) Set & list of connected vif
 $\mathit{RO}_\mathit{run}$ &  {\tt PIFs} & (PIF ref) Set & list of connected pifs \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: network}
+\subsection{RPCs associated with class: network}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -7115,7 +6922,72 @@ $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & sup
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VIF}
+\subsection{RPCs associated with class: VIF}
+\subsubsection{RPC name:~plug}
+
+{\bf Overview:} 
+Hotplug the specified VIF, dynamically attaching it to the running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void plug (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & The VIF to hotplug \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~unplug}
+
+{\bf Overview:} 
+Hot-unplug the specified VIF, dynamically unattaching it from the running
+VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void unplug (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & The VIF to hot-unplug \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -7942,7 +7814,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VIF\_metrics}
+\subsection{RPCs associated with class: VIF\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -8148,7 +8020,7 @@ $\mathit{RW}$ &  {\tt VLAN} & int & VLAN tag for all traffic passing through thi
 $\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & PIF\_metrics ref & metrics associated with this PIF. \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: PIF}
+\subsection{RPCs associated with class: PIF}
 \subsubsection{RPC name:~create\_VLAN}
 
 {\bf Overview:} 
@@ -8719,7 +8591,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: PIF\_metrics}
+\subsection{RPCs associated with class: PIF\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -8926,7 +8798,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt type} & string & type of the storage reposito
 $\mathit{RO}_\mathit{ins}$ &  {\tt location} & string & a string that uniquely determines the location of the storage repository; the format of this string depends on the repository's type \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: SR}
+\subsection{RPCs associated with class: SR}
 \subsubsection{RPC name:~clone}
 
 {\bf Overview:} 
@@ -9549,7 +9421,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RW}$ &  {\tt name/label} & string & a human-readable name \\
 $\mathit{RW}$ &  {\tt name/description} & string & a notes field containg human-readable description \\
-$\mathit{RW}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt SR} & SR ref & storage repository in which the VDI resides \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that refer to this disk \\
 $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & list of crash dumps that refer to this disk \\
 $\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in bytes). Note that, depending on storage backend type, requested size may not be respected exactly \\
@@ -9560,7 +9432,7 @@ $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VDI}
+\subsection{RPCs associated with class: VDI}
 \subsubsection{RPC name:~snapshot}
 
 {\bf Overview:} 
@@ -9842,40 +9714,6 @@ SR ref
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_SR}
-
-{\bf Overview:} 
-Set the SR field of the given VDI.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_SR (session_id s, VDI ref self, SR ref value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & reference to the object \\ \hline 
-
-{\tt SR ref } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -10426,7 +10264,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & sup
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VBD\_metrics ref & metrics associated with this VBD \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VBD}
+\subsection{RPCs associated with class: VBD}
 \subsubsection{RPC name:~media\_change}
 
 {\bf Overview:} 
@@ -10447,6 +10285,71 @@ devices, detach the VBD and attach a new one.
 {\tt VBD ref } & vbd & The vbd representing the CDROM-like device \\ \hline 
 
 {\tt VDI ref } & vdi & The new VDI to 'insert' \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~plug}
+
+{\bf Overview:} 
+Hotplug the specified VBD, dynamically attaching it to the running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void plug (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & The VBD to hotplug \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~unplug}
+
+{\bf Overview:} 
+Hot-unplug the specified VBD, dynamically unattaching it from the running
+VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void unplug (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & The VBD to hot-unplug \\ \hline 
 
 \end{tabular}
 
@@ -11354,7 +11257,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VBD\_metrics}
+\subsection{RPCs associated with class: VBD\_metrics}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -11556,7 +11459,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt device\_config} & (string $\rightarrow$ strin
 $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the SR currently attached on this host? \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: PBD}
+\subsection{RPCs associated with class: PBD}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -11884,7 +11787,39 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt VDI} & VDI ref & the virtual disk \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: crashdump}
+\subsection{RPCs associated with class: crashdump}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified crashdump.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, crashdump ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt crashdump ref } & self & The crashdump to destroy \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -12002,70 +11937,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new crashdump instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (crashdump ref) create (session_id s, crashdump record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt crashdump record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-crashdump ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified crashdump instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, crashdump ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt crashdump ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
@@ -12148,7 +12019,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt backend} & VM ref & the domain where the backend is located \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: VTPM}
+\subsection{RPCs associated with class: VTPM}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -12393,7 +12264,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VM} & VM ref & VM to which this console is at
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: console}
+\subsection{RPCs associated with class: console}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -12828,7 +12699,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt short\_name} & string & short name (e.g. user
 $\mathit{RW}$ &  {\tt fullname} & string & full name \\
 \hline
 \end{longtable}
-\subsection{Additional RPCs associated with class: user}
+\subsection{RPCs associated with class: user}
 \subsubsection{RPC name:~get\_uuid}
 
 {\bf Overview:} 
@@ -13093,7 +12964,7 @@ all fields from the object
 \section{Class: debug}
 \subsection{Fields for class: debug}
 {\bf Class debug has no fields.}
-\subsection{Additional RPCs associated with class: debug}
+\subsection{RPCs associated with class: debug}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -13465,6 +13336,15 @@ expected and actual VM state at the time of the call.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_HVM\_REQUIRED}
+
+HVM is required for this operation
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 

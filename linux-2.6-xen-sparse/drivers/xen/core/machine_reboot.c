@@ -11,7 +11,6 @@
 #include <asm/mmu_context.h>
 #include <xen/evtchn.h>
 #include <asm/hypervisor.h>
-#include <xen/interface/dom0_ops.h>
 #include <xen/xenbus.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>

@@ -12,6 +12,7 @@
 #define XCFLAGS_LIVE      1
 #define XCFLAGS_DEBUG     2
 #define XCFLAGS_HVM       4
+#define XCFLAGS_STDVGA    8
 
 
 /**
@@ -154,6 +155,8 @@ int xc_set_hvm_param(
     int handle, domid_t dom, int param, unsigned long value);
 int xc_get_hvm_param(
     int handle, domid_t dom, int param, unsigned long *value);
+
+int xc_hvm_drain_io(int handle, domid_t dom);
 
 /* PowerPC specific. */
 int xc_prose_build(int xc_handle,

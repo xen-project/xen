@@ -358,6 +358,22 @@ xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi);
 
 
 /**
+ * Hotplug the specified VBD, dynamically attaching it to the running
+ * VM
+ */
+extern bool
+xen_vbd_plug(xen_session *session, xen_vbd self);
+
+
+/**
+ * Hot-unplug the specified VBD, dynamically unattaching it from the
+ * running VM
+ */
+extern bool
+xen_vbd_unplug(xen_session *session, xen_vbd self);
+
+
+/**
  * Return a list of all the VBDs known to the system.
  */
 extern bool

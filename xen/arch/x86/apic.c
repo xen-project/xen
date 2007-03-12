@@ -1023,6 +1023,13 @@ int reprogram_timer(s_time_t timeout)
     u64         apic_tmict;
 
     /*
+     * If we don't have local APIC then we just poll the timer list off the
+     * PIT interrupt.
+     */
+    if ( !cpu_has_apic )
+        return 1;
+
+    /*
      * We use this value because we don't trust zero (we think it may just
      * cause an immediate interrupt). At least this is guaranteed to hold it
      * off for ages (esp. since the clock ticks on bus clock, not cpu clock!).
@@ -1043,13 +1050,6 @@ int reprogram_timer(s_time_t timeout)
                 (u32)now, (u32)(timeout>>32),(u32)timeout);
         return 0;
     }
-
-    /*
-     * If we don't have local APIC then we just poll the timer list off the
-     * PIT interrupt. Cheesy but good enough to work on eg. VMware :-)
-     */
-    if ( !cpu_has_apic )
-        return 1;
 
     /* conversion to bus units */
     apic_tmict = (((u64)bus_scale) * expire)>>18;

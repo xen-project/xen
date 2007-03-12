@@ -35,7 +35,7 @@ struct timer {
  * The timer must *previously* have been initialised by init_timer(), or its
  * structure initialised to all-zeroes.
  */
-static __inline__ int active_timer(struct timer *timer)
+static inline int active_timer(struct timer *timer)
 {
     return (timer->heap_offset != 0);
 }
@@ -46,7 +46,7 @@ static __inline__ int active_timer(struct timer *timer)
  * time (and multiple times) on an inactive timer. It must *never* execute
  * concurrently with any other operation on the same timer.
  */
-static __inline__ void init_timer(
+static inline void init_timer(
     struct timer *timer,
     void           (*function)(void *),
     void            *data,

@@ -22,6 +22,28 @@
 #include "xc_core.h"
 #include "xc_efi.h"
 #include "xc_dom.h"
+#include <inttypes.h>
+
+static int
+xc_memory_map_cmp(const void *lhs__, const void *rhs__)
+{
+    const struct xc_core_memory_map *lhs =
+        (const struct xc_core_memory_map *)lhs__;
+    const struct xc_core_memory_map *rhs =
+        (const struct xc_core_memory_map *)rhs__;
+
+    if (lhs->addr < rhs->addr)
+        return -1;
+    if (lhs->addr > rhs->addr)
+        return 1;
+
+    /* memory map overlap isn't allowed. complain */
+    DPRINTF("duplicated addresses are detected "
+            "(0x%" PRIx64 ", 0x%" PRIx64 "), "
+            "(0x%" PRIx64 ", 0x%" PRIx64 ")\n",
+            lhs->addr, lhs->size, rhs->addr, rhs->size);
+    return 0;
+}
 
 int
 xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
@@ -111,6 +133,7 @@ memory_map_get_old_hvm(int xc_handle, xc_dominfo_t *info,
     }
     *mapp = map;
     *nr_entries = i;
+    qsort(map, *nr_entries, sizeof(map[0]), &xc_memory_map_cmp);
     return 0;
 
 out:
@@ -196,6 +219,7 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
     ret = 0;
 out:
     munmap(memmap_info, PAGE_SIZE);
+    qsort(map, *nr_entries, sizeof(map[0]), &xc_memory_map_cmp);
     return ret;
     
 old:

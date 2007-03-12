@@ -843,6 +843,7 @@ void pci_cmd646_ide_init(PCIBus *bus, BlockDriverState **hd_table,
 void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table, int devfn);
 int pmac_ide_init (BlockDriverState **hd_table,
                    SetIRQFunc *set_irq, void *irq_opaque, int irq);
+void ide_stop_dma_thread(void);
 
 /* cdrom.c */
 int cdrom_read_toc(int nb_sectors, uint8_t *buf, int msf, int start_track);

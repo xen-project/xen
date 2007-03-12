@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005, 2006 XenSource Ltd
+# Copyright (C) 2005-2007 XenSource Ltd
 #============================================================================
 
 """Representation of a single domain.
@@ -176,14 +176,8 @@ def recreate(info, priv):
         vm._storeVmDetails()
         vm._storeDomDetails()
         
-    if vm.info['image']: # Only dom0 should be without an image entry when
-                         # recreating, but we cope with missing ones
-                         # elsewhere just in case.
-        vm.image = image.create(vm,
-                                vm.info,
-                                vm.info['image'],
-                                vm.info['devices'])
-        vm.image.recreate()
+    vm.image = image.create(vm, vm.info)
+    vm.image.recreate()
 
     vm._registerWatches()
     vm.refreshShutdown(xeninfo)
@@ -448,9 +442,7 @@ class XendDomainInfo:
         self.storeDom("control/shutdown", reason)
 
         ## shutdown hypercall for hvm domain desides xenstore write
-        image_cfg = self.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
-        if hvm:
+        if self.info.is_hvm():
             for code in DOMAIN_SHUTDOWN_REASONS.keys():
                 if DOMAIN_SHUTDOWN_REASONS[code] == reason:
                     break
@@ -781,7 +773,6 @@ class XendDomainInfo:
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_static_min'] * 1024),
-            'control/platform-feature-multiprocessor-suspend': str(1)
             }
 
         def f(n, v):
@@ -795,6 +786,9 @@ class XendDomainInfo:
         f('console/ring-ref', self.console_mfn)
         f('store/port',       self.store_port)
         f('store/ring-ref',   self.store_mfn)
+
+        if arch.type == "x86":
+            f('control/platform-feature-multiprocessor-suspend', True)
 
         # elfnotes
         for n, v in self.info.get_notes().iteritems():
@@ -1387,9 +1381,7 @@ class XendDomainInfo:
 
         self.shutdownStartTime = None
 
-        image_cfg = self.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
-
+        hvm = self.info.is_hvm()
         if hvm:
             info = xc.xeninfo()
             if 'hvm' not in info['xen_caps']:
@@ -1436,14 +1428,8 @@ class XendDomainInfo:
 
         self._configureBootloader()
 
-        if not self._infoIsSet('image'):
-            raise VmError('Missing image in configuration')
-
         try:
-            self.image = image.create(self,
-                                      self.info,
-                                      self.info['image'],
-                                      self.info['devices'])
+            self.image = image.create(self, self.info)
 
             localtime = self.info.get('platform_localtime', False)
             if localtime:
@@ -1503,9 +1489,15 @@ class XendDomainInfo:
             self.info['start_time'] = time.time()
 
             self._stateSet(DOM_STATE_RUNNING)
-        except (RuntimeError, VmError), exn:
+        except VmError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
-            self.image.cleanupBootloading()
+            if self.image:
+                self.image.cleanupBootloading()
+            raise exn
+        except RuntimeError, exn:
+            log.exception("XendDomainInfo.initDomain: exception occurred")
+            if self.image:
+                self.image.cleanupBootloading()
             raise VmError(str(exn))
 
 
@@ -1572,13 +1564,8 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
-        image_cfg = self.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
-        if hvm:
-            self.image = image.create(self,
-                    self.info,
-                    self.info['image'],
-                    self.info['devices'])
+        if self.info.is_hvm():
+            self.image = image.create(self, self.info)
             if self.image:
                 self.image.createDeviceModel(True)
                 self.image.register_shutdown_watch()
@@ -1740,11 +1727,7 @@ class XendDomainInfo:
 
         if boot:
             # HVM booting.
-            self.info['image']['type'] = 'hvm'
-            if not 'devices' in self.info['image']:
-                self.info['image']['devices'] = {}
-            self.info['image']['devices']['boot'] = \
-                self.info['HVM_boot_params'].get('order', 'dc')
+            pass
         elif not blexec and kernel:
             # Boot from dom0.  Nothing left to do -- the kernel and ramdisk
             # will be picked up by image.py.
@@ -1908,10 +1891,9 @@ class XendDomainInfo:
             if self._infoIsSet(info_key):
                 to_store[key] = str(self.info[info_key])
 
-        if self.info.get('image'):
-            image_sxpr = self.info.image_sxpr()
-            if image_sxpr:
-                to_store['image'] = sxp.to_string(image_sxpr)
+        image_sxpr = self.info.image_sxpr()
+        if image_sxpr:
+            to_store['image'] = sxp.to_string(image_sxpr)
 
         if self._infoIsSet('security'):
             secinfo = self.info['security']
@@ -2072,18 +2054,8 @@ class XendDomainInfo:
         return retval
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
-    def get_platform_std_vga(self):
-        return self.info.get('platform_std_vga', False)    
-    def get_platform_serial(self):
-        return self.info.get('platform_serial', '')
-    def get_platform_localtime(self):
-        return self.info.get('platform_localtime', False)
-    def get_platform_clock_offset(self):
-        return self.info.get('platform_clock_offset', False)
-    def get_platform_enable_audio(self):
-        return self.info.get('platform_enable_audio', False)
-    def get_platform_keymap(self):
-        return self.info.get('platform_keymap', '')
+    def get_platform(self):
+        return self.info.get('platform', {})    
     def get_pci_bus(self):
         return self.info.get('pci_bus', '')
     def get_tools_version(self):

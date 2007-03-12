@@ -16,7 +16,6 @@ struct schedule_data {
     struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
     struct timer        s_timer;        /* scheduling timer                */
-    unsigned long       tick;           /* current periodic 'tick'         */
 } __cacheline_aligned;
 
 DECLARE_PER_CPU(struct schedule_data, schedule_data);
@@ -61,7 +60,6 @@ struct scheduler {
     unsigned int sched_id;  /* ID for this scheduler             */
 
     void         (*init)           (void);
-    void         (*tick)           (unsigned int cpu);
 
     int          (*init_domain)    (struct domain *);
     void         (*destroy_domain) (struct domain *);
