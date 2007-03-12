@@ -29,6 +29,13 @@
 #include <asm/sections.h>
 #include <asm/system.h>
 
+#ifdef CONFIG_XEN
+#include <linux/kernel_stat.h>
+#include <linux/posix-timers.h>
+#include <xen/interface/vcpu.h>
+#include <asm/percpu.h>
+#endif
+
 extern unsigned long wall_jiffies;
 
 volatile int time_keeper_id = 0; /* smp_processor_id() of time-keeper */
@@ -40,16 +47,109 @@ EXPORT_SYMBOL(last_cli_ip);
 
 #endif
 
+#ifdef CONFIG_XEN
+DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
+DEFINE_PER_CPU(unsigned long, processed_stolen_time);
+DEFINE_PER_CPU(unsigned long, processed_blocked_time);
+#define NS_PER_TICK (1000000000LL/HZ)
+#endif
+
 static struct time_interpolator itc_interpolator = {
 	.shift = 16,
 	.mask = 0xffffffffffffffffLL,
 	.source = TIME_SOURCE_CPU
 };
 
+#ifdef CONFIG_XEN
+static unsigned long 
+consider_steal_time(unsigned long new_itm, struct pt_regs *regs)
+{
+	unsigned long stolen, blocked, sched_time;
+	unsigned long delta_itm = 0, stolentick = 0;
+	int i, cpu = smp_processor_id();
+	struct vcpu_runstate_info *runstate;
+	struct task_struct *p = current;
+
+	runstate = &per_cpu(runstate, smp_processor_id());
+
+	do {
+		sched_time = runstate->state_entry_time;
+		mb();
+		stolen = runstate->time[RUNSTATE_runnable] + 
+			 runstate->time[RUNSTATE_offline] -
+			 per_cpu(processed_stolen_time, cpu);
+		blocked = runstate->time[RUNSTATE_blocked] -
+			  per_cpu(processed_blocked_time, cpu);
+		mb();
+	} while (sched_time != runstate->state_entry_time);
+
+	/*
+	 * Check for vcpu migration effect
+	 * In this case, itc value is reversed.
+	 * This causes huge stolen value.  
+	 * This function just checks and reject this effect.
+	 */
+	if (!time_after_eq(runstate->time[RUNSTATE_blocked],
+			   per_cpu(processed_blocked_time, cpu)))
+		blocked = 0;
+
+	if (!time_after_eq(runstate->time[RUNSTATE_runnable] +
+			   runstate->time[RUNSTATE_offline],
+			   per_cpu(processed_stolen_time, cpu)))
+		stolen = 0;
+
+	if (!time_after(delta_itm + new_itm, ia64_get_itc()))
+		stolentick = ia64_get_itc() - delta_itm - new_itm;
+
+	do_div(stolentick, NS_PER_TICK);
+	stolentick++;
+
+	do_div(stolen, NS_PER_TICK);
+
+	if (stolen > stolentick)
+		stolen = stolentick;
+
+	stolentick -= stolen;
+	do_div(blocked, NS_PER_TICK);
+
+	if (blocked > stolentick)
+		blocked = stolentick;
+
+	if (stolen > 0 || blocked > 0) {
+		account_steal_time(NULL, jiffies_to_cputime(stolen)); 
+		account_steal_time(idle_task(cpu), jiffies_to_cputime(blocked)); 
+		run_local_timers();
+
+		if (rcu_pending(cpu))
+			rcu_check_callbacks(cpu, user_mode(regs));
+
+		scheduler_tick();
+		run_posix_cpu_timers(p);
+		delta_itm += local_cpu_data->itm_delta * (stolen + blocked);
+
+		if (cpu == time_keeper_id) {
+			write_seqlock(&xtime_lock);
+			for(i = 0; i < stolen + blocked; i++)
+				do_timer(regs);
+			local_cpu_data->itm_next = delta_itm + new_itm;
+			write_sequnlock(&xtime_lock);
+		} else {
+			local_cpu_data->itm_next = delta_itm + new_itm;
+		}
+		per_cpu(processed_stolen_time,cpu) += NS_PER_TICK * stolen;
+		per_cpu(processed_blocked_time,cpu) += NS_PER_TICK * blocked;
+	}
+	return delta_itm; 
+}
+#else
+#define consider_steal_time(new_itm, regs) (0)
+#endif
+
 static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm;
+	unsigned long delta_itm; /* XEN */
 
 	if (unlikely(cpu_is_offline(smp_processor_id()))) {
 		return IRQ_HANDLED;
@@ -64,6 +164,13 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		       ia64_get_itc(), new_itm);
 
 	profile_tick(CPU_PROFILING, regs);
+
+	if (is_running_on_xen()) {
+		delta_itm = consider_steal_time(new_itm, regs);
+		new_itm += delta_itm;
+		if (time_after(new_itm, ia64_get_itc()) && delta_itm)
+			goto skip_process_time_accounting;
+	}
 
 	while (1) {
 		update_process_times(user_mode(regs));
@@ -87,6 +194,8 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		if (time_after(new_itm, ia64_get_itc()))
 			break;
 	}
+
+skip_process_time_accounting:	/* XEN */
 
 	do {
 		/*
@@ -142,6 +251,25 @@ static int __init nojitter_setup(char *str)
 
 __setup("nojitter", nojitter_setup);
 
+#ifdef CONFIG_XEN
+/* taken from i386/kernel/time-xen.c */
+static void init_missing_ticks_accounting(int cpu)
+{
+	struct vcpu_register_runstate_memory_area area;
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
+
+	memset(runstate, 0, sizeof(*runstate));
+
+	area.addr.v = runstate;
+	HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+
+	per_cpu(processed_blocked_time, cpu) = runstate->time[RUNSTATE_blocked];
+	per_cpu(processed_stolen_time, cpu) = runstate->time[RUNSTATE_runnable]
+					    + runstate->time[RUNSTATE_offline];
+}
+#else
+#define init_missing_ticks_accounting(cpu) do {} while (0)
+#endif
 
 void __devinit
 ia64_init_itm (void)
@@ -224,6 +352,9 @@ ia64_init_itm (void)
 #endif
 		register_time_interpolator(&itc_interpolator);
 	}
+
+	if (is_running_on_xen())
+		init_missing_ticks_accounting(smp_processor_id());
 
 	/* Setup the CPU local timer tick */
 	ia64_cpu_local_tick();
