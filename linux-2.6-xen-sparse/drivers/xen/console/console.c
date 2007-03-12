@@ -348,8 +348,11 @@ void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 #ifdef CONFIG_MAGIC_SYSRQ
 		if (sysrq_enabled) {
 			if (buf[i] == '\x0f') { /* ^O */
-				sysrq_requested = jiffies;
-				continue; /* don't print the sysrq key */
+				if (!sysrq_requested) {
+					sysrq_requested = jiffies;
+					continue; /* don't print sysrq key */
+				}
+				sysrq_requested = 0;
 			} else if (sysrq_requested) {
 				unsigned long sysrq_timeout =
 					sysrq_requested + HZ*2;
