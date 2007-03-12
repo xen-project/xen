@@ -529,22 +529,22 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
  *     frame if it is mapped by a different root table. This is sufficient and
  *     also necessary to allow validation of a root table mapping itself.
  */
-#define define_get_linear_pagetable(name1, name2)                           \
+#define define_get_linear_pagetable(level)                                  \
 static int                                                                  \
-get_##name1##_linear_pagetable(                                             \
-    name1##_pgentry_t pde, unsigned long pde_pfn, struct domain *d)         \
+get_##level##_linear_pagetable(                                             \
+    level##_pgentry_t pde, unsigned long pde_pfn, struct domain *d)         \
 {                                                                           \
     unsigned long x, y;                                                     \
     struct page_info *page;                                                 \
     unsigned long pfn;                                                      \
                                                                             \
-    if ( (name2##_get_flags(pde) & _PAGE_RW) )                              \
+    if ( (level##e_get_flags(pde) & _PAGE_RW) )                             \
     {                                                                       \
         MEM_LOG("Attempt to create linear p.t. with write perms");          \
         return 0;                                                           \
     }                                                                       \
                                                                             \
-    if ( (pfn = name2##_get_pfn(pde)) != pde_pfn )                          \
+    if ( (pfn = level##e_get_pfn(pde)) != pde_pfn )                         \
     {                                                                       \
         /* Make sure the mapped frame belongs to the correct domain. */     \
         if ( unlikely(!get_page_from_pagenr(pfn, d)) )                      \
@@ -560,7 +560,7 @@ get_##name1##_linear_pagetable(                                             \
             x = y;                                                          \
             if ( unlikely((x & PGT_count_mask) == PGT_count_mask) ||        \
                  unlikely((x & (PGT_type_mask|PGT_validated)) !=            \
-                          (PGT_##name1##_page_table|PGT_validated)) )       \
+                          (PGT_##level##_page_table|PGT_validated)) )       \
             {                                                               \
                 put_page(page);                                             \
                 return 0;                                                   \
@@ -571,12 +571,6 @@ get_##name1##_linear_pagetable(                                             \
                                                                             \
     return 1;                                                               \
 }
-#if !defined(CONFIG_X86_PAE)
-define_get_linear_pagetable(root,root)
-#endif
-#if defined(CONFIG_X86_PAE) || defined(CONFIG_X86_64)
-define_get_linear_pagetable(l2,l2e)
-#endif
 
 int
 get_page_from_l1e(
@@ -638,7 +632,8 @@ get_page_from_l1e(
 
 
 /* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
-static int 
+define_get_linear_pagetable(l2);
+static int
 get_page_from_l2e(
     l2_pgentry_t l2e, unsigned long pfn, struct domain *d)
 {
@@ -655,20 +650,15 @@ get_page_from_l2e(
 
     rc = get_page_and_type_from_pagenr(l2e_get_pfn(l2e), PGT_l1_page_table, d);
     if ( unlikely(!rc) )
-    {
-#if CONFIG_PAGING_LEVELS == 2
-        rc = get_root_linear_pagetable(l2e, pfn, d);
-#else
         rc = get_l2_linear_pagetable(l2e, pfn, d);
-#endif
-    }
 
     return rc;
 }
 
 
 #if CONFIG_PAGING_LEVELS >= 3
-static int 
+define_get_linear_pagetable(l3);
+static int
 get_page_from_l3e(
     l3_pgentry_t l3e, unsigned long pfn, struct domain *d)
 {
@@ -684,12 +674,16 @@ get_page_from_l3e(
     }
 
     rc = get_page_and_type_from_pagenr(l3e_get_pfn(l3e), PGT_l2_page_table, d);
+    if ( unlikely(!rc) )
+        rc = get_l3_linear_pagetable(l3e, pfn, d);
+
     return rc;
 }
 #endif /* 3 level */
 
 #if CONFIG_PAGING_LEVELS >= 4
-static int 
+define_get_linear_pagetable(l4);
+static int
 get_page_from_l4e(
     l4_pgentry_t l4e, unsigned long pfn, struct domain *d)
 {
@@ -705,9 +699,8 @@ get_page_from_l4e(
     }
 
     rc = get_page_and_type_from_pagenr(l4e_get_pfn(l4e), PGT_l3_page_table, d);
-
     if ( unlikely(!rc) )
-        rc = get_root_linear_pagetable(l4e, pfn, d);
+        rc = get_l4_linear_pagetable(l4e, pfn, d);
 
     return rc;
 }
