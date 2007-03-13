@@ -139,7 +139,7 @@ SUBCOMMAND_HELP = {
                      'Send a trigger to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
                      'List the VCPUs for a domain or all domains.'),
-    'vcpu-pin'    : ('<Domain> <VCPU> <CPUs>',
+    'vcpu-pin'    : ('<Domain> <VCPU> <CPUs|all>',
                      'Set which CPUs a VCPU can use.'),
     'vcpu-set'    : ('<Domain> <vCPUs>',
                      'Set the number of active VCPUs for allowed for the'
@@ -1084,7 +1084,10 @@ def xm_vcpu_pin(args):
 
     dom  = args[0]
     vcpu = args[1]
-    cpumap = cpu_make_map(args[2])
+    if args[2] == 'all':
+        cpumap = cpu_make_map('0-63')
+    else:
+        cpumap = cpu_make_map(args[2])
     
     server.xend.domain.pincpu(dom, vcpu, cpumap)
 
