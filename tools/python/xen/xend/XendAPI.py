@@ -1040,6 +1040,8 @@ class XendAPI(object):
                   ('resume', None),
                   ('add_to_HVM_boot_params', None),
                   ('remove_from_HVM_boot_params', None),
+                  ('add_to_VCPUs_params', None),
+                  ('remove_from_VCPUs_params', None),
                   ('add_to_platform', None),
                   ('remove_from_platform', None),
                   ('add_to_other_config', None),
@@ -1259,9 +1261,24 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def VM_set_VCPUs_params(self, session, vm_ref, params):
+    def VM_set_VCPUs_params(self, session, vm_ref, value):
+        return self.VM_set('vcpus_params', session, vm_ref, value)
+
+    def VM_add_to_VCPUs_params(self, session, vm_ref, key, value):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+        if 'vcpus_params' not in dom.info:
+            dom.info['vcpus_params'] = {}
+        dom.info['vcpus_params'][key] = value
+        return self._VM_save(dom)
+
+    def VM_remove_from_VCPUs_params(self, session, vm_ref, key):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        if 'vcpus_params' in dom.info \
+               and key in dom.info['vcpus_params']:
+            del dom.info['vcpus_params'][key]
+            return self._VM_save(dom)
+        else:
+            return xen_api_success_void()
     
     def VM_set_actions_after_shutdown(self, session, vm_ref, action):
         if action not in XEN_API_ON_NORMAL_EXIT:
