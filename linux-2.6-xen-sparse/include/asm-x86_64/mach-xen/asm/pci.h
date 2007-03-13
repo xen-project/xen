@@ -163,11 +163,4 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 #include <asm-generic/pci.h>
 #endif
 
-/* On Xen we have to scan all functions since Xen hides bridges from
- * us.  If a bridge is at fn=0 and that slot has a multifunction
- * device, we won't find the additional devices without scanning all
- * functions. */
-#undef pcibios_scan_all_fns
-#define pcibios_scan_all_fns(a, b)	1
-
 #endif /* __x8664_PCI_H */
