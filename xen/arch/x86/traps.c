@@ -905,6 +905,10 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     struct vcpu   *v = current;
     struct domain *d = v->domain;
 
+    /* No fixups in interrupt context or when interrupts are disabled. */
+    if ( in_irq() || !(regs->eflags & X86_EFLAGS_IF) )
+        return 0;
+
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
         if ( paging_mode_external(d) && guest_mode(regs) )
@@ -914,9 +918,6 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
                 addr - GDT_LDT_VIRT_START, regs);
         return 0;
     }
-
-    ASSERT(!in_irq());
-    ASSERT(regs->eflags & X86_EFLAGS_IF);
 
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
          guest_kernel_mode(v, regs) &&

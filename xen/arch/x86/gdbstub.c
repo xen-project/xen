@@ -73,38 +73,16 @@ gdb_arch_read_reg(unsigned long regnum, struct cpu_user_regs *regs,
 
 /* Like copy_from_user, but safe to call with interrupts disabled.
    Trust me, and don't look behind the curtain. */
-unsigned 
+unsigned int
 gdb_arch_copy_from_user(void *dest, const void *src, unsigned len)
 {
-    int __d0, __d1, __d2;
-    ASSERT(!local_irq_is_enabled());
-    __asm__ __volatile__(
-        "1: rep; movsb\n"
-        "2:\n"
-        ".section .fixup,\"ax\"\n"
-        "3:     addl $4, %%esp\n"
-        "       jmp 2b\n"
-        ".previous\n"
-        ".section __pre_ex_table,\"a\"\n"
-        "   "__FIXUP_ALIGN"\n"
-        "   "__FIXUP_WORD" 1b,3b\n"
-        ".previous\n"
-        ".section __ex_table,\"a\"\n"
-        "   "__FIXUP_ALIGN"\n"
-        "   "__FIXUP_WORD" 1b,2b\n"
-        ".previous\n"
-        : "=c"(__d2), "=D" (__d0), "=S" (__d1)
-        : "0"(len), "1"(dest), "2"(src)
-        : "memory");
-    ASSERT(!local_irq_is_enabled());
-    return __d2;
+    return copy_from_user(dest, src, len);
 }
 
 unsigned int 
 gdb_arch_copy_to_user(void *dest, const void *src, unsigned len)
 {
-    /* XXX  */
-    return len;
+    return copy_to_user(dest, src, len);
 }
 
 void 
