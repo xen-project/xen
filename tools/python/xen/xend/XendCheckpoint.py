@@ -192,8 +192,8 @@ def restore(xd, fd, dominfo = None, paused = False):
     is_hvm = dominfo.info.is_hvm()
     if is_hvm:
         hvm  = dominfo.info['memory_static_min']
-        apic = dominfo.info['image']['hvm'].get('apic', 0)
-        pae  = dominfo.info['image']['hvm'].get('pae',  0)
+        apic = dominfo.info['platform'].get('apic', 0)
+        pae  = dominfo.info['platform'].get('pae',  0)
         log.info("restore hvm domain %d, mem=%d, apic=%d, pae=%d",
                  dominfo.domid, hvm, apic, pae)
     else:

@@ -118,11 +118,12 @@ XENAPI_CFG_TO_LEGACY_CFG = {
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 
 # Platform configuration keys.
-XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'device_model', 'display', 'fda',
-                        'fdb', 'keymap', 'isa', 'localtime', 'nographic',
-                        'pae', 'serial', 'sdl', 'soundhw','stdvga', 'usb',
-                        'usbdevice', 'vnc', 'vncconsole', 'vncdisplay',
-                        'vnclisten', 'vncpasswd', 'vncunused', 'xauthority']
+XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display', 
+                        'fda', 'fdb', 'keymap', 'isa', 'localtime',
+                        'nographic', 'pae', 'serial', 'sdl',
+                        'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
+                        'vncconsole', 'vncdisplay', 'vnclisten',
+                        'vncpasswd', 'vncunused', 'xauthority']
 
 # List of XendConfig configuration keys that have no direct equivalent
 # in the old world.
