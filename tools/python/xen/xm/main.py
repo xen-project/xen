@@ -557,7 +557,7 @@ class Shell(cmd.Cmd):
         if serverType == SERVER_XEN_API:
             res = server.xenapi._UNSUPPORTED_list_all_methods()
             for f in res:
-                setattr(Shell, 'do_' + f, self.default)
+                setattr(Shell, 'do_' + f + ' ', self.default)
 
     def preloop(self):
         cmd.Cmd.preloop(self)
