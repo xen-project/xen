@@ -22,7 +22,8 @@
 #include "../util.h"
 #include <xen/hvm/e820.h>
 
-#define align16(sz) (((sz) + 15) & ~15)
+#define align16(sz)        (((sz) + 15) & ~15)
+#define fixed_strcpy(d, s) strncpy((d), (s), sizeof(d))
 
 extern struct acpi_20_rsdp Rsdp;
 extern struct acpi_20_rsdt Rsdt;
@@ -57,8 +58,8 @@ int construct_madt(struct acpi_20_madt *madt)
     memset(madt, 0, sizeof(*madt));
     madt->header.signature    = ACPI_2_0_MADT_SIGNATURE;
     madt->header.revision     = ACPI_2_0_MADT_REVISION;
-    strncpy(madt->header.oem_id, ACPI_OEM_ID, 6);
-    strncpy(madt->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
+    fixed_strcpy(madt->header.oem_id, ACPI_OEM_ID);
+    fixed_strcpy(madt->header.oem_table_id, ACPI_OEM_TABLE_ID);
     madt->header.oem_revision = ACPI_OEM_REVISION;
     madt->header.creator_id   = ACPI_CREATOR_ID;
     madt->header.creator_revision = ACPI_CREATOR_REVISION;
@@ -131,8 +132,8 @@ int construct_hpet(struct acpi_20_hpet *hpet)
     memset(hpet, 0, sizeof(*hpet));
     hpet->header.signature    = ACPI_2_0_HPET_SIGNATURE;
     hpet->header.revision     = ACPI_2_0_HPET_REVISION;
-    strncpy(hpet->header.oem_id, ACPI_OEM_ID, 6);
-    strncpy(hpet->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
+    fixed_strcpy(hpet->header.oem_id, ACPI_OEM_ID);
+    fixed_strcpy(hpet->header.oem_table_id, ACPI_OEM_TABLE_ID);
     hpet->header.oem_revision = ACPI_OEM_REVISION;
     hpet->header.creator_id   = ACPI_CREATOR_ID;
     hpet->header.creator_revision = ACPI_CREATOR_REVISION;
@@ -150,6 +151,7 @@ int construct_processor_objects(uint8_t *buf)
 {
     static const char pdat[13] = { 0x5b, 0x83, 0x0b, 0x50, 0x52 };
     static const char hex[] = "0123456789ABCDEF";
+    static const char pr_scope[] = "\\_PR_";
     unsigned int i, length, nr_cpus = get_vcpu_nr();
     struct acpi_header *hdr;
     uint8_t *p = buf;
@@ -161,8 +163,8 @@ int construct_processor_objects(uint8_t *buf)
     hdr = (struct acpi_header *)p;
     hdr->signature = ASCII32('S','S','D','T');
     hdr->revision  = 2;
-    strncpy(hdr->oem_id, ACPI_OEM_ID, 6);
-    strncpy(hdr->oem_table_id, ACPI_OEM_TABLE_ID, 8);
+    fixed_strcpy(hdr->oem_id, ACPI_OEM_ID);
+    fixed_strcpy(hdr->oem_table_id, ACPI_OEM_TABLE_ID);
     hdr->oem_revision = ACPI_OEM_REVISION;
     hdr->creator_id = ACPI_CREATOR_ID;
     hdr->creator_revision = ACPI_CREATOR_REVISION;
@@ -176,7 +178,7 @@ int construct_processor_objects(uint8_t *buf)
     *p++ = 0x10;
 
     /* PkgLength (includes length bytes!). */
-    length = 1 + 5 + (nr_cpus * sizeof(pdat));
+    length = 1 + strlen(pr_scope) + (nr_cpus * sizeof(pdat));
     if ( length <= 0x3f )
     {
         *p++ = length;
@@ -195,8 +197,8 @@ int construct_processor_objects(uint8_t *buf)
     }
 
     /* NameString */
-    strncpy(p, "\\_PR_", 5);
-    p += 5;
+    strncpy(p, pr_scope, strlen(pr_scope));
+    p += strlen(pr_scope);
 
     /*
      * 3. Processor Objects.
@@ -263,8 +265,8 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.signature = ACPI_2_0_TCPA_SIGNATURE;
         tcpa->header.length    = sizeof(*tcpa);
         tcpa->header.revision  = ACPI_2_0_TCPA_REVISION;
-        strncpy(tcpa->header.oem_id, ACPI_OEM_ID, 6);
-        strncpy(tcpa->header.oem_table_id, ACPI_OEM_TABLE_ID, 8);
+        fixed_strcpy(tcpa->header.oem_id, ACPI_OEM_ID);
+        fixed_strcpy(tcpa->header.oem_table_id, ACPI_OEM_TABLE_ID);
         tcpa->header.oem_revision = ACPI_OEM_REVISION;
         tcpa->header.creator_id   = ACPI_CREATOR_ID;
         tcpa->header.creator_revision = ACPI_CREATOR_REVISION;

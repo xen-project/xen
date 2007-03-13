@@ -49,8 +49,8 @@ struct acpi_header {
     uint32_t length;
     uint8_t  revision;
     uint8_t  checksum;
-    uint8_t  oem_id[6];
-    uint8_t  oem_table_id[8];
+    char     oem_id[6];
+    char     oem_table_id[8];
     uint32_t oem_revision;
     uint32_t creator_id;
     uint32_t creator_revision;
@@ -90,7 +90,7 @@ struct acpi_20_generic_address {
 struct acpi_10_rsdp {
     uint64_t signature;
     uint8_t  checksum;
-    uint8_t  oem_id[6];
+    char     oem_id[6];
     uint8_t  reserved;
     uint32_t rsdt_address;
 };
@@ -101,7 +101,7 @@ struct acpi_10_rsdp {
 struct acpi_20_rsdp {
     uint64_t signature;
     uint8_t  checksum;
-    uint8_t  oem_id[6];
+    char     oem_id[6];
     uint8_t  revision;
     uint32_t rsdt_address;
     uint32_t length;
