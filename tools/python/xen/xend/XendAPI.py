@@ -641,6 +641,7 @@ class XendAPI(object):
     host_attr_ro = ['software_version',
                     'resident_VMs',
                     'host_CPUs',
+                    'cpu_configuration',
                     'metrics',
                     'capabilities',
                     'supported_bootloaders',
@@ -650,6 +651,7 @@ class XendAPI(object):
                     'API_version_vendor_implementation']
     
     host_attr_rw = ['name_label',
+                    'sched_policy',
                     'name_description',
                     'other_config']
 
@@ -712,7 +714,13 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().get_capabilities())
     def host_get_supported_bootloaders(self, session, host_ref):
         return xen_api_success(['pygrub'])
-
+    def host_get_sched_policy(self, _, host_ref):
+        return xen_api_success(XendNode.instance().get_vcpus_policy())
+    def host_set_sched_policy(self, _, host_ref, policy):
+        return xen_api_todo()
+    def host_get_cpu_configuration(self, _, host_ref):
+        return xen_api_success(XendNode.instance().get_cpu_configuration())
+    
     # object methods
     def host_disable(self, session, host_ref):
         XendDomain.instance().set_allow_new_domains(False)
@@ -747,9 +755,11 @@ class XendAPI(object):
                   'other_config': node.other_config,
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),
+                  'cpu_configuration': node.get_cpu_configuration(),
                   'metrics': node.host_metrics_uuid,
                   'capabilities': node.get_capabilities(),
-                  'supported_bootloaders': 'pygrub'}
+                  'supported_bootloaders': 'pygrub',
+                  'sched_policy': node.get_vcpus_policy()}
         return xen_api_success(record)
 
     # class methods
@@ -771,7 +781,8 @@ class XendAPI(object):
                         'modelname',
                         'stepping',
                         'flags',
-                        'utilisation']
+                        'utilisation',
+                        'features']
 
     # attributes
     def _host_cpu_get(self, ref, field):
@@ -780,6 +791,8 @@ class XendAPI(object):
 
     def host_cpu_get_host(self, _, ref):
         return xen_api_success(XendNode.instance().uuid)
+    def host_cpu_get_features(self, _, ref):
+        return self._host_cpu_get(ref, 'features')
     def host_cpu_get_number(self, _, ref):
         return self._host_cpu_get(ref, 'number')
     def host_cpu_get_vendor(self, _, ref):
@@ -1022,7 +1035,6 @@ class XendAPI(object):
                   'auto_power_on',
                   'memory_dynamic_max',
                   'memory_dynamic_min',
-                  'VCPUs_policy',
                   'VCPUs_params',
                   'actions_after_shutdown',
                   'actions_after_reboot',
@@ -1071,7 +1083,6 @@ class XendAPI(object):
         'memory_dynamic_max',
         'memory_dynamic_min',
         'memory_static_min',
-        'VCPUs_policy',
         'VCPUs_params',
         'actions_after_shutdown',
         'actions_after_reboot',
@@ -1169,11 +1180,7 @@ class XendAPI(object):
 
     def VM_get_memory_dynamic_min(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_memory_dynamic_min())        
-    
-    def VM_get_VCPUs_policy(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.get_vcpus_policy())
+        return xen_api_success(dom.get_memory_dynamic_min())
     
     def VM_get_VCPUs_params(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1261,10 +1268,6 @@ class XendAPI(object):
         return xen_api_todo()
     
     def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
-    
-    def VM_set_VCPUs_policy(self, session, vm_ref, policy):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
@@ -1425,7 +1428,6 @@ class XendAPI(object):
             'memory_static_max': xeninfo.get_memory_static_max(),
             'memory_dynamic_min': xeninfo.get_memory_dynamic_min(),
             'memory_dynamic_max': xeninfo.get_memory_dynamic_max(),
-            'VCPUs_policy': xeninfo.get_vcpus_policy(),
             'VCPUs_params': xeninfo.get_vcpus_params(),
             'VCPUs_number': xeninfo.getVCpuCount(),
             'actions_after_shutdown': xeninfo.get_on_shutdown(),

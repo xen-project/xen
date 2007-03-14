@@ -2045,15 +2045,6 @@ class XendDomainInfo:
         return self.info.get('memory_dynamic_max', 0)
     def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_min', 0)
-
-    def get_vcpus_policy(self):
-        sched_id = xc.sched_id_get()
-        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
-            return 'sedf'
-        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
-            return 'credit'
-        else:
-            return 'unknown'
     def get_vcpus_params(self):
         if self.getDomid() is None:
             return self.info['vcpus_params']

@@ -75,6 +75,11 @@ class XendNode:
             self.other_config = {}
             self.cpus = {}
             self.host_metrics_uuid = uuid.createString()
+
+        # put some arbitrary params in other_config as this
+        # is directly exposed via XenAPI
+        self.other_config["xen_pagesize"] = self.xeninfo_dict()["xen_pagesize"]
+        self.other_config["platform_params"] = self.xeninfo_dict()["platform_params"]
             
         # load CPU UUIDs
         saved_cpus = self.state_store.load_state('cpu')
@@ -353,13 +358,36 @@ class XendNode:
 
     def xen_version(self):
         info = self.xc.xeninfo()
+
         try:
             from xen import VERSION
-            return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+            info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
                     'Xend': VERSION}
         except (ImportError, AttributeError):
-            return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+            info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
                     'Xend': '3.0.3'}
+
+        # Add xend_config_format
+        info.update(self.xendinfo_dict())
+
+        # Add version info about machine
+        info.update(self.nodeinfo_dict())
+
+        # Add specific xen version info
+        xeninfo_dict = self.xeninfo_dict()
+
+        info.update({
+            "xen_major":         xeninfo_dict["xen_major"],
+            "xen_minor":         xeninfo_dict["xen_minor"],
+            "xen_extra":         xeninfo_dict["xen_extra"],
+            "cc_compiler":       xeninfo_dict["cc_compiler"],
+            "cc_compile_by":     xeninfo_dict["cc_compile_by"],
+            "cc_compile_domain": xeninfo_dict["cc_compile_domain"],
+            "cc_compile_date":   xeninfo_dict["cc_compile_date"],
+            "xen_changeset":     xeninfo_dict["xen_changeset"]
+            })
+        
+        return info
 
     def get_name(self):
         return self.name
@@ -415,6 +443,27 @@ class XendNode:
 
         return 0.0
 
+    def get_vcpus_policy(self):
+        sched_id = self.xc.sched_id_get()
+        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
+            return 'sedf'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
+            return 'credit'
+        else:
+            return 'unknown'
+
+    def get_cpu_configuration(self):
+        phys_info = self.physinfo_dict()
+
+        cpu_info = {
+            "nr_nodes":         phys_info["nr_nodes"],
+            "sockets_per_node": phys_info["sockets_per_node"],
+            "cores_per_socket": phys_info["cores_per_socket"],
+            "threads_per_core": phys_info["threads_per_core"]
+            }
+
+        return cpu_info
+    
     #
     # Network Functions
     #
