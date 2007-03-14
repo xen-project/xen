@@ -293,6 +293,7 @@ int acpi_build_tables(uint8_t *buf)
     struct acpi_20_rsdt *rsdt;
     struct acpi_20_xsdt *xsdt;
     struct acpi_20_fadt *fadt;
+    struct acpi_10_fadt *fadt_10;
     struct acpi_20_facs *facs;
     unsigned char       *dsdt;
     unsigned long        secondary_tables[16];
@@ -305,6 +306,25 @@ int acpi_build_tables(uint8_t *buf)
     dsdt = (unsigned char *)&buf[offset];
     memcpy(dsdt, &AmlCode, DsdtLen);
     offset += align16(DsdtLen);
+
+    /*
+     * N.B. ACPI 1.0 operating systems may not handle FADT with revision 2
+     * or above properly, notably Windows 2000, which tries to copy FADT
+     * into a 116 bytes buffer thus causing an overflow. The solution is to
+     * link the higher revision FADT with the XSDT only and introduce a
+     * compatible revision 1 FADT that is linked with the RSDT. Refer to:
+     *     http://www.acpi.info/presentations/S01USMOBS169_OS%20new.ppt
+     */
+    fadt_10 = (struct acpi_10_fadt *)&buf[offset];
+    memcpy(fadt_10, &Fadt, sizeof(struct acpi_10_fadt));
+    offset += align16(sizeof(struct acpi_10_fadt));
+    fadt_10->header.length = sizeof(struct acpi_10_fadt);
+    fadt_10->header.revision = ACPI_1_0_FADT_REVISION;
+    fadt_10->dsdt          = (unsigned long)dsdt;
+    fadt_10->firmware_ctrl = (unsigned long)facs;
+    set_checksum(fadt_10,
+                 offsetof(struct acpi_header, checksum),
+                 sizeof(struct acpi_10_fadt));
 
     fadt = (struct acpi_20_fadt *)&buf[offset];
     memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
@@ -332,7 +352,7 @@ int acpi_build_tables(uint8_t *buf)
 
     rsdt = (struct acpi_20_rsdt *)&buf[offset];
     memcpy(rsdt, &Rsdt, sizeof(struct acpi_header));
-    rsdt->entry[0] = (unsigned long)fadt;
+    rsdt->entry[0] = (unsigned long)fadt_10;
     for ( i = 0; secondary_tables[i]; i++ )
         rsdt->entry[i+1] = secondary_tables[i];
     rsdt->header.length = sizeof(struct acpi_header) + (i+1)*sizeof(uint32_t);
