@@ -1140,14 +1140,16 @@ def xm_destroy(args):
     else:
         server.xend.domain.destroy(dom)
 
-
 def xm_domid(args):
     arg_check(args, "domid", 1)
 
     name = args[0]
 
-    dom = server.xend.domain(name)
-    print sxp.child_value(dom, 'domid')
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.VM.get_domid(get_single_vm(name))
+    else:
+        dom = server.xend.domain(name)
+        print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
     arg_check(args, "domname", 1)
@@ -1155,7 +1157,7 @@ def xm_domname(args):
     name = args[0]
     
     if serverType == SERVER_XEN_API:
-        print server.xenapi.VM.get_domid(get_single_vm(dom))
+        print server.xenapi.VM.get_name_label(get_single_vm(name))
     else:
         dom = server.xend.domain(name)
         print sxp.child_value(dom, 'name')
@@ -1384,13 +1386,17 @@ def xm_console(args):
     dom = params[0]
 
     try:
-        info = server.xend.domain(dom)
+        if serverType == SERVER_XEN_API:
+            domid = int(server.xenapi.VM.get_domid(get_single_vm(dom)))
+        else:
+            info = server.xend.domain(dom)
+            domid = int(sxp.child_value(info, 'domid', '-1'))
     except:
         if quiet:
             sys.exit(1)
         else:
             raise
-    domid = int(sxp.child_value(info, 'domid', '-1'))
+        
     if domid == -1:
         if quiet:
             sys.exit(1)
