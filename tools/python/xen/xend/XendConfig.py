@@ -730,7 +730,7 @@ class XendConfig(dict):
             
             for key in XENAPI_PLATFORM_CFG:
                 val = sxp.child_value(image_sxp, key, None)
-                if val is not None:
+                if val is not None and val != '':
                     self['platform'][key] = val
             
             notes = sxp.children(image_sxp, 'notes')
@@ -1359,7 +1359,7 @@ class XendConfig(dict):
 
         for key in XENAPI_PLATFORM_CFG:
             val = sxp.child_value(image_sxp, key, None)
-            if val is not None:
+            if val is not None and val != '':
                 self['platform'][key] = val
 
         notes = sxp.children(image_sxp, 'notes')
