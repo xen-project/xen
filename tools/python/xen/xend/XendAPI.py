@@ -661,7 +661,8 @@ class XendAPI(object):
                     ('shutdown', None),
                     ('add_to_other_config', None),
                     ('remove_from_other_config', None),
-                    ('dmesg', 'String')]
+                    ('dmesg', 'String'),
+                    ('get_log', 'String')]
     
     host_funcs = [('get_by_name_label', 'Set(host)')]
 
@@ -737,8 +738,16 @@ class XendAPI(object):
             return xen_api_error(XEND_ERROR_HOST_RUNNING)
         return xen_api_error(XEND_ERROR_UNSUPPORTED)        
 
-    def host_dmesg(self, session, host_ref):
-        return xen_api_success(XendDmesg.instance().info())
+    def host_dmesg(self, session, host_ref, clear):
+        if clear:
+            return xen_api_success(XendDmesg.instance().clear())
+        else:
+            return xen_api_success(XendDmesg.instance().info())
+
+    def host_get_log(self, session, host_ref):
+        log_file = open(XendLogging.getLogFilename())
+        log_buffer = log_file.read()
+        return xen_api_success(log_buffer)
 
     def host_get_record(self, session, host_ref):
         node = XendNode.instance()

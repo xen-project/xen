@@ -1498,17 +1498,33 @@ def xm_dmesg(args):
         err("No parameter required")
         usage('dmesg')
 
-    if not use_clear:
-        print server.xend.node.dmesg.info()
+    if serverType == SERVER_XEN_API:
+        if not use_clear:
+            print server.xenapi.host.dmesg(
+                server.xenapi.session.get_this_host(),0)
+        else:
+            server.xenapi.host.dmesg(
+                server.xenapi.session.get_this_host(),1)
     else:
-        server.xend.node.dmesg.clear()
+        if not use_clear:
+            print server.xend.node.dmesg.info()
+        else:
+            server.xend.node.dmesg.clear()
 
 def xm_log(args):
     arg_check(args, "log", 0)
-    
-    print server.xend.node.log()
+
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.host.get_log(
+            server.xenapi.session.get_this_host())
+    else:
+        print server.xend.node.log()
 
 def xm_serve(args):
+    if serverType == SERVER_XEN_API:
+        print "Not supported with XenAPI"
+        sys.exit(-1)
+
     arg_check(args, "serve", 0)
 
     from fcntl import fcntl, F_SETFL
