@@ -155,7 +155,7 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
 
 def _parse_result(result):
     if type(result) != dict or 'Status' not in result:
-        raise xmlrpclib.Fault(500, 'Missing Status in response from server' + result)
+        raise xmlrpclib.Fault(500, 'Missing Status in response from server: ' + str(result))
     if result['Status'] == 'Success':
         if 'Value' in result:
             return result['Value']
