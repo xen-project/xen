@@ -17,7 +17,7 @@
 # Author: Bryan D. Payne <bdpayne@us.ibm.com>
 #============================================================================
 
-"""Labeling a domain configuration file or a resoruce.
+"""Labeling a domain configuration file or a resource.
 """
 import os
 import sys
