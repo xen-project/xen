@@ -191,3 +191,43 @@ int set_usb_string(uint8_t *buf, const char *str)
     }
     return q - buf;
 }
+
+void generic_usb_save(QEMUFile* f, void *opaque)
+{
+    USBDevice *s = (USBDevice*)opaque;
+
+    qemu_put_be32s(f, &s->speed);
+    qemu_put_8s(f, &s->addr);
+    qemu_put_be32s(f, &s->state);
+
+    qemu_put_buffer(f, s->setup_buf, 8);
+    qemu_put_buffer(f, s->data_buf, 1024);
+
+    qemu_put_be32s(f, &s->remote_wakeup);
+    qemu_put_be32s(f, &s->setup_state);
+    qemu_put_be32s(f, &s->setup_len);
+    qemu_put_be32s(f, &s->setup_index);
+
+}
+
+int generic_usb_load(QEMUFile* f, void *opaque, int version_id)
+{
+    USBDevice *s = (USBDevice*)opaque;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    qemu_get_be32s(f, &s->speed);
+    qemu_get_8s(f, &s->addr);
+    qemu_get_be32s(f, &s->state);
+
+    qemu_get_buffer(f, s->setup_buf, 8);
+    qemu_get_buffer(f, s->data_buf, 1024);
+
+    qemu_get_be32s(f, &s->remote_wakeup);
+    qemu_get_be32s(f, &s->setup_state);
+    qemu_get_be32s(f, &s->setup_len);
+    qemu_get_be32s(f, &s->setup_index);
+
+    return 0;
+}
