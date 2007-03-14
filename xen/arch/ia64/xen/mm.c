@@ -1903,9 +1903,20 @@ void __free_pages(struct page_info *page, unsigned int order)
 	free_xenheap_page(page);
 }
 
+static int opt_p2m_xenheap;
+boolean_param("p2m_xenheap", opt_p2m_xenheap);
+
 void *pgtable_quicklist_alloc(void)
 {
     void *p;
+    if (!opt_p2m_xenheap) {
+        struct page_info *page = alloc_domheap_page(NULL);
+        if (page == NULL)
+            return NULL;
+        p = page_to_virt(page);
+        clear_page(p);
+        return p;
+    }
     p = alloc_xenheap_pages(0);
     if (p)
         clear_page(p);
@@ -1914,7 +1925,10 @@ void *pgtable_quicklist_alloc(void)
 
 void pgtable_quicklist_free(void *pgtable_entry)
 {
-	free_xenheap_page(pgtable_entry);
+    if (!opt_p2m_xenheap)
+        free_domheap_page(virt_to_page(pgtable_entry));
+    else
+        free_xenheap_page(pgtable_entry);
 }
 
 void put_page_type(struct page_info *page)
