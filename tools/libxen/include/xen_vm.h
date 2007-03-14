@@ -87,7 +87,6 @@ typedef struct xen_vm_record
     int64_t memory_dynamic_max;
     int64_t memory_dynamic_min;
     int64_t memory_static_min;
-    char *vcpus_policy;
     xen_string_string_map *vcpus_params;
     int64_t vcpus_max;
     int64_t vcpus_at_startup;
@@ -320,13 +319,6 @@ xen_vm_get_memory_dynamic_min(xen_session *session, int64_t *result, xen_vm vm);
  */
 extern bool
 xen_vm_get_memory_static_min(xen_session *session, int64_t *result, xen_vm vm);
-
-
-/**
- * Get the VCPUs/policy field of the given VM.
- */
-extern bool
-xen_vm_get_vcpus_policy(xen_session *session, char **result, xen_vm vm);
 
 
 /**
@@ -565,13 +557,6 @@ xen_vm_set_memory_dynamic_min(xen_session *session, xen_vm vm, int64_t dynamic_m
  */
 extern bool
 xen_vm_set_memory_static_min(xen_session *session, xen_vm vm, int64_t static_min);
-
-
-/**
- * Set the VCPUs/policy field of the given VM.
- */
-extern bool
-xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy);
 
 
 /**

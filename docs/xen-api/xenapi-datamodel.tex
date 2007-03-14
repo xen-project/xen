@@ -1039,7 +1039,6 @@ $\mathit{RW}$ &  {\tt memory/static\_max} & int & Statically-set (i.e. absolute)
 $\mathit{RW}$ &  {\tt memory/dynamic\_max} & int & Dynamic maximum (bytes) \\
 $\mathit{RW}$ &  {\tt memory/dynamic\_min} & int & Dynamic minimum (bytes) \\
 $\mathit{RW}$ &  {\tt memory/static\_min} & int & Statically-set (i.e. absolute) mininum (bytes) \\
-$\mathit{RW}$ &  {\tt VCPUs/policy} & string & the name of the VCPU scheduling policy to be applied \\
 $\mathit{RW}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & configuration parameters for the selected VCPU policy \\
 $\mathit{RW}$ &  {\tt VCPUs/max} & int & Max number of VCPUs \\
 $\mathit{RW}$ &  {\tt VCPUs/at\_startup} & int & Boot number of VCPUs \\
@@ -2163,72 +2162,6 @@ Set the memory/static\_min field of the given VM.
 {\tt VM ref } & self & reference to the object \\ \hline 
 
 {\tt int } & value & New value to set \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_VCPUs\_policy}
-
-{\bf Overview:} 
-Get the VCPUs/policy field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} string get_VCPUs_policy (session_id s, VM ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~set\_VCPUs\_policy}
-
-{\bf Overview:} 
-Set the VCPUs/policy field of the given VM.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void set_VCPUs_policy (session_id s, VM ref self, string value)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & self & reference to the object \\ \hline 
-
-{\tt string } & value & New value to set \\ \hline 
 
 \end{tabular}
 

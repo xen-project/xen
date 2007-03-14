@@ -88,9 +88,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "memory_static_min",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, memory_static_min) },
-        { .key = "VCPUs_policy",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, vcpus_policy) },
         { .key = "VCPUs_params",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, vcpus_params) },
@@ -191,7 +188,6 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->name_description);
     xen_vdi_record_opt_free(record->suspend_vdi);
     xen_host_record_opt_free(record->resident_on);
-    free(record->vcpus_policy);
     xen_string_string_map_free(record->vcpus_params);
     xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
@@ -493,23 +489,6 @@ xen_vm_get_memory_static_min(xen_session *session, int64_t *result, xen_vm vm)
     abstract_type result_type = abstract_type_int;
 
     XEN_CALL_("VM.get_memory_static_min");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_policy(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_policy");
     return session->ok;
 }
 
@@ -1069,22 +1048,6 @@ xen_vm_set_memory_static_min(xen_session *session, xen_vm vm, int64_t static_min
         };
 
     xen_call_(session, "VM.set_memory_static_min", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = policy }
-        };
-
-    xen_call_(session, "VM.set_VCPUs_policy", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
