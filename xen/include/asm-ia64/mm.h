@@ -87,33 +87,33 @@ struct page_info
  * IA-64 should make it a definition same as x86_64.
  */
 /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none            (0<<29) /* no special uses of this page */
-#define PGT_l1_page_table   (1<<29) /* using this page as an L1 page table? */
-#define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
-#define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
-#define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
+#define PGT_none            (0UL<<29) /* no special uses of this page */
+#define PGT_l1_page_table   (1UL<<29) /* using this page as an L1 page table? */
+#define PGT_l2_page_table   (2UL<<29) /* using this page as an L2 page table? */
+#define PGT_l3_page_table   (3UL<<29) /* using this page as an L3 page table? */
+#define PGT_l4_page_table   (4UL<<29) /* using this page as an L4 page table? */
  /* Value 5 reserved. See asm-x86/mm.h */
  /* Value 6 reserved. See asm-x86/mm.h */
-#define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (7<<29) /* Bits 29-31. */
+#define PGT_writable_page   (7UL<<29) /* has writable mappings of this page? */
+#define PGT_type_mask       (7UL<<29) /* Bits 29-31. */
 
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
-#define PGT_validated       (1<<_PGT_validated)
+#define PGT_validated       (1UL<<_PGT_validated)
  /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         27
-#define PGT_pinned          (1U<<_PGT_pinned)
+#define PGT_pinned          (1UL<<_PGT_pinned)
 
  /* 16-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<16)-1)
+#define PGT_count_mask      ((1UL<<16)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
-#define PGC_allocated       (1U<<_PGC_allocated)
+#define PGC_allocated       (1UL<<_PGC_allocated)
  /* Bit 30 reserved. See asm-x86/mm.h */
  /* Bit 29 reserved. See asm-x86/mm.h */
  /* 29-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<29)-1)
+#define PGC_count_mask      ((1UL<<29)-1)
 
 #define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
 				 && (page_to_maddr(_pfn) >= xen_pstart))

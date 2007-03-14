@@ -1933,7 +1933,7 @@ void pgtable_quicklist_free(void *pgtable_entry)
 
 void put_page_type(struct page_info *page)
 {
-    u32 nx, x, y = page->u.inuse.type_info;
+    u64 nx, x, y = page->u.inuse.type_info;
 
  again:
     do {
@@ -1981,7 +1981,7 @@ void put_page_type(struct page_info *page)
 
 int get_page_type(struct page_info *page, u32 type)
 {
-    u32 nx, x, y = page->u.inuse.type_info;
+    u64 nx, x, y = page->u.inuse.type_info;
 
     ASSERT(!(type & ~PGT_type_mask));
 
@@ -2027,7 +2027,7 @@ int get_page_type(struct page_info *page, u32 type)
         {
             if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                  (type != PGT_l1_page_table) )
-                MEM_LOG("Bad type (saw %08x != exp %08x) "
+                MEM_LOG("Bad type (saw %08lx != exp %08x) "
                         "for mfn %016lx (pfn %016lx)",
                         x, type, page_to_mfn(page),
                         get_gpfn_from_mfn(page_to_mfn(page)));
