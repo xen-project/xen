@@ -299,7 +299,9 @@ static void tap_backend_changed(struct xenbus_watch *watch,
 	 * and disk info to xenstore
 	 */
 	err = xenbus_gather(XBT_NIL, dev->nodename, "info", "%lu", &info, 
-			    NULL);	
+			    NULL);
+	if (XENBUS_EXIST_ERR(err))
+		return;
 	if (err) {
 		xenbus_dev_error(dev, err, "getting info");
 		return;
