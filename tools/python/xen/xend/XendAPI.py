@@ -1516,6 +1516,9 @@ class XendAPI(object):
     def _VM_metrics_get(self, ref):
         return XendVMMetrics.get_by_uuid(ref)
 
+    def VM_metrics_get_all(self, _):
+        return xen_api_success(XendVMMetrics.get_all())
+
     def VM_metrics_get_record(self, _, ref):
         return xen_api_success(self._VM_metrics_get(ref).get_record())
 

@@ -31,6 +31,11 @@ class XendVMMetrics:
         return uuid in instances
 
     is_valid_vm_metrics = classmethod(is_valid_vm_metrics)
+
+    def get_all(_):
+        return instances.keys()
+
+    get_all = classmethod(get_all)
    
     def __init__(self, uuid, xend_domain_instance):
         self.uuid = uuid
