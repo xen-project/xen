@@ -9,6 +9,7 @@ import os
 import re
 import string
 import threading
+import fcntl
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
@@ -229,6 +230,15 @@ def restore(xd, fd, dominfo = None, paused = False):
         handler = RestoreInputHandler()
 
         forkHelper(cmd, fd, handler.handler, True)
+
+        # We don't want to pass this fd to any other children -- we 
+        # might need to recover ths disk space that backs it.
+        try:
+            flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+            flags |= fcntl.FD_CLOEXEC
+            fcntl.fcntl(fd, fcntl.F_SETFD, flags)
+        except:
+            pass
 
         if handler.store_mfn is None:
             raise XendError('Could not read store MFN')
