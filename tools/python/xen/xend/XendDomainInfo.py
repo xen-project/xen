@@ -51,6 +51,8 @@ from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
 
+from xen.xend.XendVMMetrics import XendVMMetrics
+
 MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
 
@@ -369,6 +371,8 @@ class XendDomainInfo:
             self._augmentInfo(priv)
 
         self._checkName(self.info['name_label'])
+
+        self.metrics = XendVMMetrics(uuid.createString(), self)
             
 
     #
@@ -626,6 +630,10 @@ class XendDomainInfo:
 
         except RuntimeError, exn:
             raise XendError(str(exn))
+
+
+    def getDomInfo(self):
+        return dom_get(self.domid)
 
     #
     # internal functions ... TODO: re-categorised
@@ -2060,6 +2068,8 @@ class XendDomainInfo:
         return self.info.get('pci_bus', '')
     def get_tools_version(self):
         return self.info.get('tools_version', {})
+    def get_metrics(self):
+        return self.metrics.get_uuid();
     
     def get_on_shutdown(self):
         after_shutdown = self.info.get('actions_after_shutdown')
