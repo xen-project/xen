@@ -60,7 +60,8 @@ import XenAPI
 if not hasattr(getopt, 'gnu_getopt'):
     getopt.gnu_getopt = getopt.getopt
 
-XM_CONFIG_FILE = '/etc/xen/xm-config.xml'
+XM_CONFIG_FILE_ENVVAR = 'XM_CONFIG_FILE'
+XM_CONFIG_FILE_DEFAULT = '/etc/xen/xm-config.xml'
 
 # Supported types of server
 SERVER_LEGACY_XMLRPC = 'LegacyXMLRPC'
@@ -351,13 +352,14 @@ all_commands = (domain_commands + host_commands + scheduler_commands +
 # Configuration File Parsing
 ##
 
+xmConfigFile = os.getenv(XM_CONFIG_FILE_ENVVAR, XM_CONFIG_FILE_DEFAULT)
 config = None
-if os.path.isfile(XM_CONFIG_FILE):
+if os.path.isfile(xmConfigFile):
     try:
-        config = xml.dom.minidom.parse(XM_CONFIG_FILE)
+        config = xml.dom.minidom.parse(xmConfigFile)
     except:
         print >>sys.stderr, ('Ignoring invalid configuration file %s.' %
-                             XM_CONFIG_FILE)
+                             xmConfigFile)
 
 def parseServer():
     if config:
