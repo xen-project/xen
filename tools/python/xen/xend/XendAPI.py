@@ -1515,10 +1515,15 @@ class XendAPI(object):
                                      "domain_unpause", vm_ref)
 
     def VM_send_sysrq(self, _, vm_ref, req):
-        xendom = XendDomain.instance()
-        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        xeninfo = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        if xeninfo.state != XEN_API_VM_POWER_STATE_RUNNING:
+            return xen_api_error(
+                ['VM_BAD_POWER_STATE', vm_ref,
+                 XendDomain.POWER_STATE_NAMES[XEN_API_VM_POWER_STATE_RUNNING],
+                 XendDomain.POWER_STATE_NAMES[xeninfo.state]])
         xeninfo.send_sysrq(req)
         return xen_api_success_void()
+
 
     # Xen API: Class VM_metrics
     # ----------------------------------------------------------------
