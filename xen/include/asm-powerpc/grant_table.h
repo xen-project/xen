@@ -69,4 +69,17 @@ static inline uint cpu_foreign_map_order(void)
     /* 16 GiB */
     return 34 - PAGE_SHIFT;
 }
+
+#if 0
+/*
+ * without put_page()/put_page_and_type() page might be leaked.
+ * with put_page()/put_page_and_type() freed page might be accessed.
+ */
+#define gnttab_release_put_page(page)           put_page((page))
+#define gnttab_release_put_page_and_type(page)  put_page_and_type((page))
+#else
+#define gnttab_release_put_page(page)           do { } while (0)
+#define gnttab_release_put_page_and_type(page)  do { } while (0)
+#endif
+
 #endif  /* __ASM_PPC_GRANT_TABLE_H__ */

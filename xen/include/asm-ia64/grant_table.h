@@ -64,4 +64,7 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 	clear_bit(nr, addr);
 }
 
+#define gnttab_release_put_page(page)           put_page((page))
+#define gnttab_release_put_page_and_type(page)  put_page_and_type((page))
+
 #endif /* __ASM_GRANT_TABLE_H__ */
