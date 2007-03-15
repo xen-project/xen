@@ -2768,7 +2768,9 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             flush_tlb_one_mask(d->domain_dirty_cpumask, va);
             break;
         default:
-            if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
+            if ( unlikely(!IS_COMPAT(d) ?
+                          get_user(vmask, (unsigned long *)bmap_ptr) :
+                          get_user(vmask, (unsigned int *)bmap_ptr)) )
                 rc = -EFAULT;
             pmask = vcpumask_to_pcpumask(d, vmask);
             flush_tlb_one_mask(pmask, va);
