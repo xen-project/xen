@@ -3179,6 +3179,11 @@ editing \path{grub.conf}.
   one of 80x25, 80x28, 80x30, 80x34, 80x43, 80x50, 80x60.
   \item[ keep ] Keep the VGA console even after domain 0 boots.
   \end{description}
+\item [ console\_to\_ring ] Place guest console output into the
+  hypervisor console ring buffer. This is disabled by default.
+  When enabled, both hypervisor output and guest console output
+  is available from the ring buffer. This can be useful for logging
+  and/or remote presentation of console data.
 \item [ sync\_console ] Force synchronous console output. This is
   useful if you system fails unexpectedly before it has sent all
   available output to the console. In most cases Xen will

@@ -48,6 +48,10 @@ string_param("conswitch", opt_conswitch);
 static int opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
 
+/* console_to_ring: send guest (incl. dom 0) console data to console ring. */
+static int opt_console_to_ring;
+boolean_param("console_to_ring", opt_console_to_ring);
+
 #define CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(CONRING_SIZE-1))
 static char conring[CONRING_SIZE];
@@ -329,7 +333,14 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
         sercon_puts(kbuf);
 
         for ( kptr = kbuf; *kptr != '\0'; kptr++ )
+        {
             vga_putchar(*kptr);
+            if ( opt_console_to_ring )
+                putchar_console_ring(*kptr);
+        }
+
+        if ( opt_console_to_ring )
+            send_guest_global_virq(dom0, VIRQ_CON_RING);
 
         guest_handle_add_offset(buffer, kcount);
         count -= kcount;
