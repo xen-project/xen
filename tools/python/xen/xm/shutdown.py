@@ -51,7 +51,7 @@ gopts.opt('reboot', short='R',
 
 def wait_reboot(opts, doms, rcs):
     if serverType == SERVER_XEN_API:
-	    opts.err("Cannot wait for reboot w/ XenAPI (yet)")
+        opts.err("Cannot wait for reboot w/ XenAPI (yet)")
 
     while doms:
         alive = server.xend.domains(0)
@@ -73,7 +73,7 @@ def wait_reboot(opts, doms, rcs):
 def wait_shutdown(opts, doms):
     while doms:
         if serverType == SERVER_XEN_API:
-		    alive = [dom for dom in server.xenapi.VM.get_all()
+            alive = [dom for dom in server.xenapi.VM.get_all()
                      if server.xenapi.VM.get_power_state(dom) ==
                      XEN_API_VM_POWER_STATE[XEN_API_VM_POWER_STATE_RUNNING]]
         else:
@@ -91,16 +91,16 @@ def wait_shutdown(opts, doms):
 def shutdown(opts, doms, mode, wait):
     rcs = {}
     for d in doms:
-		if serverType == SERVER_XEN_API:
-			if mode == 'halt':
-				server.xenapi.VM.clean_shutdown(d)
-			if mode == 'reboot':
-				server.xenapi.VM.clean_reboot(d)
-			if mode == 'poweroff':
-				server.xenapi.VM.clean_shutdown(d)				
-		else:
-			rcs[d] = server.xend.domain.getRestartCount(d)
-			server.xend.domain.shutdown(d, mode)
+        if serverType == SERVER_XEN_API:
+            if mode == 'halt':
+                server.xenapi.VM.clean_shutdown(d)
+            if mode == 'reboot':
+                server.xenapi.VM.clean_reboot(d)
+            if mode == 'poweroff':
+                server.xenapi.VM.clean_shutdown(d)
+        else:
+            rcs[d] = server.xend.domain.getRestartCount(d)
+            server.xend.domain.shutdown(d, mode)
 
     if wait:
         if mode == 'reboot':
@@ -135,7 +135,7 @@ def main_dom(opts, args):
     if len(args) >  1: opts.err('No multiple domain parameters allowed')
     dom = args[0]
     if serverType == SERVER_XEN_API:
-		dom = get_single_vm(dom)
+        dom = get_single_vm(dom)
     mode = shutdown_mode(opts)  
     shutdown(opts, [ dom ], mode, opts.vals.wait)
     
