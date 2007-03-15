@@ -45,22 +45,21 @@ static int relocate_elf(unsigned char *elfarray) {
         return -1;
     }
 
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        if (!(shdr[i]).sh_flags & SHF_ALLOC) {
-            shdr[i].sh_addr = 0;
-            continue;
-        }
+    for (i = 0; i < ehdr->e_shnum; i++)
         shdr[i].sh_addr = (Elf32_Addr)&elfarray[shdr[i].sh_offset];
-    }
 
     for (i = 0; i < ehdr->e_shnum; i++) {
-        if (shdr[i].sh_type == SHT_REL && shdr[i].sh_addr != 0) {
+        if (shdr[i].sh_type == SHT_REL) {
             Elf32_Shdr *targetsec = (Elf32_Shdr *)&(shdr[shdr[i].sh_info]);
             Elf32_Shdr *symtabsec = (Elf32_Shdr *)&(shdr[shdr[i].sh_link]);
             Elf32_Sym  *syms      = (Elf32_Sym *)symtabsec->sh_addr;
             Elf32_Rel  *rels      = (Elf32_Rel *)shdr[i].sh_addr;
             unsigned char *code   = (unsigned char *)targetsec->sh_addr;
             int j;
+
+            /* must not have been stripped */
+            if (shdr[i].sh_size == 0)
+                return -6;
 
             for (j = 0; j < shdr[i].sh_size / sizeof(Elf32_Rel); j++) {
                 int idx           = ELF32_R_SYM(rels[j].r_info);
