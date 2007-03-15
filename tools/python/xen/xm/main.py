@@ -1466,7 +1466,10 @@ def xm_sysrq(args):
     arg_check(args, "sysrq", 2)
     dom = args[0]
     req = args[1]
-    server.xend.domain.send_sysrq(dom, req)    
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.send_sysrq(get_single_vm(dom), req)
+    else:
+        server.xend.domain.send_sysrq(dom, req)
 
 def xm_trigger(args):
     vcpu = 0

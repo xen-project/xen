@@ -1070,6 +1070,7 @@ class XendAPI(object):
                   ('hard_reboot', None),
                   ('suspend', None),
                   ('resume', None),
+                  ('send_sysrq', None),
                   ('add_to_HVM_boot_params', None),
                   ('remove_from_HVM_boot_params', None),
                   ('add_to_VCPUs_params', None),
@@ -1512,6 +1513,12 @@ class XendAPI(object):
     def VM_unpause(self, session, vm_ref):
         return XendTask.log_progress(0, 100, do_vm_func,
                                      "domain_unpause", vm_ref)
+
+    def VM_send_sysrq(self, _, vm_ref, req):
+        xendom = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        xeninfo.send_sysrq(req)
+        return xen_api_success_void()
 
     # Xen API: Class VM_metrics
     # ----------------------------------------------------------------
