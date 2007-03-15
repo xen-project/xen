@@ -373,7 +373,6 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
             .memory_dynamic_max = 256,
             .memory_dynamic_min = 128,
             .memory_static_min = 128,
-            .vcpus_policy = "credit",
             .vcpus_params = vcpus_params,
             .vcpus_max = 4,
             .vcpus_at_startup = 2,

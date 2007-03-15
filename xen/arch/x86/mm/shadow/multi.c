@@ -660,6 +660,8 @@ _sh_propagate(struct vcpu *v,
     {
         /* Guest l1e maps MMIO space */
         *sp = sh_l1e_mmio(guest_l1e_get_gfn(*gp), gflags);
+        if ( !d->arch.paging.shadow.has_fast_mmio_entries )
+            d->arch.paging.shadow.has_fast_mmio_entries = 1;
         goto done;
     }
 

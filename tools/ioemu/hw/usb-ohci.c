@@ -1186,5 +1186,7 @@ void usb_ohci_init(struct PCIBus *bus, int num_ports, int devfn)
         qemu_register_usb_port(&ohci->rhport[i].port, ohci, i, ohci_attach);
     }
 
+    register_savevm("OHCI USB", 0, 1, generic_pci_save, generic_pci_load, ohci);
+
     ohci_reset(ohci);
 }

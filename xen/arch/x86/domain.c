@@ -601,7 +601,7 @@ int arch_set_info_guest(
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-        return 0;
+        goto out;
 
     memset(v->arch.guest_context.debugreg, 0,
            sizeof(v->arch.guest_context.debugreg));
@@ -706,6 +706,11 @@ int arch_set_info_guest(
 
     update_cr3(v);
 
+ out:
+    if ( flags & VGCF_online )
+        clear_bit(_VCPUF_down, &v->vcpu_flags);
+    else
+        set_bit(_VCPUF_down, &v->vcpu_flags);
     return 0;
 #undef c
 }
@@ -1381,7 +1386,8 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 }
 #endif
 
-static void relinquish_memory(struct domain *d, struct list_head *list)
+static void relinquish_memory(struct domain *d, struct list_head *list,
+                              unsigned long type)
 {
     struct list_head *ent;
     struct page_info  *page;
@@ -1410,23 +1416,24 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
             put_page(page);
 
         /*
-         * Forcibly invalidate base page tables at this point to break circular
-         * 'linear page table' references. This is okay because MMU structures
-         * are not shared across domains and this domain is now dead. Thus base
-         * tables are not in use so a non-zero count means circular reference.
+         * Forcibly invalidate top-most, still valid page tables at this point
+         * to break circular 'linear page table' references. This is okay
+         * because MMU structures are not shared across domains and this domain
+         * is now dead. Thus top-most valid tables are not in use so a non-zero
+         * count means circular reference.
          */
         y = page->u.inuse.type_info;
         for ( ; ; )
         {
             x = y;
             if ( likely((x & (PGT_type_mask|PGT_validated)) !=
-                        (PGT_base_page_table|PGT_validated)) )
+                        (type|PGT_validated)) )
                 break;
 
             y = cmpxchg(&page->u.inuse.type_info, x, x & ~PGT_validated);
             if ( likely(y == x) )
             {
-                free_page_type(page, PGT_base_page_table);
+                free_page_type(page, type);
                 break;
             }
         }
@@ -1524,8 +1531,16 @@ void domain_relinquish_resources(struct domain *d)
         destroy_gdt(v);
 
     /* Relinquish every page of memory. */
-    relinquish_memory(d, &d->xenpage_list);
-    relinquish_memory(d, &d->page_list);
+#if CONFIG_PAGING_LEVELS >= 4
+    relinquish_memory(d, &d->xenpage_list, PGT_l4_page_table);
+    relinquish_memory(d, &d->page_list, PGT_l4_page_table);
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
+    relinquish_memory(d, &d->xenpage_list, PGT_l3_page_table);
+    relinquish_memory(d, &d->page_list, PGT_l3_page_table);
+#endif
+    relinquish_memory(d, &d->xenpage_list, PGT_l2_page_table);
+    relinquish_memory(d, &d->page_list, PGT_l2_page_table);
 
     /* Free page used by xen oprofile buffer */
     free_xenoprof_pages(d);

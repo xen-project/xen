@@ -450,6 +450,8 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     c(flags &= ~(VGCF_i387_valid|VGCF_in_kernel));
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
         c(flags |= VGCF_i387_valid);
+    if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        c(flags |= VGCF_online);
 
     if ( is_hvm_vcpu(v) )
     {

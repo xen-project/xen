@@ -103,13 +103,13 @@ compat_page_list:
 
         /*
          * These compat page tables contain an identity mapping of the
-         * first 1G of the physical address space.
+         * first 4G of the physical address space.
          */
 compat_pg_table:
         .long compat_pg_table_l2 + 0*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
-        .long 0, 0
-        .long 0, 0
-        .long 0, 0
+        .long compat_pg_table_l2 + 1*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long compat_pg_table_l2 + 2*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long compat_pg_table_l2 + 3*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
 
         .align 4096,0
 
@@ -123,4 +123,7 @@ compat_pg_table_l2:
         .endif
         .endm
 
-        identmap
+        identmap 0x00000000
+        identmap 0x40000000
+        identmap 0x80000000
+        identmap 0xc0000000

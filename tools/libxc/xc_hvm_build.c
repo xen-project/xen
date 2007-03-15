@@ -302,9 +302,15 @@ static int setup_guest(int xc_handle,
 
     /* Set [er]ip in the way that's right for Xen */
     if ( strstr(caps, "x86_64") )
+    {
         ctxt->c64.user_regs.rip = elf_uval(&elf, elf.ehdr, e_entry); 
+        ctxt->c64.flags = VGCF_online;
+    }
     else
+    {
         ctxt->c32.user_regs.eip = elf_uval(&elf, elf.ehdr, e_entry);
+        ctxt->c32.flags = VGCF_online;
+    }
 
     return 0;
 
@@ -344,7 +350,7 @@ static int xc_hvm_build_internal(int xc_handle,
 
     memset(&launch_domctl, 0, sizeof(launch_domctl));
     launch_domctl.domain = (domid_t)domid;
-    launch_domctl.u.vcpucontext.vcpu   = 0;
+    launch_domctl.u.vcpucontext.vcpu = 0;
     set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt.c);
     launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
     rc = xc_domctl(xc_handle, &launch_domctl);

@@ -37,4 +37,4 @@ if not re.search("proc", run["output"]):
 # destroy domain - positive test
 status, output = traceCommand("xm destroy %s" % domain.getName())
 if status != 0:
-    FAIL("xm destroy returned invalud %i != 0" % status)
+    FAIL("xm destroy returned invalid %i != 0" % status)

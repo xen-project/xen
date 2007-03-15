@@ -21,7 +21,8 @@ import time
 
 from xen.xend import sxp
 from opts import *
-from main import server
+from main import server, serverType, SERVER_XEN_API, get_single_vm
+from xen.xend.XendAPIConstants import *
 
 gopts = Opts(use="""[options] [DOM]
 
@@ -49,6 +50,9 @@ gopts.opt('reboot', short='R',
           use='Shutdown and reboot.')
 
 def wait_reboot(opts, doms, rcs):
+    if serverType == SERVER_XEN_API:
+	    opts.err("Cannot wait for reboot w/ XenAPI (yet)")
+
     while doms:
         alive = server.xend.domains(0)
         reboot = []
@@ -68,7 +72,12 @@ def wait_reboot(opts, doms, rcs):
 
 def wait_shutdown(opts, doms):
     while doms:
-        alive = server.xend.domains(0)
+        if serverType == SERVER_XEN_API:
+		    alive = [dom for dom in server.xenapi.VM.get_all()
+                     if server.xenapi.VM.get_power_state(dom) ==
+                     XEN_API_VM_POWER_STATE[XEN_API_VM_POWER_STATE_RUNNING]]
+        else:
+            alive = server.xend.domains(0)
         dead = []
         for d in doms:
             if d in alive: continue
@@ -82,8 +91,16 @@ def wait_shutdown(opts, doms):
 def shutdown(opts, doms, mode, wait):
     rcs = {}
     for d in doms:
-        rcs[d] = server.xend.domain.getRestartCount(d)
-        server.xend.domain.shutdown(d, mode)
+		if serverType == SERVER_XEN_API:
+			if mode == 'halt':
+				server.xenapi.VM.clean_shutdown(d)
+			if mode == 'reboot':
+				server.xenapi.VM.clean_reboot(d)
+			if mode == 'poweroff':
+				server.xenapi.VM.clean_shutdown(d)				
+		else:
+			rcs[d] = server.xend.domain.getRestartCount(d)
+			server.xend.domain.shutdown(d, mode)
 
     if wait:
         if mode == 'reboot':
@@ -103,9 +120,13 @@ def shutdown_mode(opts):
         return 'poweroff'
 
 def main_all(opts, args):
-    doms = server.xend.domains(0)
-    dom0_name = sxp.child_value(server.xend.domain(0), 'name')
-    doms.remove(dom0_name)
+    if serverType == SERVER_XEN_API:
+        doms = [dom for dom in server.xenapi.VM.get_all()
+                if not server.xenapi.VM.get_is_control_domain(dom)]
+    else:
+        doms = server.xend.domains(0)
+        dom0_name = sxp.child_value(server.xend.domain(0), 'name')
+        doms.remove(dom0_name)
     mode = shutdown_mode(opts)  
     shutdown(opts, doms, mode, opts.vals.wait)
 
@@ -113,6 +134,8 @@ def main_dom(opts, args):
     if len(args) == 0: opts.err('No domain parameter given')
     if len(args) >  1: opts.err('No multiple domain parameters allowed')
     dom = args[0]
+    if serverType == SERVER_XEN_API:
+		dom = get_single_vm(dom)
     mode = shutdown_mode(opts)  
     shutdown(opts, [ dom ], mode, opts.vals.wait)
     

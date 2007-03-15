@@ -455,7 +455,7 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
     ctxt->kernel_ss = ctxt->user_regs.ss;
     ctxt->kernel_sp = ctxt->user_regs.esp;
 
-    ctxt->flags = VGCF_in_kernel_X86_32;
+    ctxt->flags = VGCF_in_kernel_X86_32 | VGCF_online_X86_32;
     if ( dom->parms.pae == 2 /* extended_cr3 */ ||
          dom->parms.pae == 3 /* bimodal */ )
         ctxt->vm_assist |= (1UL << VMASST_TYPE_pae_extended_cr3);
@@ -494,7 +494,7 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
     ctxt->kernel_ss = ctxt->user_regs.ss;
     ctxt->kernel_sp = ctxt->user_regs.esp;
 
-    ctxt->flags = VGCF_in_kernel_X86_64;
+    ctxt->flags = VGCF_in_kernel_X86_64 | VGCF_online_X86_64;
     cr3_pfn = xc_dom_p2m_guest(dom, dom->pgtables_seg.pfn);
     ctxt->ctrlreg[3] = xen_pfn_to_cr3_x86_64(cr3_pfn);
     xc_dom_printf("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "\n",

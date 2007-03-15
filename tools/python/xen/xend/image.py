@@ -392,7 +392,7 @@ class HVMImageHandler(ImageHandler):
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
         #
-        if vmConfig['platform'].get('nographic'):
+        if int(vmConfig['platform'].get('nographic', 0)) != 0:
             # skip vnc init if nographic is set
             ret.append('-nographic')
             return ret

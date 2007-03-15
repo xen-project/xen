@@ -139,7 +139,7 @@ SUBCOMMAND_HELP = {
                      'Send a trigger to a domain.'),
     'vcpu-list'   : ('[<Domain>]',
                      'List the VCPUs for a domain or all domains.'),
-    'vcpu-pin'    : ('<Domain> <VCPU> <CPUs>',
+    'vcpu-pin'    : ('<Domain> <VCPU> <CPUs|all>',
                      'Set which CPUs a VCPU can use.'),
     'vcpu-set'    : ('<Domain> <vCPUs>',
                      'Set the number of active VCPUs for allowed for the'
@@ -557,7 +557,7 @@ class Shell(cmd.Cmd):
         if serverType == SERVER_XEN_API:
             res = server.xenapi._UNSUPPORTED_list_all_methods()
             for f in res:
-                setattr(Shell, 'do_' + f, self.default)
+                setattr(Shell, 'do_' + f + ' ', self.default)
 
     def preloop(self):
         cmd.Cmd.preloop(self)
@@ -750,11 +750,14 @@ def parse_doms_info(info):
         }
 
 def check_sched_type(sched):
-    current = 'unknown'
-    for x in server.xend.node.info()[1:]:
-        if len(x) > 1 and x[0] == 'xen_scheduler':
-            current = x[1]
-            break
+    if serverType == SERVER_XEN_API:
+        current = server.xenapi.host.get_sched_policy(server.xenapi.session.get_this_host())
+    else:
+        current = 'unknown'
+        for x in server.xend.node.info()[1:]:
+            if len(x) > 1 and x[0] == 'xen_scheduler':
+                current = x[1]
+                break
     if sched != current:
         err("Xen is running with the %s scheduler" % current)
         sys.exit(1)
@@ -1084,7 +1087,10 @@ def xm_vcpu_pin(args):
 
     dom  = args[0]
     vcpu = args[1]
-    cpumap = cpu_make_map(args[2])
+    if args[2] == 'all':
+        cpumap = cpu_make_map('0-63')
+    else:
+        cpumap = cpu_make_map(args[2])
     
     server.xend.domain.pincpu(dom, vcpu, cpumap)
 
@@ -1092,49 +1098,69 @@ def xm_mem_max(args):
     arg_check(args, "mem-max", 2)
 
     dom = args[0]
-    mem = int_unit(args[1], 'm')
 
-    server.xend.domain.maxmem_set(dom, mem)
+    if serverType == SERVER_XEN_API:
+        mem = int_unit(args[1], 'k') * 1024
+        server.xenapi.VM.set_memory_static_max(get_single_vm(dom), mem)
+    else:
+        mem = int_unit(args[1], 'm')
+        server.xend.domain.maxmem_set(dom, mem)
     
 def xm_mem_set(args):
     arg_check(args, "mem-set", 2)
 
     dom = args[0]
-    mem_target = int_unit(args[1], 'm')
 
-    server.xend.domain.setMemoryTarget(dom, mem_target)
+    if serverType == SERVER_XEN_API:
+        mem_target = int_unit(args[1], 'k') * 1024
+        server.xenapi.VM.set_memory_dynamic_max(get_single_vm(dom), mem_target)
+        server.xenapi.VM.set_memory_dynamic_min(get_single_vm(dom), mem_target)
+    else:
+        mem_target = int_unit(args[1], 'm')
+        server.xend.domain.setMemoryTarget(dom, mem_target)
     
 def xm_vcpu_set(args):
     arg_check(args, "vcpu-set", 2)
-    
-    server.xend.domain.setVCpuCount(args[0], int(args[1]))
 
+    dom = args[0]
+    vcpus = int(args[1])
+
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.set_vcpus_live(get_single_vm(dom), vcpus)
+    else:
+        server.xend.domain.setVCpuCount(dom, vcpus)
 
 def xm_destroy(args):
     arg_check(args, "destroy", 1)
 
     dom = args[0]
+    
     if serverType == SERVER_XEN_API:
         server.xenapi.VM.hard_shutdown(get_single_vm(dom))
     else:
         server.xend.domain.destroy(dom)
-
 
 def xm_domid(args):
     arg_check(args, "domid", 1)
 
     name = args[0]
 
-    dom = server.xend.domain(name)
-    print sxp.child_value(dom, 'domid')
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.VM.get_domid(get_single_vm(name))
+    else:
+        dom = server.xend.domain(name)
+        print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
     arg_check(args, "domname", 1)
 
     name = args[0]
-
-    dom = server.xend.domain(name)
-    print sxp.child_value(dom, 'name')
+    
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.VM.get_name_label(get_single_vm(name))
+    else:
+        dom = server.xend.domain(name)
+        print sxp.child_value(dom, 'name')
 
 def xm_sched_sedf(args):
     def ns_to_ms(val):
@@ -1282,13 +1308,59 @@ def xm_sched_credit(args):
 def xm_info(args):
     arg_check(args, "info", 0)
 
-    info = server.xend.node.info()
-    
-    for x in info[1:]:
-        if len(x) < 2: 
-            print "%-23s: (none)" % x[0]
-        else: 
-            print "%-23s:" % x[0], x[1]
+    if serverType == SERVER_XEN_API:
+
+        # Need to fake out old style xm info as people rely on parsing it
+        
+        host_record = server.xenapi.host.get_record(
+            server.xenapi.session.get_this_host())        
+
+        host_cpu_records = map(server.xenapi.host_cpu.get_record, host_record["host_CPUs"])
+
+        host_metrics_record = server.xenapi.host_metrics.get_record(host_record["metrics"])
+
+        info = {
+            "host":              host_record["name_label"],
+            "release":           host_record["software_version"]["release"],
+            "version":           host_record["software_version"]["version"],
+            "machine":           host_record["software_version"]["machine"],
+            "nr_cpus":           len(host_record["host_CPUs"]),
+            "nr_nodes":          host_record["cpu_configuration"]["nr_nodes"],
+            "sockets_per_node":  host_record["cpu_configuration"]["sockets_per_node"],
+            "cores_per_socket":  host_record["cpu_configuration"]["cores_per_socket"],
+            "threads_per_core":  host_record["cpu_configuration"]["threads_per_core"],
+            "cpu_mhz":           sum([int(host_cpu_record["speed"]) for host_cpu_record in host_cpu_records])
+                                   / len(host_cpu_records),
+            "hw_caps":           host_cpu_records[0]["features"],
+            "total_memory":      int(host_metrics_record["memory_total"])/1024/1024,
+            "free_memory":       int(host_metrics_record["memory_free"])/1024/1024,
+            "xen_major":         host_record["software_version"]["xen_major"],
+            "xen_minor":         host_record["software_version"]["xen_minor"],
+            "xen_extra":         host_record["software_version"]["xen_extra"],
+            "xen_caps":          " ".join(host_record["capabilities"]),
+            "xen_scheduler":     host_record["sched_policy"],
+            "xen_pagesize":      host_record["other_config"]["xen_pagesize"],
+            "platform_params":   host_record["other_config"]["platform_params"],
+            "xen_changeset":     host_record["software_version"]["xen_changeset"],
+            "cc_compiler":       host_record["software_version"]["cc_compiler"],
+            "cc_compile_by":     host_record["software_version"]["cc_compile_by"],
+            "cc_compile_domain": host_record["software_version"]["cc_compile_domain"],
+            "cc_compile_date":   host_record["software_version"]["cc_compile_date"],
+            "xend_config_format":host_record["software_version"]["xend_config_format"]                                
+        }
+
+        sorted = info.items()
+        sorted.sort(lambda (x1,y1), (x2,y2): -cmp(x1,x2))
+        
+        for (k, v) in sorted:
+           print "%-23s:" % k, v 
+    else:
+        info = server.xend.node.info()
+        for x in info[1:]:
+            if len(x) < 2: 
+                print "%-23s: (none)" % x[0]
+            else: 
+                print "%-23s:" % x[0], x[1]
 
 def xm_console(args):
     arg_check(args, "console", 1, 2)
@@ -1314,13 +1386,17 @@ def xm_console(args):
     dom = params[0]
 
     try:
-        info = server.xend.domain(dom)
+        if serverType == SERVER_XEN_API:
+            domid = int(server.xenapi.VM.get_domid(get_single_vm(dom)))
+        else:
+            info = server.xend.domain(dom)
+            domid = int(sxp.child_value(info, 'domid', '-1'))
     except:
         if quiet:
             sys.exit(1)
         else:
             raise
-    domid = int(sxp.child_value(info, 'domid', '-1'))
+        
     if domid == -1:
         if quiet:
             sys.exit(1)
@@ -1428,17 +1504,33 @@ def xm_dmesg(args):
         err("No parameter required")
         usage('dmesg')
 
-    if not use_clear:
-        print server.xend.node.dmesg.info()
+    if serverType == SERVER_XEN_API:
+        if not use_clear:
+            print server.xenapi.host.dmesg(
+                server.xenapi.session.get_this_host(),0)
+        else:
+            server.xenapi.host.dmesg(
+                server.xenapi.session.get_this_host(),1)
     else:
-        server.xend.node.dmesg.clear()
+        if not use_clear:
+            print server.xend.node.dmesg.info()
+        else:
+            server.xend.node.dmesg.clear()
 
 def xm_log(args):
     arg_check(args, "log", 0)
-    
-    print server.xend.node.log()
+
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.host.get_log(
+            server.xenapi.session.get_this_host())
+    else:
+        print server.xend.node.log()
 
 def xm_serve(args):
+    if serverType == SERVER_XEN_API:
+        print "Not supported with XenAPI"
+        sys.exit(-1)
+
     arg_check(args, "serve", 0)
 
     from fcntl import fcntl, F_SETFL

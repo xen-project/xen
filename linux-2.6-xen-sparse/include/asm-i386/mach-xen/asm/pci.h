@@ -143,11 +143,4 @@ static inline void pci_dma_burst_advice(struct pci_dev *pdev,
 /* generic pci stuff */
 #include <asm-generic/pci.h>
 
-/* On Xen we have to scan all functions since Xen hides bridges from
- * us.  If a bridge is at fn=0 and that slot has a multifunction
- * device, we won't find the additional devices without scanning all
- * functions. */
-#undef pcibios_scan_all_fns
-#define pcibios_scan_all_fns(a, b)	1
-
 #endif /* __i386_PCI_H */

@@ -91,17 +91,10 @@ same subnet.
 
 \end{itemize}
 
-\item TPM
+\item ACM
 \begin{itemize}
 
-\item Would it not be better to have a class TPM and a member TPMs ((TPM ref)
-Set) containing an array of zero or one references to TPMs? I assume that
-an empty array would make it clear that no TPM is associated with the VM
-instead of encoding its existence into TPM/instance or TPM/backend
-somehow. The current members instance and backend could then be moved into
-the TPM class.
-
-\item Also a Xen system can be running an access control policy where each
+\item A Xen system can be running an access control policy where each
 VM's run-time access to resources is restricted by the label it has been given
 compared to those of the resources. Currently a VM's configuration file may
 contain a line like access\_control[policy='$<$name of the system's

@@ -43,7 +43,6 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
-#include <asm/hvm/svm/vmmcall.h>
 #include <asm/hvm/svm/intr.h>
 #include <asm/x86_emulate.h>
 #include <public/sched.h>
@@ -2591,65 +2590,6 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
 }
 
 
-/*
- * svm_do_vmmcall - SVM VMMCALL handler
- *
- * returns 0 on success, non-zero otherwise
- */
-static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int inst_len;
-
-    ASSERT(vmcb);
-    ASSERT(regs);
-
-    inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
-    ASSERT(inst_len > 0);
-
-    HVMTRACE_1D(VMMCALL, v, regs->eax);
-
-    if ( regs->eax & 0x80000000 )
-    {
-        /* VMMCALL sanity check */
-        if ( vmcb->cpl > get_vmmcall_cpl(regs->edi) )
-        {
-            printk("VMMCALL CPL check failed\n");
-            return -1;
-        }
-
-        /* handle the request */
-        switch ( regs->eax )
-        {
-        case VMMCALL_RESET_TO_REALMODE:
-            if ( svm_do_vmmcall_reset_to_realmode(v, regs) )
-            {
-                printk("svm_do_vmmcall_reset_to_realmode() failed\n");
-                return -1;
-            }
-            /* since we just reset the VMCB, return without adjusting
-             * the eip */
-            return 0;
-
-        case VMMCALL_DEBUG:
-            printk("DEBUG features not implemented yet\n");
-            break;
-        default:
-            break;
-        }
-
-        hvm_print_line(v, regs->eax); /* provides the current domain */
-    }
-    else
-    {
-        hvm_do_hypercall(regs);
-    }
-
-    __update_guest_eip(vmcb, inst_len);
-    return 0;
-}
-
-
 void svm_dump_inst(unsigned long eip)
 {
     u8 opcode[256];
@@ -3152,9 +3092,14 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_handle_invlpg(1, regs);
         break;
 
-    case VMEXIT_VMMCALL:
-        svm_do_vmmcall(v, regs);
+    case VMEXIT_VMMCALL: {
+        int inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
+        ASSERT(inst_len > 0);
+        HVMTRACE_1D(VMMCALL, v, regs->eax);
+        __update_guest_eip(vmcb, inst_len);
+        hvm_do_hypercall(regs);
         break;
+    }
 
     case VMEXIT_CR0_READ:
         svm_cr_access(v, 0, TYPE_MOV_FROM_CR, regs);

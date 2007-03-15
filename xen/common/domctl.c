@@ -268,18 +268,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_unpausedomain:
     {
         struct domain *d = rcu_lock_domain_by_id(op->domain);
+
         ret = -ESRCH;
-        if ( d != NULL )
-        {
-            ret = -EINVAL;
-            if ( (d != current->domain) && (d->vcpu[0] != NULL) &&
-                 test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
-            {
-                domain_unpause_by_systemcontroller(d);
-                ret = 0;
-            }
-            rcu_unlock_domain(d);
-        }
+        if ( d == NULL )
+            break;
+
+        domain_unpause_by_systemcontroller(d);
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 

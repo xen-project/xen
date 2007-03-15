@@ -200,6 +200,18 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             else:
                 response = self._dispatch(method, params)
 
+            if self.xenapi and \
+               (response is None or
+                not isinstance(response, dict) or
+                'Status' not in response):
+                log.exception('Internal error handling %s: Invalid result %s',
+                              method, response)
+                response = { "Status": "Failure",
+                             "ErrorDescription":
+                             ['INTERNAL_ERROR',
+                              'Invalid result %s handling %s' %
+                              (response, method)]}
+
             # With either Unicode or normal strings, we can only transmit
             # \t, \n, \r, \u0020-\ud7ff, \ue000-\ufffd, and \u10000-\u10ffff
             # in an XML document.  xmlrpclib does not escape these values

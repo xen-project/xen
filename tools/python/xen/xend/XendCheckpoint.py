@@ -9,6 +9,7 @@ import os
 import re
 import string
 import threading
+import fcntl
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
@@ -73,13 +74,14 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         write_exact(fd, config, "could not write guest state file: config")
 
         image_cfg = dominfo.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
+        hvm = dominfo.info.is_hvm()
         stdvga = 0
 
         if hvm:
             log.info("save hvm domain")
-            if image_cfg['hvm']['devices']['stdvga'] == 1:
-                stdvga = 1
+            if dominfo.info['platform'].has_key('stdvga'):
+                if dominfo.info['platform']['stdvga'] == 1:
+                    stdvga = 1
 
         # xc_save takes three customization parameters: maxit, max_f, and
         # flags the last controls whether or not save is 'live', while the
@@ -188,11 +190,11 @@ def restore(xd, fd, dominfo = None, paused = False):
 
     # if hvm, pass mem size to calculate the store_mfn
     image_cfg = dominfo.info.get('image', {})
-    is_hvm  = image_cfg.has_key('hvm')
+    is_hvm = dominfo.info.is_hvm()
     if is_hvm:
         hvm  = dominfo.info['memory_static_min']
-        apic = dominfo.info['image']['hvm'].get('apic', 0)
-        pae  = dominfo.info['image']['hvm'].get('pae',  0)
+        apic = dominfo.info['platform'].get('apic', 0)
+        pae  = dominfo.info['platform'].get('pae',  0)
         log.info("restore hvm domain %d, mem=%d, apic=%d, pae=%d",
                  dominfo.domid, hvm, apic, pae)
     else:
@@ -228,6 +230,15 @@ def restore(xd, fd, dominfo = None, paused = False):
         handler = RestoreInputHandler()
 
         forkHelper(cmd, fd, handler.handler, True)
+
+        # We don't want to pass this fd to any other children -- we 
+        # might need to recover ths disk space that backs it.
+        try:
+            flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+            flags |= fcntl.FD_CLOEXEC
+            fcntl.fcntl(fd, fcntl.F_SETFD, flags)
+        except:
+            pass
 
         if handler.store_mfn is None:
             raise XendError('Could not read store MFN')

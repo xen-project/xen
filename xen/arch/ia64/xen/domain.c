@@ -676,8 +676,11 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	/* This overrides some registers. */
 	vcpu_init_regs(v);
 
-	/* Don't redo final setup */
-	set_bit(_VCPUF_initialised, &v->vcpu_flags);
+	/* Don't redo final setup. Auto-online VCPU0. */
+	if (!test_and_set_bit(_VCPUF_initialised, &v->vcpu_flags) &&
+	    (v->vcpu_id == 0))
+		clear_bit(_VCPUF_down, &v->vcpu_flags);
+
 	return 0;
 }
 
@@ -1186,6 +1189,7 @@ int construct_dom0(struct domain *d,
 	printk("Dom0: 0x%lx\n", (u64)dom0);
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
+	clear_bit(_VCPUF_down, &v->vcpu_flags);
 
 	/* Build firmware.
 	   Note: Linux kernel reserve memory used by start_info, so there is

@@ -274,6 +274,7 @@ int construct_dom0(struct domain *d,
     ofd_dom0_fixup(d, *ofh_tree + rma, cmdline, shared_info_addr);
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
+    clear_bit(_VCPUF_down, &v->vcpu_flags);
 
     rc = 0;
 

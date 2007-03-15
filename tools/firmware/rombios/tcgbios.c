@@ -228,6 +228,8 @@ int1a_function32(regs, ES, DS, FLAGS)
 {
 	Bit16u rc;
 
+	BX_DEBUG_INT1A("int1a_32: AX=%04x\n", regs.u.r16.ax);
+
 	switch (regs.u.r8.ah) {
 	case 0xbb:
 		/*
@@ -256,8 +258,10 @@ int1a_function32(regs, ES, DS, FLAGS)
 		default:
 			SET_CF();
 		}
+		break;
 	default:
 		SET_CF();
 		break;
 	}
+	BX_DEBUG_INT1A("int1a_32: FLAGS=%04x\n", FLAGS);
 }

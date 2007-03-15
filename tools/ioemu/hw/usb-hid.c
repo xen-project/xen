@@ -517,6 +517,49 @@ static void usb_mouse_handle_destroy(USBDevice *dev)
     qemu_free(s);
 }
 
+void usb_mouse_save(QEMUFile *f, void *opaque)
+{
+    USBMouseState *s = (USBMouseState*)opaque;
+
+    qemu_put_be32s(f, &s->dx);
+    qemu_put_be32s(f, &s->dy);
+    qemu_put_be32s(f, &s->dz);
+    qemu_put_be32s(f, &s->buttons_state);
+    qemu_put_be32s(f, &s->x);
+    qemu_put_be32s(f, &s->y);
+    qemu_put_be32s(f, &s->kind);
+    qemu_put_be32s(f, &s->mouse_grabbed);
+    qemu_put_be32s(f, &s->status_changed);
+
+}
+
+int usb_mouse_load(QEMUFile *f, void *opaque, int version_id)
+{
+    USBMouseState *s = (USBMouseState*)opaque;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    qemu_get_be32s(f, &s->dx);
+    qemu_get_be32s(f, &s->dy);
+    qemu_get_be32s(f, &s->dz);
+    qemu_get_be32s(f, &s->buttons_state);
+    qemu_get_be32s(f, &s->x);
+    qemu_get_be32s(f, &s->y);
+    qemu_get_be32s(f, &s->kind);
+    qemu_get_be32s(f, &s->mouse_grabbed);
+    qemu_get_be32s(f, &s->status_changed);
+
+    if ( s->kind == USB_TABLET) {
+        fprintf(logfile, "usb_mouse_load:add usb_tablet_event.\n");
+        qemu_add_mouse_event_handler(usb_tablet_event, s, 1);
+    } else if ( s->kind == USB_MOUSE) {
+        fprintf(logfile, "usb_mouse_load:add usb_mouse_event.\n");
+        qemu_add_mouse_event_handler(usb_mouse_event, s, 0);
+    }
+}
+
+
 USBDevice *usb_tablet_init(void)
 {
     USBMouseState *s;
@@ -535,6 +578,8 @@ USBDevice *usb_tablet_init(void)
     s->status_changed = 0;
 
     pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Tablet");
+
+    register_savevm("USB tablet dev", 0, 1, usb_mouse_save, usb_mouse_load, s);
 
     return (USBDevice *)s;
 }
@@ -557,6 +602,8 @@ USBDevice *usb_mouse_init(void)
     s->status_changed = 0;
 
     pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Mouse");
+
+    register_savevm("USB mouse dev", 0, 1, usb_mouse_save, usb_mouse_load, s);
 
     return (USBDevice *)s;
 }
