@@ -49,10 +49,9 @@ from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
-from xen.util import security
 from xen.util.xmlrpclib2 import ServerProxy
-
 import XenAPI
+
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -675,10 +674,42 @@ def xm_restore(args):
 
 
 def getDomains(domain_names, state, full = 0):
-    if domain_names:
-        return [server.xend.domain(dom, full) for dom in domain_names]
+    if serverType == SERVER_XEN_API:
+        def map2sxp(m):
+            return ["domain"] + [[k, m[k]] for k in m.keys()]
+        
+        doms_sxp = []
+        doms_dict = []
+        dom_refs = server.xenapi.VM.get_all()
+        for dom_ref in dom_refs:
+            dom_rec = server.xenapi.VM.get_record(dom_ref)
+            dom_metrics_ref = server.xenapi.VM.get_metrics(dom_ref)
+            dom_metrics = server.xenapi.VM_metrics.get_record(dom_metrics_ref)
+            dom_rec.update({'name':     dom_rec['name_label'],
+                            'memory_actual': int(dom_metrics['memory_actual'])/1024,
+                            'vcpus':    dom_metrics['vcpus_number'],
+                            'state':    '-----',
+                            'cpu_time': dom_metrics['vcpus_utilisation']})
+			
+            doms_sxp.append(map2sxp(dom_rec))
+            doms_dict.append(dom_rec)
+            
+        if domain_names:
+            doms = [map2sxp(dom) for dom in doms_dict
+                    if dom["name"] in domain_names]
+            
+            if len(doms) > 0:
+                return doms
+            else:
+                print "Error: no domains named '%s'" % domain_names
+                sys.exit(-1)
+        else:
+            return doms_sxp
     else:
-        return server.xend.domains_with_state(True, state, full)
+        if domain_names:
+            return [server.xend.domain(dom, full) for dom in domain_names]
+        else:
+            return server.xend.domains_with_state(True, state, full)
 
 
 def xm_list(args):
@@ -737,19 +768,38 @@ def parse_doms_info(info):
     else:
         up_time = time.time() - start_time
 
-    return {
+    parsed_info = {
         'domid'    : get_info('domid',              str,   ''),
         'name'     : get_info('name',               str,   '??'),
-        'mem'      : get_info('memory_dynamic_min', int,   0),
         'state'    : get_info('state',              str,   ''),
-        'cpu_time' : get_info('cpu_time',           float, 0.0),
+
         # VCPUs is the number online when the VM is up, or the number
         # configured otherwise.
         'vcpus'    : get_info('online_vcpus', int,
                               get_info('vcpus', int, 0)),
-        'up_time'  : up_time,
-        'seclabel' : security.get_security_printlabel(info),
+        'up_time'  : up_time
         }
+
+    # We're not supporting security stuff just yet via XenAPI
+
+    if serverType != SERVER_XEN_API:
+        from xen.util import security
+        parsed_info['seclabel'] = security.get_security_printlabel(info)
+    else:
+        parsed_info['seclabel'] = ""
+
+    if serverType == SERVER_XEN_API:
+        parsed_info['mem'] = get_info('memory_actual', int, 0) / 1024
+        cpu_times = get_info('cpu_time', lambda x : (x), 0.0)
+        if sum(cpu_times.values()) > 0:
+            parsed_info['cpu_time'] = sum(cpu_times.values()) / float(len(cpu_times.values()))
+        else:
+            parsed_info['cpu_time'] = 0
+    else:
+        parsed_info['mem'] = get_info('memory_dynamic_min', int,0)
+        parsed_info['cpu_time'] = get_info('cpu_time', float, 0.0)
+
+    return parsed_info
 
 def check_sched_type(sched):
     if serverType == SERVER_XEN_API:
@@ -799,17 +849,22 @@ def xm_label_list(doms):
     output = []
     format = '%(name)-32s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
-    
-    for dom in doms:
-        d = parse_doms_info(dom)
-        if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
-            if not d['seclabel']:
-                d['seclabel'] = 'ERROR'
-        elif security.active_policy in ['DEFAULT']:
-            d['seclabel'] = 'DEFAULT'
-        else:
-            d['seclabel'] = 'INACTIVE'
-        output.append((format % d, d['seclabel']))
+
+    if serverType != SERVER_XEN_API:
+        from xen.util import security
+        
+        for dom in doms:
+            d = parse_doms_info(dom)
+
+            if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
+                if not d['seclabel']:
+                    d['seclabel'] = 'ERROR'
+                elif security.active_policy in ['DEFAULT']:
+                    d['seclabel'] = 'DEFAULT'
+                else:
+                    d['seclabel'] = 'INACTIVE'
+
+            output.append((format % d, d['seclabel']))
         
     #sort by labels
     output.sort(lambda x,y: cmp( x[1].lower(), y[1].lower()))
@@ -818,7 +873,6 @@ def xm_label_list(doms):
 
 
 def xm_vcpu_list(args):
-
     if args:
         dominfo = map(server.xend.domain.getVCPUInfo, args)
     else:
@@ -1114,7 +1168,7 @@ def xm_mem_set(args):
     dom = args[0]
 
     if serverType == SERVER_XEN_API:
-        mem_target = int_unit(args[1], 'k') * 1024
+        mem_target = int_unit(args[1], 'm') * 1024 * 1024
         server.xenapi.VM.set_memory_dynamic_max(get_single_vm(dom), mem_target)
         server.xenapi.VM.set_memory_dynamic_min(get_single_vm(dom), mem_target)
     else:
@@ -1695,13 +1749,17 @@ def parse_block_configuration(args):
     if len(args) == 5:
         vbd.append(['backend', args[4]])
 
-    # verify that policy permits attaching this resource
-    if security.on():
-        dominfo = server.xend.domain(dom)
-        label = security.get_security_printlabel(dominfo)
-    else:
-        label = None
-    security.res_security_check(args[1], label)
+    if serverType != SERVER_XEN_API:
+        # verify that policy permits attaching this resource
+        from xen.util import security
+    
+        if security.on():
+            dominfo = server.xend.domain(dom)
+            label = security.get_security_printlabel(dominfo)
+        else:
+            label = None
+
+        security.res_security_check(args[1], label)
 
     return (dom, vbd)
 
@@ -2006,13 +2064,17 @@ def _run_cmd(cmd, cmd_name, args):
         err(str(e))
         _usage(cmd_name)
         print e.usage
-    except security.ACMError, e:
-        err(str(e))
-    except:
-        print "Unexpected error:", sys.exc_info()[0]
-        print
-        print "Please report to xen-devel@lists.xensource.com"
-        raise
+    except Exception, e:
+        if serverType != SERVER_XEN_API:
+           from xen.util import security
+           if isinstance(e, security.ACMError):
+               err(str(e))
+               return False, 1
+        else:
+            print "Unexpected error:", sys.exc_info()[0]
+            print
+            print "Please report to xen-devel@lists.xensource.com"
+            raise
 
     return False, 1
 
