@@ -153,26 +153,17 @@ realmode_gdtdesc:				;to be used in real mode
 
 switch_to_realmode:
     ; Implementation of switching from protected mode to real mode
-    ; restores all registers and prepares cs, es, ds, ss to be used
-    ; in real mode
+    ; prepares cs, es, ds, ss to be used in real mode
+    ; spills   eax
     START_PM_CODE
 
     ; need to fix up the stack to return in 16 bit mode
     ; currently the 32 bit return address is on the stack
-    push bp					;pop@A1
-    mov bp, sp
-    push eax					;pop@X
+    pop eax
+    push ax
 
-    mov eax, [bp]				; return address low 16bits
-                  				; and 'bp' are being moved
-    mov 2[bp], eax
-
-    pop eax					;@X
-    add sp, #2					; adjust stack for 'lost' bytes
-
-    push eax					;pop@1
-    push bx					;pop@2
-    push si					;pop@3
+    push bx					;pop@1
+    push si					;pop@2
 
     call _ebda_ss_offset32			; get the offset of the ss
     mov bx, ax					; entry within the ebda.
@@ -229,10 +220,8 @@ switch_to_realmode_goon_2:
 
     sti						; allow interrupts
 
-    pop si					;@3
-    pop bx					;@2
-    pop eax					;@1
-    pop bp					;@A1
+    pop si					;@2
+    pop bx					;@1
 
     ret
 

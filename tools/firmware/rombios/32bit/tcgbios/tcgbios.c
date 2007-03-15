@@ -95,13 +95,15 @@ struct ptti_cust *TCG_CommandList[] = {
 };
 
 /* local function prototypes */
-static void sha1(const unsigned char *data, uint32_t length, unsigned char *hash);
+static void sha1(const unsigned char *data, uint32_t length,
+                 unsigned char *hash);
 static uint32_t TCG_ShutdownPreBootInterface(uint32_t ebx);
 static uint32_t HashAll32(struct hai *hai, unsigned char *hash,
                           uint32_t magic, uint32_t ecx, uint32_t edx);
 static uint32_t HashLogExtendEvent32(struct hleei_short *hleei_s,
                                      struct hleeo *hleeo,
-                                     uint32_t magic, uint32_t ecx, uint32_t edx);
+                                     uint32_t magic, uint32_t ecx,
+                                     uint32_t edx);
 static uint32_t HashLogEvent32(struct hlei *hlei, struct hleo *hleo,
                                uint32_t ebx, uint32_t ecx, uint32_t edx);
 static uint32_t PassThroughToTPM32(struct pttti *pttti, struct pttto *pttto,
@@ -181,8 +183,7 @@ uint32_t MA_InitTPM(uint16_t startupcode)
 }
 
 static
-uint32_t MA_Transmit(unsigned char *cmdbuffer,
-                     unsigned char *respbuffer,
+uint32_t MA_Transmit(unsigned char *cmdbuffer, unsigned char *respbuffer,
                      uint32_t respbufferlen)
 {
 	uint32_t rc = 0;
@@ -289,15 +290,14 @@ void tcpa_acpi_init(void)
 		uint32_t ctr = 0;
 		/* get RSDT from RSDP */
 		rsdt   = (struct acpi_20_rsdt *)rsdp->rsdt_address;
-		/* rsdt may be anywhere in 32bit space */
 		length = rsdt->header.length;
 		off = 36;
 		while ((off + 3) < length) {
 			/* try all pointers to structures */
 			tcpa = (struct acpi_20_tcpa *)rsdt->entry[ctr];
 			/* valid TCPA ACPI table ? */
-			if (ACPI_2_0_TCPA_SIGNATURE == tcpa->header.signature &&
-			    acpi_validate_entry(&tcpa->header) == 0) {
+			if (ACPI_2_0_TCPA_SIGNATURE == tcpa->header.signature
+			    && acpi_validate_entry(&tcpa->header) == 0) {
 				found = 1;
 				break;
 			}
@@ -311,7 +311,6 @@ void tcpa_acpi_init(void)
 		tcpa = 0;
 	}
 
-	/* initialize the TCPA part of the EBDA with our data */
 	tcpa_acpi.tcpa_ptr = tcpa;
 	tcpa_acpi.lasa_last_ptr = 0;
 	tcpa_acpi.entry_count = 0;
@@ -748,9 +747,7 @@ void tcpa_measure_post(Bit32u from, Bit32u to)
 }
 
 static
-uint32_t SendCommand32(uint32_t idx,
-                     struct pttto *pttto,
-                     uint32_t size_ptto)
+uint32_t SendCommand32(uint32_t idx, struct pttto *pttto, uint32_t size_ptto)
 {
 	uint32_t rc = 0;
 	struct pttti *pttti = (struct pttti *)TCG_CommandList[idx];
@@ -796,7 +793,8 @@ uint32_t tcpa_initialize_tpm(uint32_t physpres)
 	uint32_t pttto_size = sizeof(_pttto);
 
 	if (rc == 0) {
-		rc = SendCommand32(IDX_CMD_TPM_Startup_0x01, pttto, pttto_size);
+		rc = SendCommand32(IDX_CMD_TPM_Startup_0x01, pttto,
+		                   pttto_size);
 	}
 
 	if (rc == 0 && physpres != 0) {
@@ -884,11 +882,8 @@ uint32_t _TCG_TPM_Extend(unsigned char *hash, uint32_t pcrindex)
 
 
 static
-uint32_t HashLogExtendEvent32(struct hleei_short *hleei_s,
-                            struct hleeo *hleeo,
-                            uint32_t magic,
-                            uint32_t ecx,
-                            uint32_t edx)
+uint32_t HashLogExtendEvent32(struct hleei_short *hleei_s, struct hleeo *hleeo,
+                              uint32_t magic, uint32_t ecx, uint32_t edx)
 {
 	uint32_t rc = 0;
 	uint16_t size;
@@ -978,11 +973,8 @@ uint32_t HashLogExtendEvent32(struct hleei_short *hleei_s,
 
 
 static
-uint32_t PassThroughToTPM32(struct pttti *pttti,
-                          struct pttto *pttto,
-                          uint32_t magic,
-                          uint32_t ecx,
-                          uint32_t edx)
+uint32_t PassThroughToTPM32(struct pttti *pttti, struct pttto *pttto,
+                            uint32_t magic, uint32_t ecx, uint32_t edx)
 {
 	uint32_t rc = 0;
 	uint8_t *cmd32;
@@ -1047,9 +1039,7 @@ uint32_t TCG_ShutdownPreBootInterface(uint32_t ebx)
 
 static
 uint32_t HashLogEvent32(struct hlei *hlei, struct hleo *hleo,
-                      uint32_t ebx,
-                      uint32_t ecx,
-                      uint32_t edx)
+                        uint32_t ebx, uint32_t ecx, uint32_t edx)
 {
 	uint32_t rc = 0;
 	uint16_t size;
@@ -1144,9 +1134,7 @@ uint32_t HashLogEvent32(struct hlei *hlei, struct hleo *hleo,
 
 static
 uint32_t HashAll32(struct hai *hai, unsigned char *hash,
-                 uint32_t magic,
-                 uint32_t ecx,
-                 uint32_t edx)
+                   uint32_t magic, uint32_t ecx, uint32_t edx)
 {
 	uint32_t rc = 0;
 
@@ -1187,9 +1175,7 @@ uint32_t HashAll32(struct hai *hai, unsigned char *hash,
 
 static
 uint32_t TSS32(struct ti *ti, struct to *to,
-             uint32_t ebx,
-             uint32_t ecx,
-             uint32_t edx)
+               uint32_t ebx, uint32_t ecx, uint32_t edx)
 {
 	uint32_t rc = 0;
 	if (TCG_IsShutdownPreBootInterface() == 0) {
@@ -1209,11 +1195,11 @@ uint32_t TSS32(struct ti *ti, struct to *to,
 
 static
 uint32_t CompactHashLogExtendEvent32(unsigned char *buffer,
-                                   uint32_t info,
-                                   uint32_t magic,
-                                   uint32_t length,
-                                   uint32_t pcrindex,
-                                   uint32_t *edx_ptr)
+                                     uint32_t info,
+                                     uint32_t magic,
+                                     uint32_t length,
+                                     uint32_t pcrindex,
+                                     uint32_t *edx_ptr)
 {
 	uint32_t rc = 0;
 	struct hleeo hleeo;
@@ -1356,9 +1342,7 @@ void sha1_do(sha1_ctx *ctx, const unsigned char *data32, uint32_t length)
 
 	/* treat data in 64-byte chunks */
 	for (offset = 0; length - offset >= 64; offset += 64) {
-		/* copy into the 'w' array */
 		memcpy(w, data32 + offset, 64);
-		/* hash the block in the 'w' array */
 		sha1_block((uint32_t *)w, ctx);
 		bits += (64 * 8);
 	}
@@ -1408,7 +1392,8 @@ void sha1(const unsigned char *data, uint32_t length, unsigned char *hash)
 }
 
 
-uint32_t TCGInterruptHandler(pushad_regs_t *regs, uint32_t esds, uint32_t flags_ptr)
+uint32_t TCGInterruptHandler(pushad_regs_t *regs, uint32_t esds,
+                             uint32_t flags_ptr)
 {
 	uint16_t DS = esds >> 16;
 	uint16_t ES = esds & 0xffff;
@@ -1435,7 +1420,6 @@ uint32_t TCGInterruptHandler(pushad_regs_t *regs, uint32_t esds, uint32_t flags_
 			}
 		}
 		break;
-
 	case 0x01:
 		regs->u.r32.eax =
 			HashLogExtendEvent32((struct hleei_short*)
