@@ -475,6 +475,8 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	unsigned long r10 = 0;
 	unsigned long r11 = 0;
 	long status = PAL_STATUS_UNIMPLEMENTED;
+	unsigned long flags;
+	int processor;
 
 	if (running_on_sim)
 		return pal_emulator_static(index);
@@ -657,18 +659,20 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		 * Clear psr.ic when call PAL_CACHE_FLUSH
 		 */
 		r10 = in3;
+		local_irq_save(flags);
+		processor = current->processor;
 		status = ia64_pal_cache_flush(in1, in2, &r10, &r9);
+		local_irq_restore(flags);
 
 		if (status != 0)
 			panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
 			             "status %lx", status);
 
 		if (in1 == PAL_CACHE_TYPE_COHERENT) {
-			int cpu = current->processor;
 			cpus_setall(current->arch.cache_coherent_map);
-			cpu_clear(cpu, current->arch.cache_coherent_map);
+			cpu_clear(processor, current->arch.cache_coherent_map);
 			cpus_setall(cpu_cache_coherent_map);
-			cpu_clear(cpu, cpu_cache_coherent_map);
+			cpu_clear(processor, cpu_cache_coherent_map);
 		}
 		break;
 	    case PAL_PERF_MON_INFO:
