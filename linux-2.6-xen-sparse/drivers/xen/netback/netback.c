@@ -1267,7 +1267,7 @@ static void net_tx_action(unsigned long unused)
 
 		/* Check the remap error code. */
 		if (unlikely(netbk_tx_check_mop(skb, &mop))) {
-			printk(KERN_ALERT "#### netback grant fails\n");
+			DPRINTK("netback grant failed.\n");
 			skb_shinfo(skb)->nr_frags = 0;
 			kfree_skb(skb);
 			continue;
