@@ -135,7 +135,7 @@ gnttab_alloc_and_grant(void **map)
     return gref;
 }
 
-static const char *gnttabop_error_msgs[] = GNTTABOP_error_msgs;
+static const char * const gnttabop_error_msgs[] = GNTTABOP_error_msgs;
 
 const char *
 gnttabop_error(int16_t status)

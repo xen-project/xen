@@ -49,7 +49,7 @@
 #endif
 
 unsigned long *phys_to_machine_mapping;
-extern char *stack;
+extern char stack[];
 extern void page_walk(unsigned long virt_addr);
 
 void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn, 
@@ -453,7 +453,7 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
     printk("  _text:        %p\n", &_text);
     printk("  _etext:       %p\n", &_etext);
     printk("  _edata:       %p\n", &_edata);
-    printk("  stack start:  %p\n", &stack);
+    printk("  stack start:  %p\n", stack);
     printk("  _end:         %p\n", &_end);
 
     /* First page follows page table pages and 3 more pages (store page etc) */
