@@ -88,7 +88,7 @@ uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask);
 #define E820_MAP    ((struct e820entry *)(E820_MAP_PAGE + E820_MAP_OFFSET))
 
 /* Prepare the 32bit BIOS */
-int highbios_setup(void);
+void highbios_setup(void);
 
 #define isdigit(c) ((c) >= '0' && (c) <= '9')
 

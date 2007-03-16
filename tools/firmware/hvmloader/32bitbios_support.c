@@ -31,18 +31,15 @@
 #include "../rombios/32bit/jumptable.h"
 
 /* Relocate ELF file of type ET_REL */
-static int relocate_elf(char *elfarray)
+static void relocate_elf(char *elfarray)
 {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfarray;
     Elf32_Shdr *shdr = (Elf32_Shdr *)&elfarray[ehdr->e_shoff];
-    int i;
-
-    if ( ehdr->e_type != ET_REL )
-    {
-        printf("Not a relocatable BIOS object file. Has type %d, need %d\n",
-               ehdr->e_type, ET_REL);
-        return -1;
-    }
+    Elf32_Sym  *syms, *sym;
+    Elf32_Rel  *rels;
+    char       *code;
+    uint32_t   *loc, fix;
+    int i, j;
 
     for ( i = 0; i < ehdr->e_shnum; i++ )
         shdr[i].sh_addr = (Elf32_Addr)&elfarray[shdr[i].sh_offset];
@@ -50,43 +47,33 @@ static int relocate_elf(char *elfarray)
     for ( i = 0; i < ehdr->e_shnum; i++ )
     {
         if ( shdr[i].sh_type == SHT_RELA )
-            return -2;
+            printf("Unsupported section type SHT_RELA\n");
 
-        if ( shdr[i].sh_type == SHT_REL )
+        if ( shdr[i].sh_type != SHT_REL )
+            continue;
+
+        syms = (Elf32_Sym *)shdr[shdr[i].sh_link].sh_addr;
+        rels = (Elf32_Rel *)shdr[i].sh_addr;
+        code = (char      *)shdr[shdr[i].sh_info].sh_addr;
+
+        for ( j = 0; j < shdr[i].sh_size / sizeof(Elf32_Rel); j++ )
         {
-            Elf32_Shdr *targetsec = (Elf32_Shdr *)&(shdr[shdr[i].sh_info]);
-            Elf32_Shdr *symtabsec = (Elf32_Shdr *)&(shdr[shdr[i].sh_link]);
-            Elf32_Sym  *syms      = (Elf32_Sym *)symtabsec->sh_addr;
-            Elf32_Rel  *rels      = (Elf32_Rel *)shdr[i].sh_addr;
-            char *code            = (char *)targetsec->sh_addr;
-            int j;
+            sym = &syms[ELF32_R_SYM(rels[j].r_info)];
+            loc = (uint32_t *)&code[rels[j].r_offset];
+            fix = shdr[sym->st_shndx].sh_addr + sym->st_value;
 
-            /* must not have been stripped */
-            if ( shdr[i].sh_size == 0 )
-                return -6;
-
-            for ( j = 0; j < shdr[i].sh_size / sizeof(Elf32_Rel); j++ )
+            switch ( ELF32_R_TYPE(rels[j].r_info) )
             {
-                int idx           = ELF32_R_SYM(rels[j].r_info);
-                Elf32_Sym *symbol = &syms[idx];
-                uint32_t *loc     = (uint32_t *)&code[rels[j].r_offset];
-                uint32_t fix      = shdr[symbol->st_shndx].sh_addr +
-                                    symbol->st_value;
+            case R_386_PC32:
+                *loc += fix - (uint32_t)loc;
+                break;
 
-                switch ( ELF32_R_TYPE(rels[j].r_info) )
-                {
-                    case R_386_PC32:
-                        *loc += (fix - (uint32_t)loc);
-                    break;
-
-                    case R_386_32:
-                        *loc += fix;
-                    break;
-                }
+            case R_386_32:
+                *loc += fix;
+                break;
             }
         }
     }
-    return 0;
 }
 
 /* Scan the rombios for the destination of the jump table. */
@@ -97,26 +84,20 @@ static char *get_jump_table_start(void)
     for ( bios_mem = (char *)ROMBIOS_BEGIN;
           bios_mem != (char *)ROMBIOS_END;
           bios_mem++ )
-    {
-        if ( strncmp(bios_mem, "___JMPT", 7) == 0 )
+        if ( !strncmp(bios_mem, "___JMPT", 7) )
             return bios_mem;
-    }
 
     return NULL;
 }
 
 /* Copy relocated jumptable into the rombios. */
-static int copy_jumptable(char *elfarray)
+static void copy_jumptable(char *elfarray)
 {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfarray;
     Elf32_Shdr *shdr = (Elf32_Shdr *)&elfarray[ehdr->e_shoff];
-    Elf32_Shdr *shdr_strings = (Elf32_Shdr *)&shdr[ehdr->e_shstrndx];
-    char *secstrings = (char *)&elfarray[shdr_strings->sh_offset];
-    uint32_t *rombiosjumptable = (uint32_t *)get_jump_table_start();
+    char *secstrings = &elfarray[shdr[ehdr->e_shstrndx].sh_offset];
+    char *jump_table = get_jump_table_start();
     int i;
-
-    if ( rombiosjumptable == NULL )
-        return -3;
 
     /* Find the section with the jump table and copy to lower BIOS memory. */
     for ( i = 0; i < ehdr->e_shnum; i++ )
@@ -126,38 +107,39 @@ static int copy_jumptable(char *elfarray)
     if ( i == ehdr->e_shnum )
     {
         printf("Could not find " JUMPTABLE_SECTION_NAME " section in file.\n");
-        return -4;
+        return;
     }
 
-    memcpy(rombiosjumptable, (uint32_t *)shdr[i].sh_addr, shdr[i].sh_size);
+    if ( jump_table == NULL )
+    {
+        printf("Could not find jump table in file.\n");
+        return;
+    }
 
-    return 0;
+    memcpy(jump_table, (char *)shdr[i].sh_addr, shdr[i].sh_size);
 }
 
-static int relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
+static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
 {
     uint32_t mask = (64 * 1024) - 1;
     char *highbiosarea;
-    int rc;
 
     highbiosarea = (char *)(long)
         e820_malloc((elfarraysize + mask) & ~mask, /* round to 64kb */
                     E820_RESERVED,
                     (uint64_t)0xffffffff);
-
     if ( highbiosarea == NULL )
-        return -5;
+    {
+        printf("No available memory for BIOS high memory area\n");
+        return;
+    }
 
     memcpy(highbiosarea, elfarray, elfarraysize);
-    rc = relocate_elf(highbiosarea);
-    if ( rc == 0 )
-        rc = copy_jumptable(highbiosarea);
-
-    return rc;
+    relocate_elf(highbiosarea);
+    copy_jumptable(highbiosarea);
 }
 
-int highbios_setup(void)
+void highbios_setup(void)
 {
-    return relocate_32bitbios((char *)highbios_array,
-                              sizeof(highbios_array));
+    relocate_32bitbios((char *)highbios_array, sizeof(highbios_array));
 }
