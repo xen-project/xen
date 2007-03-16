@@ -137,6 +137,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
+    /* Explicitly reserve space for special pages (ioreq and xenstore). */
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE * 3;
+    e820entry[nr_map].size = PAGE_SIZE * 3;
+    e820entry[nr_map].type = E820_RESERVED;
+    nr_map++;
+
     if ( extra_mem_size )
     {
         e820entry[nr_map].addr = (1ULL << 32);
