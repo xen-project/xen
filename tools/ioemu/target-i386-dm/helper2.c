@@ -439,6 +439,18 @@ void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
     req->data = tmp1;
 }
 
+void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
+{
+    unsigned long tmp1;
+
+    if (req->data_is_ptr != 0)
+        hw_error("expected scalar value");
+
+    read_physical(req->addr, req->size, &tmp1);
+    write_physical(req->addr, req->size, &req->data);
+    req->data = tmp1;
+}
+
 void __handle_ioreq(CPUState *env, ioreq_t *req)
 {
     if (!req->data_is_ptr && req->dir == IOREQ_WRITE && req->size != 4)
@@ -462,6 +474,9 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         break;
     case IOREQ_TYPE_XOR:
         cpu_ioreq_xor(env, req);
+        break;
+    case IOREQ_TYPE_XCHG:
+        cpu_ioreq_xchg(env, req);
         break;
     default:
         hw_error("Invalid ioreq type 0x%x\n", req->type);
