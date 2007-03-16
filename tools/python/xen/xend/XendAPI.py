@@ -1550,7 +1550,7 @@ class XendAPI(object):
         return xen_api_success(self._VM_metrics_get(ref).get_vcpus_number())
 
     def VM_metrics_get_vcpus_utilisation(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_metrics_get_vcpus_utilisation())
+        return xen_api_success(self._VM_metrics_get(ref).get_vcpus_utilisation())
 
     # Xen API: Class VBD
     # ----------------------------------------------------------------
