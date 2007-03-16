@@ -229,7 +229,7 @@ void xenstore_process_logdirty_event(void)
     fprintf(logfile, "Triggered log-dirty buffer switch\n");
 
     if (!seg) {
-        char *path, *p, *key_ascii, *key_terminated[17] = {0,};
+        char *path, *p, *key_ascii, key_terminated[17] = {0,};
         key_t key;
         int shmid;
 
