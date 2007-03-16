@@ -11,6 +11,11 @@
 #include "vl.h"
 #include "block_int.h"
 #include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 static struct xs_handle *xsh = NULL;
 static char *hd_filename[MAX_DISKS];
@@ -183,6 +188,13 @@ void xenstore_parse_domain_config(int domid)
 	}
     }
 
+    /* Set a watch for log-dirty requests from the migration tools */
+    if (pasprintf(&buf, "%s/logdirty/next-active", path) != -1) {
+        xs_watch(xsh, buf, "logdirty");
+        fprintf(logfile, "Watching %s\n", buf);
+    }
+
+
  out:
     free(type);
     free(params);
@@ -201,6 +213,116 @@ int xenstore_fd(void)
     return -1;
 }
 
+unsigned long *logdirty_bitmap = NULL;
+unsigned long logdirty_bitmap_size;
+extern int vga_ram_size, bios_size;
+
+void xenstore_process_logdirty_event(void)
+{
+    char *act;
+    static char *active_path = NULL;
+    static char *next_active_path = NULL;
+    static char *seg = NULL;
+    unsigned int len;
+    int i;
+
+    fprintf(logfile, "Triggered log-dirty buffer switch\n");
+
+    if (!seg) {
+        char *path, *p, *key_ascii, *key_terminated[17] = {0,};
+        key_t key;
+        int shmid;
+
+        /* Find and map the shared memory segment for log-dirty bitmaps */
+        if (!(path = xs_get_domain_path(xsh, domid))) {            
+            fprintf(logfile, "Log-dirty: can't get domain path in store\n");
+            exit(1);
+        }
+        if (!(path = realloc(path, strlen(path) 
+                             + strlen("/logdirty/next-active") + 1))) {
+            fprintf(logfile, "Log-dirty: out of memory\n");
+            exit(1);
+        }
+        strcat(path, "/logdirty/");
+        p = path + strlen(path);
+        strcpy(p, "key");
+        
+        key_ascii = xs_read(xsh, XBT_NULL, path, &len);
+        if (!key_ascii) {
+            /* No key yet: wait for the next watch */
+            free(path);
+            return;
+        }
+        strncpy(key_terminated, key_ascii, 16);
+        free(key_ascii);
+        key = (key_t) strtoull(key_terminated, NULL, 16);
+
+        /* Figure out how bit the log-dirty bitmaps are */
+        logdirty_bitmap_size = ((phys_ram_size + 0x20 
+                                 - (vga_ram_size + bios_size)) 
+                                >> (TARGET_PAGE_BITS)); /* nr of bits in map*/
+        if (logdirty_bitmap_size > HVM_BELOW_4G_MMIO_START >> TARGET_PAGE_BITS)
+            logdirty_bitmap_size += 
+                HVM_BELOW_4G_MMIO_LENGTH >> TARGET_PAGE_BITS; /* still bits */
+        logdirty_bitmap_size = ((logdirty_bitmap_size + HOST_LONG_BITS - 1)
+                                / HOST_LONG_BITS); /* longs */
+        logdirty_bitmap_size *= sizeof (unsigned long); /* bytes */
+
+        /* Map the shared-memory segment */
+        if ((shmid = shmget(key, 
+                            2 * logdirty_bitmap_size, 
+                            S_IRUSR|S_IWUSR)) == -1 
+            || (seg = shmat(shmid, NULL, 0)) == (void *)-1) {
+            fprintf(logfile, "Log-dirty: can't map segment %16.16llx (%s)\n",
+                    (unsigned long long) key, strerror(errno));
+            exit(1);
+        }
+
+        fprintf(logfile, "Log-dirty: mapped segment at %p\n", seg);
+
+        /* Double-check that the bitmaps are the size we expect */
+        if (logdirty_bitmap_size != *(uint32_t *)seg) {
+            fprintf(logfile, "Log-dirty: got %lu, calc %lu\n", 
+                    *(uint32_t *)seg, logdirty_bitmap_size);
+            return;
+        }
+
+        /* Remember the paths for the next-active and active entries */
+        strcpy(p, "active");
+        if (!(active_path = strdup(path))) {
+            fprintf(logfile, "Log-dirty: out of memory\n");
+            exit(1);
+        }
+        strcpy(p, "next-active");
+        if (!(next_active_path = strdup(path))) {
+            fprintf(logfile, "Log-dirty: out of memory\n");
+            exit(1);
+        }
+        free(path);
+    }
+    
+    /* Read the required active buffer from the store */
+    act = xs_read(xsh, XBT_NULL, next_active_path, &len);
+    if (!act) {
+        fprintf(logfile, "Log-dirty: can't read next-active\n");
+        exit(1);
+    }
+
+    /* Switch buffers */
+    i = act[0] - '0';
+    if (i != 0 && i != 1) {
+        fprintf(logfile, "Log-dirty: bad next-active entry: %s\n", act);
+        exit(1);
+    }
+    logdirty_bitmap = seg + i * logdirty_bitmap_size;
+
+    /* Ack that we've switched */
+    xs_write(xsh, XBT_NULL, active_path, act, len);
+    free(act);
+}
+
+
+
 void xenstore_process_event(void *opaque)
 {
     char **vec, *image = NULL;
@@ -209,6 +331,11 @@ void xenstore_process_event(void *opaque)
     vec = xs_read_watch(xsh, &num);
     if (!vec)
 	return;
+
+    if (!strcmp(vec[XS_WATCH_TOKEN], "logdirty")) {
+        xenstore_process_logdirty_event();
+        goto out;
+    }
 
     if (strncmp(vec[XS_WATCH_TOKEN], "hd", 2) ||
 	strlen(vec[XS_WATCH_TOKEN]) != 3)
