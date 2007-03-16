@@ -27,17 +27,17 @@
 
 void outb(uint16_t addr, uint8_t val)
 {
-    __asm__ __volatile__ ( "outb %%al, %%dx" :: "d"(addr), "a"(val) );
+    __asm__ __volatile__ ( "outb %%al, %%dx" : : "d" (addr), "a" (val) );
 }
 
 void outw(uint16_t addr, uint16_t val)
 {
-    __asm__ __volatile__ ( "outw %%ax, %%dx" :: "d"(addr), "a"(val) );
+    __asm__ __volatile__ ( "outw %%ax, %%dx" : : "d" (addr), "a" (val) );
 }
 
 void outl(uint16_t addr, uint32_t val)
 {
-    __asm__ __volatile__ ( "outl %%eax, %%dx" :: "d"(addr), "a"(val) );
+    __asm__ __volatile__ ( "outl %%eax, %%dx" : : "d" (addr), "a" (val) );
 }
 
 uint8_t inb(uint16_t addr)
@@ -59,6 +59,18 @@ uint32_t inl(uint16_t addr)
     uint32_t val;
     __asm__ __volatile__ ( "inl %%dx,%%eax" : "=a" (val) : "d" (addr) );
     return val;
+}
+
+uint8_t cmos_inb(uint8_t idx)
+{
+    outb(0x70, idx);
+    return inb(0x71);
+}
+
+void cmos_outb(uint8_t idx, uint8_t val)
+{
+    outb(0x70, idx);
+    outb(0x71, val);
 }
 
 char *itoa(char *a, unsigned int i)
@@ -280,9 +292,6 @@ uuid_to_string(char *dest, uint8_t *uuid)
     *p = '\0';
 }
 
-#include <xen/hvm/e820.h>
-#define E820_MAP_NR ((unsigned char *)E820_MAP_PAGE + E820_MAP_NR_OFFSET)
-#define E820_MAP    ((struct e820entry *)(E820_MAP_PAGE + E820_MAP_OFFSET))
 uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask)
 {
     uint64_t addr = 0;

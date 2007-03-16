@@ -22,7 +22,6 @@
 
 #include <stdint.h>
 #include <xen/version.h>
-#include <xen/hvm/e820.h>
 #include "smbios.h"
 #include "smbios_types.h"
 #include "util.h"
@@ -129,47 +128,32 @@ write_smbios_tables(void *start,
     return (size_t)((char *)p - (char *)start);
 }
 
-/* This tries to figure out how much pseudo-physical memory (in MB)
-   is allocated to the current domU.
-
-   It iterates through the e820 table, adding up the 'usable' and
-   'reserved' entries and rounding up to the nearest MB.
-
-   The e820map is not at e820 in hvmloader, so this uses the
-   E820_MAP_* constants from e820.h to pick it up where libxenguest
-   left it.
- */
+/* Calculate how much pseudo-physical memory (in MB) is allocated to us. */
 static uint64_t
 get_memsize(void)
 {
-    struct e820entry *map = NULL;
-    uint8_t num_entries = 0;
+    struct e820entry *map = E820_MAP;
+    uint8_t num_entries = *E820_MAP_NR;
     uint64_t memsize = 0;
-    uint8_t i;
+    int i;
 
-    map = (struct e820entry *) (E820_MAP_PAGE + E820_MAP_OFFSET);
-    num_entries = *((uint8_t *) (E820_MAP_PAGE + E820_MAP_NR_OFFSET));
-
-    /* walk through e820map, ignoring any entries that aren't marked
-       as usable or reserved. */
-
+    /*
+     * Walk through e820map, ignoring any entries that aren't marked
+     * as usable or reserved.
+     */
     for ( i = 0; i < num_entries; i++ )
     {
-        if (map->type == E820_RAM || map->type == E820_RESERVED)
+        if ( (map->type == E820_RAM) || (map->type == E820_RESERVED) )
             memsize += map->size;
         map++;
     }
 
-    /* Round up to the nearest MB.  The user specifies domU
-       pseudo-physical memory in megabytes, so not doing this
-       could easily lead to reporting one less MB than the user
-       specified. */
-    if ( memsize & ((1<<20)-1) )
-        memsize = (memsize >> 20) + 1;
-    else
-        memsize = (memsize >> 20);
-
-    return memsize;
+    /*
+     * Round up to the nearest MB.  The user specifies domU pseudo-physical 
+     * memory in megabytes, so not doing this could easily lead to reporting 
+     * one less MB than the user specified.
+     */
+    return (memsize + (1 << 20) - 1) >> 20;
 }
 
 void

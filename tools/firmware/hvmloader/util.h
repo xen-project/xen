@@ -26,6 +26,10 @@ uint8_t  inb(uint16_t addr);
 uint16_t inw(uint16_t addr);
 uint32_t inl(uint16_t addr);
 
+/* CMOS access */
+uint8_t cmos_inb(uint8_t idx);
+void cmos_outb(uint8_t idx, uint8_t val);
+
 /* APIC access */
 uint32_t ioapic_read(uint32_t reg);
 void ioapic_write(uint32_t reg, uint32_t val);
@@ -78,9 +82,13 @@ int vprintf(const char *fmt, va_list ap);
 /* Allocate region of specified type in the e820 table. */
 uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask);
 
+/* General e820 access. */
+#include <xen/hvm/e820.h>
+#define E820_MAP_NR ((unsigned char *)E820_MAP_PAGE + E820_MAP_NR_OFFSET)
+#define E820_MAP    ((struct e820entry *)(E820_MAP_PAGE + E820_MAP_OFFSET))
+
 /* Prepare the 32bit BIOS */
 int highbios_setup(void);
-
 
 #define isdigit(c) ((c) >= '0' && (c) <= '9')
 
