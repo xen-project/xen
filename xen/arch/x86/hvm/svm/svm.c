@@ -449,6 +449,9 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->rflags = c->eflags;
 
     v->arch.hvm_svm.cpu_shadow_cr0 = c->cr0;
+    vmcb->cr0 = c->cr0 | X86_CR0_WP | X86_CR0_ET;
+    if ( !paging_mode_hap(v->domain) ) 
+        vmcb->cr0 |= X86_CR0_PG;
 
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
@@ -566,7 +569,7 @@ void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_star         = vmcb->star;
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
-    data->msr_efer         = vmcb->efer;
+    data->msr_efer         = v->arch.hvm_svm.cpu_shadow_efer;
 
     data->tsc = hvm_get_guest_time(v);
 }
@@ -581,7 +584,12 @@ void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     vmcb->star       = data->msr_star;
     vmcb->cstar      = data->msr_cstar;
     vmcb->sfmask     = data->msr_syscall_mask;
-    vmcb->efer       = data->msr_efer;
+    v->arch.hvm_svm.cpu_shadow_efer = data->msr_efer;
+    vmcb->efer       = data->msr_efer | EFER_SVME;
+    /* VMCB's EFER.LME isn't set unless we're actually in long mode
+     * (see long_mode_do_msr_write()) */
+    if ( !(vmcb->efer & EFER_LMA) )
+        vmcb->efer &= ~EFER_LME;
 
     hvm_set_guest_time(v, data->tsc);
 }
