@@ -1057,6 +1057,7 @@ int tdqcow_queue_write(struct disk_driver *dd, uint64_t sector,
 						    index_in_cluster+n);
 		if (!cluster_offset) {
 			DPRINTF("Ooops, no write cluster offset!\n");
+			aio_unlock(s, sector);
 			return cb(dd, -EIO, sector, nb_sectors, id, private);
 		}
 
