@@ -58,19 +58,7 @@ HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/svm/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/vmx/*.h)
 
-# Test for at least GCC v3.2.x.
-gcc-ver = $(shell $(CC) -dumpversion | sed -e 's/^\(.\)\.\(.\)\.\(.\)/\$(1)/')
-ifeq ($(call gcc-ver,1),1)
-$(error gcc-1.x.x unsupported - upgrade to at least gcc-3.2.x)
-endif
-ifeq ($(call gcc-ver,1),2)
-$(error gcc-2.x.x unsupported - upgrade to at least gcc-3.2.x)
-endif
-ifeq ($(call gcc-ver,1),3)
-ifeq ($(call gcc-ver,2),0)
-$(error gcc-3.0.x unsupported - upgrade to at least gcc-3.2.x)
-endif
-ifeq ($(call gcc-ver,2),1)
-$(error gcc-3.1.x unsupported - upgrade to at least gcc-3.2.x)
-endif
+# Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
+ifneq ($(call cc-ver,$(CC),0x030400),y)
+$(error Xen requires at least gcc-3.4)
 endif

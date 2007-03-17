@@ -23,6 +23,11 @@ LDFLAGS += $(shell getconf LFS_LDFLAGS)
 CFLAGS-$(CONFIG_X86_32) += $(call cc-option,$(CC),-mno-tls-direct-seg-refs)
 CFLAGS += $(CFLAGS-y)
 
+# Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
+ifeq ($(CONFIG_X86)$(call cc-ver,$(CC),0x030400),yn)
+$(error Xen tools require at least gcc-3.4)
+endif
+
 %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
 
