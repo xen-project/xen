@@ -796,7 +796,7 @@ def parse_doms_info(info):
         else:
             parsed_info['cpu_time'] = 0
     else:
-        parsed_info['mem'] = get_info('memory_dynamic_min', int,0)
+        parsed_info['mem'] = get_info('memory', int,0)
         parsed_info['cpu_time'] = get_info('cpu_time', float, 0.0)
 
     return parsed_info
