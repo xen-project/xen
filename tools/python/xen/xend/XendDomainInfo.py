@@ -576,7 +576,7 @@ class XendDomainInfo:
         if target <= 0:
             raise XendError('Invalid memory size')
         
-        self.info['memory_static_min'] = target
+        self.info['memory_static_min'] = target * 1024 * 1024
         if self.domid >= 0:
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
@@ -664,6 +664,10 @@ class XendDomainInfo:
                 if arg in XendConfig.LEGACY_CFG_TO_XENAPI_CFG:
                     xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
                     self.info[xapiarg] = val
+                elif arg == "memory":
+                    self.info["static_memory_min"] = val
+                elif arg == "maxmem":
+                    self.info["static_memory_max"] = val
                 else:
                     self.info[arg] = val
 
@@ -780,7 +784,7 @@ class XendDomainInfo:
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
-            'memory/target':      str(self.info['memory_static_min'] * 1024),
+            'memory/target':      str(self.info['memory_dynamic_max'] / 1024),
             }
 
         def f(n, v):
@@ -864,7 +868,15 @@ class XendDomainInfo:
                 xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
                 if val != None and val != self.info[xapiarg]:
                     self.info[xapiarg] = val
-                    changed= True
+                    changed = True
+            elif arg == "memory":
+                if val != None and val != self.info["static_memory_min"]:
+                    self.info["static_memory_min"] = val
+                    changed = True
+            elif arg == "maxmem":
+                if val != None and val != self.info["static_memory_max"]:
+                    self.info["static_memory_max"] = val
+                    changed = True
 
         # Check whether image definition has been updated
         image_sxp = self._readVm('image')
@@ -969,11 +981,12 @@ class XendDomainInfo:
 
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
-        return self.info['memory_static_min'] * 1024
+        return self.info['memory_static_min'] / 1024
 
     def getMemoryMaximum(self):
         """Get this domain's maximum memory size, in KB."""
-        return self.info['memory_static_max'] * 1024
+        # remember, info now stores memory in bytes
+        return self.info['memory_static_max'] / 1024
 
     def getResume(self):
         return str(self._resume)
@@ -1455,13 +1468,14 @@ class XendDomainInfo:
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
             # values. maxmem, memory, and shadow are all in KiB.
+            # but memory_static_max etc are all stored in bytes now.
             memory = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_min'] * 1024)
+                self.info['memory_static_min'] / 1024)
             maxmem = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_max'] * 1024)
+                self.info['memory_static_max'] / 1024)
             shadow = self.image.getRequiredShadowMemory(
-                self.info['shadow_memory'] * 1024,
-                self.info['memory_static_max'] * 1024)
+                self.info['shadow_memory'] / 1024,
+                self.info['memory_static_max'] / 1024)
 
             log.debug("_initDomain:shadow_memory=0x%x, memory_static_max=0x%x, memory_static_min=0x%x.", self.info['shadow_memory'], self.info['memory_static_max'], self.info['memory_static_min'],)
             # Round shadow up to a multiple of a MiB, as shadow_mem_control
@@ -1650,7 +1664,18 @@ class XendDomainInfo:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
         from xen.xend import XendDomain
-        XendDomain.instance().remove_domain(self)
+
+        if "transient" in self.info["other_config"]\
+           and bool(self.info["other_config"]["transient"]):
+            xendDomainInstance = XendDomain.instance()
+            
+            xendDomainInstance.domains_lock.acquire()
+            xendDomainInstance._refresh(refresh_shutdown = False)
+            xendDomainInstance.domains_lock.release()
+            
+            xendDomainInstance.domain_delete(self.info["name_label"])
+        else:
+            XendDomain.instance().remove_domain(self)
 
         self.cleanupDomain()
         self._cleanup_phantom_devs(paths)
@@ -1833,7 +1858,7 @@ class XendDomainInfo:
             # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
             # the minimum that Xen would allocate if no value were given.
             overhead_kb = self.info['vcpus_number'] * 1024 + \
-                          self.info['memory_static_max'] * 4
+                          (self.info['memory_static_max'] / 1024 / 1024) * 4
             overhead_kb = ((overhead_kb + 1023) / 1024) * 1024
             # The domain might already have some shadow memory
             overhead_kb -= xc.shadow_mem_control(self.domid) * 1024
@@ -1898,6 +1923,11 @@ class XendDomainInfo:
             info_key = XendConfig.LEGACY_CFG_TO_XENAPI_CFG.get(key, key)
             if self._infoIsSet(info_key):
                 to_store[key] = str(self.info[info_key])
+
+        if self._infoIsSet("static_memory_min"):
+            to_store["memory"] = str(self.info["static_memory_min"])
+        if self._infoIsSet("static_memory_max"):
+            to_store["maxmem"] = str(self.info["static_memory_max"])
 
         image_sxpr = self.info.image_sxpr()
         if image_sxpr:

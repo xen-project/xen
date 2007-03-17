@@ -530,7 +530,8 @@ class XendNode:
                            info['cores_per_socket'] *
                            info['threads_per_core'])
         info['cpu_mhz'] = info['cpu_khz'] / 1000
-        # physinfo is in KiB
+        
+        # physinfo is in KiB, need it in MiB
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
 
