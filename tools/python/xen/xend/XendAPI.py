@@ -1811,13 +1811,13 @@ class XendAPI(object):
     VDI_attr_ro = ['SR',
                    'VBDs',
                    'physical_utilisation',
-                   'sector_size',
                    'type']
     VDI_attr_rw = ['name_label',
                    'name_description',
                    'virtual_size',
                    'sharable',
-                   'read_only']
+                   'read_only',
+                   'other_config']
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
     VDI_methods = [('snapshot', 'VDI')]
@@ -1832,10 +1832,7 @@ class XendAPI(object):
     
     def VDI_get_physical_utilisation(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).
-                               get_physical_utilisation())        
-    
-    def VDI_get_sector_size(self, session, vdi_ref):
-        return xen_api_success(self._get_VDI(vdi_ref).sector_size)        
+                               get_physical_utilisation())              
     
     def VDI_get_type(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).type)
@@ -1877,6 +1874,14 @@ class XendAPI(object):
         self._get_VDI(vdi_ref).read_only = bool(value)
         return xen_api_success_void()
 
+    def VDI_get_other_config(self, session, vdi_ref):
+        return xen_api_success(
+            self._get_VDI(vdi_ref).other_config)
+
+    def VDI_set_other_config(self, session, vdi_ref, other_config):
+        self._get_VDI(vdi_ref).other_config = other_config
+        return xen_api_success_void()
+
     # Object Methods
     def VDI_snapshot(self, session, vdi_ref):
         return xen_api_todo()
@@ -1896,10 +1901,10 @@ class XendAPI(object):
             'VBDs': [], # TODO
             'virtual_size': image.virtual_size,
             'physical_utilisation': image.physical_utilisation,
-            'sector_size': image.sector_size,
             'type': image.type,
             'sharable': image.sharable,
             'read_only': image.read_only,
+            'other_config': image.other_config
             })
 
     # Class Functions    

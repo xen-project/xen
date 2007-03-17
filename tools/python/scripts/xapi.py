@@ -40,8 +40,7 @@ VM_LIST_FORMAT = '%(name_label)-18s %(memory_actual)-5s %(VCPUs_number)-5s'\
                  ' %(power_state)-10s %(uuid)-36s'
 SR_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(physical_size)-10s' \
                  '%(type)-10s'
-VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s '\
-                  '%(sector_size)-8s'
+VDI_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(virtual_size)-8s'
 VBD_LIST_FORMAT = '%(device)-6s %(uuid)-36s %(VDI)-8s'
 TASK_LIST_FORMAT = '%(name_label)-18s %(uuid)-36s %(status)-8s %(progress)-4s'
 VIF_LIST_FORMAT = '%(name)-8s %(device)-7s %(uuid)-36s %(MAC)-10s'
@@ -96,12 +95,9 @@ OPTIONS = {
     
     'vdi-create': [(('--name-label',), {'help': 'Name for VDI'}),
                    (('--name-description',), {'help': 'Description for VDI'}),
-                   (('--sector-size',), {'type': 'int',
-                                         'help': 'Sector size',
-                                         'default': 0}),
                    (('--virtual-size',), {'type': 'int',
                                           'default': 0,
-                                          'help': 'Size of VDI in sectors'}),
+                                          'help': 'Size of VDI in bytes'}),
                    (('--type',), {'choices': ['system', 'user', 'ephemeral'],
                                   'default': 'system',
                                   'help': 'VDI type'}),
@@ -569,8 +565,7 @@ def xapi_vdi_list(args, async = False):
     if not is_long:
         print VDI_LIST_FORMAT % {'name_label': 'VDI Label',
                                  'uuid' : 'UUID',
-                                 'virtual_size': 'Bytes',
-                                 'sector_size': 'Sector Size'}
+                                 'virtual_size': 'Bytes'}
         
         for vdi in vdis:
             vdi_struct = execute(server, 'VDI.get_record', (session, vdi))
