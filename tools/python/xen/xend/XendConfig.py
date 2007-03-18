@@ -28,7 +28,7 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 
 log = logging.getLogger("xend.XendConfig")
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.WARN)
 
 
 """
