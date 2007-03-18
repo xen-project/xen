@@ -314,7 +314,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
     {
         info_dict = Py_BuildValue(
             "{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-            ",s:k,s:L,s:k,s:i,s:i}",
+            ",s:L,s:L,s:L,s:i,s:i}",
             "domid",           (int)info[i].domid,
             "online_vcpus",    info[i].nr_online_vcpus,
             "max_vcpu_id",     info[i].max_vcpu_id,
@@ -325,9 +325,9 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
             "paused",          info[i].paused,
             "blocked",         info[i].blocked,
             "running",         info[i].running,
-            "mem_kb",          info[i].nr_pages*(XC_PAGE_SIZE/1024),
+            "mem_kb",          (long long)info[i].nr_pages*(XC_PAGE_SIZE/1024),
             "cpu_time",        (long long)info[i].cpu_time,
-            "maxmem_kb",       info[i].max_memkb,
+            "maxmem_kb",       (long long)info[i].max_memkb,
             "ssidref",         (int)info[i].ssidref,
             "shutdown_reason", info[i].shutdown_reason);
         pyhandle = PyList_New(sizeof(xen_domain_handle_t));
