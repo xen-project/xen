@@ -311,23 +311,25 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
         PyObject *pyhandle = PyList_New(sizeof(xen_domain_handle_t));
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
             PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
-        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-                                  ",s:l,s:L,s:l,s:i,s:i}",
-                                  "domid",       info[i].domid,
-                                  "online_vcpus", info[i].nr_online_vcpus,
-                                  "max_vcpu_id", info[i].max_vcpu_id,
-                                  "hvm",       info[i].hvm,
-                                  "dying",     info[i].dying,
-                                  "crashed",   info[i].crashed,
-                                  "shutdown",  info[i].shutdown,
-                                  "paused",    info[i].paused,
-                                  "blocked",   info[i].blocked,
-                                  "running",   info[i].running,
-                                  "mem_kb",    info[i].nr_pages*(XC_PAGE_SIZE/1024),
-                                  "cpu_time",  info[i].cpu_time,
-                                  "maxmem_kb", info[i].max_memkb,
-                                  "ssidref",   info[i].ssidref,
-                                  "shutdown_reason", info[i].shutdown_reason);
+        info_dict = Py_BuildValue(
+            "{s:i,s:I,s:I,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+            ",s:k,s:L,s:k,s:i,s:I}",
+            "domid",           (int)info[i].domid,
+            "online_vcpus",    info[i].nr_online_vcpus,
+            "max_vcpu_id",     info[i].max_vcpu_id,
+            "hvm",             info[i].hvm,
+            "dying",           info[i].dying,
+            "crashed",         info[i].crashed,
+            "shutdown",        info[i].shutdown,
+            "paused",          info[i].paused,
+            "blocked",         info[i].blocked,
+            "running",         info[i].running,
+            
+            "mem_kb",          info[i].nr_pages*(XC_PAGE_SIZE/1024),
+            "cpu_time",        (long long)info[i].cpu_time,
+            "maxmem_kb",       info[i].max_memkb,
+            "ssidref",         (int)info[i].ssidref,
+            "shutdown_reason", info[i].shutdown_reason);
         PyDict_SetItemString(info_dict, "handle", pyhandle);
         Py_DECREF(pyhandle);
         PyList_SetItem(list, i, info_dict);
