@@ -35,7 +35,6 @@ from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
 from xen.util import security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
-from xen.xm.xenapi_create import sxp2xml, xenapi_create
 
 from xen.xm.opts import *
 
@@ -1249,6 +1248,7 @@ def main(argv):
             raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
 
     if serverType == SERVER_XEN_API:
+        from xen.xm.xenapi_create import sxp2xml
         sxp2xml_inst = sxp2xml()
         doc = sxp2xml_inst.convert_sxp_to_xml(config, transient=True)
 
@@ -1266,6 +1266,7 @@ def main(argv):
         do_console(sxp.child_value(config, 'name', -1))
     
     if serverType == SERVER_XEN_API:        
+        from xen.xm.xenapi_create import xenapi_create
         xenapi_create_inst = xenapi_create()
         vm_refs = xenapi_create_inst.create(document = doc)
 
