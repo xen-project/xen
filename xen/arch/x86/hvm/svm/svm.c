@@ -749,6 +749,14 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 static void svm_init_ap_context(
     struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
+    struct vcpu *v;
+    cpu_user_regs_t *regs;
+    u16 cs_sel;
+
+    /* We know this is safe because hvm_bringup_ap() does it */
+    v = current->domain->vcpu[vcpuid];
+    regs = &v->arch.guest_context.user_regs;
+
     memset(ctxt, 0, sizeof(*ctxt));
 
     /*
@@ -756,8 +764,19 @@ static void svm_init_ap_context(
      * passed to us is page alligned and is the physicall frame number for
      * the code. We will execute this code in real mode. 
      */
+    cs_sel = trampoline_vector << 8;
     ctxt->user_regs.eip = 0x0;
-    ctxt->user_regs.cs = (trampoline_vector << 8);
+    ctxt->user_regs.cs = cs_sel;
+
+    /*
+     * This is the launch of an AP; set state so that we begin executing
+     * the trampoline code in real-mode.
+     */
+    svm_do_vmmcall_reset_to_realmode(v, regs);  
+    /* Adjust the vmcb's hidden register state. */
+    v->arch.hvm_svm.vmcb->rip = 0;
+    v->arch.hvm_svm.vmcb->cs.sel = cs_sel;
+    v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -910,21 +929,6 @@ static void arch_svm_do_launch(struct vcpu *v)
         v->arch.hvm_svm.vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
 
-    if ( v->vcpu_id != 0 )
-    {
-        cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
-        u16 cs_sel = regs->cs;
-        /*
-         * This is the launch of an AP; set state so that we begin executing
-         * the trampoline code in real-mode.
-         */
-        svm_do_vmmcall_reset_to_realmode(v, regs);  
-        /* Adjust the state to execute the trampoline code.*/
-        v->arch.hvm_svm.vmcb->rip = 0;
-        v->arch.hvm_svm.vmcb->cs.sel= cs_sel;
-        v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
-    }
-      
     reset_stack_and_jump(svm_asm_do_launch);
 }
 
