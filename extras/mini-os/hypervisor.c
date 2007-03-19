@@ -35,8 +35,8 @@
 
 void do_hypervisor_callback(struct pt_regs *regs)
 {
-    u32 	       l1, l2;
-    unsigned int   l1i, l2i, port;
+    unsigned long  l1, l2, l1i, l2i;
+    unsigned int   port;
     int            cpu = 0;
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
