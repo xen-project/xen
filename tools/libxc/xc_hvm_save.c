@@ -302,9 +302,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* The size of an array big enough to contain all guest pfns */
     unsigned long pfn_array_size;
 
-    /* The new domain's shared-info frame number. */
-    unsigned long shared_info_frame;
-
     /* Other magic frames: ioreqs and xenstore comms */
     unsigned long ioreq_pfn, bufioreq_pfn, store_pfn;
 
@@ -317,9 +314,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A copy of hvm domain context buffer*/
     uint32_t hvm_buf_size;
     uint8_t *hvm_buf = NULL;
-
-    /* Live mapping of shared info structure */
-    shared_info_t *live_shinfo = NULL;
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
@@ -372,19 +366,11 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("HVM:Could not get vcpu context");
         goto out;
     }
-    shared_info_frame = info.shared_info_frame;
 
     /* cheesy sanity check */
     if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
         ERROR("Invalid HVM state record -- pfn count out of range: %lu",
             (info.max_memkb >> (PAGE_SHIFT - 10)));
-        goto out;
-    }
-
-    /* Map the shared info frame */
-    if(!(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                            PROT_READ, shared_info_frame))) {
-        ERROR("HVM:Couldn't map live_shinfo");
         goto out;
     }
 
@@ -524,13 +510,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         N=0;
 
         DPRINTF("Saving HVM domain memory pages: iter %d   0%%", iter);
-
-        if (last_iter && (max_pfn != live_shinfo->arch.max_pfn)) {
-            DPRINTF("calculated max_pfn as %#lx, shinfo says %#lx\n",
-                    max_pfn, live_shinfo->arch.max_pfn);
-            ERROR("Max pfn doesn't match shared info");
-            goto out;
-        }
 
         while( N < pfn_array_size ){
 
@@ -679,8 +658,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     goto out;
                 }
 
-                DPRINTF("SUSPEND shinfo %08lx eip %08lx edx %08lx\n",
-                        info.shared_info_frame,
+                DPRINTF("SUSPEND eip %08lx edx %08lx\n",
                         (unsigned long)ctxt.user_regs.eip,
                         (unsigned long)ctxt.user_regs.edx);
             }
@@ -768,12 +746,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("write HVM info failed!\n");
     }
 
-    /* Shared-info pfn */
-    if (!write_exact(io_fd, &(shared_info_frame), sizeof(uint32_t)) ) {
-        ERROR("write shared-info pfn failed!\n");
-        goto out;
-    }
- 
     /* Success! */
     rc = 0;
 

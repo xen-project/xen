@@ -36,7 +36,6 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/shadow.h>
-#include <asm/shared.h>
 #include "private.h"
 
 
@@ -2672,7 +2671,7 @@ sh_alloc_log_dirty_bitmap(struct domain *d)
 {
     ASSERT(d->arch.paging.shadow.dirty_bitmap == NULL);
     d->arch.paging.shadow.dirty_bitmap_size =
-        (arch_get_max_pfn(d) + (BITS_PER_LONG - 1)) &
+        (domain_get_maximum_gpfn(d) + (BITS_PER_LONG - 1)) &
         ~(BITS_PER_LONG - 1);
     d->arch.paging.shadow.dirty_bitmap =
         xmalloc_array(unsigned long,
@@ -2682,7 +2681,8 @@ sh_alloc_log_dirty_bitmap(struct domain *d)
         d->arch.paging.shadow.dirty_bitmap_size = 0;
         return -ENOMEM;
     }
-    memset(d->arch.paging.shadow.dirty_bitmap, 0, d->arch.paging.shadow.dirty_bitmap_size/8);
+    memset(d->arch.paging.shadow.dirty_bitmap, 0,
+           d->arch.paging.shadow.dirty_bitmap_size/8);
 
     return 0;
 }

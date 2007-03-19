@@ -70,9 +70,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 {
     DECLARE_DOMCTL;
 
-    /* The new domain's shared-info frame number. */
-    unsigned long shared_info_frame;
-
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
@@ -86,8 +83,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     uint8_t *hvm_buf = NULL;
     unsigned long long v_end, memsize;
     unsigned long shared_page_nr;
-    shared_info_t *shared_info = NULL;
-    xen_pfn_t arch_max_pfn;
 
     unsigned long pfn;
     unsigned int prev_pc, this_pc;
@@ -95,8 +90,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 
     /* Types of the pfns in the current region */
     unsigned long region_pfn_type[MAX_BATCH_SIZE];
-
-    struct xen_add_to_physmap xatp;
 
     /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
     unsigned long nr_pages;
@@ -146,7 +139,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         pfns[i] = i;
     for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < pfn_array_size; i++ )
         pfns[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-    arch_max_pfn = pfns[max_pfn];/* used later */
 
     /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
     rc = xc_domain_memory_populate_physmap(
@@ -349,29 +341,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         ERROR("error set hvm buffer!\n");
         goto out;
     }
-
-    /* Shared-info pfn */
-    if (!read_exact(io_fd, &(shared_info_frame), sizeof(uint32_t)) ) {
-        ERROR("reading the shared-info pfn failed!\n");
-        goto out;
-    }
-    /* Map the shared-info frame where it was before */
-    xatp.domid = dom;
-    xatp.space = XENMAPSPACE_shared_info;
-    xatp.idx   = 0;
-    xatp.gpfn  = shared_info_frame;
-    if ( (rc = xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp)) != 0 ) {
-        ERROR("setting the shared-info pfn failed!\n");
-        goto out;
-    }
-    if ( (xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp) != 0) ||
-         ((shared_info = xc_map_foreign_range(
-             xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-             shared_info_frame)) == NULL) )
-        goto out;
-    /* shared_info.arch.max_pfn is used by dump-core */
-    shared_info->arch.max_pfn = arch_max_pfn;
-    munmap(shared_info, PAGE_SIZE);
 
     rc = 0;
     goto out;

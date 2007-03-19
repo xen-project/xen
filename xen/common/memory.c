@@ -584,6 +584,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
+    case XENMEM_maximum_gpfn:
         if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
 
@@ -594,7 +595,19 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         else if ( (d = rcu_lock_domain_by_id(domid)) == NULL )
             return -ESRCH;
 
-        rc = (op == XENMEM_current_reservation) ? d->tot_pages : d->max_pages;
+        switch ( op )
+        {
+        case XENMEM_current_reservation:
+            rc = d->tot_pages;
+            break;
+        case XENMEM_maximum_reservation:
+            rc = d->max_pages;
+            break;
+        default:
+            ASSERT(op == XENMEM_maximum_gpfn);
+            rc = domain_get_maximum_gpfn(d);
+            break;
+        }
 
         if ( unlikely(domid != DOMID_SELF) )
             rcu_unlock_domain(d);

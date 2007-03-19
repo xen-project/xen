@@ -21,12 +21,15 @@
 #include "xg_private.h"
 #include "xc_core.h"
 
+static int max_gpfn(int xc_handle, domid_t domid)
+{
+    return xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid);
+}
+
 int
 xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
 {
-    if ( info->hvm )
-        return 1;
-    return 0;
+    return info->hvm;
 }
 
 int
@@ -35,14 +38,14 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
-    unsigned long max_pfn = live_shinfo->arch.max_pfn;
-    xc_core_memory_map_t *map = NULL;
+    unsigned long max_pfn = max_gpfn(xc_handle, info->domid);
+    xc_core_memory_map_t *map;
 
     map = malloc(sizeof(*map));
-    if ( !map )
+    if ( map == NULL )
     {
         PERROR("Could not allocate memory");
-        goto out;
+        return -1;
     }
 
     map->addr = 0;
@@ -51,11 +54,6 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
     *mapp = map;
     *nr_entries = 1;
     return 0;
-
-out:
-    if ( map )
-        free(map);
-    return -1;
 }
 
 int
@@ -67,7 +65,7 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
     xen_pfn_t *live_p2m_frame_list_list = NULL;
     xen_pfn_t *live_p2m_frame_list = NULL;
     uint32_t dom = info->domid;
-    unsigned long max_pfn = live_shinfo->arch.max_pfn;
+    unsigned long max_pfn = max_gpfn(xc_handle, info->domid);
     int ret = -1;
     int err;
 

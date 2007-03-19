@@ -278,4 +278,6 @@ extern int steal_page(struct domain *d, struct page_info *page,
 
 #define domain_clamp_alloc_bitsize(d, b) (b)
 
+#define domain_get_maximum_gpfn(d) (-ENOSYS)
+
 #endif

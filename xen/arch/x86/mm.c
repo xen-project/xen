@@ -108,6 +108,7 @@
 #include <asm/x86_emulate.h>
 #include <asm/e820.h>
 #include <asm/hypercall.h>
+#include <asm/shared.h>
 #include <public/memory.h>
 
 #define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING , _f "\n" , ## _a)
@@ -244,6 +245,11 @@ int memory_is_conventional_ram(paddr_t p)
     }
 
     return 0;
+}
+
+unsigned long domain_get_maximum_gpfn(struct domain *d)
+{
+    return is_hvm_domain(d) ? d->arch.p2m.max_mapped_pfn : arch_get_max_pfn(d);
 }
 
 void share_xen_page_with_guest(
