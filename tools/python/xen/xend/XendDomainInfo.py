@@ -576,12 +576,14 @@ class XendDomainInfo:
         if target <= 0:
             raise XendError('Invalid memory size')
         
-        self.info['memory_static_min'] = target * 1024 * 1024
+        MiB = 1024 * 1024
+        self.info['memory_dynamic_min'] = target * MiB
+        self.info['memory_dynamic_max'] = target * MiB
+
         if self.domid >= 0:
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
         else:
-            self.info['memory_dynamic_min'] = target
             xen.xend.XendDomain.instance().managed_config_save(self)
 
     def setMemoryMaximum(self, limit):
@@ -981,7 +983,7 @@ class XendDomainInfo:
 
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
-        return self.info['memory_static_min'] / 1024
+        return self.info['memory_dynamic_max'] / 1024
 
     def getMemoryMaximum(self):
         """Get this domain's maximum memory size, in KB."""
@@ -1470,7 +1472,7 @@ class XendDomainInfo:
             # values. maxmem, memory, and shadow are all in KiB.
             # but memory_static_max etc are all stored in bytes now.
             memory = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_min'] / 1024)
+                self.info['memory_dynamic_max'] / 1024)
             maxmem = self.image.getRequiredAvailableMemory(
                 self.info['memory_static_max'] / 1024)
             shadow = self.image.getRequiredShadowMemory(
@@ -2018,7 +2020,11 @@ class XendDomainInfo:
             info = dom_get(self.domid)
             if not info:
                 return
-            
+
+        if info["maxmem_kb"] < 0:
+            info["maxmem_kb"] = XendNode.instance() \
+                                .physinfo_dict()['total_memory'] * 1024
+
         #manually update ssidref / security fields
         if security.on() and info.has_key('ssidref'):
             if (info['ssidref'] != 0) and self.info.has_key('security'):
@@ -2402,7 +2408,7 @@ class XendDomainInfo:
     def __str__(self):
         return '<domain id=%s name=%s memory=%s state=%s>' % \
                (str(self.domid), self.info['name_label'],
-                str(self.info['memory_static_min']), DOM_STATES[self.state])
+                str(self.info['memory_dynamic_max']), DOM_STATES[self.state])
 
     __repr__ = __str__
 
