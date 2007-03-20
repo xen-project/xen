@@ -642,7 +642,7 @@ void thash_init(thash_cb_t *hcb, u64 sz)
     }while(num);
     
     hcb->cch_freelist = p = hcb->cch_buf;
-    num = (hcb->cch_sz/sizeof(thash_data_t))-1;
+    num = hcb->cch_sz / sizeof(thash_data_t);
     do{
         p->page_flags = 0;
         p->itir = 0;
@@ -650,6 +650,6 @@ void thash_init(thash_cb_t *hcb, u64 sz)
         p++;
         num--;
     }while(num);
-    p->itir = 0;
-    p->next = NULL;
+
+    (p - 1)->next = NULL;
 }
