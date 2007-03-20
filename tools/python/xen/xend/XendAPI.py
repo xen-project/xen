@@ -36,6 +36,9 @@ from xen.xend.XendVMMetrics import XendVMMetrics
 from xen.xend.XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
+from xen.util.blkif import blkdev_name_to_number
+
+
 AUTH_NONE = 'none'
 AUTH_PAM = 'pam'
 
@@ -1555,7 +1558,8 @@ class XendAPI(object):
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['metrics']
+    VBD_attr_ro = ['metrics',
+                   'runtime_properties']
     VBD_attr_rw = ['VM',
                    'VDI',
                    'device',
@@ -1596,23 +1600,28 @@ class XendAPI(object):
     # class methods
     def VBD_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
+        xennode = XendNode.instance()
+        
         if not xendom.is_valid_vm(vbd_struct['VM']):
             return xen_api_error(['HANDLE_INVALID', 'VM', vbd_struct['VM']])
         
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
-        vbd_ref = ''
+        vdi = xennode.get_vdi_by_uuid(vbd_struct['VDI'])
+        if not vdi:
+            return xen_api_error(['HANDLE_INVALID', 'VDI', vdi_ref])
+
+        # new VBD via VDI/SR
+        vdi_image = vdi.get_location()
+
         try:
-            # new VBD via VDI/SR
-            vdi_ref = vbd_struct.get('VDI')
-            vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
-            if not vdi:
-                return xen_api_error(['HANDLE_INVALID', 'VDI', vdi_ref])
-            vdi_image = vdi.get_location()
             vbd_ref = XendTask.log_progress(0, 100,
                                             dom.create_vbd,
                                             vbd_struct, vdi_image)
-        except XendError:
-            return xen_api_todo()
+        except XendError, e:
+            log.exception("Error in VBD_create")
+            return xen_api_error(['INTERNAL_ERROR', str(e)]) 
+            
+        vdi.addVBD(vbd_ref)
 
         xendom.managed_config_save(dom)
         return xen_api_success(vbd_ref)
@@ -1624,7 +1633,14 @@ class XendAPI(object):
         if not vm:
             return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
 
+        vdi_ref = XendDomain.instance()\
+                  .get_dev_property_by_uuid('vbd', vbd_ref, "VDI")
+        vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+
         XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
+
+        vdi.removeVBD(vbd_ref)
+        
         return xen_api_success_void()
 
     def _VBD_get(self, vbd_ref, prop):
@@ -1635,6 +1651,26 @@ class XendAPI(object):
     # attributes (ro)
     def VBD_get_metrics(self, _, vbd_ref):
         return xen_api_success(vbd_ref)
+
+    def VBD_get_runtime_properties(self, _, vbd_ref):
+        xendom = XendDomain.instance()
+        dominfo = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
+        device = dominfo.get_dev_config_by_uuid('vbd', vbd_ref)
+        devid = int(device['id'])
+        device_sxps = dominfo.getDeviceSxprs('vbd')
+
+        log.debug("VBD_get_runtime_properties devid: %i device_sxps: %s",
+                  devid, device_sxps)
+        
+        device_dicts  = [dict(device_sxp[1][1:]) for device_sxp in device_sxps]
+
+        device_dict = [device_dict
+                       for device_dict in device_dicts
+                       if int(device_dict['virtual-device']) == devid][0]
+
+        log.debug("VBD_get_runtime_properties device_dict: %s", device_dict)
+
+        return xen_api_success(device_dict)
 
     # attributes (rw)
     def VBD_get_VM(self, session, vbd_ref):
@@ -1828,7 +1864,8 @@ class XendAPI(object):
         return XendNode.instance().get_vdi_by_uuid(ref)
     
     def VDI_get_VBDs(self, session, vdi_ref):
-        return xen_api_todo()
+        vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+        return xen_api_success(vdi.getVBDs())
     
     def VDI_get_physical_utilisation(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).
@@ -1898,7 +1935,7 @@ class XendAPI(object):
             'name_label': image.name_label,
             'name_description': image.name_description,
             'SR': image.sr_uuid,
-            'VBDs': [], # TODO
+            'VBDs': image.getVBDs(),
             'virtual_size': image.virtual_size,
             'physical_utilisation': image.physical_utilisation,
             'type': image.type,

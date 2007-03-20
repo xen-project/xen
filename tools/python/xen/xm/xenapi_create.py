@@ -18,7 +18,7 @@
 """Domain creation using new XenAPI
 """
 
-from xen.xm.main import server
+from xen.xm.main import server, get_default_SR
 from xml.dom.minidom import parse, getDOMImplementation
 from xml.dom.ext import PrettyPrint
 from xml.parsers.xmlproc import xmlproc, xmlval, xmldtd
@@ -71,9 +71,7 @@ def try_quietly(fn, *args):
 class xenapi_create:
 
     def __init__(self):
-        self.DEFAULT_STORAGE_REPOSITORY = [sr_ref
-                  for sr_ref in server.xenapi.SR.get_all()
-                  if server.xenapi.SR.get_type(sr_ref) == "local"][0]
+        self.DEFAULT_STORAGE_REPOSITORY = get_default_SR()
 
         self.dtd = "/usr/lib/python/xen/xm/create.dtd"
 

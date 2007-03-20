@@ -72,6 +72,16 @@ class XendVDI(AutoSaveObject):
         self.read_only = False
         self.type = "system"
         self.other_config = {}
+        self.vbds = []
+
+    def addVBD(self, vbd_ref):
+        self.vbds.append(vbd_ref)
+
+    def removeVBD(self, vbd_ref):
+        self.vbds.remove(vbd_ref)
+
+    def getVBDs(self):
+        return self.vbds
 
     def load_config_dict(self, cfg):
         """Loads configuration into the object from a dict.

@@ -33,7 +33,6 @@ import getopt
 import socket
 import traceback
 import xmlrpclib
-import traceback
 import time
 import datetime
 from select import select
@@ -50,6 +49,7 @@ from xen.xend.XendConstants import *
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
 from xen.util.xmlrpclib2 import ServerProxy
+
 import XenAPI
 
 
@@ -492,6 +492,14 @@ def usage(cmd = None):
 #
 ####################################################################
 
+def get_default_SR():
+    return [sr_ref
+            for sr_ref in server.xenapi.SR.get_all()
+            if server.xenapi.SR.get_type(sr_ref) == "local"][0]
+
+def map2sxp(m):
+    return [[k, m[k]] for k in m.keys()]
+
 def arg_check(args, name, lo, hi = -1):
     n = len([i for i in args if i != '--'])
     
@@ -675,9 +683,6 @@ def xm_restore(args):
 
 def getDomains(domain_names, state, full = 0):
     if serverType == SERVER_XEN_API:
-        def map2sxp(m):
-            return ["domain"] + [[k, m[k]] for k in m.keys()]
-        
         doms_sxp = []
         doms_dict = []
         dom_refs = server.xenapi.VM.get_all()
@@ -691,11 +696,11 @@ def getDomains(domain_names, state, full = 0):
                             'state':    '-----',
                             'cpu_time': dom_metrics['vcpus_utilisation']})
 			
-            doms_sxp.append(map2sxp(dom_rec))
+            doms_sxp.append(['domain'] + map2sxp(dom_rec))
             doms_dict.append(dom_rec)
             
         if domain_names:
-            doms = [map2sxp(dom) for dom in doms_dict
+            doms = [['domain'] + map2sxp(dom) for dom in doms_dict
                     if dom["name"] in domain_names]
             
             if len(doms) > 0:
@@ -1689,12 +1694,20 @@ def xm_block_list(args):
     (use_long, params) = arg_check_for_resource_list(args, "block-list")
 
     dom = params[0]
-    if use_long:
+
+    if serverType == SERVER_XEN_API:
+        vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
+        vbd_properties = \
+            map(server.xenapi.VBD.get_runtime_properties, vbd_refs)
+        devs = map(lambda x: [x['virtual-device'], map2sxp(x)], vbd_properties)
+    else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vbd')
+
+    if use_long:
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend.domain.getDeviceSxprs(dom, 'vbd'):
+        for x in devs:
             if hdr == 0:
                 print 'Vdev  BE handle state evt-ch ring-ref BE-path'
                 hdr = 1
@@ -1767,8 +1780,45 @@ def parse_block_configuration(args):
 def xm_block_attach(args):
     arg_check(args, 'block-attach', 4, 5)
 
-    (dom, vbd) = parse_block_configuration(args)
-    server.xend.domain.device_create(dom, vbd)
+    if serverType == SERVER_XEN_API:
+        dom   = args[0]
+        uname = args[1]
+        dev   = args[2]
+        mode  = args[3]
+
+        # First create new VDI
+        vdi_record = {
+            "name_label":       "vdi" + str(uname.__hash__()),   
+            "name_description": "",
+            "SR":               get_default_SR(),
+            "virtual_size":     0,
+            "sector_size":      512,
+            "type":             "system",
+            "sharable":         False,
+            "read_only":        mode!="w",
+            "other_config":     {"location": uname}
+        }
+
+        vdi_ref = server.xenapi.VDI.create(vdi_record)
+
+        # Now create new VBD
+
+        vbd_record = {
+            "VM":               get_single_vm(dom),
+            "VDI":              vdi_ref,
+            "device":           dev,
+            "bootable":         True,
+            "mode":             mode=="w" and "RW" or "RO",
+            "type":             "Disk",
+            "qos_algorithm_type": "",
+            "qos_algorithm_params": {}
+        }
+
+        server.xenapi.VBD.create(vbd_record)
+        
+    else:
+        (dom, vbd) = parse_block_configuration(args)
+        server.xend.domain.device_create(dom, vbd)
 
 
 def xm_block_configure(args):
@@ -1814,13 +1864,30 @@ def detach(args, command, deviceClass):
 
 
 def xm_block_detach(args):
-    try:
-        detach(args, 'block-detach', 'vbd')
-        return
-    except:
-        pass
-    detach(args, 'block-detach', 'tap')
+    if serverType == SERVER_XEN_API:
+        arg_check(args, "xm_block_detach", 2, 3)
+        dom = args[0]
+        dev = args[1]
+        vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
+        vbd_refs = [vbd_ref for vbd_ref in vbd_refs
+                    if server.xenapi.VBD.get_device(vbd_ref) == dev]
+        if len(vbd_refs) > 0:
+            vbd_ref = vbd_refs[0]
+            vdi_ref = server.xenapi.VBD.get_VDI(vbd_ref)
 
+            server.xenapi.VBD.destroy(vbd_ref)
+
+            if len(server.xenapi.VDI.get_VBDs(vdi_ref)) <= 0:
+                server.xenapi.VDI.destroy(vdi_ref)
+        else:
+            print "Cannot find device '%s' in domain '%s'" % (dev,dom)
+    else:
+        try:
+            detach(args, 'block-detach', 'vbd')
+            return
+        except:
+            pass
+        detach(args, 'block-detach', 'tap')
 
 def xm_network_detach(args):
     detach(args, 'network-detach', 'vif')
