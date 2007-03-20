@@ -37,6 +37,7 @@ import time
 import datetime
 from select import select
 import xml.dom.minidom
+from xen.util.blkif import blkdev_name_to_number
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -1724,7 +1725,12 @@ def xm_block_list(args):
         vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
         vbd_properties = \
             map(server.xenapi.VBD.get_runtime_properties, vbd_refs)
-        devs = map(lambda x: [x.get('virtual-device'), map2sxp(x)], vbd_properties)
+        vbd_devs = \
+            map(server.xenapi.VBD.get_device, vbd_refs)
+        vbd_devids = \
+            map(blkdev_name_to_number, vbd_devs)
+        devs = map(lambda (devid, prop): [devid, map2sxp(prop)],
+                   zip(vbd_devids, vbd_properties))
     else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vbd')
 
