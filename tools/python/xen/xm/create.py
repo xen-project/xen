@@ -1293,7 +1293,7 @@ def do_console(domain_name):
                     domid = server.xenapi.VM.get_domid(
                                get_single_vm(domain_name))
                 else:
-                    dom = server.xend.domain(name)
+                    dom = server.xend.domain(domain_name)
                     domid = int(sxp.child_value(dom, 'domid', '-1'))
                 console.execConsole(domid)
             except:
