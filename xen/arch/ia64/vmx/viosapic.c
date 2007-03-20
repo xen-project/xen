@@ -104,10 +104,10 @@ static void service_iosapic(struct viosapic *viosapic)
 
     while ( (irq = iosapic_get_highest_irq(viosapic)) != -1 )
     {
-        viosapic_deliver(viosapic, irq);
-
         if ( viosapic->redirtbl[irq].trig_mode == SAPIC_LEVEL )
             viosapic->isr |= (1UL << irq);
+
+        viosapic_deliver(viosapic, irq);
 
         viosapic->irr &= ~(1UL << irq);
     }
