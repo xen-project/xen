@@ -196,11 +196,13 @@ static int construct_vmcb(struct vcpu *v)
 
     arch_svm->vmcb->exception_intercepts = MONITOR_DEFAULT_EXCEPTION_BITMAP;
 
-    if ( paging_mode_hap(v->domain) ) {
+    if ( paging_mode_hap(v->domain) )
+    {
         vmcb->cr0 = arch_svm->cpu_shadow_cr0;
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_PG;
+        vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
 
     return 0;
@@ -245,16 +247,6 @@ void svm_destroy_vmcb(struct vcpu *v)
     }
 
     arch_svm->vmcb = NULL;
-}
-
-void svm_do_launch(struct vcpu *v)
-{
-    hvm_stts(v);
-
-    /* current core is the one we intend to perform the VMRUN on */
-    v->arch.hvm_svm.launch_core = smp_processor_id();
-
-    v->arch.schedule_tail = arch_svm_do_resume;
 }
 
 static void svm_dump_sel(char *name, svm_segment_register_t *s)

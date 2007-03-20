@@ -29,8 +29,6 @@
 #include <asm/i387.h>
 
 extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
-extern void svm_do_launch(struct vcpu *v);
-extern void arch_svm_do_resume(struct vcpu *v);
 
 extern u64 root_vmcb_pa[NR_CPUS];
 

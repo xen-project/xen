@@ -98,7 +98,17 @@
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
-ENTRY(svm_asm_do_launch)
+ENTRY(svm_asm_do_resume)
+        GET_CURRENT(%rbx)
+        cli                             # tests must not race interrupts
+        movl VCPU_processor(%rbx),%eax
+        shl  $IRQSTAT_shift, %rax
+        leaq irq_stat(%rip), %rdx
+        testl $~0, (%rdx, %rax, 1)
+        jnz  svm_process_softirqs
+        call svm_intr_assist
+        call svm_load_cr2
+
         CLGI                
         sti
         GET_CURRENT(%rbx)
@@ -150,28 +160,8 @@ svm_stgi_label:
         call svm_vmexit_handler
         jmp  svm_asm_do_resume
 
-ENTRY(svm_asm_do_resume)
-svm_test_all_events:
-        GET_CURRENT(%rbx)
-/*test_all_events:*/
-        cli                             # tests must not race interrupts
-/*test_softirqs:*/
-        movl  VCPU_processor(%rbx),%eax
-        shl   $IRQSTAT_shift, %rax
-        leaq  irq_stat(%rip), %rdx
-        testl $~0, (%rdx, %rax, 1)
-        jnz   svm_process_softirqs
-svm_restore_all_guest:
-        call svm_intr_assist
-        call svm_load_cr2
-        /*
-         * Check if we are going back to AMD-V based VM
-         * By this time, all the setups in the VMCB must be complete.
-         */
-        jmp svm_asm_do_launch
-
         ALIGN
 svm_process_softirqs:
         sti
         call do_softirq
-        jmp  svm_test_all_events
+        jmp  svm_asm_do_resume
