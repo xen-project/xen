@@ -485,7 +485,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
          * first.
          */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
-        /* current!=vcpu as not called by arch_vmx_do_launch */
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
         if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
             goto bad_cr3;
@@ -921,17 +920,6 @@ static void svm_load_cpu_guest_regs(
     svm_load_cpu_user_regs(v, regs);
 }
 
-static void arch_svm_do_launch(struct vcpu *v) 
-{
-    svm_do_launch(v);
-
-    if ( paging_mode_hap(v->domain) ) {
-        v->arch.hvm_svm.vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-    }
-
-    reset_stack_and_jump(svm_asm_do_launch);
-}
-
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     svm_save_dr(v);
@@ -953,15 +941,29 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 }
 
+static void arch_svm_do_resume(struct vcpu *v) 
+{
+    if ( v->arch.hvm_svm.launch_core != smp_processor_id() )
+    {
+        v->arch.hvm_svm.launch_core = smp_processor_id();
+        hvm_migrate_timers(v);
+    }
+
+    hvm_do_resume(v);
+    reset_stack_and_jump(svm_asm_do_resume);
+}
+
 static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
-    v->arch.schedule_tail    = arch_svm_do_launch;
+    v->arch.schedule_tail    = arch_svm_do_resume;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
     v->arch.hvm_svm.saved_irq_vector = -1;
+
+    v->arch.hvm_svm.launch_core = -1;
 
     if ( (rc = svm_create_vmcb(v)) != 0 )
     {
@@ -1026,10 +1028,12 @@ void svm_npt_detect(void)
 
     /* check CPUID for nested paging support */
     cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
-    if ( edx & 0x01 ) { /* nested paging */
+    if ( edx & 0x01 ) /* nested paging */
+    {
         hap_capable_system = 1;
     }
-    else if ( opt_hap_enabled ) {
+    else if ( opt_hap_enabled )
+    {
         printk(" nested paging is not supported by this CPU.\n");
         hap_capable_system = 0; /* no nested paging, we disable flag. */
     }
@@ -1085,24 +1089,6 @@ int start_svm(void)
     hvm_enable(&svm_function_table);
 
     return 1;
-}
-
-void arch_svm_do_resume(struct vcpu *v) 
-{
-    /* pinning VCPU to a different core? */
-    if ( v->arch.hvm_svm.launch_core == smp_processor_id()) {
-        hvm_do_resume( v );
-        reset_stack_and_jump( svm_asm_do_resume );
-    }
-    else {
-        if (svm_dbg_on)
-            printk("VCPU core pinned: %d to %d\n", 
-                   v->arch.hvm_svm.launch_core, smp_processor_id() );
-        v->arch.hvm_svm.launch_core = smp_processor_id();
-        hvm_migrate_timers( v );
-        hvm_do_resume( v );
-        reset_stack_and_jump( svm_asm_do_resume );
-    }
 }
 
 static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
