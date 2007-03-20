@@ -674,7 +674,7 @@ class XendDomain:
                 else:
                     return domid
             
-            raise XendInvalidDomain("Domain does not exist")
+            raise XendInvalidDomain(vm_uuid)
         finally:
             self.domains_lock.release()
         
