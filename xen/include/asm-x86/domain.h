@@ -248,6 +248,9 @@ struct arch_vcpu
 #ifdef CONFIG_X86_32
     struct desc_struct int80_desc;
 #endif
+#ifdef CONFIG_X86_64
+    struct trap_bounce int80_bounce;
+#endif
 
     /* Virtual Machine Extensions */
     struct hvm_vcpu hvm_vcpu;

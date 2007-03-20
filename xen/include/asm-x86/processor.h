@@ -455,16 +455,16 @@ extern idt_entry_t *idt_tables[];
 
 extern struct tss_struct init_tss[NR_CPUS];
 
-#ifdef CONFIG_X86_32
-
 extern void init_int80_direct_trap(struct vcpu *v);
+
+#if defined(CONFIG_X86_32)
+
 #define set_int80_direct_trap(_ed)                  \
     (memcpy(idt_tables[(_ed)->processor] + 0x80,    \
             &((_ed)->arch.int80_desc), 8))
 
 #else
 
-#define init_int80_direct_trap(_ed) ((void)0)
 #define set_int80_direct_trap(_ed)  ((void)0)
 
 #endif
