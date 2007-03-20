@@ -1962,7 +1962,8 @@ def xm_block_detach(args):
             if len(server.xenapi.VDI.get_VBDs(vdi_ref)) <= 0:
                 server.xenapi.VDI.destroy(vdi_ref)
         else:
-            print "Cannot find device '%s' in domain '%s'" % (dev,dom)
+            raise OptionError("Cannot find device '%s' in domain '%s'"
+                              % (dev,dom))
     else:
         try:
             detach(args, 'block-detach', 'vbd')
