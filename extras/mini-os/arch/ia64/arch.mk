@@ -1,5 +1,5 @@
 # Build for Big Endian?
-BIGENDIAN := n
+BIGENDIAN ?= n
 
 ARCH_CFLAGS := -mfixed-range=f2-f5,f12-f15,f32-f127 -mconstant-gp
 ARCH_CFLAGS += -O2
