@@ -241,10 +241,13 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
                              "ErrorDescription": errdesc },),
                           methodresponse = 1)
                 else:
-                    log.exception('Internal error handling %s', method)
                     import xen.xend.XendClient
-                    response = xmlrpclib.dumps(
-                       xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
+                    if isinstance(exn, xmlrpclib.Fault):
+                        response = xmlrpclib.dumps(exn)
+                    else:
+                        log.exception('Internal error handling %s', method)
+                        response = xmlrpclib.dumps(
+                            xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
             except:
                 log.exception('Internal error handling error')
 
