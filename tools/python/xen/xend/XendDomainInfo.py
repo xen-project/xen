@@ -2301,12 +2301,21 @@ class XendDomainInfo:
             dev_control = None
             
             if vdi_image_path.startswith('tap'):
-                dev_control =  self.getDeviceController('tap')
+                dev_control = self.getDeviceController('tap')
             else:
                 dev_control = self.getDeviceController('vbd')
-                
-            config['devid'] = dev_control.createDevice(config)
 
+            try:
+                devid = dev_control.createDevice(config)
+                dev_control.waitForDevice(devid)
+                self.info.device_update(dev_uuid,
+                                        cfg_xenapi = {'devid': devid})
+            except Exception, exn:
+                log.exception(exn)
+                del self.info['devices'][dev_uuid]
+                self.info['vbd_refs'].remove(dev_uuid)
+                raise
+            
         return dev_uuid
 
     def create_phantom_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
