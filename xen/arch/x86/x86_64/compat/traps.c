@@ -1,6 +1,7 @@
 #ifdef CONFIG_COMPAT
 
 #include <xen/event.h>
+#include <asm/regs.h>
 #include <compat/callback.h>
 #include <compat/arch-x86_32.h>
 
@@ -290,6 +291,9 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
         fixup_guest_code_selector(current->domain, cur.cs);
 
         XLAT_trap_info(dst + cur.vector, &cur);
+
+        if ( cur.vector == 0x80 )
+            init_int80_direct_trap(current);
 
         guest_handle_add_offset(traps, 1);
     }

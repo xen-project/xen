@@ -247,6 +247,7 @@ unsigned long do_iret(void)
 
 asmlinkage void syscall_enter(void);
 asmlinkage void compat_hypercall(void);
+asmlinkage void int80_direct_trap(void);
 void __init percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
@@ -262,6 +263,7 @@ void __init percpu_traps_init(void)
 #ifdef CONFIG_COMPAT
         /* The hypercall entry vector is only accessible from ring 1. */
         _set_gate(idt_table+HYPERCALL_VECTOR, 15, 1, &compat_hypercall);
+        _set_gate(idt_table+0x80, 15, 3, &int80_direct_trap);
 #endif
     }
 
@@ -344,6 +346,22 @@ void __init percpu_traps_init(void)
 
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
+}
+
+void init_int80_direct_trap(struct vcpu *v)
+{
+    struct trap_info *ti = &v->arch.guest_context.trap_ctxt[0x80];
+    struct trap_bounce *tb = &v->arch.int80_bounce;
+
+    if ( !guest_gate_selector_okay(v->domain, ti->cs) )
+         return;
+
+    tb->flags = TBF_EXCEPTION;
+    tb->cs    = ti->cs;
+    tb->eip   = ti->address;
+
+    if ( null_trap_bounce(v, tb) )
+        tb->flags = 0;
 }
 
 static long register_guest_callback(struct callback_register *reg)
