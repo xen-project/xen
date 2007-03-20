@@ -1549,7 +1549,15 @@ def xm_trigger(args):
 
 def xm_debug_keys(args):
     arg_check(args, "debug-keys", 1)
-    server.xend.node.send_debug_keys(str(args[0]))
+
+    keys = str(args[0])
+    
+    if serverType == SERVER_XEN_API:
+        server.xenapi.host.send_debug_keys(
+            server.xenapi.session.get_this_host(),
+            keys)
+    else:
+        server.xend.node.send_debug_keys(keys)
 
 def xm_top(args):
     arg_check(args, "top", 0)

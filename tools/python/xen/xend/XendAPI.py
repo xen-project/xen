@@ -665,7 +665,8 @@ class XendAPI(object):
                     ('add_to_other_config', None),
                     ('remove_from_other_config', None),
                     ('dmesg', 'String'),
-                    ('get_log', 'String')]
+                    ('get_log', 'String'),
+                    ('send_debug_keys', None)]
     
     host_funcs = [('get_by_name_label', 'Set(host)')]
 
@@ -751,6 +752,11 @@ class XendAPI(object):
         log_file = open(XendLogging.getLogFilename())
         log_buffer = log_file.read()
         return xen_api_success(log_buffer)
+
+    def host_send_debug_keys(self, _, host_ref, keys):
+        node = XendNode.instance()
+        node.send_debug_keys(keys)
+        return xen_api_success_void()
 
     def host_get_record(self, session, host_ref):
         node = XendNode.instance()
