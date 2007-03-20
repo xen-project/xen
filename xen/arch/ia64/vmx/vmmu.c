@@ -161,6 +161,7 @@ static void free_domain_vhpt(struct vcpu *v)
     if (v->arch.vhpt.hash) {
         page = virt_to_page(v->arch.vhpt.hash);
         free_domheap_pages(page, VCPU_VHPT_ORDER);
+        v->arch.vhpt.hash = 0;
     }
 
     return;
