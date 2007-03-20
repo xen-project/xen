@@ -710,7 +710,9 @@ def getDomains(domain_names, state, full = 0):
             if len(doms) > 0:
                 return doms
             else:
-                print "Error: no domains named '%s'" % domain_names
+                print "Error: no domain%s named %s" % \
+                      (len(domain_names) > 1 and 's' or '',
+                       ', '.join(domain_names))
                 sys.exit(-1)
         else:
             return doms_sxp
