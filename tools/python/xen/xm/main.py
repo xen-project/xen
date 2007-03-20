@@ -1692,7 +1692,8 @@ def xm_network_list(args):
         vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
         vif_properties = \
             map(server.xenapi.VIF.get_runtime_properties, vif_refs)
-        devs = map(lambda x: [x.get('handle'), map2sxp(x)], vif_properties)
+        devs = map(lambda (handle, properties): [handle, map2sxp(properties)],
+                   zip(range(len(vif_properties)), vif_properties))
     else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vif')
         
