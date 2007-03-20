@@ -513,10 +513,14 @@ class sxp2xml:
         memory_str = str(int(
             get_child_by_name(config, "memory"))*1024*1024)
 
-        memory.attributes["static_min"] = memory_str
+        memory.attributes["static_min"] = str(0)
         memory.attributes["static_max"] = memory_str
         memory.attributes["dynamic_min"] = memory_str
         memory.attributes["dynamic_max"] = memory_str
+
+        if get_child_by_name(config, "maxmem"):
+            memory.attributes["static_max"] = \
+               str(int(get_child_by_name(config, "maxmem")*1024*1024))
 
         vm.appendChild(memory)
 
