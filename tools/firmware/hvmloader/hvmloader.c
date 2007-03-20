@@ -29,7 +29,6 @@
 #include "pci_regs.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
-#include <xen/hvm/e820.h>
 
 /* memory map */
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
@@ -297,25 +296,57 @@ static void pci_setup(void)
     }
 }
 
-static 
-int must_load_nic(void) 
+/*
+ * If the network card is in the boot order, load the Etherboot option ROM.
+ * Read the boot order bytes from CMOS and check if any of them are 0x4.
+ */
+static int must_load_nic(void) 
 {
-    /* If the network card is in the boot order, load the Etherboot 
-     * option ROM.  Read the boot order bytes from CMOS and check 
-     * if any of them are 0x4. */
     uint8_t boot_order;
 
-    /* Read CMOS register 0x3d (boot choices 0 and 1) */
-    outb(0x70, 0x3d);
-    boot_order = inb(0x71);
-    if ( (boot_order & 0xf) == 0x4 || (boot_order & 0xf0) == 0x40 ) 
+    /* Read CMOS register 0x3d (boot choices 0 and 1). */
+    boot_order = cmos_inb(0x3d);
+    if ( ((boot_order & 0xf) == 0x4) || ((boot_order & 0xf0) == 0x40) ) 
         return 1;
-    /* Read CMOS register 0x38 (boot choice 2 and FDD test flag) */
-    outb(0x70, 0x38);
-    boot_order = inb(0x71);
-    if ( (boot_order & 0xf0) == 0x40 ) 
-        return 1;
-    return 0;
+
+    /* Read CMOS register 0x38 (boot choice 2 and FDD test flag). */
+    boot_order = cmos_inb(0x38);
+    return ((boot_order & 0xf0) == 0x40);
+}
+
+/* Replace possibly erroneous memory-size CMOS fields with correct values. */
+static void cmos_write_memory_size(void)
+{
+    struct e820entry *map = E820_MAP;
+    int i, nr = *E820_MAP_NR;
+    uint32_t base_mem = 640, ext_mem = 0, alt_mem = 0;
+
+    for ( i = 0; i < nr; i++ )
+        if ( (map[i].addr >= 0x100000) && (map[i].type == E820_RAM) )
+            break;
+
+    if ( i != nr )
+    {
+        alt_mem = ext_mem = map[i].addr + map[i].size;
+        ext_mem = (ext_mem > 0x0100000) ? (ext_mem - 0x0100000) >> 10 : 0;
+        if ( ext_mem > 0xffff )
+            ext_mem = 0xffff;
+        alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
+    }
+
+    /* All BIOSes: conventional memory (640kB). */
+    cmos_outb(0x15, (uint8_t)(base_mem >> 0));
+    cmos_outb(0x16, (uint8_t)(base_mem >> 8));
+
+    /* All BIOSes: extended memory (1kB chunks above 1MB). */
+    cmos_outb(0x17, (uint8_t)( ext_mem >> 0));
+    cmos_outb(0x18, (uint8_t)( ext_mem >> 8));
+    cmos_outb(0x30, (uint8_t)( ext_mem >> 0));
+    cmos_outb(0x31, (uint8_t)( ext_mem >> 8));
+
+    /* Some BIOSes: alternative extended memory (64kB chunks above 16MB). */
+    cmos_outb(0x34, (uint8_t)( alt_mem >> 0));
+    cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
 int main(void)
@@ -365,6 +396,8 @@ int main(void)
         acpi_sz = acpi_build_tables((uint8_t *)ACPI_PHYSICAL_ADDRESS);
         ASSERT((ACPI_PHYSICAL_ADDRESS + acpi_sz) <= 0xF0000);
     }
+
+    cmos_write_memory_size();
 
     if ( !check_amd() )
     {

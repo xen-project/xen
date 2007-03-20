@@ -72,11 +72,12 @@ static void memcpy_from_ring(const void *Ring,
     memcpy(dest + c1, ring, c2);
 }
 
-static inline void wait_for_watch(void)
+void wait_for_watch(void)
 {
     DEFINE_WAIT(w);
     add_waiter(w,watch_queue);
     schedule();
+    remove_waiter(w);
     wake(current);
 }
 

@@ -41,11 +41,11 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
     do {                                 \
         if ( unlikely(tb_init_done) )    \
             trace(e,                     \
-                 (unsigned long)d1,      \
-                 (unsigned long)d2,      \
-                 (unsigned long)d3,      \
-                 (unsigned long)d4,      \
-                 (unsigned long)d5);     \
+                  (unsigned long)(d1),   \
+                  (unsigned long)(d2),   \
+                  (unsigned long)(d3),   \
+                  (unsigned long)(d4),   \
+                  (unsigned long)(d5));  \
     } while ( 0 )
 
 /* Convenience macros for calling the trace function. */

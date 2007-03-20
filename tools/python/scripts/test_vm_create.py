@@ -39,8 +39,7 @@ vm_cfg = {
 vdi_cfg = {
     'name_label': 'API_VDI',
     'name_description': '',
-    'virtual_size': 100 * 1024 * 1024,
-    'sector_size': 1024,
+    'virtual_size': 100 * 1024 * 1024 * 1024,
     'type': 'system',
     'parent': '',
     'SR_name': 'QCoW',
@@ -60,14 +59,13 @@ vbd_cfg = {
 local_vdi_cfg = {
     'name_label': 'gentoo.amd64.img',
     'name_description': '',
-    'location': 'file:/root/gentoo.amd64.img',
     'virtual_size': 0,
-    'sector_size': 0,
     'type': 'system',
     'parent': '',
     'SR_name': 'Local',
     'sharable': False,
     'read_only': False,
+    'other_config': {'location': 'file:/root/gentoo.amd64.img'},
 }    
 
 local_vbd_cfg = {

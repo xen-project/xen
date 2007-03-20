@@ -74,6 +74,13 @@ static inline void wake_up(struct wait_queue_head *head)
     local_irq_restore(flags);   \
 } while (0)
 
+#define remove_waiter(w) do {   \
+    unsigned long flags;        \
+    local_irq_save(flags);      \
+    remove_wait_queue(&w);      \
+    local_irq_restore(flags);   \
+} while (0)
+
 #define wait_event(wq, condition) do{             \
     unsigned long flags;                          \
     if(condition)                                 \

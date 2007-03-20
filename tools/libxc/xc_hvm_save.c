@@ -54,6 +54,11 @@ static unsigned long hvirt_start;
 /* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
+/* Shared-memory bitmaps for getting log-dirty bits from qemu */
+static unsigned long *qemu_bitmaps[2];
+static int qemu_active;
+static int qemu_non_active;
+
 int xc_hvm_drain_io(int handle, domid_t dom)
 {
     DECLARE_HYPERCALL;
@@ -77,7 +82,8 @@ int xc_hvm_drain_io(int handle, domid_t dom)
 */
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8)
-#define BITMAP_SIZE   ((pfn_array_size + BITS_PER_LONG - 1) / 8)
+#define BITS_TO_LONGS(bits) (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
+#define BITMAP_SIZE   (BITS_TO_LONGS(pfn_array_size) * sizeof(unsigned long))
 
 #define BITMAP_ENTRY(_nr,_bmap) \
    ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
@@ -123,6 +129,7 @@ static inline int permute( int i, int nr, int order_nr  )
 
     return i;
 }
+
 
 static uint64_t tv_to_us(struct timeval *new)
 {
@@ -277,7 +284,9 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 }
 
 int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                  uint32_t max_factor, uint32_t flags, int (*suspend)(int))
+                uint32_t max_factor, uint32_t flags, int (*suspend)(int),
+                void *(*init_qemu_maps)(int, unsigned), 
+                void (*qemu_flip_buffer)(int, int))
 {
     xc_dominfo_t info;
 
@@ -293,9 +302,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* The size of an array big enough to contain all guest pfns */
     unsigned long pfn_array_size;
 
-    /* The new domain's shared-info frame number. */
-    unsigned long shared_info_frame;
-
     /* Other magic frames: ioreqs and xenstore comms */
     unsigned long ioreq_pfn, bufioreq_pfn, store_pfn;
 
@@ -308,9 +314,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A copy of hvm domain context buffer*/
     uint32_t hvm_buf_size;
     uint8_t *hvm_buf = NULL;
-
-    /* Live mapping of shared info structure */
-    shared_info_t *live_shinfo = NULL;
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
@@ -363,19 +366,11 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("HVM:Could not get vcpu context");
         goto out;
     }
-    shared_info_frame = info.shared_info_frame;
 
     /* cheesy sanity check */
     if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
         ERROR("Invalid HVM state record -- pfn count out of range: %lu",
             (info.max_memkb >> (PAGE_SHIFT - 10)));
-        goto out;
-    }
-
-    /* Map the shared info frame */
-    if(!(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                            PROT_READ, shared_info_frame))) {
-        ERROR("HVM:Couldn't map live_shinfo");
         goto out;
     }
 
@@ -392,8 +387,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             "nr_pages=0x%lx\n", info.max_memkb, max_mfn, info.nr_pages); 
 
     if (live) {
-        ERROR("hvm domain doesn't support live migration now.\n");
-        goto out;
         
         if (xc_shadow_control(xc_handle, dom,
                               XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
@@ -453,6 +446,15 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     to_skip = malloc(BITMAP_SIZE);
 
 
+    if (live) {
+        /* Get qemu-dm logging dirty pages too */
+        void *seg = init_qemu_maps(dom, BITMAP_SIZE);
+        qemu_bitmaps[0] = seg;
+        qemu_bitmaps[1] = seg + BITMAP_SIZE;
+        qemu_active = 0;
+        qemu_non_active = 1;
+    }
+
     hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
     if ( hvm_buf_size == -1 )
     {
@@ -508,13 +510,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         N=0;
 
         DPRINTF("Saving HVM domain memory pages: iter %d   0%%", iter);
-
-        if (last_iter && (max_pfn != live_shinfo->arch.max_pfn)) {
-            DPRINTF("calculated max_pfn as %#lx, shinfo says %#lx\n",
-                    max_pfn, live_shinfo->arch.max_pfn);
-            ERROR("Max pfn doesn't match shared info");
-            goto out;
-        }
 
         while( N < pfn_array_size ){
 
@@ -663,8 +658,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     goto out;
                 }
 
-                DPRINTF("SUSPEND shinfo %08lx eip %08lx edx %08lx\n",
-                        info.shared_info_frame,
+                DPRINTF("SUSPEND eip %08lx edx %08lx\n",
                         (unsigned long)ctxt.user_regs.eip,
                         (unsigned long)ctxt.user_regs.edx);
             }
@@ -677,10 +671,23 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
+            /* Pull in the dirty bits from qemu too */
+            if (!last_iter) {
+                qemu_active = qemu_non_active;
+                qemu_non_active = qemu_active ? 0 : 1;
+                qemu_flip_buffer(dom, qemu_active);
+                for (j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++) {
+                    to_send[j] |= qemu_bitmaps[qemu_non_active][j];
+                    qemu_bitmaps[qemu_non_active][j] = 0;
+                }
+            } else {
+                for (j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++) 
+                    to_send[j] |= qemu_bitmaps[qemu_active][j];
+            }
+
             sent_last_iter = sent_this_iter;
 
             print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
-
         }
 
 
@@ -739,12 +746,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("write HVM info failed!\n");
     }
 
-    /* Shared-info pfn */
-    if (!write_exact(io_fd, &(shared_info_frame), sizeof(uint32_t)) ) {
-        ERROR("write shared-info pfn failed!\n");
-        goto out;
-    }
- 
     /* Success! */
     rc = 0;
 

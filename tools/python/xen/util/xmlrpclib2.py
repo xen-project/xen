@@ -227,24 +227,30 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             response = xmlrpclib.dumps(response,
                                        methodresponse=1,
                                        allow_none=1)
-        except xmlrpclib.Fault, fault:
-            response = xmlrpclib.dumps(fault)
         except Exception, exn:
-            if self.xenapi:
-                if _is_not_supported(exn):
-                    errdesc = ['MESSAGE_METHOD_UNKNOWN', method]
+            try:
+                if self.xenapi:
+                    if _is_not_supported(exn):
+                         errdesc = ['MESSAGE_METHOD_UNKNOWN', method]
+                    else:
+                         log.exception('Internal error handling %s', method)
+                         errdesc = ['INTERNAL_ERROR', str(exn)]
+
+                    response = xmlrpclib.dumps(
+                          ({ "Status": "Failure",
+                             "ErrorDescription": errdesc },),
+                          methodresponse = 1)
                 else:
-                    log.exception('Internal error handling %s', method)
-                    errdesc = ['INTERNAL_ERROR', str(exn)]
-                response = xmlrpclib.dumps(
-                    ({ "Status": "Failure",
-                       "ErrorDescription": errdesc },),
-                    methodresponse = 1)
-            else:
-                log.exception('Internal error handling %s', method)
-                import xen.xend.XendClient
-                response = xmlrpclib.dumps(
-                    xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
+                    import xen.xend.XendClient
+                    if isinstance(exn, xmlrpclib.Fault):
+                        response = xmlrpclib.dumps(exn)
+                    else:
+                        log.exception('Internal error handling %s', method)
+                        response = xmlrpclib.dumps(
+                            xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
+            except:
+                log.exception('Internal error handling error')
+
         return response
 
 
@@ -253,7 +259,7 @@ def _is_not_supported(exn):
     try:
         m = notSupportedRE.search(exn[0])
         return m is not None
-    except TypeError, e:
+    except:
         return False
 
 

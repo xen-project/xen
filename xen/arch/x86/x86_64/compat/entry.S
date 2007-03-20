@@ -187,6 +187,10 @@ ENTRY(compat_post_handle_exception)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
+ENTRY(compat_int80_direct_trap)
+        call  compat_create_bounce_frame
+        jmp   compat_restore_all_guest
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */

@@ -421,8 +421,7 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
             .name_label = "MyRootFS",
             .name_description = "MyRootFS description",
             .sr = &sr_record,
-            .virtual_size = (1 << 21),  // 1GiB / 512 bytes/sector
-            .sector_size = 512,
+            .virtual_size = (INT64_C(1) << 30),  // 1GiB
             .type = XEN_VDI_TYPE_SYSTEM,
             .sharable = false,
             .read_only = false

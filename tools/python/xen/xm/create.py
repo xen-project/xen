@@ -28,12 +28,13 @@ import time
 import xmlrpclib
 
 from xen.xend import sxp
-from xen.xend import PrettyPrint
+from xen.xend import PrettyPrint as SXPPrettyPrint
 from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
 from xen.util import security
+from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
 
 from xen.xm.opts import *
 
@@ -96,6 +97,11 @@ gopts.opt('config', short='F', val='FILE',
 gopts.opt('dryrun', short='n',
           fn=set_true, default=0,
           use="Dry run - prints the resulting configuration in SXP but "
+          "does not create the domain.")
+
+gopts.opt('xmldryrun', short='x',
+          fn=set_true, default=0,
+          use="XML dry run - prints the resulting configuration in XML but "
           "does not create the domain.")
 
 gopts.opt('paused', short='p',
@@ -1241,34 +1247,59 @@ def main(argv):
         except IOError, exn:
             raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
 
+    if serverType == SERVER_XEN_API:
+        from xen.xm.xenapi_create import sxp2xml
+        sxp2xml_inst = sxp2xml()
+        doc = sxp2xml_inst.convert_sxp_to_xml(config, transient=True)
+
     if opts.vals.dryrun:
-        PrettyPrint.prettyprint(config)
+        SXPPrettyPrint.prettyprint(config)
+
+    if opts.vals.xmldryrun and serverType == SERVER_XEN_API:
+        from xml.dom.ext import PrettyPrint as XMLPrettyPrint
+        XMLPrettyPrint(doc)
+
+    if opts.vals.dryrun or opts.vals.xmldryrun:
+        return                                               
+
+    if opts.vals.console_autoconnect:
+        do_console(sxp.child_value(config, 'name', -1))
+    
+    if serverType == SERVER_XEN_API:        
+        from xen.xm.xenapi_create import xenapi_create
+        xenapi_create_inst = xenapi_create()
+        vm_refs = xenapi_create_inst.create(document = doc)
+
+        map(lambda vm_ref: server.xenapi.VM.start(vm_ref, 0), vm_refs)
     else:
         if not create_security_check(config):
-            raise security.ACMError('Security Configuration prevents domain from starting')
-        else:
-            if opts.vals.console_autoconnect:
-                cpid = os.fork() 
-                if cpid != 0:
-                    for i in range(10):
-                        # Catch failure of the create process 
-                        time.sleep(1)
-                        (p, rv) = os.waitpid(cpid, os.WNOHANG)
-                        if os.WIFEXITED(rv):
-                            if os.WEXITSTATUS(rv) != 0:
-                                sys.exit(os.WEXITSTATUS(rv))
-                        try:
-                            # Acquire the console of the created dom
-                            name = sxp.child_value(config, 'name', -1)
-                            dom = server.xend.domain(name)
-                            domid = int(sxp.child_value(dom, 'domid', '-1'))
-                            console.execConsole(domid)
-                        except:
-                            pass
-                    print("Could not start console\n");
-                    sys.exit(0)
-            dom = make_domain(opts, config)
-
+            raise security.ACMError(
+                'Security Configuration prevents domain from starting')
+        dom = make_domain(opts, config)
+        
+def do_console(domain_name):
+    cpid = os.fork() 
+    if cpid != 0:
+        for i in range(10):
+            # Catch failure of the create process 
+            time.sleep(1)
+            (p, rv) = os.waitpid(cpid, os.WNOHANG)
+            if os.WIFEXITED(rv):
+                if os.WEXITSTATUS(rv) != 0:
+                    sys.exit(os.WEXITSTATUS(rv))
+            try:
+                # Acquire the console of the created dom
+                if serverType == SERVER_XEN_API:
+                    domid = server.xenapi.VM.get_domid(
+                               get_single_vm(domain_name))
+                else:
+                    dom = server.xend.domain(domain_name)
+                    domid = int(sxp.child_value(dom, 'domid', '-1'))
+                console.execConsole(domid)
+            except:
+                pass
+        print("Could not start console\n");
+        sys.exit(0)
 
 if __name__ == '__main__':
     main(sys.argv)

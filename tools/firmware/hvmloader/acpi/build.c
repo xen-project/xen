@@ -20,7 +20,6 @@
 #include "ssdt_tpm.h"
 #include "../config.h"
 #include "../util.h"
-#include <xen/hvm/e820.h>
 
 #define align16(sz)        (((sz) + 15) & ~15)
 #define fixed_strcpy(d, s) strncpy((d), (s), sizeof(d))

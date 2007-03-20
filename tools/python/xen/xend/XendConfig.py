@@ -28,7 +28,7 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 
 log = logging.getLogger("xend.XendConfig")
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.WARN)
 
 
 """
@@ -105,8 +105,6 @@ XENAPI_CFG_TO_LEGACY_CFG = {
     'uuid': 'uuid',
     'vcpus_number': 'vcpus',
     'cpus': 'cpus',
-    'memory_static_min': 'memory',
-    'memory_static_max': 'maxmem',
     'name_label': 'name',
     'actions_after_shutdown': 'on_poweroff',
     'actions_after_reboot': 'on_reboot',
@@ -136,11 +134,10 @@ XENAPI_CFG_TYPES = {
     'user_version': str,
     'is_a_template': bool0,
     'resident_on': str,
-    'memory_static_min': int,
+    'memory_static_min': int,  # note these are stored in bytes, not KB!
     'memory_static_max': int,
     'memory_dynamic_min': int,
     'memory_dynamic_max': int,
-    'memory_actual': int,
     'cpus': list,
     'vcpus_policy': str,
     'vcpus_params': dict,
@@ -314,7 +311,6 @@ class XendConfig(dict):
             'shadow_memory': 0,
             'memory_static_max': 0,
             'memory_dynamic_max': 0,
-            'memory_actual': 0,
             'devices': {},
             'security': None,
             'on_xend_start': 'ignore',
@@ -334,20 +330,39 @@ class XendConfig(dict):
         
         return defaults
 
+    #
+    # Here we assume these values exist in the dict.
+    # If they don't we have a bigger problem, lets not
+    # try and 'fix it up' but acutually fix the cause ;-)
+    #
     def _memory_sanity_check(self):
-        if self['memory_static_min'] == 0:
-            self['memory_static_min'] = self['memory_dynamic_min']
-
-        # If the static max is not set, let's set it to dynamic max.
-        # If the static max is smaller than static min, then fix it!
-        self['memory_static_max'] = max(self['memory_static_max'],
-                                        self['memory_dynamic_max'],
-                                        self['memory_static_min'])
-
-        for mem_type in ('memory_static_min', 'memory_static_max'):
-            if self[mem_type] <= 0:
-                raise XendConfigError('Memory value too low for %s: %d' %
-                                      (mem_type, self[mem_type]))
+        log.debug("_memory_sanity_check memory_static_min: %s, "
+                      "memory_static_max: %i, "
+                      "memory_dynamic_min: %i, " 
+                      "memory_dynamic_max: %i",
+                      self["memory_static_min"],
+                      self["memory_static_max"],
+                      self["memory_dynamic_min"],
+                      self["memory_dynamic_max"])
+        
+        if not self["memory_static_min"] <= self["memory_static_max"]:
+            raise XendConfigError("memory_static_min must be less " \
+                                  "than or equal to memory_static_max") 
+        if not self["memory_dynamic_min"] <= self["memory_dynamic_max"]:
+            raise XendConfigError("memory_dynamic_min must be less " \
+                                  "than or equal to memory_dynamic_max")
+        if not self["memory_static_min"] <= self["memory_dynamic_min"]:
+            raise XendConfigError("memory_static_min must be less " \
+                                  "than or equal to memory_dynamic_min")
+        if not self["memory_dynamic_max"] <= self["memory_static_max"]:
+            raise XendConfigError("memory_dynamic_max must be less " \
+                                  "than or equal to memory_static_max")
+        if not self["memory_dynamic_max"] > 0:
+            raise XendConfigError("memory_dynamic_max must be greater " \
+                                  "than zero")
+        if not self["memory_static_max"] > 0:
+            raise XendConfigError("memory_static_max must be greater " \
+                                  "than zero")
 
     def _actions_sanity_check(self):
         for event in ['shutdown', 'reboot', 'crash']:
@@ -392,8 +407,12 @@ class XendConfig(dict):
         self['domid'] = dominfo['domid']
         self['online_vcpus'] = dominfo['online_vcpus']
         self['vcpus_number'] = dominfo['max_vcpu_id'] + 1
-        self['memory_dynamic_min'] = (dominfo['mem_kb'] + 1023)/1024
-        self['memory_dynamic_max'] = (dominfo['maxmem_kb'] + 1023)/1024
+
+        self['memory_dynamic_min'] = dominfo['mem_kb'] * 1024
+        self['memory_dynamic_max'] = dominfo['mem_kb'] * 1024
+        self['memory_static_min'] = 0
+        self['memory_static_max'] = dominfo['maxmem_kb'] * 1024
+
         self['cpu_time'] = dominfo['cpu_time']/1e9
         # TODO: i don't know what the security stuff expects here
         if dominfo.get('ssidref'):
@@ -447,6 +466,13 @@ class XendConfig(dict):
                 log.warn('Ignoring unrecognised value for deprecated option:'
                          'restart = \'%s\'', restart)
 
+        # Handle memory, passed in as MiB
+
+        if sxp.child_value(sxp_cfg, "memory") != None:
+            cfg["memory"] = int(sxp.child_value(sxp_cfg, "memory"))
+        if sxp.child_value(sxp_cfg, "maxmem") != None:
+            cfg["maxmem"] = int(sxp.child_value(sxp_cfg, "maxmem"))
+            
         # Only extract options we know about.
         extract_keys = LEGACY_UNSUPPORTED_BY_XENAPI_CFG
         extract_keys += XENAPI_CFG_TO_LEGACY_CFG.values()
@@ -616,6 +642,21 @@ class XendConfig(dict):
             except KeyError:
                 pass
 
+        # Lets try and handle memory correctly
+
+        MiB = 1024 * 1024
+
+        if "memory" in cfg:
+            self["memory_static_min"] = 0
+            self["memory_static_max"] = int(cfg["memory"]) * MiB
+            self["memory_dynamic_min"] = int(cfg["memory"]) * MiB
+            self["memory_dynamic_max"] = int(cfg["memory"]) * MiB
+            
+            if "maxmem" in cfg:
+                self["memory_static_max"] = int(cfg["maxmem"]) * MiB
+
+        self._memory_sanity_check()
+
         def update_with(n, o):
             if not self.get(n):
                 self[n] = cfg.get(o, '')
@@ -631,13 +672,6 @@ class XendConfig(dict):
         for key in XENAPI_PLATFORM_CFG:
             if key in cfg:
                 self['platform'][key] = cfg[key]
-
-        # make sure a sane maximum is set
-        if self['memory_static_max'] <= 0:
-            self['memory_static_max'] = self['memory_static_min']
-            
-        self['memory_dynamic_max'] = self['memory_static_max']
-        self['memory_dynamic_min'] = self['memory_static_min']
 
         # set device references in the configuration
         self['devices'] = cfg.get('devices', {})
@@ -812,6 +846,21 @@ class XendConfig(dict):
                 else:
                     sxpr.append([legacy, self[xenapi]])
 
+        MiB = 1024*1024
+
+        sxpr.append(["maxmem", int(self["memory_static_max"])/MiB])
+        sxpr.append(["memory", int(self["memory_dynamic_max"])/MiB])
+
+        if not legacy_only:
+            sxpr.append(['memory_dynamic_min',
+                     int(self.get('memory_dynamic_min'))])
+            sxpr.append(['memory_dynamic_max',
+                     int(self.get('memory_dynamic_max'))])
+            sxpr.append(['memory_static_max',
+                     int(self.get('memory_static_max'))])
+            sxpr.append(['memory_static_min',
+                     int(self.get('memory_static_min'))])
+
         for legacy in LEGACY_UNSUPPORTED_BY_XENAPI_CFG:
             if legacy in ('domid', 'uuid'): # skip these
                 continue
@@ -820,8 +869,6 @@ class XendConfig(dict):
 
         sxpr.append(['image', self.image_sxpr()])
         sxpr.append(['status', domain.state])
-        sxpr.append(['memory_dynamic_min',  self.get('memory_dynamic_min')])
-        sxpr.append(['memory_dynamic_max',  self.get('memory_dynamic_max')])
 
         if domain.getDomid() is not None:
             sxpr.append(['state', self._get_old_state_string()])

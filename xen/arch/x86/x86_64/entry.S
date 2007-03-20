@@ -222,6 +222,35 @@ bad_hypercall:
         movq $-ENOSYS,UREGS_rax(%rsp)
         jmp  test_all_events
 
+ENTRY(int80_direct_trap)
+        pushq $0
+        SAVE_ALL
+
+        GET_CURRENT(%rbx)
+
+        /* Check that the callback is non-null. */
+        leaq  VCPU_int80_bounce(%rbx),%rdx
+        cmp   $0, TRAPBOUNCE_flags(%rdx)
+        jz    int80_slow_path
+
+        movq  VCPU_domain(%rbx),%rax
+        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
+        jc    compat_int80_direct_trap
+
+        call  create_bounce_frame
+        jmp   restore_all_guest
+
+int80_slow_path:
+        /* 
+         * Setup entry vector and error code as if this was a GPF caused by an
+         * IDT entry with DPL==0.
+         */
+        movl  $((0x80 << 3) | 0x2),UREGS_error_code(%rsp)
+        movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        /* A GPF wouldn't have incremented the instruction pointer. */
+        sub   $2,UREGS_rip(%rsp)
+        jmp   handle_exception_saved
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
 /* %rdx: trap_bounce, %rbx: struct vcpu                           */
@@ -359,6 +388,7 @@ ENTRY(ret_from_intr)
 /* No special register assumptions. */
 ENTRY(handle_exception)
         SAVE_ALL
+handle_exception_saved:
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
         sti

@@ -22,6 +22,9 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
 
+from xen.xm.main import serverType, SERVER_XEN_API
+from xen.xm.xenapi_create import *
+
 from opts import *
 from create import *
 
@@ -65,7 +68,15 @@ def main(argv):
 
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
-    else:
+        return
+    
+    if serverType == SERVER_XEN_API:
+        sxp2xml_inst = sxp2xml()
+        doc = sxp2xml_inst.convert_sxp_to_xml(config) 
+        
+        xenapi_create_inst = xenapi_create()
+        vm_refs = xenapi_create_inst.create(document = doc)
+    else:       
         make_unstarted_domain(opts, config)
         
 if __name__ == '__main__':

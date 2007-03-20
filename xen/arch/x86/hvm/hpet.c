@@ -29,6 +29,10 @@
 #define S_TO_NS  1000000000ULL           /* 1s  = 10^9  ns */
 #define S_TO_FS  1000000000000000ULL     /* 1s  = 10^15 fs */
 
+/* Frequency_of_TSC / frequency_of_HPET = 32 */
+#define TSC_PER_HPET_TICK 32
+#define guest_time_hpet(v) (hvm_get_guest_time(v) / TSC_PER_HPET_TICK)
+
 #define HPET_ID         0x000
 #define HPET_PERIOD     0x004
 #define HPET_CFG        0x010
@@ -67,7 +71,9 @@
 #define HPET_TN_INT_ROUTE_CAP_MASK (0xffffffffULL \
                     << HPET_TN_INT_ROUTE_CAP_SHIFT)
 
-#define hpet_tick_to_ns(h, tick) ((s_time_t)(tick)*S_TO_NS/h->tsc_freq)
+#define hpet_tick_to_ns(h, tick) ((s_time_t)(tick)* \
+                                  (S_TO_NS*TSC_PER_HPET_TICK)/h->tsc_freq)
+
 #define timer_config(h, n)       (h->hpet.timers[n].config)
 #define timer_enabled(h, n)      (timer_config(h, n) & HPET_TN_ENABLE)
 #define timer_is_periodic(h, n)  (timer_config(h, n) & HPET_TN_PERIODIC)
@@ -108,7 +114,7 @@ static inline int hpet_check_access_length(
 static inline uint64_t hpet_read_maincounter(HPETState *h)
 {
     if ( hpet_enabled(h) )
-        return hvm_get_guest_time(h->vcpu) + h->mc_offset;
+        return guest_time_hpet(h->vcpu) + h->mc_offset;
     else 
         return h->hpet.mc64;
 }
@@ -144,7 +150,7 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn)
 
 /* the number of HPET tick that stands for
  * 1/(2^10) second, namely, 0.9765625 milliseconds */
-#define  HPET_TINY_TIME_SPAN  (h->tsc_freq >> 10)
+#define  HPET_TINY_TIME_SPAN  ((h->tsc_freq >> 10) / TSC_PER_HPET_TICK)
 
 static void hpet_set_timer(HPETState *h, unsigned int tn)
 {
@@ -225,14 +231,14 @@ static void hpet_write(
         if ( !(old_val & HPET_CFG_ENABLE) && (new_val & HPET_CFG_ENABLE) )
         {
             /* Enable main counter and interrupt generation. */
-            h->mc_offset = h->hpet.mc64 - hvm_get_guest_time(h->vcpu);
+            h->mc_offset = h->hpet.mc64 - guest_time_hpet(h->vcpu);
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
                 hpet_set_timer(h, i); 
         }
         else if ( (old_val & HPET_CFG_ENABLE) && !(new_val & HPET_CFG_ENABLE) )
         {
             /* Halt main counter and disable interrupt generation. */
-            h->hpet.mc64 = h->mc_offset + hvm_get_guest_time(h->vcpu);
+            h->hpet.mc64 = h->mc_offset + guest_time_hpet(h->vcpu);
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
                 hpet_stop_timer(h, i);
         }
@@ -384,7 +390,7 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
     HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
 
     /* Write the proper value into the main counter */
-    hp->hpet.mc64 = hp->mc_offset + hvm_get_guest_time(hp->vcpu);
+    hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp->vcpu);
 
     /* Save the HPET registers */
     return hvm_save_entry(HPET, 0, h, &hp->hpet);
@@ -400,7 +406,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     
     /* Recalculate the offset between the main counter and guest time */
-    hp->mc_offset = hp->hpet.mc64 - hvm_get_guest_time(hp->vcpu);
+    hp->mc_offset = hp->hpet.mc64 - guest_time_hpet(hp->vcpu);
                 
     /* Restart the timers */
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
@@ -425,8 +431,8 @@ void hpet_init(struct vcpu *v)
     h->hpet.capability = 0x8086A201ULL;
 
     /* This is the number of femptoseconds per HPET tick. */
-    /* Here we define HPET's frequency to be the same as the TSC's. */
-    h->hpet.capability |= ((S_TO_FS/h->tsc_freq) << 32);
+    /* Here we define HPET's frequency to be 1/32 of the TSC's */
+    h->hpet.capability |= ((S_TO_FS*TSC_PER_HPET_TICK/h->tsc_freq) << 32);
 
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
     {

@@ -36,6 +36,9 @@ from xen.xend.XendVMMetrics import XendVMMetrics
 from xen.xend.XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
+from xen.util.blkif import blkdev_name_to_number
+
+
 AUTH_NONE = 'none'
 AUTH_PAM = 'pam'
 
@@ -662,7 +665,8 @@ class XendAPI(object):
                     ('add_to_other_config', None),
                     ('remove_from_other_config', None),
                     ('dmesg', 'String'),
-                    ('get_log', 'String')]
+                    ('get_log', 'String'),
+                    ('send_debug_keys', None)]
     
     host_funcs = [('get_by_name_label', 'Set(host)')]
 
@@ -748,6 +752,11 @@ class XendAPI(object):
         log_file = open(XendLogging.getLogFilename())
         log_buffer = log_file.read()
         return xen_api_success(log_buffer)
+
+    def host_send_debug_keys(self, _, host_ref, keys):
+        node = XendNode.instance()
+        node.send_debug_keys(keys)
+        return xen_api_success_void()
 
     def host_get_record(self, session, host_ref):
         node = XendNode.instance()
@@ -1070,6 +1079,7 @@ class XendAPI(object):
                   ('hard_reboot', None),
                   ('suspend', None),
                   ('resume', None),
+                  ('send_sysrq', None),
                   ('add_to_HVM_boot_params', None),
                   ('remove_from_HVM_boot_params', None),
                   ('add_to_VCPUs_params', None),
@@ -1077,7 +1087,8 @@ class XendAPI(object):
                   ('add_to_platform', None),
                   ('remove_from_platform', None),
                   ('add_to_other_config', None),
-                  ('remove_from_other_config', None)]
+                  ('remove_from_other_config', None),
+                  ('send_trigger', None)]
     
     VM_funcs  = [('create', 'VM'),
                  ('get_by_name_label', 'Set(VM)')]
@@ -1513,6 +1524,24 @@ class XendAPI(object):
         return XendTask.log_progress(0, 100, do_vm_func,
                                      "domain_unpause", vm_ref)
 
+    def VM_send_sysrq(self, _, vm_ref, req):
+        xeninfo = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        if xeninfo.state != XEN_API_VM_POWER_STATE_RUNNING:
+            return xen_api_error(
+                ['VM_BAD_POWER_STATE', vm_ref,
+                 XendDomain.POWER_STATE_NAMES[XEN_API_VM_POWER_STATE_RUNNING],
+                 XendDomain.POWER_STATE_NAMES[xeninfo.state]])
+        xeninfo.send_sysrq(req)
+        return xen_api_success_void()
+
+
+    def VM_send_trigger(self, _, vm_ref, trigger, vcpu):
+        xendom = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        xendom.domain_send_trigger(xeninfo.getDomid(), trigger, vcpu)
+        return xen_api_success_void()
+        
+
     # Xen API: Class VM_metrics
     # ----------------------------------------------------------------
 
@@ -1538,12 +1567,13 @@ class XendAPI(object):
         return xen_api_success(self._VM_metrics_get(ref).get_vcpus_number())
 
     def VM_metrics_get_vcpus_utilisation(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_metrics_get_vcpus_utilisation())
+        return xen_api_success(self._VM_metrics_get(ref).get_vcpus_utilisation())
 
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['metrics']
+    VBD_attr_ro = ['metrics',
+                   'runtime_properties']
     VBD_attr_rw = ['VM',
                    'VDI',
                    'device',
@@ -1584,23 +1614,28 @@ class XendAPI(object):
     # class methods
     def VBD_create(self, session, vbd_struct):
         xendom = XendDomain.instance()
+        xennode = XendNode.instance()
+        
         if not xendom.is_valid_vm(vbd_struct['VM']):
             return xen_api_error(['HANDLE_INVALID', 'VM', vbd_struct['VM']])
         
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
-        vbd_ref = ''
+        vdi = xennode.get_vdi_by_uuid(vbd_struct['VDI'])
+        if not vdi:
+            return xen_api_error(['HANDLE_INVALID', 'VDI', vdi_ref])
+
+        # new VBD via VDI/SR
+        vdi_image = vdi.get_location()
+
         try:
-            # new VBD via VDI/SR
-            vdi_ref = vbd_struct.get('VDI')
-            vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
-            if not vdi:
-                return xen_api_error(['HANDLE_INVALID', 'VDI', vdi_ref])
-            vdi_image = vdi.get_location()
             vbd_ref = XendTask.log_progress(0, 100,
                                             dom.create_vbd,
                                             vbd_struct, vdi_image)
-        except XendError:
-            return xen_api_todo()
+        except XendError, e:
+            log.exception("Error in VBD_create")
+            return xen_api_error(['INTERNAL_ERROR', str(e)]) 
+            
+        vdi.addVBD(vbd_ref)
 
         xendom.managed_config_save(dom)
         return xen_api_success(vbd_ref)
@@ -1612,7 +1647,14 @@ class XendAPI(object):
         if not vm:
             return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
 
+        vdi_ref = XendDomain.instance()\
+                  .get_dev_property_by_uuid('vbd', vbd_ref, "VDI")
+        vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+
         XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
+
+        vdi.removeVBD(vbd_ref)
+        
         return xen_api_success_void()
 
     def _VBD_get(self, vbd_ref, prop):
@@ -1623,6 +1665,24 @@ class XendAPI(object):
     # attributes (ro)
     def VBD_get_metrics(self, _, vbd_ref):
         return xen_api_success(vbd_ref)
+
+    def VBD_get_runtime_properties(self, _, vbd_ref):
+        xendom = XendDomain.instance()
+        dominfo = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
+        device = dominfo.get_dev_config_by_uuid('vbd', vbd_ref)
+
+        try:
+            devid = int(device['id'])
+            device_sxps = dominfo.getDeviceSxprs('vbd')
+            device_dicts  = [dict(device_sxp[1][1:]) for device_sxp in device_sxps]
+            device_dict = [device_dict
+                           for device_dict in device_dicts
+                           if int(device_dict['virtual-device']) == devid][0]
+
+            return xen_api_success(device_dict)
+        except Exception, exn:
+            log.exception(exn)
+            return xen_api_success({})
 
     # attributes (rw)
     def VBD_get_VM(self, session, vbd_ref):
@@ -1684,7 +1744,8 @@ class XendAPI(object):
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['metrics']
+    VIF_attr_ro = ['metrics',
+                   'runtime_properties']
     VIF_attr_rw = ['device',
                    'network',
                    'VM',
@@ -1721,18 +1782,17 @@ class XendAPI(object):
     # class methods
     def VIF_create(self, session, vif_struct):
         xendom = XendDomain.instance()
-        if xendom.is_valid_vm(vif_struct['VM']):
-            dom = xendom.get_vm_by_uuid(vif_struct['VM'])
-            try:
-                vif_ref = dom.create_vif(vif_struct)
-                xendom.managed_config_save(dom)                
-                return xen_api_success(vif_ref)
-            except XendError:
-                return xen_api_error(XEND_ERROR_TODO)
-        else:
+        if not xendom.is_valid_vm(vif_struct['VM']):
             return xen_api_error(['HANDLE_INVALID', 'VM', vif_struct['VM']])
 
-
+        dom = xendom.get_vm_by_uuid(vif_struct['VM'])
+        try:
+            vif_ref = dom.create_vif(vif_struct)
+            xendom.managed_config_save(dom)
+            return xen_api_success(vif_ref)
+        except XendError:
+            return xen_api_error(XEND_ERROR_TODO)
+          
     def VIF_destroy(self, session, vif_ref):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
@@ -1770,6 +1830,27 @@ class XendAPI(object):
         vifs = reduce(lambda x, y: x + y, vifs)
         return xen_api_success(vifs)
 
+    def VIF_get_runtime_properties(self, _, vif_ref):
+        xendom = XendDomain.instance()
+        dominfo = xendom.get_vm_with_dev_uuid('vif', vif_ref)
+        device = dominfo.get_dev_config_by_uuid('vif', vif_ref)
+        
+        try:
+            devid = int(device['id'])
+        
+            device_sxps = dominfo.getDeviceSxprs('vif')
+            device_dicts = [dict(device_sxp[1][1:])
+                            for device_sxp in device_sxps]
+            
+            device_dict = [device_dict
+                       for device_dict in device_dicts
+                       if int(device_dict['handle']) == devid][0]
+            
+            return xen_api_success(device_dict)
+        
+        except Exception, exn:
+            log.exception(exn)
+            return xen_api_success({})
     
     # Xen API: Class VIF_metrics
     # ----------------------------------------------------------------
@@ -1799,13 +1880,13 @@ class XendAPI(object):
     VDI_attr_ro = ['SR',
                    'VBDs',
                    'physical_utilisation',
-                   'sector_size',
                    'type']
     VDI_attr_rw = ['name_label',
                    'name_description',
                    'virtual_size',
                    'sharable',
-                   'read_only']
+                   'read_only',
+                   'other_config']
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
     VDI_methods = [('snapshot', 'VDI')]
@@ -1816,14 +1897,12 @@ class XendAPI(object):
         return XendNode.instance().get_vdi_by_uuid(ref)
     
     def VDI_get_VBDs(self, session, vdi_ref):
-        return xen_api_todo()
+        vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+        return xen_api_success(vdi.getVBDs())
     
     def VDI_get_physical_utilisation(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).
-                               get_physical_utilisation())        
-    
-    def VDI_get_sector_size(self, session, vdi_ref):
-        return xen_api_success(self._get_VDI(vdi_ref).sector_size)        
+                               get_physical_utilisation())              
     
     def VDI_get_type(self, session, vdi_ref):
         return xen_api_success(self._get_VDI(vdi_ref).type)
@@ -1865,6 +1944,14 @@ class XendAPI(object):
         self._get_VDI(vdi_ref).read_only = bool(value)
         return xen_api_success_void()
 
+    def VDI_get_other_config(self, session, vdi_ref):
+        return xen_api_success(
+            self._get_VDI(vdi_ref).other_config)
+
+    def VDI_set_other_config(self, session, vdi_ref, other_config):
+        self._get_VDI(vdi_ref).other_config = other_config
+        return xen_api_success_void()
+
     # Object Methods
     def VDI_snapshot(self, session, vdi_ref):
         return xen_api_todo()
@@ -1881,13 +1968,13 @@ class XendAPI(object):
             'name_label': image.name_label,
             'name_description': image.name_description,
             'SR': image.sr_uuid,
-            'VBDs': [], # TODO
+            'VBDs': image.getVBDs(),
             'virtual_size': image.virtual_size,
             'physical_utilisation': image.physical_utilisation,
-            'sector_size': image.sector_size,
             'type': image.type,
             'sharable': image.sharable,
             'read_only': image.read_only,
+            'other_config': image.other_config
             })
 
     # Class Functions    

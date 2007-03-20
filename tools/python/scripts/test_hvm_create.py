@@ -39,14 +39,13 @@ vm_cfg = {
 local_vdi_cfg = {
     'name_label': 'gentoo.hvm',
     'name_description': '',
-    'location': 'file:/root/gentoo.amd64.hvm.img',
     'virtual_size': 0,
-    'sector_size': 0,
     'type': 'system',
     'parent': '',
     'SR_name': 'Local',
     'sharable': False,
     'read_only': False,
+    'other_config': {'location': 'file:/root/gentoo.amd64.hvm.img'},
 }    
 
 local_vbd_cfg = {

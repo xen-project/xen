@@ -57,7 +57,7 @@ GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_compat_linux.c
 
 CFLAGS   += -Werror -Wmissing-prototypes
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += $(INCLUDES) -I.
+CFLAGS   += $(INCLUDES) -I. -I../xenstore
 
 # Needed for posix_fadvise64() in xc_linux.c
 CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE

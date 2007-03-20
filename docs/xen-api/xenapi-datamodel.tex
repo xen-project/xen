@@ -9359,10 +9359,10 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & list of vbds that ref
 $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & list of crash dumps that refer to this disk \\
 $\mathit{RW}$ &  {\tt virtual\_size} & int & size of disk as presented to the guest (in bytes). Note that, depending on storage backend type, requested size may not be respected exactly \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & amount of physical space that the disk image is currently taking up on the storage repository (in bytes) \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt sector\_size} & int & sector size of VDI (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt type} & vdi\_type & type of the VDI \\
 $\mathit{RW}$ &  {\tt sharable} & bool & true if this disk may be shared \\
 $\mathit{RW}$ &  {\tt read\_only} & bool & true if this disk may ONLY be mounted read-only \\
+$\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VDI}
@@ -9812,38 +9812,6 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_sector\_size}
-
-{\bf Overview:} 
-Get the sector\_size field of the given VDI.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} int get_sector_size (session_id s, VDI ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VDI ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-int
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
 \subsubsection{RPC name:~get\_type}
 
 {\bf Overview:} 
@@ -9993,6 +9961,143 @@ Set the read\_only field of the given VDI.
 {\tt VDI ref } & self & reference to the object \\ \hline 
 
 {\tt bool } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_other\_config}
+
+{\bf Overview:} 
+Get the other\_config field of the given VDI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_other_config (session_id s, VDI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_other\_config}
+
+{\bf Overview:} 
+Set the other\_config field of the given VDI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_other_config (session_id s, VDI ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_other\_config}
+
+{\bf Overview:} 
+Add the given key-value pair to the other\_config field of the given VDI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_other_config (session_id s, VDI ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to add \\ \hline 
+
+{\tt string } & value & Value to add \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_other\_config}
+
+{\bf Overview:} 
+Remove the given key and its corresponding value from the other\_config
+field of the given VDI.  If the key is not in that Map, then do nothing.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void remove_from_other_config (session_id s, VDI ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VDI ref } & self & reference to the object \\ \hline 
+
+{\tt string } & key & Key to remove \\ \hline 
 
 \end{tabular}
 

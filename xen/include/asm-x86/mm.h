@@ -404,5 +404,6 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 # define domain_clamp_alloc_bitsize(d, b) (b)
 #endif
 
+unsigned long domain_get_maximum_gpfn(struct domain *d);
 
 #endif /* __ASM_X86_MM_H__ */

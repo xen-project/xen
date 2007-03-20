@@ -11,9 +11,14 @@
 #include "vl.h"
 #include "block_int.h"
 #include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 static struct xs_handle *xsh = NULL;
-static char *hd_filename[MAX_DISKS];
+static char *media_filename[MAX_DISKS];
 static QEMUTimer *insert_timer = NULL;
 
 #define UWAIT_MAX (30*1000000) /* thirty seconds */
@@ -40,10 +45,10 @@ static void insert_media(void *opaque)
     int i;
 
     for (i = 0; i < MAX_DISKS; i++) {
-	if (hd_filename[i]) {
-	    do_change(bs_table[i]->device_name, hd_filename[i]);
-	    free(hd_filename[i]);
-	    hd_filename[i] = NULL;
+	if (media_filename[i] && bs_table[i]) {
+	    do_change(bs_table[i]->device_name, media_filename[i]);
+	    free(media_filename[i]);
+	    media_filename[i] = NULL;
 	}
     }
 }
@@ -82,7 +87,7 @@ void xenstore_parse_domain_config(int domid)
     unsigned int len, num, hd_index;
 
     for(i = 0; i < MAX_DISKS; i++)
-        hd_filename[i] = NULL;
+        media_filename[i] = NULL;
 
     xsh = xs_daemon_open();
     if (xsh == NULL) {
@@ -128,19 +133,12 @@ void xenstore_parse_domain_config(int domid)
 	    continue;
 	free(type);
 	type = xs_read(xsh, XBT_NULL, buf, &len);
-	/* read params to get the patch of the image -- read it last
-	 * so that we have its path in buf when setting up the
-	 * watch */
 	if (pasprintf(&buf, "%s/params", bpath) == -1)
 	    continue;
 	free(params);
 	params = xs_read(xsh, XBT_NULL, buf, &len);
 	if (params == NULL)
 	    continue;
-	if (params[0]) {
-	    hd_filename[hd_index] = params;	/* strdup() */
-	    params = NULL;		/* don't free params on re-use */
-	}
         /* 
          * check if device has a phantom vbd; the phantom is hooked
          * to the frontend device (for ease of cleanup), so lookup 
@@ -151,37 +149,41 @@ void xenstore_parse_domain_config(int domid)
 	    continue;
 	free(fpath);
         fpath = xs_read(xsh, XBT_NULL, buf, &len);
-	if (fpath != NULL) {
+	if (fpath) {
 	    if (pasprintf(&buf, "%s/dev", fpath) == -1)
 	        continue;
+	    free(params);
             params = xs_read(xsh, XBT_NULL, buf , &len);
-	    if (params != NULL) {
-                free(hd_filename[hd_index]);
-                hd_filename[hd_index] = params;
-                params = NULL;              /* don't free params on re-use */
+	    if (params) {
                 /* 
                  * wait for device, on timeout silently fail because we will 
                  * fail to open below
                  */
-                waitForDevice(hd_filename[hd_index]);
+                waitForDevice(params);
             }
         }
+
 	bs_table[hd_index] = bdrv_new(dev);
-        /* re-establish buf */
-	if (pasprintf(&buf, "%s/params", bpath) == -1)
-	    continue;
 	/* check if it is a cdrom */
 	if (type && !strcmp(type, "cdrom")) {
 	    bdrv_set_type_hint(bs_table[hd_index], BDRV_TYPE_CDROM);
-	    xs_watch(xsh, buf, dev);
+	    if (pasprintf(&buf, "%s/params", bpath) != -1)
+		xs_watch(xsh, buf, dev);
 	}
-	if (hd_filename[hd_index]) {
-            if (bdrv_open(bs_table[hd_index], hd_filename[hd_index],
-			  0 /* snapshot */) < 0)
+	/* open device now if media present */
+	if (params[0]) {
+            if (bdrv_open(bs_table[hd_index], params, 0 /* snapshot */) < 0)
                 fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
-                        hd_filename[hd_index]);
+                        params);
 	}
     }
+
+    /* Set a watch for log-dirty requests from the migration tools */
+    if (pasprintf(&buf, "%s/logdirty/next-active", path) != -1) {
+        xs_watch(xsh, buf, "logdirty");
+        fprintf(logfile, "Watching %s\n", buf);
+    }
+
 
  out:
     free(type);
@@ -201,6 +203,116 @@ int xenstore_fd(void)
     return -1;
 }
 
+unsigned long *logdirty_bitmap = NULL;
+unsigned long logdirty_bitmap_size;
+extern int vga_ram_size, bios_size;
+
+void xenstore_process_logdirty_event(void)
+{
+    char *act;
+    static char *active_path = NULL;
+    static char *next_active_path = NULL;
+    static char *seg = NULL;
+    unsigned int len;
+    int i;
+
+    fprintf(logfile, "Triggered log-dirty buffer switch\n");
+
+    if (!seg) {
+        char *path, *p, *key_ascii, key_terminated[17] = {0,};
+        key_t key;
+        int shmid;
+
+        /* Find and map the shared memory segment for log-dirty bitmaps */
+        if (!(path = xs_get_domain_path(xsh, domid))) {            
+            fprintf(logfile, "Log-dirty: can't get domain path in store\n");
+            exit(1);
+        }
+        if (!(path = realloc(path, strlen(path) 
+                             + strlen("/logdirty/next-active") + 1))) {
+            fprintf(logfile, "Log-dirty: out of memory\n");
+            exit(1);
+        }
+        strcat(path, "/logdirty/");
+        p = path + strlen(path);
+        strcpy(p, "key");
+        
+        key_ascii = xs_read(xsh, XBT_NULL, path, &len);
+        if (!key_ascii) {
+            /* No key yet: wait for the next watch */
+            free(path);
+            return;
+        }
+        strncpy(key_terminated, key_ascii, 16);
+        free(key_ascii);
+        key = (key_t) strtoull(key_terminated, NULL, 16);
+
+        /* Figure out how bit the log-dirty bitmaps are */
+        logdirty_bitmap_size = ((phys_ram_size + 0x20 
+                                 - (vga_ram_size + bios_size)) 
+                                >> (TARGET_PAGE_BITS)); /* nr of bits in map*/
+        if (logdirty_bitmap_size > HVM_BELOW_4G_MMIO_START >> TARGET_PAGE_BITS)
+            logdirty_bitmap_size += 
+                HVM_BELOW_4G_MMIO_LENGTH >> TARGET_PAGE_BITS; /* still bits */
+        logdirty_bitmap_size = ((logdirty_bitmap_size + HOST_LONG_BITS - 1)
+                                / HOST_LONG_BITS); /* longs */
+        logdirty_bitmap_size *= sizeof (unsigned long); /* bytes */
+
+        /* Map the shared-memory segment */
+        if ((shmid = shmget(key, 
+                            2 * logdirty_bitmap_size, 
+                            S_IRUSR|S_IWUSR)) == -1 
+            || (seg = shmat(shmid, NULL, 0)) == (void *)-1) {
+            fprintf(logfile, "Log-dirty: can't map segment %16.16llx (%s)\n",
+                    (unsigned long long) key, strerror(errno));
+            exit(1);
+        }
+
+        fprintf(logfile, "Log-dirty: mapped segment at %p\n", seg);
+
+        /* Double-check that the bitmaps are the size we expect */
+        if (logdirty_bitmap_size != *(uint32_t *)seg) {
+            fprintf(logfile, "Log-dirty: got %lu, calc %lu\n", 
+                    *(uint32_t *)seg, logdirty_bitmap_size);
+            return;
+        }
+
+        /* Remember the paths for the next-active and active entries */
+        strcpy(p, "active");
+        if (!(active_path = strdup(path))) {
+            fprintf(logfile, "Log-dirty: out of memory\n");
+            exit(1);
+        }
+        strcpy(p, "next-active");
+        if (!(next_active_path = strdup(path))) {
+            fprintf(logfile, "Log-dirty: out of memory\n");
+            exit(1);
+        }
+        free(path);
+    }
+    
+    /* Read the required active buffer from the store */
+    act = xs_read(xsh, XBT_NULL, next_active_path, &len);
+    if (!act) {
+        fprintf(logfile, "Log-dirty: can't read next-active\n");
+        exit(1);
+    }
+
+    /* Switch buffers */
+    i = act[0] - '0';
+    if (i != 0 && i != 1) {
+        fprintf(logfile, "Log-dirty: bad next-active entry: %s\n", act);
+        exit(1);
+    }
+    logdirty_bitmap = seg + i * logdirty_bitmap_size;
+
+    /* Ack that we've switched */
+    xs_write(xsh, XBT_NULL, active_path, act, len);
+    free(act);
+}
+
+
+
 void xenstore_process_event(void *opaque)
 {
     char **vec, *image = NULL;
@@ -209,6 +321,11 @@ void xenstore_process_event(void *opaque)
     vec = xs_read_watch(xsh, &num);
     if (!vec)
 	return;
+
+    if (!strcmp(vec[XS_WATCH_TOKEN], "logdirty")) {
+        xenstore_process_logdirty_event();
+        goto out;
+    }
 
     if (strncmp(vec[XS_WATCH_TOKEN], "hd", 2) ||
 	strlen(vec[XS_WATCH_TOKEN]) != 3)
@@ -220,13 +337,13 @@ void xenstore_process_event(void *opaque)
 
     do_eject(0, vec[XS_WATCH_TOKEN]);
     bs_table[hd_index]->filename[0] = 0;
-    if (hd_filename[hd_index]) {
-	free(hd_filename[hd_index]);
-	hd_filename[hd_index] = NULL;
+    if (media_filename[hd_index]) {
+	free(media_filename[hd_index]);
+	media_filename[hd_index] = NULL;
     }
 
     if (image[0]) {
-	hd_filename[hd_index] = strdup(image);
+	media_filename[hd_index] = strdup(image);
 	xenstore_check_new_media_present(5000);
     }
 

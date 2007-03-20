@@ -33,11 +33,11 @@ import getopt
 import socket
 import traceback
 import xmlrpclib
-import traceback
 import time
 import datetime
 from select import select
 import xml.dom.minidom
+from xen.util.blkif import blkdev_name_to_number
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -49,10 +49,10 @@ from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
-from xen.util import security
 from xen.util.xmlrpclib2 import ServerProxy
 
 import XenAPI
+
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -60,7 +60,8 @@ import XenAPI
 if not hasattr(getopt, 'gnu_getopt'):
     getopt.gnu_getopt = getopt.getopt
 
-XM_CONFIG_FILE = '/etc/xen/xm-config.xml'
+XM_CONFIG_FILE_ENVVAR = 'XM_CONFIG_FILE'
+XM_CONFIG_FILE_DEFAULT = '/etc/xen/xm-config.xml'
 
 # Supported types of server
 SERVER_LEGACY_XMLRPC = 'LegacyXMLRPC'
@@ -351,13 +352,14 @@ all_commands = (domain_commands + host_commands + scheduler_commands +
 # Configuration File Parsing
 ##
 
+xmConfigFile = os.getenv(XM_CONFIG_FILE_ENVVAR, XM_CONFIG_FILE_DEFAULT)
 config = None
-if os.path.isfile(XM_CONFIG_FILE):
+if os.path.isfile(xmConfigFile):
     try:
-        config = xml.dom.minidom.parse(XM_CONFIG_FILE)
+        config = xml.dom.minidom.parse(xmConfigFile)
     except:
         print >>sys.stderr, ('Ignoring invalid configuration file %s.' %
-                             XM_CONFIG_FILE)
+                             xmConfigFile)
 
 def parseServer():
     if config:
@@ -490,6 +492,18 @@ def usage(cmd = None):
 #  Utility functions
 #
 ####################################################################
+
+def get_default_SR():
+    return [sr_ref
+            for sr_ref in server.xenapi.SR.get_all()
+            if server.xenapi.SR.get_type(sr_ref) == "local"][0]
+
+def get_default_Network():
+    return [network_ref
+            for network_ref in server.xenapi.network.get_all()][0]
+
+def map2sxp(m):
+    return [[k, m[k]] for k in m.keys()]
 
 def arg_check(args, name, lo, hi = -1):
     n = len([i for i in args if i != '--'])
@@ -673,10 +687,41 @@ def xm_restore(args):
 
 
 def getDomains(domain_names, state, full = 0):
-    if domain_names:
-        return [server.xend.domain(dom, full) for dom in domain_names]
+    if serverType == SERVER_XEN_API:
+        doms_sxp = []
+        doms_dict = []
+        dom_refs = server.xenapi.VM.get_all()
+        for dom_ref in dom_refs:
+            dom_rec = server.xenapi.VM.get_record(dom_ref)
+            dom_metrics_ref = server.xenapi.VM.get_metrics(dom_ref)
+            dom_metrics = server.xenapi.VM_metrics.get_record(dom_metrics_ref)
+            dom_rec.update({'name':     dom_rec['name_label'],
+                            'memory_actual': int(dom_metrics['memory_actual'])/1024,
+                            'vcpus':    dom_metrics['vcpus_number'],
+                            'state':    '-----',
+                            'cpu_time': dom_metrics['vcpus_utilisation']})
+			
+            doms_sxp.append(['domain'] + map2sxp(dom_rec))
+            doms_dict.append(dom_rec)
+            
+        if domain_names:
+            doms = [['domain'] + map2sxp(dom) for dom in doms_dict
+                    if dom["name"] in domain_names]
+            
+            if len(doms) > 0:
+                return doms
+            else:
+                print "Error: no domain%s named %s" % \
+                      (len(domain_names) > 1 and 's' or '',
+                       ', '.join(domain_names))
+                sys.exit(-1)
+        else:
+            return doms_sxp
     else:
-        return server.xend.domains_with_state(True, state, full)
+        if domain_names:
+            return [server.xend.domain(dom, full) for dom in domain_names]
+        else:
+            return server.xend.domains_with_state(True, state, full)
 
 
 def xm_list(args):
@@ -735,19 +780,38 @@ def parse_doms_info(info):
     else:
         up_time = time.time() - start_time
 
-    return {
+    parsed_info = {
         'domid'    : get_info('domid',              str,   ''),
         'name'     : get_info('name',               str,   '??'),
-        'mem'      : get_info('memory_dynamic_min', int,   0),
         'state'    : get_info('state',              str,   ''),
-        'cpu_time' : get_info('cpu_time',           float, 0.0),
+
         # VCPUs is the number online when the VM is up, or the number
         # configured otherwise.
         'vcpus'    : get_info('online_vcpus', int,
                               get_info('vcpus', int, 0)),
-        'up_time'  : up_time,
-        'seclabel' : security.get_security_printlabel(info),
+        'up_time'  : up_time
         }
+
+    # We're not supporting security stuff just yet via XenAPI
+
+    if serverType != SERVER_XEN_API:
+        from xen.util import security
+        parsed_info['seclabel'] = security.get_security_printlabel(info)
+    else:
+        parsed_info['seclabel'] = ""
+
+    if serverType == SERVER_XEN_API:
+        parsed_info['mem'] = get_info('memory_actual', int, 0) / 1024
+        cpu_times = get_info('cpu_time', lambda x : (x), 0.0)
+        if sum(cpu_times.values()) > 0:
+            parsed_info['cpu_time'] = sum(cpu_times.values()) / float(len(cpu_times.values()))
+        else:
+            parsed_info['cpu_time'] = 0
+    else:
+        parsed_info['mem'] = get_info('memory', int,0)
+        parsed_info['cpu_time'] = get_info('cpu_time', float, 0.0)
+
+    return parsed_info
 
 def check_sched_type(sched):
     if serverType == SERVER_XEN_API:
@@ -797,17 +861,22 @@ def xm_label_list(doms):
     output = []
     format = '%(name)-32s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
-    
-    for dom in doms:
-        d = parse_doms_info(dom)
-        if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
-            if not d['seclabel']:
-                d['seclabel'] = 'ERROR'
-        elif security.active_policy in ['DEFAULT']:
-            d['seclabel'] = 'DEFAULT'
-        else:
-            d['seclabel'] = 'INACTIVE'
-        output.append((format % d, d['seclabel']))
+
+    if serverType != SERVER_XEN_API:
+        from xen.util import security
+        
+        for dom in doms:
+            d = parse_doms_info(dom)
+
+            if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
+                if not d['seclabel']:
+                    d['seclabel'] = 'ERROR'
+                elif security.active_policy in ['DEFAULT']:
+                    d['seclabel'] = 'DEFAULT'
+                else:
+                    d['seclabel'] = 'INACTIVE'
+
+            output.append((format % d, d['seclabel']))
         
     #sort by labels
     output.sort(lambda x,y: cmp( x[1].lower(), y[1].lower()))
@@ -816,7 +885,6 @@ def xm_label_list(doms):
 
 
 def xm_vcpu_list(args):
-
     if args:
         dominfo = map(server.xend.domain.getVCPUInfo, args)
     else:
@@ -1112,7 +1180,7 @@ def xm_mem_set(args):
     dom = args[0]
 
     if serverType == SERVER_XEN_API:
-        mem_target = int_unit(args[1], 'k') * 1024
+        mem_target = int_unit(args[1], 'm') * 1024 * 1024
         server.xenapi.VM.set_memory_dynamic_max(get_single_vm(dom), mem_target)
         server.xenapi.VM.set_memory_dynamic_min(get_single_vm(dom), mem_target)
     else:
@@ -1464,7 +1532,10 @@ def xm_sysrq(args):
     arg_check(args, "sysrq", 2)
     dom = args[0]
     req = args[1]
-    server.xend.domain.send_sysrq(dom, req)    
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.send_sysrq(get_single_vm(dom), req)
+    else:
+        server.xend.domain.send_sysrq(dom, req)
 
 def xm_trigger(args):
     vcpu = 0
@@ -1474,12 +1545,23 @@ def xm_trigger(args):
     trigger = args[1]
     if len(args) == 3:
         vcpu = int(args[2])
-    
-    server.xend.domain.send_trigger(dom, trigger, vcpu)
+        
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.send_trigger(get_single_vm(dom), trigger, vcpu)
+    else:
+        server.xend.domain.send_trigger(dom, trigger, vcpu)
 
 def xm_debug_keys(args):
     arg_check(args, "debug-keys", 1)
-    server.xend.node.send_debug_keys(str(args[0]))
+
+    keys = str(args[0])
+    
+    if serverType == SERVER_XEN_API:
+        server.xenapi.host.send_debug_keys(
+            server.xenapi.session.get_this_host(),
+            keys)
+    else:
+        server.xend.node.send_debug_keys(keys)
 
 def xm_top(args):
     arg_check(args, "top", 0)
@@ -1605,12 +1687,21 @@ def xm_network_list(args):
     (use_long, params) = arg_check_for_resource_list(args, "network-list")
 
     dom = params[0]
-    if use_long:
+
+    if serverType == SERVER_XEN_API:
+        vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
+        vif_properties = \
+            map(server.xenapi.VIF.get_runtime_properties, vif_refs)
+        devs = map(lambda (handle, properties): [handle, map2sxp(properties)],
+                   zip(range(len(vif_properties)), vif_properties))
+    else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vif')
+        
+    if use_long:
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend.domain.getDeviceSxprs(dom, 'vif'):
+        for x in devs:
             if hdr == 0:
                 print 'Idx BE     MAC Addr.     handle state evt-ch tx-/rx-ring-ref BE-path'
                 hdr = 1
@@ -1630,12 +1721,25 @@ def xm_block_list(args):
     (use_long, params) = arg_check_for_resource_list(args, "block-list")
 
     dom = params[0]
-    if use_long:
+
+    if serverType == SERVER_XEN_API:
+        vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
+        vbd_properties = \
+            map(server.xenapi.VBD.get_runtime_properties, vbd_refs)
+        vbd_devs = \
+            map(server.xenapi.VBD.get_device, vbd_refs)
+        vbd_devids = \
+            map(blkdev_name_to_number, vbd_devs)
+        devs = map(lambda (devid, prop): [devid, map2sxp(prop)],
+                   zip(vbd_devids, vbd_properties))
+    else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vbd')
+
+    if use_long:
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend.domain.getDeviceSxprs(dom, 'vbd'):
+        for x in devs:
             if hdr == 0:
                 print 'Vdev  BE handle state evt-ch ring-ref BE-path'
                 hdr = 1
@@ -1690,13 +1794,17 @@ def parse_block_configuration(args):
     if len(args) == 5:
         vbd.append(['backend', args[4]])
 
-    # verify that policy permits attaching this resource
-    if security.on():
-        dominfo = server.xend.domain(dom)
-        label = security.get_security_printlabel(dominfo)
-    else:
-        label = None
-    security.res_security_check(args[1], label)
+    if serverType != SERVER_XEN_API:
+        # verify that policy permits attaching this resource
+        from xen.util import security
+    
+        if security.on():
+            dominfo = server.xend.domain(dom)
+            label = security.get_security_printlabel(dominfo)
+        else:
+            label = None
+
+        security.res_security_check(args[1], label)
 
     return (dom, vbd)
 
@@ -1704,8 +1812,45 @@ def parse_block_configuration(args):
 def xm_block_attach(args):
     arg_check(args, 'block-attach', 4, 5)
 
-    (dom, vbd) = parse_block_configuration(args)
-    server.xend.domain.device_create(dom, vbd)
+    if serverType == SERVER_XEN_API:
+        dom   = args[0]
+        uname = args[1]
+        dev   = args[2]
+        mode  = args[3]
+
+        # First create new VDI
+        vdi_record = {
+            "name_label":       "vdi" + str(uname.__hash__()),   
+            "name_description": "",
+            "SR":               get_default_SR(),
+            "virtual_size":     0,
+            "sector_size":      512,
+            "type":             "system",
+            "sharable":         False,
+            "read_only":        mode!="w",
+            "other_config":     {"location": uname}
+        }
+
+        vdi_ref = server.xenapi.VDI.create(vdi_record)
+
+        # Now create new VBD
+
+        vbd_record = {
+            "VM":               get_single_vm(dom),
+            "VDI":              vdi_ref,
+            "device":           dev,
+            "bootable":         True,
+            "mode":             mode=="w" and "RW" or "RO",
+            "type":             "Disk",
+            "qos_algorithm_type": "",
+            "qos_algorithm_params": {}
+        }
+
+        server.xenapi.VBD.create(vbd_record)
+        
+    else:
+        (dom, vbd) = parse_block_configuration(args)
+        server.xend.domain.device_create(dom, vbd)
 
 
 def xm_block_configure(args):
@@ -1723,15 +1868,65 @@ def xm_network_attach(args):
     vif_params = ['type', 'mac', 'bridge', 'ip', 'script', \
                   'backend', 'vifname', 'rate', 'model']
 
-    for a in args[1:]:
-        vif_param = a.split("=")
-        if len(vif_param) != 2 or vif_param[1] == '' or \
-           vif_param[0] not in vif_params:
-            err("Invalid argument: %s" % a)
-            usage('network-attach')
-        vif.append(vif_param)
+    if serverType == SERVER_XEN_API:     
+        vif_record = {
+            "device":               "eth0",
+            "network":              get_default_Network(),
+            "VM":                   get_single_vm(dom),
+            "MAC":                  "",
+            "MTU":                  "",
+            "qos_algorithm_type":   "",
+            "qos_algorithm_params": {},
+            "other_config":         {}
+            }
 
-    server.xend.domain.device_create(dom, vif)
+        def set(keys, val):
+            record = vif_record
+            for key in keys[:-1]:
+                record = record[key]
+            record[keys[-1]] = val 
+         
+        vif_conv = {
+            'type':
+                lambda x: None,
+            'mac':
+                lambda x: set(['MAC'], x),
+            'bridge':
+                lambda x: set(['network'], get_net_from_bridge(x)),
+            'ip':
+                lambda x: set(['other_config', 'ip'], x),
+            'script':
+                lambda x: set(['other_config', 'script'], x),
+            'backend':
+                lambda x: set(['other_config', 'backend'], x),
+            'vifname':
+                lambda x: set(['device'], x),
+            'rate':
+                lambda x: set(['qos_algorithm_params', 'rate'], x),
+            'model':
+                lambda x: None
+            }
+            
+        for a in args[1:]:
+            vif_param = a.split("=")
+            if len(vif_param) != 2 or vif_param[1] == '' or \
+                   vif_param[0] not in vif_params:
+                err("Invalid argument: %s" % a)
+                usage('network-attach')   
+            else:
+                vif_conv[vif_param[0]](vif_param[1])
+
+        print str(vif_record)
+        server.xenapi.VIF.create(vif_record)
+    else:
+        for a in args[1:]:
+            vif_param = a.split("=")
+            if len(vif_param) != 2 or vif_param[1] == '' or \
+                   vif_param[0] not in vif_params:
+                err("Invalid argument: %s" % a)
+                usage('network-attach')
+            vif.append(vif_param)
+        server.xend.domain.device_create(dom, vif)
 
 
 def detach(args, command, deviceClass):
@@ -1751,16 +1946,49 @@ def detach(args, command, deviceClass):
 
 
 def xm_block_detach(args):
-    try:
-        detach(args, 'block-detach', 'vbd')
-        return
-    except:
-        pass
-    detach(args, 'block-detach', 'tap')
+    if serverType == SERVER_XEN_API:
+        arg_check(args, "xm_block_detach", 2, 3)
+        dom = args[0]
+        dev = args[1]
+        vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
+        vbd_refs = [vbd_ref for vbd_ref in vbd_refs
+                    if server.xenapi.VBD.get_device(vbd_ref) == dev]
+        if len(vbd_refs) > 0:
+            vbd_ref = vbd_refs[0]
+            vdi_ref = server.xenapi.VBD.get_VDI(vbd_ref)
 
+            server.xenapi.VBD.destroy(vbd_ref)
+
+            if len(server.xenapi.VDI.get_VBDs(vdi_ref)) <= 0:
+                server.xenapi.VDI.destroy(vdi_ref)
+        else:
+            raise OptionError("Cannot find device '%s' in domain '%s'"
+                              % (dev,dom))
+    else:
+        try:
+            detach(args, 'block-detach', 'vbd')
+            return
+        except:
+            pass
+        detach(args, 'block-detach', 'tap')
 
 def xm_network_detach(args):
-    detach(args, 'network-detach', 'vif')
+    if serverType == SERVER_XEN_API:
+        arg_check(args, "xm_block_detach", 2, 3)
+        dom = args[0]
+        devid = args[1]
+        vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
+        vif_refs = [vif_ref for vif_ref in vif_refs
+                    if server.xenapi.VIF.\
+                    get_runtime_properties(vif_ref)["handle"] == devid]
+        if len(vif_refs) > 0:
+            vif_ref = vif_refs[0]
+            
+            server.xenapi.VIF.destroy(vif_ref)
+        else:
+            print "Cannot find device '%s' in domain '%s'" % (devid,dom)
+    else:
+        detach(args, 'network-detach', 'vif')
 
 
 def xm_vnet_list(args):
@@ -2001,13 +2229,17 @@ def _run_cmd(cmd, cmd_name, args):
         err(str(e))
         _usage(cmd_name)
         print e.usage
-    except security.ACMError, e:
-        err(str(e))
-    except:
-        print "Unexpected error:", sys.exc_info()[0]
-        print
-        print "Please report to xen-devel@lists.xensource.com"
-        raise
+    except Exception, e:
+        if serverType != SERVER_XEN_API:
+           from xen.util import security
+           if isinstance(e, security.ACMError):
+               err(str(e))
+               return False, 1
+        else:
+            print "Unexpected error:", sys.exc_info()[0]
+            print
+            print "Please report to xen-devel@lists.xensource.com"
+            raise
 
     return False, 1
 

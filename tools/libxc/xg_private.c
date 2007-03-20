@@ -201,7 +201,9 @@ __attribute__((weak))
 __attribute__((weak)) 
     int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     uint32_t max_factor, uint32_t flags,
-                    int (*suspend)(int domid))
+                    int (*suspend)(int domid), 
+                    void *(*init_qemu_maps)(int, unsigned), 
+                    void (*qemu_flip_buffer)(int, int))
 {
     errno = ENOSYS;
     return -1;

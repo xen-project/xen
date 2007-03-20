@@ -18,7 +18,7 @@ check-headers: checker
 	./checker > $(XEN_TARGET_ARCH).size
 	diff -u reference.size $(XEN_TARGET_ARCH).size
 checker: checker.c $(headers)
-	$(HOSTCC) $(CFLAGS) -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 else
 check-headers:
 	@echo "cross build: skipping check"

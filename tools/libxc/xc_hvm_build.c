@@ -137,6 +137,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
+    /* Explicitly reserve space for special pages (ioreq and xenstore). */
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE * 3;
+    e820entry[nr_map].size = PAGE_SIZE * 3;
+    e820entry[nr_map].type = E820_RESERVED;
+    nr_map++;
+
     if ( extra_mem_size )
     {
         e820entry[nr_map].addr = (1ULL << 32);
@@ -280,7 +286,6 @@ static int setup_guest(int xc_handle,
     /* NB. evtchn_upcall_mask is unused: leave as zero. */
     memset(&shared_info->evtchn_mask[0], 0xff,
            sizeof(shared_info->evtchn_mask));
-    shared_info->arch.max_pfn = page_array[nr_pages - 1];
     munmap(shared_info, PAGE_SIZE);
 
     if ( v_end > HVM_BELOW_4G_RAM_END )
