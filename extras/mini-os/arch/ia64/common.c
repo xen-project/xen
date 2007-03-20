@@ -225,6 +225,7 @@ arch_print_info(void)
 	major = minor >> 16;
 	minor &= ~0xffffffff;
 	printk("Running on Xen version: %d.%d\n", major, minor);
+#if 0
 	printk("machine addr of shared_info_t  : 0x%lx\n",
 	       start_info.shared_info);
 	printk("machine page number of shared page: 0x%lx\n",
@@ -235,5 +236,8 @@ arch_print_info(void)
 	       start_info.console.domU.mfn);
 	printk("evtchn for console messages    : %d\n",
 	       start_info.console.domU.evtchn);
-	printk("xen_guest_cmdline              : %s\n", boot_cmd_line);
+#endif
+	if(strlen(boot_cmd_line) > 0)
+		printk("xen_guest_cmdline              : %s\n", boot_cmd_line);
 }
+

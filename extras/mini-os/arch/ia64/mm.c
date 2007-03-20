@@ -127,7 +127,7 @@ void*
 map_frames(unsigned long* frames, unsigned long n)
 {
 	n = n;
-	return (void*) __va(frames[0] << PAGE_SHIFT);
+	return (void*) __va(SWAP(frames[0]) << PAGE_SHIFT);
 }
 
 void arch_init_p2m(unsigned long max_pfn)

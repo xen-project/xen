@@ -138,7 +138,7 @@ xencomm_arch_event_channel_op(int cmd, void *arg)
 	if (unlikely(rc == -ENOSYS)) {
 		struct evtchn_op op;
 
-		op.cmd = cmd;
+		op.cmd = SWAP(cmd);
 		memcpy(&op.u, arg, sizeof(op.u));
 		rc = _hypercall1(int, event_channel_op_compat, &op);
 	}

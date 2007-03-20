@@ -33,6 +33,7 @@
 #include "ia64_cpu.h"
 #include "ia64_fpu.h"
 #include "offsets.h"
+#include "xen/xen.h"
 
 
 /*
@@ -517,3 +518,23 @@ ENTRY(__hypercall)
 	br.ret.sptk.many b0
 	;;
 END(__hypercall)
+
+/*
+ * Stub for suspend.
+ * Just force the stacked registers to be written in memory.
+ */
+ENTRY(xencomm_arch_hypercall_suspend)
+	;;
+	alloc	r20=ar.pfs,0,0,6,0
+	mov	r2=__HYPERVISOR_sched_op
+	;;
+	/* We don't want to deal with RSE.  */
+	flushrs
+	mov	r33=r32
+	mov	r32=2		// SCHEDOP_shutdown
+	;;
+	break	0x1000
+	;;
+	br.ret.sptk.many b0
+END(xencomm_arch_hypercall_suspend)
+
