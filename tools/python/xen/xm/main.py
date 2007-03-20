@@ -1544,8 +1544,11 @@ def xm_trigger(args):
     trigger = args[1]
     if len(args) == 3:
         vcpu = int(args[2])
-    
-    server.xend.domain.send_trigger(dom, trigger, vcpu)
+        
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.send_trigger(get_single_vm(dom), trigger, vcpu)
+    else:
+        server.xend.domain.send_trigger(dom, trigger, vcpu)
 
 def xm_debug_keys(args):
     arg_check(args, "debug-keys", 1)

@@ -1087,7 +1087,8 @@ class XendAPI(object):
                   ('add_to_platform', None),
                   ('remove_from_platform', None),
                   ('add_to_other_config', None),
-                  ('remove_from_other_config', None)]
+                  ('remove_from_other_config', None),
+                  ('send_trigger', None)]
     
     VM_funcs  = [('create', 'VM'),
                  ('get_by_name_label', 'Set(VM)')]
@@ -1533,6 +1534,13 @@ class XendAPI(object):
         xeninfo.send_sysrq(req)
         return xen_api_success_void()
 
+
+    def VM_send_trigger(self, _, vm_ref, trigger, vcpu):
+        xendom = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        xendom.domain_send_trigger(xeninfo.getDomid(), trigger, vcpu)
+        return xen_api_success_void()
+        
 
     # Xen API: Class VM_metrics
     # ----------------------------------------------------------------
