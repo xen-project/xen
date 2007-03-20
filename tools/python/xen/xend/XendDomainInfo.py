@@ -34,7 +34,7 @@ from types import StringTypes
 
 import xen.lowlevel.xc
 from xen.util import asserts
-from xen.util.blkif import blkdev_uname_to_file
+from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 from xen.util import security
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
@@ -1786,7 +1786,8 @@ class XendDomainInfo:
             disk = devinfo[1]['uname']
 
             fn = blkdev_uname_to_file(disk)
-            mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            taptype = blkdev_uname_to_taptype(disk)
+            mounted = devtype == 'tap' and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
             if mounted:
                 # This is a file, not a device.  pygrub can cope with a
                 # file if it's raw, but if it's QCOW or other such formats
@@ -1802,7 +1803,7 @@ class XendDomainInfo:
 
                 from xen.xend import XendDomain
                 dom0 = XendDomain.instance().privilegedDomain()
-                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
+                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, disk))
                 fn = BOOTLOADER_LOOPBACK_DEVICE
 
             try:
