@@ -1656,21 +1656,19 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         dominfo = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
         device = dominfo.get_dev_config_by_uuid('vbd', vbd_ref)
-        devid = int(device['id'])
-        device_sxps = dominfo.getDeviceSxprs('vbd')
 
-        log.debug("VBD_get_runtime_properties devid: %i device_sxps: %s",
-                  devid, device_sxps)
-        
-        device_dicts  = [dict(device_sxp[1][1:]) for device_sxp in device_sxps]
+        try:
+            devid = int(device['id'])
+            device_sxps = dominfo.getDeviceSxprs('vbd')
+            device_dicts  = [dict(device_sxp[1][1:]) for device_sxp in device_sxps]
+            device_dict = [device_dict
+                           for device_dict in device_dicts
+                           if int(device_dict['virtual-device']) == devid][0]
 
-        device_dict = [device_dict
-                       for device_dict in device_dicts
-                       if int(device_dict['virtual-device']) == devid][0]
-
-        log.debug("VBD_get_runtime_properties device_dict: %s", device_dict)
-
-        return xen_api_success(device_dict)
+            return xen_api_success(device_dict)
+        except Exception, exn:
+            log.exception(exn)
+            return xen_api_success({})
 
     # attributes (rw)
     def VBD_get_VM(self, session, vbd_ref):
@@ -1732,7 +1730,8 @@ class XendAPI(object):
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['metrics']
+    VIF_attr_ro = ['metrics',
+                   'runtime_properties']
     VIF_attr_rw = ['device',
                    'network',
                    'VM',
@@ -1769,18 +1768,17 @@ class XendAPI(object):
     # class methods
     def VIF_create(self, session, vif_struct):
         xendom = XendDomain.instance()
-        if xendom.is_valid_vm(vif_struct['VM']):
-            dom = xendom.get_vm_by_uuid(vif_struct['VM'])
-            try:
-                vif_ref = dom.create_vif(vif_struct)
-                xendom.managed_config_save(dom)                
-                return xen_api_success(vif_ref)
-            except XendError:
-                return xen_api_error(XEND_ERROR_TODO)
-        else:
+        if not xendom.is_valid_vm(vif_struct['VM']):
             return xen_api_error(['HANDLE_INVALID', 'VM', vif_struct['VM']])
 
-
+        dom = xendom.get_vm_by_uuid(vif_struct['VM'])
+        try:
+            vif_ref = dom.create_vif(vif_struct)
+            xendom.managed_config_save(dom)
+            return xen_api_success(vif_ref)
+        except XendError:
+            return xen_api_error(XEND_ERROR_TODO)
+          
     def VIF_destroy(self, session, vif_ref):
         xendom = XendDomain.instance()
         vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
@@ -1818,6 +1816,27 @@ class XendAPI(object):
         vifs = reduce(lambda x, y: x + y, vifs)
         return xen_api_success(vifs)
 
+    def VIF_get_runtime_properties(self, _, vif_ref):
+        xendom = XendDomain.instance()
+        dominfo = xendom.get_vm_with_dev_uuid('vif', vif_ref)
+        device = dominfo.get_dev_config_by_uuid('vif', vif_ref)
+        
+        try:
+            devid = int(device['id'])
+        
+            device_sxps = dominfo.getDeviceSxprs('vif')
+            device_dicts = [dict(device_sxp[1][1:])
+                            for device_sxp in device_sxps]
+            
+            device_dict = [device_dict
+                       for device_dict in device_dicts
+                       if int(device_dict['handle']) == devid][0]
+            
+            return xen_api_success(device_dict)
+        
+        except Exception, exn:
+            log.exception(exn)
+            return xen_api_success({})
     
     # Xen API: Class VIF_metrics
     # ----------------------------------------------------------------

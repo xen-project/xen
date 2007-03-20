@@ -497,6 +497,10 @@ def get_default_SR():
             for sr_ref in server.xenapi.SR.get_all()
             if server.xenapi.SR.get_type(sr_ref) == "local"][0]
 
+def get_default_Network():
+    return [network_ref
+            for network_ref in server.xenapi.network.get_all()][0]
+
 def map2sxp(m):
     return [[k, m[k]] for k in m.keys()]
 
@@ -1669,12 +1673,20 @@ def xm_network_list(args):
     (use_long, params) = arg_check_for_resource_list(args, "network-list")
 
     dom = params[0]
-    if use_long:
+
+    if serverType == SERVER_XEN_API:
+        vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
+        vif_properties = \
+            map(server.xenapi.VIF.get_runtime_properties, vif_refs)
+        devs = map(lambda x: [x.get('handle'), map2sxp(x)], vif_properties)
+    else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vif')
+        
+    if use_long:
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend.domain.getDeviceSxprs(dom, 'vif'):
+        for x in devs:
             if hdr == 0:
                 print 'Idx BE     MAC Addr.     handle state evt-ch tx-/rx-ring-ref BE-path'
                 hdr = 1
@@ -1699,7 +1711,7 @@ def xm_block_list(args):
         vbd_refs = server.xenapi.VM.get_VBDs(get_single_vm(dom))
         vbd_properties = \
             map(server.xenapi.VBD.get_runtime_properties, vbd_refs)
-        devs = map(lambda x: [x['virtual-device'], map2sxp(x)], vbd_properties)
+        devs = map(lambda x: [x.get('virtual-device'), map2sxp(x)], vbd_properties)
     else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vbd')
 
@@ -1836,15 +1848,65 @@ def xm_network_attach(args):
     vif_params = ['type', 'mac', 'bridge', 'ip', 'script', \
                   'backend', 'vifname', 'rate', 'model']
 
-    for a in args[1:]:
-        vif_param = a.split("=")
-        if len(vif_param) != 2 or vif_param[1] == '' or \
-           vif_param[0] not in vif_params:
-            err("Invalid argument: %s" % a)
-            usage('network-attach')
-        vif.append(vif_param)
+    if serverType == SERVER_XEN_API:     
+        vif_record = {
+            "device":               "eth0",
+            "network":              get_default_Network(),
+            "VM":                   get_single_vm(dom),
+            "MAC":                  "",
+            "MTU":                  "",
+            "qos_algorithm_type":   "",
+            "qos_algorithm_params": {},
+            "other_config":         {}
+            }
 
-    server.xend.domain.device_create(dom, vif)
+        def set(keys, val):
+            record = vif_record
+            for key in keys[:-1]:
+                record = record[key]
+            record[keys[-1]] = val 
+         
+        vif_conv = {
+            'type':
+                lambda x: None,
+            'mac':
+                lambda x: set(['MAC'], x),
+            'bridge':
+                lambda x: set(['network'], get_net_from_bridge(x)),
+            'ip':
+                lambda x: set(['other_config', 'ip'], x),
+            'script':
+                lambda x: set(['other_config', 'script'], x),
+            'backend':
+                lambda x: set(['other_config', 'backend'], x),
+            'vifname':
+                lambda x: set(['device'], x),
+            'rate':
+                lambda x: set(['qos_algorithm_params', 'rate'], x),
+            'model':
+                lambda x: None
+            }
+            
+        for a in args[1:]:
+            vif_param = a.split("=")
+            if len(vif_param) != 2 or vif_param[1] == '' or \
+                   vif_param[0] not in vif_params:
+                err("Invalid argument: %s" % a)
+                usage('network-attach')   
+            else:
+                vif_conv[vif_param[0]](vif_param[1])
+
+        print str(vif_record)
+        server.xenapi.VIF.create(vif_record)
+    else:
+        for a in args[1:]:
+            vif_param = a.split("=")
+            if len(vif_param) != 2 or vif_param[1] == '' or \
+                   vif_param[0] not in vif_params:
+                err("Invalid argument: %s" % a)
+                usage('network-attach')
+            vif.append(vif_param)
+        server.xend.domain.device_create(dom, vif)
 
 
 def detach(args, command, deviceClass):
@@ -1890,7 +1952,22 @@ def xm_block_detach(args):
         detach(args, 'block-detach', 'tap')
 
 def xm_network_detach(args):
-    detach(args, 'network-detach', 'vif')
+    if serverType == SERVER_XEN_API:
+        arg_check(args, "xm_block_detach", 2, 3)
+        dom = args[0]
+        devid = args[1]
+        vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
+        vif_refs = [vif_ref for vif_ref in vif_refs
+                    if server.xenapi.VIF.\
+                    get_runtime_properties(vif_ref)["handle"] == devid]
+        if len(vif_refs) > 0:
+            vif_ref = vif_refs[0]
+            
+            server.xenapi.VIF.destroy(vif_ref)
+        else:
+            print "Cannot find device '%s' in domain '%s'" % (devid,dom)
+    else:
+        detach(args, 'network-detach', 'vif')
 
 
 def xm_vnet_list(args):

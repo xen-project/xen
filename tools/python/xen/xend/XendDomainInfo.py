@@ -2286,8 +2286,6 @@ class XendDomainInfo:
         @return: uuid of the device
         """
         xenapi_vbd['image'] = vdi_image_path
-        log.debug('create_vbd: %s' % xenapi_vbd)
-        dev_uuid = ''
         if vdi_image_path.startswith('tap'):
             dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
         else:
@@ -2297,8 +2295,8 @@ class XendDomainInfo:
             raise XendError('Failed to create device')
 
         if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            
             _, config = self.info['devices'][dev_uuid]
-            dev_control = None
             
             if vdi_image_path.startswith('tap'):
                 dev_control = self.getDeviceController('tap')
@@ -2349,9 +2347,21 @@ class XendDomainInfo:
             raise XendError('Failed to create device')
         
         if self.state == XEN_API_VM_POWER_STATE_RUNNING:
-            _, config = self.info['devices'][dev_uuid]
-            config['devid'] = self.getDeviceController('vif').createDevice(config)
 
+            _, config = self.info['devices'][dev_uuid]
+            dev_control = self.getDeviceController('vif')
+
+            try:
+                devid = dev_control.createDevice(config)
+                dev_control.waitForDevice(devid)
+                self.info.device_update(dev_uuid,
+                                        cfg_xenapi = {'devid': devid})
+            except Exception, exn:
+                log.exception(exn)
+                del self.info['devices'][dev_uuid]
+                self.info['vif_refs'].remove(dev_uuid)
+                raise            
+ 
         return dev_uuid
 
     def create_vtpm(self, xenapi_vtpm):
