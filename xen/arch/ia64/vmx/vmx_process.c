@@ -92,6 +92,11 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
 
     switch (vec) {
 
+    case 22:	// IA64_INST_ACCESS_RIGHTS_VECTOR
+        if (vhpt_access_rights_fixup(vcpu, ifa, 0))
+            return;
+        break;
+
     case 25:	// IA64_DISABLED_FPREG_VECTOR
 
         if (FP_PSR(vcpu) & IA64_PSR_DFH) {

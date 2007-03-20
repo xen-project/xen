@@ -291,6 +291,7 @@ extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, in
 
 #define   ITIR_RV_MASK      (((1UL<<32)-1)<<32 | 0x3)
 #define   PAGE_FLAGS_RV_MASK    (0x2 | (0x3UL<<50)|(((1UL<<11)-1)<<53))
+#define   PAGE_FLAGS_AR_PL_MASK ((0x7UL<<9)|(0x3UL<<7))
 extern u64 machine_ttag(PTA pta, u64 va);
 extern u64 machine_thash(PTA pta, u64 va);
 extern void purge_machine_tc_by_domid(domid_t domid);
@@ -309,6 +310,7 @@ extern u64 translate_phy_pte(struct vcpu *v, u64 *pte, u64 itir, u64 va);
 extern void thash_vhpt_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa,
                               int type);
 extern u64 guest_vhpt_lookup(u64 iha, u64 *pte);
+extern int vhpt_access_rights_fixup(struct vcpu *v, u64 ifa, int is_data);
 
 static inline void vmx_vcpu_set_tr (thash_data_t *trp, u64 pte, u64 itir, u64 va, u64 rid)
 {

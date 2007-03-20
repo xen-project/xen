@@ -196,6 +196,37 @@ void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va, int type)
         ia64_srlz_i();
     }
 }
+
+int vhpt_access_rights_fixup(VCPU *v, u64 ifa, int is_data)
+{
+    thash_data_t *trp, *data;
+    u64 ps, tag, mask;
+
+    trp = __vtr_lookup(v, ifa, is_data);
+    if (trp) {
+        ps = _REGION_PAGE_SIZE(ia64_get_rr(ifa));
+        if (trp->ps < ps)
+            return 0;
+        ifa = PAGEALIGN(ifa, ps);
+        data = (thash_data_t *)ia64_thash(ifa);
+        tag = ia64_ttag(ifa);
+        do {
+            if (data->etag == tag) {
+                mask = trp->page_flags & PAGE_FLAGS_AR_PL_MASK;
+                if (mask != (data->page_flags & PAGE_FLAGS_AR_PL_MASK)) {
+                    data->page_flags &= ~PAGE_FLAGS_AR_PL_MASK;
+                    data->page_flags |= mask;
+                    machine_tlb_purge(ifa, ps);
+                    return 1;
+                }
+                return 0;
+            }
+            data = data->next;
+        } while(data);
+    }
+    return 0;
+}
+
 /*
  *   vhpt lookup
  */
