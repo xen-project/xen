@@ -253,6 +253,10 @@ static inline xen_pfn_t xc_dom_p2m_guest(struct xc_dom_image *dom,
 
 /* --- arch bits --------------------------------------------------- */
 
+int arch_setup_meminit(struct xc_dom_image *dom);
+int arch_setup_bootearly(struct xc_dom_image *dom);
+int arch_setup_bootlate(struct xc_dom_image *dom);
+
 /*
  * Local variables:
  * mode: C
