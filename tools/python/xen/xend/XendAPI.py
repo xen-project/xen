@@ -665,6 +665,7 @@ class XendAPI(object):
                     ('add_to_other_config', None),
                     ('remove_from_other_config', None),
                     ('dmesg', 'String'),
+                    ('dmesg_clear', 'String'),
                     ('get_log', 'String'),
                     ('send_debug_keys', None)]
     
@@ -742,11 +743,11 @@ class XendAPI(object):
             return xen_api_error(XEND_ERROR_HOST_RUNNING)
         return xen_api_error(XEND_ERROR_UNSUPPORTED)        
 
-    def host_dmesg(self, session, host_ref, clear):
-        if clear:
-            return xen_api_success(XendDmesg.instance().clear())
-        else:
-            return xen_api_success(XendDmesg.instance().info())
+    def host_dmesg(self, session, host_ref):
+        return xen_api_success(XendDmesg.instance().info())
+
+    def host_dmesg_clear(self, session, host_ref):
+        return xen_api_success(XendDmesg.instance().clear())
 
     def host_get_log(self, session, host_ref):
         log_file = open(XendLogging.getLogFilename())

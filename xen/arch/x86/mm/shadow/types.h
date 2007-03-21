@@ -597,7 +597,7 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
  * have reserved bits that we can use for this.
  */
 
-#define SH_L1E_MAGIC 0xffffffff00000000ULL
+#define SH_L1E_MAGIC 0xffffffff00000001ULL
 static inline int sh_l1e_is_magic(shadow_l1e_t sl1e)
 {
     return ((sl1e.l1 & SH_L1E_MAGIC) == SH_L1E_MAGIC);
