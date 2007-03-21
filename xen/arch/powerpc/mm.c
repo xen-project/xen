@@ -401,9 +401,13 @@ int allocate_rma(struct domain *d, unsigned int order)
 
 void free_rma_check(struct page_info *page)
 {
-    if (test_bit(_PGC_page_RMA, &page->count_info) &&
-        !test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags))
-        panic("Attempt to free an RMA page: 0x%lx\n", page_to_mfn(page));
+    if (test_bit(_PGC_page_RMA, &page->count_info)) {
+        if (!test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags)) {
+            panic("Attempt to free an RMA page: 0x%lx\n", page_to_mfn(page));
+        } else {
+            clear_bit(_PGC_page_RMA, &page->count_info);
+        }
+    }
 }
 
 ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
