@@ -22,6 +22,7 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "xenctrl.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -626,14 +627,26 @@ static int x86_shadow(int xc, domid_t domid)
 
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
-    int rc = 0;
+    int rc;
 
     x86_compat(dom->guest_xc, dom->guest_domid, dom->guest_type);
     if ( xc_dom_feature_translated(dom) )
     {
         dom->shadow_enabled = 1;
         rc = x86_shadow(dom->guest_xc, dom->guest_domid);
+        if ( rc )
+            return rc;
     }
+
+    /* setup initial p2m */
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
+        dom->p2m_host[pfn] = pfn;
+
+    /* allocate guest memory */
+    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+                                           dom->total_pages, 0, 0,
+                                           dom->p2m_host);
     return rc;
 }
 

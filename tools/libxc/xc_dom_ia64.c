@@ -18,6 +18,7 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "xenctrl.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -130,8 +131,19 @@ static void __init register_arch_hooks(void)
 
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
-    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
-    return 0;
+    xen_pfn_t pfn;
+    int rc;
+
+    /* setup initial p2m */
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
+        dom->p2m_host[pfn] = pfn;
+
+    /* allocate guest memory */
+    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+                                           dom->total_pages, 0, 0,
+                                           dom->p2m_host);
+    return rc;
 }
 
 int arch_setup_bootearly(struct xc_dom_image *dom)

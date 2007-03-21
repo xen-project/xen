@@ -133,13 +133,7 @@ int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
-    if ( (rc = arch_setup_meminit(dom)) != 0 )
-        return rc;
-
-    /* allocate guest memory */
-    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
-                                           dom->total_pages, 0, 0,
-                                           dom->p2m_host);
+    rc = arch_setup_meminit(dom);
     if ( rc != 0 )
     {
         xc_dom_panic(XC_OUT_OF_MEMORY,

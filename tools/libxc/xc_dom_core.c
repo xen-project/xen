@@ -639,7 +639,7 @@ int xc_dom_parse_image(struct xc_dom_image *dom)
 int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb)
 {
     unsigned int page_shift;
-    xen_pfn_t nr_pages, pfn;
+    xen_pfn_t nr_pages;
 
     dom->arch_hooks = xc_dom_find_arch_hooks(dom->guest_type);
     if ( dom->arch_hooks == NULL )
@@ -659,10 +659,6 @@ int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb)
     xc_dom_printf("%s: 0x%" PRIpfn " pages\n",
                   __FUNCTION__, dom->total_pages);
 
-    /* setup initial p2m */
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
-    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
-        dom->p2m_host[pfn] = pfn;
     return 0;
 }
 
