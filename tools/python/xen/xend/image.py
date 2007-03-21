@@ -229,35 +229,6 @@ class PPC_LinuxImageHandler(LinuxImageHandler):
 
 
 
-class PPC_ProseImageHandler(PPC_LinuxImageHandler):
-
-    ostype = "prose"
-
-    def buildDomain(self):
-        store_evtchn = self.vm.getStorePort()
-        console_evtchn = self.vm.getConsolePort()
-
-        mem_mb = self.getRequiredInitialReservation() / 1024
-
-        log.debug("dom            = %d", self.vm.getDomid())
-        log.debug("memsize        = %d", mem_mb)
-        log.debug("image          = %s", self.kernel)
-        log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("console_evtchn = %d", console_evtchn)
-        log.debug("cmdline        = %s", self.cmdline)
-        log.debug("ramdisk        = %s", self.ramdisk)
-        log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("features       = %s", self.vm.getFeatures())
-
-        return xc.arch_prose_build(dom            = self.vm.getDomid(),
-                                   memsize        = mem_mb,
-                                   image          = self.kernel,
-                                   store_evtchn   = store_evtchn,
-                                   console_evtchn = console_evtchn,
-                                   cmdline        = self.cmdline,
-                                   ramdisk        = self.ramdisk,
-                                   features       = self.vm.getFeatures())
-
 class HVMImageHandler(ImageHandler):
 
     ostype = "hvm"
@@ -616,7 +587,6 @@ class X86_Linux_ImageHandler(LinuxImageHandler):
 _handlers = {
     "powerpc": {
         "linux": PPC_LinuxImageHandler,
-        "prose": PPC_ProseImageHandler,
     },
     "ia64": {
         "linux": LinuxImageHandler,
