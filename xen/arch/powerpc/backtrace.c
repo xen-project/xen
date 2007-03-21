@@ -222,8 +222,7 @@ void __warn(char *file, int line)
 
 void dump_execution_state(void)
 {
-    struct vcpu *v = current;
-    struct cpu_user_regs *regs = &v->arch.ctxt;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     show_registers(regs);
     if (regs->msr & MSR_HV) {
