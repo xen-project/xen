@@ -32,6 +32,10 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
 {
     int rc;
 
+    dom->flags = flags;
+    dom->console_evtchn = console_evtchn;
+    dom->xenstore_evtchn = store_evtchn;
+
     if ( (rc = xc_dom_boot_xen_init(dom, xc_handle, domid)) != 0 )
         goto out;
     if ( (rc = xc_dom_parse_image(dom)) != 0 )
@@ -42,12 +46,7 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
         goto out;
     if ( (rc = xc_dom_build_image(dom)) != 0 )
         goto out;
-
-    dom->flags = flags;
-    dom->console_evtchn = console_evtchn;
-    dom->xenstore_evtchn = store_evtchn;
-    rc = xc_dom_boot_image(dom);
-    if ( rc != 0 )
+    if ( (rc = xc_dom_boot_image(dom)) != 0 )
         goto out;
 
     *console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);

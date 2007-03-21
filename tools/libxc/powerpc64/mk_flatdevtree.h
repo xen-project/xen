@@ -26,18 +26,8 @@
 
 extern void free_devtree(struct ft_cxt *root);
 extern int make_devtree(struct ft_cxt *root,
-                        uint32_t domid, 
-                        uint32_t mem_mb,
-                        unsigned long rma_bytes,
-                        unsigned long shadow_mb,
-                        unsigned long initrd_base,
-                        unsigned long initrd_len,
-                        const char *bootargs,
-                        uint64_t shared_info_paddr,
-                        unsigned long console_evtchn,
-                        uint64_t console_paddr,
-                        unsigned long store_evtchn,
-                        uint64_t store_paddr);
+                        struct xc_dom_image *dom,
+                        unsigned long shadow_mb);
 
 #define MAX_PATH 200
 #define BUFSIZE 1024
