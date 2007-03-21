@@ -37,6 +37,7 @@
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
 #include <xen/rcupdate.h>
+#include <xen/version.h>
 #include <acm/acm_hooks.h>
 #include <public/version.h>
 #include <asm/mpic.h>
@@ -453,6 +454,14 @@ void __init __start_xen_ppc(
 extern void arch_get_xen_caps(xen_capabilities_info_t *info);
 void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
+    int major = xen_major_version();
+    int minor = xen_minor_version();
+    char s[32];
+
+    (*info)[0] = '\0';
+
+    snprintf(s, sizeof(s), "xen-%d.%d-powerpc64 ", major, minor);
+    safe_strcat(*info, s);
 }
 
 
