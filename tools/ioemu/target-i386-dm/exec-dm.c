@@ -450,6 +450,9 @@ static inline int paddr_is_ram(target_phys_addr_t addr)
 #define phys_ram_addr(x) (phys_ram_base + (x))
 #endif
 
+extern unsigned long *logdirty_bitmap;
+extern unsigned long logdirty_bitmap_size;
+
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                             int len, int is_write)
 {
@@ -485,9 +488,20 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     l = 1;
                 }
             } else if (paddr_is_ram(addr)) {
-                /* Reading from RAM */
+                /* Writing to RAM */
                 ptr = phys_ram_addr(addr);
                 memcpy(ptr, buf, l);
+                if (logdirty_bitmap != NULL) {
+                    /* Record that we have dirtied this frame */
+                    unsigned long pfn = addr >> TARGET_PAGE_BITS;
+                    if (pfn / 8 >= logdirty_bitmap_size) {
+                        fprintf(logfile, "dirtying pfn %x >= bitmap size %x\n",
+                                pfn, logdirty_bitmap_size * 8);
+                    } else {
+                        logdirty_bitmap[pfn / HOST_LONG_BITS]
+                            |= 1UL << pfn % HOST_LONG_BITS;
+                    }
+                }
 #ifdef __ia64__
                 sync_icache(ptr, l);
 #endif 

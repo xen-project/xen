@@ -4,16 +4,6 @@
 struct tpm_chip;
 struct tpm_private;
 
-struct tpm_virtual_device {
-	/*
-	 * This field indicates the maximum size the driver can
-	 * transfer in one chunk. It is filled in by the front-end
-	 * driver and should be propagated to the generic tpm driver
-	 * for allocation of buffers.
-	 */
-	unsigned int max_tx_size;
-};
-
 struct vtpm_state {
 	struct transmission *current_request;
 	spinlock_t           req_list_lock;
@@ -29,8 +19,6 @@ struct vtpm_state {
 	u8                   flags;
 
 	unsigned long        disconnect_time;
-
-	struct tpm_virtual_device *tpmvd;
 
 	/*
 	 * The following is a private structure of the underlying
@@ -51,7 +39,6 @@ int vtpm_vd_send(struct tpm_private * tp,
 
 /* these functions are offered by tpm_vtpm.c */
 struct tpm_chip *init_vtpm(struct device *,
-                           struct tpm_virtual_device *,
                            struct tpm_private *);
 void cleanup_vtpm(struct device *);
 int vtpm_vd_recv(const struct tpm_chip* chip,

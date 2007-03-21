@@ -23,7 +23,7 @@ void xc_default_error_handler(const xc_error const *err)
     fprintf(stderr, "ERROR %s: %s\n", desc, err->message);
 }
 
-const xc_error const *xc_get_last_error(void)
+const xc_error *xc_get_last_error(void)
 {
     return &last_error;
 }
@@ -263,6 +263,15 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
+    case XENMEM_current_reservation:
+    case XENMEM_maximum_reservation:
+    case XENMEM_maximum_gpfn:
+        if ( lock_pages(arg, sizeof(domid_t)) )
+        {
+            PERROR("Could not lock");
+            goto out1;
+        }
+        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -286,6 +295,11 @@ int xc_memory_op(int xc_handle,
         break;
     case XENMEM_add_to_physmap:
         unlock_pages(arg, sizeof(struct xen_add_to_physmap));
+        break;
+    case XENMEM_current_reservation:
+    case XENMEM_maximum_reservation:
+    case XENMEM_maximum_gpfn:
+        unlock_pages(arg, sizeof(domid_t));
         break;
     }
 

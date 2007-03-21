@@ -46,7 +46,7 @@ class VfbifController(DevController):
 
     def createDevice(self, config):
         DevController.createDevice(self, config)
-        if self.vm.info.get('HVM_boot_policy'):
+        if self.vm.info.is_hvm():
             # is HVM, so qemu-dm will handle the vfb.
             return
         

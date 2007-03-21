@@ -18,6 +18,7 @@
 #include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/keyhandler.h>
 #include <asm/current.h>
 #include <public/sysctl.h>
 
@@ -120,6 +121,20 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 #endif
+
+    case XEN_SYSCTL_debug_keys:
+    {
+        char c;
+        uint32_t i;
+
+        for ( i = 0; i < op->u.debug_keys.nr_keys; i++ )
+        {
+            if ( copy_from_guest_offset(&c, op->u.debug_keys.keys, i, 1) )
+                return -EFAULT;
+            handle_keypress(c, guest_cpu_user_regs());
+        }
+    }
+    break;
 
     default:
         ret = arch_do_sysctl(op, u_sysctl);

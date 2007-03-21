@@ -4196,178 +4196,86 @@ ASM_END
     case 0xe8:
         switch(regs.u.r8.al)
         {
-         case 0x20: // coded by osmaker aka K.J.
-            if(regs.u.r32.edx == 0x534D4150) /* SMAP */
-            {
-#ifdef HVMASSIST
-		if ((regs.u.r16.bx / 0x14) * 0x14 == regs.u.r16.bx) {
-		    Bit16u e820_table_size = read_word(0xe000, 0x8) * 0x14;
+        case 0x20: {
+            Bit16u e820_table_size = read_word(0xe000, 0x8) * 0x14;
 
-		    if (regs.u.r16.bx + 0x14 <= e820_table_size) {
-			memcpyb(ES, regs.u.r16.di,
-				0xe000, 0x10 + regs.u.r16.bx, 0x14);
-		    }
-		    regs.u.r32.ebx += 0x14;
-		    if ((regs.u.r32.ebx + 0x14 - 1) > e820_table_size)
-			regs.u.r32.ebx = 0;
-		    regs.u.r32.eax = 0x534D4150;
-		    regs.u.r32.ecx = 0x14;
-		    CLEAR_CF();
-		    return;
-		} else if (regs.u.r16.bx == 1) {
-		    extended_memory_size = inb_cmos(0x35);
-		    extended_memory_size <<= 8;
-		    extended_memory_size |= inb_cmos(0x34);
-		    extended_memory_size *= 64;
-		    if (extended_memory_size > 0x3bc000) // greater than EFF00000???
-		    {
-			extended_memory_size = 0x3bc000; // everything after this is reserved memory until we get to 0x100000000
-		    }
-		    extended_memory_size *= 1024;
-		    extended_memory_size += 15728640; // make up for the 16mb of memory that is chopped off
+            if (regs.u.r32.edx != 0x534D4150) /* SMAP */
+                goto int15_unimplemented;
 
-		    if (extended_memory_size <= 15728640)
-		    {
-			extended_memory_size = inb_cmos(0x31);
-			extended_memory_size <<= 8;
-			extended_memory_size |= inb_cmos(0x30);
-			extended_memory_size *= 1024;
-		    }
-
-		    write_word(ES, regs.u.r16.di, 0x0000);
-		    write_word(ES, regs.u.r16.di+2, 0x0010);
-		    write_word(ES, regs.u.r16.di+4, 0x0000);
-		    write_word(ES, regs.u.r16.di+6, 0x0000);
-
-		    write_word(ES, regs.u.r16.di+8, extended_memory_size);
-		    extended_memory_size >>= 16;
-		    write_word(ES, regs.u.r16.di+10, extended_memory_size);
-		    extended_memory_size >>= 16;
-		    write_word(ES, regs.u.r16.di+12, extended_memory_size);
-		    extended_memory_size >>= 16;
-		    write_word(ES, regs.u.r16.di+14, extended_memory_size);
-
-		    write_word(ES, regs.u.r16.di+16, 0x1);
-		    write_word(ES, regs.u.r16.di+18, 0x0);
-
-		    regs.u.r32.ebx = 0;
-		    regs.u.r32.eax = 0x534D4150;
-		    regs.u.r32.ecx = 0x14;
-		    CLEAR_CF();
-		    return;
-		} else { /* AX=E820, DX=534D4150, BX unrecognized */
-		    goto int15_unimplemented;
-		}
-#else
-                switch(regs.u.r16.bx)
-                {
-                    case 0:
-                        write_word(ES, regs.u.r16.di, 0x00);
-                        write_word(ES, regs.u.r16.di+2, 0x00);
-                        write_word(ES, regs.u.r16.di+4, 0x00);
-                        write_word(ES, regs.u.r16.di+6, 0x00);
-
-                        write_word(ES, regs.u.r16.di+8, 0xFC00);
-                        write_word(ES, regs.u.r16.di+10, 0x0009);
-                        write_word(ES, regs.u.r16.di+12, 0x0000);
-                        write_word(ES, regs.u.r16.di+14, 0x0000);
-
-                        write_word(ES, regs.u.r16.di+16, 0x1);
-                        write_word(ES, regs.u.r16.di+18, 0x0);
-
-                        regs.u.r32.ebx = 1;
-
-                        regs.u.r32.eax = 0x534D4150;
-                        regs.u.r32.ecx = 0x14;
-                        CLEAR_CF();
-                        return;
-                        break;
-                    case 1:
-                        extended_memory_size = inb_cmos(0x35);
-                        extended_memory_size <<= 8;
-                        extended_memory_size |= inb_cmos(0x34);
-                        extended_memory_size *= 64;
-                        if(extended_memory_size > 0x3bc000) // greater than EFF00000???
-                        {
-                            extended_memory_size = 0x3bc000; // everything after this is reserved memory until we get to 0x100000000
-                        }
-                        extended_memory_size *= 1024;
-                        extended_memory_size += 15728640; // make up for the 16mb of memory that is chopped off
-
-                        if(extended_memory_size <= 15728640)
-                        {
-                            extended_memory_size = inb_cmos(0x31);
-                            extended_memory_size <<= 8;
-                            extended_memory_size |= inb_cmos(0x30);
-                            extended_memory_size *= 1024;
-                        }
-
-                        write_word(ES, regs.u.r16.di, 0x0000);
-                        write_word(ES, regs.u.r16.di+2, 0x0010);
-                        write_word(ES, regs.u.r16.di+4, 0x0000);
-                        write_word(ES, regs.u.r16.di+6, 0x0000);
-
-                        write_word(ES, regs.u.r16.di+8, extended_memory_size);
-                        extended_memory_size >>= 16;
-                        write_word(ES, regs.u.r16.di+10, extended_memory_size);
-                        extended_memory_size >>= 16;
-                        write_word(ES, regs.u.r16.di+12, extended_memory_size);
-                        extended_memory_size >>= 16;
-                        write_word(ES, regs.u.r16.di+14, extended_memory_size);
-
-                        write_word(ES, regs.u.r16.di+16, 0x1);
-                        write_word(ES, regs.u.r16.di+18, 0x0);
-
-                        regs.u.r32.ebx = 0;
-                        regs.u.r32.eax = 0x534D4150;
-                        regs.u.r32.ecx = 0x14;
-                        CLEAR_CF();
-                        return;
-                        break;
-                    default:  /* AX=E820, DX=534D4150, BX unrecognized */
-                        goto int15_unimplemented;
+            if ((regs.u.r16.bx / 0x14) * 0x14 == regs.u.r16.bx) {
+                if (regs.u.r16.bx + 0x14 <= e820_table_size)
+                    memcpyb(ES, regs.u.r16.di,
+                            0xe000, 0x10 + regs.u.r16.bx, 0x14);
+                regs.u.r32.ebx += 0x14;
+                if ((regs.u.r32.ebx + 0x14 - 1) > e820_table_size)
+                    regs.u.r32.ebx = 0;
+            } else if (regs.u.r16.bx == 1) {
+                Bit32u base, type;
+                Bit16u off;
+                for (off = 0; off < e820_table_size; off += 0x14) {
+                    base = read_dword(0xe000, 0x10 + off);
+                    type = read_dword(0xe000, 0x20 + off);
+                    if ((base >= 0x100000) && (type == 1))
                         break;
                 }
-#endif
-	    } else {
-	      // if DX != 0x534D4150)
-	      goto int15_unimplemented;
-	    }
+                if (off == e820_table_size) {
+                    SET_CF();
+                    break;
+                }
+                memcpyb(ES, regs.u.r16.di, 0xe000, 0x10 + off, 0x14);
+                regs.u.r32.ebx = 0;
+            } else { /* AX=E820, DX=534D4150, BX unrecognized */
+                goto int15_unimplemented;
+            }
+
+            regs.u.r32.eax = 0x534D4150;
+            regs.u.r32.ecx = 0x14;
+            CLEAR_CF();
             break;
+        }
 
-        case 0x01: 
-          // do we have any reason to fail here ?
-          CLEAR_CF();
+        case 0x01: {
+            Bit16u off, e820_table_size = read_word(0xe000, 0x8) * 0x14;
+            Bit32u base, type, size;
 
-          // my real system sets ax and bx to 0
-          // this is confirmed by Ralph Brown list
-          // but syslinux v1.48 is known to behave 
-          // strangely if ax is set to 0
-          // regs.u.r16.ax = 0;
-          // regs.u.r16.bx = 0;
+            // do we have any reason to fail here ?
+            CLEAR_CF();
 
-          // Get the amount of extended memory (above 1M)
-          regs.u.r8.cl = inb_cmos(0x30);
-          regs.u.r8.ch = inb_cmos(0x31);
+            // Get the amount of extended memory (above 1M)
+            regs.u.r8.cl = inb_cmos(0x30);
+            regs.u.r8.ch = inb_cmos(0x31);
           
-          // limit to 15M
-          if(regs.u.r16.cx > 0x3c00)
-          {
-            regs.u.r16.cx = 0x3c00;
-          }
+            // limit to 15M
+            if (regs.u.r16.cx > (15*1024))
+                regs.u.r16.cx = 15*1024;
 
-          // Get the amount of extended memory above 16M in 64k blocs
-          regs.u.r8.dl = inb_cmos(0x34);
-          regs.u.r8.dh = inb_cmos(0x35);
+            // Find first RAM E820 entry >= 1MB.
+            for (off = 0; off < e820_table_size; off += 0x14) {
+                base = read_dword(0xe000, 0x10 + off);
+                type = read_dword(0xe000, 0x20 + off);
+                if ((base >= 0x100000) && (type == 1))
+                    break;
+            }
 
-          // Set configured memory equal to extended memory
-          regs.u.r16.ax = regs.u.r16.cx;
-          regs.u.r16.bx = regs.u.r16.dx;
-          break;
+            // If there is RAM above 16MB, return amount in 64kB chunks.
+            regs.u.r16.dx = 0;
+            if (off != e820_table_size) {
+                size = base + read_dword(0xe000, 0x18 + off);
+                if (size > 0x1000000) {
+                    size -= 0x1000000;
+                    regs.u.r16.dx = (Bit16u)(size >> 16);
+                }
+            }
+
+            // Set configured memory equal to extended memory
+            regs.u.r16.ax = regs.u.r16.cx;
+            regs.u.r16.bx = regs.u.r16.dx;
+            break;
+        }
 	default:  /* AH=0xE8?? but not implemented */
-	  goto int15_unimplemented;
-       }
-       break;
+            goto int15_unimplemented;
+        }
+        break;
     int15_unimplemented:
        // fall into the default
     default:
@@ -7792,10 +7700,11 @@ ASM_END
 
     bootdrv = (Bit8u)(status>>8);
     bootseg = read_word(ebda_seg,&EbdaData->cdemu.load_segment);
-    /* Canonicalize bootseg:bootip */
 #if BX_TCGBIOS
     tcpa_add_bootdevice((Bit32u)1L, (Bit32u)0L);
 #endif
+
+    /* Canonicalize bootseg:bootip */
     bootip = (bootseg & 0x0fff) << 4;
     bootseg &= 0xf000;
     break;
@@ -7812,8 +7721,6 @@ ASM_END
 #if BX_TCGBIOS
   tcpa_ipl((Bit32u)bootseg);               /* specs: 8.2.3 steps 4 and 5 */
 #endif
-  /* Debugging info */
-  printf("Booting from %x:%x\n", bootseg, bootip);
   
   /* Jump to the boot vector */
 ASM_START

@@ -79,14 +79,17 @@ void mm_pin(struct mm_struct *mm)
 	spin_lock(&mm->page_table_lock);
 
 	mm_walk(mm, PAGE_KERNEL_RO);
-	BUG_ON(HYPERVISOR_update_va_mapping(
-		       (unsigned long)mm->pgd,
-		       pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO),
-		       UVMF_TLB_FLUSH));
-	BUG_ON(HYPERVISOR_update_va_mapping(
-		       (unsigned long)__user_pgd(mm->pgd),
-		       pfn_pte(virt_to_phys(__user_pgd(mm->pgd))>>PAGE_SHIFT, PAGE_KERNEL_RO),
-		       UVMF_TLB_FLUSH));
+	if (HYPERVISOR_update_va_mapping(
+		(unsigned long)mm->pgd,
+		pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO),
+		UVMF_TLB_FLUSH))
+		BUG();
+	if (HYPERVISOR_update_va_mapping(
+		(unsigned long)__user_pgd(mm->pgd),
+		pfn_pte(virt_to_phys(__user_pgd(mm->pgd))>>PAGE_SHIFT,
+			PAGE_KERNEL_RO),
+		UVMF_TLB_FLUSH))
+		BUG();
 	xen_pgd_pin(__pa(mm->pgd)); /* kernel */
 	xen_pgd_pin(__pa(__user_pgd(mm->pgd))); /* user */
 	mm->context.pinned = 1;
@@ -106,12 +109,15 @@ void mm_unpin(struct mm_struct *mm)
 
 	xen_pgd_unpin(__pa(mm->pgd));
 	xen_pgd_unpin(__pa(__user_pgd(mm->pgd)));
-	BUG_ON(HYPERVISOR_update_va_mapping(
-		       (unsigned long)mm->pgd,
-		       pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0));
-	BUG_ON(HYPERVISOR_update_va_mapping(
-		       (unsigned long)__user_pgd(mm->pgd),
-		       pfn_pte(virt_to_phys(__user_pgd(mm->pgd))>>PAGE_SHIFT, PAGE_KERNEL), 0));
+	if (HYPERVISOR_update_va_mapping(
+		(unsigned long)mm->pgd,
+		pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0))
+		BUG();
+	if (HYPERVISOR_update_va_mapping(
+		(unsigned long)__user_pgd(mm->pgd),
+		pfn_pte(virt_to_phys(__user_pgd(mm->pgd))>>PAGE_SHIFT,
+			PAGE_KERNEL), 0))
+		BUG();
 	mm_walk(mm, PAGE_KERNEL);
 	xen_tlb_flush();
 	mm->context.pinned = 0;
@@ -127,43 +133,50 @@ void mm_pin_all(void)
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
 
+	/*
+	 * Allow uninterrupted access to the mm_unpinned list. We don't
+	 * actually take the mm_unpinned_lock as it is taken inside mm_pin().
+	 * All other CPUs must be at a safe point (e.g., in stop_machine
+	 * or offlined entirely).
+	 */
+	preempt_disable();
 	while (!list_empty(&mm_unpinned))	
 		mm_pin(list_entry(mm_unpinned.next, struct mm_struct,
 				  context.unpinned));
+	preempt_enable();
 }
 
 void _arch_dup_mmap(struct mm_struct *mm)
 {
-    if (!mm->context.pinned)
-        mm_pin(mm);
+	if (!mm->context.pinned)
+		mm_pin(mm);
 }
 
 void _arch_exit_mmap(struct mm_struct *mm)
 {
-    struct task_struct *tsk = current;
+	struct task_struct *tsk = current;
 
-    task_lock(tsk);
+	task_lock(tsk);
 
-    /*
-     * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
-     * *much* faster this way, as no tlb flushes means bigger wrpt batches.
-     */
-    if ( tsk->active_mm == mm )
-    {
-        tsk->active_mm = &init_mm;
-        atomic_inc(&init_mm.mm_count);
+	/*
+	 * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
+	 * *much* faster this way, as no tlb flushes means bigger wrpt batches.
+	 */
+	if (tsk->active_mm == mm) {
+		tsk->active_mm = &init_mm;
+		atomic_inc(&init_mm.mm_count);
 
-        switch_mm(mm, &init_mm, tsk);
+		switch_mm(mm, &init_mm, tsk);
 
-        atomic_dec(&mm->mm_count);
-        BUG_ON(atomic_read(&mm->mm_count) == 0);
-    }
+		atomic_dec(&mm->mm_count);
+		BUG_ON(atomic_read(&mm->mm_count) == 0);
+	}
 
-    task_unlock(tsk);
+	task_unlock(tsk);
 
-    if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) &&
-         !mm->context.has_foreign_mappings )
-        mm_unpin(mm);
+	if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) &&
+	     !mm->context.has_foreign_mappings )
+		mm_unpin(mm);
 }
 
 struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
@@ -183,8 +196,9 @@ void pte_free(struct page *pte)
 	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
 
 	if (!pte_write(*virt_to_ptep(va)))
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
+		if (HYPERVISOR_update_va_mapping(
+			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0))
+			BUG();
 
 	ClearPageForeign(pte);
 	init_page_count(pte);

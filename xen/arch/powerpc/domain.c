@@ -142,6 +142,8 @@ void free_vcpu_struct(struct vcpu *v)
 
 int vcpu_initialise(struct vcpu *v)
 {
+    /* Guests by default have a 100Hz ticker. */
+    v->periodic_period = MILLISECS(10);
     return 0;
 }
 
@@ -166,7 +168,10 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     d->shared_info->wc_nsec = dom0->shared_info->wc_nsec;
     d->shared_info->arch.boot_timebase = dom0->shared_info->arch.boot_timebase;
 
-    set_bit(_VCPUF_initialised, &v->vcpu_flags);
+    /* Auto-online VCPU0 when it is initialised. */
+    if ( !test_and_set_bit(_VCPUF_initialised, &v->vcpu_flags) &&
+         (v->vcpu_id == 0) )
+        clear_bit(_VCPUF_down, &v->vcpu_flags);
 
     cpu_init_vcpu(v);
 

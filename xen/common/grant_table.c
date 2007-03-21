@@ -1392,8 +1392,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
-                /* Done implicitly when page tables are destroyed. */
-                /* put_page(mfn_to_page(act->frame)); */
+                gnttab_release_put_page(mfn_to_page(act->frame));
             }
         }
         else
@@ -1409,8 +1408,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
-                /* Done implicitly when page tables are destroyed. */
-                /* put_page_and_type(mfn_to_page(act->frame)); */
+                gnttab_release_put_page_and_type(mfn_to_page(act->frame));
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )

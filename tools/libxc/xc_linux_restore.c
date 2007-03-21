@@ -189,6 +189,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     uint64_t vcpumap = 1ULL;
     unsigned int max_vcpu_id = 0;
+    int new_ctxt_format = 0;
 
     max_pfn = nr_pfns;
 
@@ -372,6 +373,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
 
         if (j == -2) {
+            new_ctxt_format = 1;
             if (!read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
                 (max_vcpu_id >= 64) ||
                 !read_exact(io_fd, &vcpumap, sizeof(uint64_t))) {
@@ -796,6 +798,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
             ERROR("Error when reading ctxt %d", i);
             goto out;
         }
+
+        if ( !new_ctxt_format )
+            ctxt.flags |= VGCF_online;
 
         if (i == 0) {
             /*

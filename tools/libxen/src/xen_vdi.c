@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,6 +24,7 @@
 #include "xen_crashdump.h"
 #include "xen_internal.h"
 #include "xen_sr.h"
+#include "xen_string_string_map.h"
 #include "xen_vbd.h"
 #include "xen_vdi.h"
 #include "xen_vdi_type_internal.h"
@@ -64,12 +65,6 @@ static const struct_member xen_vdi_record_struct_members[] =
         { .key = "physical_utilisation",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vdi_record, physical_utilisation) },
-        { .key = "sector_size",
-          .type = &abstract_type_int,
-          .offset = offsetof(xen_vdi_record, sector_size) },
-        { .key = "location",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vdi_record, location) },
         { .key = "type",
           .type = &xen_vdi_type_abstract_type_,
           .offset = offsetof(xen_vdi_record, type) },
@@ -78,7 +73,10 @@ static const struct_member xen_vdi_record_struct_members[] =
           .offset = offsetof(xen_vdi_record, sharable) },
         { .key = "read_only",
           .type = &abstract_type_bool,
-          .offset = offsetof(xen_vdi_record, read_only) }
+          .offset = offsetof(xen_vdi_record, read_only) },
+        { .key = "other_config",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vdi_record, other_config) }
     };
 
 const abstract_type xen_vdi_record_abstract_type_ =
@@ -105,6 +103,7 @@ xen_vdi_record_free(xen_vdi_record *record)
     xen_sr_record_opt_free(record->sr);
     xen_vbd_record_opt_set_free(record->vbds);
     xen_crashdump_record_opt_set_free(record->crash_dumps);
+    xen_string_string_map_free(record->other_config);
     free(record);
 }
 
@@ -315,22 +314,6 @@ xen_vdi_get_physical_utilisation(xen_session *session, int64_t *result, xen_vdi 
 
 
 bool
-xen_vdi_get_sector_size(xen_session *session, int64_t *result, xen_vdi vdi)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi }
-        };
-
-    abstract_type result_type = abstract_type_int;
-
-    XEN_CALL_("VDI.get_sector_size");
-    return session->ok;
-}
-
-
-bool
 xen_vdi_get_type(xen_session *session, enum xen_vdi_type *result, xen_vdi vdi)
 {
     abstract_value param_values[] =
@@ -378,6 +361,23 @@ xen_vdi_get_read_only(xen_session *session, bool *result, xen_vdi vdi)
 
 
 bool
+xen_vdi_get_other_config(xen_session *session, xen_string_string_map **result, xen_vdi vdi)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("VDI.get_other_config");
+    return session->ok;
+}
+
+
+bool
 xen_vdi_set_name_label(xen_session *session, xen_vdi vdi, char *label)
 {
     abstract_value param_values[] =
@@ -405,22 +405,6 @@ xen_vdi_set_name_description(xen_session *session, xen_vdi vdi, char *descriptio
         };
 
     xen_call_(session, "VDI.set_name_description", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi },
-            { .type = &abstract_type_string,
-              .u.string_val = sr }
-        };
-
-    xen_call_(session, "VDI.set_SR", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -469,6 +453,56 @@ xen_vdi_set_read_only(xen_session *session, xen_vdi vdi, bool read_only)
         };
 
     xen_call_(session, "VDI.set_read_only", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vdi_set_other_config(xen_session *session, xen_vdi vdi, xen_string_string_map *other_config)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)other_config }
+        };
+
+    xen_call_(session, "VDI.set_other_config", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vdi_add_to_other_config(xen_session *session, xen_vdi vdi, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VDI.add_to_other_config", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vdi_remove_from_other_config(xen_session *session, xen_vdi vdi, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vdi },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VDI.remove_from_other_config", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

@@ -47,7 +47,7 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
     irq_keyhandler_t *h;
 
-    if ( key_table[key].flags & KEYHANDLER_IRQ_CALLBACK )
+    if ( !in_irq() || (key_table[key].flags & KEYHANDLER_IRQ_CALLBACK) )
     {
         console_start_log_everything();
         if ( (h = key_table[key].u.irq_handler) != NULL )
@@ -135,12 +135,25 @@ static void cpuset_print(char *set, int size, cpumask_t mask)
     *set++ = '\0';
 }
 
+static void periodic_timer_print(char *str, int size, uint64_t period)
+{
+    if ( period == 0 )
+    {
+        strlcpy(str, "No periodic timer", size);
+        return;
+    }
+
+    snprintf(str, size,
+             "%u Hz periodic timer (period %u ms)",
+             1000000000/(int)period, (int)period/1000000);
+}
+
 static void dump_domains(unsigned char key)
 {
     struct domain *d;
     struct vcpu   *v;
     s_time_t       now = NOW();
-    char           cpuset[100];
+    char           tmpstr[100];
 
     printk("'%c' pressed -> dumping domain info (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now);
@@ -150,11 +163,11 @@ static void dump_domains(unsigned char key)
     for_each_domain ( d )
     {
         printk("General information for domain %u:\n", d->domain_id);
-        cpuset_print(cpuset, sizeof(cpuset), d->domain_dirty_cpumask);
+        cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
         printk("    flags=%lx refcnt=%d nr_pages=%d xenheap_pages=%d "
                "dirty_cpus=%s\n",
                d->domain_flags, atomic_read(&d->refcnt),
-               d->tot_pages, d->xenheap_pages, cpuset);
+               d->tot_pages, d->xenheap_pages, tmpstr);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
@@ -179,18 +192,21 @@ static void dump_domains(unsigned char key)
                    v->vcpu_flags,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
-            cpuset_print(cpuset, sizeof(cpuset), v->vcpu_dirty_cpumask);
-            printk("dirty_cpus=%s ", cpuset);
-            cpuset_print(cpuset, sizeof(cpuset), v->cpu_affinity);
-            printk("cpu_affinity=%s\n", cpuset);
+            cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
+            printk("dirty_cpus=%s ", tmpstr);
+            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_affinity);
+            printk("cpu_affinity=%s\n", tmpstr);
             arch_dump_vcpu_info(v);
+            periodic_timer_print(tmpstr, sizeof(tmpstr), v->periodic_period);
+            printk("    %s\n", tmpstr);
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
                             shared_info_addr(d, evtchn_pending)),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
                             shared_info_addr(d, evtchn_mask)),
-                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG]/BITS_PER_GUEST_LONG(d),
+                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG] /
+                            BITS_PER_GUEST_LONG(d),
                             vcpu_info_addr(v, evtchn_pending_sel)));
             send_guest_vcpu_virq(v, VIRQ_DEBUG);
         }

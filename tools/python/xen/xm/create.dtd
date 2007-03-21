@@ -1,0 +1,118 @@
+<!ENTITY % HTMLlat1 PUBLIC 
+   "-//W3C//ENTITIES Latin 1 for XHTML//EN" 
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml-lat1.ent"> 
+%HTMLlat1; 
+<!ENTITY % HTMLsymbol PUBLIC 
+   "-//W3C//ENTITIES Symbols for XHTML//EN" 
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml-symbol.ent"> 
+%HTMLsymbol; 
+<!ENTITY % HTMLspecial PUBLIC 
+   "-//W3C//ENTITIES Special for XHTML//EN" 
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml-special.ent"> 
+%HTMLspecial; 
+<!-- a Uniform Resource Identifier, see [RFC2396] --> 
+<!ENTITY % URI "CDATA"> 
+<!ENTITY % NAMEID "name ID #REQUIRED"> 
+<!ENTITY % CRASH_BEHAVIOUR "( destroy 
+                            | coredump_and_destroy
+                            | restart
+                            | coredump_and_restart
+                            | preserve
+                            | rename_restart )">
+<!ENTITY % NORMAL_EXIT     "( destroy | restart )">
+<!ENTITY % VDI_TYPE        "( system
+                            | user
+                            | ephemeral
+                            | suspend
+                            | crashdump )">
+
+<!ELEMENT xm (vm*, 
+              vdi*)> 
+
+<!ELEMENT version (#PCDATA)>
+ 
+<!ELEMENT vm    (name,
+                 version,
+                 (pv|hvm), 
+                 memory,
+                 vbd*,
+                 vif*,
+                 vcpu_param*,
+                 other_config*)> 
+<!ATTLIST vm     is_a_template          CDATA #REQUIRED
+                 auto_power_on          CDATA #REQUIRED
+                 vcpus_max              CDATA #REQUIRED
+                 vcpus_at_startup       CDATA #REQUIRED
+                 actions_after_shutdown %NORMAL_EXIT; #REQUIRED 
+                 actions_after_reboot   %NORMAL_EXIT; #REQUIRED
+                 actions_after_crash    %CRASH_BEHAVIOUR; #REQUIRED
+                 platform_std_VGA       CDATA #REQUIRED
+                 platform_serial        CDATA #REQUIRED
+                 platform_localtime     CDATA #REQUIRED 
+                 platform_clock_offet   CDATA #REQUIRED
+                 platform_enable_audio  CDATA #REQUIRED
+                 PCI_bus                CDATA #REQUIRED> 
+
+<!ELEMENT memory EMPTY> 
+<!ATTLIST memory static_min      CDATA #REQUIRED
+                 static_max      CDATA #REQUIRED
+                 dynamic_min     CDATA #REQUIRED 
+                 dynamic_max     CDATA #REQUIRED> 
+
+<!ELEMENT vbd    (qos_algorithm_param*)> 
+<!ATTLIST vbd    %NAMEID; 
+                 mode            (RO | RW)   #REQUIRED 
+                 vdi             IDREF       #REQUIRED
+                 device          CDATA       #REQUIRED
+                 bootable        CDATA       #REQUIRED
+                 type            (CD | disk) #REQUIRED
+                 qos_algorithm_type CDATA #REQUIRED> 
+
+<!ELEMENT vif    (qos_algorithm_param*)>
+<!ATTLIST vif    %NAMEID; 
+                 mac             CDATA       #REQUIRED 
+                 mtu             CDATA       #REQUIRED
+                 device          CDATA       #REQUIRED
+                 qos_algorithm_type CDATA    #REQUIRED
+                 bridge          CDATA       #IMPLIED
+                 network         CDATA       #IMPLIED> 
+
+<!ELEMENT pv     EMPTY>
+<!ATTLIST pv     kernel          CDATA #REQUIRED
+                 bootloader      CDATA #REQUIRED
+                 ramdisk         CDATA #REQUIRED
+                 args            CDATA #REQUIRED
+                 bootloader_args CDATA #REQUIRED>
+
+<!ELEMENT hvm    (boot_param*)>
+<!ATTLIST hvm    boot_policy     CDATA #REQUIRED>
+
+<!ELEMENT boot_param EMPTY>
+<!ATTLIST boot_param key         CDATA #REQUIRED
+                     value       CDATA #REQUIRED>
+
+<!ELEMENT vdi    (name)> 
+<!ATTLIST vdi    %NAMEID; 
+                 src             %URI; #REQUIRED
+                 type            %VDI_TYPE; #REQUIRED
+                 size            CDATA #REQUIRED
+                 shareable       CDATA #REQUIRED
+                 read_only       CDATA #REQUIRED>
+
+<!ELEMENT name   (label, 
+                  description)> 
+
+<!ELEMENT label  (#PCDATA)> 
+<!ELEMENT description (#PCDATA)>
+
+<!ELEMENT vcpu_param EMPTY>
+<!ATTLIST vcpu_param key   CDATA #REQUIRED
+                     value CDATA #REQUIRED>
+
+<!ELEMENT other_config EMPTY>
+<!ATTLIST other_config key   CDATA #REQUIRED
+                      value CDATA #REQUIRED>
+
+<!ELEMENT qos_algorithm_param EMPTY>
+<!ATTLIST qos_algorithm_param key   CDATA #REQUIRED
+                              value CDATA #REQUIRED>

@@ -34,7 +34,7 @@ diff -pruN ../orig-linux-2.6.18/kernel/softlockup.c ./kernel/softlockup.c
 +			!per_cpu(watchdog_task, this_cpu))
 +		return MAX_JIFFY_OFFSET;
 +
-+	return min_t(long, 0, touch_timestamp + HZ - jiffies);
++	return max_t(long, 0, touch_timestamp + HZ - jiffies);
 +}
 +
  /*

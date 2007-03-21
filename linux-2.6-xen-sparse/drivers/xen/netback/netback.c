@@ -110,6 +110,7 @@ static unsigned int alloc_index = 0;
 
 static inline unsigned long alloc_mfn(void)
 {
+	BUG_ON(alloc_index == 0);
 	return mfn_list[--alloc_index];
 }
 
@@ -552,6 +553,7 @@ static void net_rx_action(unsigned long unused)
 		*(int *)skb->cb = nr_frags;
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+		    !((netif_t *)netdev_priv(skb->dev))->copying_receiver &&
 		    check_mfn(nr_frags + 1)) {
 			/* Memory squeeze? Back off for an arbitrary while. */
 			if ( net_ratelimit() )
@@ -1265,7 +1267,7 @@ static void net_tx_action(unsigned long unused)
 
 		/* Check the remap error code. */
 		if (unlikely(netbk_tx_check_mop(skb, &mop))) {
-			printk(KERN_ALERT "#### netback grant fails\n");
+			DPRINTK("netback grant failed.\n");
 			skb_shinfo(skb)->nr_frags = 0;
 			kfree_skb(skb);
 			continue;

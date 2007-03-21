@@ -726,7 +726,7 @@ x86_emulate(
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     unsigned int op_bytes, def_op_bytes, ad_bytes, def_ad_bytes;
     unsigned int lock_prefix = 0, rep_prefix = 0;
-    int rc = X86EMUL_OKAY;
+    int override_seg = -1, rc = X86EMUL_OKAY;
     struct operand src, dst;
 
     /* Data operand effective address (usually computed from ModRM). */
@@ -758,22 +758,22 @@ x86_emulate(
             ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
             break;
         case 0x2e: /* CS override */
-            ea.mem.seg = x86_seg_cs;
+            override_seg = x86_seg_cs;
             break;
         case 0x3e: /* DS override */
-            ea.mem.seg = x86_seg_ds;
+            override_seg = x86_seg_ds;
             break;
         case 0x26: /* ES override */
-            ea.mem.seg = x86_seg_es;
+            override_seg = x86_seg_es;
             break;
         case 0x64: /* FS override */
-            ea.mem.seg = x86_seg_fs;
+            override_seg = x86_seg_fs;
             break;
         case 0x65: /* GS override */
-            ea.mem.seg = x86_seg_gs;
+            override_seg = x86_seg_gs;
             break;
         case 0x36: /* SS override */
-            ea.mem.seg = x86_seg_ss;
+            override_seg = x86_seg_ss;
             break;
         case 0xf0: /* LOCK */
             lock_prefix = 1;
@@ -839,14 +839,35 @@ x86_emulate(
             /* 16-bit ModR/M decode. */
             switch ( modrm_rm )
             {
-            case 0: ea.mem.off = _regs.ebx + _regs.esi; break;
-            case 1: ea.mem.off = _regs.ebx + _regs.edi; break;
-            case 2: ea.mem.off = _regs.ebp + _regs.esi; break;
-            case 3: ea.mem.off = _regs.ebp + _regs.edi; break;
-            case 4: ea.mem.off = _regs.esi; break;
-            case 5: ea.mem.off = _regs.edi; break;
-            case 6: ea.mem.off = _regs.ebp; break;
-            case 7: ea.mem.off = _regs.ebx; break;
+            case 0:
+                ea.mem.off = _regs.ebx + _regs.esi;
+                break;
+            case 1:
+                ea.mem.off = _regs.ebx + _regs.edi;
+                break;
+            case 2:
+                ea.mem.seg = x86_seg_ss;
+                ea.mem.off = _regs.ebp + _regs.esi;
+                break;
+            case 3:
+                ea.mem.seg = x86_seg_ss;
+                ea.mem.off = _regs.ebp + _regs.edi;
+                break;
+            case 4:
+                ea.mem.off = _regs.esi;
+                break;
+            case 5:
+                ea.mem.off = _regs.edi;
+                break;
+            case 6:
+                if ( modrm_mod == 0 )
+                    break;
+                ea.mem.seg = x86_seg_ss;
+                ea.mem.off = _regs.ebp;
+                break;
+            case 7:
+                ea.mem.off = _regs.ebx;
+                break;
             }
             switch ( modrm_mod )
             {
@@ -876,10 +897,20 @@ x86_emulate(
                 ea.mem.off <<= (sib >> 6) & 3;
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
                     ea.mem.off += insn_fetch_type(int32_t);
-                else if ( (sib_base == 4) && !twobyte && (b == 0x8f) )
-                    /* POP <rm> must have its EA calculated post increment. */
-                    ea.mem.off += _regs.esp +
-                        ((mode_64bit() && (op_bytes == 4)) ? 8 : op_bytes);
+                else if ( sib_base == 4 )
+                {
+                    ea.mem.seg  = x86_seg_ss;
+                    ea.mem.off += _regs.esp;
+                    if ( !twobyte && (b == 0x8f) )
+                        /* POP <rm> computes its EA post increment. */
+                        ea.mem.off += ((mode_64bit() && (op_bytes == 4))
+                                       ? 8 : op_bytes);
+                }
+                else if ( sib_base == 5 )
+                {
+                    ea.mem.seg  = x86_seg_ss;
+                    ea.mem.off += _regs.ebp;
+                }
                 else
                     ea.mem.off += *(long*)decode_register(sib_base, &_regs, 0);
             }
@@ -887,6 +918,8 @@ x86_emulate(
             {
                 modrm_rm |= (rex_prefix & 1) << 3;
                 ea.mem.off = *(long *)decode_register(modrm_rm, &_regs, 0);
+                if ( (modrm_rm == 5) && (modrm_mod != 0) )
+                    ea.mem.seg = x86_seg_ss;
             }
             switch ( modrm_mod )
             {
@@ -919,6 +952,9 @@ x86_emulate(
             ea.mem.off = truncate_ea(ea.mem.off);
         }
     }
+
+    if ( override_seg != -1 )
+        ea.mem.seg = override_seg;
 
     /* Special instructions do their own operand decoding. */
     if ( (d & DstMask) == ImplicitOps )

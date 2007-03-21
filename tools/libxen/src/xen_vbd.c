@@ -54,9 +54,6 @@ static const struct_member xen_vbd_record_struct_members[] =
         { .key = "device",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vbd_record, device) },
-        { .key = "image",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vbd_record, image) },
         { .key = "bootable",
           .type = &abstract_type_bool,
           .offset = offsetof(xen_vbd_record, bootable) },
@@ -547,6 +544,34 @@ xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi)
         };
 
     xen_call_(session, "VBD.media_change", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_plug(xen_session *session, xen_vbd self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "VBD.plug", param_values, 1, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vbd_unplug(xen_session *session, xen_vbd self)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self }
+        };
+
+    xen_call_(session, "VBD.unplug", param_values, 1, NULL, NULL);
     return session->ok;
 }
 

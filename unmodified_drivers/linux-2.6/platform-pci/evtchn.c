@@ -167,7 +167,8 @@ EXPORT_SYMBOL(notify_remote_via_irq);
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int l1i, port;
-	int cpu = smp_processor_id();
+	/* XXX: All events are bound to vcpu0 but irq may be redirected. */
+	int cpu = 0; /*smp_processor_id();*/
 	irqreturn_t(*handler) (int, void *, struct pt_regs *);
 	shared_info_t *s = shared_info_area;
 	vcpu_info_t *v = &s->vcpu_info[cpu];

@@ -70,9 +70,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 {
     DECLARE_DOMCTL;
 
-    /* The new domain's shared-info frame number. */
-    unsigned long shared_info_frame;
-
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
@@ -86,8 +83,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     uint8_t *hvm_buf = NULL;
     unsigned long long v_end, memsize;
     unsigned long shared_page_nr;
-    shared_info_t *shared_info = NULL;
-    xen_pfn_t arch_max_pfn;
 
     unsigned long pfn;
     unsigned int prev_pc, this_pc;
@@ -96,10 +91,11 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     /* Types of the pfns in the current region */
     unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
-    struct xen_add_to_physmap xatp;
-
     /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
     unsigned long nr_pages;
+
+    /* The size of an array big enough to contain all guest pfns */
+    unsigned long pfn_array_size = max_pfn + 1;
 
     /* hvm guest mem size (Mb) */
     memsize = (unsigned long long)*store_mfn;
@@ -127,7 +123,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     }
 
 
-    pfns = malloc(max_pfn * sizeof(xen_pfn_t));
+    pfns = malloc(pfn_array_size * sizeof(xen_pfn_t));
     if (pfns == NULL) {
         ERROR("memory alloc failed");
         errno = ENOMEM;
@@ -139,11 +135,10 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    for ( i = 0; i < max_pfn; i++ )
+    for ( i = 0; i < pfn_array_size; i++ )
         pfns[i] = i;
-    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < max_pfn; i++ )
+    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < pfn_array_size; i++ )
         pfns[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-    arch_max_pfn = pfns[max_pfn - 1];/* used later */
 
     /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
     rc = xc_domain_memory_populate_physmap(
@@ -281,6 +276,14 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
+    /* Paranoia: clean pages. */
+    if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-1) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-2) ) {
+        ERROR("error clearing comms frames!\n");
+        goto out;
+    }
+
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
@@ -288,29 +291,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     /* caculate the store_mfn , wrong val cause hang when introduceDomain */
     *store_mfn = (v_end >> PAGE_SHIFT) - 2;
     DPRINTF("hvm restore:calculate new store_mfn=0x%lx,v_end=0x%llx..\n", *store_mfn, v_end);
-
-    /* restore hvm context including pic/pit/shpage */
-    if (!read_exact(io_fd, &rec_len, sizeof(uint32_t))) {
-        ERROR("error read hvm context size!\n");
-        goto out;
-    }
-
-    hvm_buf = malloc(rec_len);
-    if (hvm_buf == NULL) {
-        ERROR("memory alloc for hvm context buffer failed");
-        errno = ENOMEM;
-        goto out;
-    }
-
-    if (!read_exact(io_fd, hvm_buf, rec_len)) {
-        ERROR("error read hvm buffer!\n");
-        goto out;
-    }
-
-    if (( rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len))) {
-        ERROR("error set hvm buffer!\n");
-        goto out;
-    }
 
     if (!read_exact(io_fd, &nr_vcpus, sizeof(uint32_t))) {
         ERROR("error read nr vcpu !\n");
@@ -339,28 +319,28 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         }
     }
 
-    /* Shared-info pfn */
-    if (!read_exact(io_fd, &(shared_info_frame), sizeof(uint32_t)) ) {
-        ERROR("reading the shared-info pfn failed!\n");
+    /* restore hvm context including pic/pit/shpage */
+    if (!read_exact(io_fd, &rec_len, sizeof(uint32_t))) {
+        ERROR("error read hvm context size!\n");
         goto out;
     }
-    /* Map the shared-info frame where it was before */
-    xatp.domid = dom;
-    xatp.space = XENMAPSPACE_shared_info;
-    xatp.idx   = 0;
-    xatp.gpfn  = shared_info_frame;
-    if ( (rc = xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp)) != 0 ) {
-        ERROR("setting the shared-info pfn failed!\n");
+
+    hvm_buf = malloc(rec_len);
+    if (hvm_buf == NULL) {
+        ERROR("memory alloc for hvm context buffer failed");
+        errno = ENOMEM;
         goto out;
     }
-    if ( (xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp) != 0) ||
-         ((shared_info = xc_map_foreign_range(
-             xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-             shared_info_frame)) == NULL) )
+
+    if (!read_exact(io_fd, hvm_buf, rec_len)) {
+        ERROR("error read hvm buffer!\n");
         goto out;
-    /* shared_info.arch.max_pfn is used by dump-core */
-    shared_info->arch.max_pfn = arch_max_pfn;
-    munmap(shared_info, PAGE_SIZE);
+    }
+
+    if (( rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len))) {
+        ERROR("error set hvm buffer!\n");
+        goto out;
+    }
 
     rc = 0;
     goto out;

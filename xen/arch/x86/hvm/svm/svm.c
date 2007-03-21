@@ -43,7 +43,6 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
-#include <asm/hvm/svm/vmmcall.h>
 #include <asm/hvm/svm/intr.h>
 #include <asm/x86_emulate.h>
 #include <public/sched.h>
@@ -107,22 +106,10 @@ static inline void svm_inject_exception(struct vcpu *v, int trap,
 static void stop_svm(void)
 {
     u32 eax, edx;    
-    int cpu = smp_processor_id();
-
     /* We turn off the EFER_SVME bit. */
     rdmsr(MSR_EFER, eax, edx);
     eax &= ~EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
- 
-    /* release the HSA */
-    free_host_save_area(hsa[cpu]);
-    hsa[cpu] = NULL;
-    wrmsr(MSR_K8_VM_HSAVE_PA, 0, 0 );
-
-    /* free up the root vmcb */
-    free_vmcb(root_vmcb[cpu]);
-    root_vmcb[cpu] = NULL;
-    root_vmcb_pa[cpu] = 0;
 }
 
 static void svm_store_cpu_guest_regs(
@@ -462,6 +449,9 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->rflags = c->eflags;
 
     v->arch.hvm_svm.cpu_shadow_cr0 = c->cr0;
+    vmcb->cr0 = c->cr0 | X86_CR0_WP | X86_CR0_ET;
+    if ( !paging_mode_hap(v->domain) ) 
+        vmcb->cr0 |= X86_CR0_PG;
 
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
@@ -495,7 +485,6 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
          * first.
          */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
-        /* current!=vcpu as not called by arch_vmx_do_launch */
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
         if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
             goto bad_cr3;
@@ -579,7 +568,7 @@ void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_star         = vmcb->star;
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
-    data->msr_efer         = vmcb->efer;
+    data->msr_efer         = v->arch.hvm_svm.cpu_shadow_efer;
 
     data->tsc = hvm_get_guest_time(v);
 }
@@ -594,7 +583,12 @@ void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     vmcb->star       = data->msr_star;
     vmcb->cstar      = data->msr_cstar;
     vmcb->sfmask     = data->msr_syscall_mask;
-    vmcb->efer       = data->msr_efer;
+    v->arch.hvm_svm.cpu_shadow_efer = data->msr_efer;
+    vmcb->efer       = data->msr_efer | EFER_SVME;
+    /* VMCB's EFER.LME isn't set unless we're actually in long mode
+     * (see long_mode_do_msr_write()) */
+    if ( !(vmcb->efer & EFER_LMA) )
+        vmcb->efer &= ~EFER_LME;
 
     hvm_set_guest_time(v, data->tsc);
 }
@@ -754,6 +748,14 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 static void svm_init_ap_context(
     struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
+    struct vcpu *v;
+    cpu_user_regs_t *regs;
+    u16 cs_sel;
+
+    /* We know this is safe because hvm_bringup_ap() does it */
+    v = current->domain->vcpu[vcpuid];
+    regs = &v->arch.guest_context.user_regs;
+
     memset(ctxt, 0, sizeof(*ctxt));
 
     /*
@@ -761,8 +763,19 @@ static void svm_init_ap_context(
      * passed to us is page alligned and is the physicall frame number for
      * the code. We will execute this code in real mode. 
      */
+    cs_sel = trampoline_vector << 8;
     ctxt->user_regs.eip = 0x0;
-    ctxt->user_regs.cs = (trampoline_vector << 8);
+    ctxt->user_regs.cs = cs_sel;
+
+    /*
+     * This is the launch of an AP; set state so that we begin executing
+     * the trampoline code in real-mode.
+     */
+    svm_do_vmmcall_reset_to_realmode(v, regs);  
+    /* Adjust the vmcb's hidden register state. */
+    v->arch.hvm_svm.vmcb->rip = 0;
+    v->arch.hvm_svm.vmcb->cs.sel = cs_sel;
+    v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -907,32 +920,6 @@ static void svm_load_cpu_guest_regs(
     svm_load_cpu_user_regs(v, regs);
 }
 
-static void arch_svm_do_launch(struct vcpu *v) 
-{
-    svm_do_launch(v);
-
-    if ( paging_mode_hap(v->domain) ) {
-        v->arch.hvm_svm.vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-    }
-
-    if ( v->vcpu_id != 0 )
-    {
-        cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
-        u16 cs_sel = regs->cs;
-        /*
-         * This is the launch of an AP; set state so that we begin executing
-         * the trampoline code in real-mode.
-         */
-        svm_do_vmmcall_reset_to_realmode(v, regs);  
-        /* Adjust the state to execute the trampoline code.*/
-        v->arch.hvm_svm.vmcb->rip = 0;
-        v->arch.hvm_svm.vmcb->cs.sel= cs_sel;
-        v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
-    }
-      
-    reset_stack_and_jump(svm_asm_do_launch);
-}
-
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     svm_save_dr(v);
@@ -954,15 +941,29 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 }
 
+static void arch_svm_do_resume(struct vcpu *v) 
+{
+    if ( v->arch.hvm_svm.launch_core != smp_processor_id() )
+    {
+        v->arch.hvm_svm.launch_core = smp_processor_id();
+        hvm_migrate_timers(v);
+    }
+
+    hvm_do_resume(v);
+    reset_stack_and_jump(svm_asm_do_resume);
+}
+
 static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
-    v->arch.schedule_tail    = arch_svm_do_launch;
+    v->arch.schedule_tail    = arch_svm_do_resume;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
     v->arch.hvm_svm.saved_irq_vector = -1;
+
+    v->arch.hvm_svm.launch_core = -1;
 
     if ( (rc = svm_create_vmcb(v)) != 0 )
     {
@@ -1027,10 +1028,12 @@ void svm_npt_detect(void)
 
     /* check CPUID for nested paging support */
     cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
-    if ( edx & 0x01 ) { /* nested paging */
+    if ( edx & 0x01 ) /* nested paging */
+    {
         hap_capable_system = 1;
     }
-    else if ( opt_hap_enabled ) {
+    else if ( opt_hap_enabled )
+    {
         printk(" nested paging is not supported by this CPU.\n");
         hap_capable_system = 0; /* no nested paging, we disable flag. */
     }
@@ -1058,8 +1061,9 @@ int start_svm(void)
         return 0;
     }
 
-    if (!(hsa[cpu] = alloc_host_save_area()))
-        return 0;
+    if (!hsa[cpu])
+        if (!(hsa[cpu] = alloc_host_save_area()))
+            return 0;
     
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
@@ -1074,8 +1078,9 @@ int start_svm(void)
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
   
-    if (!(root_vmcb[cpu] = alloc_vmcb())) 
-        return 0;
+    if (!root_vmcb[cpu])
+        if (!(root_vmcb[cpu] = alloc_vmcb())) 
+            return 0;
     root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
 
     if (cpu == 0)
@@ -1084,24 +1089,6 @@ int start_svm(void)
     hvm_enable(&svm_function_table);
 
     return 1;
-}
-
-void arch_svm_do_resume(struct vcpu *v) 
-{
-    /* pinning VCPU to a different core? */
-    if ( v->arch.hvm_svm.launch_core == smp_processor_id()) {
-        hvm_do_resume( v );
-        reset_stack_and_jump( svm_asm_do_resume );
-    }
-    else {
-        if (svm_dbg_on)
-            printk("VCPU core pinned: %d to %d\n", 
-                   v->arch.hvm_svm.launch_core, smp_processor_id() );
-        v->arch.hvm_svm.launch_core = smp_processor_id();
-        hvm_migrate_timers( v );
-        hvm_do_resume( v );
-        reset_stack_and_jump( svm_asm_do_resume );
-    }
 }
 
 static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
@@ -2601,65 +2588,6 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
 }
 
 
-/*
- * svm_do_vmmcall - SVM VMMCALL handler
- *
- * returns 0 on success, non-zero otherwise
- */
-static int svm_do_vmmcall(struct vcpu *v, struct cpu_user_regs *regs)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int inst_len;
-
-    ASSERT(vmcb);
-    ASSERT(regs);
-
-    inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
-    ASSERT(inst_len > 0);
-
-    HVMTRACE_1D(VMMCALL, v, regs->eax);
-
-    if ( regs->eax & 0x80000000 )
-    {
-        /* VMMCALL sanity check */
-        if ( vmcb->cpl > get_vmmcall_cpl(regs->edi) )
-        {
-            printk("VMMCALL CPL check failed\n");
-            return -1;
-        }
-
-        /* handle the request */
-        switch ( regs->eax )
-        {
-        case VMMCALL_RESET_TO_REALMODE:
-            if ( svm_do_vmmcall_reset_to_realmode(v, regs) )
-            {
-                printk("svm_do_vmmcall_reset_to_realmode() failed\n");
-                return -1;
-            }
-            /* since we just reset the VMCB, return without adjusting
-             * the eip */
-            return 0;
-
-        case VMMCALL_DEBUG:
-            printk("DEBUG features not implemented yet\n");
-            break;
-        default:
-            break;
-        }
-
-        hvm_print_line(v, regs->eax); /* provides the current domain */
-    }
-    else
-    {
-        hvm_do_hypercall(regs);
-    }
-
-    __update_guest_eip(vmcb, inst_len);
-    return 0;
-}
-
-
 void svm_dump_inst(unsigned long eip)
 {
     u8 opcode[256];
@@ -3162,9 +3090,14 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_handle_invlpg(1, regs);
         break;
 
-    case VMEXIT_VMMCALL:
-        svm_do_vmmcall(v, regs);
+    case VMEXIT_VMMCALL: {
+        int inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
+        ASSERT(inst_len > 0);
+        HVMTRACE_1D(VMMCALL, v, regs->eax);
+        __update_guest_eip(vmcb, inst_len);
+        hvm_do_hypercall(regs);
         break;
+    }
 
     case VMEXIT_CR0_READ:
         svm_cr_access(v, 0, TYPE_MOV_FROM_CR, regs);

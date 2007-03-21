@@ -66,16 +66,23 @@ def blkdev_segment(name):
                 'type'         : 'Disk' }
     return val
 
-def blkdev_uname_to_file(uname):
-    """Take a blkdev uname and return the corresponding filename."""
-    fn = None
+def _parse_uname(uname):
+    fn = taptype = None
     if uname.find(":") != -1:
         (typ, fn) = uname.split(":", 1)
         if typ == "phy" and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
         if typ == "tap":
-            (typ, fn) = fn.split(":", 1)
-    return fn
+            (taptype, fn) = fn.split(":", 1)
+    return (fn, taptype)
+
+def blkdev_uname_to_file(uname):
+    """Take a blkdev uname and return the corresponding filename."""
+    return _parse_uname(uname)[0]
+
+def blkdev_uname_to_taptype(uname):
+    """Take a blkdev uname and return the blktap type."""
+    return _parse_uname(uname)[1]
 
 def mount_mode(name):
     mode = None

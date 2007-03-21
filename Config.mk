@@ -36,6 +36,12 @@ endif
 cc-option = $(shell if test -z "`$(1) $(2) -S -o /dev/null -xc \
               /dev/null 2>&1`"; then echo "$(2)"; else echo "$(3)"; fi ;)
 
+# cc-ver
+# Usage: ifeq ($(call cc-ver,$(CC),0x030400),y)
+cc-ver = $(shell if [ $$((`$(1) -dumpversion | awk -F. \
+           '{ printf "0x%02x%02x%02x", $$1, $$2, $$3}'`)) -ge $$(($(2))) ]; \
+           then echo y; else echo n; fi ;)
+
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
 else

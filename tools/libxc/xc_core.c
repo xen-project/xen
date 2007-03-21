@@ -349,11 +349,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     /* Map the shared info frame */
     live_shinfo = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ, info.shared_info_frame);
-    if ( !live_shinfo 
-#ifdef __ia64__
-         && !info.hvm
-#endif
-        )
+    if ( !live_shinfo && !info.hvm )
     {
         PERROR("Couldn't map live_shinfo");
         goto out;

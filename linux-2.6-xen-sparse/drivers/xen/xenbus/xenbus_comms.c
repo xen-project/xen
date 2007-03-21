@@ -110,7 +110,6 @@ int xb_write(const void *data, unsigned len)
 		/* Read indexes, then verify. */
 		cons = intf->req_cons;
 		prod = intf->req_prod;
-		mb();
 		if (!check_indexes(cons, prod)) {
 			intf->req_cons = intf->req_prod = 0;
 			return -EIO;
@@ -122,15 +121,18 @@ int xb_write(const void *data, unsigned len)
 		if (avail > len)
 			avail = len;
 
+		/* Must write data /after/ reading the consumer index. */
+		mb();
+
 		memcpy(dst, data, avail);
 		data += avail;
 		len -= avail;
 
-		/* Other side must not see new header until data is there. */
+		/* Other side must not see new producer until data is there. */
 		wmb();
 		intf->req_prod += avail;
 
-		/* This implies mb() before other side sees interrupt. */
+		/* Implies mb(): other side will see the updated producer. */
 		notify_remote_via_evtchn(xen_store_evtchn);
 	}
 
@@ -165,7 +167,6 @@ int xb_read(void *data, unsigned len)
 		/* Read indexes, then verify. */
 		cons = intf->rsp_cons;
 		prod = intf->rsp_prod;
-		mb();
 		if (!check_indexes(cons, prod)) {
 			intf->rsp_cons = intf->rsp_prod = 0;
 			return -EIO;
@@ -177,7 +178,7 @@ int xb_read(void *data, unsigned len)
 		if (avail > len)
 			avail = len;
 
-		/* We must read header before we read data. */
+		/* Must read data /after/ reading the producer index. */
 		rmb();
 
 		memcpy(data, src, avail);
@@ -190,7 +191,7 @@ int xb_read(void *data, unsigned len)
 
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
 
-		/* Implies mb(): they will see new header. */
+		/* Implies mb(): other side will see the updated consumer. */
 		notify_remote_via_evtchn(xen_store_evtchn);
 	}
 

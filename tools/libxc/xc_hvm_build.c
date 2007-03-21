@@ -137,6 +137,12 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
+    /* Explicitly reserve space for special pages (ioreq and xenstore). */
+    e820entry[nr_map].addr = mem_size - PAGE_SIZE * 3;
+    e820entry[nr_map].size = PAGE_SIZE * 3;
+    e820entry[nr_map].type = E820_RESERVED;
+    nr_map++;
+
     if ( extra_mem_size )
     {
         e820entry[nr_map].addr = (1ULL << 32);
@@ -280,7 +286,6 @@ static int setup_guest(int xc_handle,
     /* NB. evtchn_upcall_mask is unused: leave as zero. */
     memset(&shared_info->evtchn_mask[0], 0xff,
            sizeof(shared_info->evtchn_mask));
-    shared_info->arch.max_pfn = page_array[nr_pages - 1];
     munmap(shared_info, PAGE_SIZE);
 
     if ( v_end > HVM_BELOW_4G_RAM_END )
@@ -302,9 +307,15 @@ static int setup_guest(int xc_handle,
 
     /* Set [er]ip in the way that's right for Xen */
     if ( strstr(caps, "x86_64") )
+    {
         ctxt->c64.user_regs.rip = elf_uval(&elf, elf.ehdr, e_entry); 
+        ctxt->c64.flags = VGCF_online;
+    }
     else
+    {
         ctxt->c32.user_regs.eip = elf_uval(&elf, elf.ehdr, e_entry);
+        ctxt->c32.flags = VGCF_online;
+    }
 
     return 0;
 
@@ -344,7 +355,7 @@ static int xc_hvm_build_internal(int xc_handle,
 
     memset(&launch_domctl, 0, sizeof(launch_domctl));
     launch_domctl.domain = (domid_t)domid;
-    launch_domctl.u.vcpucontext.vcpu   = 0;
+    launch_domctl.u.vcpucontext.vcpu = 0;
     set_xen_guest_handle(launch_domctl.u.vcpucontext.ctxt, &ctxt.c);
     launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
     rc = xc_domctl(xc_handle, &launch_domctl);

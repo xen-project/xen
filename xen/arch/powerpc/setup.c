@@ -366,9 +366,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
         kick_secondary_cpus(max_cpus);
     }
 
-    /* Secondary processors must be online before we call this.  */
-    schedulers_start();
-
     /* This cannot be called before secondary cpus are marked online.  */
     percpu_free_unused_areas();
 

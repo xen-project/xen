@@ -170,6 +170,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
 
         case XENMEM_current_reservation:
         case XENMEM_maximum_reservation:
+        case XENMEM_maximum_gpfn:
         {
 #define xen_domid_t domid_t
 #define compat_domid_t domid_compat_t
@@ -325,6 +326,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
         case XENMEM_maximum_ram_page:
         case XENMEM_current_reservation:
         case XENMEM_maximum_reservation:
+        case XENMEM_maximum_gpfn:
             break;
 
         case XENMEM_translate_gpfn_list:

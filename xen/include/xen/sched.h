@@ -79,8 +79,10 @@ struct vcpu
 
     struct vcpu     *next_in_list;
 
-    struct timer     timer;         /* one-shot timer for timeout values */
-    unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
+    uint64_t         periodic_period;
+    uint64_t         periodic_last_event;
+    struct timer     periodic_timer;
+    struct timer     singleshot_timer;
 
     struct timer     poll_timer;    /* timeout for SCHEDOP_poll */
 
@@ -332,7 +334,6 @@ void __domain_crash_synchronous(void) __attribute__((noreturn));
 
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
-void schedulers_start(void);
 int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
 void sched_destroy_vcpu(struct vcpu *v);
 int  sched_init_domain(struct domain *d);
@@ -497,6 +498,7 @@ void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
 
+void vcpu_force_reschedule(struct vcpu *v);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);

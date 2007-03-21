@@ -200,6 +200,18 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             else:
                 response = self._dispatch(method, params)
 
+            if self.xenapi and \
+               (response is None or
+                not isinstance(response, dict) or
+                'Status' not in response):
+                log.exception('Internal error handling %s: Invalid result %s',
+                              method, response)
+                response = { "Status": "Failure",
+                             "ErrorDescription":
+                             ['INTERNAL_ERROR',
+                              'Invalid result %s handling %s' %
+                              (response, method)]}
+
             # With either Unicode or normal strings, we can only transmit
             # \t, \n, \r, \u0020-\ud7ff, \ue000-\ufffd, and \u10000-\u10ffff
             # in an XML document.  xmlrpclib does not escape these values
@@ -215,24 +227,30 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             response = xmlrpclib.dumps(response,
                                        methodresponse=1,
                                        allow_none=1)
-        except xmlrpclib.Fault, fault:
-            response = xmlrpclib.dumps(fault)
         except Exception, exn:
-            if self.xenapi:
-                if _is_not_supported(exn):
-                    errdesc = ['MESSAGE_METHOD_UNKNOWN', method]
+            try:
+                if self.xenapi:
+                    if _is_not_supported(exn):
+                         errdesc = ['MESSAGE_METHOD_UNKNOWN', method]
+                    else:
+                         log.exception('Internal error handling %s', method)
+                         errdesc = ['INTERNAL_ERROR', str(exn)]
+
+                    response = xmlrpclib.dumps(
+                          ({ "Status": "Failure",
+                             "ErrorDescription": errdesc },),
+                          methodresponse = 1)
                 else:
-                    log.exception('Internal error handling %s', method)
-                    errdesc = ['INTERNAL_ERROR', str(exn)]
-                response = xmlrpclib.dumps(
-                    ({ "Status": "Failure",
-                       "ErrorDescription": errdesc },),
-                    methodresponse = 1)
-            else:
-                log.exception('Internal error handling %s', method)
-                import xen.xend.XendClient
-                response = xmlrpclib.dumps(
-                    xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
+                    import xen.xend.XendClient
+                    if isinstance(exn, xmlrpclib.Fault):
+                        response = xmlrpclib.dumps(exn)
+                    else:
+                        log.exception('Internal error handling %s', method)
+                        response = xmlrpclib.dumps(
+                            xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
+            except:
+                log.exception('Internal error handling error')
+
         return response
 
 
@@ -241,7 +259,7 @@ def _is_not_supported(exn):
     try:
         m = notSupportedRE.search(exn[0])
         return m is not None
-    except TypeError, e:
+    except:
         return False
 
 

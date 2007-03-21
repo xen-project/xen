@@ -29,7 +29,6 @@
 #include "pci_regs.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
-#include <xen/hvm/e820.h>
 
 /* memory map */
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
@@ -38,23 +37,53 @@
 #define VMXASSIST_PHYSICAL_ADDRESS    0x000D0000
 #define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
 
-/* invoke SVM's paged realmode support */
-#define SVM_VMMCALL_RESET_TO_REALMODE 0x80000001
-
-/*
- * C runtime start off
- */
 asm(
     "    .text                       \n"
     "    .globl _start               \n"
     "_start:                         \n"
+    /* C runtime kickoff. */
     "    cld                         \n"
     "    cli                         \n"
-    "    lgdt gdt_desr               \n"
-    "    movl $stack_top, %esp       \n"
-    "    movl %esp, %ebp             \n"
+    "    movl $stack_top,%esp        \n"
+    "    movl %esp,%ebp              \n"
     "    call main                   \n"
-    "    ud2                         \n"
+    /* Relocate real-mode trampoline to 0x0. */
+    "    mov  $trampoline_start,%esi \n"
+    "    xor  %edi,%edi              \n"
+    "    mov  $trampoline_end,%ecx   \n"
+    "    sub  %esi,%ecx              \n"
+    "    rep  movsb                  \n"
+    /* Load real-mode compatible segment state (base 0x0000, limit 0xffff). */
+    "    lgdt gdt_desr               \n"
+    "    mov  $0x0010,%ax            \n"
+    "    mov  %ax,%ds                \n"
+    "    mov  %ax,%es                \n"
+    "    mov  %ax,%fs                \n"
+    "    mov  %ax,%gs                \n"
+    "    mov  %ax,%ss                \n"
+    /* Initialise all 32-bit GPRs to zero. */
+    "    xor  %eax,%eax              \n"
+    "    xor  %ebx,%ebx              \n"
+    "    xor  %ecx,%ecx              \n"
+    "    xor  %edx,%edx              \n"
+    "    xor  %esp,%esp              \n"
+    "    xor  %ebp,%ebp              \n"
+    "    xor  %esi,%esi              \n"
+    "    xor  %edi,%edi              \n"
+    /* Enter real mode, reload all segment registers and IDT. */
+    "    ljmp $0x8,$0x0              \n"
+    "trampoline_start: .code16       \n"
+    "    mov  %eax,%cr0              \n"
+    "    ljmp $0,$1f-trampoline_start\n"
+    "1:  mov  %ax,%ds                \n"
+    "    mov  %ax,%es                \n"
+    "    mov  %ax,%fs                \n"
+    "    mov  %ax,%gs                \n"
+    "    mov  %ax,%ss                \n"
+    "    lidt 1f-trampoline_start    \n"
+    "    ljmp $0xf000,$0xfff0        \n"
+    "1:  .word 0x3ff,0,0             \n"
+    "trampoline_end:   .code32       \n"
     "                                \n"
     "gdt_desr:                       \n"
     "    .word gdt_end - gdt - 1     \n"
@@ -63,8 +92,8 @@ asm(
     "    .align 8                    \n"
     "gdt:                            \n"
     "    .quad 0x0000000000000000    \n"
-    "    .quad 0x00CF92000000FFFF    \n"
-    "    .quad 0x00CF9A000000FFFF    \n"
+    "    .quad 0x00009a000000ffff    \n" /* Ring 0 code, base 0 limit 0xffff */
+    "    .quad 0x000092000000ffff    \n" /* Ring 0 data, base 0 limit 0xffff */
     "gdt_end:                        \n"
     "                                \n"
     "    .bss                        \n"
@@ -81,19 +110,6 @@ cirrus_check(void)
 {
     outw(0x3C4, 0x9206);
     return inb(0x3C5) == 0x12;
-}
-
-static int
-vmmcall(int function, int edi, int esi, int edx, int ecx, int ebx)
-{
-    int eax;
-
-    __asm__ __volatile__ (
-        ".byte 0x0F,0x01,0xD9"
-        : "=a" (eax)
-        : "a"(function),
-        "b"(ebx), "c"(ecx), "d"(edx), "D"(edi), "S"(esi) );
-    return eax;
 }
 
 static int
@@ -280,25 +296,57 @@ static void pci_setup(void)
     }
 }
 
-static 
-int must_load_nic(void) 
+/*
+ * If the network card is in the boot order, load the Etherboot option ROM.
+ * Read the boot order bytes from CMOS and check if any of them are 0x4.
+ */
+static int must_load_nic(void) 
 {
-    /* If the network card is in the boot order, load the Etherboot 
-     * option ROM.  Read the boot order bytes from CMOS and check 
-     * if any of them are 0x4. */
     uint8_t boot_order;
 
-    /* Read CMOS register 0x3d (boot choices 0 and 1) */
-    outb(0x70, 0x3d);
-    boot_order = inb(0x71);
-    if ( (boot_order & 0xf) == 0x4 || (boot_order & 0xf0) == 0x40 ) 
+    /* Read CMOS register 0x3d (boot choices 0 and 1). */
+    boot_order = cmos_inb(0x3d);
+    if ( ((boot_order & 0xf) == 0x4) || ((boot_order & 0xf0) == 0x40) ) 
         return 1;
-    /* Read CMOS register 0x38 (boot choice 2 and FDD test flag) */
-    outb(0x70, 0x38);
-    boot_order = inb(0x71);
-    if ( (boot_order & 0xf0) == 0x40 ) 
-        return 1;
-    return 0;
+
+    /* Read CMOS register 0x38 (boot choice 2 and FDD test flag). */
+    boot_order = cmos_inb(0x38);
+    return ((boot_order & 0xf0) == 0x40);
+}
+
+/* Replace possibly erroneous memory-size CMOS fields with correct values. */
+static void cmos_write_memory_size(void)
+{
+    struct e820entry *map = E820_MAP;
+    int i, nr = *E820_MAP_NR;
+    uint32_t base_mem = 640, ext_mem = 0, alt_mem = 0;
+
+    for ( i = 0; i < nr; i++ )
+        if ( (map[i].addr >= 0x100000) && (map[i].type == E820_RAM) )
+            break;
+
+    if ( i != nr )
+    {
+        alt_mem = ext_mem = map[i].addr + map[i].size;
+        ext_mem = (ext_mem > 0x0100000) ? (ext_mem - 0x0100000) >> 10 : 0;
+        if ( ext_mem > 0xffff )
+            ext_mem = 0xffff;
+        alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
+    }
+
+    /* All BIOSes: conventional memory (640kB). */
+    cmos_outb(0x15, (uint8_t)(base_mem >> 0));
+    cmos_outb(0x16, (uint8_t)(base_mem >> 8));
+
+    /* All BIOSes: extended memory (1kB chunks above 1MB). */
+    cmos_outb(0x17, (uint8_t)( ext_mem >> 0));
+    cmos_outb(0x18, (uint8_t)( ext_mem >> 8));
+    cmos_outb(0x30, (uint8_t)( ext_mem >> 0));
+    cmos_outb(0x31, (uint8_t)( ext_mem >> 8));
+
+    /* Some BIOSes: alternative extended memory (64kB chunks above 16MB). */
+    cmos_outb(0x34, (uint8_t)( alt_mem >> 0));
+    cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
 int main(void)
@@ -349,13 +397,9 @@ int main(void)
         ASSERT((ACPI_PHYSICAL_ADDRESS + acpi_sz) <= 0xF0000);
     }
 
-    if ( check_amd() )
-    {
-        /* AMD implies this is SVM */
-        printf("SVM go ...\n");
-        vmmcall(SVM_VMMCALL_RESET_TO_REALMODE, 0, 0, 0, 0, 0);
-    }
-    else
+    cmos_write_memory_size();
+
+    if ( !check_amd() )
     {
         printf("Loading VMXAssist ...\n");
         memcpy((void *)VMXASSIST_PHYSICAL_ADDRESS,
@@ -368,7 +412,7 @@ int main(void)
             );
     }
 
-    printf("Failed to invoke ROMBIOS\n");
+    printf("Invoking ROMBIOS ...\n");
     return 0;
 }
 

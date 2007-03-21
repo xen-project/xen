@@ -841,10 +841,22 @@ void qemu_get_timer(QEMUFile *f, QEMUTimer *ts)
 #ifdef CONFIG_DM
 static void timer_save(QEMUFile *f, void *opaque)
 {
+    /* need timer for save/restoe qemu_timer in usb_uhci */
+    if (cpu_ticks_enabled) {
+        hw_error("cannot save state if virtual timers are running");
+    }
+    qemu_put_be64s(f, &cpu_clock_offset);
 }
 
 static int timer_load(QEMUFile *f, void *opaque, int version_id)
 {
+    if (version_id != 1)
+        return -EINVAL;
+    if (cpu_ticks_enabled) {
+        return -EINVAL;
+    }
+
+    qemu_get_be64s(f, &cpu_clock_offset);
     return 0;
 }
 #else  /* !CONFIG_DM */
@@ -3900,6 +3912,7 @@ static int usb_device_add(const char *devname)
     const char *p;
     USBDevice *dev;
     USBPort *port;
+    char usb_name[256] = "USB ";
 
     if (!free_usb_ports)
         return -1;
@@ -3936,6 +3949,12 @@ static int usb_device_add(const char *devname)
     free_usb_ports = port->next;
     port->next = used_usb_ports;
     used_usb_ports = port;
+
+    pstrcpy(usb_name + strlen(usb_name), 
+            sizeof(usb_name) - strlen(usb_name), 
+            devname);
+    register_savevm(usb_name, 0, 1, generic_usb_save, generic_usb_load, dev);
+    
     usb_attach(port, dev);
     return 0;
 }

@@ -13,7 +13,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 PROGRAMS_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
 
-INCLUDES += -I $(XEN_LIBXC)
+INCLUDES += -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 
 CFLAGS += -Werror -fno-strict-aliasing
 CFLAGS += $(INCLUDES)
@@ -22,9 +22,9 @@ CFLAGS += $(INCLUDES)
 CFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 
-PROGRAMS		= xc_restore xc_save readnotes
+PROGRAMS = xc_restore xc_save readnotes
 
-LDLIBS			= -L$(XEN_LIBXC) -lxenguest -lxenctrl
+LDLIBS   = -L$(XEN_LIBXC) -L$(XEN_XENSTORE) -lxenguest -lxenctrl -lxenstore
 
 .PHONY: all
 all: build

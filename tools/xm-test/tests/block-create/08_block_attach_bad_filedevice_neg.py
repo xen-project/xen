@@ -31,10 +31,10 @@ except ConsoleError, e:
 
 status, output = traceCommand("xm block-attach %s file:/dev/NOT-EXIST xvda1 w" % domain.getName())
 eyecatcher = "Error"
-where = output.find(eyecatcher)
+where = re.compile(eyecatcher, re.IGNORECASE).search(output)
 if status == 0:
     FAIL("xm block-attach returned bad status, expected non 0, status is: %i" % status )
-elif where == -1:
+elif where is None:
     FAIL("xm block-attach returned bad output, expected Error, output is: %s" % output )
     
 try:

@@ -140,6 +140,18 @@ struct xen_sysctl_getdomaininfolist {
 typedef struct xen_sysctl_getdomaininfolist xen_sysctl_getdomaininfolist_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getdomaininfolist_t);
 
+/*
+ * Inject debug keys into Xen.
+ */
+#define XEN_SYSCTL_debug_keys        7
+struct xen_sysctl_debug_keys {
+    /* IN variables. */
+    XEN_GUEST_HANDLE_64(char) keys;
+    uint32_t nr_keys;
+};
+typedef struct xen_sysctl_debug_keys xen_sysctl_debug_keys_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -150,6 +162,7 @@ struct xen_sysctl {
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
         struct xen_sysctl_getdomaininfolist getdomaininfolist;
+        struct xen_sysctl_debug_keys        debug_keys;
         uint8_t                             pad[128];
     } u;
 };

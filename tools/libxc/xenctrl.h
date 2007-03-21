@@ -467,6 +467,8 @@ int xc_readconsolering(int xc_handle,
                        unsigned int *pnr_chars,
                        int clear);
 
+int xc_send_debug_keys(int xc_handle, char *keys);
+
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
@@ -770,19 +772,19 @@ typedef struct {
  * data pointed to are only valid until the next call to
  * libxc.
  */
-const xc_error const *xc_get_last_error(void);
+const xc_error *xc_get_last_error(void);
 
 /*
  * Clear the last error
  */
 void xc_clear_last_error(void);
 
-typedef void (*xc_error_handler)(const xc_error const* err);
+typedef void (*xc_error_handler)(const xc_error * const err);
 
 /*
  * The default error handler which prints to stderr
  */
-void xc_default_error_handler(const xc_error const* err);
+void xc_default_error_handler(const xc_error * const err);
 
 /*
  * Convert an error code into a text description

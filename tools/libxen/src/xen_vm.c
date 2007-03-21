@@ -88,9 +88,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "memory_static_min",
           .type = &abstract_type_int,
           .offset = offsetof(xen_vm_record, memory_static_min) },
-        { .key = "VCPUs_policy",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, vcpus_policy) },
         { .key = "VCPUs_params",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, vcpus_params) },
@@ -145,21 +142,9 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "HVM_boot_params",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_record, hvm_boot_params) },
-        { .key = "platform_std_VGA",
-          .type = &abstract_type_bool,
-          .offset = offsetof(xen_vm_record, platform_std_vga) },
-        { .key = "platform_serial",
-          .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, platform_serial) },
-        { .key = "platform_localtime",
-          .type = &abstract_type_bool,
-          .offset = offsetof(xen_vm_record, platform_localtime) },
-        { .key = "platform_clock_offset",
-          .type = &abstract_type_bool,
-          .offset = offsetof(xen_vm_record, platform_clock_offset) },
-        { .key = "platform_enable_audio",
-          .type = &abstract_type_bool,
-          .offset = offsetof(xen_vm_record, platform_enable_audio) },
+        { .key = "platform",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vm_record, platform) },
         { .key = "PCI_bus",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, pci_bus) },
@@ -203,7 +188,6 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->name_description);
     xen_vdi_record_opt_free(record->suspend_vdi);
     xen_host_record_opt_free(record->resident_on);
-    free(record->vcpus_policy);
     xen_string_string_map_free(record->vcpus_params);
     xen_console_record_opt_set_free(record->consoles);
     xen_vif_record_opt_set_free(record->vifs);
@@ -217,7 +201,7 @@ xen_vm_record_free(xen_vm_record *record)
     free(record->pv_bootloader_args);
     free(record->hvm_boot_policy);
     xen_string_string_map_free(record->hvm_boot_params);
-    free(record->platform_serial);
+    xen_string_string_map_free(record->platform);
     free(record->pci_bus);
     xen_string_string_map_free(record->other_config);
     xen_vm_metrics_record_opt_free(record->metrics);
@@ -505,23 +489,6 @@ xen_vm_get_memory_static_min(xen_session *session, int64_t *result, xen_vm vm)
     abstract_type result_type = abstract_type_int;
 
     XEN_CALL_("VM.get_memory_static_min");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vcpus_policy(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VCPUs_policy");
     return session->ok;
 }
 
@@ -825,7 +792,7 @@ xen_vm_get_hvm_boot_params(xen_session *session, xen_string_string_map **result,
 
 
 bool
-xen_vm_get_platform_std_vga(xen_session *session, bool *result, xen_vm vm)
+xen_vm_get_platform(xen_session *session, xen_string_string_map **result, xen_vm vm)
 {
     abstract_value param_values[] =
         {
@@ -833,74 +800,10 @@ xen_vm_get_platform_std_vga(xen_session *session, bool *result, xen_vm vm)
               .u.string_val = vm }
         };
 
-    abstract_type result_type = abstract_type_bool;
-
-    XEN_CALL_("VM.get_platform_std_VGA");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_platform_serial(xen_session *session, char **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_string_map;
 
     *result = NULL;
-    XEN_CALL_("VM.get_platform_serial");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_platform_localtime(xen_session *session, bool *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_bool;
-
-    XEN_CALL_("VM.get_platform_localtime");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_platform_clock_offset(xen_session *session, bool *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_bool;
-
-    XEN_CALL_("VM.get_platform_clock_offset");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_platform_enable_audio(xen_session *session, bool *result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_bool;
-
-    XEN_CALL_("VM.get_platform_enable_audio");
+    XEN_CALL_("VM.get_platform");
     return session->ok;
 }
 
@@ -1145,22 +1048,6 @@ xen_vm_set_memory_static_min(xen_session *session, xen_vm vm, int64_t static_min
         };
 
     xen_call_(session, "VM.set_memory_static_min", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_vcpus_policy(xen_session *session, xen_vm vm, char *policy)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_string,
-              .u.string_val = policy }
-        };
-
-    xen_call_(session, "VM.set_VCPUs_policy", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
@@ -1442,81 +1329,67 @@ xen_vm_remove_from_hvm_boot_params(xen_session *session, xen_vm vm, char *key)
 
 
 bool
-xen_vm_set_platform_std_vga(xen_session *session, xen_vm vm, bool std_vga)
+xen_vm_set_platform(xen_session *session, xen_vm vm, xen_string_string_map *platform)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
-            { .type = &abstract_type_bool,
-              .u.bool_val = std_vga }
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)platform }
         };
 
-    xen_call_(session, "VM.set_platform_std_VGA", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_platform", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
 
 bool
-xen_vm_set_platform_serial(xen_session *session, xen_vm vm, char *serial)
+xen_vm_add_to_platform(xen_session *session, xen_vm vm, char *key, char *value)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &abstract_type_string,
-              .u.string_val = serial }
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
         };
 
-    xen_call_(session, "VM.set_platform_serial", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.add_to_platform", param_values, 3, NULL, NULL);
     return session->ok;
 }
 
 
 bool
-xen_vm_set_platform_localtime(xen_session *session, xen_vm vm, bool localtime)
+xen_vm_remove_from_platform(xen_session *session, xen_vm vm, char *key)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
-            { .type = &abstract_type_bool,
-              .u.bool_val = localtime }
+            { .type = &abstract_type_string,
+              .u.string_val = key }
         };
 
-    xen_call_(session, "VM.set_platform_localtime", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.remove_from_platform", param_values, 2, NULL, NULL);
     return session->ok;
 }
 
 
 bool
-xen_vm_set_platform_clock_offset(xen_session *session, xen_vm vm, bool clock_offset)
+xen_vm_set_pci_bus(xen_session *session, xen_vm vm, char *pci_bus)
 {
     abstract_value param_values[] =
         {
             { .type = &abstract_type_string,
               .u.string_val = vm },
-            { .type = &abstract_type_bool,
-              .u.bool_val = clock_offset }
-        };
-
-    xen_call_(session, "VM.set_platform_clock_offset", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
-xen_vm_set_platform_enable_audio(xen_session *session, xen_vm vm, bool enable_audio)
-{
-    abstract_value param_values[] =
-        {
             { .type = &abstract_type_string,
-              .u.string_val = vm },
-            { .type = &abstract_type_bool,
-              .u.bool_val = enable_audio }
+              .u.string_val = pci_bus }
         };
 
-    xen_call_(session, "VM.set_platform_enable_audio", param_values, 2, NULL, NULL);
+    xen_call_(session, "VM.set_PCI_bus", param_values, 2, NULL, NULL);
     return session->ok;
 }
 

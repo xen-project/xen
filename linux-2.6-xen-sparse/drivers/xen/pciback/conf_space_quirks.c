@@ -32,16 +32,14 @@ static inline void register_quirk(struct pciback_config_quirk *quirk)
 	list_add_tail(&quirk->quirks_list, &pciback_quirks);
 }
 
-int pciback_field_is_dup(struct pci_dev *dev, int reg)
+int pciback_field_is_dup(struct pci_dev *dev, unsigned int reg)
 {
 	int ret = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
-	struct config_field *field;
 	struct config_field_entry *cfg_entry;
 
 	list_for_each_entry(cfg_entry, &dev_data->config_fields, list) {
-		field = cfg_entry->field;
-		if (field->offset == reg) {
+		if ( OFFSET(cfg_entry) == reg) {
 			ret = 1;
 			break;
 		}

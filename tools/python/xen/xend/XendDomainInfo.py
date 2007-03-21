@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005, 2006 XenSource Ltd
+# Copyright (C) 2005-2007 XenSource Ltd
 #============================================================================
 
 """Representation of a single domain.
@@ -34,7 +34,7 @@ from types import StringTypes
 
 import xen.lowlevel.xc
 from xen.util import asserts
-from xen.util.blkif import blkdev_uname_to_file
+from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 from xen.util import security
 
 from xen.xend import balloon, sxp, uuid, image, arch, osdep
@@ -50,6 +50,8 @@ from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, ResumeDomai
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
+
+from xen.xend.XendVMMetrics import XendVMMetrics
 
 MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
@@ -176,14 +178,8 @@ def recreate(info, priv):
         vm._storeVmDetails()
         vm._storeDomDetails()
         
-    if vm.info['image']: # Only dom0 should be without an image entry when
-                         # recreating, but we cope with missing ones
-                         # elsewhere just in case.
-        vm.image = image.create(vm,
-                                vm.info,
-                                vm.info['image'],
-                                vm.info['devices'])
-        vm.image.recreate()
+    vm.image = image.create(vm, vm.info)
+    vm.image.recreate()
 
     vm._registerWatches()
     vm.refreshShutdown(xeninfo)
@@ -375,6 +371,8 @@ class XendDomainInfo:
             self._augmentInfo(priv)
 
         self._checkName(self.info['name_label'])
+
+        self.metrics = XendVMMetrics(uuid.createString(), self)
             
 
     #
@@ -448,9 +446,7 @@ class XendDomainInfo:
         self.storeDom("control/shutdown", reason)
 
         ## shutdown hypercall for hvm domain desides xenstore write
-        image_cfg = self.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
-        if hvm:
+        if self.info.is_hvm():
             for code in DOMAIN_SHUTDOWN_REASONS.keys():
                 if DOMAIN_SHUTDOWN_REASONS[code] == reason:
                     break
@@ -580,12 +576,14 @@ class XendDomainInfo:
         if target <= 0:
             raise XendError('Invalid memory size')
         
-        self.info['memory_static_min'] = target
+        MiB = 1024 * 1024
+        self.info['memory_dynamic_min'] = target * MiB
+        self.info['memory_dynamic_max'] = target * MiB
+
         if self.domid >= 0:
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
         else:
-            self.info['memory_dynamic_min'] = target
             xen.xend.XendDomain.instance().managed_config_save(self)
 
     def setMemoryMaximum(self, limit):
@@ -635,6 +633,10 @@ class XendDomainInfo:
         except RuntimeError, exn:
             raise XendError(str(exn))
 
+
+    def getDomInfo(self):
+        return dom_get(self.domid)
+
     #
     # internal functions ... TODO: re-categorised
     # 
@@ -664,6 +666,10 @@ class XendDomainInfo:
                 if arg in XendConfig.LEGACY_CFG_TO_XENAPI_CFG:
                     xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
                     self.info[xapiarg] = val
+                elif arg == "memory":
+                    self.info["static_memory_min"] = val
+                elif arg == "maxmem":
+                    self.info["static_memory_max"] = val
                 else:
                     self.info[arg] = val
 
@@ -780,7 +786,7 @@ class XendDomainInfo:
             'vm':                 self.vmpath,
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
-            'memory/target':      str(self.info['memory_static_min'] * 1024),
+            'memory/target':      str(self.info['memory_dynamic_max'] / 1024),
             }
 
         def f(n, v):
@@ -864,7 +870,15 @@ class XendDomainInfo:
                 xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
                 if val != None and val != self.info[xapiarg]:
                     self.info[xapiarg] = val
-                    changed= True
+                    changed = True
+            elif arg == "memory":
+                if val != None and val != self.info["static_memory_min"]:
+                    self.info["static_memory_min"] = val
+                    changed = True
+            elif arg == "maxmem":
+                if val != None and val != self.info["static_memory_max"]:
+                    self.info["static_memory_max"] = val
+                    changed = True
 
         # Check whether image definition has been updated
         image_sxp = self._readVm('image')
@@ -969,11 +983,12 @@ class XendDomainInfo:
 
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
-        return self.info['memory_static_min'] * 1024
+        return self.info['memory_dynamic_max'] / 1024
 
     def getMemoryMaximum(self):
         """Get this domain's maximum memory size, in KB."""
-        return self.info['memory_static_max'] * 1024
+        # remember, info now stores memory in bytes
+        return self.info['memory_static_max'] / 1024
 
     def getResume(self):
         return str(self._resume)
@@ -1389,9 +1404,7 @@ class XendDomainInfo:
 
         self.shutdownStartTime = None
 
-        image_cfg = self.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
-
+        hvm = self.info.is_hvm()
         if hvm:
             info = xc.xeninfo()
             if 'hvm' not in info['xen_caps']:
@@ -1438,14 +1451,8 @@ class XendDomainInfo:
 
         self._configureBootloader()
 
-        if not self._infoIsSet('image'):
-            raise VmError('Missing image in configuration')
-
         try:
-            self.image = image.create(self,
-                                      self.info,
-                                      self.info['image'],
-                                      self.info['devices'])
+            self.image = image.create(self, self.info)
 
             localtime = self.info.get('platform_localtime', False)
             if localtime:
@@ -1463,13 +1470,14 @@ class XendDomainInfo:
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
             # values. maxmem, memory, and shadow are all in KiB.
+            # but memory_static_max etc are all stored in bytes now.
             memory = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_min'] * 1024)
+                self.info['memory_dynamic_max'] / 1024)
             maxmem = self.image.getRequiredAvailableMemory(
-                self.info['memory_static_max'] * 1024)
+                self.info['memory_static_max'] / 1024)
             shadow = self.image.getRequiredShadowMemory(
-                self.info['shadow_memory'] * 1024,
-                self.info['memory_static_max'] * 1024)
+                self.info['shadow_memory'] / 1024,
+                self.info['memory_static_max'] / 1024)
 
             log.debug("_initDomain:shadow_memory=0x%x, memory_static_max=0x%x, memory_static_min=0x%x.", self.info['shadow_memory'], self.info['memory_static_max'], self.info['memory_static_min'],)
             # Round shadow up to a multiple of a MiB, as shadow_mem_control
@@ -1505,9 +1513,15 @@ class XendDomainInfo:
             self.info['start_time'] = time.time()
 
             self._stateSet(DOM_STATE_RUNNING)
-        except (RuntimeError, VmError), exn:
+        except VmError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
-            self.image.cleanupBootloading()
+            if self.image:
+                self.image.cleanupBootloading()
+            raise exn
+        except RuntimeError, exn:
+            log.exception("XendDomainInfo.initDomain: exception occurred")
+            if self.image:
+                self.image.cleanupBootloading()
             raise VmError(str(exn))
 
 
@@ -1574,13 +1588,8 @@ class XendDomainInfo:
         self.console_mfn = console_mfn
 
         self._introduceDomain()
-        image_cfg = self.info.get('image', {})
-        hvm = image_cfg.has_key('hvm')
-        if hvm:
-            self.image = image.create(self,
-                    self.info,
-                    self.info['image'],
-                    self.info['devices'])
+        if self.info.is_hvm():
+            self.image = image.create(self, self.info)
             if self.image:
                 self.image.createDeviceModel(True)
                 self.image.register_shutdown_watch()
@@ -1657,7 +1666,18 @@ class XendDomainInfo:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
         from xen.xend import XendDomain
-        XendDomain.instance().remove_domain(self)
+
+        if "transient" in self.info["other_config"]\
+           and bool(self.info["other_config"]["transient"]):
+            xendDomainInstance = XendDomain.instance()
+            
+            xendDomainInstance.domains_lock.acquire()
+            xendDomainInstance._refresh(refresh_shutdown = False)
+            xendDomainInstance.domains_lock.release()
+            
+            xendDomainInstance.domain_delete(self.info["name_label"])
+        else:
+            XendDomain.instance().remove_domain(self)
 
         self.cleanupDomain()
         self._cleanup_phantom_devs(paths)
@@ -1742,11 +1762,7 @@ class XendDomainInfo:
 
         if boot:
             # HVM booting.
-            self.info['image']['type'] = 'hvm'
-            if not 'devices' in self.info['image']:
-                self.info['image']['devices'] = {}
-            self.info['image']['devices']['boot'] = \
-                self.info['HVM_boot_params'].get('order', 'dc')
+            pass
         elif not blexec and kernel:
             # Boot from dom0.  Nothing left to do -- the kernel and ramdisk
             # will be picked up by image.py.
@@ -1770,7 +1786,8 @@ class XendDomainInfo:
             disk = devinfo[1]['uname']
 
             fn = blkdev_uname_to_file(disk)
-            mounted = devtype == 'tap' and not os.stat(fn).st_rdev
+            taptype = blkdev_uname_to_taptype(disk)
+            mounted = devtype == 'tap' and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
             if mounted:
                 # This is a file, not a device.  pygrub can cope with a
                 # file if it's raw, but if it's QCOW or other such formats
@@ -1786,7 +1803,7 @@ class XendDomainInfo:
 
                 from xen.xend import XendDomain
                 dom0 = XendDomain.instance().privilegedDomain()
-                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, fn))
+                dom0._waitForDeviceUUID(dom0.create_vbd(vbd, disk))
                 fn = BOOTLOADER_LOOPBACK_DEVICE
 
             try:
@@ -1844,7 +1861,7 @@ class XendDomainInfo:
             # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
             # the minimum that Xen would allocate if no value were given.
             overhead_kb = self.info['vcpus_number'] * 1024 + \
-                          self.info['memory_static_max'] * 4
+                          (self.info['memory_static_max'] / 1024 / 1024) * 4
             overhead_kb = ((overhead_kb + 1023) / 1024) * 1024
             # The domain might already have some shadow memory
             overhead_kb -= xc.shadow_mem_control(self.domid) * 1024
@@ -1910,10 +1927,14 @@ class XendDomainInfo:
             if self._infoIsSet(info_key):
                 to_store[key] = str(self.info[info_key])
 
-        if self.info.get('image'):
-            image_sxpr = self.info.image_sxpr()
-            if image_sxpr:
-                to_store['image'] = sxp.to_string(image_sxpr)
+        if self._infoIsSet("static_memory_min"):
+            to_store["memory"] = str(self.info["static_memory_min"])
+        if self._infoIsSet("static_memory_max"):
+            to_store["maxmem"] = str(self.info["static_memory_max"])
+
+        image_sxpr = self.info.image_sxpr()
+        if image_sxpr:
+            to_store['image'] = sxp.to_string(image_sxpr)
 
         if self._infoIsSet('security'):
             secinfo = self.info['security']
@@ -2000,7 +2021,11 @@ class XendDomainInfo:
             info = dom_get(self.domid)
             if not info:
                 return
-            
+
+        if info["maxmem_kb"] < 0:
+            info["maxmem_kb"] = XendNode.instance() \
+                                .physinfo_dict()['total_memory'] * 1024
+
         #manually update ssidref / security fields
         if security.on() and info.has_key('ssidref'):
             if (info['ssidref'] != 0) and self.info.has_key('security'):
@@ -2057,15 +2082,6 @@ class XendDomainInfo:
         return self.info.get('memory_dynamic_max', 0)
     def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_min', 0)
-
-    def get_vcpus_policy(self):
-        sched_id = xc.sched_id_get()
-        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
-            return 'sedf'
-        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
-            return 'credit'
-        else:
-            return 'unknown'
     def get_vcpus_params(self):
         if self.getDomid() is None:
             return self.info['vcpus_params']
@@ -2074,22 +2090,14 @@ class XendDomainInfo:
         return retval
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self.state]
-    def get_platform_std_vga(self):
-        return self.info.get('platform_std_vga', False)    
-    def get_platform_serial(self):
-        return self.info.get('platform_serial', '')
-    def get_platform_localtime(self):
-        return self.info.get('platform_localtime', False)
-    def get_platform_clock_offset(self):
-        return self.info.get('platform_clock_offset', False)
-    def get_platform_enable_audio(self):
-        return self.info.get('platform_enable_audio', False)
-    def get_platform_keymap(self):
-        return self.info.get('platform_keymap', '')
+    def get_platform(self):
+        return self.info.get('platform', {})    
     def get_pci_bus(self):
         return self.info.get('pci_bus', '')
     def get_tools_version(self):
         return self.info.get('tools_version', {})
+    def get_metrics(self):
+        return self.metrics.get_uuid();
     
     def get_on_shutdown(self):
         after_shutdown = self.info.get('actions_after_shutdown')
@@ -2278,8 +2286,6 @@ class XendDomainInfo:
         @return: uuid of the device
         """
         xenapi_vbd['image'] = vdi_image_path
-        log.debug('create_vbd: %s' % xenapi_vbd)
-        dev_uuid = ''
         if vdi_image_path.startswith('tap'):
             dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
         else:
@@ -2289,16 +2295,25 @@ class XendDomainInfo:
             raise XendError('Failed to create device')
 
         if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            
             _, config = self.info['devices'][dev_uuid]
-            dev_control = None
             
             if vdi_image_path.startswith('tap'):
-                dev_control =  self.getDeviceController('tap')
+                dev_control = self.getDeviceController('tap')
             else:
                 dev_control = self.getDeviceController('vbd')
-                
-            config['devid'] = dev_control.createDevice(config)
 
+            try:
+                devid = dev_control.createDevice(config)
+                dev_control.waitForDevice(devid)
+                self.info.device_update(dev_uuid,
+                                        cfg_xenapi = {'devid': devid})
+            except Exception, exn:
+                log.exception(exn)
+                del self.info['devices'][dev_uuid]
+                self.info['vbd_refs'].remove(dev_uuid)
+                raise
+            
         return dev_uuid
 
     def create_phantom_vbd_with_vdi(self, xenapi_vbd, vdi_image_path):
@@ -2332,9 +2347,21 @@ class XendDomainInfo:
             raise XendError('Failed to create device')
         
         if self.state == XEN_API_VM_POWER_STATE_RUNNING:
-            _, config = self.info['devices'][dev_uuid]
-            config['devid'] = self.getDeviceController('vif').createDevice(config)
 
+            _, config = self.info['devices'][dev_uuid]
+            dev_control = self.getDeviceController('vif')
+
+            try:
+                devid = dev_control.createDevice(config)
+                dev_control.waitForDevice(devid)
+                self.info.device_update(dev_uuid,
+                                        cfg_xenapi = {'devid': devid})
+            except Exception, exn:
+                log.exception(exn)
+                del self.info['devices'][dev_uuid]
+                self.info['vif_refs'].remove(dev_uuid)
+                raise            
+ 
         return dev_uuid
 
     def create_vtpm(self, xenapi_vtpm):
@@ -2401,7 +2428,7 @@ class XendDomainInfo:
     def __str__(self):
         return '<domain id=%s name=%s memory=%s state=%s>' % \
                (str(self.domid), self.info['name_label'],
-                str(self.info['memory_static_min']), DOM_STATES[self.state])
+                str(self.info['memory_dynamic_max']), DOM_STATES[self.state])
 
     __repr__ = __str__
 

@@ -59,6 +59,18 @@ if 'TRACE' not in logging.__dict__:
                     return filename, frame[2]
     logging.Logger.findCaller = findCaller
 
+    # Work around a bug in Python's inspect module: findsource is supposed to
+    # raise IOError if it fails, with other functions in that module coping
+    # with that, but some people are seeing IndexError raised from there.
+    if hasattr(inspect, 'findsource'):
+        real_findsource = getattr(inspect, 'findsource')
+        def findsource(*args, **kwargs):
+            try:
+                return real_findsource(*args, **kwargs)
+            except IndexError, exn:
+                raise IOError(exn)
+        inspect.findsource = findsource
+
 
 log = logging.getLogger("xend")
 

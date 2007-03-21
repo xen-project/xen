@@ -511,4 +511,6 @@ int steal_page(
 
 #define domain_clamp_alloc_bitsize(d, b) (b)
 
+#define domain_get_maximum_gpfn(d) (-ENOSYS)
+
 #endif /* __ASM_IA64_MM_H__ */

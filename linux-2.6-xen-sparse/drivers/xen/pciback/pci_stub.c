@@ -589,10 +589,6 @@ static int pcistub_reg_add(int domain, int bus, int slot, int func, int reg,
 	}
 	dev = psdev->dev;
 
-	/* check for duplicate field */
-	if (pciback_field_is_dup(dev, reg))
-		goto out;
-
 	field = kzalloc(sizeof(*field), GFP_ATOMIC);
 	if (!field) {
 		err = -ENOMEM;
@@ -728,10 +724,10 @@ static ssize_t pcistub_quirk_show(struct device_driver *drv, char *buf)
 			if (count >= PAGE_SIZE)
 				goto out;
 
-			count += scnprintf(buf + count, PAGE_SIZE -
-					   count, "\t\t%08x:%01x:%08x\n",
-					   field->offset, field->size,
-					   field->mask);
+			count += scnprintf(buf + count, PAGE_SIZE - count,
+					   "\t\t%08x:%01x:%08x\n",
+					   cfg_entry->base_offset + field->offset, 
+					   field->size, field->mask);
 		}
 	}
 

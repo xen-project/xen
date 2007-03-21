@@ -103,7 +103,7 @@
          (hnd).p = val;                                     \
     } while ( 0 )
 #define uint64_aligned_t uint64_t __attribute__((aligned(8)))
-#define XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name __attribute__((aligned(8)))
+#define XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name
 #endif
 
 #ifndef __ASSEMBLY__

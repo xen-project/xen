@@ -79,6 +79,9 @@ struct shadow_domain {
     struct shadow_page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
 
+    /* Fast MMIO path heuristic */
+    int has_fast_mmio_entries;
+
     /* Shadow log-dirty bitmap */
     unsigned long *dirty_bitmap;
     unsigned int dirty_bitmap_size;  /* in pages, bit per page */
@@ -244,6 +247,9 @@ struct arch_vcpu
 
 #ifdef CONFIG_X86_32
     struct desc_struct int80_desc;
+#endif
+#ifdef CONFIG_X86_64
+    struct trap_bounce int80_bounce;
 #endif
 
     /* Virtual Machine Extensions */

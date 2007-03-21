@@ -439,6 +439,18 @@ void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
     req->data = tmp1;
 }
 
+void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
+{
+    unsigned long tmp1;
+
+    if (req->data_is_ptr != 0)
+        hw_error("expected scalar value");
+
+    read_physical(req->addr, req->size, &tmp1);
+    write_physical(req->addr, req->size, &req->data);
+    req->data = tmp1;
+}
+
 void __handle_ioreq(CPUState *env, ioreq_t *req)
 {
     if (!req->data_is_ptr && req->dir == IOREQ_WRITE && req->size != 4)
@@ -462,6 +474,9 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         break;
     case IOREQ_TYPE_XOR:
         cpu_ioreq_xor(env, req);
+        break;
+    case IOREQ_TYPE_XCHG:
+        cpu_ioreq_xchg(env, req);
         break;
     default:
         hw_error("Invalid ioreq type 0x%x\n", req->type);
@@ -577,7 +592,28 @@ int main_loop(void)
         destroy_hvm_domain();
     else {
         char qemu_file[20];
+        ioreq_t *req;
+        int rc;
+
         sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
+        xc_domain_pause(xc_handle, domid);
+
+        /* Pull all outstanding ioreqs through the system */
+        handle_buffered_io(env);
+        main_loop_wait(1); /* For the select() on events */
+        
+        /* Stop the IDE thread */
+        ide_stop_dma_thread();
+
+        /* Make sure that all outstanding IO responses are handled too */ 
+        if ( xc_hvm_drain_io(xc_handle, domid) != 0 )
+        {
+            fprintf(stderr, "error clearing ioreq rings (%s)\n", 
+                    strerror(errno));
+            return -1;
+        }
+
+        /* Save the device state */
         if (qemu_savevm(qemu_file) < 0)
             fprintf(stderr, "qemu save fail.\n");
     }

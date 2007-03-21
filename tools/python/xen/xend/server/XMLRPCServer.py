@@ -157,7 +157,7 @@ class XMLRPCServer:
                     self.server.register_function(fn, "xend.domain.%s" % name[7:])
 
         # Functions in XendNode and XendDmesg
-        for type, lst, n in [(XendNode, ['info'], 'node'),
+        for type, lst, n in [(XendNode, ['info', 'send_debug_keys'], 'node'),
                              (XendDmesg, ['info', 'clear'], 'node.dmesg')]:
             inst = type.instance()
             for name in lst:

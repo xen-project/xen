@@ -307,7 +307,8 @@ void exit_thread(void)
 	if (unlikely(test_thread_flag(TIF_IO_BITMAP))) {
 		struct task_struct *tsk = current;
 		struct thread_struct *t = &tsk->thread;
-		struct physdev_set_iobitmap set_iobitmap = { 0 };
+		struct physdev_set_iobitmap set_iobitmap;
+		memset(&set_iobitmap, 0, sizeof(set_iobitmap));
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
@@ -606,7 +607,8 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	}
 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		iobmp_op.bitmap   = (char *)next->io_bitmap_ptr;
+		set_xen_guest_handle(iobmp_op.bitmap,
+				     (char *)next->io_bitmap_ptr);
 		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iobitmap;

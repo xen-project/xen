@@ -72,7 +72,6 @@ typedef struct xen_vbd_record
     struct xen_vm_record_opt *vm;
     struct xen_vdi_record_opt *vdi;
     char *device;
-    char *image;
     bool bootable;
     enum xen_vbd_mode mode;
     enum xen_vbd_type type;
@@ -355,6 +354,22 @@ xen_vbd_remove_from_qos_algorithm_params(xen_session *session, xen_vbd vbd, char
  */
 extern bool
 xen_vbd_media_change(xen_session *session, xen_vbd vbd, xen_vdi vdi);
+
+
+/**
+ * Hotplug the specified VBD, dynamically attaching it to the running
+ * VM
+ */
+extern bool
+xen_vbd_plug(xen_session *session, xen_vbd self);
+
+
+/**
+ * Hot-unplug the specified VBD, dynamically unattaching it from the
+ * running VM
+ */
+extern bool
+xen_vbd_unplug(xen_session *session, xen_vbd self);
 
 
 /**

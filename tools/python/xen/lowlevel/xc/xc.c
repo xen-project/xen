@@ -47,20 +47,24 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
 static PyObject *pyxc_error_to_exception(void)
 {
     PyObject *pyerr;
-    const xc_error const *err = xc_get_last_error();
+    const xc_error *err = xc_get_last_error();
     const char *desc = xc_error_code_to_desc(err->code);
 
-    if (err->code == XC_ERROR_NONE)
+    if ( err->code == XC_ERROR_NONE )
         return PyErr_SetFromErrno(xc_error_obj);
 
-    if (err->message[0] != '\0')
+    if ( err->message[0] != '\0' )
 	pyerr = Py_BuildValue("(iss)", err->code, desc, err->message);
     else
 	pyerr = Py_BuildValue("(is)", err->code, desc);
 
     xc_clear_last_error();
 
-    PyErr_SetObject(xc_error_obj, pyerr);
+    if ( pyerr != NULL )
+    {
+        PyErr_SetObject(xc_error_obj, pyerr);
+        Py_DECREF(pyerr);
+    }
 
     return NULL;
 }
@@ -70,13 +74,13 @@ static PyObject *pyxc_domain_dumpcore(XcObject *self, PyObject *args)
     uint32_t dom;
     char *corefile;
 
-    if (!PyArg_ParseTuple(args, "is", &dom, &corefile))
+    if ( !PyArg_ParseTuple(args, "is", &dom, &corefile) )
         return NULL;
 
     if ( (corefile == NULL) || (corefile[0] == '\0') )
         return NULL;
 
-    if (xc_domain_dumpcore(self->xc_handle, dom, corefile) != 0)
+    if ( xc_domain_dumpcore(self->xc_handle, dom, corefile) != 0 )
         return pyxc_error_to_exception();
     
     Py_INCREF(zero);
@@ -168,10 +172,10 @@ static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
 {
     uint32_t dom, reason;
 
-    if (!PyArg_ParseTuple(args, "ii", &dom, &reason))
+    if ( !PyArg_ParseTuple(args, "ii", &dom, &reason) )
       return NULL;
 
-    if (xc_domain_shutdown(self->xc_handle, dom, reason) != 0)
+    if ( xc_domain_shutdown(self->xc_handle, dom, reason) != 0 )
         return pyxc_error_to_exception();
     
     Py_INCREF(zero);
@@ -183,10 +187,10 @@ static PyObject *pyxc_domain_resume(XcObject *self, PyObject *args)
     uint32_t dom;
     int fast;
 
-    if (!PyArg_ParseTuple(args, "ii", &dom, &fast))
+    if ( !PyArg_ParseTuple(args, "ii", &dom, &fast) )
         return NULL;
 
-    if (xc_domain_resume(self->xc_handle, dom, fast) != 0)
+    if ( xc_domain_resume(self->xc_handle, dom, fast) != 0 )
         return pyxc_error_to_exception();
 
     Py_INCREF(zero);
@@ -282,7 +286,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
                                      PyObject *args,
                                      PyObject *kwds)
 {
-    PyObject *list, *info_dict;
+    PyObject *list, *info_dict, *pyhandle;
 
     uint32_t first_dom = 0;
     int max_doms = 1024, nr_doms, i, j;
@@ -308,26 +312,34 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
     list = PyList_New(nr_doms);
     for ( i = 0 ; i < nr_doms; i++ )
     {
-        PyObject *pyhandle = PyList_New(sizeof(xen_domain_handle_t));
+        info_dict = Py_BuildValue(
+            "{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+            ",s:L,s:L,s:L,s:i,s:i}",
+            "domid",           (int)info[i].domid,
+            "online_vcpus",    info[i].nr_online_vcpus,
+            "max_vcpu_id",     info[i].max_vcpu_id,
+            "hvm",             info[i].hvm,
+            "dying",           info[i].dying,
+            "crashed",         info[i].crashed,
+            "shutdown",        info[i].shutdown,
+            "paused",          info[i].paused,
+            "blocked",         info[i].blocked,
+            "running",         info[i].running,
+            "mem_kb",          (long long)info[i].nr_pages*(XC_PAGE_SIZE/1024),
+            "cpu_time",        (long long)info[i].cpu_time,
+            "maxmem_kb",       (long long)info[i].max_memkb,
+            "ssidref",         (int)info[i].ssidref,
+            "shutdown_reason", info[i].shutdown_reason);
+        pyhandle = PyList_New(sizeof(xen_domain_handle_t));
+        if ( (pyhandle == NULL) || (info_dict == NULL) )
+        {
+            Py_DECREF(list);
+            if ( pyhandle  != NULL ) { Py_DECREF(pyhandle);  }
+            if ( info_dict != NULL ) { Py_DECREF(info_dict); }
+            return NULL;
+        }
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
             PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
-        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-                                  ",s:l,s:L,s:l,s:i,s:i}",
-                                  "domid",       info[i].domid,
-                                  "online_vcpus", info[i].nr_online_vcpus,
-                                  "max_vcpu_id", info[i].max_vcpu_id,
-                                  "hvm",       info[i].hvm,
-                                  "dying",     info[i].dying,
-                                  "crashed",   info[i].crashed,
-                                  "shutdown",  info[i].shutdown,
-                                  "paused",    info[i].paused,
-                                  "blocked",   info[i].blocked,
-                                  "running",   info[i].running,
-                                  "mem_kb",    info[i].nr_pages*(XC_PAGE_SIZE/1024),
-                                  "cpu_time",  info[i].cpu_time,
-                                  "maxmem_kb", info[i].max_memkb,
-                                  "ssidref",   info[i].ssidref,
-                                  "shutdown_reason", info[i].shutdown_reason);
         PyDict_SetItemString(info_dict, "handle", pyhandle);
         Py_DECREF(pyhandle);
         PyList_SetItem(list, i, info_dict);
@@ -1007,6 +1019,24 @@ static PyObject *pyxc_domain_send_trigger(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_send_debug_keys(XcObject *self,
+                                      PyObject *args,
+                                      PyObject *kwds)
+{
+    char *keys;
+
+    static char *kwd_list[] = { "keys", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "s", kwd_list, &keys) )
+        return NULL;
+
+    if ( xc_send_debug_keys(self->xc_handle, keys) != 0 )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
 {
@@ -1379,6 +1409,12 @@ static PyMethodDef pyxc_methods[] = {
       " trigger [int]: Trigger type number.\n"
       " vcpu    [int]: VCPU to be sent trigger.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "send_debug_keys",
+      (PyCFunction)pyxc_send_debug_keys,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Inject debug keys into Xen.\n"
+      " keys    [str]: String of keys to inject.\n" },
 
 #ifdef __powerpc__
     { "arch_alloc_real_mode_area", 

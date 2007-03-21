@@ -14,11 +14,11 @@ static DEFINE_MUTEX(mtrr_mutex);
 void generic_get_mtrr(unsigned int reg, unsigned long *base,
 		      unsigned int *size, mtrr_type * type)
 {
-	dom0_op_t op;
+	struct xen_platform_op op;
 
-	op.cmd = DOM0_READ_MEMTYPE;
+	op.cmd = XENPF_read_memtype;
 	op.u.read_memtype.reg = reg;
-	(void)HYPERVISOR_dom0_op(&op);
+	(void)HYPERVISOR_platform_op(&op);
 
 	*size = op.u.read_memtype.nr_mfns;
 	*base = op.u.read_memtype.mfn;
@@ -36,12 +36,12 @@ unsigned int *usage_table;
 
 static void __init set_num_var_ranges(void)
 {
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	for (num_var_ranges = 0; ; num_var_ranges++) {
-		op.cmd = DOM0_READ_MEMTYPE;
+		op.cmd = XENPF_read_memtype;
 		op.u.read_memtype.reg = num_var_ranges;
-		if (HYPERVISOR_dom0_op(&op) != 0)
+		if (HYPERVISOR_platform_op(&op) != 0)
 			break;
 	}
 }
@@ -64,15 +64,15 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 		  unsigned int type, char increment)
 {
 	int error;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	mutex_lock(&mtrr_mutex);
 
-	op.cmd = DOM0_ADD_MEMTYPE;
+	op.cmd = XENPF_add_memtype;
 	op.u.add_memtype.mfn     = base;
 	op.u.add_memtype.nr_mfns = size;
 	op.u.add_memtype.type    = type;
-	error = HYPERVISOR_dom0_op(&op);
+	error = HYPERVISOR_platform_op(&op);
 	if (error) {
 		mutex_unlock(&mtrr_mutex);
 		BUG_ON(error > 0);
@@ -117,7 +117,7 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	unsigned long lbase;
 	unsigned int lsize;
 	int error = -EINVAL;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	mutex_lock(&mtrr_mutex);
 
@@ -141,10 +141,10 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 		goto out;
 	}
 	if (--usage_table[reg] < 1) {
-		op.cmd = DOM0_DEL_MEMTYPE;
+		op.cmd = XENPF_del_memtype;
 		op.u.del_memtype.handle = 0;
 		op.u.del_memtype.reg    = reg;
-		error = HYPERVISOR_dom0_op(&op);
+		error = HYPERVISOR_platform_op(&op);
 		if (error) {
 			BUG_ON(error > 0);
 			goto out;

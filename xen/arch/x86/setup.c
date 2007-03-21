@@ -195,13 +195,13 @@ static void __init percpu_free_unused_areas(void)
 
     /* Find first unused CPU number. */
     for ( i = 0; i < NR_CPUS; i++ )
-        if ( !cpu_online(i) )
+        if ( !cpu_possible(i) )
             break;
     first_unused = i;
 
-    /* Check that there are no holes in cpu_online_map. */
+    /* Check that there are no holes in cpu_possible_map. */
     for ( ; i < NR_CPUS; i++ )
-        BUG_ON(cpu_online(i));
+        BUG_ON(cpu_possible(i));
 
 #ifndef MEMORY_GUARD
     init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
@@ -716,8 +716,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     initialise_gdb(); /* could be moved earlier */
 
     do_initcalls();
-
-    schedulers_start();
 
     if ( opt_watchdog ) 
         watchdog_enable();

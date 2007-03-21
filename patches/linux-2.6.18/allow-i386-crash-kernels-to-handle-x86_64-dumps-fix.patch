@@ -1,0 +1,30 @@
+From: Andrew Morton <akpm@linux-foundation.org>
+
+In file included from arch/i386/kernel/setup.c:46:
+include/linux/crash_dump.h:19:36: warning: extra tokens at end of #ifndef directive
+
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Andi Kleen <ak@suse.de>
+Cc: Horms <horms@verge.net.au>
+Cc: Ian Campbell <ian.campbell@xensource.com>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Vivek Goyal <vgoyal@in.ibm.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ include/linux/crash_dump.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff -puN include/linux/crash_dump.h~allow-i386-crash-kernels-to-handle-x86_64-dumps-fix include/linux/crash_dump.h
+--- a/include/linux/crash_dump.h~allow-i386-crash-kernels-to-handle-x86_64-dumps-fix
++++ a/include/linux/crash_dump.h
+@@ -16,7 +16,7 @@ extern struct proc_dir_entry *proc_vmcor
+ 
+ /* Architecture code defines this if there are other possible ELF
+  * machine types, e.g. on bi-arch capable hardware. */
+-#ifndef vmcore_elf_check_arch_cross(x)
++#ifndef vmcore_elf_check_arch_cross
+ #define vmcore_elf_check_arch_cross(x) 0
+ #endif
+ 
+_

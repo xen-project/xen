@@ -12,6 +12,7 @@
 #define XCFLAGS_LIVE      1
 #define XCFLAGS_DEBUG     2
 #define XCFLAGS_HVM       4
+#define XCFLAGS_STDVGA    8
 
 
 /**
@@ -31,8 +32,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  * @return 0 on success, -1 on failure
  */
 int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                  int (*suspend)(int domid));
+                uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
+                int (*suspend)(int domid),  
+                void *(*init_qemu_maps)(int, unsigned), 
+                void (*qemu_flip_buffer)(int, int));
 
 /**
  * This function will restore a saved domain running Linux.
@@ -154,6 +157,8 @@ int xc_set_hvm_param(
     int handle, domid_t dom, int param, unsigned long value);
 int xc_get_hvm_param(
     int handle, domid_t dom, int param, unsigned long *value);
+
+int xc_hvm_drain_io(int handle, domid_t dom);
 
 /* PowerPC specific. */
 int xc_prose_build(int xc_handle,

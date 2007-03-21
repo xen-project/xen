@@ -195,8 +195,9 @@ int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
             result = 1;
         break;
     default:
-        gdprintk(XENLOG_WARNING, "Bad DFR value for lapic of vcpu %d\n",
-                 vlapic_vcpu(vlapic)->vcpu_id);
+        gdprintk(XENLOG_WARNING, "Bad DFR value for lapic of vcpu %d: %08x\n",
+                 vlapic_vcpu(vlapic)->vcpu_id,
+                 vlapic_get_reg(vlapic, APIC_DFR));
         break;
     }
 

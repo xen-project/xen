@@ -50,7 +50,7 @@
 #include <asm/pda.h>
 #include <asm/prctl.h>
 #include <asm/kdebug.h>
-#include <xen/interface/dom0_ops.h>
+#include <xen/interface/platform.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/vcpu.h>
 #include <asm/desc.h>
@@ -304,7 +304,8 @@ void exit_thread(void)
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
 #endif
 #ifdef CONFIG_XEN
-		struct physdev_set_iobitmap iobmp_op = { 0 };
+		struct physdev_set_iobitmap iobmp_op;
+		memset(&iobmp_op, 0, sizeof(iobmp_op));
 #endif
 
 		kfree(t->io_bitmap_ptr);
@@ -540,7 +541,8 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	}
 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		iobmp_op.bitmap   = (char *)next->io_bitmap_ptr;
+		set_xen_guest_handle(iobmp_op.bitmap,
+				     (char *)next->io_bitmap_ptr);
 		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iobitmap;

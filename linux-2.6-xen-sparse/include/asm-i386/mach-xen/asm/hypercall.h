@@ -201,11 +201,11 @@ HYPERVISOR_set_timer_op(
 }
 
 static inline int
-HYPERVISOR_dom0_op(
-	dom0_op_t *dom0_op)
+HYPERVISOR_platform_op(
+	struct xen_platform_op *platform_op)
 {
-	dom0_op->interface_version = DOM0_INTERFACE_VERSION;
-	return _hypercall1(int, dom0_op, dom0_op);
+	platform_op->interface_version = XENPF_INTERFACE_VERSION;
+	return _hypercall1(int, platform_op, platform_op);
 }
 
 static inline int

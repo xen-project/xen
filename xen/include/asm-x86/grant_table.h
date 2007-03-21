@@ -38,4 +38,14 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
     clear_bit(nr, addr);
 }
 
+#define gnttab_release_put_page(page)                           \
+    do {                                                        \
+        /* Done implicitly when page tables are destroyed. */   \
+    } while (0)
+
+#define gnttab_release_put_page_and_type(page)                  \
+    do {                                                        \
+        /* Done implicitly when page tables are destroyed. */   \
+    } while (0)
+
 #endif /* __ASM_GRANT_TABLE_H__ */

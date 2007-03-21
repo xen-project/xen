@@ -28,7 +28,6 @@
 #include <asm/hypervisor.h>
 #include <xen/public/privcmd.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
 #include <xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;

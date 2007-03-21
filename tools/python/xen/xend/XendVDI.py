@@ -54,7 +54,6 @@ class XendVDI(AutoSaveObject):
     
     SAVED_CFG = ['name_label',
                  'name_description',
-                 'sector_size',
                  'virtual_size',
                  'physical_utilisation',
                  'sharable',
@@ -67,13 +66,22 @@ class XendVDI(AutoSaveObject):
         self.sr_uuid = sr_uuid
         self.name_label = ""
         self.name_description = ""
-        self.sector_size = 1024
         self.virtual_size = 0
         self.physical_utilisation = 0
         self.sharable = False
         self.read_only = False
         self.type = "system"
-        self.location = ''
+        self.other_config = {}
+        self.vbds = []
+
+    def addVBD(self, vbd_ref):
+        self.vbds.append(vbd_ref)
+
+    def removeVBD(self, vbd_ref):
+        self.vbds.remove(vbd_ref)
+
+    def getVBDs(self):
+        return self.vbds
 
     def load_config_dict(self, cfg):
         """Loads configuration into the object from a dict.
@@ -144,11 +152,10 @@ class XendVDI(AutoSaveObject):
                 'name_description': self.name_description,
                 'virtual_size': self.virtual_size,
                 'physical_utilisation': self.physical_utilisation,
-                'sector_size': self.sector_size,
                 'sharable': False,
                 'readonly': False,
                 'SR': self.sr_uuid,
-                'location': self.get_location(),
+                'other_config': self.other_config,
                 'VBDs': []}
 
     def get_location(self):
@@ -163,12 +170,11 @@ class XendQCoWVDI(XendVDI):
         self.cfg_path = cfg_path
         self.physical_utilisation = psize
         self.virtual_size = vsize
-        self.sector_size = 512
         self.auto_save = True
-        self.location = 'tap:qcow:%s' % self.qcow_path
+        self.other_config['location'] = 'tap:qcow:%s' % self.qcow_path
 
     def get_location(self):
-        return self.location
+        return self.other_config['location']
 
 class XendLocalVDI(XendVDI):
     def __init__(self, vdi_struct):
@@ -182,11 +188,10 @@ class XendLocalVDI(XendVDI):
         self.name_description = vdi_struct.get('name_description', '')
         self.physical_utilisation = 0
         self.virtual_size = 0
-        self.sector_size = 0
         self.type = vdi_struct.get('type', '')
         self.sharable = vdi_struct.get('sharable', False)
         self.read_only = vdi_struct.get('read_only', False)
-        self.location = vdi_struct.get('location', 'file:/dev/null')
+        self.other_config = vdi_struct.get('other_config', {})
 
     def get_location(self):
-        return self.location
+        return self.other_config['location']

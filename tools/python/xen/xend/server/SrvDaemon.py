@@ -276,9 +276,12 @@ class Daemon:
             if not m:
                 return None
             modulename = m.group(1)
-            if re.search('sxp.py', modulename):
-                return None
-            if re.search('SrvServer.py', modulename):
+            if modulename.endswith('.pyc'):
+                modulename = modulename[:-1]
+            if modulename == 'sxp.py' or \
+               modulename == 'XendLogging.py' or \
+               modulename == 'XendMonitor.py' or \
+               modulename == 'server/SrvServer.py':
                 return None
             self.traceindent += 1
             self.print_trace("> %s:%s\n"

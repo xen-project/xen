@@ -75,6 +75,11 @@ class XendNode:
             self.other_config = {}
             self.cpus = {}
             self.host_metrics_uuid = uuid.createString()
+
+        # put some arbitrary params in other_config as this
+        # is directly exposed via XenAPI
+        self.other_config["xen_pagesize"] = self.xeninfo_dict()["xen_pagesize"]
+        self.other_config["platform_params"] = self.xeninfo_dict()["platform_params"]
             
         # load CPU UUIDs
         saved_cpus = self.state_store.load_state('cpu')
@@ -95,15 +100,12 @@ class XendNode:
                 self.cpus[u] = {'uuid': u, 'number': i }
 
         for u in self.cpus.keys():
-            log.error(self.cpus[u])
             number = self.cpus[u]['number']
             # We can run off the end of the cpuinfo list if domain0 does not
             # have #vcpus == #pcpus. In that case we just replicate one that's
             # in the hash table.
             if not cpuinfo.has_key(number):
                 number = cpuinfo.keys()[0]
-            log.error(number)
-            log.error(cpuinfo)
             if arch.type == "x86":
                 self.cpus[u].update(
                     { 'host'     : self.uuid,
@@ -356,13 +358,36 @@ class XendNode:
 
     def xen_version(self):
         info = self.xc.xeninfo()
+
         try:
             from xen import VERSION
-            return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+            info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
                     'Xend': VERSION}
         except (ImportError, AttributeError):
-            return {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
+            info = {'Xen': '%(xen_major)d.%(xen_minor)d' % info,
                     'Xend': '3.0.3'}
+
+        # Add xend_config_format
+        info.update(self.xendinfo_dict())
+
+        # Add version info about machine
+        info.update(self.nodeinfo_dict())
+
+        # Add specific xen version info
+        xeninfo_dict = self.xeninfo_dict()
+
+        info.update({
+            "xen_major":         xeninfo_dict["xen_major"],
+            "xen_minor":         xeninfo_dict["xen_minor"],
+            "xen_extra":         xeninfo_dict["xen_extra"],
+            "cc_compiler":       xeninfo_dict["cc_compiler"],
+            "cc_compile_by":     xeninfo_dict["cc_compile_by"],
+            "cc_compile_domain": xeninfo_dict["cc_compile_domain"],
+            "cc_compile_date":   xeninfo_dict["cc_compile_date"],
+            "xen_changeset":     xeninfo_dict["xen_changeset"]
+            })
+        
+        return info
 
     def get_name(self):
         return self.name
@@ -418,6 +443,27 @@ class XendNode:
 
         return 0.0
 
+    def get_vcpus_policy(self):
+        sched_id = self.xc.sched_id_get()
+        if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:
+            return 'sedf'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
+            return 'credit'
+        else:
+            return 'unknown'
+
+    def get_cpu_configuration(self):
+        phys_info = self.physinfo_dict()
+
+        cpu_info = {
+            "nr_nodes":         phys_info["nr_nodes"],
+            "sockets_per_node": phys_info["sockets_per_node"],
+            "cores_per_socket": phys_info["cores_per_socket"],
+            "threads_per_core": phys_info["threads_per_core"]
+            }
+
+        return cpu_info
+    
     #
     # Network Functions
     #
@@ -453,6 +499,12 @@ class XendNode:
                 return pif.network
         raise Exception('Bridge %s is not connected to a network' % bridge)
 
+    #
+    # Debug keys.
+    #
+
+    def send_debug_keys(self, keys):
+        return self.xc.send_debug_keys(keys)
 
     #
     # Getting host information.
@@ -478,7 +530,8 @@ class XendNode:
                            info['cores_per_socket'] *
                            info['threads_per_core'])
         info['cpu_mhz'] = info['cpu_khz'] / 1000
-        # physinfo is in KiB
+        
+        # physinfo is in KiB, need it in MiB
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
 

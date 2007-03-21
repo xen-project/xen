@@ -146,7 +146,7 @@ void xen_tlb_flush_mask(cpumask_t *mask)
 	if ( cpus_empty(*mask) )
 		return;
 	op.cmd = MMUEXT_TLB_FLUSH_MULTI;
-	op.arg2.vcpumask = mask->bits;
+	set_xen_guest_handle(op.arg2.vcpumask, mask->bits);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -165,7 +165,7 @@ void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
 		return;
 	op.cmd = MMUEXT_INVLPG_MULTI;
 	op.arg1.linear_addr = ptr & PAGE_MASK;
-	op.arg2.vcpumask    = mask->bits;
+	set_xen_guest_handle(op.arg2.vcpumask, mask->bits);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 

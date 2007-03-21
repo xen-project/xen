@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_crashdump_decl.h"
 #include "xen_sr_decl.h"
+#include "xen_string_string_map.h"
 #include "xen_vbd_decl.h"
 #include "xen_vdi_decl.h"
 #include "xen_vdi_type.h"
@@ -73,11 +74,10 @@ typedef struct xen_vdi_record
     struct xen_crashdump_record_opt_set *crash_dumps;
     int64_t virtual_size;
     int64_t physical_utilisation;
-    int64_t sector_size;
-    char *location;
     enum xen_vdi_type type;
     bool sharable;
     bool read_only;
+    xen_string_string_map *other_config;
 } xen_vdi_record;
 
 /**
@@ -251,13 +251,6 @@ xen_vdi_get_physical_utilisation(xen_session *session, int64_t *result, xen_vdi 
 
 
 /**
- * Get the sector_size field of the given VDI.
- */
-extern bool
-xen_vdi_get_sector_size(xen_session *session, int64_t *result, xen_vdi vdi);
-
-
-/**
  * Get the type field of the given VDI.
  */
 extern bool
@@ -279,6 +272,13 @@ xen_vdi_get_read_only(xen_session *session, bool *result, xen_vdi vdi);
 
 
 /**
+ * Get the other_config field of the given VDI.
+ */
+extern bool
+xen_vdi_get_other_config(xen_session *session, xen_string_string_map **result, xen_vdi vdi);
+
+
+/**
  * Set the name/label field of the given VDI.
  */
 extern bool
@@ -290,13 +290,6 @@ xen_vdi_set_name_label(xen_session *session, xen_vdi vdi, char *label);
  */
 extern bool
 xen_vdi_set_name_description(xen_session *session, xen_vdi vdi, char *description);
-
-
-/**
- * Set the SR field of the given VDI.
- */
-extern bool
-xen_vdi_set_sr(xen_session *session, xen_vdi vdi, xen_sr sr);
 
 
 /**
@@ -318,6 +311,30 @@ xen_vdi_set_sharable(xen_session *session, xen_vdi vdi, bool sharable);
  */
 extern bool
 xen_vdi_set_read_only(xen_session *session, xen_vdi vdi, bool read_only);
+
+
+/**
+ * Set the other_config field of the given VDI.
+ */
+extern bool
+xen_vdi_set_other_config(xen_session *session, xen_vdi vdi, xen_string_string_map *other_config);
+
+
+/**
+ * Add the given key-value pair to the other_config field of the given
+ * VDI.
+ */
+extern bool
+xen_vdi_add_to_other_config(xen_session *session, xen_vdi vdi, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * other_config field of the given VDI.  If the key is not in that Map, then
+ * do nothing.
+ */
+extern bool
+xen_vdi_remove_from_other_config(xen_session *session, xen_vdi vdi, char *key);
 
 
 /**

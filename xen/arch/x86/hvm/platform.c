@@ -415,6 +415,17 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         GET_OP_SIZE_FOR_NONEBYTE(*op_size);
         return mem_reg(*op_size, opcode, mmio_op, rex);
 
+    case 0x08: /* or r8, m8 */	
+        mmio_op->instr = INSTR_OR;
+        *op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, mmio_op, rex);
+
+    case 0x09: /* or r32/16, m32/16 */
+        mmio_op->instr = INSTR_OR;
+        GET_OP_SIZE_FOR_NONEBYTE(*op_size);
+        return reg_mem(*op_size, opcode, mmio_op, rex);
+
     case 0x0A: /* or m8, r8 */
         mmio_op->instr = INSTR_OR;
         *op_size = BYTE;

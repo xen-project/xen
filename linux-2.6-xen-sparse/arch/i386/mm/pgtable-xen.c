@@ -256,8 +256,9 @@ void pte_free(struct page *pte)
 		unsigned long va = (unsigned long)__va(pfn << PAGE_SHIFT);
 
 		if (!pte_write(*virt_to_ptep(va)))
-			BUG_ON(HYPERVISOR_update_va_mapping(
-			       va, pfn_pte(pfn, PAGE_KERNEL), 0));
+			if (HYPERVISOR_update_va_mapping(
+				va, pfn_pte(pfn, PAGE_KERNEL), 0))
+				BUG();
 	} else
 		clear_bit(PG_pinned, &pte->flags);
 
@@ -600,7 +601,7 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 	int    g, u, m, rc;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
-		return 0;
+		return;
 
 	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
 		if (pgd_none(*pgd))
@@ -672,14 +673,23 @@ void mm_unpin(struct mm_struct *mm)
 void mm_pin_all(void)
 {
 	struct page *page;
+	unsigned long flags;
 
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
 
+	/*
+	 * Allow uninterrupted access to the pgd_list. Also protects
+	 * __pgd_pin() by disabling preemption.
+	 * All other CPUs must be at a safe point (e.g., in stop_machine
+	 * or offlined entirely).
+	 */
+	spin_lock_irqsave(&pgd_lock, flags);
 	for (page = pgd_list; page; page = (struct page *)page->index) {
 		if (!test_bit(PG_pinned, &page->flags))
 			__pgd_pin((pgd_t *)page_address(page));
 	}
+	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
 void _arch_dup_mmap(struct mm_struct *mm)

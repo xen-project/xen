@@ -28,5 +28,5 @@
 #define NOTE_KERNELCAP_END ASM_ELF_NOTE_END
 
 NOTE_KERNELCAP_BEGIN(1, 1)
-NOTE_KERNELCAP(1, "nosegneg")  /* Change 1 back to 0 when glibc is fixed! */
+NOTE_KERNELCAP(0, "nosegneg")
 NOTE_KERNELCAP_END

@@ -495,7 +495,7 @@ class XendDomain:
             self._refresh(refresh_shutdown = False)
             dom = self.domain_lookup_nr(domid)
             if not dom:
-                raise XendInvalidDomain("No domain named '%s'." % str(domid))
+                raise XendInvalidDomain(str(domid))
             return dom
         finally:
             self.domains_lock.release()
@@ -674,7 +674,7 @@ class XendDomain:
                 else:
                     return domid
             
-            raise XendInvalidDomain("Domain does not exist")
+            raise XendInvalidDomain(vm_uuid)
         finally:
             self.domains_lock.release()
         

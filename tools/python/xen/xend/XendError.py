@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (c) 2006, 2007 XenSource Inc.
 #============================================================================
 
 from xmlrpclib import Fault
@@ -54,6 +55,12 @@ class VLANTagInvalid(XendError):
 class VmError(XendError):
     """Vm construction error."""
     pass
+
+class HVMRequired(VmError):
+    def __init__(self):
+        XendError.__init__(self,
+                           'HVM guest support is unavailable: is VT/AMD-V '
+                           'supported by your CPU and enabled in your BIOS?')
 
 
 XEND_ERROR_AUTHENTICATION_FAILED = ('ELUSER', 'Authentication Failed')
