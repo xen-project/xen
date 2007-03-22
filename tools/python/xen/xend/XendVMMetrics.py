@@ -13,9 +13,13 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (c) 2006-2007 Xensource Inc.
+# Copyright (c) 2007 Tom Wilkie
 #============================================================================
 
 from xen.xend.XendLogging import log
+import xen.lowlevel.xc
+
+xc = xen.lowlevel.xc.xc()
 
 instances = {}
 
@@ -46,25 +50,75 @@ class XendVMMetrics:
         return self.uuid
 
     def get_memory_actual(self):
-        return self.get_record()["memory_actual"]
-
-    def get_vcpus_number(self):
-        return self.get_record()["vcpus_number"]
-    
-    def get_vcpus_utilisation(self):
-        return self.xend_domain_instance.get_vcpus_util()
-
-    def get_record(self):
         domInfo = self.xend_domain_instance.getDomInfo()
         if domInfo:
-            return { 'uuid'              : self.uuid,
-                     'memory_actual'     : domInfo["mem_kb"] * 1024,
-                     'vcpus_number'      : domInfo["online_vcpus"],
-                     'vcpus_utilisation' : self.get_vcpus_utilisation()
-                   }
+            return domInfo["mem_kb"] * 1024
         else:
-            return { 'uuid'              : self.uuid,
-                     'memory_actual'     : 0,
-                     'vcpus_number'      : 0,
-                     'vcpus_utilisation' : {}
-                   }
+            return 0
+
+    def get_VCPUs_number(self):
+        domInfo = self.xend_domain_instance.getDomInfo()
+        if domInfo:
+            return domInfo["online_vcpus"]
+        else:
+            return 0
+    
+    def get_VCPUs_utilisation(self):
+        return self.xend_domain_instance.get_vcpus_util()
+
+    def get_VCPUs_CPU(self):
+        domid = self.xend_domain_instance.getDomid()
+        if domid is not None:
+            vcpus_cpu = {}
+            vcpus_max = self.xend_domain_instance.info['VCPUs_max']
+            for i in range(0, vcpus_max):
+                info = xc.vcpu_getinfo(domid, i)
+                vcpus_cpu[i] = info['cpu']
+            return vcpus_cpu
+        else:
+            return {}
+
+    def get_VCPUs_flags(self):
+        domid = self.xend_domain_instance.getDomid()
+        if domid is not None:
+            vcpus_flags = {}
+            vcpus_max = self.xend_domain_instance.info['VCPUs_max']
+            for i in range(0, vcpus_max):
+                info = xc.vcpu_getinfo(domid, i)
+                flags = []
+                def set_flag(flag):
+                    if info[flag] == 1:
+                        flags.append(flag)
+                set_flag('blocked')
+                set_flag('online')
+                set_flag('running')
+                vcpus_flags[i] = ",".join(flags)
+            return vcpus_flags
+        else:
+            return {}
+
+    def get_VCPUs_params(self):
+        domid = self.xend_domain_instance.getDomid()
+        if domid is not None:
+            params_live = {}
+            vcpus_max = self.xend_domain_instance.info['VCPUs_max']
+            for i in range(0, vcpus_max):
+                info = xc.vcpu_getinfo(domid, i)
+                params_live['cpumap%i' % i] = \
+                    ",".join(map(str, info['cpumap']))
+
+            params_live.update(xc.sched_credit_domain_get(domid))
+            
+            return params_live
+        else:
+            return {}
+
+    def get_record(self):
+        return { 'uuid'              : self.uuid,
+                 'memory_actual'     : self.get_memory_actual(),
+                 'VCPUs_number'      : self.get_VCPUs_number(),
+                 'VCPUs_utilisation' : self.get_VCPUs_utilisation(),
+                 'VCPUs_CPU'         : self.get_VCPUs_CPU(),
+                 'VCPUs_flags'       : self.get_VCPUs_flags(),
+                 'VCPUs_params'      : self.get_VCPUs_params()
+               }

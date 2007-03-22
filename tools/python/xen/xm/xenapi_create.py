@@ -253,11 +253,11 @@ class xenapi_create:
                 get_child_node_attribute(vm, "memory", "dynamic_max"),
             "memory_dynamic_min":
                 get_child_node_attribute(vm, "memory", "dynamic_min"),
-            "vcpus_params":
+            "VCPUs_params":
                 get_child_nodes_as_dict(vm, "vcpu_param", "key", "value"),
-            "vcpus_max":
+            "VCPUs_max":
                 vm.attributes["vcpus_max"].value,
-            "vcpus_at_startup":
+            "VCPUs_at_startup":
                 vm.attributes["vcpus_at_startup"].value,
             "actions_after_shutdown":
                 vm.attributes["actions_after_shutdown"].value,

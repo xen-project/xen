@@ -1230,7 +1230,9 @@ class XendDomain:
             try:
                 rc = xc.vcpu_setaffinity(dominfo.getDomid(), int(v), cpumap)
             except Exception, ex:
-                raise XendError(str(ex))
+                log.exception(ex)
+                raise XendError("Cannot pin vcpu: %s to cpu: %s - %s" % \
+                                (v, cpumap, str(ex)))
         return rc
 
     def domain_cpu_sedf_set(self, domid, period, slice_, latency, extratime,

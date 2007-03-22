@@ -81,18 +81,18 @@ def scrub_password(data):
 #
 # CPU fields:
 #
-# vcpus_number -- the maximum number of vcpus that this domain may ever have.
+# VCPUs_max    -- the maximum number of vcpus that this domain may ever have.
 #                 aka XendDomainInfo.getVCpuCount().
 # vcpus        -- the legacy configuration name for above.
 # max_vcpu_id  -- vcpus_number - 1.  This is given to us by Xen.
 #
 # cpus         -- the list of pCPUs available to each vCPU.
 #
-#   vcpu_avail:  a bitmap telling the guest domain whether it may use each of
-#                its VCPUs.  This is translated to
-#                <dompath>/cpu/<id>/availability = {online,offline} for use
-#                by the guest domain.
-# online_vpcus -- the number of VCPUs currently up, as reported by Xen.  This
+# vcpu_avail   -- a bitmap telling the guest domain whether it may use each of
+#                 its VCPUs.  This is translated to
+#                 <dompath>/cpu/<id>/availability = {online,offline} for use
+#                 by the guest domain.
+# VCPUs_live   -- the number of VCPUs currently up, as reported by Xen.  This
 #                 is changed by changing vcpu_avail, and waiting for the
 #                 domain to respond.
 #
@@ -103,7 +103,7 @@ def scrub_password(data):
 
 XENAPI_CFG_TO_LEGACY_CFG = {
     'uuid': 'uuid',
-    'vcpus_number': 'vcpus',
+    'VCPUs_max': 'vcpus',
     'cpus': 'cpus',
     'name_label': 'name',
     'actions_after_shutdown': 'on_poweroff',
@@ -139,9 +139,10 @@ XENAPI_CFG_TYPES = {
     'memory_dynamic_min': int,
     'memory_dynamic_max': int,
     'cpus': list,
-    'vcpus_policy': str,
     'vcpus_params': dict,
-    'vcpus_number': int,
+    'VCPUs_max': int,
+    'VCPUs_at_startup': int,
+    'VCPUs_live': int,
     'actions_after_shutdown': str,
     'actions_after_reboot': str,
     'actions_after_crash': str,
@@ -318,7 +319,9 @@ class XendConfig(dict):
             'cpus': [],
             'cpu_weight': 256,
             'cpu_cap': 0,
-            'vcpus_number': 1,
+            'VCPUs_max': 1,
+            'VCPUs_live': 1,
+            'VCPUs_at_startup': 1,
             'vcpus_params': {},
             'console_refs': [],
             'vif_refs': [],
@@ -371,8 +374,8 @@ class XendConfig(dict):
                                       event)
 
     def _vcpus_sanity_check(self):
-        if 'vcpus_number' in self and 'vcpu_avail' not in self:
-            self['vcpu_avail'] = (1 << self['vcpus_number']) - 1
+        if 'VCPUs_max' in self and 'vcpu_avail' not in self:
+            self['vcpu_avail'] = (1 << self['VCPUs_max']) - 1
 
     def _uuid_sanity_check(self):
         """Make sure UUID is in proper string format with hyphens."""
@@ -406,7 +409,7 @@ class XendConfig(dict):
     def _dominfo_to_xapi(self, dominfo):
         self['domid'] = dominfo['domid']
         self['online_vcpus'] = dominfo['online_vcpus']
-        self['vcpus_number'] = dominfo['max_vcpu_id'] + 1
+        self['VCPUs_max'] = dominfo['max_vcpu_id'] + 1
 
         self['memory_dynamic_min'] = dominfo['mem_kb'] * 1024
         self['memory_dynamic_max'] = dominfo['mem_kb'] * 1024
@@ -562,12 +565,12 @@ class XendConfig(dict):
             image_vcpus = sxp.child_value(image_sxp, 'vcpus')
             if image_vcpus != None:
                 try:
-                    if 'vcpus_number' not in cfg:
-                        cfg['vcpus_number'] = int(image_vcpus)
-                    elif cfg['vcpus_number'] != int(image_vcpus):
-                        cfg['vcpus_number'] = int(image_vcpus)
+                    if 'VCPUs_max' not in cfg:
+                        cfg['VCPUs_max'] = int(image_vcpus)
+                    elif cfg['VCPUs_max'] != int(image_vcpus):
+                        cfg['VCPUs_max'] = int(image_vcpus)
                         log.warn('Overriding vcpus from %d to %d using image'
-                                 'vcpus value.', cfg['vcpus_number'])
+                                 'vcpus value.', cfg['VCPUs_max'])
                 except ValueError, e:
                     raise XendConfigError('integer expeceted: %s: %s' %
                                           image_sxp, e)

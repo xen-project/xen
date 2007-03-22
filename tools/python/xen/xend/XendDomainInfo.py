@@ -614,9 +614,9 @@ class XendDomainInfo:
             sxpr = ['domain',
                     ['domid',      self.domid],
                     ['name',       self.info['name_label']],
-                    ['vcpu_count', self.info['vcpus_number']]]
+                    ['vcpu_count', self.info['VCPUs_max']]]
 
-            for i in range(0, self.info['vcpus_number']):
+            for i in range(0, self.info['VCPUs_max']):
                 info = xc.vcpu_getinfo(self.domid, i)
 
                 sxpr.append(['vcpu',
@@ -678,7 +678,7 @@ class XendDomainInfo:
         # settings to take precedence over any entries in the store.
         if priv:
             xeninfo = dom_get(self.domid)
-            self.info['vcpus_number'] = xeninfo['online_vcpus']
+            self.info['VCPUs_max'] = xeninfo['online_vcpus']
             self.info['vcpu_avail'] = (1 << xeninfo['online_vcpus']) - 1
 
         # read image value
@@ -831,7 +831,7 @@ class XendDomainInfo:
                 return 'offline'
 
         result = {}
-        for v in range(0, self.info['vcpus_number']):
+        for v in range(0, self.info['VCPUs_max']):
             result["cpu/%d/availability" % v] = availability(v)
         return result
 
@@ -952,7 +952,7 @@ class XendDomainInfo:
         return self.info['features']
 
     def getVCpuCount(self):
-        return self.info['vcpus_number']
+        return self.info['VCPUs_max']
 
     def setVCpuCount(self, vcpus):
         if vcpus <= 0:
@@ -964,16 +964,16 @@ class XendDomainInfo:
             # update dom differently depending on whether we are adjusting
             # vcpu number up or down, otherwise _vcpuDomDetails does not
             # disable the vcpus
-            if self.info['vcpus_number'] > vcpus:
+            if self.info['VCPUs_max'] > vcpus:
                 # decreasing
                 self._writeDom(self._vcpuDomDetails())
-                self.info['vcpus_number'] = vcpus
+                self.info['VCPUs_live'] = vcpus
             else:
                 # same or increasing
-                self.info['vcpus_number'] = vcpus
+                self.info['VCPUs_live'] = vcpus
                 self._writeDom(self._vcpuDomDetails())
         else:
-            self.info['vcpus_number'] = vcpus
+            self.info['VCPUs_live'] = vcpus
             xen.xend.XendDomain.instance().managed_config_save(self)
         log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
                  vcpus)
@@ -1427,7 +1427,7 @@ class XendDomainInfo:
         self._recreateDom()
 
         # Set maximum number of vcpus in domain
-        xc.domain_max_vcpus(self.domid, int(self.info['vcpus_number']))
+        xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 
         # register the domain in the list 
         from xen.xend import XendDomain
@@ -1464,7 +1464,7 @@ class XendDomainInfo:
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
             if self.info['cpus'] is not None and len(self.info['cpus']) > 0:
-                for v in range(0, self.info['vcpus_number']):
+                for v in range(0, self.info['VCPUs_max']):
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'])
 
             # Use architecture- and image-specific calculations to determine
@@ -1860,7 +1860,7 @@ class XendDomainInfo:
         if arch.type == "x86":
             # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than 
             # the minimum that Xen would allocate if no value were given.
-            overhead_kb = self.info['vcpus_number'] * 1024 + \
+            overhead_kb = self.info['VCPUs_max'] * 1024 + \
                           (self.info['memory_static_max'] / 1024 / 1024) * 4
             overhead_kb = ((overhead_kb + 1023) / 1024) * 1024
             # The domain might already have some shadow memory
@@ -2258,8 +2258,8 @@ class XendDomainInfo:
     def get_vcpus_util(self):
         vcpu_util = {}
         xennode = XendNode.instance()
-        if 'vcpus_number' in self.info and self.domid != None:
-            for i in range(0, self.info['vcpus_number']):
+        if 'VCPUs_max' in self.info and self.domid != None:
+            for i in range(0, self.info['VCPUs_max']):
                 util = xennode.get_vcpu_util(self.domid, i)
                 vcpu_util[str(i)] = util
                 
