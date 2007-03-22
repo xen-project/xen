@@ -136,8 +136,7 @@ static int init_domain_vhpt(struct vcpu *v)
     page = alloc_domheap_pages (NULL, VCPU_VHPT_ORDER, 0);
     if ( page == NULL ) {
         printk("No enough contiguous memory for init_domain_vhpt\n");
-
-        return -1;
+        return -ENOMEM;
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VHPT_SIZE);
@@ -171,15 +170,17 @@ int init_domain_tlb(struct vcpu *v)
 {
     struct page_info *page;
     void * vbase;
+    int rc;
 
-    if (init_domain_vhpt(v) != 0)
-        return -1;
+    rc = init_domain_vhpt(v);
+    if (rc)
+        return rc;
 
     page = alloc_domheap_pages (NULL, VCPU_VTLB_ORDER, 0);
     if ( page == NULL ) {
         printk("No enough contiguous memory for init_domain_tlb\n");
         free_domain_vhpt(v);
-        return -1;
+        return -ENOMEM;
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VTLB_SIZE);

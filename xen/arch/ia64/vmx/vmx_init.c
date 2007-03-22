@@ -295,6 +295,7 @@ int
 vmx_final_setup_guest(struct vcpu *v)
 {
 	vpd_t *vpd;
+	int rc;
 
 	vpd = alloc_vpd();
 	ASSERT(vpd);
@@ -306,8 +307,9 @@ vmx_final_setup_guest(struct vcpu *v)
 	 * to this solution. Maybe it can be deferred until we know created
 	 * one as vmx domain */
 #ifndef HASH_VHPT
-	if (init_domain_tlb(v) != 0)
-		return -1;
+	rc = init_domain_tlb(v);
+	if (rc)
+		return rc;
 #endif
 	vmx_create_event_channels(v);
 
