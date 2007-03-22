@@ -1592,7 +1592,8 @@ class XendAPI(object):
                           'VCPUs_utilisation',
                           'VCPUs_CPU',
                           'VCPUs_flags',
-                          'VCPUs_params']
+                          'VCPUs_params',
+                          'start_time']
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
@@ -1622,6 +1623,9 @@ class XendAPI(object):
 
     def VM_metrics_get_VCPUs_params(self, _, ref):
         return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_params())
+
+    def VM_metrics_get_start_time(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_start_time())
 
 
     # Xen API: Class VBD

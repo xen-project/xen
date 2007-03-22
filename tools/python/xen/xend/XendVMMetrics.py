@@ -113,6 +113,9 @@ class XendVMMetrics:
         else:
             return {}
 
+    def get_start_time(self):
+        return self.xend_domain_instance.info.get("start_time", -1)
+    
     def get_record(self):
         return { 'uuid'              : self.uuid,
                  'memory_actual'     : self.get_memory_actual(),
@@ -120,5 +123,6 @@ class XendVMMetrics:
                  'VCPUs_utilisation' : self.get_VCPUs_utilisation(),
                  'VCPUs_CPU'         : self.get_VCPUs_CPU(),
                  'VCPUs_flags'       : self.get_VCPUs_flags(),
-                 'VCPUs_params'      : self.get_VCPUs_params()
+                 'VCPUs_params'      : self.get_VCPUs_params(),
+                 'start_time'        : self.get_start_time(),
                }
