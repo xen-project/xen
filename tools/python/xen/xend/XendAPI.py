@@ -1200,9 +1200,8 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def VM_get_is_a_template(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+    def VM_get_is_a_template(self, session, ref):
+        return self.VM_get('is_a_template', session, ref)
     
     def VM_get_memory_dynamic_max(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1481,7 +1480,7 @@ class XendAPI(object):
             'name_label': xeninfo.getName(),
             'name_description': xeninfo.getName(),
             'user_version': 1,
-            'is_a_template': False,
+            'is_a_template': xeninfo.info.get('is_a_template'),
             'auto_power_on': False,
             'resident_on': XendNode.instance().uuid,
             'memory_static_min': xeninfo.get_memory_static_min(),
