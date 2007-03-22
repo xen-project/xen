@@ -660,7 +660,6 @@ class XendDomainInfo:
         vm_config = dict(zip(augment_entries, vm_config))
         
         for arg in augment_entries:
-            xapicfg = arg
             val = vm_config[arg]
             if val != None:
                 if arg in XendConfig.LEGACY_CFG_TO_XENAPI_CFG:
@@ -1651,6 +1650,12 @@ class XendDomainInfo:
 
         self._cleanup_phantom_devs(paths)
 
+        if "transient" in self.info["other_config"] \
+           and bool(self.info["other_config"]["transient"]):
+            from xen.xend import XendDomain
+            XendDomain.instance().domain_delete_by_dominfo(self)
+
+
     def destroyDomain(self):
         log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
 
@@ -1662,25 +1667,16 @@ class XendDomainInfo:
                 self.domid = None
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0
+                self._stateSet(DOM_STATE_HALTED)
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
         from xen.xend import XendDomain
-
-        if "transient" in self.info["other_config"]\
-           and bool(self.info["other_config"]["transient"]):
-            xendDomainInstance = XendDomain.instance()
-            
-            xendDomainInstance.domains_lock.acquire()
-            xendDomainInstance._refresh(refresh_shutdown = False)
-            xendDomainInstance.domains_lock.release()
-            
-            xendDomainInstance.domain_delete(self.info["name_label"])
-        else:
-            XendDomain.instance().remove_domain(self)
+        XendDomain.instance().remove_domain(self)
 
         self.cleanupDomain()
         self._cleanup_phantom_devs(paths)
+
 
     def resumeDomain(self):
         log.debug("XendDomainInfo.resumeDomain(%s)", str(self.domid))
