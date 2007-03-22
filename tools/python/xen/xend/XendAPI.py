@@ -643,6 +643,7 @@ class XendAPI(object):
 
     host_attr_ro = ['software_version',
                     'resident_VMs',
+                    'PIFs',
                     'host_CPUs',
                     'cpu_configuration',
                     'metrics',
@@ -712,6 +713,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().xen_version())
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
+    def host_get_PIFs(self, session, ref):
+        return xen_api_success(XendNode.instance().get_PIF_refs())
     def host_get_host_CPUs(self, session, host_ref):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
     def host_get_metrics(self, _, ref):
