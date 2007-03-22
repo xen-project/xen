@@ -8,6 +8,7 @@ CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
 CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
+CTRL_SRCS-$(CONFIG_POWERPC) += xc_core_powerpc.c
 CTRL_SRCS-y       += xc_domain.c
 CTRL_SRCS-y       += xc_evtchn.c
 CTRL_SRCS-y       += xc_misc.c
@@ -47,11 +48,11 @@ GUEST_SRCS-y += $(LIBELF_SRCS)
 GUEST_SRCS-y += xc_dom_core.c xc_dom_boot.c
 GUEST_SRCS-y += xc_dom_elfloader.c
 GUEST_SRCS-y += xc_dom_binloader.c
-GUEST_SRCS-y += xc_dom_x86.c
-GUEST_SRCS-y += xc_dom_ia64.c
+GUEST_SRCS-y += xc_dom_compat_linux.c
 
-GUEST_SRCS-$(CONFIG_X86)     += xc_dom_compat_linux.c
-GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_compat_linux.c
+GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
+GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
+GUEST_SRCS-$(CONFIG_POWERPC) += xc_dom_powerpc.c
 
 -include $(XEN_TARGET_ARCH)/Makefile
 

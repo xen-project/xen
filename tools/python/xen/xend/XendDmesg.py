@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2007       XenSource Inc.
 #============================================================================
 
 """Get dmesg output for this node.
@@ -28,7 +29,7 @@ class XendDmesg:
         return self.xc.readconsolering()
 
     def clear(self):
-        self.xc.readconsolering(True)
+        return self.xc.readconsolering(True)
 
 def instance():
     global inst

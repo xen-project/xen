@@ -144,6 +144,8 @@ int xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
 # include "xc_core_x86.h"
 #elif defined (__ia64__)
 # include "xc_core_ia64.h"
+#elif defined (__powerpc__)
+# include "xc_core_powerpc.h"
 #else
 # error "unsupported architecture"
 #endif

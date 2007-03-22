@@ -105,13 +105,11 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	int i;
 
 	xen_start_info = (struct start_info *)real_mode_data;
-	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+	if (!xen_feature(XENFEAT_auto_translated_physmap))
 		phys_to_machine_mapping =
 			(unsigned long *)xen_start_info->mfn_list;
-		start_pfn = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) +
-			xen_start_info->nr_pt_frames;
-	}
-
+	start_pfn = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) +
+		xen_start_info->nr_pt_frames;
 
 	machine_to_phys_mapping = (unsigned long *)MACH2PHYS_VIRT_START;
 	machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;

@@ -18,6 +18,7 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "xenctrl.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -126,6 +127,62 @@ static void __init register_arch_hooks(void)
 {
     xc_dom_register_arch_hooks(&xc_dom_arch);
     xc_dom_register_arch_hooks(&xc_dom_arch_ia64be);
+}
+
+int arch_setup_meminit(struct xc_dom_image *dom)
+{
+    xen_pfn_t pfn;
+    int rc;
+
+    /* setup initial p2m */
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
+        dom->p2m_host[pfn] = pfn;
+
+    /* allocate guest memory */
+    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+                                           dom->total_pages, 0, 0,
+                                           dom->p2m_host);
+    return rc;
+}
+
+int arch_setup_bootearly(struct xc_dom_image *dom)
+{
+    DECLARE_DOMCTL;
+    int rc;
+
+    xc_dom_printf("%s: setup firmware\n", __FUNCTION__);
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.cmd = XEN_DOMCTL_arch_setup;
+    domctl.domain = dom->guest_domid;
+    domctl.u.arch_setup.flags = 0;
+
+    domctl.u.arch_setup.bp = (dom->start_info_pfn << PAGE_SHIFT)
+        + sizeof(start_info_t);
+    /* 3 = start info page, xenstore page and console page */
+    domctl.u.arch_setup.maxmem = (dom->total_pages - 3) << PAGE_SHIFT;
+    rc = do_domctl(dom->guest_xc, &domctl);
+    return rc;
+}
+
+int arch_setup_bootlate(struct xc_dom_image *dom)
+{
+    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+    shared_info_t *shared_info;
+
+    /* setup shared_info page */
+    xc_dom_printf("%s: shared_info: mfn 0x%" PRIpfn "\n",
+                  __FUNCTION__, dom->shared_info_mfn);
+    shared_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+                                       page_size,
+                                       PROT_READ | PROT_WRITE,
+                                       dom->shared_info_mfn);
+    if ( shared_info == NULL )
+        return -1;
+    dom->arch_hooks->shared_info(dom, shared_info);
+    munmap(shared_info, page_size);
+    return 0;
 }
 
 /*

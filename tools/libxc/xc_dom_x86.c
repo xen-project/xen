@@ -22,6 +22,7 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "xenctrl.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -545,6 +546,188 @@ static void __init register_arch_hooks(void)
     xc_dom_register_arch_hooks(&xc_dom_32);
     xc_dom_register_arch_hooks(&xc_dom_32_pae);
     xc_dom_register_arch_hooks(&xc_dom_64);
+}
+
+static int x86_compat(int xc, domid_t domid, char *guest_type)
+{
+    static const struct {
+        char           *guest;
+        uint32_t        size;
+    } types[] = {
+        { "xen-3.0-x86_32p", 32 },
+        { "xen-3.0-x86_64",  64 },
+    };
+    DECLARE_DOMCTL;
+    int i,rc;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd    = XEN_DOMCTL_set_address_size;
+    for ( i = 0; i < sizeof(types)/sizeof(types[0]); i++ )
+        if ( !strcmp(types[i].guest, guest_type) )
+            domctl.u.address_size.size = types[i].size;
+    if ( domctl.u.address_size.size == 0 )
+        /* nothing to do */
+        return 0;
+
+    xc_dom_printf("%s: guest %s, address size %" PRId32 "\n", __FUNCTION__,
+                  guest_type, domctl.u.address_size.size);
+    rc = do_domctl(xc, &domctl);
+    if ( rc != 0 )
+        xc_dom_printf("%s: warning: failed (rc=%d)\n",
+                      __FUNCTION__, rc);
+    return rc;
+}
+
+
+static int x86_shadow(int xc, domid_t domid)
+{
+    int rc, mode;
+
+    xc_dom_printf("%s: called\n", __FUNCTION__);
+
+    mode = XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT |
+        XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE;
+
+    rc = xc_shadow_control(xc, domid,
+                           XEN_DOMCTL_SHADOW_OP_ENABLE,
+                           NULL, 0, NULL, mode, NULL);
+    if ( rc != 0 )
+    {
+        xc_dom_panic(XC_INTERNAL_ERROR,
+                     "%s: SHADOW_OP_ENABLE (mode=0x%x) failed (rc=%d)\n",
+                     __FUNCTION__, mode, rc);
+        return rc;
+    }
+    xc_dom_printf("%s: shadow enabled (mode=0x%x)\n", __FUNCTION__, mode);
+    return rc;
+}
+
+int arch_setup_meminit(struct xc_dom_image *dom)
+{
+    int rc;
+    xen_pfn_t pfn;
+
+    x86_compat(dom->guest_xc, dom->guest_domid, dom->guest_type);
+    if ( xc_dom_feature_translated(dom) )
+    {
+        dom->shadow_enabled = 1;
+        rc = x86_shadow(dom->guest_xc, dom->guest_domid);
+        if ( rc )
+            return rc;
+    }
+
+    /* setup initial p2m */
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
+        dom->p2m_host[pfn] = pfn;
+
+    /* allocate guest memory */
+    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+                                           dom->total_pages, 0, 0,
+                                           dom->p2m_host);
+    return rc;
+}
+
+int arch_setup_bootearly(struct xc_dom_image *dom)
+{
+    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    return 0;
+}
+
+int arch_setup_bootlate(struct xc_dom_image *dom)
+{
+    static const struct {
+        char *guest;
+        unsigned long pgd_type;
+    } types[] = {
+        { "xen-3.0-x86_32",  MMUEXT_PIN_L2_TABLE},
+        { "xen-3.0-x86_32p", MMUEXT_PIN_L3_TABLE},
+        { "xen-3.0-x86_64",  MMUEXT_PIN_L4_TABLE},
+    };
+    unsigned long pgd_type = 0;
+    shared_info_t *shared_info;
+    xen_pfn_t shinfo;
+    int i, rc;
+
+    for ( i = 0; i < sizeof(types) / sizeof(types[0]); i++ )
+        if ( !strcmp(types[i].guest, dom->guest_type) )
+            pgd_type = types[i].pgd_type;
+
+    if ( !xc_dom_feature_translated(dom) )
+    {
+        /* paravirtualized guest */
+        xc_dom_unmap_one(dom, dom->pgtables_seg.pfn);
+        rc = pin_table(dom->guest_xc, pgd_type,
+                       xc_dom_p2m_host(dom, dom->pgtables_seg.pfn),
+                       dom->guest_domid);
+        if ( rc != 0 )
+        {
+            xc_dom_panic(XC_INTERNAL_ERROR,
+                         "%s: pin_table failed (pfn 0x%" PRIpfn ", rc=%d)\n",
+                         __FUNCTION__, dom->pgtables_seg.pfn, rc);
+            return rc;
+        }
+        shinfo = dom->shared_info_mfn;
+    }
+    else
+    {
+        /* paravirtualized guest with auto-translation */
+        struct xen_add_to_physmap xatp;
+        int i;
+
+        /* Map shared info frame into guest physmap. */
+        xatp.domid = dom->guest_domid;
+        xatp.space = XENMAPSPACE_shared_info;
+        xatp.idx = 0;
+        xatp.gpfn = dom->shared_info_pfn;
+        rc = xc_memory_op(dom->guest_xc, XENMEM_add_to_physmap, &xatp);
+        if ( rc != 0 )
+        {
+            xc_dom_panic(XC_INTERNAL_ERROR, "%s: mapping shared_info failed "
+                         "(pfn=0x%" PRIpfn ", rc=%d)\n",
+                         __FUNCTION__, xatp.gpfn, rc);
+            return rc;
+        }
+
+        /* Map grant table frames into guest physmap. */
+        for ( i = 0; ; i++ )
+        {
+            xatp.domid = dom->guest_domid;
+            xatp.space = XENMAPSPACE_grant_table;
+            xatp.idx = i;
+            xatp.gpfn = dom->total_pages + i;
+            rc = xc_memory_op(dom->guest_xc, XENMEM_add_to_physmap, &xatp);
+            if ( rc != 0 )
+            {
+                if ( (i > 0) && (errno == EINVAL) )
+                {
+                    xc_dom_printf("%s: %d grant tables mapped\n", __FUNCTION__,
+                                  i);
+                    break;
+                }
+                xc_dom_panic(XC_INTERNAL_ERROR,
+                             "%s: mapping grant tables failed " "(pfn=0x%"
+                             PRIpfn ", rc=%d)\n", __FUNCTION__, xatp.gpfn, rc);
+                return rc;
+            }
+        }
+        shinfo = dom->shared_info_pfn;
+    }
+
+    /* setup shared_info page */
+    xc_dom_printf("%s: shared_info: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "\n",
+                  __FUNCTION__, dom->shared_info_pfn, dom->shared_info_mfn);
+    shared_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+                                       PAGE_SIZE_X86,
+                                       PROT_READ | PROT_WRITE,
+                                       shinfo);
+    if ( shared_info == NULL )
+        return -1;
+    dom->arch_hooks->shared_info(dom, shared_info);
+    munmap(shared_info, PAGE_SIZE_X86);
+
+    return 0;
 }
 
 /*

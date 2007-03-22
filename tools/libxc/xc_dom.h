@@ -49,6 +49,7 @@ struct xc_dom_image {
     struct xc_dom_seg ramdisk_seg;
     struct xc_dom_seg p2m_seg;
     struct xc_dom_seg pgtables_seg;
+    struct xc_dom_seg devicetree_seg;
     xen_pfn_t start_info_pfn;
     xen_pfn_t console_pfn;
     xen_pfn_t xenstore_pfn;
@@ -75,6 +76,7 @@ struct xc_dom_image {
     /* physical memory */
     xen_pfn_t total_pages;
     struct xc_dom_phys *phys_pages;
+    int realmodearea_log;
 
     /* malloc memory pool */
     struct xc_dom_mem *memblocks;
@@ -252,6 +254,10 @@ static inline xen_pfn_t xc_dom_p2m_guest(struct xc_dom_image *dom,
 }
 
 /* --- arch bits --------------------------------------------------- */
+
+int arch_setup_meminit(struct xc_dom_image *dom);
+int arch_setup_bootearly(struct xc_dom_image *dom);
+int arch_setup_bootlate(struct xc_dom_image *dom);
 
 /*
  * Local variables:

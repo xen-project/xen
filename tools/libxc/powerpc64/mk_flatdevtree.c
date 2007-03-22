@@ -34,6 +34,7 @@
 #include <sys/param.h>
 
 #include <xc_private.h> /* for PERROR() */
+#include <xc_dom.h>
 
 #include "mk_flatdevtree.h"
 
@@ -310,24 +311,19 @@ void free_devtree(struct ft_cxt *root)
 }
 
 int make_devtree(struct ft_cxt *root,
-                 uint32_t domid, 
-                 uint32_t mem_mb,
-                 unsigned long rma_bytes,
-                 unsigned long shadow_mb,
-                 unsigned long initrd_base,
-                 unsigned long initrd_len,
-                 const char *bootargs,
-                 uint64_t shared_info_paddr,
-                 unsigned long console_evtchn,
-                 uint64_t console_paddr,
-                 unsigned long store_evtchn,
-                 uint64_t store_paddr)
+                 struct xc_dom_image *dom,
+                 unsigned long shadow_mb)
 {
     struct boot_param_header *bph = NULL;
     uint64_t val[2];
     uint32_t val32[2];
-    unsigned long remaining;
-    unsigned long initrd_end = initrd_base + initrd_len;
+    uint64_t shared_info_paddr = dom->shared_info_pfn << PAGE_SHIFT;
+    uint64_t xenstore_paddr = dom->xenstore_pfn << PAGE_SHIFT;
+    uint64_t console_paddr = dom->console_pfn << PAGE_SHIFT;
+    long remaining;
+    unsigned long ramdisk_start;
+    unsigned long ramdisk_size;
+    unsigned long rma_bytes = 1 << dom->realmodearea_log;
     int64_t shadow_mb_log;
     uint64_t pft_size;
     char cpupath[MAX_PATH];
@@ -370,16 +366,18 @@ int make_devtree(struct ft_cxt *root,
     }
 
     /* reserve xen store page for domU */
-    if (store_paddr) {
-        val[0] = cpu_to_be64((u64) store_paddr);
+    if (xenstore_paddr) {
+        val[0] = cpu_to_be64((u64) xenstore_paddr);
         val[1] = cpu_to_be64((u64) PAGE_SIZE);
         ft_add_rsvmap(root, val[0], val[1]);
     }
 
     /* reserve space for initrd if needed */
-    if ( initrd_len > 0 )  {
-        val[0] = cpu_to_be64((u64) initrd_base);
-        val[1] = cpu_to_be64((u64) initrd_len);
+    ramdisk_start = dom->ramdisk_seg.pfn << PAGE_SHIFT;
+    ramdisk_size = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+    if (ramdisk_size > 0) {
+        val[0] = cpu_to_be64((u64) ramdisk_start);
+        val[1] = cpu_to_be64((u64) ramdisk_size);
         ft_add_rsvmap(root, val[0], val[1]);
     }
 
@@ -422,13 +420,13 @@ int make_devtree(struct ft_cxt *root,
     ft_prop_int(root, "interrupt-controller", xen_phandle);
 
     /* chosen.addprop('bootargs', imghandler.cmdline + '\0') */
-    if ( bootargs != NULL )
-        ft_prop_str(root, "bootargs", bootargs);
+    if (dom->cmdline != NULL)
+        ft_prop_str(root, "bootargs", dom->cmdline);
 
     /* mark where the initrd is, if present */
-    if ( initrd_len > 0 ) {
-        val[0] = cpu_to_be64((u64) initrd_base);
-        val[1] = cpu_to_be64((u64) initrd_end);
+    if (ramdisk_size > 0) {
+        val[0] = cpu_to_be64((u64) ramdisk_start);
+        val[1] = cpu_to_be64((u64) ramdisk_start + ramdisk_size);
         ft_prop(root, "linux,initrd-start", &(val[0]), sizeof(val[0]));
         ft_prop(root, "linux,initrd-end", &(val[1]), sizeof(val[1]));
     }
@@ -443,7 +441,7 @@ int make_devtree(struct ft_cxt *root,
     ft_prop_str(root, "compatible", "Xen-3.0-unstable");
 
     /* xen.addprop('reg', long(imghandler.vm.domid), long(0)) */
-    val[0] = cpu_to_be64((u64) domid);
+    val[0] = cpu_to_be64((u64) dom->guest_domid);
     val[1] = cpu_to_be64((u64) 0);
     ft_prop(root, "reg", val, sizeof(val));
 
@@ -469,7 +467,7 @@ int make_devtree(struct ft_cxt *root,
         ft_prop(root, "reg", val, sizeof(val));
 
         /* xencons.addprop('interrupts', console_evtchn, 0) */
-        val32[0] = cpu_to_be32((u32) console_evtchn);
+        val32[0] = cpu_to_be32((u32) dom->console_evtchn);
         val32[1] = cpu_to_be32((u32) 0);
         ft_prop(root, "interrupts", val32, sizeof(val32));
 
@@ -477,17 +475,17 @@ int make_devtree(struct ft_cxt *root,
         ft_end_node(root);
     }
 
-    if (store_paddr != 0) {
+    if (xenstore_paddr != 0) {
         /* start store node */
         ft_begin_node(root, "store");
 
         /* store paddr */
-        val[0] = cpu_to_be64((u64) store_paddr);
+        val[0] = cpu_to_be64((u64) xenstore_paddr);
         val[1] = cpu_to_be64((u64) PAGE_SIZE);
         ft_prop(root, "reg", val, sizeof(val));
 
         /* store event channel */
-        val32[0] = cpu_to_be32((u32) store_evtchn);
+        val32[0] = cpu_to_be32((u32) dom->xenstore_evtchn);
         val32[1] = cpu_to_be32((u32) 0);
         ft_prop(root, "interrupts", val32, sizeof(val32));
 
@@ -516,7 +514,7 @@ int make_devtree(struct ft_cxt *root,
     ft_end_node(root);
 
     /* calculate remaining bytes from total - rma size */
-    remaining = (mem_mb * 1024 * 1024) - rma_bytes;
+    remaining = (dom->total_pages << PAGE_SHIFT) - rma_bytes;
 
     /* memory@<rma_bytes> is all remaining memory after RMA */
     if (remaining > 0)

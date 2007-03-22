@@ -217,7 +217,7 @@ SUBCOMMAND_OPTIONS = {
        ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
     ),
     'dmesg': (
-       ('-c', '--clear', 'Clear dmesg buffer'),
+       ('-c', '--clear', 'Clear dmesg buffer as well as printing it'),
     ),
     'vnet-list': (
        ('-l', '--long', 'List Vnets as SXP'),
@@ -1587,17 +1587,16 @@ def xm_dmesg(args):
         usage('dmesg')
 
     if serverType == SERVER_XEN_API:
-        if not use_clear:
-            print server.xenapi.host.dmesg(
-                server.xenapi.session.get_this_host(),0)
+        host = server.xenapi.session.get_this_host()
+        if use_clear:
+            print server.xenapi.host.dmesg_clear(host),
         else:
-            server.xenapi.host.dmesg(
-                server.xenapi.session.get_this_host(),1)
+            print server.xenapi.host.dmesg(host),
     else:
         if not use_clear:
-            print server.xend.node.dmesg.info()
+            print server.xend.node.dmesg.info(),
         else:
-            server.xend.node.dmesg.clear()
+            print server.xend.node.dmesg.clear(),
 
 def xm_log(args):
     arg_check(args, "log", 0)
