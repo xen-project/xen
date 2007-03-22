@@ -44,7 +44,7 @@ def reverse_dict(adict):
     return dict([(v, k) for k, v in adict.items()])
 
 def bool0(v):
-    return v != '0' and bool(v)
+    return v != '0' and v != 'False' and bool(v)
 
 # Recursively copy a data struct, scrubbing out VNC passwords.
 # Will scrub any dict entry with a key of 'vncpasswd' or any
@@ -128,7 +128,6 @@ XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display',
 
 XENAPI_CFG_TYPES = {
     'uuid': str,
-    'power_state': str,
     'name_label': str,
     'name_description': str,
     'user_version': str,
@@ -853,16 +852,6 @@ class XendConfig(dict):
 
         sxpr.append(["maxmem", int(self["memory_static_max"])/MiB])
         sxpr.append(["memory", int(self["memory_dynamic_max"])/MiB])
-
-        if not legacy_only:
-            sxpr.append(['memory_dynamic_min',
-                     int(self.get('memory_dynamic_min'))])
-            sxpr.append(['memory_dynamic_max',
-                     int(self.get('memory_dynamic_max'))])
-            sxpr.append(['memory_static_max',
-                     int(self.get('memory_static_max'))])
-            sxpr.append(['memory_static_min',
-                     int(self.get('memory_static_min'))])
 
         for legacy in LEGACY_UNSUPPORTED_BY_XENAPI_CFG:
             if legacy in ('domid', 'uuid'): # skip these
