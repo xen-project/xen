@@ -49,4 +49,4 @@ domain.stop()
 vtpm_cleanup(domName)
 
 if not re.search("PCR-00:",run["output"]):
-	FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")
+    FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")

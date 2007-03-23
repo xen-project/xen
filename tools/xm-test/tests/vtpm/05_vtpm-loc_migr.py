@@ -91,7 +91,7 @@ while loop < 3:
     if not re.search("PCR-00:",run["output"]):
         saveLog(console.getHistory())
         vtpm_cleanup(domName)
-	FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")
+        FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")
 
     loop += 1
 

@@ -101,10 +101,10 @@ class SrvDomain(SrvDir):
 
     def do_dump(self, _, req):
         fn = FormFn(self.xd.domain_dump,
-	            [['dom',         'int'],
-		     ['file',        'str'],
-		     ['live',        'int'],
-		     ['crash',       'int']])
+                    [['dom',         'int'],
+                     ['file',        'str'],
+                     ['live',        'int'],
+                     ['crash',       'int']])
         return fn(req.args, {'dom': self.dom.domid})
 
     def op_migrate(self, op, req):
@@ -139,9 +139,9 @@ class SrvDomain(SrvDir):
                     [['dom', 'int'],
                      ['period', 'int'],
                      ['slice', 'int'],
-		     ['latency', 'int'],
-		     ['extratime', 'int'],
-		     ['weight', 'int']])
+                     ['latency', 'int'],
+                     ['extratime', 'int'],
+                     ['weight', 'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
     

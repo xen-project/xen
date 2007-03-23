@@ -51,6 +51,6 @@ def network_detach(domain_name, console, num=0):
 
     eths_after = count_eth(console)
     if eths_after != (eths_before-1):
-    	return -2, "Network device was not actually disconnected from domU"
+        return -2, "Network device was not actually disconnected from domU"
 
     return 0, None

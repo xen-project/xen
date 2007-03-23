@@ -86,7 +86,7 @@ def encodeForm(fieldList):
 
 def postResults(report_server, results):
     if not re.match('http://', report_server):
-	report_server = 'http://'+report_server
+        report_server = 'http://'+report_server
     (report_host,report_url) = urlparse(report_server)[1:3]
     conn = httplib.HTTPConnection(report_host)
 

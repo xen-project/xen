@@ -15,12 +15,12 @@ from XmTestLib import *
 
 rdpath = os.environ.get("RD_PATH")
 if not rdpath:
-        rdpath = "../ramdisk"
+    rdpath = "../ramdisk"
 
 #get current free memory info
 mem = int(getInfo("free_memory"))
 if mem < 64:
-	SKIP("This test needs 64 MB of free memory (%i MB avail)" % mem)
+    SKIP("This test needs 64 MB of free memory (%i MB avail)" % mem)
 
 #create a domain with mem=64
 config = {"memory": 64}
@@ -39,11 +39,11 @@ except DomainError, e:
 
 eyecatcher1 = str(isDomainRunning(domain_mem64.getName()))
 if eyecatcher1 != "True":
-	FAIL("Failed to verify that a 64MB domain started")
+    FAIL("Failed to verify that a 64MB domain started")
 
 eyecatcher2 = getDomMem(domain_mem64.getName())
 if eyecatcher2 not in range(62, 65):
-	FAIL("Started domain with 64MB, but it got %i MB" % eyecatcher2)
+    FAIL("Started domain with 64MB, but it got %i MB" % eyecatcher2)
 
 #stop the domain (nice shutdown)
 domain_mem64.stop()

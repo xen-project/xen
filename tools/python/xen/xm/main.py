@@ -732,7 +732,7 @@ def getDomains(domain_names, state, full = 0):
                             'state':    state_str,
                             'cpu_time': dom_metrics['VCPUs_utilisation'],
                             'start_time': dom_metrics['start_time']})
-			
+
             doms_sxp.append(['domain'] + map2sxp(dom_rec))
             doms_dict.append(dom_rec)
             

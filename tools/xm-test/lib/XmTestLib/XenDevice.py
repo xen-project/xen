@@ -98,8 +98,8 @@ class XenDevice:
         self.domain = domain
         self.configNode = None
         # Commands run when domain is started or devices added and removed.
-	self.dom0_cmds = []
-	self.domU_cmds = []
+        self.dom0_cmds = []
+        self.domU_cmds = []
 
     def __str__(self):
         """Convert device config to XenConfig node compatible string"""
@@ -178,7 +178,7 @@ class XenNetDevice(XenDevice):
         self.dom0_alias_ip = None
 
         if domain.getDomainType() == "HVM":
-	    self.config["type"] = "ioemu"
+            self.config["type"] = "ioemu"
             if not self.config.has_key('bridge'):
                 self.config["bridge"] = "xenbr0"
 
@@ -252,7 +252,7 @@ class XenNetDevice(XenDevice):
         if (self.ip and not ip) or ((self.ip and ip) and (self.ip != ip)): 
             self.releaseNetDevIP()
 
-	if not self.netmask:
+        if not self.netmask:
             self.netmask = xmtest_netconf.getNetMask()
 
         if not self.network:

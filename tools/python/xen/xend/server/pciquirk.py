@@ -74,7 +74,7 @@ class PCIQuirk:
                 self.pci_quirks_config = pci_quirks_config
             except Exception, ex:
                 raise XendError("Reading config file %s: %s" %
-				(QUIRK_CONFIG_FILE, str(ex)))
+                                (QUIRK_CONFIG_FILE, str(ex)))
         else:
             log.info("Config file does not exist: %s" % QUIRK_CONFIG_FILE)
             self.pci_quirks_config = ['xend-pci-quirks']
@@ -83,7 +83,7 @@ class PCIQuirk:
         for dev in devices:
             ids = child_at(child(dev,'pci_ids'),0)
             fields = child_at(child(dev,'pci_config_space_fields'),0)
-	    if self.__matchPCIdev( ids ):
+            if self.__matchPCIdev( ids ):
                 log.info("Quirks found for PCI device [%s]" % self.devid)
                 return fields
 
@@ -93,11 +93,11 @@ class PCIQuirk:
     def __sendQuirks(self):
         for quirk in self.quirks:
             log.debug("Quirk Info: %04x:%02x:%02x.%1x-%s" % (self.domain,
-		    self.bus, self.slot, self.func, quirk))
+                      self.bus, self.slot, self.func, quirk))
             try:
                 f = file(QUIRK_SYSFS_NODE ,"w")
                 f.write( "%04x:%02x:%02x.%1x-%s" % (self.domain, self.bus,
-			self.slot, self.func, quirk) )
+                        self.slot, self.func, quirk) )
                 f.close()
             except Exception, e:
                 raise VmError("pci: failed to open/write/close quirks " +
@@ -118,13 +118,13 @@ class PCIQuirk:
                 self.pci_perm_dev_config = pci_perm_dev_config
             except Exception, ex:
                 raise XendError("Reading config file %s: %s" %
-				(PERMISSIVE_CONFIG_FILE,str(ex)))
+                                (PERMISSIVE_CONFIG_FILE,str(ex)))
         else:
             log.info("Config file does not exist: %s" % PERMISSIVE_CONFIG_FILE)
             self.pci_perm_dev_config = ['xend-pci-perm-devs']
 
         devices = child_at(child(pci_perm_dev_config, 'unconstrained_dev_ids'),0)
-	if self.__matchPCIdev( devices ):
+        if self.__matchPCIdev( devices ):
             log.debug("Permissive mode enabled for PCI device [%s]" %
                       self.devid)
             return True
@@ -133,7 +133,7 @@ class PCIQuirk:
         return False
 
     def __sendPermDevs(self):
-	if self.__devIsUnconstrained( ):
+        if self.__devIsUnconstrained( ):
             log.debug("Unconstrained device: %04x:%02x:%02x.%1x" %
                       (self.domain, self.bus, self.slot, self.func))
             try:
