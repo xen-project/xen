@@ -653,14 +653,16 @@ class XendDomain:
     def get_dev_property_by_uuid(self, klass, dev_uuid, field):
         value = None
         self.domains_lock.acquire()
-        try:
-            dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
-            if dom:
-                value = dom.get_dev_property(klass, dev_uuid, field)
-        except ValueError, e:
-            pass
 
-        self.domains_lock.release()
+        try:
+            try:
+                dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
+                if dom:
+                    value = dom.get_dev_property(klass, dev_uuid, field)
+            except ValueError, e:
+                pass
+        finally:
+            self.domains_lock.release()
         
         return value
 
