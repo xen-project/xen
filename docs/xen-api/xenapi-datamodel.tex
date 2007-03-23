@@ -3983,6 +3983,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VM\_metrics}
@@ -4135,6 +4136,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
@@ -4219,6 +4252,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt memory} & (string $\rightarrow$ string) Map &
 $\mathit{RO}_\mathit{run}$ &  {\tt disks} & (string $\rightarrow$ string) Map & disk configuration/free space \\
 $\mathit{RO}_\mathit{run}$ &  {\tt networks} & (string $\rightarrow$ string) Map & network configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt other} & (string $\rightarrow$ string) Map & anything else \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VM\_guest\_metrics}
@@ -4460,6 +4494,38 @@ Get the other field of the given VM\_guest\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 (string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -5816,6 +5882,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: host\_metrics}
@@ -5929,6 +5996,38 @@ Get the memory/free field of the given host\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -7745,6 +7844,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VIF\_metrics}
@@ -7858,6 +7958,38 @@ Get the io/write\_kbs field of the given VIF\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -8522,6 +8654,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: PIF\_metrics}
@@ -8635,6 +8768,38 @@ Get the io/write\_kbs field of the given PIF\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -11293,6 +11458,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VBD\_metrics}
@@ -11406,6 +11572,38 @@ Get the io/write\_kbs field of the given VBD\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VBD\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VBD_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 

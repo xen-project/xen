@@ -592,6 +592,11 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
         return;
     }
 
+    char time[256];
+    struct tm *tm = localtime(&vm_metrics_record->last_updated);
+    strftime(time, 256, "Metrics updated at %c, local time.\n", tm);
+    printf(time);
+
     for (size_t i = 0; i < vm_metrics_record->vcpus_utilisation->size; i++)
     {
         printf("%"PRId64" -> %lf.\n",

@@ -44,7 +44,10 @@ static const struct_member xen_host_metrics_record_struct_members[] =
           .offset = offsetof(xen_host_metrics_record, memory_total) },
         { .key = "memory_free",
           .type = &abstract_type_int,
-          .offset = offsetof(xen_host_metrics_record, memory_free) }
+          .offset = offsetof(xen_host_metrics_record, memory_free) },
+        { .key = "last_updated",
+          .type = &abstract_type_datetime,
+          .offset = offsetof(xen_host_metrics_record, last_updated) }
     };
 
 const abstract_type xen_host_metrics_record_abstract_type_ =
@@ -138,6 +141,22 @@ xen_host_metrics_get_memory_free(xen_session *session, int64_t *result, xen_host
     abstract_type result_type = abstract_type_int;
 
     XEN_CALL_("host_metrics.get_memory_free");
+    return session->ok;
+}
+
+
+bool
+xen_host_metrics_get_last_updated(xen_session *session, time_t *result, xen_host_metrics host_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_metrics }
+        };
+
+    abstract_type result_type = abstract_type_datetime;
+
+    XEN_CALL_("host_metrics.get_last_updated");
     return session->ok;
 }
 

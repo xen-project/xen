@@ -48,7 +48,10 @@ static const struct_member xen_vm_metrics_record_struct_members[] =
           .offset = offsetof(xen_vm_metrics_record, vcpus_number) },
         { .key = "VCPUs_utilisation",
           .type = &abstract_type_int_float_map,
-          .offset = offsetof(xen_vm_metrics_record, vcpus_utilisation) }
+          .offset = offsetof(xen_vm_metrics_record, vcpus_utilisation) },
+        { .key = "last_updated",
+          .type = &abstract_type_datetime,
+          .offset = offsetof(xen_vm_metrics_record, last_updated) }
     };
 
 const abstract_type xen_vm_metrics_record_abstract_type_ =
@@ -160,6 +163,22 @@ xen_vm_metrics_get_vcpus_utilisation(xen_session *session, xen_int_float_map **r
 
     *result = NULL;
     XEN_CALL_("VM_metrics.get_VCPUs_utilisation");
+    return session->ok;
+}
+
+
+bool
+xen_vm_metrics_get_last_updated(xen_session *session, time_t *result, xen_vm_metrics vm_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_metrics }
+        };
+
+    abstract_type result_type = abstract_type_datetime;
+
+    XEN_CALL_("VM_metrics.get_last_updated");
     return session->ok;
 }
 

@@ -21,6 +21,8 @@ import string
 import sys
 import traceback
 import threading
+import time
+import xmlrpclib
 
 from xen.xend import XendDomain, XendDomainInfo, XendNode, XendDmesg
 from xen.xend import XendLogging, XendTaskManager
@@ -76,6 +78,11 @@ def xen_api_error(error):
 def xen_api_todo():
     """Temporary method to make sure we track down all the TODOs"""
     return {"Status": "Error", "ErrorDescription": XEND_ERROR_TODO}
+
+
+def now():
+    return xmlrpclib.DateTime(time.strftime("%Y%m%dT%H:%M:%S", time.gmtime()))
+
 
 # ---------------------------------------------------
 # Python Method Decorators for input value validation
@@ -850,7 +857,8 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     host_metrics_attr_ro = ['memory_total',
-                            'memory_free']
+                            'memory_free',
+                            'last_updated']
     host_metrics_attr_rw = []
     host_metrics_methods = []
 
@@ -865,13 +873,17 @@ class XendAPI(object):
             'uuid'         : ref,
             'memory_total' : self._host_metrics_get_memory_total(),
             'memory_free'  : self._host_metrics_get_memory_free(),
+            'last_updated' : now(),
             })
 
-    def host_metrics_get_memory_total(self, _, ref):
+    def host_metrics_get_memory_total(self, _1, _2):
         return xen_api_success(self._host_metrics_get_memory_total())
 
-    def host_metrics_get_memory_free(self, _, ref):
+    def host_metrics_get_memory_free(self, _1, _2):
         return xen_api_success(self._host_metrics_get_memory_free())
+
+    def host_metrics_get_last_updated(self, _1, _2):
+        return xen_api_success(now())
 
     def _host_metrics_get_memory_total(self):
         node = XendNode.instance()
@@ -1012,7 +1024,8 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     PIF_metrics_attr_ro = ['io_read_kbs',
-                           'io_write_kbs']
+                           'io_write_kbs',
+                           'last_updated']
     PIF_metrics_attr_rw = []
     PIF_methods = []
 
@@ -1030,6 +1043,9 @@ class XendAPI(object):
 
     def PIF_metrics_get_io_write_kbs(self, _, ref):
         return xen_api_success(self._PIF_metrics_get(ref).get_io_write_kbs())
+
+    def PIF_metrics_get_last_updated(self, _1, _2):
+        return xen_api_success(now())
 
 
     # Xen API: Class VM
@@ -1609,7 +1625,8 @@ class XendAPI(object):
                           'VCPUs_flags',
                           'VCPUs_params',
                           'state',
-                          'start_time']
+                          'start_time',
+                          'last_updated']
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
@@ -1645,6 +1662,9 @@ class XendAPI(object):
 
     def VM_metrics_get_state(self, _, ref):
         return xen_api_success(self._VM_metrics_get(ref).get_state())
+
+    def VM_metrics_get_last_updated(self, _1, _2):
+        return xen_api_success(now())
 
 
     # Xen API: Class VBD
@@ -1800,7 +1820,8 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     VBD_metrics_attr_ro = ['io_read_kbs',
-                           'io_write_kbs']
+                           'io_write_kbs',
+                           'last_updated']
     VBD_metrics_attr_rw = []
     VBD_methods = []
 
@@ -1810,13 +1831,18 @@ class XendAPI(object):
             return xen_api_error(['HANDLE_INVALID', 'VBD_metrics', ref])
         return xen_api_success(
             { 'io_read_kbs'  : vm.get_dev_property('vbd', ref, 'io_read_kbs'),
-              'io_write_kbs' : vm.get_dev_property('vbd', ref, 'io_write_kbs') })
+              'io_write_kbs' : vm.get_dev_property('vbd', ref, 'io_write_kbs'),
+              'last_updated' : now()
+            })
 
     def VBD_metrics_get_io_read_kbs(self, _, ref):
         return self._VBD_get(ref, 'io_read_kbs')
     
     def VBD_metrics_get_io_write_kbs(self, session, ref):
         return self._VBD_get(ref, 'io_write_kbs')
+
+    def VBD_metrics_get_last_updated(self, _1, _2):
+        return xen_api_success(now())
 
 
     # Xen API: Class VIF
@@ -1934,7 +1960,8 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     VIF_metrics_attr_ro = ['io_read_kbs',
-                           'io_write_kbs']
+                           'io_write_kbs',
+                           'last_updated']
     VIF_metrics_attr_rw = []
     VIF_methods = []
 
@@ -1944,13 +1971,18 @@ class XendAPI(object):
             return xen_api_error(['HANDLE_INVALID', 'VIF_metrics', ref])
         return xen_api_success(
             { 'io_read_kbs'  : vm.get_dev_property('vif', ref, 'io_read_kbs'),
-              'io_write_kbs' : vm.get_dev_property('vif', ref, 'io_write_kbs') })
+              'io_write_kbs' : vm.get_dev_property('vif', ref, 'io_write_kbs'),
+              'last_updated' : now()
+            })
 
     def VIF_metrics_get_io_read_kbs(self, _, ref):
         return self._VIF_get(ref, 'io_read_kbs')
     
     def VIF_metrics_get_io_write_kbs(self, session, ref):
         return self._VIF_get(ref, 'io_write_kbs')
+
+    def VIF_metrics_get_last_updated(self, _1, _2):
+        return xen_api_success(now())
 
 
     # Xen API: Class VDI
@@ -2424,39 +2456,3 @@ class XendAPIAsyncProxy:
                                                 synchronous_method_name,
                                                 session)
         return xen_api_success(task_uuid)
-
-#   
-# Auto generate some stubs based on XendAPI introspection
-#
-if __name__ == "__main__":
-    def output(line):
-        print '    ' + line
-    
-    classes = ['VDI', 'SR']
-    for cls in classes:
-        ro_attrs = getattr(XendAPI, '%s_attr_ro' % cls, [])
-        rw_attrs = getattr(XendAPI, '%s_attr_rw' % cls, [])
-        methods  = getattr(XendAPI, '%s_methods' % cls, [])
-        funcs    = getattr(XendAPI, '%s_funcs' % cls, [])
-
-        ref = '%s_ref' % cls
-
-        for attr_name in ro_attrs + rw_attrs + XendAPI.Base_attr_ro:
-            getter_name = '%s_get_%s' % (cls, attr_name)
-            output('def %s(self, session, %s):' % (getter_name, ref))
-            output('    return xen_api_todo()')
-
-        for attr_name in rw_attrs + XendAPI.Base_attr_rw:
-            setter_name = '%s_set_%s' % (cls, attr_name)
-            output('def %s(self, session, %s, value):' % (setter_name, ref))
-            output('    return xen_api_todo()')
-
-        for method_name in methods + XendAPI.Base_methods:
-            method_full_name = '%s_%s' % (cls,method_name)
-            output('def %s(self, session, %s):' % (method_full_name, ref))
-            output('    return xen_api_todo()')
-
-        for func_name in funcs + XendAPI.Base_funcs:
-            func_full_name = '%s_%s' % (cls, func_name)
-            output('def %s(self, session):' % func_full_name)
-            output('    return xen_api_todo()')
