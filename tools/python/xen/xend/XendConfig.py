@@ -269,7 +269,7 @@ class XendConfig(dict):
             self.update_with_xenapi_config(xapi)
         elif dominfo:
             # output from xc.domain_getinfo
-            self._dominfo_to_xapi(dominfo)
+            self._dominfo_to_xapi(dominfo, update_mem = True)
 
         log.debug('XendConfig.init: %s' % scrub_password(self))
 
@@ -405,15 +405,17 @@ class XendConfig(dict):
         self._vcpus_sanity_check()
         self._platform_sanity_check()
 
-    def _dominfo_to_xapi(self, dominfo):
+    def _dominfo_to_xapi(self, dominfo, update_mem = False):
         self['domid'] = dominfo['domid']
         self['online_vcpus'] = dominfo['online_vcpus']
         self['VCPUs_max'] = dominfo['max_vcpu_id'] + 1
 
-        self['memory_dynamic_min'] = dominfo['mem_kb'] * 1024
-        self['memory_dynamic_max'] = dominfo['mem_kb'] * 1024
-        self['memory_static_min'] = 0
-        self['memory_static_max'] = dominfo['maxmem_kb'] * 1024
+        if update_mem:
+            self['memory_dynamic_min'] = dominfo['mem_kb'] * 1024
+            self['memory_dynamic_max'] = dominfo['mem_kb'] * 1024
+            self['memory_static_min'] = 0
+            self['memory_static_max'] = dominfo['maxmem_kb'] * 1024
+            self._memory_sanity_check()
 
         self['cpu_time'] = dominfo['cpu_time']/1e9
         # TODO: i don't know what the security stuff expects here
