@@ -637,13 +637,17 @@ def xm_shell(args):
 #########################################################################
 
 def xm_save(args):
-    arg_check(args, "save", 2, 3)
 
+    arg_check(args, "save", 2, 3)
+    
     try:
         (options, params) = getopt.gnu_getopt(args, 'c', ['checkpoint'])
     except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
+
+    dom = params[0]
+    savefile = params[1]
 
     checkpoint = False
     for (k, v) in options:
@@ -655,19 +659,22 @@ def xm_save(args):
         usage('save')
         sys.exit(1)
 
-    try:
-        dominfo = parse_doms_info(server.xend.domain(params[0]))
-    except xmlrpclib.Fault, ex:
-        raise ex
-    
-    domid = dominfo['domid']
-    savefile = os.path.abspath(params[1])
+    savefile = os.path.abspath(savefile)
 
     if not os.access(os.path.dirname(savefile), os.W_OK):
         err("xm save: Unable to create file %s" % savefile)
         sys.exit(1)
+        
+    if serverType == SERVER_XEN_API:       
+        server.xenapi.VM.save(get_single_vm(dom), savefile, checkpoint)
+    else:
+        try:
+            dominfo = parse_doms_info(server.xend.domain(dom))
+        except xmlrpclib.Fault, ex:
+            raise ex
     
-    server.xend.domain.save(domid, savefile, checkpoint)
+        domid = dominfo['domid']
+        server.xend.domain.save(domid, savefile, checkpoint)
     
 def xm_restore(args):
     arg_check(args, "restore", 1, 2)
@@ -693,7 +700,10 @@ def xm_restore(args):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    server.xend.domain.restore(savefile, paused)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.restore(savefile, paused)
+    else:
+        server.xend.domain.restore(savefile, paused)
 
 
 def getDomains(domain_names, state, full = 0):

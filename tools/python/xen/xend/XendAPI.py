@@ -1095,9 +1095,11 @@ class XendAPI(object):
                   ('remove_from_platform', None),
                   ('add_to_other_config', None),
                   ('remove_from_other_config', None),
+                  ('save', None),
                   ('send_trigger', None)]
     
     VM_funcs  = [('create', 'VM'),
+                 ('restore', None),
                  ('get_by_name_label', 'Set(VM)')]
 
     # parameters required for _create()
@@ -1584,7 +1586,18 @@ class XendAPI(object):
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         xendom.domain_send_trigger(xeninfo.getDomid(), trigger, vcpu)
         return xen_api_success_void()
-        
+
+    def VM_save(self, _, vm_ref, dest, checkpoint):
+        xendom = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        xendom.domain_save(xeninfo.getDomid(), dest, checkpoint)
+        return xen_api_success_void()
+
+    def VM_restore(self, _, src, paused):
+        xendom = XendDomain.instance()
+        xendom.domain_restore(src, bool(paused))
+        return xen_api_success_void()
+
 
     # Xen API: Class VM_metrics
     # ----------------------------------------------------------------
