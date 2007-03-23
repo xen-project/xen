@@ -97,6 +97,30 @@ class XendVMMetrics:
         else:
             return {}
 
+    def get_state(self):
+        try:
+            domid = self.xend_domain_instance.getDomid()
+            domlist = xc.domain_getinfo(domid, 1)
+            if domlist and domid == domlist[0]['domid']:
+                dominfo = domlist[0]
+
+                states = []
+                def addState(key):
+                    if dominfo[key] == 1:
+                        states.append(key)
+
+                addState("running")
+                addState("blocked")
+                addState("paused")
+                addState("dying")
+                addState("crashed")
+                addState("shutdown")
+                return ",".join(states)
+        except Exception, err:
+            # ignore missing domain
+            log.trace("domain_getinfo(%d) failed, ignoring: %s", domid, str(err))
+        return ""
+
     def get_VCPUs_params(self):
         domid = self.xend_domain_instance.getDomid()
         if domid is not None:
@@ -125,4 +149,5 @@ class XendVMMetrics:
                  'VCPUs_flags'       : self.get_VCPUs_flags(),
                  'VCPUs_params'      : self.get_VCPUs_params(),
                  'start_time'        : self.get_start_time(),
+                 'state'             : self.get_state(),
                }

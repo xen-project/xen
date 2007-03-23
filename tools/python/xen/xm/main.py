@@ -715,10 +715,21 @@ def getDomains(domain_names, state, full = 0):
             dom_rec = server.xenapi.VM.get_record(dom_ref)
             dom_metrics_ref = server.xenapi.VM.get_metrics(dom_ref)
             dom_metrics = server.xenapi.VM_metrics.get_record(dom_metrics_ref)
+
+            states = ('running', 'blocked', 'paused', 'shutdown',
+                      'crashed', 'dying')
+            def state_on_off(state):
+                if dom_metrics['state'].find(state) > -1:
+                    return state[0]
+                else:
+                    return "-"
+            state_str = "".join([state_on_off(state)
+                                 for state in states])
+            
             dom_rec.update({'name':     dom_rec['name_label'],
                             'memory_actual': int(dom_metrics['memory_actual'])/1024,
                             'vcpus':    dom_metrics['VCPUs_number'],
-                            'state':    '-----',
+                            'state':    state_str,
                             'cpu_time': dom_metrics['VCPUs_utilisation'],
                             'start_time': dom_metrics['start_time']})
 			
