@@ -51,7 +51,7 @@ for i in range(100):
         # Unpause the domain
         status, output = traceCommand("xm unpause %s" % domain.getName())
         if status != 0:
-            FAIL("xm unpause returned invalud %i != 0", status)
+            FAIL("xm unpause returned invalid %i != 0", status)
 
 # Make sure the domain is unpaused before we finish up
 status, output = traceCommand("xm unpause %s" % domain.getName())
