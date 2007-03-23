@@ -235,6 +235,15 @@ xen_pbd_get_all(xen_session *session, struct xen_pbd_set **result)
 bool
 xen_pbd_get_uuid(xen_session *session, char **result, xen_pbd pbd)
 {
-    *result = session->ok ? xen_strdup_((char *)pbd) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = pbd }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("PBD.get_uuid");
     return session->ok;
 }

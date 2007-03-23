@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -196,6 +196,15 @@ xen_user_set_fullname(xen_session *session, xen_user user, char *fullname)
 bool
 xen_user_get_uuid(xen_session *session, char **result, xen_user user)
 {
-    *result = session->ok ? xen_strdup_((char *)user) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = user }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("user.get_uuid");
     return session->ok;
 }

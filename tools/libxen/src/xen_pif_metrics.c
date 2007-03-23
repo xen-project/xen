@@ -176,6 +176,15 @@ xen_pif_metrics_get_all(xen_session *session, struct xen_pif_metrics_set **resul
 bool
 xen_pif_metrics_get_uuid(xen_session *session, char **result, xen_pif_metrics pif_metrics)
 {
-    *result = session->ok ? xen_strdup_((char *)pif_metrics) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = pif_metrics }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("PIF_metrics.get_uuid");
     return session->ok;
 }

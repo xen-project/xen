@@ -182,6 +182,15 @@ xen_vtpm_get_backend(xen_session *session, xen_vm *result, xen_vtpm vtpm)
 bool
 xen_vtpm_get_uuid(xen_session *session, char **result, xen_vtpm vtpm)
 {
-    *result = session->ok ? xen_strdup_((char *)vtpm) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vtpm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VTPM.get_uuid");
     return session->ok;
 }

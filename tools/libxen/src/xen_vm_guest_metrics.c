@@ -265,6 +265,15 @@ xen_vm_guest_metrics_get_all(xen_session *session, struct xen_vm_guest_metrics_s
 bool
 xen_vm_guest_metrics_get_uuid(xen_session *session, char **result, xen_vm_guest_metrics vm_guest_metrics)
 {
-    *result = session->ok ? xen_strdup_((char *)vm_guest_metrics) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_guest_metrics }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM_guest_metrics.get_uuid");
     return session->ok;
 }

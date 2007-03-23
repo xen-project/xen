@@ -366,6 +366,15 @@ xen_pif_get_all(xen_session *session, struct xen_pif_set **result)
 bool
 xen_pif_get_uuid(xen_session *session, char **result, xen_pif pif)
 {
-    *result = session->ok ? xen_strdup_((char *)pif) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = pif }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("PIF.get_uuid");
     return session->ok;
 }
