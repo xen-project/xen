@@ -579,9 +579,12 @@ class Shell(cmd.Cmd):
         cmd.Cmd.__init__(self)
         self.prompt = "xm> "
         if serverType == SERVER_XEN_API:
-            res = server.xenapi._UNSUPPORTED_list_all_methods()
-            for f in res:
-                setattr(Shell, 'do_' + f + ' ', self.default)
+            try:
+                res = server.xenapi._UNSUPPORTED_list_all_methods()
+                for f in res:
+                    setattr(Shell, 'do_' + f + ' ', self.default)
+            except:
+                pass
 
     def preloop(self):
         cmd.Cmd.preloop(self)
