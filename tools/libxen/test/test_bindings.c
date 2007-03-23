@@ -573,6 +573,16 @@ static void print_vm_power_state(xen_session *session, xen_vm vm)
 
 
 /**
+ * Workaround for whinging GCCs, as suggested by strftime(3).
+ */
+static size_t my_strftime(char *s, size_t max, const char *fmt,
+                          const struct tm *tm)
+{
+    return strftime(s, max, fmt, tm);
+}
+
+
+/**
  * Print the metrics for the given VM.
  */
 static void print_vm_metrics(xen_session *session, xen_vm vm)
@@ -594,7 +604,7 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
 
     char time[256];
     struct tm *tm = localtime(&vm_metrics_record->last_updated);
-    strftime(time, 256, "Metrics updated at %c, local time.\n", tm);
+    my_strftime(time, 256, "Metrics updated at %c, local time.\n", tm);
     printf(time);
 
     for (size_t i = 0; i < vm_metrics_record->vcpus_utilisation->size; i++)
