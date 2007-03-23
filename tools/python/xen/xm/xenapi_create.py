@@ -242,9 +242,9 @@ class xenapi_create:
             "user_version":
                 get_text_in_child_node(vm, "version"),
             "is_a_template":
-                vm.attributes["is_a_template"].value,
+                vm.attributes["is_a_template"].value == 'true',
             "auto_power_on":
-                vm.attributes["auto_power_on"].value,
+                vm.attributes["auto_power_on"].value == 'true',
             "memory_static_max":
                 get_child_node_attribute(vm, "memory", "static_max"),
             "memory_static_min":
@@ -253,11 +253,11 @@ class xenapi_create:
                 get_child_node_attribute(vm, "memory", "dynamic_max"),
             "memory_dynamic_min":
                 get_child_node_attribute(vm, "memory", "dynamic_min"),
-            "vcpus_params":
+            "VCPUs_params":
                 get_child_nodes_as_dict(vm, "vcpu_param", "key", "value"),
-            "vcpus_max":
+            "VCPUs_max":
                 vm.attributes["vcpus_max"].value,
-            "vcpus_at_startup":
+            "VCPUs_at_startup":
                 vm.attributes["vcpus_at_startup"].value,
             "actions_after_shutdown":
                 vm.attributes["actions_after_shutdown"].value,
@@ -591,7 +591,6 @@ class sxp2xml:
     def extract_vdi(self, vbd_sxp, document):
         src = get_child_by_name(vbd_sxp, "uname")
         name = "vdi" + str(src.__hash__())
-        path = src[src.find(":")+1:]
 
         vdi = document.createElement("vdi")
 
@@ -599,8 +598,7 @@ class sxp2xml:
         vdi.attributes["read_only"] \
             = (get_child_by_name(vbd_sxp, "mode") != "w") \
                and "true" or "false"
-        vdi.attributes["size"] \
-            = str(os.path.getsize(path))
+        vdi.attributes["size"] = '-1'
         vdi.attributes["type"] = "system"
         vdi.attributes["shareable"] = "false"
         vdi.attributes["name"] = name

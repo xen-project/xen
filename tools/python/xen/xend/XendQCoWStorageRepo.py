@@ -208,7 +208,8 @@ class XendQCoWStorageRepo(XendStorageRepository):
         self.lock.acquire()
         try:
             if not self._has_space_available_for(desired_size_bytes):
-                raise XendError("Not enough space")
+                raise XendError("Not enough space (need %d)" %
+                                desired_size_bytes)
 
             image_uuid = uuid.createString()
             qcow_path = os.path.join(self.location,
@@ -251,6 +252,7 @@ class XendQCoWStorageRepo(XendStorageRepository):
                 except OSError:
                     log.exception("Failed to destroy image")
                 del self.images[image_uuid]
+                self._refresh()
                 return True
         finally:
             self.lock.release()
@@ -317,15 +319,12 @@ class XendQCoWStorageRepo(XendStorageRepository):
     def create_vdi(self, vdi_struct):
         image_uuid = None
         try:
-            sector_count = int(vdi_struct.get('virtual_size', 0))
-            sector_size = int(vdi_struct.get('sector_size', 1024))
-            size_bytes = (sector_count * sector_size)
+            size_bytes = int(vdi_struct.get('virtual_size', 0))
 
             image_uuid = self._create_image_files(size_bytes)
             
             image = self.images[image_uuid]
             image_cfg = {
-                'sector_size': sector_size,
                 'virtual_size': size_bytes,
                 'type': vdi_struct.get('type', 'system'),
                 'name_label': vdi_struct.get('name_label', ''),
@@ -350,17 +349,3 @@ class XendQCoWStorageRepo(XendStorageRepository):
             raise
 
         return image_uuid
-
-
-# remove everything below this line!! for testing only
-if __name__ == "__main__":
-    xsr = XendStorageRepository()
-    print 'Free Space: %d MB' % (xsr.free_space_bytes()/MB)
-    print "Create Image:",
-    print xsr._create_image_files(10 * MB)
-    print 'Delete all images:'
-    for image_uuid in xsr.list_images():
-        print image_uuid,
-        xsr._destroy_image_files(image_uuid)
-
-    print

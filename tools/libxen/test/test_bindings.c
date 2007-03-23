@@ -403,7 +403,7 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
      * Create a new disk for the new VM.
      */
     xen_sr_set *srs;
-    if (!xen_sr_get_by_name_label(session, &srs, "Local") ||
+    if (!xen_sr_get_by_name_label(session, &srs, "QCoW") ||
         srs->size < 1)
     {
         fprintf(stderr, "SR lookup failed.\n");

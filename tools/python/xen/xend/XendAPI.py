@@ -643,6 +643,7 @@ class XendAPI(object):
 
     host_attr_ro = ['software_version',
                     'resident_VMs',
+                    'PIFs',
                     'host_CPUs',
                     'cpu_configuration',
                     'metrics',
@@ -712,6 +713,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().xen_version())
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
+    def host_get_PIFs(self, session, ref):
+        return xen_api_success(XendNode.instance().get_PIF_refs())
     def host_get_host_CPUs(self, session, host_ref):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
     def host_get_metrics(self, _, ref):
@@ -1034,9 +1037,8 @@ class XendAPI(object):
 
     VM_attr_ro = ['power_state',
                   'resident_on',
-                  'memory_static_max',                  
+                  'memory_static_max',
                   'memory_static_min',
-                  'VCPUs_number',
                   'consoles',
                   'VIFs',
                   'VBDs',
@@ -1054,6 +1056,8 @@ class XendAPI(object):
                   'auto_power_on',
                   'memory_dynamic_max',
                   'memory_dynamic_min',
+                  'VCPUs_max',
+                  'VCPUs_at_startup',
                   'VCPUs_params',
                   'actions_after_shutdown',
                   'actions_after_reboot',
@@ -1081,9 +1085,11 @@ class XendAPI(object):
                   ('suspend', None),
                   ('resume', None),
                   ('send_sysrq', None),
+                  ('set_VCPUs_number_live', None),
                   ('add_to_HVM_boot_params', None),
                   ('remove_from_HVM_boot_params', None),
                   ('add_to_VCPUs_params', None),
+                  ('add_to_VCPUs_params_live', None),
                   ('remove_from_VCPUs_params', None),
                   ('add_to_platform', None),
                   ('remove_from_platform', None),
@@ -1104,6 +1110,8 @@ class XendAPI(object):
         'memory_dynamic_max',
         'memory_dynamic_min',
         'memory_static_min',
+        'VCPUs_max',
+        'VCPUs_at_startup',
         'VCPUs_params',
         'actions_after_shutdown',
         'actions_after_reboot',
@@ -1150,10 +1158,6 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_memory_static_min())
     
-    def VM_get_VCPUs_number(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_success(dom.getVCpuCount())
-    
     def VM_get_VIFs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_vifs())
@@ -1178,6 +1182,14 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_metrics())
 
+    def VM_get_VCPUs_max(self, _, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_todo()
+
+    def VM_get_VCPUs_at_startup(self, _, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_todo()
+
     # attributes (rw)
     def VM_get_name_label(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1191,9 +1203,8 @@ class XendAPI(object):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
     
-    def VM_get_is_a_template(self, session, vm_ref):
-        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+    def VM_get_is_a_template(self, session, ref):
+        return self.VM_get('is_a_template', session, ref)
     
     def VM_get_memory_dynamic_max(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1302,6 +1313,36 @@ class XendAPI(object):
         dom.info['vcpus_params'][key] = value
         return self._VM_save(dom)
 
+    def VM_add_to_VCPUs_params_live(self, session, vm_ref, key, value):
+        self.VM_add_to_VCPUs_params(session, vm_ref, key, value)
+        self._VM_VCPUs_params_refresh(vm_ref)
+        return xen_api_success_void()
+
+    def _VM_VCPUs_params_refresh(self, vm_ref):
+        xendom  = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+
+        #update the cpumaps
+        for key, value in xeninfo.info['vcpus_params'].items():
+            if key.startswith("cpumap"):
+                vcpu = int(key[6:])
+                try:
+                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, value)
+                except Exception, ex:
+                    log.exception(ex)
+
+        #need to update sched params aswell
+        if 'weight' in xeninfo.info['vcpus_params'] \
+           and 'cap' in xeninfo.info['vcpus_params']:
+            weight = xeninfo.info['vcpus_params']['weight']
+            cap = xeninfo.info['vcpus_params']['cap']
+            xendom.domain_sched_credit_set(xeninfo.getDomid(), weight, cap)
+
+    def VM_set_VCPUs_number_live(self, _, vm_ref, num):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.setVCpuCount(int(num))
+        return xen_api_success_void()
+     
     def VM_remove_from_VCPUs_params(self, session, vm_ref, key):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         if 'vcpus_params' in dom.info \
@@ -1442,7 +1483,7 @@ class XendAPI(object):
             'name_label': xeninfo.getName(),
             'name_description': xeninfo.getName(),
             'user_version': 1,
-            'is_a_template': False,
+            'is_a_template': xeninfo.info.get('is_a_template'),
             'auto_power_on': False,
             'resident_on': XendNode.instance().uuid,
             'memory_static_min': xeninfo.get_memory_static_min(),
@@ -1450,7 +1491,8 @@ class XendAPI(object):
             'memory_dynamic_min': xeninfo.get_memory_dynamic_min(),
             'memory_dynamic_max': xeninfo.get_memory_dynamic_max(),
             'VCPUs_params': xeninfo.get_vcpus_params(),
-            'VCPUs_number': xeninfo.getVCpuCount(),
+            'VCPUs_at_startup': xeninfo.getVCpuCount(),
+            'VCPUs_max': xeninfo.getVCpuCount(),
             'actions_after_shutdown': xeninfo.get_on_shutdown(),
             'actions_after_reboot': xeninfo.get_on_reboot(),
             'actions_after_suspend': xeninfo.get_on_suspend(),
@@ -1472,6 +1514,7 @@ class XendAPI(object):
             'other_config': xeninfo.info.get('other_config', {}),
             'domid': domid is None and -1 or domid,
             'is_control_domain': xeninfo == xendom.privilegedDomain(),
+            'metrics': xeninfo.get_metrics()
         }
         return xen_api_success(record)
 
@@ -1547,8 +1590,12 @@ class XendAPI(object):
     # ----------------------------------------------------------------
 
     VM_metrics_attr_ro = ['memory_actual',
-                           'vcpus_number',
-                           'vcpus_utilisation']
+                          'VCPUs_number',
+                          'VCPUs_utilisation',
+                          'VCPUs_CPU',
+                          'VCPUs_flags',
+                          'VCPUs_params',
+                          'start_time']
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
@@ -1564,11 +1611,24 @@ class XendAPI(object):
     def VM_metrics_get_memory_actual(self, _, ref):
         return xen_api_success(self._VM_metrics_get(ref).get_memory_actual())
 
-    def VM_metrics_get_vcpus_number(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_vcpus_number())
+    def VM_metrics_get_VCPUs_number(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_number())
 
-    def VM_metrics_get_vcpus_utilisation(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_vcpus_utilisation())
+    def VM_metrics_get_VCPUs_utilisation(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_utilisation())
+
+    def VM_metrics_get_VCPUs_CPU(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_CPU())
+    
+    def VM_metrics_get_VCPUs_flags(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_flags())
+
+    def VM_metrics_get_VCPUs_params(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_params())
+
+    def VM_metrics_get_start_time(self, _, ref):
+        return xen_api_success(self._VM_metrics_get(ref).get_start_time())
+
 
     # Xen API: Class VBD
     # ----------------------------------------------------------------
