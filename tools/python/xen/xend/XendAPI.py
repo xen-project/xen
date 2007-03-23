@@ -1053,8 +1053,6 @@ class XendAPI(object):
 
     VM_attr_ro = ['power_state',
                   'resident_on',
-                  'memory_static_max',
-                  'memory_static_min',
                   'consoles',
                   'VIFs',
                   'VBDs',
@@ -1072,6 +1070,8 @@ class XendAPI(object):
                   'auto_power_on',
                   'memory_dynamic_max',
                   'memory_dynamic_min',
+                  'memory_static_max',
+                  'memory_static_min',
                   'VCPUs_max',
                   'VCPUs_at_startup',
                   'VCPUs_params',
@@ -1112,6 +1112,8 @@ class XendAPI(object):
                   ('add_to_other_config', None),
                   ('remove_from_other_config', None),
                   ('save', None),
+                  ('set_memory_dynamic_max_live', None),
+                  ('set_memory_dynamic_min_live', None),
                   ('send_trigger', None)]
     
     VM_funcs  = [('create', 'VM'),
@@ -1315,12 +1317,38 @@ class XendAPI(object):
     
     def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
-    
+        dom.set_memory_dynamic_max(int(mem))
+        return xen_api_success_void()
+
     def VM_set_memory_dynamic_min(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        return xen_api_todo()
+        dom.set_memory_dynamic_min(int(mem))
+        return xen_api_success_void()
+
+    def VM_set_memory_static_max(self, session, vm_ref, mem):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.set_memory_static_max(int(mem))
+        return xen_api_success_void()
     
+    def VM_set_memory_static_min(self, session, vm_ref, mem):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.set_memory_static_min(int(mem))
+        return xen_api_success_void()
+
+    def VM_set_memory_dynamic_max_live(self, session, vm_ref, mem):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.set_memory_dynamic_max(int(mem))
+        # need to pass target as MiB
+        dom.setMemoryTarget(int(mem)/1024/1024)
+        return xen_api_success_void()
+
+    def VM_set_memory_dynamic_min_live(self, session, vm_ref, mem):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        dom.set_memory_dynamic_min(int(mem))
+        # need to pass target as MiB
+        dom.setMemoryTarget(int(mem)/1024/1024)
+        return xen_api_success_void()
+
     def VM_set_VCPUs_params(self, session, vm_ref, value):
         return self.VM_set('vcpus_params', session, vm_ref, value)
 

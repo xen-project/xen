@@ -1281,8 +1281,10 @@ def xm_mem_set(args):
 
     if serverType == SERVER_XEN_API:
         mem_target = int_unit(args[1], 'm') * 1024 * 1024
-        server.xenapi.VM.set_memory_dynamic_max(get_single_vm(dom), mem_target)
-        server.xenapi.VM.set_memory_dynamic_min(get_single_vm(dom), mem_target)
+        server.xenapi.VM.set_memory_dynamic_max_live(get_single_vm(dom),
+                                                     mem_target)
+        server.xenapi.VM.set_memory_dynamic_min_live(get_single_vm(dom),
+                                                     mem_target)
     else:
         mem_target = int_unit(args[1], 'm')
         server.xend.domain.setMemoryTarget(dom, mem_target)

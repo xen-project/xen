@@ -2078,6 +2078,16 @@ class XendDomainInfo:
         return self.info.get('memory_dynamic_max', 0)
     def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_min', 0)
+
+    def set_memory_static_max(self, val):
+        self.info['memory_static_max'] = val
+    def set_memory_static_min(self, val):
+        self.info['memory_static_min'] = val
+    def set_memory_dynamic_max(self, val):
+        self.info['memory_dynamic_max'] = val
+    def set_memory_dynamic_min(self, val):
+        self.info['memory_dynamic_min'] = val
+    
     def get_vcpus_params(self):
         if self.getDomid() is None:
             return self.info['vcpus_params']
