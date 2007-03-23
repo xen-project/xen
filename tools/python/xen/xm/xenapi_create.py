@@ -611,7 +611,10 @@ class sxp2xml:
 
         vif = document.createElement("vif")
 
-        dev = get_child_by_name(vif_sxp, "vifname", "eth0")
+        dev = get_child_by_name(vif_sxp, "vifname", None)
+
+        if dev is None:
+            dev = self.getFreshEthDevice()
 
         vif.attributes["name"] \
             = "vif" + str(dev.__hash__())
@@ -628,7 +631,8 @@ class sxp2xml:
         
         return vif
 
+    _eths = -1
 
-
-
-
+    def getFreshEthDevice(self):
+        self._eths += 1
+        return "eth%i" % self._eths
