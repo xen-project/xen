@@ -524,6 +524,7 @@ int sched_id(void)
 long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 {
     struct vcpu *v;
+    long ret;
     
     if ( (op->sched_id != ops.sched_id) ||
          ((op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
@@ -552,8 +553,8 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
     if ( d == current->domain )
         vcpu_schedule_lock_irq(current);
 
-    SCHED_OP(adjust, d, op);
-    TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
+    if ( (ret = SCHED_OP(adjust, d, op)) == 0 )
+        TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
 
     if ( d == current->domain )
         vcpu_schedule_unlock_irq(current);
@@ -564,7 +565,7 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
             vcpu_unpause(v);
     }
 
-    return 0;
+    return ret;
 }
 
 static void vcpu_periodic_timer_work(struct vcpu *v)
