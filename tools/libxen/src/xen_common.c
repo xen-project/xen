@@ -16,12 +16,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
  */
 
+#define _XOPEN_SOURCE
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -493,16 +495,18 @@ static void destring(xen_session *s, xmlChar *name, const abstract_type *type,
 
 
 /**
- * result_type : STRING => value : char **, the char * is yours.
- * result_type : ENUM   => value : int *
- * result_type : INT    => value : int64_t *
- * result_type : FLOAT  => value : double *
- * result_type : BOOL   => value : bool *
- * result_type : SET    => value : arbitrary_set **, the set is yours.
- * result_type : MAP    => value : arbitrary_map **, the map is yours.
- * result_type : OPT    => value : arbitrary_record_opt **,
- *                                 the record is yours, the handle is filled.
- * result_type : STRUCT => value : void **, the void * is yours.
+ * result_type : STRING   => value : char **, the char * is yours.
+ * result_type : ENUM     => value : int *
+ * result_type : INT      => value : int64_t *
+ * result_type : FLOAT    => value : double *
+ * result_type : BOOL     => value : bool *
+ * result_type : DATETIME => value : time_t *
+ * result_type : SET      => value : arbitrary_set **, the set is yours.
+ * result_type : MAP      => value : arbitrary_map **, the map is yours.
+ * result_type : OPT      => value : arbitrary_record_opt **,
+ *                                   the record is yours, the handle is
+ *                                   filled.
+ * result_type : STRUCT   => value : void **, the void * is yours.
  */
 static void parse_into(xen_session *s, xmlNode *value_node,
                        const abstract_type *result_type, void *value,
@@ -620,6 +624,25 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         else
         {
             ((bool *)value)[slot] = (0 == strcmp((char *)string, "1"));
+            free(string);
+        }
+    }
+    break;
+
+    case DATETIME:
+    {
+        xmlChar *string = string_from_value(value_node, "dateTime.iso8601");
+        if (string == NULL)
+        {
+            server_error(
+                s, "Expected an DateTime from the server but didn't get one");
+        }
+        else
+        {
+            struct tm tm;
+            memset(&tm, 0, sizeof(tm));
+            strptime((char *)string, "%Y%m%dT%H:%M:%S", &tm);
+            ((time_t *)value)[slot] = (time_t)mktime(&tm);
             free(string);
         }
     }
