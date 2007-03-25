@@ -400,7 +400,7 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
             .vcpus_at_startup = 2,
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
-            .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
+            .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_RESTART,
             .hvm_boot_policy = hvm ? "BIOS order" : NULL,
             .hvm_boot_params = hvm ? hvm_boot_params : NULL,
             .pv_bootloader   = hvm ? NULL : "pygrub",
