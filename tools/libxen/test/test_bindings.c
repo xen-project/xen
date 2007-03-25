@@ -266,12 +266,12 @@ int main(int argc, char **argv)
 
     printf("%s.\n", vm_uuid);
 
-    fprintf(stderr, "In bytes, the VM UUID is ");
+    printf("In bytes, the VM UUID is ");
     for (int i = 0; i < 15; i++)
     {
-        fprintf(stderr, "%x, ", (unsigned int)vm_uuid_bytes[i]);
+        printf("%x, ", (unsigned int)vm_uuid_bytes[i]);
     }
-    fprintf(stderr, "%x.\n", (unsigned int)vm_uuid_bytes[15]);
+    printf("%x.\n", (unsigned int)vm_uuid_bytes[15]);
 
     printf("%zd.\n", versions->size);
 
@@ -529,16 +529,14 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
     }
 
     if (hvm) {
-        fprintf(stderr,
-                "Created a new HVM VM, with UUID %s, VDI UUID %s, VBD "
-                "UUID %s, and VNC console UUID %s.\n",
-                vm_uuid, vdi0_uuid, vbd0_uuid, vnc_uuid);
+        printf("Created a new HVM VM, with UUID %s, VDI UUID %s, VBD "
+               "UUID %s, and VNC console UUID %s.\n",
+               vm_uuid, vdi0_uuid, vbd0_uuid, vnc_uuid);
     }
     else {
-        fprintf(stderr,
-                "Created a new PV VM, with UUID %s, VDI UUID %s, and VBD "
-                "UUID %s.\n",
-                vm_uuid, vdi0_uuid, vbd0_uuid);
+        printf("Created a new PV VM, with UUID %s, VDI UUID %s, and VBD "
+               "UUID %s.\n",
+               vm_uuid, vdi0_uuid, vbd0_uuid);
     }
 
     xen_uuid_free(vm_uuid);
@@ -579,6 +577,8 @@ static void print_vm_power_state(xen_session *session, xen_vm vm)
            xen_vm_power_state_to_string(power_state));
 
     xen_uuid_free(vm_uuid);
+
+    fflush(stdout);
 }
 
 
@@ -627,6 +627,8 @@ static void print_session_info(xen_session *session)
     assert(!strcmp(record->this_user, this_user));
 
     xen_session_record_free(record);
+
+    fflush(stdout);
 }
 
 
@@ -664,4 +666,6 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
 
     xen_vm_metrics_record_free(vm_metrics_record);
     xen_vm_metrics_free(vm_metrics);
+
+    fflush(stdout);
 }
