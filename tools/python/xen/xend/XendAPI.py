@@ -523,8 +523,11 @@ class XendAPI(object):
     # ----------------------------------------------------------------
     # NOTE: Left unwrapped by __init__
 
-    session_attr_ro = ['this_host', 'this_user']
+    session_attr_ro = ['this_host', 'this_user', 'last_active']
     session_methods = [('logout', None)]
+
+    def session_get_all(self, session):
+        return xen_api_success([session])
 
     def session_login_with_password(self, *args):
         if len(args) != 2:
@@ -534,8 +537,8 @@ class XendAPI(object):
         username = args[0]
         password = args[1]
         try:
-            session = (self.auth == AUTH_NONE and
-                       auth_manager().login_unconditionally(username) or
+            session = ((self.auth == AUTH_NONE and
+                        auth_manager().login_unconditionally(username)) or
                        auth_manager().login_with_password(username, password))
             return xen_api_success(session)
         except XendError, e:
@@ -546,26 +549,40 @@ class XendAPI(object):
     def session_logout(self, session):
         auth_manager().logout(session)
         return xen_api_success_void()
-    def session_get_record(self, session):
-        record = {'uuid'     : session,
-                  'this_host': XendNode.instance().uuid,
-                  'this_user': auth_manager().get_user(session)}
+
+    def session_get_record(self, session, self_session):
+        if self_session != session:
+            return xen_api_error(['PERMISSION_DENIED'])
+        record = {'uuid'       : session,
+                  'this_host'  : XendNode.instance().uuid,
+                  'this_user'  : auth_manager().get_user(session),
+                  'last_active': now()}
         return xen_api_success(record)
 
-    def session_get_uuid(self, session):
-        return xen_api_success(session)
+    def session_get_uuid(self, session, self_session):
+        return xen_api_success(self_session)
 
-    def session_get_by_uuid(self, session):
-        return xen_api_success(session)
+    def session_get_by_uuid(self, session, self_session):
+        return xen_api_success(self_session)
 
     # attributes (ro)
-    def session_get_this_host(self, session):
+    def session_get_this_host(self, session, self_session):
+        if self_session != session:
+            return xen_api_error(['PERMISSION_DENIED'])
         return xen_api_success(XendNode.instance().uuid)
-    def session_get_this_user(self, session):
+
+    def session_get_this_user(self, session, self_session):
+        if self_session != session:
+            return xen_api_error(['PERMISSION_DENIED'])
         user = auth_manager().get_user(session)
-        if user:
+        if user is not None:
             return xen_api_success(user)
         return xen_api_error(['SESSION_INVALID', session])
+
+    def session_get_last_active(self, session, self_session):
+        if self_session != session:
+            return xen_api_error(['PERMISSION_DENIED'])
+        return xen_api_success(now())
 
 
     # Xen API: Class User

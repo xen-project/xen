@@ -17,6 +17,7 @@
  */
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -61,6 +62,7 @@ typedef struct
 
 
 static xen_vm create_new_vm(xen_session *session, bool hvm);
+static void print_session_info(xen_session *session);
 static void print_vm_power_state(xen_session *session, xen_vm vm);
 static void print_vm_metrics(xen_session *session, xen_vm vm);
 
@@ -144,6 +146,14 @@ int main(int argc, char **argv)
     xen_session *session =
         xen_session_login_with_password(call_func, NULL, username, password);
 
+    print_session_info(session);
+    if (!session->ok)
+    {
+        /* Error has been logged, just clean up. */
+        CLEANUP;
+        return 1;
+    }
+
     xen_vm vm;
     if (!xen_vm_get_by_uuid(session, &vm,
                             "00000000-0000-0000-0000-000000000000"))
@@ -184,7 +194,7 @@ int main(int argc, char **argv)
     }
 
     xen_host host;
-    if (!xen_session_get_this_host(session, &host))
+    if (!xen_session_get_this_host(session, &host, session))
     {
         print_error(session);
         xen_vm_record_free(vm_record);
@@ -579,6 +589,44 @@ static size_t my_strftime(char *s, size_t max, const char *fmt,
                           const struct tm *tm)
 {
     return strftime(s, max, fmt, tm);
+}
+
+
+/**
+ * Print some session details.
+ */
+static void print_session_info(xen_session *session)
+{
+    xen_session_record *record;
+    if (!xen_session_get_record(session, &record, session))
+    {
+        print_error(session);
+        return;
+    }
+
+    printf("Session UUID: %s.\n", record->uuid);
+    printf("Session user: %s.\n", record->this_user);
+    char time[256];
+    struct tm *tm = localtime(&record->last_active);
+    my_strftime(time, 256, "Session last active: %c, local time.\n", tm);
+    printf(time);
+
+    char *uuid = NULL;
+    char *this_user = NULL;
+    xen_session_get_uuid(session, &uuid, session);
+    xen_session_get_this_user(session, &this_user, session);
+
+    if (!session->ok)
+    {
+        xen_session_record_free(record);
+        print_error(session);
+        return;
+    }
+
+    assert(!strcmp(record->uuid, uuid));
+    assert(!strcmp(record->this_user, this_user));
+
+    xen_session_record_free(record);
 }
 
 
