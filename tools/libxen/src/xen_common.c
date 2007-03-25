@@ -208,8 +208,8 @@ xen_session_get_uuid(xen_session *session, char **result,
 {
     abstract_value params[] =
         {
-	  { .type = &abstract_type_string,
-	    .u.string_val = self_session->session_id }
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
         };
 
     xen_call_(session, "session.get_uuid", params, 1,
@@ -224,8 +224,8 @@ xen_session_get_this_host(xen_session *session, xen_host *result,
 {
     abstract_value params[] =
         {
-	  { .type = &abstract_type_string,
-	    .u.string_val = self_session->session_id }
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
         };
 
     xen_call_(session, "session.get_this_host", params, 1,
@@ -240,8 +240,8 @@ xen_session_get_this_user(xen_session *session, char **result,
 {
     abstract_value params[] =
         {
-	  { .type = &abstract_type_string,
-	    .u.string_val = self_session->session_id }
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
         };
 
     xen_call_(session, "session.get_this_user", params, 1,
@@ -256,8 +256,8 @@ xen_session_get_last_active(xen_session *session, time_t *result,
 {
     abstract_value params[] =
         {
-	  { .type = &abstract_type_string,
-	    .u.string_val = self_session->session_id }
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
         };
 
     xen_call_(session, "session.get_last_active", params, 1,
