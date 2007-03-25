@@ -1546,7 +1546,7 @@ class XendAPI(object):
             'name_label': xeninfo.getName(),
             'name_description': xeninfo.getName(),
             'user_version': 1,
-            'is_a_template': xeninfo.info.get('is_a_template'),
+            'is_a_template': xeninfo.info['is_a_template'],
             'auto_power_on': False,
             'resident_on': XendNode.instance().uuid,
             'memory_static_min': xeninfo.get_memory_static_min(),
@@ -1576,7 +1576,7 @@ class XendAPI(object):
             'tools_version': xeninfo.get_tools_version(),
             'other_config': xeninfo.info.get('other_config', {}),
             'domid': domid is None and -1 or domid,
-            'is_control_domain': xeninfo == xendom.privilegedDomain(),
+            'is_control_domain': xeninfo.info['is_control_domain'],
             'metrics': xeninfo.get_metrics()
         }
         return xen_api_success(record)

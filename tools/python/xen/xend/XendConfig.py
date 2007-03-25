@@ -298,6 +298,8 @@ class XendConfig(dict):
             'actions_after_reboot': 'restart',
             'actions_after_crash': 'restart',
             'actions_after_suspend': '',
+            'is_template': False,
+            'is_control_domain': False,
             'features': '',
             'PV_bootloader': '',
             'PV_kernel': '',
