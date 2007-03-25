@@ -34,6 +34,7 @@
 #include "xen_vm.h"
 #include "xen_vm_metrics.h"
 
+//#define PRINT_XML
 
 static void usage()
 {
@@ -71,6 +72,11 @@ static size_t
 write_func(void *ptr, size_t size, size_t nmemb, xen_comms *comms)
 {
     size_t n = size * nmemb;
+#ifdef PRINT_XML
+    printf("\n\n---Result from server -----------------------\n");
+    printf("%s\n",((char*) ptr));
+    fflush(stdout);
+#endif
     return comms->func(ptr, n, comms->handle) ? n : 0;
 }
 
@@ -80,6 +86,12 @@ call_func(const void *data, size_t len, void *user_handle,
           void *result_handle, xen_result_func result_func)
 {
     (void)user_handle;
+
+#ifdef PRINT_XML
+    printf("\n\n---Data to server: -----------------------\n");
+    printf("%s\n",((char*) data));
+    fflush(stdout);
+#endif
 
     CURL *curl = curl_easy_init();
     if (!curl) {
