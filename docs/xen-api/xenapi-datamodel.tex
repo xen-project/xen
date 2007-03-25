@@ -13582,14 +13582,3 @@ HVM is required for this operation
 {\bf Signature:}
 \begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
-
-
-
-\newpage
-\section{DTD}
-General notes:
-\begin{itemize}
-\item Values of primitive types (int, bool, etc) and higher-order types (Sets, Maps) are encoded as simple strings, rather than being expanded into XML fragments. For example ``5'', ``true'', ``1, 2, 3, 4'', ``(1, 2), (2, 3), (3, 4)''
-\item Values of enumeration types are represented as strings (e.g. ``PAE'', ``3DNow!'')
-\item Object References are represented as UUIDs, written in string form
-\end{itemize}
