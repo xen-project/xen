@@ -830,6 +830,14 @@ xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused);
 
 
 /**
+ * Set this VM's VCPUs/at_startup value, and set the same value on the
+ * VM, if running
+ */
+extern bool
+xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu);
+
+
+/**
  * Return a list of all the VMs known to the system.
  */
 extern bool

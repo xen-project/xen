@@ -1594,6 +1594,22 @@ xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused)
 
 
 bool
+xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self },
+            { .type = &abstract_type_int,
+              .u.int_val = nvcpu }
+        };
+
+    xen_call_(session, "VM.set_VCPUs_number_live", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result)
 {
 
