@@ -2354,7 +2354,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING \
+               or self.state == XEN_API_VM_POWER_STATE_PAUSED:
 
             _, config = self.info['devices'][dev_uuid]
             dev_control = self.getDeviceController('vif')
