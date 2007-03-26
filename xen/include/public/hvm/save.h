@@ -392,7 +392,9 @@ DECLARE_HVM_SAVE_TYPE(HPET, 12, struct hvm_hw_hpet);
  */
 
 struct hvm_hw_pmtimer {
-    uint32_t timer;
+    uint32_t tmr_val;   /* PM_TMR_BLK.TMR_VAL: 24bit free-running counter */
+    uint16_t pm1a_sts;  /* PM1a_EVT_BLK.PM1a_STS: status register */
+    uint16_t pm1a_en;   /* PM1a_EVT_BLK.PM1a_EN: enable register */
 };
 
 DECLARE_HVM_SAVE_TYPE(PMTIMER, 13, struct hvm_hw_pmtimer);
