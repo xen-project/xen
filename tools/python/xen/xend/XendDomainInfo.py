@@ -593,13 +593,15 @@ class XendDomainInfo:
         """Set the maximum memory limit of this domain
         @param limit: In MiB.
         """
-        log.debug("Setting memory maximum of domain %s (%d) to %d MiB.",
-                  self.info['name_label'], self.domid, limit)
+        log.debug("Setting memory maximum of domain %s (%s) to %d MiB.",
+                  self.info['name_label'], str(self.domid), limit)
 
         if limit <= 0:
             raise XendError('Invalid memory size')
 
-        self.info['memory_static_max'] = limit
+        MiB = 1024 * 1024
+        self.info['memory_static_max'] = limit * MiB
+
         if self.domid >= 0:
             maxmem = int(limit) * 1024
             try:
@@ -607,7 +609,7 @@ class XendDomainInfo:
             except Exception, ex:
                 raise XendError(str(ex))
         else:
-            self.info['memory_dynamic_max'] = limit
+            self.info['memory_dynamic_max'] = limit * MiB
             xen.xend.XendDomain.instance().managed_config_save(self)
 
 
