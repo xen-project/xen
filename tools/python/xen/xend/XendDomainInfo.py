@@ -573,8 +573,8 @@ class XendDomainInfo:
         """Set the memory target of this domain.
         @param target: In MiB.
         """
-        log.debug("Setting memory target of domain %s (%d) to %d MiB.",
-                  self.info['name_label'], self.domid, target)
+        log.debug("Setting memory target of domain %s (%s) to %d MiB.",
+                  self.info['name_label'], str(self.domid), target)
         
         if target <= 0:
             raise XendError('Invalid memory size')
