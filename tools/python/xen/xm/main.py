@@ -850,7 +850,8 @@ def parse_doms_info(info):
 
 def check_sched_type(sched):
     if serverType == SERVER_XEN_API:
-        current = server.xenapi.host.get_sched_policy(server.xenapi.session.get_this_host())
+        current = server.xenapi.host.get_sched_policy(
+            server.xenapi.session.get_this_host(server.getSession()))
     else:
         current = 'unknown'
         for x in server.xend.node.info()[1:]:
@@ -1044,7 +1045,7 @@ def xm_vcpu_list(args):
 
             if serverType == SERVER_XEN_API:
                 nr_cpus = len(server.xenapi.host.get_host_CPUs(
-                    server.xenapi.session.get_this_host()))
+                    server.xenapi.session.get_this_host(server.getSession())))
             else:
                 for x in server.xend.node.info()[1:]:
                     if len(x) > 1 and x[0] == 'nr_cpus':
@@ -1509,7 +1510,7 @@ def xm_info(args):
         # Need to fake out old style xm info as people rely on parsing it
         
         host_record = server.xenapi.host.get_record(
-            server.xenapi.session.get_this_host())        
+            server.xenapi.session.get_this_host(server.getSession()))
 
         host_cpu_records = map(server.xenapi.host_cpu.get_record, host_record["host_CPUs"])
 
@@ -1686,7 +1687,7 @@ def xm_debug_keys(args):
     
     if serverType == SERVER_XEN_API:
         server.xenapi.host.send_debug_keys(
-            server.xenapi.session.get_this_host(),
+            server.xenapi.session.get_this_host(server.getSession()),
             keys)
     else:
         server.xend.node.send_debug_keys(keys)
@@ -1715,7 +1716,7 @@ def xm_dmesg(args):
         usage('dmesg')
 
     if serverType == SERVER_XEN_API:
-        host = server.xenapi.session.get_this_host()
+        host = server.xenapi.session.get_this_host(server.getSession())
         if use_clear:
             print server.xenapi.host.dmesg_clear(host),
         else:
@@ -1731,7 +1732,7 @@ def xm_log(args):
 
     if serverType == SERVER_XEN_API:
         print server.xenapi.host.get_log(
-            server.xenapi.session.get_this_host())
+            server.xenapi.session.get_this_host(server.getSession()))
     else:
         print server.xend.node.log()
 

@@ -112,6 +112,9 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
         self.last_login_params = None
 
 
+    def getSession(self):
+        return self._session
+
     def xenapi_request(self, methodname, params):
         if methodname.startswith('login'):
             self._login(methodname, params)
