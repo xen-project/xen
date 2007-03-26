@@ -24,6 +24,8 @@ import os.path
 import sys
 import types
 
+
+
 def _line_wrap(text, width = 70):
     lines = []
     current_line = ''
@@ -59,6 +61,15 @@ class OptionError(Exception):
         self.usage = usage
     def __str__(self):
         return self.message
+
+class XMLFileError(Exception):
+    """Thrown is input is an XML File"""
+    def __init__(self, XMLFile):
+        self.XMLFile = XMLFile
+    def __str__(self):
+        return "XMLFileError: %s" % self.XMLFile
+    def getFile(self):
+        return self.XMLFile
 
 class Opt:
     """An individual option.
@@ -492,6 +503,14 @@ class Opts:
                 p = os.path.join(os.path.curdir, p)
             if os.path.exists(p):
                 self.info('Using config file "%s".' % p)
+
+                f = open(p)
+                is_xml = (f.read(1) == '<')
+                f.close()
+
+                if is_xml:
+                    raise XMLFileError(p)
+
                 self.load(p, help)
                 break
         else:

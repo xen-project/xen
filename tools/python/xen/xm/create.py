@@ -1098,6 +1098,8 @@ def parseCommandLine(argv):
     if not gopts.vals.xauthority:
         gopts.vals.xauthority = get_xauthority()
 
+    gopts.is_xml = False
+
     # Process remaining args as config variables.
     for arg in args:
         if '=' in arg:
@@ -1106,11 +1108,16 @@ def parseCommandLine(argv):
     if gopts.vals.config:
         config = gopts.vals.config
     else:
-        gopts.load_defconfig()
-        preprocess(gopts.vals)
-        if not gopts.getopt('name') and gopts.getopt('defconfig'):
-            gopts.setopt('name', os.path.basename(gopts.getopt('defconfig')))
-        config = make_config(gopts.vals)
+        try:
+            gopts.load_defconfig()
+            preprocess(gopts.vals)
+            if not gopts.getopt('name') and gopts.getopt('defconfig'):
+                gopts.setopt('name', os.path.basename(gopts.getopt('defconfig')))
+            config = make_config(gopts.vals)
+        except XMLFileError, ex:
+            XMLFile = ex.getFile()
+            gopts.is_xml = True
+            config = ex.getFile()
 
     return (gopts, config)
 
@@ -1233,6 +1240,8 @@ def help():
     return str(gopts)
 
 def main(argv):
+    is_xml = False
+    
     try:
         (opts, config) = parseCommandLine(argv)
     except StandardError, ex:
@@ -1241,23 +1250,24 @@ def main(argv):
     if not opts:
         return
 
-    if type(config) == str:
-        try:
-            config = sxp.parse(file(config))[0]
-        except IOError, exn:
-            raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
+    if not opts.is_xml:
+        if type(config) == str:
+            try:
+                config = sxp.parse(file(config))[0]
+            except IOError, exn:
+                raise OptionError("Cannot read file %s: %s" % (config, exn[1]))
+        
+        if serverType == SERVER_XEN_API:
+            from xen.xm.xenapi_create import sxp2xml
+            sxp2xml_inst = sxp2xml()
+            doc = sxp2xml_inst.convert_sxp_to_xml(config, transient=True)
 
-    if serverType == SERVER_XEN_API:
-        from xen.xm.xenapi_create import sxp2xml
-        sxp2xml_inst = sxp2xml()
-        doc = sxp2xml_inst.convert_sxp_to_xml(config, transient=True)
+        if opts.vals.dryrun and not opts.is_xml:
+            SXPPrettyPrint.prettyprint(config)
 
-    if opts.vals.dryrun:
-        SXPPrettyPrint.prettyprint(config)
-
-    if opts.vals.xmldryrun and serverType == SERVER_XEN_API:
-        from xml.dom.ext import PrettyPrint as XMLPrettyPrint
-        XMLPrettyPrint(doc)
+        if opts.vals.xmldryrun and serverType == SERVER_XEN_API:
+            from xml.dom.ext import PrettyPrint as XMLPrettyPrint
+            XMLPrettyPrint(doc)
 
     if opts.vals.dryrun or opts.vals.xmldryrun:
         return                                               
@@ -1268,10 +1278,13 @@ def main(argv):
     if serverType == SERVER_XEN_API:        
         from xen.xm.xenapi_create import xenapi_create
         xenapi_create_inst = xenapi_create()
-        vm_refs = xenapi_create_inst.create(document = doc)
+        if opts.is_xml:
+            vm_refs = xenapi_create_inst.create(filename = config)
+        else:
+            vm_refs = xenapi_create_inst.create(document = doc)
 
         map(lambda vm_ref: server.xenapi.VM.start(vm_ref, 0), vm_refs)
-    else:
+    elif not opts.is_xml:
         if not create_security_check(config):
             raise security.ACMError(
                 'Security Configuration prevents domain from starting')

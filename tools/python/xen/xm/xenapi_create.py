@@ -80,8 +80,8 @@ class xenapi_create:
         Create a domain from an XML file or DOM tree
         """
         if filename is not None:
-            self.check_dtd(file)
-            document = parse(file)
+            self.check_dtd(filename)
+            document = parse(filename)
         elif document is not None:
             self.check_dom_against_dtd(document)
 
