@@ -141,11 +141,9 @@ class XendNode:
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
             for net_uuid, network in saved_networks.items():
-                self.network_create(network.get('name_label'),
-                                    network.get('name_description', ''),
-                                    False, net_uuid)
+                self.network_create(network, False, net_uuid)
         else:
-            self.network_create('net0', '', False)
+            self.network_create({'name_label' : 'net0' }, False)
 
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
@@ -199,12 +197,10 @@ class XendNode:
 
 
 
-    def network_create(self, name_label, name_description, persist = True,
-                       net_uuid = None):
+    def network_create(self, record, persist = True, net_uuid = None):
         if net_uuid is None:
             net_uuid = uuid.createString()
-        self.networks[net_uuid] = XendNetwork(net_uuid, name_label,
-                                              name_description)
+        self.networks[net_uuid] = XendNetwork(net_uuid, record)
         if persist:
             self.save_networks()
         return net_uuid
@@ -280,7 +276,7 @@ class XendNode:
         self.state_store.save_state('pif', pif_records)
 
     def save_networks(self):
-        net_records = dict([(k, v.get_record(transient = False))
+        net_records = dict([(k, v.get_record_internal(False))
                             for k, v in self.networks.items()])
         self.state_store.save_state('network', net_records)
 

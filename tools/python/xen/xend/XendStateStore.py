@@ -126,6 +126,13 @@ class XendStateStore:
                     if val_name not in cls_dict:
                         cls_dict[val_name] = {}
                     cls_dict[val_name][val_uuid] = None
+                elif val_type == '':
+                    # dictionary
+                    k = val_elem.getAttribute('key').encode('utf8')
+                    v = val_elem.getAttribute('value').encode('utf8')
+                    if val_name not in cls_dict:
+                        cls_dict[val_name] = {}
+                    cls_dict[val_name][k] = v
                 elif val_type == 'string':
                     cls_dict[val_name] = val_text.encode('utf8')
                 elif val_type == 'float':
@@ -197,7 +204,11 @@ class XendStateStore:
                 if type(val) == dict:
                     for val_uuid in val.keys():
                         val_node = doc.createElement(key)
-                        val_node.setAttribute('uuid', val_uuid)
+                        if key == 'other_config':
+                            val_node.setAttribute('key', str(val_uuid))
+                            val_node.setAttribute('value', str(val[val_uuid]))
+                        else:
+                            val_node.setAttribute('uuid', val_uuid)
                         node.appendChild(val_node)
                 elif type(val) in (list, tuple):
                     for val_uuid in val:

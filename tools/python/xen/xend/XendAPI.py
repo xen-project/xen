@@ -32,6 +32,7 @@ from xen.xend.XendAuthSessions import instance as auth_manager
 from xen.xend.XendError import *
 from xen.xend.XendClient import ERROR_INVALID_DOMAIN
 from xen.xend.XendLogging import log
+from xen.xend.XendNetwork import XendNetwork
 from xen.xend.XendTask import XendTask
 from xen.xend.XendVMMetrics import XendVMMetrics
 
@@ -436,6 +437,10 @@ class XendAPI(object):
             'debug'        : valid_debug,
         }
 
+        autoplug_classes = {
+            'network' : XendNetwork
+        }
+
         # Cheat methods
         # -------------
         # Methods that have a trivial implementation for all classes.
@@ -457,6 +462,41 @@ class XendAPI(object):
             setattr(cls, get_by_uuid, _get_by_uuid)
             setattr(cls, get_uuid,    _get_uuid)
 
+
+        # Autoplugging classes
+        # --------------------
+        # These have all of their methods grabbed out from the implementation
+        # class, and wrapped up to be compatible with the Xen-API.
+        
+        for api_cls, impl_cls in autoplug_classes.items():
+            getter = getattr(cls, '_%s_get' % api_cls)
+
+            def doit(n):
+                dot_n = '%s.%s' % (api_cls, n)
+                full_n = '%s_%s' % (api_cls, n)
+                if not hasattr(cls, full_n):
+                    f = getattr(impl_cls, n)
+                    argcounts[dot_n] = f.func_code.co_argcount + 1
+                    setattr(cls, full_n,
+                            lambda s, session, ref, *args: \
+                               xen_api_success( \
+                                   f(getter(s, session, ref), *args)))
+
+            ro_attrs = getattr(cls, '%s_attr_ro' % api_cls, [])
+            rw_attrs = getattr(cls, '%s_attr_rw' % api_cls, [])
+            methods  = getattr(cls, '%s_methods' % api_cls, [])
+            funcs    = getattr(cls, '%s_funcs'   % api_cls, [])
+            
+            for attr_name in ro_attrs + rw_attrs:
+                doit('get_%s' % attr_name)
+            for attr_name in rw_attrs + cls.Base_attr_rw:
+                doit('set_%s' % attr_name)
+            for method_name, return_type in methods + cls.Base_methods:
+                doit('%s' % method_name)
+            for func_name, return_type in funcs + cls.Base_funcs:
+                doit('%s' % func_name)
+
+
         # Wrapping validators around XMLRPC calls
         # ---------------------------------------
 
@@ -466,7 +506,8 @@ class XendAPI(object):
                 n_ = n.replace('.', '_')
                 try:
                     f = getattr(cls, n_)
-                    argcounts[n] = f.func_code.co_argcount - 1
+                    if n not in argcounts:
+                        argcounts[n] = f.func_code.co_argcount - 1
                     
                     validators = takes_instance and validator and \
                                  [validator] or []
@@ -916,44 +957,24 @@ class XendAPI(object):
 
     network_attr_ro = ['VIFs', 'PIFs']
     network_attr_rw = ['name_label',
-                       'name_description']
+                       'name_description',
+                       'other_config']
+    network_methods = [('add_to_other_config', None),
+                       ('remove_from_other_config', None)]
+    network_funcs = [('create', None)]
     
-    network_funcs = [('create', 'network')]
-    
-    def network_create(self, _, name_label, name_description):
-        return xen_api_success(
-            XendNode.instance().network_create(name_label, name_description))
-
-    def network_destroy(self, _, ref):
-        return xen_api_success(XendNode.instance().network_destroy(ref))
-
-    def _get_network(self, ref):
+    def _network_get(self, _, ref):
         return XendNode.instance().get_network(ref)
 
     def network_get_all(self, _):
         return xen_api_success(XendNode.instance().get_network_refs())
 
-    def network_get_record(self, _, ref):
-        return xen_api_success(
-            XendNode.instance().get_network(ref).get_record())
+    def network_create(self, _, record):
+        return xen_api_success(XendNode.instance().network_create(record))
 
-    def network_get_name_label(self, _, ref):
-        return xen_api_success(self._get_network(ref).name_label)
+    def network_destroy(self, _, ref):
+        return xen_api_success(XendNode.instance().network_destroy(ref))
 
-    def network_get_name_description(self, _, ref):
-        return xen_api_success(self._get_network(ref).name_description)
-
-    def network_get_VIFs(self, _, ref):
-        return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
-
-    def network_get_PIFs(self, session, ref):
-        return xen_api_success(self._get_network(ref).get_PIF_UUIDs())
-
-    def network_set_name_label(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_name_label(val))
-
-    def network_set_name_description(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_name_description(val))
 
     # Xen API: Class PIF
     # ----------------------------------------------------------------
