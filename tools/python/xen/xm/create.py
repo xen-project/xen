@@ -104,6 +104,11 @@ gopts.opt('xmldryrun', short='x',
           use="XML dry run - prints the resulting configuration in XML but "
           "does not create the domain.")
 
+gopts.opt('skipdtd', short='s',
+          fn=set_true, default=0,
+          use="Skip DTD checking - skips checks on XML before creating. "
+          " Experimental.  Can decreate create time." )
+
 gopts.opt('paused', short='p',
           fn=set_true, default=0,
           use='Leave the domain paused after it is created.')
@@ -1279,9 +1284,11 @@ def main(argv):
         from xen.xm.xenapi_create import xenapi_create
         xenapi_create_inst = xenapi_create()
         if opts.is_xml:
-            vm_refs = xenapi_create_inst.create(filename = config)
+            vm_refs = xenapi_create_inst.create(filename = config,
+                                                skipdtd = opts.vals.skipdtd)
         else:
-            vm_refs = xenapi_create_inst.create(document = doc)
+            vm_refs = xenapi_create_inst.create(document = doc,
+                                                skipdtd = opts.vals.skipdtd)
 
         map(lambda vm_ref: server.xenapi.VM.start(vm_ref, 0), vm_refs)
     elif not opts.is_xml:

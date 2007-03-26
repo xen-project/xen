@@ -75,15 +75,20 @@ class xenapi_create:
 
         self.dtd = "/usr/lib/python/xen/xm/create.dtd"
 
-    def create(self, filename=None, document=None):
+    def create(self, filename=None, document=None, skipdtd=False):
         """
         Create a domain from an XML file or DOM tree
         """
+        if skipdtd:
+            print "Skipping DTD checks.  Dangerous!"
+        
         if filename is not None:
-            self.check_dtd(filename)
+            if not skipdtd:
+                self.check_dtd(filename)
             document = parse(filename)
         elif document is not None:
-            self.check_dom_against_dtd(document)
+            if not skipdtd:
+                self.check_dom_against_dtd(document)
 
         self.check_doc(document)
 
