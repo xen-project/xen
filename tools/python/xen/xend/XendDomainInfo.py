@@ -2410,7 +2410,8 @@ class XendDomainInfo:
             raise XendError('Device does not exist')
 
         try:
-            if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            if self.state == XEN_API_VM_POWER_STATE_RUNNING \
+                   or self.state == XEN_API_VM_POWER_STATE_PAUSED:
                 _, config = self.info['devices'][dev_uuid]
                 devid = config.get('devid')
                 if devid != None:
