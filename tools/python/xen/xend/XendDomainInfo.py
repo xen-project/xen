@@ -556,7 +556,8 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
     def getDeviceSxprs(self, deviceClass):
-        if self.state == DOM_STATE_RUNNING:
+        if self.state == DOM_STATE_RUNNING \
+               or self.state == DOM_STATE_PAUSED:
             return self.getDeviceController(deviceClass).sxprs()
         else:
             sxprs = []
@@ -2302,8 +2303,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
 
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
-            
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING or \
+               self.state == XEN_API_VM_POWER_STATE_PAUSED:
             _, config = self.info['devices'][dev_uuid]
             
             if vdi_image_path.startswith('tap'):
