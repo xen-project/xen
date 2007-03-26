@@ -438,7 +438,8 @@ class XendAPI(object):
         }
 
         autoplug_classes = {
-            'network' : XendNetwork
+            'network'    : XendNetwork,
+            'VM_metrics' : XendVMMetrics,
         }
 
         # Cheat methods
@@ -469,9 +470,8 @@ class XendAPI(object):
         # class, and wrapped up to be compatible with the Xen-API.
         
         for api_cls, impl_cls in autoplug_classes.items():
-            getter = getattr(cls, '_%s_get' % api_cls)
-
             def doit(n):
+                getter = getattr(cls, '_%s_get' % api_cls)
                 dot_n = '%s.%s' % (api_cls, n)
                 full_n = '%s_%s' % (api_cls, n)
                 if not hasattr(cls, full_n):
@@ -557,7 +557,7 @@ class XendAPI(object):
 
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
-    Base_methods = [('destroy', None), ('get_record', 'Struct')]
+    Base_methods = [('get_record', 'Struct')]
     Base_funcs   = [('get_all', 'Set'), ('get_by_uuid', None)]
 
     # Xen API: Class Session
@@ -960,7 +960,8 @@ class XendAPI(object):
                        'name_description',
                        'other_config']
     network_methods = [('add_to_other_config', None),
-                       ('remove_from_other_config', None)]
+                       ('remove_from_other_config', None),
+                       ('destroy', None)]
     network_funcs = [('create', None)]
     
     def _network_get(self, _, ref):
@@ -989,7 +990,7 @@ class XendAPI(object):
 
     PIF_attr_inst = PIF_attr_rw
 
-    PIF_methods = [('create_VLAN', 'int')]
+    PIF_methods = [('create_VLAN', 'int'), ('destroy', None)]
 
     def _get_PIF(self, ref):
         return XendNode.instance().pifs[ref]
@@ -1152,7 +1153,8 @@ class XendAPI(object):
                   ('save', None),
                   ('set_memory_dynamic_max_live', None),
                   ('set_memory_dynamic_min_live', None),
-                  ('send_trigger', None)]
+                  ('send_trigger', None),
+                  ('destroy', None)]
     
     VM_funcs  = [('create', 'VM'),
                  ('restore', None),
@@ -1696,41 +1698,11 @@ class XendAPI(object):
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
-    def _VM_metrics_get(self, ref):
+    def _VM_metrics_get(self, _, ref):
         return XendVMMetrics.get_by_uuid(ref)
 
     def VM_metrics_get_all(self, _):
         return xen_api_success(XendVMMetrics.get_all())
-
-    def VM_metrics_get_record(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_record())
-
-    def VM_metrics_get_memory_actual(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_memory_actual())
-
-    def VM_metrics_get_VCPUs_number(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_number())
-
-    def VM_metrics_get_VCPUs_utilisation(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_utilisation())
-
-    def VM_metrics_get_VCPUs_CPU(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_CPU())
-    
-    def VM_metrics_get_VCPUs_flags(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_flags())
-
-    def VM_metrics_get_VCPUs_params(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_params())
-
-    def VM_metrics_get_start_time(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_start_time())
-
-    def VM_metrics_get_state(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_state())
-
-    def VM_metrics_get_last_updated(self, _1, _2):
-        return xen_api_success(now())
 
 
     # Xen API: Class VBD
@@ -1747,7 +1719,7 @@ class XendAPI(object):
 
     VBD_attr_inst = VBD_attr_rw
 
-    VBD_methods = [('media_change', None)]
+    VBD_methods = [('media_change', None), ('destroy', None)]
     VBD_funcs = [('create', 'VBD')]
     
     # object methods
@@ -1924,6 +1896,7 @@ class XendAPI(object):
 
     VIF_attr_inst = VIF_attr_rw
 
+    VIF_methods = [('destroy', None)]
     VIF_funcs = [('create', 'VIF')]
 
                  
@@ -2065,7 +2038,7 @@ class XendAPI(object):
                    'other_config']
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
-    VDI_methods = [('snapshot', 'VDI')]
+    VDI_methods = [('snapshot', 'VDI'), ('destroy', None)]
     VDI_funcs = [('create', 'VDI'),
                   ('get_by_name_label', 'Set(VDI)')]
 
@@ -2182,6 +2155,7 @@ class XendAPI(object):
 
     VTPM_attr_inst = VTPM_attr_rw
 
+    VTPM_methods = [('destroy', None)]
     VTPM_funcs = [('create', 'VTPM')]
     
     # object methods
@@ -2340,7 +2314,7 @@ class XendAPI(object):
                     'name_label',
                     'name_description']
     
-    SR_methods = [('clone', 'SR')]
+    SR_methods = [('clone', 'SR'), ('destroy', None)]
     SR_funcs = [('get_by_name_label', 'Set(SR)'),
                 ('get_by_uuid', 'SR')]
 

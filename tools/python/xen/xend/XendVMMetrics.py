@@ -140,8 +140,11 @@ class XendVMMetrics:
     def get_start_time(self):
         return self.xend_domain_instance.info.get("start_time", -1)
     
-    def get_record(self):
+    def get_last_updated(self):
         import xen.xend.XendAPI as XendAPI
+        return XendAPI.now()
+    
+    def get_record(self):
         return { 'uuid'              : self.uuid,
                  'memory_actual'     : self.get_memory_actual(),
                  'VCPUs_number'      : self.get_VCPUs_number(),
@@ -151,5 +154,5 @@ class XendVMMetrics:
                  'VCPUs_params'      : self.get_VCPUs_params(),
                  'start_time'        : self.get_start_time(),
                  'state'             : self.get_state(),
-                 'last_updated'      : XendAPI.now(),
+                 'last_updated'      : self.get_last_updated(),
                }
