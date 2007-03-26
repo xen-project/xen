@@ -586,8 +586,7 @@ class XendDomainInfo:
         if self.domid >= 0:
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
-        else:
-            xen.xend.XendDomain.instance().managed_config_save(self)
+        xen.xend.XendDomain.instance().managed_config_save(self)
 
     def setMemoryMaximum(self, limit):
         """Set the maximum memory limit of this domain
@@ -608,9 +607,7 @@ class XendDomainInfo:
                 return xc.domain_setmaxmem(self.domid, maxmem)
             except Exception, ex:
                 raise XendError(str(ex))
-        else:
-            self.info['memory_dynamic_max'] = limit * MiB
-            xen.xend.XendDomain.instance().managed_config_save(self)
+        xen.xend.XendDomain.instance().managed_config_save(self)
 
 
     def getVCPUInfo(self):
