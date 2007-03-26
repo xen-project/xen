@@ -722,7 +722,7 @@ def getDomains(domain_names, state, full = 0):
             states = ('running', 'blocked', 'paused', 'shutdown',
                       'crashed', 'dying')
             def state_on_off(state):
-                if dom_metrics['state'].find(state) > -1:
+                if state in dom_metrics['state']:
                     return state[0]
                 else:
                     return "-"
@@ -953,12 +953,10 @@ def xm_vcpu_list(args):
                     ['name',       vm_records[vm_ref]['name_label']],
                     ['vcpu_count', vm_records[vm_ref]['VCPUs_max']]]
 
-            
-
             for i in range(int(vm_records[vm_ref]['VCPUs_max'])):
                 def chk_flag(flag):
-                    return vm_metrics[vm_ref]['VCPUs_flags'][str(i)] \
-                           .find(flag) > -1 and 1 or 0
+                    return flag in vm_metrics[vm_ref]['VCPUs_flags'][str(i)] \
+                           and 1 or 0
                 
                 vcpu_info = ['vcpu',
                              ['number',
@@ -1261,8 +1259,9 @@ def xm_vcpu_pin(args):
         cpumap = cpu_make_map(args[2])
 
     if serverType == SERVER_XEN_API:
+        cpumap = map(str, cpumap)        
         server.xenapi.VM.add_to_VCPUs_params_live(
-            get_single_vm(dom), "cpumap%i" % vcpu, ",".join(cpumap))
+            get_single_vm(dom), "cpumap%i" % int(vcpu), ",".join(cpumap))
     else:
         server.xend.domain.pincpu(dom, vcpu, cpumap)
 

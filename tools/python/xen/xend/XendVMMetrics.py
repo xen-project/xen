@@ -92,7 +92,7 @@ class XendVMMetrics:
                 set_flag('blocked')
                 set_flag('online')
                 set_flag('running')
-                vcpus_flags[i] = ",".join(flags)
+                vcpus_flags[i] = flags
             return vcpus_flags
         else:
             return {}
@@ -115,7 +115,7 @@ class XendVMMetrics:
                 addState("dying")
                 addState("crashed")
                 addState("shutdown")
-                return ",".join(states)
+                return states
         except Exception, err:
             # ignore missing domain
             log.trace("domain_getinfo(%d) failed, ignoring: %s", domid, str(err))
