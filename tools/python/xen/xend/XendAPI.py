@@ -34,6 +34,7 @@ from xen.xend.XendClient import ERROR_INVALID_DOMAIN
 from xen.xend.XendLogging import log
 from xen.xend.XendNetwork import XendNetwork
 from xen.xend.XendTask import XendTask
+from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendVMMetrics import XendVMMetrics
 
 from xen.xend.XendAPIConstants import *
@@ -438,8 +439,9 @@ class XendAPI(object):
         }
 
         autoplug_classes = {
-            'network'    : XendNetwork,
-            'VM_metrics' : XendVMMetrics,
+            'network'     : XendNetwork,
+            'VM_metrics'  : XendVMMetrics,
+            'PIF_metrics' : XendPIFMetrics,
         }
 
         # Cheat methods
@@ -1071,20 +1073,8 @@ class XendAPI(object):
     def PIF_metrics_get_all(self, _):
         return xen_api_success(XendNode.instance().pif_metrics.keys())
 
-    def _PIF_metrics_get(self, ref):
+    def _PIF_metrics_get(self, _, ref):
         return XendNode.instance().pif_metrics[ref]
-
-    def PIF_metrics_get_record(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).get_record())
-
-    def PIF_metrics_get_io_read_kbs(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).get_io_read_kbs())
-
-    def PIF_metrics_get_io_write_kbs(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).get_io_write_kbs())
-
-    def PIF_metrics_get_last_updated(self, _1, _2):
-        return xen_api_success(now())
 
 
     # Xen API: Class VM
