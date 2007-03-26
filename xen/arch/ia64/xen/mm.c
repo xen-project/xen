@@ -208,46 +208,6 @@ alloc_dom_xen_and_dom_io(void)
     BUG_ON(dom_io == NULL);
 }
 
-// heavily depends on the struct page_info layout.
-// if (page_get_owner(page) == d &&
-//     test_and_clear_bit(_PGC_allocated, &page->count_info)) {
-//     put_page(page);
-// }
-static void
-try_to_clear_PGC_allocate(struct domain* d, struct page_info* page)
-{
-    u32 _d, _nd;
-    u64 x, nx, y;
-
-    _d = pickle_domptr(d);
-    y = *((u64*)&page->count_info);
-    do {
-        x = y;
-        _nd = x >> 32;
-        nx = x - 1;
-        __clear_bit(_PGC_allocated, &nx);
-
-        if (unlikely(!(x & PGC_allocated)) || unlikely(_nd != _d)) {
-            struct domain* nd = unpickle_domptr(_nd);
-            if (nd == NULL) {
-                gdprintk(XENLOG_INFO, "gnttab_transfer: "
-                        "Bad page %p: ed=%p(%u) 0x%x, "
-                        "sd=%p 0x%x,"
-                        " caf=%016lx, taf=%" PRtype_info "\n",
-                        (void *) page_to_mfn(page),
-                        d, d->domain_id, _d,
-                        nd, _nd,
-                        x,
-                        page->u.inuse.type_info);
-            }
-            break;
-        }
-
-        BUG_ON((nx & PGC_count_mask) < 1);
-        y = cmpxchg((u64*)&page->count_info, x, nx);
-    } while (unlikely(y != x));
-}
-
 static void
 mm_teardown_pte(struct domain* d, volatile pte_t* pte, unsigned long offset)
 {
@@ -267,22 +227,25 @@ mm_teardown_pte(struct domain* d, volatile pte_t* pte, unsigned long offset)
     if (!mfn_valid(mfn))
         return;
     page = mfn_to_page(mfn);
-    // struct page_info corresponding to mfn may exist or not depending
-    // on CONFIG_VIRTUAL_FRAME_TABLE.
-    // This check is too easy.
-    // The right way is to check whether this page is of io area or acpi pages
+    // page might be pte page for p2m exposing. check it.
     if (page_get_owner(page) == NULL) {
         BUG_ON(page->count_info != 0);
         return;
     }
+    // struct page_info corresponding to mfn may exist or not depending
+    // on CONFIG_VIRTUAL_FRAME_TABLE.
+    // The above check is too easy.
+    // The right way is to check whether this page is of io area or acpi pages
 
     if (pte_pgc_allocated(old_pte)) {
         BUG_ON(page_get_owner(page) != d);
         BUG_ON(get_gpfn_from_mfn(mfn) == INVALID_M2P_ENTRY);
         set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
-        try_to_clear_PGC_allocate(d, page);
+        if (test_and_clear_bit(_PGC_allocated, &page->count_info))
+            put_page(page);
+    } else {
+        put_page(page);
     }
-    put_page(page);
 }
 
 static void
@@ -770,7 +733,6 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr,
 {
     struct page_info *p;
     unsigned long maddr;
-    int ret;
 
     BUG_ON(!pte_none(*pte));
 
@@ -791,8 +753,6 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr,
                maddr);
     }
 
-    ret = get_page(p, d);
-    BUG_ON(ret == 0);
     set_gpfn_from_mfn(page_to_mfn(p), mpaddr >> PAGE_SHIFT);
     // clear_page() and set_gpfn_from_mfn() become visible before set_pte_rel()
     // because set_pte_rel() has release semantics
@@ -893,11 +853,9 @@ assign_domain_page(struct domain *d,
                    unsigned long mpaddr, unsigned long physaddr)
 {
     struct page_info* page = mfn_to_page(physaddr >> PAGE_SHIFT);
-    int ret;
 
     BUG_ON((physaddr & GPFN_IO_MASK) != GPFN_MEM);
-    ret = get_page(page, d);
-    BUG_ON(ret == 0);
+    BUG_ON(page->count_info != (PGC_allocated | 1));
     set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
     // because __assign_domain_page() uses set_pte_rel() which has
     // release semantics, smp_mb() isn't needed.
@@ -1086,6 +1044,29 @@ assign_domain_mach_page(struct domain *d,
 }
 
 static void
+adjust_page_count_info(struct page_info* page)
+{
+    struct domain* d = page_get_owner(page);
+    BUG_ON((page->count_info & PGC_count_mask) != 1);
+    if (d != NULL) {
+        int ret = get_page(page, d);
+        BUG_ON(ret == 0);
+    } else {
+        u64 x, nx, y;
+
+        y = *((u64*)&page->count_info);
+        do {
+            x = y;
+            nx = x + 1;
+
+            BUG_ON((x >> 32) != 0);
+            BUG_ON((nx & PGC_count_mask) != 2);
+            y = cmpxchg((u64*)&page->count_info, x, nx);
+        } while (unlikely(y != x));
+    }
+}
+
+static void
 domain_put_page(struct domain* d, unsigned long mpaddr,
                 volatile pte_t* ptep, pte_t old_pte, int clear_PGC_allocate)
 {
@@ -1100,8 +1081,19 @@ domain_put_page(struct domain* d, unsigned long mpaddr,
             BUG();
         }
 
-	if (clear_PGC_allocate)
-            try_to_clear_PGC_allocate(d, page);
+        if (likely(clear_PGC_allocate)) {
+            if (!test_and_clear_bit(_PGC_allocated, &page->count_info))
+                BUG();
+            /* put_page() is done by domain_page_flush_and_put() */
+        } else {
+            // In this case, page reference count mustn't touched.
+            // domain_page_flush_and_put() decrements it, we increment
+            // it in advence. This patch is slow path.
+            //
+            // guest_remove_page(): owner = d, count_info = 1
+            // memory_exchange(): owner = NULL, count_info = 1
+            adjust_page_count_info(page);
+        }
     }
     domain_page_flush_and_put(d, mpaddr, ptep, old_pte, page);
 }
@@ -1148,7 +1140,7 @@ static int
 assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
                                struct page_info* old_page,
                                struct page_info* new_page,
-                               unsigned long flags)
+                               unsigned long flags, int clear_PGC_allocate)
 {
     struct mm_struct *mm = &d->arch.mm;
     volatile pte_t* pte;
@@ -1160,6 +1152,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     pte_t new_pte;
     pte_t ret_pte;
 
+    BUG_ON((flags & ASSIGN_pgc_allocated) == 0);
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
  again:
@@ -1200,6 +1193,18 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     BUG_ON(old_mfn == new_mfn);
 
     set_gpfn_from_mfn(old_mfn, INVALID_M2P_ENTRY);
+    if (likely(clear_PGC_allocate)) {
+        if (!test_and_clear_bit(_PGC_allocated, &old_page->count_info))
+            BUG();
+    } else {
+        int ret;
+        // adjust for count_info for domain_page_flush_and_put()
+        // This is slow path.
+        BUG_ON(!test_bit(_PGC_allocated, &old_page->count_info));
+        BUG_ON(d == NULL);
+        ret = get_page(old_page, d);
+        BUG_ON(ret == 0);
+    }
 
     domain_page_flush_and_put(d, mpaddr, pte, old_pte, old_page);
     perfc_incrc(assign_domain_pge_cmpxchg_rel);
@@ -1207,7 +1212,8 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
 }
 
 static void
-zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
+zap_domain_page_one(struct domain *d, unsigned long mpaddr,
+                    int clear_PGC_allocate, unsigned long mfn)
 {
     struct mm_struct *mm = &d->arch.mm;
     volatile pte_t *pte;
@@ -1258,12 +1264,8 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
     page = mfn_to_page(mfn);
     BUG_ON((page->count_info & PGC_count_mask) == 0);
 
-    // exchange_memory() calls
-    //   steal_page()
-    //     page owner is set to NULL
-    //   guest_physmap_remove_page()
-    //     zap_domain_page_one()
-    domain_put_page(d, mpaddr, pte, old_pte, (page_get_owner(page) != NULL));
+    BUG_ON(clear_PGC_allocate && (page_get_owner(page) == NULL));
+    domain_put_page(d, mpaddr, pte, old_pte, clear_PGC_allocate);
     perfc_incrc(zap_dcomain_page_one);
 }
 
@@ -1276,7 +1278,7 @@ dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
         return -ENOSYS;
     }
 
-    zap_domain_page_one(d, gpfn << PAGE_SHIFT, INVALID_MFN);
+    zap_domain_page_one(d, gpfn << PAGE_SHIFT, 1, INVALID_MFN);
     perfc_incrc(dom0vp_zap_physmap);
     return 0;
 }
@@ -1563,6 +1565,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     /* try_to_clear_PGC_allocate(d, page) is not needed. */
     BUG_ON(page_get_owner(page) == d &&
            get_gpfn_from_mfn(mfn) == gpfn);
+    BUG_ON(pte_pgc_allocated(old_pte));
     domain_page_flush_and_put(d, gpaddr, pte, old_pte, page);
 
     perfc_incrc(destroy_grant_host_mapping);
@@ -1606,9 +1609,6 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
         // assign_domain_page_cmpxchg_rel() has release semantics
         // so smp_mb() isn't needed.
 
-        ret = get_page(new, d);
-        BUG_ON(ret == 0);
-
         gpfn = get_gpfn_from_mfn(page_to_mfn(page));
         if (gpfn == INVALID_M2P_ENTRY) {
             free_domheap_page(new);
@@ -1621,7 +1621,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 
         ret = assign_domain_page_cmpxchg_rel(d, gpfn << PAGE_SHIFT, page, new,
                                              ASSIGN_writable |
-                                             ASSIGN_pgc_allocated);
+                                             ASSIGN_pgc_allocated, 0);
         if (ret < 0) {
             gdprintk(XENLOG_INFO, "assign_domain_page_cmpxchg_rel failed %d\n",
                     ret);
@@ -1648,18 +1648,8 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
         // page->u.inused._domain = 0;
         _nd = x >> 32;
 
-        if (
-            // when !MEMF_no_refcount, page might be put_page()'d or
-            // it will be put_page()'d later depending on queued.
-            unlikely(!(memflags & MEMF_no_refcount) &&
-                     ((x & (PGC_count_mask | PGC_allocated)) !=
+        if (unlikely(((x & (PGC_count_mask | PGC_allocated)) !=
                       (1 | PGC_allocated))) ||
-            // when MEMF_no_refcount, page isn't de-assigned from
-            // this domain yet. So count_info = 2
-            unlikely((memflags & MEMF_no_refcount) &&
-                     ((x & (PGC_count_mask | PGC_allocated)) !=
-                      (2 | PGC_allocated))) ||
-
             unlikely(_nd != _d)) {
             struct domain* nd = unpickle_domptr(_nd);
             if (nd == NULL) {
@@ -1711,11 +1701,8 @@ void
 guest_physmap_add_page(struct domain *d, unsigned long gpfn,
                        unsigned long mfn)
 {
-    int ret;
-
     BUG_ON(!mfn_valid(mfn));
-    ret = get_page(mfn_to_page(mfn), d);
-    BUG_ON(ret == 0);
+    BUG_ON(mfn_to_page(mfn)->count_info != (PGC_allocated | 1));
     set_gpfn_from_mfn(mfn, gpfn);
     smp_mb();
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
@@ -1731,7 +1718,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
                           unsigned long mfn)
 {
     BUG_ON(mfn == 0);//XXX
-    zap_domain_page_one(d, gpfn << PAGE_SHIFT, mfn);
+    zap_domain_page_one(d, gpfn << PAGE_SHIFT, 0, mfn);
     perfc_incrc(guest_physmap_remove_page);
 }
 
@@ -2142,26 +2129,8 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);
-        if (gpfn != INVALID_M2P_ENTRY) {
-            /*
-             * guest_physmap_remove_page() (for IPF) descrements page
-             * counter and unset PGC_allocated flag,
-             * so pre-increment page counter and post-set flag inserted
-             */
-            /* pre-increment page counter */
-            if (!get_page(mfn_to_page(mfn), d))
-                goto out;
-
+        if (gpfn != INVALID_M2P_ENTRY)
             guest_physmap_remove_page(d, gpfn, mfn);
-
-            /* post-set PGC_allocated flag */
-            if ((mfn_to_page(mfn)->count_info & PGC_count_mask) != 1) {
-                /* no one but us is using this page */
-                put_page(mfn_to_page(mfn));
-                goto out;
-            }
-            set_bit(_PGC_allocated, &mfn_to_page(mfn)->count_info);
-        }
 
         /* Map at new location. */
         guest_physmap_add_page(d, xatp.gpfn, mfn);

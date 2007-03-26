@@ -212,7 +212,7 @@ static inline int get_page_and_type(struct page_info *page,
 
 static inline int page_is_removable(struct page_info *page)
 {
-    return ((page->count_info & PGC_count_mask) == 2);
+    return ((page->count_info & PGC_count_mask) == 1);
 }
 
 #define	set_machinetophys(_mfn, _pfn) do { } while(0);
