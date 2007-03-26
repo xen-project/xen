@@ -51,12 +51,12 @@ except TimeoutError, e:
     FAIL(str(e))
     
 if status != 0:
-	FAIL("xm migrate returned invalid %i != 0" % status)
+    FAIL("xm migrate returned invalid %i != 0" % status)
 
 new_domid = domid(domain.getName())
 
 if (old_domid == new_domid):
-	FAIL("xm migrate failed, domain id is still %s" % old_domid)
+    FAIL("xm migrate failed, domain id is still %s" % old_domid)
 
 # Attach a console to it
 try:

@@ -11,6 +11,6 @@ status, output = traceCommand("xm list -x")
 eyecatcher = "Error:"
 where = output.find(eyecatcher)
 if status == 0:
-    FAIL("xm list returned invalud %i != 0" % status)
+    FAIL("xm list returned invalid %i != 0" % status)
 elif where == -1:
     FAIL("xm list failed to report error for bad arg")

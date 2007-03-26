@@ -34,7 +34,7 @@ import xen.lowlevel.xc
 
 from xen.xend import XendOptions, XendCheckpoint, XendDomainInfo
 from xen.xend.PrettyPrint import prettyprint
-from xen.xend.XendConfig import XendConfig
+from xen.xend import XendConfig
 from xen.xend.XendError import XendError, XendInvalidDomain, VmError
 from xen.xend.XendError import VMBadState
 from xen.xend.XendLogging import log
@@ -191,6 +191,10 @@ class XendDomain:
                         self._managed_domain_register(new_dom)
                     else:
                         self._managed_domain_register(running_dom)
+                        for key in XendConfig.XENAPI_CFG_TYPES.keys():
+                            if key not in XendConfig.LEGACY_XENSTORE_VM_PARAMS and \
+                                   key in dom:
+                                running_dom.info[key] = dom[key]
                 except Exception:
                     log.exception("Failed to create reference to managed "
                                   "domain: %s" % dom_name)
@@ -316,7 +320,7 @@ class XendDomain:
         for dom_uuid in dom_uuids:
             try:
                 cfg_file = self._managed_config_path(dom_uuid)
-                cfg = XendConfig(filename = cfg_file)
+                cfg = XendConfig.XendConfig(filename = cfg_file)
                 if cfg.get('uuid') != dom_uuid:
                     # something is wrong with the SXP
                     log.error("UUID mismatch in stored configuration: %s" %
@@ -414,7 +418,7 @@ class XendDomain:
         running_domids = [d['domid'] for d in running if d['dying'] != 1]
         for domid, dom in self.domains.items():
             if domid not in running_domids and domid != DOM0_ID:
-                self.remove_domain(dom, domid)
+                self._remove_domain(dom, domid)
 
 
     def add_domain(self, info):
@@ -433,6 +437,16 @@ class XendDomain:
             self._managed_domain_register(info)
 
     def remove_domain(self, info, domid = None):
+        """Remove the domain from the list of running domains, taking the
+        domains_lock first.
+        """
+        self.domains_lock.acquire()
+        try:
+            self._remove_domain(info, domid)
+        finally:
+            self.domains_lock.release()
+
+    def _remove_domain(self, info, domid = None):
         """Remove the domain from the list of running domains
         
         @requires: Expects to be protected by the domains_lock.
@@ -639,14 +653,16 @@ class XendDomain:
     def get_dev_property_by_uuid(self, klass, dev_uuid, field):
         value = None
         self.domains_lock.acquire()
-        try:
-            dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
-            if dom:
-                value = dom.get_dev_property(klass, dev_uuid, field)
-        except ValueError, e:
-            pass
 
-        self.domains_lock.release()
+        try:
+            try:
+                dom = self.get_vm_with_dev_uuid(klass, dev_uuid)
+                if dom:
+                    value = dom.get_dev_property(klass, dev_uuid, field)
+            except ValueError, e:
+                pass
+        finally:
+            self.domains_lock.release()
         
         return value
 
@@ -683,7 +699,7 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
-                xeninfo = XendConfig(xapi = xenapi_vm)
+                xeninfo = XendConfig.XendConfig(xapi = xenapi_vm)
                 dominfo = XendDomainInfo.createDormant(xeninfo)
                 log.debug("Creating new managed domain: %s: %s" %
                           (dominfo.getName(), dominfo.get_uuid()))
@@ -906,7 +922,7 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             try:
-                domconfig = XendConfig(sxp_obj = config)
+                domconfig = XendConfig.XendConfig(sxp_obj = config)
                 dominfo = XendDomainInfo.createDormant(domconfig)
                 log.debug("Creating new managed domain: %s" %
                           dominfo.getName())
@@ -971,18 +987,34 @@ class XendDomain:
                     raise VMBadState("Domain is still running",
                                      POWER_STATE_NAMES[DOM_STATE_HALTED],
                                      POWER_STATE_NAMES[dominfo.state])
-
-                log.info("Domain %s (%s) deleted." %
-                         (dominfo.getName(), dominfo.info.get('uuid')))
-
-                self._managed_domain_unregister(dominfo)
-                self.remove_domain(dominfo)
-                XendDevices.destroy_device_state(dominfo)
+                
+                self._domain_delete_by_info(dominfo)
             except Exception, ex:
                 raise XendError(str(ex))
         finally:
             self.domains_lock.release()
-        
+
+
+    def domain_delete_by_dominfo(self, dominfo):
+        """Only for use by XendDomainInfo.
+        """
+        self.domains_lock.acquire()
+        try:
+            self._domain_delete_by_info(dominfo)
+        finally:
+            self.domains_lock.release()
+
+
+    def _domain_delete_by_info(self, dominfo):
+        """Expects to be protected by domains_lock.
+        """
+        log.info("Domain %s (%s) deleted." %
+                 (dominfo.getName(), dominfo.info.get('uuid')))
+                
+        self._managed_domain_unregister(dominfo)
+        self._remove_domain(dominfo)
+        XendDevices.destroy_device_state(dominfo)
+
 
     def domain_configure(self, config):
         """Configure an existing domain.
@@ -1230,7 +1262,9 @@ class XendDomain:
             try:
                 rc = xc.vcpu_setaffinity(dominfo.getDomid(), int(v), cpumap)
             except Exception, ex:
-                raise XendError(str(ex))
+                log.exception(ex)
+                raise XendError("Cannot pin vcpu: %s to cpu: %s - %s" % \
+                                (v, cpumap, str(ex)))
         return rc
 
     def domain_cpu_sedf_set(self, domid, period, slice_, latency, extratime,

@@ -80,7 +80,7 @@ struct hvm_io_op {
     struct cpu_user_regs    io_context; /* current context */
 };
 
-#define MAX_IO_HANDLER              8
+#define MAX_IO_HANDLER              9
 
 #define HVM_PORTIO                  0
 #define HVM_MMIO                    1

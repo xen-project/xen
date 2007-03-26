@@ -94,7 +94,7 @@ def ppc_checkBuffer(buffer):
     for i in range(0, len(checks)):
         check=checks[i]
         if check.get('pattern').search(buffer):
-		FAIL(check.get('message'))
+            FAIL(check.get('message'))
 
     return
 

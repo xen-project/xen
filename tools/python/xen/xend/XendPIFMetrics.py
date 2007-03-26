@@ -40,8 +40,10 @@ class XendPIFMetrics:
         return 0.0
 
     def get_record(self):
+        import xen.xend.XendAPI as XendAPI
         return {'uuid'         : self.uuid,
                 'PIF'          : self.pif.uuid,
                 'io_read_kbs'  : self.get_io_read_kbs(),
-                'io_write_kbs' : self.get_io_write_kbs()
+                'io_write_kbs' : self.get_io_write_kbs(),
+                'last_updated' : XendAPI.now(),
                 }

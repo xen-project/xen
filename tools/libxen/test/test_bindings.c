@@ -17,6 +17,7 @@
  */
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,6 +34,7 @@
 #include "xen_vm.h"
 #include "xen_vm_metrics.h"
 
+//#define PRINT_XML
 
 static void usage()
 {
@@ -61,6 +63,7 @@ typedef struct
 
 
 static xen_vm create_new_vm(xen_session *session, bool hvm);
+static void print_session_info(xen_session *session);
 static void print_vm_power_state(xen_session *session, xen_vm vm);
 static void print_vm_metrics(xen_session *session, xen_vm vm);
 
@@ -69,6 +72,11 @@ static size_t
 write_func(void *ptr, size_t size, size_t nmemb, xen_comms *comms)
 {
     size_t n = size * nmemb;
+#ifdef PRINT_XML
+    printf("\n\n---Result from server -----------------------\n");
+    printf("%s\n",((char*) ptr));
+    fflush(stdout);
+#endif
     return comms->func(ptr, n, comms->handle) ? n : 0;
 }
 
@@ -78,6 +86,12 @@ call_func(const void *data, size_t len, void *user_handle,
           void *result_handle, xen_result_func result_func)
 {
     (void)user_handle;
+
+#ifdef PRINT_XML
+    printf("\n\n---Data to server: -----------------------\n");
+    printf("%s\n",((char*) data));
+    fflush(stdout);
+#endif
 
     CURL *curl = curl_easy_init();
     if (!curl) {
@@ -144,6 +158,14 @@ int main(int argc, char **argv)
     xen_session *session =
         xen_session_login_with_password(call_func, NULL, username, password);
 
+    print_session_info(session);
+    if (!session->ok)
+    {
+        /* Error has been logged, just clean up. */
+        CLEANUP;
+        return 1;
+    }
+
     xen_vm vm;
     if (!xen_vm_get_by_uuid(session, &vm,
                             "00000000-0000-0000-0000-000000000000"))
@@ -184,7 +206,7 @@ int main(int argc, char **argv)
     }
 
     xen_host host;
-    if (!xen_session_get_this_host(session, &host))
+    if (!xen_session_get_this_host(session, &host, session))
     {
         print_error(session);
         xen_vm_record_free(vm_record);
@@ -256,12 +278,12 @@ int main(int argc, char **argv)
 
     printf("%s.\n", vm_uuid);
 
-    fprintf(stderr, "In bytes, the VM UUID is ");
+    printf("In bytes, the VM UUID is ");
     for (int i = 0; i < 15; i++)
     {
-        fprintf(stderr, "%x, ", (unsigned int)vm_uuid_bytes[i]);
+        printf("%x, ", (unsigned int)vm_uuid_bytes[i]);
     }
-    fprintf(stderr, "%x.\n", (unsigned int)vm_uuid_bytes[15]);
+    printf("%x.\n", (unsigned int)vm_uuid_bytes[15]);
 
     printf("%zd.\n", versions->size);
 
@@ -369,16 +391,16 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
             .name_description = hvm ? "New HVM VM" : "New PV VM",
             .user_version = 1,
             .is_a_template = false,
-            .memory_static_max = 256,
-            .memory_dynamic_max = 256,
-            .memory_dynamic_min = 128,
-            .memory_static_min = 128,
+            .memory_static_max = 256 * 1024 * 1024,
+            .memory_dynamic_max = 256 * 1024 * 1024,
+            .memory_dynamic_min = 128 * 1024 * 1024,
+            .memory_static_min = 128 * 1024 * 1024,
             .vcpus_params = vcpus_params,
             .vcpus_max = 4,
             .vcpus_at_startup = 2,
             .actions_after_shutdown = XEN_ON_NORMAL_EXIT_DESTROY,
             .actions_after_reboot = XEN_ON_NORMAL_EXIT_RESTART,
-            .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_PRESERVE,
+            .actions_after_crash = XEN_ON_CRASH_BEHAVIOUR_RESTART,
             .hvm_boot_policy = hvm ? "BIOS order" : NULL,
             .hvm_boot_params = hvm ? hvm_boot_params : NULL,
             .pv_bootloader   = hvm ? NULL : "pygrub",
@@ -403,7 +425,7 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
      * Create a new disk for the new VM.
      */
     xen_sr_set *srs;
-    if (!xen_sr_get_by_name_label(session, &srs, "Local") ||
+    if (!xen_sr_get_by_name_label(session, &srs, "QCoW") ||
         srs->size < 1)
     {
         fprintf(stderr, "SR lookup failed.\n");
@@ -519,16 +541,14 @@ static xen_vm create_new_vm(xen_session *session, bool hvm)
     }
 
     if (hvm) {
-        fprintf(stderr,
-                "Created a new HVM VM, with UUID %s, VDI UUID %s, VBD "
-                "UUID %s, and VNC console UUID %s.\n",
-                vm_uuid, vdi0_uuid, vbd0_uuid, vnc_uuid);
+        printf("Created a new HVM VM, with UUID %s, VDI UUID %s, VBD "
+               "UUID %s, and VNC console UUID %s.\n",
+               vm_uuid, vdi0_uuid, vbd0_uuid, vnc_uuid);
     }
     else {
-        fprintf(stderr,
-                "Created a new PV VM, with UUID %s, VDI UUID %s, and VBD "
-                "UUID %s.\n",
-                vm_uuid, vdi0_uuid, vbd0_uuid);
+        printf("Created a new PV VM, with UUID %s, VDI UUID %s, and VBD "
+               "UUID %s.\n",
+               vm_uuid, vdi0_uuid, vbd0_uuid);
     }
 
     xen_uuid_free(vm_uuid);
@@ -569,6 +589,58 @@ static void print_vm_power_state(xen_session *session, xen_vm vm)
            xen_vm_power_state_to_string(power_state));
 
     xen_uuid_free(vm_uuid);
+
+    fflush(stdout);
+}
+
+
+/**
+ * Workaround for whinging GCCs, as suggested by strftime(3).
+ */
+static size_t my_strftime(char *s, size_t max, const char *fmt,
+                          const struct tm *tm)
+{
+    return strftime(s, max, fmt, tm);
+}
+
+
+/**
+ * Print some session details.
+ */
+static void print_session_info(xen_session *session)
+{
+    xen_session_record *record;
+    if (!xen_session_get_record(session, &record, session))
+    {
+        print_error(session);
+        return;
+    }
+
+    printf("Session UUID: %s.\n", record->uuid);
+    printf("Session user: %s.\n", record->this_user);
+    char time[256];
+    struct tm *tm = localtime(&record->last_active);
+    my_strftime(time, 256, "Session last active: %c, local time.\n", tm);
+    printf(time);
+
+    char *uuid = NULL;
+    char *this_user = NULL;
+    xen_session_get_uuid(session, &uuid, session);
+    xen_session_get_this_user(session, &this_user, session);
+
+    if (!session->ok)
+    {
+        xen_session_record_free(record);
+        print_error(session);
+        return;
+    }
+
+    assert(!strcmp(record->uuid, uuid));
+    assert(!strcmp(record->this_user, this_user));
+
+    xen_session_record_free(record);
+
+    fflush(stdout);
 }
 
 
@@ -592,6 +664,11 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
         return;
     }
 
+    char time[256];
+    struct tm *tm = localtime(&vm_metrics_record->last_updated);
+    my_strftime(time, 256, "Metrics updated at %c, local time.\n", tm);
+    printf(time);
+
     for (size_t i = 0; i < vm_metrics_record->vcpus_utilisation->size; i++)
     {
         printf("%"PRId64" -> %lf.\n",
@@ -601,4 +678,6 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
 
     xen_vm_metrics_record_free(vm_metrics_record);
     xen_vm_metrics_free(vm_metrics);
+
+    fflush(stdout);
 }

@@ -57,7 +57,10 @@ static const struct_member xen_vm_guest_metrics_record_struct_members[] =
           .offset = offsetof(xen_vm_guest_metrics_record, networks) },
         { .key = "other",
           .type = &abstract_type_string_string_map,
-          .offset = offsetof(xen_vm_guest_metrics_record, other) }
+          .offset = offsetof(xen_vm_guest_metrics_record, other) },
+        { .key = "last_updated",
+          .type = &abstract_type_datetime,
+          .offset = offsetof(xen_vm_guest_metrics_record, last_updated) }
     };
 
 const abstract_type xen_vm_guest_metrics_record_abstract_type_ =
@@ -232,6 +235,22 @@ xen_vm_guest_metrics_get_other(xen_session *session, xen_string_string_map **res
 
 
 bool
+xen_vm_guest_metrics_get_last_updated(xen_session *session, time_t *result, xen_vm_guest_metrics vm_guest_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_guest_metrics }
+        };
+
+    abstract_type result_type = abstract_type_datetime;
+
+    XEN_CALL_("VM_guest_metrics.get_last_updated");
+    return session->ok;
+}
+
+
+bool
 xen_vm_guest_metrics_get_all(xen_session *session, struct xen_vm_guest_metrics_set **result)
 {
 
@@ -246,6 +265,15 @@ xen_vm_guest_metrics_get_all(xen_session *session, struct xen_vm_guest_metrics_s
 bool
 xen_vm_guest_metrics_get_uuid(xen_session *session, char **result, xen_vm_guest_metrics vm_guest_metrics)
 {
-    *result = session->ok ? xen_strdup_((char *)vm_guest_metrics) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_guest_metrics }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM_guest_metrics.get_uuid");
     return session->ok;
 }

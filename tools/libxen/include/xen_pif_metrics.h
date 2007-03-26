@@ -64,6 +64,7 @@ typedef struct xen_pif_metrics_record
     char *uuid;
     double io_read_kbs;
     double io_write_kbs;
+    time_t last_updated;
 } xen_pif_metrics_record;
 
 /**
@@ -178,6 +179,13 @@ xen_pif_metrics_get_io_read_kbs(xen_session *session, double *result, xen_pif_me
  */
 extern bool
 xen_pif_metrics_get_io_write_kbs(xen_session *session, double *result, xen_pif_metrics pif_metrics);
+
+
+/**
+ * Get the last_updated field of the given PIF_metrics.
+ */
+extern bool
+xen_pif_metrics_get_last_updated(xen_session *session, time_t *result, xen_pif_metrics pif_metrics);
 
 
 /**

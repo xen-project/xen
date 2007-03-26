@@ -16,7 +16,7 @@ from XmTestLib import *
 
 rdpath = os.environ.get("RD_PATH")
 if not rdpath:
-	rdpath = "../ramdisk"
+    rdpath = "../ramdisk"
 
 # Test 1: create a domain with mem=0
 config1 = {"memory": 0}
@@ -29,8 +29,8 @@ except DomainError, e:
     eyecatcher1 = "Fail"
 
 if eyecatcher1 != "Fail":
-	domain1.stop()
-        FAIL("xm create let me create a domain with 0 memory")
+    domain1.stop()
+    FAIL("xm create let me create a domain with 0 memory")
 
 
 # Test 2: create a domain with mem>sys_mem
@@ -48,6 +48,6 @@ except DomainError, e:
     eyecatcher2 = "Fail"
 
 if eyecatcher2 != "Fail":
-        domain2.stop()
-        FAIL("xm create let me create a domain with mem > sys_mem")
+    domain2.stop()
+    FAIL("xm create let me create a domain with mem > sys_mem")
 

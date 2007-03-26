@@ -44,7 +44,10 @@ static const struct_member xen_vbd_metrics_record_struct_members[] =
           .offset = offsetof(xen_vbd_metrics_record, io_read_kbs) },
         { .key = "io_write_kbs",
           .type = &abstract_type_float,
-          .offset = offsetof(xen_vbd_metrics_record, io_write_kbs) }
+          .offset = offsetof(xen_vbd_metrics_record, io_write_kbs) },
+        { .key = "last_updated",
+          .type = &abstract_type_datetime,
+          .offset = offsetof(xen_vbd_metrics_record, last_updated) }
     };
 
 const abstract_type xen_vbd_metrics_record_abstract_type_ =
@@ -143,6 +146,22 @@ xen_vbd_metrics_get_io_write_kbs(xen_session *session, double *result, xen_vbd_m
 
 
 bool
+xen_vbd_metrics_get_last_updated(xen_session *session, time_t *result, xen_vbd_metrics vbd_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd_metrics }
+        };
+
+    abstract_type result_type = abstract_type_datetime;
+
+    XEN_CALL_("VBD_metrics.get_last_updated");
+    return session->ok;
+}
+
+
+bool
 xen_vbd_metrics_get_all(xen_session *session, struct xen_vbd_metrics_set **result)
 {
 
@@ -157,6 +176,15 @@ xen_vbd_metrics_get_all(xen_session *session, struct xen_vbd_metrics_set **resul
 bool
 xen_vbd_metrics_get_uuid(xen_session *session, char **result, xen_vbd_metrics vbd_metrics)
 {
-    *result = session->ok ? xen_strdup_((char *)vbd_metrics) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vbd_metrics }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VBD_metrics.get_uuid");
     return session->ok;
 }

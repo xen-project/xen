@@ -69,6 +69,7 @@ typedef struct xen_vm_guest_metrics_record
     xen_string_string_map *disks;
     xen_string_string_map *networks;
     xen_string_string_map *other;
+    time_t last_updated;
 } xen_vm_guest_metrics_record;
 
 /**
@@ -213,6 +214,13 @@ xen_vm_guest_metrics_get_networks(xen_session *session, xen_string_string_map **
  */
 extern bool
 xen_vm_guest_metrics_get_other(xen_session *session, xen_string_string_map **result, xen_vm_guest_metrics vm_guest_metrics);
+
+
+/**
+ * Get the last_updated field of the given VM_guest_metrics.
+ */
+extern bool
+xen_vm_guest_metrics_get_last_updated(xen_session *session, time_t *result, xen_vm_guest_metrics vm_guest_metrics);
 
 
 /**

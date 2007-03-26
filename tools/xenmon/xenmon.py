@@ -166,7 +166,7 @@ class DomainInfo:
 
     def ec_stats(self, passed):
         total = float(self.exec_count/(float(passed)/10**9))
-	return total
+        return total
 
     def io_stats(self, passed):
         total = float(self.iocount_sum)
@@ -235,7 +235,7 @@ def time_scale(ns):
     elif ns < 1000*1000:
         return "%4.2f us" % (float(ns)/10**3)
     elif ns < 10**9:
-	    return "%4.2f ms" % (float(ns)/10**6)
+        return "%4.2f ms" % (float(ns)/10**6)
     else:
         return "%4.2f s" % (float(ns)/10**9)
 
@@ -534,20 +534,20 @@ def show_livestats(cpu):
 # write does the file get created
 class Delayed(file):
     def __init__(self, filename, mode):
-	self.filename = filename
-	self.saved_mode = mode
-	self.delay_data = ""
-	self.opened = 0
+        self.filename = filename
+        self.saved_mode = mode
+        self.delay_data = ""
+        self.opened = 0
 
     def delayed_write(self, str):
-	self.delay_data = str
+        self.delay_data = str
 
     def write(self, str):
-	if not self.opened:
-	    self.file = open(self.filename, self.saved_mode)
-	    self.opened = 1
+        if not self.opened:
+            self.file = open(self.filename, self.saved_mode)
+            self.opened = 1
             self.file.write(self.delay_data)
-	self.file.write(str)
+        self.file.write(str)
 
     def rename(self, name):
         self.filename = name

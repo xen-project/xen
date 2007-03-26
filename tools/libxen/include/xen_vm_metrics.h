@@ -66,6 +66,7 @@ typedef struct xen_vm_metrics_record
     int64_t memory_actual;
     int64_t vcpus_number;
     xen_int_float_map *vcpus_utilisation;
+    time_t last_updated;
 } xen_vm_metrics_record;
 
 /**
@@ -187,6 +188,13 @@ xen_vm_metrics_get_vcpus_number(xen_session *session, int64_t *result, xen_vm_me
  */
 extern bool
 xen_vm_metrics_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, xen_vm_metrics vm_metrics);
+
+
+/**
+ * Get the last_updated field of the given VM_metrics.
+ */
+extern bool
+xen_vm_metrics_get_last_updated(xen_session *session, time_t *result, xen_vm_metrics vm_metrics);
 
 
 /**

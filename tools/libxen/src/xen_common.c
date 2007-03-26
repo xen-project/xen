@@ -16,12 +16,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
  */
 
+#define _XOPEN_SOURCE
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -30,6 +32,7 @@
 #include <libxml/xpath.h>
 
 #include "xen_common.h"
+#include "xen_host.h"
 #include "xen_internal.h"
 #include "xen_int_float_map.h"
 #include "xen_string_string_map.h"
@@ -136,6 +139,20 @@ xen_fini(void)
 }
 
 
+void
+xen_session_record_free(xen_session_record *record)
+{
+    if (record == NULL)
+    {
+        return;
+    }
+    free(record->uuid);
+    xen_host_record_opt_free(record->this_host);
+    free(record->this_user);
+    free(record);
+}
+
+
 xen_session *
 xen_session_login_with_password(xen_call_func call_func, void *handle,
                                 const char *uname, const char *pwd)
@@ -185,15 +202,111 @@ xen_session_logout(xen_session *session)
 }
 
 
-int
-xen_session_get_this_host(xen_session *session, xen_host *result)
+bool
+xen_session_get_uuid(xen_session *session, char **result,
+                     xen_session *self_session)
 {
     abstract_value params[] =
         {
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
         };
 
-    xen_call_(session, "session.get_this_host", params, 0,
+    xen_call_(session, "session.get_uuid", params, 1,
               &abstract_type_string, result);
+    return session->ok;
+}
+
+
+bool
+xen_session_get_this_host(xen_session *session, xen_host *result,
+                          xen_session *self_session)
+{
+    abstract_value params[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
+        };
+
+    xen_call_(session, "session.get_this_host", params, 1,
+              &abstract_type_string, result);
+    return session->ok;
+}
+
+
+bool
+xen_session_get_this_user(xen_session *session, char **result,
+                          xen_session *self_session)
+{
+    abstract_value params[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
+        };
+
+    xen_call_(session, "session.get_this_user", params, 1,
+              &abstract_type_string, result);
+    return session->ok;
+}
+
+
+bool
+xen_session_get_last_active(xen_session *session, time_t *result,
+                            xen_session *self_session)
+{
+    abstract_value params[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
+        };
+
+    xen_call_(session, "session.get_last_active", params, 1,
+              &abstract_type_datetime, result);
+    return session->ok;
+}
+
+
+static const struct_member xen_session_record_struct_members[] =
+    {
+        { .key = "uuid",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_session_record, uuid) },
+        { .key = "this_host",
+          .type = &abstract_type_ref,
+          .offset = offsetof(xen_session_record, this_host) },
+        { .key = "this_user",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_session_record, this_user) },
+        { .key = "last_active",
+          .type = &abstract_type_datetime,
+          .offset = offsetof(xen_session_record, last_active) },
+    };
+
+const abstract_type xen_session_record_abstract_type_ =
+    {
+       .typename = STRUCT,
+       .struct_size = sizeof(xen_session_record),
+       .member_count =
+           sizeof(xen_session_record_struct_members) / sizeof(struct_member),
+       .members = xen_session_record_struct_members
+    };
+
+
+bool
+xen_session_get_record(xen_session *session, xen_session_record **result,
+                       xen_session *self_session)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self_session->session_id }
+        };
+
+    abstract_type result_type = xen_session_record_abstract_type_;
+
+    *result = NULL;
+    XEN_CALL_("session.get_record");
+
     return session->ok;
 }
 
@@ -493,16 +606,18 @@ static void destring(xen_session *s, xmlChar *name, const abstract_type *type,
 
 
 /**
- * result_type : STRING => value : char **, the char * is yours.
- * result_type : ENUM   => value : int *
- * result_type : INT    => value : int64_t *
- * result_type : FLOAT  => value : double *
- * result_type : BOOL   => value : bool *
- * result_type : SET    => value : arbitrary_set **, the set is yours.
- * result_type : MAP    => value : arbitrary_map **, the map is yours.
- * result_type : OPT    => value : arbitrary_record_opt **,
- *                                 the record is yours, the handle is filled.
- * result_type : STRUCT => value : void **, the void * is yours.
+ * result_type : STRING   => value : char **, the char * is yours.
+ * result_type : ENUM     => value : int *
+ * result_type : INT      => value : int64_t *
+ * result_type : FLOAT    => value : double *
+ * result_type : BOOL     => value : bool *
+ * result_type : DATETIME => value : time_t *
+ * result_type : SET      => value : arbitrary_set **, the set is yours.
+ * result_type : MAP      => value : arbitrary_map **, the map is yours.
+ * result_type : OPT      => value : arbitrary_record_opt **,
+ *                                   the record is yours, the handle is
+ *                                   filled.
+ * result_type : STRUCT   => value : void **, the void * is yours.
  */
 static void parse_into(xen_session *s, xmlNode *value_node,
                        const abstract_type *result_type, void *value,
@@ -620,6 +735,25 @@ static void parse_into(xen_session *s, xmlNode *value_node,
         else
         {
             ((bool *)value)[slot] = (0 == strcmp((char *)string, "1"));
+            free(string);
+        }
+    }
+    break;
+
+    case DATETIME:
+    {
+        xmlChar *string = string_from_value(value_node, "dateTime.iso8601");
+        if (string == NULL)
+        {
+            server_error(
+                s, "Expected an DateTime from the server but didn't get one");
+        }
+        else
+        {
+            struct tm tm;
+            memset(&tm, 0, sizeof(tm));
+            strptime((char *)string, "%Y%m%dT%H:%M:%S", &tm);
+            ((time_t *)value)[slot] = (time_t)mktime(&tm);
             free(string);
         }
     }

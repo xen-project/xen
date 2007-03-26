@@ -64,6 +64,7 @@ typedef struct xen_host_metrics_record
     char *uuid;
     int64_t memory_total;
     int64_t memory_free;
+    time_t last_updated;
 } xen_host_metrics_record;
 
 /**
@@ -179,6 +180,13 @@ xen_host_metrics_get_memory_total(xen_session *session, int64_t *result, xen_hos
  */
 extern bool
 xen_host_metrics_get_memory_free(xen_session *session, int64_t *result, xen_host_metrics host_metrics);
+
+
+/**
+ * Get the last_updated field of the given host_metrics.
+ */
+extern bool
+xen_host_metrics_get_last_updated(xen_session *session, time_t *result, xen_host_metrics host_metrics);
 
 
 /**

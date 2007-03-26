@@ -87,7 +87,7 @@ class NetConfig:
         else:
             self.netmask = NETMASK
             self.network = NETWORK
-	    s_ip = ''
+            s_ip = ''
 
             # Get starting ip and max ip from configured ip range
             s_ip = NETWORK_IP_RANGE

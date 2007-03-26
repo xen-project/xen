@@ -39,7 +39,7 @@ domain.closeConsole()
 # Pause the domain
 status, output = traceCommand("xm pause %s" % domain.getName())
 if status != 0:
-	FAIL("xm pause returned invalid %i != 0", status)
+    FAIL("xm pause returned invalid %i != 0", status)
 
 # Try to attach a console to it
 try:
@@ -56,7 +56,7 @@ domain.closeConsole()
 
 status, output = traceCommand("xm unpause %s" % domain.getName())
 if status != 0:
-	FAIL("xm unpause returned invalid %i != 0", status)
+    FAIL("xm unpause returned invalid %i != 0", status)
 
 # Stop the domain (nice shutdown)
 domain.stop()

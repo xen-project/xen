@@ -282,6 +282,15 @@ xen_host_cpu_get_all(xen_session *session, struct xen_host_cpu_set **result)
 bool
 xen_host_cpu_get_uuid(xen_session *session, char **result, xen_host_cpu host_cpu)
 {
-    *result = session->ok ? xen_strdup_((char *)host_cpu) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_cpu }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host_cpu.get_uuid");
     return session->ok;
 }

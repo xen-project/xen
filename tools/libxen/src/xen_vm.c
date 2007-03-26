@@ -1594,6 +1594,22 @@ xen_vm_resume(xen_session *session, xen_vm vm, bool start_paused)
 
 
 bool
+xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self },
+            { .type = &abstract_type_int,
+              .u.int_val = nvcpu }
+        };
+
+    xen_call_(session, "VM.set_VCPUs_number_live", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result)
 {
 
@@ -1608,6 +1624,15 @@ xen_vm_get_all(xen_session *session, struct xen_vm_set **result)
 bool
 xen_vm_get_uuid(xen_session *session, char **result, xen_vm vm)
 {
-    *result = session->ok ? xen_strdup_((char *)vm) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_uuid");
     return session->ok;
 }

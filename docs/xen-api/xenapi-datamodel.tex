@@ -1062,7 +1062,7 @@ $\mathit{RW}$ &  {\tt PCI\_bus} & string & PCI bus path for pass-through devices
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt domid} & int & domain ID (if available, -1 otherwise) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt is\_control\_domain} & bool & true if this is a control domain (domain 0 or a driver domain) \\
-$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VM\_metrics ref & metrics associated with this VM \\
 $\mathit{RO}_\mathit{run}$ &  {\tt guest\_metrics} & VM\_guest\_metrics ref & metrics associated with the running guest \\
 \hline
 \end{longtable}
@@ -1379,7 +1379,7 @@ specified VM is in the Running state.
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & vm & The VM to hibernate \\ \hline 
+{\tt VM ref } & vm & The VM to suspend \\ \hline 
 
 \end{tabular}
 
@@ -1414,9 +1414,9 @@ specified VM is in the Suspended state.
 \begin{tabular}{|c|c|p{7cm}|}
  \hline
 {\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt VM ref } & vm & The VM to unhibernate \\ \hline 
+{\tt VM ref } & vm & The VM to resume \\ \hline 
 
-{\tt bool } & start\_paused & Unhibernate VM in paused state if set to true. \\ \hline 
+{\tt bool } & start\_paused & Resume VM in paused state if set to true. \\ \hline 
 
 \end{tabular}
 
@@ -1434,6 +1434,41 @@ void
 \noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
 
 \vspace{0.6cm}
+\subsubsection{RPC name:~set\_VCPUs\_number\_live}
+
+{\bf Overview:} 
+Set this VM's VCPUs/at\_startup value, and set the same value on the VM, if
+running.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_VCPUs_number_live (session_id s, VM ref self, int nvcpu)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & The VM \\ \hline 
+
+{\tt int } & nvcpu & The number of VCPUs \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -3983,6 +4018,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VM\_metrics}
@@ -4135,6 +4171,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
@@ -4219,6 +4287,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt memory} & (string $\rightarrow$ string) Map &
 $\mathit{RO}_\mathit{run}$ &  {\tt disks} & (string $\rightarrow$ string) Map & disk configuration/free space \\
 $\mathit{RO}_\mathit{run}$ &  {\tt networks} & (string $\rightarrow$ string) Map & network configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt other} & (string $\rightarrow$ string) Map & anything else \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VM\_guest\_metrics}
@@ -4467,6 +4536,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VM\_guest\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VM_guest_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_guest\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
@@ -4562,7 +4663,7 @@ $\mathit{RW}$ &  {\tt suspend\_image\_sr} & SR ref & The SR in which VDIs for su
 $\mathit{RW}$ &  {\tt crash\_dump\_sr} & SR ref & The SR in which VDIs for crash dumps are created \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: host}
@@ -5816,6 +5917,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/total} & int & Host's total memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/free} & int & Host's free memory (bytes) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: host\_metrics}
@@ -5929,6 +6031,38 @@ Get the memory/free field of the given host\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given host\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, host_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -6852,7 +6986,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success info
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VIF \\
-$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & VIF\_metrics ref & metrics associated with this VIF \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VIF}
@@ -7745,6 +7879,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VIF\_metrics}
@@ -7865,6 +8000,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_by\_uuid}
 
 {\bf Overview:} 
@@ -7950,7 +8117,7 @@ $\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & physical machine to which 
 $\mathit{RW}$ &  {\tt MAC} & string & ethernet MAC address of physical interface \\
 $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
 $\mathit{RW}$ &  {\tt VLAN} & int & VLAN tag for all traffic passing through this interface \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt metrics} & PIF\_metrics ref & metrics associated with this PIF. \\
+$\mathit{RO}_\mathit{run}$ &  {\tt metrics} & PIF\_metrics ref & metrics associated with this PIF \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: PIF}
@@ -8522,6 +8689,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: PIF\_metrics}
@@ -8635,6 +8803,38 @@ Get the io/write\_kbs field of the given PIF\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given PIF\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, PIF_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PIF\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -11293,6 +11493,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/read\_kbs} & float & Read bandwidth (KiB/s) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt io/write\_kbs} & float & Write bandwidth (KiB/s) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: VBD\_metrics}
@@ -11406,6 +11607,38 @@ Get the io/write\_kbs field of the given VBD\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 float
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_last\_updated}
+
+{\bf Overview:} 
+Get the last\_updated field of the given VBD\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_last_updated (session_id s, VBD_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -13384,14 +13617,3 @@ HVM is required for this operation
 {\bf Signature:}
 \begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
-
-
-
-\newpage
-\section{DTD}
-General notes:
-\begin{itemize}
-\item Values of primitive types (int, bool, etc) and higher-order types (Sets, Maps) are encoded as simple strings, rather than being expanded into XML fragments. For example ``5'', ``true'', ``1, 2, 3, 4'', ``(1, 2), (2, 3), (3, 4)''
-\item Values of enumeration types are represented as strings (e.g. ``PAE'', ``3DNow!'')
-\item Object References are represented as UUIDs, written in string form
-\end{itemize}

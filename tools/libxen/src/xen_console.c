@@ -284,6 +284,15 @@ xen_console_get_all(xen_session *session, struct xen_console_set **result)
 bool
 xen_console_get_uuid(xen_session *session, char **result, xen_console console)
 {
-    *result = session->ok ? xen_strdup_((char *)console) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = console }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("console.get_uuid");
     return session->ok;
 }

@@ -218,6 +218,7 @@ void hvm_domain_destroy(struct domain *d)
 {
     pit_deinit(d);
     rtc_deinit(d);
+    pmtimer_deinit(d);
     hpet_deinit(d);
 
     if ( d->arch.hvm_domain.shared_page_va )
@@ -303,7 +304,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     pit_init(v, cpu_khz);
     rtc_init(v, RTC_PORT(0));
-    pmtimer_init(v, ACPI_PM_TMR_BLK_ADDRESS);
+    pmtimer_init(v);
     hpet_init(v);
  
     /* Init guest TSC to start from zero. */

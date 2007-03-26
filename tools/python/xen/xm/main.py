@@ -502,6 +502,13 @@ def get_default_Network():
     return [network_ref
             for network_ref in server.xenapi.network.get_all()][0]
 
+class XenAPIUnsupportedException(Exception):
+    pass
+
+def xenapi_unsupported():
+    if serverType == SERVER_XEN_API:
+        raise XenAPIUnsupportedException, "This function is not supported by Xen-API"
+
 def map2sxp(m):
     return [[k, m[k]] for k in m.keys()]
 
@@ -550,10 +557,13 @@ def err(msg):
 
 
 def get_single_vm(dom):
-    uuids = server.xenapi.VM.get_by_name_label(dom)
-    n = len(uuids)
-    if n == 1:
-        return uuids[0]
+    if serverType == SERVER_XEN_API:
+        uuids = server.xenapi.VM.get_by_name_label(dom)
+        n = len(uuids)
+        if n > 0:
+            return uuids[0]
+        else:
+            raise OptionError("Domain '%s' not found." % dom)
     else:
         dominfo = server.xend.domain(dom, False)
         return dominfo['uuid']
@@ -569,9 +579,12 @@ class Shell(cmd.Cmd):
         cmd.Cmd.__init__(self)
         self.prompt = "xm> "
         if serverType == SERVER_XEN_API:
-            res = server.xenapi._UNSUPPORTED_list_all_methods()
-            for f in res:
-                setattr(Shell, 'do_' + f + ' ', self.default)
+            try:
+                res = server.xenapi._UNSUPPORTED_list_all_methods()
+                for f in res:
+                    setattr(Shell, 'do_' + f + ' ', self.default)
+            except:
+                pass
 
     def preloop(self):
         cmd.Cmd.preloop(self)
@@ -627,13 +640,17 @@ def xm_shell(args):
 #########################################################################
 
 def xm_save(args):
-    arg_check(args, "save", 2, 3)
 
+    arg_check(args, "save", 2, 3)
+    
     try:
         (options, params) = getopt.gnu_getopt(args, 'c', ['checkpoint'])
     except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
+
+    dom = params[0]
+    savefile = params[1]
 
     checkpoint = False
     for (k, v) in options:
@@ -645,19 +662,22 @@ def xm_save(args):
         usage('save')
         sys.exit(1)
 
-    try:
-        dominfo = parse_doms_info(server.xend.domain(params[0]))
-    except xmlrpclib.Fault, ex:
-        raise ex
-    
-    domid = dominfo['domid']
-    savefile = os.path.abspath(params[1])
+    savefile = os.path.abspath(savefile)
 
     if not os.access(os.path.dirname(savefile), os.W_OK):
         err("xm save: Unable to create file %s" % savefile)
         sys.exit(1)
+        
+    if serverType == SERVER_XEN_API:       
+        server.xenapi.VM.save(get_single_vm(dom), savefile, checkpoint)
+    else:
+        try:
+            dominfo = parse_doms_info(server.xend.domain(dom))
+        except xmlrpclib.Fault, ex:
+            raise ex
     
-    server.xend.domain.save(domid, savefile, checkpoint)
+        domid = dominfo['domid']
+        server.xend.domain.save(domid, savefile, checkpoint)
     
 def xm_restore(args):
     arg_check(args, "restore", 1, 2)
@@ -683,7 +703,10 @@ def xm_restore(args):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    server.xend.domain.restore(savefile, paused)
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.restore(savefile, paused)
+    else:
+        server.xend.domain.restore(savefile, paused)
 
 
 def getDomains(domain_names, state, full = 0):
@@ -695,12 +718,24 @@ def getDomains(domain_names, state, full = 0):
             dom_rec = server.xenapi.VM.get_record(dom_ref)
             dom_metrics_ref = server.xenapi.VM.get_metrics(dom_ref)
             dom_metrics = server.xenapi.VM_metrics.get_record(dom_metrics_ref)
+
+            states = ('running', 'blocked', 'paused', 'shutdown',
+                      'crashed', 'dying')
+            def state_on_off(state):
+                if dom_metrics['state'].find(state) > -1:
+                    return state[0]
+                else:
+                    return "-"
+            state_str = "".join([state_on_off(state)
+                                 for state in states])
+            
             dom_rec.update({'name':     dom_rec['name_label'],
                             'memory_actual': int(dom_metrics['memory_actual'])/1024,
-                            'vcpus':    dom_metrics['vcpus_number'],
-                            'state':    '-----',
-                            'cpu_time': dom_metrics['vcpus_utilisation']})
-			
+                            'vcpus':    dom_metrics['VCPUs_number'],
+                            'state':    state_str,
+                            'cpu_time': dom_metrics['VCPUs_utilisation'],
+                            'start_time': dom_metrics['start_time']})
+
             doms_sxp.append(['domain'] + map2sxp(dom_rec))
             doms_dict.append(dom_rec)
             
@@ -885,11 +920,71 @@ def xm_label_list(doms):
 
 
 def xm_vcpu_list(args):
-    if args:
-        dominfo = map(server.xend.domain.getVCPUInfo, args)
-    else:
-        doms = server.xend.domains(False)
-        dominfo = map(server.xend.domain.getVCPUInfo, doms)
+    if serverType == SERVER_XEN_API:
+        if args:
+            vm_refs = map(get_single_vm, args)
+        else:
+            vm_refs = server.xenapi.VM.get_all()
+            
+        vm_records = dict(map(lambda vm_ref:
+                                  (vm_ref, server.xenapi.VM.get_record(
+                                      vm_ref)),
+                              vm_refs))
+
+        vm_metrics = dict(map(lambda (ref, record):
+                                  (ref,
+                                   server.xenapi.VM_metrics.get_record(
+                                       record['metrics'])),
+                              vm_records.items()))
+
+        dominfo = []
+
+        # vcpu_list doesn't list 'managed' domains
+        # when they are not running, so filter them out
+
+        vm_refs = [vm_ref
+                  for vm_ref in vm_refs
+                  if vm_records[vm_ref]["power_state"] != "Halted"]
+
+        for vm_ref in vm_refs:
+            info = ['domain',
+                    ['domid',      vm_records[vm_ref]['domid']],
+                    ['name',       vm_records[vm_ref]['name_label']],
+                    ['vcpu_count', vm_records[vm_ref]['VCPUs_max']]]
+
+            
+
+            for i in range(int(vm_records[vm_ref]['VCPUs_max'])):
+                def chk_flag(flag):
+                    return vm_metrics[vm_ref]['VCPUs_flags'][str(i)] \
+                           .find(flag) > -1 and 1 or 0
+                
+                vcpu_info = ['vcpu',
+                             ['number',
+                                  i],
+                             ['online',
+                                  chk_flag("online")],
+                             ['blocked',
+                                  chk_flag("blocked")],
+                             ['running',
+                                  chk_flag("running")],
+                             ['cpu_time',
+                                  vm_metrics[vm_ref]['VCPUs_utilisation'][str(i)]],
+                             ['cpu',
+                                  vm_metrics[vm_ref]['VCPUs_CPU'][str(i)]],
+                             ['cpumap',
+                                  vm_metrics[vm_ref]['VCPUs_params']\
+                                  ['cpumap%i' % i].split(",")]]
+                
+                info.append(vcpu_info)
+
+            dominfo.append(info)
+    else:    
+        if args:
+            dominfo = map(server.xend.domain.getVCPUInfo, args)
+        else:
+            doms = server.xend.domains(False)
+            dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
     print '%-32s %3s %5s %5s %5s %9s %s' % \
           ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
@@ -947,16 +1042,20 @@ def xm_vcpu_list(args):
             cpumap = map(lambda x: int(x), cpumap)
             cpumap.sort()
 
-            for x in server.xend.node.info()[1:]:
-                if len(x) > 1 and x[0] == 'nr_cpus':
-                    nr_cpus = int(x[1])
-                    # normalize cpumap by modulus nr_cpus, and drop duplicates
-                    cpumap = dict.fromkeys(
-                                map(lambda x: x % nr_cpus, cpumap)).keys()
-                    if len(cpumap) == nr_cpus:
-                        return "any cpu"
-                    break
- 
+            if serverType == SERVER_XEN_API:
+                nr_cpus = len(server.xenapi.host.get_host_CPUs(
+                    server.xenapi.session.get_this_host()))
+            else:
+                for x in server.xend.node.info()[1:]:
+                    if len(x) > 1 and x[0] == 'nr_cpus':
+                        nr_cpus = int(x[1])
+
+            # normalize cpumap by modulus nr_cpus, and drop duplicates
+            cpumap = dict.fromkeys(
+                       map(lambda x: x % nr_cpus, cpumap)).keys()
+            if len(cpumap) == nr_cpus:
+                return "any cpu"
+
             return format_pairs(list_to_rangepairs(cpumap))
 
         name  =     get_info('name')
@@ -1154,13 +1253,17 @@ def xm_vcpu_pin(args):
         return cpus
 
     dom  = args[0]
-    vcpu = args[1]
+    vcpu = int(args[1])
     if args[2] == 'all':
         cpumap = cpu_make_map('0-63')
     else:
         cpumap = cpu_make_map(args[2])
-    
-    server.xend.domain.pincpu(dom, vcpu, cpumap)
+
+    if serverType == SERVER_XEN_API:
+        server.xenapi.VM.add_to_VCPUs_params_live(
+            get_single_vm(dom), "cpumap%i" % vcpu, ",".join(cpumap))
+    else:
+        server.xend.domain.pincpu(dom, vcpu, cpumap)
 
 def xm_mem_max(args):
     arg_check(args, "mem-max", 2)
@@ -1181,8 +1284,10 @@ def xm_mem_set(args):
 
     if serverType == SERVER_XEN_API:
         mem_target = int_unit(args[1], 'm') * 1024 * 1024
-        server.xenapi.VM.set_memory_dynamic_max(get_single_vm(dom), mem_target)
-        server.xenapi.VM.set_memory_dynamic_min(get_single_vm(dom), mem_target)
+        server.xenapi.VM.set_memory_dynamic_max_live(get_single_vm(dom),
+                                                     mem_target)
+        server.xenapi.VM.set_memory_dynamic_min_live(get_single_vm(dom),
+                                                     mem_target)
     else:
         mem_target = int_unit(args[1], 'm')
         server.xend.domain.setMemoryTarget(dom, mem_target)
@@ -1194,7 +1299,7 @@ def xm_vcpu_set(args):
     vcpus = int(args[1])
 
     if serverType == SERVER_XEN_API:
-        server.xenapi.VM.set_vcpus_live(get_single_vm(dom), vcpus)
+        server.xenapi.VM.set_VCPUs_number_live(get_single_vm(dom), vcpus)
     else:
         server.xend.domain.setVCpuCount(dom, vcpus)
 
@@ -1231,6 +1336,8 @@ def xm_domname(args):
         print sxp.child_value(dom, 'name')
 
 def xm_sched_sedf(args):
+    xenapi_unsupported()
+    
     def ns_to_ms(val):
         return float(val) * 0.000001
     
@@ -1355,10 +1462,21 @@ def xm_sched_credit(args):
         
         for d in doms:
             try:
-                info = server.xend.domain.sched_credit_get(d['domid'])
+                if serverType == SERVER_XEN_API:
+                    info = server.xenapi.VM_metrics.get_VCPUs_params(
+                        server.xenapi.VM.get_metrics(
+                            get_single_vm(d['name'])))
+                else:
+                    info = server.xend.domain.sched_credit_get(d['domid'])
             except xmlrpclib.Fault:
+                pass
+
+            if 'weight' not in info or 'cap' not in info:
                 # domain does not support sched-credit?
                 info = {'weight': -1, 'cap': -1}
+
+            info['weight'] = int(info['weight'])
+            info['cap']    = int(info['cap'])
             
             info['name']  = d['name']
             info['domid'] = int(d['domid'])
@@ -1368,10 +1486,20 @@ def xm_sched_credit(args):
             # place holder for system-wide scheduler parameters
             err("No domain given.")
             usage('sched-credit')
-        
-        result = server.xend.domain.sched_credit_set(domid, weight, cap)
-        if result != 0:
-            err(str(result))
+
+        if serverType == SERVER_XEN_API:
+            server.xenapi.VM.add_to_VCPUs_params_live(
+                get_single_vm(domid),
+                "weight",
+                weight)
+            server.xenapi.VM.add_to_VCPUs_params_live(
+                get_single_vm(domid),
+                "cap",
+                cap)            
+        else:
+            result = server.xend.domain.sched_credit_set(domid, weight, cap)
+            if result != 0:
+                err(str(result))
 
 def xm_info(args):
     arg_check(args, "info", 0)
@@ -1754,6 +1882,7 @@ def xm_block_list(args):
                    % ni)
 
 def xm_vtpm_list(args):
+    xenapi_unsupported()
     (use_long, params) = arg_check_for_resource_list(args, "vtpm-list")
 
     dom = params[0]
@@ -1883,7 +2012,10 @@ def xm_network_attach(args):
             record = vif_record
             for key in keys[:-1]:
                 record = record[key]
-            record[keys[-1]] = val 
+            record[keys[-1]] = val
+
+        def get_net_from_bridge(bridge):
+            raise "Not supported just yet"
          
         vif_conv = {
             'type':
@@ -1991,6 +2123,7 @@ def xm_network_detach(args):
 
 
 def xm_vnet_list(args):
+    xenapi_unsupported()
     try:
         (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
     except getopt.GetoptError, opterr:
@@ -2019,6 +2152,7 @@ def xm_vnet_list(args):
             print vnet, ex
 
 def xm_vnet_create(args):
+    xenapi_unsupported()
     arg_check(args, "vnet-create", 1)
     conf = args[0]
     if not os.access(conf, os.R_OK):
@@ -2028,6 +2162,7 @@ def xm_vnet_create(args):
     server.xend_vnet_create(conf)
 
 def xm_vnet_delete(args):
+    xenapi_unsupported()
     arg_check(args, "vnet-delete", 1)
     vnet = args[0]
     server.xend_vnet_delete(vnet)
@@ -2044,7 +2179,7 @@ commands = {
     "domid": xm_domid,
     "domname": xm_domname,
     "dump-core": xm_dump_core,
-    "reboot": xm_reboot,    
+    "reboot": xm_reboot,
     "rename": xm_rename,
     "restore": xm_restore,
     "resume": xm_resume,
@@ -2228,6 +2363,8 @@ def _run_cmd(cmd, cmd_name, args):
         err(str(e))
         _usage(cmd_name)
         print e.usage
+    except XenAPIUnsupportedException, e:
+        err(str(e))
     except Exception, e:
         if serverType != SERVER_XEN_API:
            from xen.util import security

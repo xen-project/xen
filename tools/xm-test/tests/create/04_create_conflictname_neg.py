@@ -34,8 +34,8 @@ try:
 except DomainError, e:
     eyecatcher = "Fail"
     # Stop the domain1 (nice shutdown)
-    domain1.stop()	
+    domain1.stop()
 
 if eyecatcher != "Fail":
-	domain2.stop()
-	FAIL("xm create let me create a duplicate-named domain!") 
+    domain2.stop()
+    FAIL("xm create let me create a duplicate-named domain!") 

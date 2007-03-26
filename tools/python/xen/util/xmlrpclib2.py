@@ -54,9 +54,10 @@ def stringify(value):
        (isinstance(value, int) and not isinstance(value, bool)):
         return str(value)
     elif isinstance(value, dict):
+        new_value = {}
         for k, v in value.items():
-            value[k] = stringify(v)
-        return value
+            new_value[stringify(k)] = stringify(v)
+        return new_value
     elif isinstance(value, (tuple, list)):
         return [stringify(v) for v in value]
     else:

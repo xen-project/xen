@@ -101,6 +101,7 @@ typedef struct PMTState {
     struct vcpu *vcpu;          /* Keeps sync with this vcpu's guest-time */
     uint64_t last_gtime;        /* Last (guest) time we updated the timer */
     uint64_t scale;             /* Multiplier to get from tsc to timer ticks */
+    struct timer timer;         /* To make sure we send SCIs */
 } PMTState;
 
 struct pl_time {    /* platform time */
@@ -132,7 +133,8 @@ void rtc_init(struct vcpu *v, int base);
 void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
 int is_rtc_periodic_irq(void *opaque);
-void pmtimer_init(struct vcpu *v, int base);
+void pmtimer_init(struct vcpu *v);
+void pmtimer_deinit(struct domain *d);
 
 void hpet_migrate_timers(struct vcpu *v);
 void hpet_init(struct vcpu *v);

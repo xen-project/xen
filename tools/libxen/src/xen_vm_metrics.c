@@ -48,7 +48,10 @@ static const struct_member xen_vm_metrics_record_struct_members[] =
           .offset = offsetof(xen_vm_metrics_record, vcpus_number) },
         { .key = "VCPUs_utilisation",
           .type = &abstract_type_int_float_map,
-          .offset = offsetof(xen_vm_metrics_record, vcpus_utilisation) }
+          .offset = offsetof(xen_vm_metrics_record, vcpus_utilisation) },
+        { .key = "last_updated",
+          .type = &abstract_type_datetime,
+          .offset = offsetof(xen_vm_metrics_record, last_updated) }
     };
 
 const abstract_type xen_vm_metrics_record_abstract_type_ =
@@ -165,6 +168,22 @@ xen_vm_metrics_get_vcpus_utilisation(xen_session *session, xen_int_float_map **r
 
 
 bool
+xen_vm_metrics_get_last_updated(xen_session *session, time_t *result, xen_vm_metrics vm_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_metrics }
+        };
+
+    abstract_type result_type = abstract_type_datetime;
+
+    XEN_CALL_("VM_metrics.get_last_updated");
+    return session->ok;
+}
+
+
+bool
 xen_vm_metrics_get_all(xen_session *session, struct xen_vm_metrics_set **result)
 {
 
@@ -179,6 +198,15 @@ xen_vm_metrics_get_all(xen_session *session, struct xen_vm_metrics_set **result)
 bool
 xen_vm_metrics_get_uuid(xen_session *session, char **result, xen_vm_metrics vm_metrics)
 {
-    *result = session->ok ? xen_strdup_((char *)vm_metrics) : NULL;
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_metrics }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM_metrics.get_uuid");
     return session->ok;
 }

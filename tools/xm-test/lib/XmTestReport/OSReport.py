@@ -149,16 +149,16 @@ class OperatingSystem:
             return None, None
 
     def __debianStyleRelease(self):
-	if os.access("/etc/debian_version", os.R_OK):
-	    rFile = file("/etc/debian_version")
-	else:
-	    rFile = None
+        if os.access("/etc/debian_version", os.R_OK):
+            rFile = file("/etc/debian_version")
+        else:
+            rFile = None
 
-	if not rFile:
-	    return None, None
+        if not rFile:
+            return None, None
 
-	line = rFile.readline()
-	return "Debian", line.rstrip("\n");
+        line = rFile.readline()
+        return "Debian", line.rstrip("\n");
 
     def __lsbStyleRelease(self):
         if os.access("/etc/lsb-release", os.R_OK):

@@ -9,7 +9,7 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS-y := xenperf xc_shadow
+TARGETS-y := xenperf
 TARGETS-$(CONFIG_X86) += xen-detect
 TARGETS := $(TARGETS-y)
 
@@ -43,5 +43,5 @@ clean:
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-xenperf xc_shadow: %: %.o Makefile
+xenperf: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl

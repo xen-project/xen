@@ -46,9 +46,9 @@ ACMLabelResource(resource1, resourcelabel1)
 block_utils.block_attach(domain, resource1, "xvda1")
 
 try:
-	run1 = console.runCmd("cat /proc/partitions")
+    run1 = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
-	FAIL(str(e))
+    FAIL(str(e))
 
 #Explicitly label the 2nd resource
 ACMLabelResource(resource2, resourcelabel2)
@@ -62,9 +62,9 @@ for i in range(10):
     time.sleep(1)
 
 try:
-	run2 = console.runCmd("cat /proc/partitions")
+    run2 = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
-	FAIL(str(e))
+    FAIL(str(e))
 
 # Close the console
 domain.closeConsole()

@@ -215,6 +215,10 @@ class XendNode:
         self.save_networks()
 
 
+    def get_PIF_refs(self):
+        return self.pifs.keys()
+
+
     def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
                     pif_uuid = None, metrics_uuid = None):
         for pif in self.pifs.values():

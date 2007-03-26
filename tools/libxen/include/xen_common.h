@@ -51,6 +51,30 @@ typedef struct
 } xen_session;
 
 
+typedef struct xen_session_record
+{
+    char *uuid;
+    struct xen_host_record_opt *this_host;
+    char *this_user;
+    time_t last_active;
+} xen_session_record;
+
+
+/**
+ * Allocate a xen_session_record.
+ */
+extern xen_session_record *
+xen_session_record_alloc(void);
+
+
+/**
+ * Free the given xen_session_record, and all referenced values.  The
+ * given record must have been allocated by this library.
+ */
+extern void
+xen_session_record_free(xen_session_record *record);
+
+
 struct xen_task_;
 typedef struct xen_task_ * xen_task_id;
 
@@ -136,10 +160,45 @@ xen_session_logout(xen_session *session);
 
 
 /**
- * Set *result to be a handle to the host to which this session is connected.
+ * Get the UUID of the second given session.  Set *result to point at a
+ * string, yours to free.
  */
-extern int
-xen_session_get_this_host(xen_session *session, xen_host *result);
+extern bool
+xen_session_get_uuid(xen_session *session, char **result,
+                     xen_session *self_session);
+
+
+/**
+ * Get the this_host field of the second given session.  Set *result to be a
+ * handle to that host.
+ */
+extern bool
+xen_session_get_this_host(xen_session *session, xen_host *result,
+                          xen_session *self_session);
+
+
+/**
+ * Get the this_user field of the second given session.  Set *result to point
+ * at a string, yours to free.
+ */
+extern bool
+xen_session_get_this_user(xen_session *session, char **result,
+                          xen_session *self_session);
+
+
+/**
+ * Get the last_active field of the given session, and place it in *result.
+ */
+extern bool
+xen_session_get_last_active(xen_session *session, time_t *result,
+                            xen_session *self_session);
+
+/**
+ * Get a record containing the current state of the second given session.
+ */
+extern bool
+xen_session_get_record(xen_session *session, xen_session_record **result,
+                       xen_session *self_session);
 
 
 #endif
