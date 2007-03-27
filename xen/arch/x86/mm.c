@@ -2431,12 +2431,12 @@ int do_mmu_update(
         guest_handle_add_offset(ureqs, 1);
     }
 
-    domain_mmap_cache_destroy(&mapcache);
-    domain_mmap_cache_destroy(&sh_mapcache);
-
     process_deferred_ops();
 
     UNLOCK_BIGLOCK(d);
+
+    domain_mmap_cache_destroy(&mapcache);
+    domain_mmap_cache_destroy(&sh_mapcache);
 
  out:
     /* Add incremental work we have done to the @done output parameter. */
@@ -2740,6 +2740,10 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         guest_unmap_l1e(v, pl1e);
     pl1e = NULL;
 
+    process_deferred_ops();
+
+    UNLOCK_BIGLOCK(d);
+
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
     case UVMF_TLB_FLUSH:
@@ -2785,10 +2789,6 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         break;
     }
 
-    process_deferred_ops();
-    
-    UNLOCK_BIGLOCK(d);
-
     return rc;
 }
 
@@ -2805,6 +2805,9 @@ int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
         return -ESRCH;
 
     rc = do_update_va_mapping(va, val64, flags);
+
+    BUG_ON(this_cpu(percpu_mm_info).deferred_ops);
+    process_deferred_ops(); /* only to clear foreigndom */
 
     return rc;
 }
