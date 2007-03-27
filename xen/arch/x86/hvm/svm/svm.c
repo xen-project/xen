@@ -64,8 +64,8 @@ extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
-static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
-                                            struct cpu_user_regs *regs);
+static int svm_reset_to_realmode(struct vcpu *v,
+                                 struct cpu_user_regs *regs);
 
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
@@ -749,19 +749,21 @@ static void svm_init_ap_context(
     struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
     struct vcpu *v;
+    struct vmcb_struct *vmcb;
     cpu_user_regs_t *regs;
     u16 cs_sel;
 
     /* We know this is safe because hvm_bringup_ap() does it */
     v = current->domain->vcpu[vcpuid];
+    vmcb = v->arch.hvm_svm.vmcb;
     regs = &v->arch.guest_context.user_regs;
 
     memset(ctxt, 0, sizeof(*ctxt));
 
     /*
      * We execute the trampoline code in real mode. The trampoline vector
-     * passed to us is page alligned and is the physicall frame number for
-     * the code. We will execute this code in real mode. 
+     * passed to us is page alligned and is the physical frame number for
+     * the code. We will execute this code in real mode.
      */
     cs_sel = trampoline_vector << 8;
     ctxt->user_regs.eip = 0x0;
@@ -771,11 +773,11 @@ static void svm_init_ap_context(
      * This is the launch of an AP; set state so that we begin executing
      * the trampoline code in real-mode.
      */
-    svm_do_vmmcall_reset_to_realmode(v, regs);  
+    svm_reset_to_realmode(v, regs);  
     /* Adjust the vmcb's hidden register state. */
-    v->arch.hvm_svm.vmcb->rip = 0;
-    v->arch.hvm_svm.vmcb->cs.sel = cs_sel;
-    v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
+    vmcb->rip = 0;
+    vmcb->cs.sel = cs_sel;
+    vmcb->cs.base = (cs_sel << 4);
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -2494,8 +2496,8 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
  *
  * returns 0 on success, non-zero otherwise
  */
-static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v, 
-                                            struct cpu_user_regs *regs)
+static int svm_reset_to_realmode(struct vcpu *v, 
+                                 struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb;
 

@@ -659,11 +659,8 @@ static void schedule(void)
     stop_timer(&prev->periodic_timer);
 
     /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_vcpu(next) )
-    {
-        update_vcpu_system_time(next);
-        vcpu_periodic_timer_work(next);
-    }
+    update_vcpu_system_time(next);
+    vcpu_periodic_timer_work(next);
 
     TRACE_4D(TRC_SCHED_SWITCH,
              prev->domain->domain_id, prev->vcpu_id,

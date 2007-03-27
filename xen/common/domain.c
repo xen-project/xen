@@ -96,14 +96,16 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
     spin_lock_init(&v->pause_lock);
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
 
     if ( !is_idle_domain(d) )
+    {
         set_bit(_VCPUF_down, &v->vcpu_flags);
+        v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
+    }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
     {
