@@ -203,6 +203,7 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_PG;
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+        vmcb->cr4 = arch_svm->cpu_shadow_cr4 = 0;
     }
 
     return 0;
