@@ -1,4 +1,3 @@
-
 #ifndef __XEN_PERFC_H__
 #define __XEN_PERFC_H__
 
@@ -8,13 +7,14 @@
 #include <xen/smp.h>
 #include <xen/percpu.h>
 
-/* 
+/*
  * NOTE: new counters must be defined in perfc_defn.h
  * 
+ * Counter declarations:
  * PERFCOUNTER (counter, string)              define a new performance counter
  * PERFCOUNTER_ARRAY (counter, string, size)  define an array of counters
  * 
- * unlike "COUNTERS", "STATUS" variables DO NOT RESET
+ * Unlike counters, status variables do not reset:
  * PERFSTATUS (counter, string)               define a new performance stauts
  * PERFSTATUS_ARRAY (counter, string, size)   define an array of status vars
  * 
@@ -31,16 +31,13 @@
  */
 
 #define PERFCOUNTER( name, descr ) \
-  PERFC_ ## name,
+  PERFC_##name,
 #define PERFCOUNTER_ARRAY( name, descr, size ) \
-  PERFC_ ## name,                              \
-  PERFC_LAST_ ## name = PERFC_ ## name + (size) - sizeof(char[2 * !!(size) - 1]),
+  PERFC_##name,                                \
+  PERFC_LAST_##name = PERFC_ ## name + (size) - sizeof(char[2 * !!(size) - 1]),
 
 #define PERFSTATUS       PERFCOUNTER
 #define PERFSTATUS_ARRAY PERFCOUNTER_ARRAY
-
-/* Compatibility: This should go away once all users got converted. */
-#define PERFCOUNTER_CPU PERFCOUNTER
 
 enum perfcounter {
 #include <xen/perfc_defn.h>
@@ -114,8 +111,5 @@ int perfc_control(struct xen_sysctl_perfc_op *);
 #define perfc_incr_histo(x,y,z) ((void)0)
 
 #endif /* PERF_COUNTERS */
-
-/* Compatibility: This should go away once all users got converted. */
-#define perfc_incrc     perfc_incr
 
 #endif /* __XEN_PERFC_H__ */

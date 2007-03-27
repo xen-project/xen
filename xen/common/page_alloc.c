@@ -423,7 +423,7 @@ static struct page_info *alloc_heap_pages(
 
     if ( unlikely(!cpus_empty(mask)) )
     {
-        perfc_incrc(need_flush_tlb_flush);
+        perfc_incr(need_flush_tlb_flush);
         flush_tlb_mask(mask);
     }
 

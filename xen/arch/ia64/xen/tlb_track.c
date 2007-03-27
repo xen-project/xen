@@ -216,14 +216,14 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
     TLB_TRACK_RET_T ret = TLB_TRACK_NOT_FOUND;
 
 #if 0 /* this is done at vcpu_tlb_track_insert_or_dirty() */
-    perfc_incrc(tlb_track_iod);
+    perfc_incr(tlb_track_iod);
     if (!pte_tlb_tracking(old_pte)) {
-        perfc_incrc(tlb_track_iod_not_tracked);
+        perfc_incr(tlb_track_iod_not_tracked);
         return TLB_TRACK_NOT_TRACKED;
     }
 #endif
     if (pte_tlb_inserted_many(old_pte)) {
-        perfc_incrc(tlb_track_iod_tracked_many);
+        perfc_incr(tlb_track_iod_tracked_many);
         return TLB_TRACK_MANY;
     }
 
@@ -260,7 +260,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
             if (entry->vaddr == vaddr && entry->rid == rid) {
                 // tlb_track_printd("TLB_TRACK_FOUND\n");
                 ret = TLB_TRACK_FOUND;
-                perfc_incrc(tlb_track_iod_found);
+                perfc_incr(tlb_track_iod_found);
 #ifdef CONFIG_TLB_TRACK_CNT
                 entry->cnt++;
                 if (entry->cnt > TLB_TRACK_CNT_FORCE_MANY) {
@@ -276,7 +276,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
                      */
                      // tlb_track_entry_printf(entry);
                      // tlb_track_printd("cnt = %ld\n", entry->cnt);
-                    perfc_incrc(tlb_track_iod_force_many);
+                    perfc_incr(tlb_track_iod_force_many);
                     goto force_many;
                 }
 #endif
@@ -294,14 +294,14 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
                 if (pte_val(ret_pte) != pte_val(old_pte)) {
                     // tlb_track_printd("TLB_TRACK_AGAIN\n");
                     ret = TLB_TRACK_AGAIN;
-                    perfc_incrc(tlb_track_iod_again);
+                    perfc_incr(tlb_track_iod_again);
                 } else {
                     // tlb_track_printd("TLB_TRACK_MANY del entry 0x%p\n",
                     //                  entry);
                     ret = TLB_TRACK_MANY;
                     list_del(&entry->list);
                     // tlb_track_entry_printf(entry);
-                    perfc_incrc(tlb_track_iod_tracked_many_del);
+                    perfc_incr(tlb_track_iod_tracked_many_del);
                 }
                 goto out;
             }
@@ -314,7 +314,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
          */
         // tlb_track_printd("TLB_TRACK_AGAIN\n");
         ret = TLB_TRACK_AGAIN;
-        perfc_incrc(tlb_track_iod_again);
+        perfc_incr(tlb_track_iod_again);
         goto out;
     }
 
@@ -323,7 +323,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
         /* Other thread else removed the tlb_track_entry after we got old_pte
            before we got spin lock. */
         ret = TLB_TRACK_AGAIN;
-        perfc_incrc(tlb_track_iod_again);
+        perfc_incr(tlb_track_iod_again);
         goto out;
     }
     if (new_entry == NULL && bit_to_be_set == _PAGE_TLB_INSERTED) {
@@ -334,10 +334,10 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
             /* entry can't be allocated.
                fall down into full flush mode. */
             bit_to_be_set |= _PAGE_TLB_INSERTED_MANY;
-            perfc_incrc(tlb_track_iod_new_failed);
+            perfc_incr(tlb_track_iod_new_failed);
         }
         // tlb_track_printd("new_entry 0x%p\n", new_entry);
-        perfc_incrc(tlb_track_iod_new_entry);
+        perfc_incr(tlb_track_iod_new_entry);
         goto again;
     }
 
@@ -348,7 +348,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
         if (tlb_track_pte_zapped(old_pte, ret_pte)) {
             // tlb_track_printd("zapped TLB_TRACK_AGAIN\n");
             ret = TLB_TRACK_AGAIN;
-            perfc_incrc(tlb_track_iod_again);
+            perfc_incr(tlb_track_iod_again);
             goto out;
         }
 
@@ -359,7 +359,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
             // tlb_track_printd("iserted TLB_TRACK_MANY\n");
             BUG_ON(!pte_tlb_inserted(ret_pte));
             ret = TLB_TRACK_MANY;
-            perfc_incrc(tlb_track_iod_new_many);
+            perfc_incr(tlb_track_iod_new_many);
             goto out;
         }
         BUG_ON(pte_tlb_inserted(ret_pte));
@@ -381,7 +381,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
 #ifdef CONFIG_TLB_TRACK_CNT
         entry->cnt = 0;
 #endif
-        perfc_incrc(tlb_track_iod_insert);
+        perfc_incr(tlb_track_iod_insert);
         // tlb_track_entry_printf(entry);
     } else {
         goto out;
@@ -392,7 +392,7 @@ tlb_track_insert_or_dirty(struct tlb_track* tlb_track, struct mm_struct* mm,
     cpu_set(v->processor, entry->pcpu_dirty_mask);
     BUG_ON(v->vcpu_id >= NR_CPUS);
     vcpu_set(v->vcpu_id, entry->vcpu_dirty_mask);
-    perfc_incrc(tlb_track_iod_dirtied);
+    perfc_incr(tlb_track_iod_dirtied);
 
  out:
     spin_unlock(&tlb_track->hash_lock);
@@ -432,19 +432,19 @@ tlb_track_search_and_remove(struct tlb_track* tlb_track,
     struct list_head* head = tlb_track_hash_head(tlb_track, ptep);
     struct tlb_track_entry* entry;
 
-    perfc_incrc(tlb_track_sar);
+    perfc_incr(tlb_track_sar);
     if (!pte_tlb_tracking(old_pte)) {
-        perfc_incrc(tlb_track_sar_not_tracked);
+        perfc_incr(tlb_track_sar_not_tracked);
         return TLB_TRACK_NOT_TRACKED;
     }
     if (!pte_tlb_inserted(old_pte)) {
         BUG_ON(pte_tlb_inserted_many(old_pte));
-        perfc_incrc(tlb_track_sar_not_found);
+        perfc_incr(tlb_track_sar_not_found);
         return TLB_TRACK_NOT_FOUND;
     }
     if (pte_tlb_inserted_many(old_pte)) {
         BUG_ON(!pte_tlb_inserted(old_pte));
-        perfc_incrc(tlb_track_sar_many);
+        perfc_incr(tlb_track_sar_many);
         return TLB_TRACK_MANY;
     }
 
@@ -475,14 +475,14 @@ tlb_track_search_and_remove(struct tlb_track* tlb_track,
                          pte_tlb_inserted(current_pte))) {
                 BUG_ON(pte_tlb_inserted_many(current_pte));
                 spin_unlock(&tlb_track->hash_lock);
-                perfc_incrc(tlb_track_sar_many);
+                perfc_incr(tlb_track_sar_many);
                 return TLB_TRACK_MANY;
             }
 
             list_del(&entry->list);
             spin_unlock(&tlb_track->hash_lock);
             *entryp = entry;
-            perfc_incrc(tlb_track_sar_found);
+            perfc_incr(tlb_track_sar_found);
             // tlb_track_entry_printf(entry);
 #ifdef CONFIG_TLB_TRACK_CNT
             // tlb_track_printd("cnt = %ld\n", entry->cnt);

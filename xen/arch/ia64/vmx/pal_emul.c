@@ -37,7 +37,7 @@ pal_emul(struct vcpu *vcpu)
 	vcpu_get_gr_nat(vcpu, 30, &gr30); 
 	vcpu_get_gr_nat(vcpu, 31, &gr31);
 
-	perfc_incrc(vmx_pal_emul);
+	perfc_incr(vmx_pal_emul);
 	result = xen_pal_emulator(gr28, gr29, gr30, gr31);
 
 	vcpu_set_gr(vcpu, 8, result.status, 0);

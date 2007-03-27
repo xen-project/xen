@@ -956,7 +956,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
-    perfc_incrc(page_faults);
+    perfc_incr(page_faults);
 
     if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
         return rc;
@@ -968,7 +968,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
-            perfc_incrc(copy_user_faults);
+            perfc_incr(copy_user_faults);
             regs->eip = fixup;
             return 0;
         }

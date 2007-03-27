@@ -606,7 +606,7 @@ static void schedule(void)
     ASSERT(!in_irq());
     ASSERT(this_cpu(mc_state).flags == 0);
 
-    perfc_incrc(sched_run);
+    perfc_incr(sched_run);
 
     sd = &this_cpu(schedule_data);
 
@@ -654,7 +654,7 @@ static void schedule(void)
 
     spin_unlock_irq(&sd->schedule_lock);
 
-    perfc_incrc(sched_ctx);
+    perfc_incr(sched_ctx);
 
     stop_timer(&prev->periodic_timer);
 
@@ -681,7 +681,7 @@ void context_saved(struct vcpu *prev)
 static void s_timer_fn(void *unused)
 {
     raise_softirq(SCHEDULE_SOFTIRQ);
-    perfc_incrc(sched_irq);
+    perfc_incr(sched_irq);
 }
 
 /* Per-VCPU periodic timer function: sends a virtual timer interrupt. */

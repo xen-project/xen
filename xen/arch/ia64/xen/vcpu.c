@@ -1616,7 +1616,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 			*pteval = (address & _PAGE_PPN_MASK) |
 				__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 			*itir = PAGE_SHIFT << 2;
-			perfc_incrc(phys_translate);
+			perfc_incr(phys_translate);
 			return IA64_NO_FAULT;
 		}
 	} else if (!region && warn_region0_address) {
@@ -1637,7 +1637,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		if (trp != NULL) {
 			*pteval = trp->pte.val;
 			*itir = trp->itir;
-			perfc_incrc(tr_translate);
+			perfc_incr(tr_translate);
 			return IA64_NO_FAULT;
 		}
 	}
@@ -1647,7 +1647,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		if (trp != NULL) {
 			*pteval = trp->pte.val;
 			*itir = trp->itir;
-			perfc_incrc(tr_translate);
+			perfc_incr(tr_translate);
 			return IA64_NO_FAULT;
 		}
 	}
@@ -1660,7 +1660,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 	    && vcpu_match_tr_entry_no_p(trp, address, rid)) {
 		*pteval = pte.val;
 		*itir = trp->itir;
-		perfc_incrc(dtlb_translate);
+		perfc_incr(dtlb_translate);
 		return IA64_USE_TLB;
 	}
 
@@ -1709,7 +1709,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 out:
 	*itir = rr & RR_PS_MASK;
 	*pteval = pte.val;
-	perfc_incrc(vhpt_translate);
+	perfc_incr(vhpt_translate);
 	return IA64_NO_FAULT;
 }
 

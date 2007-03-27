@@ -169,7 +169,7 @@ static unsigned long flush_va;
 fastcall void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
-    perfc_incrc(ipis);
+    perfc_incr(ipis);
     irq_enter();
     if ( !__sync_lazy_execstate() )
     {
@@ -329,7 +329,7 @@ void smp_send_stop(void)
 fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
-    perfc_incrc(ipis);
+    perfc_incr(ipis);
 }
 
 fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
@@ -338,7 +338,7 @@ fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
     void *info = call_data->info;
 
     ack_APIC_irq();
-    perfc_incrc(ipis);
+    perfc_incr(ipis);
 
     if ( !cpu_isset(smp_processor_id(), call_data->selected) )
         return;

@@ -1726,7 +1726,7 @@ int get_page_type(struct page_info *page, unsigned long type)
                      (!shadow_mode_enabled(page_get_owner(page)) ||
                       ((nx & PGT_type_mask) == PGT_writable_page)) )
                 {
-                    perfc_incrc(need_flush_tlb_flush);
+                    perfc_incr(need_flush_tlb_flush);
                     flush_tlb_mask(mask);
                 }
 
@@ -2729,7 +2729,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     cpumask_t      pmask;
     int            rc  = 0;
 
-    perfc_incrc(calls_to_update_va);
+    perfc_incr(calls_to_update_va);
 
     if ( unlikely(!__addr_ok(va) && !paging_mode_external(d)) )
         return -EINVAL;
@@ -3386,7 +3386,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         goto bail;
 
     UNLOCK_BIGLOCK(d);
-    perfc_incrc(ptwr_emulations);
+    perfc_incr(ptwr_emulations);
     return EXCRET_fault_fixed;
 
  bail:
