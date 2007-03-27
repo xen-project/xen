@@ -32,7 +32,6 @@ except ImportError:
     ssh_enabled = False
 
 
-
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
 # form:
 #
@@ -57,6 +56,33 @@ class UnixTransport(xmlrpclib.Transport):
         return HTTPUnix(self.__handler)
 
 
+# We need our own transport for HTTPS, because xmlrpclib.SafeTransport is
+# broken -- it does not handle ERROR_ZERO_RETURN properly.
+class HTTPSTransport(xmlrpclib.SafeTransport):
+    def _parse_response(self, file, sock):
+        p, u = self.getparser()
+        while 1:
+            try:
+                if sock:
+                    response = sock.recv(1024)
+                else:
+                    response = file.read(1024)
+            except socket.sslerror, exn:
+                if exn[0] == socket.SSL_ERROR_ZERO_RETURN:
+                    break
+                raise
+                
+            if not response:
+                break
+            if self.verbose:
+                print 'body:', repr(response)
+            p.feed(response)
+            
+        file.close()
+        p.close()
+        return u.close()
+
+
 # See xmlrpclib2.TCPXMLRPCServer._marshalled_dispatch.
 def conv_string(x):
     if isinstance(x, StringTypes):
@@ -75,6 +101,8 @@ class ServerProxy(xmlrpclib.ServerProxy):
             if protocol == 'httpu':
                 uri = 'http:' + rest
                 transport = UnixTransport()
+            elif protocol == 'https':
+                transport = HTTPSTransport()
             elif protocol == 'ssh':
                 global ssh_enabled
                 if ssh_enabled:
