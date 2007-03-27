@@ -148,11 +148,11 @@ NMI_MASK = 0x80000000
 	.endm
 
         /*
-         * Must be consistent with the definition in arch-x86_64.h:    
+         * Must be consistent with the definition in arch-x86/xen-x86_64.h:
          *     struct iret_context {
          *        u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
          *     };
-         * #define VGCF_IN_SYSCALL (1<<8) 
+         * with rax, r11, and rcx being taken care of in the hypercall stub.
          */
 	.macro HYPERVISOR_IRET flag
 	testb $3,1*8(%rsp)
@@ -164,21 +164,15 @@ NMI_MASK = 0x80000000
 	jnz   1f
 
 	/* Direct iret to kernel space. Correct CS and SS. */
-	orb   $3,1*8(%rsp)
-	orb   $3,4*8(%rsp)
+	orl   $3,1*8(%rsp)
+	orl   $3,4*8(%rsp)
 1:	iretq
 
 2:	/* Slow iret via hypervisor. */
-	andl  $~NMI_MASK, 16(%rsp)
+	andl  $~NMI_MASK, 2*8(%rsp)
 	pushq $\flag
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 	.endm
-
-        .macro SWITCH_TO_KERNEL ssoff,adjust=0
-	jc  1f
-	orb  $1,\ssoff-\adjust+4(%rsp)
-1:
-        .endm
 
 /*
  * A newly forked process directly context switches into this.
