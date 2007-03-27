@@ -121,30 +121,8 @@ void __dummy__(void)
     BLANK();
 
 #if PERF_COUNTERS
-    OFFSET(PERFC_hypercalls, struct perfcounter, hypercalls);
-    OFFSET(PERFC_exceptions, struct perfcounter, exceptions);
-    BLANK();
-#endif
-
-    OFFSET(MULTICALL_op, struct multicall_entry, op);
-    OFFSET(MULTICALL_arg0, struct multicall_entry, args[0]);
-    OFFSET(MULTICALL_arg1, struct multicall_entry, args[1]);
-    OFFSET(MULTICALL_arg2, struct multicall_entry, args[2]);
-    OFFSET(MULTICALL_arg3, struct multicall_entry, args[3]);
-    OFFSET(MULTICALL_arg4, struct multicall_entry, args[4]);
-    OFFSET(MULTICALL_arg5, struct multicall_entry, args[5]);
-    OFFSET(MULTICALL_result, struct multicall_entry, result);
-    BLANK();
-
-#ifdef CONFIG_COMPAT
-    OFFSET(COMPAT_MULTICALL_op, struct compat_multicall_entry, op);
-    OFFSET(COMPAT_MULTICALL_arg0, struct compat_multicall_entry, args[0]);
-    OFFSET(COMPAT_MULTICALL_arg1, struct compat_multicall_entry, args[1]);
-    OFFSET(COMPAT_MULTICALL_arg2, struct compat_multicall_entry, args[2]);
-    OFFSET(COMPAT_MULTICALL_arg3, struct compat_multicall_entry, args[3]);
-    OFFSET(COMPAT_MULTICALL_arg4, struct compat_multicall_entry, args[4]);
-    OFFSET(COMPAT_MULTICALL_arg5, struct compat_multicall_entry, args[5]);
-    OFFSET(COMPAT_MULTICALL_result, struct compat_multicall_entry, result);
+    DEFINE(PERFC_hypercalls, PERFC_hypercalls);
+    DEFINE(PERFC_exceptions, PERFC_exceptions);
     BLANK();
 #endif
 

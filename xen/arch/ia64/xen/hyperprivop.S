@@ -26,8 +26,7 @@
 # define FAST_HYPERPRIVOPS
 # ifdef PERF_COUNTERS
 #  define FAST_HYPERPRIVOP_CNT
-#  define FAST_HYPERPRIVOP_PERFC(N) \
-	(perfcounters + FAST_HYPERPRIVOP_PERFC_OFS + (4 * N))
+#  define FAST_HYPERPRIVOP_PERFC(N) PERFC(fast_hyperprivop + N)
 #  define FAST_REFLECT_CNT
 # endif
 	
@@ -364,7 +363,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	mov rp=r29;;
 	mov cr.itm=r26;;	// ensure next tick
 #ifdef FAST_REFLECT_CNT
-	movl r20=perfcounters+FAST_REFLECT_PERFC_OFS+((0x3000>>8)*4);;
+	movl r20=PERFC(fast_reflect + (0x3000>>8));;
 	ld4 r21=[r20];;
 	adds r21=1,r21;;
 	st4 [r20]=r21;;
@@ -597,7 +596,7 @@ END(fast_break_reflect)
 //	r31 == pr
 ENTRY(fast_reflect)
 #ifdef FAST_REFLECT_CNT
-	movl r22=perfcounters+FAST_REFLECT_PERFC_OFS;
+	movl r22=PERFC(fast_reflect);
 	shr r23=r20,8-2;;
 	add r22=r22,r23;;
 	ld4 r21=[r22];;
@@ -938,7 +937,7 @@ fast_tlb_no_tr_match:
 (p7)	br.cond.spnt.few page_not_present;;
 
 #ifdef FAST_REFLECT_CNT
-	movl r21=perfcounter+FAST_VHPT_TRANSLATE_PERFC_OFS;;
+	movl r21=PERFC(fast_vhpt_translate);;
 	ld4 r22=[r21];;
 	adds r22=1,r22;;
 	st4 [r21]=r22;;
@@ -968,7 +967,7 @@ END(fast_tlb_miss_reflect)
 // we get here if fast_insert fails (e.g. due to metaphysical lookup)
 ENTRY(recover_and_page_fault)
 #ifdef PERF_COUNTERS
-	movl r21=perfcounters + RECOVER_TO_PAGE_FAULT_PERFC_OFS;;
+	movl r21=PERFC(recover_to_page_fault);;
 	ld4 r22=[r21];;
 	adds r22=1,r22;;
 	st4 [r21]=r22;;
@@ -1832,7 +1831,7 @@ END(hyper_ptc_ga)
 // recovery block for hyper_itc metaphysical memory lookup
 ENTRY(recover_and_dispatch_break_fault)
 #ifdef PERF_COUNTERS
-	movl r21=perfcounters + RECOVER_TO_BREAK_FAULT_PERFC_OFS;;
+	movl r21=PERFC(recover_to_break_fault);;
 	ld4 r22=[r21];;
 	adds r22=1,r22;;
 	st4 [r21]=r22;;

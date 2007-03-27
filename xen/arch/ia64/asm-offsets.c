@@ -223,10 +223,11 @@ void foo(void)
 
 #ifdef PERF_COUNTERS
 	BLANK();
-	DEFINE(RECOVER_TO_PAGE_FAULT_PERFC_OFS, offsetof (struct perfcounter, recover_to_page_fault));
-	DEFINE(RECOVER_TO_BREAK_FAULT_PERFC_OFS, offsetof (struct perfcounter, recover_to_break_fault));
-	DEFINE(FAST_HYPERPRIVOP_PERFC_OFS, offsetof (struct perfcounter, fast_hyperprivop));
-	DEFINE(FAST_REFLECT_PERFC_OFS, offsetof (struct perfcounter, fast_reflect));
+	DEFINE(IA64_PERFC_recover_to_page_fault, PERFC_recover_to_page_fault);
+	DEFINE(IA64_PERFC_recover_to_break_fault, PERFC_recover_to_break_fault);
+	DEFINE(IA64_PERFC_fast_vhpt_translate, PERFC_fast_vhpt_translate);
+	DEFINE(IA64_PERFC_fast_hyperprivop, PERFC_fast_hyperprivop);
+	DEFINE(IA64_PERFC_fast_reflect, PERFC_fast_reflect);
 #endif
 
 	BLANK();

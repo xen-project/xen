@@ -84,7 +84,7 @@ PERFCOUNTER_ARRAY(slow_reflect,       "slow reflection", 0x80)
 PERFCOUNTER_ARRAY(fast_reflect,       "fast reflection", 0x80)
 
 PERFSTATUS(vhpt_nbr_entries,          "nbr of entries per VHPT")
-PERFSTATUS_CPU(vhpt_valid_entries,    "nbr of valid entries in VHPT")
+PERFSTATUS(vhpt_valid_entries,        "nbr of valid entries in VHPT")
 
 PERFCOUNTER_ARRAY(vmx_mmio_access,    "vmx_mmio_access", 8)
 PERFCOUNTER_CPU(vmx_pal_emul,         "vmx_pal_emul")
@@ -106,6 +106,8 @@ PERFSTATUS(privop_addr_##name##_overflow, "privop-addrs overflow " #name)
 
 PERFPRIVOPADDR(get_ifa)
 PERFPRIVOPADDR(thash)
+
+#undef PERFPRIVOPADDR
 #endif
 
 // vhpt.c

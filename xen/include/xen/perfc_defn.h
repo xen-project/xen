@@ -6,6 +6,9 @@
 
 PERFCOUNTER_ARRAY(hypercalls,           "hypercalls", NR_hypercalls)
 
+PERFCOUNTER(calls_to_multicall,         "calls to multicall")
+PERFCOUNTER(calls_from_multicall,       "calls from multicall")
+
 PERFCOUNTER_CPU(irqs,                   "#interrupts")
 PERFCOUNTER_CPU(ipis,                   "#IPIs")
 

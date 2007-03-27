@@ -18,9 +18,11 @@ PERFCOUNTER_CPU(apic_timer,             "apic timer interrupts")
 
 PERFCOUNTER_CPU(domain_page_tlb_flush,  "domain page tlb flushes")
 
-PERFCOUNTER_CPU(calls_to_mmu_update,    "calls_to_mmu_update")
-PERFCOUNTER_CPU(num_page_updates,       "num_page_updates")
-PERFCOUNTER_CPU(calls_to_update_va,     "calls_to_update_va_map")
+PERFCOUNTER(calls_to_mmuext_op,         "calls to mmuext_op")
+PERFCOUNTER(num_mmuext_ops,             "mmuext ops")
+PERFCOUNTER(calls_to_mmu_update,        "calls to mmu_update")
+PERFCOUNTER(num_page_updates,           "page updates")
+PERFCOUNTER(calls_to_update_va,         "calls to update_va_map")
 PERFCOUNTER_CPU(page_faults,            "page faults")
 PERFCOUNTER_CPU(copy_user_faults,       "copy_user faults")
 

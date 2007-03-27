@@ -116,4 +116,8 @@ name:
 # define dv_serialize_instruction
 #endif
 
+#ifdef PERF_COUNTERS
+#define PERFC(n) (THIS_CPU(perfcounters) + (IA64_PERFC_ ## n) * 4)
+#endif
+
 #endif /* _ASM_IA64_ASMMACRO_H */

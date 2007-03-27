@@ -107,20 +107,10 @@ void __dummy__(void)
     BLANK();
 
 #if PERF_COUNTERS
-    OFFSET(PERFC_hypercalls, struct perfcounter, hypercalls);
-    OFFSET(PERFC_exceptions, struct perfcounter, exceptions);
+    DEFINE(PERFC_hypercalls, PERFC_hypercalls);
+    DEFINE(PERFC_exceptions, PERFC_exceptions);
     BLANK();
 #endif
-
-    OFFSET(MULTICALL_op, struct multicall_entry, op);
-    OFFSET(MULTICALL_arg0, struct multicall_entry, args[0]);
-    OFFSET(MULTICALL_arg1, struct multicall_entry, args[1]);
-    OFFSET(MULTICALL_arg2, struct multicall_entry, args[2]);
-    OFFSET(MULTICALL_arg3, struct multicall_entry, args[3]);
-    OFFSET(MULTICALL_arg4, struct multicall_entry, args[4]);
-    OFFSET(MULTICALL_arg5, struct multicall_entry, args[5]);
-    OFFSET(MULTICALL_result, struct multicall_entry, result);
-    BLANK();
 
     DEFINE(FIXMAP_apic_base, fix_to_virt(FIX_APIC_BASE));
     BLANK();

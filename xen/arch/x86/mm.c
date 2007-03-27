@@ -1969,6 +1969,8 @@ int do_mmuext_op(
         if ( unlikely(!guest_handle_is_null(pdone)) )
             (void)copy_from_guest(&done, pdone, 1);
     }
+    else
+        perfc_incr(calls_to_mmuext_op);
 
     if ( unlikely(!guest_handle_okay(uops, count)) )
     {
@@ -2223,6 +2225,8 @@ int do_mmuext_op(
 
     UNLOCK_BIGLOCK(d);
 
+    perfc_add(num_mmuext_ops, i);
+
  out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
@@ -2257,6 +2261,8 @@ int do_mmu_update(
         if ( unlikely(!guest_handle_is_null(pdone)) )
             (void)copy_from_guest(&done, pdone, 1);
     }
+    else
+        perfc_incr(calls_to_mmu_update);
 
     if ( unlikely(!guest_handle_okay(ureqs, count)) )
     {
@@ -2272,9 +2278,6 @@ int do_mmu_update(
 
     domain_mmap_cache_init(&mapcache);
     domain_mmap_cache_init(&sh_mapcache);
-
-    perfc_incrc(calls_to_mmu_update);
-    perfc_addc(num_page_updates, count);
 
     LOCK_BIGLOCK(d);
 
@@ -2437,6 +2440,8 @@ int do_mmu_update(
 
     domain_mmap_cache_destroy(&mapcache);
     domain_mmap_cache_destroy(&sh_mapcache);
+
+    perfc_add(num_page_updates, i);
 
  out:
     /* Add incremental work we have done to the @done output parameter. */

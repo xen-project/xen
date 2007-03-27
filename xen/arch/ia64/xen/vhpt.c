@@ -512,7 +512,7 @@ void gather_vhpt_stats(void)
 		for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
 			if (!(v->ti_tag & INVALID_TI_TAG))
 				vhpt_valid++;
-		perfc_seta(vhpt_valid_entries, cpu, vhpt_valid);
+		per_cpu(perfcounters, cpu)[PERFC_vhpt_valid_entries] = vhpt_valid;
 	}
 }
 #endif
