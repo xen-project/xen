@@ -68,6 +68,20 @@ asmlinkage void svm_intr_assist(void)
     int intr_vector = -1;
 
     /*
+     * Do not deliver a virtual interrupt (vintr) if an exception is pending.
+     * This is because the delivery of the exception can arbitrarily delay
+     * the injection of the vintr (for example, if the exception is handled
+     * via an interrupt gate, hence zeroing RFLAGS.IF). In the meantime the
+     * vTPR can be modified upwards and we can end up delivering the vintr
+     * when it is not in fact valid to do so (because we do not re-check the
+     * vTPR value). Moreover, the guest will be able to see the updated
+     * APIC/PIC state (as if the interrupt had been acknowledged) yet will not
+     * have actually received the interrupt. This could confuse the guest!
+     */
+    if ( vmcb->eventinj.fields.v )
+        return;
+
+    /*
      * Previous Interrupt delivery caused this intercept?
      * This will happen if the injection is latched by the processor (hence
      * clearing vintr.fields.irq) but then subsequently a fault occurs (e.g.,
