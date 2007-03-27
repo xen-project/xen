@@ -1647,14 +1647,15 @@ class XendAPI(object):
 
     def VM_send_sysrq(self, _, vm_ref, req):
         xeninfo = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        if xeninfo.state != XEN_API_VM_POWER_STATE_RUNNING:
+        if xeninfo.state == XEN_API_VM_POWER_STATE_RUNNING \
+               or xeninfo.state == XEN_API_VM_POWER_STATE_PAUSED:
+            xeninfo.send_sysrq(req)
+            return xen_api_success_void()
+        else:
             return xen_api_error(
                 ['VM_BAD_POWER_STATE', vm_ref,
                  XendDomain.POWER_STATE_NAMES[XEN_API_VM_POWER_STATE_RUNNING],
                  XendDomain.POWER_STATE_NAMES[xeninfo.state]])
-        xeninfo.send_sysrq(req)
-        return xen_api_success_void()
-
 
     def VM_send_trigger(self, _, vm_ref, trigger, vcpu):
         xendom = XendDomain.instance()
