@@ -27,7 +27,7 @@
 #define PM1a_EN_ADDR  (ACPI_PM1A_EVT_BLK_ADDRESS + 2)
 #define TMR_VAL_ADDR  (ACPI_PM_TMR_BLK_ADDRESS)
 
-/* The interesting bit of the PM1a_STS register */
+/* The interesting bits of the PM1a_STS register */
 #define TMR_STS    (1 << 0)
 #define PWRBTN_STS (1 << 5)
 #define GBL_STS    (1 << 8)

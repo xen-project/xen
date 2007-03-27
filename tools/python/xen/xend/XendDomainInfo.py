@@ -556,7 +556,8 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
     def getDeviceSxprs(self, deviceClass):
-        if self.state == DOM_STATE_RUNNING:
+        if self.state == DOM_STATE_RUNNING \
+               or self.state == DOM_STATE_PAUSED:
             return self.getDeviceController(deviceClass).sxprs()
         else:
             sxprs = []
@@ -572,8 +573,8 @@ class XendDomainInfo:
         """Set the memory target of this domain.
         @param target: In MiB.
         """
-        log.debug("Setting memory target of domain %s (%d) to %d MiB.",
-                  self.info['name_label'], self.domid, target)
+        log.debug("Setting memory target of domain %s (%s) to %d MiB.",
+                  self.info['name_label'], str(self.domid), target)
         
         if target <= 0:
             raise XendError('Invalid memory size')
@@ -585,29 +586,28 @@ class XendDomainInfo:
         if self.domid >= 0:
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
-        else:
-            xen.xend.XendDomain.instance().managed_config_save(self)
+        xen.xend.XendDomain.instance().managed_config_save(self)
 
     def setMemoryMaximum(self, limit):
         """Set the maximum memory limit of this domain
         @param limit: In MiB.
         """
-        log.debug("Setting memory maximum of domain %s (%d) to %d MiB.",
-                  self.info['name_label'], self.domid, limit)
+        log.debug("Setting memory maximum of domain %s (%s) to %d MiB.",
+                  self.info['name_label'], str(self.domid), limit)
 
         if limit <= 0:
             raise XendError('Invalid memory size')
 
-        self.info['memory_static_max'] = limit
+        MiB = 1024 * 1024
+        self.info['memory_static_max'] = limit * MiB
+
         if self.domid >= 0:
             maxmem = int(limit) * 1024
             try:
                 return xc.domain_setmaxmem(self.domid, maxmem)
             except Exception, ex:
                 raise XendError(str(ex))
-        else:
-            self.info['memory_dynamic_max'] = limit
-            xen.xend.XendDomain.instance().managed_config_save(self)
+        xen.xend.XendDomain.instance().managed_config_save(self)
 
 
     def getVCPUInfo(self):
@@ -2302,8 +2302,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
 
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
-            
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING or \
+               self.state == XEN_API_VM_POWER_STATE_PAUSED:
             _, config = self.info['devices'][dev_uuid]
             
             if vdi_image_path.startswith('tap'):
@@ -2409,7 +2409,8 @@ class XendDomainInfo:
             raise XendError('Device does not exist')
 
         try:
-            if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+            if self.state == XEN_API_VM_POWER_STATE_RUNNING \
+                   or self.state == XEN_API_VM_POWER_STATE_PAUSED:
                 _, config = self.info['devices'][dev_uuid]
                 devid = config.get('devid')
                 if devid != None:

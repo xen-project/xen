@@ -18,6 +18,7 @@
 ^cscope.*$
 ^[^/]*\.bz2$
 ^\.config$
+^\.pc
 ^TAGS$
 ^tags$
 ^build.*$
