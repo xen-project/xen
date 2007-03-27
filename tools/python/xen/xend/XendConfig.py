@@ -845,6 +845,8 @@ class XendConfig(dict):
                     sxpr.append([name, s])
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
+            if legacy in ('cpus'): # skip this
+                continue
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
                 if type(self[xenapi]) == bool:
                     # convert booleans to ints before making an sxp item
@@ -858,7 +860,7 @@ class XendConfig(dict):
         sxpr.append(["memory", int(self["memory_dynamic_max"])/MiB])
 
         for legacy in LEGACY_UNSUPPORTED_BY_XENAPI_CFG:
-            if legacy in ('domid', 'uuid'): # skip these
+            if legacy in ('domid', 'uuid', 'cpus'): # skip these
                 continue
             if self.has_key(legacy) and self[legacy] not in (None, []):
                 sxpr.append([legacy, self[legacy]])
