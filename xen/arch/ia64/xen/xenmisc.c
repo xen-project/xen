@@ -166,11 +166,7 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printk(buf);
-	if (regs) show_registers(regs);
-	if (regs) {
-		debugger_trap_fatal(0 /* don't care */, regs);
-	} else {
-		debugger_trap_immediate();
-	}
+	if (regs)
+		show_registers(regs);
 	domain_crash_synchronous ();
 }
