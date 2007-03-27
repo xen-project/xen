@@ -1856,7 +1856,7 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     VBD_metrics_attr_rw = []
-    VBD_methods = []
+    VBD_metrics_methods = []
 
     def VBD_metrics_get_all(self, session):
         return self.VBD_get_all(session)
