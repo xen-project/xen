@@ -1993,7 +1993,7 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     VIF_metrics_attr_rw = []
-    VIF_methods = []
+    VIF_metrics_methods = []
 
     def VIF_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vif', ref)
