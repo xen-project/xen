@@ -52,6 +52,7 @@ from xen.xend import XendNode, XendOptions, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
+from xen.xend.XendDomain import instance as xenddomain
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
@@ -72,7 +73,7 @@ class XendServers:
     def add(self, server):
         self.servers.append(server)
 
-    def cleanup(self, signum = 0, frame = None):
+    def cleanup(self, signum = 0, frame = None, reloading = False):
         log.debug("SrvServer.cleanup()")
         self.cleaningUp = True
         for server in self.servers:
@@ -80,12 +81,18 @@ class XendServers:
                 server.shutdown()
             except:
                 pass
+
+        # clean up domains for those that have on_xend_stop
+        if not reloading:
+            xenddomain().cleanup_domains()
+        
         self.running = False
+        
 
     def reloadConfig(self, signum = 0, frame = None):
         log.debug("SrvServer.reloadConfig()")
         self.reloadingConfig = True
-        self.cleanup(signum, frame)
+        self.cleanup(signum, frame, reloading = True)
 
     def start(self, status):
         # Running the network script will spawn another process, which takes
@@ -143,6 +150,12 @@ class XendServers:
                 status.write('0')
                 status.close()
                 status = None
+
+            # Reaching this point means we can auto start domains
+            try:
+                xenddomain().autostart_domains()
+            except Exception, e:
+                log.exception("Failed while autostarting domains")
 
             # loop to keep main thread alive until it receives a SIGTERM
             self.running = True

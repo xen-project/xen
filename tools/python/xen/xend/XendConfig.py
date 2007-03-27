@@ -452,7 +452,10 @@ class XendConfig(dict):
         for key, typ in XENAPI_CFG_TYPES.items():
             val = sxp.child_value(sxp_cfg, key)
             if val is not None:
-                cfg[key] = typ(val)
+                try:
+                    cfg[key] = typ(val)
+                except (ValueError, TypeError), e:
+                    log.warn('Unable to convert type value for key: %s' % key)
 
         # Convert deprecated options to current equivalents.
         
