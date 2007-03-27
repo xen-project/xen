@@ -963,8 +963,6 @@ static int svm_vcpu_initialise(struct vcpu *v)
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
-    v->arch.hvm_svm.saved_irq_vector = -1;
-
     v->arch.hvm_svm.launch_core = -1;
 
     if ( (rc = svm_create_vmcb(v)) != 0 )

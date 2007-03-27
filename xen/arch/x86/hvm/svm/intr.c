@@ -64,87 +64,61 @@ asmlinkage void svm_intr_assist(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct periodic_time *pt;
     int intr_type = APIC_DM_EXTINT;
     int intr_vector = -1;
-    int re_injecting = 0;
 
-    /* Check if an Injection is active */
-    /* Previous Interrupt delivery caused this Intercept? */
+    /*
+     * Previous Interrupt delivery caused this intercept?
+     * This will happen if the injection is latched by the processor (hence
+     * clearing vintr.fields.irq) but then subsequently a fault occurs (e.g.,
+     * due to lack of shadow mapping of guest IDT or guest-kernel stack).
+     * 
+     * NB. Exceptions that fault during delivery are lost. This needs to be
+     * fixed but we'll usually get away with it since faults are usually
+     * idempotent. But this isn't the case for e.g. software interrupts!
+     */
     if ( vmcb->exitintinfo.fields.v && (vmcb->exitintinfo.fields.type == 0) )
     {
-        v->arch.hvm_svm.saved_irq_vector = vmcb->exitintinfo.fields.vector;
+        intr_vector = vmcb->exitintinfo.fields.vector;
         vmcb->exitintinfo.bytes = 0;
-        re_injecting = 1;
+        HVMTRACE_1D(REINJ_VIRQ, v, intr_vector);
+        svm_inject_extint(v, intr_vector);
+        return;
     }
 
-    /* Previous interrupt still pending? */
+    /*
+     * Previous interrupt still pending? This occurs if we return from VMRUN
+     * very early in the entry-to-guest process. Usually this is because an
+     * external physical interrupt was pending when we executed VMRUN.
+     */
     if ( vmcb->vintr.fields.irq )
-    {
-        intr_vector = vmcb->vintr.fields.vector;
-        vmcb->vintr.bytes = 0;
-        re_injecting = 1;
-    }
-    /* Pending IRQ saved at last VMExit? */
-    else if ( v->arch.hvm_svm.saved_irq_vector >= 0 )
-    {
-        intr_vector = v->arch.hvm_svm.saved_irq_vector;
-        v->arch.hvm_svm.saved_irq_vector = -1;
-        re_injecting = 1;
-    }
-    /* Now let's check for newer interrrupts  */
-    else
-    {
-        pt_update_irq(v);
-
-        hvm_set_callback_irq_level();
-
-        if ( cpu_has_pending_irq(v) )
-        {
-            /*
-             * Create a 'fake' virtual interrupt on to intercept as soon
-             * as the guest _can_ take interrupts.  Do not obtain the next
-             * interrupt from the vlapic/pic if unable to inject.
-             */
-            if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )  
-            {
-                vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
-                HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
-                svm_inject_extint(v, 0x0); /* actual vector doesn't really matter */
-                return;
-            }
-            intr_vector = cpu_get_interrupt(v, &intr_type);
-        }
-    }
-
-    /* have we got an interrupt to inject? */
-    if ( intr_vector < 0 )
         return;
 
-    switch ( intr_type )
+    /* Crank the handle on interrupt state and check for new interrrupts. */
+    pt_update_irq(v);
+    hvm_set_callback_irq_level();
+    if ( !cpu_has_pending_irq(v) )
+        return;
+
+    /*
+     * Create a 'fake' virtual interrupt on to intercept as soon as the
+     * guest _can_ take interrupts.  Do not obtain the next interrupt from
+     * the vlapic/pic if unable to inject.
+     */
+    if ( irq_masked(vmcb->rflags) || vmcb->interrupt_shadow )  
     {
-    case APIC_DM_EXTINT:
-    case APIC_DM_FIXED:
-    case APIC_DM_LOWEST:
-        /* Re-injecting a PIT interruptt? */
-        if ( re_injecting && (pt = is_pt_irq(v, intr_vector, intr_type)) )
-            ++pt->pending_intr_nr;
-        /* let's inject this interrupt */
-        if (re_injecting)
-            HVMTRACE_1D(REINJ_VIRQ, v, intr_vector);
-        else
-            HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
-        svm_inject_extint(v, intr_vector);
-        break;
-    case APIC_DM_SMI:
-    case APIC_DM_NMI:
-    case APIC_DM_INIT:
-    case APIC_DM_STARTUP:
-    default:
-        printk("Unsupported interrupt type: %d\n", intr_type);
-        BUG();
-        break;
+        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
+        HVMTRACE_2D(INJ_VIRQ, v, 0x0, /*fake=*/ 1);
+        svm_inject_extint(v, 0x0); /* actual vector doesn't matter */
+        return;
     }
+
+    /* Okay, we can deliver the interrupt: grab it and update PIC state. */
+    intr_vector = cpu_get_interrupt(v, &intr_type);
+    BUG_ON(intr_vector < 0);
+
+    HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
+    svm_inject_extint(v, intr_vector);
 
     pt_intr_post(v, intr_vector, intr_type);
 }
