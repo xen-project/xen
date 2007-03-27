@@ -670,13 +670,19 @@ static inline void version_update_end(u32 *version)
     (*version)++;
 }
 
-static inline void __update_vcpu_system_time(struct vcpu *v)
+void update_vcpu_system_time(struct vcpu *v)
 {
     struct cpu_time       *t;
     struct vcpu_time_info *u;
 
+    if ( v->vcpu_info == NULL )
+        return;
+
     t = &this_cpu(cpu_time);
     u = &vcpu_info(v, time);
+
+    if ( u->tsc_timestamp == t->local_tsc_stamp )
+        return;
 
     version_update_begin(&u->version);
 
@@ -686,13 +692,6 @@ static inline void __update_vcpu_system_time(struct vcpu *v)
     u->tsc_shift         = (s8)t->tsc_scale.shift;
 
     version_update_end(&u->version);
-}
-
-void update_vcpu_system_time(struct vcpu *v)
-{
-    if ( vcpu_info(v, time.tsc_timestamp) !=
-         this_cpu(cpu_time).local_tsc_stamp )
-        __update_vcpu_system_time(v);
 }
 
 void update_domain_wallclock_time(struct domain *d)
@@ -771,9 +770,10 @@ static void local_time_calibration(void *unused)
     local_irq_enable();
 
 #if 0
-    printk("PRE%d: tsc=%lld stime=%lld master=%lld\n",
+    printk("PRE%d: tsc=%"PRIu64" stime=%"PRIu64" master=%"PRIu64"\n",
            smp_processor_id(), prev_tsc, prev_local_stime, prev_master_stime);
-    printk("CUR%d: tsc=%lld stime=%lld master=%lld -> %lld\n",
+    printk("CUR%d: tsc=%"PRIu64" stime=%"PRIu64" master=%"PRIu64
+           " -> %"PRId64"\n",
            smp_processor_id(), curr_tsc, curr_local_stime, curr_master_stime,
            curr_master_stime - curr_local_stime);
 #endif
@@ -854,6 +854,8 @@ static void local_time_calibration(void *unused)
     t->local_tsc_stamp    = curr_tsc;
     t->stime_local_stamp  = curr_local_stime;
     t->stime_master_stamp = curr_master_stime;
+
+    update_vcpu_system_time(current);
 
  out:
     set_timer(&t->calibration_timer, NOW() + EPOCH);
