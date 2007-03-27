@@ -12,7 +12,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2006 XenSource Inc.
+# Copyright (C) 2006-2007 XenSource Inc.
 #============================================================================
 #
 # Parts of this file are based upon xmlrpclib.py, the XML-RPC client
@@ -47,7 +47,7 @@
 import gettext
 import xmlrpclib
 
-import xen.util.xmlrpclib2
+import xen.util.xmlrpcclient as xmlrpcclient
 
 
 translation = gettext.translation('xen-xm', fallback = True)
@@ -85,7 +85,7 @@ class Failure(Exception):
 _RECONNECT_AND_RETRY = (lambda _ : ())
 
 
-class Session(xen.util.xmlrpclib2.ServerProxy):
+class Session(xmlrpcclient.ServerProxy):
     """A server proxy and session manager for communicating with Xend using
     the Xen-API.
 
@@ -104,9 +104,8 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
 
     def __init__(self, uri, transport=None, encoding=None, verbose=0,
                  allow_none=1):
-        xen.util.xmlrpclib2.ServerProxy.__init__(self, uri, transport,
-                                                 encoding, verbose,
-                                                 allow_none)
+        xmlrpcclient.ServerProxy.__init__(self, uri, transport, encoding,
+                                          verbose, allow_none)
         self._session = None
         self.last_login_method = None
         self.last_login_params = None
@@ -153,7 +152,7 @@ class Session(xen.util.xmlrpclib2.ServerProxy):
         elif name.startswith('login'):
             return lambda *params: self._login(name, params)
         else:
-            return xen.util.xmlrpclib2.ServerProxy.__getattr__(self, name)
+            return xmlrpcclient.ServerProxy.__getattr__(self, name)
 
 
 def _parse_result(result):

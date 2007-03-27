@@ -17,7 +17,7 @@
 # Copyright (C) 2006 Anthony Liguori <aliguori@us.ibm.com>
 #============================================================================
 
-from xen.util.xmlrpclib2 import ServerProxy
+from xen.util.xmlrpcclient import ServerProxy
 import os
 import sys
 
