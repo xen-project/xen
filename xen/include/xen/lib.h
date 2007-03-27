@@ -10,8 +10,10 @@
 #include <asm/bug.h>
 
 void __bug(char *file, int line) __attribute__((noreturn));
+void __warn(char *file, int line);
 
-#define BUG_ON(_p) do { if (_p) BUG(); } while ( 0 )
+#define BUG_ON(p)  do { if (p) BUG();  } while (0)
+#define WARN_ON(p) do { if (p) WARN(); } while (0)
 
 /* Force a compilation error if condition is true */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2 * !!(condition)]))

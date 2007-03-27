@@ -123,13 +123,6 @@ static inline void list_move(struct list_head *list, struct list_head *head)
 
 #define move_irq(x)
 
-#define WARN_ON(condition) do { \
-	if (unlikely((condition)!=0)) { \
-		printk("Badness in %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
-		dump_stack(); \
-	} \
-} while (0)
-
 #ifdef nop
 #undef nop
 #endif

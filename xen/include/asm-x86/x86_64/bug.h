@@ -12,6 +12,12 @@ struct bug_frame_str {
         "ud2 ; ret $%c0"                                \
         : : "i" (BUGFRAME_dump) )
 
+#define WARN()                                          \
+    asm volatile (                                      \
+        "ud2 ; ret $%c0 ; .byte 0x48,0xbc ; .quad %c1"  \
+        : : "i" (BUGFRAME_warn | (__LINE__<<2)),        \
+            "i" (__FILE__) )
+
 #define BUG()                                           \
     asm volatile (                                      \
         "ud2 ; ret $%c0 ; .byte 0x48,0xbc ; .quad %c1"  \

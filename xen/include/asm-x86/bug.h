@@ -14,8 +14,8 @@ struct bug_frame {
 } __attribute__((packed));
 
 #define BUGFRAME_dump   0
-#define BUGFRAME_bug    1
-#define BUGFRAME_assert 2
-#define BUGFRAME_rsvd   3
+#define BUGFRAME_warn   1
+#define BUGFRAME_bug    2
+#define BUGFRAME_assert 3
 
 #endif /* __X86_BUG_H__ */
