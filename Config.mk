@@ -31,16 +31,26 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
-# cc-option
+# cc-option: Check if compiler supports first option, else fall back to second.
 # Usage: cflags-y += $(call cc-option,$(CC),-march=winchip-c6,-march=i586)
 cc-option = $(shell if test -z "`$(1) $(2) -S -o /dev/null -xc \
               /dev/null 2>&1`"; then echo "$(2)"; else echo "$(3)"; fi ;)
 
-# cc-ver
+# cc-ver: Check compiler is at least specified version. Return boolean 'y'/'n'.
 # Usage: ifeq ($(call cc-ver,$(CC),0x030400),y)
 cc-ver = $(shell if [ $$((`$(1) -dumpversion | awk -F. \
            '{ printf "0x%02x%02x%02x", $$1, $$2, $$3}'`)) -ge $$(($(2))) ]; \
            then echo y; else echo n; fi ;)
+
+# cc-ver-check: Check compiler is at least specified version, else fail.
+# Usage: $(call cc-ver-check,CC,0x030400,"Require at least gcc-3.4")
+cc-ver-check = $(eval $(call cc-ver-check-closure,$(1),$(2),$(3)))
+define cc-ver-check-closure
+    ifeq ($$(call cc-ver,$$($(1)),$(2)),n)
+        override $(1) = echo "*** FATAL BUILD ERROR: "$(3) >&2; exit 1;
+        cc-option := n
+    endif
+endef
 
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
