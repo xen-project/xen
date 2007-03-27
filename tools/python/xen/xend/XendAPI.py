@@ -982,10 +982,10 @@ class XendAPI(object):
     # Xen API: Class PIF
     # ----------------------------------------------------------------
 
-    PIF_attr_ro = ['metrics']
-    PIF_attr_rw = ['device',
-                   'network',
+    PIF_attr_ro = ['network',
                    'host',
+                   'metrics']
+    PIF_attr_rw = ['device',
                    'MAC',
                    'MTU',
                    'VLAN']
@@ -1689,6 +1689,9 @@ class XendAPI(object):
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
+    def VIF_metrics_get_all(self, session):
+        return self.VIF_get_all(session)
+
     def _VM_metrics_get(self, _, ref):
         return XendVMMetrics.get_by_uuid(ref)
 
@@ -1699,11 +1702,11 @@ class XendAPI(object):
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['metrics',
-                   'runtime_properties']
-    VBD_attr_rw = ['VM',
+    VBD_attr_ro = ['VM',
                    'VDI',
-                   'device',
+                   'metrics',
+                   'runtime_properties']
+    VBD_attr_rw = ['device',
                    'bootable',
                    'mode',
                    'type']
@@ -1854,6 +1857,9 @@ class XendAPI(object):
     VBD_metrics_attr_rw = []
     VBD_methods = []
 
+    def VBD_metrics_get_all(self, session):
+        return self.VBD_get_all(session)
+
     def VBD_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vbd', ref)
         if not vm:
@@ -1877,11 +1883,11 @@ class XendAPI(object):
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['metrics',
+    VIF_attr_ro = ['network',
+                   'VM',
+                   'metrics',
                    'runtime_properties']
     VIF_attr_rw = ['device',
-                   'network',
-                   'VM',
                    'MAC',
                    'MTU']
 
@@ -1945,10 +1951,10 @@ class XendAPI(object):
         return xen_api_success(vif_ref)
 
     def VIF_get_VM(self, session, vif_ref):
-        xendom = XendDomain.instance()        
-        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)        
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         return xen_api_success(vm.get_uuid())
-    
+
     def VIF_get_MTU(self, session, vif_ref):
         return self._VIF_get(vif_ref, 'MTU')
     
