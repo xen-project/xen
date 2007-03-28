@@ -22,6 +22,8 @@
 				<xsd:element name="Reference" type="xsd:string" minOccurs="0" maxOccurs="1" />
 				<xsd:element name="Date" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
 				<xsd:element name="NameSpaceUrl" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="Version" minOccurs="0" maxOccurs="1" type="VersionFormat"/>
+				<xsd:element ref="FromPolicy" minOccurs="0" maxOccurs="1"/>
 			</xsd:sequence>
 		</xsd:complexType>
 	</xsd:element>
@@ -114,6 +116,19 @@
 	<xsd:simpleType name="PolicyOrder">
 		<xsd:restriction base="xsd:string">
 			<xsd:enumeration value="PrimaryPolicyComponent"></xsd:enumeration>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<xsd:element name="FromPolicy">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="PolicyName" minOccurs="1" maxOccurs="1" type="xsd:string"/>
+				<xsd:element name="Version" minOccurs="1" maxOccurs="1" type="VersionFormat"/>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:simpleType name="VersionFormat">
+		<xsd:restriction base="xsd:string">
+			<xsd:pattern value="[0-9]{1,8}.[0-9]{1,8}"></xsd:pattern>
 		</xsd:restriction>
 	</xsd:simpleType>
 </xsd:schema>

@@ -108,26 +108,25 @@ char *policy_filename = NULL,
 
 char *policy_reference_name = NULL;
 
+char *policy_version_string = NULL;
+
 void walk_labels(xmlNode * start, xmlDocPtr doc, unsigned long state);
 
 void usage(char *prg)
 {
-    printf("Usage: %s [OPTIONS] POLICYNAME\n", prg);
-    printf
-        ("POLICYNAME is the directory name within the policy directory\n");
-    printf
-        ("that contains the policy files.  The default policy directory\n");
-    printf("is '%s' (see the '-d' option below to change it)\n",
-           POLICY_DIR);
-    printf
-        ("The policy files contained in the POLICYNAME directory must be named:\n");
-    printf("\tPOLICYNAME-security_policy.xml\n");
-    printf("\tPOLICYNAME-security_label_template.xml\n\n");
-    printf("OPTIONS:\n");
-    printf("\t-d POLICYDIR\n");
-    printf
-        ("\t\tUse POLICYDIR as the policy directory. This directory must contain\n");
-    printf("\t\tthe policy schema file 'security_policy.xsd'\n");
+    printf(
+    "Usage: %s [OPTIONS] POLICYNAME\n"
+    "POLICYNAME is the directory name within the policy directory\n"
+    "that contains the policy files.  The default policy directory\n"
+    "is '%s' (see the '-d' option below to change it)\n"
+    "The policy files contained in the POLICYNAME directory must be named:\n"
+    "\tPOLICYNAME-security_policy.xml\n"
+    "\tPOLICYNAME-security_label_template.xml\n\n"
+    "OPTIONS:\n"
+    "\t-d POLICYDIR\n"
+    "\t\tUse POLICYDIR as the policy directory. This directory must \n"
+    "\t\tcontain the policy schema file 'security_policy.xsd'\n",
+    prg, POLICY_DIR);
     exit(EXIT_FAILURE);
 }
 
@@ -300,25 +299,50 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
         case XML2BIN_CHWALLTYPES:
         case XML2BIN_CONFLICTSETS:
         case XML2BIN_POLICYHEADER:
+        case XML2BIN_FROMPOLICY:
             walk_policy(cur_node->children, doc, state | (1 << code));
             break;
 
         case XML2BIN_POLICYNAME:       /* get policy reference name .... */
-            if (state != XML2BIN_PN_S) {
+            if (state != XML2BIN_PN_S &&
+                state != XML2BIN_PN_frompolicy_S) {
                 printf("ERROR: >Url< >%s< out of context.\n",
                        (char *) xmlNodeListGetString(doc,
                                                      cur_node->
                                                      xmlChildrenNode, 1));
                 exit(EXIT_FAILURE);
             }
-            policy_reference_name = (char *)
-                xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
-            if (!policy_reference_name) {
-                printf("ERROR: empty >policy reference name (Url)<!\n");
+            if (state == XML2BIN_PN_S) {
+                policy_reference_name = (char *)
+                    xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
+                if (!policy_reference_name) {
+                    printf("ERROR: empty >policy reference name (Url)<!\n");
+                    exit(EXIT_FAILURE);
+                } else
+                    printf("Policy Reference name (Url): %s\n",
+                           policy_reference_name);
+            }
+            break;
+
+        case XML2BIN_VERSION:         /* get policy version number .... */
+            if (state != XML2BIN_PN_S &&
+                state != XML2BIN_PN_frompolicy_S) {
+                printf("ERROR: >Url< >%s< out of context.\n",
+                       (char *) xmlNodeListGetString(doc,
+                                                     cur_node->
+                                                     xmlChildrenNode, 1));
                 exit(EXIT_FAILURE);
-            } else
-                printf("Policy Reference name (Url): %s\n",
-                       policy_reference_name);
+            }
+            if (state == XML2BIN_PN_S) {
+                policy_version_string = (char *)
+                    xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
+                if (!policy_version_string) {
+                    printf("ERROR: empty >policy version string <!\n");
+                    exit(EXIT_FAILURE);
+                } else
+                    printf("Policy version string: %s\n",
+                           policy_version_string);
+            }
             break;
 
         case XML2BIN_STE:
@@ -1135,8 +1159,11 @@ int write_binary(char *filename)
         NULL, *policy_reference_buffer = NULL;
     u_int32_t len;
     int fd, ret = 0;
+    uint32_t major = 0, minor = 0;
 
     u_int32_t len_ste = 0, len_chwall = 0, len_pr = 0;  /* length of policy components */
+
+    sscanf(policy_version_string,"%d.%d", &major, &minor);
 
     /* open binary file */
     if ((fd =
@@ -1152,6 +1179,8 @@ int write_binary(char *filename)
     /* determine primary component (default chwall) */
     header.policy_version = htonl(ACM_POLICY_VERSION);
     header.magic = htonl(ACM_MAGIC);
+    header.xml_pol_version.major = htonl(major);
+    header.xml_pol_version.minor = htonl(minor);
 
     len = sizeof(struct acm_policy_buffer);
     if (have_chwall)

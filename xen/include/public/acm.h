@@ -78,7 +78,7 @@
  * whenever the interpretation of the related
  * policy's data structure changes
  */
-#define ACM_POLICY_VERSION 2
+#define ACM_POLICY_VERSION 3
 #define ACM_CHWALL_VERSION 1
 #define ACM_STE_VERSION  1
 
@@ -119,6 +119,14 @@ typedef uint16_t domaintype_t;
 /* each offset in bytes from start of the struct they
  * are part of */
 
+/* V3 of the policy buffer aded a version structure */
+struct acm_policy_version
+{
+    uint32_t major;
+    uint32_t minor;
+} __attribute__((packed));
+
+
 /* each buffer consists of all policy information for
  * the respective policy given in the policy code
  *
@@ -136,11 +144,13 @@ struct acm_policy_buffer {
     uint32_t primary_buffer_offset;
     uint32_t secondary_policy_code;
     uint32_t secondary_buffer_offset;
-};
+    struct acm_policy_version xml_pol_version; /* add in V3 */
+} __attribute__((packed));
+
 
 struct acm_policy_reference_buffer {
     uint32_t len;
-};
+} __attribute__((packed));
 
 struct acm_chwall_policy_buffer {
     uint32_t policy_version; /* ACM_CHWALL_VERSION */
@@ -152,7 +162,7 @@ struct acm_chwall_policy_buffer {
     uint32_t chwall_conflict_sets_offset;
     uint32_t chwall_running_types_offset;
     uint32_t chwall_conflict_aggregate_offset;
-};
+} __attribute__((packed));
 
 struct acm_ste_policy_buffer {
     uint32_t policy_version; /* ACM_STE_VERSION */
@@ -160,7 +170,7 @@ struct acm_ste_policy_buffer {
     uint32_t ste_max_types;
     uint32_t ste_max_ssidrefs;
     uint32_t ste_ssid_offset;
-};
+} __attribute__((packed));
 
 struct acm_stats_buffer {
     uint32_t magic;
@@ -169,7 +179,7 @@ struct acm_stats_buffer {
     uint32_t primary_stats_offset;
     uint32_t secondary_policy_code;
     uint32_t secondary_stats_offset;
-};
+} __attribute__((packed));
 
 struct acm_ste_stats_buffer {
     uint32_t ec_eval_count;
@@ -178,7 +188,7 @@ struct acm_ste_stats_buffer {
     uint32_t gt_denied_count;
     uint32_t ec_cachehit_count;
     uint32_t gt_cachehit_count;
-};
+} __attribute__((packed));
 
 struct acm_ssid_buffer {
     uint32_t len;
@@ -190,7 +200,7 @@ struct acm_ssid_buffer {
     uint32_t secondary_policy_code;
     uint32_t secondary_max_types;
     uint32_t secondary_types_offset;
-};
+} __attribute__((packed));
 
 #endif
 

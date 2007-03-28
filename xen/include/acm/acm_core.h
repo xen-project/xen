@@ -29,6 +29,7 @@ struct acm_binary_policy {
     char *policy_reference_name;
     u16 primary_policy_code;
     u16 secondary_policy_code;
+    struct acm_policy_version xml_pol_version;
 };
 
 struct chwall_binary_policy {

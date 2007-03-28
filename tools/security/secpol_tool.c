@@ -172,6 +172,9 @@ void acm_dump_policy_buffer(void *buf, int buflen)
     printf("============\n");
     printf("POLICY REFERENCE = %s.\n", policy_reference_name);
     printf("PolicyVer = %x.\n", ntohl(pol->policy_version));
+    printf("XML Vers. = %d.%d\n",
+           ntohl(pol->xml_pol_version.major),
+           ntohl(pol->xml_pol_version.minor));
     printf("Magic     = %x.\n", ntohl(pol->magic));
     printf("Len       = %x.\n", ntohl(pol->len));
     printf("Primary   = %s (c=%x, off=%x).\n",
