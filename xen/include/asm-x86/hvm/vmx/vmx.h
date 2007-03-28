@@ -27,11 +27,11 @@
 #include <asm/i387.h>
 #include <asm/hvm/trace.h>
 
-extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
-extern void vmx_asm_do_vmentry(void);
-extern void vmx_intr_assist(void);
-extern void arch_vmx_do_resume(struct vcpu *);
-extern void set_guest_time(struct vcpu *v, u64 gtime);
+void vmx_asm_vmexit_handler(struct cpu_user_regs);
+void vmx_asm_do_vmentry(void);
+void vmx_intr_assist(void);
+void vmx_do_resume(struct vcpu *);
+void set_guest_time(struct vcpu *v, u64 gtime);
 
 extern unsigned int cpu_rev;
 
@@ -224,14 +224,14 @@ static inline unsigned long __vmread_safe(unsigned long field, int *error)
     return ecx;
 }
 
-static inline void __vm_set_bit(unsigned long field, unsigned long mask)
+static inline void __vm_set_bit(unsigned long field, unsigned int bit)
 {
-    __vmwrite(field, __vmread(field) | mask);
+    __vmwrite(field, __vmread(field) | (1UL << bit));
 }
 
-static inline void __vm_clear_bit(unsigned long field, unsigned long mask)
+static inline void __vm_clear_bit(unsigned long field, unsigned int bit)
 {
-    __vmwrite(field, __vmread(field) & ~mask);
+    __vmwrite(field, __vmread(field) & ~(1UL << bit));
 }
 
 static inline void __vmxoff (void)

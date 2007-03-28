@@ -20,6 +20,8 @@
 #define LONG_MIN        (-LONG_MAX - 1)
 #define ULONG_MAX       (~0UL)
 
+typedef char bool_t;
+
 /* bsd */
 typedef unsigned char           u_char;
 typedef unsigned short          u_short;

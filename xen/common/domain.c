@@ -336,7 +336,6 @@ void domain_shutdown(struct domain *d, u8 reason)
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
-
 void domain_pause_for_debugger(void)
 {
     struct domain *d = current->domain;
@@ -349,6 +348,8 @@ void domain_pause_for_debugger(void)
 
     send_guest_global_virq(dom0, VIRQ_DEBUGGER);
 }
+
+__attribute__ ((weak)) void domain_debug_state_changed(struct domain *d) { }
 
 /* Complete domain destroy after RCU readers are not holding old references. */
 static void complete_domain_destroy(struct rcu_head *head)

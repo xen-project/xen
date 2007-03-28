@@ -60,7 +60,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
 
-    v->arch.schedule_tail    = arch_vmx_do_resume;
+    v->arch.schedule_tail    = vmx_do_resume;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
     v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
 
@@ -716,11 +716,6 @@ static void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
     /* NB. Bit 1 of RFLAGS must be set for VMENTRY to succeed. */
     __vmwrite(GUEST_RFLAGS, regs->eflags | 2UL);
 
-    if ( regs->eflags & EF_TF )
-        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else
-        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-
     if ( regs->eflags & EF_VM )
     {
         /*
@@ -880,7 +875,7 @@ static void vmx_stts(struct vcpu *v)
     {
         v->arch.hvm_vmx.cpu_cr0 |= X86_CR0_TS;
         __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
-        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
+        __vm_set_bit(EXCEPTION_BITMAP, TRAP_no_device);
     }
 }
 
@@ -1144,7 +1139,7 @@ static void vmx_do_no_device_fault(void)
     struct vcpu *v = current;
 
     setup_fpu(current);
-    __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
+    __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
 
     /* Disable TS in guest CR0 unless the guest wants the exception too. */
     if ( !(v->arch.hvm_vmx.cpu_shadow_cr0 & X86_CR0_TS) )
@@ -1885,7 +1880,7 @@ static int vmx_set_cr0(unsigned long value)
     if ( !(value & X86_CR0_TS) )
     {
         setup_fpu(v);
-        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
+        __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
     }
 
     v->arch.hvm_vmx.cpu_cr0 = (value | X86_CR0_PE | X86_CR0_PG 
@@ -2259,11 +2254,9 @@ static int vmx_cr_access(unsigned long exit_qualification,
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
-//        TRACE_VMEXIT(1, TYPE_CLTS);
-
         /* We initialise the FPU now, to avoid needing another vmexit. */
         setup_fpu(v);
-        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
+        __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
 
         v->arch.hvm_vmx.cpu_cr0 &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
@@ -2275,10 +2268,7 @@ static int vmx_cr_access(unsigned long exit_qualification,
         value = v->arch.hvm_vmx.cpu_shadow_cr0;
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
-//        TRACE_VMEXIT(1, TYPE_LMSW);
-//        TRACE_VMEXIT(2, value);
         return vmx_set_cr0(value);
-        break;
     default:
         BUG();
     }
@@ -2435,60 +2425,6 @@ static inline void vmx_do_extint(struct cpu_user_regs *regs)
     }
 }
 
-#if defined (__x86_64__)
-void store_cpu_user_regs(struct cpu_user_regs *regs)
-{
-    regs->ss = __vmread(GUEST_SS_SELECTOR);
-    regs->rsp = __vmread(GUEST_RSP);
-    regs->rflags = __vmread(GUEST_RFLAGS);
-    regs->cs = __vmread(GUEST_CS_SELECTOR);
-    regs->ds = __vmread(GUEST_DS_SELECTOR);
-    regs->es = __vmread(GUEST_ES_SELECTOR);
-    regs->rip = __vmread(GUEST_RIP);
-}
-#elif defined (__i386__)
-void store_cpu_user_regs(struct cpu_user_regs *regs)
-{
-    regs->ss = __vmread(GUEST_SS_SELECTOR);
-    regs->esp = __vmread(GUEST_RSP);
-    regs->eflags = __vmread(GUEST_RFLAGS);
-    regs->cs = __vmread(GUEST_CS_SELECTOR);
-    regs->ds = __vmread(GUEST_DS_SELECTOR);
-    regs->es = __vmread(GUEST_ES_SELECTOR);
-    regs->eip = __vmread(GUEST_RIP);
-}
-#endif
-
-#ifdef XEN_DEBUGGER
-void save_cpu_user_regs(struct cpu_user_regs *regs)
-{
-    regs->xss = __vmread(GUEST_SS_SELECTOR);
-    regs->esp = __vmread(GUEST_RSP);
-    regs->eflags = __vmread(GUEST_RFLAGS);
-    regs->xcs = __vmread(GUEST_CS_SELECTOR);
-    regs->eip = __vmread(GUEST_RIP);
-
-    regs->xgs = __vmread(GUEST_GS_SELECTOR);
-    regs->xfs = __vmread(GUEST_FS_SELECTOR);
-    regs->xes = __vmread(GUEST_ES_SELECTOR);
-    regs->xds = __vmread(GUEST_DS_SELECTOR);
-}
-
-void restore_cpu_user_regs(struct cpu_user_regs *regs)
-{
-    __vmwrite(GUEST_SS_SELECTOR, regs->xss);
-    __vmwrite(GUEST_RSP, regs->esp);
-    __vmwrite(GUEST_RFLAGS, regs->eflags);
-    __vmwrite(GUEST_CS_SELECTOR, regs->xcs);
-    __vmwrite(GUEST_RIP, regs->eip);
-
-    __vmwrite(GUEST_GS_SELECTOR, regs->xgs);
-    __vmwrite(GUEST_FS_SELECTOR, regs->xfs);
-    __vmwrite(GUEST_ES_SELECTOR, regs->xes);
-    __vmwrite(GUEST_DS_SELECTOR, regs->xds);
-}
-#endif
-
 static void vmx_reflect_exception(struct vcpu *v)
 {
     int error_code, intr_info, vector;
@@ -2598,56 +2534,22 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
         switch ( vector )
         {
-#ifdef XEN_DEBUGGER
         case TRAP_debug:
-        {
-            save_cpu_user_regs(regs);
-            pdb_handle_exception(1, regs, 1);
-            restore_cpu_user_regs(regs);
-            break;
-        }
-        case TRAP_int3:
-        {
-            save_cpu_user_regs(regs);
-            pdb_handle_exception(3, regs, 1);
-            restore_cpu_user_regs(regs);
-            break;
-        }
-#else
-        case TRAP_debug:
-        {
-            if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
-            {
-                store_cpu_user_regs(regs);
-                domain_pause_for_debugger();
-                __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
-                               PENDING_DEBUG_EXC_BS);
-            }
-            else
-            {
-                vmx_reflect_exception(v);
-                __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
-                               PENDING_DEBUG_EXC_BS);
-            }
-
-            break;
-        }
-        case TRAP_int3:
-        {
-            if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
+            if ( v->domain->debugger_attached )
                 domain_pause_for_debugger();
             else
                 vmx_reflect_exception(v);
             break;
-        }
-#endif
+        case TRAP_int3:
+            if ( v->domain->debugger_attached )
+                domain_pause_for_debugger();
+            else
+                vmx_reflect_exception(v);
+            break;
         case TRAP_no_device:
-        {
             vmx_do_no_device_fault();
             break;
-        }
         case TRAP_page_fault:
-        {
             exit_qualification = __vmread(EXIT_QUALIFICATION);
             regs->error_code = __vmread(VM_EXIT_INTR_ERROR_CODE);
 
@@ -2666,7 +2568,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             v->arch.hvm_vmx.cpu_cr2 = exit_qualification;
             vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
             break;
-        }
         case TRAP_nmi:
             HVMTRACE_0D(NMI, v);
             if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )

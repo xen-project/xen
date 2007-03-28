@@ -83,8 +83,6 @@ struct arch_vmx_struct {
 #define vmx_schedule_tail(next)         \
     (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
 
-void vmx_do_resume(struct vcpu *);
-
 struct vmcs_struct *vmx_alloc_host_vmcs(void);
 void vmx_free_host_vmcs(struct vmcs_struct *vmcs);
 

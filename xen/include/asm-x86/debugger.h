@@ -65,8 +65,7 @@ static inline int debugger_trap_entry(
 {
     struct vcpu *v = current;
 
-    if ( guest_kernel_mode(v, regs) &&
-         test_bit(_DOMF_debugging, &v->domain->domain_flags) &&
+    if ( guest_kernel_mode(v, regs) && v->domain->debugger_attached &&
          ((vector == TRAP_int3) || (vector == TRAP_debug)) )
     {
         domain_pause_for_debugger();

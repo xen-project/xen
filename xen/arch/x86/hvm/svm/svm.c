@@ -733,7 +733,7 @@ static void svm_stts(struct vcpu *v)
      */
     if ( !(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS) )
     {
-        v->arch.hvm_svm.vmcb->exception_intercepts |= EXCEPTION_BITMAP_NM;
+        v->arch.hvm_svm.vmcb->exception_intercepts |= 1U << TRAP_no_device;
         vmcb->cr0 |= X86_CR0_TS;
     }
 }
@@ -869,8 +869,6 @@ static void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(vmcb);
-
     ctxt->eax = vmcb->rax;
     ctxt->ss = vmcb->ss.sel;
     ctxt->esp = vmcb->rsp;
@@ -884,42 +882,16 @@ static void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
     ctxt->ds = vmcb->ds.sel;
 }
 
-static void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v)
+static void svm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    regs->eip    = vmcb->rip;
-    regs->esp    = vmcb->rsp;
-    regs->eflags = vmcb->rflags;
-    regs->cs     = vmcb->cs.sel;
-    regs->ds     = vmcb->ds.sel;
-    regs->es     = vmcb->es.sel;
-    regs->ss     = vmcb->ss.sel;
-}
-
-/* XXX Use svm_load_cpu_guest_regs instead */
-static void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
-{ 
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    u32 *intercepts = &v->arch.hvm_svm.vmcb->exception_intercepts;
     
-    /* Write the guest register value into VMCB */
     vmcb->rax      = regs->eax;
     vmcb->ss.sel   = regs->ss;
     vmcb->rsp      = regs->esp;   
     vmcb->rflags   = regs->eflags | 2UL;
     vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
-    if (regs->eflags & EF_TF)
-        *intercepts |= EXCEPTION_BITMAP_DB;
-    else
-        *intercepts &= ~EXCEPTION_BITMAP_DB;
-}
-
-static void svm_load_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs)
-{
-    svm_load_cpu_user_regs(v, regs);
 }
 
 static void svm_ctxt_switch_from(struct vcpu *v)
@@ -943,8 +915,20 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 }
 
-static void arch_svm_do_resume(struct vcpu *v) 
+static void svm_do_resume(struct vcpu *v) 
 {
+    bool_t debug_state = v->domain->debugger_attached;
+
+    if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
+    {
+        uint32_t mask = (1U << TRAP_debug) | (1U << TRAP_int3);
+        v->arch.hvm_vcpu.debug_state_latch = debug_state;
+        if ( debug_state )
+            v->arch.hvm_svm.vmcb->exception_intercepts |= mask;
+        else
+            v->arch.hvm_svm.vmcb->exception_intercepts &= ~mask;
+    }
+
     if ( v->arch.hvm_svm.launch_core != smp_processor_id() )
     {
         v->arch.hvm_svm.launch_core = smp_processor_id();
@@ -959,7 +943,7 @@ static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
-    v->arch.schedule_tail    = arch_svm_do_resume;
+    v->arch.schedule_tail    = svm_do_resume;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
@@ -1118,45 +1102,10 @@ static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
     struct vcpu *v = current;
 
     setup_fpu(v);    
-    vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+    vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
 
     if ( !(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS) )
         vmcb->cr0 &= ~X86_CR0_TS;
-}
-
-
-static void svm_do_general_protection_fault(struct vcpu *v, 
-                                            struct cpu_user_regs *regs) 
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long eip, error_code;
-
-    ASSERT(vmcb);
-
-    eip = vmcb->rip;
-    error_code = vmcb->exitinfo1;
-
-    if (vmcb->idtr.limit == 0) {
-        printk("Huh? We got a GP Fault with an invalid IDTR!\n");
-        svm_dump_vmcb(__func__, vmcb);
-        svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(v));
-        domain_crash(v->domain);
-        return;
-    }
-
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "svm_general_protection_fault: eip = %lx, erro_code = %lx",
-                eip, error_code);
-
-    HVM_DBG_LOG(DBG_LEVEL_1, 
-                "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                (unsigned long)regs->eax, (unsigned long)regs->ebx,
-                (unsigned long)regs->ecx, (unsigned long)regs->edx,
-                (unsigned long)regs->esi, (unsigned long)regs->edi);
-      
-    /* Reflect it back into the guest */
-    svm_inject_exception(v, TRAP_gp_fault, 1, error_code);
 }
 
 /* Reserved bits ECX: [31:14], [12:4], [2:1]*/
@@ -1767,7 +1716,7 @@ static int npt_set_cr0(unsigned long value)
     /* TS cleared? Then initialise FPU now. */
     if ( !(value & X86_CR0_TS) ) {
         setup_fpu(v);
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
     }
     
     paging_update_paging_modes(v);
@@ -1795,7 +1744,7 @@ static int svm_set_cr0(unsigned long value)
     if ( !(value & X86_CR0_TS) )
     {
         setup_fpu(v);
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
     }
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
@@ -2214,7 +2163,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     case INSTR_CLTS:
         /* TS being cleared means that it's time to restore fpu state. */
         setup_fpu(current);
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
         vmcb->cr0 &= ~X86_CR0_TS; /* clear TS */
         v->arch.hvm_svm.cpu_shadow_cr0 &= ~X86_CR0_TS; /* clear TS */
         break;
@@ -2357,7 +2306,6 @@ static inline void svm_do_msr_access(
     __update_guest_eip(vmcb, inst_len);
 }
 
-
 static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 {
     __update_guest_eip(vmcb, 1);
@@ -2372,7 +2320,6 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
     HVMTRACE_1D(HLT, current, /*int pending=*/ 0);
     hvm_hlt(vmcb->rflags);
 }
-
 
 static void svm_vmexit_do_invd(struct vcpu *v)
 {
@@ -2393,42 +2340,6 @@ static void svm_vmexit_do_invd(struct vcpu *v)
     __update_guest_eip(vmcb, inst_len);
 }    
         
-
-
-
-#ifdef XEN_DEBUGGER
-static void svm_debug_save_cpu_user_regs(struct vmcb_struct *vmcb, 
-                                         struct cpu_user_regs *regs)
-{
-    regs->eip = vmcb->rip;
-    regs->esp = vmcb->rsp;
-    regs->eflags = vmcb->rflags;
-
-    regs->xcs = vmcb->cs.sel;
-    regs->xds = vmcb->ds.sel;
-    regs->xes = vmcb->es.sel;
-    regs->xfs = vmcb->fs.sel;
-    regs->xgs = vmcb->gs.sel;
-    regs->xss = vmcb->ss.sel;
-}
-
-
-static void svm_debug_restore_cpu_user_regs(struct cpu_user_regs *regs)
-{
-    vmcb->ss.sel   = regs->xss;
-    vmcb->rsp      = regs->esp;
-    vmcb->rflags   = regs->eflags;
-    vmcb->cs.sel   = regs->xcs;
-    vmcb->rip      = regs->eip;
-
-    vmcb->gs.sel = regs->xgs;
-    vmcb->fs.sel = regs->xfs;
-    vmcb->es.sel = regs->xes;
-    vmcb->ds.sel = regs->xds;
-}
-#endif
-
-
 void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2976,60 +2887,40 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     switch (exit_reason) 
     {
-    case VMEXIT_EXCEPTION_DB:
-    {
-#ifdef XEN_DEBUGGER
-        svm_debug_save_cpu_user_regs(regs);
-        pdb_handle_exception(1, regs, 1);
-        svm_debug_restore_cpu_user_regs(regs);
-#else
-        svm_store_cpu_user_regs(regs, v);
-        domain_pause_for_debugger();  
-#endif
-    }
-    break;
-
     case VMEXIT_INTR:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
         HVMTRACE_0D(INTR, v);
         break;
+
     case VMEXIT_NMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
         HVMTRACE_0D(NMI, v);
         break;
+
     case VMEXIT_SMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
         HVMTRACE_0D(SMI, v);
         break;
 
-    case VMEXIT_INIT:
-        BUG(); /* unreachable */
+    case VMEXIT_EXCEPTION_DB:
+        if ( v->domain->debugger_attached )
+            domain_pause_for_debugger();
+        else 
+            svm_inject_exception(v, TRAP_debug, 0, 0);
+        break;
 
     case VMEXIT_EXCEPTION_BP:
-#ifdef XEN_DEBUGGER
-        svm_debug_save_cpu_user_regs(regs);
-        pdb_handle_exception(3, regs, 1);
-        svm_debug_restore_cpu_user_regs(regs);
-#else
-        if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
+        if ( v->domain->debugger_attached )
             domain_pause_for_debugger();
         else 
             svm_inject_exception(v, TRAP_int3, 0, 0);
-#endif
         break;
 
     case VMEXIT_EXCEPTION_NM:
         svm_do_no_device_fault(vmcb);
         break;  
 
-    case VMEXIT_EXCEPTION_GP:
-        /* This should probably not be trapped in the future */
-        regs->error_code = vmcb->exitinfo1;
-        svm_do_general_protection_fault(v, regs);
-        break;  
-
-    case VMEXIT_EXCEPTION_PF:
-    {
+    case VMEXIT_EXCEPTION_PF: {
         unsigned long va;
         va = vmcb->exitinfo2;
         regs->error_code = vmcb->exitinfo1;
@@ -3049,14 +2940,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
         break;
     }
-
-    case VMEXIT_EXCEPTION_DF:
-        /* Debug info to hopefully help debug WHY the guest double-faulted. */
-        svm_dump_vmcb(__func__, vmcb);
-        svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(v));
-        svm_inject_exception(v, TRAP_double_fault, 1, 0);
-        break;
 
     case VMEXIT_VINTR:
         vmcb->vintr.fields.irq = 0;

@@ -210,7 +210,7 @@ void vmx_vmcs_exit(struct vcpu *v)
     if ( v == current )
         return;
 
-    /* Don't confuse arch_vmx_do_resume (for @v or @current!) */
+    /* Don't confuse vmx_do_resume (for @v or @current!) */
     vmx_clear_vmcs(v);
     if ( is_hvm_vcpu(current) )
         vmx_load_vmcs(current);
@@ -412,7 +412,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
 #endif
 
-    __vmwrite(EXCEPTION_BITMAP, MONITOR_DEFAULT_EXCEPTION_BITMAP);
+    __vmwrite(EXCEPTION_BITMAP, 1U << TRAP_page_fault);
 
     /* Guest CR0. */
     cr0 = read_cr0();
@@ -493,8 +493,10 @@ void vm_resume_fail(unsigned long eflags)
     domain_crash_synchronous();
 }
 
-void arch_vmx_do_resume(struct vcpu *v)
+void vmx_do_resume(struct vcpu *v)
 {
+    bool_t debug_state;
+
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
     {
         vmx_load_vmcs(v);
@@ -505,6 +507,19 @@ void arch_vmx_do_resume(struct vcpu *v)
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);
         vmx_set_host_env(v);
+    }
+
+    debug_state = v->domain->debugger_attached;
+    if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
+    {
+        unsigned long intercepts = __vmread(EXCEPTION_BITMAP);
+        unsigned long mask = (1U << TRAP_debug) | (1U << TRAP_int3);
+        v->arch.hvm_vcpu.debug_state_latch = debug_state;
+        if ( debug_state )
+            intercepts |= mask;
+        else
+            intercepts &= ~mask;
+        __vmwrite(EXCEPTION_BITMAP, intercepts);
     }
 
     hvm_do_resume(v);

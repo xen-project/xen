@@ -167,11 +167,12 @@ struct domain
 
     unsigned long    domain_flags;
 
-    /* Boolean: Is this an HVM guest? */
-    char             is_hvm;
-
-    /* Boolean: Is this guest fully privileged (aka dom0)? */
-    char             is_privileged;
+    /* Is this an HVM guest? */
+    bool_t           is_hvm;
+    /* Is this guest fully privileged (aka dom0)? */
+    bool_t           is_privileged;
+    /* Is this guest being debugged by dom0? */
+    bool_t           debugger_attached;
 
     spinlock_t       pause_lock;
     unsigned int     pause_count;
@@ -310,6 +311,7 @@ void domain_destroy(struct domain *d);
 void domain_kill(struct domain *d);
 void domain_shutdown(struct domain *d, u8 reason);
 void domain_pause_for_debugger(void);
+void domain_debug_state_changed(struct domain *d);
 
 /*
  * Mark specified domain as crashed. This function always returns, even if the
@@ -462,17 +464,14 @@ extern struct domain *domain_list;
  /* Domain is paused by controller software. */
 #define _DOMF_ctrl_pause       2
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
- /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        3
-#define DOMF_debugging         (1UL<<_DOMF_debugging)
  /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
-#define _DOMF_polling          4
+#define _DOMF_polling          3
 #define DOMF_polling           (1UL<<_DOMF_polling)
  /* Domain is paused by the hypervisor? */
-#define _DOMF_paused           5
+#define _DOMF_paused           4
 #define DOMF_paused            (1UL<<_DOMF_paused)
  /* Domain is a compatibility one? */
-#define _DOMF_compat           6
+#define _DOMF_compat           5
 #define DOMF_compat            (1UL<<_DOMF_compat)
 
 static inline int vcpu_runnable(struct vcpu *v)

@@ -639,10 +639,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d != NULL )
         {
-            if ( op->u.setdebugging.enable )
-                set_bit(_DOMF_debugging, &d->domain_flags);
-            else
-                clear_bit(_DOMF_debugging, &d->domain_flags);
+            d->debugger_attached = !!op->u.setdebugging.enable;
             rcu_unlock_domain(d);
             ret = 0;
         }
