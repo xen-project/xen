@@ -123,7 +123,7 @@ static void post_suspend(int suspend_cancelled)
 static int take_machine_down(void *p_fast_suspend)
 {
 	int fast_suspend = *(int *)p_fast_suspend;
-	int suspend_cancelled, err, cpu;
+	int suspend_cancelled, err;
 	extern void time_resume(void);
 
 	if (fast_suspend) {

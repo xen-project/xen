@@ -205,21 +205,6 @@ void show_backtrace_regs(struct cpu_user_regs *regs)
     console_end_sync();
 }
 
-void __warn(char *file, int line)
-{
-    ulong sp;
-    ulong lr;
-
-    console_start_sync();
-    printk("WARN at %s:%d\n", file, line);
-
-    sp = (ulong)__builtin_frame_address(0);
-    lr = (ulong)__builtin_return_address(0);
-    backtrace(sp, lr, lr);
-
-    console_end_sync();
-}
-
 void dump_execution_state(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();

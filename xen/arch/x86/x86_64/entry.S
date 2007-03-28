@@ -147,7 +147,7 @@ ENTRY(syscall_enter)
         pushq UREGS_rip+8(%rsp)
 #endif
         leaq  hypercall_table(%rip),%r10
-        PERFC_INCR(PERFC_hypercalls, %rax)
+        PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
@@ -396,7 +396,7 @@ handle_exception_saved:
         movl  UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         GET_CURRENT(%rbx)
-        PERFC_INCR(PERFC_exceptions, %rax)
+        PERFC_INCR(PERFC_exceptions, %rax, %rbx)
         callq *(%rdx,%rax,8)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen

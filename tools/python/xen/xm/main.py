@@ -49,7 +49,7 @@ from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
-from xen.util.xmlrpclib2 import ServerProxy
+from xen.util.xmlrpcclient import ServerProxy
 
 import XenAPI
 

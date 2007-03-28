@@ -276,7 +276,7 @@ hvm_emulate_write(enum x86_segment seg,
 
     /* How many emulations could we save if we unshadowed on stack writes? */
     if ( seg == x86_seg_ss )
-        perfc_incrc(shadow_fault_emulate_stack);
+        perfc_incr(shadow_fault_emulate_stack);
 
     rc = hvm_translate_linear_addr(
         seg, offset, bytes, hvm_access_write, sh_ctxt, &addr);
@@ -804,7 +804,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     ASSERT(v != NULL); /* Shouldn't have enabled shadows if we've no vcpus  */
 
     /* Stage one: walk the list of pinned pages, unpinning them */
-    perfc_incrc(shadow_prealloc_1);
+    perfc_incr(shadow_prealloc_1);
     list_for_each_backwards_safe(l, t, &d->arch.paging.shadow.pinned_shadows)
     {
         sp = list_entry(l, struct shadow_page_info, list);
@@ -820,7 +820,7 @@ void shadow_prealloc(struct domain *d, unsigned int order)
     /* Stage two: all shadow pages are in use in hierarchies that are
      * loaded in cr3 on some vcpu.  Walk them, unhooking the non-Xen
      * mappings. */
-    perfc_incrc(shadow_prealloc_2);
+    perfc_incr(shadow_prealloc_2);
 
     for_each_vcpu(d, v2) 
         for ( i = 0 ; i < 4 ; i++ )
@@ -929,7 +929,7 @@ mfn_t shadow_alloc(struct domain *d,
     ASSERT(shadow_locked_by_me(d));
     ASSERT(order <= SHADOW_MAX_ORDER);
     ASSERT(shadow_type != SH_type_none);
-    perfc_incrc(shadow_alloc);
+    perfc_incr(shadow_alloc);
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i <= SHADOW_MAX_ORDER; i++ )
@@ -967,7 +967,7 @@ mfn_t shadow_alloc(struct domain *d,
         tlbflush_filter(mask, sp[i].tlbflush_timestamp);
         if ( unlikely(!cpus_empty(mask)) )
         {
-            perfc_incrc(shadow_alloc_tlbflush);
+            perfc_incr(shadow_alloc_tlbflush);
             flush_tlb_mask(mask);
         }
         /* Now safe to clear the page for reuse */
@@ -997,7 +997,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
     int i;
 
     ASSERT(shadow_locked_by_me(d));
-    perfc_incrc(shadow_free);
+    perfc_incr(shadow_free);
 
     shadow_type = sp->type;
     ASSERT(shadow_type != SH_type_none);
@@ -1406,7 +1406,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
 
     sh_hash_audit(d);
 
-    perfc_incrc(shadow_hash_lookups);
+    perfc_incr(shadow_hash_lookups);
     key = sh_hash(n, t);
     sh_hash_audit_bucket(d, key);
 
@@ -1434,7 +1434,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
             }
             else
             {
-                perfc_incrc(shadow_hash_lookup_head);
+                perfc_incr(shadow_hash_lookup_head);
             }
             return shadow_page_to_mfn(sp);
         }
@@ -1442,7 +1442,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
         sp = sp->next_shadow;
     }
 
-    perfc_incrc(shadow_hash_lookup_miss);
+    perfc_incr(shadow_hash_lookup_miss);
     return _mfn(INVALID_MFN);
 }
 
@@ -1460,7 +1460,7 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
 
     sh_hash_audit(d);
 
-    perfc_incrc(shadow_hash_inserts);
+    perfc_incr(shadow_hash_inserts);
     key = sh_hash(n, t);
     sh_hash_audit_bucket(d, key);
     
@@ -1486,7 +1486,7 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
 
     sh_hash_audit(d);
 
-    perfc_incrc(shadow_hash_deletes);
+    perfc_incr(shadow_hash_deletes);
     key = sh_hash(n, t);
     sh_hash_audit_bucket(d, key);
     
@@ -1713,7 +1713,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
          || (pg->u.inuse.type_info & PGT_count_mask) == 0 )
         return 0;
 
-    perfc_incrc(shadow_writeable);
+    perfc_incr(shadow_writeable);
 
     /* If this isn't a "normal" writeable page, the domain is trying to 
      * put pagetables in special memory of some kind.  We can't allow that. */
@@ -1735,7 +1735,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
 
 #define GUESS(_a, _h) do {                                                \
             if ( v->arch.paging.mode->shadow.guess_wrmap(v, (_a), gmfn) ) \
-                perfc_incrc(shadow_writeable_h_ ## _h);                   \
+                perfc_incr(shadow_writeable_h_ ## _h);                   \
             if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )          \
                 return 1;                                                 \
         } while (0)
@@ -1808,7 +1808,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             callbacks[shtype](v, last_smfn, gmfn);
 
         if ( (pg->u.inuse.type_info & PGT_count_mask) != old_count )
-            perfc_incrc(shadow_writeable_h_5);
+            perfc_incr(shadow_writeable_h_5);
     }
 
     if ( (pg->u.inuse.type_info & PGT_count_mask) == 0 )
@@ -1817,7 +1817,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
 #endif /* SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC */
     
     /* Brute-force search of all the shadows, by walking the hash */
-    perfc_incrc(shadow_writeable_bf);
+    perfc_incr(shadow_writeable_bf);
     hash_foreach(v, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
@@ -1888,7 +1888,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
         | 1 << SH_type_fl1_64_shadow
         ;
 
-    perfc_incrc(shadow_mappings);
+    perfc_incr(shadow_mappings);
     if ( (page->count_info & PGC_count_mask) == 0 )
         return 0;
 
@@ -1903,7 +1903,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
      * Heuristics for finding the (probably) single mapping of this gmfn */
     
     /* Brute-force search of all the shadows, by walking the hash */
-    perfc_incrc(shadow_mappings_bf);
+    perfc_incr(shadow_mappings_bf);
     hash_foreach(v, callback_mask, callbacks, gmfn);
 
     /* If that didn't catch the mapping, something is very wrong */
@@ -1992,9 +1992,9 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
     
     sh_unmap_domain_page(vaddr);
     if ( rc )
-        perfc_incrc(shadow_up_pointer);
+        perfc_incr(shadow_up_pointer);
     else
-        perfc_incrc(shadow_unshadow_bf);
+        perfc_incr(shadow_unshadow_bf);
 
     return rc;
 }
@@ -2093,7 +2093,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     }
 
     /* Search for this shadow in all appropriate shadows */
-    perfc_incrc(shadow_unshadow);
+    perfc_incr(shadow_unshadow);
     sh_flags = pg->shadow_flags;
 
     /* Lower-level shadows need to be excised from upper-level shadows.

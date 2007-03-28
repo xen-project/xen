@@ -50,7 +50,7 @@ void *map_domain_page(unsigned long mfn)
 
     ASSERT(!in_irq());
 
-    perfc_incrc(map_domain_page_count);
+    perfc_incr(map_domain_page_count);
 
     v = mapcache_current_vcpu();
 
@@ -76,7 +76,7 @@ void *map_domain_page(unsigned long mfn)
         cache->shadow_epoch[vcpu] = cache->epoch;
         if ( NEED_FLUSH(this_cpu(tlbflush_time), cache->tlbflush_timestamp) )
         {
-            perfc_incrc(domain_page_tlb_flush);
+            perfc_incr(domain_page_tlb_flush);
             local_flush_tlb();
         }
     }
@@ -92,7 +92,7 @@ void *map_domain_page(unsigned long mfn)
         }
 
         /* /Second/, flush TLBs. */
-        perfc_incrc(domain_page_tlb_flush);
+        perfc_incr(domain_page_tlb_flush);
         local_flush_tlb();
         cache->shadow_epoch[vcpu] = ++cache->epoch;
         cache->tlbflush_timestamp = tlbflush_current_time();

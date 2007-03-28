@@ -236,7 +236,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		break;
 
 	case XS_WATCH:
-	case XS_UNWATCH:
+	case XS_UNWATCH: {
+		static const char *XS_RESP = "OK";
+		struct xsd_sockmsg hdr;
+
 		path = u->u.buffer + sizeof(u->u.msg);
 		token = memchr(path, 0, u->u.msg.len);
 		if (token == NULL) {
@@ -246,9 +249,6 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		token++;
 
 		if (msg_type == XS_WATCH) {
-			static const char * XS_WATCH_RESP = "OK";
-			struct xsd_sockmsg hdr;
-
 			watch = kmalloc(sizeof(*watch), GFP_KERNEL);
 			watch->watch.node = kmalloc(strlen(path)+1,
                                                     GFP_KERNEL);
@@ -266,11 +266,6 @@ static ssize_t xenbus_dev_write(struct file *filp,
 			}
 			
 			list_add(&watch->list, &u->watches);
-
-			hdr.type = XS_WATCH;
-			hdr.len = strlen(XS_WATCH_RESP) + 1;
-			queue_reply(u, (char *)&hdr, sizeof(hdr));
-			queue_reply(u, (char *)XS_WATCH_RESP, hdr.len);
 		} else {
 			list_for_each_entry_safe(watch, tmp_watch,
                                                  &u->watches, list) {
@@ -285,7 +280,12 @@ static ssize_t xenbus_dev_write(struct file *filp,
 			}
 		}
 
+		hdr.type = msg_type;
+		hdr.len = strlen(XS_RESP) + 1;
+		queue_reply(u, (char *)&hdr, sizeof(hdr));
+		queue_reply(u, (char *)XS_RESP, hdr.len);
 		break;
+	}
 
 	default:
 		rc = -EINVAL;

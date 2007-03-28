@@ -97,9 +97,9 @@ vcpu_tlb_track_insert_or_dirty(struct vcpu *vcpu, unsigned long vaddr,
 {
     /* optimization.
        non-tracking pte is most common. */
-    perfc_incrc(tlb_track_iod);
+    perfc_incr(tlb_track_iod);
     if (!pte_tlb_tracking(entry->used)) {
-        perfc_incrc(tlb_track_iod_not_tracked);
+        perfc_incr(tlb_track_iod_not_tracked);
         return;
     }
 

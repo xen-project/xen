@@ -261,7 +261,7 @@ int get_page_type(struct page_info *page, unsigned long type)
 
                 if ( unlikely(!cpus_empty(mask)) )
                 {
-                    perfc_incrc(need_flush_tlb_flush);
+                    perfc_incr(need_flush_tlb_flush);
                     flush_tlb_mask(mask);
                 }
 

@@ -606,7 +606,7 @@ static void schedule(void)
     ASSERT(!in_irq());
     ASSERT(this_cpu(mc_state).flags == 0);
 
-    perfc_incrc(sched_run);
+    perfc_incr(sched_run);
 
     sd = &this_cpu(schedule_data);
 
@@ -654,16 +654,13 @@ static void schedule(void)
 
     spin_unlock_irq(&sd->schedule_lock);
 
-    perfc_incrc(sched_ctx);
+    perfc_incr(sched_ctx);
 
     stop_timer(&prev->periodic_timer);
 
     /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_vcpu(next) )
-    {
-        update_vcpu_system_time(next);
-        vcpu_periodic_timer_work(next);
-    }
+    update_vcpu_system_time(next);
+    vcpu_periodic_timer_work(next);
 
     TRACE_4D(TRC_SCHED_SWITCH,
              prev->domain->domain_id, prev->vcpu_id,
@@ -684,7 +681,7 @@ void context_saved(struct vcpu *prev)
 static void s_timer_fn(void *unused)
 {
     raise_softirq(SCHEDULE_SOFTIRQ);
-    perfc_incrc(sched_irq);
+    perfc_incr(sched_irq);
 }
 
 /* Per-VCPU periodic timer function: sends a virtual timer interrupt. */

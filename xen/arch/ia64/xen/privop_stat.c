@@ -10,48 +10,39 @@ struct privop_addr_count {
 	unsigned long addr[PRIVOP_COUNT_NADDRS];
 	unsigned int count[PRIVOP_COUNT_NADDRS];
 	unsigned int overflow;
-	atomic_t *perfc_addr;
-	atomic_t *perfc_count;
-	atomic_t *perfc_overflow;
 };
 
-#undef  PERFCOUNTER
+struct privop_addr_info {
+	enum perfcounter perfc_addr;
+	enum perfcounter perfc_count;
+	enum perfcounter perfc_overflow;
+};
+
 #define PERFCOUNTER(var, name)
-
-#undef  PERFCOUNTER_CPU
-#define PERFCOUNTER_CPU(var, name)
-
-#undef  PERFCOUNTER_ARRAY
 #define PERFCOUNTER_ARRAY(var, name, size)
 
-#undef  PERFSTATUS
 #define PERFSTATUS(var, name)
-
-#undef  PERFSTATUS_CPU
-#define PERFSTATUS_CPU(var, name)
-
-#undef  PERFSTATUS_ARRAY
 #define PERFSTATUS_ARRAY(var, name, size)
 
-#undef PERFPRIVOPADDR
 #define PERFPRIVOPADDR(name)                        \
     {                                               \
-        { 0 }, { 0 }, 0,                            \
-        perfcounters.privop_addr_##name##_addr,     \
-        perfcounters.privop_addr_##name##_count,    \
-        perfcounters.privop_addr_##name##_overflow  \
+        PERFC_privop_addr_##name##_addr,            \
+        PERFC_privop_addr_##name##_count,           \
+        PERFC_privop_addr_##name##_overflow         \
     },
 
-static struct privop_addr_count privop_addr_counter[] = {
+static const struct privop_addr_info privop_addr_info[] = {
 #include <asm/perfc_defn.h>
 };
 
 #define PRIVOP_COUNT_NINSTS \
-        (sizeof(privop_addr_counter) / sizeof(privop_addr_counter[0]))
+        (sizeof(privop_addr_info) / sizeof(privop_addr_info[0]))
+
+static DEFINE_PER_CPU(struct privop_addr_count[PRIVOP_COUNT_NINSTS], privop_addr_counter);
 
 void privop_count_addr(unsigned long iip, enum privop_inst inst)
 {
-	struct privop_addr_count *v = &privop_addr_counter[inst];
+	struct privop_addr_count *v = this_cpu(privop_addr_counter) + inst;
 	int i;
 
 	if (inst >= PRIVOP_COUNT_NINSTS)
@@ -72,31 +63,44 @@ void privop_count_addr(unsigned long iip, enum privop_inst inst)
 
 void gather_privop_addrs(void)
 {
-	int i, j;
-	atomic_t *v;
-	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
-		/* Note: addresses are truncated!  */
-		v = privop_addr_counter[i].perfc_addr;
-		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
-			atomic_set(&v[j], privop_addr_counter[i].addr[j]);
+	unsigned int cpu;
 
-		v = privop_addr_counter[i].perfc_count;
-		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
-			atomic_set(&v[j], privop_addr_counter[i].count[j]);
+	for_each_cpu ( cpu ) {
+		perfc_t *perfcounters = per_cpu(perfcounters, cpu);
+		struct privop_addr_count *s = per_cpu(privop_addr_counter, cpu);
+		int i, j;
+
+		for (i = 0; i < PRIVOP_COUNT_NINSTS; i++, s++) {
+			perfc_t *d;
+
+			/* Note: addresses are truncated!  */
+			d = perfcounters + privop_addr_info[i].perfc_addr;
+			for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+				d[j] = s->addr[j];
+
+			d = perfcounters + privop_addr_info[i].perfc_count;
+			for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+				d[j] = s->count[j];
 		
-		atomic_set(privop_addr_counter[i].perfc_overflow,
-		           privop_addr_counter[i].overflow);
+			perfcounters[privop_addr_info[i].perfc_overflow] =
+				s->overflow;
+		}
 	}
 }
 
 void reset_privop_addrs(void)
 {
-	int i, j;
-	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
-		struct privop_addr_count *v = &privop_addr_counter[i];
-		for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
-			v->addr[j] = v->count[j] = 0;
-		v->overflow = 0;
+	unsigned int cpu;
+
+	for_each_cpu ( cpu ) {
+		struct privop_addr_count *v = per_cpu(privop_addr_counter, cpu);
+		int i, j;
+
+		for (i = 0; i < PRIVOP_COUNT_NINSTS; i++, v++) {
+			for (j = 0; j < PRIVOP_COUNT_NADDRS; j++)
+				v->addr[j] = v->count[j] = 0;
+			v->overflow = 0;
+		}
 	}
 }
 #endif

@@ -21,6 +21,11 @@ import socket
 import types
 import xmlrpclib
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
+try:
+    from SSLXMLRPCServer import SSLXMLRPCServer
+    ssl_enabled = True
+except ImportError:
+    ssl_enabled = False
 
 from xen.xend import XendAPI, XendDomain, XendDomainInfo, XendNode
 from xen.xend import XendLogging, XendDmesg
@@ -87,13 +92,19 @@ methods = ['device_create', 'device_configure',
 exclude = ['domain_create', 'domain_restore']
 
 class XMLRPCServer:
-    def __init__(self, auth, use_xenapi, use_tcp=False, host = "localhost",
-                 port = 8006, path = XML_RPC_SOCKET, hosts_allowed = None):
+    def __init__(self, auth, use_xenapi, use_tcp = False,
+                 ssl_key_file = None, ssl_cert_file = None,
+                 host = "localhost", port = 8006, path = XML_RPC_SOCKET,
+                 hosts_allowed = None):
+        
         self.use_tcp = use_tcp
         self.port = port
         self.host = host
         self.path = path
         self.hosts_allowed = hosts_allowed
+        
+        self.ssl_key_file = ssl_key_file
+        self.ssl_cert_file = ssl_cert_file
         
         self.ready = False        
         self.running = True
@@ -107,14 +118,33 @@ class XMLRPCServer:
 
         try:
             if self.use_tcp:
-                log.info("Opening TCP XML-RPC server on %s%d%s",
+                using_ssl = self.ssl_key_file and self.ssl_cert_file
+
+                log.info("Opening %s XML-RPC server on %s%d%s",
+                         using_ssl and 'HTTPS' or 'TCP',
                          self.host and '%s:' % self.host or
                          'all interfaces, port ',
                          self.port, authmsg)
-                self.server = TCPXMLRPCServer((self.host, self.port),
-                                              self.hosts_allowed,
-                                              self.xenapi is not None,
-                                              logRequests = False)
+
+                if not ssl_enabled:
+                    raise ValueError("pyOpenSSL not installed. "
+                                     "Unable to start HTTPS XML-RPC server")
+
+                if using_ssl:
+                    self.server = SSLXMLRPCServer(
+                        (self.host, self.port),
+                        self.hosts_allowed,
+                        self.xenapi is not None,
+                        logRequests = False,
+                        ssl_key_file = self.ssl_key_file,
+                        ssl_cert_file = self.ssl_cert_file)
+                else:
+                    self.server = TCPXMLRPCServer(
+                        (self.host, self.port),
+                        self.hosts_allowed,
+                        self.xenapi is not None,
+                        logRequests = False)
+
             else:
                 log.info("Opening Unix domain socket XML-RPC server on %s%s",
                          self.path, authmsg)
@@ -126,7 +156,12 @@ class XMLRPCServer:
             ready = True
             running = False
             return
-
+        except Exception, e:
+            log.exception('Cannot start server: %s!', e)
+            ready = True
+            running = False
+            return
+        
         # Register Xen API Functions
         # -------------------------------------------------------------------
         # exportable functions are ones that do not begin with '_'

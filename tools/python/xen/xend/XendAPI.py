@@ -982,10 +982,10 @@ class XendAPI(object):
     # Xen API: Class PIF
     # ----------------------------------------------------------------
 
-    PIF_attr_ro = ['metrics']
-    PIF_attr_rw = ['device',
-                   'network',
+    PIF_attr_ro = ['network',
                    'host',
+                   'metrics']
+    PIF_attr_rw = ['device',
                    'MAC',
                    'MTU',
                    'VLAN']
@@ -1647,14 +1647,15 @@ class XendAPI(object):
 
     def VM_send_sysrq(self, _, vm_ref, req):
         xeninfo = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        if xeninfo.state != XEN_API_VM_POWER_STATE_RUNNING:
+        if xeninfo.state == XEN_API_VM_POWER_STATE_RUNNING \
+               or xeninfo.state == XEN_API_VM_POWER_STATE_PAUSED:
+            xeninfo.send_sysrq(req)
+            return xen_api_success_void()
+        else:
             return xen_api_error(
                 ['VM_BAD_POWER_STATE', vm_ref,
                  XendDomain.POWER_STATE_NAMES[XEN_API_VM_POWER_STATE_RUNNING],
                  XendDomain.POWER_STATE_NAMES[xeninfo.state]])
-        xeninfo.send_sysrq(req)
-        return xen_api_success_void()
-
 
     def VM_send_trigger(self, _, vm_ref, trigger, vcpu):
         xendom = XendDomain.instance()
@@ -1689,6 +1690,9 @@ class XendAPI(object):
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
+    def VIF_metrics_get_all(self, session):
+        return self.VIF_get_all(session)
+
     def _VM_metrics_get(self, _, ref):
         return XendVMMetrics.get_by_uuid(ref)
 
@@ -1699,11 +1703,11 @@ class XendAPI(object):
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['metrics',
-                   'runtime_properties']
-    VBD_attr_rw = ['VM',
+    VBD_attr_ro = ['VM',
                    'VDI',
-                   'device',
+                   'metrics',
+                   'runtime_properties']
+    VBD_attr_rw = ['device',
                    'bootable',
                    'mode',
                    'type']
@@ -1852,7 +1856,10 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     VBD_metrics_attr_rw = []
-    VBD_methods = []
+    VBD_metrics_methods = []
+
+    def VBD_metrics_get_all(self, session):
+        return self.VBD_get_all(session)
 
     def VBD_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vbd', ref)
@@ -1877,11 +1884,11 @@ class XendAPI(object):
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['metrics',
+    VIF_attr_ro = ['network',
+                   'VM',
+                   'metrics',
                    'runtime_properties']
     VIF_attr_rw = ['device',
-                   'network',
-                   'VM',
                    'MAC',
                    'MTU']
 
@@ -1945,10 +1952,10 @@ class XendAPI(object):
         return xen_api_success(vif_ref)
 
     def VIF_get_VM(self, session, vif_ref):
-        xendom = XendDomain.instance()        
-        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)        
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         return xen_api_success(vm.get_uuid())
-    
+
     def VIF_get_MTU(self, session, vif_ref):
         return self._VIF_get(vif_ref, 'MTU')
     
@@ -1993,7 +2000,7 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     VIF_metrics_attr_rw = []
-    VIF_methods = []
+    VIF_metrics_methods = []
 
     def VIF_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vif', ref)

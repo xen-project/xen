@@ -900,10 +900,16 @@ void panic(const char *fmt, ...)
 void __bug(char *file, int line)
 {
     console_start_sync();
-    printk("BUG at %s:%d\n", file, line);
+    printk("Xen BUG at %s:%d\n", file, line);
     dump_execution_state();
-    panic("BUG at %s:%d\n", file, line);
+    panic("Xen BUG at %s:%d\n", file, line);
     for ( ; ; ) ;
+}
+
+void __warn(char *file, int line)
+{
+    printk("Xen WARN at %s:%d\n", file, line);
+    dump_execution_state();
 }
 
 /*

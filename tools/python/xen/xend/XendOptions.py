@@ -165,7 +165,13 @@ class XendOptions:
 
     def get_xend_tcp_xmlrpc_server_address(self):
         return self.get_config_string("xend-tcp-xmlrpc-server-address",
-                                    self.xend_tcp_xmlrpc_server_address_default)    
+                                      self.xend_tcp_xmlrpc_server_address_default)
+
+    def get_xend_tcp_xmlrpc_server_ssl_key_file(self):
+        return self.get_config_string("xend-tcp-xmlrpc-server-ssl-key-file")
+
+    def get_xend_tcp_xmlrpc_server_ssl_cert_file(self):
+        return self.get_config_string("xend-tcp-xmlrpc-server-ssl-cert-file")
 
     def get_xend_unix_xmlrpc_server(self):
         return self.get_config_bool("xend-unix-xmlrpc-server",

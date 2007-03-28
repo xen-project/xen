@@ -62,6 +62,7 @@ int
 do_acm_set_policy(void *buf, u32 buf_size)
 {
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *)buf;
+    uint32_t offset, length;
     /* some sanity checking */
     if ((be32_to_cpu(pol->magic) != ACM_MAGIC) ||
         (buf_size != be32_to_cpu(pol->len)) ||
@@ -92,22 +93,27 @@ do_acm_set_policy(void *buf, u32 buf_size)
     /* get bin_policy lock and rewrite policy (release old one) */
     write_lock(&acm_bin_pol_rwlock);
 
+    offset = be32_to_cpu(pol->policy_reference_offset);
+    length = be32_to_cpu(pol->primary_buffer_offset) - offset;
+
     /* set label reference name */
-    if (acm_set_policy_reference(buf + be32_to_cpu(pol->policy_reference_offset),
-                                 be32_to_cpu(pol->primary_buffer_offset) -
-                                 be32_to_cpu(pol->policy_reference_offset)))
+    if ( (offset + length) > buf_size ||
+         acm_set_policy_reference(buf + offset, length))
         goto error_lock_free;
 
     /* set primary policy data */
-    if (acm_primary_ops->set_binary_policy(buf + be32_to_cpu(pol->primary_buffer_offset),
-                                           be32_to_cpu(pol->secondary_buffer_offset) -
-                                           be32_to_cpu(pol->primary_buffer_offset)))
+    offset = be32_to_cpu(pol->primary_buffer_offset);
+    length = be32_to_cpu(pol->secondary_buffer_offset) - offset;
+
+    if ( (offset + length) > buf_size ||
+         acm_primary_ops->set_binary_policy(buf + offset, length))
         goto error_lock_free;
 
     /* set secondary policy data */
-    if (acm_secondary_ops->set_binary_policy(buf + be32_to_cpu(pol->secondary_buffer_offset),
-                                             be32_to_cpu(pol->len) - 
-                                             be32_to_cpu(pol->secondary_buffer_offset)))
+    offset = be32_to_cpu(pol->secondary_buffer_offset);
+    length = be32_to_cpu(pol->len) - offset;
+    if ( (offset + length) > buf_size ||
+         acm_secondary_ops->set_binary_policy(buf + offset, length))
         goto error_lock_free;
 
     write_unlock(&acm_bin_pol_rwlock);

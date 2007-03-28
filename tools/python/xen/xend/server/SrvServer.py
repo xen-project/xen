@@ -52,6 +52,7 @@ from xen.xend import XendNode, XendOptions, XendAPI
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
+from xen.xend.XendDomain import instance as xenddomain
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
@@ -72,7 +73,7 @@ class XendServers:
     def add(self, server):
         self.servers.append(server)
 
-    def cleanup(self, signum = 0, frame = None):
+    def cleanup(self, signum = 0, frame = None, reloading = False):
         log.debug("SrvServer.cleanup()")
         self.cleaningUp = True
         for server in self.servers:
@@ -80,12 +81,18 @@ class XendServers:
                 server.shutdown()
             except:
                 pass
+
+        # clean up domains for those that have on_xend_stop
+        if not reloading:
+            xenddomain().cleanup_domains()
+        
         self.running = False
+        
 
     def reloadConfig(self, signum = 0, frame = None):
         log.debug("SrvServer.reloadConfig()")
         self.reloadingConfig = True
-        self.cleanup(signum, frame)
+        self.cleanup(signum, frame, reloading = True)
 
     def start(self, status):
         # Running the network script will spawn another process, which takes
@@ -144,6 +151,12 @@ class XendServers:
                 status.close()
                 status = None
 
+            # Reaching this point means we can auto start domains
+            try:
+                xenddomain().autostart_domains()
+            except Exception, e:
+                log.exception("Failed while autostarting domains")
+
             # loop to keep main thread alive until it receives a SIGTERM
             self.running = True
             while self.running:
@@ -172,33 +185,49 @@ def _loadConfig(servers, root, reload):
     api_cfg = xoptions.get_xen_api_server()
     if api_cfg:
         try:
-            addrs = [(str(x[0]).split(':'),
-                      len(x) > 1 and x[1] or XendAPI.AUTH_PAM,
-                      len(x) > 2 and x[2] and map(re.compile, x[2].split(" "))
-                      or None)
-                     for x in api_cfg]
-            for addrport, auth, allowed in addrs:
-                if auth not in [XendAPI.AUTH_PAM, XendAPI.AUTH_NONE]:
-                    log.error('Xen-API server configuration %s is invalid, ' +
-                              'as %s is not a valid authentication type.',
-                              api_cfg, auth)
-                    break
+            for server_cfg in api_cfg:
+                # Parse the xen-api-server config
+                
+                host = 'localhost'
+                port = 0
+                use_tcp = False
+                ssl_key_file = None
+                ssl_cert_file = None
+                auth_method = XendAPI.AUTH_NONE
+                hosts_allowed = None
+                
+                host_addr = server_cfg[0].split(':', 1)
+                if len(host_addr) == 1 and host_addr[0].lower() == 'unix':
+                    use_tcp = False
+                elif len(host_addr) == 1:
+                    use_tcp = True
+                    port = int(host_addr[0])
+                elif len(host_addr) == 2:
+                    use_tcp = True
+                    host = str(host_addr[0])
+                    port = int(host_addr[1])
 
-                if len(addrport) == 1:
-                    if addrport[0] == 'unix':
-                        servers.add(XMLRPCServer(auth, True,
-                                                 path = XEN_API_SOCKET,
-                                                 hosts_allowed = allowed))
-                    else:
-                        servers.add(
-                            XMLRPCServer(auth, True, True, '',
-                                         int(addrport[0]),
-                                         hosts_allowed = allowed))
-                else:
-                    addr, port = addrport
-                    servers.add(XMLRPCServer(auth, True, True, addr,
-                                             int(port),
-                                             hosts_allowed = allowed))
+                if len(server_cfg) > 1:
+                    if server_cfg[1] in [XendAPI.AUTH_PAM, XendAPI.AUTH_NONE]:
+                        auth_method = server_cfg[1]
+
+                if len(server_cfg) > 2:
+                    hosts_allowed = server_cfg[2] or None
+                
+
+                if len(server_cfg) > 4:
+                    # SSL key and cert file
+                    ssl_key_file = server_cfg[3]
+                    ssl_cert_file = server_cfg[4]
+
+
+                servers.add(XMLRPCServer(auth_method, True, use_tcp = use_tcp,
+                                         ssl_key_file = ssl_key_file,
+                                         ssl_cert_file = ssl_cert_file,
+                                         host = host, port = port,
+                                         path = XEN_API_SOCKET,
+                                         hosts_allowed = hosts_allowed))
+
         except (ValueError, TypeError), exn:
             log.exception('Xen API Server init failed')
             log.error('Xen-API server configuration %s is invalid.', api_cfg)
@@ -206,8 +235,17 @@ def _loadConfig(servers, root, reload):
     if xoptions.get_xend_tcp_xmlrpc_server():
         addr = xoptions.get_xend_tcp_xmlrpc_server_address()
         port = xoptions.get_xend_tcp_xmlrpc_server_port()
-        servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, use_tcp = True,
-                                 host = addr, port = port))
+        ssl_key_file = xoptions.get_xend_tcp_xmlrpc_server_ssl_key_file()
+        ssl_cert_file = xoptions.get_xend_tcp_xmlrpc_server_ssl_cert_file()
+
+        if ssl_key_file and ssl_cert_file:
+            servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, use_tcp = True,
+                                     ssl_key_file = ssl_key_file,
+                                     ssl_cert_file = ssl_cert_file,
+                                     host = addr, port = port))
+        else:
+            servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False, use_tcp = True,
+                                     host = addr, port = port))
 
     if xoptions.get_xend_unix_xmlrpc_server():
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False))

@@ -89,7 +89,7 @@ static void update_tpr_threshold(struct vlapic *vlapic)
 asmlinkage void vmx_intr_assist(void)
 {
     int intr_type = 0;
-    int highest_vector;
+    int intr_vector;
     unsigned long eflags;
     struct vcpu *v = current;
     unsigned int idtv_info_field;
@@ -106,8 +106,9 @@ asmlinkage void vmx_intr_assist(void)
 
     if ( unlikely(v->arch.hvm_vmx.vector_injected) )
     {
-        v->arch.hvm_vmx.vector_injected=0;
-        if (unlikely(has_ext_irq)) enable_irq_window(v);
+        v->arch.hvm_vmx.vector_injected = 0;
+        if ( unlikely(has_ext_irq) )
+            enable_irq_window(v);
         return;
     }
 
@@ -132,7 +133,6 @@ asmlinkage void vmx_intr_assist(void)
             enable_irq_window(v);
 
         HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
-
         return;
     }
 
@@ -154,30 +154,13 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-    highest_vector = cpu_get_interrupt(v, &intr_type);
-    if ( highest_vector < 0 )
-        return;
+    intr_vector = cpu_get_interrupt(v, &intr_type);
+    BUG_ON(intr_vector < 0);
 
-    switch ( intr_type )
-    {
-    case APIC_DM_EXTINT:
-    case APIC_DM_FIXED:
-    case APIC_DM_LOWEST:
-        HVMTRACE_2D(INJ_VIRQ, v, highest_vector, /*fake=*/ 0);
-        vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
-        break;
+    HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
+    vmx_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
 
-    case APIC_DM_SMI:
-    case APIC_DM_NMI:
-    case APIC_DM_INIT:
-    case APIC_DM_STARTUP:
-    default:
-        printk("Unsupported interrupt type\n");
-        BUG();
-        break;
-    }
-
-    pt_intr_post(v, highest_vector, intr_type);
+    pt_intr_post(v, intr_vector, intr_type);
 }
 
 /*

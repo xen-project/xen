@@ -107,7 +107,7 @@ gopts.opt('xmldryrun', short='x',
 gopts.opt('skipdtd', short='s',
           fn=set_true, default=0,
           use="Skip DTD checking - skips checks on XML before creating. "
-          " Experimental.  Can decreate create time." )
+          " Experimental.  Can decrease create time." )
 
 gopts.opt('paused', short='p',
           fn=set_true, default=0,

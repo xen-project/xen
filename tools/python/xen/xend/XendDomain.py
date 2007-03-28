@@ -569,6 +569,26 @@ class XendDomain:
         finally:
             self.domains_lock.release()
 
+    def autostart_domains(self):
+        """ Autostart managed domains that are marked as such. """
+
+        need_starting = []
+        
+        self.domains_lock.acquire()
+        try:
+            for dom_uuid, dom in self.managed_domains.items():
+                if dom and dom.state == DOM_STATE_HALTED:
+                    on_xend_start = dom.info.get('on_xend_start', 'ignore')
+                    auto_power_on = dom.info.get('auto_power_on', False)
+                    should_start = (on_xend_start == 'start') or auto_power_on
+                    if should_start:
+                        need_starting.append(dom_uuid)
+        finally:
+            self.domains_lock.release()
+
+        for dom_uuid in need_starting:
+            self.domain_start(dom_uuid, False)
+
     def cleanup_domains(self):
         """Clean up domains that are marked as autostop.
         Should be called when Xend goes down. This is currently

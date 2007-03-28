@@ -67,10 +67,6 @@ static inline void unimplemented(void)
 #endif
 }
 
-extern void __warn(char *file, int line);
-#define WARN() __warn(__FILE__, __LINE__)
-#define WARN_ON(_p) do { if (_p) WARN(); } while ( 0 )
-
 extern void __attn(void);
 #define ATTN() __attn();
 

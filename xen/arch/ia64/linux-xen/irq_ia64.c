@@ -113,7 +113,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	unsigned long saved_tpr;
 
 #ifdef XEN
-	perfc_incrc(irqs);
+	perfc_incr(irqs);
 #endif
 #if IRQ_DEBUG
 #ifdef XEN

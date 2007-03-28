@@ -637,28 +637,34 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
          memcmp(bug.ud2, "\xf\xb", sizeof(bug.ud2)) ||
          (bug.ret != 0xc2) )
         goto die;
+    eip += sizeof(bug);
 
     id = bug.id & 3;
-    if ( id == BUGFRAME_rsvd )
-        goto die;
 
     if ( id == BUGFRAME_dump )
     {
         show_execution_state(regs);
-        regs->eip += sizeof(bug);
+        regs->eip = (unsigned long)eip;
         return EXCRET_fault_fixed;
     }
 
-    /* BUG() or ASSERT(): decode the filename pointer and line number. */
-    ASSERT((id == BUGFRAME_bug) || (id == BUGFRAME_assert));
-    eip += sizeof(bug);
+    /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
          memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
         goto die;
+    eip += sizeof(bug_str);
 
     filename = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
     lineno   = bug.id >> 2;
+
+    if ( id == BUGFRAME_warn )
+    {
+        printk("Xen WARN at %.50s:%d\n", filename, lineno);
+        show_execution_state(regs);
+        regs->eip = (unsigned long)eip;
+        return EXCRET_fault_fixed;
+    }
 
     if ( id == BUGFRAME_bug )
     {
@@ -668,13 +674,13 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
         panic("Xen BUG at %.50s:%d\n", filename, lineno);
     }
 
-    /* ASSERT(): decode the predicate string pointer. */
+    /* ASSERT: decode the predicate string pointer. */
     ASSERT(id == BUGFRAME_assert);
-    eip += sizeof(bug_str);
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
          memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
         goto die;
+    eip += sizeof(bug_str);
 
     predicate = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
     printk("Assertion '%s' failed at %.50s:%d\n",
@@ -950,7 +956,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
-    perfc_incrc(page_faults);
+    perfc_incr(page_faults);
 
     if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
         return rc;
@@ -962,7 +968,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
-            perfc_incrc(copy_user_faults);
+            perfc_incr(copy_user_faults);
             regs->eip = fixup;
             return 0;
         }

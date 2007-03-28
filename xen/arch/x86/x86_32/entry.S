@@ -173,7 +173,7 @@ ENTRY(hypercall)
         GET_CURRENT(%ebx)
         cmpl  $NR_hypercalls,%eax
         jae   bad_hypercall
-        PERFC_INCR(PERFC_hypercalls, %eax)
+        PERFC_INCR(PERFC_hypercalls, %eax, %ebx)
 #ifndef NDEBUG
         /* Create shadow parameters and corrupt those not used by this call. */
         pushl %eax
@@ -429,7 +429,7 @@ handle_exception:
         movl  %esp,%edx
         pushl %edx                      # push the cpu_user_regs pointer
         GET_CURRENT(%ebx)
-        PERFC_INCR(PERFC_exceptions, %eax)
+        PERFC_INCR(PERFC_exceptions, %eax, %ebx)
         call  *exception_table(,%eax,4)
         addl  $4,%esp
         movl  UREGS_eflags(%esp),%eax

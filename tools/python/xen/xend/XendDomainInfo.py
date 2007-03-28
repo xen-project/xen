@@ -152,8 +152,9 @@ def recreate(info, priv):
     try:
         vmpath = xstransact.Read(dompath, "vm")
         if not vmpath:
-            log.warn('/local/domain/%d/vm is missing. recreate is '
-                     'confused, trying our best to recover' % domid)
+            if not priv:
+                log.warn('/local/domain/%d/vm is missing. recreate is '
+                         'confused, trying our best to recover' % domid)
             needs_reinitialising = True
             raise XendError('reinit')
         

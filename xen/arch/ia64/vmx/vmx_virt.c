@@ -1401,159 +1401,159 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 
     switch(cause) {
     case EVENT_RSM:
-        perfc_incrc(vmx_rsm);
+        perfc_incr(vmx_rsm);
         status=vmx_emul_rsm(vcpu, inst);
         break;
     case EVENT_SSM:
-        perfc_incrc(vmx_ssm);
+        perfc_incr(vmx_ssm);
         status=vmx_emul_ssm(vcpu, inst);
         break;
     case EVENT_MOV_TO_PSR:
-        perfc_incrc(vmx_mov_to_psr);
+        perfc_incr(vmx_mov_to_psr);
         status=vmx_emul_mov_to_psr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_PSR:
-        perfc_incrc(vmx_mov_from_psr);
+        perfc_incr(vmx_mov_from_psr);
         status=vmx_emul_mov_from_psr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_CR:
-        perfc_incrc(vmx_mov_from_cr);
+        perfc_incr(vmx_mov_from_cr);
         status=vmx_emul_mov_from_cr(vcpu, inst);
         break;
     case EVENT_MOV_TO_CR:
-        perfc_incrc(vmx_mov_to_cr);
+        perfc_incr(vmx_mov_to_cr);
         status=vmx_emul_mov_to_cr(vcpu, inst);
         break;
     case EVENT_BSW_0:
-        perfc_incrc(vmx_bsw0);
+        perfc_incr(vmx_bsw0);
         status=vmx_emul_bsw0(vcpu, inst);
         break;
     case EVENT_BSW_1:
-        perfc_incrc(vmx_bsw1);
+        perfc_incr(vmx_bsw1);
         status=vmx_emul_bsw1(vcpu, inst);
         break;
     case EVENT_COVER:
-        perfc_incrc(vmx_cover);
+        perfc_incr(vmx_cover);
         status=vmx_emul_cover(vcpu, inst);
         break;
     case EVENT_RFI:
-        perfc_incrc(vmx_rfi);
+        perfc_incr(vmx_rfi);
         status=vmx_emul_rfi(vcpu, inst);
         break;
     case EVENT_ITR_D:
-        perfc_incrc(vmx_itr_d);
+        perfc_incr(vmx_itr_d);
         status=vmx_emul_itr_d(vcpu, inst);
         break;
     case EVENT_ITR_I:
-        perfc_incrc(vmx_itr_i);
+        perfc_incr(vmx_itr_i);
         status=vmx_emul_itr_i(vcpu, inst);
         break;
     case EVENT_PTR_D:
-        perfc_incrc(vmx_ptr_d);
+        perfc_incr(vmx_ptr_d);
         status=vmx_emul_ptr_d(vcpu, inst);
         break;
     case EVENT_PTR_I:
-        perfc_incrc(vmx_ptr_i);
+        perfc_incr(vmx_ptr_i);
         status=vmx_emul_ptr_i(vcpu, inst);
         break;
     case EVENT_ITC_D:
-        perfc_incrc(vmx_itc_d);
+        perfc_incr(vmx_itc_d);
         status=vmx_emul_itc_d(vcpu, inst);
         break;
     case EVENT_ITC_I:
-        perfc_incrc(vmx_itc_i);
+        perfc_incr(vmx_itc_i);
         status=vmx_emul_itc_i(vcpu, inst);
         break;
     case EVENT_PTC_L:
-        perfc_incrc(vmx_ptc_l);
+        perfc_incr(vmx_ptc_l);
         status=vmx_emul_ptc_l(vcpu, inst);
         break;
     case EVENT_PTC_G:
-        perfc_incrc(vmx_ptc_g);
+        perfc_incr(vmx_ptc_g);
         status=vmx_emul_ptc_g(vcpu, inst);
         break;
     case EVENT_PTC_GA:
-        perfc_incrc(vmx_ptc_ga);
+        perfc_incr(vmx_ptc_ga);
         status=vmx_emul_ptc_ga(vcpu, inst);
         break;
     case EVENT_PTC_E:
-        perfc_incrc(vmx_ptc_e);
+        perfc_incr(vmx_ptc_e);
         status=vmx_emul_ptc_e(vcpu, inst);
         break;
     case EVENT_MOV_TO_RR:
-        perfc_incrc(vmx_mov_to_rr);
+        perfc_incr(vmx_mov_to_rr);
         status=vmx_emul_mov_to_rr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_RR:
-        perfc_incrc(vmx_mov_from_rr);
+        perfc_incr(vmx_mov_from_rr);
         status=vmx_emul_mov_from_rr(vcpu, inst);
         break;
     case EVENT_THASH:
-        perfc_incrc(vmx_thash);
+        perfc_incr(vmx_thash);
         status=vmx_emul_thash(vcpu, inst);
         break;
     case EVENT_TTAG:
-        perfc_incrc(vmx_ttag);
+        perfc_incr(vmx_ttag);
         status=vmx_emul_ttag(vcpu, inst);
         break;
     case EVENT_TPA:
-        perfc_incrc(vmx_tpa);
+        perfc_incr(vmx_tpa);
         status=vmx_emul_tpa(vcpu, inst);
         break;
     case EVENT_TAK:
-        perfc_incrc(vmx_tak);
+        perfc_incr(vmx_tak);
         status=vmx_emul_tak(vcpu, inst);
         break;
     case EVENT_MOV_TO_AR_IMM:
-        perfc_incrc(vmx_mov_to_ar_imm);
+        perfc_incr(vmx_mov_to_ar_imm);
         status=vmx_emul_mov_to_ar_imm(vcpu, inst);
         break;
     case EVENT_MOV_TO_AR:
-        perfc_incrc(vmx_mov_to_ar_reg);
+        perfc_incr(vmx_mov_to_ar_reg);
         status=vmx_emul_mov_to_ar_reg(vcpu, inst);
         break;
     case EVENT_MOV_FROM_AR:
-        perfc_incrc(vmx_mov_from_ar_reg);
+        perfc_incr(vmx_mov_from_ar_reg);
         status=vmx_emul_mov_from_ar_reg(vcpu, inst);
         break;
     case EVENT_MOV_TO_DBR:
-        perfc_incrc(vmx_mov_to_dbr);
+        perfc_incr(vmx_mov_to_dbr);
         status=vmx_emul_mov_to_dbr(vcpu, inst);
         break;
     case EVENT_MOV_TO_IBR:
-        perfc_incrc(vmx_mov_to_ibr);
+        perfc_incr(vmx_mov_to_ibr);
         status=vmx_emul_mov_to_ibr(vcpu, inst);
         break;
     case EVENT_MOV_TO_PMC:
-        perfc_incrc(vmx_mov_to_pmc);
+        perfc_incr(vmx_mov_to_pmc);
         status=vmx_emul_mov_to_pmc(vcpu, inst);
         break;
     case EVENT_MOV_TO_PMD:
-        perfc_incrc(vmx_mov_to_pmd);
+        perfc_incr(vmx_mov_to_pmd);
         status=vmx_emul_mov_to_pmd(vcpu, inst);
         break;
     case EVENT_MOV_TO_PKR:
-        perfc_incrc(vmx_mov_to_pkr);
+        perfc_incr(vmx_mov_to_pkr);
         status=vmx_emul_mov_to_pkr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_DBR:
-        perfc_incrc(vmx_mov_from_dbr);
+        perfc_incr(vmx_mov_from_dbr);
         status=vmx_emul_mov_from_dbr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_IBR:
-        perfc_incrc(vmx_mov_from_ibr);
+        perfc_incr(vmx_mov_from_ibr);
         status=vmx_emul_mov_from_ibr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_PMC:
-        perfc_incrc(vmx_mov_from_pmc);
+        perfc_incr(vmx_mov_from_pmc);
         status=vmx_emul_mov_from_pmc(vcpu, inst);
         break;
     case EVENT_MOV_FROM_PKR:
-        perfc_incrc(vmx_mov_from_pkr);
+        perfc_incr(vmx_mov_from_pkr);
         status=vmx_emul_mov_from_pkr(vcpu, inst);
         break;
     case EVENT_MOV_FROM_CPUID:
-        perfc_incrc(vmx_mov_from_cpuid);
+        perfc_incr(vmx_mov_from_cpuid);
         status=vmx_emul_mov_from_cpuid(vcpu, inst);
         break;
     case EVENT_VMSW:

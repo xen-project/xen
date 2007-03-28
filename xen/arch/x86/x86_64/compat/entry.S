@@ -57,7 +57,7 @@ ENTRY(compat_hypercall)
         movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
 #endif
         leaq  compat_hypercall_table(%rip),%r10
-        PERFC_INCR(PERFC_hypercalls, %rax)
+        PERFC_INCR(PERFC_hypercalls, %rax, %rbx)
         callq *(%r10,%rax,8)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
