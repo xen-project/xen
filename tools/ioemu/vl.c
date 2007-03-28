@@ -6109,10 +6109,9 @@ int main(int argc, char **argv)
 #endif /* !CONFIG_DM */
     cyls = heads = secs = 0;
     translation = BIOS_ATA_TRANSLATION_AUTO;
-    pstrcpy(monitor_device, sizeof(monitor_device), "vc");
+    pstrcpy(monitor_device, sizeof(monitor_device), "null");
 
-    pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "vc");
-    for(i = 1; i < MAX_SERIAL_PORTS; i++)
+    for(i = 0; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
 

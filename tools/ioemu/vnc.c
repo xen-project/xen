@@ -113,10 +113,8 @@ struct VncState
     int visible_w;
     int visible_h;
 
-#ifdef QEMU_VNC_MONITOR_EXPORT
     int ctl_keys;               /* Ctrl+Alt starts calibration */
     int shift_keys;             /* Shift / CapsLock keys */
-#endif
     int numlock;
 };
 
@@ -897,7 +895,6 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 	    kbd_put_keycode(keycode & 0x7f);
 	else
 	    kbd_put_keycode(keycode | 0x80);
-#ifdef QEMU_VNC_MONITOR_EXPORT
     } else if (down) {
 	int qemu_keysym = 0;
 
@@ -925,10 +922,8 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 	}
 	if (qemu_keysym != 0)
 	    kbd_put_keysym(qemu_keysym);
-#endif
     }
 
-#ifdef QEMU_VNC_MONITOR_EXPORT
     if (down) {
 	switch (sym) {
 	case XK_Control_L:
@@ -981,10 +976,6 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 	    break;
 	}
     }
-#else
-    if (!down && sym == XK_Num_Lock)
-        vs->numlock = !vs->numlock;
-#endif
 }
 
 static void key_event(VncState *vs, int down, uint32_t sym)

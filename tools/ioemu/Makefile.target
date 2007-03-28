@@ -193,10 +193,6 @@ ifdef CONFIG_SOLARIS
 LIBS+=-lsocket -lnsl -lresolv
 endif
 
-ifeq ($(debug),y)
-CFLAGS += -DQEMU_VNC_MONITOR_EXPORT
-endif
-
 # profiling code
 ifdef TARGET_GPROF
 LDFLAGS+=-p
