@@ -21,7 +21,6 @@ An enhanced XML-RPC client/server interface for Python.
 """
 
 import re
-import string
 import fcntl
 from types import *
     

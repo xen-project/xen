@@ -19,6 +19,7 @@
 
 from httplib import FakeSocket, HTTPConnection, HTTP
 import socket
+import string
 import xmlrpclib
 from types import StringTypes
 
