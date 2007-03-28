@@ -3156,14 +3156,22 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         hvm_triple_fault();
         break;
 
+    case VMEXIT_VMRUN:
+    case VMEXIT_VMLOAD:
+    case VMEXIT_VMSAVE:
+    case VMEXIT_STGI:
+    case VMEXIT_CLGI:
+    case VMEXIT_SKINIT:
+        /* Report "Invalid opcode" on any VM-operation except VMMCALL */
+        svm_inject_exception(v, TRAP_invalid_op, 0, 0);
+        break;
+
     case VMEXIT_NPF:
-    {
         regs->error_code = vmcb->exitinfo1;
         if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) ) {
             domain_crash(v->domain);
         }
         break;
-    }
 
     default:
     exit_and_crash:
