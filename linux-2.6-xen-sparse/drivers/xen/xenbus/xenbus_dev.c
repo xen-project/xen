@@ -58,6 +58,13 @@ struct xenbus_dev_transaction {
 	struct xenbus_transaction handle;
 };
 
+struct read_buffer {
+	struct list_head list;
+	unsigned int cons;
+	unsigned int len;
+	char msg[];
+};
+
 struct xenbus_dev_data {
 	/* In-progress transaction. */
 	struct list_head transactions;
@@ -73,9 +80,7 @@ struct xenbus_dev_data {
 	} u;
 
 	/* Response queue. */
-#define MASK_READ_IDX(idx) ((idx)&(PAGE_SIZE-1))
-	char read_buffer[PAGE_SIZE];
-	unsigned int read_cons, read_prod;
+	struct list_head read_buffers;
 	wait_queue_head_t read_waitq;
 
 	struct mutex reply_mutex;
@@ -88,18 +93,34 @@ static ssize_t xenbus_dev_read(struct file *filp,
 			       size_t len, loff_t *ppos)
 {
 	struct xenbus_dev_data *u = filp->private_data;
-	int i;
+	struct read_buffer *rb;
+	int i, ret;
 
-	if (wait_event_interruptible(u->read_waitq,
-				     u->read_prod != u->read_cons))
-		return -EINTR;
-
-	for (i = 0; i < len; i++) {
-		if (u->read_cons == u->read_prod)
-			break;
-		put_user(u->read_buffer[MASK_READ_IDX(u->read_cons)], ubuf+i);
-		u->read_cons++;
+	mutex_lock(&u->reply_mutex);
+	while (list_empty(&u->read_buffers)) {
+		mutex_unlock(&u->reply_mutex);
+		ret = wait_event_interruptible(u->read_waitq,
+					       !list_empty(&u->read_buffers));
+		if (ret)
+			return ret;
+		mutex_lock(&u->reply_mutex);
 	}
+
+	rb = list_entry(u->read_buffers.next, struct read_buffer, list);
+	for (i = 0; i < len;) {
+		put_user(rb->msg[rb->cons], ubuf + i);
+		i++;
+		rb->cons++;
+		if (rb->cons == rb->len) {
+			list_del(&rb->list);
+			kfree(rb);
+			if (list_empty(&u->read_buffers))
+				break;
+			rb = list_entry(u->read_buffers.next,
+					struct read_buffer, list);
+		}
+	}
+	mutex_unlock(&u->reply_mutex);
 
 	return i;
 }
@@ -107,16 +128,20 @@ static ssize_t xenbus_dev_read(struct file *filp,
 static void queue_reply(struct xenbus_dev_data *u,
 			char *data, unsigned int len)
 {
-	int i;
+	struct read_buffer *rb;
 
-	mutex_lock(&u->reply_mutex);
+	if (len == 0)
+		return;
 
-	for (i = 0; i < len; i++, u->read_prod++)
-		u->read_buffer[MASK_READ_IDX(u->read_prod)] = data[i];
+	rb = kmalloc(sizeof(*rb) + len, GFP_KERNEL);
+	BUG_ON(rb == NULL);
 
-	BUG_ON((u->read_prod - u->read_cons) > sizeof(u->read_buffer));
+	rb->cons = 0;
+	rb->len = len;
 
-	mutex_unlock(&u->reply_mutex);
+	memcpy(rb->msg, data, len);
+
+	list_add_tail(&rb->list, &u->read_buffers);
 
 	wake_up(&u->read_waitq);
 }
@@ -155,10 +180,12 @@ static void watch_fired(struct xenbus_watch *watch,
 
 	hdr.type = XS_WATCH_EVENT;
 	hdr.len = body_len;
-	
+
+	mutex_lock(&adap->dev_data->reply_mutex);
 	queue_reply(adap->dev_data, (char *)&hdr, sizeof(hdr));
 	queue_reply(adap->dev_data, (char *)path, path_len);
 	queue_reply(adap->dev_data, (char *)token, tok_len);
+	mutex_unlock(&adap->dev_data->reply_mutex);
 }
 
 static LIST_HEAD(watch_list);
@@ -230,8 +257,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 			list_del(&trans->list);
 			kfree(trans);
 		}
+		mutex_lock(&u->reply_mutex);
 		queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
 		queue_reply(u, (char *)reply, u->u.msg.len);
+		mutex_unlock(&u->reply_mutex);
 		kfree(reply);
 		break;
 
@@ -282,8 +311,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 
 		hdr.type = msg_type;
 		hdr.len = strlen(XS_RESP) + 1;
+		mutex_lock(&u->reply_mutex);
 		queue_reply(u, (char *)&hdr, sizeof(hdr));
 		queue_reply(u, (char *)XS_RESP, hdr.len);
+		mutex_unlock(&u->reply_mutex);
 		break;
 	}
 
@@ -312,6 +343,7 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 
 	INIT_LIST_HEAD(&u->transactions);
 	INIT_LIST_HEAD(&u->watches);
+	INIT_LIST_HEAD(&u->read_buffers);
 	init_waitqueue_head(&u->read_waitq);
 
 	mutex_init(&u->reply_mutex);
@@ -349,7 +381,7 @@ static unsigned int xenbus_dev_poll(struct file *file, poll_table *wait)
 	struct xenbus_dev_data *u = file->private_data;
 
 	poll_wait(file, &u->read_waitq, wait);
-	if (u->read_cons != u->read_prod)
+	if (!list_empty(&u->read_buffers))
 		return POLLIN | POLLRDNORM;
 	return 0;
 }
