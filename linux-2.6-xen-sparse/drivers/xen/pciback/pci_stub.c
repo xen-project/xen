@@ -895,6 +895,10 @@ static int __init pcistub_init(void)
 fs_initcall(pcistub_init);
 #endif
 
+static void pciback_exit(void)
+{
+}
+
 static int __init pciback_init(void)
 {
 	int err;
