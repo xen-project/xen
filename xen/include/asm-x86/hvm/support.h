@@ -86,8 +86,7 @@ enum hval_bitmaps {
       EXCEPTION_BITMAP_GP )
 #else
 #define MONITOR_DEFAULT_EXCEPTION_BITMAP        \
-    ( EXCEPTION_BITMAP_PG |                     \
-      EXCEPTION_BITMAP_BP )
+    ( EXCEPTION_BITMAP_PG )
 #endif
 
 #define VMX_DELIVER_NO_ERROR_CODE  -1
