@@ -109,18 +109,6 @@ extern void __devinit map_iosapic_to_node (unsigned int, int);
 #endif
 
 #ifdef XEN
-/* Move to common code later */
-/**
- * list_move - delete from one list and add as another's head
- * @list: the entry to move
- * @head: the head that will precede our entry
- */
-static inline void list_move(struct list_head *list, struct list_head *head)
-{
-        __list_del(list->prev, list->next);
-        list_add(list, head);
-}
-
 #define move_irq(x)
 
 #ifdef nop
