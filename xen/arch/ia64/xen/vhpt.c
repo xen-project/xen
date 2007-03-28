@@ -48,14 +48,14 @@ local_vhpt_flush(void)
 	/* this must be after flush */
 	tlbflush_update_time(&__get_cpu_var(vhpt_tlbflush_timestamp),
 	                     flush_time);
-	perfc_incrc(local_vhpt_flush);
+	perfc_incr(local_vhpt_flush);
 }
 
 void
 vcpu_vhpt_flush(struct vcpu* v)
 {
 	__vhpt_flush(vcpu_vhpt_maddr(v));
-	perfc_incrc(vcpu_vhpt_flush);
+	perfc_incr(vcpu_vhpt_flush);
 }
 
 static void
@@ -248,7 +248,7 @@ void vcpu_flush_vtlb_all(struct vcpu *v)
 	   not running on this processor.  There is currently no easy way to
 	   check this.  */
 
-	perfc_incrc(vcpu_flush_vtlb_all);
+	perfc_incr(vcpu_flush_vtlb_all);
 }
 
 static void __vcpu_flush_vtlb_all(void *vcpu)
@@ -280,7 +280,7 @@ void domain_flush_vtlb_all(struct domain* d)
 						 __vcpu_flush_vtlb_all,
 						 v, 1, 1);
 	}
-	perfc_incrc(domain_flush_vtlb_all);
+	perfc_incr(domain_flush_vtlb_all);
 }
 
 // Callers may need to call smp_mb() before/after calling this.
@@ -322,7 +322,7 @@ void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range)
 		                     vadr, 1UL << log_range);
 	ia64_ptcl(vadr, log_range << 2);
 	ia64_srlz_i();
-	perfc_incrc(vcpu_flush_tlb_vhpt_range);
+	perfc_incr(vcpu_flush_tlb_vhpt_range);
 }
 
 void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
@@ -361,7 +361,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 
 	/* ptc.ga  */
 	platform_global_tlb_purge(vadr, vadr + addr_range, PAGE_SHIFT);
-	perfc_incrc(domain_flush_vtlb_range);
+	perfc_incr(domain_flush_vtlb_range);
 }
 
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
@@ -391,11 +391,11 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 	 */
 	vcpu_get_rr(current, VRN7 << VRN_SHIFT, &rr7_rid);
 	if (likely(rr7_rid == entry->rid)) {
-		perfc_incrc(tlb_track_use_rr7);
+		perfc_incr(tlb_track_use_rr7);
 	} else {
 		swap_rr0 = 1;
 		vaddr = (vaddr << 3) >> 3;// force vrn0
-		perfc_incrc(tlb_track_swap_rr0);
+		perfc_incr(tlb_track_swap_rr0);
 	}
 
 	// tlb_track_entry_printf(entry);
@@ -435,18 +435,18 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 	/* ptc.ga  */
 	if (local_purge) {
 		ia64_ptcl(vaddr, PAGE_SHIFT << 2);
-		perfc_incrc(domain_flush_vtlb_local);
+		perfc_incr(domain_flush_vtlb_local);
 	} else {
 		/* ptc.ga has release semantics. */
 		platform_global_tlb_purge(vaddr, vaddr + PAGE_SIZE,
 		                          PAGE_SHIFT);
-		perfc_incrc(domain_flush_vtlb_global);
+		perfc_incr(domain_flush_vtlb_global);
 	}
 
 	if (swap_rr0) {
 		vcpu_set_rr(current, 0, old_rid);
 	}
-	perfc_incrc(domain_flush_vtlb_track_entry);
+	perfc_incr(domain_flush_vtlb_track_entry);
 }
 
 void
@@ -512,7 +512,7 @@ void gather_vhpt_stats(void)
 		for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
 			if (!(v->ti_tag & INVALID_TI_TAG))
 				vhpt_valid++;
-		perfc_seta(vhpt_valid_entries, cpu, vhpt_valid);
+		per_cpu(perfcounters, cpu)[PERFC_vhpt_valid_entries] = vhpt_valid;
 	}
 }
 #endif

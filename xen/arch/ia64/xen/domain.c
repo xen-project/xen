@@ -131,11 +131,11 @@ static void flush_vtlb_for_context_switch(struct vcpu* prev, struct vcpu* next)
 		if (vhpt_is_flushed || NEED_FLUSH(__get_cpu_var(tlbflush_time),
 		                                  last_tlbflush_timestamp)) {
 			local_flush_tlb_all();
-			perfc_incrc(tlbflush_clock_cswitch_purge);
+			perfc_incr(tlbflush_clock_cswitch_purge);
 		} else {
-			perfc_incrc(tlbflush_clock_cswitch_skip);
+			perfc_incr(tlbflush_clock_cswitch_skip);
 		}
-		perfc_incrc(flush_vtlb_for_context_switch);
+		perfc_incr(flush_vtlb_for_context_switch);
 	}
 }
 

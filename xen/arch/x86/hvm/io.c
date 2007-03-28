@@ -292,7 +292,11 @@ extern long get_reg_value(int size, int index, int seg, struct cpu_user_regs *re
 static inline void set_eflags_CF(int size, unsigned long v1,
                                  unsigned long v2, struct cpu_user_regs *regs)
 {
-    unsigned long mask = (1 << (8 * size)) - 1;
+    unsigned long mask;
+    
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
 
     if ((v1 & mask) > (v2 & mask))
         regs->eflags |= X86_EFLAGS_CF;
@@ -303,7 +307,13 @@ static inline void set_eflags_CF(int size, unsigned long v1,
 static inline void set_eflags_OF(int size, unsigned long v1,
                                  unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
 {
-    if ((v3 ^ v2) & (v3 ^ v1) & (1 << ((8 * size) - 1)))
+    unsigned long mask;
+
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
+    
+    if ((v3 ^ v2) & (v3 ^ v1) & mask)
         regs->eflags |= X86_EFLAGS_OF;
 }
 
@@ -317,7 +327,11 @@ static inline void set_eflags_AF(int size, unsigned long v1,
 static inline void set_eflags_ZF(int size, unsigned long v1,
                                  struct cpu_user_regs *regs)
 {
-    unsigned long mask = (1 << (8 * size)) - 1;
+    unsigned long mask;
+    
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
 
     if ((v1 & mask) == 0)
         regs->eflags |= X86_EFLAGS_ZF;
@@ -326,7 +340,13 @@ static inline void set_eflags_ZF(int size, unsigned long v1,
 static inline void set_eflags_SF(int size, unsigned long v1,
                                  struct cpu_user_regs *regs)
 {
-    if (v1 & (1 << ((8 * size) - 1)))
+    unsigned long mask;
+    
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
+
+    if (v1 & mask)
         regs->eflags |= X86_EFLAGS_SF;
 }
 

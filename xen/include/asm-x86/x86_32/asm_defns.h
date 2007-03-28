@@ -1,6 +1,8 @@
 #ifndef __X86_32_ASM_DEFNS_H__
 #define __X86_32_ASM_DEFNS_H__
 
+#include <asm/percpu.h>
+
 #ifndef NDEBUG
 /* Indicate special exception stack frame by inverting the frame pointer. */
 #define SETUP_EXCEPTION_FRAME_POINTER           \
@@ -47,10 +49,14 @@
         1:
 
 #ifdef PERF_COUNTERS
-#define PERFC_INCR(_name,_idx)                          \
-        lock incl perfcounters+_name(,_idx,4)
+#define PERFC_INCR(_name,_idx,_cur)                     \
+        pushl _cur;                                     \
+        movl VCPU_processor(_cur),_cur;                 \
+        shll $PERCPU_SHIFT,_cur;                        \
+        incl per_cpu__perfcounters+_name*4(_cur,_idx,4);\
+        popl _cur
 #else
-#define PERFC_INCR(_name,_idx)
+#define PERFC_INCR(_name,_idx,_cur)
 #endif
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL

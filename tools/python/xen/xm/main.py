@@ -49,7 +49,7 @@ from xen.xend.XendConstants import *
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
-from xen.util.xmlrpclib2 import ServerProxy
+from xen.util.xmlrpcclient import ServerProxy
 
 import XenAPI
 
@@ -722,7 +722,7 @@ def getDomains(domain_names, state, full = 0):
             states = ('running', 'blocked', 'paused', 'shutdown',
                       'crashed', 'dying')
             def state_on_off(state):
-                if dom_metrics['state'].find(state) > -1:
+                if state in dom_metrics['state']:
                     return state[0]
                 else:
                     return "-"
@@ -850,7 +850,8 @@ def parse_doms_info(info):
 
 def check_sched_type(sched):
     if serverType == SERVER_XEN_API:
-        current = server.xenapi.host.get_sched_policy(server.xenapi.session.get_this_host())
+        current = server.xenapi.host.get_sched_policy(
+            server.xenapi.session.get_this_host(server.getSession()))
     else:
         current = 'unknown'
         for x in server.xend.node.info()[1:]:
@@ -952,12 +953,10 @@ def xm_vcpu_list(args):
                     ['name',       vm_records[vm_ref]['name_label']],
                     ['vcpu_count', vm_records[vm_ref]['VCPUs_max']]]
 
-            
-
             for i in range(int(vm_records[vm_ref]['VCPUs_max'])):
                 def chk_flag(flag):
-                    return vm_metrics[vm_ref]['VCPUs_flags'][str(i)] \
-                           .find(flag) > -1 and 1 or 0
+                    return flag in vm_metrics[vm_ref]['VCPUs_flags'][str(i)] \
+                           and 1 or 0
                 
                 vcpu_info = ['vcpu',
                              ['number',
@@ -1044,7 +1043,7 @@ def xm_vcpu_list(args):
 
             if serverType == SERVER_XEN_API:
                 nr_cpus = len(server.xenapi.host.get_host_CPUs(
-                    server.xenapi.session.get_this_host()))
+                    server.xenapi.session.get_this_host(server.getSession())))
             else:
                 for x in server.xend.node.info()[1:]:
                     if len(x) > 1 and x[0] == 'nr_cpus':
@@ -1260,8 +1259,9 @@ def xm_vcpu_pin(args):
         cpumap = cpu_make_map(args[2])
 
     if serverType == SERVER_XEN_API:
+        cpumap = map(str, cpumap)        
         server.xenapi.VM.add_to_VCPUs_params_live(
-            get_single_vm(dom), "cpumap%i" % vcpu, ",".join(cpumap))
+            get_single_vm(dom), "cpumap%i" % int(vcpu), ",".join(cpumap))
     else:
         server.xend.domain.pincpu(dom, vcpu, cpumap)
 
@@ -1509,7 +1509,7 @@ def xm_info(args):
         # Need to fake out old style xm info as people rely on parsing it
         
         host_record = server.xenapi.host.get_record(
-            server.xenapi.session.get_this_host())        
+            server.xenapi.session.get_this_host(server.getSession()))
 
         host_cpu_records = map(server.xenapi.host_cpu.get_record, host_record["host_CPUs"])
 
@@ -1686,7 +1686,7 @@ def xm_debug_keys(args):
     
     if serverType == SERVER_XEN_API:
         server.xenapi.host.send_debug_keys(
-            server.xenapi.session.get_this_host(),
+            server.xenapi.session.get_this_host(server.getSession()),
             keys)
     else:
         server.xend.node.send_debug_keys(keys)
@@ -1715,7 +1715,7 @@ def xm_dmesg(args):
         usage('dmesg')
 
     if serverType == SERVER_XEN_API:
-        host = server.xenapi.session.get_this_host()
+        host = server.xenapi.session.get_this_host(server.getSession())
         if use_clear:
             print server.xenapi.host.dmesg_clear(host),
         else:
@@ -1731,7 +1731,7 @@ def xm_log(args):
 
     if serverType == SERVER_XEN_API:
         print server.xenapi.host.get_log(
-            server.xenapi.session.get_this_host())
+            server.xenapi.session.get_this_host(server.getSession()))
     else:
         print server.xend.node.log()
 
@@ -2371,11 +2371,10 @@ def _run_cmd(cmd, cmd_name, args):
            if isinstance(e, security.ACMError):
                err(str(e))
                return False, 1
-        else:
-            print "Unexpected error:", sys.exc_info()[0]
-            print
-            print "Please report to xen-devel@lists.xensource.com"
-            raise
+        print "Unexpected error:", sys.exc_info()[0]
+        print
+        print "Please report to xen-devel@lists.xensource.com"
+        raise
 
     return False, 1
 

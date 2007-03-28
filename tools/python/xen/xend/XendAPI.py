@@ -32,7 +32,9 @@ from xen.xend.XendAuthSessions import instance as auth_manager
 from xen.xend.XendError import *
 from xen.xend.XendClient import ERROR_INVALID_DOMAIN
 from xen.xend.XendLogging import log
+from xen.xend.XendNetwork import XendNetwork
 from xen.xend.XendTask import XendTask
+from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendVMMetrics import XendVMMetrics
 
 from xen.xend.XendAPIConstants import *
@@ -436,6 +438,12 @@ class XendAPI(object):
             'debug'        : valid_debug,
         }
 
+        autoplug_classes = {
+            'network'     : XendNetwork,
+            'VM_metrics'  : XendVMMetrics,
+            'PIF_metrics' : XendPIFMetrics,
+        }
+
         # Cheat methods
         # -------------
         # Methods that have a trivial implementation for all classes.
@@ -457,6 +465,40 @@ class XendAPI(object):
             setattr(cls, get_by_uuid, _get_by_uuid)
             setattr(cls, get_uuid,    _get_uuid)
 
+
+        # Autoplugging classes
+        # --------------------
+        # These have all of their methods grabbed out from the implementation
+        # class, and wrapped up to be compatible with the Xen-API.
+        
+        for api_cls, impl_cls in autoplug_classes.items():
+            def doit(n):
+                getter = getattr(cls, '_%s_get' % api_cls)
+                dot_n = '%s.%s' % (api_cls, n)
+                full_n = '%s_%s' % (api_cls, n)
+                if not hasattr(cls, full_n):
+                    f = getattr(impl_cls, n)
+                    argcounts[dot_n] = f.func_code.co_argcount + 1
+                    setattr(cls, full_n,
+                            lambda s, session, ref, *args: \
+                               xen_api_success( \
+                                   f(getter(s, session, ref), *args)))
+
+            ro_attrs = getattr(cls, '%s_attr_ro' % api_cls, [])
+            rw_attrs = getattr(cls, '%s_attr_rw' % api_cls, [])
+            methods  = getattr(cls, '%s_methods' % api_cls, [])
+            funcs    = getattr(cls, '%s_funcs'   % api_cls, [])
+            
+            for attr_name in ro_attrs + rw_attrs:
+                doit('get_%s' % attr_name)
+            for attr_name in rw_attrs + cls.Base_attr_rw:
+                doit('set_%s' % attr_name)
+            for method_name, return_type in methods + cls.Base_methods:
+                doit('%s' % method_name)
+            for func_name, return_type in funcs + cls.Base_funcs:
+                doit('%s' % func_name)
+
+
         # Wrapping validators around XMLRPC calls
         # ---------------------------------------
 
@@ -466,7 +508,8 @@ class XendAPI(object):
                 n_ = n.replace('.', '_')
                 try:
                     f = getattr(cls, n_)
-                    argcounts[n] = f.func_code.co_argcount - 1
+                    if n not in argcounts:
+                        argcounts[n] = f.func_code.co_argcount - 1
                     
                     validators = takes_instance and validator and \
                                  [validator] or []
@@ -516,7 +559,7 @@ class XendAPI(object):
 
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
-    Base_methods = [('destroy', None), ('get_record', 'Struct')]
+    Base_methods = [('get_record', 'Struct')]
     Base_funcs   = [('get_all', 'Set'), ('get_by_uuid', None)]
 
     # Xen API: Class Session
@@ -916,59 +959,40 @@ class XendAPI(object):
 
     network_attr_ro = ['VIFs', 'PIFs']
     network_attr_rw = ['name_label',
-                       'name_description']
+                       'name_description',
+                       'other_config']
+    network_methods = [('add_to_other_config', None),
+                       ('remove_from_other_config', None),
+                       ('destroy', None)]
+    network_funcs = [('create', None)]
     
-    network_funcs = [('create', 'network')]
-    
-    def network_create(self, _, name_label, name_description):
-        return xen_api_success(
-            XendNode.instance().network_create(name_label, name_description))
-
-    def network_destroy(self, _, ref):
-        return xen_api_success(XendNode.instance().network_destroy(ref))
-
-    def _get_network(self, ref):
+    def _network_get(self, _, ref):
         return XendNode.instance().get_network(ref)
 
     def network_get_all(self, _):
         return xen_api_success(XendNode.instance().get_network_refs())
 
-    def network_get_record(self, _, ref):
-        return xen_api_success(
-            XendNode.instance().get_network(ref).get_record())
+    def network_create(self, _, record):
+        return xen_api_success(XendNode.instance().network_create(record))
 
-    def network_get_name_label(self, _, ref):
-        return xen_api_success(self._get_network(ref).name_label)
+    def network_destroy(self, _, ref):
+        return xen_api_success(XendNode.instance().network_destroy(ref))
 
-    def network_get_name_description(self, _, ref):
-        return xen_api_success(self._get_network(ref).name_description)
-
-    def network_get_VIFs(self, _, ref):
-        return xen_api_success(self._get_network(ref).get_VIF_UUIDs())
-
-    def network_get_PIFs(self, session, ref):
-        return xen_api_success(self._get_network(ref).get_PIF_UUIDs())
-
-    def network_set_name_label(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_name_label(val))
-
-    def network_set_name_description(self, _, ref, val):
-        return xen_api_success(self._get_network(ref).set_name_description(val))
 
     # Xen API: Class PIF
     # ----------------------------------------------------------------
 
-    PIF_attr_ro = ['metrics']
-    PIF_attr_rw = ['device',
-                   'network',
+    PIF_attr_ro = ['network',
                    'host',
+                   'metrics']
+    PIF_attr_rw = ['device',
                    'MAC',
                    'MTU',
                    'VLAN']
 
     PIF_attr_inst = PIF_attr_rw
 
-    PIF_methods = [('create_VLAN', 'int')]
+    PIF_methods = [('create_VLAN', 'int'), ('destroy', None)]
 
     def _get_PIF(self, ref):
         return XendNode.instance().pifs[ref]
@@ -1049,20 +1073,8 @@ class XendAPI(object):
     def PIF_metrics_get_all(self, _):
         return xen_api_success(XendNode.instance().pif_metrics.keys())
 
-    def _PIF_metrics_get(self, ref):
+    def _PIF_metrics_get(self, _, ref):
         return XendNode.instance().pif_metrics[ref]
-
-    def PIF_metrics_get_record(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).get_record())
-
-    def PIF_metrics_get_io_read_kbs(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).get_io_read_kbs())
-
-    def PIF_metrics_get_io_write_kbs(self, _, ref):
-        return xen_api_success(self._PIF_metrics_get(ref).get_io_write_kbs())
-
-    def PIF_metrics_get_last_updated(self, _1, _2):
-        return xen_api_success(now())
 
 
     # Xen API: Class VM
@@ -1131,7 +1143,8 @@ class XendAPI(object):
                   ('save', None),
                   ('set_memory_dynamic_max_live', None),
                   ('set_memory_dynamic_min_live', None),
-                  ('send_trigger', None)]
+                  ('send_trigger', None),
+                  ('destroy', None)]
     
     VM_funcs  = [('create', 'VM'),
                  ('restore', None),
@@ -1390,7 +1403,8 @@ class XendAPI(object):
             if key.startswith("cpumap"):
                 vcpu = int(key[6:])
                 try:
-                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, value)
+                    cpus = map(int, value.split(","))
+                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, cpus)
                 except Exception, ex:
                     log.exception(ex)
 
@@ -1633,14 +1647,15 @@ class XendAPI(object):
 
     def VM_send_sysrq(self, _, vm_ref, req):
         xeninfo = XendDomain.instance().get_vm_by_uuid(vm_ref)
-        if xeninfo.state != XEN_API_VM_POWER_STATE_RUNNING:
+        if xeninfo.state == XEN_API_VM_POWER_STATE_RUNNING \
+               or xeninfo.state == XEN_API_VM_POWER_STATE_PAUSED:
+            xeninfo.send_sysrq(req)
+            return xen_api_success_void()
+        else:
             return xen_api_error(
                 ['VM_BAD_POWER_STATE', vm_ref,
                  XendDomain.POWER_STATE_NAMES[XEN_API_VM_POWER_STATE_RUNNING],
                  XendDomain.POWER_STATE_NAMES[xeninfo.state]])
-        xeninfo.send_sysrq(req)
-        return xen_api_success_void()
-
 
     def VM_send_trigger(self, _, vm_ref, trigger, vcpu):
         xendom = XendDomain.instance()
@@ -1675,58 +1690,31 @@ class XendAPI(object):
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
-    def _VM_metrics_get(self, ref):
+    def VIF_metrics_get_all(self, session):
+        return self.VIF_get_all(session)
+
+    def _VM_metrics_get(self, _, ref):
         return XendVMMetrics.get_by_uuid(ref)
 
     def VM_metrics_get_all(self, _):
         return xen_api_success(XendVMMetrics.get_all())
 
-    def VM_metrics_get_record(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_record())
-
-    def VM_metrics_get_memory_actual(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_memory_actual())
-
-    def VM_metrics_get_VCPUs_number(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_number())
-
-    def VM_metrics_get_VCPUs_utilisation(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_utilisation())
-
-    def VM_metrics_get_VCPUs_CPU(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_CPU())
-    
-    def VM_metrics_get_VCPUs_flags(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_flags())
-
-    def VM_metrics_get_VCPUs_params(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_VCPUs_params())
-
-    def VM_metrics_get_start_time(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_start_time())
-
-    def VM_metrics_get_state(self, _, ref):
-        return xen_api_success(self._VM_metrics_get(ref).get_state())
-
-    def VM_metrics_get_last_updated(self, _1, _2):
-        return xen_api_success(now())
-
 
     # Xen API: Class VBD
     # ----------------------------------------------------------------
 
-    VBD_attr_ro = ['metrics',
-                   'runtime_properties']
-    VBD_attr_rw = ['VM',
+    VBD_attr_ro = ['VM',
                    'VDI',
-                   'device',
+                   'metrics',
+                   'runtime_properties']
+    VBD_attr_rw = ['device',
                    'bootable',
                    'mode',
                    'type']
 
     VBD_attr_inst = VBD_attr_rw
 
-    VBD_methods = [('media_change', None)]
+    VBD_methods = [('media_change', None), ('destroy', None)]
     VBD_funcs = [('create', 'VBD')]
     
     # object methods
@@ -1868,7 +1856,10 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     VBD_metrics_attr_rw = []
-    VBD_methods = []
+    VBD_metrics_methods = []
+
+    def VBD_metrics_get_all(self, session):
+        return self.VBD_get_all(session)
 
     def VBD_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vbd', ref)
@@ -1893,16 +1884,17 @@ class XendAPI(object):
     # Xen API: Class VIF
     # ----------------------------------------------------------------
 
-    VIF_attr_ro = ['metrics',
+    VIF_attr_ro = ['network',
+                   'VM',
+                   'metrics',
                    'runtime_properties']
     VIF_attr_rw = ['device',
-                   'network',
-                   'VM',
                    'MAC',
                    'MTU']
 
     VIF_attr_inst = VIF_attr_rw
 
+    VIF_methods = [('destroy', None)]
     VIF_funcs = [('create', 'VIF')]
 
                  
@@ -1960,10 +1952,10 @@ class XendAPI(object):
         return xen_api_success(vif_ref)
 
     def VIF_get_VM(self, session, vif_ref):
-        xendom = XendDomain.instance()        
-        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)        
+        xendom = XendDomain.instance()
+        vm = xendom.get_vm_with_dev_uuid('vif', vif_ref)
         return xen_api_success(vm.get_uuid())
-    
+
     def VIF_get_MTU(self, session, vif_ref):
         return self._VIF_get(vif_ref, 'MTU')
     
@@ -2008,7 +2000,7 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     VIF_metrics_attr_rw = []
-    VIF_methods = []
+    VIF_metrics_methods = []
 
     def VIF_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vif', ref)
@@ -2044,7 +2036,7 @@ class XendAPI(object):
                    'other_config']
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
-    VDI_methods = [('snapshot', 'VDI')]
+    VDI_methods = [('snapshot', 'VDI'), ('destroy', None)]
     VDI_funcs = [('create', 'VDI'),
                   ('get_by_name_label', 'Set(VDI)')]
 
@@ -2161,6 +2153,7 @@ class XendAPI(object):
 
     VTPM_attr_inst = VTPM_attr_rw
 
+    VTPM_methods = [('destroy', None)]
     VTPM_funcs = [('create', 'VTPM')]
     
     # object methods
@@ -2319,7 +2312,7 @@ class XendAPI(object):
                     'name_label',
                     'name_description']
     
-    SR_methods = [('clone', 'SR')]
+    SR_methods = [('clone', 'SR'), ('destroy', None)]
     SR_funcs = [('get_by_name_label', 'Set(SR)'),
                 ('get_by_uuid', 'SR')]
 

@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_network_decl.h"
 #include "xen_pif_decl.h"
+#include "xen_string_string_map.h"
 #include "xen_vif_decl.h"
 
 
@@ -68,6 +69,7 @@ typedef struct xen_network_record
     char *name_description;
     struct xen_vif_record_opt_set *vifs;
     struct xen_pif_record_opt_set *pifs;
+    xen_string_string_map *other_config;
 } xen_network_record;
 
 /**
@@ -220,6 +222,13 @@ xen_network_get_pifs(xen_session *session, struct xen_pif_set **result, xen_netw
 
 
 /**
+ * Get the other_config field of the given network.
+ */
+extern bool
+xen_network_get_other_config(xen_session *session, xen_string_string_map **result, xen_network network);
+
+
+/**
  * Set the name/label field of the given network.
  */
 extern bool
@@ -231,6 +240,30 @@ xen_network_set_name_label(xen_session *session, xen_network network, char *labe
  */
 extern bool
 xen_network_set_name_description(xen_session *session, xen_network network, char *description);
+
+
+/**
+ * Set the other_config field of the given network.
+ */
+extern bool
+xen_network_set_other_config(xen_session *session, xen_network network, xen_string_string_map *other_config);
+
+
+/**
+ * Add the given key-value pair to the other_config field of the given
+ * network.
+ */
+extern bool
+xen_network_add_to_other_config(xen_session *session, xen_network network, char *key, char *value);
+
+
+/**
+ * Remove the given key and its corresponding value from the
+ * other_config field of the given network.  If the key is not in that Map,
+ * then do nothing.
+ */
+extern bool
+xen_network_remove_from_other_config(xen_session *session, xen_network network, char *key);
 
 
 /**

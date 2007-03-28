@@ -10,6 +10,7 @@
 #include <xen/event.h>
 #include <xen/multicall.h>
 #include <xen/guest_access.h>
+#include <xen/perfc.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 
@@ -69,14 +70,18 @@ do_multicall(
         guest_handle_add_offset(call_list, 1);
     }
 
+    perfc_incr(calls_to_multicall);
+    perfc_add(calls_from_multicall, nr_calls);
     mcs->flags = 0;
     return 0;
 
  fault:
+    perfc_incr(calls_to_multicall);
     mcs->flags = 0;
     return -EFAULT;
 
  preempted:
+    perfc_add(calls_from_multicall, i);
     mcs->flags = 0;
     return hypercall_create_continuation(
         __HYPERVISOR_multicall, "hi", call_list, nr_calls-i);

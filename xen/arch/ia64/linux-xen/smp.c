@@ -148,7 +148,7 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long ops;
 
 #ifdef XEN
-	perfc_incrc(ipis);
+	perfc_incr(ipis);
 #endif
 	mb();	/* Order interrupt and bit testing. */
 	while ((ops = xchg(pending_ipis, 0)) != 0) {

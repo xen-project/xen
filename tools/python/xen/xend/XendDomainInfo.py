@@ -152,8 +152,9 @@ def recreate(info, priv):
     try:
         vmpath = xstransact.Read(dompath, "vm")
         if not vmpath:
-            log.warn('/local/domain/%d/vm is missing. recreate is '
-                     'confused, trying our best to recover' % domid)
+            if not priv:
+                log.warn('/local/domain/%d/vm is missing. recreate is '
+                         'confused, trying our best to recover' % domid)
             needs_reinitialising = True
             raise XendError('reinit')
         
@@ -2354,7 +2355,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING \
+               or self.state == XEN_API_VM_POWER_STATE_PAUSED:
 
             _, config = self.info['devices'][dev_uuid]
             dev_control = self.getDeviceController('vif')

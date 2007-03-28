@@ -1,6 +1,8 @@
 #ifndef __X86_64_ASM_DEFNS_H__
 #define __X86_64_ASM_DEFNS_H__
 
+#include <asm/percpu.h>
+
 #ifndef NDEBUG
 /* Indicate special exception stack frame by inverting the frame pointer. */
 #define SETUP_EXCEPTION_FRAME_POINTER           \
@@ -47,13 +49,18 @@
         popq  %rdi;
 
 #ifdef PERF_COUNTERS
-#define PERFC_INCR(_name,_idx)                  \
-    pushq %rdx;                                 \
-    leaq perfcounters+_name(%rip),%rdx;         \
-    lock incl (%rdx,_idx,4);                    \
-    popq %rdx;
+#define PERFC_INCR(_name,_idx,_cur)             \
+        pushq _cur;                             \
+        movslq VCPU_processor(_cur),_cur;       \
+        pushq %rdx;                             \
+        leaq per_cpu__perfcounters(%rip),%rdx;  \
+        shlq $PERCPU_SHIFT,_cur;                \
+        addq %rdx,_cur;                         \
+        popq %rdx;                              \
+        incl _name*4(_cur,_idx,4);              \
+        popq _cur
 #else
-#define PERFC_INCR(_name,_idx)
+#define PERFC_INCR(_name,_idx,_cur)
 #endif
 
 /* Work around AMD erratum #88 */

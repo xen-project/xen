@@ -298,7 +298,7 @@ class XendConfig(dict):
             'actions_after_reboot': 'restart',
             'actions_after_crash': 'restart',
             'actions_after_suspend': '',
-            'is_template': False,
+            'is_a_template': False,
             'is_control_domain': False,
             'features': '',
             'PV_bootloader': '',
@@ -452,7 +452,10 @@ class XendConfig(dict):
         for key, typ in XENAPI_CFG_TYPES.items():
             val = sxp.child_value(sxp_cfg, key)
             if val is not None:
-                cfg[key] = typ(val)
+                try:
+                    cfg[key] = typ(val)
+                except (ValueError, TypeError), e:
+                    log.warn('Unable to convert type value for key: %s' % key)
 
         # Convert deprecated options to current equivalents.
         
@@ -845,6 +848,8 @@ class XendConfig(dict):
                     sxpr.append([name, s])
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
+            if legacy in ('cpus'): # skip this
+                continue
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
                 if type(self[xenapi]) == bool:
                     # convert booleans to ints before making an sxp item
@@ -858,7 +863,7 @@ class XendConfig(dict):
         sxpr.append(["memory", int(self["memory_dynamic_max"])/MiB])
 
         for legacy in LEGACY_UNSUPPORTED_BY_XENAPI_CFG:
-            if legacy in ('domid', 'uuid'): # skip these
+            if legacy in ('domid', 'uuid', 'cpus'): # skip these
                 continue
             if self.has_key(legacy) and self[legacy] not in (None, []):
                 sxpr.append([legacy, self[legacy]])

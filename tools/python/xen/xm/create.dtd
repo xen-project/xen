@@ -111,7 +111,7 @@
 
 <!ELEMENT other_config EMPTY>
 <!ATTLIST other_config key   CDATA #REQUIRED
-                      value CDATA #REQUIRED>
+                       value CDATA #REQUIRED>
 
 <!ELEMENT qos_algorithm_param EMPTY>
 <!ATTLIST qos_algorithm_param key   CDATA #REQUIRED

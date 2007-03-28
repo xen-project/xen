@@ -72,7 +72,7 @@ search_pre_exception_table(struct cpu_user_regs *regs)
     if ( fixup )
     {
         dprintk(XENLOG_INFO, "Pre-exception: %p -> %p\n", _p(addr), _p(fixup));
-        perfc_incrc(exception_fixed);
+        perfc_incr(exception_fixed);
     }
     return fixup;
 }

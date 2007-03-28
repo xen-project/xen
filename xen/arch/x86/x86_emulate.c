@@ -1565,8 +1565,10 @@ x86_emulate(
             if ( ((op_bytes = dst.bytes) != 8) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
-                if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
-                                     &dst.val, 8, ctxt)) != 0 )
+                if ( dst.type == OP_REG )
+                    dst.val = *dst.reg;
+                else if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
+                                          &dst.val, 8, ctxt)) != 0 )
                     goto done;
             }
             src.val = _regs.eip;
@@ -1579,8 +1581,10 @@ x86_emulate(
             if ( mode_64bit() && (dst.bytes == 4) )
             {
                 dst.bytes = 8;
-                if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
-                                     &dst.val, 8, ctxt)) != 0 )
+                if ( dst.type == OP_REG )
+                    dst.val = *dst.reg;
+                else if ( (rc = ops->read(dst.mem.seg, dst.mem.off,
+                                          &dst.val, 8, ctxt)) != 0 )
                     goto done;
             }
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
