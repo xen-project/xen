@@ -204,11 +204,6 @@ static inline int get_page_and_type(struct page_info *page,
     return rc;
 }
 
-static inline int page_is_removable(struct page_info *page)
-{
-    return ((page->count_info & PGC_count_mask) == 1);
-}
-
 extern void synchronise_pagetables(unsigned long cpu_mask);
 
 /* XXX don't know what this is for */

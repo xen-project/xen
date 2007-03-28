@@ -173,11 +173,11 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
-    if ( unlikely(!page_is_removable(page)) )
+    if ( unlikely((page->count_info & PGC_count_mask) != 1) )
     {
         shadow_drop_references(d, page);
         /* We'll make this a guest-visible error in future, so take heed! */
-        if ( !page_is_removable(page) )
+        if ( (page->count_info & PGC_count_mask) != 1 )
             gdprintk(XENLOG_INFO, "Dom%d freeing in-use page %lx "
                      "(pseudophys %lx): count=%lx type=%lx\n",
                      d->domain_id, mfn, get_gpfn_from_mfn(mfn),
