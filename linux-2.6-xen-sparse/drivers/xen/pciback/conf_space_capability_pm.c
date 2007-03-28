@@ -32,19 +32,19 @@ static int pm_ctrl_write(struct pci_dev *dev, int offset, u16 new_value,
 			 void *data)
 {
 	int err;
-	u16 cur_value;
-	pci_power_t new_state;
+	u16 old_value;
+	pci_power_t new_state, old_state;
 
-	/* Handle setting power state separately */
-	new_state = (pci_power_t)(new_value & PCI_PM_CTRL_STATE_MASK);
-
-	err = pci_read_config_word(dev, offset, &cur_value);
+	err = pci_read_config_word(dev, offset, &old_value);
 	if (err)
 		goto out;
 
+	old_state = (pci_power_t)(old_value & PCI_PM_CTRL_STATE_MASK);
+	new_state = (pci_power_t)(new_value & PCI_PM_CTRL_STATE_MASK);
+
 	new_value &= PM_OK_BITS;
-	if ((cur_value & PM_OK_BITS) != new_value) {
-		new_value = (cur_value & ~PM_OK_BITS) | new_value;
+	if ((old_value & PM_OK_BITS) != new_value) {
+		new_value = (old_value & ~PM_OK_BITS) | new_value;
 		err = pci_write_config_word(dev, offset, new_value);
 		if (err)
 			goto out;
@@ -53,10 +53,25 @@ static int pm_ctrl_write(struct pci_dev *dev, int offset, u16 new_value,
 	/* Let pci core handle the power management change */
 	dev_dbg(&dev->dev, "set power state to %x\n", new_state);
 	err = pci_set_power_state(dev, new_state);
-	if (err)
+	if (err) {
 		err = PCIBIOS_SET_FAILED;
+		goto out;
+	}
 
-      out:
+	/*
+	 * Device may lose PCI config info on D3->D0 transition. This
+	 * is a problem for some guests which will not reset BARs. Even
+	 * those that have a go will be foiled by our BAR-write handler
+	 * which will discard the write! Since Linux won't re-init
+	 * the config space automatically in all cases, we do it here.
+	 * Future: Should we re-initialise all first 64 bytes of config space?
+	 */
+	if (new_state == PCI_D0 &&
+	    (old_state == PCI_D3hot || old_state == PCI_D3cold) &&
+	    !(old_value & PCI_PM_CTRL_NO_SOFT_RESET))
+		pci_restore_bars(dev);
+
+ out:
 	return err;
 }
 
