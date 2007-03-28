@@ -126,11 +126,10 @@ class XMLRPCServer:
                          'all interfaces, port ',
                          self.port, authmsg)
 
-                if not ssl_enabled:
-                    raise ValueError("pyOpenSSL not installed. "
-                                     "Unable to start HTTPS XML-RPC server")
-
                 if using_ssl:
+                    if not ssl_enabled:
+                        raise ValueError("pyOpenSSL not installed. "
+                                         "Unable to start HTTPS XML-RPC server")
                     self.server = SSLXMLRPCServer(
                         (self.host, self.port),
                         self.hosts_allowed,
