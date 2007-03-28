@@ -2371,11 +2371,10 @@ def _run_cmd(cmd, cmd_name, args):
            if isinstance(e, security.ACMError):
                err(str(e))
                return False, 1
-        else:
-            print "Unexpected error:", sys.exc_info()[0]
-            print
-            print "Please report to xen-devel@lists.xensource.com"
-            raise
+        print "Unexpected error:", sys.exc_info()[0]
+        print
+        print "Please report to xen-devel@lists.xensource.com"
+        raise
 
     return False, 1
 
