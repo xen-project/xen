@@ -188,21 +188,22 @@ def _loadConfig(servers, root, reload):
             for server_cfg in api_cfg:
                 # Parse the xen-api-server config
                 
-                host = 'localhost'
-                port = 0
-                use_tcp = False
                 ssl_key_file = None
                 ssl_cert_file = None
                 auth_method = XendAPI.AUTH_NONE
                 hosts_allowed = None
                 
                 host_addr = server_cfg[0].split(':', 1)
-                if len(host_addr) == 1 and host_addr[0].lower() == 'unix':
-                    use_tcp = False
-                elif len(host_addr) == 1:
-                    use_tcp = True
-                    port = int(host_addr[0])
-                elif len(host_addr) == 2:
+                if len(host_addr) == 1:
+                    if host_addr[0].lower() == 'unix':
+                        use_tcp = False
+                        host = 'localhost'
+                        port = 0
+                    else:
+                        use_tcp = True
+                        host = ''
+                        port = int(host_addr[0])
+                else:
                     use_tcp = True
                     host = str(host_addr[0])
                     port = int(host_addr[1])
@@ -213,7 +214,6 @@ def _loadConfig(servers, root, reload):
 
                 if len(server_cfg) > 2:
                     hosts_allowed = server_cfg[2] or None
-                
 
                 if len(server_cfg) > 4:
                     # SSL key and cert file
