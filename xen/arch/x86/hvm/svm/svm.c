@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
 
 #include <xen/config.h>
@@ -50,19 +49,12 @@
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
 
-#define SVM_EXTRA_DEBUG
-
 #define set_segment_register(name, value)  \
-       __asm__ __volatile__ ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
+    asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
-/* External functions. We should move these to some suitable header file(s) */
-
-extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
-                                int inst_len);
-extern asmlinkage void do_IRQ(struct cpu_user_regs *);
-extern void svm_dump_inst(unsigned long eip);
-extern int svm_dbg_on;
-void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
+int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
+                         int inst_len);
+asmlinkage void do_IRQ(struct cpu_user_regs *);
 
 static int svm_reset_to_realmode(struct vcpu *v,
                                  struct cpu_user_regs *regs);
@@ -324,9 +316,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 
 #define loaddebug(_v,_reg) \
-    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+    asm volatile ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
 #define savedebug(_v,_reg) \
-    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
+    asm volatile ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
 
 static inline void svm_save_dr(struct vcpu *v)
 {
@@ -802,69 +794,6 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
-
-int svm_dbg_on = 0;
-
-static inline int svm_do_debugout(unsigned long exit_code)
-{
-    int i;
-
-    static unsigned long counter = 0;
-    static unsigned long works[] =
-    {
-        VMEXIT_IOIO,
-        VMEXIT_HLT,
-        VMEXIT_CPUID,
-        VMEXIT_DR0_READ,
-        VMEXIT_DR1_READ,
-        VMEXIT_DR2_READ,
-        VMEXIT_DR3_READ,
-        VMEXIT_DR6_READ,
-        VMEXIT_DR7_READ,
-        VMEXIT_DR0_WRITE,
-        VMEXIT_DR1_WRITE,
-        VMEXIT_DR2_WRITE,
-        VMEXIT_DR3_WRITE,
-        VMEXIT_CR0_READ,
-        VMEXIT_CR0_WRITE,
-        VMEXIT_CR3_READ,
-        VMEXIT_CR4_READ, 
-        VMEXIT_MSR,
-        VMEXIT_CR0_WRITE,
-        VMEXIT_CR3_WRITE,
-        VMEXIT_CR4_WRITE,
-        VMEXIT_EXCEPTION_PF,
-        VMEXIT_INTR,
-        VMEXIT_INVLPG,
-        VMEXIT_EXCEPTION_NM
-    };
-
-
-#if 0
-    if (svm_dbg_on && exit_code != 0x7B)
-        return 1;
-#endif
-
-    counter++;
-
-#if 0
-    if ((exit_code == 0x4E 
-         || exit_code == VMEXIT_CR0_READ 
-         || exit_code == VMEXIT_CR0_WRITE) 
-        && counter < 200000)
-        return 0;
-
-    if ((exit_code == 0x4E) && counter < 500000)
-        return 0;
-#endif
-
-    for (i = 0; i < sizeof(works) / sizeof(works[0]); i++)
-        if (exit_code == works[i])
-            return 0;
-
-    return 1;
-}
-
 static void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -1086,17 +1015,6 @@ static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
     return 0;
 }
 
-
-static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
-{
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, 
-                "svm_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
-                va, (unsigned long)current->arch.hvm_svm.vmcb->rip,
-                (unsigned long)regs->error_code);
-    return paging_fault(va, regs); 
-}
-
-
 static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
 {
     struct vcpu *v = current;
@@ -1120,8 +1038,6 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     unsigned int eax, ebx, ecx, edx;
     struct vcpu *v = current;
     int inst_len;
-
-    ASSERT(vmcb);
 
     hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
 
@@ -1254,8 +1170,8 @@ static inline unsigned long *get_reg_p(
 }
 
 
-static inline unsigned long get_reg(unsigned int gpreg, 
-                                    struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
+static inline unsigned long get_reg(
+    unsigned int gpreg, struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
     unsigned long *gp;
     gp = get_reg_p(gpreg, regs, vmcb);
@@ -1263,8 +1179,9 @@ static inline unsigned long get_reg(unsigned int gpreg,
 }
 
 
-static inline void set_reg(unsigned int gpreg, unsigned long value, 
-                           struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
+static inline void set_reg(
+    unsigned int gpreg, unsigned long value, 
+    struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
     unsigned long *gp;
     gp = get_reg_p(gpreg, regs, vmcb);
@@ -1534,7 +1451,6 @@ static void svm_io_instruction(struct vcpu *v)
     ioio_info_t info;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(vmcb);
     pio_opp = &current->arch.hvm_vcpu.io_op;
     pio_opp->instr = INSTR_PIO;
     pio_opp->flags = 0;
@@ -1683,8 +1599,6 @@ static int npt_set_cr0(unsigned long value)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
   
-    ASSERT(vmcb);
-
     /* ET is reserved and should be always be 1*/
     value |= X86_CR0_ET;
 
@@ -1732,8 +1646,6 @@ static int svm_set_cr0(unsigned long value)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long old_base_mfn;
   
-    ASSERT(vmcb);
-
     /* We don't want to lose PG.  ET is reserved and should be always be 1*/
     paging_enabled = svm_paging_enabled(v);
     value |= X86_CR0_ET;
@@ -1821,10 +1733,6 @@ static int svm_set_cr0(unsigned long value)
     return 1;
 }
 
-//
-// nested paging functions
-//
-
 static int npt_mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 {  
     unsigned long value;
@@ -1832,11 +1740,10 @@ static int npt_mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    ASSERT(vmcb);
-
     value = get_reg(gpreg, regs, vmcb);
 
-    switch (cr) {
+    switch ( cr )
+    {
     case 0:
         return npt_set_cr0(value);
 
@@ -1869,13 +1776,11 @@ static void npt_mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     struct vcpu *v = current;
-    struct vmcb_struct *vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    vmcb = v->arch.hvm_svm.vmcb;
-    ASSERT(vmcb);
-
-    switch(cr) {
+    switch ( cr )
+    {
     case 0:
         value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr0;
         break;
@@ -1908,30 +1813,21 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     unsigned long value = 0;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
-    struct vmcb_struct *vmcb;
-
-    vmcb = v->arch.hvm_svm.vmcb;
-    ASSERT(vmcb);
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     switch ( cr )
     {
     case 0:
         value = v->arch.hvm_svm.cpu_shadow_cr0;
-        if (svm_dbg_on)
-            printk("CR0 read =%lx \n", value );
         break;
     case 2:
         value = vmcb->cr2;
         break;
     case 3:
-        value = (unsigned long) v->arch.hvm_svm.cpu_cr3;
-        if (svm_dbg_on)
-            printk("CR3 read =%lx \n", value );
+        value = (unsigned long)v->arch.hvm_svm.cpu_cr3;
         break;
     case 4:
-        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
-        if (svm_dbg_on)
-            printk("CR4 read=%lx\n", value);
+        value = (unsigned long)v->arch.hvm_svm.cpu_shadow_cr4;
         break;
     case 8:
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
@@ -1971,21 +1867,18 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     switch (cr) 
     {
     case 0: 
-        if (svm_dbg_on)
-            printk("CR0 write =%lx \n", value );
         return svm_set_cr0(value);
 
     case 3: 
-        if (svm_dbg_on)
-            printk("CR3 write =%lx \n", value );
         /* If paging is not enabled yet, simply copy the value to CR3. */
-        if (!svm_paging_enabled(v)) {
+        if ( !svm_paging_enabled(v) )
+        {
             v->arch.hvm_svm.cpu_cr3 = value;
             break;
         }
 
         /* We make a new one if the shadow does not exist. */
-        if (value == v->arch.hvm_svm.cpu_cr3) 
+        if ( value == v->arch.hvm_svm.cpu_cr3 )
         {
             /* 
              * This is simple TLB flush, implying the guest has 
@@ -1993,7 +1886,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              * We simply invalidate the shadow.
              */
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if (mfn != pagetable_get_pfn(v->arch.guest_table))
+            if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
                 goto bad_cr3;
             paging_update_cr3(v);
         }
@@ -2005,13 +1898,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
                 goto bad_cr3;
 
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
 
-            if (old_base_mfn)
+            if ( old_base_mfn )
                 put_page(mfn_to_page(old_base_mfn));
 
             v->arch.hvm_svm.cpu_cr3 = value;
@@ -2021,9 +1914,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         break;
 
     case 4: /* CR4 */
-        if (svm_dbg_on)
-            printk( "write cr4=%lx, cr0=%lx\n", 
-                    value,  v->arch.hvm_svm.cpu_shadow_cr0 );
         old_cr = v->arch.hvm_svm.cpu_shadow_cr4;
         if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
         {
@@ -2113,8 +2003,6 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     enum instruction_index list_b[] = {INSTR_MOVCR2, INSTR_SMSW};
     enum instruction_index match;
 
-    ASSERT(vmcb);
-
     inst_copy_from_guest(buffer, svm_rip2pointer(v), sizeof(buffer));
 
     /* get index to first actual instruction byte - as we will need to know 
@@ -2169,20 +2057,10 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     case INSTR_LMSW:
-        if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(v));
-        
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
 
-        if (svm_dbg_on)
-            printk("CR0-LMSW value=%lx, reg=%d, inst_len=%d\n", value, gpreg, 
-                   inst_len);
-
         value = (v->arch.hvm_svm.cpu_shadow_cr0 & ~0xF) | value;
-
-        if (svm_dbg_on)
-            printk("CR0-LMSW CR0 - New value=%lx\n", value);
 
         if ( paging_mode_hap(v->domain) )
             result = npt_set_cr0(value);
@@ -2191,15 +2069,9 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     case INSTR_SMSW:
-        if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(v));
         value = v->arch.hvm_svm.cpu_shadow_cr0;
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         set_reg(gpreg, value, regs, vmcb);
-
-        if (svm_dbg_on)
-            printk("CR0-SMSW value=%lx, reg=%d, inst_len=%d\n", value, gpreg, 
-                   inst_len);
         break;
 
     default:
@@ -2220,8 +2092,6 @@ static inline void svm_do_msr_access(
     int  inst_len;
     u64 msr_content=0;
     u32 ecx = regs->ecx, eax, edx;
-
-    ASSERT(vmcb);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x, exitinfo = %lx",
                 ecx, (u32)regs->eax, (u32)regs->edx,
@@ -2334,7 +2204,7 @@ static void svm_vmexit_do_invd(struct vcpu *v)
     /* Tell the user that we did this - just in case someone runs some really 
      * weird operating system and wants to know why it's not working...
      */
-    printk("INVD instruction intercepted - ignored\n");
+    gdprintk(XENLOG_WARNING, "INVD instruction intercepted - ignored\n");
     
     inst_len = __get_instruction_length(v, INSTR_INVD, NULL);
     __update_guest_eip(vmcb, inst_len);
@@ -2408,15 +2278,8 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 static int svm_reset_to_realmode(struct vcpu *v, 
                                  struct cpu_user_regs *regs)
 {
-    struct vmcb_struct *vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(v);
-    ASSERT(regs);
-
-    vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
-    
     /* clear the vmcb and user regs */
     memset(regs, 0, sizeof(struct cpu_user_regs));
    
@@ -2498,394 +2361,28 @@ static int svm_reset_to_realmode(struct vcpu *v,
     return 0;
 }
 
-
-void svm_dump_inst(unsigned long eip)
-{
-    u8 opcode[256];
-    unsigned long ptr;
-    int len;
-    int i;
-
-    ptr = eip & ~0xff;
-    len = 0;
-
-    if (hvm_copy_from_guest_virt(opcode, ptr, sizeof(opcode)) == 0)
-        len = sizeof(opcode);
-
-    printk("Code bytes around(len=%d) %lx:", len, eip);
-    for (i = 0; i < len; i++)
-    {
-        if ((i & 0x0f) == 0)
-            printk("\n%08lx:", ptr+i);
-
-        printk("%02x ", opcode[i]);
-    }
-
-    printk("\n");
-}
-
-
-void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long pt = v->arch.hvm_vcpu.hw_cr3;
-
-    printk("%s: guest registers from %s:\n", __func__, from);
-#if defined (__x86_64__)
-    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
-           regs->rax, regs->rbx, regs->rcx);
-    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
-           regs->rdx, regs->rsi, regs->rdi);
-    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
-           regs->rbp, regs->rsp, regs->r8);
-    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
-           regs->r9,  regs->r10, regs->r11);
-    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-           regs->r12, regs->r13, regs->r14);
-    printk("r15: %016lx   cr0: %016lx   cr3: %016lx\n",
-           regs->r15, v->arch.hvm_svm.cpu_shadow_cr0, vmcb->cr3);
-#else
-    printk("eax: %08x, ebx: %08x, ecx: %08x, edx: %08x\n", 
-           regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printk("edi: %08x, esi: %08x, ebp: %08x, esp: %08x\n", 
-           regs->edi, regs->esi, regs->ebp, regs->esp);
-    printk("%s: guest cr0: %lx\n", __func__, 
-           v->arch.hvm_svm.cpu_shadow_cr0);
-    printk("guest CR3 = %llx\n", vmcb->cr3);
-#endif
-    printk("%s: pt = %lx\n", __func__, pt);
-}
-
-
-void svm_dump_host_regs(const char *from)
-{
-    struct vcpu *v = current;
-    unsigned long pt = pt = pagetable_get_paddr(v->arch.monitor_table);
-    unsigned long cr3, cr0;
-    printk("Host registers at %s\n", from);
-
-    __asm__ __volatile__ ("\tmov %%cr0,%0\n"
-                          "\tmov %%cr3,%1\n"
-                          : "=r" (cr0), "=r"(cr3));
-    printk("%s: pt = %lx, cr3 = %lx, cr0 = %lx\n", __func__, pt, cr3, cr0);
-}
-
-#ifdef SVM_EXTRA_DEBUG
-static char *exit_reasons[] = {
-    [VMEXIT_CR0_READ] = "CR0_READ",
-    [VMEXIT_CR1_READ] = "CR1_READ",
-    [VMEXIT_CR2_READ] = "CR2_READ",
-    [VMEXIT_CR3_READ] = "CR3_READ",
-    [VMEXIT_CR4_READ] = "CR4_READ",
-    [VMEXIT_CR5_READ] = "CR5_READ",
-    [VMEXIT_CR6_READ] = "CR6_READ",
-    [VMEXIT_CR7_READ] = "CR7_READ",
-    [VMEXIT_CR8_READ] = "CR8_READ",
-    [VMEXIT_CR9_READ] = "CR9_READ",
-    [VMEXIT_CR10_READ] = "CR10_READ",
-    [VMEXIT_CR11_READ] = "CR11_READ",
-    [VMEXIT_CR12_READ] = "CR12_READ",
-    [VMEXIT_CR13_READ] = "CR13_READ",
-    [VMEXIT_CR14_READ] = "CR14_READ",
-    [VMEXIT_CR15_READ] = "CR15_READ",
-    [VMEXIT_CR0_WRITE] = "CR0_WRITE",
-    [VMEXIT_CR1_WRITE] = "CR1_WRITE",
-    [VMEXIT_CR2_WRITE] = "CR2_WRITE",
-    [VMEXIT_CR3_WRITE] = "CR3_WRITE",
-    [VMEXIT_CR4_WRITE] = "CR4_WRITE",
-    [VMEXIT_CR5_WRITE] = "CR5_WRITE",
-    [VMEXIT_CR6_WRITE] = "CR6_WRITE",
-    [VMEXIT_CR7_WRITE] = "CR7_WRITE",
-    [VMEXIT_CR8_WRITE] = "CR8_WRITE",
-    [VMEXIT_CR9_WRITE] = "CR9_WRITE",
-    [VMEXIT_CR10_WRITE] = "CR10_WRITE",
-    [VMEXIT_CR11_WRITE] = "CR11_WRITE",
-    [VMEXIT_CR12_WRITE] = "CR12_WRITE",
-    [VMEXIT_CR13_WRITE] = "CR13_WRITE",
-    [VMEXIT_CR14_WRITE] = "CR14_WRITE",
-    [VMEXIT_CR15_WRITE] = "CR15_WRITE",
-    [VMEXIT_DR0_READ] = "DR0_READ",
-    [VMEXIT_DR1_READ] = "DR1_READ",
-    [VMEXIT_DR2_READ] = "DR2_READ",
-    [VMEXIT_DR3_READ] = "DR3_READ",
-    [VMEXIT_DR4_READ] = "DR4_READ",
-    [VMEXIT_DR5_READ] = "DR5_READ",
-    [VMEXIT_DR6_READ] = "DR6_READ",
-    [VMEXIT_DR7_READ] = "DR7_READ",
-    [VMEXIT_DR8_READ] = "DR8_READ",
-    [VMEXIT_DR9_READ] = "DR9_READ",
-    [VMEXIT_DR10_READ] = "DR10_READ",
-    [VMEXIT_DR11_READ] = "DR11_READ",
-    [VMEXIT_DR12_READ] = "DR12_READ",
-    [VMEXIT_DR13_READ] = "DR13_READ",
-    [VMEXIT_DR14_READ] = "DR14_READ",
-    [VMEXIT_DR15_READ] = "DR15_READ",
-    [VMEXIT_DR0_WRITE] = "DR0_WRITE",
-    [VMEXIT_DR1_WRITE] = "DR1_WRITE",
-    [VMEXIT_DR2_WRITE] = "DR2_WRITE",
-    [VMEXIT_DR3_WRITE] = "DR3_WRITE",
-    [VMEXIT_DR4_WRITE] = "DR4_WRITE",
-    [VMEXIT_DR5_WRITE] = "DR5_WRITE",
-    [VMEXIT_DR6_WRITE] = "DR6_WRITE",
-    [VMEXIT_DR7_WRITE] = "DR7_WRITE",
-    [VMEXIT_DR8_WRITE] = "DR8_WRITE",
-    [VMEXIT_DR9_WRITE] = "DR9_WRITE",
-    [VMEXIT_DR10_WRITE] = "DR10_WRITE",
-    [VMEXIT_DR11_WRITE] = "DR11_WRITE",
-    [VMEXIT_DR12_WRITE] = "DR12_WRITE",
-    [VMEXIT_DR13_WRITE] = "DR13_WRITE",
-    [VMEXIT_DR14_WRITE] = "DR14_WRITE",
-    [VMEXIT_DR15_WRITE] = "DR15_WRITE",
-    [VMEXIT_EXCEPTION_DE] = "EXCEPTION_DE",
-    [VMEXIT_EXCEPTION_DB] = "EXCEPTION_DB",
-    [VMEXIT_EXCEPTION_NMI] = "EXCEPTION_NMI",
-    [VMEXIT_EXCEPTION_BP] = "EXCEPTION_BP",
-    [VMEXIT_EXCEPTION_OF] = "EXCEPTION_OF",
-    [VMEXIT_EXCEPTION_BR] = "EXCEPTION_BR",
-    [VMEXIT_EXCEPTION_UD] = "EXCEPTION_UD",
-    [VMEXIT_EXCEPTION_NM] = "EXCEPTION_NM",
-    [VMEXIT_EXCEPTION_DF] = "EXCEPTION_DF",
-    [VMEXIT_EXCEPTION_09] = "EXCEPTION_09",
-    [VMEXIT_EXCEPTION_TS] = "EXCEPTION_TS",
-    [VMEXIT_EXCEPTION_NP] = "EXCEPTION_NP",
-    [VMEXIT_EXCEPTION_SS] = "EXCEPTION_SS",
-    [VMEXIT_EXCEPTION_GP] = "EXCEPTION_GP",
-    [VMEXIT_EXCEPTION_PF] = "EXCEPTION_PF",
-    [VMEXIT_EXCEPTION_15] = "EXCEPTION_15",
-    [VMEXIT_EXCEPTION_MF] = "EXCEPTION_MF",
-    [VMEXIT_EXCEPTION_AC] = "EXCEPTION_AC",
-    [VMEXIT_EXCEPTION_MC] = "EXCEPTION_MC",
-    [VMEXIT_EXCEPTION_XF] = "EXCEPTION_XF",
-    [VMEXIT_INTR] = "INTR",
-    [VMEXIT_NMI] = "NMI",
-    [VMEXIT_SMI] = "SMI",
-    [VMEXIT_INIT] = "INIT",
-    [VMEXIT_VINTR] = "VINTR",
-    [VMEXIT_CR0_SEL_WRITE] = "CR0_SEL_WRITE",
-    [VMEXIT_IDTR_READ] = "IDTR_READ",
-    [VMEXIT_GDTR_READ] = "GDTR_READ",
-    [VMEXIT_LDTR_READ] = "LDTR_READ",
-    [VMEXIT_TR_READ] = "TR_READ",
-    [VMEXIT_IDTR_WRITE] = "IDTR_WRITE",
-    [VMEXIT_GDTR_WRITE] = "GDTR_WRITE",
-    [VMEXIT_LDTR_WRITE] = "LDTR_WRITE",
-    [VMEXIT_TR_WRITE] = "TR_WRITE",
-    [VMEXIT_RDTSC] = "RDTSC",
-    [VMEXIT_RDPMC] = "RDPMC",
-    [VMEXIT_PUSHF] = "PUSHF",
-    [VMEXIT_POPF] = "POPF",
-    [VMEXIT_CPUID] = "CPUID",
-    [VMEXIT_RSM] = "RSM",
-    [VMEXIT_IRET] = "IRET",
-    [VMEXIT_SWINT] = "SWINT",
-    [VMEXIT_INVD] = "INVD",
-    [VMEXIT_PAUSE] = "PAUSE",
-    [VMEXIT_HLT] = "HLT",
-    [VMEXIT_INVLPG] = "INVLPG",
-    [VMEXIT_INVLPGA] = "INVLPGA",
-    [VMEXIT_IOIO] = "IOIO",
-    [VMEXIT_MSR] = "MSR",
-    [VMEXIT_TASK_SWITCH] = "TASK_SWITCH",
-    [VMEXIT_FERR_FREEZE] = "FERR_FREEZE",
-    [VMEXIT_SHUTDOWN] = "SHUTDOWN",
-    [VMEXIT_VMRUN] = "VMRUN",
-    [VMEXIT_VMMCALL] = "VMMCALL",
-    [VMEXIT_VMLOAD] = "VMLOAD",
-    [VMEXIT_VMSAVE] = "VMSAVE",
-    [VMEXIT_STGI] = "STGI",
-    [VMEXIT_CLGI] = "CLGI",
-    [VMEXIT_SKINIT] = "SKINIT",
-    [VMEXIT_RDTSCP] = "RDTSCP",
-    [VMEXIT_ICEBP] = "ICEBP",
-    [VMEXIT_NPF] = "NPF"
-};
-#endif /* SVM_EXTRA_DEBUG */
-
-#ifdef SVM_WALK_GUEST_PAGES
-void walk_shadow_and_guest_pt(unsigned long gva)
-{
-    l2_pgentry_t gpde;
-    l2_pgentry_t spde;
-    l1_pgentry_t gpte;
-    l1_pgentry_t spte;
-    struct vcpu        *v    = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    paddr_t gpa;
-
-    gpa = paging_gva_to_gpa(current, gva);
-    printk("gva = %lx, gpa=%"PRIpaddr", gCR3=%x\n", gva, gpa, (u32)vmcb->cr3);
-    if( !svm_paging_enabled(v) || mmio_space(gpa) )
-        return;
-
-    /* let's dump the guest and shadow page info */
-
-    __guest_get_l2e(v, gva, &gpde);
-    printk( "G-PDE = %x, flags=%x\n", gpde.l2, l2e_get_flags(gpde) );
-    __shadow_get_l2e( v, gva, &spde );
-    printk( "S-PDE = %x, flags=%x\n", spde.l2, l2e_get_flags(spde) );
-
-    if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
-        return;
-
-    spte = l1e_empty();
-
-    /* This is actually overkill - we only need to ensure the hl2 is in-sync.*/
-    shadow_sync_va(v, gva);
-
-    gpte.l1 = 0;
-    __copy_from_user(&gpte, &__linear_l1_table[ l1_linear_offset(gva) ],
-                     sizeof(gpte) );
-    printk( "G-PTE = %x, flags=%x\n", gpte.l1, l1e_get_flags(gpte) );
-
-    BUG(); // need to think about this, and convert usage of
-    // phys_to_machine_mapping to use pagetable format...
-    __copy_from_user( &spte, &phys_to_machine_mapping[ l1e_get_pfn( gpte ) ], 
-                      sizeof(spte) );
-
-    printk( "S-PTE = %x, flags=%x\n", spte.l1, l1e_get_flags(spte));
-}
-#endif /* SVM_WALK_GUEST_PAGES */
-
-
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     unsigned long eip;
     struct vcpu *v = current;
-    int do_debug = 0;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
 
     HVMTRACE_2D(VMEXIT, v, vmcb->rip, exit_reason);
 
-    if (exit_reason == VMEXIT_INVALID)
+    if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
         svm_dump_vmcb(__func__, vmcb);
         goto exit_and_crash;
     }
 
-#ifdef SVM_EXTRA_DEBUG
-    {
-#if defined(__i386__)
-#define rip eip
-#endif
-
-        static unsigned long intercepts_counter = 0;
-
-        if (svm_dbg_on && exit_reason == VMEXIT_EXCEPTION_PF) 
-        {
-            if (svm_paging_enabled(v) && 
-                !mmio_space(
-                    paging_gva_to_gfn(current, vmcb->exitinfo2) << PAGE_SHIFT))
-            {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64", "
-                       "gpa=%"PRIx64"\n", intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs->cs,
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes,
-                       (((u64)paging_gva_to_gfn(current, vmcb->exitinfo2)
-                        << PAGE_SHIFT) | (vmcb->exitinfo2 & ~PAGE_MASK)));
-            }
-            else 
-            {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
-                       intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs->cs,
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes );
-            }
-        } 
-        else if ( svm_dbg_on 
-                  && exit_reason != VMEXIT_IOIO 
-                  && exit_reason != VMEXIT_INTR) 
-        {
-
-            if (exit_reasons[exit_reason])
-            {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
-                       intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs->cs,
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes);
-            } 
-            else 
-            {
-                printk("I%08ld,ExC=%d(0x%x),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
-                       intercepts_counter, exit_reason, exit_reason, regs->cs, 
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes);
-            }
-        }
-
-#ifdef SVM_WALK_GUEST_PAGES
-        if( exit_reason == VMEXIT_EXCEPTION_PF 
-            && ( ( vmcb->exitinfo2 == vmcb->rip )
-                 || vmcb->exitintinfo.bytes) )
-        {
-            if ( svm_paging_enabled(v) &&
-                 !mmio_space(gva_to_gpa(vmcb->exitinfo2)) )
-                walk_shadow_and_guest_pt(vmcb->exitinfo2);
-        }
-#endif
-
-        intercepts_counter++;
-
-#if 0
-        if (svm_dbg_on)
-            do_debug = svm_do_debugout(exit_reason);
-#endif
-
-        if (do_debug)
-        {
-            printk("%s:+ guest_table = 0x%08x, monitor_table = 0x%08x, "
-                   "hw_cr3 = 0x%16lx\n", 
-                   __func__,
-                   (int) v->arch.guest_table.pfn,
-                   (int) v->arch.monitor_table.pfn, 
-                   (long unsigned int) v->arch.hvm_vcpu.hw_cr3);
-
-            svm_dump_vmcb(__func__, vmcb);
-            svm_dump_regs(__func__, regs);
-            svm_dump_inst(svm_rip2pointer(v));
-        }
-
-#if defined(__i386__)
-#undef rip
-#endif
-
-    }
-#endif /* SVM_EXTRA_DEBUG */
-
-
     perfc_incra(svmexits, exit_reason);
     eip = vmcb->rip;
 
-#ifdef SVM_EXTRA_DEBUG
-    if (do_debug)
-    {
-        printk("eip = %lx, exit_reason = %d (0x%x)\n", 
-               eip, exit_reason, exit_reason);
-    }
-#endif /* SVM_EXTRA_DEBUG */
-
-    switch (exit_reason) 
+    switch ( exit_reason )
     {
     case VMEXIT_INTR:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
@@ -2930,7 +2427,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                     (unsigned long)regs->ecx, (unsigned long)regs->edx,
                     (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-        if ( svm_do_page_fault(va, regs) )
+        if ( paging_fault(va, regs) )
         {
             HVMTRACE_2D(PF_XEN, v, va, regs->error_code);
             break;
@@ -3051,9 +2548,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_NPF:
         regs->error_code = vmcb->exitinfo1;
-        if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) ) {
+        if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) )
             domain_crash(v->domain);
-        }
         break;
 
     default:
@@ -3065,35 +2561,16 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         domain_crash(v->domain);
         break;
     }
-
-#ifdef SVM_EXTRA_DEBUG
-    if (do_debug) 
-    {
-        printk("%s: Done switch on vmexit_code\n", __func__);
-        svm_dump_regs(__func__, regs);
-    }
-
-    if (do_debug) 
-    {
-        printk("vmexit_handler():- guest_table = 0x%08x, "
-               "monitor_table = 0x%08x, hw_cr3 = 0x%16x\n",
-               (int)v->arch.guest_table.pfn,
-               (int)v->arch.monitor_table.pfn, 
-               (int)v->arch.hvm_vcpu.hw_cr3);
-        printk("svm_vmexit_handler: Returning\n");
-    }
-#endif
 }
 
 asmlinkage void svm_load_cr2(void)
 {
     struct vcpu *v = current;
 
-    // this is the last C code before the VMRUN instruction
+    /* This is the last C code before the VMRUN instruction. */
     HVMTRACE_0D(VMENTRY, v);
 
-    local_irq_disable();
-    asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
+    asm volatile ( "mov %0,%%cr2" : : "r" (v->arch.hvm_svm.cpu_cr2) );
 }
   
 /*

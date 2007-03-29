@@ -1104,36 +1104,6 @@ static void inline __update_guest_eip(unsigned long inst_len)
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 }
 
-static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
-{
-    int result;
-
-#if 0 /* keep for debugging */
-    {
-        unsigned long eip, cs;
-
-        cs = __vmread(GUEST_CS_BASE);
-        eip = __vmread(GUEST_RIP);
-        HVM_DBG_LOG(DBG_LEVEL_VMMU,
-                    "vmx_do_page_fault = 0x%lx, cs_base=%lx, "
-                    "eip = %lx, error_code = %lx\n",
-                    va, cs, eip, (unsigned long)regs->error_code);
-    }
-#endif
-
-    result = paging_fault(va, regs);
-
-#if 0
-    if ( !result )
-    {
-        eip = __vmread(GUEST_RIP);
-        printk("vmx pgfault to guest va=%lx eip=%lx\n", va, eip);
-    }
-#endif
-
-    return result;
-}
-
 static void vmx_do_no_device_fault(void)
 {
     struct vcpu *v = current;
@@ -2559,7 +2529,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                         (unsigned long)regs->ecx, (unsigned long)regs->edx,
                         (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-            if ( vmx_do_page_fault(exit_qualification, regs) )
+            if ( paging_fault(exit_qualification, regs) )
             {
                 HVMTRACE_2D(PF_XEN, v, exit_qualification, regs->error_code);
                 break;
