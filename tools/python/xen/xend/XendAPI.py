@@ -122,7 +122,7 @@ def event_unregister(session, unreg_classes):
 
 def event_next(session):
     if session not in event_registrations:
-        return xen_api_error(['SESSION_INVALID', session])
+        return xen_api_error(['SESSION_NOT_REGISTERED', session])
     queue = event_registrations[session]['queue']
     events = [queue.get()]
     try:

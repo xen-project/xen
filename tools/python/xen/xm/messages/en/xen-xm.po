@@ -19,7 +19,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Xen-xm 3.0\n"
-"PO-Revision-Date: 2007-03-10 23:17+0000\n"
+"PO-Revision-Date: 2007-03-29 16:13+0100\n"
 "Last-Translator: Ewan Mellor <ewan@xensource.com>\n"
 "Language-Team: xen-devel <xen-devel@lists.xensource.com>\n"
 "MIME-Version: 1.0\n"
@@ -64,3 +64,6 @@ msgstr "The VM must be %(2)s to perform the requested operation (it is currently
 
 msgid "VM_HVM_REQUIRED"
 msgstr "HVM guest support is unavailable: is VT/AMD-V supported by your CPU and enabled in your BIOS?"
+
+msgid "SESSION_NOT_REGISTERED"
+msgstr "This session is not registered to receive events.  You must call event.register before event.next.  (Session handle is %(1)s.)"

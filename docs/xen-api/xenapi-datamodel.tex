@@ -1131,8 +1131,10 @@ Blocking call which returns a (possibly empty) batch of events.
 
 the batch of events
 \vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SESSION\_NOT\_REGISTERED}
+
+\vspace{0.6cm}
 
 \vspace{1cm}
 \newpage
@@ -13834,6 +13836,17 @@ current connection.  The handle parameter echoes the bad value given.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_NOT\_REGISTERED}
+
+This session is not registered to receive events.  You must call
+event.register before event.next.  The session handle you are using is
+echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SESSION_NOT_REGISTERED(handle)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 \subsubsection{VALUE\_NOT\_SUPPORTED}
