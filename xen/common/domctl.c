@@ -620,29 +620,33 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_setdomainhandle:
     {
         struct domain *d;
+
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            memcpy(d->handle, op->u.setdomainhandle.handle,
-                   sizeof(xen_domain_handle_t));
-            rcu_unlock_domain(d);
-            ret = 0;
-        }
+        if ( d == NULL )
+            break;
+
+        memcpy(d->handle, op->u.setdomainhandle.handle,
+               sizeof(xen_domain_handle_t));
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 
     case XEN_DOMCTL_setdebugging:
     {
         struct domain *d;
+
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            d->debugger_attached = !!op->u.setdebugging.enable;
-            rcu_unlock_domain(d);
-            ret = 0;
-        }
+        if ( d == NULL )
+            break;
+
+        domain_pause(d);
+        d->debugger_attached = !!op->u.setdebugging.enable;
+        domain_unpause(d); /* causes guest to latch new status */
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 
