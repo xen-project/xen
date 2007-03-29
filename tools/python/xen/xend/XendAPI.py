@@ -1068,7 +1068,7 @@ class XendAPI(object):
                            'io_write_kbs',
                            'last_updated']
     PIF_metrics_attr_rw = []
-    PIF_methods = []
+    PIF_metrics_methods = []
 
     def PIF_metrics_get_all(self, _):
         return xen_api_success(XendNode.instance().pif_metrics.keys())
