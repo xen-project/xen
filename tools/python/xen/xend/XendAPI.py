@@ -1823,9 +1823,6 @@ class XendAPI(object):
     VM_metrics_attr_rw = []
     VM_metrics_methods = []
 
-    def VIF_metrics_get_all(self, session):
-        return self.VIF_get_all(session)
-
     def _VM_metrics_get(self, _, ref):
         return XendVMMetrics.get_by_uuid(ref)
 
@@ -2134,6 +2131,9 @@ class XendAPI(object):
                            'last_updated']
     VIF_metrics_attr_rw = []
     VIF_metrics_methods = []
+
+    def VIF_metrics_get_all(self, session):
+        return self.VIF_get_all(session)
 
     def VIF_metrics_get_record(self, _, ref):
         vm = XendDomain.instance().get_vm_with_dev_uuid('vif', ref)
