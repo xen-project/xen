@@ -1783,6 +1783,7 @@ void pci_pcnet_init(PCIBus *bus, NICInfo *nd)
 {
     PCNetState *d;
     uint8_t *pci_conf;
+    int instance;
 
 #if 0
     printf("sizeof(RMD)=%d, sizeof(TMD)=%d\n", 
@@ -1828,9 +1829,10 @@ void pci_pcnet_init(PCIBus *bus, NICInfo *nd)
     d->vc = qemu_new_vlan_client(nd->vlan, pcnet_receive, 
                                  pcnet_can_receive, d);
 
-    register_savevm("pcnet", 0, 1, pcnet_save, pcnet_load, d);
-    register_savevm("pcnet_pci", 0, 1, generic_pci_save, generic_pci_load, 
-                    &d->dev);
+    instance = pci_bus_num(bus) << 8 | d->dev.devfn;
+    register_savevm("pcnet", instance, 1, pcnet_save, pcnet_load, d);
+    register_savevm("pcnet_pci", instance, 1, generic_pci_save,
+                    generic_pci_load, &d->dev);
     
     snprintf(d->vc->info_str, sizeof(d->vc->info_str),
              "pcnet macaddr=%02x:%02x:%02x:%02x:%02x:%02x",
