@@ -82,7 +82,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 
   	if (vector == XEN_SAL_BOOT_RENDEZ_VEC
 	    && (!targ->is_initialised
-		|| test_bit(_VCPUF_down, &targ->vcpu_flags))) {
+		|| test_bit(_VPF_down, &targ->pause_flags))) {
 
 		/* First start: initialize vpcu.  */
 		if (!targ->is_initialised) {
@@ -102,8 +102,8 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		vcpu_regs (targ)->r1 = d->arch.sal_data->boot_rdv_r1;
 		vcpu_regs (targ)->b0 = FW_HYPERCALL_SAL_RETURN_PADDR;
 
-		if (test_and_clear_bit(_VCPUF_down,
-				       &targ->vcpu_flags)) {
+		if (test_and_clear_bit(_VPF_down,
+				       &targ->pause_flags)) {
 			vcpu_wake(targ);
 			printk(XENLOG_INFO "arch_boot_vcpu: vcpu %d awaken\n",
 			       targ->vcpu_id);
@@ -207,7 +207,7 @@ ia64_hypercall(struct pt_regs *regs)
 		regs->r10 = x.r10; regs->r11 = x.r11;
 		break;
 	case FW_HYPERCALL_SAL_RETURN:
-	        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+	        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
 			vcpu_sleep_nosync(v);
 		break;
 	case FW_HYPERCALL_EFI_CALL:

@@ -481,8 +481,8 @@ long evtchn_send(unsigned int lport)
         if ( rchn->consumer_is_xen )
         {
             /* Xen consumers need notification only if they are blocked. */
-            if ( test_and_clear_bit(_VCPUF_blocked_in_xen,
-                                    &rvcpu->vcpu_flags) )
+            if ( test_and_clear_bit(_VPF_blocked_in_xen,
+                                    &rvcpu->pause_flags) )
                 vcpu_wake(rvcpu);
         }
         else

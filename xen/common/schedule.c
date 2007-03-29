@@ -190,7 +190,7 @@ void vcpu_wake(struct vcpu *v)
             vcpu_runstate_change(v, RUNSTATE_runnable, NOW());
         SCHED_OP(wake, v);
     }
-    else if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+    else if ( !test_bit(_VPF_blocked, &v->pause_flags) )
     {
         if ( v->runstate.state == RUNSTATE_blocked )
             vcpu_runstate_change(v, RUNSTATE_offline, NOW());
@@ -214,7 +214,7 @@ static void vcpu_migrate(struct vcpu *v)
      * regions are strictly serialised.
      */
     if ( v->is_running ||
-         !test_and_clear_bit(_VCPUF_migrating, &v->vcpu_flags) )
+         !test_and_clear_bit(_VPF_migrating, &v->pause_flags) )
     {
         vcpu_schedule_unlock_irqrestore(v, flags);
         return;
@@ -240,10 +240,10 @@ void vcpu_force_reschedule(struct vcpu *v)
 {
     vcpu_schedule_lock_irq(v);
     if ( v->is_running )
-        set_bit(_VCPUF_migrating, &v->vcpu_flags);
+        set_bit(_VPF_migrating, &v->pause_flags);
     vcpu_schedule_unlock_irq(v);
 
-    if ( test_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    if ( test_bit(_VPF_migrating, &v->pause_flags) )
     {
         vcpu_sleep_nosync(v);
         vcpu_migrate(v);
@@ -265,11 +265,11 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
     v->cpu_affinity = *affinity;
     if ( !cpu_isset(v->processor, v->cpu_affinity) )
-        set_bit(_VCPUF_migrating, &v->vcpu_flags);
+        set_bit(_VPF_migrating, &v->pause_flags);
 
     vcpu_schedule_unlock_irq(v);
 
-    if ( test_bit(_VCPUF_migrating, &v->vcpu_flags) )
+    if ( test_bit(_VPF_migrating, &v->pause_flags) )
     {
         vcpu_sleep_nosync(v);
         vcpu_migrate(v);
@@ -284,12 +284,12 @@ static long do_block(void)
     struct vcpu *v = current;
 
     local_event_delivery_enable();
-    set_bit(_VCPUF_blocked, &v->vcpu_flags);
+    set_bit(_VPF_blocked, &v->pause_flags);
 
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
     if ( local_events_need_delivery() )
     {
-        clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+        clear_bit(_VPF_blocked, &v->pause_flags);
     }
     else
     {
@@ -315,7 +315,7 @@ static long do_poll(struct sched_poll *sched_poll)
     if ( !guest_handle_okay(sched_poll->ports, sched_poll->nr_ports) )
         return -EFAULT;
 
-    set_bit(_VCPUF_blocked, &v->vcpu_flags);
+    set_bit(_VPF_blocked, &v->pause_flags);
     v->is_polling = 1;
     d->is_polling = 1;
 
@@ -347,7 +347,7 @@ static long do_poll(struct sched_poll *sched_poll)
 
  out:
     v->is_polling = 0;
-    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    clear_bit(_VPF_blocked, &v->pause_flags);
     return rc;
 }
 
@@ -648,7 +648,7 @@ static void schedule(void)
     ASSERT(prev->runstate.state == RUNSTATE_running);
     vcpu_runstate_change(
         prev,
-        (test_bit(_VCPUF_blocked, &prev->vcpu_flags) ? RUNSTATE_blocked :
+        (test_bit(_VPF_blocked, &prev->pause_flags) ? RUNSTATE_blocked :
          (vcpu_runnable(prev) ? RUNSTATE_runnable : RUNSTATE_offline)),
         now);
 
@@ -685,7 +685,7 @@ void context_saved(struct vcpu *prev)
     /* Check for migration request /after/ clearing running flag. */
     smp_mb();
 
-    if ( unlikely(test_bit(_VCPUF_migrating, &prev->vcpu_flags)) )
+    if ( unlikely(test_bit(_VPF_migrating, &prev->pause_flags)) )
         vcpu_migrate(prev);
 }
 

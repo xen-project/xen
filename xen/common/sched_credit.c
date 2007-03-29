@@ -565,7 +565,7 @@ csched_vcpu_acct(unsigned int cpu)
     {
         CSCHED_VCPU_STAT_CRANK(svc, migrate_r);
         CSCHED_STAT_CRANK(migrate_running);
-        set_bit(_VCPUF_migrating, &current->vcpu_flags);
+        set_bit(_VPF_migrating, &current->pause_flags);
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     }
 }

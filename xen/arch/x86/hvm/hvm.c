@@ -238,7 +238,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     {
         /* We don't need to save state for a vcpu that is down; the restore 
          * code will leave it down if there is nothing saved. */
-        if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) 
+        if ( test_bit(_VPF_down, &v->pause_flags) ) 
             continue;
 
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
@@ -269,7 +269,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     /* Auxiliary processors should be woken immediately. */
-    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+    if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
         vcpu_wake(v);
 
     return 0;
@@ -331,8 +331,8 @@ void hvm_vcpu_reset(struct vcpu *v)
 
     hvm_funcs.vcpu_initialise(v);
 
-    set_bit(_VCPUF_down, &v->vcpu_flags);
-    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    set_bit(_VPF_down, &v->pause_flags);
+    clear_bit(_VPF_blocked, &v->pause_flags);
     v->fpu_initialised = 0;
     v->fpu_dirtied     = 0;
     v->is_initialised  = 0;
@@ -350,13 +350,13 @@ static void hvm_vcpu_down(void)
            d->domain_id, v->vcpu_id);
 
     /* Doesn't halt us immediately, but we'll never return to guest context. */
-    set_bit(_VCPUF_down, &v->vcpu_flags);
+    set_bit(_VPF_down, &v->pause_flags);
     vcpu_sleep_nosync(v);
 
     /* Any other VCPUs online? ... */
     LOCK_BIGLOCK(d);
     for_each_vcpu ( d, v )
-        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
             online_count++;
     UNLOCK_BIGLOCK(d);
 
@@ -734,7 +734,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
         goto out;
     }
 
-    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+    if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
         vcpu_wake(v);
     gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 

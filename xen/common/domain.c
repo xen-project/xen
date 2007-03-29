@@ -101,7 +101,7 @@ struct vcpu *alloc_vcpu(
 
     if ( !is_idle_domain(d) )
     {
-        set_bit(_VCPUF_down, &v->vcpu_flags);
+        set_bit(_VPF_down, &v->pause_flags);
         v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
     }
 
@@ -481,7 +481,7 @@ int vcpu_reset(struct vcpu *v)
     if ( rc != 0 )
         goto out;
 
-    set_bit(_VCPUF_down, &v->vcpu_flags);
+    set_bit(_VPF_down, &v->pause_flags);
 
     v->fpu_initialised = 0;
     v->fpu_dirtied     = 0;
@@ -489,7 +489,7 @@ int vcpu_reset(struct vcpu *v)
     v->is_initialised  = 0;
     v->nmi_pending     = 0;
     v->nmi_masked      = 0;
-    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    clear_bit(_VPF_blocked, &v->pause_flags);
 
  out:
     UNLOCK_BIGLOCK(v->domain);
@@ -537,18 +537,18 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         if ( !v->is_initialised )
             return -EINVAL;
 
-        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
             vcpu_wake(v);
 
         break;
 
     case VCPUOP_down:
-        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
             vcpu_sleep_nosync(v);
         break;
 
     case VCPUOP_is_up:
-        rc = !test_bit(_VCPUF_down, &v->vcpu_flags);
+        rc = !test_bit(_VPF_down, &v->pause_flags);
         break;
 
     case VCPUOP_get_runstate_info:

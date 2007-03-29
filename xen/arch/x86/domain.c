@@ -706,9 +706,9 @@ int arch_set_info_guest(
 
  out:
     if ( flags & VGCF_online )
-        clear_bit(_VCPUF_down, &v->vcpu_flags);
+        clear_bit(_VPF_down, &v->pause_flags);
     else
-        set_bit(_VCPUF_down, &v->vcpu_flags);
+        set_bit(_VPF_down, &v->pause_flags);
     return 0;
 #undef c
 }

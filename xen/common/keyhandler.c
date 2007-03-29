@@ -189,7 +189,7 @@ static void dump_domains(unsigned char key)
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
                    v->is_running ? 'T':'F',
-                   v->vcpu_flags,
+                   v->pause_flags,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);

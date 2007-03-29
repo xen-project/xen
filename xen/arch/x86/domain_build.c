@@ -902,7 +902,7 @@ int construct_dom0(struct domain *d,
     update_domain_wallclock_time(d);
 
     v->is_initialised = 1;
-    clear_bit(_VCPUF_down, &v->vcpu_flags);
+    clear_bit(_VPF_down, &v->pause_flags);
 
     /*
      * Initial register values:

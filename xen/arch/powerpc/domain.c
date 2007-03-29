@@ -173,7 +173,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         v->is_initialised = 1;
         /* Auto-online VCPU0 when it is initialised. */
         if ( v->vcpu_id == 0 )
-            clear_bit(_VCPUF_down, &v->vcpu_flags);
+            clear_bit(_VPF_down, &v->pause_flags);
     }
 
     cpu_init_vcpu(v);

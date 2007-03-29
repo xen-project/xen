@@ -66,7 +66,6 @@ void __dummy__(void)
            arch.guest_context.kernel_sp);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
     OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
-    OFFSET(VCPU_flags, struct vcpu, vcpu_flags);
     OFFSET(VCPU_nmi_addr, struct vcpu, nmi_addr);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
     OFFSET(VCPU_nmi_masked, struct vcpu, nmi_masked);

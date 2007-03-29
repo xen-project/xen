@@ -68,7 +68,7 @@ static inline int arch_virq_is_global(int virq)
 static inline void vcpu_kick(struct vcpu *v)
 {
     /*
-     * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of
+     * NB1. 'pause_flags' and 'processor' must be checked /after/ update of
      * pending flag. These values may fluctuate (after all, we hold no
      * locks) but the key insight is that each change will cause
      * evtchn_upcall_pending to be polled.

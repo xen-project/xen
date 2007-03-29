@@ -693,7 +693,7 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
         panic_domain(NULL, "Unknown IPI cpu\n");
 
     if (!targ->is_initialised ||
-        test_bit(_VCPUF_down, &targ->vcpu_flags)) {
+        test_bit(_VPF_down, &targ->pause_flags)) {
 
         struct pt_regs *targ_regs = vcpu_regs(targ);
         struct vcpu_guest_context c;
@@ -709,7 +709,7 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
         targ_regs->cr_iip = d->arch.sal_data->boot_rdv_ip;
         targ_regs->r1 = d->arch.sal_data->boot_rdv_r1;
 
-        if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
+        if (test_and_clear_bit(_VPF_down,&targ->pause_flags)) {
             vcpu_wake(targ);
             printk(XENLOG_DEBUG "arch_boot_vcpu: vcpu %d awaken %016lx!\n",
                    targ->vcpu_id, targ_regs->cr_iip);

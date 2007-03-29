@@ -101,9 +101,9 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
         vcpu_runstate_get(v, &runstate);
         cpu_time += runstate.time[RUNSTATE_running];
         info->max_vcpu_id = v->vcpu_id;
-        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
         {
-            if ( !(v->vcpu_flags & VCPUF_blocked) )
+            if ( !(v->pause_flags & VPF_blocked) )
                 flags &= ~XEN_DOMINF_blocked;
             if ( v->is_running )
                 flags |= XEN_DOMINF_running;
@@ -145,7 +145,7 @@ static unsigned int default_vcpu0_location(void)
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
         for_each_vcpu ( d, v )
-        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
             cnt[v->processor]++;
     rcu_read_unlock(&domlist_read_lock);
 
@@ -574,8 +574,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         vcpu_runstate_get(v, &runstate);
 
-        op->u.getvcpuinfo.online   = !test_bit(_VCPUF_down, &v->vcpu_flags);
-        op->u.getvcpuinfo.blocked  = test_bit(_VCPUF_blocked, &v->vcpu_flags);
+        op->u.getvcpuinfo.online   = !test_bit(_VPF_down, &v->pause_flags);
+        op->u.getvcpuinfo.blocked  = test_bit(_VPF_blocked, &v->pause_flags);
         op->u.getvcpuinfo.running  = v->is_running;
         op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;

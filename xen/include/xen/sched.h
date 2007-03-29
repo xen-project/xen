@@ -115,8 +115,7 @@ struct vcpu
     /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
     bool_t           nmi_masked;
 
-    unsigned long    vcpu_flags;
-
+    unsigned long    pause_flags;
     atomic_t         pause_count;
 
     u16              virq_to_evtchn[NR_VIRQS];
@@ -434,26 +433,26 @@ extern struct domain *domain_list;
        (_v) = (_v)->next_in_list )
 
 /*
- * Per-VCPU flags (vcpu_flags).
+ * Per-VCPU pause flags.
  */
  /* Domain is blocked waiting for an event. */
-#define _VCPUF_blocked         0
-#define VCPUF_blocked          (1UL<<_VCPUF_blocked)
+#define _VPF_blocked         0
+#define VPF_blocked          (1UL<<_VPF_blocked)
  /* VCPU is offline. */
-#define _VCPUF_down            1
-#define VCPUF_down             (1UL<<_VCPUF_down)
+#define _VPF_down            1
+#define VPF_down             (1UL<<_VPF_down)
  /* VCPU is blocked awaiting an event to be consumed by Xen. */
-#define _VCPUF_blocked_in_xen  2
-#define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
+#define _VPF_blocked_in_xen  2
+#define VPF_blocked_in_xen   (1UL<<_VPF_blocked_in_xen)
  /* VCPU affinity has changed: migrating to a new CPU. */
-#define _VCPUF_migrating       3
-#define VCPUF_migrating        (1UL<<_VCPUF_migrating)
+#define _VPF_migrating       3
+#define VPF_migrating        (1UL<<_VPF_migrating)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
-    return (!v->vcpu_flags &&
-            !atomic_read(&v->pause_count) &&
-            !atomic_read(&v->domain->pause_count));
+    return !(v->pause_flags |
+             atomic_read(&v->pause_count) |
+             atomic_read(&v->domain->pause_count));
 }
 
 void vcpu_pause(struct vcpu *v);
@@ -472,7 +471,7 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {
-    if ( test_and_clear_bit(_VCPUF_blocked, &v->vcpu_flags) )
+    if ( test_and_clear_bit(_VPF_blocked, &v->pause_flags) )
         vcpu_wake(v);
 }
 
