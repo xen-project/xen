@@ -126,6 +126,7 @@
 ^tools/ioemu/qemu\.pod$
 ^tools/libxc/xen/.*$
 ^tools/libxen/test/test_bindings$
+^tools/libxen/test/test_event_handling$
 ^tools/libaio/src/.*\.ol$
 ^tools/libaio/src/.*\.os$
 ^tools/misc/cpuperf/cpuperf-perfcntr$

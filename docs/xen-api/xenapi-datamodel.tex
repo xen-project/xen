@@ -24,6 +24,7 @@ Name & Description \\
 \hline
 {\tt session} & A session \\
 {\tt task} & A long-running asynchronous task \\
+{\tt event} & Asynchronous event registration and handling \\
 {\tt VM} & A virtual machine (or 'guest') \\
 {\tt VM\_metrics} & The metrics associated with a VM \\
 {\tt VM\_guest\_metrics} & The metrics reported by the guest (as opposed to inferred from outside) \\
@@ -110,6 +111,17 @@ Map (a $\rightarrow$ b) & a table mapping values of type a to values of type b \
 \subsection{Enumeration types}
 The following enumeration types are used:
 
+\begin{longtable}{|ll|}
+\hline
+{\tt enum event\_operation} & \\
+\hline
+\hspace{0.5cm}{\tt add} & An object has been created \\
+\hspace{0.5cm}{\tt del} & An object has been deleted \\
+\hspace{0.5cm}{\tt mod} & An object has been modified \\
+\hline
+\end{longtable}
+
+\vspace{1cm}
 \begin{longtable}{|ll|}
 \hline
 {\tt enum console\_protocol} & \\
@@ -1010,6 +1022,114 @@ Get all the task instances with the given label.
 
 
 references to objects with match names
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: event}
+\subsection{Fields for class: event}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf event} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em
+Asynchronous event registration and handling.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{ins}$ &  {\tt id} & int & An ID, monotonically increasing, and local to the current session \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt timestamp} & datetime & The time at which the event occurred \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt class} & string & The name of the class of the object that changed \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt operation} & event\_operation & The operation that was performed \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt ref} & string & A reference to the object that changed \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt obj\_uuid} & string & The uuid of the object that changed \\
+\hline
+\end{longtable}
+\subsection{RPCs associated with class: event}
+\subsubsection{RPC name:~register}
+
+{\bf Overview:} 
+Registers this session with the event system.  Specifying the empty list
+will register for all classes.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void register (session_id s, string Set classes)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string Set } & classes & register for events for the indicated classes \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~unregister}
+
+{\bf Overview:} 
+Unregisters this session with the event system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void unregister (session_id s, string Set classes)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string Set } & classes & remove this session's registration for the indicated classes \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~next}
+
+{\bf Overview:} 
+Blocking call which returns a (possibly empty) batch of events.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((event record) Set) next (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(event record) Set
+}
+
+
+the batch of events
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}

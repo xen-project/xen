@@ -345,7 +345,8 @@ acm_commands = [
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
-                device_commands + vnet_commands + acm_commands + ['shell'])
+                device_commands + vnet_commands + acm_commands +
+                ['shell', 'event-monitor'])
 
 
 ##
@@ -631,6 +632,17 @@ class Shell(cmd.Cmd):
 
 def xm_shell(args):
     Shell().cmdloop('The Xen Master. Type "help" for a list of functions.')
+
+
+def xm_event_monitor(args):
+    if serverType == SERVER_XEN_API:
+        while True:
+            server.xenapi.event.register(args)
+            events = server.xenapi.event.next()
+            for e in events:
+                print e
+    else:
+        err("Event monitoring not supported unless using Xen-API.")
 
 
 #########################################################################
@@ -2169,6 +2181,7 @@ def xm_vnet_delete(args):
 
 commands = {
     "shell": xm_shell,
+    "event-monitor": xm_event_monitor,
     # console commands
     "console": xm_console,
     # xenstat commands

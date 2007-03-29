@@ -17,6 +17,8 @@
 
 import inspect
 import os
+import Queue
+import sets
 import string
 import sys
 import traceback
@@ -84,6 +86,91 @@ def xen_api_todo():
 
 def now():
     return xmlrpclib.DateTime(time.strftime("%Y%m%dT%H:%M:%S", time.gmtime()))
+
+
+# ---------------------------------------------------
+# Event dispatch
+# ---------------------------------------------------
+
+EVENT_QUEUE_LENGTH = 50
+event_registrations = {}
+
+def event_register(session, reg_classes):
+    if session not in event_registrations:
+        event_registrations[session] = {
+            'classes' : sets.Set(),
+            'queue'   : Queue.Queue(EVENT_QUEUE_LENGTH),
+            'next-id' : 1
+            }
+    if not reg_classes:
+        reg_classes = classes
+    event_registrations[session]['classes'].union_update(reg_classes)
+
+
+def event_unregister(session, unreg_classes):
+    if session not in event_registrations:
+        return
+
+    if unreg_classes:
+        event_registrations[session]['classes'].intersection_update(
+            unreg_classes)
+        if len(event_registrations[session]['classes']) == 0:
+            del event_registrations[session]
+    else:
+        del event_registrations[session]
+
+
+def event_next(session):
+    if session not in event_registrations:
+        return xen_api_error(['SESSION_INVALID', session])
+    queue = event_registrations[session]['queue']
+    events = [queue.get()]
+    try:
+        while True:
+            events.append(queue.get(False))
+    except Queue.Empty:
+        pass
+
+    return xen_api_success(events)
+
+
+def _ctor_event_dispatch(xenapi, ctor, api_cls, session, args):
+    result = ctor(xenapi, session, *args)
+    if result['Status'] == 'Success':
+        ref = result['Value']
+        _event_dispatch('add', api_cls, ref, '')
+    return result
+
+
+def _dtor_event_dispatch(xenapi, dtor, api_cls, session, ref, args):
+    result = dtor(xenapi, session, ref, *args)
+    if result['Status'] == 'Success':
+        _event_dispatch('del', api_cls, ref, '')
+    return result
+
+
+def _setter_event_dispatch(xenapi, setter, api_cls, attr_name, session, ref,
+                           args):
+    result = setter(xenapi, session, ref, *args)
+    if result['Status'] == 'Success':
+        _event_dispatch('mod', api_cls, ref, attr_name)
+    return result
+
+
+def _event_dispatch(operation, api_cls, ref, attr_name):
+    event = {
+        'timestamp' : now(),
+        'class'     : api_cls,
+        'operation' : operation,
+        'ref'       : ref,
+        'obj_uuid'  : ref,
+        'field'     : attr_name,
+        }
+    for reg in event_registrations.values():
+        if api_cls in reg['classes']:
+            event['id'] = reg['next-id']
+            reg['next-id'] += 1
+            reg['queue'].put(event)
 
 
 # ---------------------------------------------------
@@ -375,6 +462,36 @@ def do_vm_func(fn_name, vm_ref, *args, **kwargs):
                               exn.actual])
 
 
+classes = {
+    'session'      : None,
+    'event'        : None,
+    'host'         : valid_host,
+    'host_cpu'     : valid_host_cpu,
+    'host_metrics' : valid_host_metrics,
+    'network'      : valid_network,
+    'VM'           : valid_vm,
+    'VM_metrics'   : valid_vm_metrics,
+    'VBD'          : valid_vbd,
+    'VBD_metrics'  : valid_vbd_metrics,
+    'VIF'          : valid_vif,
+    'VIF_metrics'  : valid_vif_metrics,
+    'VDI'          : valid_vdi,
+    'VTPM'         : valid_vtpm,
+    'console'      : valid_console,
+    'SR'           : valid_sr,
+    'PIF'          : valid_pif,
+    'PIF_metrics'  : valid_pif_metrics,
+    'task'         : valid_task,
+    'debug'        : valid_debug,
+}
+
+autoplug_classes = {
+    'network'     : XendNetwork,
+    'VM_metrics'  : XendVMMetrics,
+    'PIF_metrics' : XendPIFMetrics,
+}
+
+
 class XendAPI(object):
     """Implementation of the Xen-API in Xend. Expects to be
     used via XMLRPCServer.
@@ -416,33 +533,7 @@ class XendAPI(object):
         server.
         """
         global_validators = [session_required, catch_typeerror]
-        classes = {
-            'session'      : None,
-            'host'         : valid_host,
-            'host_cpu'     : valid_host_cpu,
-            'host_metrics' : valid_host_metrics,
-            'network'      : valid_network,
-            'VM'           : valid_vm,
-            'VM_metrics'   : valid_vm_metrics,
-            'VBD'          : valid_vbd,
-            'VBD_metrics'  : valid_vbd_metrics,
-            'VIF'          : valid_vif,
-            'VIF_metrics'  : valid_vif_metrics,
-            'VDI'          : valid_vdi,
-            'VTPM'         : valid_vtpm,
-            'console'      : valid_console,
-            'SR'           : valid_sr,
-            'PIF'          : valid_pif,
-            'PIF_metrics'  : valid_pif_metrics,
-            'task'         : valid_task,
-            'debug'        : valid_debug,
-        }
 
-        autoplug_classes = {
-            'network'     : XendNetwork,
-            'VM_metrics'  : XendVMMetrics,
-            'PIF_metrics' : XendPIFMetrics,
-        }
 
         # Cheat methods
         # -------------
@@ -499,6 +590,43 @@ class XendAPI(object):
                 doit('%s' % func_name)
 
 
+        def wrap_method(name, new_f):
+            try:
+                f = getattr(cls, name)
+                wrapped_f = (lambda *args: new_f(f, *args))
+                wrapped_f.api = f.api
+                wrapped_f.async = f.async
+                setattr(cls, name, wrapped_f)
+            except AttributeError:
+                # Logged below (API call: %s not found)
+                pass
+
+
+        def setter_event_wrapper(api_cls, attr_name):
+            setter_name = '%s_set_%s' % (api_cls, attr_name)
+            wrap_method(
+                setter_name,
+                lambda setter, s, session, ref, *args:
+                _setter_event_dispatch(s, setter, api_cls, attr_name,
+                                       session, ref, args))
+
+
+        def ctor_event_wrapper(api_cls):
+            ctor_name = '%s_create' % api_cls
+            wrap_method(
+                ctor_name,
+                lambda ctor, s, session, *args:
+                _ctor_event_dispatch(s, ctor, api_cls, session, args))
+
+
+        def dtor_event_wrapper(api_cls):
+            dtor_name = '%s_destroy' % api_cls
+            wrap_method(
+                dtor_name,
+                lambda dtor, s, session, ref, *args:
+                _dtor_event_dispatch(s, dtor, api_cls, session, ref, args))
+
+
         # Wrapping validators around XMLRPC calls
         # ---------------------------------------
 
@@ -541,6 +669,7 @@ class XendAPI(object):
             for attr_name in rw_attrs + cls.Base_attr_rw:
                 doit('%s.set_%s' % (api_cls, attr_name), True,
                      async_support = False)
+                setter_event_wrapper(api_cls, attr_name)
 
             # wrap validators around methods
             for method_name, return_type in methods + cls.Base_methods:
@@ -551,6 +680,10 @@ class XendAPI(object):
             for func_name, return_type in funcs + cls.Base_funcs:
                 doit('%s.%s' % (api_cls, func_name), False, async_support = True,
                      return_type = return_type)
+
+            ctor_event_wrapper(api_cls)
+            dtor_event_wrapper(api_cls)
+
 
     _decorate = classmethod(_decorate)
 
@@ -2387,6 +2520,26 @@ class XendAPI(object):
             XendNode.instance().save()        
         return xen_api_success_void()
 
+
+    # Xen API: Class event
+    # ----------------------------------------------------------------
+
+    event_attr_ro = []
+    event_attr_rw = []
+    event_funcs = [('register', None),
+                   ('unregister', None),
+                   ('next', None)]
+
+    def event_register(self, session, reg_classes):
+        event_register(session, reg_classes)
+        return xen_api_success_void()
+
+    def event_unregister(self, session, unreg_classes):
+        event_unregister(session, reg_classes)
+        return xen_api_success_void()
+
+    def event_next(self, session):
+        return event_next(session)
 
     # Xen API: Class debug
     # ----------------------------------------------------------------
