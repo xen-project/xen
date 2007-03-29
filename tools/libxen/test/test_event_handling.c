@@ -186,15 +186,15 @@ int main(int argc, char **argv)
             printf("Event received: ID = %"PRId64", %s.\n", ev->id, time);
             switch (ev->operation)
             {
-            case XEN_EVENT_OPERATIONS_ADD:
+            case XEN_EVENT_OPERATION_ADD:
                 printf("%s created with UUID %s.\n", ev->class, ev->obj_uuid);
                 break;
 
-            case XEN_EVENT_OPERATIONS_DEL:
+            case XEN_EVENT_OPERATION_DEL:
                 printf("%s with UUID %s deleted.\n", ev->class, ev->obj_uuid);
                 break;
 
-            case XEN_EVENT_OPERATIONS_MOD:
+            case XEN_EVENT_OPERATION_MOD:
                 printf("%s with UUID %s modified.\n", ev->class, ev->obj_uuid);
                 break;
             default:
