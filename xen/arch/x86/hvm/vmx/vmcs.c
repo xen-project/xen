@@ -37,41 +37,6 @@
 #include <xen/keyhandler.h>
 #include <asm/shadow.h>
 
-/* Basic flags for Pin-based VM-execution controls. */
-#define MONITOR_PIN_BASED_EXEC_CONTROLS                 \
-    ( PIN_BASED_EXT_INTR_MASK |                         \
-      PIN_BASED_NMI_EXITING )
-
-/* Basic flags for CPU-based VM-execution controls. */
-#ifdef __x86_64__
-#define MONITOR_CPU_BASED_EXEC_CONTROLS_SUBARCH         \
-    ( CPU_BASED_CR8_LOAD_EXITING |                      \
-      CPU_BASED_CR8_STORE_EXITING )
-#else
-#define MONITOR_CPU_BASED_EXEC_CONTROLS_SUBARCH 0
-#endif
-#define MONITOR_CPU_BASED_EXEC_CONTROLS                 \
-    ( MONITOR_CPU_BASED_EXEC_CONTROLS_SUBARCH |         \
-      CPU_BASED_HLT_EXITING |                           \
-      CPU_BASED_INVDPG_EXITING |                        \
-      CPU_BASED_MWAIT_EXITING |                         \
-      CPU_BASED_MOV_DR_EXITING |                        \
-      CPU_BASED_ACTIVATE_IO_BITMAP |                    \
-      CPU_BASED_USE_TSC_OFFSETING )
-
-/* Basic flags for VM-Exit controls. */
-#ifdef __x86_64__
-#define MONITOR_VM_EXIT_CONTROLS_SUBARCH VM_EXIT_IA32E_MODE
-#else
-#define MONITOR_VM_EXIT_CONTROLS_SUBARCH 0
-#endif
-#define MONITOR_VM_EXIT_CONTROLS                        \
-    ( MONITOR_VM_EXIT_CONTROLS_SUBARCH |                \
-      VM_EXIT_ACK_INTR_ON_EXIT )
-
-/* Basic flags for VM-Entry controls. */
-#define MONITOR_VM_ENTRY_CONTROLS                       0x00000000
-
 /* Dynamic (run-time adjusted) execution control flags. */
 static u32 vmx_pin_based_exec_control;
 static u32 vmx_cpu_based_exec_control;
@@ -80,41 +45,56 @@ static u32 vmx_vmentry_control;
 
 static u32 vmcs_revision_id;
 
-static u32 adjust_vmx_controls(u32 ctrls, u32 msr)
+static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_max, u32 msr)
 {
-    u32 vmx_msr_low, vmx_msr_high;
+    u32 vmx_msr_low, vmx_msr_high, ctl = ctl_max;
 
     rdmsr(msr, vmx_msr_low, vmx_msr_high);
 
-    /* Bit == 0 means must be zero. */
-    BUG_ON(ctrls & ~vmx_msr_high);
+    ctl &= vmx_msr_high; /* bit == 0 in high word ==> must be zero */
+    ctl |= vmx_msr_low;  /* bit == 1 in low word  ==> must be one  */
 
-    /* Bit == 1 means must be one. */
-    ctrls |= vmx_msr_low;
+    /* Ensure minimum (required) set of control bits are supported. */
+    BUG_ON(ctl_min & ~ctl);
+    BUG_ON(ctl_min & ~ctl_max);
 
-    return ctrls;
+    return ctl;
 }
 
 void vmx_init_vmcs_config(void)
 {
-    u32 vmx_msr_low, vmx_msr_high;
+    u32 vmx_msr_low, vmx_msr_high, min, max;
     u32 _vmx_pin_based_exec_control;
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
 
-    _vmx_pin_based_exec_control =
-        adjust_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS,
-                            MSR_IA32_VMX_PINBASED_CTLS_MSR);
-    _vmx_cpu_based_exec_control =
-        adjust_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS,
-                            MSR_IA32_VMX_PROCBASED_CTLS_MSR);
-    _vmx_vmexit_control =
-        adjust_vmx_controls(MONITOR_VM_EXIT_CONTROLS,
-                            MSR_IA32_VMX_EXIT_CTLS_MSR);
-    _vmx_vmentry_control =
-        adjust_vmx_controls(MONITOR_VM_ENTRY_CONTROLS,
-                            MSR_IA32_VMX_ENTRY_CTLS_MSR);
+    min = max = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
+    _vmx_pin_based_exec_control = adjust_vmx_controls(
+        min, max, MSR_IA32_VMX_PINBASED_CTLS_MSR);
+
+    min = max = (CPU_BASED_HLT_EXITING |
+                 CPU_BASED_INVDPG_EXITING |
+                 CPU_BASED_MWAIT_EXITING |
+                 CPU_BASED_MOV_DR_EXITING |
+                 CPU_BASED_ACTIVATE_IO_BITMAP |
+                 CPU_BASED_USE_TSC_OFFSETING);
+#ifdef __x86_64__
+    min = max |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
+#endif
+    _vmx_cpu_based_exec_control = adjust_vmx_controls(
+        min, max, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
+
+    min = max = VM_EXIT_ACK_INTR_ON_EXIT;
+#ifdef __x86_64__
+    min = max |= VM_EXIT_IA32E_MODE;
+#endif
+    _vmx_vmexit_control = adjust_vmx_controls(
+        min, max, MSR_IA32_VMX_EXIT_CTLS_MSR);
+
+    min = max = 0;
+    _vmx_vmentry_control = adjust_vmx_controls(
+        min, max, MSR_IA32_VMX_ENTRY_CTLS_MSR);
 
     rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
 
