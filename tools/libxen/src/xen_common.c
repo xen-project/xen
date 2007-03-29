@@ -1217,11 +1217,88 @@ static void parse_result(xen_session *session, const char *result,
 }
 
 
+static void
+make_body_add_type(enum abstract_typename typename, abstract_value *v,
+                   xmlNode *params_node)
+{
+    char buf[20];
+    switch (typename)
+    {
+    case STRING:
+        add_param(params_node, "string", v->u.string_val);
+        break;
+
+    case INT:
+        snprintf(buf, sizeof(buf), "%"PRId64, v->u.int_val);
+        add_param(params_node, "string", buf);
+        break;
+
+    case FLOAT:
+        snprintf(buf, sizeof(buf), "%lf", v->u.float_val);
+        add_param(params_node, "double", buf);
+        break;
+
+    case BOOL:
+        add_param(params_node, "boolean", v->u.bool_val ? "1" : "0");
+        break;
+        
+    case VOID:
+        add_param(params_node, "string", "");
+        break;
+
+    case ENUM:
+        add_param(params_node, "string",
+                  v->type->enum_marshaller(v->u.enum_val));
+        break;
+
+    case SET:
+    {
+        const struct abstract_type *member_type = v->type->child;
+        arbitrary_set *set_val = v->u.struct_val;
+        abstract_value v;
+        xmlNode *data_node = add_param_struct(params_node);
+
+        for (size_t i = 0; i < set_val->size; i++)
+        {
+            switch (member_type->typename) {
+                case STRING:
+                    v.u.string_val = (char *)set_val->contents[i];
+                    make_body_add_type(member_type->typename, &v, data_node);
+                    break;
+                default:
+                    assert(false);
+            }
+        }
+    }
+    break;
+
+    case STRUCT:
+    {
+        size_t member_count = v->type->member_count;
+
+        xmlNode *struct_node = add_param_struct(params_node);
+
+        for (size_t i = 0; i < member_count; i++)
+        {
+            const struct struct_member *mem = v->type->members + i;
+            const char *key = mem->key;
+            void *struct_value = v->u.struct_val;
+
+            add_struct_value(mem->type, struct_value + mem->offset,
+                             add_struct_member, key, struct_node);
+        }
+    }
+    break;
+
+    default:
+        assert(false);
+    }
+}
+
+
 static char *
 make_body(const char *method_name, abstract_value params[], int param_count)
 {
-    char buf[20];
-
     xmlDocPtr doc = xmlNewDoc(BAD_CAST "1.0");
     xmlNode *methodCall = xmlNewNode(NULL, BAD_CAST "methodCall");
     xmlDocSetRootElement(doc, methodCall);
@@ -1235,56 +1312,7 @@ make_body(const char *method_name, abstract_value params[], int param_count)
     for (int p = 0; p < param_count; p++)
     {
         abstract_value *v = params + p;
-        switch (v->type->typename)
-        {
-        case STRING:
-            add_param(params_node, "string", v->u.string_val);
-            break;
-
-        case INT:
-            snprintf(buf, sizeof(buf), "%"PRId64, v->u.int_val);
-            add_param(params_node, "string", buf);
-            break;
-
-        case FLOAT:
-            snprintf(buf, sizeof(buf), "%lf", v->u.float_val);
-            add_param(params_node, "double", buf);
-            break;
-
-        case BOOL:
-            add_param(params_node, "boolean", v->u.bool_val ? "1" : "0");
-            break;
-            
-        case VOID:
-            add_param(params_node, "string", "");
-            break;
-
-        case ENUM:
-            add_param(params_node, "string",
-                      v->type->enum_marshaller(v->u.enum_val));
-            break;
-
-        case STRUCT:
-        {
-            size_t member_count = v->type->member_count;
-
-            xmlNode *struct_node = add_param_struct(params_node);
-
-            for (size_t i = 0; i < member_count; i++)
-            {
-                const struct struct_member *mem = v->type->members + i;
-                const char *key = mem->key;
-                void *struct_value = v->u.struct_val;
-
-                add_struct_value(mem->type, struct_value + mem->offset,
-                                 add_struct_member, key, struct_node);
-            }
-        }
-        break;
-
-        default:
-            assert(false);
-        }
+        make_body_add_type(v->type->typename, v, params_node);
     }
 
     xmlBufferPtr buffer = xmlBufferCreate();
