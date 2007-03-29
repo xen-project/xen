@@ -333,7 +333,6 @@ void domain_destroy(struct domain *d);
 void domain_kill(struct domain *d);
 void domain_shutdown(struct domain *d, u8 reason);
 void domain_pause_for_debugger(void);
-void domain_debug_state_changed(struct domain *d);
 
 /*
  * Mark specified domain as crashed. This function always returns, even if the
