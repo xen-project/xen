@@ -59,6 +59,9 @@ struct hvm_function_table hvm_funcs __read_mostly;
 /* I/O permission bitmap is globally shared by all HVM guests. */
 char __attribute__ ((__section__ (".bss.page_aligned")))
     hvm_io_bitmap[3*PAGE_SIZE];
+/* MSR permission bitmap is globally shared by all HVM guests. */
+char __attribute__ ((__section__ (".bss.page_aligned")))
+    hvm_msr_bitmap[PAGE_SIZE];
 
 void hvm_enable(struct hvm_function_table *fns)
 {
@@ -71,6 +74,9 @@ void hvm_enable(struct hvm_function_table *fns)
      */
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
     clear_bit(0x80, hvm_io_bitmap);
+
+    /* All MSR accesses are intercepted by default. */
+    memset(hvm_msr_bitmap, ~0, sizeof(hvm_msr_bitmap));
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;

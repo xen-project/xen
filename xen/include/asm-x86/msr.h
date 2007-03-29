@@ -126,8 +126,8 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_LSTAR 0xc0000082 		/* long mode SYSCALL target */
 #define MSR_CSTAR 0xc0000083		/* compatibility mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084	/* EFLAGS mask for syscall */
-#define MSR_FS_BASE 0xc0000100		/* 64bit GS base */
-#define MSR_GS_BASE 0xc0000101		/* 64bit FS base */
+#define MSR_FS_BASE 0xc0000100		/* 64bit FS base */
+#define MSR_GS_BASE 0xc0000101		/* 64bit GS base */
 #define MSR_SHADOW_GS_BASE  0xc0000102	/* SwapGS GS shadow */ 
 /* EFER bits: */ 
 #define _EFER_SCE 0  /* SYSCALL/SYSRET */

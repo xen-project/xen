@@ -109,6 +109,7 @@ extern int vmcs_version;
 #define CPU_BASED_MOV_DR_EXITING        0x00800000
 #define CPU_BASED_UNCOND_IO_EXITING     0x01000000
 #define CPU_BASED_ACTIVATE_IO_BITMAP    0x02000000
+#define CPU_BASED_ACTIVATE_MSR_BITMAP   0x10000000
 #define CPU_BASED_MONITOR_EXITING       0x20000000
 #define CPU_BASED_PAUSE_EXITING         0x40000000
 
@@ -143,6 +144,8 @@ enum vmcs_field {
     IO_BITMAP_A_HIGH                = 0x00002001,
     IO_BITMAP_B                     = 0x00002002,
     IO_BITMAP_B_HIGH                = 0x00002003,
+    MSR_BITMAP                      = 0x00002004,
+    MSR_BITMAP_HIGH                 = 0x00002005,
     VM_EXIT_MSR_STORE_ADDR          = 0x00002006,
     VM_EXIT_MSR_STORE_ADDR_HIGH     = 0x00002007,
     VM_EXIT_MSR_LOAD_ADDR           = 0x00002008,

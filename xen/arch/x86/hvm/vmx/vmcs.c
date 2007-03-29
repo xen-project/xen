@@ -61,6 +61,25 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_max, u32 msr)
     return ctl;
 }
 
+static void disable_intercept_for_msr(u32 msr)
+{
+    /*
+     * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address).
+     * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
+     */
+    if ( msr <= 0x1fff )
+    {
+        __clear_bit(msr, hvm_msr_bitmap + 0x000); /* read-low */
+        __clear_bit(msr, hvm_msr_bitmap + 0x400); /* write-low */
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        __clear_bit(msr, hvm_msr_bitmap + 0x800); /* read-high */
+        __clear_bit(msr, hvm_msr_bitmap + 0xc00); /* write-high */
+    }
+}
+
 void vmx_init_vmcs_config(void)
 {
     u32 vmx_msr_low, vmx_msr_high, min, max;
@@ -82,6 +101,7 @@ void vmx_init_vmcs_config(void)
 #ifdef __x86_64__
     min = max |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
 #endif
+    max |= CPU_BASED_ACTIVATE_MSR_BITMAP;
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
         min, max, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
 
@@ -105,6 +125,9 @@ void vmx_init_vmcs_config(void)
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
+
+        disable_intercept_for_msr(MSR_FS_BASE);
+        disable_intercept_for_msr(MSR_GS_BASE);
     }
     else
     {
@@ -286,6 +309,9 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
+
+    if ( vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP )
+        __vmwrite(MSR_BITMAP, virt_to_maddr(hvm_msr_bitmap));
 
     /* I/O access bitmap. */
     __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
