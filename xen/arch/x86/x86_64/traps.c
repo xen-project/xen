@@ -231,7 +231,7 @@ unsigned long do_iret(void)
     }
 
     /* No longer in NMI context. */
-    clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
+    current->nmi_masked = 0;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
     vcpu_info(current, evtchn_upcall_mask) = !(iret_saved.rflags & EF_IE);

@@ -68,8 +68,8 @@ void __dummy__(void)
     OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
     OFFSET(VCPU_flags, struct vcpu, vcpu_flags);
     OFFSET(VCPU_nmi_addr, struct vcpu, nmi_addr);
-    DEFINE(_VCPUF_nmi_pending, _VCPUF_nmi_pending);
-    DEFINE(_VCPUF_nmi_masked, _VCPUF_nmi_masked);
+    OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
+    OFFSET(VCPU_nmi_masked, struct vcpu, nmi_masked);
     DEFINE(_VGCF_failsafe_disables_events, _VGCF_failsafe_disables_events);
     BLANK();
 

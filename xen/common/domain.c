@@ -95,7 +95,6 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    spin_lock_init(&v->pause_lock);
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
@@ -407,40 +406,23 @@ void domain_destroy(struct domain *d)
     call_rcu(&d->rcu, complete_domain_destroy);
 }
 
-static void vcpu_pause_setup(struct vcpu *v)
-{
-    spin_lock(&v->pause_lock);
-    if ( v->pause_count++ == 0 )
-        set_bit(_VCPUF_paused, &v->vcpu_flags);
-    spin_unlock(&v->pause_lock);
-}
-
 void vcpu_pause(struct vcpu *v)
 {
     ASSERT(v != current);
-    vcpu_pause_setup(v);
+    atomic_inc(&v->pause_count);
     vcpu_sleep_sync(v);
 }
 
 void vcpu_pause_nosync(struct vcpu *v)
 {
-    vcpu_pause_setup(v);
+    atomic_inc(&v->pause_count);
     vcpu_sleep_nosync(v);
 }
 
 void vcpu_unpause(struct vcpu *v)
 {
-    int wake;
-
     ASSERT(v != current);
-
-    spin_lock(&v->pause_lock);
-    wake = (--v->pause_count == 0);
-    if ( wake )
-        clear_bit(_VCPUF_paused, &v->vcpu_flags);
-    spin_unlock(&v->pause_lock);
-
-    if ( wake )
+    if ( atomic_dec_and_test(&v->pause_count) )
         vcpu_wake(v);
 }
 
@@ -507,9 +489,9 @@ int vcpu_reset(struct vcpu *v)
     v->fpu_dirtied     = 0;
     v->is_polling      = 0;
     v->is_initialised  = 0;
+    v->nmi_pending     = 0;
+    v->nmi_masked      = 0;
     clear_bit(_VCPUF_blocked, &v->vcpu_flags);
-    clear_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
-    clear_bit(_VCPUF_nmi_masked, &v->vcpu_flags);
 
  out:
     UNLOCK_BIGLOCK(v->domain);

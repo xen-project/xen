@@ -110,11 +110,14 @@ struct vcpu
     bool_t           is_initialised;
     /* Currently running on a CPU? */
     bool_t           is_running;
+    /* NMI callback pending for this VCPU? */
+    bool_t           nmi_pending;
+    /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
+    bool_t           nmi_masked;
 
     unsigned long    vcpu_flags;
 
-    spinlock_t       pause_lock;
-    unsigned int     pause_count;
+    atomic_t         pause_count;
 
     u16              virq_to_evtchn[NR_VIRQS];
 
@@ -440,31 +443,18 @@ extern struct domain *domain_list;
  /* VCPU is offline. */
 #define _VCPUF_down            1
 #define VCPUF_down             (1UL<<_VCPUF_down)
- /* NMI callback pending for this VCPU? */
-#define _VCPUF_nmi_pending     2
-#define VCPUF_nmi_pending      (1UL<<_VCPUF_nmi_pending)
- /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
-#define _VCPUF_nmi_masked      3
-#define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
- /* VCPU is paused by the hypervisor? */
-#define _VCPUF_paused          4
-#define VCPUF_paused           (1UL<<_VCPUF_paused)
  /* VCPU is blocked awaiting an event to be consumed by Xen. */
-#define _VCPUF_blocked_in_xen  5
+#define _VCPUF_blocked_in_xen  2
 #define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
  /* VCPU affinity has changed: migrating to a new CPU. */
-#define _VCPUF_migrating       6
+#define _VCPUF_migrating       3
 #define VCPUF_migrating        (1UL<<_VCPUF_migrating)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
-    return ( !(v->vcpu_flags &
-               ( VCPUF_blocked |
-                 VCPUF_down |
-                 VCPUF_paused |
-                 VCPUF_blocked_in_xen |
-                 VCPUF_migrating )) &&
-             (atomic_read(&v->domain->pause_count) == 0) );
+    return (!v->vcpu_flags &&
+            !atomic_read(&v->pause_count) &&
+            !atomic_read(&v->domain->pause_count));
 }
 
 void vcpu_pause(struct vcpu *v);

@@ -177,8 +177,8 @@ test_all_events:
         leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   process_softirqs
-        btr   $_VCPUF_nmi_pending,VCPU_flags(%rbx)
-        jc    process_nmi
+        testb $1,VCPU_nmi_pending(%rbx)
+        jnz   process_nmi
 test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
         testb $0xFF,VCPUINFO_upcall_mask(%rax)
@@ -204,19 +204,19 @@ process_softirqs:
         ALIGN
 /* %rbx: struct vcpu */
 process_nmi:
+        testb $1,VCPU_nmi_masked(%rbx)
+        jnz  test_guest_events
+        movb $0,VCPU_nmi_pending(%rbx)
         movq VCPU_nmi_addr(%rbx),%rax
         test %rax,%rax
-        jz   test_all_events
-        bts  $_VCPUF_nmi_masked,VCPU_flags(%rbx)
-        jc   1f
+        jz   test_guest_events
+        movb $1,VCPU_nmi_masked(%rbx)
         sti
         leaq VCPU_trap_bounce(%rbx),%rdx
         movq %rax,TRAPBOUNCE_eip(%rdx)
         movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call create_bounce_frame
         jmp  test_all_events
-1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
-        jmp  test_guest_events
 
 bad_hypercall:
         movq $-ENOSYS,UREGS_rax(%rsp)

@@ -118,7 +118,7 @@ unsigned int compat_iret(void)
         regs->_esp += 16;
 
     /* No longer in NMI context. */
-    clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
+    current->nmi_masked = 0;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
     vcpu_info(current, evtchn_upcall_mask) = !(eflags & X86_EFLAGS_IF);

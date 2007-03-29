@@ -87,8 +87,8 @@ ENTRY(compat_test_all_events)
         leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   compat_process_softirqs
-        btrq  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
-        jc    compat_process_nmi
+        testb $1,VCPU_nmi_pending(%rbx)
+        jnz   compat_process_nmi
 compat_test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
         testb $0xFF,COMPAT_VCPUINFO_upcall_mask(%rax)
@@ -116,11 +116,13 @@ compat_process_softirqs:
 	ALIGN
 /* %rbx: struct vcpu */
 compat_process_nmi:
+        testb $1,VCPU_nmi_masked(%rbx)
+        jnz   compat_test_guest_events
+        movb  $0,VCPU_nmi_pending(%rbx)
         movl  VCPU_nmi_addr(%rbx),%eax
         testl %eax,%eax
-        jz    compat_test_all_events
-        btsq  $_VCPUF_nmi_masked,VCPU_flags(%rbx)
-        jc    1f
+        jz    compat_test_guest_events
+        movb  $1,VCPU_nmi_masked(%rbx)
         sti
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movl  %eax,TRAPBOUNCE_eip(%rdx)
@@ -128,9 +130,6 @@ compat_process_nmi:
         movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
-1:
-        btsq  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
-        jmp   compat_test_guest_events
 
 compat_bad_hypercall:
         movl $-ENOSYS,UREGS_rax(%rsp)

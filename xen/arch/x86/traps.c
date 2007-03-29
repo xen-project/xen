@@ -1859,7 +1859,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
 
     set_bit(reason_idx, nmi_reason(d));
 
-    if ( !test_and_set_bit(_VCPUF_nmi_pending, &v->vcpu_flags) )
+    if ( !xchg(&v->nmi_pending, 1) )
         raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
 }
 
