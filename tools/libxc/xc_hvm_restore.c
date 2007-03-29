@@ -81,7 +81,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     unsigned int rc = 1, n, i;
     uint32_t rec_len, nr_vcpus;
     uint8_t *hvm_buf = NULL;
-    unsigned long long v_end, memsize;
+    unsigned long long v_end;
     unsigned long shared_page_nr;
 
     unsigned long pfn;
@@ -91,16 +91,19 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     /* Types of the pfns in the current region */
     unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
-    /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
-    unsigned long nr_pages;
-
     /* The size of an array big enough to contain all guest pfns */
     unsigned long pfn_array_size = max_pfn + 1;
 
-    /* hvm guest mem size (Mb) */
-    memsize = (unsigned long long)*store_mfn;
-    v_end = memsize << 20;
-    nr_pages = (unsigned long) memsize << (20 - PAGE_SHIFT);
+    /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
+    unsigned long nr_pages = max_pfn + 1;
+    /* MMIO hole doesn't contain RAM */
+    if ( nr_pages >= HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT ) 
+        nr_pages -= HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT; 
+    /* VGA hole doesn't contain RAM */
+    nr_pages -= 0x20;
+
+    /* XXX: Unlikely to be true, but matches previous behaviour. :( */
+    v_end = (nr_pages + 0x20) << PAGE_SHIFT;
 
     DPRINTF("xc_hvm_restore:dom=%d, nr_pages=0x%lx, store_evtchn=%d, "
             "*store_mfn=%ld, pae=%u, apic=%u.\n", 
@@ -146,7 +149,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         0, 0, &pfns[0x00]);
     if ( (rc == 0) && (nr_pages > 0xc0) )
         rc = xc_domain_memory_populate_physmap(
-            xc_handle, dom, nr_pages - 0xc0, 0, 0, &pfns[0xc0]);
+            xc_handle, dom, nr_pages - 0xa0, 0, 0, &pfns[0xc0]);
     if ( rc != 0 )
     {
         PERROR("Could not allocate memory for HVM guest.\n");
@@ -275,14 +278,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
         shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
-
-    /* Paranoia: clean pages. */
-    if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
-         xc_clear_domain_page(xc_handle, dom, shared_page_nr-1) ||
-         xc_clear_domain_page(xc_handle, dom, shared_page_nr-2) ) {
-        ERROR("error clearing comms frames!\n");
-        goto out;
-    }
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
