@@ -1840,11 +1840,16 @@ static int vmx_set_cr0(unsigned long value)
     unsigned long old_cr0;
     unsigned long old_base_mfn;
 
-    /*
-     * CR0: We don't want to lose PE and PG.
-     */
-    old_cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
-    paging_enabled = (old_cr0 & X86_CR0_PE) && (old_cr0 & X86_CR0_PG);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
+
+    /* ET is reserved and should be always be 1. */
+    value |= X86_CR0_ET;
+
+    if ( (value & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG )
+    {
+        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+        return 0;
+    }
 
     /* TS cleared? Then initialise FPU now. */
     if ( !(value & X86_CR0_TS) )
@@ -1853,14 +1858,15 @@ static int vmx_set_cr0(unsigned long value)
         __vm_clear_bit(EXCEPTION_BITMAP, TRAP_no_device);
     }
 
+    old_cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
+    paging_enabled = old_cr0 & X86_CR0_PG;
+
     v->arch.hvm_vmx.cpu_cr0 = (value | X86_CR0_PE | X86_CR0_PG 
                                | X86_CR0_NE | X86_CR0_WP);
     __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
 
     v->arch.hvm_vmx.cpu_shadow_cr0 = value;
     __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
-
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
 
     if ( (value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled )
     {

@@ -205,7 +205,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_EFER:
-        /* offending reserved bit will cause #GP */
+        /* Offending reserved bit will cause #GP. */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
             gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
@@ -213,53 +213,33 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             goto gp_fault;
         }
 
-        /* 
-         * update the VMCB's EFER with the intended value along with
-         * that crucial EFER.SVME bit =)
-         */
-        vmcb->efer = msr_content | EFER_SVME;
-
 #ifdef __x86_64__
-
-        /*
-         * Check for EFER.LME transitions from 0->1 or 1->0.  Do the
-         * sanity checks and then make sure that both EFER.LME and
-         * EFER.LMA are cleared. (EFER.LME can't be set in the vmcb
-         * until the guest also sets CR0.PG, since even if the guest has
-         * paging "disabled", the vmcb's CR0 always has PG set.)
-         */
         if ( (msr_content & EFER_LME) && !svm_lme_is_set(v) )
         {
-            /* EFER.LME transition from 0 to 1 */
-            
-            if ( svm_paging_enabled(v) ||
-                 !svm_cr4_pae_is_set(v) )
+            /* EFER.LME transition from 0 to 1. */
+            if ( svm_paging_enabled(v) || !svm_cr4_pae_is_set(v) )
             {
                 gdprintk(XENLOG_WARNING, "Trying to set LME bit when "
                          "in paging mode or PAE bit is not set\n");
                 goto gp_fault;
             }
-
-            vmcb->efer &= ~(EFER_LME | EFER_LMA);
         }
         else if ( !(msr_content & EFER_LME) && svm_lme_is_set(v) )
         {
-            /* EFER.LME transistion from 1 to 0 */
-            
+            /* EFER.LME transistion from 1 to 0. */
             if ( svm_paging_enabled(v) )
             {
                 gdprintk(XENLOG_WARNING, 
                          "Trying to clear EFER.LME while paging enabled\n");
                 goto gp_fault;
             }
-
-            vmcb->efer &= ~(EFER_LME | EFER_LMA);
         }
-
 #endif /* __x86_64__ */
 
-        /* update the guest EFER's shadow with the intended value */
         v->arch.hvm_svm.cpu_shadow_efer = msr_content;
+        vmcb->efer = msr_content | EFER_SVME;
+        if ( !svm_paging_enabled(v) )
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
 
         break;
 
@@ -1594,63 +1574,23 @@ static void svm_io_instruction(struct vcpu *v)
     }
 }
 
-static int npt_set_cr0(unsigned long value) 
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-  
-    /* ET is reserved and should be always be 1*/
-    value |= X86_CR0_ET;
-
-    /* Check whether the guest is about to turn on long mode. 
-     * If it is, set EFER.LME and EFER.LMA.  Update the shadow EFER.LMA
-     * bit too, so svm_long_mode_enabled() will work.
-     */
-    if ( (value & X86_CR0_PG) && svm_lme_is_set(v) &&
-         (vmcb->cr4 & X86_CR4_PAE) && (vmcb->cr0 & X86_CR0_PE) )
-    {
-        v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
-        vmcb->efer |= EFER_LMA | EFER_LME;
-    }
-
-    /* Whenever CR0.PG is cleared under long mode, LMA will be cleared 
-     * immediatly. We emulate this process for svm_long_mode_enabled().
-     */
-    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
-    {
-        if ( svm_long_mode_enabled(v) )
-        {
-            v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
-        }
-    }
-    
-    vmcb->cr0 = value | X86_CR0_WP;
-    v->arch.hvm_svm.cpu_shadow_cr0 = value;
-
-    /* TS cleared? Then initialise FPU now. */
-    if ( !(value & X86_CR0_TS) ) {
-        setup_fpu(v);
-        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
-    }
-    
-    paging_update_paging_modes(v);
-    
-    return 1;
-}
-
 static int svm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    unsigned long mfn;
-    int paging_enabled;
+    unsigned long mfn, old_value = v->arch.hvm_svm.cpu_shadow_cr0;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long old_base_mfn;
   
-    /* We don't want to lose PG.  ET is reserved and should be always be 1*/
-    paging_enabled = svm_paging_enabled(v);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
+
+    /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
-    vmcb->cr0 = value | X86_CR0_PG | X86_CR0_WP;
-    v->arch.hvm_svm.cpu_shadow_cr0 = value;
+
+    if ( (value & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG )
+    {
+        svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+        return 0;
+    }
 
     /* TS cleared? Then initialise FPU now. */
     if ( !(value & X86_CR0_TS) )
@@ -1659,150 +1599,70 @@ static int svm_set_cr0(unsigned long value)
         vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
-
-    if ( ((value & (X86_CR0_PE | X86_CR0_PG)) == (X86_CR0_PE | X86_CR0_PG))
-         && !paging_enabled ) 
+    if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
     {
-        /* The guest CR3 must be pointing to the guest physical. */
-        mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
-        {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
-                     v->arch.hvm_svm.cpu_cr3, mfn);
-            domain_crash(v->domain);
-            return 0;
-        }
-
 #if defined(__x86_64__)
-        if ( svm_lme_is_set(v) && !svm_cr4_pae_is_set(v) )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-        }
-
         if ( svm_lme_is_set(v) )
         {
+            if ( !svm_cr4_pae_is_set(v) )
+            {
+                HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
+                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+                return 0;
+            }
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
             v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
             vmcb->efer |= EFER_LMA | EFER_LME;
         }
 #endif  /* __x86_64__ */
 
-        /* Now arch.guest_table points to machine physical. */
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( old_base_mfn )
-            put_page(mfn_to_page(old_base_mfn));
-        paging_update_paging_modes(v);
+        if ( !paging_mode_hap(v->domain) )
+        {
+            /* The guest CR3 must be pointing to the guest physical. */
+            mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            {
+                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+                         v->arch.hvm_svm.cpu_cr3, mfn);
+                domain_crash(v->domain);
+                return 0;
+            }
 
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                    (unsigned long) (mfn << PAGE_SHIFT));
-    }
+            /* Now arch.guest_table points to machine physical. */
+            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+            v->arch.guest_table = pagetable_from_pfn(mfn);
+            if ( old_base_mfn )
+                put_page(mfn_to_page(old_base_mfn));
 
-    if ( !((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled )
-        if ( v->arch.hvm_svm.cpu_cr3 ) {
-            put_page(mfn_to_page(get_mfn_from_gpfn(
-                v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)));
-            v->arch.guest_table = pagetable_null();
+            HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
+                        (unsigned long) (mfn << PAGE_SHIFT));
         }
-
-    /*
-     * SVM implements paged real-mode and when we return to real-mode
-     * we revert back to the physical mappings that the domain builder
-     * created.
-     */
-    if ((value & X86_CR0_PE) == 0) {
-        if (value & X86_CR0_PG) {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-            return 0;
-        }
-        paging_update_paging_modes(v);
     }
-    else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
+    else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
     {
+        /* When CR0.PG is cleared, LMA is cleared immediately. */
         if ( svm_long_mode_enabled(v) )
         {
             vmcb->efer &= ~(EFER_LME | EFER_LMA);
             v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
         }
-        /* we should take care of this kind of situation */
-        paging_update_paging_modes(v);
+
+        if ( !paging_mode_hap(v->domain) && v->arch.hvm_svm.cpu_cr3 )
+        {
+            put_page(mfn_to_page(get_mfn_from_gpfn(
+                v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)));
+            v->arch.guest_table = pagetable_null();
+        }
     }
+
+    vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0 = value;
+    if ( !paging_mode_hap(v->domain) )
+        vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
+
+    if ( (value ^ old_value) & X86_CR0_PG )
+        paging_update_paging_modes(v);
 
     return 1;
-}
-
-static int npt_mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
-{  
-    unsigned long value;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-
-    value = get_reg(gpreg, regs, vmcb);
-
-    switch ( cr )
-    {
-    case 0:
-        return npt_set_cr0(value);
-
-    case 3:
-        vmcb->cr3 = value;
-        v->arch.hvm_svm.cpu_cr3 = value;
-        break;
-
-    case 4: /* CR4 */
-        vmcb->cr4 = value;
-        v->arch.hvm_svm.cpu_shadow_cr4 = value;
-        paging_update_paging_modes(v);
-        break;
-
-    case 8:
-        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
-        vmcb->vintr.fields.tpr = value & 0x0F;
-        break;
-
-    default:
-        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
-        domain_crash(v->domain);
-        return 0;
-    }
-    
-    return 1;
-}
-
-static void npt_mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
-{
-    unsigned long value = 0;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-
-    switch ( cr )
-    {
-    case 0:
-        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr0;
-        break;
-    case 2:
-        value = vmcb->cr2;
-        break;
-    case 3:
-        value = (unsigned long) v->arch.hvm_svm.cpu_cr3;
-        break;
-    case 4:
-        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
-       break;
-    case 8:
-        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
-        value = (value & 0xF0) >> 4;
-        break;
-    default:
-        domain_crash(v->domain);
-        return;
-    }
-    
-    set_reg(gp, value, regs, vmcb);
 }
 
 /*
@@ -1864,12 +1724,18 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
     HVM_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
 
-    switch (cr) 
+    switch ( cr )
     {
     case 0: 
         return svm_set_cr0(value);
 
-    case 3: 
+    case 3:
+        if ( paging_mode_hap(v->domain) )
+        {
+            vmcb->cr3 = v->arch.hvm_svm.cpu_cr3 = value;
+            break;
+        }
+
         /* If paging is not enabled yet, simply copy the value to CR3. */
         if ( !svm_paging_enabled(v) )
         {
@@ -1914,6 +1780,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         break;
 
     case 4: /* CR4 */
+        if ( paging_mode_hap(v->domain) )
+        {
+            vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 = value;
+            paging_update_paging_modes(v);
+            break;
+        }
+
         old_cr = v->arch.hvm_svm.cpu_shadow_cr4;
         if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
         {
@@ -2034,18 +1907,12 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     {
     case INSTR_MOV2CR:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
-        if ( paging_mode_hap(v->domain) )
-            result = npt_mov_to_cr(gpreg, cr, regs);
-        else
-            result = mov_to_cr(gpreg, cr, regs);
+        result = mov_to_cr(gpreg, cr, regs);
         break;
 
     case INSTR_MOVCR2:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
-        if ( paging_mode_hap(v->domain) )
-            npt_mov_from_cr(cr, gpreg, regs);
-        else
-            mov_from_cr(cr, gpreg, regs);
+        mov_from_cr(cr, gpreg, regs);
         break;
 
     case INSTR_CLTS:
@@ -2059,13 +1926,8 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     case INSTR_LMSW:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
-
         value = (v->arch.hvm_svm.cpu_shadow_cr0 & ~0xF) | value;
-
-        if ( paging_mode_hap(v->domain) )
-            result = npt_set_cr0(value);
-        else
-            result = svm_set_cr0(value);
+        result = svm_set_cr0(value);
         break;
 
     case INSTR_SMSW:
