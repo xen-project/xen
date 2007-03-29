@@ -560,11 +560,21 @@ def err(msg):
 def get_single_vm(dom):
     if serverType == SERVER_XEN_API:
         uuids = server.xenapi.VM.get_by_name_label(dom)
-        n = len(uuids)
-        if n > 0:
+        if len(uuids) > 0:
             return uuids[0]
-        else:
-            raise OptionError("Domain '%s' not found." % dom)
+
+        try:
+            domid = int(dom)
+            uuids = [server.xenapi.VM.get_domid(vm_ref)
+                     for vm_ref in server.xenapi.VM.get_all()
+                     if int(server.xenapi.VM.get_domid(vm_ref)) == domid]
+        except:
+            pass
+            
+        if len(uuids) > 0:
+            return uuids[0]
+
+        raise OptionError("Domain '%s' not found." % dom)
     else:
         dominfo = server.xend.domain(dom, False)
         return dominfo['uuid']
