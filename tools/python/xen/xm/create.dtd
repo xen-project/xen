@@ -74,7 +74,6 @@
                  mtu             CDATA       #REQUIRED
                  device          CDATA       #REQUIRED
                  qos_algorithm_type CDATA    #REQUIRED
-                 bridge          CDATA       #IMPLIED
                  network         CDATA       #IMPLIED> 
 
 <!ELEMENT pv     EMPTY>

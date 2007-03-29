@@ -143,8 +143,14 @@ class XendNode:
             for net_uuid, network in saved_networks.items():
                 self.network_create(network, False, net_uuid)
         else:
-            self.network_create({'name_label' : 'net0' }, False)
+            bridges = Brctl.get_state().keys()
+            for bridge in bridges:
+                self.network_create({'name_label' : bridge }, False)
+                
+        # Get a mapping from interface to bridge
 
+        if_to_br = dict(reduce(lambda ls,(b,ifs):[(i,b) for i in ifs] + ls,
+                               Brctl.get_state().items(), []))
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
         if saved_pifs:
@@ -174,8 +180,14 @@ class XendNode:
                                   pif_uuid, pif['network'], exn.pif_uuid)
         else:
             for name, mtu, mac in linux_get_phy_ifaces():
-                network = self.networks.values()[0]
-                self._PIF_create(name, mtu, -1, mac, network, False)
+                bridge_name = if_to_br.get(name, None)
+                if bridge_name is not None:
+                    networks = [network for
+                                network in self.networks.values()
+                                if network.get_name_label() == bridge_name]
+                    if len(networks) > 0:
+                        network = networks[0]
+                        self._PIF_create(name, mtu, -1, mac, network, False)
 
         # initialise storage
         saved_srs = self.state_store.load_state('sr')
