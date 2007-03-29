@@ -114,9 +114,9 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->cpu_time = cpu_time;
 
     info->flags = flags |
-        ((d->domain_flags & DOMF_dying)      ? XEN_DOMINF_dying    : 0) |
-        ((d->domain_flags & DOMF_shutdown)   ? XEN_DOMINF_shutdown : 0) |
-        ((d->domain_flags & DOMF_ctrl_pause) ? XEN_DOMINF_paused   : 0) |
+        (d->is_dying                ? XEN_DOMINF_dying    : 0) |
+        (d->is_shutdown             ? XEN_DOMINF_shutdown : 0) |
+        (d->is_paused_by_controller ? XEN_DOMINF_paused   : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
     if ( is_hvm_domain(d) )
@@ -288,7 +288,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d != NULL )
         {
             ret = 0;
-            if ( test_and_clear_bit(_DOMF_shutdown, &d->domain_flags) )
+            if ( xchg(&d->is_shutdown, 0) )
                 for_each_vcpu ( d, v )
                     vcpu_wake(v);
             rcu_unlock_domain(d);

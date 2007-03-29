@@ -2461,7 +2461,7 @@ void shadow_teardown(struct domain *d)
     struct list_head *entry, *n;
     struct page_info *pg;
 
-    ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
+    ASSERT(d->is_dying);
     ASSERT(d != current->domain);
 
     if ( !shadow_locked_by_me(d) )
@@ -2992,7 +2992,7 @@ int shadow_domctl(struct domain *d,
         return -EINVAL;
     }
 
-    if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
+    if ( unlikely(d->is_dying) )
     {
         gdprintk(XENLOG_INFO, "Ignoring shadow op on dying domain %u\n",
                  d->domain_id);

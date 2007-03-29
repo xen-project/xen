@@ -82,6 +82,13 @@ typedef struct { int gcc_is_buggy; } rwlock_t;
 #define write_lock(_lock)            _raw_write_lock(_lock)
 #define write_unlock(_lock)          _raw_write_unlock(_lock)
 
+/* Ensure a lock is quiescent between two critical operations. */
+static inline void spin_barrier(spinlock_t *lock)
+{
+    spin_lock(lock);
+    spin_unlock(lock);
+}
+
 #define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
 #define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
 

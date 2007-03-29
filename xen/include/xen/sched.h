@@ -138,7 +138,6 @@ struct domain
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
     /* Scheduling. */
-    int              shutdown_code; /* code value from OS (if DOMF_shutdown) */
     void            *sched_priv;    /* scheduler-specific data */
 
     struct domain   *next_in_list;
@@ -165,17 +164,26 @@ struct domain
     struct rangeset *iomem_caps;
     struct rangeset *irq_caps;
 
-    unsigned long    domain_flags;
-
     /* Is this an HVM guest? */
     bool_t           is_hvm;
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
     /* Is this guest being debugged by dom0? */
     bool_t           debugger_attached;
+    /* Is a 'compatibility mode' guest (semantics are arch specific)? */
+    bool_t           is_compat;
+    /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
+    bool_t           is_polling;
+    /* Is this guest dying (i.e., a zombie)? */
+    bool_t           is_dying;
+    /* Domain is paused by controller software? */
+    bool_t           is_paused_by_controller;
 
-    spinlock_t       pause_lock;
-    unsigned int     pause_count;
+    /* Guest has shut down (inc. reason code)? */
+    bool_t           is_shutdown;
+    int              shutdown_code;
+
+    atomic_t         pause_count;
 
     unsigned long    vm_assist;
 
@@ -452,28 +460,6 @@ extern struct domain *domain_list;
 #define _VCPUF_migrating       13
 #define VCPUF_migrating        (1UL<<_VCPUF_migrating)
 
-/*
- * Per-domain flags (domain_flags).
- */
- /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         0
-#define DOMF_shutdown          (1UL<<_DOMF_shutdown)
- /* Death rattle. */
-#define _DOMF_dying            1
-#define DOMF_dying             (1UL<<_DOMF_dying)
- /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       2
-#define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
- /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
-#define _DOMF_polling          3
-#define DOMF_polling           (1UL<<_DOMF_polling)
- /* Domain is paused by the hypervisor? */
-#define _DOMF_paused           4
-#define DOMF_paused            (1UL<<_DOMF_paused)
- /* Domain is a compatibility one? */
-#define _DOMF_compat           5
-#define DOMF_compat            (1UL<<_DOMF_compat)
-
 static inline int vcpu_runnable(struct vcpu *v)
 {
     return ( !(v->vcpu_flags &
@@ -482,10 +468,7 @@ static inline int vcpu_runnable(struct vcpu *v)
                  VCPUF_paused |
                  VCPUF_blocked_in_xen |
                  VCPUF_migrating )) &&
-             !(v->domain->domain_flags &
-               ( DOMF_shutdown |
-                 DOMF_ctrl_pause |
-                 DOMF_paused )));
+             (atomic_read(&v->domain->pause_count) == 0) );
 }
 
 void vcpu_pause(struct vcpu *v);
@@ -511,8 +494,7 @@ static inline void vcpu_unblock(struct vcpu *v)
 #define IS_PRIV(_d) ((_d)->is_privileged)
 
 #ifdef CONFIG_COMPAT
-#define IS_COMPAT(_d)                                       \
-    (test_bit(_DOMF_compat, &(_d)->domain_flags))
+#define IS_COMPAT(_d) ((_d)->is_compat)
 #else
 #define IS_COMPAT(_d) 0
 #endif

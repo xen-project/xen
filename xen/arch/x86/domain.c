@@ -274,7 +274,7 @@ int switch_native(struct domain *d)
     if ( !IS_COMPAT(d) )
         return 0;
 
-    clear_bit(_DOMF_compat, &d->domain_flags);
+    d->is_compat = 0;
     release_arg_xlat_area(d);
 
     /* switch gdt */
@@ -306,7 +306,7 @@ int switch_compat(struct domain *d)
     if ( IS_COMPAT(d) )
         return 0;
 
-    set_bit(_DOMF_compat, &d->domain_flags);
+    d->is_compat = 1;
 
     /* switch gdt */
     gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table), PAGE_HYPERVISOR);

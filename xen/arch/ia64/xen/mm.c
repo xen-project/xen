@@ -400,7 +400,7 @@ share_xen_page_with_guest(struct page_info *page,
     ASSERT(page->count_info == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
-    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    if ( !d->is_dying )
     {
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
@@ -1935,8 +1935,7 @@ void put_page_type(struct page_info *page)
          * page-table pages if we detect a referential loop.
          * See domain.c:relinquish_list().
          */
-        ASSERT((x & PGT_validated) ||
-               test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags));
+        ASSERT((x & PGT_validated) || page_get_owner(page)->is_dying);
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {

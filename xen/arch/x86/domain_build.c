@@ -324,7 +324,7 @@ int construct_dom0(struct domain *d,
     {
         l1_pgentry_t gdt_l1e;
 
-        set_bit(_DOMF_compat, &d->domain_flags);
+        d->is_compat = 1;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
 
         if ( nr_pages != (unsigned int)nr_pages )

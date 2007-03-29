@@ -345,7 +345,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 
     /*
      * Only support exchange on calling domain right now. Otherwise there are
-     * tricky corner cases to consider (e.g., DOMF_dying domain).
+     * tricky corner cases to consider (e.g., dying domain).
      */
     if ( unlikely(exch.in.domid != DOMID_SELF) )
     {

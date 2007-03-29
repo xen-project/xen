@@ -92,8 +92,7 @@ void __dummy__(void)
     OFFSET(VCPU_vmx_cr2, struct vcpu, arch.hvm_vmx.cpu_cr2);
     BLANK();
 
-    OFFSET(DOMAIN_domain_flags, struct domain, domain_flags);
-    DEFINE(_DOMF_compat, _DOMF_compat);
+    OFFSET(DOMAIN_is_compat, struct domain, is_compat);
     BLANK();
 
     OFFSET(VMCB_rax, struct vmcb_struct, rax);

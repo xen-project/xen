@@ -234,8 +234,8 @@ ENTRY(int80_direct_trap)
         jz    int80_slow_path
 
         movq  VCPU_domain(%rbx),%rax
-        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
-        jc    compat_int80_direct_trap
+        testb $1,DOMAIN_is_compat(%rax)
+        jnz   compat_int80_direct_trap
 
         call  create_bounce_frame
         jmp   restore_all_guest
@@ -353,16 +353,12 @@ ENTRY(domain_crash_synchronous)
         GET_GUEST_REGS(%rax)
         movq  %rax,%rsp
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
-#ifdef CONFIG_COMPAT
         movq  CPUINFO_current_vcpu(%rax),%rax
         movq  VCPU_domain(%rax),%rax
-        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
-        setnc %al
+        testb $1,DOMAIN_is_compat(%rax)
+        setz  %al
         leal  (%rax,%rax,2),%eax
         orb   %al,UREGS_cs(%rsp)
-#else
-        orb   $3,UREGS_cs(%rsp)
-#endif
         # printk(domain_crash_synchronous_string)
         leaq  domain_crash_synchronous_string(%rip),%rdi
         xorl  %eax,%eax
@@ -375,14 +371,10 @@ ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
-#ifndef CONFIG_COMPAT
-        jmp   test_all_events
-#else
         movq  VCPU_domain(%rbx),%rax
-        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
-        jnc   test_all_events
+        testb $1,DOMAIN_is_compat(%rax)
+        jz    test_all_events
         jmp   compat_test_all_events
-#endif
 
         ALIGN
 /* No special register assumptions. */
@@ -401,11 +393,9 @@ handle_exception_saved:
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         leaq  VCPU_trap_bounce(%rbx),%rdx
-#ifdef CONFIG_COMPAT
         movq  VCPU_domain(%rbx),%rax
-        btl   $_DOMF_compat,DOMAIN_domain_flags(%rax)
-        jc    compat_post_handle_exception
-#endif
+        testb $1,DOMAIN_is_compat(%rax)
+        jnz   compat_post_handle_exception
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
         call  create_bounce_frame

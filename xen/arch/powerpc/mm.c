@@ -106,7 +106,7 @@ void share_xen_page_with_guest(
     ASSERT(page->count_info == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
-    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    if ( !d->is_dying )
     {
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
@@ -218,8 +218,7 @@ void put_page_type(struct page_info *page)
          * page-table pages if we detect a referential loop.
          * See domain.c:relinquish_list().
          */
-        ASSERT((x & PGT_validated) || 
-               test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags));
+        ASSERT((x & PGT_validated) || page_get_owner(page)->is_dying);
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
@@ -402,7 +401,7 @@ int allocate_rma(struct domain *d, unsigned int order)
 void free_rma_check(struct page_info *page)
 {
     if (test_bit(_PGC_page_RMA, &page->count_info)) {
-        if (!test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags)) {
+        if (!page_get_owner(page)->is_dying) {
             panic("Attempt to free an RMA page: 0x%lx\n", page_to_mfn(page));
         } else {
             clear_bit(_PGC_page_RMA, &page->count_info);
@@ -439,8 +438,7 @@ ulong pfn2mfn(struct domain *d, ulong pfn, int *type)
             mfn = d->arch.p2m[pfn];
         }
 #ifdef DEBUG
-        if (t != PFN_TYPE_NONE &&
-            (d->domain_flags & DOMF_dying) &&
+        if (t != PFN_TYPE_NONE && d->is_dying &&
             page_get_owner(mfn_to_page(mfn)) != d) {
             printk("%s: page type: %d owner Dom[%d]:%p expected Dom[%d]:%p\n",
                    __func__, t,

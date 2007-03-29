@@ -451,7 +451,7 @@ void hap_teardown(struct domain *d)
     mfn_t mfn;
     HERE_I_AM;
 
-    ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
+    ASSERT(d->is_dying);
     ASSERT(d != current->domain);
 
     if ( !hap_locked_by_me(d) )

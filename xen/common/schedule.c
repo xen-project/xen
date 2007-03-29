@@ -313,7 +313,9 @@ static long do_poll(struct sched_poll *sched_poll)
     /* These operations must occur in order. */
     set_bit(_VCPUF_blocked, &v->vcpu_flags);
     set_bit(_VCPUF_polling, &v->vcpu_flags);
-    set_bit(_DOMF_polling, &d->domain_flags);
+    smp_wmb();
+    d->is_polling = 1;
+    smp_wmb();
 
     /* Check for events /after/ setting flags: avoids wakeup waiting race. */
     for ( i = 0; i < sched_poll->nr_ports; i++ )

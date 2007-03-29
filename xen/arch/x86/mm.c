@@ -271,7 +271,7 @@ void share_xen_page_with_guest(
     ASSERT(page->count_info == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
-    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    if ( !d->is_dying )
     {
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
@@ -806,8 +806,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
      * (Note that the undestroyable active grants are not a security hole in
      * Xen. All active grants can safely be cleaned up when the domain dies.)
      */
-    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
-         !(d->domain_flags & (DOMF_shutdown|DOMF_dying)) )
+    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) && !d->is_shutdown && !d->is_dying )
     {
         MEM_LOG("Attempt to implicitly unmap a granted PTE %" PRIpte,
                 l1e_get_intpte(l1e));
@@ -2054,9 +2053,12 @@ int do_mmuext_op(
             /* A page is dirtied when its pin status is set. */
             mark_dirty(d, mfn);
            
-            /* We can race domain destruction (domain_relinquish_resources). */
+            /*
+             * We can race domain destruction (domain_relinquish_resources).
+             * NB. The dying-flag test must happen /after/ setting PGT_pinned.
+             */
             if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) &&
-                 test_bit(_DOMF_dying, &FOREIGNDOM->domain_flags) &&
+                 this_cpu(percpu_mm_info).foreign->is_dying &&
                  test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
                 put_page_and_type(page);
 
