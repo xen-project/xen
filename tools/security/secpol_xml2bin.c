@@ -1163,7 +1163,8 @@ int write_binary(char *filename)
 
     u_int32_t len_ste = 0, len_chwall = 0, len_pr = 0;  /* length of policy components */
 
-    sscanf(policy_version_string,"%d.%d", &major, &minor);
+    if (policy_version_string)
+        sscanf(policy_version_string,"%d.%d", &major, &minor);
 
     /* open binary file */
     if ((fd =

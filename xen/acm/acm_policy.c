@@ -50,7 +50,7 @@ acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
         printk("%s: Error copying!\n",__func__);
         goto error_free;
     }
-    ret = do_acm_set_policy(policy_buffer, buf_size);
+    ret = do_acm_set_policy(policy_buffer, buf_size, 0);
 
  error_free:
     xfree(policy_buffer);
@@ -59,7 +59,7 @@ acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
 
 
 int
-do_acm_set_policy(void *buf, u32 buf_size)
+do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy)
 {
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *)buf;
     uint32_t offset, length;
@@ -106,14 +106,16 @@ do_acm_set_policy(void *buf, u32 buf_size)
     length = be32_to_cpu(pol->secondary_buffer_offset) - offset;
 
     if ( (offset + length) > buf_size ||
-         acm_primary_ops->set_binary_policy(buf + offset, length))
+         acm_primary_ops->set_binary_policy(buf + offset, length,
+                                            is_bootpolicy))
         goto error_lock_free;
 
     /* set secondary policy data */
     offset = be32_to_cpu(pol->secondary_buffer_offset);
     length = be32_to_cpu(pol->len) - offset;
     if ( (offset + length) > buf_size ||
-         acm_secondary_ops->set_binary_policy(buf + offset, length))
+         acm_secondary_ops->set_binary_policy(buf + offset, length,
+                                              is_bootpolicy))
         goto error_lock_free;
 
     memcpy(&acm_bin_pol.xml_pol_version,

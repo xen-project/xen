@@ -91,7 +91,8 @@ struct acm_operations {
     int  (*init_domain_ssid)           (void **ssid, ssidref_t ssidref);
     void (*free_domain_ssid)           (void *ssid);
     int  (*dump_binary_policy)         (u8 *buffer, u32 buf_size);
-    int  (*set_binary_policy)          (u8 *buffer, u32 buf_size);
+    int  (*set_binary_policy)          (u8 *buffer, u32 buf_size,
+                                        int is_bootpolicy);
     int  (*dump_statistics)            (u8 *buffer, u16 buf_size);
     int  (*dump_ssid_types)            (ssidref_t ssidref, u8 *buffer, u16 buf_size);
     /* domain management control hooks (can be NULL) */
@@ -347,14 +348,13 @@ static inline int acm_pre_grant_setup(domid_t id)
     }
 }
 
-/* predefined ssidref for DOM0 used by xen when creating DOM0 */
-#define ACM_DOM0_SSIDREF       0x00010001 
-
 static inline void acm_post_domain0_create(domid_t domid)
 {
     /* initialialize shared sHype security labels for new domain */
-    acm_init_domain_ssid(domid, ACM_DOM0_SSIDREF);
-    acm_post_domain_create(domid, ACM_DOM0_SSIDREF);
+    int dom0_ssidref = dom0_ste_ssidref << 16 | dom0_chwall_ssidref;
+
+    acm_init_domain_ssid(domid, dom0_ssidref);
+    acm_post_domain_create(domid, dom0_ssidref);
 }
 
 static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)

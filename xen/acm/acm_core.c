@@ -62,18 +62,63 @@ struct acm_binary_policy acm_bin_pol;
 /* acm binary policy lock */
 DEFINE_RWLOCK(acm_bin_pol_rwlock);
 
+/* ACM's only accepted policy name */
+char polname[80];
+char *acm_accepted_boot_policy_name = NULL;
+
+static void __init set_dom0_ssidref(const char *val)
+{
+    /* expected format:
+         ssidref=<hex number>:<policy name>
+         Policy name must not have a 'space'.
+     */
+    const char *c;
+    int lo, hi;
+    int i;
+    int dom0_ssidref = simple_strtoull(val, &c, 0);
+
+    if (!strncmp(&c[0],":sHype:", 7)) {
+        lo = dom0_ssidref & 0xffff;
+        if (lo < ACM_MAX_NUM_TYPES && lo >= 1)
+            dom0_chwall_ssidref = lo;
+        hi = dom0_ssidref >> 16;
+        if (hi < ACM_MAX_NUM_TYPES && hi >= 1)
+            dom0_ste_ssidref = hi;
+        for (i = 0; i < sizeof(polname); i++) {
+            polname[i] = c[7+i];
+            if (polname[i] == '\0' || polname[i] == '\t' ||
+                polname[i] == '\n' || polname[i] == ' '  ||
+                polname[i] == ':') {
+                break;
+            }
+        }
+        polname[i] = 0;
+        acm_accepted_boot_policy_name = polname;
+    }
+}
+
+custom_param("ssidref", set_dom0_ssidref);
+
 int
 acm_set_policy_reference(u8 *buf, u32 buf_size)
 {
+    char *name = (char *)(buf + sizeof(struct acm_policy_reference_buffer));
     struct acm_policy_reference_buffer *pr = (struct acm_policy_reference_buffer *)buf;
+
+    if (acm_accepted_boot_policy_name != NULL) {
+        if (strcmp(acm_accepted_boot_policy_name, name)) {
+            printk("Policy's name '%s' is not the expected one '%s'.\n",
+                   name, acm_accepted_boot_policy_name);
+            return ACM_ERROR;
+        }
+    }
+
     acm_bin_pol.policy_reference_name = (char *)xmalloc_array(u8, be32_to_cpu(pr->len));
 
     if (!acm_bin_pol.policy_reference_name)
         return -ENOMEM;
+    strlcpy(acm_bin_pol.policy_reference_name, name, be32_to_cpu(pr->len));
 
-    strlcpy(acm_bin_pol.policy_reference_name,
-            (char *)(buf + sizeof(struct acm_policy_reference_buffer)),
-            be32_to_cpu(pr->len));
     printk("%s: Activating policy %s\n", __func__,
            acm_bin_pol.policy_reference_name);
     return 0;
@@ -190,7 +235,8 @@ acm_is_policy(char *buf, unsigned long len)
 
 static int
 acm_setup(char *policy_start,
-          unsigned long policy_len)
+          unsigned long policy_len,
+          int is_bootpolicy)
 {
     int rc = ACM_OK;
     struct acm_policy_buffer *pol;
@@ -202,7 +248,8 @@ acm_setup(char *policy_start,
     if (be32_to_cpu(pol->magic) != ACM_MAGIC)
         return rc;
 
-    rc = do_acm_set_policy((void *)policy_start, (u32)policy_len);
+    rc = do_acm_set_policy((void *)policy_start, (u32)policy_len,
+                           is_bootpolicy);
     if (rc == ACM_OK)
     {
         printkd("Policy len  0x%lx, start at %p.\n",policy_len,policy_start);
@@ -224,7 +271,10 @@ acm_init(char *policy_start,
     int ret = ACM_OK;
 
     /* first try to load the boot policy (uses its own locks) */
-    acm_setup(policy_start, policy_len);
+    acm_setup(policy_start, policy_len, 1);
+
+    /* a user-provided policy may have any name; only matched during boot */
+    acm_accepted_boot_policy_name = NULL;
 
     if (acm_active_security_policy != ACM_POLICY_UNDEFINED)
     {
@@ -235,6 +285,9 @@ acm_init(char *policy_start,
     /* else continue with the minimal hardcoded default startup policy */
     printk("%s: Loading default policy (%s).\n",
            __func__, ACM_POLICY_NAME(ACM_DEFAULT_SECURITY_POLICY));
+
+    /* (re-)set dom-0 ssidref to default */
+    dom0_ste_ssidref = dom0_chwall_ssidref = 0x0001;
 
     if (acm_init_binary_policy(ACM_DEFAULT_SECURITY_POLICY)) {
         ret = -EINVAL;

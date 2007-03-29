@@ -33,7 +33,7 @@ null_dump_binary_policy(u8 *buf, u32 buf_size)
 }
 
 static int
-null_set_binary_policy(u8 *buf, u32 buf_size)
+null_set_binary_policy(u8 *buf, u32 buf_size, int is_bootpolicy)
 { 
     return ACM_OK;
 }
