@@ -85,7 +85,7 @@ void hvm_disable(void)
 void hvm_stts(struct vcpu *v)
 {
     /* FPU state already dirty? Then no need to setup_fpu() lazily. */
-    if ( !test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+    if ( !v->fpu_dirtied )
         hvm_funcs.stts(v);
 }
 
@@ -332,10 +332,10 @@ void hvm_vcpu_reset(struct vcpu *v)
     hvm_funcs.vcpu_initialise(v);
 
     set_bit(_VCPUF_down, &v->vcpu_flags);
-    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
     clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    v->fpu_initialised = 0;
+    v->fpu_dirtied     = 0;
+    v->is_initialised  = 0;
 
     vcpu_unpause(v);
 }
@@ -722,7 +722,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     LOCK_BIGLOCK(d);
     rc = -EEXIST;
-    if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    if ( !v->is_initialised )
         rc = boot_vcpu(d, vcpuid, ctxt);
     UNLOCK_BIGLOCK(d);
 

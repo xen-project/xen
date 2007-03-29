@@ -44,7 +44,7 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
         LOCK_BIGLOCK(d);
         rc = -EEXIST;
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             rc = boot_vcpu(d, vcpuid, cmp_ctxt);
         UNLOCK_BIGLOCK(d);
 

@@ -21,7 +21,7 @@ void init_fpu(void)
     __asm__ __volatile__ ( "fninit" );
     if ( cpu_has_xmm )
         load_mxcsr(0x1f80);
-    set_bit(_VCPUF_fpu_initialised, &current->vcpu_flags);
+    current->fpu_initialised = 1;
 }
 
 void save_init_fpu(struct vcpu *v)
@@ -76,7 +76,7 @@ void save_init_fpu(struct vcpu *v)
             : "=m" (*fpu_ctxt) );
     }
 
-    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    v->fpu_dirtied = 0;
     write_cr0(cr0|X86_CR0_TS);
 }
 

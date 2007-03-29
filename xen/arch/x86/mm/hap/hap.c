@@ -569,7 +569,8 @@ void hap_update_cr3(struct vcpu *v, int do_locking)
 
     HERE_I_AM;
     /* Don't do anything on an uninitialised vcpu */
-    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) ) {
+    if ( !is_hvm_domain(d) && !v->is_initialised )
+    {
         ASSERT(v->arch.cr3 == 0);
         return;
     }

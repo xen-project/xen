@@ -563,9 +563,7 @@ int arch_set_info_guest(
 #endif
     }
 
-    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    if ( flags & VGCF_I387_VALID )
-        set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    v->fpu_initialised = !!(flags & VGCF_I387_VALID);
 
     v->arch.flags &= ~TF_kernel_mode;
     if ( (flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
@@ -600,7 +598,7 @@ int arch_set_info_guest(
         hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
     }
 
-    if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    if ( v->is_initialised )
         goto out;
 
     memset(v->arch.guest_context.debugreg, 0,
@@ -699,7 +697,7 @@ int arch_set_info_guest(
         update_domain_wallclock_time(d);
 
     /* Don't redo final setup */
-    set_bit(_VCPUF_initialised, &v->vcpu_flags);
+    v->is_initialised = 1;
 
     if ( paging_mode_enabled(d) )
         paging_update_paging_modes(v);

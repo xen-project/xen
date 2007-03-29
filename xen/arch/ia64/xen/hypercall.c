@@ -81,11 +81,11 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		return;
 
   	if (vector == XEN_SAL_BOOT_RENDEZ_VEC
-	    && (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)
+	    && (!targ->is_initialised
 		|| test_bit(_VCPUF_down, &targ->vcpu_flags))) {
 
 		/* First start: initialize vpcu.  */
-		if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+		if (!targ->is_initialised) {
 			struct vcpu_guest_context c;
 		
 			memset (&c, 0, sizeof (c));
@@ -112,9 +112,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 			printk ("arch_boot_vcpu: huu, already awaken!\n");
 	}
 	else {
-		int running = test_bit(_VCPUF_running,
-				       &targ->vcpu_flags);
-		
+		int running = targ->is_running;
 		vcpu_pend_interrupt(targ, vector);
 		vcpu_unblock(targ);
 		if (running)

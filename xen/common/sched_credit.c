@@ -411,8 +411,7 @@ __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
      * Don't pick up work that's in the peer's scheduling tail. Also only pick
      * up work that's allowed to run on our CPU.
      */
-    return !test_bit(_VCPUF_running, &vc->vcpu_flags) &&
-           cpu_isset(dest_cpu, vc->cpu_affinity);
+    return !vc->is_running && cpu_isset(dest_cpu, vc->cpu_affinity);
 }
 
 static int

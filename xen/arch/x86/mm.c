@@ -1089,7 +1089,7 @@ static int alloc_l3_table(struct page_info *page)
      */
     if ( (pfn >= 0x100000) &&
          unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
-         d->vcpu[0] && test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
+         d->vcpu[0] && d->vcpu[0]->is_initialised )
     {
         MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
         return 0;

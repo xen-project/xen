@@ -188,7 +188,7 @@ static void dump_domains(unsigned char key)
             printk("    VCPU%d: CPU%d [has=%c] flags=%lx "
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
-                   test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F',
+                   v->is_running ? 'T':'F',
                    v->vcpu_flags,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
