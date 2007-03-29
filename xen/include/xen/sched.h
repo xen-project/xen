@@ -100,6 +100,17 @@ struct vcpu
     } runstate_guest; /* guest address */
 #endif
 
+    /* Has the FPU been initialised? */
+    bool_t           fpu_initialised;
+    /* Has the FPU been used since it was last saved? */
+    bool_t           fpu_dirtied;
+    /* Is this VCPU polling any event channels (SCHEDOP_poll)? */
+    bool_t           is_polling;
+    /* Initialization completed for this VCPU? */
+    bool_t           is_initialised;
+    /* Currently running on a CPU? */
+    bool_t           is_running;
+
     unsigned long    vcpu_flags;
 
     spinlock_t       pause_lock;
@@ -423,41 +434,26 @@ extern struct domain *domain_list;
 /*
  * Per-VCPU flags (vcpu_flags).
  */
- /* Has the FPU been initialised? */
-#define _VCPUF_fpu_initialised 0
-#define VCPUF_fpu_initialised  (1UL<<_VCPUF_fpu_initialised)
- /* Has the FPU been used since it was last saved? */
-#define _VCPUF_fpu_dirtied     1
-#define VCPUF_fpu_dirtied      (1UL<<_VCPUF_fpu_dirtied)
  /* Domain is blocked waiting for an event. */
-#define _VCPUF_blocked         2
+#define _VCPUF_blocked         0
 #define VCPUF_blocked          (1UL<<_VCPUF_blocked)
- /* Currently running on a CPU? */
-#define _VCPUF_running         3
-#define VCPUF_running          (1UL<<_VCPUF_running)
- /* Initialization completed. */
-#define _VCPUF_initialised     4
-#define VCPUF_initialised      (1UL<<_VCPUF_initialised)
  /* VCPU is offline. */
-#define _VCPUF_down            5
+#define _VCPUF_down            1
 #define VCPUF_down             (1UL<<_VCPUF_down)
  /* NMI callback pending for this VCPU? */
-#define _VCPUF_nmi_pending     8
+#define _VCPUF_nmi_pending     2
 #define VCPUF_nmi_pending      (1UL<<_VCPUF_nmi_pending)
  /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
-#define _VCPUF_nmi_masked      9
+#define _VCPUF_nmi_masked      3
 #define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
- /* VCPU is polling a set of event channels (SCHEDOP_poll). */
-#define _VCPUF_polling         10
-#define VCPUF_polling          (1UL<<_VCPUF_polling)
  /* VCPU is paused by the hypervisor? */
-#define _VCPUF_paused          11
+#define _VCPUF_paused          4
 #define VCPUF_paused           (1UL<<_VCPUF_paused)
  /* VCPU is blocked awaiting an event to be consumed by Xen. */
-#define _VCPUF_blocked_in_xen  12
+#define _VCPUF_blocked_in_xen  5
 #define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
  /* VCPU affinity has changed: migrating to a new CPU. */
-#define _VCPUF_migrating       13
+#define _VCPUF_migrating       6
 #define VCPUF_migrating        (1UL<<_VCPUF_migrating)
 
 static inline int vcpu_runnable(struct vcpu *v)

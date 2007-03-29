@@ -484,7 +484,7 @@ int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 {
     struct vcpu *v = d->vcpu[vcpuid];
 
-    BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
+    BUG_ON(v->is_initialised);
 
     return arch_set_info_guest(v, ctxt);
 }
@@ -503,13 +503,13 @@ int vcpu_reset(struct vcpu *v)
 
     set_bit(_VCPUF_down, &v->vcpu_flags);
 
-    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    v->fpu_initialised = 0;
+    v->fpu_dirtied     = 0;
+    v->is_polling      = 0;
+    v->is_initialised  = 0;
     clear_bit(_VCPUF_blocked, &v->vcpu_flags);
-    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
     clear_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
     clear_bit(_VCPUF_nmi_masked, &v->vcpu_flags);
-    clear_bit(_VCPUF_polling, &v->vcpu_flags);
 
  out:
     UNLOCK_BIGLOCK(v->domain);
@@ -546,7 +546,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
         LOCK_BIGLOCK(d);
         rc = -EEXIST;
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             rc = boot_vcpu(d, vcpuid, ctxt);
         UNLOCK_BIGLOCK(d);
 
@@ -554,7 +554,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case VCPUOP_up:
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             return -EINVAL;
 
         if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )

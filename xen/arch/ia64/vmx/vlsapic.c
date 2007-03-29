@@ -692,7 +692,7 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
     if (targ == NULL)
         panic_domain(NULL, "Unknown IPI cpu\n");
 
-    if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags) ||
+    if (!targ->is_initialised ||
         test_bit(_VCPUF_down, &targ->vcpu_flags)) {
 
         struct pt_regs *targ_regs = vcpu_regs(targ);
@@ -717,7 +717,7 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
             printk("arch_boot_vcpu: huh, already awake!");
         }
     } else {
-        int running = test_bit(_VCPUF_running, &targ->vcpu_flags);
+        int running = targ->is_running;
         vlsapic_deliver_ipi(targ, ((ipi_d_t)value).dm, 
                             ((ipi_d_t)value).vector);
         vcpu_unblock(targ);

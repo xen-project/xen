@@ -1030,7 +1030,7 @@ long do_fpu_taskswitch(int set)
     else
     {
         v->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
-        if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+        if ( v->fpu_dirtied )
             clts();
     }
 

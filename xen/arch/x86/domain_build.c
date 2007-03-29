@@ -254,7 +254,7 @@ int construct_dom0(struct domain *d,
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
-    BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
+    BUG_ON(v->is_initialised);
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
@@ -901,7 +901,7 @@ int construct_dom0(struct domain *d,
 
     update_domain_wallclock_time(d);
 
-    set_bit(_VCPUF_initialised, &v->vcpu_flags);
+    v->is_initialised = 1;
     clear_bit(_VCPUF_down, &v->vcpu_flags);
 
     /*

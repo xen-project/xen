@@ -303,7 +303,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( trig_mode && !(level & APIC_INT_ASSERT) )
             break;
         /* FIXME How to check the situation after vcpu reset? */
-        if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( v->is_initialised )
             hvm_vcpu_reset(v);
         v->arch.hvm_vcpu.init_sipi_sipi_state =
             HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI;
@@ -318,7 +318,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         v->arch.hvm_vcpu.init_sipi_sipi_state =
             HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM;
 
-        if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( v->is_initialised )
         {
             gdprintk(XENLOG_ERR, "SIPI for initialized vcpu %x\n", v->vcpu_id);
             goto exit_and_crash;

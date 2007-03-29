@@ -18,9 +18,9 @@ extern void init_fpu(void);
 extern void save_init_fpu(struct vcpu *v);
 extern void restore_fpu(struct vcpu *v);
 
-#define unlazy_fpu(v) do {                                      \
-    if ( test_bit(_VCPUF_fpu_dirtied, &(v)->vcpu_flags) )       \
-        save_init_fpu(v);                                       \
+#define unlazy_fpu(v) do {                      \
+    if ( (v)->fpu_dirtied )                     \
+        save_init_fpu(v);                       \
 } while ( 0 )
 
 #define load_mxcsr(val) do {                                    \
@@ -33,9 +33,10 @@ static inline void setup_fpu(struct vcpu *v)
     /* Avoid recursion. */
     clts();
 
-    if ( !test_and_set_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+    if ( !v->fpu_dirtied )
     {
-        if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
+        v->fpu_dirtied = 1;
+        if ( v->fpu_initialised )
             restore_fpu(v);
         else
             init_fpu();

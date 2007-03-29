@@ -105,7 +105,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
         {
             if ( !(v->vcpu_flags & VCPUF_blocked) )
                 flags &= ~XEN_DOMINF_blocked;
-            if ( v->vcpu_flags & VCPUF_running )
+            if ( v->is_running )
                 flags |= XEN_DOMINF_running;
             info->nr_online_vcpus++;
         }
@@ -517,7 +517,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto getvcpucontext_out;
 
         ret = -ENODATA;
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             goto getvcpucontext_out;
 
 #ifdef CONFIG_COMPAT
@@ -576,7 +576,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         op->u.getvcpuinfo.online   = !test_bit(_VCPUF_down, &v->vcpu_flags);
         op->u.getvcpuinfo.blocked  = test_bit(_VCPUF_blocked, &v->vcpu_flags);
-        op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
+        op->u.getvcpuinfo.running  = v->is_running;
         op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;
         ret = 0;

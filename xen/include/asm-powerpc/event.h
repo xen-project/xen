@@ -27,7 +27,7 @@
 static inline void evtchn_notify(struct vcpu *v)
 {
 #ifdef XXX_NO_SMP_YET
-    int running = test_bit(_VCPUF_running, &v->vcpu_flags);
+    int running = v->is_running;
     vcpu_unblock(v);
     if (running)
         smp_send_event_check_cpu(v->processor);
@@ -73,10 +73,10 @@ static inline void vcpu_kick(struct vcpu *v)
      * locks) but the key insight is that each change will cause
      * evtchn_upcall_pending to be polled.
      *
-     * NB2. We save VCPUF_running across the unblock to avoid a needless
+     * NB2. We save the running flag across the unblock to avoid a needless
      * IPI for domains that we IPI'd to unblock.
      */
-    int running = test_bit(_VCPUF_running, &v->vcpu_flags);
+    int running = v->is_running;
     vcpu_unblock(v);
     if (running)
         smp_send_event_check_cpu(v->processor);

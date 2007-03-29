@@ -168,10 +168,13 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     d->shared_info->wc_nsec = dom0->shared_info->wc_nsec;
     d->shared_info->arch.boot_timebase = dom0->shared_info->arch.boot_timebase;
 
-    /* Auto-online VCPU0 when it is initialised. */
-    if ( !test_and_set_bit(_VCPUF_initialised, &v->vcpu_flags) &&
-         (v->vcpu_id == 0) )
-        clear_bit(_VCPUF_down, &v->vcpu_flags);
+    if ( !v->is_initialised )
+    {
+        v->is_initialised = 1;
+        /* Auto-online VCPU0 when it is initialised. */
+        if ( v->vcpu_id == 0 )
+            clear_bit(_VCPUF_down, &v->vcpu_flags);
+    }
 
     cpu_init_vcpu(v);
 

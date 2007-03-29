@@ -657,7 +657,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		v->arch.iva = er->iva;
 	}
 
-	if (test_bit(_VCPUF_initialised, &v->vcpu_flags))
+	if (v->is_initialised)
 		return 0;
 
 	if (d->arch.is_vti) {
@@ -676,10 +676,12 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	/* This overrides some registers. */
 	vcpu_init_regs(v);
 
-	/* Don't redo final setup. Auto-online VCPU0. */
-	if (!test_and_set_bit(_VCPUF_initialised, &v->vcpu_flags) &&
-	    (v->vcpu_id == 0))
-		clear_bit(_VCPUF_down, &v->vcpu_flags);
+	if (!v->is_initialised) {
+		v->is_initialised = 1;
+		/* Auto-online VCPU0 when it is initialised. */
+		if (v->vcpu_id == 0)
+			clear_bit(_VCPUF_down, &v->vcpu_flags);
+	}
 
 	return 0;
 }
@@ -1067,7 +1069,7 @@ int construct_dom0(struct domain *d,
 	/* Sanity! */
 	BUG_ON(d != dom0);
 	BUG_ON(d->vcpu[0] == NULL);
-	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
+	BUG_ON(v->is_initialised);
 
 	printk("*** LOADING DOMAIN 0 ***\n");
 
@@ -1188,7 +1190,7 @@ int construct_dom0(struct domain *d,
 
 	printk("Dom0: 0x%lx\n", (u64)dom0);
 
-	set_bit(_VCPUF_initialised, &v->vcpu_flags);
+	v->is_initialised = 1;
 	clear_bit(_VCPUF_down, &v->vcpu_flags);
 
 	/* Build firmware.

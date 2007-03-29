@@ -529,11 +529,17 @@ void evtchn_set_pending(struct vcpu *v, int port)
     }
     
     /* Check if some VCPU might be polling for this event. */
-    if ( unlikely(d->is_polling) && likely(xchg(&d->is_polling, 0)) )
+    if ( unlikely(d->is_polling) )
     {
+        d->is_polling = 0;
+        smp_mb(); /* check vcpu poll-flags /after/ clearing domain poll-flag */
         for_each_vcpu ( d, v )
-            if ( test_and_clear_bit(_VCPUF_polling, &v->vcpu_flags) )
-                vcpu_unblock(v);
+        {
+            if ( !v->is_polling )
+                continue;
+            v->is_polling = 0;
+            vcpu_unblock(v);
+        }
     }
 }
 

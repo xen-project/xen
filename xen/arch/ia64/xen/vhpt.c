@@ -184,7 +184,7 @@ domain_purge_swtc_entries(struct domain *d)
 {
 	struct vcpu* v;
 	for_each_vcpu(d, v) {
-		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+		if (!v->is_initialised)
 			continue;
 
 		/* Purge TC entries.
@@ -202,7 +202,7 @@ domain_purge_swtc_entries_vcpu_dirty_mask(struct domain* d,
 
 	for_each_vcpu_mask(vcpu, vcpu_dirty_mask) {
 		struct vcpu* v = d->vcpu[vcpu];
-		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+		if (!v->is_initialised)
 			continue;
 
 		/* Purge TC entries.
@@ -263,7 +263,7 @@ void domain_flush_vtlb_all(struct domain* d)
 	struct vcpu *v;
 
 	for_each_vcpu(d, v) {
-		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+		if (!v->is_initialised)
 			continue;
 
 		if (v->processor == cpu)
@@ -341,7 +341,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 	smp_mb();
 
 	for_each_vcpu (d, v) {
-		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+		if (!v->is_initialised)
 			continue;
 
 		if (HAS_PERVCPU_VHPT(d)) {
@@ -407,7 +407,7 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 	if (HAS_PERVCPU_VHPT(d)) {
 		for_each_vcpu_mask(vcpu, entry->vcpu_dirty_mask) {
 			v = d->vcpu[vcpu];
-			if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+			if (!v->is_initialised)
 				continue;
 
 			/* Invalidate VHPT entries.  */
