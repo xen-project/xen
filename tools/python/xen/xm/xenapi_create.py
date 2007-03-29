@@ -25,7 +25,7 @@ from xml.parsers.xmlproc import xmlproc, xmlval, xmldtd
 from xen.xend import sxp
 from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
-
+from xen.xm.opts import OptionError
 
 import sys
 import os
@@ -184,15 +184,7 @@ class xenapi_create:
         map(self.check_vif, vifs)
 
     def check_vif(self, vif):
-        """
-        Check that the vif has
-        either a bridge or network
-        name but not both
-        """
-        if "bridge" in vif.attributes.keys() \
-               and "network" in vif.attributes.keys():
-            raise "You cannot specify both a bridge and\
-                   a network name."
+        pass
 
     # Cleanup methods here
     def cleanup_vdis(self, vdi_refs_dict):
@@ -313,19 +305,23 @@ class xenapi_create:
             traceback.print_exc()
             sys.exit(-1)
 
-        # Now create vbds
+        try:
+            # Now create vbds
 
-        vbds = vm.getElementsByTagName("vbd")
+            vbds = vm.getElementsByTagName("vbd")
 
-        self.create_vbds(vm_ref, vbds, vdis)
+            self.create_vbds(vm_ref, vbds, vdis)
 
-        # Now create vifs
+            # Now create vifs
 
-        vifs = vm.getElementsByTagName("vif")
+            vifs = vm.getElementsByTagName("vif")
 
-        self.create_vifs(vm_ref, vifs)
+            self.create_vifs(vm_ref, vifs)
 
-        return vm_ref
+            return vm_ref
+        except:
+            server.xenapi.VM.destroy(vm_ref)
+            raise
         
     def create_vbds(self, vm_ref, vbds, vdis):
         log(DEBUG, "create_vbds")
@@ -363,13 +359,16 @@ class xenapi_create:
     def create_vif(self, vm_ref, vif):
         log(DEBUG, "create_vif")
 
-        if "bridge" in vif.attributes.keys():
-            raise "Not allowed to add by bridge just yet"
-        elif "network" in vif.attributes.keys():
-            network = [network_ref
+        if "network" in vif.attributes.keys():
+            networks = [network_ref
                 for network_ref in server.xenapi.network.get_all()
                 if server.xenapi.network.get_name_label(network_ref)
-                       == vif.attributes["network"].value][0]
+                       == vif.attributes["network"].value]
+            if len(networks) > 0:
+                network = networks[0]
+            else:
+                raise OptionError("Network %s doesn't exist"
+                                  % vif.attributes["network"].value)
         else:
             network = self._get_network_ref()
 
@@ -631,7 +630,7 @@ class sxp2xml:
         vif.attributes["qos_algorithm_type"] = ""
 
         if get_child_by_name(vif_sxp, "bridge") is not None:
-            vif.attributes["bridge"] \
+            vif.attributes["network"] \
                 = get_child_by_name(vif_sxp, "bridge")
         
         return vif
