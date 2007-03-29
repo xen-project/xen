@@ -33,7 +33,24 @@ static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 #ifdef CONFIG_XEN
 int __xen_suspend(int fast_suspend);
 #else
-#define __xen_suspend(fast_suspend) 0
+extern void xenbus_suspend(void);
+extern void xenbus_resume(void);
+extern void platform_pci_suspend(void);
+extern void platform_pci_resume(void);
+int __xen_suspend(int fast_suspend)
+{
+	xenbus_suspend();
+	platform_pci_suspend();
+
+	/* pvdrv sleep in this hyper-call when save */
+	HYPERVISOR_shutdown(SHUTDOWN_suspend);
+
+	platform_pci_resume();
+	xenbus_resume();
+	printk("PV stuff on HVM resume successfully!\n");
+
+	return 0;
+}
 #endif
 
 static int shutdown_process(void *__unused)

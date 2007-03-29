@@ -36,6 +36,7 @@
 #include <asm/pgtable.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
+#include <xen/gnttab.h>
 #ifdef __ia64__
 #include <asm/xen/xencomm.h>
 #endif
@@ -61,9 +62,11 @@ MODULE_LICENSE("GPL");
 unsigned long *phys_to_machine_mapping;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
+static unsigned long shared_info_frame;
+static uint64_t callback_via;
+
 static int __devinit init_xen_info(void)
 {
-	unsigned long shared_info_frame;
 	struct xen_add_to_physmap xatp;
 	extern void *shared_info_area;
 
@@ -219,7 +222,6 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	int i, ret;
 	long ioaddr, iolen;
 	long mmio_addr, mmio_len;
-	uint64_t callback_via;
 
 	i = pci_enable_device(pdev);
 	if (i)
@@ -302,6 +304,35 @@ static struct pci_driver platform_driver = {
 };
 
 static int pci_device_registered;
+
+void platform_pci_suspend(void)
+{
+	gnttab_suspend();
+}
+EXPORT_SYMBOL_GPL(platform_pci_suspend);
+
+void platform_pci_resume(void)
+{
+	struct xen_add_to_physmap xatp;
+	phys_to_machine_mapping = NULL;
+
+	/* do 2 things for PV driver restore on HVM
+	 * 1: rebuild share info
+	 * 2: set callback irq again
+	 */
+	xatp.domid = DOMID_SELF;
+	xatp.idx = 0;
+	xatp.space = XENMAPSPACE_shared_info;
+	xatp.gpfn = shared_info_frame;
+	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+		BUG();
+
+	if (( set_callback_via(callback_via)))
+		printk("platform_pci_resume failure!\n");
+
+	gnttab_resume();
+}
+EXPORT_SYMBOL_GPL(platform_pci_resume);
 
 static int __init platform_pci_module_init(void)
 {

@@ -556,6 +556,7 @@ static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
+    HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
 };
 

@@ -448,11 +448,12 @@ class XendDomainInfo:
         self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
 
-        ## shutdown hypercall for hvm domain desides xenstore write
-        if self.info.is_hvm():
-            for code in DOMAIN_SHUTDOWN_REASONS.keys():
-                if DOMAIN_SHUTDOWN_REASONS[code] == reason:
-                    break
+        ## HVM domain shutdown itself if has PV driver,
+        ## otherwise remote shutdown it
+        hvm_pvdrv = xc.hvm_get_param(self.domid, HVM_PARAM_CALLBACK_IRQ)
+        if self.info.is_hvm() and not hvm_pvdrv:
+            code = REVERSE_DOMAIN_SHUTDOWN_REASONS[reason]
+            log.info("HVM save:remote shutdown dom %d!", self.domid)
             xc.domain_shutdown(self.domid, code)
 
 
