@@ -400,7 +400,7 @@ share_xen_page_with_guest(struct page_info *page,
     ASSERT(page->count_info == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
-    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    if ( !d->is_dying )
     {
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
@@ -1131,7 +1131,7 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
             domain_put_page(d, mpaddr, pte, old_pte, 1);
         }
     }
-    perfc_incrc(assign_domain_page_replace);
+    perfc_incr(assign_domain_page_replace);
 }
 
 // caller must get_page(new_page) before
@@ -1207,7 +1207,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     }
 
     domain_page_flush_and_put(d, mpaddr, pte, old_pte, old_page);
-    perfc_incrc(assign_domain_pge_cmpxchg_rel);
+    perfc_incr(assign_domain_pge_cmpxchg_rel);
     return 0;
 }
 
@@ -1266,7 +1266,7 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
 
     BUG_ON(clear_PGC_allocate && (page_get_owner(page) == NULL));
     domain_put_page(d, mpaddr, pte, old_pte, clear_PGC_allocate);
-    perfc_incrc(zap_dcomain_page_one);
+    perfc_incr(zap_dcomain_page_one);
 }
 
 unsigned long
@@ -1279,7 +1279,7 @@ dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
     }
 
     zap_domain_page_one(d, gpfn << PAGE_SHIFT, 1, INVALID_MFN);
-    perfc_incrc(dom0vp_zap_physmap);
+    perfc_incr(dom0vp_zap_physmap);
     return 0;
 }
 
@@ -1333,7 +1333,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
            get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, flags);
     //don't update p2m table because this page belongs to rd, not d.
-    perfc_incrc(dom0vp_add_physmap);
+    perfc_incr(dom0vp_add_physmap);
 out1:
     put_domain(rd);
     return error;
@@ -1503,7 +1503,7 @@ create_grant_host_mapping(unsigned long gpaddr,
 #endif
                                ((flags & GNTMAP_readonly) ?
                                 ASSIGN_readonly : ASSIGN_writable));
-    perfc_incrc(create_grant_host_mapping);
+    perfc_incr(create_grant_host_mapping);
     return GNTST_okay;
 }
 
@@ -1568,7 +1568,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     BUG_ON(pte_pgc_allocated(old_pte));
     domain_page_flush_and_put(d, gpaddr, pte, old_pte, page);
 
-    perfc_incrc(destroy_grant_host_mapping);
+    perfc_incr(destroy_grant_host_mapping);
     return GNTST_okay;
 }
 
@@ -1629,7 +1629,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
             free_domheap_page(new);
             return -1;
         }
-        perfc_incrc(steal_page_refcount);
+        perfc_incr(steal_page_refcount);
     }
 
     spin_lock(&d->page_alloc_lock);
@@ -1693,7 +1693,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     list_del(&page->list);
 
     spin_unlock(&d->page_alloc_lock);
-    perfc_incrc(steal_page);
+    perfc_incr(steal_page);
     return 0;
 }
 
@@ -1710,7 +1710,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
 
     //BUG_ON(mfn != ((lookup_domain_mpa(d, gpfn << PAGE_SHIFT) & _PFN_MASK) >> PAGE_SHIFT));
 
-    perfc_incrc(guest_physmap_add_page);
+    perfc_incr(guest_physmap_add_page);
 }
 
 void
@@ -1719,7 +1719,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
 {
     BUG_ON(mfn == 0);//XXX
     zap_domain_page_one(d, gpfn << PAGE_SHIFT, 0, mfn);
-    perfc_incrc(guest_physmap_remove_page);
+    perfc_incr(guest_physmap_remove_page);
 }
 
 static void
@@ -1799,7 +1799,7 @@ domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
         break;
     }
 #endif
-    perfc_incrc(domain_page_flush_and_put);
+    perfc_incr(domain_page_flush_and_put);
 }
 
 int
@@ -1935,8 +1935,7 @@ void put_page_type(struct page_info *page)
          * page-table pages if we detect a referential loop.
          * See domain.c:relinquish_list().
          */
-        ASSERT((x & PGT_validated) ||
-               test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags));
+        ASSERT((x & PGT_validated) || page_get_owner(page)->is_dying);
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
@@ -1996,7 +1995,7 @@ int get_page_type(struct page_info *page, u32 type)
 
                 if ( unlikely(!cpus_empty(mask)) )
                 {
-                    perfc_incrc(need_flush_tlb_flush);
+                    perfc_incr(need_flush_tlb_flush);
                     flush_tlb_mask(mask);
                 }
 

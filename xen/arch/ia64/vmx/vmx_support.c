@@ -82,12 +82,12 @@ void vmx_send_assist_req(struct vcpu *v)
             p->state != STATE_IOREQ_INPROCESS)
             break;
 
-        set_bit(_VCPUF_blocked_in_xen, &current->vcpu_flags);
+        set_bit(_VPF_blocked_in_xen, &current->pause_flags);
         mb(); /* set blocked status /then/ re-evaluate condition */
         if (p->state != STATE_IOREQ_READY &&
             p->state != STATE_IOREQ_INPROCESS)
         {
-            clear_bit(_VCPUF_blocked_in_xen, &current->vcpu_flags);
+            clear_bit(_VPF_blocked_in_xen, &current->pause_flags);
             break;
         }
 

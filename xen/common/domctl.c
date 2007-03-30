@@ -101,11 +101,11 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
         vcpu_runstate_get(v, &runstate);
         cpu_time += runstate.time[RUNSTATE_running];
         info->max_vcpu_id = v->vcpu_id;
-        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
         {
-            if ( !(v->vcpu_flags & VCPUF_blocked) )
+            if ( !(v->pause_flags & VPF_blocked) )
                 flags &= ~XEN_DOMINF_blocked;
-            if ( v->vcpu_flags & VCPUF_running )
+            if ( v->is_running )
                 flags |= XEN_DOMINF_running;
             info->nr_online_vcpus++;
         }
@@ -114,9 +114,9 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->cpu_time = cpu_time;
 
     info->flags = flags |
-        ((d->domain_flags & DOMF_dying)      ? XEN_DOMINF_dying    : 0) |
-        ((d->domain_flags & DOMF_shutdown)   ? XEN_DOMINF_shutdown : 0) |
-        ((d->domain_flags & DOMF_ctrl_pause) ? XEN_DOMINF_paused   : 0) |
+        (d->is_dying                ? XEN_DOMINF_dying    : 0) |
+        (d->is_shutdown             ? XEN_DOMINF_shutdown : 0) |
+        (d->is_paused_by_controller ? XEN_DOMINF_paused   : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
     if ( is_hvm_domain(d) )
@@ -145,7 +145,7 @@ static unsigned int default_vcpu0_location(void)
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
         for_each_vcpu ( d, v )
-        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
             cnt[v->processor]++;
     rcu_read_unlock(&domlist_read_lock);
 
@@ -282,17 +282,15 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_resumedomain:
     {
         struct domain *d = rcu_lock_domain_by_id(op->domain);
-        struct vcpu *v;
 
         ret = -ESRCH;
-        if ( d != NULL )
-        {
-            ret = 0;
-            if ( test_and_clear_bit(_DOMF_shutdown, &d->domain_flags) )
-                for_each_vcpu ( d, v )
-                    vcpu_wake(v);
-            rcu_unlock_domain(d);
-        }
+        if ( d == NULL )
+            break;
+
+        if ( xchg(&d->is_shutdown, 0) )
+            domain_unpause(d);
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 
@@ -517,7 +515,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto getvcpucontext_out;
 
         ret = -ENODATA;
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             goto getvcpucontext_out;
 
 #ifdef CONFIG_COMPAT
@@ -574,9 +572,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         vcpu_runstate_get(v, &runstate);
 
-        op->u.getvcpuinfo.online   = !test_bit(_VCPUF_down, &v->vcpu_flags);
-        op->u.getvcpuinfo.blocked  = test_bit(_VCPUF_blocked, &v->vcpu_flags);
-        op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
+        op->u.getvcpuinfo.online   = !test_bit(_VPF_down, &v->pause_flags);
+        op->u.getvcpuinfo.blocked  = test_bit(_VPF_blocked, &v->pause_flags);
+        op->u.getvcpuinfo.running  = v->is_running;
         op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;
         ret = 0;
@@ -620,32 +618,33 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_setdomainhandle:
     {
         struct domain *d;
+
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            memcpy(d->handle, op->u.setdomainhandle.handle,
-                   sizeof(xen_domain_handle_t));
-            rcu_unlock_domain(d);
-            ret = 0;
-        }
+        if ( d == NULL )
+            break;
+
+        memcpy(d->handle, op->u.setdomainhandle.handle,
+               sizeof(xen_domain_handle_t));
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 
     case XEN_DOMCTL_setdebugging:
     {
         struct domain *d;
+
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            if ( op->u.setdebugging.enable )
-                set_bit(_DOMF_debugging, &d->domain_flags);
-            else
-                clear_bit(_DOMF_debugging, &d->domain_flags);
-            rcu_unlock_domain(d);
-            ret = 0;
-        }
+        if ( d == NULL )
+            break;
+
+        domain_pause(d);
+        d->debugger_attached = !!op->u.setdebugging.enable;
+        domain_unpause(d); /* causes guest to latch new status */
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 

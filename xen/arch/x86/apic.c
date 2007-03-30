@@ -1076,7 +1076,7 @@ int reprogram_timer(s_time_t timeout)
 fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
 {
     ack_APIC_irq();
-    perfc_incrc(apic_timer);
+    perfc_incr(apic_timer);
     raise_softirq(TIMER_SOFTIRQ);
 }
 

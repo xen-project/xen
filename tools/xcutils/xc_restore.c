@@ -42,8 +42,6 @@ main(int argc, char **argv)
     apic = atoi(argv[8]);
 
     if (hvm) {
-         /* pass the memsize to xc_hvm_restore to find the store_mfn */
-        store_mfn = hvm;
         ret = xc_hvm_restore(xc_fd, io_fd, domid, max_pfn, store_evtchn,
                 &store_mfn, pae, apic);
     } else 

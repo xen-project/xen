@@ -335,6 +335,9 @@ int xenbus_register_driver_common(struct xenbus_driver *drv,
 {
 	int ret;
 
+	if (bus->error)
+		return bus->error;
+
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
@@ -476,6 +479,9 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 
 	enum xenbus_state state = xenbus_read_driver_state(nodename);
 
+	if (bus->error)
+		return bus->error;
+
 	if (state != XenbusStateInitialising) {
 		/* Device is not new, so ignore it.  This can happen if a
 		   device is going away after switching to Closed.  */
@@ -513,10 +519,18 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 	if (err)
 		goto fail;
 
-	device_create_file(&xendev->dev, &dev_attr_nodename);
-	device_create_file(&xendev->dev, &dev_attr_devtype);
+	err = device_create_file(&xendev->dev, &dev_attr_nodename);
+	if (err)
+		goto unregister;
+	err = device_create_file(&xendev->dev, &dev_attr_devtype);
+	if (err)
+		goto unregister;
 
 	return 0;
+unregister:
+	device_remove_file(&xendev->dev, &dev_attr_nodename);
+	device_remove_file(&xendev->dev, &dev_attr_devtype);
+	device_unregister(&xendev->dev);
 fail:
 	kfree(xendev);
 	return err;
@@ -565,6 +579,9 @@ int xenbus_probe_devices(struct xen_bus_type *bus)
 	char **dir;
 	unsigned int i, dir_n;
 
+	if (bus->error)
+		return bus->error;
+
 	dir = xenbus_directory(XBT_NIL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
@@ -608,7 +625,7 @@ void dev_changed(const char *node, struct xen_bus_type *bus)
 	char type[BUS_ID_SIZE];
 	const char *p, *root;
 
-	if (char_count(node, '/') < 2)
+	if (bus->error || char_count(node, '/') < 2)
  		return;
 
 	exists = xenbus_exists(XBT_NIL, node, "");
@@ -742,7 +759,8 @@ void xenbus_suspend(void)
 {
 	DPRINTK("");
 
-	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
+	if (!xenbus_frontend.error)
+		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	xenbus_backend_suspend(suspend_dev);
 	xs_suspend();
 }
@@ -752,7 +770,8 @@ void xenbus_resume(void)
 {
 	xb_init_comms();
 	xs_resume();
-	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
+	if (!xenbus_frontend.error)
+		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	xenbus_backend_resume(resume_dev);
 }
 EXPORT_SYMBOL_GPL(xenbus_resume);
@@ -760,7 +779,8 @@ EXPORT_SYMBOL_GPL(xenbus_resume);
 void xenbus_suspend_cancel(void)
 {
 	xs_suspend_cancel();
-	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_cancel_dev);
+	if (!xenbus_frontend.error)
+		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_cancel_dev);
 	xenbus_backend_resume(suspend_cancel_dev);
 }
 EXPORT_SYMBOL_GPL(xenbus_suspend_cancel);
@@ -854,7 +874,11 @@ static int __init xenbus_probe_init(void)
 		return -ENODEV;
 
 	/* Register ourselves with the kernel bus subsystem */
-	bus_register(&xenbus_frontend.bus);
+	xenbus_frontend.error = bus_register(&xenbus_frontend.bus);
+	if (xenbus_frontend.error)
+		printk(KERN_WARNING
+		       "XENBUS: Error registering frontend bus: %i\n",
+		       xenbus_frontend.error);
 	xenbus_backend_bus_register();
 
 	/*
@@ -925,7 +949,15 @@ static int __init xenbus_probe_init(void)
 	}
 
 	/* Register ourselves with the kernel device subsystem */
-	device_register(&xenbus_frontend.dev);
+	if (!xenbus_frontend.error) {
+		xenbus_frontend.error = device_register(&xenbus_frontend.dev);
+		if (xenbus_frontend.error) {
+			bus_unregister(&xenbus_frontend.bus);
+			printk(KERN_WARNING
+			       "XENBUS: Error registering frontend device: %i\n",
+			       xenbus_frontend.error);
+		}
+	}
 	xenbus_backend_device_register();
 
 	if (!is_initial_xendomain())
@@ -972,6 +1004,8 @@ static int is_disconnected_device(struct device *dev, void *data)
 
 static int exists_disconnected_device(struct device_driver *drv)
 {
+	if (xenbus_frontend.error)
+		return xenbus_frontend.error;
 	return bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 				is_disconnected_device);
 }
@@ -1036,8 +1070,10 @@ static void wait_for_devices(struct xenbus_driver *xendrv)
 #ifndef MODULE
 static int __init boot_wait_for_devices(void)
 {
-	ready_to_wait_for_devices = 1;
-	wait_for_devices(NULL);
+	if (!xenbus_frontend.error) {
+		ready_to_wait_for_devices = 1;
+		wait_for_devices(NULL);
+	}
 	return 0;
 }
 

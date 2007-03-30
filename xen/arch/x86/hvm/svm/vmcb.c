@@ -194,15 +194,17 @@ static int construct_vmcb(struct vcpu *v)
     paging_update_paging_modes(v);
     vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 
-    arch_svm->vmcb->exception_intercepts = MONITOR_DEFAULT_EXCEPTION_BITMAP;
-
     if ( paging_mode_hap(v->domain) )
     {
         vmcb->cr0 = arch_svm->cpu_shadow_cr0;
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_PG;
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+        vmcb->cr4 = arch_svm->cpu_shadow_cr4 = 0;
+    }
+    else
+    {
+        vmcb->exception_intercepts = 1U << TRAP_page_fault;
     }
 
     return 0;

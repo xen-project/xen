@@ -192,13 +192,11 @@ def restore(xd, fd, dominfo = None, paused = False):
     image_cfg = dominfo.info.get('image', {})
     is_hvm = dominfo.info.is_hvm()
     if is_hvm:
-        hvm  = dominfo.info['memory_static_min']
         apic = int(dominfo.info['platform'].get('apic', 0))
         pae  = int(dominfo.info['platform'].get('pae',  0))
-        log.info("restore hvm domain %d, mem=%d, apic=%d, pae=%d",
-                 dominfo.domid, hvm, apic, pae)
+        log.info("restore hvm domain %d, apic=%d, pae=%d",
+                 dominfo.domid, apic, pae)
     else:
-        hvm  = 0
         apic = 0
         pae  = 0
 
@@ -224,7 +222,7 @@ def restore(xd, fd, dominfo = None, paused = False):
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
                         fd, dominfo.getDomid(), max_pfn,
-                        store_port, console_port, hvm, pae, apic])
+                        store_port, console_port, int(is_hvm), pae, apic])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
         handler = RestoreInputHandler()

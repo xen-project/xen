@@ -22,31 +22,35 @@
 #define SCHEMA_FILENAME     			"security_policy.xsd"
 
 /* basic states (used as 1 << X) */
-#define ENDOFLIST_POS           22  /* ADAPT!! this position will be NULL; stay below 32 (bit) */
-#define XML2BIN_SECPOL          0   /* policy tokens */
-#define XML2BIN_STE             1
-#define XML2BIN_CHWALL          2
-#define XML2BIN_CONFLICTSETS    3
-#define XML2BIN_CSTYPE          4
-#define XML2BIN_POLICYHEADER    5
-#define XML2BIN_NSURL           6
-#define XML2BIN_POLICYNAME      7
-#define XML2BIN_URL             8
-#define XML2BIN_REFERENCE       9
-#define XML2BIN_DATE            10
+enum {
+    XML2BIN_SECPOL = 0,   /* policy tokens */
+    XML2BIN_STE,
+    XML2BIN_CHWALL,
+    XML2BIN_CONFLICTSETS,
+    XML2BIN_CSTYPE,
+    XML2BIN_POLICYHEADER,
+    XML2BIN_NSURL,
+    XML2BIN_POLICYNAME,
+    XML2BIN_URL,
+    XML2BIN_REFERENCE,
+    XML2BIN_DATE,
+    XML2BIN_VERSION,
+    XML2BIN_FROMPOLICY,
 
-#define XML2BIN_LABELTEMPLATE   11  /* label tokens */
-#define XML2BIN_SUBJECTS        12
-#define XML2BIN_OBJECTS         13
-#define XML2BIN_VM              14
-#define XML2BIN_RES             15
-#define XML2BIN_NAME            16
+    XML2BIN_LABELTEMPLATE,  /* label tokens */
+    XML2BIN_SUBJECTS,
+    XML2BIN_OBJECTS,
+    XML2BIN_VM,
+    XML2BIN_RES,
+    XML2BIN_NAME,
 
-#define XML2BIN_STETYPES        17  /* shared tokens */
-#define XML2BIN_CHWALLTYPES     18
-#define XML2BIN_TYPE            19
-#define XML2BIN_TEXT            20
-#define XML2BIN_COMMENT         21
+    XML2BIN_STETYPES,
+    XML2BIN_CHWALLTYPES,
+    XML2BIN_TYPE,
+    XML2BIN_TEXT,
+    XML2BIN_COMMENT,
+    ENDOFLIST_POS /* keep last ! */
+};
 
 /* type "data type" (currently 16bit) */
 typedef u_int16_t type_t;
@@ -68,6 +72,8 @@ char *token[32] =                       /* parser triggers */
     [XML2BIN_URL]           = "PolicyUrl",
     [XML2BIN_REFERENCE]     = "Reference",
     [XML2BIN_DATE]          = "Date",
+    [XML2BIN_VERSION]       = "Version",
+    [XML2BIN_FROMPOLICY]    = "FromPolicy",
 
     [XML2BIN_LABELTEMPLATE] = "SecurityLabelTemplate", /* label-template xml */
     [XML2BIN_SUBJECTS]      = "SubjectLabels",
@@ -79,7 +85,7 @@ char *token[32] =                       /* parser triggers */
     [XML2BIN_STETYPES]      = "SimpleTypeEnforcementTypes", /* common tags */
     [XML2BIN_CHWALLTYPES]   = "ChineseWallTypes",
     [XML2BIN_TYPE]          = "Type",
-	[XML2BIN_TEXT]          = "text",
+    [XML2BIN_TEXT]          = "text",
     [XML2BIN_COMMENT]       = "comment",
     [ENDOFLIST_POS]         = NULL  /* End of LIST, adapt ENDOFLIST_POS
                                        when adding entries */
@@ -111,6 +117,10 @@ char *token[32] =                       /* parser triggers */
 
 #define XML2BIN_PN_S ((1 << XML2BIN_SECPOL) | \
                  (1 << XML2BIN_POLICYHEADER))
+
+#define XML2BIN_PN_frompolicy_S ((1 << XML2BIN_SECPOL) | \
+                 (1 << XML2BIN_POLICYHEADER) | \
+                 (1 << XML2BIN_FROMPOLICY))
 
 /* label xml states */
 #define XML2BIN_VM_S ((1 << XML2BIN_SECPOL) | \
@@ -147,7 +157,7 @@ char *token[32] =                       /* parser triggers */
  */
 
 /* protects from unnoticed changes in struct acm_policy_buffer */
-#define WRITTEN_AGAINST_ACM_POLICY_VERSION  2
+#define WRITTEN_AGAINST_ACM_POLICY_VERSION  3
 
 /* protects from unnoticed changes in struct acm_chwall_policy_buffer */
 #define WRITTEN_AGAINST_ACM_CHWALL_VERSION  1

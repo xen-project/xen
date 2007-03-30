@@ -38,7 +38,8 @@ class Daemon:
         self.traceon = False
         self.tracefile = None
         self.traceindent = 0
-        self.child = 0 
+        self.child = 0
+        self.traceLock = threading.Lock()
 
 
     def cleanup_xend(self, kill):
@@ -253,6 +254,7 @@ class Daemon:
                 pass
 
     def print_trace(self, string):
+        self.tracefile.write("%s: "% threading.currentThread().getName())
         for i in range(self.traceindent):
             ch = " "
             if (i % 5):
@@ -263,50 +265,54 @@ class Daemon:
         self.tracefile.write(string)
             
     def trace(self, frame, event, arg):
-        if not self.traceon:
-            print >>self.tracefile
-            print >>self.tracefile, '-' * 20, 'TRACE OFF', '-' * 20
-            self.tracefile.close()
-            self.tracefile = None
-            return None
-        if event == 'call':
-            code = frame.f_code
-            filename = code.co_filename
-            m = re.search('.*xend/(.*)', filename)
-            if not m:
+        self.traceLock.acquire()
+        try:
+            if not self.traceon:
+                print >>self.tracefile
+                print >>self.tracefile, '-' * 20, 'TRACE OFF', '-' * 20
+                self.tracefile.close()
+                self.tracefile = None
                 return None
-            modulename = m.group(1)
-            if modulename.endswith('.pyc'):
-                modulename = modulename[:-1]
-            if modulename == 'sxp.py' or \
-               modulename == 'XendLogging.py' or \
-               modulename == 'XendMonitor.py' or \
-               modulename == 'server/SrvServer.py':
-                return None
-            self.traceindent += 1
-            self.print_trace("> %s:%s\n"
-                             % (modulename, code.co_name))
-        elif event == 'line':
-            filename = frame.f_code.co_filename
-            lineno = frame.f_lineno
-            self.print_trace("%4d %s" %
-                             (lineno, linecache.getline(filename, lineno)))
-        elif event == 'return':
-            code = frame.f_code
-            filename = code.co_filename
-            m = re.search('.*xend/(.*)', filename)
-            if not m:
-                return None
-            modulename = m.group(1)
-            self.print_trace("< %s:%s\n"
-                             % (modulename, code.co_name))
-            self.traceindent -= 1
-        elif event == 'exception':
-            self.print_trace("! Exception:\n")
-            (ex, val, tb) = arg
-            traceback.print_exception(ex, val, tb, 10, self.tracefile)
-            #del tb
-        return self.trace
+            if event == 'call':
+                code = frame.f_code
+                filename = code.co_filename
+                m = re.search('.*xend/(.*)', filename)
+                if not m:
+                    return None
+                modulename = m.group(1)
+                if modulename.endswith('.pyc'):
+                    modulename = modulename[:-1]
+                if modulename == 'sxp.py' or \
+                   modulename == 'XendLogging.py' or \
+                   modulename == 'XendMonitor.py' or \
+                   modulename == 'server/SrvServer.py':
+                    return None
+                self.traceindent += 1
+                self.print_trace("> %s:%s\n"
+                                 % (modulename, code.co_name))
+            elif event == 'line':
+                filename = frame.f_code.co_filename
+                lineno = frame.f_lineno
+                self.print_trace("%4d %s" %
+                                 (lineno, linecache.getline(filename, lineno)))
+            elif event == 'return':
+                code = frame.f_code
+                filename = code.co_filename
+                m = re.search('.*xend/(.*)', filename)
+                if not m:
+                    return None
+                modulename = m.group(1)
+                self.print_trace("< %s:%s\n"
+                                 % (modulename, code.co_name))
+                self.traceindent -= 1
+            elif event == 'exception':
+                self.print_trace("! Exception:\n")
+                (ex, val, tb) = arg
+                traceback.print_exception(ex, val, tb, 10, self.tracefile)
+                #del tb
+            return self.trace
+        finally:
+            self.traceLock.release()
 
     def set_user(self):
         # Set the UID.

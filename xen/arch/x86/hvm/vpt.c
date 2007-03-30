@@ -49,7 +49,7 @@ void pt_freeze_time(struct vcpu *v)
     struct list_head *list;
     struct periodic_time *pt;
 
-    if ( test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+    if ( test_bit(_VPF_blocked, &v->pause_flags) )
         return;
 
     v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);

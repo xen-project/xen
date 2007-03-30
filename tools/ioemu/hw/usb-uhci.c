@@ -700,6 +700,7 @@ int uhci_usb_load(QEMUFile *f, void *opaque, int version_id)
 
     qemu_get_timer(f, s->frame_timer);
 
+    return 0;
 }
 
 void usb_uhci_init(PCIBus *bus, int devfn)

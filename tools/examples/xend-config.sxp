@@ -46,6 +46,11 @@
 #   (xen-api-server ((9363 pam '^localhost$ example\\.com$')
 #                    (unix none)))
 #
+# Optionally, the TCP Xen-API server can use SSL by specifying the private
+# key and certificate location:
+#
+#                    (9367 pam '' /etc/xen/xen-api.key /etc/xen/xen-api.crt)
+#
 # Default:
 #   (xen-api-server ((unix)))
 
@@ -59,10 +64,17 @@
 
 #(xend-unix-path /var/lib/xend/xend-socket)
 
-# Address and port xend should use for the TCP XMLRPC interface, 
+
+# Address and port xend should use for the legacy TCP XMLRPC interface, 
 # if xen-tcp-xmlrpc-server is set.
 #(xen-tcp-xmlrpc-server-address 'localhost')
 #(xen-tcp-xmlrpc-server-port 8006)
+
+# SSL key and certificate to use for the legacy TCP XMLRPC interface.
+# Setting these will mean that this port serves only SSL connections as
+# opposed to plaintext ones.
+#(xend-tcp-xmlrpc-server-ssl-key-file  /etc/xen/xmlrpc.key)
+#(xend-tcp-xmlrpc-server-ssl-cert-file /etc/xen/xmlrpc.crt)
 
 
 # Port xend should use for the HTTP interface, if xend-http-server is set.

@@ -59,11 +59,14 @@ struct hvm_function_table hvm_funcs __read_mostly;
 /* I/O permission bitmap is globally shared by all HVM guests. */
 char __attribute__ ((__section__ (".bss.page_aligned")))
     hvm_io_bitmap[3*PAGE_SIZE];
+/* MSR permission bitmap is globally shared by all HVM guests. */
+char __attribute__ ((__section__ (".bss.page_aligned")))
+    hvm_msr_bitmap[PAGE_SIZE];
 
 void hvm_enable(struct hvm_function_table *fns)
 {
-    if ( hvm_enabled )
-        return;
+    BUG_ON(hvm_enabled);
+    printk("HVM: %s enabled\n", fns->name);
 
     /*
      * Allow direct access to the PC debug port (it is often used for I/O
@@ -71,6 +74,9 @@ void hvm_enable(struct hvm_function_table *fns)
      */
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
     clear_bit(0x80, hvm_io_bitmap);
+
+    /* All MSR accesses are intercepted by default. */
+    memset(hvm_msr_bitmap, ~0, sizeof(hvm_msr_bitmap));
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;
@@ -85,7 +91,7 @@ void hvm_disable(void)
 void hvm_stts(struct vcpu *v)
 {
     /* FPU state already dirty? Then no need to setup_fpu() lazily. */
-    if ( !test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+    if ( !v->fpu_dirtied )
         hvm_funcs.stts(v);
 }
 
@@ -238,7 +244,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     {
         /* We don't need to save state for a vcpu that is down; the restore 
          * code will leave it down if there is nothing saved. */
-        if ( test_bit(_VCPUF_down, &v->vcpu_flags) ) 
+        if ( test_bit(_VPF_down, &v->pause_flags) ) 
             continue;
 
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
@@ -269,7 +275,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     /* Auxiliary processors should be woken immediately. */
-    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+    if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
         vcpu_wake(v);
 
     return 0;
@@ -331,11 +337,11 @@ void hvm_vcpu_reset(struct vcpu *v)
 
     hvm_funcs.vcpu_initialise(v);
 
-    set_bit(_VCPUF_down, &v->vcpu_flags);
-    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
-    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    set_bit(_VPF_down, &v->pause_flags);
+    clear_bit(_VPF_blocked, &v->pause_flags);
+    v->fpu_initialised = 0;
+    v->fpu_dirtied     = 0;
+    v->is_initialised  = 0;
 
     vcpu_unpause(v);
 }
@@ -350,13 +356,13 @@ static void hvm_vcpu_down(void)
            d->domain_id, v->vcpu_id);
 
     /* Doesn't halt us immediately, but we'll never return to guest context. */
-    set_bit(_VCPUF_down, &v->vcpu_flags);
+    set_bit(_VPF_down, &v->pause_flags);
     vcpu_sleep_nosync(v);
 
     /* Any other VCPUs online? ... */
     LOCK_BIGLOCK(d);
     for_each_vcpu ( d, v )
-        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
             online_count++;
     UNLOCK_BIGLOCK(d);
 
@@ -556,6 +562,7 @@ static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
+    HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
 };
 
@@ -722,7 +729,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
 
     LOCK_BIGLOCK(d);
     rc = -EEXIST;
-    if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    if ( !v->is_initialised )
         rc = boot_vcpu(d, vcpuid, ctxt);
     UNLOCK_BIGLOCK(d);
 
@@ -733,7 +740,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
         goto out;
     }
 
-    if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+    if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
         vcpu_wake(v);
     gdprintk(XENLOG_INFO, "AP %d bringup suceeded.\n", vcpuid);
 

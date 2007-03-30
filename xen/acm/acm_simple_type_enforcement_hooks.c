@@ -31,6 +31,9 @@
 #include <acm/acm_hooks.h>
 #include <asm/atomic.h>
 #include <acm/acm_endian.h>
+#include <acm/acm_core.h>
+
+ssidref_t dom0_ste_ssidref = 0x0001;
 
 /* local cache structures for STE policy */
 struct ste_binary_policy ste_bin_pol;
@@ -74,15 +77,21 @@ int acm_init_ste_policy(void)
 {
     /* minimal startup policy; policy write-locked already */
     ste_bin_pol.max_types = 1;
-    ste_bin_pol.max_ssidrefs = 2;
-    ste_bin_pol.ssidrefs = (domaintype_t *)xmalloc_array(domaintype_t, 2);
-    memset(ste_bin_pol.ssidrefs, 0, 2);
+    ste_bin_pol.max_ssidrefs = 1 + dom0_ste_ssidref;
+    ste_bin_pol.ssidrefs =
+            (domaintype_t *)xmalloc_array(domaintype_t,
+                                          ste_bin_pol.max_types *
+                                          ste_bin_pol.max_ssidrefs);
 
     if (ste_bin_pol.ssidrefs == NULL)
         return ACM_INIT_SSID_ERROR;
 
- /* initialize state so that dom0 can start up and communicate with itself */
-    ste_bin_pol.ssidrefs[1] = 1;
+    memset(ste_bin_pol.ssidrefs, 0, sizeof(domaintype_t) *
+                                    ste_bin_pol.max_types *
+                                    ste_bin_pol.max_ssidrefs);
+
+    /* initialize state so that dom0 can start up and communicate with itself */
+    ste_bin_pol.ssidrefs[ste_bin_pol.max_types * dom0_ste_ssidref] = 1;
 
     /* init stats */
     atomic_set(&(ste_bin_pol.ec_eval_count), 0);
@@ -274,7 +283,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
 
 /* set new policy; policy write-locked already */
 static int
-ste_set_policy(u8 *buf, u32 buf_size)
+ste_set_policy(u8 *buf, u32 buf_size, int is_bootpolicy)
 {
     struct acm_ste_policy_buffer *ste_buf = (struct acm_ste_policy_buffer *)buf;
     void *ssidrefsbuf;
@@ -304,6 +313,11 @@ ste_set_policy(u8 *buf, u32 buf_size)
     }
     if (ste_buf->ste_ssid_offset + sizeof(domaintype_t) * ste_buf->ste_max_ssidrefs*ste_buf->ste_max_types > buf_size)
         goto error_free;
+
+    /* during boot dom0_chwall_ssidref is set */
+    if (is_bootpolicy && (dom0_ste_ssidref >= ste_buf->ste_max_ssidrefs)) {
+        goto error_free;
+    }
 
     arrcpy(ssidrefsbuf, 
            buf + ste_buf->ste_ssid_offset,

@@ -397,16 +397,6 @@ ia64_log_queue(int sal_info_type, int virq)
 
 #ifdef XEN
 /**
- *	Copy from linux/include/asm-generic/bug.h
- */
-#define WARN_ON(condition) do { \
-	if (unlikely((condition)!=0)) { \
-		printk("Badness in %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
-		dump_stack(); \
-	} \
-} while (0)
-
-/**
  *	Copy from linux/kernel/irq/manage.c
  *
  *	disable_irq_nosync - disable an irq without waiting

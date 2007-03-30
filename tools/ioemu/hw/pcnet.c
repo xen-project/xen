@@ -1727,10 +1727,63 @@ static void pcnet_mmio_map(PCIDevice *pci_dev, int region_num,
     cpu_register_physical_memory(addr, PCNET_PNPMMIO_SIZE, d->mmio_io_addr);
 }
 
+
+static void pcnet_save(QEMUFile *f, void *opaque)
+{
+    PCNetState *s = opaque;
+    unsigned int i;
+
+    qemu_put_be32s(f, &s->rap);
+    qemu_put_be32s(f, &s->isr);
+    qemu_put_be32s(f, &s->lnkst);
+    qemu_put_be32s(f, &s->rdra);
+    qemu_put_be32s(f, &s->tdra);
+    qemu_put_buffer(f, s->prom, 16);
+    for (i = 0; i < 128; i++)
+        qemu_put_be16s(f, &s->csr[i]);
+    for (i = 0; i < 32; i++)
+        qemu_put_be16s(f, &s->bcr[i]);
+    qemu_put_be64s(f, &s->timer);
+    qemu_put_be32s(f, &s->xmit_pos);
+    qemu_put_be32s(f, &s->recv_pos);
+    qemu_put_buffer(f, s->buffer, 4096);
+    qemu_put_be32s(f, &s->tx_busy);
+    qemu_put_timer(f, s->poll_timer);
+}
+
+static int pcnet_load(QEMUFile *f, void *opaque, int version_id)
+{
+    PCNetState *s = opaque;
+    int i, ret;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    qemu_get_be32s(f, &s->rap);
+    qemu_get_be32s(f, &s->isr);
+    qemu_get_be32s(f, &s->lnkst);
+    qemu_get_be32s(f, &s->rdra);
+    qemu_get_be32s(f, &s->tdra);
+    qemu_get_buffer(f, s->prom, 16);
+    for (i = 0; i < 128; i++)
+        qemu_get_be16s(f, &s->csr[i]);
+    for (i = 0; i < 32; i++)
+        qemu_get_be16s(f, &s->bcr[i]);
+    qemu_get_be64s(f, &s->timer);
+    qemu_get_be32s(f, &s->xmit_pos);
+    qemu_get_be32s(f, &s->recv_pos);
+    qemu_get_buffer(f, s->buffer, 4096);
+    qemu_get_be32s(f, &s->tx_busy);
+    qemu_get_timer(f, s->poll_timer);
+
+    return 0;
+}
+
 void pci_pcnet_init(PCIBus *bus, NICInfo *nd)
 {
     PCNetState *d;
     uint8_t *pci_conf;
+    int instance;
 
 #if 0
     printf("sizeof(RMD)=%d, sizeof(TMD)=%d\n", 
@@ -1775,6 +1828,11 @@ void pci_pcnet_init(PCIBus *bus, NICInfo *nd)
 
     d->vc = qemu_new_vlan_client(nd->vlan, pcnet_receive, 
                                  pcnet_can_receive, d);
+
+    instance = pci_bus_num(bus) << 8 | d->dev.devfn;
+    register_savevm("pcnet", instance, 1, pcnet_save, pcnet_load, d);
+    register_savevm("pcnet_pci", instance, 1, generic_pci_save,
+                    generic_pci_load, &d->dev);
     
     snprintf(d->vc->info_str, sizeof(d->vc->info_str),
              "pcnet macaddr=%02x:%02x:%02x:%02x:%02x:%02x",

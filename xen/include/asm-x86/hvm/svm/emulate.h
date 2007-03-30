@@ -72,6 +72,7 @@ enum instruction_index {
     INSTR_CLTS,
     INSTR_LMSW,
     INSTR_SMSW,
+    INSTR_INT3,
     INSTR_MAX_COUNT /* Must be last - Number of instructions supported */
 };
 

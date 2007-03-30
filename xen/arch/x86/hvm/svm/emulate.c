@@ -373,6 +373,7 @@ MAKE_INSTR(HLT,    1, 0xf4);
 MAKE_INSTR(CLTS,   2, 0x0f, 0x06);
 MAKE_INSTR(LMSW,   3, 0x0f, 0x01, 0x00);
 MAKE_INSTR(SMSW,   3, 0x0f, 0x01, 0x00);
+MAKE_INSTR(INT3,   1, 0xcc);
 
 static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
 {
@@ -405,7 +406,8 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
     [INSTR_CLTS]   = OPCODE_CLTS,
     [INSTR_HLT]    = OPCODE_HLT,
     [INSTR_LMSW]   = OPCODE_LMSW,
-    [INSTR_SMSW]   = OPCODE_SMSW
+    [INSTR_SMSW]   = OPCODE_SMSW,
+    [INSTR_INT3]   = OPCODE_INT3
 };
 
 /* 

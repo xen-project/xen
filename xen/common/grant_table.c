@@ -311,7 +311,7 @@ __gnttab_map_grant_ref(
                     get_page_and_type(mfn_to_page(frame), rd,
                                       PGT_writable_page))) )
     {
-        if ( !test_bit(_DOMF_dying, &rd->domain_flags) )
+        if ( !rd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n", frame);
         rc = GNTST_general_error;
         goto undo_out;
@@ -865,16 +865,16 @@ gnttab_transfer(
          * headroom.  Also, a domain mustn't have PGC_allocated
          * pages when it is dying.
          */
-        if ( unlikely(test_bit(_DOMF_dying, &e->domain_flags)) ||
+        if ( unlikely(e->is_dying) ||
              unlikely(e->tot_pages >= e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gop.ref)) )
         {
-            if ( !test_bit(_DOMF_dying, &e->domain_flags) )
+            if ( !e->is_dying )
                 gdprintk(XENLOG_INFO, "gnttab_transfer: "
                         "Transferee has no reservation "
                         "headroom (%d,%d) or provided a bad grant ref (%08x) "
-                        "or is dying (%lx)\n",
-                        e->tot_pages, e->max_pages, gop.ref, e->domain_flags);
+                        "or is dying (%d)\n",
+                        e->tot_pages, e->max_pages, gop.ref, e->is_dying);
             spin_unlock(&e->page_alloc_lock);
             rcu_unlock_domain(e);
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
@@ -1094,7 +1094,7 @@ __gnttab_copy(
                  "source frame %lx invalid.\n", s_frame);
     if ( !get_page(mfn_to_page(s_frame), sd) )
     {
-        if ( !test_bit(_DOMF_dying, &sd->domain_flags) )
+        if ( !sd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not get src frame %lx\n", s_frame);
         rc = GNTST_general_error;
         goto error_out;
@@ -1117,7 +1117,7 @@ __gnttab_copy(
                  "destination frame %lx invalid.\n", d_frame);
     if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
     {
-        if ( !test_bit(_DOMF_dying, &dd->domain_flags) )
+        if ( !dd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not get dst frame %lx\n", d_frame);
         rc = GNTST_general_error;
         goto error_out;
@@ -1352,7 +1352,7 @@ gnttab_release_mappings(
     struct active_grant_entry *act;
     struct grant_entry   *sha;
 
-    BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags));
+    BUG_ON(!d->is_dying);
 
     for ( handle = 0; handle < gt->maptrack_limit; handle++ )
     {

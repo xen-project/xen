@@ -1,0 +1,195 @@
+# -*- sh -*-
+
+#
+# Xend configuration file.
+#
+
+# This example configuration is appropriate for an installation that 
+# utilizes a bridged network configuration. Access to xend via http
+# is disabled.  
+
+# Commented out entries show the default for that entry, unless otherwise
+# specified.
+
+#(logfile /var/log/xen/xend.log)
+#(loglevel DEBUG)
+
+
+# The Xen-API server configuration.  (Please note that this server is
+# available as an UNSUPPORTED PREVIEW in Xen 3.0.4, and should not be relied
+# upon).
+#
+# This value configures the ports, interfaces, and access controls for the
+# Xen-API server.  Each entry in the list starts with either unix, a port
+# number, or an address:port pair.  If this is "unix", then a UDP socket is
+# opened, and this entry applies to that.  If it is a port, then Xend will
+# listen on all interfaces on that TCP port, and if it is an address:port
+# pair, then Xend will listen on the specified port, using the interface with
+# the specified address.
+#
+# The subsequent string configures the user-based access control for the
+# listener in question.  This can be one of "none" or "pam", indicating either
+# that users should be allowed access unconditionally, or that the local
+# Pluggable Authentication Modules configuration should be used.  If this
+# string is missing or empty, then "pam" is used.
+#
+# The final string gives the host-based access control for that listener. If
+# this is missing or empty, then all connections are accepted.  Otherwise,
+# this should be a space-separated sequence of regular expressions; any host
+# with a fully-qualified domain name or an IP address that matches one of
+# these regular expressions will be accepted.
+#
+# Example: listen on TCP port 9363 on all interfaces, accepting connections
+# only from machines in example.com or localhost, and allow access through
+# the unix domain socket unconditionally:
+#
+   (xen-api-server ((9363 none)))
+#                    (unix none)))
+#
+# Optionally, the TCP Xen-API server can use SSL by specifying the private
+# key and certificate location:
+#
+#                    (9367 pam '' /etc/xen/xen-api.key /etc/xen/xen-api.crt)
+#
+# Default:
+#   (xen-api-server ((unix)))
+
+
+#(xend-http-server no)
+#(xend-unix-server no)
+#(xend-tcp-xmlrpc-server no)
+#(xend-unix-xmlrpc-server yes)
+#(xend-relocation-server no)
+(xend-relocation-server yes)
+
+#(xend-unix-path /var/lib/xend/xend-socket)
+
+
+# Address and port xend should use for the legacy TCP XMLRPC interface, 
+# if xen-tcp-xmlrpc-server is set.
+#(xen-tcp-xmlrpc-server-address 'localhost')
+#(xen-tcp-xmlrpc-server-port 8006)
+
+# SSL key and certificate to use for the legacy TCP XMLRPC interface.
+# Setting these will mean that this port serves only SSL connections as
+# opposed to plaintext ones.
+#(xend-tcp-xmlrpc-server-ssl-key-file  /etc/xen/xmlrpc.key)
+#(xend-tcp-xmlrpc-server-ssl-cert-file /etc/xen/xmlrpc.crt)
+
+
+# Port xend should use for the HTTP interface, if xend-http-server is set.
+#(xend-port            8000)
+
+# Port xend should use for the relocation interface, if xend-relocation-server
+# is set.
+#(xend-relocation-port 8002)
+
+# Address xend should listen on for HTTP connections, if xend-http-server is
+# set.
+# Specifying 'localhost' prevents remote connections.
+# Specifying the empty string '' (the default) allows all connections.
+#(xend-address '')
+#(xend-address localhost)
+
+# Address xend should listen on for relocation-socket connections, if
+# xend-relocation-server is set.
+# Meaning and default as for xend-address above.
+#(xend-relocation-address '')
+
+# The hosts allowed to talk to the relocation port.  If this is empty (the
+# default), then all connections are allowed (assuming that the connection
+# arrives on a port and interface on which we are listening; see
+# xend-relocation-port and xend-relocation-address above).  Otherwise, this
+# should be a space-separated sequence of regular expressions.  Any host with
+# a fully-qualified domain name or an IP address that matches one of these
+# regular expressions will be accepted.
+#
+# For example:
+#  (xend-relocation-hosts-allow '^localhost$ ^.*\\.example\\.org$')
+#
+#(xend-relocation-hosts-allow '')
+(xend-relocation-hosts-allow '^localhost$ ^localhost\\.localdomain$')
+
+# The limit (in kilobytes) on the size of the console buffer
+#(console-limit 1024)
+
+##
+# To bridge network traffic, like this:
+#
+# dom0: fake eth0 -> vif0.0 -+
+#                            |
+#                          bridge -> real eth0 -> the network
+#                            |
+# domU: fake eth0 -> vifN.0 -+
+#
+# use
+#
+# (network-script network-bridge)
+#
+# Your default ethernet device is used as the outgoing interface, by default. 
+# To use a different one (e.g. eth1) use
+#
+# (network-script 'network-bridge netdev=eth1')
+#
+# The bridge is named xenbr0, by default.  To rename the bridge, use
+#
+# (network-script 'network-bridge bridge=<name>')
+#
+# It is possible to use the network-bridge script in more complicated
+# scenarios, such as having two outgoing interfaces, with two bridges, and
+# two fake interfaces per guest domain.  To do things like this, write
+# yourself a wrapper script, and call network-bridge from it, as appropriate.
+#
+(network-script network-bridge)
+
+# The script used to control virtual interfaces.  This can be overridden on a
+# per-vif basis when creating a domain or a configuring a new vif.  The
+# vif-bridge script is designed for use with the network-bridge script, or
+# similar configurations.
+#
+# If you have overridden the bridge name using
+# (network-script 'network-bridge bridge=<name>') then you may wish to do the
+# same here.  The bridge name can also be set when creating a domain or
+# configuring a new vif, but a value specified here would act as a default.
+#
+# If you are using only one bridge, the vif-bridge script will discover that,
+# so there is no need to specify it explicitly.
+#
+(vif-script vif-bridge)
+
+
+## Use the following if network traffic is routed, as an alternative to the
+# settings for bridged networking given above.
+#(network-script network-route)
+#(vif-script     vif-route)
+
+
+## Use the following if network traffic is routed with NAT, as an alternative
+# to the settings for bridged networking given above.
+#(network-script network-nat)
+#(vif-script     vif-nat)
+
+
+# Dom0 will balloon out when needed to free memory for domU.
+# dom0-min-mem is the lowest memory level (in MB) dom0 will get down to.
+# If dom0-min-mem=0, dom0 will never balloon out.
+(dom0-min-mem 196)
+
+# In SMP system, dom0 will use dom0-cpus # of CPUS
+# If dom0-cpus = 0, dom0 will take all cpus available
+(dom0-cpus 0)
+
+# Whether to enable core-dumps when domains crash.
+#(enable-dump no)
+
+# The tool used for initiating virtual TPM migration
+#(external-migration-tool '')
+
+# The interface for VNC servers to listen on. Defaults
+# to 127.0.0.1  To restore old 'listen everywhere' behaviour
+# set this to 0.0.0.0
+#(vnc-listen '127.0.0.1')
+
+# The default password for VNC console on HVM domain.
+# Empty string is no authentication.
+(vncpasswd '')

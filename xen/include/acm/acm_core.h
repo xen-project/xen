@@ -29,6 +29,7 @@ struct acm_binary_policy {
     char *policy_reference_name;
     u16 primary_policy_code;
     u16 secondary_policy_code;
+    struct acm_policy_version xml_pol_version;
 };
 
 struct chwall_binary_policy {
@@ -122,13 +123,20 @@ int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
 void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
 int acm_init_binary_policy(u32 policy_code);
 int acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
-int do_acm_set_policy(void *buf, u32 buf_size);
+int do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy);
 int acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
 int acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size);
 int acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE(void) buf, u16 buf_size);
 int acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook);
 int acm_set_policy_reference(u8 * buf, u32 buf_size);
 int acm_dump_policy_reference(u8 *buf, u32 buf_size);
+
+
+/* variables */
+extern ssidref_t dom0_chwall_ssidref;
+extern ssidref_t dom0_ste_ssidref;
+#define ACM_MAX_NUM_TYPES   (256)
+
 #endif
 
 /*

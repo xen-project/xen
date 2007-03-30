@@ -22,7 +22,6 @@
 import os
 import sys
 from XmTestLib import *
-from xen.util.xmlrpclib2 import ServerProxy
 from types import DictType
 
 

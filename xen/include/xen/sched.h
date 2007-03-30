@@ -100,10 +100,23 @@ struct vcpu
     } runstate_guest; /* guest address */
 #endif
 
-    unsigned long    vcpu_flags;
+    /* Has the FPU been initialised? */
+    bool_t           fpu_initialised;
+    /* Has the FPU been used since it was last saved? */
+    bool_t           fpu_dirtied;
+    /* Is this VCPU polling any event channels (SCHEDOP_poll)? */
+    bool_t           is_polling;
+    /* Initialization completed for this VCPU? */
+    bool_t           is_initialised;
+    /* Currently running on a CPU? */
+    bool_t           is_running;
+    /* NMI callback pending for this VCPU? */
+    bool_t           nmi_pending;
+    /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
+    bool_t           nmi_masked;
 
-    spinlock_t       pause_lock;
-    unsigned int     pause_count;
+    unsigned long    pause_flags;
+    atomic_t         pause_count;
 
     u16              virq_to_evtchn[NR_VIRQS];
 
@@ -138,7 +151,6 @@ struct domain
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
     /* Scheduling. */
-    int              shutdown_code; /* code value from OS (if DOMF_shutdown) */
     void            *sched_priv;    /* scheduler-specific data */
 
     struct domain   *next_in_list;
@@ -165,16 +177,26 @@ struct domain
     struct rangeset *iomem_caps;
     struct rangeset *irq_caps;
 
-    unsigned long    domain_flags;
+    /* Is this an HVM guest? */
+    bool_t           is_hvm;
+    /* Is this guest fully privileged (aka dom0)? */
+    bool_t           is_privileged;
+    /* Is this guest being debugged by dom0? */
+    bool_t           debugger_attached;
+    /* Is a 'compatibility mode' guest (semantics are arch specific)? */
+    bool_t           is_compat;
+    /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
+    bool_t           is_polling;
+    /* Is this guest dying (i.e., a zombie)? */
+    bool_t           is_dying;
+    /* Domain is paused by controller software? */
+    bool_t           is_paused_by_controller;
 
-    /* Boolean: Is this an HVM guest? */
-    char             is_hvm;
+    /* Guest has shut down (inc. reason code)? */
+    bool_t           is_shutdown;
+    int              shutdown_code;
 
-    /* Boolean: Is this guest fully privileged (aka dom0)? */
-    char             is_privileged;
-
-    spinlock_t       pause_lock;
-    unsigned int     pause_count;
+    atomic_t         pause_count;
 
     unsigned long    vm_assist;
 
@@ -411,82 +433,26 @@ extern struct domain *domain_list;
        (_v) = (_v)->next_in_list )
 
 /*
- * Per-VCPU flags (vcpu_flags).
+ * Per-VCPU pause flags.
  */
- /* Has the FPU been initialised? */
-#define _VCPUF_fpu_initialised 0
-#define VCPUF_fpu_initialised  (1UL<<_VCPUF_fpu_initialised)
- /* Has the FPU been used since it was last saved? */
-#define _VCPUF_fpu_dirtied     1
-#define VCPUF_fpu_dirtied      (1UL<<_VCPUF_fpu_dirtied)
  /* Domain is blocked waiting for an event. */
-#define _VCPUF_blocked         2
-#define VCPUF_blocked          (1UL<<_VCPUF_blocked)
- /* Currently running on a CPU? */
-#define _VCPUF_running         3
-#define VCPUF_running          (1UL<<_VCPUF_running)
- /* Initialization completed. */
-#define _VCPUF_initialised     4
-#define VCPUF_initialised      (1UL<<_VCPUF_initialised)
+#define _VPF_blocked         0
+#define VPF_blocked          (1UL<<_VPF_blocked)
  /* VCPU is offline. */
-#define _VCPUF_down            5
-#define VCPUF_down             (1UL<<_VCPUF_down)
- /* NMI callback pending for this VCPU? */
-#define _VCPUF_nmi_pending     8
-#define VCPUF_nmi_pending      (1UL<<_VCPUF_nmi_pending)
- /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
-#define _VCPUF_nmi_masked      9
-#define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
- /* VCPU is polling a set of event channels (SCHEDOP_poll). */
-#define _VCPUF_polling         10
-#define VCPUF_polling          (1UL<<_VCPUF_polling)
- /* VCPU is paused by the hypervisor? */
-#define _VCPUF_paused          11
-#define VCPUF_paused           (1UL<<_VCPUF_paused)
+#define _VPF_down            1
+#define VPF_down             (1UL<<_VPF_down)
  /* VCPU is blocked awaiting an event to be consumed by Xen. */
-#define _VCPUF_blocked_in_xen  12
-#define VCPUF_blocked_in_xen   (1UL<<_VCPUF_blocked_in_xen)
+#define _VPF_blocked_in_xen  2
+#define VPF_blocked_in_xen   (1UL<<_VPF_blocked_in_xen)
  /* VCPU affinity has changed: migrating to a new CPU. */
-#define _VCPUF_migrating       13
-#define VCPUF_migrating        (1UL<<_VCPUF_migrating)
-
-/*
- * Per-domain flags (domain_flags).
- */
- /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         0
-#define DOMF_shutdown          (1UL<<_DOMF_shutdown)
- /* Death rattle. */
-#define _DOMF_dying            1
-#define DOMF_dying             (1UL<<_DOMF_dying)
- /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       2
-#define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
- /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        3
-#define DOMF_debugging         (1UL<<_DOMF_debugging)
- /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
-#define _DOMF_polling          4
-#define DOMF_polling           (1UL<<_DOMF_polling)
- /* Domain is paused by the hypervisor? */
-#define _DOMF_paused           5
-#define DOMF_paused            (1UL<<_DOMF_paused)
- /* Domain is a compatibility one? */
-#define _DOMF_compat           6
-#define DOMF_compat            (1UL<<_DOMF_compat)
+#define _VPF_migrating       3
+#define VPF_migrating        (1UL<<_VPF_migrating)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
-    return ( !(v->vcpu_flags &
-               ( VCPUF_blocked |
-                 VCPUF_down |
-                 VCPUF_paused |
-                 VCPUF_blocked_in_xen |
-                 VCPUF_migrating )) &&
-             !(v->domain->domain_flags &
-               ( DOMF_shutdown |
-                 DOMF_ctrl_pause |
-                 DOMF_paused )));
+    return !(v->pause_flags |
+             atomic_read(&v->pause_count) |
+             atomic_read(&v->domain->pause_count));
 }
 
 void vcpu_pause(struct vcpu *v);
@@ -505,15 +471,14 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {
-    if ( test_and_clear_bit(_VCPUF_blocked, &v->vcpu_flags) )
+    if ( test_and_clear_bit(_VPF_blocked, &v->pause_flags) )
         vcpu_wake(v);
 }
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 
 #ifdef CONFIG_COMPAT
-#define IS_COMPAT(_d)                                       \
-    (test_bit(_DOMF_compat, &(_d)->domain_flags))
+#define IS_COMPAT(_d) ((_d)->is_compat)
 #else
 #define IS_COMPAT(_d) 0
 #endif

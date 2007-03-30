@@ -625,8 +625,6 @@ void __init setup_arch(char **cmdline_p)
 
 #endif
 
-	setup_xen_features();
-
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 

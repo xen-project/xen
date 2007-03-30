@@ -187,7 +187,7 @@ static int handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
 	if (!PSCB(v, interrupt_collection_enabled)) {
 		PSCB(v, ifs) = regs->cr_ifs;
 		regs->cr_ifs = 0;
-		perfc_incrc(lazy_cover);
+		perfc_incr(lazy_cover);
 		return 1;	// retry same instruction with cr.ifs off
 	}
 	return 0;

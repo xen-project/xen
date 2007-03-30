@@ -50,7 +50,7 @@ acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
         printk("%s: Error copying!\n",__func__);
         goto error_free;
     }
-    ret = do_acm_set_policy(policy_buffer, buf_size);
+    ret = do_acm_set_policy(policy_buffer, buf_size, 0);
 
  error_free:
     xfree(policy_buffer);
@@ -59,9 +59,10 @@ acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
 
 
 int
-do_acm_set_policy(void *buf, u32 buf_size)
+do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy)
 {
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *)buf;
+    uint32_t offset, length;
     /* some sanity checking */
     if ((be32_to_cpu(pol->magic) != ACM_MAGIC) ||
         (buf_size != be32_to_cpu(pol->len)) ||
@@ -92,23 +93,34 @@ do_acm_set_policy(void *buf, u32 buf_size)
     /* get bin_policy lock and rewrite policy (release old one) */
     write_lock(&acm_bin_pol_rwlock);
 
+    offset = be32_to_cpu(pol->policy_reference_offset);
+    length = be32_to_cpu(pol->primary_buffer_offset) - offset;
+
     /* set label reference name */
-    if (acm_set_policy_reference(buf + be32_to_cpu(pol->policy_reference_offset),
-                                 be32_to_cpu(pol->primary_buffer_offset) -
-                                 be32_to_cpu(pol->policy_reference_offset)))
+    if ( (offset + length) > buf_size ||
+         acm_set_policy_reference(buf + offset, length))
         goto error_lock_free;
 
     /* set primary policy data */
-    if (acm_primary_ops->set_binary_policy(buf + be32_to_cpu(pol->primary_buffer_offset),
-                                           be32_to_cpu(pol->secondary_buffer_offset) -
-                                           be32_to_cpu(pol->primary_buffer_offset)))
+    offset = be32_to_cpu(pol->primary_buffer_offset);
+    length = be32_to_cpu(pol->secondary_buffer_offset) - offset;
+
+    if ( (offset + length) > buf_size ||
+         acm_primary_ops->set_binary_policy(buf + offset, length,
+                                            is_bootpolicy))
         goto error_lock_free;
 
     /* set secondary policy data */
-    if (acm_secondary_ops->set_binary_policy(buf + be32_to_cpu(pol->secondary_buffer_offset),
-                                             be32_to_cpu(pol->len) - 
-                                             be32_to_cpu(pol->secondary_buffer_offset)))
+    offset = be32_to_cpu(pol->secondary_buffer_offset);
+    length = be32_to_cpu(pol->len) - offset;
+    if ( (offset + length) > buf_size ||
+         acm_secondary_ops->set_binary_policy(buf + offset, length,
+                                              is_bootpolicy))
         goto error_lock_free;
+
+    memcpy(&acm_bin_pol.xml_pol_version,
+           &pol->xml_pol_version,
+           sizeof(acm_bin_pol.xml_pol_version));
 
     write_unlock(&acm_bin_pol_rwlock);
     return ACM_OK;
@@ -126,7 +138,7 @@ acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
     u8 *policy_buffer;
     int ret;
     struct acm_policy_buffer *bin_pol;
- 
+
     if (buf_size < sizeof(struct acm_policy_buffer))
         return -EFAULT;
 
@@ -145,6 +157,10 @@ acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
     bin_pol->primary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
     bin_pol->secondary_buffer_offset = cpu_to_be32(be32_to_cpu(bin_pol->len));
      
+    memcpy(&bin_pol->xml_pol_version,
+           &acm_bin_pol.xml_pol_version,
+           sizeof(struct acm_policy_version));
+
     ret = acm_dump_policy_reference(policy_buffer + be32_to_cpu(bin_pol->policy_reference_offset),
                                     buf_size - be32_to_cpu(bin_pol->policy_reference_offset));
     if (ret < 0)

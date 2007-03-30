@@ -423,7 +423,7 @@ static struct page_info *alloc_heap_pages(
 
     if ( unlikely(!cpus_empty(mask)) )
     {
-        perfc_incrc(need_flush_tlb_flush);
+        perfc_incr(need_flush_tlb_flush);
         flush_tlb_mask(mask);
     }
 
@@ -739,7 +739,7 @@ int assign_pages(
 
     spin_lock(&d->page_alloc_lock);
 
-    if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
+    if ( unlikely(d->is_dying) )
     {
         gdprintk(XENLOG_INFO, "Cannot assign page to domain%d -- dying.\n",
                 d->domain_id);
@@ -869,7 +869,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
         spin_unlock_recursive(&d->page_alloc_lock);
 
-        if ( likely(!test_bit(_DOMF_dying, &d->domain_flags)) )
+        if ( likely(!d->is_dying) )
         {
             free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         }

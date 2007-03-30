@@ -125,16 +125,13 @@ class GrubLineEditor(curses.textpad.Textbox):
         is that we can handle lines longer than the window."""
 
         self.win.clear()
-        if self.pos > 70:
-            if self.pos > 130:
-                off = 120
-            else:
-                off = 55
-            l = [ "<" ] + self.line[off:]
-            p = self.pos - off
-        else:
-            l = self.line[:70]
-            p = self.pos
+        p = self.pos
+        off = 0
+        while p > 70:
+            p -= 55
+            off += 55
+
+        l = self.line[off:off+70]
         self.win.addstr(0, 0, string.join(l, ("")))
         if self.pos > 70:
             self.win.addch(0, 0, curses.ACS_LARROW)

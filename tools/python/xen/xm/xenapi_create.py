@@ -25,7 +25,7 @@ from xml.parsers.xmlproc import xmlproc, xmlval, xmldtd
 from xen.xend import sxp
 from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
-
+from xen.xm.opts import OptionError
 
 import sys
 import os
@@ -75,15 +75,20 @@ class xenapi_create:
 
         self.dtd = "/usr/lib/python/xen/xm/create.dtd"
 
-    def create(self, filename=None, document=None):
+    def create(self, filename=None, document=None, skipdtd=False):
         """
         Create a domain from an XML file or DOM tree
         """
+        if skipdtd:
+            print "Skipping DTD checks.  Dangerous!"
+        
         if filename is not None:
-            self.check_dtd(file)
-            document = parse(file)
+            if not skipdtd:
+                self.check_dtd(filename)
+            document = parse(filename)
         elif document is not None:
-            self.check_dom_against_dtd(document)
+            if not skipdtd:
+                self.check_dom_against_dtd(document)
 
         self.check_doc(document)
 
@@ -179,15 +184,7 @@ class xenapi_create:
         map(self.check_vif, vifs)
 
     def check_vif(self, vif):
-        """
-        Check that the vif has
-        either a bridge or network
-        name but not both
-        """
-        if "bridge" in vif.attributes.keys() \
-               and "network" in vif.attributes.keys():
-            raise "You cannot specify both a bridge and\
-                   a network name."
+        pass
 
     # Cleanup methods here
     def cleanup_vdis(self, vdi_refs_dict):
@@ -265,18 +262,8 @@ class xenapi_create:
                 vm.attributes["actions_after_reboot"].value,
             "actions_after_crash":
                 vm.attributes["actions_after_crash"].value,
-            "platform_std_VGA":
-                vm.attributes["platform_std_VGA"].value,
-            "platform_serial":
-                vm.attributes["platform_serial"].value,
-            "platform_localtime":
-                vm.attributes["platform_localtime"].value,
-            "platform_clock_offet":
-                vm.attributes["platform_clock_offet"].value,
-            "platform_enable_audio":
-                vm.attributes["platform_enable_audio"].value,
-            "PCI_bus":
-                vm.attributes["platform_enable_audio"].value,
+            "platform":
+                get_child_nodes_as_dict(vm, "platform", "key", "value"),
             "other_config":
                 get_child_nodes_as_dict(vm, "other_config", "key", "value")
             }
@@ -300,7 +287,7 @@ class xenapi_create:
                 "HVM_boot_policy":
                     get_child_node_attribute(vm, "hvm", "boot_policy"),
                 "HVM_boot_params":
-                    get_child_nodes_as_dict(hvm, "boot_params", "key", "value")
+                    get_child_nodes_as_dict(hvm, "boot_param", "key", "value")
                 })
         try:
             vm_ref = server.xenapi.VM.create(vm_record)
@@ -308,19 +295,29 @@ class xenapi_create:
             traceback.print_exc()
             sys.exit(-1)
 
-        # Now create vbds
+        try:
+            # Now create vbds
 
-        vbds = vm.getElementsByTagName("vbd")
+            vbds = vm.getElementsByTagName("vbd")
 
-        self.create_vbds(vm_ref, vbds, vdis)
+            self.create_vbds(vm_ref, vbds, vdis)
 
-        # Now create vifs
+            # Now create vifs
 
-        vifs = vm.getElementsByTagName("vif")
+            vifs = vm.getElementsByTagName("vif")
 
-        self.create_vifs(vm_ref, vifs)
+            self.create_vifs(vm_ref, vifs)
 
-        return vm_ref
+            # Now create consoles
+
+            consoles = vm.getElementsByTagName("console")
+
+            self.create_consoles(vm_ref, consoles)
+
+            return vm_ref
+        except:
+            server.xenapi.VM.destroy(vm_ref)
+            raise
         
     def create_vbds(self, vm_ref, vbds, vdis):
         log(DEBUG, "create_vbds")
@@ -358,13 +355,16 @@ class xenapi_create:
     def create_vif(self, vm_ref, vif):
         log(DEBUG, "create_vif")
 
-        if "bridge" in vif.attributes.keys():
-            raise "Not allowed to add by bridge just yet"
-        elif "network" in vif.attributes.keys():
-            network = [network_ref
+        if "network" in vif.attributes.keys():
+            networks = [network_ref
                 for network_ref in server.xenapi.network.get_all()
                 if server.xenapi.network.get_name_label(network_ref)
-                       == vif.attributes["network"].value][0]
+                       == vif.attributes["network"].value]
+            if len(networks) > 0:
+                network = networks[0]
+            else:
+                raise OptionError("Network %s doesn't exist"
+                                  % vif.attributes["network"].value)
         else:
             network = self._get_network_ref()
 
@@ -396,6 +396,26 @@ class xenapi_create:
         except IndexError:
             self._network_refs = server.xenapi.network.get_all()
             return self._network_refs.pop(0)
+
+    def create_consoles(self, vm_ref, consoles):
+        log(DEBUG, "create_consoles")
+        return map(lambda console: self.create_console(vm_ref, console),
+                   consoles)
+
+    def create_console(self, vm_ref, console):
+        log(DEBUG, "create_consoles")
+
+        console_record = {
+            "VM":
+                vm_ref,
+            "protocol":
+                console.attributes["protocol"].value,
+            "other_params":
+                get_child_nodes_as_dict(console,
+                  "other_param", "key", "value")
+            }
+
+        return server.xenapi.console.create(console_record)
 
 def get_child_by_name(exp, childname, default = None):
     try:
@@ -460,11 +480,6 @@ class sxp2xml:
             = actions_after_reboot
         vm.attributes["actions_after_crash"] \
             = actions_after_crash
-        vm.attributes["platform_std_VGA"] = "false"
-        vm.attributes["platform_serial"] = ""
-        vm.attributes["platform_localtime"] = ""
-        vm.attributes["platform_clock_offet"] = ""
-        vm.attributes["platform_enable_audio"] = ""
         vm.attributes["PCI_bus"] = ""
 
         vm.attributes["vcpus_max"] \
@@ -502,7 +517,13 @@ class sxp2xml:
             vm.appendChild(pv)
         elif image[0] == "hvm":
             hvm = document.createElement("hvm")
-            hvm.attributes["boot_policy"] = ""
+            hvm.attributes["boot_policy"] = "BIOS order"
+
+            boot_order = document.createElement("boot_param")
+            boot_order.attributes["key"] = "order"
+            boot_order.attributes["value"] \
+                = get_child_by_name(image, "boot", "abcd")
+            hvm.appendChild
 
             vm.appendChild(hvm)
 
@@ -535,6 +556,18 @@ class sxp2xml:
         vifs = map(lambda vif: self.extract_vif(vif, document), vifs_sxp)
 
         map(vm.appendChild, vifs)
+
+        # Last but not least the consoles...
+
+        consoles = self.extract_consoles(image, document)
+
+        map(vm.appendChild, consoles)
+
+        # Platform variables...
+
+        platform = self.extract_platform(image, document)
+
+        map(vm.appendChild, platform)
 
         # transient?
 
@@ -626,13 +659,69 @@ class sxp2xml:
         vif.attributes["qos_algorithm_type"] = ""
 
         if get_child_by_name(vif_sxp, "bridge") is not None:
-            vif.attributes["bridge"] \
+            vif.attributes["network"] \
                 = get_child_by_name(vif_sxp, "bridge")
         
         return vif
 
     _eths = -1
 
+    def mk_other_config(self, key, value, document):
+        other_config = document.createElement("other_config")
+        other_config.attributes["key"] = key
+        other_config.attributes["value"] = value
+        return other_config
+
+    def extract_consoles(self, image, document):
+        consoles = []
+
+        if int(get_child_by_name(image, "nographic", "1")) == 1:
+            return consoles
+        
+        if int(get_child_by_name(image, "vnc", "0")) == 1:
+            console = document.createElement("console")
+            console.attributes["protocol"] = "rfb"
+            console.appendChild(self.mk_other_config(
+                "vncunused", str(get_child_by_name(image, "vncunused", "0")),
+                document))
+            console.appendChild(self.mk_other_config(
+                "vnclisten",
+                get_child_by_name(image, "vnclisten", "127.0.0.1"),
+                document))
+            console.appendChild(self.mk_other_config(
+                "vncpasswd", get_child_by_name(image, "vncpasswd", ""),
+                document))
+            consoles.append(console)          
+        if int(get_child_by_name(image, "sdl", "0")) == 1:
+            console = document.createElement("console")
+            console.attributes["protocol"] = "sdl"
+            console.appendChild(self.mk_other_config(
+                "display", get_child_by_name(image, "display", ""),
+                document))
+            console.appendChild(self.mk_other_config(
+                "xauthority",
+                get_child_by_name(image, "vxauthority", "127.0.0.1"),
+                document))
+            console.appendChild(self.mk_other_config(
+                "vncpasswd", get_child_by_name(image, "vncpasswd", ""),
+                document))
+            consoles.append(console)
+            
+        return consoles
+
+
+    def extract_platform(self, image, document):
+        platform_keys = ['acpi', 'apic', 'pae']
+
+        def extract_platform_key(key):
+            platform = document.createElement("platform")
+            platform.attributes["key"] = key
+            platform.attributes["value"] \
+                = str(get_child_by_name(image, key, "1"))
+            return platform
+        
+        return map(extract_platform_key, platform_keys)
+    
     def getFreshEthDevice(self):
         self._eths += 1
         return "eth%i" % self._eths

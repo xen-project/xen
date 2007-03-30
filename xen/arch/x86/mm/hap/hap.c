@@ -135,6 +135,7 @@ void hap_free_p2m_page(struct domain *d, struct page_info *pg)
         HAP_ERROR("Odd p2m page count c=%#x t=%"PRtype_info"\n",
                   pg->count_info, pg->u.inuse.type_info);
     }
+    pg->count_info = 0;
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
@@ -182,6 +183,7 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             list_del(&sp->list);
             d->arch.paging.hap.free_pages -= 1;
             d->arch.paging.hap.total_pages -= 1;
+            sp->count_info = 0;
             free_domheap_pages(sp, 0);
         }
         
@@ -367,17 +369,7 @@ void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 {
     struct domain *d = v->domain;
 
-#if CONFIG_PAGING_LEVELS == 4
-    /* Need to destroy the l3 monitor page in slot 0 too */
-    {
-        mfn_t m3mfn;
-        l4_pgentry_t *l4e = hap_map_domain_page(mmfn);
-        ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
-        m3mfn = _mfn(l4e_get_pfn(l4e[0]));
-        hap_free(d, m3mfn);
-        hap_unmap_domain_page(l4e);
-    }
-#elif CONFIG_PAGING_LEVELS == 3
+#if CONFIG_PAGING_LEVELS == 3
     /* Need to destroy the l2 monitor page in slot 4 too */
     {
         l3_pgentry_t *l3e = hap_map_domain_page(mmfn);
@@ -459,7 +451,7 @@ void hap_teardown(struct domain *d)
     mfn_t mfn;
     HERE_I_AM;
 
-    ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
+    ASSERT(d->is_dying);
     ASSERT(d != current->domain);
 
     if ( !hap_locked_by_me(d) )
@@ -577,7 +569,8 @@ void hap_update_cr3(struct vcpu *v, int do_locking)
 
     HERE_I_AM;
     /* Don't do anything on an uninitialised vcpu */
-    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) ) {
+    if ( !is_hvm_domain(d) && !v->is_initialised )
+    {
         ASSERT(v->arch.cr3 == 0);
         return;
     }
@@ -631,10 +624,6 @@ void hap_update_paging_modes(struct vcpu *v)
     }
 
     v->arch.paging.translate_enabled = !!hvm_paging_enabled(v);    
-
-    /* use p2m map */
-    v->arch.guest_table =
-        pagetable_from_pfn(pagetable_get_pfn(d->arch.phys_table));
 
     if ( pagetable_is_null(v->arch.monitor_table) ) {
         mfn_t mmfn = hap_make_monitor_table(v);

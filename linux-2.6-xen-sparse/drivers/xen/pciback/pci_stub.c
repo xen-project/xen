@@ -805,6 +805,18 @@ static ssize_t permissive_show(struct device_driver *drv, char *buf)
 
 DRIVER_ATTR(permissive, S_IRUSR | S_IWUSR, permissive_show, permissive_add);
 
+static void pcistub_exit(void)
+{
+	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_new_slot);
+	driver_remove_file(&pciback_pci_driver.driver,
+			   &driver_attr_remove_slot);
+	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_slots);
+	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_quirks);
+	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_permissive);
+
+	pci_unregister_driver(&pciback_pci_driver);
+}
+
 static int __init pcistub_init(void)
 {
 	int pos = 0;
@@ -845,12 +857,23 @@ static int __init pcistub_init(void)
 	if (err < 0)
 		goto out;
 
-	driver_create_file(&pciback_pci_driver.driver, &driver_attr_new_slot);
-	driver_create_file(&pciback_pci_driver.driver,
-			   &driver_attr_remove_slot);
-	driver_create_file(&pciback_pci_driver.driver, &driver_attr_slots);
-	driver_create_file(&pciback_pci_driver.driver, &driver_attr_quirks);
-	driver_create_file(&pciback_pci_driver.driver, &driver_attr_permissive);
+	err = driver_create_file(&pciback_pci_driver.driver,
+				 &driver_attr_new_slot);
+	if (!err)
+		err = driver_create_file(&pciback_pci_driver.driver,
+					 &driver_attr_remove_slot);
+	if (!err)
+		err = driver_create_file(&pciback_pci_driver.driver,
+					 &driver_attr_slots);
+	if (!err)
+		err = driver_create_file(&pciback_pci_driver.driver,
+					 &driver_attr_quirks);
+	if (!err)
+		err = driver_create_file(&pciback_pci_driver.driver,
+					 &driver_attr_permissive);
+
+	if (err)
+		pcistub_exit();
 
       out:
 	return err;
@@ -887,23 +910,17 @@ static int __init pciback_init(void)
 #endif
 
 	pcistub_init_devices_late();
-	pciback_xenbus_register();
+	err = pciback_xenbus_register();
+	if (err)
+		pcistub_exit();
 
-	return 0;
+	return err;
 }
 
 static void __exit pciback_cleanup(void)
 {
 	pciback_xenbus_unregister();
-
-	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_new_slot);
-	driver_remove_file(&pciback_pci_driver.driver,
-			   &driver_attr_remove_slot);
-	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_slots);
-	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_quirks);
-	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_permissive);
-
-	pci_unregister_driver(&pciback_pci_driver);
+	pcistub_exit();
 }
 
 module_init(pciback_init);

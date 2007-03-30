@@ -152,8 +152,9 @@ def recreate(info, priv):
     try:
         vmpath = xstransact.Read(dompath, "vm")
         if not vmpath:
-            log.warn('/local/domain/%d/vm is missing. recreate is '
-                     'confused, trying our best to recover' % domid)
+            if not priv:
+                log.warn('/local/domain/%d/vm is missing. recreate is '
+                         'confused, trying our best to recover' % domid)
             needs_reinitialising = True
             raise XendError('reinit')
         
@@ -447,13 +448,13 @@ class XendDomainInfo:
         self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
 
-        ## shutdown hypercall for hvm domain desides xenstore write
+        # HVM domain shuts itself down only if it has PV drivers
         if self.info.is_hvm():
-            for code in DOMAIN_SHUTDOWN_REASONS.keys():
-                if DOMAIN_SHUTDOWN_REASONS[code] == reason:
-                    break
-            xc.domain_shutdown(self.domid, code)
-
+            hvm_pvdrv = xc.hvm_get_param(self.domid, HVM_PARAM_CALLBACK_IRQ)
+            if not hvm_pvdrv:
+                code = REVERSE_DOMAIN_SHUTDOWN_REASONS[reason]
+                log.info("HVM save:remote shutdown dom %d!", self.domid)
+                xc.domain_shutdown(self.domid, code)
 
     def pause(self):
         """Pause domain
@@ -2354,7 +2355,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+        if self.state == XEN_API_VM_POWER_STATE_RUNNING \
+               or self.state == XEN_API_VM_POWER_STATE_PAUSED:
 
             _, config = self.info['devices'][dev_uuid]
             dev_control = self.getDeviceController('vif')

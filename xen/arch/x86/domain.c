@@ -274,7 +274,7 @@ int switch_native(struct domain *d)
     if ( !IS_COMPAT(d) )
         return 0;
 
-    clear_bit(_DOMF_compat, &d->domain_flags);
+    d->is_compat = 0;
     release_arg_xlat_area(d);
 
     /* switch gdt */
@@ -306,7 +306,7 @@ int switch_compat(struct domain *d)
     if ( IS_COMPAT(d) )
         return 0;
 
-    set_bit(_DOMF_compat, &d->domain_flags);
+    d->is_compat = 1;
 
     /* switch gdt */
     gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table), PAGE_HYPERVISOR);
@@ -563,9 +563,7 @@ int arch_set_info_guest(
 #endif
     }
 
-    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    if ( flags & VGCF_I387_VALID )
-        set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    v->fpu_initialised = !!(flags & VGCF_I387_VALID);
 
     v->arch.flags &= ~TF_kernel_mode;
     if ( (flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
@@ -600,7 +598,7 @@ int arch_set_info_guest(
         hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
     }
 
-    if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    if ( v->is_initialised )
         goto out;
 
     memset(v->arch.guest_context.debugreg, 0,
@@ -699,7 +697,7 @@ int arch_set_info_guest(
         update_domain_wallclock_time(d);
 
     /* Don't redo final setup */
-    set_bit(_VCPUF_initialised, &v->vcpu_flags);
+    v->is_initialised = 1;
 
     if ( paging_mode_enabled(d) )
         paging_update_paging_modes(v);
@@ -708,9 +706,9 @@ int arch_set_info_guest(
 
  out:
     if ( flags & VGCF_online )
-        clear_bit(_VCPUF_down, &v->vcpu_flags);
+        clear_bit(_VPF_down, &v->pause_flags);
     else
-        set_bit(_VCPUF_down, &v->vcpu_flags);
+        set_bit(_VPF_down, &v->pause_flags);
     return 0;
 #undef c
 }

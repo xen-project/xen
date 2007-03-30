@@ -66,10 +66,9 @@ void __dummy__(void)
            arch.guest_context.kernel_sp);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
     OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
-    OFFSET(VCPU_flags, struct vcpu, vcpu_flags);
     OFFSET(VCPU_nmi_addr, struct vcpu, nmi_addr);
-    DEFINE(_VCPUF_nmi_pending, _VCPUF_nmi_pending);
-    DEFINE(_VCPUF_nmi_masked, _VCPUF_nmi_masked);
+    OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
+    OFFSET(VCPU_nmi_masked, struct vcpu, nmi_masked);
     DEFINE(_VGCF_failsafe_disables_events, _VGCF_failsafe_disables_events);
     BLANK();
 
@@ -107,20 +106,10 @@ void __dummy__(void)
     BLANK();
 
 #if PERF_COUNTERS
-    OFFSET(PERFC_hypercalls, struct perfcounter, hypercalls);
-    OFFSET(PERFC_exceptions, struct perfcounter, exceptions);
+    DEFINE(PERFC_hypercalls, PERFC_hypercalls);
+    DEFINE(PERFC_exceptions, PERFC_exceptions);
     BLANK();
 #endif
-
-    OFFSET(MULTICALL_op, struct multicall_entry, op);
-    OFFSET(MULTICALL_arg0, struct multicall_entry, args[0]);
-    OFFSET(MULTICALL_arg1, struct multicall_entry, args[1]);
-    OFFSET(MULTICALL_arg2, struct multicall_entry, args[2]);
-    OFFSET(MULTICALL_arg3, struct multicall_entry, args[3]);
-    OFFSET(MULTICALL_arg4, struct multicall_entry, args[4]);
-    OFFSET(MULTICALL_arg5, struct multicall_entry, args[5]);
-    OFFSET(MULTICALL_result, struct multicall_entry, result);
-    BLANK();
 
     DEFINE(FIXMAP_apic_base, fix_to_virt(FIX_APIC_BASE));
     BLANK();

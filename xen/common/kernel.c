@@ -256,7 +256,7 @@ long register_guest_nmi_callback(unsigned long address)
      * now.
      */
     if ( arch_get_nmi_reason(d) != 0 )
-        set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+        v->nmi_pending = 1;
 #endif
 
     return 0;

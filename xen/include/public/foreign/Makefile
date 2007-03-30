@@ -1,5 +1,5 @@
-XEN_ROOT := ../../../..
-include $(XEN_ROOT)/tools/Rules.mk
+XEN_ROOT=../../../..
+include $(XEN_ROOT)/Config.mk
 
 architectures := x86_32 x86_64 ia64
 headers := $(patsubst %, %.h, $(architectures))

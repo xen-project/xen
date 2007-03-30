@@ -271,7 +271,7 @@ void share_xen_page_with_guest(
     ASSERT(page->count_info == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
-    if ( !test_bit(_DOMF_dying, &d->domain_flags) )
+    if ( !d->is_dying )
     {
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
@@ -806,8 +806,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
      * (Note that the undestroyable active grants are not a security hole in
      * Xen. All active grants can safely be cleaned up when the domain dies.)
      */
-    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
-         !(d->domain_flags & (DOMF_shutdown|DOMF_dying)) )
+    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) && !d->is_shutdown && !d->is_dying )
     {
         MEM_LOG("Attempt to implicitly unmap a granted PTE %" PRIpte,
                 l1e_get_intpte(l1e));
@@ -1090,7 +1089,7 @@ static int alloc_l3_table(struct page_info *page)
      */
     if ( (pfn >= 0x100000) &&
          unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
-         d->vcpu[0] && test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
+         d->vcpu[0] && d->vcpu[0]->is_initialised )
     {
         MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
         return 0;
@@ -1726,7 +1725,7 @@ int get_page_type(struct page_info *page, unsigned long type)
                      (!shadow_mode_enabled(page_get_owner(page)) ||
                       ((nx & PGT_type_mask) == PGT_writable_page)) )
                 {
-                    perfc_incrc(need_flush_tlb_flush);
+                    perfc_incr(need_flush_tlb_flush);
                     flush_tlb_mask(mask);
                 }
 
@@ -1969,6 +1968,8 @@ int do_mmuext_op(
         if ( unlikely(!guest_handle_is_null(pdone)) )
             (void)copy_from_guest(&done, pdone, 1);
     }
+    else
+        perfc_incr(calls_to_mmuext_op);
 
     if ( unlikely(!guest_handle_okay(uops, count)) )
     {
@@ -2052,9 +2053,12 @@ int do_mmuext_op(
             /* A page is dirtied when its pin status is set. */
             mark_dirty(d, mfn);
            
-            /* We can race domain destruction (domain_relinquish_resources). */
+            /*
+             * We can race domain destruction (domain_relinquish_resources).
+             * NB. The dying-flag test must happen /after/ setting PGT_pinned.
+             */
             if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) &&
-                 test_bit(_DOMF_dying, &FOREIGNDOM->domain_flags) &&
+                 this_cpu(percpu_mm_info).foreign->is_dying &&
                  test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
                 put_page_and_type(page);
 
@@ -2223,6 +2227,8 @@ int do_mmuext_op(
 
     UNLOCK_BIGLOCK(d);
 
+    perfc_add(num_mmuext_ops, i);
+
  out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
@@ -2257,6 +2263,8 @@ int do_mmu_update(
         if ( unlikely(!guest_handle_is_null(pdone)) )
             (void)copy_from_guest(&done, pdone, 1);
     }
+    else
+        perfc_incr(calls_to_mmu_update);
 
     if ( unlikely(!guest_handle_okay(ureqs, count)) )
     {
@@ -2272,9 +2280,6 @@ int do_mmu_update(
 
     domain_mmap_cache_init(&mapcache);
     domain_mmap_cache_init(&sh_mapcache);
-
-    perfc_incrc(calls_to_mmu_update);
-    perfc_addc(num_page_updates, count);
 
     LOCK_BIGLOCK(d);
 
@@ -2431,12 +2436,14 @@ int do_mmu_update(
         guest_handle_add_offset(ureqs, 1);
     }
 
-    domain_mmap_cache_destroy(&mapcache);
-    domain_mmap_cache_destroy(&sh_mapcache);
-
     process_deferred_ops();
 
     UNLOCK_BIGLOCK(d);
+
+    domain_mmap_cache_destroy(&mapcache);
+    domain_mmap_cache_destroy(&sh_mapcache);
+
+    perfc_add(num_page_updates, i);
 
  out:
     /* Add incremental work we have done to the @done output parameter. */
@@ -2724,7 +2731,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     cpumask_t      pmask;
     int            rc  = 0;
 
-    perfc_incrc(calls_to_update_va);
+    perfc_incr(calls_to_update_va);
 
     if ( unlikely(!__addr_ok(va) && !paging_mode_external(d)) )
         return -EINVAL;
@@ -2739,6 +2746,10 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( pl1e )
         guest_unmap_l1e(v, pl1e);
     pl1e = NULL;
+
+    process_deferred_ops();
+
+    UNLOCK_BIGLOCK(d);
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
@@ -2785,10 +2796,6 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         break;
     }
 
-    process_deferred_ops();
-    
-    UNLOCK_BIGLOCK(d);
-
     return rc;
 }
 
@@ -2805,6 +2812,9 @@ int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
         return -ESRCH;
 
     rc = do_update_va_mapping(va, val64, flags);
+
+    BUG_ON(this_cpu(percpu_mm_info).deferred_ops);
+    process_deferred_ops(); /* only to clear foreigndom */
 
     return rc;
 }
@@ -3378,7 +3388,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
         goto bail;
 
     UNLOCK_BIGLOCK(d);
-    perfc_incrc(ptwr_emulations);
+    perfc_incr(ptwr_emulations);
     return EXCRET_fault_fixed;
 
  bail:

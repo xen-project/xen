@@ -57,7 +57,7 @@ void usage(char *progname)
 
 /*************************** DUMPS *******************************/
 
-void acm_dump_chinesewall_buffer(void *buf, int buflen)
+void acm_dump_chinesewall_buffer(void *buf, int buflen, uint16_t chwall_ref)
 {
 
     struct acm_chwall_policy_buffer *cwbuf =
@@ -91,6 +91,8 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
         for (j = 0; j < ntohl(cwbuf->chwall_max_types); j++)
             printf("%02x ",
                    ntohs(ssids[i * ntohl(cwbuf->chwall_max_types) + j]));
+        if (i == chwall_ref)
+            printf(" <-- Domain-0");
     }
     printf("\n\nConfict Sets:\n");
     conflicts =
@@ -131,7 +133,7 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
     }
 }
 
-void acm_dump_ste_buffer(void *buf, int buflen)
+void acm_dump_ste_buffer(void *buf, int buflen, uint16_t ste_ref)
 {
 
     struct acm_ste_policy_buffer *stebuf =
@@ -158,11 +160,14 @@ void acm_dump_ste_buffer(void *buf, int buflen)
         for (j = 0; j < ntohl(stebuf->ste_max_types); j++)
             printf("%02x ",
                    ntohs(ssids[i * ntohl(stebuf->ste_max_types) + j]));
+        if (i == ste_ref)
+            printf(" <-- Domain-0");
     }
     printf("\n\n");
 }
 
-void acm_dump_policy_buffer(void *buf, int buflen)
+void acm_dump_policy_buffer(void *buf, int buflen,
+                            uint16_t chwall_ref, uint16_t ste_ref)
 {
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *) buf;
     char *policy_reference_name =
@@ -172,6 +177,9 @@ void acm_dump_policy_buffer(void *buf, int buflen)
     printf("============\n");
     printf("POLICY REFERENCE = %s.\n", policy_reference_name);
     printf("PolicyVer = %x.\n", ntohl(pol->policy_version));
+    printf("XML Vers. = %d.%d\n",
+           ntohl(pol->xml_pol_version.major),
+           ntohl(pol->xml_pol_version.minor));
     printf("Magic     = %x.\n", ntohl(pol->magic));
     printf("Len       = %x.\n", ntohl(pol->len));
     printf("Primary   = %s (c=%x, off=%x).\n",
@@ -187,13 +195,15 @@ void acm_dump_policy_buffer(void *buf, int buflen)
         acm_dump_chinesewall_buffer(ALIGN8(buf +
                                      ntohl(pol->primary_buffer_offset)),
                                     ntohl(pol->len) -
-                                    ntohl(pol->primary_buffer_offset));
+                                    ntohl(pol->primary_buffer_offset),
+                                    chwall_ref);
         break;
 
     case ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY:
         acm_dump_ste_buffer(ALIGN8(buf + ntohl(pol->primary_buffer_offset)),
                             ntohl(pol->len) -
-                            ntohl(pol->primary_buffer_offset));
+                            ntohl(pol->primary_buffer_offset),
+                            ste_ref);
         break;
 
     case ACM_NULL_POLICY:
@@ -209,13 +219,15 @@ void acm_dump_policy_buffer(void *buf, int buflen)
         acm_dump_chinesewall_buffer(ALIGN8(buf +
                                      ntohl(pol->secondary_buffer_offset)),
                                     ntohl(pol->len) -
-                                    ntohl(pol->secondary_buffer_offset));
+                                    ntohl(pol->secondary_buffer_offset),
+                                    chwall_ref);
         break;
 
     case ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY:
         acm_dump_ste_buffer(ALIGN8(buf + ntohl(pol->secondary_buffer_offset)),
                             ntohl(pol->len) -
-                            ntohl(pol->secondary_buffer_offset));
+                            ntohl(pol->secondary_buffer_offset),
+                            ste_ref);
         break;
 
     case ACM_NULL_POLICY:
@@ -227,6 +239,27 @@ void acm_dump_policy_buffer(void *buf, int buflen)
     }
 }
 
+/************************** get dom0 ssidref *****************************/
+int acm_get_ssidref(int xc_handle, int domid, uint16_t *chwall_ref,
+                    uint16_t *ste_ref)
+{
+    int ret;
+    struct acm_getssid getssid;
+    char buf[4096];
+    struct acm_ssid_buffer *ssid = (struct acm_ssid_buffer *)buf;
+    getssid.interface_version = ACM_INTERFACE_VERSION;
+    set_xen_guest_handle(getssid.ssidbuf, buf);
+    getssid.ssidbuf_size = sizeof(buf);
+    getssid.get_ssid_by = ACM_GETBY_domainid;
+    getssid.id.domainid = domid;
+    ret = xc_acm_op(xc_handle, ACMOP_getssid, &getssid, sizeof(getssid));
+    if (ret == 0) {
+        *chwall_ref = ssid->ssidref  & 0xffff;
+        *ste_ref    = ssid->ssidref >> 16;
+    }
+    return ret;
+}
+
 /******************************* get policy ******************************/
 
 #define PULL_CACHE_SIZE		8192
@@ -236,12 +269,16 @@ int acm_domain_getpolicy(int xc_handle)
 {
     struct acm_getpolicy getpolicy;
     int ret;
+    uint16_t chwall_ref, ste_ref;
 
     memset(pull_buffer, 0x00, sizeof(pull_buffer));
     getpolicy.interface_version = ACM_INTERFACE_VERSION;
     set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
     getpolicy.pullcache_size = sizeof(pull_buffer);
     ret = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
+    if (ret >= 0) {
+        ret = acm_get_ssidref(xc_handle, 0, &chwall_ref, &ste_ref);
+    }
 
     if (ret < 0) {
         printf("ACM operation failed: errno=%d\n", errno);
@@ -251,7 +288,9 @@ int acm_domain_getpolicy(int xc_handle)
     }
 
     /* dump policy  */
-    acm_dump_policy_buffer(pull_buffer, sizeof(pull_buffer));
+    acm_dump_policy_buffer(pull_buffer, sizeof(pull_buffer),
+                           chwall_ref, ste_ref);
+
     return ret;
 }
 
@@ -263,6 +302,7 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
     int ret, fd;
     off_t len;
     uint8_t *buffer;
+    uint16_t chwall_ssidref, ste_ssidref;
 
     if ((ret = stat(filename, &mystat))) {
         printf("File %s not found.\n", filename);
@@ -279,10 +319,14 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
         printf("File %s not found.\n", filename);
         goto free_out;
     }
+    ret =acm_get_ssidref(xc_handle, 0, &chwall_ssidref, &ste_ssidref);
+    if (ret < 0) {
+        goto free_out;
+    }
     if (len == read(fd, buffer, len)) {
         struct acm_setpolicy setpolicy;
         /* dump it and then push it down into xen/acm */
-        acm_dump_policy_buffer(buffer, len);
+        acm_dump_policy_buffer(buffer, len, chwall_ssidref, ste_ssidref);
         setpolicy.interface_version = ACM_INTERFACE_VERSION;
         set_xen_guest_handle(setpolicy.pushcache, buffer);
         setpolicy.pushcache_size = len;

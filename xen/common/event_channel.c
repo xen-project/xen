@@ -481,8 +481,8 @@ long evtchn_send(unsigned int lport)
         if ( rchn->consumer_is_xen )
         {
             /* Xen consumers need notification only if they are blocked. */
-            if ( test_and_clear_bit(_VCPUF_blocked_in_xen,
-                                    &rvcpu->vcpu_flags) )
+            if ( test_and_clear_bit(_VPF_blocked_in_xen,
+                                    &rvcpu->pause_flags) )
                 vcpu_wake(rvcpu);
         }
         else
@@ -529,12 +529,17 @@ void evtchn_set_pending(struct vcpu *v, int port)
     }
     
     /* Check if some VCPU might be polling for this event. */
-    if ( unlikely(test_bit(_DOMF_polling, &d->domain_flags)) &&
-         likely(test_and_clear_bit(_DOMF_polling, &d->domain_flags)) )
+    if ( unlikely(d->is_polling) )
     {
+        d->is_polling = 0;
+        smp_mb(); /* check vcpu poll-flags /after/ clearing domain poll-flag */
         for_each_vcpu ( d, v )
-            if ( test_and_clear_bit(_VCPUF_polling, &v->vcpu_flags) )
-                vcpu_unblock(v);
+        {
+            if ( !v->is_polling )
+                continue;
+            v->is_polling = 0;
+            vcpu_unblock(v);
+        }
     }
 }
 

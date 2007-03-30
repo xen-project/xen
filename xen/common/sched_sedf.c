@@ -1189,7 +1189,7 @@ void sedf_wake(struct vcpu *d)
 static void sedf_dump_domain(struct vcpu *d)
 {
     printk("%i.%i has=%c ", d->domain->domain_id, d->vcpu_id,
-           test_bit(_VCPUF_running, &d->vcpu_flags) ? 'T':'F');
+           d->is_running ? 'T':'F');
     printk("p=%"PRIu64" sl=%"PRIu64" ddl=%"PRIu64" w=%hu"
            " sc=%i xtr(%s)=%"PRIu64" ew=%hu",
            EDOM_INFO(d)->period, EDOM_INFO(d)->slice, EDOM_INFO(d)->deadl_abs,

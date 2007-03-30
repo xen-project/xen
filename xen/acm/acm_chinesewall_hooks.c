@@ -41,6 +41,9 @@
 #include <acm/acm_core.h>
 #include <acm/acm_hooks.h>
 #include <acm/acm_endian.h>
+#include <acm/acm_core.h>
+
+ssidref_t dom0_chwall_ssidref = 0x0001;
 
 /* local cache structures for chinese wall policy */
 struct chwall_binary_policy chwall_bin_pol;
@@ -53,7 +56,7 @@ int acm_init_chwall_policy(void)
 {
     /* minimal startup policy; policy write-locked already */
     chwall_bin_pol.max_types = 1;
-    chwall_bin_pol.max_ssidrefs = 2;
+    chwall_bin_pol.max_ssidrefs = 1 + dom0_chwall_ssidref;
     chwall_bin_pol.max_conflictsets = 1;
     chwall_bin_pol.ssidrefs =
         (domaintype_t *) xmalloc_array(domaintype_t,
@@ -254,7 +257,7 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
      * more than one type is currently running */
 }
 
-static int chwall_set_policy(u8 * buf, u32 buf_size)
+static int chwall_set_policy(u8 * buf, u32 buf_size, int is_bootpolicy)
 {
     /* policy write-locked already */
     struct acm_chwall_policy_buffer *chwall_buf =
@@ -285,6 +288,12 @@ static int chwall_set_policy(u8 * buf, u32 buf_size)
     if ((chwall_buf->policy_code != ACM_CHINESE_WALL_POLICY) ||
         (chwall_buf->policy_version != ACM_CHWALL_VERSION))
         return -EINVAL;
+
+    /* during boot dom0_chwall_ssidref is set */
+    if (is_bootpolicy &&
+        (dom0_chwall_ssidref >= chwall_buf->chwall_max_ssidrefs)) {
+        goto error_free;
+    }
 
     /* 1. allocate new buffers */
     ssids =

@@ -467,6 +467,26 @@ static PyObject *pyxc_linux_build(XcObject *self,
     return pyxc_error_to_exception();
 }
 
+static PyObject *pyxc_get_hvm_param(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    uint32_t dom;
+    int param;
+    unsigned long value;
+
+    static char *kwd_list[] = { "domid", "param", NULL }; 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
+                                      &dom, &param) )
+        return NULL;
+
+    if ( xc_get_hvm_param(self->xc_handle, dom, param, &value) != 0 )
+        return pyxc_error_to_exception();
+
+    return Py_BuildValue("i", value);
+
+}
+
 static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *args,
                                 PyObject *kwds)
@@ -1224,6 +1244,14 @@ static PyMethodDef pyxc_methods[] = {
       " image   [str]:      Name of HVM loader image file.\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "hvm_get_param", 
+      (PyCFunction)pyxc_get_hvm_param, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "get a parameter of HVM guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " param   [int]:      No. of HVM param.\n"
+      "Returns: [int] value of the param.\n" },
 
     { "sched_id_get",
       (PyCFunction)pyxc_sched_id_get,

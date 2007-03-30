@@ -81,11 +81,11 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		return;
 
   	if (vector == XEN_SAL_BOOT_RENDEZ_VEC
-	    && (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)
-		|| test_bit(_VCPUF_down, &targ->vcpu_flags))) {
+	    && (!targ->is_initialised
+		|| test_bit(_VPF_down, &targ->pause_flags))) {
 
 		/* First start: initialize vpcu.  */
-		if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+		if (!targ->is_initialised) {
 			struct vcpu_guest_context c;
 		
 			memset (&c, 0, sizeof (c));
@@ -102,8 +102,8 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		vcpu_regs (targ)->r1 = d->arch.sal_data->boot_rdv_r1;
 		vcpu_regs (targ)->b0 = FW_HYPERCALL_SAL_RETURN_PADDR;
 
-		if (test_and_clear_bit(_VCPUF_down,
-				       &targ->vcpu_flags)) {
+		if (test_and_clear_bit(_VPF_down,
+				       &targ->pause_flags)) {
 			vcpu_wake(targ);
 			printk(XENLOG_INFO "arch_boot_vcpu: vcpu %d awaken\n",
 			       targ->vcpu_id);
@@ -112,9 +112,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 			printk ("arch_boot_vcpu: huu, already awaken!\n");
 	}
 	else {
-		int running = test_bit(_VCPUF_running,
-				       &targ->vcpu_flags);
-		
+		int running = targ->is_running;
 		vcpu_pend_interrupt(targ, vector);
 		vcpu_unblock(targ);
 		if (running)
@@ -161,7 +159,7 @@ ia64_hypercall(struct pt_regs *regs)
 		if (regs->r28 == PAL_HALT_LIGHT) {
 			if (vcpu_deliverable_interrupts(v) ||
 				event_pending(v)) {
-				perfc_incrc(idle_when_pending);
+				perfc_incr(idle_when_pending);
 				vcpu_pend_unspecified_interrupt(v);
 //printk("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
@@ -170,7 +168,7 @@ ia64_hypercall(struct pt_regs *regs)
 //as deliver_pending_interrupt is called on the way out and will deliver it
 			}
 			else {
-				perfc_incrc(pal_halt_light);
+				perfc_incr(pal_halt_light);
 				migrate_timer(&v->arch.hlt_timer,
 				              v->processor);
 				set_timer(&v->arch.hlt_timer,
@@ -209,7 +207,7 @@ ia64_hypercall(struct pt_regs *regs)
 		regs->r10 = x.r10; regs->r11 = x.r11;
 		break;
 	case FW_HYPERCALL_SAL_RETURN:
-	        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+	        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
 			vcpu_sleep_nosync(v);
 		break;
 	case FW_HYPERCALL_EFI_CALL:

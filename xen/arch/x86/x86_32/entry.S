@@ -173,7 +173,7 @@ ENTRY(hypercall)
         GET_CURRENT(%ebx)
         cmpl  $NR_hypercalls,%eax
         jae   bad_hypercall
-        PERFC_INCR(PERFC_hypercalls, %eax)
+        PERFC_INCR(PERFC_hypercalls, %eax, %ebx)
 #ifndef NDEBUG
         /* Create shadow parameters and corrupt those not used by this call. */
         pushl %eax
@@ -232,8 +232,8 @@ test_all_events:
         shl  $IRQSTAT_shift,%eax
         test %ecx,irq_stat(%eax,1)
         jnz  process_softirqs
-        btr  $_VCPUF_nmi_pending,VCPU_flags(%ebx)
-        jc   process_nmi
+        testb $1,VCPU_nmi_pending(%ebx)
+        jnz  process_nmi
 test_guest_events:
         movl VCPU_vcpu_info(%ebx),%eax
         testb $0xFF,VCPUINFO_upcall_mask(%eax)
@@ -259,11 +259,13 @@ process_softirqs:
 
         ALIGN
 process_nmi:
+        testb $1,VCPU_nmi_masked(%ebx)
+        jnz  test_guest_events
+        movb $0,VCPU_nmi_pending(%ebx)
         movl VCPU_nmi_addr(%ebx),%eax
         test %eax,%eax
-        jz   test_all_events
-        bts  $_VCPUF_nmi_masked,VCPU_flags(%ebx)
-        jc   1f
+        jz   test_guest_events
+        movb $1,VCPU_nmi_masked(%ebx)
         sti
         leal VCPU_trap_bounce(%ebx),%edx
         movl %eax,TRAPBOUNCE_eip(%edx)
@@ -271,8 +273,6 @@ process_nmi:
         movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
         jmp  test_all_events
-1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%ebx)
-        jmp  test_guest_events
 
 bad_hypercall:
         movl $-ENOSYS,UREGS_eax(%esp)
@@ -429,7 +429,7 @@ handle_exception:
         movl  %esp,%edx
         pushl %edx                      # push the cpu_user_regs pointer
         GET_CURRENT(%ebx)
-        PERFC_INCR(PERFC_exceptions, %eax)
+        PERFC_INCR(PERFC_exceptions, %eax, %ebx)
         call  *exception_table(,%eax,4)
         addl  $4,%esp
         movl  UREGS_eflags(%esp),%eax

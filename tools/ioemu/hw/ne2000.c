@@ -770,7 +770,7 @@ void isa_ne2000_init(int base, int irq, NICInfo *nd)
              s->macaddr[4],
              s->macaddr[5]);
              
-    register_savevm("ne2000", 0, 2, ne2000_save, ne2000_load, s);
+    register_savevm("ne2000", base, 2, ne2000_save, ne2000_load, s);
 }
 
 /***********************************************************/
@@ -806,6 +806,7 @@ void pci_ne2000_init(PCIBus *bus, NICInfo *nd)
     PCINE2000State *d;
     NE2000State *s;
     uint8_t *pci_conf;
+    int instance;
     
     d = (PCINE2000State *)pci_register_device(bus,
                                               "NE2000", sizeof(PCINE2000State),
@@ -840,8 +841,8 @@ void pci_ne2000_init(PCIBus *bus, NICInfo *nd)
              s->macaddr[4],
              s->macaddr[5]);
              
-    /* XXX: instance number ? */
-    register_savevm("ne2000", 0, 2, ne2000_save, ne2000_load, s);
-    register_savevm("ne2000_pci", 0, 1, generic_pci_save, generic_pci_load, 
-                    &d->dev);
+    instance = pci_bus_num(bus) << 8 | s->pci_dev->devfn;
+    register_savevm("ne2000", instance, 2, ne2000_save, ne2000_load, s);
+    register_savevm("ne2000_pci", instance, 1, generic_pci_save, 
+                    generic_pci_load, &d->dev);
 }

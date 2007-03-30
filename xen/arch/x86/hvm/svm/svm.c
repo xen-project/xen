@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
 
 #include <xen/config.h>
@@ -50,22 +49,15 @@
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
 
-#define SVM_EXTRA_DEBUG
-
 #define set_segment_register(name, value)  \
-       __asm__ __volatile__ ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
+    asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
-/* External functions. We should move these to some suitable header file(s) */
+int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
+                         int inst_len);
+asmlinkage void do_IRQ(struct cpu_user_regs *);
 
-extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
-                                int inst_len);
-extern asmlinkage void do_IRQ(struct cpu_user_regs *);
-extern void svm_dump_inst(unsigned long eip);
-extern int svm_dbg_on;
-void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
-
-static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
-                                            struct cpu_user_regs *regs);
+static int svm_reset_to_realmode(struct vcpu *v,
+                                 struct cpu_user_regs *regs);
 
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
@@ -78,7 +70,6 @@ u64 root_vmcb_pa[NR_CPUS] __read_mostly;
 
 /* hardware assisted paging bits */
 extern int opt_hap_enabled;
-extern int hap_capable_system;
 
 static inline void svm_inject_exception(struct vcpu *v, int trap, 
                                         int ev, int error_code)
@@ -213,7 +204,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     switch ( ecx )
     {
     case MSR_EFER:
-        /* offending reserved bit will cause #GP */
+        /* Offending reserved bit will cause #GP. */
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
             gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
@@ -221,53 +212,33 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             goto gp_fault;
         }
 
-        /* 
-         * update the VMCB's EFER with the intended value along with
-         * that crucial EFER.SVME bit =)
-         */
-        vmcb->efer = msr_content | EFER_SVME;
-
 #ifdef __x86_64__
-
-        /*
-         * Check for EFER.LME transitions from 0->1 or 1->0.  Do the
-         * sanity checks and then make sure that both EFER.LME and
-         * EFER.LMA are cleared. (EFER.LME can't be set in the vmcb
-         * until the guest also sets CR0.PG, since even if the guest has
-         * paging "disabled", the vmcb's CR0 always has PG set.)
-         */
         if ( (msr_content & EFER_LME) && !svm_lme_is_set(v) )
         {
-            /* EFER.LME transition from 0 to 1 */
-            
-            if ( svm_paging_enabled(v) ||
-                 !svm_cr4_pae_is_set(v) )
+            /* EFER.LME transition from 0 to 1. */
+            if ( svm_paging_enabled(v) || !svm_cr4_pae_is_set(v) )
             {
                 gdprintk(XENLOG_WARNING, "Trying to set LME bit when "
                          "in paging mode or PAE bit is not set\n");
                 goto gp_fault;
             }
-
-            vmcb->efer &= ~(EFER_LME | EFER_LMA);
         }
         else if ( !(msr_content & EFER_LME) && svm_lme_is_set(v) )
         {
-            /* EFER.LME transistion from 1 to 0 */
-            
+            /* EFER.LME transistion from 1 to 0. */
             if ( svm_paging_enabled(v) )
             {
                 gdprintk(XENLOG_WARNING, 
                          "Trying to clear EFER.LME while paging enabled\n");
                 goto gp_fault;
             }
-
-            vmcb->efer &= ~(EFER_LME | EFER_LMA);
         }
-
 #endif /* __x86_64__ */
 
-        /* update the guest EFER's shadow with the intended value */
         v->arch.hvm_svm.cpu_shadow_efer = msr_content;
+        vmcb->efer = msr_content | EFER_SVME;
+        if ( !svm_paging_enabled(v) )
+            vmcb->efer &= ~(EFER_LME | EFER_LMA);
 
         break;
 
@@ -324,9 +295,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 
 #define loaddebug(_v,_reg) \
-    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+    asm volatile ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
 #define savedebug(_v,_reg) \
-    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
+    asm volatile ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
 
 static inline void svm_save_dr(struct vcpu *v)
 {
@@ -733,7 +704,7 @@ static void svm_stts(struct vcpu *v)
      */
     if ( !(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS) )
     {
-        v->arch.hvm_svm.vmcb->exception_intercepts |= EXCEPTION_BITMAP_NM;
+        v->arch.hvm_svm.vmcb->exception_intercepts |= 1U << TRAP_no_device;
         vmcb->cr0 |= X86_CR0_TS;
     }
 }
@@ -749,19 +720,21 @@ static void svm_init_ap_context(
     struct vcpu_guest_context *ctxt, int vcpuid, int trampoline_vector)
 {
     struct vcpu *v;
+    struct vmcb_struct *vmcb;
     cpu_user_regs_t *regs;
     u16 cs_sel;
 
     /* We know this is safe because hvm_bringup_ap() does it */
     v = current->domain->vcpu[vcpuid];
+    vmcb = v->arch.hvm_svm.vmcb;
     regs = &v->arch.guest_context.user_regs;
 
     memset(ctxt, 0, sizeof(*ctxt));
 
     /*
      * We execute the trampoline code in real mode. The trampoline vector
-     * passed to us is page alligned and is the physicall frame number for
-     * the code. We will execute this code in real mode. 
+     * passed to us is page alligned and is the physical frame number for
+     * the code. We will execute this code in real mode.
      */
     cs_sel = trampoline_vector << 8;
     ctxt->user_regs.eip = 0x0;
@@ -771,11 +744,11 @@ static void svm_init_ap_context(
      * This is the launch of an AP; set state so that we begin executing
      * the trampoline code in real-mode.
      */
-    svm_do_vmmcall_reset_to_realmode(v, regs);  
+    svm_reset_to_realmode(v, regs);  
     /* Adjust the vmcb's hidden register state. */
-    v->arch.hvm_svm.vmcb->rip = 0;
-    v->arch.hvm_svm.vmcb->cs.sel = cs_sel;
-    v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
+    vmcb->rip = 0;
+    vmcb->cs.sel = cs_sel;
+    vmcb->cs.base = (cs_sel << 4);
 }
 
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
@@ -800,74 +773,9 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
-
-int svm_dbg_on = 0;
-
-static inline int svm_do_debugout(unsigned long exit_code)
-{
-    int i;
-
-    static unsigned long counter = 0;
-    static unsigned long works[] =
-    {
-        VMEXIT_IOIO,
-        VMEXIT_HLT,
-        VMEXIT_CPUID,
-        VMEXIT_DR0_READ,
-        VMEXIT_DR1_READ,
-        VMEXIT_DR2_READ,
-        VMEXIT_DR3_READ,
-        VMEXIT_DR6_READ,
-        VMEXIT_DR7_READ,
-        VMEXIT_DR0_WRITE,
-        VMEXIT_DR1_WRITE,
-        VMEXIT_DR2_WRITE,
-        VMEXIT_DR3_WRITE,
-        VMEXIT_CR0_READ,
-        VMEXIT_CR0_WRITE,
-        VMEXIT_CR3_READ,
-        VMEXIT_CR4_READ, 
-        VMEXIT_MSR,
-        VMEXIT_CR0_WRITE,
-        VMEXIT_CR3_WRITE,
-        VMEXIT_CR4_WRITE,
-        VMEXIT_EXCEPTION_PF,
-        VMEXIT_INTR,
-        VMEXIT_INVLPG,
-        VMEXIT_EXCEPTION_NM
-    };
-
-
-#if 0
-    if (svm_dbg_on && exit_code != 0x7B)
-        return 1;
-#endif
-
-    counter++;
-
-#if 0
-    if ((exit_code == 0x4E 
-         || exit_code == VMEXIT_CR0_READ 
-         || exit_code == VMEXIT_CR0_WRITE) 
-        && counter < 200000)
-        return 0;
-
-    if ((exit_code == 0x4E) && counter < 500000)
-        return 0;
-#endif
-
-    for (i = 0; i < sizeof(works) / sizeof(works[0]); i++)
-        if (exit_code == works[i])
-            return 0;
-
-    return 1;
-}
-
 static void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
 
     ctxt->eax = vmcb->rax;
     ctxt->ss = vmcb->ss.sel;
@@ -882,42 +790,16 @@ static void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
     ctxt->ds = vmcb->ds.sel;
 }
 
-static void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v)
+static void svm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    regs->eip    = vmcb->rip;
-    regs->esp    = vmcb->rsp;
-    regs->eflags = vmcb->rflags;
-    regs->cs     = vmcb->cs.sel;
-    regs->ds     = vmcb->ds.sel;
-    regs->es     = vmcb->es.sel;
-    regs->ss     = vmcb->ss.sel;
-}
-
-/* XXX Use svm_load_cpu_guest_regs instead */
-static void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
-{ 
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    u32 *intercepts = &v->arch.hvm_svm.vmcb->exception_intercepts;
     
-    /* Write the guest register value into VMCB */
     vmcb->rax      = regs->eax;
     vmcb->ss.sel   = regs->ss;
     vmcb->rsp      = regs->esp;   
     vmcb->rflags   = regs->eflags | 2UL;
     vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
-    if (regs->eflags & EF_TF)
-        *intercepts |= EXCEPTION_BITMAP_DB;
-    else
-        *intercepts &= ~EXCEPTION_BITMAP_DB;
-}
-
-static void svm_load_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs)
-{
-    svm_load_cpu_user_regs(v, regs);
 }
 
 static void svm_ctxt_switch_from(struct vcpu *v)
@@ -941,8 +823,20 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 }
 
-static void arch_svm_do_resume(struct vcpu *v) 
+static void svm_do_resume(struct vcpu *v) 
 {
+    bool_t debug_state = v->domain->debugger_attached;
+
+    if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
+    {
+        uint32_t mask = (1U << TRAP_debug) | (1U << TRAP_int3);
+        v->arch.hvm_vcpu.debug_state_latch = debug_state;
+        if ( debug_state )
+            v->arch.hvm_svm.vmcb->exception_intercepts |= mask;
+        else
+            v->arch.hvm_svm.vmcb->exception_intercepts &= ~mask;
+    }
+
     if ( v->arch.hvm_svm.launch_core != smp_processor_id() )
     {
         v->arch.hvm_svm.launch_core = smp_processor_id();
@@ -957,11 +851,9 @@ static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
-    v->arch.schedule_tail    = arch_svm_do_resume;
+    v->arch.schedule_tail    = svm_do_resume;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
-
-    v->arch.hvm_svm.saved_irq_vector = -1;
 
     v->arch.hvm_svm.launch_core = -1;
 
@@ -997,6 +889,7 @@ static int svm_event_injection_faulted(struct vcpu *v)
 }
 
 static struct hvm_function_table svm_function_table = {
+    .name                 = "SVM",
     .disable              = stop_svm,
     .vcpu_initialise      = svm_vcpu_initialise,
     .vcpu_destroy         = svm_vcpu_destroy,
@@ -1026,16 +919,13 @@ void svm_npt_detect(void)
 {
     u32 eax, ebx, ecx, edx;
 
-    /* check CPUID for nested paging support */
+    /* Check CPUID for nested paging support. */
     cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
-    if ( edx & 0x01 ) /* nested paging */
+
+    if ( !(edx & 1) && opt_hap_enabled )
     {
-        hap_capable_system = 1;
-    }
-    else if ( opt_hap_enabled )
-    {
-        printk(" nested paging is not supported by this CPU.\n");
-        hap_capable_system = 0; /* no nested paging, we disable flag. */
+        printk("SVM: Nested paging is not supported by this CPU.\n");
+        opt_hap_enabled = 0;
     }
 }
 
@@ -1050,7 +940,7 @@ int start_svm(void)
     ecx = cpuid_ecx(0x80000001);
     boot_cpu_data.x86_capability[5] = ecx;
     
-    if (!(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)))
+    if ( !(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)) )
         return 0;
 
     /* check whether SVM feature is disabled in BIOS */
@@ -1061,14 +951,13 @@ int start_svm(void)
         return 0;
     }
 
-    if (!hsa[cpu])
-        if (!(hsa[cpu] = alloc_host_save_area()))
-            return 0;
-    
+    if ( ((hsa[cpu] = alloc_host_save_area()) == NULL) ||
+         ((root_vmcb[cpu] = alloc_vmcb()) == NULL) )
+        return 0;
+
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
-    printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
 
     svm_npt_detect();
 
@@ -1077,14 +966,13 @@ int start_svm(void)
     phys_hsa_lo = (u32) phys_hsa;
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
-  
-    if (!root_vmcb[cpu])
-        if (!(root_vmcb[cpu] = alloc_vmcb())) 
-            return 0;
-    root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
 
-    if (cpu == 0)
-        setup_vmcb_dump();
+    root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
+  
+    if ( cpu != 0 )
+        return 1;
+
+    setup_vmcb_dump();
 
     hvm_enable(&svm_function_table);
 
@@ -1102,61 +990,15 @@ static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
     return 0;
 }
 
-
-static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
-{
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, 
-                "svm_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
-                va, (unsigned long)current->arch.hvm_svm.vmcb->rip,
-                (unsigned long)regs->error_code);
-    return paging_fault(va, regs); 
-}
-
-
 static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
 {
     struct vcpu *v = current;
 
     setup_fpu(v);    
-    vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+    vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
 
     if ( !(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS) )
         vmcb->cr0 &= ~X86_CR0_TS;
-}
-
-
-static void svm_do_general_protection_fault(struct vcpu *v, 
-                                            struct cpu_user_regs *regs) 
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long eip, error_code;
-
-    ASSERT(vmcb);
-
-    eip = vmcb->rip;
-    error_code = vmcb->exitinfo1;
-
-    if (vmcb->idtr.limit == 0) {
-        printk("Huh? We got a GP Fault with an invalid IDTR!\n");
-        svm_dump_vmcb(__func__, vmcb);
-        svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(v));
-        domain_crash(v->domain);
-        return;
-    }
-
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "svm_general_protection_fault: eip = %lx, erro_code = %lx",
-                eip, error_code);
-
-    HVM_DBG_LOG(DBG_LEVEL_1, 
-                "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                (unsigned long)regs->eax, (unsigned long)regs->ebx,
-                (unsigned long)regs->ecx, (unsigned long)regs->edx,
-                (unsigned long)regs->esi, (unsigned long)regs->edi);
-      
-    /* Reflect it back into the guest */
-    svm_inject_exception(v, TRAP_gp_fault, 1, error_code);
 }
 
 /* Reserved bits ECX: [31:14], [12:4], [2:1]*/
@@ -1171,8 +1013,6 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     unsigned int eax, ebx, ecx, edx;
     struct vcpu *v = current;
     int inst_len;
-
-    ASSERT(vmcb);
 
     hvm_cpuid(input, &eax, &ebx, &ecx, &edx);
 
@@ -1305,8 +1145,8 @@ static inline unsigned long *get_reg_p(
 }
 
 
-static inline unsigned long get_reg(unsigned int gpreg, 
-                                    struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
+static inline unsigned long get_reg(
+    unsigned int gpreg, struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
     unsigned long *gp;
     gp = get_reg_p(gpreg, regs, vmcb);
@@ -1314,8 +1154,9 @@ static inline unsigned long get_reg(unsigned int gpreg,
 }
 
 
-static inline void set_reg(unsigned int gpreg, unsigned long value, 
-                           struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
+static inline void set_reg(
+    unsigned int gpreg, unsigned long value, 
+    struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
     unsigned long *gp;
     gp = get_reg_p(gpreg, regs, vmcb);
@@ -1585,7 +1426,6 @@ static void svm_io_instruction(struct vcpu *v)
     ioio_info_t info;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(vmcb);
     pio_opp = &current->arch.hvm_vcpu.io_op;
     pio_opp->instr = INSTR_PIO;
     pio_opp->flags = 0;
@@ -1729,226 +1569,95 @@ static void svm_io_instruction(struct vcpu *v)
     }
 }
 
-static int npt_set_cr0(unsigned long value) 
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-  
-    ASSERT(vmcb);
-
-    /* ET is reserved and should be always be 1*/
-    value |= X86_CR0_ET;
-
-    /* Check whether the guest is about to turn on long mode. 
-     * If it is, set EFER.LME and EFER.LMA.  Update the shadow EFER.LMA
-     * bit too, so svm_long_mode_enabled() will work.
-     */
-    if ( (value & X86_CR0_PG) && svm_lme_is_set(v) &&
-         (vmcb->cr4 & X86_CR4_PAE) && (vmcb->cr0 & X86_CR0_PE) )
-    {
-        v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
-        vmcb->efer |= EFER_LMA | EFER_LME;
-    }
-
-    /* Whenever CR0.PG is cleared under long mode, LMA will be cleared 
-     * immediatly. We emulate this process for svm_long_mode_enabled().
-     */
-    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
-    {
-        if ( svm_long_mode_enabled(v) )
-        {
-            v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
-        }
-    }
-    
-    vmcb->cr0 = value | X86_CR0_WP;
-    v->arch.hvm_svm.cpu_shadow_cr0 = value;
-
-    /* TS cleared? Then initialise FPU now. */
-    if ( !(value & X86_CR0_TS) ) {
-        setup_fpu(v);
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
-    }
-    
-    paging_update_paging_modes(v);
-    
-    return 1;
-}
-
 static int svm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    unsigned long mfn;
-    int paging_enabled;
+    unsigned long mfn, old_value = v->arch.hvm_svm.cpu_shadow_cr0;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long old_base_mfn;
   
-    ASSERT(vmcb);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
 
-    /* We don't want to lose PG.  ET is reserved and should be always be 1*/
-    paging_enabled = svm_paging_enabled(v);
+    /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
-    vmcb->cr0 = value | X86_CR0_PG | X86_CR0_WP;
-    v->arch.hvm_svm.cpu_shadow_cr0 = value;
+
+    if ( (value & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG )
+    {
+        svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+        return 0;
+    }
 
     /* TS cleared? Then initialise FPU now. */
     if ( !(value & X86_CR0_TS) )
     {
         setup_fpu(v);
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
-
-    if ( ((value & (X86_CR0_PE | X86_CR0_PG)) == (X86_CR0_PE | X86_CR0_PG))
-         && !paging_enabled ) 
+    if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
     {
-        /* The guest CR3 must be pointing to the guest physical. */
-        mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
-        if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
-        {
-            gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
-                     v->arch.hvm_svm.cpu_cr3, mfn);
-            domain_crash(v->domain);
-            return 0;
-        }
-
 #if defined(__x86_64__)
-        if ( svm_lme_is_set(v) && !svm_cr4_pae_is_set(v) )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-        }
-
         if ( svm_lme_is_set(v) )
         {
+            if ( !svm_cr4_pae_is_set(v) )
+            {
+                HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
+                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+                return 0;
+            }
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
             v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
             vmcb->efer |= EFER_LMA | EFER_LME;
         }
 #endif  /* __x86_64__ */
 
-        /* Now arch.guest_table points to machine physical. */
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( old_base_mfn )
-            put_page(mfn_to_page(old_base_mfn));
-        paging_update_paging_modes(v);
+        if ( !paging_mode_hap(v->domain) )
+        {
+            /* The guest CR3 must be pointing to the guest physical. */
+            mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            {
+                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n", 
+                         v->arch.hvm_svm.cpu_cr3, mfn);
+                domain_crash(v->domain);
+                return 0;
+            }
 
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                    (unsigned long) (mfn << PAGE_SHIFT));
-    }
+            /* Now arch.guest_table points to machine physical. */
+            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+            v->arch.guest_table = pagetable_from_pfn(mfn);
+            if ( old_base_mfn )
+                put_page(mfn_to_page(old_base_mfn));
 
-    if ( !((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled )
-        if ( v->arch.hvm_svm.cpu_cr3 ) {
-            put_page(mfn_to_page(get_mfn_from_gpfn(
-                v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)));
-            v->arch.guest_table = pagetable_null();
+            HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
+                        (unsigned long) (mfn << PAGE_SHIFT));
         }
-
-    /*
-     * SVM implements paged real-mode and when we return to real-mode
-     * we revert back to the physical mappings that the domain builder
-     * created.
-     */
-    if ((value & X86_CR0_PE) == 0) {
-        if (value & X86_CR0_PG) {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-            return 0;
-        }
-        paging_update_paging_modes(v);
     }
-    else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
+    else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
     {
+        /* When CR0.PG is cleared, LMA is cleared immediately. */
         if ( svm_long_mode_enabled(v) )
         {
             vmcb->efer &= ~(EFER_LME | EFER_LMA);
             v->arch.hvm_svm.cpu_shadow_efer &= ~EFER_LMA;
         }
-        /* we should take care of this kind of situation */
-        paging_update_paging_modes(v);
+
+        if ( !paging_mode_hap(v->domain) && v->arch.hvm_svm.cpu_cr3 )
+        {
+            put_page(mfn_to_page(get_mfn_from_gpfn(
+                v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)));
+            v->arch.guest_table = pagetable_null();
+        }
     }
+
+    vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0 = value;
+    if ( !paging_mode_hap(v->domain) )
+        vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
+
+    if ( (value ^ old_value) & X86_CR0_PG )
+        paging_update_paging_modes(v);
 
     return 1;
-}
-
-//
-// nested paging functions
-//
-
-static int npt_mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
-{  
-    unsigned long value;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-
-    ASSERT(vmcb);
-
-    value = get_reg(gpreg, regs, vmcb);
-
-    switch (cr) {
-    case 0:
-        return npt_set_cr0(value);
-
-    case 3:
-        vmcb->cr3 = value;
-        v->arch.hvm_svm.cpu_cr3 = value;
-        break;
-
-    case 4: /* CR4 */
-        vmcb->cr4 = value;
-        v->arch.hvm_svm.cpu_shadow_cr4 = value;
-        paging_update_paging_modes(v);
-        break;
-
-    case 8:
-        vlapic_set_reg(vlapic, APIC_TASKPRI, ((value & 0x0F) << 4));
-        vmcb->vintr.fields.tpr = value & 0x0F;
-        break;
-
-    default:
-        gdprintk(XENLOG_ERR, "invalid cr: %d\n", cr);
-        domain_crash(v->domain);
-        return 0;
-    }
-    
-    return 1;
-}
-
-static void npt_mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
-{
-    unsigned long value = 0;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb;
-    struct vlapic *vlapic = vcpu_vlapic(v);
-
-    vmcb = v->arch.hvm_svm.vmcb;
-    ASSERT(vmcb);
-
-    switch(cr) {
-    case 0:
-        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr0;
-        break;
-    case 2:
-        value = vmcb->cr2;
-        break;
-    case 3:
-        value = (unsigned long) v->arch.hvm_svm.cpu_cr3;
-        break;
-    case 4:
-        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
-       break;
-    case 8:
-        value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
-        value = (value & 0xF0) >> 4;
-        break;
-    default:
-        domain_crash(v->domain);
-        return;
-    }
-    
-    set_reg(gp, value, regs, vmcb);
 }
 
 /*
@@ -1959,30 +1668,21 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     unsigned long value = 0;
     struct vcpu *v = current;
     struct vlapic *vlapic = vcpu_vlapic(v);
-    struct vmcb_struct *vmcb;
-
-    vmcb = v->arch.hvm_svm.vmcb;
-    ASSERT(vmcb);
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     switch ( cr )
     {
     case 0:
         value = v->arch.hvm_svm.cpu_shadow_cr0;
-        if (svm_dbg_on)
-            printk("CR0 read =%lx \n", value );
         break;
     case 2:
         value = vmcb->cr2;
         break;
     case 3:
-        value = (unsigned long) v->arch.hvm_svm.cpu_cr3;
-        if (svm_dbg_on)
-            printk("CR3 read =%lx \n", value );
+        value = (unsigned long)v->arch.hvm_svm.cpu_cr3;
         break;
     case 4:
-        value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
-        if (svm_dbg_on)
-            printk("CR4 read=%lx\n", value);
+        value = (unsigned long)v->arch.hvm_svm.cpu_shadow_cr4;
         break;
     case 8:
         value = (unsigned long)vlapic_get_reg(vlapic, APIC_TASKPRI);
@@ -2019,24 +1719,27 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
     HVM_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
 
-    switch (cr) 
+    switch ( cr )
     {
     case 0: 
-        if (svm_dbg_on)
-            printk("CR0 write =%lx \n", value );
         return svm_set_cr0(value);
 
-    case 3: 
-        if (svm_dbg_on)
-            printk("CR3 write =%lx \n", value );
+    case 3:
+        if ( paging_mode_hap(v->domain) )
+        {
+            vmcb->cr3 = v->arch.hvm_svm.cpu_cr3 = value;
+            break;
+        }
+
         /* If paging is not enabled yet, simply copy the value to CR3. */
-        if (!svm_paging_enabled(v)) {
+        if ( !svm_paging_enabled(v) )
+        {
             v->arch.hvm_svm.cpu_cr3 = value;
             break;
         }
 
         /* We make a new one if the shadow does not exist. */
-        if (value == v->arch.hvm_svm.cpu_cr3) 
+        if ( value == v->arch.hvm_svm.cpu_cr3 )
         {
             /* 
              * This is simple TLB flush, implying the guest has 
@@ -2044,7 +1747,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              * We simply invalidate the shadow.
              */
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if (mfn != pagetable_get_pfn(v->arch.guest_table))
+            if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
                 goto bad_cr3;
             paging_update_cr3(v);
         }
@@ -2056,13 +1759,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
-            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain))
+            if ( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) )
                 goto bad_cr3;
 
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = pagetable_from_pfn(mfn);
 
-            if (old_base_mfn)
+            if ( old_base_mfn )
                 put_page(mfn_to_page(old_base_mfn));
 
             v->arch.hvm_svm.cpu_cr3 = value;
@@ -2072,9 +1775,13 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         break;
 
     case 4: /* CR4 */
-        if (svm_dbg_on)
-            printk( "write cr4=%lx, cr0=%lx\n", 
-                    value,  v->arch.hvm_svm.cpu_shadow_cr0 );
+        if ( paging_mode_hap(v->domain) )
+        {
+            vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 = value;
+            paging_update_paging_modes(v);
+            break;
+        }
+
         old_cr = v->arch.hvm_svm.cpu_shadow_cr4;
         if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
         {
@@ -2154,17 +1861,17 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int inst_len = 0;
-    int index;
-    unsigned int gpreg;
-    unsigned long value;
+    int index,addr_size,i;
+    unsigned int gpreg,offset;
+    unsigned long value,addr;
     u8 buffer[MAX_INST_LEN];   
     u8 prefix = 0;
+    u8 modrm;
+    enum x86_segment seg;
     int result = 1;
     enum instruction_index list_a[] = {INSTR_MOV2CR, INSTR_CLTS, INSTR_LMSW};
     enum instruction_index list_b[] = {INSTR_MOVCR2, INSTR_SMSW};
     enum instruction_index match;
-
-    ASSERT(vmcb);
 
     inst_copy_from_guest(buffer, svm_rip2pointer(v), sizeof(buffer));
 
@@ -2197,60 +1904,83 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     {
     case INSTR_MOV2CR:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
-        if ( paging_mode_hap(v->domain) )
-            result = npt_mov_to_cr(gpreg, cr, regs);
-        else
-            result = mov_to_cr(gpreg, cr, regs);
+        result = mov_to_cr(gpreg, cr, regs);
         break;
 
     case INSTR_MOVCR2:
         gpreg = decode_src_reg(prefix, buffer[index+2]);
-        if ( paging_mode_hap(v->domain) )
-            npt_mov_from_cr(cr, gpreg, regs);
-        else
-            mov_from_cr(cr, gpreg, regs);
+        mov_from_cr(cr, gpreg, regs);
         break;
 
     case INSTR_CLTS:
         /* TS being cleared means that it's time to restore fpu state. */
         setup_fpu(current);
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+        vmcb->exception_intercepts &= ~(1U << TRAP_no_device);
         vmcb->cr0 &= ~X86_CR0_TS; /* clear TS */
         v->arch.hvm_svm.cpu_shadow_cr0 &= ~X86_CR0_TS; /* clear TS */
         break;
 
     case INSTR_LMSW:
-        if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(v));
-        
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         value = get_reg(gpreg, regs, vmcb) & 0xF;
-
-        if (svm_dbg_on)
-            printk("CR0-LMSW value=%lx, reg=%d, inst_len=%d\n", value, gpreg, 
-                   inst_len);
-
         value = (v->arch.hvm_svm.cpu_shadow_cr0 & ~0xF) | value;
-
-        if (svm_dbg_on)
-            printk("CR0-LMSW CR0 - New value=%lx\n", value);
-
-        if ( paging_mode_hap(v->domain) )
-            result = npt_set_cr0(value);
-        else
-            result = svm_set_cr0(value);
+        result = svm_set_cr0(value);
         break;
 
     case INSTR_SMSW:
-        if (svm_dbg_on)
-            svm_dump_inst(svm_rip2pointer(v));
-        value = v->arch.hvm_svm.cpu_shadow_cr0;
-        gpreg = decode_src_reg(prefix, buffer[index+2]);
-        set_reg(gpreg, value, regs, vmcb);
-
-        if (svm_dbg_on)
-            printk("CR0-SMSW value=%lx, reg=%d, inst_len=%d\n", value, gpreg, 
-                   inst_len);
+        value = v->arch.hvm_svm.cpu_shadow_cr0 & 0xFFFF;
+        modrm = buffer[index+2];
+        addr_size = svm_guest_x86_mode( v );
+        if ( likely((modrm & 0xC0) >> 6 == 3) )
+        {
+            gpreg = decode_src_reg(prefix, modrm);
+            set_reg(gpreg, value, regs, vmcb);
+        }
+        /*
+         * For now, only implement decode of the offset mode, since that's the
+         * only mode observed in a real-world OS. This code is also making the
+         * assumption that we'll never hit this code in long mode.
+         */
+        else if ( (modrm == 0x26) || (modrm == 0x25) )
+        {   
+            seg = x86_seg_ds;
+            i = index;
+            /* Segment or address size overrides? */
+            while ( i-- )
+            {
+                switch ( buffer[i] )
+                {
+                   case 0x26: seg = x86_seg_es; break;
+                   case 0x2e: seg = x86_seg_cs; break;
+                   case 0x36: seg = x86_seg_ss; break;
+                   case 0x64: seg = x86_seg_fs; break;
+                   case 0x65: seg = x86_seg_gs; break;
+                   case 0x67: addr_size ^= 6;   break;
+                }
+            }
+            /* Bail unless this really is a seg_base + offset case */
+            if ( ((modrm == 0x26) && (addr_size == 4)) ||
+                 ((modrm == 0x25) && (addr_size == 2)) )
+            {
+                gdprintk(XENLOG_ERR, "SMSW emulation at guest address: "
+                         "%lx failed due to unhandled addressing mode."
+                         "ModRM byte was: %x \n", svm_rip2pointer(v), modrm);
+                domain_crash(v->domain);
+            }
+            inst_len += addr_size;
+            offset = *(( unsigned int *) ( void *) &buffer[index + 3]);
+            offset = ( addr_size == 4 ) ? offset : ( offset & 0xFFFF );
+            addr = hvm_get_segment_base(v, seg);
+            addr += offset;
+            hvm_copy_to_guest_virt(addr,&value,2);
+        }
+        else
+        {
+           gdprintk(XENLOG_ERR, "SMSW emulation at guest address: %lx "
+                    "failed due to unhandled addressing mode!"
+                    "ModRM byte was: %x \n", svm_rip2pointer(v), modrm);
+           domain_crash(v->domain);
+        }
         break;
 
     default:
@@ -2271,8 +2001,6 @@ static inline void svm_do_msr_access(
     int  inst_len;
     u64 msr_content=0;
     u32 ecx = regs->ecx, eax, edx;
-
-    ASSERT(vmcb);
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x, exitinfo = %lx",
                 ecx, (u32)regs->eax, (u32)regs->edx,
@@ -2357,7 +2085,6 @@ static inline void svm_do_msr_access(
     __update_guest_eip(vmcb, inst_len);
 }
 
-
 static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 {
     __update_guest_eip(vmcb, 1);
@@ -2373,7 +2100,6 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
     hvm_hlt(vmcb->rflags);
 }
 
-
 static void svm_vmexit_do_invd(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -2387,48 +2113,12 @@ static void svm_vmexit_do_invd(struct vcpu *v)
     /* Tell the user that we did this - just in case someone runs some really 
      * weird operating system and wants to know why it's not working...
      */
-    printk("INVD instruction intercepted - ignored\n");
+    gdprintk(XENLOG_WARNING, "INVD instruction intercepted - ignored\n");
     
     inst_len = __get_instruction_length(v, INSTR_INVD, NULL);
     __update_guest_eip(vmcb, inst_len);
 }    
         
-
-
-
-#ifdef XEN_DEBUGGER
-static void svm_debug_save_cpu_user_regs(struct vmcb_struct *vmcb, 
-                                         struct cpu_user_regs *regs)
-{
-    regs->eip = vmcb->rip;
-    regs->esp = vmcb->rsp;
-    regs->eflags = vmcb->rflags;
-
-    regs->xcs = vmcb->cs.sel;
-    regs->xds = vmcb->ds.sel;
-    regs->xes = vmcb->es.sel;
-    regs->xfs = vmcb->fs.sel;
-    regs->xgs = vmcb->gs.sel;
-    regs->xss = vmcb->ss.sel;
-}
-
-
-static void svm_debug_restore_cpu_user_regs(struct cpu_user_regs *regs)
-{
-    vmcb->ss.sel   = regs->xss;
-    vmcb->rsp      = regs->esp;
-    vmcb->rflags   = regs->eflags;
-    vmcb->cs.sel   = regs->xcs;
-    vmcb->rip      = regs->eip;
-
-    vmcb->gs.sel = regs->xgs;
-    vmcb->fs.sel = regs->xfs;
-    vmcb->es.sel = regs->xes;
-    vmcb->ds.sel = regs->xds;
-}
-#endif
-
-
 void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2494,18 +2184,11 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
  *
  * returns 0 on success, non-zero otherwise
  */
-static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v, 
-                                            struct cpu_user_regs *regs)
+static int svm_reset_to_realmode(struct vcpu *v, 
+                                 struct cpu_user_regs *regs)
 {
-    struct vmcb_struct *vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(v);
-    ASSERT(regs);
-
-    vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
-    
     /* clear the vmcb and user regs */
     memset(regs, 0, sizeof(struct cpu_user_regs));
    
@@ -2587,449 +2270,65 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
     return 0;
 }
 
-
-void svm_dump_inst(unsigned long eip)
-{
-    u8 opcode[256];
-    unsigned long ptr;
-    int len;
-    int i;
-
-    ptr = eip & ~0xff;
-    len = 0;
-
-    if (hvm_copy_from_guest_virt(opcode, ptr, sizeof(opcode)) == 0)
-        len = sizeof(opcode);
-
-    printk("Code bytes around(len=%d) %lx:", len, eip);
-    for (i = 0; i < len; i++)
-    {
-        if ((i & 0x0f) == 0)
-            printk("\n%08lx:", ptr+i);
-
-        printk("%02x ", opcode[i]);
-    }
-
-    printk("\n");
-}
-
-
-void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long pt = v->arch.hvm_vcpu.hw_cr3;
-
-    printk("%s: guest registers from %s:\n", __func__, from);
-#if defined (__x86_64__)
-    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
-           regs->rax, regs->rbx, regs->rcx);
-    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
-           regs->rdx, regs->rsi, regs->rdi);
-    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
-           regs->rbp, regs->rsp, regs->r8);
-    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
-           regs->r9,  regs->r10, regs->r11);
-    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-           regs->r12, regs->r13, regs->r14);
-    printk("r15: %016lx   cr0: %016lx   cr3: %016lx\n",
-           regs->r15, v->arch.hvm_svm.cpu_shadow_cr0, vmcb->cr3);
-#else
-    printk("eax: %08x, ebx: %08x, ecx: %08x, edx: %08x\n", 
-           regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printk("edi: %08x, esi: %08x, ebp: %08x, esp: %08x\n", 
-           regs->edi, regs->esi, regs->ebp, regs->esp);
-    printk("%s: guest cr0: %lx\n", __func__, 
-           v->arch.hvm_svm.cpu_shadow_cr0);
-    printk("guest CR3 = %llx\n", vmcb->cr3);
-#endif
-    printk("%s: pt = %lx\n", __func__, pt);
-}
-
-
-void svm_dump_host_regs(const char *from)
-{
-    struct vcpu *v = current;
-    unsigned long pt = pt = pagetable_get_paddr(v->arch.monitor_table);
-    unsigned long cr3, cr0;
-    printk("Host registers at %s\n", from);
-
-    __asm__ __volatile__ ("\tmov %%cr0,%0\n"
-                          "\tmov %%cr3,%1\n"
-                          : "=r" (cr0), "=r"(cr3));
-    printk("%s: pt = %lx, cr3 = %lx, cr0 = %lx\n", __func__, pt, cr3, cr0);
-}
-
-#ifdef SVM_EXTRA_DEBUG
-static char *exit_reasons[] = {
-    [VMEXIT_CR0_READ] = "CR0_READ",
-    [VMEXIT_CR1_READ] = "CR1_READ",
-    [VMEXIT_CR2_READ] = "CR2_READ",
-    [VMEXIT_CR3_READ] = "CR3_READ",
-    [VMEXIT_CR4_READ] = "CR4_READ",
-    [VMEXIT_CR5_READ] = "CR5_READ",
-    [VMEXIT_CR6_READ] = "CR6_READ",
-    [VMEXIT_CR7_READ] = "CR7_READ",
-    [VMEXIT_CR8_READ] = "CR8_READ",
-    [VMEXIT_CR9_READ] = "CR9_READ",
-    [VMEXIT_CR10_READ] = "CR10_READ",
-    [VMEXIT_CR11_READ] = "CR11_READ",
-    [VMEXIT_CR12_READ] = "CR12_READ",
-    [VMEXIT_CR13_READ] = "CR13_READ",
-    [VMEXIT_CR14_READ] = "CR14_READ",
-    [VMEXIT_CR15_READ] = "CR15_READ",
-    [VMEXIT_CR0_WRITE] = "CR0_WRITE",
-    [VMEXIT_CR1_WRITE] = "CR1_WRITE",
-    [VMEXIT_CR2_WRITE] = "CR2_WRITE",
-    [VMEXIT_CR3_WRITE] = "CR3_WRITE",
-    [VMEXIT_CR4_WRITE] = "CR4_WRITE",
-    [VMEXIT_CR5_WRITE] = "CR5_WRITE",
-    [VMEXIT_CR6_WRITE] = "CR6_WRITE",
-    [VMEXIT_CR7_WRITE] = "CR7_WRITE",
-    [VMEXIT_CR8_WRITE] = "CR8_WRITE",
-    [VMEXIT_CR9_WRITE] = "CR9_WRITE",
-    [VMEXIT_CR10_WRITE] = "CR10_WRITE",
-    [VMEXIT_CR11_WRITE] = "CR11_WRITE",
-    [VMEXIT_CR12_WRITE] = "CR12_WRITE",
-    [VMEXIT_CR13_WRITE] = "CR13_WRITE",
-    [VMEXIT_CR14_WRITE] = "CR14_WRITE",
-    [VMEXIT_CR15_WRITE] = "CR15_WRITE",
-    [VMEXIT_DR0_READ] = "DR0_READ",
-    [VMEXIT_DR1_READ] = "DR1_READ",
-    [VMEXIT_DR2_READ] = "DR2_READ",
-    [VMEXIT_DR3_READ] = "DR3_READ",
-    [VMEXIT_DR4_READ] = "DR4_READ",
-    [VMEXIT_DR5_READ] = "DR5_READ",
-    [VMEXIT_DR6_READ] = "DR6_READ",
-    [VMEXIT_DR7_READ] = "DR7_READ",
-    [VMEXIT_DR8_READ] = "DR8_READ",
-    [VMEXIT_DR9_READ] = "DR9_READ",
-    [VMEXIT_DR10_READ] = "DR10_READ",
-    [VMEXIT_DR11_READ] = "DR11_READ",
-    [VMEXIT_DR12_READ] = "DR12_READ",
-    [VMEXIT_DR13_READ] = "DR13_READ",
-    [VMEXIT_DR14_READ] = "DR14_READ",
-    [VMEXIT_DR15_READ] = "DR15_READ",
-    [VMEXIT_DR0_WRITE] = "DR0_WRITE",
-    [VMEXIT_DR1_WRITE] = "DR1_WRITE",
-    [VMEXIT_DR2_WRITE] = "DR2_WRITE",
-    [VMEXIT_DR3_WRITE] = "DR3_WRITE",
-    [VMEXIT_DR4_WRITE] = "DR4_WRITE",
-    [VMEXIT_DR5_WRITE] = "DR5_WRITE",
-    [VMEXIT_DR6_WRITE] = "DR6_WRITE",
-    [VMEXIT_DR7_WRITE] = "DR7_WRITE",
-    [VMEXIT_DR8_WRITE] = "DR8_WRITE",
-    [VMEXIT_DR9_WRITE] = "DR9_WRITE",
-    [VMEXIT_DR10_WRITE] = "DR10_WRITE",
-    [VMEXIT_DR11_WRITE] = "DR11_WRITE",
-    [VMEXIT_DR12_WRITE] = "DR12_WRITE",
-    [VMEXIT_DR13_WRITE] = "DR13_WRITE",
-    [VMEXIT_DR14_WRITE] = "DR14_WRITE",
-    [VMEXIT_DR15_WRITE] = "DR15_WRITE",
-    [VMEXIT_EXCEPTION_DE] = "EXCEPTION_DE",
-    [VMEXIT_EXCEPTION_DB] = "EXCEPTION_DB",
-    [VMEXIT_EXCEPTION_NMI] = "EXCEPTION_NMI",
-    [VMEXIT_EXCEPTION_BP] = "EXCEPTION_BP",
-    [VMEXIT_EXCEPTION_OF] = "EXCEPTION_OF",
-    [VMEXIT_EXCEPTION_BR] = "EXCEPTION_BR",
-    [VMEXIT_EXCEPTION_UD] = "EXCEPTION_UD",
-    [VMEXIT_EXCEPTION_NM] = "EXCEPTION_NM",
-    [VMEXIT_EXCEPTION_DF] = "EXCEPTION_DF",
-    [VMEXIT_EXCEPTION_09] = "EXCEPTION_09",
-    [VMEXIT_EXCEPTION_TS] = "EXCEPTION_TS",
-    [VMEXIT_EXCEPTION_NP] = "EXCEPTION_NP",
-    [VMEXIT_EXCEPTION_SS] = "EXCEPTION_SS",
-    [VMEXIT_EXCEPTION_GP] = "EXCEPTION_GP",
-    [VMEXIT_EXCEPTION_PF] = "EXCEPTION_PF",
-    [VMEXIT_EXCEPTION_15] = "EXCEPTION_15",
-    [VMEXIT_EXCEPTION_MF] = "EXCEPTION_MF",
-    [VMEXIT_EXCEPTION_AC] = "EXCEPTION_AC",
-    [VMEXIT_EXCEPTION_MC] = "EXCEPTION_MC",
-    [VMEXIT_EXCEPTION_XF] = "EXCEPTION_XF",
-    [VMEXIT_INTR] = "INTR",
-    [VMEXIT_NMI] = "NMI",
-    [VMEXIT_SMI] = "SMI",
-    [VMEXIT_INIT] = "INIT",
-    [VMEXIT_VINTR] = "VINTR",
-    [VMEXIT_CR0_SEL_WRITE] = "CR0_SEL_WRITE",
-    [VMEXIT_IDTR_READ] = "IDTR_READ",
-    [VMEXIT_GDTR_READ] = "GDTR_READ",
-    [VMEXIT_LDTR_READ] = "LDTR_READ",
-    [VMEXIT_TR_READ] = "TR_READ",
-    [VMEXIT_IDTR_WRITE] = "IDTR_WRITE",
-    [VMEXIT_GDTR_WRITE] = "GDTR_WRITE",
-    [VMEXIT_LDTR_WRITE] = "LDTR_WRITE",
-    [VMEXIT_TR_WRITE] = "TR_WRITE",
-    [VMEXIT_RDTSC] = "RDTSC",
-    [VMEXIT_RDPMC] = "RDPMC",
-    [VMEXIT_PUSHF] = "PUSHF",
-    [VMEXIT_POPF] = "POPF",
-    [VMEXIT_CPUID] = "CPUID",
-    [VMEXIT_RSM] = "RSM",
-    [VMEXIT_IRET] = "IRET",
-    [VMEXIT_SWINT] = "SWINT",
-    [VMEXIT_INVD] = "INVD",
-    [VMEXIT_PAUSE] = "PAUSE",
-    [VMEXIT_HLT] = "HLT",
-    [VMEXIT_INVLPG] = "INVLPG",
-    [VMEXIT_INVLPGA] = "INVLPGA",
-    [VMEXIT_IOIO] = "IOIO",
-    [VMEXIT_MSR] = "MSR",
-    [VMEXIT_TASK_SWITCH] = "TASK_SWITCH",
-    [VMEXIT_FERR_FREEZE] = "FERR_FREEZE",
-    [VMEXIT_SHUTDOWN] = "SHUTDOWN",
-    [VMEXIT_VMRUN] = "VMRUN",
-    [VMEXIT_VMMCALL] = "VMMCALL",
-    [VMEXIT_VMLOAD] = "VMLOAD",
-    [VMEXIT_VMSAVE] = "VMSAVE",
-    [VMEXIT_STGI] = "STGI",
-    [VMEXIT_CLGI] = "CLGI",
-    [VMEXIT_SKINIT] = "SKINIT",
-    [VMEXIT_RDTSCP] = "RDTSCP",
-    [VMEXIT_ICEBP] = "ICEBP",
-    [VMEXIT_NPF] = "NPF"
-};
-#endif /* SVM_EXTRA_DEBUG */
-
-#ifdef SVM_WALK_GUEST_PAGES
-void walk_shadow_and_guest_pt(unsigned long gva)
-{
-    l2_pgentry_t gpde;
-    l2_pgentry_t spde;
-    l1_pgentry_t gpte;
-    l1_pgentry_t spte;
-    struct vcpu        *v    = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    paddr_t gpa;
-
-    gpa = paging_gva_to_gpa(current, gva);
-    printk("gva = %lx, gpa=%"PRIpaddr", gCR3=%x\n", gva, gpa, (u32)vmcb->cr3);
-    if( !svm_paging_enabled(v) || mmio_space(gpa) )
-        return;
-
-    /* let's dump the guest and shadow page info */
-
-    __guest_get_l2e(v, gva, &gpde);
-    printk( "G-PDE = %x, flags=%x\n", gpde.l2, l2e_get_flags(gpde) );
-    __shadow_get_l2e( v, gva, &spde );
-    printk( "S-PDE = %x, flags=%x\n", spde.l2, l2e_get_flags(spde) );
-
-    if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
-        return;
-
-    spte = l1e_empty();
-
-    /* This is actually overkill - we only need to ensure the hl2 is in-sync.*/
-    shadow_sync_va(v, gva);
-
-    gpte.l1 = 0;
-    __copy_from_user(&gpte, &__linear_l1_table[ l1_linear_offset(gva) ],
-                     sizeof(gpte) );
-    printk( "G-PTE = %x, flags=%x\n", gpte.l1, l1e_get_flags(gpte) );
-
-    BUG(); // need to think about this, and convert usage of
-    // phys_to_machine_mapping to use pagetable format...
-    __copy_from_user( &spte, &phys_to_machine_mapping[ l1e_get_pfn( gpte ) ], 
-                      sizeof(spte) );
-
-    printk( "S-PTE = %x, flags=%x\n", spte.l1, l1e_get_flags(spte));
-}
-#endif /* SVM_WALK_GUEST_PAGES */
-
-
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     unsigned long eip;
     struct vcpu *v = current;
-    int do_debug = 0;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    ASSERT(vmcb);
+    int inst_len;
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
 
     HVMTRACE_2D(VMEXIT, v, vmcb->rip, exit_reason);
 
-    if (exit_reason == VMEXIT_INVALID)
+    if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
         svm_dump_vmcb(__func__, vmcb);
         goto exit_and_crash;
     }
 
-#ifdef SVM_EXTRA_DEBUG
-    {
-#if defined(__i386__)
-#define rip eip
-#endif
-
-        static unsigned long intercepts_counter = 0;
-
-        if (svm_dbg_on && exit_reason == VMEXIT_EXCEPTION_PF) 
-        {
-            if (svm_paging_enabled(v) && 
-                !mmio_space(
-                    paging_gva_to_gfn(current, vmcb->exitinfo2) << PAGE_SHIFT))
-            {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64", "
-                       "gpa=%"PRIx64"\n", intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs->cs,
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes,
-                       (((u64)paging_gva_to_gfn(current, vmcb->exitinfo2)
-                        << PAGE_SHIFT) | (vmcb->exitinfo2 & ~PAGE_MASK)));
-            }
-            else 
-            {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
-                       intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs->cs,
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes );
-            }
-        } 
-        else if ( svm_dbg_on 
-                  && exit_reason != VMEXIT_IOIO 
-                  && exit_reason != VMEXIT_INTR) 
-        {
-
-            if (exit_reasons[exit_reason])
-            {
-                printk("I%08ld,ExC=%s(%d),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
-                       intercepts_counter,
-                       exit_reasons[exit_reason], exit_reason, regs->cs,
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes);
-            } 
-            else 
-            {
-                printk("I%08ld,ExC=%d(0x%x),IP=%x:%"PRIx64","
-                       "I1=%"PRIx64",I2=%"PRIx64",INT=%"PRIx64"\n", 
-                       intercepts_counter, exit_reason, exit_reason, regs->cs, 
-                       (u64)regs->rip,
-                       (u64)vmcb->exitinfo1,
-                       (u64)vmcb->exitinfo2,
-                       (u64)vmcb->exitintinfo.bytes);
-            }
-        }
-
-#ifdef SVM_WALK_GUEST_PAGES
-        if( exit_reason == VMEXIT_EXCEPTION_PF 
-            && ( ( vmcb->exitinfo2 == vmcb->rip )
-                 || vmcb->exitintinfo.bytes) )
-        {
-            if ( svm_paging_enabled(v) &&
-                 !mmio_space(gva_to_gpa(vmcb->exitinfo2)) )
-                walk_shadow_and_guest_pt(vmcb->exitinfo2);
-        }
-#endif
-
-        intercepts_counter++;
-
-#if 0
-        if (svm_dbg_on)
-            do_debug = svm_do_debugout(exit_reason);
-#endif
-
-        if (do_debug)
-        {
-            printk("%s:+ guest_table = 0x%08x, monitor_table = 0x%08x, "
-                   "hw_cr3 = 0x%16lx\n", 
-                   __func__,
-                   (int) v->arch.guest_table.pfn,
-                   (int) v->arch.monitor_table.pfn, 
-                   (long unsigned int) v->arch.hvm_vcpu.hw_cr3);
-
-            svm_dump_vmcb(__func__, vmcb);
-            svm_dump_regs(__func__, regs);
-            svm_dump_inst(svm_rip2pointer(v));
-        }
-
-#if defined(__i386__)
-#undef rip
-#endif
-
-    }
-#endif /* SVM_EXTRA_DEBUG */
-
-
     perfc_incra(svmexits, exit_reason);
     eip = vmcb->rip;
 
-#ifdef SVM_EXTRA_DEBUG
-    if (do_debug)
+    switch ( exit_reason )
     {
-        printk("eip = %lx, exit_reason = %d (0x%x)\n", 
-               eip, exit_reason, exit_reason);
-    }
-#endif /* SVM_EXTRA_DEBUG */
-
-    switch (exit_reason) 
-    {
-    case VMEXIT_EXCEPTION_DB:
-    {
-#ifdef XEN_DEBUGGER
-        svm_debug_save_cpu_user_regs(regs);
-        pdb_handle_exception(1, regs, 1);
-        svm_debug_restore_cpu_user_regs(regs);
-#else
-        svm_store_cpu_user_regs(regs, v);
-        domain_pause_for_debugger();  
-#endif
-    }
-    break;
-
     case VMEXIT_INTR:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
         HVMTRACE_0D(INTR, v);
         break;
+
     case VMEXIT_NMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
         HVMTRACE_0D(NMI, v);
         break;
+
     case VMEXIT_SMI:
         /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
         HVMTRACE_0D(SMI, v);
         break;
 
-    case VMEXIT_INIT:
-        BUG(); /* unreachable */
+    case VMEXIT_EXCEPTION_DB:
+        if ( !v->domain->debugger_attached )
+            goto exit_and_crash;
+        domain_pause_for_debugger();
+        break;
 
     case VMEXIT_EXCEPTION_BP:
-#ifdef XEN_DEBUGGER
-        svm_debug_save_cpu_user_regs(regs);
-        pdb_handle_exception(3, regs, 1);
-        svm_debug_restore_cpu_user_regs(regs);
-#else
-        if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
-            domain_pause_for_debugger();
-        else 
-            svm_inject_exception(v, TRAP_int3, 0, 0);
-#endif
+        if ( !v->domain->debugger_attached )
+            goto exit_and_crash;
+        /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
+        inst_len = __get_instruction_length(v, INSTR_INT3, NULL);
+        __update_guest_eip(vmcb, inst_len);
+        domain_pause_for_debugger();
         break;
 
     case VMEXIT_EXCEPTION_NM:
         svm_do_no_device_fault(vmcb);
         break;  
 
-    case VMEXIT_EXCEPTION_GP:
-        /* This should probably not be trapped in the future */
-        regs->error_code = vmcb->exitinfo1;
-        svm_do_general_protection_fault(v, regs);
-        break;  
-
-    case VMEXIT_EXCEPTION_PF:
-    {
+    case VMEXIT_EXCEPTION_PF: {
         unsigned long va;
         va = vmcb->exitinfo2;
         regs->error_code = vmcb->exitinfo1;
@@ -3039,7 +2338,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                     (unsigned long)regs->ecx, (unsigned long)regs->edx,
                     (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-        if ( svm_do_page_fault(va, regs) )
+        if ( paging_fault(va, regs) )
         {
             HVMTRACE_2D(PF_XEN, v, va, regs->error_code);
             break;
@@ -3049,14 +2348,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
         break;
     }
-
-    case VMEXIT_EXCEPTION_DF:
-        /* Debug info to hopefully help debug WHY the guest double-faulted. */
-        svm_dump_vmcb(__func__, vmcb);
-        svm_dump_regs(__func__, regs);
-        svm_dump_inst(svm_rip2pointer(v));
-        svm_inject_exception(v, TRAP_double_fault, 1, 0);
-        break;
 
     case VMEXIT_VINTR:
         vmcb->vintr.fields.irq = 0;
@@ -3090,14 +2381,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_handle_invlpg(1, regs);
         break;
 
-    case VMEXIT_VMMCALL: {
-        int inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
+    case VMEXIT_VMMCALL:
+        inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
         ASSERT(inst_len > 0);
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         __update_guest_eip(vmcb, inst_len);
         hvm_do_hypercall(regs);
         break;
-    }
 
     case VMEXIT_CR0_READ:
         svm_cr_access(v, 0, TYPE_MOV_FROM_CR, regs);
@@ -3156,14 +2446,21 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         hvm_triple_fault();
         break;
 
-    case VMEXIT_NPF:
-    {
-        regs->error_code = vmcb->exitinfo1;
-        if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) ) {
-            domain_crash(v->domain);
-        }
+    case VMEXIT_VMRUN:
+    case VMEXIT_VMLOAD:
+    case VMEXIT_VMSAVE:
+    case VMEXIT_STGI:
+    case VMEXIT_CLGI:
+    case VMEXIT_SKINIT:
+        /* Report "Invalid opcode" on any VM-operation except VMMCALL */
+        svm_inject_exception(v, TRAP_invalid_op, 0, 0);
         break;
-    }
+
+    case VMEXIT_NPF:
+        regs->error_code = vmcb->exitinfo1;
+        if ( !svm_do_nested_pgfault(vmcb->exitinfo2, regs) )
+            domain_crash(v->domain);
+        break;
 
     default:
     exit_and_crash:
@@ -3174,35 +2471,16 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         domain_crash(v->domain);
         break;
     }
-
-#ifdef SVM_EXTRA_DEBUG
-    if (do_debug) 
-    {
-        printk("%s: Done switch on vmexit_code\n", __func__);
-        svm_dump_regs(__func__, regs);
-    }
-
-    if (do_debug) 
-    {
-        printk("vmexit_handler():- guest_table = 0x%08x, "
-               "monitor_table = 0x%08x, hw_cr3 = 0x%16x\n",
-               (int)v->arch.guest_table.pfn,
-               (int)v->arch.monitor_table.pfn, 
-               (int)v->arch.hvm_vcpu.hw_cr3);
-        printk("svm_vmexit_handler: Returning\n");
-    }
-#endif
 }
 
 asmlinkage void svm_load_cr2(void)
 {
     struct vcpu *v = current;
 
-    // this is the last C code before the VMRUN instruction
+    /* This is the last C code before the VMRUN instruction. */
     HVMTRACE_0D(VMENTRY, v);
 
-    local_irq_disable();
-    asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
+    asm volatile ( "mov %0,%%cr2" : : "r" (v->arch.hvm_svm.cpu_cr2) );
 }
   
 /*

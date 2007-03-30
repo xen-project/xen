@@ -109,7 +109,7 @@ get_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
 /* Look for shadows in the hash table */
 {
     mfn_t smfn = shadow_hash_lookup(v, mfn_x(gmfn), shadow_type);
-    perfc_incrc(shadow_get_shadow_status);
+    perfc_incr(shadow_get_shadow_status);
     return smfn;
 }
 
@@ -209,7 +209,7 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, int guest_op)
 {
     ASSERT(!guest_op || shadow_locked_by_me(v->domain));
 
-    perfc_incrc(shadow_guest_walk);
+    perfc_incr(shadow_guest_walk);
     memset(gw, 0, sizeof(*gw));
     gw->va = va;
 
@@ -448,14 +448,14 @@ static u32 guest_set_ad_bits(struct vcpu *v,
              == (_PAGE_DIRTY | _PAGE_ACCESSED) )
             return flags;  /* Guest already has A and D bits set */
         flags |= _PAGE_DIRTY | _PAGE_ACCESSED;
-        perfc_incrc(shadow_ad_update);
+        perfc_incr(shadow_ad_update);
     }
     else 
     {
         if ( flags & _PAGE_ACCESSED )
             return flags;  /* Guest already has A bit set */
         flags |= _PAGE_ACCESSED;
-        perfc_incrc(shadow_a_update);
+        perfc_incr(shadow_a_update);
     }
 
     /* Set the bit(s) */
@@ -863,7 +863,7 @@ shadow_write_entries(void *d, void *s, int entries, mfn_t mfn)
      * using map_domain_page() to get a writeable mapping if we need to. */
     if ( __copy_to_user(d, d, sizeof (unsigned long)) != 0 ) 
     {
-        perfc_incrc(shadow_linear_map_failed);
+        perfc_incr(shadow_linear_map_failed);
         map = sh_map_domain_page(mfn);
         ASSERT(map != NULL);
         dst = map + ((unsigned long)dst & (PAGE_SIZE - 1));
@@ -925,7 +925,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
 
     if ( unlikely(!res) )
     {
-        perfc_incrc(shadow_get_page_fail);
+        perfc_incr(shadow_get_page_fail);
         SHADOW_PRINTK("failed: l1e=" SH_PRI_pte "\n");
     }
 
@@ -2198,7 +2198,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
     mfn_t sl3mfn = _mfn(INVALID_MFN);
     int result = 0;
 
-    perfc_incrc(shadow_validate_gl4e_calls);
+    perfc_incr(shadow_validate_gl4e_calls);
 
     if ( guest_l4e_get_flags(*new_gl4e) & _PAGE_PRESENT )
     {
@@ -2250,7 +2250,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
     mfn_t sl2mfn = _mfn(INVALID_MFN);
     int result = 0;
 
-    perfc_incrc(shadow_validate_gl3e_calls);
+    perfc_incr(shadow_validate_gl3e_calls);
 
     if ( guest_l3e_get_flags(*new_gl3e) & _PAGE_PRESENT )
     {
@@ -2277,7 +2277,7 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
     mfn_t sl1mfn = _mfn(INVALID_MFN);
     int result = 0;
 
-    perfc_incrc(shadow_validate_gl2e_calls);
+    perfc_incr(shadow_validate_gl2e_calls);
 
     if ( guest_l2e_get_flags(*new_gl2e) & _PAGE_PRESENT )
     {
@@ -2363,7 +2363,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     mfn_t gmfn;
     int result = 0, mmio;
 
-    perfc_incrc(shadow_validate_gl1e_calls);
+    perfc_incr(shadow_validate_gl1e_calls);
 
     gfn = guest_l1e_get_gfn(*new_gl1e);
     gmfn = vcpu_gfn_to_mfn(v, gfn);
@@ -2523,7 +2523,7 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
         u32 flags = mfn_to_page(gmfn)->shadow_flags;
         if ( !(flags & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64)) )
         {
-            perfc_incrc(shadow_early_unshadow);
+            perfc_incr(shadow_early_unshadow);
             sh_remove_shadows(v, gmfn, 0, 0 /* Slow, can fail to unshadow */ );
         } 
     }
@@ -2642,7 +2642,7 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("d:v=%u:%u va=%#lx err=%u\n",
                    v->domain->domain_id, v->vcpu_id, va, regs->error_code);
 
-    perfc_incrc(shadow_fault);
+    perfc_incr(shadow_fault);
     //
     // XXX: Need to think about eventually mapping superpages directly in the
     //      shadow (when possible), as opposed to splintering them into a
@@ -2670,7 +2670,7 @@ static int sh_page_fault(struct vcpu *v,
                     ASSERT(regs->error_code & PFEC_page_present);
                     regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
                     reset_early_unshadow(v);
-                    perfc_incrc(shadow_fault_fast_gnp);
+                    perfc_incr(shadow_fault_fast_gnp);
                     SHADOW_PRINTK("fast path not-present\n");
                     return 0;
                 }
@@ -2688,7 +2688,7 @@ static int sh_page_fault(struct vcpu *v,
                        << PAGE_SHIFT) 
                     | (va & ~PAGE_MASK);
             }
-            perfc_incrc(shadow_fault_fast_mmio);
+            perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             reset_early_unshadow(v);
             handle_mmio(gpa);
@@ -2699,7 +2699,7 @@ static int sh_page_fault(struct vcpu *v,
             /* This should be exceptionally rare: another vcpu has fixed
              * the tables between the fault and our reading the l1e. 
              * Retry and let the hardware give us the right fault next time. */
-            perfc_incrc(shadow_fault_fast_fail);
+            perfc_incr(shadow_fault_fast_fail);
             SHADOW_PRINTK("fast path false alarm!\n");            
             return EXCRET_fault_fixed;
         }
@@ -2746,7 +2746,7 @@ static int sh_page_fault(struct vcpu *v,
             goto mmio;
         }
 
-        perfc_incrc(shadow_fault_bail_not_present);
+        perfc_incr(shadow_fault_bail_not_present);
         goto not_a_shadow_fault;
     }
 
@@ -2761,7 +2761,7 @@ static int sh_page_fault(struct vcpu *v,
          !(accumulated_gflags & _PAGE_USER) )
     {
         /* illegal user-mode access to supervisor-only page */
-        perfc_incrc(shadow_fault_bail_user_supervisor);
+        perfc_incr(shadow_fault_bail_user_supervisor);
         goto not_a_shadow_fault;
     }
 
@@ -2772,7 +2772,7 @@ static int sh_page_fault(struct vcpu *v,
     {
         if ( unlikely(!(accumulated_gflags & _PAGE_RW)) )
         {
-            perfc_incrc(shadow_fault_bail_ro_mapping);
+            perfc_incr(shadow_fault_bail_ro_mapping);
             goto not_a_shadow_fault;
         }
     }
@@ -2787,7 +2787,7 @@ static int sh_page_fault(struct vcpu *v,
             if ( accumulated_gflags & _PAGE_NX_BIT )
             {
                 /* NX prevented this code fetch */
-                perfc_incrc(shadow_fault_bail_nx);
+                perfc_incr(shadow_fault_bail_nx);
                 goto not_a_shadow_fault;
             }
         }
@@ -2802,7 +2802,7 @@ static int sh_page_fault(struct vcpu *v,
 
     if ( !mmio && !mfn_valid(gmfn) )
     {
-        perfc_incrc(shadow_fault_bail_bad_gfn);
+        perfc_incr(shadow_fault_bail_bad_gfn);
         SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"PRI_mfn"\n", 
                       gfn_x(gfn), mfn_x(gmfn));
         goto not_a_shadow_fault;
@@ -2821,9 +2821,9 @@ static int sh_page_fault(struct vcpu *v,
     {
         /* Couldn't get the sl1e!  Since we know the guest entries
          * are OK, this can only have been caused by a failed
-         * shadow_set_l*e(), which will have crashed the guest.  
+         * shadow_set_l*e(), which will have crashed the guest.
          * Get out of the fault handler immediately. */
-        ASSERT(test_bit(_DOMF_dying, &d->domain_flags));
+        ASSERT(d->is_shutdown);
         unmap_walk(v, &gw); 
         shadow_unlock(d);
         return 0;
@@ -2844,12 +2844,12 @@ static int sh_page_fault(struct vcpu *v,
     {
         if ( ft == ft_demand_write )
         {
-            perfc_incrc(shadow_fault_emulate_write);
+            perfc_incr(shadow_fault_emulate_write);
             goto emulate;
         }
         else if ( shadow_mode_trap_reads(d) && ft == ft_demand_read )
         {
-            perfc_incrc(shadow_fault_emulate_read);
+            perfc_incr(shadow_fault_emulate_read);
             goto emulate;
         }
     }
@@ -2860,7 +2860,7 @@ static int sh_page_fault(struct vcpu *v,
         goto mmio;
     }
 
-    perfc_incrc(shadow_fault_fixed);
+    perfc_incr(shadow_fault_fixed);
     d->arch.paging.shadow.fault_count++;
     reset_early_unshadow(v);
 
@@ -2920,7 +2920,7 @@ static int sh_page_fault(struct vcpu *v,
     {
         SHADOW_PRINTK("emulator failure, unshadowing mfn %#lx\n", 
                        mfn_x(gmfn));
-        perfc_incrc(shadow_fault_emulate_failed);
+        perfc_incr(shadow_fault_emulate_failed);
         /* If this is actually a page table, then we have a bug, and need 
          * to support more operations in the emulator.  More likely, 
          * though, this is a hint that this page should not be shadowed. */
@@ -2935,7 +2935,7 @@ static int sh_page_fault(struct vcpu *v,
  mmio:
     if ( !guest_mode(regs) )
         goto not_a_shadow_fault;
-    perfc_incrc(shadow_fault_mmio);
+    perfc_incr(shadow_fault_mmio);
     sh_audit_gw(v, &gw);
     unmap_walk(v, &gw);
     SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
@@ -2964,7 +2964,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
 {
     shadow_l2e_t sl2e;
     
-    perfc_incrc(shadow_invlpg);
+    perfc_incr(shadow_invlpg);
 
     /* First check that we can safely read the shadow l2e.  SMP/PAE linux can
      * run as high as 6% of invlpg calls where we haven't shadowed the l2 
@@ -2983,7 +2983,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
                                       + shadow_l3_linear_offset(va)),
                               sizeof (sl3e)) != 0 )
         {
-            perfc_incrc(shadow_invlpg_fault);
+            perfc_incr(shadow_invlpg_fault);
             return 0;
         }
         if ( (!shadow_l3e_get_flags(sl3e) & _PAGE_PRESENT) )
@@ -3002,7 +3002,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
                           sh_linear_l2_table(v) + shadow_l2_linear_offset(va),
                           sizeof (sl2e)) != 0 )
     {
-        perfc_incrc(shadow_invlpg_fault);
+        perfc_incr(shadow_invlpg_fault);
         return 0;
     }
 
@@ -3427,7 +3427,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 #endif
 
     /* Don't do anything on an uninitialised vcpu */
-    if ( !is_hvm_domain(d) && !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    if ( !is_hvm_domain(d) && !v->is_initialised )
     {
         ASSERT(v->arch.cr3 == 0);
         return;

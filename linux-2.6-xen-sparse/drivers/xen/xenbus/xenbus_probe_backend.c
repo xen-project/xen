@@ -245,13 +245,15 @@ static struct xenbus_watch be_watch = {
 void xenbus_backend_suspend(int (*fn)(struct device *, void *))
 {
 	DPRINTK("");
-	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, fn);
+	if (!xenbus_backend.error)
+		bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, fn);
 }
 
 void xenbus_backend_resume(int (*fn)(struct device *, void *))
 {
 	DPRINTK("");
-	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, fn);
+	if (!xenbus_backend.error)
+		bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, fn);
 }
 
 void xenbus_backend_probe_and_watch(void)
@@ -262,10 +264,23 @@ void xenbus_backend_probe_and_watch(void)
 
 void xenbus_backend_bus_register(void)
 {
-	bus_register(&xenbus_backend.bus);
+	xenbus_backend.error = bus_register(&xenbus_backend.bus);
+	if (xenbus_backend.error)
+		printk(KERN_WARNING
+		       "XENBUS: Error registering backend bus: %i\n",
+		       xenbus_backend.error);
 }
 
 void xenbus_backend_device_register(void)
 {
-	device_register(&xenbus_backend.dev);
+	if (xenbus_backend.error)
+		return;
+
+	xenbus_backend.error = device_register(&xenbus_backend.dev);
+	if (xenbus_backend.error) {
+		bus_unregister(&xenbus_backend.bus);
+		printk(KERN_WARNING
+		       "XENBUS: Error registering backend device: %i\n",
+		       xenbus_backend.error);
+	}
 }

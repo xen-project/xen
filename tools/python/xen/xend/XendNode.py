@@ -141,12 +141,16 @@ class XendNode:
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
             for net_uuid, network in saved_networks.items():
-                self.network_create(network.get('name_label'),
-                                    network.get('name_description', ''),
-                                    False, net_uuid)
+                self.network_create(network, False, net_uuid)
         else:
-            self.network_create('net0', '', False)
+            bridges = Brctl.get_state().keys()
+            for bridge in bridges:
+                self.network_create({'name_label' : bridge }, False)
+                
+        # Get a mapping from interface to bridge
 
+        if_to_br = dict(reduce(lambda ls,(b,ifs):[(i,b) for i in ifs] + ls,
+                               Brctl.get_state().items(), []))
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
         if saved_pifs:
@@ -176,8 +180,14 @@ class XendNode:
                                   pif_uuid, pif['network'], exn.pif_uuid)
         else:
             for name, mtu, mac in linux_get_phy_ifaces():
-                network = self.networks.values()[0]
-                self._PIF_create(name, mtu, -1, mac, network, False)
+                bridge_name = if_to_br.get(name, None)
+                if bridge_name is not None:
+                    networks = [network for
+                                network in self.networks.values()
+                                if network.get_name_label() == bridge_name]
+                    if len(networks) > 0:
+                        network = networks[0]
+                        self._PIF_create(name, mtu, -1, mac, network, False)
 
         # initialise storage
         saved_srs = self.state_store.load_state('sr')
@@ -199,12 +209,10 @@ class XendNode:
 
 
 
-    def network_create(self, name_label, name_description, persist = True,
-                       net_uuid = None):
+    def network_create(self, record, persist = True, net_uuid = None):
         if net_uuid is None:
             net_uuid = uuid.createString()
-        self.networks[net_uuid] = XendNetwork(net_uuid, name_label,
-                                              name_description)
+        self.networks[net_uuid] = XendNetwork(net_uuid, record)
         if persist:
             self.save_networks()
         return net_uuid
@@ -280,7 +288,7 @@ class XendNode:
         self.state_store.save_state('pif', pif_records)
 
     def save_networks(self):
-        net_records = dict([(k, v.get_record(transient = False))
+        net_records = dict([(k, v.get_record_internal(False))
                             for k, v in self.networks.items()])
         self.state_store.save_state('network', net_records)
 

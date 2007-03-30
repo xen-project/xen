@@ -374,7 +374,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		printk("*** CALLED SAL_UPDATE_PAL.  IGNORED...\n");
 		break;
 	    case SAL_XEN_SAL_RETURN:
-	        if (!test_and_set_bit(_VCPUF_down, &current->vcpu_flags))
+	        if (!test_and_set_bit(_VPF_down, &current->pause_flags))
 			vcpu_sleep_nosync(current);
 		break;
 	    case SN_SAL_GET_MASTER_NASID:
@@ -725,7 +725,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			console_start_sync();
 			(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
 		} else {
-			set_bit(_VCPUF_down, &current->vcpu_flags);
+			set_bit(_VPF_down, &current->pause_flags);
 			vcpu_sleep_nosync(current);
 			status = PAL_STATUS_SUCCESS;
 		}

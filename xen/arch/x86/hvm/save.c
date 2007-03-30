@@ -185,7 +185,7 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
 
     /* Down all the vcpus: we only re-enable the ones that had state saved. */
     for_each_vcpu(d, v) 
-        if ( test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( test_and_set_bit(_VPF_down, &v->pause_flags) )
             vcpu_sleep_nosync(v);
 
     while(1) {

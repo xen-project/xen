@@ -47,6 +47,7 @@
 #include <linux/irq.h>
 #include <linux/init.h>
 #include <linux/gfp.h>
+#include <linux/mutex.h>
 #include <xen/evtchn.h>
 #include <xen/public/evtchn.h>
 
@@ -56,6 +57,7 @@ struct per_user_data {
 #define EVTCHN_RING_MASK(_i) ((_i)&(EVTCHN_RING_SIZE-1))
 	evtchn_port_t *ring;
 	unsigned int ring_cons, ring_prod, ring_overflow;
+	struct mutex ring_cons_mutex; /* protect against concurrent readers */
 
 	/* Processes wait on this queue when ring is empty. */
 	wait_queue_head_t evtchn_wait;
@@ -108,11 +110,16 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 		count = PAGE_SIZE;
 
 	for (;;) {
+		mutex_lock(&u->ring_cons_mutex);
+
+		rc = -EFBIG;
 		if (u->ring_overflow)
-			return -EFBIG;
+			goto unlock_out;
 
 		if ((c = u->ring_cons) != (p = u->ring_prod))
 			break;
+
+		mutex_unlock(&u->ring_cons_mutex);
 
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
@@ -141,20 +148,24 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 		bytes2 = count - bytes1;
 	}
 
+	rc = -EFAULT;
 	if (copy_to_user(buf, &u->ring[EVTCHN_RING_MASK(c)], bytes1) ||
 	    ((bytes2 != 0) &&
 	     copy_to_user(&buf[bytes1], &u->ring[0], bytes2)))
-		return -EFAULT;
+		goto unlock_out;
 
 	u->ring_cons += (bytes1 + bytes2) / sizeof(evtchn_port_t);
+	rc = bytes1 + bytes2;
 
-	return bytes1 + bytes2;
+ unlock_out:
+	mutex_unlock(&u->ring_cons_mutex);
+	return rc;
 }
 
 static ssize_t evtchn_write(struct file *file, const char __user *buf,
 			    size_t count, loff_t *ppos)
 {
-	int  rc, i;
+	int rc, i;
 	evtchn_port_t *kbuf = (evtchn_port_t *)__get_free_page(GFP_KERNEL);
 	struct per_user_data *u = file->private_data;
 
@@ -164,18 +175,16 @@ static ssize_t evtchn_write(struct file *file, const char __user *buf,
 	/* Whole number of ports. */
 	count &= ~(sizeof(evtchn_port_t)-1);
 
-	if (count == 0) {
-		rc = 0;
+	rc = 0;
+	if (count == 0)
 		goto out;
-	}
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
 
-	if (copy_from_user(kbuf, buf, count) != 0) {
-		rc = -EFAULT;
+	rc = -EFAULT;
+	if (copy_from_user(kbuf, buf, count) != 0)
 		goto out;
-	}
 
 	spin_lock_irq(&port_user_lock);
 	for (i = 0; i < (count/sizeof(evtchn_port_t)); i++)
@@ -321,9 +330,11 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 
 	case IOCTL_EVTCHN_RESET: {
 		/* Initialise the ring to empty. Clear errors. */
+		mutex_lock(&u->ring_cons_mutex);
 		spin_lock_irq(&port_user_lock);
 		u->ring_cons = u->ring_prod = u->ring_overflow = 0;
 		spin_unlock_irq(&port_user_lock);
+		mutex_unlock(&u->ring_cons_mutex);
 		rc = 0;
 		break;
 	}
@@ -370,6 +381,8 @@ static int evtchn_open(struct inode *inode, struct file *filp)
 		kfree(u);
 		return -ENOMEM;
 	}
+
+	mutex_init(&u->ring_cons_mutex);
 
 	filp->private_data = u;
 

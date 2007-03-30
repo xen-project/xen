@@ -151,7 +151,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
     struct domain *d = current->domain;
     struct vcpu *v = current;
 
-    perfc_incrc(vmx_ia64_handle_break);
+    perfc_incr(vmx_ia64_handle_break);
 #ifdef CRASH_DEBUG
     if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs) &&
         IS_VMM_ADDRESS(regs->cr_iip)) {

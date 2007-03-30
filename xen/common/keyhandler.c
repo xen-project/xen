@@ -164,9 +164,9 @@ static void dump_domains(unsigned char key)
     {
         printk("General information for domain %u:\n", d->domain_id);
         cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
-        printk("    flags=%lx refcnt=%d nr_pages=%d xenheap_pages=%d "
+        printk("    refcnt=%d nr_pages=%d xenheap_pages=%d "
                "dirty_cpus=%s\n",
-               d->domain_flags, atomic_read(&d->refcnt),
+               atomic_read(&d->refcnt),
                d->tot_pages, d->xenheap_pages, tmpstr);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
@@ -188,8 +188,8 @@ static void dump_domains(unsigned char key)
             printk("    VCPU%d: CPU%d [has=%c] flags=%lx "
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
-                   test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F',
-                   v->vcpu_flags,
+                   v->is_running ? 'T':'F',
+                   v->pause_flags,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);

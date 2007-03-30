@@ -287,12 +287,18 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 }
 #endif
 
-extern long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs);
+long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs);
 
 static inline void set_eflags_CF(int size, unsigned long v1,
                                  unsigned long v2, struct cpu_user_regs *regs)
 {
-    unsigned long mask = (1 << (8 * size)) - 1;
+    unsigned long mask;
+
+    if ( size == BYTE_64 )
+        size = BYTE;
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
 
     if ((v1 & mask) > (v2 & mask))
         regs->eflags |= X86_EFLAGS_CF;
@@ -301,14 +307,24 @@ static inline void set_eflags_CF(int size, unsigned long v1,
 }
 
 static inline void set_eflags_OF(int size, unsigned long v1,
-                                 unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
+                                 unsigned long v2, unsigned long v3,
+                                 struct cpu_user_regs *regs)
 {
-    if ((v3 ^ v2) & (v3 ^ v1) & (1 << ((8 * size) - 1)))
+    unsigned long mask;
+
+    if ( size == BYTE_64 )
+        size = BYTE;
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
+
+    if ((v3 ^ v2) & (v3 ^ v1) & mask)
         regs->eflags |= X86_EFLAGS_OF;
 }
 
 static inline void set_eflags_AF(int size, unsigned long v1,
-                                 unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
+                                 unsigned long v2, unsigned long v3,
+                                 struct cpu_user_regs *regs)
 {
     if ((v1 ^ v2 ^ v3) & 0x10)
         regs->eflags |= X86_EFLAGS_AF;
@@ -317,7 +333,13 @@ static inline void set_eflags_AF(int size, unsigned long v1,
 static inline void set_eflags_ZF(int size, unsigned long v1,
                                  struct cpu_user_regs *regs)
 {
-    unsigned long mask = (1 << (8 * size)) - 1;
+    unsigned long mask;
+
+    if ( size == BYTE_64 )
+        size = BYTE;
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
 
     if ((v1 & mask) == 0)
         regs->eflags |= X86_EFLAGS_ZF;
@@ -326,7 +348,15 @@ static inline void set_eflags_ZF(int size, unsigned long v1,
 static inline void set_eflags_SF(int size, unsigned long v1,
                                  struct cpu_user_regs *regs)
 {
-    if (v1 & (1 << ((8 * size) - 1)))
+    unsigned long mask;
+
+    if ( size == BYTE_64 )
+        size = BYTE;
+    ASSERT((size <= sizeof(mask)) && (size > 0));
+
+    mask = ~0UL >> (8 * (sizeof(mask) - size));
+
+    if (v1 & mask)
         regs->eflags |= X86_EFLAGS_SF;
 }
 
@@ -375,14 +405,14 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                 if ( hvm_paging_enabled(current) )
                 {
                     int rv = hvm_copy_to_guest_virt(addr, &p->data, p->size);
-                    if ( rv != 0 ) 
+                    if ( rv != 0 )
                     {
                         /* Failed on the page-spanning copy.  Inject PF into
                          * the guest for the address where we failed. */
                         addr += p->size - rv;
                         gdprintk(XENLOG_DEBUG, "Pagefault writing non-io side "
                                  "of a page-spanning PIO: va=%#lx\n", addr);
-                        hvm_inject_exception(TRAP_page_fault, 
+                        hvm_inject_exception(TRAP_page_fault,
                                              PFEC_write_access, addr);
                         return;
                     }
@@ -505,14 +535,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             if (hvm_paging_enabled(current))
             {
                 int rv = hvm_copy_to_guest_virt(addr, &p->data, p->size);
-                if ( rv != 0 ) 
+                if ( rv != 0 )
                 {
                     /* Failed on the page-spanning copy.  Inject PF into
                      * the guest for the address where we failed. */
                     addr += p->size - rv;
                     gdprintk(XENLOG_DEBUG, "Pagefault writing non-io side of "
                              "a page-spanning MMIO: va=%#lx\n", addr);
-                    hvm_inject_exception(TRAP_page_fault, 
+                    hvm_inject_exception(TRAP_page_fault,
                                          PFEC_write_access, addr);
                     return;
                 }
@@ -718,14 +748,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
     case INSTR_PUSH:
         mmio_opp->addr += hvm_get_segment_base(current, x86_seg_ss);
-        { 
+        {
             unsigned long addr = mmio_opp->addr;
             int rv = hvm_copy_to_guest_virt(addr, &p->data, size);
-            if ( rv != 0 ) 
+            if ( rv != 0 )
             {
                 addr += p->size - rv;
-                gdprintk(XENLOG_DEBUG, "Pagefault emulating PUSH from MMIO: "
-                         "va=%#lx\n", addr);
+                gdprintk(XENLOG_DEBUG, "Pagefault emulating PUSH from MMIO:"
+                         " va=%#lx\n", addr);
                 hvm_inject_exception(TRAP_page_fault, PFEC_write_access, addr);
                 return;
             }
@@ -767,7 +797,7 @@ void hvm_io_assist(struct vcpu *v)
     memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
 
     /* Has memory been dirtied? */
-    if ( p->dir == IOREQ_READ && p->data_is_ptr ) 
+    if ( p->dir == IOREQ_READ && p->data_is_ptr )
     {
         gmfn = get_mfn_from_gpfn(paging_gva_to_gfn(v, p->data));
         mark_dirty(v->domain, gmfn);

@@ -39,11 +39,13 @@ class XendPIFMetrics:
             return pifs_util[pifname][n]
         return 0.0
 
-    def get_record(self):
+    def get_last_updated(self):
         import xen.xend.XendAPI as XendAPI
+        return XendAPI.now()
+
+    def get_record(self):
         return {'uuid'         : self.uuid,
-                'PIF'          : self.pif.uuid,
                 'io_read_kbs'  : self.get_io_read_kbs(),
                 'io_write_kbs' : self.get_io_write_kbs(),
-                'last_updated' : XendAPI.now(),
+                'last_updated' : self.get_last_updated(),
                 }

@@ -59,7 +59,6 @@ struct domain *alloc_domain(domid_t domid)
     atomic_set(&d->refcnt, 1);
     spin_lock_init(&d->big_lock);
     spin_lock_init(&d->page_alloc_lock);
-    spin_lock_init(&d->pause_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
@@ -96,14 +95,15 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
-    spin_lock_init(&v->pause_lock);
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
 
     if ( !is_idle_domain(d) )
-        set_bit(_VCPUF_down, &v->vcpu_flags);
+    {
+        set_bit(_VPF_down, &v->pause_flags);
+        v->vcpu_info = shared_info_addr(d, vcpu_info[vcpu_id]);
+    }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
     {
@@ -159,9 +159,12 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 
     if ( !is_idle_domain(d) )
     {
-        set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+        d->is_paused_by_controller = 1;
+        atomic_inc(&d->pause_count);
+
         if ( evtchn_init(d) != 0 )
             goto fail1;
+
         if ( grant_table_create(d) != 0 )
             goto fail2;
     }
@@ -260,8 +263,15 @@ void domain_kill(struct domain *d)
 {
     domain_pause(d);
 
-    if ( test_and_set_bit(_DOMF_dying, &d->domain_flags) )
+    /* Already dying? Then bail. */
+    if ( xchg(&d->is_dying, 1) )
+    {
+        domain_unpause(d);
         return;
+    }
+
+    /* Tear down state /after/ setting the dying flag. */
+    smp_wmb();
 
     gnttab_release_mappings(d);
     domain_relinquish_resources(d);
@@ -276,7 +286,7 @@ void domain_kill(struct domain *d)
 
 void __domain_crash(struct domain *d)
 {
-    if ( test_bit(_DOMF_shutdown, &d->domain_flags) )
+    if ( d->is_shutdown )
     {
         /* Print nothing: the domain is already shutting down. */
     }
@@ -325,8 +335,11 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
 
-    if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
+    atomic_inc(&d->pause_count);
+    if ( !xchg(&d->is_shutdown, 1) )
         d->shutdown_code = reason;
+    else
+        domain_unpause(d);
 
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
@@ -334,13 +347,14 @@ void domain_shutdown(struct domain *d, u8 reason)
     send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
-
 void domain_pause_for_debugger(void)
 {
     struct domain *d = current->domain;
     struct vcpu *v;
 
-    set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+    atomic_inc(&d->pause_count);
+    if ( xchg(&d->is_paused_by_controller, 1) )
+        domain_unpause(d); /* race-free atomic_dec(&d->pause_count) */
 
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
@@ -371,7 +385,7 @@ void domain_destroy(struct domain *d)
     struct domain **pd;
     atomic_t      old, new;
 
-    BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags));
+    BUG_ON(!d->is_dying);
 
     /* May be already destroyed, or get_domain() can race us. */
     _atomic_set(old, 0);
@@ -396,40 +410,23 @@ void domain_destroy(struct domain *d)
     call_rcu(&d->rcu, complete_domain_destroy);
 }
 
-static void vcpu_pause_setup(struct vcpu *v)
-{
-    spin_lock(&v->pause_lock);
-    if ( v->pause_count++ == 0 )
-        set_bit(_VCPUF_paused, &v->vcpu_flags);
-    spin_unlock(&v->pause_lock);
-}
-
 void vcpu_pause(struct vcpu *v)
 {
     ASSERT(v != current);
-    vcpu_pause_setup(v);
+    atomic_inc(&v->pause_count);
     vcpu_sleep_sync(v);
 }
 
 void vcpu_pause_nosync(struct vcpu *v)
 {
-    vcpu_pause_setup(v);
+    atomic_inc(&v->pause_count);
     vcpu_sleep_nosync(v);
 }
 
 void vcpu_unpause(struct vcpu *v)
 {
-    int wake;
-
     ASSERT(v != current);
-
-    spin_lock(&v->pause_lock);
-    wake = (--v->pause_count == 0);
-    if ( wake )
-        clear_bit(_VCPUF_paused, &v->vcpu_flags);
-    spin_unlock(&v->pause_lock);
-
-    if ( wake )
+    if ( atomic_dec_and_test(&v->pause_count) )
         vcpu_wake(v);
 }
 
@@ -439,10 +436,7 @@ void domain_pause(struct domain *d)
 
     ASSERT(d != current->domain);
 
-    spin_lock(&d->pause_lock);
-    if ( d->pause_count++ == 0 )
-        set_bit(_DOMF_paused, &d->domain_flags);
-    spin_unlock(&d->pause_lock);
+    atomic_inc(&d->pause_count);
 
     for_each_vcpu( d, v )
         vcpu_sleep_sync(v);
@@ -451,50 +445,32 @@ void domain_pause(struct domain *d)
 void domain_unpause(struct domain *d)
 {
     struct vcpu *v;
-    int wake;
 
     ASSERT(d != current->domain);
 
-    spin_lock(&d->pause_lock);
-    wake = (--d->pause_count == 0);
-    if ( wake )
-        clear_bit(_DOMF_paused, &d->domain_flags);
-    spin_unlock(&d->pause_lock);
-
-    if ( wake )
+    if ( atomic_dec_and_test(&d->pause_count) )
         for_each_vcpu( d, v )
             vcpu_wake(v);
 }
 
 void domain_pause_by_systemcontroller(struct domain *d)
 {
-    struct vcpu *v;
-
-    BUG_ON(current->domain == d);
-
-    if ( !test_and_set_bit(_DOMF_ctrl_pause, &d->domain_flags) )
-    {
-        for_each_vcpu ( d, v )
-            vcpu_sleep_sync(v);
-    }
+    domain_pause(d);
+    if ( xchg(&d->is_paused_by_controller, 1) )
+        domain_unpause(d);
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)
 {
-    struct vcpu *v;
-
-    if ( test_and_clear_bit(_DOMF_ctrl_pause, &d->domain_flags) )
-    {
-        for_each_vcpu ( d, v )
-            vcpu_wake(v);
-    }
+    if ( xchg(&d->is_paused_by_controller, 0) )
+        domain_unpause(d);
 }
 
 int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
 {
     struct vcpu *v = d->vcpu[vcpuid];
 
-    BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
+    BUG_ON(v->is_initialised);
 
     return arch_set_info_guest(v, ctxt);
 }
@@ -511,15 +487,15 @@ int vcpu_reset(struct vcpu *v)
     if ( rc != 0 )
         goto out;
 
-    set_bit(_VCPUF_down, &v->vcpu_flags);
+    set_bit(_VPF_down, &v->pause_flags);
 
-    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
-    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
-    clear_bit(_VCPUF_initialised, &v->vcpu_flags);
-    clear_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
-    clear_bit(_VCPUF_nmi_masked, &v->vcpu_flags);
-    clear_bit(_VCPUF_polling, &v->vcpu_flags);
+    v->fpu_initialised = 0;
+    v->fpu_dirtied     = 0;
+    v->is_polling      = 0;
+    v->is_initialised  = 0;
+    v->nmi_pending     = 0;
+    v->nmi_masked      = 0;
+    clear_bit(_VPF_blocked, &v->pause_flags);
 
  out:
     UNLOCK_BIGLOCK(v->domain);
@@ -556,7 +532,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
         LOCK_BIGLOCK(d);
         rc = -EEXIST;
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             rc = boot_vcpu(d, vcpuid, ctxt);
         UNLOCK_BIGLOCK(d);
 
@@ -564,21 +540,21 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case VCPUOP_up:
-        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( !v->is_initialised )
             return -EINVAL;
 
-        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
             vcpu_wake(v);
 
         break;
 
     case VCPUOP_down:
-        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
             vcpu_sleep_nosync(v);
         break;
 
     case VCPUOP_is_up:
-        rc = !test_bit(_VCPUF_down, &v->vcpu_flags);
+        rc = !test_bit(_VPF_down, &v->pause_flags);
         break;
 
     case VCPUOP_get_runstate_info:

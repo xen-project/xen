@@ -56,7 +56,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     irq_desc_t       *desc = &irq_desc[vector];
     struct irqaction *action;
 
-    perfc_incrc(irqs);
+    perfc_incr(irqs);
 
     spin_lock(&desc->lock);
     desc->handler->ack(vector);

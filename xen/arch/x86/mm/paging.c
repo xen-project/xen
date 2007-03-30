@@ -27,9 +27,8 @@
 #include <asm/hap.h>
 
 /* Xen command-line option to enable hardware-assisted paging */
-int opt_hap_enabled = 0; 
+int opt_hap_enabled;
 boolean_param("hap", opt_hap_enabled);
-int hap_capable_system = 0;
 
 /* Printouts */
 #define PAGING_PRINTK(_f, _a...)                                     \
@@ -49,14 +48,14 @@ void paging_domain_init(struct domain *d)
     p2m_init(d);
     shadow_domain_init(d);
 
-    if ( opt_hap_enabled && hap_capable_system && is_hvm_domain(d) )
+    if ( opt_hap_enabled && is_hvm_domain(d) )
         hap_domain_init(d);
 }
 
 /* vcpu paging struct initialization goes here */
 void paging_vcpu_init(struct vcpu *v)
 {
-    if ( opt_hap_enabled && hap_capable_system && is_hvm_vcpu(v) )
+    if ( opt_hap_enabled && is_hvm_vcpu(v) )
         hap_vcpu_init(v);
     else
         shadow_vcpu_init(v);
@@ -67,7 +66,7 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
                   XEN_GUEST_HANDLE(void) u_domctl)
 {
     /* Here, dispatch domctl to the appropriate paging code */
-    if ( opt_hap_enabled && hap_capable_system && is_hvm_domain(d) )
+    if ( opt_hap_enabled && is_hvm_domain(d) )
         return hap_domctl(d, sc, u_domctl);
     else
         return shadow_domctl(d, sc, u_domctl);
@@ -76,7 +75,7 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 /* Call when destroying a domain */
 void paging_teardown(struct domain *d)
 {
-    if ( opt_hap_enabled && hap_capable_system && is_hvm_domain(d) )
+    if ( opt_hap_enabled && is_hvm_domain(d) )
         hap_teardown(d);
     else
         shadow_teardown(d);
@@ -85,7 +84,7 @@ void paging_teardown(struct domain *d)
 /* Call once all of the references to the domain have gone away */
 void paging_final_teardown(struct domain *d)
 {
-    if ( opt_hap_enabled && hap_capable_system && is_hvm_domain(d) )
+    if ( opt_hap_enabled && is_hvm_domain(d) )
         hap_final_teardown(d);
     else
         shadow_final_teardown(d);
@@ -95,7 +94,7 @@ void paging_final_teardown(struct domain *d)
  * creation. */
 int paging_enable(struct domain *d, u32 mode)
 {
-    if ( opt_hap_enabled && hap_capable_system && is_hvm_domain(d) )
+    if ( opt_hap_enabled && is_hvm_domain(d) )
         return hap_enable(d, mode | PG_HAP_enable);
     else
         return shadow_enable(d, mode | PG_SH_enable);

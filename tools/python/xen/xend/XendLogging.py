@@ -62,6 +62,7 @@ if 'TRACE' not in logging.__dict__:
     # Work around a bug in Python's inspect module: findsource is supposed to
     # raise IOError if it fails, with other functions in that module coping
     # with that, but some people are seeing IndexError raised from there.
+    # This is Python bug 1628987.  http://python.org/sf/1628987.
     if hasattr(inspect, 'findsource'):
         real_findsource = getattr(inspect, 'findsource')
         def findsource(*args, **kwargs):

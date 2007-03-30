@@ -42,8 +42,8 @@ struct hvm_vcpu {
 
     int                 xen_port;
 
-    /* Flags */
-    int                 flag_dr_dirty;
+    bool_t              flag_dr_dirty;
+    bool_t              debug_state_latch;
 
     union {
         struct arch_vmx_struct vmx;

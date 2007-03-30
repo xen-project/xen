@@ -434,7 +434,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         goto fail;
 
     /* Success! */
-    perfc_incrc(seg_fixups);
+    perfc_incr(seg_fixups);
 
     /* If requested, give a callback on otherwise unused vector 15. */
     if ( VM_ASSIST(d->domain, VMASST_TYPE_4gb_segments_notify) )

@@ -24,8 +24,8 @@ import re
 """Monitoring thread to keep track of Xend statistics. """
 
 VBD_SYSFS_PATH = '/sys/devices/xen-backend/'
-VBD_WR_PATH = VBD_SYSFS_PATH + '%s/statistics/wr_req'
-VBD_RD_PATH = VBD_SYSFS_PATH + '%s/statistics/rd_req'
+VBD_WR_PATH = VBD_SYSFS_PATH + '%s/statistics/wr_sect'
+VBD_RD_PATH = VBD_SYSFS_PATH + '%s/statistics/rd_sect'
 VBD_DOMAIN_RE = r'vbd-(?P<domid>\d+)-(?P<devid>\d+)$'
 
 NET_PROCFS_PATH = '/proc/net/dev'
@@ -51,14 +51,9 @@ VIF_DOMAIN_RE = re.compile(r'vif(?P<domid>\d+)\.(?P<iface>\d+):\s*' +
                            PROC_NET_DEV_RE)
 PIF_RE = re.compile(r'^\s*(?P<iface>peth\d+):\s*' + PROC_NET_DEV_RE)
 
-# The VBD transfer figures are in "requests" where we don't
-# really know how many bytes per requests. For now we make
-# up a number roughly could be.
-VBD_ROUGH_BYTES_PER_REQUEST = 1024 * 8 * 4
-
 # Interval to poll xc, sysfs and proc
 POLL_INTERVAL = 2.0
-
+SECTOR_SIZE = 512
 class XendMonitor(threading.Thread):
     """Monitors VCPU, VBD, VIF and PIF statistics for Xen API.
 
@@ -186,9 +181,8 @@ class XendMonitor(threading.Thread):
                 usage_at = time.time()
                 rd_stat = int(open(rd_stat_path).readline().strip())
                 wr_stat = int(open(wr_stat_path).readline().strip())
-                rd_stat *= VBD_ROUGH_BYTES_PER_REQUEST
-                wr_stat *= VBD_ROUGH_BYTES_PER_REQUEST
-                
+                rd_stat *= SECTOR_SIZE
+                wr_stat *= SECTOR_SIZE
                 if domid not in stats:
                     stats[domid] = {}
 
