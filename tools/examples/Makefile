@@ -9,7 +9,9 @@ XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 # Xen configuration dir and configs to go there.
 XEN_CONFIG_DIR = /etc/xen
 XEN_CONFIGS = xend-config.sxp
+XEN_CONFIGS += xend-config-xenapi.sxp
 XEN_CONFIGS += xm-config.xml
+XEN_CONFIGS += xm-config-xenapi.xml
 XEN_CONFIGS += xmexample1 
 XEN_CONFIGS += xmexample2
 XEN_CONFIGS += xmexample.hvm
