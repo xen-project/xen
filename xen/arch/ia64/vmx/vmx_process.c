@@ -437,6 +437,11 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
             /* VHPT successfully read.  */
             if (pteval & _PAGE_P) {
+                if ((pteval & _PAGE_MA_MASK) == _PAGE_MA_ST) {
+                    vcpu_set_isr(v, misr.val);
+                    itlb_fault(v, vadr);
+                    return IA64_FAULT;
+                }
                 vcpu_get_rr(v, vadr, &rr);
                 itir = rr & (RR_RID_MASK | RR_PS_MASK);
                 thash_purge_and_insert(v, pteval, itir, vadr, ISIDE_TLB);
