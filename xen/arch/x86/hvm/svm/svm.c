@@ -70,7 +70,6 @@ u64 root_vmcb_pa[NR_CPUS] __read_mostly;
 
 /* hardware assisted paging bits */
 extern int opt_hap_enabled;
-extern int hap_capable_system;
 
 static inline void svm_inject_exception(struct vcpu *v, int trap, 
                                         int ev, int error_code)
@@ -920,16 +919,13 @@ void svm_npt_detect(void)
 {
     u32 eax, ebx, ecx, edx;
 
-    /* check CPUID for nested paging support */
+    /* Check CPUID for nested paging support. */
     cpuid(0x8000000A, &eax, &ebx, &ecx, &edx);
-    if ( edx & 0x01 ) /* nested paging */
+
+    if ( !(edx & 1) && opt_hap_enabled )
     {
-        hap_capable_system = 1;
-    }
-    else if ( opt_hap_enabled )
-    {
-        printk(" nested paging is not supported by this CPU.\n");
-        hap_capable_system = 0; /* no nested paging, we disable flag. */
+        printk("SVM: Nested paging is not supported by this CPU.\n");
+        opt_hap_enabled = 0;
     }
 }
 
@@ -944,7 +940,7 @@ int start_svm(void)
     ecx = cpuid_ecx(0x80000001);
     boot_cpu_data.x86_capability[5] = ecx;
     
-    if (!(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)))
+    if ( !(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)) )
         return 0;
 
     /* check whether SVM feature is disabled in BIOS */
@@ -955,13 +951,13 @@ int start_svm(void)
         return 0;
     }
 
-    if ( (hsa[cpu] == NULL) && ((hsa[cpu] = alloc_host_save_area()) == NULL) )
+    if ( ((hsa[cpu] = alloc_host_save_area()) == NULL) ||
+         ((root_vmcb[cpu] = alloc_vmcb()) == NULL) )
         return 0;
-    
+
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
-    printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
 
     svm_npt_detect();
 
@@ -970,12 +966,9 @@ int start_svm(void)
     phys_hsa_lo = (u32) phys_hsa;
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
-  
-    if ( (root_vmcb[cpu] == NULL) &&
-         ((root_vmcb[cpu] = alloc_vmcb()) == NULL) )
-        return 0;
-    root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
 
+    root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
+  
     if ( cpu != 0 )
         return 1;
 
