@@ -265,7 +265,10 @@ void domain_kill(struct domain *d)
 
     /* Already dying? Then bail. */
     if ( xchg(&d->is_dying, 1) )
+    {
+        domain_unpause(d);
         return;
+    }
 
     /* Tear down state /after/ setting the dying flag. */
     smp_wmb();
@@ -332,8 +335,11 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
 
+    atomic_inc(&d->pause_count);
     if ( !xchg(&d->is_shutdown, 1) )
         d->shutdown_code = reason;
+    else
+        domain_unpause(d);
 
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);

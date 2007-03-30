@@ -282,17 +282,15 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_resumedomain:
     {
         struct domain *d = rcu_lock_domain_by_id(op->domain);
-        struct vcpu *v;
 
         ret = -ESRCH;
-        if ( d != NULL )
-        {
-            ret = 0;
-            if ( xchg(&d->is_shutdown, 0) )
-                for_each_vcpu ( d, v )
-                    vcpu_wake(v);
-            rcu_unlock_domain(d);
-        }
+        if ( d == NULL )
+            break;
+
+        if ( xchg(&d->is_shutdown, 0) )
+            domain_unpause(d);
+        rcu_unlock_domain(d);
+        ret = 0;
     }
     break;
 
