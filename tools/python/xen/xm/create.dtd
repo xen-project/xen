@@ -37,6 +37,8 @@
                  memory,
                  vbd*,
                  vif*,
+                 console*,
+                 platform*,
                  vcpu_param*,
                  other_config*)> 
 <!ATTLIST vm     is_a_template          CDATA #REQUIRED
@@ -46,11 +48,6 @@
                  actions_after_shutdown %NORMAL_EXIT; #REQUIRED 
                  actions_after_reboot   %NORMAL_EXIT; #REQUIRED
                  actions_after_crash    %CRASH_BEHAVIOUR; #REQUIRED
-                 platform_std_VGA       CDATA #REQUIRED
-                 platform_serial        CDATA #REQUIRED
-                 platform_localtime     CDATA #REQUIRED 
-                 platform_clock_offet   CDATA #REQUIRED
-                 platform_enable_audio  CDATA #REQUIRED
                  PCI_bus                CDATA #REQUIRED> 
 
 <!ELEMENT memory EMPTY> 
@@ -75,6 +72,9 @@
                  device          CDATA       #REQUIRED
                  qos_algorithm_type CDATA    #REQUIRED
                  network         CDATA       #IMPLIED> 
+
+<!ELEMENT console (other_config*)>
+<!ATTLIST console protocol       (vt100|rfb|rdp) #REQUIRED>
 
 <!ELEMENT pv     EMPTY>
 <!ATTLIST pv     kernel          CDATA #REQUIRED
@@ -103,6 +103,10 @@
 
 <!ELEMENT label  (#PCDATA)> 
 <!ELEMENT description (#PCDATA)>
+
+<!ELEMENT platform   EMPTY>
+<!ATTLIST platform   key   CDATA #REQUIRED
+                     value CDATA #REQUIRED>
 
 <!ELEMENT vcpu_param EMPTY>
 <!ATTLIST vcpu_param key   CDATA #REQUIRED
