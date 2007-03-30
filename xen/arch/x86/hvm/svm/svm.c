@@ -1866,11 +1866,13 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int inst_len = 0;
-    int index;
-    unsigned int gpreg;
-    unsigned long value;
+    int index,addr_size,i;
+    unsigned int gpreg,offset;
+    unsigned long value,addr;
     u8 buffer[MAX_INST_LEN];   
     u8 prefix = 0;
+    u8 modrm;
+    enum x86_segment seg;
     int result = 1;
     enum instruction_index list_a[] = {INSTR_MOV2CR, INSTR_CLTS, INSTR_LMSW};
     enum instruction_index list_b[] = {INSTR_MOVCR2, INSTR_SMSW};
@@ -1931,9 +1933,59 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     case INSTR_SMSW:
-        value = v->arch.hvm_svm.cpu_shadow_cr0;
-        gpreg = decode_src_reg(prefix, buffer[index+2]);
-        set_reg(gpreg, value, regs, vmcb);
+        value = v->arch.hvm_svm.cpu_shadow_cr0 & 0xFFFF;
+        modrm = buffer[index+2];
+        addr_size = svm_guest_x86_mode( v );
+        if ( likely((modrm & 0xC0) >> 6 == 3) )
+        {
+            gpreg = decode_src_reg(prefix, modrm);
+            set_reg(gpreg, value, regs, vmcb);
+        }
+        /*
+         * For now, only implement decode of the offset mode, since that's the
+         * only mode observed in a real-world OS. This code is also making the
+         * assumption that we'll never hit this code in long mode.
+         */
+        else if ( (modrm == 0x26) || (modrm == 0x25) )
+        {   
+            seg = x86_seg_ds;
+            i = index;
+            /* Segment or address size overrides? */
+            while ( i-- )
+            {
+                switch ( buffer[i] )
+                {
+                   case 0x26: seg = x86_seg_es; break;
+                   case 0x2e: seg = x86_seg_cs; break;
+                   case 0x36: seg = x86_seg_ss; break;
+                   case 0x64: seg = x86_seg_fs; break;
+                   case 0x65: seg = x86_seg_gs; break;
+                   case 0x67: addr_size ^= 6;   break;
+                }
+            }
+            /* Bail unless this really is a seg_base + offset case */
+            if ( ((modrm == 0x26) && (addr_size == 4)) ||
+                 ((modrm == 0x25) && (addr_size == 2)) )
+            {
+                gdprintk(XENLOG_ERR, "SMSW emulation at guest address: "
+                         "%lx failed due to unhandled addressing mode."
+                         "ModRM byte was: %x \n", svm_rip2pointer(v), modrm);
+                domain_crash(v->domain);
+            }
+            inst_len += addr_size;
+            offset = *(( unsigned int *) ( void *) &buffer[index + 3]);
+            offset = ( addr_size == 4 ) ? offset : ( offset & 0xFFFF );
+            addr = hvm_get_segment_base(v, seg);
+            addr += offset;
+            hvm_copy_to_guest_virt(addr,&value,2);
+        }
+        else
+        {
+           gdprintk(XENLOG_ERR, "SMSW emulation at guest address: %lx "
+                    "failed due to unhandled addressing mode!"
+                    "ModRM byte was: %x \n", svm_rip2pointer(v), modrm);
+           domain_crash(v->domain);
+        }
         break;
 
     default:
