@@ -43,6 +43,7 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
+#include <linux/mutex.h>
 #include <xen/xen_proc.h>
 #include <asm/hypervisor.h>
 #include <xen/balloon.h>
