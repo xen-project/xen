@@ -295,9 +295,9 @@ extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, in
 extern u64 machine_ttag(PTA pta, u64 va);
 extern u64 machine_thash(PTA pta, u64 va);
 extern void purge_machine_tc_by_domid(domid_t domid);
-extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
+extern void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
-extern int init_domain_tlb(struct vcpu *d);
+extern int init_domain_tlb(struct vcpu *v);
 extern void free_domain_tlb(struct vcpu *v);
 extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);

@@ -212,7 +212,7 @@ void free_domain_tlb(struct vcpu *v)
  * Insert guest TLB to machine TLB.
  *  data:   In TLB format
  */
-void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
+void machine_tlb_insert(struct vcpu *v, thash_data_t *tlb)
 {
     u64     psr;
     thash_data_t    mtlb;
@@ -221,12 +221,12 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     mtlb.ifa = tlb->vadr;
     mtlb.itir = tlb->itir & ~ITIR_RV_MASK;
     mtlb.page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
-    mtlb.ppn = get_mfn(d->domain,tlb->ppn);
+    mtlb.ppn = get_mfn(v->domain, tlb->ppn);
     mtlb_ppn=mtlb.ppn;
 
 #if 0
     if (mtlb_ppn == INVALID_MFN)
-        panic_domain(vcpu_regs(d),"Machine tlb insert with invalid mfn number.\n");
+        panic_domain(vcpu_regs(v), "Machine tlb insert with invalid mfn number.\n");
 #endif
 
     psr = ia64_clear_ic();
