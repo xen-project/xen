@@ -336,6 +336,7 @@ static void continue_cpu_idle_loop(void)
 #else
 	    irq_stat[cpu].idle_timestamp = jiffies;
 #endif
+	    page_scrub_schedule_work();
 	    while ( !softirq_pending(smp_processor_id()) )
 	        default_idle();
 	    raise_softirq(SCHEDULE_SOFTIRQ);
