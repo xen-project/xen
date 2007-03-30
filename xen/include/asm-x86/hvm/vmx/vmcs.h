@@ -80,9 +80,6 @@ struct arch_vmx_struct {
     unsigned long        vmxassist_enabled:1;
 };
 
-#define vmx_schedule_tail(next)         \
-    (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
-
 struct vmcs_struct *vmx_alloc_host_vmcs(void);
 void vmx_free_host_vmcs(struct vmcs_struct *vmcs);
 
@@ -90,11 +87,6 @@ int vmx_create_vmcs(struct vcpu *v);
 void vmx_destroy_vmcs(struct vcpu *v);
 void vmx_vmcs_enter(struct vcpu *v);
 void vmx_vmcs_exit(struct vcpu *v);
-
-#define VMCS_USE_HOST_ENV       1
-#define VMCS_USE_SEPARATE_ENV   0
-
-extern int vmcs_version;
 
 #define CPU_BASED_VIRTUAL_INTR_PENDING  0x00000004
 #define CPU_BASED_USE_TSC_OFFSETING     0x00000008
@@ -112,16 +104,23 @@ extern int vmcs_version;
 #define CPU_BASED_ACTIVATE_MSR_BITMAP   0x10000000
 #define CPU_BASED_MONITOR_EXITING       0x20000000
 #define CPU_BASED_PAUSE_EXITING         0x40000000
+extern u32 vmx_cpu_based_exec_control;
 
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
 #define PIN_BASED_NMI_EXITING           0x00000008
+extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_IA32E_MODE              0x00000200
 #define VM_EXIT_ACK_INTR_ON_EXIT        0x00008000
+extern u32 vmx_vmexit_control;
 
 #define VM_ENTRY_IA32E_MODE             0x00000200
 #define VM_ENTRY_SMM                    0x00000400
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
+extern u32 vmx_vmentry_control;
+
+#define cpu_has_vmx_msr_bitmap \
+    (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
 
 /* VMCS Encordings */
 enum vmcs_field {

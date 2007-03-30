@@ -97,9 +97,6 @@ struct arch_vmx_struct {
 #endif
 };
 
-#define vmx_schedule_tail(next)         \
-    (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
-
 #define VMX_DOMAIN(v)   v->arch.arch_vmx.flags
 
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */

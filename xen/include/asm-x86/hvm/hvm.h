@@ -61,6 +61,8 @@ typedef struct segment_register {
  * supports Intel's VT-x and AMD's SVM extensions.
  */
 struct hvm_function_table {
+    char *name;
+
     /*
      *  Disable HVM functionality
      */

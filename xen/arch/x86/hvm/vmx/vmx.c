@@ -996,7 +996,28 @@ static int vmx_event_injection_faulted(struct vcpu *v)
     return (idtv_info_field & INTR_INFO_VALID_MASK);
 }
 
+static void disable_intercept_for_msr(u32 msr)
+{
+    /*
+     * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
+     * have the write-low and read-high bitmap offsets the wrong way round.
+     * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
+     */
+    if ( msr <= 0x1fff )
+    {
+        __clear_bit(msr, hvm_msr_bitmap + 0x000); /* read-low */
+        __clear_bit(msr, hvm_msr_bitmap + 0x800); /* write-low */
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        __clear_bit(msr, hvm_msr_bitmap + 0x400); /* read-high */
+        __clear_bit(msr, hvm_msr_bitmap + 0xc00); /* write-high */
+    }
+}
+
 static struct hvm_function_table vmx_function_table = {
+    .name                 = "VMX",
     .disable              = stop_vmx,
     .vcpu_initialise      = vmx_vcpu_initialise,
     .vcpu_destroy         = vmx_vcpu_destroy,
@@ -1074,11 +1095,19 @@ int start_vmx(void)
         return 0;
     }
 
-    printk("VMXON is done\n");
-
     vmx_save_host_msrs();
 
+    if ( smp_processor_id() != 0 )
+        return 1;
+
     hvm_enable(&vmx_function_table);
+
+    if ( cpu_has_vmx_msr_bitmap )
+    {
+        printk("VMX: MSR intercept bitmap enabled\n");
+        disable_intercept_for_msr(MSR_FS_BASE);
+        disable_intercept_for_msr(MSR_GS_BASE);
+    }
 
     return 1;
 }

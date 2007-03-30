@@ -890,6 +890,7 @@ static int svm_event_injection_faulted(struct vcpu *v)
 }
 
 static struct hvm_function_table svm_function_table = {
+    .name                 = "SVM",
     .disable              = stop_svm,
     .vcpu_initialise      = svm_vcpu_initialise,
     .vcpu_destroy         = svm_vcpu_destroy,
@@ -954,9 +955,8 @@ int start_svm(void)
         return 0;
     }
 
-    if (!hsa[cpu])
-        if (!(hsa[cpu] = alloc_host_save_area()))
-            return 0;
+    if ( (hsa[cpu] == NULL) && ((hsa[cpu] = alloc_host_save_area()) == NULL) )
+        return 0;
     
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
@@ -971,13 +971,15 @@ int start_svm(void)
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
   
-    if (!root_vmcb[cpu])
-        if (!(root_vmcb[cpu] = alloc_vmcb())) 
-            return 0;
+    if ( (root_vmcb[cpu] == NULL) &&
+         ((root_vmcb[cpu] = alloc_vmcb()) == NULL) )
+        return 0;
     root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
 
-    if (cpu == 0)
-        setup_vmcb_dump();
+    if ( cpu != 0 )
+        return 1;
+
+    setup_vmcb_dump();
 
     hvm_enable(&svm_function_table);
 

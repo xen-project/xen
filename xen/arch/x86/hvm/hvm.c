@@ -65,8 +65,8 @@ char __attribute__ ((__section__ (".bss.page_aligned")))
 
 void hvm_enable(struct hvm_function_table *fns)
 {
-    if ( hvm_enabled )
-        return;
+    BUG_ON(hvm_enabled);
+    printk("HVM: %s enabled\n", fns->name);
 
     /*
      * Allow direct access to the PC debug port (it is often used for I/O
