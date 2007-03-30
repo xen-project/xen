@@ -104,6 +104,8 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	char *s;
 	int i;
 
+	setup_xen_features();
+
 	xen_start_info = (struct start_info *)real_mode_data;
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
 		phys_to_machine_mapping =
