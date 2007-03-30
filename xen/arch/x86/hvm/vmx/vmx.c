@@ -2511,16 +2511,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         switch ( vector )
         {
         case TRAP_debug:
-            if ( v->domain->debugger_attached )
-                domain_pause_for_debugger();
-            else
-                vmx_reflect_exception(v);
-            break;
         case TRAP_int3:
-            if ( v->domain->debugger_attached )
-                domain_pause_for_debugger();
-            else
-                vmx_reflect_exception(v);
+            if ( !v->domain->debugger_attached )
+                goto exit_and_crash;
+            domain_pause_for_debugger();
             break;
         case TRAP_no_device:
             vmx_do_no_device_fault();
@@ -2552,8 +2546,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 vmx_reflect_exception(v);
             break;
         default:
-            vmx_reflect_exception(v);
-            break;
+            goto exit_and_crash;
         }
         break;
     }

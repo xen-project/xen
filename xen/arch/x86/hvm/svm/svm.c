@@ -2229,6 +2229,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     unsigned long eip;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    int inst_len;
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
@@ -2262,17 +2263,18 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_EXCEPTION_DB:
-        if ( v->domain->debugger_attached )
-            domain_pause_for_debugger();
-        else 
-            svm_inject_exception(v, TRAP_debug, 0, 0);
+        if ( !v->domain->debugger_attached )
+            goto exit_and_crash;
+        domain_pause_for_debugger();
         break;
 
     case VMEXIT_EXCEPTION_BP:
-        if ( v->domain->debugger_attached )
-            domain_pause_for_debugger();
-        else 
-            svm_inject_exception(v, TRAP_int3, 0, 0);
+        if ( !v->domain->debugger_attached )
+            goto exit_and_crash;
+        /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
+        inst_len = __get_instruction_length(v, INSTR_INT3, NULL);
+        __update_guest_eip(vmcb, inst_len);
+        domain_pause_for_debugger();
         break;
 
     case VMEXIT_EXCEPTION_NM:
@@ -2332,14 +2334,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_handle_invlpg(1, regs);
         break;
 
-    case VMEXIT_VMMCALL: {
-        int inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
+    case VMEXIT_VMMCALL:
+        inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
         ASSERT(inst_len > 0);
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         __update_guest_eip(vmcb, inst_len);
         hvm_do_hypercall(regs);
         break;
-    }
 
     case VMEXIT_CR0_READ:
         svm_cr_access(v, 0, TYPE_MOV_FROM_CR, regs);
