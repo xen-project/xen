@@ -929,10 +929,10 @@ def xm_label_list(doms):
             if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
                 if not d['seclabel']:
                     d['seclabel'] = 'ERROR'
-                elif security.active_policy in ['DEFAULT']:
-                    d['seclabel'] = 'DEFAULT'
-                else:
-                    d['seclabel'] = 'INACTIVE'
+            elif security.active_policy in ['DEFAULT']:
+                d['seclabel'] = 'DEFAULT'
+            else:
+                d['seclabel'] = 'INACTIVE'
 
             output.append((format % d, d['seclabel']))
         
