@@ -591,8 +591,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     numa_initmem_init(0, max_page);
 
-    end_boot_allocator();
-
     /* Initialise the Xen heap, skipping RAM holes. */
     nr_pages = 0;
     for ( i = 0; i < e820.nr_map; i++ )
@@ -617,6 +615,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     printk("Xen heap: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
+
+    end_boot_allocator();
 
     early_boot = 0;
 

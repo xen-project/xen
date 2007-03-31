@@ -512,6 +512,14 @@ void init_heap_pages(
 
     ASSERT(zone < NR_ZONES);
 
+    if ( unlikely(avail[0] == NULL) )
+    {
+        /* Start-of-day memory node 0 initialisation. */
+        init_heap_block(&_heap0);
+        _heap[0] = &_heap0;
+        avail[0] = avail0;
+    }
+
     if ( likely(page_to_mfn(pg) != 0) )
         nid_prev = phys_to_nid(page_to_maddr(pg-1));
     else
@@ -569,10 +577,6 @@ void end_boot_allocator(void)
 {
     unsigned long i;
     int curr_free, next_free;
-
-    init_heap_block(&_heap0);
-    _heap[0] = &_heap0;
-    avail[0] = avail0;
 
     /* Pages that are free now go to the domain sub-allocator. */
     if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
