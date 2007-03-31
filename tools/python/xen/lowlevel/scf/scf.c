@@ -26,7 +26,7 @@
 #include <libscf.h>
 #include <stdio.h>
 
-#define	XEND_FMRI "svc:/system/xen/xend:default"
+#define	XEND_FMRI "svc:/system/xctl/xend:default"
 #define	XEND_PG "config"
 
 static PyObject *scf_exc;
