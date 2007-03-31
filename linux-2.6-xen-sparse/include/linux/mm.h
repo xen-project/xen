@@ -205,6 +205,11 @@ struct vm_operations_struct {
 	/* notification that a previously read-only page is about to become
 	 * writable, if an error is returned it will cause a SIGBUS */
 	int (*page_mkwrite)(struct vm_area_struct *vma, struct page *page);
+	/* Area-specific function for clearing the PTE at @ptep. Returns the
+	 * original value of @ptep. */
+	pte_t (*ptep_get_and_clear_full)(struct vm_area_struct *vma, 
+					 unsigned long addr, pte_t *ptep, 
+					 int is_fullmm);
 #ifdef CONFIG_NUMA
 	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
 	struct mempolicy *(*get_policy)(struct vm_area_struct *vma,
