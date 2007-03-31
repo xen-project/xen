@@ -3,6 +3,7 @@ obj-y	+= console/
 obj-y	+= evtchn/
 obj-y	+= privcmd/
 obj-y	+= xenbus/
+obj-y	+= gntdev/
 
 obj-$(CONFIG_XEN_UTIL)			+= util.o
 obj-$(CONFIG_XEN_BALLOON)		+= balloon/
