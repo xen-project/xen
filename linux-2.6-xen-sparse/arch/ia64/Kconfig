@@ -576,15 +576,6 @@ source "crypto/Kconfig"
 # override default values of drivers/xen/Kconfig
 #
 if XEN
-config XEN_UTIL
-	default n
-
-config XEN_BALLOON
-	default y
-
-config XEN_REBOOT
-	default y
-
 config XEN_SMPBOOT
 	default n
 endif
