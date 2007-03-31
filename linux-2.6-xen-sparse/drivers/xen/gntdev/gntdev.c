@@ -151,7 +151,7 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 
 static struct vm_operations_struct gntdev_vmops = {
 	.close = gntdev_vma_close,
-	.ptep_get_and_clear_full = gntdev_clear_pte
+	.zap_pte = gntdev_clear_pte
 };
 
 /* Global variables. */

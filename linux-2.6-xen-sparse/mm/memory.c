@@ -659,12 +659,9 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				     page->index > details->last_index))
 					continue;
 			}
-			if (unlikely(vma->vm_ops && 
-				     vma->vm_ops->ptep_get_and_clear_full))
-				ptent = vma->vm_ops->
-					ptep_get_and_clear_full(vma, addr,
-								pte,
-								tlb->fullmm);
+			if (unlikely(vma->vm_ops && vma->vm_ops->zap_pte))
+				ptent = vma->vm_ops->zap_pte(vma, addr, pte,
+							     tlb->fullmm);
 			else
 				ptent = ptep_get_and_clear_full(mm, addr, pte,
 								tlb->fullmm);

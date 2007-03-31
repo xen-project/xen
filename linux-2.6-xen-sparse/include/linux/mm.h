@@ -207,9 +207,8 @@ struct vm_operations_struct {
 	int (*page_mkwrite)(struct vm_area_struct *vma, struct page *page);
 	/* Area-specific function for clearing the PTE at @ptep. Returns the
 	 * original value of @ptep. */
-	pte_t (*ptep_get_and_clear_full)(struct vm_area_struct *vma, 
-					 unsigned long addr, pte_t *ptep, 
-					 int is_fullmm);
+	pte_t (*zap_pte)(struct vm_area_struct *vma, 
+			 unsigned long addr, pte_t *ptep, int is_fullmm);
 #ifdef CONFIG_NUMA
 	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
 	struct mempolicy *(*get_policy)(struct vm_area_struct *vma,
