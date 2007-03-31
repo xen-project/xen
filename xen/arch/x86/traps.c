@@ -291,7 +291,7 @@ void show_stack_overflow(unsigned long esp)
     unsigned long esp_top;
     unsigned long *stack, addr;
 
-    esp_top = (esp | (STACK_SIZE - 1)) - DEBUG_STACK_SIZE;
+    esp_top = (esp | (STACK_SIZE - 1)) - (DEBUG_STACK_SIZE - 1);
 
     /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
     if ( ((unsigned long)(esp - esp_top) > 512) &&

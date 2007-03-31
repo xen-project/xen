@@ -858,19 +858,20 @@ __initcall(debugtrace_init);
 void panic(const char *fmt, ...)
 {
     va_list args;
-    char buf[128];
     unsigned long flags;
     static DEFINE_SPINLOCK(lock);
+    static char buf[128];
     
     debugtrace_dump();
+
+    /* Protects buf[] and ensure multi-line message prints atomically. */
+    spin_lock_irqsave(&lock, flags);
 
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    /* Spit out multiline message in one go. */
     console_start_sync();
-    spin_lock_irqsave(&lock, flags);
     printk("\n****************************************\n");
     printk("Panic on CPU %d:\n", smp_processor_id());
     printk(buf);
@@ -879,6 +880,7 @@ void panic(const char *fmt, ...)
         printk("Manual reset required ('noreboot' specified)\n");
     else
         printk("Reboot in five seconds...\n");
+
     spin_unlock_irqrestore(&lock, flags);
 
     debugger_trap_immediate();
