@@ -786,8 +786,8 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
  */
 void *xc_gnttab_map_grant_refs(int xcg_handle,
                                uint32_t count,
-                               uint32_t domids[count],
-                               uint32_t refs[count],
+                               uint32_t *domids,
+                               uint32_t *refs,
                                int prot);
 
 /*
