@@ -4,6 +4,9 @@
  * A library for low-level access to the Xen control interfaces.
  *
  * Copyright (c) 2003-2004, K A Fraser.
+ *
+ * xc_gnttab functions:
+ * Copyright (c) 2007, D G Murray <Derek.Murray@cl.cam.ac.uk>
  */
 
 #ifndef XENCTRL_H
@@ -739,6 +742,62 @@ evtchn_port_t xc_evtchn_pending(int xce_handle);
  * will be set appropriately.
  */
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
+
+/**************************
+ * GRANT TABLE OPERATIONS *
+ **************************/
+
+/*
+ * Return a handle to the grant table driver, or -1 on failure, in which case
+ * errno will be set appropriately.
+ */
+int xc_gnttab_open(void);
+
+/*
+ * Close a handle previously allocated with xc_gnttab_open().
+ */
+int xc_gnttab_close(int xcg_handle);
+
+/*
+ * Memory maps a grant reference from one domain to a local address range.
+ * Mappings should be unmapped with xc_gnttab_munmap.  Returns NULL on failure.
+ *
+ * @parm xcg_handle a handle on an open grant table interface
+ * @parm domid the domain to map memory from
+ * @parm ref the grant reference ID to map
+ * @parm prot same flag as in mmap()
+ */
+void *xc_gnttab_map_grant_ref(int xcg_handle,
+                              uint32_t domid,
+                              uint32_t ref,
+                              int prot);
+
+/**
+ * Memory maps one or more grant references from one or more domains to a
+ * contiguous local address range. Mappings should be unmapped with
+ * xc_gnttab_munmap.  Returns NULL on failure.
+ *
+ * @parm xcg_handle a handle on an open grant table interface
+ * @parm count the number of grant references to be mapped
+ * @parm domids an array of @count domain IDs by which the corresponding @refs
+ *              were granted
+ * @parm refs an array of @count grant references to be mapped
+ * @parm prot same flag as in mmap()
+ */
+void *xc_gnttab_map_grant_refs(int xcg_handle,
+                               uint32_t count,
+                               uint32_t domids[count],
+                               uint32_t refs[count],
+                               int prot);
+
+/*
+ * Unmaps the @count pages starting at @start_address, which were mapped by a
+ * call to xc_gnttab_map_grant_ref or xc_gnttab_map_grant_refs. Returns zero
+ * on success, otherwise sets errno and returns non-zero.
+ */
+int xc_gnttab_munmap(int xcg_handle,
+                     void *start_address,
+                     uint32_t count);
 
 int xc_hvm_set_pci_intx_level(
     int xc_handle, domid_t dom,
