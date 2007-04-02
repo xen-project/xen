@@ -215,7 +215,6 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h);
 /* End of save/restore */
 
 extern char hvm_io_bitmap[];
-extern char hvm_msr_bitmap[];
 extern int hvm_enabled;
 
 void hvm_enable(struct hvm_function_table *);

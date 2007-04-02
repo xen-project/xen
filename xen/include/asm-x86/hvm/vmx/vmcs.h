@@ -121,6 +121,7 @@ extern u32 vmx_vmentry_control;
 
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
+extern char *vmx_msr_bitmap;
 
 /* VMCS Encordings */
 enum vmcs_field {

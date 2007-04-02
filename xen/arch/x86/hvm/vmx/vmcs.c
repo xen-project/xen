@@ -289,7 +289,7 @@ static void construct_vmcs(struct vcpu *v)
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
 
     if ( cpu_has_vmx_msr_bitmap )
-        __vmwrite(MSR_BITMAP, virt_to_maddr(hvm_msr_bitmap));
+        __vmwrite(MSR_BITMAP, virt_to_maddr(vmx_msr_bitmap));
 
     /* I/O access bitmap. */
     __vmwrite(IO_BITMAP_A, virt_to_maddr(hvm_io_bitmap));
