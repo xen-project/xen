@@ -167,7 +167,7 @@ asmlinkage void do_double_fault(void)
            tss->esi, tss->edi, tss->ebp, tss->esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            tss->ds, tss->es, tss->fs, tss->gs, tss->ss);
-    show_stack_overflow(tss->esp);
+    show_stack_overflow(cpu, tss->esp);
 
     panic("DOUBLE FAULT -- system shutdown\n");
 }

@@ -553,7 +553,7 @@ extern always_inline void prefetchw(const void *x)
 
 void show_stack(struct cpu_user_regs *regs);
 void show_xen_trace(void);
-void show_stack_overflow(unsigned long esp);
+void show_stack_overflow(unsigned int cpu, unsigned long esp);
 void show_registers(struct cpu_user_regs *regs);
 void show_execution_state(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);

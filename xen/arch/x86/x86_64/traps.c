@@ -171,7 +171,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx\n", regs->r15);
-    show_stack_overflow(regs->rsp);
+    show_stack_overflow(cpu, regs->rsp);
 
     panic("DOUBLE FAULT -- system shutdown\n");
 }
