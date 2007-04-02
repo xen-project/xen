@@ -413,9 +413,9 @@ static always_inline void __mwait(unsigned long eax, unsigned long ecx)
 struct tss_struct {
     unsigned short	back_link,__blh;
 #ifdef __x86_64__
-    u64 rsp0;
-    u64 rsp1;
-    u64 rsp2;
+    union { u64 rsp0, esp0; };
+    union { u64 rsp1, esp1; };
+    union { u64 rsp2, esp2; };
     u64 reserved1;
     u64 ist[7];
     u64 reserved2;
