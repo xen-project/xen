@@ -425,7 +425,6 @@ void vcpu_pause_nosync(struct vcpu *v)
 
 void vcpu_unpause(struct vcpu *v)
 {
-    ASSERT(v != current);
     if ( atomic_dec_and_test(&v->pause_count) )
         vcpu_wake(v);
 }
@@ -445,8 +444,6 @@ void domain_pause(struct domain *d)
 void domain_unpause(struct domain *d)
 {
     struct vcpu *v;
-
-    ASSERT(d != current->domain);
 
     if ( atomic_dec_and_test(&d->pause_count) )
         for_each_vcpu( d, v )
