@@ -18,15 +18,14 @@
 int
 main(int argc, char **argv)
 {
-    unsigned int xc_fd, io_fd, domid, max_pfn, store_evtchn, console_evtchn;
+    unsigned int xc_fd, io_fd, domid, store_evtchn, console_evtchn;
     unsigned int hvm, pae, apic;
     int ret;
-    unsigned long store_mfn, console_mfn;
+    unsigned long p2m_size, max_nr_pfns, store_mfn, console_mfn;
 
-    if (argc != 9)
-	errx(1,
-	     "usage: %s iofd domid max_pfn store_evtchn console_evtchn hvm pae apic",
-	     argv[0]);
+    if (argc != 10)
+        errx(1, "usage: %s iofd domid p2m_size max_nr_pfns store_evtchn "
+             "console_evtchn hvm pae apic", argv[0]);
 
     xc_fd = xc_interface_open();
     if (xc_fd < 0)
@@ -34,19 +33,21 @@ main(int argc, char **argv)
 
     io_fd = atoi(argv[1]);
     domid = atoi(argv[2]);
-    max_pfn = atoi(argv[3]);
-    store_evtchn = atoi(argv[4]);
-    console_evtchn = atoi(argv[5]);
-    hvm  = atoi(argv[6]);
-    pae  = atoi(argv[7]);
-    apic = atoi(argv[8]);
+    p2m_size = atoi(argv[3]);
+    max_nr_pfns = atoi(argv[4]);
+    store_evtchn = atoi(argv[5]);
+    console_evtchn = atoi(argv[6]);
+    hvm  = atoi(argv[7]);
+    pae  = atoi(argv[8]);
+    apic = atoi(argv[9]);
 
     if (hvm) {
-        ret = xc_hvm_restore(xc_fd, io_fd, domid, max_pfn, store_evtchn,
+        ret = xc_hvm_restore(xc_fd, io_fd, domid, max_nr_pfns, store_evtchn,
                 &store_mfn, pae, apic);
-    } else 
-        ret = xc_linux_restore(xc_fd, io_fd, domid, max_pfn, store_evtchn,
-                &store_mfn, console_evtchn, &console_mfn);
+    } else
+        ret = xc_linux_restore(xc_fd, io_fd, domid, p2m_size,
+                               max_nr_pfns, store_evtchn, &store_mfn,
+                               console_evtchn, &console_mfn);
 
     if (ret == 0) {
 	printf("store-mfn %li\n", store_mfn);

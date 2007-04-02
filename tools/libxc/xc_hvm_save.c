@@ -332,10 +332,10 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     unsigned long total_sent    = 0;
 
-    DPRINTF("xc_hvm_save:dom=%d, max_iters=%d, max_factor=%d, flags=0x%x, live=%d, debug=%d.\n",
-            dom, max_iters, max_factor, flags,
+    DPRINTF("xc_hvm_save: dom=%d, max_iters=%d, max_factor=%d, flags=0x%x, "
+            "live=%d, debug=%d.\n", dom, max_iters, max_factor, flags,
             live, debug);
-
+    
     /* If no explicit control parameters given, use defaults */
     if(!max_iters)
         max_iters = DEF_MAX_ITERS;
@@ -382,7 +382,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("HVM: Could not read magic PFN parameters");
         goto out;
     }
-
     DPRINTF("saved hvm domain info:max_memkb=0x%lx, max_mfn=0x%lx, "
             "nr_pages=0x%lx\n", info.max_memkb, max_mfn, info.nr_pages); 
 

@@ -43,15 +43,16 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm fd the file descriptor to restore a domain from
  * @parm dom the id of the domain
- * @parm nr_pfns the number of pages
+ * @parm p2m_size number of pages the guest has (i.e. number entries in P2M)
+ * @parm max_nr_pfns domains maximum real memory allocation, in pages
  * @parm store_evtchn the store event channel for this domain to use
  * @parm store_mfn returned with the mfn of the store page
  * @return 0 on success, -1 on failure
  */
 int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                     unsigned long nr_pfns, unsigned int store_evtchn,
-                     unsigned long *store_mfn, unsigned int console_evtchn,
-                     unsigned long *console_mfn);
+                     unsigned long p2m_size, unsigned long max_nr_pfns,
+                     unsigned int store_evtchn, unsigned long *store_mfn,
+                     unsigned int console_evtchn, unsigned long *console_mfn);
 
 /**
  * This function will restore a saved hvm domain running unmodified guest.

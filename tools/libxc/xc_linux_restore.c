@@ -22,8 +22,14 @@ static unsigned long hvirt_start;
 /* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
-/* total number of pages used by the current guest */
-static unsigned long max_pfn;
+/* number of pfns this guest has (i.e. number of entries in the P2M) */
+static unsigned long p2m_size;
+
+/* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
+static unsigned long nr_pfns;
+
+/* largest possible value of nr_pfns (i.e. domain's maximum memory size) */
+static unsigned long max_nr_pfns;
 
 /* Live mapping of the table mapping each PFN to its current MFN. */
 static xen_pfn_t *live_p2m = NULL;
@@ -33,7 +39,6 @@ static xen_pfn_t *p2m = NULL;
 
 /* A table of P2M mappings in the current region */
 static xen_pfn_t *p2m_batch = NULL;
-
 
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
@@ -85,11 +90,11 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         
         pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
         
-        if(pfn >= max_pfn) {
+        if(pfn >= p2m_size) {
             /* This "page table page" is probably not one; bail. */
             ERROR("Frame number in type %lu page table is out of range: "
-                  "i=%d pfn=0x%lx max_pfn=%lu",
-                  type >> 28, i, pfn, max_pfn);
+                  "i=%d pfn=0x%lx p2m_size=%lu",
+                  type >> 28, i, pfn, p2m_size);
             return 0;
         }
         
@@ -138,8 +143,9 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
     return 1;
 }
 
-int xc_linux_restore(int xc_handle, int io_fd,
-                     uint32_t dom, unsigned long nr_pfns,
+
+int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
+                     unsigned long p2msize, unsigned long maxnrpfns,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -191,9 +197,13 @@ int xc_linux_restore(int xc_handle, int io_fd,
     unsigned int max_vcpu_id = 0;
     int new_ctxt_format = 0;
 
-    max_pfn = nr_pfns;
+    p2m_size    = p2msize;
+    max_nr_pfns = maxnrpfns;
 
-    DPRINTF("xc_linux_restore start: max_pfn = %lx\n", max_pfn);
+    /* For info only */
+    nr_pfns = 0;
+
+    DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
     /*
      * XXX For now, 32bit dom0's can only save/restore 32bit domUs
@@ -294,8 +304,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    p2m        = calloc(max_pfn, sizeof(xen_pfn_t));
-    pfn_type   = calloc(max_pfn, sizeof(unsigned long));
+    p2m        = calloc(p2m_size, sizeof(xen_pfn_t));
+    pfn_type   = calloc(p2m_size, sizeof(unsigned long));
     region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
     p2m_batch  = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
 
@@ -325,13 +335,13 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
 
-    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
+    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_nr_pfns)) != 0) {
         errno = ENOMEM;
         goto out;
     }
 
     /* Mark all PFNs as invalid; we allocate on demand */
-    for ( pfn = 0; pfn < max_pfn; pfn++ )
+    for ( pfn = 0; pfn < p2m_size; pfn++ )
         p2m[pfn] = INVALID_P2M_ENTRY;
 
     if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) {
@@ -352,7 +362,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         int j, nr_mfns = 0; 
 
-        this_pc = (n * 100) / max_pfn;
+        this_pc = (n * 100) / p2m_size;
         if ( (this_pc - prev_pc) >= 5 )
         {
             PPRINTF("\b\b\b\b%3d%%", this_pc);
@@ -436,6 +446,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 if (p2m[pfn] == INVALID_P2M_ENTRY) {
                     /* We just allocated a new mfn above; update p2m */
                     p2m[pfn] = p2m_batch[nr_mfns++]; 
+                    nr_pfns++; 
                 }
 
                 /* setup region_mfn[] for batch map */
@@ -465,7 +476,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 /* a bogus/unmapped page: skip it */
                 continue;
 
-            if ( pfn > max_pfn )
+            if ( pfn > p2m_size )
             {
                 ERROR("pfn out of range");
                 goto out;
@@ -518,7 +529,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             else if ( pagetype != XEN_DOMCTL_PFINFO_NOTAB )
             {
                 ERROR("Bogus page type %lx page table is out of range: "
-                    "i=%d max_pfn=%lu", pagetype, i, max_pfn);
+                    "i=%d p2m_size=%lu", pagetype, i, p2m_size);
                 goto out;
 
             }
@@ -598,7 +609,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         int j, k;
         
         /* First pass: find all L3TABs current in > 4G mfns and get new mfns */
-        for ( i = 0; i < max_pfn; i++ )
+        for ( i = 0; i < p2m_size; i++ )
         {
             if ( ((pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
                   XEN_DOMCTL_PFINFO_L3TAB) &&
@@ -646,7 +657,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         /* Second pass: find all L1TABs and uncanonicalize them */
         j = 0;
 
-        for ( i = 0; i < max_pfn; i++ )
+        for ( i = 0; i < p2m_size; i++ )
         {
             if ( ((pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
                   XEN_DOMCTL_PFINFO_L1TAB) )
@@ -655,7 +666,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 j++;
             }
 
-            if(i == (max_pfn-1) || j == MAX_BATCH_SIZE) {
+            if(i == (p2m_size-1) || j == MAX_BATCH_SIZE) {
 
                 if (!(region_base = xc_map_foreign_batch(
                           xc_handle, dom, PROT_READ | PROT_WRITE,
@@ -689,7 +700,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
      * will barf when doing the type-checking.
      */
     nr_pins = 0;
-    for ( i = 0; i < max_pfn; i++ )
+    for ( i = 0; i < p2m_size; i++ )
     {
         if ( (pfn_type[i] & XEN_DOMCTL_PFINFO_LPINTAB) == 0 )
             continue;
@@ -736,7 +747,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     DPRINTF("\b\b\b\b100%%\n");
-    DPRINTF("Memory reloaded.\n");
+    DPRINTF("Memory reloaded (%ld pages of max %ld)\n", nr_pfns, max_nr_pfns);
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
@@ -808,7 +819,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
              * resume record.
              */
             pfn = ctxt.user_regs.edx;
-            if ((pfn >= max_pfn) ||
+            if ((pfn >= p2m_size) ||
                 (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
                 ERROR("Suspend record frame number is bad");
                 goto out;
@@ -816,7 +827,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             ctxt.user_regs.edx = mfn = p2m[pfn];
             start_info = xc_map_foreign_range(
                 xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
-            start_info->nr_pages = max_pfn;
+            start_info->nr_pages = p2m_size;
             start_info->shared_info = shared_info_frame << PAGE_SHIFT;
             start_info->flags = 0;
             *store_mfn = start_info->store_mfn = p2m[start_info->store_mfn];
@@ -835,7 +846,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         for (j = 0; (512*j) < ctxt.gdt_ents; j++) {
             pfn = ctxt.gdt_frames[j];
-            if ((pfn >= max_pfn) ||
+            if ((pfn >= p2m_size) ||
                 (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
                 ERROR("GDT frame number is bad");
                 goto out;
@@ -846,16 +857,16 @@ int xc_linux_restore(int xc_handle, int io_fd,
         /* Uncanonicalise the page table base pointer. */
         pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
 
-        if (pfn >= max_pfn) {
-            ERROR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
-                  pfn, max_pfn, pfn_type[pfn]);
+        if (pfn >= p2m_size) {
+            ERROR("PT base is bad: pfn=%lu p2m_size=%lu type=%08lx",
+                  pfn, p2m_size, pfn_type[pfn]);
             goto out;
         }
 
         if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
              ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
             ERROR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
-                  pfn, max_pfn, pfn_type[pfn],
+                  pfn, p2m_size, pfn_type[pfn],
                   (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto out;
         }
@@ -867,16 +878,16 @@ int xc_linux_restore(int xc_handle, int io_fd,
         {
             pfn = xen_cr3_to_pfn(ctxt.ctrlreg[1]);
 
-            if (pfn >= max_pfn) {
-                ERROR("User PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
-                      pfn, max_pfn, pfn_type[pfn]);
+            if (pfn >= p2m_size) {
+                ERROR("User PT base is bad: pfn=%lu p2m_size=%lu type=%08lx",
+                      pfn, p2m_size, pfn_type[pfn]);
                 goto out;
             }
 
             if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
                  ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
                 ERROR("User PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
-                      pfn, max_pfn, pfn_type[pfn],
+                      pfn, p2m_size, pfn_type[pfn],
                       (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
                 goto out;
             }
@@ -915,7 +926,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
     for (i = 0; i < P2M_FL_ENTRIES; i++) {
         pfn = p2m_frame_list[i];
-        if ((pfn >= max_pfn) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
+        if ((pfn >= p2m_size) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
             ERROR("PFN-to-MFN frame number is bad");
             goto out;
         }
@@ -930,8 +941,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    memcpy(live_p2m, p2m, P2M_SIZE);
-    munmap(live_p2m, P2M_SIZE);
+    memcpy(live_p2m, p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));
+    munmap(live_p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     DPRINTF("Domain ready to be built.\n");
 

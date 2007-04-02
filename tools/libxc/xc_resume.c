@@ -46,7 +46,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
     xc_dominfo_t info;
     int i, rc = -1;
 #if defined(__i386__) || defined(__x86_64__)
-    unsigned long mfn, max_pfn = 0;
+    unsigned long mfn, p2m_size = 0;
     vcpu_guest_context_t ctxt;
     start_info_t *start_info;
     shared_info_t *shinfo = NULL;
@@ -74,7 +74,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
         goto out;
     }
 
-    max_pfn = shinfo->arch.max_pfn;
+    p2m_size = shinfo->arch.max_pfn;
 
     p2m_frame_list_list =
         xc_map_foreign_range(xc_handle, domid, PAGE_SIZE, PROT_READ,

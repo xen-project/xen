@@ -187,6 +187,7 @@ def restore(xd, fd, dominfo = None, paused = False):
     assert console_port
 
     nr_pfns = (dominfo.getMemoryTarget() + 3) / 4 
+    max_nr_pfns = (dominfo.getMemoryMaximum() + 3) / 4 
 
     # if hvm, pass mem size to calculate the store_mfn
     image_cfg = dominfo.info.get('image', {})
@@ -203,17 +204,17 @@ def restore(xd, fd, dominfo = None, paused = False):
     try:
         l = read_exact(fd, sizeof_unsigned_long,
                        "not a valid guest state file: pfn count read")
-        max_pfn = unpack("L", l)[0]    # native sizeof long
+        p2m_size = unpack("L", l)[0]    # native sizeof long
 
-        if max_pfn > 16*1024*1024:     # XXX 
+        if p2m_size > 16*1024*1024:     # XXX 
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 
         shadow = dominfo.info['shadow_memory']
         log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, "
-                  "nr_pfns=0x%x.", dominfo.info['shadow_memory'],
+                  "p2m_size=0x%x.", dominfo.info['shadow_memory'],
                   dominfo.info['memory_static_max'],
-                  dominfo.info['memory_static_min'], nr_pfns)
+                  dominfo.info['memory_static_min'], p2m_size)
 
         balloon.free(xc.pages_to_kib(nr_pfns) + shadow * 1024)
 
@@ -221,7 +222,7 @@ def restore(xd, fd, dominfo = None, paused = False):
         dominfo.info['shadow_memory'] = shadow_cur
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
-                        fd, dominfo.getDomid(), max_pfn,
+                        fd, dominfo.getDomid(), p2m_size, max_nr_pfns, 
                         store_port, console_port, int(is_hvm), pae, apic])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
