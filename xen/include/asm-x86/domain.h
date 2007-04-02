@@ -115,7 +115,6 @@ struct hap_domain {
     const char       *locker_function;
     
     struct list_head  freelists;
-    struct list_head  p2m_freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages allocates to p2m */
