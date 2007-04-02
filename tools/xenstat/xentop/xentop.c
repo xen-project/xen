@@ -984,6 +984,8 @@ static void top(void)
 
 	if(!batch)
 	do_bottom_line();
+
+	free(domains);
 }
 
 int main(int argc, char **argv)
