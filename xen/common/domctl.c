@@ -115,7 +115,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 
     info->flags = flags |
         (d->is_dying                ? XEN_DOMINF_dying    : 0) |
-        (d->is_shutdown             ? XEN_DOMINF_shutdown : 0) |
+        (d->is_shut_down            ? XEN_DOMINF_shutdown : 0) |
         (d->is_paused_by_controller ? XEN_DOMINF_paused   : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
@@ -287,8 +287,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( d == NULL )
             break;
 
-        if ( xchg(&d->is_shutdown, 0) )
-            domain_unpause(d);
+        domain_resume(d);
         rcu_unlock_domain(d);
         ret = 0;
     }

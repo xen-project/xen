@@ -373,6 +373,9 @@ void hvm_send_assist_req(struct vcpu *v)
 {
     ioreq_t *p;
 
+    if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
+        return; /* implicitly bins the i/o operation */
+
     p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {

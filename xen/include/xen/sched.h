@@ -114,6 +114,10 @@ struct vcpu
     bool_t           nmi_pending;
     /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
     bool_t           nmi_masked;
+    /* Require shutdown to be deferred for some asynchronous operation? */
+    bool_t           defer_shutdown;
+    /* VCPU is paused following shutdown request (d->is_shutting_down)? */
+    bool_t           paused_for_shutdown;
 
     unsigned long    pause_flags;
     atomic_t         pause_count;
@@ -193,7 +197,9 @@ struct domain
     bool_t           is_paused_by_controller;
 
     /* Guest has shut down (inc. reason code)? */
-    bool_t           is_shutdown;
+    spinlock_t       shutdown_lock;
+    bool_t           is_shutting_down; /* in process of shutting down? */
+    bool_t           is_shut_down;     /* fully shut down? */
     int              shutdown_code;
 
     atomic_t         pause_count;
@@ -331,7 +337,11 @@ struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 void domain_kill(struct domain *d);
 void domain_shutdown(struct domain *d, u8 reason);
+void domain_resume(struct domain *d);
 void domain_pause_for_debugger(void);
+
+int vcpu_start_shutdown_deferral(struct vcpu *v);
+void vcpu_end_shutdown_deferral(struct vcpu *v);
 
 /*
  * Mark specified domain as crashed. This function always returns, even if the

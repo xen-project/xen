@@ -59,6 +59,7 @@ struct domain *alloc_domain(domid_t domid)
     atomic_set(&d->refcnt, 1);
     spin_lock_init(&d->big_lock);
     spin_lock_init(&d->page_alloc_lock);
+    spin_lock_init(&d->shutdown_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
@@ -81,6 +82,45 @@ void free_domain(struct domain *d)
 
     sched_destroy_domain(d);
     xfree(d);
+}
+
+static void __domain_finalise_shutdown(struct domain *d)
+{
+    struct vcpu *v;
+
+    BUG_ON(!spin_is_locked(&d->shutdown_lock));
+
+    if ( d->is_shut_down )
+        return;
+
+    for_each_vcpu ( d, v )
+        if ( !v->paused_for_shutdown )
+            return;
+
+    d->is_shut_down = 1;
+
+    for_each_vcpu ( d, v )
+        vcpu_sleep_nosync(v);
+
+    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+}
+
+static void vcpu_check_shutdown(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+
+    spin_lock(&d->shutdown_lock);
+
+    if ( d->is_shutting_down )
+    {
+        if ( !v->paused_for_shutdown )
+            atomic_inc(&v->pause_count);
+        v->paused_for_shutdown = 1;
+        v->defer_shutdown = 0;
+        __domain_finalise_shutdown(d);
+    }
+
+    spin_unlock(&d->shutdown_lock);
 }
 
 struct vcpu *alloc_vcpu(
@@ -121,6 +161,9 @@ struct vcpu *alloc_vcpu(
     d->vcpu[vcpu_id] = v;
     if ( vcpu_id != 0 )
         d->vcpu[v->vcpu_id-1]->next_in_list = v;
+
+    /* Must be called after making new vcpu visible to for_each_vcpu(). */
+    vcpu_check_shutdown(v);
 
     return v;
 }
@@ -286,7 +329,7 @@ void domain_kill(struct domain *d)
 
 void __domain_crash(struct domain *d)
 {
-    if ( d->is_shutdown )
+    if ( d->is_shutting_down )
     {
         /* Print nothing: the domain is already shutting down. */
     }
@@ -335,16 +378,73 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
 
-    atomic_inc(&d->pause_count);
-    if ( !xchg(&d->is_shutdown, 1) )
-        d->shutdown_code = reason;
-    else
-        domain_unpause(d);
+    spin_lock(&d->shutdown_lock);
+
+    if ( d->is_shutting_down )
+    {
+        spin_unlock(&d->shutdown_lock);
+        return;
+    }
+
+    d->is_shutting_down = 1;
+    d->shutdown_code = reason;
+
+    smp_mb(); /* set shutdown status /then/ check for per-cpu deferrals */
 
     for_each_vcpu ( d, v )
-        vcpu_sleep_nosync(v);
+    {
+        if ( v->defer_shutdown )
+            continue;
+        atomic_inc(&v->pause_count);
+        v->paused_for_shutdown = 1;
+    }
 
-    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
+    __domain_finalise_shutdown(d);
+
+    spin_unlock(&d->shutdown_lock);
+}
+
+void domain_resume(struct domain *d)
+{
+    struct vcpu *v;
+
+    /*
+     * Some code paths assume that shutdown status does not get reset under
+     * their feet (e.g., some assertions make this assumption).
+     */
+    domain_pause(d);
+
+    spin_lock(&d->shutdown_lock);
+
+    d->is_shutting_down = d->is_shut_down = 0;
+
+    for_each_vcpu ( d, v )
+    {
+        if ( v->paused_for_shutdown )
+            vcpu_unpause(v);
+        v->paused_for_shutdown = 0;
+    }
+
+    spin_unlock(&d->shutdown_lock);
+
+    domain_unpause(d);
+}
+
+int vcpu_start_shutdown_deferral(struct vcpu *v)
+{
+    v->defer_shutdown = 1;
+    smp_mb(); /* set deferral status /then/ check for shutdown */
+    if ( unlikely(v->domain->is_shutting_down) )
+        vcpu_check_shutdown(v);
+    return v->defer_shutdown;
+}
+
+void vcpu_end_shutdown_deferral(struct vcpu *v)
+{
+    v->defer_shutdown = 0;
+    smp_mb(); /* clear deferral status /then/ check for shutdown */
+    if ( unlikely(v->domain->is_shutting_down) )
+        vcpu_check_shutdown(v);
 }
 
 void domain_pause_for_debugger(void)

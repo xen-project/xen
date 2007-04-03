@@ -806,7 +806,8 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
      * (Note that the undestroyable active grants are not a security hole in
      * Xen. All active grants can safely be cleaned up when the domain dies.)
      */
-    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) && !d->is_shutdown && !d->is_dying )
+    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
+         !d->is_shutting_down && !d->is_dying )
     {
         MEM_LOG("Attempt to implicitly unmap a granted PTE %" PRIpte,
                 l1e_get_intpte(l1e));
