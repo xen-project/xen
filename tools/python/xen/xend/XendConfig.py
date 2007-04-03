@@ -118,7 +118,7 @@ LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 # Platform configuration keys.
 XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display', 
                         'fda', 'fdb', 'keymap', 'isa', 'localtime',
-                        'nographic', 'pae', 'serial', 'sdl',
+                        'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten',
                         'vncpasswd', 'vncunused', 'xauthority']
@@ -203,6 +203,7 @@ LEGACY_CFG_TYPES = {
     'on_xend_stop':  str,
     'on_xend_start': str,
     'online_vcpus':  int,
+    'rtc/timeoffset': str,
 }
 
 # Values that should be stored in xenstore's /vm/<uuid> that is used

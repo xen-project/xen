@@ -186,6 +186,10 @@ gopts.var('cpus', val='CPUS',
           fn=set_value, default=None,
           use="CPUS to run the domain on.")
 
+gopts.var('rtc_timeoffset', val='RTC_TIMEOFFSET',
+          fn=set_value, default="0",
+          use="Set RTC offset.")
+
 gopts.var('pae', val='PAE',
           fn=set_int, default=1,
           use="Disable or enable PAE of HVM domain.")
@@ -717,7 +721,7 @@ def configure_hvm(config_image, vals):
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
-             'sdl', 'display', 'xauthority',
+             'sdl', 'display', 'xauthority', 'rtc_timeoffset',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap' ]
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

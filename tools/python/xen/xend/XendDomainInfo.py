@@ -859,7 +859,8 @@ class XendDomainInfo:
         # Check whether values in the configuration have
         # changed in Xenstore.
         
-        cfg_vm = ['name', 'on_poweroff', 'on_reboot', 'on_crash']
+        cfg_vm = ['name', 'on_poweroff', 'on_reboot', 'on_crash',
+                  'rtc/timeoffset']
         
         vm_details = self._readVMDetails([(k,XendConfig.LEGACY_CFG_TYPES[k])
                                            for k in cfg_vm])
@@ -888,6 +889,11 @@ class XendDomainInfo:
             self.info.update_with_image_sxp(sxp.from_string(image_sxp))
             changed = True
 
+        # Check if the rtc offset has changes
+        if vm_details.get("rtc/timeoffset", 0) != self.info["platform"].get("rtc_timeoffset", 0):
+            self.info["platform"]["rtc_timeoffset"] = vm_details.get("rtc/timeoffset", 0)
+            changed = True
+ 
         if changed:
             # Update the domain section of the store, as this contains some
             # parameters derived from the VM configuration.

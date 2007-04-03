@@ -155,28 +155,13 @@ static inline void hvm_mmio_access(struct vcpu *v,
     }
 }
 
-int hvm_buffered_io_intercept(ioreq_t *p)
+int hvm_buffered_io_send(ioreq_t *p)
 {
     struct vcpu *v = current;
     spinlock_t  *buffered_io_lock;
     buffered_iopage_t *buffered_iopage =
         (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
     unsigned long tmp_write_pointer = 0;
-    int i;
-
-    /* ignore READ ioreq_t! */
-    if ( p->dir == IOREQ_READ )
-        return 0;
-
-    for ( i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++ ) {
-        if ( p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
-             p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
-                                     hvm_buffered_io_ranges[i]->length )
-            break;
-    }
-
-    if ( i == HVM_BUFFERED_IO_RANGE_NR )
-        return 0;
 
     buffered_io_lock = &v->domain->arch.hvm_domain.buffered_io_lock;
     spin_lock(buffered_io_lock);
@@ -203,6 +188,27 @@ int hvm_buffered_io_intercept(ioreq_t *p)
     spin_unlock(buffered_io_lock);
 
     return 1;
+}
+
+int hvm_buffered_io_intercept(ioreq_t *p)
+{
+    int i;
+
+    /* ignore READ ioreq_t! */
+    if ( p->dir == IOREQ_READ )
+        return 0;
+
+    for ( i = 0; i < HVM_BUFFERED_IO_RANGE_NR; i++ ) {
+        if ( p->addr >= hvm_buffered_io_ranges[i]->start_addr &&
+             p->addr + p->size - 1 < hvm_buffered_io_ranges[i]->start_addr +
+                                     hvm_buffered_io_ranges[i]->length )
+            break;
+    }
+
+    if ( i == HVM_BUFFERED_IO_RANGE_NR )
+        return 0;
+
+    return hvm_buffered_io_send(p);
 }
 
 int hvm_mmio_intercept(ioreq_t *p)

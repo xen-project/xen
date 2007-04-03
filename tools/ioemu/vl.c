@@ -6670,6 +6670,9 @@ int main(int argc, char **argv)
     }
     free(page_array);
 #endif
+
+    timeoffset_get();
+
 #else  /* !CONFIG_DM */
 
     phys_ram_base = qemu_vmalloc(phys_ram_size);

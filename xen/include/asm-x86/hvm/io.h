@@ -127,6 +127,7 @@ static inline int hvm_portio_intercept(ioreq_t *p)
 }
 
 extern int hvm_mmio_intercept(ioreq_t *p);
+extern int hvm_buffered_io_send(ioreq_t *p);
 extern int hvm_buffered_io_intercept(ioreq_t *p);
 
 static inline int register_portio_handler(
@@ -145,6 +146,7 @@ static inline int irq_masked(unsigned long eflags)
 
 extern void send_pio_req(unsigned long port, unsigned long count, int size,
                          paddr_t value, int dir, int df, int value_is_ptr);
+void send_timeoffset_req(unsigned long timeoff);
 extern void handle_mmio(unsigned long gpa);
 extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 extern void hvm_io_assist(struct vcpu *v);

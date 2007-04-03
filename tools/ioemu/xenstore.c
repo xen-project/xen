@@ -567,3 +567,72 @@ int xenstore_unsubscribe_from_hotplug_status(struct xs_handle *handle,
 
     return rc;
 }
+
+char *xenstore_vm_read(int domid, char *key, int *len)
+{
+    char *buf = NULL, *path = NULL, *value = NULL;
+
+    if (xsh == NULL)
+	goto out;
+
+    path = xs_get_domain_path(xsh, domid);
+    if (path == NULL) {
+	fprintf(logfile, "xs_get_domain_path(%d): error\n", domid);
+	goto out;
+    }
+
+    pasprintf(&buf, "%s/vm", path);
+    free(path);
+    path = xs_read(xsh, XBT_NULL, buf, NULL);
+    if (path == NULL) {
+	fprintf(logfile, "xs_read(%s): read error\n", buf);
+	goto out;
+    }
+
+    pasprintf(&buf, "%s/%s", path, key);
+    value = xs_read(xsh, XBT_NULL, buf, len);
+    if (value == NULL) {
+	fprintf(logfile, "xs_read(%s): read error\n", buf);
+	goto out;
+    }
+
+ out:
+    free(path);
+    free(buf);
+    return value;
+}
+
+int xenstore_vm_write(int domid, char *key, char *value)
+{
+    char *buf = NULL, *path = NULL;
+    int rc = -1;
+
+    if (xsh == NULL)
+	goto out;
+
+    path = xs_get_domain_path(xsh, domid);
+    if (path == NULL) {
+	fprintf(logfile, "xs_get_domain_path(%d): error\n");
+	goto out;
+    }
+
+    pasprintf(&buf, "%s/vm", path);
+    free(path);
+    path = xs_read(xsh, XBT_NULL, buf, NULL);
+    if (path == NULL) {
+	fprintf(logfile, "xs_read(%s): read error\n", buf);
+	goto out;
+    }
+
+    pasprintf(&buf, "%s/%s", path, key);
+    rc = xs_write(xsh, XBT_NULL, buf, value, strlen(value));
+    if (rc) {
+	fprintf(logfile, "xs_write(%s, %s): write error\n", buf, key);
+	goto out;
+    }
+
+ out:
+    free(path);
+    free(buf);
+    return rc;
+}

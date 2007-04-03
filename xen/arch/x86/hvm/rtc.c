@@ -157,6 +157,10 @@ static inline int from_bcd(RTCState *s, int a)
 static void rtc_set_time(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
+    unsigned long before, after; /* XXX s_time_t */
+      
+    before = mktime(tm->tm_year, tm->tm_mon, tm->tm_mday,
+		    tm->tm_hour, tm->tm_min, tm->tm_sec);
     
     tm->tm_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS]);
     tm->tm_min = from_bcd(s, s->hw.cmos_data[RTC_MINUTES]);
@@ -168,6 +172,10 @@ static void rtc_set_time(RTCState *s)
     tm->tm_mday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_MONTH]);
     tm->tm_mon = from_bcd(s, s->hw.cmos_data[RTC_MONTH]) - 1;
     tm->tm_year = from_bcd(s, s->hw.cmos_data[RTC_YEAR]) + 100;
+
+    after = mktime(tm->tm_year, tm->tm_mon, tm->tm_mday,
+                   tm->tm_hour, tm->tm_min, tm->tm_sec);
+    send_timeoffset_req(after - before);
 }
 
 static void rtc_copy_date(RTCState *s)

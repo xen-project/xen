@@ -74,6 +74,8 @@ int vcpus = 1;
 
 int xc_handle;
 
+long time_offset = 0;
+
 shared_iopage_t *shared_page = NULL;
 
 #define BUFFER_IO_MAX_DELAY  100
@@ -439,6 +441,34 @@ void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
     req->data = tmp1;
 }
 
+void timeoffset_get()
+{
+    char *p;
+
+    p = xenstore_vm_read(domid, "rtc/timeoffset", NULL);
+    if (!p)
+	return;
+
+    if (sscanf(p, "%ld", &time_offset) == 1)
+	fprintf(logfile, "Time offset set %ld\n", time_offset);
+    else
+	time_offset = 0;
+
+    xc_domain_set_time_offset(xc_handle, domid, time_offset);
+
+    free(p);
+}
+
+void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
+{
+    char b[64];
+
+    time_offset += (ulong)req->data;
+
+    sprintf(b, "%ld", time_offset);
+    xenstore_vm_write(domid, "rtc/timeoffset", b);
+}
+
 void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
 {
     unsigned long tmp1;
@@ -478,6 +508,9 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
     case IOREQ_TYPE_XCHG:
         cpu_ioreq_xchg(env, req);
         break;
+    case IOREQ_TYPE_TIMEOFFSET:
+	cpu_ioreq_timeoffset(env, req);
+	break;
     default:
         hw_error("Invalid ioreq type 0x%x\n", req->type);
     }

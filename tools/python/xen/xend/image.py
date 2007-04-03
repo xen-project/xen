@@ -256,9 +256,12 @@ class HVMImageHandler(ImageHandler):
         self.xauthority = vmConfig['platform'].get('xauthority')
         self.vncconsole = vmConfig['platform'].get('vncconsole')
 
+        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
+
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
+        self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
 
         self.pid = None
 
