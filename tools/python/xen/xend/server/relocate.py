@@ -106,8 +106,12 @@ class RelocationProtocol(protocol.Protocol):
     def op_receive(self, name, _):
         if self.transport:
             self.send_reply(["ready", name])
-            XendDomain.instance().domain_restore_fd(
-                self.transport.sock.fileno())
+            try:
+                XendDomain.instance().domain_restore_fd(
+                    self.transport.sock.fileno())
+            except:
+                self.send_error()
+                self.close()
         else:
             log.error(name + ": no transport")
             raise XendError(name + ": no transport")
