@@ -38,7 +38,7 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
-    unsigned long max_pfn = max_gpfn(xc_handle, info->domid);
+    unsigned long p2m_size = max_gpfn(xc_handle, info->domid);
     xc_core_memory_map_t *map;
 
     map = malloc(sizeof(*map));
@@ -49,7 +49,7 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
     }
 
     map->addr = 0;
-    map->size = max_pfn << PAGE_SHIFT;
+    map->size = p2m_size << PAGE_SHIFT;
 
     *mapp = map;
     *nr_entries = 1;
@@ -65,13 +65,13 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
     xen_pfn_t *live_p2m_frame_list_list = NULL;
     xen_pfn_t *live_p2m_frame_list = NULL;
     uint32_t dom = info->domid;
-    unsigned long max_pfn = max_gpfn(xc_handle, info->domid);
+    unsigned long p2m_size = max_gpfn(xc_handle, info->domid);
     int ret = -1;
     int err;
 
-    if ( max_pfn < info->nr_pages  )
+    if ( p2m_size < info->nr_pages  )
     {
-        ERROR("max_pfn < nr_pages -1 (%lx < %lx", max_pfn, info->nr_pages - 1);
+        ERROR("p2m_size < nr_pages -1 (%lx < %lx", p2m_size, info->nr_pages - 1);
         goto out;
     }
 
@@ -106,7 +106,7 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
         goto out;
     }
 
-    *pfnp = max_pfn;
+    *pfnp = p2m_size;
 
     ret = 0;
 

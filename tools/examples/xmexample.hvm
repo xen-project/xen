@@ -180,6 +180,10 @@ serial='pty'
 
 
 #-----------------------------------------------------------------------------
+#    set the real time clock offset in seconds [default=0 i.e. same as dom0]
+#rtc_timeoffset=3600
+
+#-----------------------------------------------------------------------------
 #    start in full screen
 #full-screen=1   
 

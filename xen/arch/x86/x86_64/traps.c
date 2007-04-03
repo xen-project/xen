@@ -171,7 +171,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx\n", regs->r15);
-    show_stack_overflow(regs->rsp);
+    show_stack_overflow(cpu, regs->rsp);
 
     panic("DOUBLE FAULT -- system shutdown\n");
 }
@@ -270,18 +270,18 @@ void __init percpu_traps_init(void)
     stack_bottom = (char *)get_stack_bottom();
     stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
 
-    /* Double-fault handler has its own per-CPU 1kB stack. */
-    init_tss[cpu].ist[0] = (unsigned long)&stack[1024];
+    /* Double-fault handler has its own per-CPU 2kB stack. */
+    init_tss[cpu].ist[0] = (unsigned long)&stack[2048];
 
     /* NMI handler has its own per-CPU 1kB stack. */
-    init_tss[cpu].ist[1] = (unsigned long)&stack[2048];
+    init_tss[cpu].ist[1] = (unsigned long)&stack[3072];
 
     /*
      * Trampoline for SYSCALL entry from long mode.
      */
 
     /* Skip the NMI and DF stacks. */
-    stack = &stack[2048];
+    stack = &stack[3072];
     wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
 
     /* movq %rsp, saversp(%rip) */

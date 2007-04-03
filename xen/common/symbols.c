@@ -16,6 +16,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/string.h>
+#include <xen/spinlock.h>
 
 extern unsigned long symbols_addresses[];
 extern unsigned long symbols_num_syms;
@@ -140,12 +141,15 @@ const char *symbols_lookup(unsigned long addr,
 void __print_symbol(const char *fmt, unsigned long address)
 {
     const char *name;
-    unsigned long offset, size;
-    char namebuf[KSYM_NAME_LEN+1];
+    unsigned long offset, size, flags;
 
+    static DEFINE_SPINLOCK(lock);
+    static char namebuf[KSYM_NAME_LEN+1];
 #define BUFFER_SIZE sizeof("%s+%#lx/%#lx [%s]") + KSYM_NAME_LEN + \
 			2*(BITS_PER_LONG*3/10) + 1
-    char buffer[BUFFER_SIZE];
+    static char buffer[BUFFER_SIZE];
+
+    spin_lock_irqsave(&lock, flags);
 
     name = symbols_lookup(address, &size, &offset, namebuf);
 
@@ -155,4 +159,6 @@ void __print_symbol(const char *fmt, unsigned long address)
         snprintf(buffer, BUFFER_SIZE, "%s+%#lx/%#lx", name, offset, size);
 
     printk(fmt, buffer);
+
+    spin_unlock_irqrestore(&lock, flags);
 }

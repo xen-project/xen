@@ -79,6 +79,30 @@ struct host_save_area *alloc_host_save_area(void)
     return hsa;
 }
 
+static void disable_intercept_for_msr(char *msr_bitmap, u32 msr)
+{
+    /*
+     * See AMD64 Programmers Manual, Vol 2, Section 15.10 (MSR-Bitmap Address).
+     */
+    if ( msr <= 0x1fff )
+    {
+        __clear_bit(msr*2, msr_bitmap + 0x000); 
+        __clear_bit(msr*2+1, msr_bitmap + 0x000); 
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        __clear_bit(msr*2, msr_bitmap + 0x800);
+        __clear_bit(msr*2+1, msr_bitmap + 0x800);
+    } 
+    else if ( (msr >= 0xc001000) && (msr <= 0xc0011fff) )
+    {
+        msr &= 0x1fff;
+        __clear_bit(msr*2, msr_bitmap + 0x1000);
+        __clear_bit(msr*2+1, msr_bitmap + 0x1000);
+    }
+}
+
 static int construct_vmcb(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
@@ -114,6 +138,10 @@ static int construct_vmcb(struct vcpu *v)
     if ( arch_svm->msrpm == NULL )
         return -ENOMEM;
     memset(arch_svm->msrpm, 0xff, MSRPM_SIZE);
+
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_FS_BASE);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_GS_BASE);
+
     vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
     vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);
 

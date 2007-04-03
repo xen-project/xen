@@ -3,6 +3,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * xc_gnttab functions:
+ * Copyright (c) 2007, D G Murray <Derek.Murray@cl.cam.ac.uk>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, version 2 of the
@@ -13,6 +16,7 @@
 
 #include <xen/memory.h>
 #include <xen/sys/evtchn.h>
+#include <xen/sys/gntdev.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -361,6 +365,158 @@ void discard_file_cache(int fd, int flush)
 
  out:
     errno = saved_errno;
+}
+
+#define GNTTAB_DEV_NAME "/dev/xen/gntdev"
+
+int xc_gnttab_open(void)
+{
+    struct stat st;
+    int fd;
+    int devnum;
+    
+    devnum = xc_find_device_number("gntdev");
+    
+    /* Make sure any existing device file links to correct device. */
+    if ( (lstat(GNTTAB_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
+         (st.st_rdev != devnum) )
+        (void)unlink(GNTTAB_DEV_NAME);
+    
+reopen:
+    if ( (fd = open(GNTTAB_DEV_NAME, O_RDWR)) == -1 )
+    {
+        if ( (errno == ENOENT) &&
+             ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
+             (mknod(GNTTAB_DEV_NAME, S_IFCHR|0600, devnum) == 0) )
+            goto reopen;
+        
+        PERROR("Could not open grant table interface");
+        return -1;
+    }
+    
+    return fd;
+}
+
+int xc_gnttab_close(int xcg_handle)
+{
+    return close(xcg_handle);
+}
+
+void *xc_gnttab_map_grant_ref(int xcg_handle,
+                              uint32_t domid,
+                              uint32_t ref,
+                              int prot)
+{
+    struct ioctl_gntdev_map_grant_ref map;
+    void *addr;
+    
+    map.count = 1;
+    map.refs[0].domid = domid;
+    map.refs[0].ref   = ref;
+
+    if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, &map) )
+        return NULL;
+    
+    addr = mmap(NULL, PAGE_SIZE, prot, MAP_SHARED, xcg_handle, map.index);
+    if ( addr == MAP_FAILED )
+    {
+        int saved_errno = errno;
+        struct ioctl_gntdev_unmap_grant_ref unmap_grant;
+        /* Unmap the driver slots used to store the grant information. */
+        unmap_grant.index = map.index;
+        unmap_grant.count = 1;
+        ioctl(xcg_handle, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
+        errno = saved_errno;
+        return NULL;
+    }
+    
+    return addr;
+}
+
+void *xc_gnttab_map_grant_refs(int xcg_handle,
+                               uint32_t count,
+                               uint32_t *domids,
+                               uint32_t *refs,
+                               int prot)
+{
+    struct ioctl_gntdev_map_grant_ref *map;
+    void *addr = NULL;
+    int i;
+    
+    map = malloc(sizeof(*map) +
+                 (count-1) * sizeof(struct ioctl_gntdev_map_grant_ref));
+    if ( map == NULL )
+        return NULL;
+
+    for ( i = 0; i < count; i++ )
+    {
+        map->refs[i].domid = domids[i];
+        map->refs[i].ref   = refs[i];
+    }
+
+    map->count = count;
+    
+    if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, &map) )
+        goto out;
+
+    addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, xcg_handle,
+                map->index);
+    if ( addr == MAP_FAILED )
+    {
+        int saved_errno = errno;
+        struct ioctl_gntdev_unmap_grant_ref unmap_grant;
+        /* Unmap the driver slots used to store the grant information. */
+        unmap_grant.index = map->index;
+        unmap_grant.count = count;
+        ioctl(xcg_handle, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
+        errno = saved_errno;
+        addr = NULL;
+    }
+
+ out:
+    free(map);
+    return addr;
+}
+
+int xc_gnttab_munmap(int xcg_handle,
+                     void *start_address,
+                     uint32_t count)
+{
+    struct ioctl_gntdev_get_offset_for_vaddr get_offset;
+    struct ioctl_gntdev_unmap_grant_ref unmap_grant;
+    int rc;
+
+    if ( start_address == NULL )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* First, it is necessary to get the offset which was initially used to
+     * mmap() the pages.
+     */
+    get_offset.vaddr = (unsigned long)start_address;
+    if ( (rc = ioctl(xcg_handle, IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR, 
+                     &get_offset)) )
+        return rc;
+
+    if ( get_offset.count != count )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* Next, unmap the memory. */
+    if ( (rc = munmap(start_address, count * getpagesize())) )
+        return rc;
+    
+    /* Finally, unmap the driver slots used to store the grant information. */
+    unmap_grant.index = get_offset.offset;
+    unmap_grant.count = count;
+    if ( (rc = ioctl(xcg_handle, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant)) )
+        return rc;
+
+    return 0;
 }
 
 /*

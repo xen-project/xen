@@ -51,7 +51,6 @@
 #define BLOCK_PROCESSSZ 4096
 
 static int maxfds, *qcowio_fd, *aio_fd, running = 1, complete = 0; 
-static int read_complete = 0, write_complete = 0;
 static int returned_read_events = 0, returned_write_events = 0;
 static int submit_events = 0;
 static uint32_t read_idx = 0, write_idx = 0;
@@ -109,8 +108,6 @@ static int send_write_responses(struct disk_driver *dd, int res, uint64_t sec,
 	written += BLOCK_PROCESSSZ;
 	returned_write_events++;
 	write_idx = idx;
-	if (complete && (returned_write_events == submit_events)) 
-		write_complete = 1;
 
 	debug_output(written, dd->td_state->size << 9);
 	free(private);
@@ -126,8 +123,6 @@ static int send_read_responses(struct disk_driver *dd, int res, uint64_t sec,
 	
 	returned_read_events++;
 	read_idx = idx;
-	if (complete && (returned_read_events == submit_events)) 
-		read_complete = 1;
 	
 	ret = ddaio.drv->td_queue_write(&ddaio, idx, BLOCK_PROCESSSZ>>9, private, 
 					send_write_responses, idx, private);
@@ -136,7 +131,7 @@ static int send_read_responses(struct disk_driver *dd, int res, uint64_t sec,
 		return 0;
 	}
 
-	if ( (complete && returned_read_events == submit_events) || 
+	if ( (returned_read_events == submit_events) || 
 	     (returned_read_events % 10 == 0) ) {
 		ddaio.drv->td_submit(&ddaio);
 	}
@@ -299,6 +294,7 @@ int main(int argc, char *argv[])
 			}
 		
 			/*Attempt to read 4k sized blocks*/
+			submit_events++;
 			ret = ddqcow.drv->td_queue_read(&ddqcow, i>>9,
 							BLOCK_PROCESSSZ>>9, buf, 
 							send_read_responses, i>>9, buf);
@@ -309,7 +305,6 @@ int main(int argc, char *argv[])
 				exit(-1);
 			} else {
 				i += BLOCK_PROCESSSZ;
-				submit_events++;
 			}
 
 			if (i >= ddqcow.td_state->size<<9) {

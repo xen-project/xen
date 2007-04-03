@@ -285,23 +285,32 @@ void show_xen_trace()
     show_trace(&regs);
 }
 
-void show_stack_overflow(unsigned long esp)
+void show_stack_overflow(unsigned int cpu, unsigned long esp)
 {
 #ifdef MEMORY_GUARD
-    unsigned long esp_top;
+    unsigned long esp_top, esp_bottom;
     unsigned long *stack, addr;
 
-    esp_top = (esp | (STACK_SIZE - 1)) - DEBUG_STACK_SIZE;
+    esp_bottom = (esp | (STACK_SIZE - 1)) + 1;
+    esp_top    = esp_bottom - DEBUG_STACK_SIZE;
+
+    printk("Valid stack range: %p-%p, sp=%p, tss.esp0=%p\n",
+           (void *)esp_top, (void *)esp_bottom, (void *)esp,
+           (void *)init_tss[cpu].esp0);
 
     /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
     if ( ((unsigned long)(esp - esp_top) > 512) &&
          ((unsigned long)(esp_top - esp) > 512) )
+    {
+        printk("No stack overflow detected. Skipping stack trace.\n");
         return;
+    }
 
     if ( esp < esp_top )
         esp = esp_top;
 
-    printk("Xen stack overflow:\n   ");
+    printk("Xen stack overflow (dumping trace %p-%p):\n   ",
+           (void *)esp, (void *)esp_bottom);
 
     stack = (unsigned long *)esp;
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )

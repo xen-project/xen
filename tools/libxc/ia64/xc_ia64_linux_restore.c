@@ -14,8 +14,14 @@
 
 #define PFN_TO_KB(_pfn) ((_pfn) << (PAGE_SHIFT - 10))
 
-/* total number of pages used by the current guest */
-static unsigned long max_pfn;
+/* number of pfns this guest has (i.e. number of entries in the P2M) */
+static unsigned long p2m_size;
+
+/* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
+static unsigned long nr_pfns;
+
+/* largest possible value of nr_pfns (i.e. domain's maximum memory size) */
+static unsigned long max_nr_pfns;
 
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
@@ -57,9 +63,9 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 
 int
 xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                 unsigned long nr_pfns, unsigned int store_evtchn,
-                 unsigned long *store_mfn, unsigned int console_evtchn,
-                 unsigned long *console_mfn)
+                 unsigned long p2msize, unsigned long maxnrpfns,
+                 unsigned int store_evtchn, unsigned long *store_mfn,
+                 unsigned int console_evtchn, unsigned long *console_mfn)
 {
     DECLARE_DOMCTL;
     int rc = 1, i;
@@ -79,10 +85,13 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
 
-    max_pfn = nr_pfns;
+    p2m_size = p2msize;
+    max_nr_pfns = maxnrpfns;
 
-    DPRINTF("xc_linux_restore start: max_pfn = %ld\n", max_pfn);
+    /* For info only */
+    nr_pfns = 0;
 
+    DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
     if (!read_exact(io_fd, &ver, sizeof(unsigned long))) {
 	ERROR("Error when reading version");
@@ -99,29 +108,29 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         return 1;
     }
 
-    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) {
+    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_nr_pfns)) != 0) {
         errno = ENOMEM;
         goto out;
     }
 
     /* Get pages.  */
-    page_array = malloc(max_pfn * sizeof(unsigned long));
+    page_array = malloc(p2m_size * sizeof(unsigned long));
     if (page_array == NULL) {
         ERROR("Could not allocate memory");
         goto out;
     }
 
-    for ( i = 0; i < max_pfn; i++ )
+    for ( i = 0; i < p2m_size; i++ )
         page_array[i] = i;
 
-    if ( xc_domain_memory_populate_physmap(xc_handle, dom, max_pfn,
+    if ( xc_domain_memory_populate_physmap(xc_handle, dom, p2m_size,
                                            0, 0, page_array) )
     {
         ERROR("Failed to allocate memory for %ld KB to dom %d.\n",
-              PFN_TO_KB(max_pfn), dom);
+              PFN_TO_KB(p2m_size), dom);
         goto out;
     }
-    DPRINTF("Allocated memory by %ld KB\n", PFN_TO_KB(max_pfn));
+    DPRINTF("Allocated memory by %ld KB\n", PFN_TO_KB(p2m_size));
 
     if (!read_exact(io_fd, &domctl.u.arch_setup, sizeof(domctl.u.arch_setup))) {
         ERROR("read: domain setup");
@@ -131,9 +140,9 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Build firmware (will be overwritten).  */
     domctl.domain = (domid_t)dom;
     domctl.u.arch_setup.flags &= ~XEN_DOMAINSETUP_query;
-    domctl.u.arch_setup.bp = ((nr_pfns - 3) << PAGE_SHIFT)
+    domctl.u.arch_setup.bp = ((p2m_size - 3) << PAGE_SHIFT)
                            + sizeof (start_info_t);
-    domctl.u.arch_setup.maxmem = (nr_pfns - 3) << PAGE_SHIFT;
+    domctl.u.arch_setup.maxmem = (p2m_size - 3) << PAGE_SHIFT;
     
     domctl.cmd = XEN_DOMCTL_arch_setup;
     if (xc_domctl(xc_handle, &domctl))
@@ -157,8 +166,6 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         }
 	if (gmfn == INVALID_MFN)
 		break;
-
-       //DPRINTF("xc_linux_restore: page %lu/%lu at %lx\n", gmfn, max_pfn, pfn);
 
 	if (read_page(xc_handle, io_fd, dom, gmfn) < 0)
 		goto out;
@@ -281,7 +288,7 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     start_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                       PROT_READ | PROT_WRITE, gmfn);
-    start_info->nr_pages = max_pfn;
+    start_info->nr_pages = p2m_size;
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
     start_info->flags = 0;
     *store_mfn = start_info->store_mfn;

@@ -177,3 +177,25 @@ On Linux:
    an initial ram disk, just like a native system e.g.
     # depmod 2.6.16-xen
     # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.16-xen.img 2.6.16-xen
+
+
+Python Runtime Libraries
+========================
+
+Xend (the Xen daemon) has the following runtime dependencies:
+
+    * Python 2.3 or later.
+      In many distros, the XML-aspects to the standard library
+      (xml.dom.minidom etc) are broken out into a separate python-xml package.
+      This is also required.
+
+          URL:    http://www.python.org/
+          Debian: python, python-xml
+
+    * For optional SSL support, pyOpenSSL:
+          URL:    http://pyopenssl.sourceforge.net/
+          Debian: python-pyopenssl
+
+    * For optional PAM support, PyPAM:
+          URL:    http://www.pangalactic.org/PyPAM/
+          Debian: python-pam

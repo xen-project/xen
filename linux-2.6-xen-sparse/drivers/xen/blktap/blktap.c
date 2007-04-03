@@ -44,6 +44,7 @@
 #include <asm/hypervisor.h>
 #include "common.h"
 #include <xen/balloon.h>
+#include <xen/driver_util.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -55,30 +56,6 @@
 
 #define MAX_TAP_DEV 256     /*the maximum number of tapdisk ring devices    */
 #define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
-
-
-struct class *xen_class;
-EXPORT_SYMBOL_GPL(xen_class);
-
-/*
- * Setup the xen class.  This should probably go in another file, but
- * since blktap is the only user of it so far, it gets to keep it.
- */
-int setup_xen_class(void)
-{
-	int ret;
-
-	if (xen_class)
-		return 0;
-
-	xen_class = class_create(THIS_MODULE, "xen");
-	if ((ret = IS_ERR(xen_class))) {
-		xen_class = NULL;
-		return ret;
-	}
-
-	return 0;
-}
 
 /*
  * The maximum number of requests that can be outstanding at any time
@@ -347,6 +324,7 @@ static const struct file_operations blktap_fops = {
 
 static tap_blkif_t *get_next_free_dev(void)
 {
+	struct class *class;
 	tap_blkif_t *info;
 	int minor;
 
@@ -409,9 +387,10 @@ found:
 		wmb();
 		tapfds[minor] = info;
 
-		class_device_create(xen_class, NULL,
-				    MKDEV(blktap_major, minor), NULL,
-				    "blktap%d", minor);
+		if ((class = get_xen_class()) != NULL)
+			class_device_create(class, NULL,
+					    MKDEV(blktap_major, minor), NULL,
+					    "blktap%d", minor);
 	}
 
 out:
@@ -1487,6 +1466,7 @@ static void make_response(blkif_t *blkif, unsigned long id,
 static int __init blkif_init(void)
 {
 	int i, ret;
+	struct class *class;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -1522,7 +1502,7 @@ static int __init blkif_init(void)
 	DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
 
 	/* Make sure the xen class exists */
-	if (!setup_xen_class()) {
+	if ((class = get_xen_class()) != NULL) {
 		/*
 		 * This will allow udev to create the blktap ctrl device.
 		 * We only want to create blktap0 first.  We don't want
@@ -1530,7 +1510,7 @@ static int __init blkif_init(void)
 		 * We only create the device when a request of a new device is
 		 * made.
 		 */
-		class_device_create(xen_class, NULL,
+		class_device_create(class, NULL,
 				    MKDEV(blktap_major, 0), NULL,
 				    "blktap0");
 	} else {

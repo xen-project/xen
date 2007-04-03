@@ -148,17 +148,16 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
-/* Size in bytes of the P2M (rounded up to the nearest PAGE_SIZE bytes) */
-#define P2M_SIZE        ROUNDUP((max_pfn * sizeof(xen_pfn_t)), PAGE_SHIFT)
-
 /* Number of xen_pfn_t in a page */
 #define fpp             (PAGE_SIZE/sizeof(xen_pfn_t))
 
+/* XXX SMH: following 3 skanky macros rely on variable p2m_size being set */
+
 /* Number of entries in the pfn_to_mfn_frame_list_list */
-#define P2M_FLL_ENTRIES (((max_pfn)+(fpp*fpp)-1)/(fpp*fpp))
+#define P2M_FLL_ENTRIES (((p2m_size)+(fpp*fpp)-1)/(fpp*fpp))
 
 /* Number of entries in the pfn_to_mfn_frame_list */
-#define P2M_FL_ENTRIES  (((max_pfn)+fpp-1)/fpp)
+#define P2M_FL_ENTRIES  (((p2m_size)+fpp-1)/fpp)
 
 /* Size in bytes of the pfn_to_mfn_frame_list     */
 #define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*sizeof(unsigned long))

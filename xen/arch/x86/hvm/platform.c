@@ -921,6 +921,26 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
     hvm_send_assist_req(v);
 }
 
+void send_timeoffset_req(unsigned long timeoff)
+{
+    ioreq_t p[1];
+
+    if ( timeoff == 0 )
+        return;
+
+    memset(p, 0, sizeof(*p));
+
+    p->type = IOREQ_TYPE_TIMEOFFSET;
+    p->size = 4;
+    p->dir = IOREQ_WRITE;
+    p->data = timeoff;
+
+    p->state = STATE_IOREQ_READY;
+
+    if ( !hvm_buffered_io_send(p) )
+        printk("Unsuccessful timeoffset update\n");
+}
+
 static void mmio_operands(int type, unsigned long gpa,
                           struct hvm_io_op *mmio_op,
                           unsigned char op_size)

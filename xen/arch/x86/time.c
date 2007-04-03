@@ -573,7 +573,7 @@ static void init_platform_timer(void)
  * machines were long is 32-bit! (However, as time_t is signed, we
  * will already get problems at other places on 2038-01-19 03:14:08)
  */
-static inline unsigned long
+unsigned long
 mktime (unsigned int year, unsigned int mon,
         unsigned int day, unsigned int hour,
         unsigned int min, unsigned int sec)

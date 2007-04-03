@@ -95,7 +95,7 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     unsigned long pfn_array_size = max_pfn + 1;
 
     /* Number of pages of memory the guest has.  *Not* the same as max_pfn. */
-    unsigned long nr_pages = max_pfn + 1;
+    unsigned long nr_pages = max_pfn;
     /* MMIO hole doesn't contain RAM */
     if ( nr_pages >= HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT ) 
         nr_pages -= HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT; 
@@ -270,7 +270,6 @@ int xc_hvm_restore(int xc_handle, int io_fd,
 
     }/*while 1*/
     
-/*    xc_set_hvm_param(xc_handle, dom, HVM_PARAM_APIC_ENABLED, apic);*/
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
 
@@ -279,13 +278,22 @@ int xc_hvm_restore(int xc_handle, int io_fd,
     else
         shared_page_nr = (v_end >> PAGE_SHIFT) - 1;
 
+    /* Ensure we clear these pages */
+    if ( xc_clear_domain_page(xc_handle, dom, shared_page_nr) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-1) ||
+         xc_clear_domain_page(xc_handle, dom, shared_page_nr-2) ) {
+        rc = -1;
+        goto out;
+    }
+
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, shared_page_nr-1);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, shared_page_nr-2);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, shared_page_nr);
 
     /* caculate the store_mfn , wrong val cause hang when introduceDomain */
     *store_mfn = (v_end >> PAGE_SHIFT) - 2;
-    DPRINTF("hvm restore:calculate new store_mfn=0x%lx,v_end=0x%llx..\n", *store_mfn, v_end);
+    DPRINTF("hvm restore: calculate new store_mfn=0x%lx, v_end=0x%llx.\n", 
+            *store_mfn, v_end);
 
     if (!read_exact(io_fd, &nr_vcpus, sizeof(uint32_t))) {
         ERROR("error read nr vcpu !\n");

@@ -20,7 +20,6 @@
 
 from xen.xm.main import server, get_default_SR
 from xml.dom.minidom import parse, getDOMImplementation
-from xml.dom.ext import PrettyPrint
 from xml.parsers.xmlproc import xmlproc, xmlval, xmldtd
 from xen.xend import sxp
 from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \

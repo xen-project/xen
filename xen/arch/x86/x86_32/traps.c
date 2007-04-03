@@ -139,7 +139,7 @@ void show_page_walk(unsigned long addr)
     unmap_domain_page(l1t);
 }
 
-#define DOUBLEFAULT_STACK_SIZE 1024
+#define DOUBLEFAULT_STACK_SIZE 2048
 static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
 
@@ -167,7 +167,7 @@ asmlinkage void do_double_fault(void)
            tss->esi, tss->edi, tss->ebp, tss->esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            tss->ds, tss->es, tss->fs, tss->gs, tss->ss);
-    show_stack_overflow(tss->esp);
+    show_stack_overflow(cpu, tss->esp);
 
     panic("DOUBLE FAULT -- system shutdown\n");
 }
@@ -268,8 +268,7 @@ void __init percpu_traps_init(void)
     tss->ds     = __HYPERVISOR_DS;
     tss->es     = __HYPERVISOR_DS;
     tss->ss     = __HYPERVISOR_DS;
-    tss->esp    = (unsigned long)
-        &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+    tss->esp    = (unsigned long)&doublefault_stack[DOUBLEFAULT_STACK_SIZE];
     tss->__cr3  = __pa(idle_pg_table);
     tss->cs     = __HYPERVISOR_CS;
     tss->eip    = (unsigned long)do_double_fault;

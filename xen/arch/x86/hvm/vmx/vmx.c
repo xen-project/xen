@@ -51,6 +51,8 @@
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
 
+char *vmx_msr_bitmap;
+
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
 
@@ -1005,14 +1007,14 @@ static void disable_intercept_for_msr(u32 msr)
      */
     if ( msr <= 0x1fff )
     {
-        __clear_bit(msr, hvm_msr_bitmap + 0x000); /* read-low */
-        __clear_bit(msr, hvm_msr_bitmap + 0x800); /* write-low */
+        __clear_bit(msr, vmx_msr_bitmap + 0x000); /* read-low */
+        __clear_bit(msr, vmx_msr_bitmap + 0x800); /* write-low */
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        __clear_bit(msr, hvm_msr_bitmap + 0x400); /* read-high */
-        __clear_bit(msr, hvm_msr_bitmap + 0xc00); /* write-high */
+        __clear_bit(msr, vmx_msr_bitmap + 0x400); /* read-high */
+        __clear_bit(msr, vmx_msr_bitmap + 0xc00); /* write-high */
     }
 }
 
@@ -1105,6 +1107,9 @@ int start_vmx(void)
     if ( cpu_has_vmx_msr_bitmap )
     {
         printk("VMX: MSR intercept bitmap enabled\n");
+        vmx_msr_bitmap = alloc_xenheap_page();
+        BUG_ON(vmx_msr_bitmap == NULL);
+        memset(vmx_msr_bitmap, ~0, PAGE_SIZE);
         disable_intercept_for_msr(MSR_FS_BASE);
         disable_intercept_for_msr(MSR_GS_BASE);
     }

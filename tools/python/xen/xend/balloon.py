@@ -25,9 +25,7 @@ import XendDomain
 import XendOptions
 from XendLogging import log
 from XendError import VmError
-
-
-PROC_XEN_BALLOON = '/proc/xen/balloon'
+import osdep
 
 RETRY_LIMIT = 20
 RETRY_LIMIT_INCR = 5
@@ -51,19 +49,7 @@ def _get_proc_balloon(label):
     """Returns the value for the named label.  Returns None if the label was
        not found or the value was non-numeric."""
 
-    f = file(PROC_XEN_BALLOON, 'r')
-    try:
-        for line in f:
-            keyvalue = line.split(':')
-            if keyvalue[0] == label:
-                values = keyvalue[1].split()
-                if values[0].isdigit():
-                    return int(values[0])
-                else:
-                    return None
-        return None
-    finally:
-        f.close()
+    return osdep.lookup_balloon_stat(label)
 
 def get_dom0_current_alloc():
     """Returns the current memory allocation (in KiB) of dom0."""

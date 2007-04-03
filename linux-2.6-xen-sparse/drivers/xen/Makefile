@@ -3,10 +3,11 @@ obj-y	+= console/
 obj-y	+= evtchn/
 obj-y	+= privcmd/
 obj-y	+= xenbus/
+obj-y	+= gntdev/
+obj-y	+= balloon/
+obj-y	+= char/
 
-obj-$(CONFIG_XEN_UTIL)			+= util.o
-obj-$(CONFIG_XEN_BALLOON)		+= balloon/
-obj-$(CONFIG_XEN_DEVMEM)		+= char/
+obj-y	+= util.o
 obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= blkback/
 obj-$(CONFIG_XEN_BLKDEV_TAP)		+= blktap/
 obj-$(CONFIG_XEN_NETDEV_BACKEND)	+= netback/

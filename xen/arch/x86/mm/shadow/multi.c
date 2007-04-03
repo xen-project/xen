@@ -2823,8 +2823,8 @@ static int sh_page_fault(struct vcpu *v,
          * are OK, this can only have been caused by a failed
          * shadow_set_l*e(), which will have crashed the guest.
          * Get out of the fault handler immediately. */
-        ASSERT(d->is_shutdown);
-        unmap_walk(v, &gw); 
+        ASSERT(d->is_shutting_down);
+        unmap_walk(v, &gw);
         shadow_unlock(d);
         return 0;
     }

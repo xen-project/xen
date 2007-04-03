@@ -212,8 +212,8 @@ def _loadConfig(servers, root, reload):
                     if server_cfg[1] in [XendAPI.AUTH_PAM, XendAPI.AUTH_NONE]:
                         auth_method = server_cfg[1]
 
-                if len(server_cfg) > 2:
-                    hosts_allowed = server_cfg[2] or None
+                if len(server_cfg) > 2 and len(server_cfg[2]):
+                    hosts_allowed = map(re.compile, server_cfg[2].split(' '))
 
                 if len(server_cfg) > 4:
                     # SSL key and cert file

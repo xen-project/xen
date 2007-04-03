@@ -52,7 +52,7 @@
 /************************************************/
 /*             HAP SUPPORT FUNCTIONS            */
 /************************************************/
-mfn_t hap_alloc(struct domain *d, unsigned long backpointer)
+mfn_t hap_alloc(struct domain *d)
 {
     struct page_info *sp = NULL;
     void *p;
@@ -82,43 +82,43 @@ void hap_free(struct domain *d, mfn_t smfn)
     list_add_tail(&sp->list, &d->arch.paging.hap.freelists);
 }
 
-static int hap_alloc_p2m_pages(struct domain *d)
-{
-    struct page_info *pg;
-
-    ASSERT(hap_locked_by_me(d));
-
-    pg = mfn_to_page(hap_alloc(d, 0));
-    d->arch.paging.hap.p2m_pages += 1;
-    d->arch.paging.hap.total_pages -= 1;
-    
-    page_set_owner(pg, d);
-    pg->count_info = 1;
-    list_add_tail(&pg->list, &d->arch.paging.hap.p2m_freelist);
-
-    return 1;
-}
-
 struct page_info * hap_alloc_p2m_page(struct domain *d)
 {
-    struct list_head *entry;
     struct page_info *pg;
     mfn_t mfn;
     void *p;
 
     hap_lock(d);
-    
-    if ( list_empty(&d->arch.paging.hap.p2m_freelist) && 
-         !hap_alloc_p2m_pages(d) ) {
-        hap_unlock(d);
-        return NULL;
+
+#if CONFIG_PAGING_LEVELS == 3
+    /* Under PAE mode, top-level P2M table should be allocated below 4GB space
+     * because the size of h_cr3 is only 32-bit. We use alloc_domheap_pages to 
+     * force this requirement. This page will be de-allocated in 
+     * hap_free_p2m_page(), like other P2M pages.
+    */
+    if ( d->arch.paging.hap.p2m_pages == 0 ) 
+    {
+	pg = alloc_domheap_pages(NULL, 0, MEMF_bits(32));
+	d->arch.paging.hap.p2m_pages += 1;
     }
-    entry = d->arch.paging.hap.p2m_freelist.next;
-    list_del(entry);
-    
+    else
+#endif
+    {
+	pg = mfn_to_page(hap_alloc(d));
+	
+	d->arch.paging.hap.p2m_pages += 1;
+	d->arch.paging.hap.total_pages -= 1;
+    }	
+
+    if ( pg == NULL ) {
+	hap_unlock(d);
+	return NULL;
+    }   
+
     hap_unlock(d);
 
-    pg = list_entry(entry, struct page_info, list);
+    page_set_owner(pg, d);
+    pg->count_info = 1;
     mfn = page_to_mfn(pg);
     p = hap_map_domain_page(mfn);
     clear_page(p);
@@ -141,6 +141,7 @@ void hap_free_p2m_page(struct domain *d, struct page_info *pg)
     page_set_owner(pg, NULL); 
     free_domheap_pages(pg, 0);
     d->arch.paging.hap.p2m_pages--;
+    ASSERT( d->arch.paging.hap.p2m_pages >= 0 );
 }
 
 /* Return the size of the pool, rounded up to the nearest MB */
@@ -320,7 +321,7 @@ mfn_t hap_make_monitor_table(struct vcpu *v)
 #if CONFIG_PAGING_LEVELS == 4
     {
         mfn_t m4mfn;
-        m4mfn = hap_alloc(d, 0);
+        m4mfn = hap_alloc(d);
         hap_install_xen_entries_in_l4(v, m4mfn, m4mfn);
         return m4mfn;
     }
@@ -331,12 +332,12 @@ mfn_t hap_make_monitor_table(struct vcpu *v)
         l2_pgentry_t *l2e;
         int i;
 
-        m3mfn = hap_alloc(d, 0);
+        m3mfn = hap_alloc(d);
 
         /* Install a monitor l2 table in slot 3 of the l3 table.
          * This is used for all Xen entries, including linear maps
          */
-        m2mfn = hap_alloc(d, 0);
+        m2mfn = hap_alloc(d);
         l3e = hap_map_domain_page(m3mfn);
         l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
         hap_install_xen_entries_in_l2h(v, m2mfn);
@@ -357,7 +358,7 @@ mfn_t hap_make_monitor_table(struct vcpu *v)
     {
         mfn_t m2mfn;
         
-        m2mfn = hap_alloc(d, 0);
+        m2mfn = hap_alloc(d);
         hap_install_xen_entries_in_l2(v, m2mfn, m2mfn);
     
         return m2mfn;
@@ -390,7 +391,6 @@ void hap_domain_init(struct domain *d)
 {
     hap_lock_init(d);
     INIT_LIST_HEAD(&d->arch.paging.hap.freelists);
-    INIT_LIST_HEAD(&d->arch.paging.hap.p2m_freelist);
 }
 
 /* return 0 for success, -errno for failure */
