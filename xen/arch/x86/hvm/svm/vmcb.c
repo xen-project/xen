@@ -141,6 +141,14 @@ static int construct_vmcb(struct vcpu *v)
 
     disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_FS_BASE);
     disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_GS_BASE);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_SHADOW_GS_BASE);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_CSTAR);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_LSTAR);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_STAR);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_SYSCALL_MASK);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_IA32_SYSENTER_CS);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_IA32_SYSENTER_ESP);
+    disable_intercept_for_msr((char *)arch_svm->msrpm, MSR_IA32_SYSENTER_EIP);
 
     vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
     vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);

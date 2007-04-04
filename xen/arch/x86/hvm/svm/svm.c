@@ -131,66 +131,6 @@ static void svm_store_cpu_guest_regs(
     }
 }
 
-
-static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
-{
-    u64 msr_content = 0;
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    switch ((u32)regs->ecx)
-    {
-    case MSR_EFER:
-        msr_content = v->arch.hvm_svm.cpu_shadow_efer;
-        break;
-
-#ifdef __x86_64__
-    case MSR_FS_BASE:
-        msr_content = vmcb->fs.base;
-        goto check_long_mode;
-
-    case MSR_GS_BASE:
-        msr_content = vmcb->gs.base;
-        goto check_long_mode;
-
-    case MSR_SHADOW_GS_BASE:
-        msr_content = vmcb->kerngsbase;
-    check_long_mode:
-        if ( !svm_long_mode_enabled(v) )
-        {
-            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-            return 0;
-        }
-        break;
-#endif
-
-    case MSR_STAR:
-        msr_content = vmcb->star;
-        break;
- 
-    case MSR_LSTAR:
-        msr_content = vmcb->lstar;
-        break;
- 
-    case MSR_CSTAR:
-        msr_content = vmcb->cstar;
-        break;
- 
-    case MSR_SYSCALL_MASK:
-        msr_content = vmcb->sfmask;
-        break;
-    default:
-        return 0;
-    }
-
-    HVM_DBG_LOG(DBG_LEVEL_2, "msr_content: %"PRIx64"\n",
-                msr_content);
-
-    regs->eax = (u32)(msr_content >>  0);
-    regs->edx = (u32)(msr_content >> 32);
-    return 1;
-}
-
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
@@ -242,52 +182,12 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
         break;
 
-#ifdef __x86_64__
-    case MSR_FS_BASE:
-    case MSR_GS_BASE:
-    case MSR_SHADOW_GS_BASE:
-        if ( !svm_long_mode_enabled(v) )
-            goto gp_fault;
-
-        if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
-
-        if ( ecx == MSR_FS_BASE )
-            vmcb->fs.base = msr_content;
-        else if ( ecx == MSR_GS_BASE )
-            vmcb->gs.base = msr_content;
-        else
-            vmcb->kerngsbase = msr_content;
-        break;
-#endif
- 
-    case MSR_STAR:
-        vmcb->star = msr_content;
-        break;
- 
-    case MSR_LSTAR:
-    case MSR_CSTAR:
-        if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
-
-        if ( ecx == MSR_LSTAR )
-            vmcb->lstar = msr_content;
-        else
-            vmcb->cstar = msr_content;
-        break;
- 
-    case MSR_SYSCALL_MASK:
-        vmcb->sfmask = msr_content;
-        break;
-
     default:
         return 0;
     }
 
     return 1;
 
- uncanonical_address:
-    HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write %x\n", ecx);
  gp_fault:
     svm_inject_exception(v, TRAP_gp_fault, 1, 0);
     return 0;
@@ -2013,22 +1913,14 @@ static inline void svm_do_msr_access(
         case MSR_IA32_TIME_STAMP_COUNTER:
             msr_content = hvm_get_guest_time(v);
             break;
-        case MSR_IA32_SYSENTER_CS:
-            msr_content = vmcb->sysenter_cs;
-            break;
-        case MSR_IA32_SYSENTER_ESP: 
-            msr_content = vmcb->sysenter_esp;
-            break;
-        case MSR_IA32_SYSENTER_EIP:     
-            msr_content = vmcb->sysenter_eip;
-            break;
         case MSR_IA32_APICBASE:
             msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
             break;
-        default:
-            if (long_mode_do_msr_read(regs))
-                goto done;
+        case MSR_EFER:
+            msr_content = v->arch.hvm_svm.cpu_shadow_efer;
+            break;
 
+        default:
             if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
                  rdmsr_safe(ecx, eax, edx) == 0 )
             {
@@ -2060,15 +1952,6 @@ static inline void svm_do_msr_access(
         case MSR_IA32_TIME_STAMP_COUNTER:
             hvm_set_guest_time(v, msr_content);
             pt_reset(v);
-            break;
-        case MSR_IA32_SYSENTER_CS:
-            vmcb->sysenter_cs = msr_content;
-            break;
-        case MSR_IA32_SYSENTER_ESP: 
-            vmcb->sysenter_esp = msr_content;
-            break;
-        case MSR_IA32_SYSENTER_EIP:     
-            vmcb->sysenter_eip = msr_content;
             break;
         case MSR_IA32_APICBASE:
             vlapic_msr_set(vcpu_vlapic(v), msr_content);
