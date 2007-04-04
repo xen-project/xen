@@ -59,10 +59,6 @@
 #include <xen/xenbus.h>
 #include "common.h"
 
-#ifndef CONFIG_XEN 
-#define scrub_pages(_p,_n)
-#endif
-
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *balloon_pde;
 #endif
@@ -251,8 +247,6 @@ static int increase_reservation(unsigned long nr_pages)
 	return 0;
 }
 
-extern void xen_invalidate_foreign_mappings(void);
-
 static int decrease_reservation(unsigned long nr_pages)
 {
 	unsigned long  pfn, i, flags;
@@ -286,7 +280,7 @@ static int decrease_reservation(unsigned long nr_pages)
 				(unsigned long)v, __pte_ma(0), 0);
 			BUG_ON(ret);
 		}
-#ifdef CONFIG_XEN
+#ifdef CONFIG_XEN_SCRUB_PAGES
 		else {
 			v = kmap(page);
 			scrub_pages(v, 1);
@@ -306,13 +300,18 @@ static int decrease_reservation(unsigned long nr_pages)
 	/* No more mappings: invalidate P2M and add to balloon. */
 	for (i = 0; i < nr_pages; i++) {
 		pfn = mfn_to_pfn(frame_list[i]);
-#ifdef CONFIG_XEN
 		set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
-#endif
 		balloon_append(pfn_to_page(pfn));
 	}
 
-        xen_invalidate_foreign_mappings(); 
+#ifndef CONFIG_XEN
+	/* XXX Temporary hack. */
+	{
+		extern void xen_invalidate_foreign_mappings(void);
+		xen_invalidate_foreign_mappings(); 
+	}
+#endif
+
 	set_xen_guest_handle(reservation.extent_start, frame_list);
 	reservation.nr_extents   = nr_pages;
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
@@ -476,7 +475,7 @@ static int __init balloon_init(void)
 	bs.current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages   = bs.current_pages;
 #else 
-        bs.current_pages = totalram_pages; 
+	bs.current_pages = totalram_pages; 
 #endif
 	bs.target_pages  = bs.current_pages;
 	bs.balloon_low   = 0;
@@ -592,9 +591,9 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 #ifdef CONFIG_XEN
 			ret = apply_to_page_range(&init_mm, vaddr, PAGE_SIZE,
 						  dealloc_pte_fn, NULL);
-#else 
-                        /* cannot handle non-auto translate mode */
-                        ret = 1; 
+#else
+			/* Cannot handle non-auto translate mode. */
+			ret = 1;
 #endif
 		}
 

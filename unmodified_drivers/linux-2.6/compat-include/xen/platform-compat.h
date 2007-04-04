@@ -25,6 +25,10 @@
 #define NET_IP_ALIGN 0
 #endif
 
+#if defined(_LINUX_SKBUFF_H) && !defined(CHECKSUM_HW)
+#define CHECKSUM_HW CHECKSUM_PARTIAL
+#endif
+
 #if defined(_LINUX_ERR_H) && !defined(IS_ERR_VALUE)
 #define IS_ERR_VALUE(x) unlikely((x) > (unsigned long)-1000L)
 #endif
@@ -74,6 +78,10 @@ void *kzalloc(size_t size, int flags);
 #if defined(_LINUX_KERNEL_H) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
 extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
        __attribute__ ((format (printf, 2, 3)));
+#endif
+
+#if defined(_LINUX_SYSRQ_H) && LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18)
+#define handle_sysrq(x,y,z) handle_sysrq(x,y)
 #endif
 
 /*

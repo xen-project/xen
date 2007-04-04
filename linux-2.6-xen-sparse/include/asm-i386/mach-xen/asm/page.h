@@ -45,12 +45,6 @@
 })
 #define HAVE_ARCH_FREE_PAGE
 
-#ifdef CONFIG_XEN_SCRUB_PAGES
-#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
-#else
-#define scrub_pages(_p,_n) ((void)0)
-#endif
-
 #ifdef CONFIG_X86_USE_3DNOW
 
 #include <asm/mmx.h>

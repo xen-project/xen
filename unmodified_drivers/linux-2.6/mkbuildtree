@@ -50,7 +50,6 @@ i[34567]86)
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/hypercall.h include/asm
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/synch_bitops.h include/asm
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/maddr.h include/asm
-    ln -sf ${XL}/include/asm-i386/mach-xen/asm/page.h include/asm
   ;;
 "ia64")
     ln -sf ${XL}/include/asm-ia64/hypervisor.h include/asm

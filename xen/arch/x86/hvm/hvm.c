@@ -531,25 +531,22 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs)
 
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
-        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %d.\n",
-                current->domain->domain_id, current->vcpu_id,
-                pregs->eax);
+        if ( pregs->eax != __HYPERVISOR_grant_table_op )
+            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %d.\n",
+                     current->domain->domain_id, current->vcpu_id, pregs->eax);
         pregs->eax = -ENOSYS;
         return 0;
     }
 
-    /* Install a canary value in regs->eip so can check for continuation */
-    pregs->eip |= 0xF; 
+    /* Check for preemption: EIP will be modified from this dummy value. */
+    pregs->eip = 0xF0F0F0FF;
 
     pregs->eax = hvm_hypercall_table[pregs->eax](
         pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
 
-    /* XXX: pot fake IO instr here to inform the emulator to flush mapcache */
+    /* XXX: put fake IO instr here to inform the emulator to flush mapcache */
 
-    if( (pregs->eip & 0xF) == 0 ) /* preempted */
-        return 1; 
-
-    return 0; 
+    return (pregs->eip != 0xF0F0F0FF); /* preempted? */
 }
 
 #else /* defined(__x86_64__) */
@@ -620,12 +617,15 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs)
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
     if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
     {
-        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %ld.\n",
-                current->domain->domain_id, current->vcpu_id,
-                pregs->rax);
+        if ( pregs->rax != __HYPERVISOR_grant_table_op )
+            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %ld.\n",
+                     current->domain->domain_id, current->vcpu_id, pregs->rax);
         pregs->rax = -ENOSYS;
         return 0;
     }
+
+    /* Check for preemption: RIP will be modified from this dummy value. */
+    pregs->rip = 0xF0F0F0FF;
 
     if ( current->arch.paging.mode->guest_levels == 4 )
     {
@@ -643,7 +643,10 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs)
                                                        (uint32_t)pregs->esi,
                                                        (uint32_t)pregs->edi);
     }
-    return 0; /* XXX SMH: fix for preempt here */
+
+    /* XXX: put fake IO instr here to inform the emulator to flush mapcache */
+
+    return (pregs->rip != 0xF0F0F0FF); /* preempted? */
 }
 
 #endif /* defined(__x86_64__) */

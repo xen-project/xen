@@ -2275,8 +2275,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
         ASSERT(inst_len > 0);
         HVMTRACE_1D(VMMCALL, v, regs->eax);
-        if(hvm_do_hypercall(regs) == 0) /* not preempted */
-            __update_guest_eip(vmcb, inst_len);
+        if ( !hvm_do_hypercall(regs) )
+            __update_guest_eip(vmcb, inst_len); /* not preempted */
         break;
 
     case VMEXIT_CR0_READ:

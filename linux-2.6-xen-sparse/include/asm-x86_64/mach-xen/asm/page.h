@@ -24,12 +24,6 @@
 })
 #define HAVE_ARCH_FREE_PAGE
 
-#ifdef CONFIG_XEN_SCRUB_PAGES
-#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
-#else
-#define scrub_pages(_p,_n) ((void)0)
-#endif
-
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	12
 #ifdef __ASSEMBLY__

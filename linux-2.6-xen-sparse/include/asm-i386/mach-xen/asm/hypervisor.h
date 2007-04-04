@@ -122,6 +122,12 @@ void xen_destroy_contiguous_region(
 /* Turn jiffies into Xen system time. */
 u64 jiffies_to_st(unsigned long jiffies);
 
+#ifdef CONFIG_XEN_SCRUB_PAGES
+#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
+#else
+#define scrub_pages(_p,_n) ((void)0)
+#endif
+
 #include <asm/hypercall.h>
 
 #if defined(CONFIG_X86_64)

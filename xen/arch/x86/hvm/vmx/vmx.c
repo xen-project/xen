@@ -2628,8 +2628,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     {
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         inst_len = __get_instruction_length(); /* Safe: VMCALL */
-        if(hvm_do_hypercall(regs) == 0)        /* not preempted */
-            __update_guest_eip(inst_len);
+        if ( !hvm_do_hypercall(regs) )
+            __update_guest_eip(inst_len); /* preempted */
         break;
     }
     case EXIT_REASON_CR_ACCESS:
