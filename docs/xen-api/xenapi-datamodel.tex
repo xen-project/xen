@@ -9190,51 +9190,35 @@ $\mathit{RO}_\mathit{run}$ &  {\tt virtual\_allocation} & int & sum of virtual\_
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_utilisation} & int & physical space currently utilised on this storage repository (in bytes). Note that for sparse disk formats, physical\_utilisation may be less than virtual\_allocation \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt physical\_size} & int & total physical size of the repository (in bytes) \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt type} & string & type of the storage repository \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt location} & string & a string that uniquely determines the location of the storage repository; the format of this string depends on the repository's type \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt content\_type} & string & the type of the SR's content, if required (e.g. ISOs) \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: SR}
-\subsubsection{RPC name:~clone}
+\subsubsection{RPC name:~get\_supported\_types}
 
 {\bf Overview:} 
-Take an exact copy of the Storage Repository;
-        the cloned storage repository has the same type as its parent
+Return a set of all the SR types supported by the system.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} (SR ref) clone (session_id s, SR ref sr, string loc, string name)\end{verbatim}
+\begin{verbatim} (string Set) get_supported_types (session_id s)\end{verbatim}
 
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & sr & The Storage Repository to clone \\ \hline 
-
-{\tt string } & loc & The location string that defines where the new storage repository will be located \\ \hline 
-
-{\tt string } & name & The name of the new storage repository \\ \hline 
-
-\end{tabular}
 
 \vspace{0.3cm}
 
  \noindent {\bf Return Type:} 
 {\tt 
-SR ref
+string Set
 }
 
 
-The ID of the newly created Storage Repository.
+the supported SR types
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
-Return a list of all the Storage Repositories known to the system
+Return a list of all the SRs known to the system.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} ((SR ref) Set) get_all (session_id s)\end{verbatim}
@@ -9248,7 +9232,7 @@ Return a list of all the Storage Repositories known to the system
 }
 
 
-A list of all the IDs of all the Storage Repositories
+references to all objects
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -9608,13 +9592,13 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
-\subsubsection{RPC name:~get\_location}
+\subsubsection{RPC name:~get\_content\_type}
 
 {\bf Overview:} 
-Get the location field of the given SR.
+Get the content\_type field of the given SR.
 
  \noindent {\bf Signature:} 
-\begin{verbatim} string get_location (session_id s, SR ref self)\end{verbatim}
+\begin{verbatim} string get_content_type (session_id s, SR ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
@@ -9637,70 +9621,6 @@ string
 
 
 value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~create}
-
-{\bf Overview:} 
-Create a new SR instance, and return its handle.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} (SR ref) create (session_id s, SR record args)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR record } & args & All constructor arguments \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-SR ref
-}
-
-
-reference to the newly created object
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~destroy}
-
-{\bf Overview:} 
-Destroy the specified SR instance.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} void destroy (session_id s, SR ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt SR ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-void
-}
-
-
-
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -11988,7 +11908,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt host} & host ref & physical machine on which the pbd is available \\
 $\mathit{RO}_\mathit{ins}$ &  {\tt SR} & SR ref & the storage repository that the pbd realises \\
-$\mathit{RO}_\mathit{ins}$ &  {\tt device\_config} & (string $\rightarrow$ string) Map & a config string that is provided to the host's SR-backend-driver \\
+$\mathit{RO}_\mathit{ins}$ &  {\tt device\_config} & (string $\rightarrow$ string) Map & a config string to string map that is provided to the host's SR-backend-driver \\
 $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the SR currently attached on this host? \\
 \hline
 \end{longtable}

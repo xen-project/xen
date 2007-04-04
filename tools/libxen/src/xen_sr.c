@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -65,9 +65,9 @@ static const struct_member xen_sr_record_struct_members[] =
         { .key = "type",
           .type = &abstract_type_string,
           .offset = offsetof(xen_sr_record, type) },
-        { .key = "location",
+        { .key = "content_type",
           .type = &abstract_type_string,
-          .offset = offsetof(xen_sr_record, location) }
+          .offset = offsetof(xen_sr_record, content_type) }
     };
 
 const abstract_type xen_sr_record_abstract_type_ =
@@ -94,7 +94,7 @@ xen_sr_record_free(xen_sr_record *record)
     xen_vdi_record_opt_set_free(record->vdis);
     xen_pbd_record_opt_set_free(record->pbds);
     free(record->type);
-    free(record->location);
+    free(record->content_type);
     free(record);
 }
 
@@ -135,37 +135,6 @@ xen_sr_get_by_uuid(xen_session *session, xen_sr *result, char *uuid)
 
     *result = NULL;
     XEN_CALL_("SR.get_by_uuid");
-    return session->ok;
-}
-
-
-bool
-xen_sr_create(xen_session *session, xen_sr *result, xen_sr_record *record)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &xen_sr_record_abstract_type_,
-              .u.struct_val = record }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("SR.create");
-    return session->ok;
-}
-
-
-bool
-xen_sr_destroy(xen_session *session, xen_sr sr)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = sr }
-        };
-
-    xen_call_(session, "SR.destroy", param_values, 1, NULL, NULL);
     return session->ok;
 }
 
@@ -239,6 +208,23 @@ xen_sr_get_vdis(xen_session *session, struct xen_vdi_set **result, xen_sr sr)
 
 
 bool
+xen_sr_get_pbds(xen_session *session, struct xen_pbd_set **result, xen_sr sr)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = sr }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("SR.get_PBDs");
+    return session->ok;
+}
+
+
+bool
 xen_sr_get_virtual_allocation(xen_session *session, int64_t *result, xen_sr sr)
 {
     abstract_value param_values[] =
@@ -304,7 +290,7 @@ xen_sr_get_type(xen_session *session, char **result, xen_sr sr)
 
 
 bool
-xen_sr_get_location(xen_session *session, char **result, xen_sr sr)
+xen_sr_get_content_type(xen_session *session, char **result, xen_sr sr)
 {
     abstract_value param_values[] =
         {
@@ -315,7 +301,7 @@ xen_sr_get_location(xen_session *session, char **result, xen_sr sr)
     abstract_type result_type = abstract_type_string;
 
     *result = NULL;
-    XEN_CALL_("SR.get_location");
+    XEN_CALL_("SR.get_content_type");
     return session->ok;
 }
 
@@ -353,22 +339,13 @@ xen_sr_set_name_description(xen_session *session, xen_sr sr, char *description)
 
 
 bool
-xen_sr_clone(xen_session *session, xen_sr *result, xen_sr sr, char *loc, char *name)
+xen_sr_get_supported_types(xen_session *session, struct xen_string_set **result)
 {
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = sr },
-            { .type = &abstract_type_string,
-              .u.string_val = loc },
-            { .type = &abstract_type_string,
-              .u.string_val = name }
-        };
 
-    abstract_type result_type = abstract_type_string;
+    abstract_type result_type = abstract_type_string_set;
 
     *result = NULL;
-    XEN_CALL_("SR.clone");
+    xen_call_(session, "SR.get_supported_types", NULL, 0, &result_type, result);
     return session->ok;
 }
 

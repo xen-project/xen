@@ -22,17 +22,18 @@ import xen.lowlevel.xc
 
 from xen.util import Brctl
 
-from xen.xend import uuid, arch
-from xen.xend.XendError import *
-from xen.xend.XendOptions import instance as xendoptions
-from xen.xend.XendQCoWStorageRepo import XendQCoWStorageRepo
-from xen.xend.XendLocalStorageRepo import XendLocalStorageRepo
-from xen.xend.XendLogging import log
-from xen.xend.XendPIF import *
-from xen.xend.XendPIFMetrics import XendPIFMetrics
-from xen.xend.XendNetwork import *
-from xen.xend.XendStateStore import XendStateStore
-from xen.xend.XendMonitor import XendMonitor
+import uuid, arch
+import XendPBD
+from XendError import *
+from XendOptions import instance as xendoptions
+from XendQCoWStorageRepo import XendQCoWStorageRepo
+from XendLocalStorageRepo import XendLocalStorageRepo
+from XendLogging import log
+from XendPIF import *
+from XendPIFMetrics import XendPIFMetrics
+from XendNetwork import *
+from XendStateStore import XendStateStore
+from XendMonitor import XendMonitor
 
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
@@ -193,13 +194,14 @@ class XendNode:
         saved_srs = self.state_store.load_state('sr')
         if saved_srs:
             for sr_uuid, sr_cfg in saved_srs.items():
+                log.error("SAved SRS %s %s", sr_uuid, sr_cfg['type'])
                 if sr_cfg['type'] == 'qcow_file':
                     self.srs[sr_uuid] = XendQCoWStorageRepo(sr_uuid)
-                elif sr_cfg['type'] == 'local_image':
+                elif sr_cfg['type'] == 'local':
                     self.srs[sr_uuid] = XendLocalStorageRepo(sr_uuid)
 
         # Create missing SRs if they don't exist
-        if not self.get_sr_by_type('local_image'):
+        if not self.get_sr_by_type('local'):
             image_sr_uuid = uuid.createString()
             self.srs[image_sr_uuid] = XendLocalStorageRepo(image_sr_uuid)
             
@@ -207,6 +209,11 @@ class XendNode:
             qcow_sr_uuid = uuid.createString()
             self.srs[qcow_sr_uuid] = XendQCoWStorageRepo(qcow_sr_uuid)
 
+        saved_pbds = self.state_store.load_state('pbd')
+        if saved_pbds:
+            for pbd_uuid, pbd_cfg in saved_pbds.items():
+                pbd_cfg['uuid'] = pbd_uuid
+                XendPBD.XendPBD(pbd_cfg)
 
 
     def network_create(self, record, persist = True, net_uuid = None):
@@ -280,6 +287,7 @@ class XendNode:
         self.state_store.save_state('cpu', self.cpus)
         self.save_PIFs()
         self.save_networks()
+        self.save_PBDs()
         self.save_SRs()
 
     def save_PIFs(self):
@@ -291,6 +299,11 @@ class XendNode:
         net_records = dict([(k, v.get_record_internal(False))
                             for k, v in self.networks.items()])
         self.state_store.save_state('network', net_records)
+
+    def save_PBDs(self):
+        pbd_records = dict([(v.get_uuid(), v.get_record())
+                            for v in XendPBD.get_all()])
+        self.state_store.save_state('pbd', pbd_records)
 
     def save_SRs(self):
         sr_records = dict([(k, v.get_record(transient = False))

@@ -22,8 +22,9 @@
 import threading
 import sys
 
-from xen.xend.XendError import XendError
-from xen.xend.XendVDI import *
+from XendError import XendError
+from XendVDI import *
+import XendPBD
 
 XEND_STORAGE_NO_MAXIMUM = sys.maxint
 
@@ -34,7 +35,6 @@ class XendStorageRepository:
                  sr_type = "unknown",
                  name_label = 'Unknown',
                  name_description = 'Not Implemented',
-                 location = '',
                  storage_max = XEND_STORAGE_NO_MAXIMUM):
         """
         @keyword storage_max: Maximum disk space to use in bytes.
@@ -49,7 +49,6 @@ class XendStorageRepository:
         # XenAPI Parameters
         self.uuid = uuid
         self.type = sr_type
-        self.location = location
         self.name_label = name_label
         self.name_description = name_description
         self.images = {}
@@ -57,6 +56,7 @@ class XendStorageRepository:
         self.physical_size = storage_max
         self.physical_utilisation = 0
         self.virtual_allocation = 0
+        self.content_type = ''
  
         self.lock = threading.RLock()
 
@@ -68,9 +68,10 @@ class XendStorageRepository:
                   'physical_utilisation': self.physical_utilisation,
                   'physical_size': self.physical_size,
                   'type': self.type,
-                  'location': self.location,
+                  'content_type': self.content_type,
                   'VDIs': self.images.keys()}
-
+        if not transient:
+            retval ['PBDs'] = XendPBD.get_by_SR(self.uuid)
         return retval
 
 

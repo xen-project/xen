@@ -29,12 +29,13 @@ import sys
 import struct
 
 from xen.util import mkdir
-from xen.xend import uuid
-from xen.xend.XendError import XendError
-from xen.xend.XendVDI import *
-from xen.xend.XendTask import XendTask
-from xen.xend.XendStorageRepository import XendStorageRepository
-from xen.xend.XendOptions import instance as xendoptions
+import uuid
+import XendPBD
+from XendError import XendError
+from XendVDI import *
+from XendTask import XendTask
+from XendStorageRepository import XendStorageRepository
+from XendOptions import instance as xendoptions
 
 XEND_STORAGE_NO_MAXIMUM = sys.maxint
 XEND_STORAGE_QCOW_FILENAME = "%s.qcow"
@@ -72,7 +73,6 @@ class XendQCoWStorageRepo(XendStorageRepository):
                  sr_type = "qcow_file",
                  name_label = "QCoW",
                  name_description = "Xend QCoW Storage Repository",
-                 location = xendoptions().get_xend_storage_path(),
                  storage_max = XEND_STORAGE_NO_MAXIMUM):
         """
         @keyword storage_max: Maximum disk space to use in bytes.
@@ -85,9 +85,9 @@ class XendQCoWStorageRepo(XendStorageRepository):
         """
 
         XendStorageRepository.__init__(self, sr_uuid, sr_type, name_label,
-                                       name_description, location,
-                                       storage_max)
+                                       name_description, storage_max)
         self.storage_free = 0
+        self.location = xendoptions().get_xend_storage_path()
         self._refresh()
 
     def get_record(self, transient = True):
@@ -98,8 +98,9 @@ class XendQCoWStorageRepo(XendStorageRepository):
                   'physical_utilisation': self.physical_utilisation,
                   'physical_size': self.physical_size,
                   'type': self.type,
-                  'location': self.location,
-                  'VDIs': self.images.keys()}
+                  'content_type': self.content_type,
+                  'VDIs': self.images.keys(),
+                  'PBDs': XendPBD.get_by_SR(self.uuid)}
         
         if self.physical_size == XEND_STORAGE_NO_MAXIMUM:
             stfs = os.statvfs(self.location)

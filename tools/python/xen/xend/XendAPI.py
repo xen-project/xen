@@ -26,20 +26,22 @@ import threading
 import time
 import xmlrpclib
 
-from xen.xend import XendDomain, XendDomainInfo, XendNode, XendDmesg
-from xen.xend import XendLogging, XendTaskManager
+import XendDomain, XendDomainInfo, XendNode, XendDmesg
+import XendLogging, XendTaskManager
 
-from xen.xend.XendAPIVersion import *
-from xen.xend.XendAuthSessions import instance as auth_manager
-from xen.xend.XendError import *
-from xen.xend.XendClient import ERROR_INVALID_DOMAIN
-from xen.xend.XendLogging import log
-from xen.xend.XendNetwork import XendNetwork
-from xen.xend.XendTask import XendTask
-from xen.xend.XendPIFMetrics import XendPIFMetrics
-from xen.xend.XendVMMetrics import XendVMMetrics
+from XendAPIVersion import *
+from XendAuthSessions import instance as auth_manager
+from XendError import *
+from XendClient import ERROR_INVALID_DOMAIN
+from XendLogging import log
+from XendNetwork import XendNetwork
+from XendTask import XendTask
+from XendPIFMetrics import XendPIFMetrics
+from XendVMMetrics import XendVMMetrics
 
-from xen.xend.XendAPIConstants import *
+import XendPBD
+
+from XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
 from xen.util.blkif import blkdev_name_to_number
@@ -394,6 +396,17 @@ def valid_sr(func):
            _check_ref(lambda r: XendNode.instance().is_valid_sr,
                       'SR', func, *args, **kwargs)
 
+def valid_pbd(func):
+    """Decorator to verify if pbd_ref is valid before calling
+    method.
+
+    @param func: function with params: (self, session, pbd_ref)
+    @rtype: callable object
+    """
+    return lambda *args, **kwargs: \
+           _check_ref(lambda r: r in XendPBD.get_all_refs(),
+                      'PBD', func, *args, **kwargs)
+
 def valid_pif(func):
     """Decorator to verify if pif_ref is valid before calling
     method.
@@ -479,6 +492,7 @@ classes = {
     'VTPM'         : valid_vtpm,
     'console'      : valid_console,
     'SR'           : valid_sr,
+    'PBD'          : valid_pbd,
     'PIF'          : valid_pif,
     'PIF_metrics'  : valid_pif_metrics,
     'task'         : valid_task,
@@ -488,6 +502,7 @@ classes = {
 autoplug_classes = {
     'network'     : XendNetwork,
     'VM_metrics'  : XendVMMetrics,
+    'PBD'         : XendPBD.XendPBD,
     'PIF_metrics' : XendPIFMetrics,
 }
 
@@ -843,6 +858,7 @@ class XendAPI(object):
 
     host_attr_ro = ['software_version',
                     'resident_VMs',
+                    'PBDs',
                     'PIFs',
                     'host_CPUs',
                     'cpu_configuration',
@@ -913,6 +929,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().xen_version())
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
+    def host_get_PBDs(self, _, ref):
+        return xen_api_success(XendPBD.get_all_refs())
     def host_get_PIFs(self, session, ref):
         return xen_api_success(XendNode.instance().get_PIF_refs())
     def host_get_host_CPUs(self, session, host_ref):
@@ -2434,18 +2452,17 @@ class XendAPI(object):
                   'physical_utilisation',
                   'physical_size',
                   'type',
-                  'location']
+                  'content_type']
     
     SR_attr_rw = ['name_label',
                   'name_description']
     
     SR_attr_inst = ['physical_size',
                     'type',
-                    'location',
                     'name_label',
                     'name_description']
     
-    SR_methods = [('clone', 'SR'), ('destroy', None)]
+    SR_methods = []
     SR_funcs = [('get_by_name_label', 'Set(SR)'),
                 ('get_by_uuid', 'SR')]
 
@@ -2456,15 +2473,10 @@ class XendAPI(object):
     def SR_get_by_name_label(self, session, label):
         return xen_api_success(XendNode.instance().get_sr_by_name(label))
     
-    def SR_create(self, session):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+    def SR_get_supported_types(self, _):
+        return xen_api_success(['local', 'qcow_file'])
 
     # Class Methods
-    def SR_clone(self, session, sr_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
-    
-    def SR_destroy(self, session, sr_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
     
     def SR_get_record(self, session, sr_ref):
         sr = XendNode.instance().get_sr(sr_ref)
@@ -2497,8 +2509,8 @@ class XendAPI(object):
     def SR_get_type(self, _, ref):
         return self._get_SR_attr(ref, 'type')
 
-    def SR_get_location(self, _, ref):
-        return self._get_SR_attr(ref, 'location')
+    def SR_get_content_type(self, _, ref):
+        return self._get_SR_attr(ref, 'content_type')
 
     def SR_get_name_label(self, _, ref):
         return self._get_SR_attr(ref, 'name_label')
@@ -2519,6 +2531,33 @@ class XendAPI(object):
             sr.name_description = value
             XendNode.instance().save()        
         return xen_api_success_void()
+
+
+    # Xen API: Class PBD
+    # ----------------------------------------------------------------
+
+    PBD_attr_ro = ['host',
+                   'SR',
+                   'device_config',
+                   'currently_attached']
+    PBD_attr_rw = []
+    PBD_methods = [('destroy', None)]
+    PBD_funcs   = [('create', None)]
+
+    def PBD_get_all(self, _):
+        return xen_api_success(XendPBD.get_all_refs())
+
+    def _PBD_get(self, _, ref):
+        return XendPBD.get(ref)
+
+    def PBD_create(self, _, record):
+        if 'uuid' in record:
+            return xen_api_error(['VALUE_NOT_SUPPORTED',
+                                  'uuid', record['uuid'],
+                                  'You may not specify a UUID on creation'])
+        new_uuid = XendPBD.XendPBD(record).get_uuid()
+        XendNode.instance().save()
+        return xen_api_success(new_uuid)
 
 
     # Xen API: Class event
