@@ -20,9 +20,6 @@ static unsigned long p2m_size;
 /* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
 static unsigned long nr_pfns;
 
-/* largest possible value of nr_pfns (i.e. domain's maximum memory size) */
-static unsigned long max_nr_pfns;
-
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
 {
@@ -62,8 +59,7 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 }
 
 int
-xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                 unsigned long p2msize, unsigned long maxnrpfns,
+xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long p2msize,
                  unsigned int store_evtchn, unsigned long *store_mfn,
                  unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -86,7 +82,6 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     start_info_t *start_info;
 
     p2m_size = p2msize;
-    max_nr_pfns = maxnrpfns;
 
     /* For info only */
     nr_pfns = 0;
@@ -106,11 +101,6 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         /* needed for build domctl, but might as well do early */
         ERROR("Unable to mlock ctxt");
         return 1;
-    }
-
-    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_nr_pfns)) != 0) {
-        errno = ENOMEM;
-        goto out;
     }
 
     /* Get pages.  */

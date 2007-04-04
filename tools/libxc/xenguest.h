@@ -50,7 +50,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  * @return 0 on success, -1 on failure
  */
 int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                     unsigned long p2m_size, unsigned long max_nr_pfns,
+                     unsigned long p2m_size,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn);
 
@@ -61,9 +61,9 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
  * @return 0 on success, -1 on failure
  */
 int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
-                      unsigned long max_pfn, unsigned int store_evtchn,
-                      unsigned long *store_mfn, 
-                      unsigned int pae, unsigned int apic);
+                   unsigned int store_evtchn,
+                   unsigned long *store_mfn, 
+                   unsigned int pae, unsigned int apic);
 
 /**
  * This function will create a domain for a paravirtualized Linux

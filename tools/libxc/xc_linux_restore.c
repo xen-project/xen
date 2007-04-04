@@ -28,9 +28,6 @@ static unsigned long p2m_size;
 /* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
 static unsigned long nr_pfns;
 
-/* largest possible value of nr_pfns (i.e. domain's maximum memory size) */
-static unsigned long max_nr_pfns;
-
 /* Live mapping of the table mapping each PFN to its current MFN. */
 static xen_pfn_t *live_p2m = NULL;
 
@@ -145,7 +142,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 
 
 int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                     unsigned long p2msize, unsigned long maxnrpfns,
+                     unsigned long p2msize,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -198,7 +195,6 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     int new_ctxt_format = 0;
 
     p2m_size    = p2msize;
-    max_nr_pfns = maxnrpfns;
 
     /* For info only */
     nr_pfns = 0;
@@ -334,11 +330,6 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
     shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
-
-    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_nr_pfns)) != 0) {
-        errno = ENOMEM;
-        goto out;
-    }
 
     /* Mark all PFNs as invalid; we allocate on demand */
     for ( pfn = 0; pfn < p2m_size; pfn++ )
@@ -747,7 +738,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     DPRINTF("\b\b\b\b100%%\n");
-    DPRINTF("Memory reloaded (%ld pages of max %ld)\n", nr_pfns, max_nr_pfns);
+    DPRINTF("Memory reloaded (%ld pages)\n", nr_pfns);
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {

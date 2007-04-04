@@ -211,7 +211,7 @@ __attribute__((weak))
 
 __attribute__((weak)) 
     int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
-                       unsigned long max_pfn, unsigned int store_evtchn,
+                       unsigned int store_evtchn,
                        unsigned long *store_mfn,
                        unsigned int pae, unsigned int apic)
 {
