@@ -142,7 +142,6 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 
 
 int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                     unsigned long p2msize,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -194,11 +193,14 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     unsigned int max_vcpu_id = 0;
     int new_ctxt_format = 0;
 
-    p2m_size    = p2msize;
-
     /* For info only */
     nr_pfns = 0;
 
+    if ( !read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    {
+        ERROR("read: p2m_size");
+        goto out;
+    }
     DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
     /*

@@ -201,19 +201,11 @@ def restore(xd, fd, dominfo = None, paused = False):
         pae  = 0
 
     try:
-        l = read_exact(fd, sizeof_unsigned_long,
-                       "not a valid guest state file: pfn count read")
-        p2m_size = unpack("L", l)[0]    # native sizeof long
-
-        if p2m_size > 16*1024*1024:     # XXX 
-            raise XendError(
-                "not a valid guest state file: pfn count out of range")
-
         shadow = dominfo.info['shadow_memory']
-        log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, "
-                  "p2m_size=0x%x.", dominfo.info['shadow_memory'],
+        log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, ",
+                  dominfo.info['shadow_memory'],
                   dominfo.info['memory_static_max'],
-                  dominfo.info['memory_static_min'], p2m_size)
+                  dominfo.info['memory_static_min'])
 
         balloon.free(xc.pages_to_kib(nr_pfns) + shadow * 1024)
 
@@ -223,7 +215,7 @@ def restore(xd, fd, dominfo = None, paused = False):
         xc.domain_setmaxmem(dominfo.getDomid(), dominfo.getMemoryMaximum())
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
-                        fd, dominfo.getDomid(), p2m_size,
+                        fd, dominfo.getDomid(),
                         store_port, console_port, int(is_hvm), pae, apic])
         log.debug("[xc_restore]: %s", string.join(cmd))
 

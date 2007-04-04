@@ -434,13 +434,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /* Start writing out the saved-domain record. */
-    if ( !write_exact(io_fd, &max_pfn, sizeof(unsigned long)) )
-    {
-        ERROR("write: max_pfn");
-        goto out;
-    }
-
     for ( ; ; )
     {
         unsigned int prev_pc, sent_this_iter, N, batch;

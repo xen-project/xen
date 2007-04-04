@@ -21,10 +21,10 @@ main(int argc, char **argv)
     unsigned int xc_fd, io_fd, domid, store_evtchn, console_evtchn;
     unsigned int hvm, pae, apic;
     int ret;
-    unsigned long p2m_size, store_mfn, console_mfn;
+    unsigned long store_mfn, console_mfn;
 
-    if ( argc != 9 )
-        errx(1, "usage: %s iofd domid p2m_size store_evtchn "
+    if ( argc != 8 )
+        errx(1, "usage: %s iofd domid store_evtchn "
              "console_evtchn hvm pae apic", argv[0]);
 
     xc_fd = xc_interface_open();
@@ -33,18 +33,18 @@ main(int argc, char **argv)
 
     io_fd = atoi(argv[1]);
     domid = atoi(argv[2]);
-    p2m_size = atoi(argv[3]);
-    store_evtchn = atoi(argv[4]);
-    console_evtchn = atoi(argv[5]);
-    hvm  = atoi(argv[6]);
-    pae  = atoi(argv[7]);
-    apic = atoi(argv[8]);
+    store_evtchn = atoi(argv[3]);
+    console_evtchn = atoi(argv[4]);
+    hvm  = atoi(argv[5]);
+    pae  = atoi(argv[6]);
+    apic = atoi(argv[7]);
 
     if ( hvm )
-        ret = xc_hvm_restore(xc_fd, io_fd, domid, store_evtchn,
-                             &store_mfn, pae, apic);
+        ret = xc_hvm_restore(xc_fd, io_fd, domid,
+                             store_evtchn, &store_mfn,
+                             pae, apic);
     else
-        ret = xc_linux_restore(xc_fd, io_fd, domid, p2m_size,
+        ret = xc_linux_restore(xc_fd, io_fd, domid,
                                store_evtchn, &store_mfn,
                                console_evtchn, &console_mfn);
 

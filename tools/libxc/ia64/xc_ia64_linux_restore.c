@@ -59,7 +59,7 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 }
 
 int
-xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long p2msize,
+xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
                  unsigned int store_evtchn, unsigned long *store_mfn,
                  unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -81,11 +81,14 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long p2msize,
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
 
-    p2m_size = p2msize;
-
     /* For info only */
     nr_pfns = 0;
 
+    if ( !read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    {
+        ERROR("read: p2m_size");
+        goto out;
+    }
     DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
     if (!read_exact(io_fd, &ver, sizeof(unsigned long))) {
