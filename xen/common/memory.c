@@ -173,12 +173,6 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
-    if ( unlikely((page->count_info & PGC_count_mask) != 1) )
-    {
-        shadow_drop_references(d, page);
-        /* NB: still may have foreign references to the page at this stage */
-    }
-
     guest_physmap_remove_page(d, gmfn, mfn);
 
     put_page(page);
