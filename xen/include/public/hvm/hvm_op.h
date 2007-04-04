@@ -70,12 +70,4 @@ struct xen_hvm_set_pci_link_route {
 typedef struct xen_hvm_set_pci_link_route xen_hvm_set_pci_link_route_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t);
 
-/* Drain all outstanding qemu-dm IO responses from a domain's ioreq ring. */
-#define HVMOP_drain_io            5
-struct xen_hvm_drain_io {
-    domid_t  domid;
-};
-typedef struct xen_hvm_drain_io xen_hvm_drain_io_t;
-DEFINE_XEN_GUEST_HANDLE(xen_hvm_drain_io_t);
-
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */

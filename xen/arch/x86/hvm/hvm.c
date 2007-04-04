@@ -146,48 +146,6 @@ void hvm_do_resume(struct vcpu *v)
     }
 }
 
-/* Called from the tools when saving a domain to make sure the io
- * request-response ring is entirely empty. */
-static int hvmop_drain_io(
-    XEN_GUEST_HANDLE(xen_hvm_drain_io_t) uop)
-{
-    struct xen_hvm_drain_io op;
-    struct domain *d;
-    struct vcpu *v;
-    ioreq_t *p;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    d = rcu_lock_domain_by_id(op.domid);
-    if ( d == NULL )
-        return -ESRCH;
-
-    rc = -EINVAL;
-    /* Can't do this to yourself, or to a domain without an ioreq ring */
-    if ( d == current->domain || !is_hvm_domain(d) || get_sp(d) == NULL )
-        goto out;
-
-    rc = 0;
-
-    domain_pause(d);  /* It's not safe to do this to running vcpus */
-    for_each_vcpu(d, v)
-    {
-        p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-        if ( p->state == STATE_IORESP_READY )
-            hvm_io_assist(v);
-    }
-    domain_unpause(d);
-
- out:
-    rcu_unlock_domain(d);
-    return rc;
-}
-
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -962,12 +920,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = hvmop_set_pci_link_route(
             guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
         break;
-
-    case HVMOP_drain_io:
-        rc = hvmop_drain_io(
-            guest_handle_cast(arg, xen_hvm_drain_io_t));
-        break;
-
 
     default:
     {

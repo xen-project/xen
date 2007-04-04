@@ -159,8 +159,6 @@ int xc_set_hvm_param(
 int xc_get_hvm_param(
     int handle, domid_t dom, int param, unsigned long *value);
 
-int xc_hvm_drain_io(int handle, domid_t dom);
-
 /* PowerPC specific. */
 int xc_prose_build(int xc_handle,
                    uint32_t domid,

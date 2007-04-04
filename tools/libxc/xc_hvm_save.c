@@ -59,23 +59,6 @@ static unsigned long *qemu_bitmaps[2];
 static int qemu_active;
 static int qemu_non_active;
 
-int xc_hvm_drain_io(int handle, domid_t dom)
-{
-    DECLARE_HYPERCALL;
-    xen_hvm_drain_io_t arg;
-    int rc;
-
-    hypercall.op     = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_drain_io;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domid = dom;
-    if ( lock_pages(&arg, sizeof(arg)) != 0 )
-        return -1;
-    rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(&arg, sizeof(arg));
-    return rc;
-}
-
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track
 ** which pages we have to send, to fixup, and to skip.
