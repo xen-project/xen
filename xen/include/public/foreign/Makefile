@@ -13,7 +13,7 @@ clean:
 	rm -f checker checker.c $(XEN_TARGET_ARCH).size
 	rm -f *.pyc *.o *~
 
-ifeq ($(CROSS_COMPILE),)
+ifeq ($(CROSS_COMPILE)$(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
 check-headers: checker
 	./checker > $(XEN_TARGET_ARCH).size
 	diff -u reference.size $(XEN_TARGET_ARCH).size

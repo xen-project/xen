@@ -764,13 +764,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     }
 }
 
-void hvm_io_assist(struct vcpu *v)
+void hvm_io_assist(void)
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct cpu_user_regs *regs;
     struct hvm_io_op *io_opp;
     unsigned long gmfn;
+    struct vcpu *v = current;
     struct domain *d = v->domain;
 
     io_opp = &v->arch.hvm_vcpu.io_op;
