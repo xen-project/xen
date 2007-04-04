@@ -498,6 +498,12 @@ static int svm_realmode(struct vcpu *v)
     return (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE);
 }
 
+static int svm_interrupts_enabled(struct vcpu *v)
+{
+    unsigned long eflags = v->arch.hvm_svm.vmcb->rflags;
+    return !irq_masked(eflags); 
+}
+
 static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -800,6 +806,7 @@ static struct hvm_function_table svm_function_table = {
     .paging_enabled       = svm_paging_enabled,
     .long_mode_enabled    = svm_long_mode_enabled,
     .pae_enabled          = svm_pae_enabled,
+    .interrupts_enabled   = svm_interrupts_enabled,
     .guest_x86_mode       = svm_guest_x86_mode,
     .get_guest_ctrl_reg   = svm_get_ctrl_reg,
     .get_segment_base     = svm_get_segment_base,
@@ -2268,8 +2275,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
         ASSERT(inst_len > 0);
         HVMTRACE_1D(VMMCALL, v, regs->eax);
-        __update_guest_eip(vmcb, inst_len);
-        hvm_do_hypercall(regs);
+        if(hvm_do_hypercall(regs) == 0) /* not preempted */
+            __update_guest_eip(vmcb, inst_len);
         break;
 
     case VMEXIT_CR0_READ:

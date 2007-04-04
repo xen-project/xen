@@ -1,4 +1,5 @@
 
+#include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <xen/xen_proc.h>
 
@@ -12,7 +13,11 @@ struct proc_dir_entry *create_xen_proc_entry(const char *name, mode_t mode)
 	return create_proc_entry(name, mode, xen_base);
 }
 
+EXPORT_SYMBOL_GPL(create_xen_proc_entry); 
+
 void remove_xen_proc_entry(const char *name)
 {
 	remove_proc_entry(name, xen_base);
 }
+
+EXPORT_SYMBOL_GPL(remove_xen_proc_entry); 

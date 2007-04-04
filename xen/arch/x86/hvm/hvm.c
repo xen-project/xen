@@ -521,12 +521,12 @@ static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(hvm_op)
 };
 
-void hvm_do_hypercall(struct cpu_user_regs *pregs)
+int hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
     if ( unlikely(ring_3(pregs)) )
     {
         pregs->eax = -EPERM;
-        return;
+        return 0;
     }
 
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
@@ -535,11 +535,21 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
                 current->domain->domain_id, current->vcpu_id,
                 pregs->eax);
         pregs->eax = -ENOSYS;
-        return;
+        return 0;
     }
+
+    /* Install a canary value in regs->eip so can check for continuation */
+    pregs->eip |= 0xF; 
 
     pregs->eax = hvm_hypercall_table[pregs->eax](
         pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
+
+    /* XXX: pot fake IO instr here to inform the emulator to flush mapcache */
+
+    if( (pregs->eip & 0xF) == 0 ) /* preempted */
+        return 1; 
+
+    return 0; 
 }
 
 #else /* defined(__x86_64__) */
@@ -599,12 +609,12 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(event_channel_op)
 };
 
-void hvm_do_hypercall(struct cpu_user_regs *pregs)
+int hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
     if ( unlikely(ring_3(pregs)) )
     {
         pregs->rax = -EPERM;
-        return;
+        return 0;
     }
 
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
@@ -614,7 +624,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
                 current->domain->domain_id, current->vcpu_id,
                 pregs->rax);
         pregs->rax = -ENOSYS;
-        return;
+        return 0;
     }
 
     if ( current->arch.paging.mode->guest_levels == 4 )
@@ -633,6 +643,7 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
                                                        (uint32_t)pregs->esi,
                                                        (uint32_t)pregs->edi);
     }
+    return 0; /* XXX SMH: fix for preempt here */
 }
 
 #endif /* defined(__x86_64__) */

@@ -17,6 +17,9 @@ for d in $(find ${XL}/drivers/xen/ -maxdepth 1 -type d | sed -e 1d); do
     if ! echo $d | egrep -q back; then
         lndir $d $(basename $d) > /dev/null 2>&1
     fi
+    if ! echo $d | egrep -q ball; then
+        lndir $d $(basename $d) > /dev/null 2>&1
+    fi
 done
 
 ln -sf ${XL}/drivers/xen/core/gnttab.c platform-pci
@@ -47,6 +50,7 @@ i[34567]86)
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/hypercall.h include/asm
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/synch_bitops.h include/asm
     ln -sf ${XL}/include/asm-i386/mach-xen/asm/maddr.h include/asm
+    ln -sf ${XL}/include/asm-i386/mach-xen/asm/page.h include/asm
   ;;
 "ia64")
     ln -sf ${XL}/include/asm-ia64/hypervisor.h include/asm

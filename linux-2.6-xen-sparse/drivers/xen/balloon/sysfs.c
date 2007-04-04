@@ -29,6 +29,7 @@
  */
 
 #include <linux/capability.h>
+#include <linux/errno.h>
 #include <linux/stat.h>
 #include <linux/sysdev.h>
 #include "common.h"

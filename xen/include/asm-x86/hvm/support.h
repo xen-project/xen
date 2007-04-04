@@ -228,7 +228,7 @@ int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 void hvm_print_line(struct vcpu *v, const char c);
 void hlt_timer_fn(void *data);
 
-void hvm_do_hypercall(struct cpu_user_regs *pregs);
+int hvm_do_hypercall(struct cpu_user_regs *pregs);
 
 void hvm_hlt(unsigned long rflags);
 void hvm_triple_fault(void);

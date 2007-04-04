@@ -407,11 +407,13 @@ grow_nomem:
 static unsigned int __max_nr_grant_frames(void)
 {
 	struct gnttab_query_size query;
-	int rc;
+	int rc = -1;
 
 	query.dom = DOMID_SELF;
 
+#ifdef CONFIG_XEN
 	rc = HYPERVISOR_grant_table_op(GNTTABOP_query_size, &query, 1);
+#endif
 	if ((rc < 0) || (query.status != GNTST_okay))
 		return 4; /* Legacy max supported number of frames */
 

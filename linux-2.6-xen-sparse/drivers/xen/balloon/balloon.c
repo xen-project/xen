@@ -48,13 +48,20 @@
 #include <asm/hypervisor.h>
 #include <xen/balloon.h>
 #include <xen/interface/memory.h>
+#include <asm/maddr.h>
+#include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
+#include <linux/highmem.h>
 #include <linux/list.h>
 #include <xen/xenbus.h>
 #include "common.h"
+
+#ifndef CONFIG_XEN 
+#define scrub_pages(_p,_n)
+#endif
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *balloon_pde;
@@ -217,6 +224,7 @@ static int increase_reservation(unsigned long nr_pages)
 
 		set_phys_to_machine(pfn, frame_list[i]);
 
+#ifdef CONFIG_XEN
 		/* Link back into the page tables if not highmem. */
 		if (pfn < max_low_pfn) {
 			int ret;
@@ -226,6 +234,7 @@ static int increase_reservation(unsigned long nr_pages)
 				0);
 			BUG_ON(ret);
 		}
+#endif
 
 		/* Relinquish the page back to the allocator. */
 		ClearPageReserved(page);
@@ -241,6 +250,8 @@ static int increase_reservation(unsigned long nr_pages)
 
 	return 0;
 }
+
+extern void xen_invalidate_foreign_mappings(void);
 
 static int decrease_reservation(unsigned long nr_pages)
 {
@@ -275,7 +286,7 @@ static int decrease_reservation(unsigned long nr_pages)
 				(unsigned long)v, __pte_ma(0), 0);
 			BUG_ON(ret);
 		}
-#ifdef CONFIG_XEN_SCRUB_PAGES
+#ifdef CONFIG_XEN
 		else {
 			v = kmap(page);
 			scrub_pages(v, 1);
@@ -284,19 +295,24 @@ static int decrease_reservation(unsigned long nr_pages)
 #endif
 	}
 
+#ifdef CONFIG_XEN
 	/* Ensure that ballooned highmem pages don't have kmaps. */
 	kmap_flush_unused();
 	flush_tlb_all();
+#endif
 
 	balloon_lock(flags);
 
 	/* No more mappings: invalidate P2M and add to balloon. */
 	for (i = 0; i < nr_pages; i++) {
 		pfn = mfn_to_pfn(frame_list[i]);
+#ifdef CONFIG_XEN
 		set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
+#endif
 		balloon_append(pfn_to_page(pfn));
 	}
 
+        xen_invalidate_foreign_mappings(); 
 	set_xen_guest_handle(reservation.extent_start, frame_list);
 	reservation.nr_extents   = nr_pages;
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
@@ -446,7 +462,7 @@ static struct notifier_block xenstore_notifier;
 
 static int __init balloon_init(void)
 {
-#ifdef CONFIG_X86
+#if defined(CONFIG_X86) && defined(CONFIG_XEN) 
 	unsigned long pfn;
 	struct page *page;
 #endif
@@ -456,8 +472,12 @@ static int __init balloon_init(void)
 
 	IPRINTK("Initialising balloon driver.\n");
 
+#ifdef CONFIG_XEN
 	bs.current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages   = bs.current_pages;
+#else 
+        bs.current_pages = totalram_pages; 
+#endif
 	bs.target_pages  = bs.current_pages;
 	bs.balloon_low   = 0;
 	bs.balloon_high  = 0;
@@ -479,7 +499,7 @@ static int __init balloon_init(void)
 #endif
 	balloon_sysfs_init();
 
-#ifdef CONFIG_X86
+#if defined(CONFIG_X86) && defined(CONFIG_XEN) 
 	/* Initialise the balloon with excess memory space. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
 		page = pfn_to_page(pfn);
@@ -498,6 +518,14 @@ static int __init balloon_init(void)
 
 subsys_initcall(balloon_init);
 
+static void balloon_exit(void) 
+{
+    /* XXX - release balloon here */
+    return; 
+}
+
+module_exit(balloon_exit); 
+
 void balloon_update_driver_allowance(long delta)
 {
 	unsigned long flags;
@@ -507,6 +535,7 @@ void balloon_update_driver_allowance(long delta)
 	balloon_unlock(flags);
 }
 
+#ifdef CONFIG_XEN
 static int dealloc_pte_fn(
 	pte_t *pte, struct page *pmd_page, unsigned long addr, void *data)
 {
@@ -524,6 +553,7 @@ static int dealloc_pte_fn(
 	BUG_ON(ret != 1);
 	return 0;
 }
+#endif
 
 struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 {
@@ -559,8 +589,13 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 			if (ret == 1)
 				ret = 0; /* success */
 		} else {
+#ifdef CONFIG_XEN
 			ret = apply_to_page_range(&init_mm, vaddr, PAGE_SIZE,
 						  dealloc_pte_fn, NULL);
+#else 
+                        /* cannot handle non-auto translate mode */
+                        ret = 1; 
+#endif
 		}
 
 		if (ret != 0) {
@@ -576,7 +611,9 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 
  out:
 	schedule_work(&balloon_worker);
+#ifdef CONFIG_XEN
 	flush_tlb_all();
+#endif
 	return pagevec;
 
  err:

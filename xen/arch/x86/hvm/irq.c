@@ -347,11 +347,7 @@ int hvm_local_events_need_delivery(struct vcpu *v)
 
     pending = (vcpu_info(v, evtchn_upcall_pending) || cpu_has_pending_irq(v));
     if ( unlikely(pending) )
-    {
-        struct cpu_user_regs regs;
-        hvm_store_cpu_guest_regs(v, &regs, NULL);
-        pending = !irq_masked(regs.eflags);
-    }
+        pending = hvm_interrupts_enabled(v); 
 
     return pending;
 }
