@@ -337,6 +337,25 @@ int is_isa_irq_masked(struct vcpu *v, int isa_irq)
             domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
 }
 
+/*
+ * TODO: 1. Should not need special treatment of event-channel events.
+ *       2. Should take notice of interrupt shadows (or clear them).
+ */
+int hvm_local_events_need_delivery(struct vcpu *v)
+{
+    int pending;
+
+    pending = (vcpu_info(v, evtchn_upcall_pending) || cpu_has_pending_irq(v));
+    if ( unlikely(pending) )
+    {
+        struct cpu_user_regs regs;
+        hvm_store_cpu_guest_regs(v, &regs, NULL);
+        pending = !irq_masked(regs.eflags);
+    }
+
+    return pending;
+}
+
 #if 0 /* Keep for debugging */
 static void irq_dump(struct domain *d)
 {
