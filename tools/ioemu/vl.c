@@ -88,6 +88,7 @@
 
 #include "exec-all.h"
 
+#include <xen/hvm/params.h>
 #define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
 #define DEFAULT_BRIDGE "xenbr0"
 
@@ -5886,7 +5887,8 @@ int set_mm_mapping(int xc_handle, uint32_t domid,
 
 void suspend(int sig)
 {
-   fprintf(logfile, "suspend sig handler called with requested=%d!\n", suspend_requested);
+    fprintf(logfile, "suspend sig handler called with requested=%d!\n",
+            suspend_requested);
     if (sig != SIGUSR1)
         fprintf(logfile, "suspend signal dismatch, get sig=%d!\n", sig);
     suspend_requested = 1;
@@ -5900,32 +5902,28 @@ static unsigned long nr_buckets;
 static unsigned long last_address_index = ~0UL;
 static uint8_t      *last_address_vaddr;
 
-static int qemu_map_cache_init(unsigned long nr_pages)
+static int qemu_map_cache_init(void)
 {
-    unsigned long max_pages = MAX_MCACHE_SIZE >> PAGE_SHIFT;
-    int i;
+    unsigned long size;
 
-    if (nr_pages < max_pages)
-        max_pages = nr_pages;
-
-    nr_buckets   = max_pages + (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1;
-    nr_buckets >>= (MCACHE_BUCKET_SHIFT - PAGE_SHIFT);
+    nr_buckets = (((MAX_MCACHE_SIZE >> PAGE_SHIFT) +
+                   (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1) >>
+                  (MCACHE_BUCKET_SHIFT - PAGE_SHIFT));
     fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx\n", nr_buckets);
 
-    mapcache_entry = malloc(nr_buckets * sizeof(struct map_cache));
-    if (mapcache_entry == NULL) {
+    /*
+     * Use mmap() directly: lets us allocate a big hash table with no up-front
+     * cost in storage space. The OS will allocate memory only for the buckets
+     * that we actually use. All others will contain all zeroes.
+     */
+    size = nr_buckets * sizeof(struct map_cache);
+    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    mapcache_entry = mmap(NULL, size, PROT_READ|PROT_WRITE,
+                          MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+    if (mapcache_entry == MAP_FAILED) {
         errno = ENOMEM;
         return -1;
     }
-
-    memset(mapcache_entry, 0, nr_buckets * sizeof(struct map_cache));
-
-    /*
-     * To avoid ENOMEM from xc_map_foreign_batch() at runtime, we
-     * pre-fill all the map caches in advance.
-     */
-    for (i = 0; i < nr_buckets; i++)
-       (void)qemu_map_cache(((target_phys_addr_t)i) << MCACHE_BUCKET_SHIFT);
 
     return 0;
 }
@@ -6038,11 +6036,14 @@ int main(int argc, char **argv)
     QEMUMachine *machine;
     char usb_devices[MAX_USB_CMDLINE][128];
     int usb_devices_index;
-    unsigned long nr_pages, tmp_nr_pages, shared_page_nr;
-    xen_pfn_t *page_array;
+    unsigned long ioreq_pfn;
     extern void *shared_page;
     extern void *buffered_io_page;
+#ifdef __ia64__
+    unsigned long nr_pages;
+    xen_pfn_t *page_array;
     extern void *buffered_pio_page;
+#endif
 
     char qemu_dm_logfilename[64];
 
@@ -6592,47 +6593,36 @@ int main(int argc, char **argv)
 
     xc_handle = xc_interface_open();
 
-    nr_pages = ram_size/PAGE_SIZE;
-    tmp_nr_pages = nr_pages;
-
-#if defined(__i386__) || defined(__x86_64__)
-    if (ram_size > HVM_BELOW_4G_RAM_END) {
-        tmp_nr_pages += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-        shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
-    } else
-        shared_page_nr = nr_pages - 1;
-#endif
-
 #if defined(__i386__) || defined(__x86_64__)
 
-    if ( qemu_map_cache_init(tmp_nr_pages) )
-    {
+    if (qemu_map_cache_init()) {
         fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
         exit(-1);
     }
 
+    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
+    fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                       PROT_READ|PROT_WRITE, shared_page_nr);
+                                       PROT_READ|PROT_WRITE, ioreq_pfn);
     if (shared_page == NULL) {
         fprintf(logfile, "map shared IO page returned error %d\n", errno);
         exit(-1);
     }
 
-    fprintf(logfile, "shared page at pfn:%lx\n", shared_page_nr);
-
+    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
+    fprintf(logfile, "buffered io page at pfn %lx\n", ioreq_pfn);
     buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                            PROT_READ|PROT_WRITE,
-                                            shared_page_nr - 2);
+                                            PROT_READ|PROT_WRITE, ioreq_pfn);
     if (buffered_io_page == NULL) {
         fprintf(logfile, "map buffered IO page returned error %d\n", errno);
         exit(-1);
     }
 
-    fprintf(logfile, "buffered io page at pfn:%lx\n", shared_page_nr - 2);
-
 #elif defined(__ia64__)
 
-    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
+    nr_pages = ram_size/PAGE_SIZE;
+
+    page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
     if (page_array == NULL) {
         fprintf(logfile, "malloc returned error %d\n", errno);
         exit(-1);
@@ -6650,7 +6640,7 @@ int main(int argc, char **argv)
                                        PROT_READ|PROT_WRITE,
                                        BUFFER_PIO_PAGE_START >> PAGE_SHIFT);
 
-    for (i = 0; i < tmp_nr_pages; i++)
+    for (i = 0; i < nr_pages; i++)
         page_array[i] = i;
 	
     /* VTI will not use memory between 3G~4G, so we just pass a legal pfn
