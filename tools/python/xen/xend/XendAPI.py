@@ -2187,7 +2187,7 @@ class XendAPI(object):
                    'other_config']
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
-    VDI_methods = [('snapshot', 'VDI'), ('destroy', None)]
+    VDI_methods = [('destroy', None)]
     VDI_funcs = [('create', 'VDI'),
                   ('get_by_name_label', 'Set(VDI)')]
 
@@ -2251,8 +2251,6 @@ class XendAPI(object):
         return xen_api_success_void()
 
     # Object Methods
-    def VDI_snapshot(self, session, vdi_ref):
-        return xen_api_todo()
     
     def VDI_destroy(self, session, vdi_ref):
         sr = XendNode.instance().get_sr_containing_vdi(vdi_ref)
