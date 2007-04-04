@@ -2079,8 +2079,8 @@ class XendAPI(object):
             vif_ref = dom.create_vif(vif_struct)
             xendom.managed_config_save(dom)
             return xen_api_success(vif_ref)
-        except XendError:
-            return xen_api_error(XEND_ERROR_TODO)
+        except XendError, exn:
+            return xen_api_error(['INTERNAL_ERROR', str(exn)])
           
     def VIF_destroy(self, session, vif_ref):
         xendom = XendDomain.instance()
@@ -2367,8 +2367,8 @@ class XendAPI(object):
                 vtpm_ref = dom.create_vtpm(vtpm_struct)
                 xendom.managed_config_save(dom)
                 return xen_api_success(vtpm_ref)
-            except XendError:
-                return xen_api_error(XEND_ERROR_TODO)
+            except XendError, exn:
+                return xen_api_error(['INTERNAL_ERROR', str(exn)])
         else:
             return xen_api_error(['HANDLE_INVALID', 'VM', vtpm_struct['VM']])
 
@@ -2442,8 +2442,8 @@ class XendAPI(object):
             console_ref = dom.create_console(console_struct)
             xendom.managed_config_save(dom)
             return xen_api_success(console_ref)
-        except XendError, e:
-            return xen_api_error([XEND_ERROR_TODO, str(e)])
+        except XendError, exn:
+            return xen_api_error(['INTERNAL_ERROR', str(exn)])
 
     # Xen API: Class SR
     # ----------------------------------------------------------------
