@@ -944,8 +944,6 @@ class XendAPI(object):
         return xen_api_success(['pygrub'])
     def host_get_sched_policy(self, _, host_ref):
         return xen_api_success(XendNode.instance().get_vcpus_policy())
-    def host_set_sched_policy(self, _, host_ref, policy):
-        return xen_api_todo()
     def host_get_cpu_configuration(self, _, host_ref):
         return xen_api_success(XendNode.instance().get_cpu_configuration())
     
