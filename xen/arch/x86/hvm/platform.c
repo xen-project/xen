@@ -865,7 +865,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
     if ( hvm_portio_intercept(p) )
     {
         p->state = STATE_IORESP_READY;
-        hvm_io_assist(v);
+        hvm_io_assist();
         return;
     }
 
@@ -914,7 +914,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
     if ( hvm_mmio_intercept(p) || hvm_buffered_io_intercept(p) )
     {
         p->state = STATE_IORESP_READY;
-        hvm_io_assist(v);
+        hvm_io_assist();
         return;
     }
 

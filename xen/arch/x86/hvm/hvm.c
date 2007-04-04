@@ -131,7 +131,7 @@ void hvm_do_resume(struct vcpu *v)
         switch ( p->state )
         {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
-            hvm_io_assist(v);
+            hvm_io_assist();
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
