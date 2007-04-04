@@ -272,7 +272,7 @@ void xenstore_process_logdirty_event(void)
 
         /* Double-check that the bitmaps are the size we expect */
         if (logdirty_bitmap_size != *(uint32_t *)seg) {
-            fprintf(logfile, "Log-dirty: got %lu, calc %lu\n", 
+            fprintf(logfile, "Log-dirty: got %u, calc %lu\n", 
                     *(uint32_t *)seg, logdirty_bitmap_size);
             return;
         }
@@ -304,7 +304,7 @@ void xenstore_process_logdirty_event(void)
         fprintf(logfile, "Log-dirty: bad next-active entry: %s\n", act);
         exit(1);
     }
-    logdirty_bitmap = seg + i * logdirty_bitmap_size;
+    logdirty_bitmap = (unsigned long *)(seg + i * logdirty_bitmap_size);
 
     /* Ack that we've switched */
     xs_write(xsh, XBT_NULL, active_path, act, len);
@@ -612,7 +612,7 @@ int xenstore_vm_write(int domid, char *key, char *value)
 
     path = xs_get_domain_path(xsh, domid);
     if (path == NULL) {
-	fprintf(logfile, "xs_get_domain_path(%d): error\n");
+	fprintf(logfile, "xs_get_domain_path: error\n");
 	goto out;
     }
 

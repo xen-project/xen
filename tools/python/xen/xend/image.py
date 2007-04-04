@@ -426,11 +426,14 @@ class HVMImageHandler(ImageHandler):
         # Execute device model.
         #todo: Error handling
         args = [self.device_model]
-        args = args + ([ "-d",  "%d" % self.vm.getDomid(),
-                  "-m", "%s" % (self.getRequiredInitialReservation() / 1024)])
+        args = args + ([ "-d",  "%d" % self.vm.getDomid() ])
+        if arch.type == "ia64":
+            args = args + ([ "-m", "%s" %
+                             (self.getRequiredInitialReservation() / 1024) ])
         args = args + self.dmargs
         if restore:
-            args = args + ([ "-loadvm", "/tmp/xen.qemu-dm.%d" % self.vm.getDomid() ])
+            args = args + ([ "-loadvm", "/tmp/xen.qemu-dm.%d" %
+                             self.vm.getDomid() ])
         env = dict(os.environ)
         if self.display:
             env['DISPLAY'] = self.display
