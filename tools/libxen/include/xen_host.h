@@ -436,6 +436,13 @@ xen_host_dmesg(xen_session *session, char **result, xen_host host);
 
 
 /**
+ * List all supported methods.
+ */
+extern bool
+xen_host_list_methods(xen_session *session, struct xen_string_set **result);
+
+
+/**
  * Return a list of all the hosts known to the system.
  */
 extern bool

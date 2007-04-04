@@ -740,6 +740,18 @@ xen_host_dmesg(xen_session *session, char **result, xen_host host)
 
 
 bool
+xen_host_list_methods(xen_session *session, struct xen_string_set **result)
+{
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "host.list_methods", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+bool
 xen_host_get_all(xen_session *session, struct xen_host_set **result)
 {
 

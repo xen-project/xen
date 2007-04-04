@@ -886,7 +886,8 @@ class XendAPI(object):
                     ('get_log', 'String'),
                     ('send_debug_keys', None)]
     
-    host_funcs = [('get_by_name_label', 'Set(host)')]
+    host_funcs = [('get_by_name_label', None),
+                  ('list_methods', None)]
 
     # attributes
     def host_get_name_label(self, session, host_ref):
@@ -1010,6 +1011,12 @@ class XendAPI(object):
             return xen_api_success((XendNode.instance().uuid,))
         return xen_api_success([])
     
+    def host_list_methods(self, _):
+        def _funcs():
+            return [getattr(XendAPI, x) for x in XendAPI.__dict__]
+
+        return xen_api_success([x.api for x in _funcs()
+                                if hasattr(x, 'api')])
 
     # Xen API: Class host_CPU
     # ----------------------------------------------------------------
@@ -2609,15 +2616,6 @@ class XendAPI(object):
 
     def debug_get_record(self, session, debug_ref):
         return xen_api_success({'uuid': debug_ref})
-
-
-    def list_all_methods(self, _):
-        def _funcs():
-            return [getattr(XendAPI, x) for x in XendAPI.__dict__]
-
-        return xen_api_success([x.api for x in _funcs()
-                                if hasattr(x, 'api')])
-    list_all_methods.api = '_UNSUPPORTED_list_all_methods'
 
 
 class XendAPIAsyncProxy:

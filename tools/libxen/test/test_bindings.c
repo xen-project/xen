@@ -64,6 +64,7 @@ typedef struct
 
 static xen_vm create_new_vm(xen_session *session, bool hvm);
 static void print_session_info(xen_session *session);
+static void print_methods(xen_session *session);
 static void print_vm_power_state(xen_session *session, xen_vm vm);
 static void print_vm_metrics(xen_session *session, xen_vm vm);
 
@@ -159,6 +160,14 @@ int main(int argc, char **argv)
         xen_session_login_with_password(call_func, NULL, username, password);
 
     print_session_info(session);
+    if (!session->ok)
+    {
+        /* Error has been logged, just clean up. */
+        CLEANUP;
+        return 1;
+    }
+
+    print_methods(session);
     if (!session->ok)
     {
         /* Error has been logged, just clean up. */
@@ -641,6 +650,40 @@ static void print_session_info(xen_session *session)
     xen_session_record_free(record);
 
     fflush(stdout);
+}
+
+
+static int pstrcmp(const void *p1, const void *p2)
+{
+    return strcmp(*(char **)p1, *(char **)p2);
+}
+
+
+/**
+ * Print the list of supported methods.
+ */
+static void print_methods(xen_session *session)
+{
+    xen_string_set *methods;
+
+    if (!xen_host_list_methods(session, &methods))
+    {
+        print_error(session);
+        goto done;
+    }
+
+    printf("%zd.\n", methods->size);
+    qsort(methods->contents, methods->size, sizeof(char *), pstrcmp);
+
+    printf("Supported methods:\n");
+    for (size_t i = 0; i < methods->size; i++)
+    {
+        printf("  %s\n", methods->contents[i]);
+    }
+    fflush(stdout);
+
+done:
+    xen_string_set_free(methods);
 }
 
 

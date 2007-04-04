@@ -591,7 +591,7 @@ class Shell(cmd.Cmd):
         self.prompt = "xm> "
         if serverType == SERVER_XEN_API:
             try:
-                res = server.xenapi._UNSUPPORTED_list_all_methods()
+                res = server.xenapi.host.list_methods()
                 for f in res:
                     setattr(Shell, 'do_' + f + ' ', self.default)
             except:
