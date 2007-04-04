@@ -33,9 +33,6 @@
 startup_64:
 ENTRY(_start)
 	movq $(init_thread_union+THREAD_SIZE-8),%rsp
-	/* zero EFLAGS after setting rsp */
-	pushq $0
-	popfq
 
 	/* rsi is pointer to startup info structure.
 	   pass it to C */
