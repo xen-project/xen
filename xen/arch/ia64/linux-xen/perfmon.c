@@ -7471,8 +7471,8 @@ xenpfm_context_load(XEN_GUEST_HANDLE(pfarg_load_t) req)
 	spin_unlock(&xenpfm_context_lock);
 	for_each_online_cpu(cpu) {
 		if (arg.error[cpu]) {
-			gdprintk(XENLOG_INFO, "%s: error %d cpu %d\n",
-				 __func__, error, cpu);
+			gdprintk(XENLOG_INFO, "%s: cpu %d error %d\n",
+				 __func__, cpu, arg.error[cpu]);
 			error = arg.error[cpu];
 		}
 	}
@@ -7518,8 +7518,8 @@ xenpfm_context_unload(void)
 	spin_unlock(&xenpfm_context_lock);
 	for_each_online_cpu(cpu) {
 		if (arg.error[cpu]) {
-			gdprintk(XENLOG_INFO, "%s: error %d cpu %d\n",
-				 __func__, error, cpu);
+			gdprintk(XENLOG_INFO, "%s: cpu %d error %d\n",
+				 __func__, cpu, arg.error[cpu]);
 			error = arg.error[cpu];
 		}
 	}
@@ -7699,7 +7699,7 @@ xenpfm_start_stop_locked(int is_start)
 	local_irq_restore(flags);
 
 	for_each_online_cpu(cpu) {
-		if (!arg.error[cpu]) {
+		if (arg.error[cpu]) {
 			gdprintk(XENLOG_INFO, "%s: cpu %d error %d\n", 
 				__func__, cpu, arg.error[cpu]);
 			error = arg.error[cpu];
