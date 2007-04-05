@@ -289,8 +289,12 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 
 long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs);
 
-static inline void set_eflags_CF(int size, unsigned long v1,
-                                 unsigned long v2, struct cpu_user_regs *regs)
+static inline void set_eflags_CF(int size,
+                                 unsigned int instr,
+                                 unsigned long result,
+                                 unsigned long src,
+                                 unsigned long dst,
+                                 struct cpu_user_regs *regs)
 {
     unsigned long mask;
 
@@ -300,14 +304,28 @@ static inline void set_eflags_CF(int size, unsigned long v1,
 
     mask = ~0UL >> (8 * (sizeof(mask) - size));
 
-    if ((v1 & mask) > (v2 & mask))
-        regs->eflags |= X86_EFLAGS_CF;
+    if ( instr == INSTR_ADD )
+    {
+        /* CF=1 <==> result is less than the augend and addend) */
+        if ( (result & mask) < (dst & mask) )
+        {
+            ASSERT((result & mask) < (src & mask));
+            regs->eflags |= X86_EFLAGS_CF;
+        }
+    }
     else
-        regs->eflags &= ~X86_EFLAGS_CF;
+    {
+        ASSERT( instr == INSTR_CMP || instr == INSTR_SUB );
+        if ( (src & mask) > (dst & mask) )
+            regs->eflags |= X86_EFLAGS_CF;
+    }
 }
 
-static inline void set_eflags_OF(int size, unsigned long v1,
-                                 unsigned long v2, unsigned long v3,
+static inline void set_eflags_OF(int size,
+                                 unsigned int instr,
+                                 unsigned long result,
+                                 unsigned long src,
+                                 unsigned long dst,
                                  struct cpu_user_regs *regs)
 {
     unsigned long mask;
@@ -316,21 +334,32 @@ static inline void set_eflags_OF(int size, unsigned long v1,
         size = BYTE;
     ASSERT((size <= sizeof(mask)) && (size > 0));
 
-    mask = ~0UL >> (8 * (sizeof(mask) - size));
+    mask =  1UL << ((8*size) - 1);
 
-    if ((v3 ^ v2) & (v3 ^ v1) & mask)
-        regs->eflags |= X86_EFLAGS_OF;
+    if ( instr == INSTR_ADD )
+    {
+        if ((src ^ result) & (dst ^ result) & mask);
+            regs->eflags |= X86_EFLAGS_OF;
+    }
+    else
+    {
+        ASSERT(instr == INSTR_CMP || instr == INSTR_SUB);
+        if ((dst ^ src) & (dst ^ result) & mask)
+            regs->eflags |= X86_EFLAGS_OF;
+    }
 }
 
-static inline void set_eflags_AF(int size, unsigned long v1,
-                                 unsigned long v2, unsigned long v3,
+static inline void set_eflags_AF(int size,
+                                 unsigned long result,
+                                 unsigned long src,
+                                 unsigned long dst,
                                  struct cpu_user_regs *regs)
 {
-    if ((v1 ^ v2 ^ v3) & 0x10)
+    if ((result ^ src ^ dst) & 0x10)
         regs->eflags |= X86_EFLAGS_AF;
 }
 
-static inline void set_eflags_ZF(int size, unsigned long v1,
+static inline void set_eflags_ZF(int size, unsigned long result,
                                  struct cpu_user_regs *regs)
 {
     unsigned long mask;
@@ -341,11 +370,11 @@ static inline void set_eflags_ZF(int size, unsigned long v1,
 
     mask = ~0UL >> (8 * (sizeof(mask) - size));
 
-    if ((v1 & mask) == 0)
+    if ((result & mask) == 0)
         regs->eflags |= X86_EFLAGS_ZF;
 }
 
-static inline void set_eflags_SF(int size, unsigned long v1,
+static inline void set_eflags_SF(int size, unsigned long result,
                                  struct cpu_user_regs *regs)
 {
     unsigned long mask;
@@ -354,9 +383,9 @@ static inline void set_eflags_SF(int size, unsigned long v1,
         size = BYTE;
     ASSERT((size <= sizeof(mask)) && (size > 0));
 
-    mask = ~0UL >> (8 * (sizeof(mask) - size));
+    mask = 1UL << ((8*size) - 1);
 
-    if (v1 & mask)
+    if (result & mask)
         regs->eflags |= X86_EFLAGS_SF;
 }
 
@@ -379,10 +408,10 @@ static char parity_table[256] = {
     1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
 };
 
-static inline void set_eflags_PF(int size, unsigned long v1,
+static inline void set_eflags_PF(int size, unsigned long result,
                                  struct cpu_user_regs *regs)
 {
-    if (parity_table[v1 & 0xFF])
+    if (parity_table[result & 0xFF])
         regs->eflags |= X86_EFLAGS_PF;
 }
 
@@ -585,6 +614,17 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             diff = (unsigned long) p->data & value;
             set_reg_value(size, index, 0, regs, diff);
         }
+
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, diff, regs);
+        set_eflags_SF(size, diff, regs);
+        set_eflags_PF(size, diff, regs);
         break;
 
     case INSTR_ADD:
@@ -603,12 +643,16 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         }
 
         /*
-         * The OF and CF flags are cleared; the SF, ZF, and PF
-         * flags are set according to the result. The state of
-         * the AF flag is undefined.
+         * The CF, OF, SF, ZF, AF, and PF flags are set according
+         * to the result
          */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_CF(size, mmio_opp->instr, diff, value,
+                      (unsigned long) p->data, regs);
+        set_eflags_OF(size, mmio_opp->instr, diff, value,
+                      (unsigned long) p->data, regs);
+        set_eflags_AF(size, diff, value, (unsigned long) p->data, regs);
         set_eflags_ZF(size, diff, regs);
         set_eflags_SF(size, diff, regs);
         set_eflags_PF(size, diff, regs);
@@ -691,8 +735,20 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_CF(size, value, (unsigned long) p->data, regs);
-        set_eflags_OF(size, diff, value, (unsigned long) p->data, regs);
+        if ( src & (REGISTER | IMMEDIATE) )
+        {
+            set_eflags_CF(size, mmio_opp->instr, diff, value,
+                          (unsigned long) p->data, regs);
+            set_eflags_OF(size, mmio_opp->instr, diff, value,
+                          (unsigned long) p->data, regs);
+        }
+        else
+        {
+            set_eflags_CF(size, mmio_opp->instr, diff,
+                          (unsigned long) p->data, value, regs);
+            set_eflags_OF(size, mmio_opp->instr, diff,
+                          (unsigned long) p->data, value, regs);
+        }
         set_eflags_AF(size, diff, value, (unsigned long) p->data, regs);
         set_eflags_ZF(size, diff, regs);
         set_eflags_SF(size, diff, regs);
