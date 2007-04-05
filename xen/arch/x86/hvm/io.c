@@ -483,7 +483,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 {
     int sign = p->df ? -1 : 1;
     int size = -1, index = -1;
-    unsigned long value = 0, diff = 0;
+    unsigned long value = 0, result = 0;
     unsigned long src, dst;
 
     src = mmio_opp->operand[0];
@@ -604,15 +604,15 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data & value;
+            result = (unsigned long) p->data & value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data & value;
+            result = (unsigned long) p->data & value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data & value;
-            set_reg_value(size, index, 0, regs, diff);
+            result = (unsigned long) p->data & value;
+            set_reg_value(size, index, 0, regs, result);
         }
 
         /*
@@ -622,24 +622,24 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_ADD:
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data + value;
+            result = (unsigned long) p->data + value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data + value;
+            result = (unsigned long) p->data + value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data + value;
-            set_reg_value(size, index, 0, regs, diff);
+            result = (unsigned long) p->data + value;
+            set_reg_value(size, index, 0, regs, result);
         }
 
         /*
@@ -648,29 +648,29 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_CF(size, mmio_opp->instr, diff, value,
+        set_eflags_CF(size, mmio_opp->instr, result, value,
                       (unsigned long) p->data, regs);
-        set_eflags_OF(size, mmio_opp->instr, diff, value,
+        set_eflags_OF(size, mmio_opp->instr, result, value,
                       (unsigned long) p->data, regs);
-        set_eflags_AF(size, diff, value, (unsigned long) p->data, regs);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_AF(size, result, value, (unsigned long) p->data, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_OR:
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data | value;
+            result = (unsigned long) p->data | value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data | value;
+            result = (unsigned long) p->data | value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data | value;
-            set_reg_value(size, index, 0, regs, diff);
+            result = (unsigned long) p->data | value;
+            set_reg_value(size, index, 0, regs, result);
         }
 
         /*
@@ -680,24 +680,24 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_XOR:
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data ^ value;
+            result = (unsigned long) p->data ^ value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data ^ value;
+            result = (unsigned long) p->data ^ value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data ^ value;
-            set_reg_value(size, index, 0, regs, diff);
+            result = (unsigned long) p->data ^ value;
+            set_reg_value(size, index, 0, regs, result);
         }
 
         /*
@@ -707,9 +707,9 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_CMP:
@@ -717,16 +717,16 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data - value;
+            result = (unsigned long) p->data - value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data - value;
+            result = (unsigned long) p->data - value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = value - (unsigned long) p->data;
+            result = value - (unsigned long) p->data;
             if ( mmio_opp->instr == INSTR_SUB )
-                set_reg_value(size, index, 0, regs, diff);
+                set_reg_value(size, index, 0, regs, result);
         }
 
         /*
@@ -737,22 +737,22 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
         if ( src & (REGISTER | IMMEDIATE) )
         {
-            set_eflags_CF(size, mmio_opp->instr, diff, value,
+            set_eflags_CF(size, mmio_opp->instr, result, value,
                           (unsigned long) p->data, regs);
-            set_eflags_OF(size, mmio_opp->instr, diff, value,
+            set_eflags_OF(size, mmio_opp->instr, result, value,
                           (unsigned long) p->data, regs);
         }
         else
         {
-            set_eflags_CF(size, mmio_opp->instr, diff,
+            set_eflags_CF(size, mmio_opp->instr, result,
                           (unsigned long) p->data, value, regs);
-            set_eflags_OF(size, mmio_opp->instr, diff,
+            set_eflags_OF(size, mmio_opp->instr, result,
                           (unsigned long) p->data, value, regs);
         }
-        set_eflags_AF(size, diff, value, (unsigned long) p->data, regs);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_AF(size, result, value, (unsigned long) p->data, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_TEST:
@@ -765,16 +765,16 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
         }
-        diff = (unsigned long) p->data & value;
+        result = (unsigned long) p->data & value;
 
         /*
          * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_BT:
