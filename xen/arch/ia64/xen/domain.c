@@ -446,22 +446,11 @@ int vcpu_initialise(struct vcpu *v)
 	return 0;
 }
 
-int vcpu_late_initialise(struct vcpu *v)
+void vcpu_share_privregs_with_guest(struct vcpu *v)
 {
 	struct domain *d = v->domain;
-	int rc, order, i;
+	int i, order = get_order_from_shift(XMAPPEDREGS_SHIFT); 
 
-	if (HAS_PERVCPU_VHPT(d)) {
-		rc = pervcpu_vhpt_alloc(v);
-		if (rc != 0)
-			return rc;
-	}
-
-	/* Create privregs page. */
-	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
-	v->arch.privregs = alloc_xenheap_pages(order);
-	BUG_ON(v->arch.privregs == NULL);
-	memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
 	for (i = 0; i < (1 << order); i++)
 		share_xen_page_with_guest(virt_to_page(v->arch.privregs) + i,
 		                          d, XENSHARE_writable);
@@ -474,6 +463,25 @@ int vcpu_late_initialise(struct vcpu *v)
 	for (i = 0; i < XMAPPEDREGS_SIZE; i += PAGE_SIZE)
 		assign_domain_page(d, IA64_XMAPPEDREGS_PADDR(v->vcpu_id) + i,
 		                   virt_to_maddr(v->arch.privregs + i));
+}
+
+int vcpu_late_initialise(struct vcpu *v)
+{
+	struct domain *d = v->domain;
+	int rc, order;
+
+	if (HAS_PERVCPU_VHPT(d)) {
+		rc = pervcpu_vhpt_alloc(v);
+		if (rc != 0)
+			return rc;
+	}
+
+	/* Create privregs page. */
+	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
+	v->arch.privregs = alloc_xenheap_pages(order);
+	BUG_ON(v->arch.privregs == NULL);
+	memset(v->arch.privregs, 0, 1 << XMAPPEDREGS_SHIFT);
+	vcpu_share_privregs_with_guest(v);
 
 	return 0;
 }

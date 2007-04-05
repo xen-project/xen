@@ -301,6 +301,7 @@ vmx_final_setup_guest(struct vcpu *v)
 	ASSERT(vpd);
 
 	v->arch.privregs = (mapped_regs_t *)vpd;
+	vcpu_share_privregs_with_guest(v);
 	vpd->vpd_low.virt_env_vaddr = vm_buffer;
 
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick

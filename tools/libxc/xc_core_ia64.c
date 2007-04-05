@@ -93,6 +93,7 @@ memory_map_get_old_hvm(int xc_handle, xc_dominfo_t *info,
         {IO_PAGE_START, IO_PAGE_SIZE},
         {STORE_PAGE_START, STORE_PAGE_SIZE},
         {BUFFER_IO_PAGE_START, BUFFER_IO_PAGE_SIZE},
+        {BUFFER_PIO_PAGE_START, BUFFER_PIO_PAGE_SIZE},
         {GFW_START, GFW_SIZE},
     };
     const unsigned int nr_gfw_map = sizeof(gfw_map)/sizeof(gfw_map[0]);
