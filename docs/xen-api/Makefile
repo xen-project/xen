@@ -37,6 +37,9 @@ xenapi.dvi: $(TEX) $(EPS) $(EPSDOT)
 %.eps: %.dot
 	$(DOT) -Tps $< >$@
 
+xenapi-datamodel-graph.eps: xenapi-datamodel-graph.dot
+	$(NEATO) -Goverlap=false -Tps $< >$@
+
 .PHONY: clean
 clean:
 	rm -f *.pdf *.ps *.dvi *.aux *.log $(EPSDOT)
