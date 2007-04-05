@@ -1,18 +1,31 @@
-digraph g{
-node [ shape=box ]; session [ URL="session.html" ] task [ URL="task.html" ] VM [ URL="VM.html" ] host [ URL="host.html" ] host_cpu [ URL="host_cpu.html" ] network [ URL="network.html" ] VIF [ URL="VIF.html" ] PIF [ URL="PIF.html" ] SR [ URL="SR.html" ] VDI [ URL="VDI.html" ] VBD [ URL="VBD.html" ] VTPM [ URL="VTPM.html" ] console [ URL="console.html" ] user [ URL="user.html" ] debug [ URL="debug.html" ];
-session -> host [ label="this_host(1)" ]
-session -> user [ label="this_user(1)" ]
-host -> VM [ color="blue", arrowhead="crow", arrowtail="none" ]
-host -> host_cpu [ color="blue", arrowhead="crow", arrowtail="none" ]
-VIF -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
-VIF -> network [ color="blue", arrowhead="none", arrowtail="crow" ]
-PIF -> host [ color="blue", arrowhead="none", arrowtail="crow" ]
-PIF -> network [ color="blue", arrowhead="none", arrowtail="crow" ]
-SR -> VDI [ color="blue", arrowhead="crow", arrowtail="none" ]
-VDI -> VBD [ color="blue", arrowhead="crow", arrowtail="none" ]
-VDI -> VDI [ color="blue", arrowhead="none", arrowtail="crow" ]
-VBD -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
-VTPM -> VM [ label="backend(1)" ]
-VTPM -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
-console -> VM [ color="blue", arrowhead="none", arrowtail="crow" ]
+# Hand edited class diagram for the SDK -- HTML version
+# this one mentions all the classes so the imagemap works
+
+digraph "Xen-API Class Diagram" {
+fontname="Verdana";
+
+node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user;
+node [shape=ellipse]; PIF_metrics VIF_metrics VM_metrics VBD_metrics PBD_metrics VM_guest_metrics host_metrics;
+node [shape=box]; host_cpu console
+session -> host [ arrowhead="none" ]
+session -> user [ arrowhead="none" ]
+VM -> VM_metrics [ arrowhead="none" ]
+VM -> VM_guest_metrics [ arrowhead="none" ]
+VM -> console [ arrowhead="crow" ]
+host -> PBD [ arrowhead="crow", arrowtail="none" ]
+host -> host_metrics [ arrowhead="none" ]
+host -> host_cpu [ arrowhead="none" ]
+VIF -> VM [ arrowhead="none", arrowtail="crow" ]
+VIF -> network [ arrowhead="none", arrowtail="crow" ]
+VIF -> VIF_metrics [ arrowhead="none" ]
+PIF -> host [ arrowhead="none", arrowtail="crow" ]
+PIF -> network [ arrowhead="none", arrowtail="crow" ]
+PIF -> PIF_metrics [ arrowhead="none" ]
+SR -> PBD [ arrowhead="crow", arrowtail="none" ]
+PBD -> PBD_metrics [ arrowhead="none" ]
+SR -> VDI [ arrowhead="crow", arrowtail="none" ]
+VDI -> VBD [ arrowhead="crow", arrowtail="none" ]
+VBD -> VM [ arrowhead="none", arrowtail="crow" ]
+VTPM -> VM [ arrowhead="none", arrowtail="crow" ]
+VBD -> VBD_metrics [ arrowhead="none" ]
 }
