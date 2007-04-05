@@ -102,7 +102,7 @@ static inline unsigned long long pte_val(pte_t x)
 static inline unsigned long long pmd_val(pmd_t x)
 {
 	unsigned long long ret = x.pmd;
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret) ret = pte_machine_to_phys(ret) | _PAGE_PRESENT;
 #else
 	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
@@ -134,7 +134,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pgd_val(pgd_t x)
 {
 	unsigned long ret = x.pgd;
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret) ret = machine_to_phys(ret) | _PAGE_PRESENT;
 #else
 	if (ret & _PAGE_PRESENT) ret = machine_to_phys(ret);
@@ -197,10 +197,10 @@ extern int page_is_ram(unsigned long pagenr);
 #endif
 #define __KERNEL_START		(__PAGE_OFFSET + __PHYSICAL_START)
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 #undef LOAD_OFFSET
 #define LOAD_OFFSET		0
-#endif /* CONFIG_XEN_COMPAT_030002 */
+#endif
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)

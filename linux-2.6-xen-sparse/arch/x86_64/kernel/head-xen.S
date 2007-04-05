@@ -152,7 +152,7 @@ gdt_end:
 ENTRY(empty_zero_page)
 	.skip PAGE_SIZE
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 /*
  * __xen_guest information
  */
@@ -184,17 +184,17 @@ ENTRY(empty_zero_page)
 	.ascii	         "|supervisor_mode_kernel"
 	.ascii	",LOADER=generic"
 	.byte	0
-#endif /* CONFIG_XEN_COMPAT_030002 */
+#endif /* CONFIG_XEN_COMPAT <= 0x030002 */
 	
 	ELFNOTE(Xen, XEN_ELFNOTE_GUEST_OS,       .asciz, "linux")
 	ELFNOTE(Xen, XEN_ELFNOTE_GUEST_VERSION,  .asciz, "2.6")
 	ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION,    .asciz, "xen-3.0")
 	ELFNOTE(Xen, XEN_ELFNOTE_VIRT_BASE,      .quad,  __START_KERNEL_map)
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   .quad,  __START_KERNEL_map)
 #else
 	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   .quad,  0)
-#endif /* !CONFIG_XEN_COMPAT_030002 */
+#endif
 	ELFNOTE(Xen, XEN_ELFNOTE_ENTRY,          .quad,  startup_64)
 	ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, .quad,  hypercall_page)
 	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .quad,  _PAGE_PRESENT,_PAGE_PRESENT)

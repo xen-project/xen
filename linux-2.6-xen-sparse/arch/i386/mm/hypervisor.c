@@ -312,7 +312,7 @@ int xen_create_contiguous_region(
 	success = (exchange.nr_exchanged == (1UL << order));
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -408,7 +408,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	success = (exchange.nr_exchanged == 1);
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,

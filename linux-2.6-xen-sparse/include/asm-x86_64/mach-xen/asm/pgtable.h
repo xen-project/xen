@@ -205,7 +205,7 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
 #define _PAGE_PROTNONE	0x080	/* If not present */
 #define _PAGE_NX        (1UL<<_PAGE_BIT_NX)
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 extern unsigned int __kernel_page_user;
 #else
 #define __kernel_page_user 0
