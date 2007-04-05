@@ -789,7 +789,6 @@ class XendAPI(object):
                     'progress',
                     'type',
                     'result',
-                    'error_code',
                     'error_info',
                     'allowed_operations',
                     'session'
@@ -823,10 +822,6 @@ class XendAPI(object):
     def task_get_result(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
         return xen_api_success(task.result)
-
-    def task_get_error_code(self, session, task_ref):
-        task = XendTaskManager.get_task(task_ref)
-        return xen_api_success(task.error_code)
 
     def task_get_error_info(self, session, task_ref):
         task = XendTaskManager.get_task(task_ref)
