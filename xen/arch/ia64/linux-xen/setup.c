@@ -316,7 +316,7 @@ io_port_init (void)
 
 #ifdef XEN
 static int __init
-intel_tiger_console_setup(void)
+acpi_oem_console_setup(void)
 {
 	extern struct ns16550_defaults ns16550_com1;
 	efi_system_table_t *systab;
@@ -353,8 +353,17 @@ intel_tiger_console_setup(void)
 	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1))
 		return -ENODEV;
 
+	/* Looking for Fujitsu PRIMEQUEST systems */
+	if (!strncmp(hdr->oem_id, "FUJITSPQ", 8) &&
+	    (!strncmp(hdr->oem_table_id, "PQ", 2))){
+		ns16550_com1.baud = BAUD_AUTO;
+		ns16550_com1.io_base =	0x3f8;
+		ns16550_com1.irq = 48;
+		return 0;
+	}
+
 	/*
-	 * Only looking for Intel Tiger systems
+	 * Looking for Intel Tiger systems
 	 * Tiger 2: SR870BH2
 	 * Tiger 4: SR870BN4
 	 */
@@ -402,7 +411,7 @@ early_console_setup (char *cmdline)
 #endif
 
 #ifdef XEN
-	if (!intel_tiger_console_setup())
+	if (!acpi_oem_console_setup())
 		earlycons++;
 #endif
 	return (earlycons) ? 0 : -1;
