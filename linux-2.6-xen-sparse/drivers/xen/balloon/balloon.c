@@ -59,6 +59,10 @@
 #include <xen/xenbus.h>
 #include "common.h"
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *balloon_pde;
 #endif
