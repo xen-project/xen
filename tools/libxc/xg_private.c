@@ -209,16 +209,6 @@ __attribute__((weak))
     return -1;
 }
 
-__attribute__((weak)) 
-    int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
-                       unsigned int store_evtchn,
-                       unsigned long *store_mfn,
-                       unsigned int pae, unsigned int apic)
-{
-    errno = ENOSYS;
-    return -1;
-}
-
 __attribute__((weak)) int xc_get_hvm_param(
     int handle, domid_t dom, int param, unsigned long *value)
 {

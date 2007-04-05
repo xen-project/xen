@@ -26,8 +26,8 @@ CTRL_SRCS-$(CONFIG_X86_Linux) += xc_ptrace.c xc_ptrace_core.c
 
 GUEST_SRCS-y :=
 GUEST_SRCS-y += xg_private.c
-GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
-GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c xc_hvm_restore.c xc_hvm_save.c
+GUEST_SRCS-$(CONFIG_MIGRATE) += xc_domain_restore.c xc_linux_save.c
+GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c xc_hvm_save.c
 
 # symlink libelf from xen/common/libelf/
 LIBELF_SRCS := libelf-tools.c libelf-loader.c

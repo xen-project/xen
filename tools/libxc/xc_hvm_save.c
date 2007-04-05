@@ -305,6 +305,8 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     unsigned long total_sent = 0;
 
+    uint64_t vcpumap = 1ULL;
+
     DPRINTF("xc_hvm_save: dom=%d, max_iters=%d, max_factor=%d, flags=0x%x, "
             "live=%d, debug=%d.\n", dom, max_iters, max_factor, flags,
             live, debug);
@@ -371,6 +373,12 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* Size of any array that covers 0 ... max_pfn */
     pfn_array_size = max_pfn + 1;
+    if ( !write_exact(io_fd, &pfn_array_size, sizeof(unsigned long)) )
+    {
+        ERROR("Error when writing to state file (1)");
+        goto out;
+    }
+    
 
     /* pretend we sent all the pages last iteration */
     sent_last_iter = pfn_array_size;
@@ -644,6 +652,32 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     DPRINTF("All HVM memory is saved\n");
 
+    {
+        struct {
+            int minustwo;
+            int max_vcpu_id;
+            uint64_t vcpumap;
+        } chunk = { -2, info.max_vcpu_id };
+
+        if (info.max_vcpu_id >= 64) {
+            ERROR("Too many VCPUS in guest!");
+            goto out;
+        }
+
+        for (i = 1; i <= info.max_vcpu_id; i++) {
+            xc_vcpuinfo_t vinfo;
+            if ((xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) &&
+                vinfo.online)
+                vcpumap |= 1ULL << i;
+        }
+
+        chunk.vcpumap = vcpumap;
+        if(!write_exact(io_fd, &chunk, sizeof(chunk))) {
+            ERROR("Error when writing to state file (errno %d)", errno);
+            goto out;
+        }
+    }
+
     /* Zero terminate */
     i = 0;
     if ( !write_exact(io_fd, &i, sizeof(int)) )
@@ -666,33 +700,22 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /* save vcpu/vmcs context */
-    if ( !write_exact(io_fd, &nr_vcpus, sizeof(uint32_t)) )
-    {
-        ERROR("error write nr vcpus");
-        goto out;
-    }
-
-    /*XXX: need a online map to exclude down cpu */
+    /* save vcpu/vmcs contexts */
     for ( i = 0; i < nr_vcpus; i++ )
     {
+        if (!(vcpumap & (1ULL << i)))
+            continue;
+
         if ( xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
         {
             ERROR("HVM:Could not get vcpu context");
             goto out;
         }
 
-        rec_size = sizeof(ctxt);
-        DPRINTF("write %d vcpucontext of total %d.\n", i, nr_vcpus); 
-        if ( !write_exact(io_fd, &rec_size, sizeof(uint32_t)) )
-        {
-            ERROR("error write vcpu ctxt size");
-            goto out;
-        }
-
+        DPRINTF("write vcpu %d context.\n", i); 
         if ( !write_exact(io_fd, &(ctxt), sizeof(ctxt)) )
         {
-            ERROR("write vmcs failed!\n");
+            ERROR("write vcpu context failed!\n");
             goto out;
         }
     }

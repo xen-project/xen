@@ -38,29 +38,21 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 void (*qemu_flip_buffer)(int, int));
 
 /**
- * This function will restore a saved domain running Linux.
+ * This function will restore a saved domain.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm fd the file descriptor to restore a domain from
  * @parm dom the id of the domain
  * @parm store_evtchn the store event channel for this domain to use
  * @parm store_mfn returned with the mfn of the store page
+ * @parm hvm non-zero if this is a HVM restore
+ * @parm pae non-zero if this HVM domain has PAE support enabled
  * @return 0 on success, -1 on failure
  */
-int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                     unsigned int store_evtchn, unsigned long *store_mfn,
-                     unsigned int console_evtchn, unsigned long *console_mfn);
-
-/**
- * This function will restore a saved hvm domain running unmodified guest.
- *
- * @parm store_mfn pass mem size & returned with the mfn of the store page
- * @return 0 on success, -1 on failure
- */
-int xc_hvm_restore(int xc_handle, int io_fd, uint32_t dom,
-                   unsigned int store_evtchn,
-                   unsigned long *store_mfn, 
-                   unsigned int pae, unsigned int apic);
+int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
+                      unsigned int store_evtchn, unsigned long *store_mfn,
+                      unsigned int console_evtchn, unsigned long *console_mfn,
+                      unsigned int hvm, unsigned int pae);
 
 /**
  * This function will create a domain for a paravirtualized Linux

@@ -39,14 +39,8 @@ main(int argc, char **argv)
     pae  = atoi(argv[6]);
     apic = atoi(argv[7]);
 
-    if ( hvm )
-        ret = xc_hvm_restore(xc_fd, io_fd, domid,
-                             store_evtchn, &store_mfn,
-                             pae, apic);
-    else
-        ret = xc_linux_restore(xc_fd, io_fd, domid,
-                               store_evtchn, &store_mfn,
-                               console_evtchn, &console_mfn);
+    ret = xc_domain_restore(xc_fd, io_fd, domid, store_evtchn, &store_mfn,
+                            console_evtchn, &console_mfn, hvm, pae);
 
     if ( ret == 0 )
     {

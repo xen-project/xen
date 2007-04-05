@@ -1,9 +1,25 @@
 /******************************************************************************
- * xc_linux_restore.c
+ * xc_domain_restore.c
  *
- * Restore the state of a Linux session.
+ * Restore the state of a guest session.
  *
  * Copyright (c) 2003, K A Fraser.
+ * Copyright (c) 2006, Intel Corporation
+ * Copyright (c) 2007, XenSource Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place - Suite 330, Boston, MA 02111-1307 USA.
+ *
  */
 
 #include <stdlib.h>
@@ -12,6 +28,9 @@
 #include "xg_private.h"
 #include "xg_save_restore.h"
 #include "xc_dom.h"
+
+#include <xen/hvm/ioreq.h>
+#include <xen/hvm/params.h>
 
 /* max mfn of the current host machine */
 static unsigned long max_mfn;
@@ -102,7 +121,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
     }
     
     
-    /* Alllocate the requistite number of mfns */
+    /* Allocate the requistite number of mfns */
     if (nr_mfns && xc_domain_memory_populate_physmap(
             xc_handle, dom, nr_mfns, 0, 0, p2m_batch) != 0) { 
         ERROR("Failed to allocate memory for batch.!\n"); 
@@ -141,9 +160,93 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 }
 
 
-int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                     unsigned int store_evtchn, unsigned long *store_mfn,
-                     unsigned int console_evtchn, unsigned long *console_mfn)
+/* Load the p2m frame list, plus potential extended info chunk */
+static xen_pfn_t * load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
+{
+    xen_pfn_t *p2m_frame_list;
+    vcpu_guest_context_t ctxt;
+
+    if (!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
+        ERROR("Couldn't allocate p2m_frame_list array");
+        return NULL;
+    }
+    
+    /* Read first entry of P2M list, or extended-info signature (~0UL). */
+    if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
+            ERROR("read extended-info signature failed");
+            return NULL;
+        }
+    
+    if (p2m_frame_list[0] == ~0UL) {
+        uint32_t tot_bytes;
+        
+        /* Next 4 bytes: total size of following extended info. */
+        if (!read_exact(io_fd, &tot_bytes, sizeof(tot_bytes))) {
+            ERROR("read extended-info size failed");
+            return NULL;
+        }
+        
+        while (tot_bytes) {
+            uint32_t chunk_bytes;
+            char     chunk_sig[4];
+            
+            /* 4-character chunk signature + 4-byte remaining chunk size. */
+            if (!read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
+                !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes))) {
+                ERROR("read extended-info chunk signature failed");
+                return NULL;
+            }
+            tot_bytes -= 8;
+            
+            /* VCPU context structure? */
+            if (!strncmp(chunk_sig, "vcpu", 4)) {
+                if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
+                    ERROR("read extended-info vcpu context failed");
+                    return NULL;
+                }
+                tot_bytes   -= sizeof(struct vcpu_guest_context);
+                chunk_bytes -= sizeof(struct vcpu_guest_context);
+                
+                if (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3))
+                    *pae_extended_cr3 = 1;
+            }
+            
+            /* Any remaining bytes of this chunk: read and discard. */
+            while (chunk_bytes) {
+                unsigned long sz = chunk_bytes;
+                if ( sz > P2M_FL_SIZE )
+                    sz = P2M_FL_SIZE;
+                if (!read_exact(io_fd, p2m_frame_list, sz)) {
+                    ERROR("read-and-discard extended-info chunk bytes failed");
+                    return NULL;
+                }
+                chunk_bytes -= sz;
+                tot_bytes   -= sz;
+            }
+        }
+        
+        /* Now read the real first entry of P2M list. */
+        if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
+            ERROR("read first entry of p2m_frame_list failed");
+            return NULL;
+        }
+    }
+    
+    /* First entry is already read into the p2m array. */
+    if (!read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long))) {
+            ERROR("read p2m_frame_list failed");
+            return NULL;
+    }
+    
+    return p2m_frame_list;
+}
+
+
+
+int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
+                      unsigned int store_evtchn, unsigned long *store_mfn,
+                      unsigned int console_evtchn, unsigned long *console_mfn,
+                      unsigned int hvm, unsigned int pae)
 {
     DECLARE_DOMCTL;
     int rc = 1, i, j, n, m, pae_extended_cr3 = 0;
@@ -174,7 +277,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* A copy of the pfn-to-mfn table frame list. */
     xen_pfn_t *p2m_frame_list = NULL;
-
+    
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
 
@@ -193,6 +296,12 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     unsigned int max_vcpu_id = 0;
     int new_ctxt_format = 0;
 
+    /* Magic frames in HVM guests: ioreqs and xenstore comms. */
+    uint64_t magic_pfns[3]; /* ioreq_pfn, bufioreq_pfn, store_pfn */
+
+    /* Buffer for holding HVM context */
+    uint8_t *hvm_buf = NULL;
+
     /* For info only */
     nr_pfns = 0;
 
@@ -201,20 +310,24 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         ERROR("read: p2m_size");
         goto out;
     }
-    DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
+    DPRINTF("xc_domain_restore start: p2m_size = %lx\n", p2m_size);
 
-    /*
-     * XXX For now, 32bit dom0's can only save/restore 32bit domUs
-     * on 64bit hypervisors.
-     */
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = dom;
-    domctl.cmd    = XEN_DOMCTL_set_address_size;
-    domctl.u.address_size.size = sizeof(unsigned long) * 8;
-    rc = do_domctl(xc_handle, &domctl);
-    if ( rc != 0 ) {
-	ERROR("Unable to set guest address size.");
-	goto out;
+    if ( !hvm )
+    {
+        /*
+         * XXX For now, 32bit dom0's can only save/restore 32bit domUs
+         * on 64bit hypervisors.
+         */
+        memset(&domctl, 0, sizeof(domctl));
+        domctl.domain = dom;
+        domctl.cmd    = XEN_DOMCTL_set_address_size;
+        domctl.u.address_size.size = sizeof(unsigned long) * 8;
+        rc = do_domctl(xc_handle, &domctl);
+        if ( rc != 0 ) {
+            ERROR("Unable to set guest address size.");
+            goto out;
+        }
+        rc = 1;
     }
 
     if(!get_platform_info(xc_handle, dom,
@@ -229,76 +342,12 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         return 1;
     }
 
-    if (!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
-        ERROR("Couldn't allocate p2m_frame_list array");
-        goto out;
-    }
-
-    /* Read first entry of P2M list, or extended-info signature (~0UL). */
-    if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
-        ERROR("read extended-info signature failed");
-        goto out;
-    }
-
-    if (p2m_frame_list[0] == ~0UL) {
-        uint32_t tot_bytes;
-
-        /* Next 4 bytes: total size of following extended info. */
-        if (!read_exact(io_fd, &tot_bytes, sizeof(tot_bytes))) {
-            ERROR("read extended-info size failed");
+    /* Load the p2m frame list, plus potential extended info chunk */
+    if ( !hvm ) 
+    {
+        p2m_frame_list = load_p2m_frame_list(io_fd, &pae_extended_cr3);
+        if ( !p2m_frame_list )
             goto out;
-        }
-
-        while (tot_bytes) {
-            uint32_t chunk_bytes;
-            char     chunk_sig[4];
-
-            /* 4-character chunk signature + 4-byte remaining chunk size. */
-            if (!read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
-                !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes))) {
-                ERROR("read extended-info chunk signature failed");
-                goto out;
-            }
-            tot_bytes -= 8;
-
-            /* VCPU context structure? */
-            if (!strncmp(chunk_sig, "vcpu", 4)) {
-                if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
-                    ERROR("read extended-info vcpu context failed");
-                    goto out;
-                }
-                tot_bytes   -= sizeof(struct vcpu_guest_context);
-                chunk_bytes -= sizeof(struct vcpu_guest_context);
-
-                if (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3))
-                    pae_extended_cr3 = 1;
-            }
-
-            /* Any remaining bytes of this chunk: read and discard. */
-            while (chunk_bytes) {
-                unsigned long sz = chunk_bytes;
-                if ( sz > P2M_FL_SIZE )
-                    sz = P2M_FL_SIZE;
-                if (!read_exact(io_fd, p2m_frame_list, sz)) {
-                    ERROR("read-and-discard extended-info chunk bytes failed");
-                    goto out;
-                }
-                chunk_bytes -= sz;
-                tot_bytes   -= sz;
-            }
-        }
-
-        /* Now read the real first entry of P2M list. */
-        if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
-            ERROR("read first entry of p2m_frame_list failed");
-            goto out;
-        }
-    }
-
-    /* First entry is already read into the p2m array. */
-    if (!read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long))) {
-        ERROR("read p2m_frame_list failed");
-        goto out;
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
@@ -442,8 +491,9 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
                     nr_pfns++; 
                 }
 
-                /* setup region_mfn[] for batch map */
-                region_mfn[i] = p2m[pfn]; 
+                /* setup region_mfn[] for batch map.
+                 * For HVM guests, this interface takes PFNs, not MFNs */
+                region_mfn[i] = hvm ? pfn : p2m[pfn]; 
             }
         } 
 
@@ -551,9 +601,10 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
                 }
             }
 
-            if (xc_add_mmu_update(xc_handle, mmu,
-                                  (((unsigned long long)mfn) << PAGE_SHIFT)
-                                  | MMU_MACHPHYS_UPDATE, pfn)) {
+            if (!hvm 
+                && xc_add_mmu_update(xc_handle, mmu,
+                                     (((unsigned long long)mfn) << PAGE_SHIFT)
+                                     | MMU_MACHPHYS_UPDATE, pfn)) {
                 ERROR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
                 goto out;
             }
@@ -578,12 +629,89 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
      * Ensure we flush all machphys updates before potential PAE-specific
      * reallocations below.
      */
-    if (xc_finish_mmu_updates(xc_handle, mmu)) {
+    if (!hvm && xc_finish_mmu_updates(xc_handle, mmu)) {
         ERROR("Error doing finish_mmu_updates()");
         goto out;
     }
 
     DPRINTF("Received all pages (%d races)\n", nraces);
+
+    if ( hvm ) 
+    {
+        uint32_t rec_len;
+
+        /* Set HVM-specific parameters */
+        if ( !read_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
+        {
+            ERROR("error reading magic page addresses");
+            goto out;
+        }
+        
+        /* These comms pages need to be zeroed at the start of day */
+        if ( xc_clear_domain_page(xc_handle, dom, magic_pfns[0]) ||
+             xc_clear_domain_page(xc_handle, dom, magic_pfns[1]) ||
+             xc_clear_domain_page(xc_handle, dom, magic_pfns[2]) )
+        {
+            ERROR("error zeroing magic pages");
+            goto out;
+        }
+        
+        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, magic_pfns[0]);
+        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, magic_pfns[1]);
+        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, magic_pfns[2]);
+        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
+        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
+        *store_mfn = magic_pfns[2];
+
+        /* Read vcpu contexts */
+        for (i = 0; i <= max_vcpu_id; i++) 
+        {
+            if (!(vcpumap & (1ULL << i)))
+                continue;
+
+            if ( !read_exact(io_fd, &(ctxt), sizeof(ctxt)) )
+            {
+                ERROR("error read vcpu context.\n");
+                goto out;
+            }
+            
+            if ( (rc = xc_vcpu_setcontext(xc_handle, dom, i, &ctxt)) )
+            {
+                ERROR("Could not set vcpu context, rc=%d", rc);
+                goto out;
+            }
+            rc = 1;
+        }
+
+        /* Read HVM context */
+        if ( !read_exact(io_fd, &rec_len, sizeof(uint32_t)) )
+        {
+            ERROR("error read hvm context size!\n");
+            goto out;
+        }
+        
+        hvm_buf = malloc(rec_len);
+        if ( hvm_buf == NULL )
+        {
+            ERROR("memory alloc for hvm context buffer failed");
+            errno = ENOMEM;
+            goto out;
+        }
+        
+        if ( !read_exact(io_fd, hvm_buf, rec_len) )
+        {
+            ERROR("error loading the HVM context");
+            goto out;
+        }
+        
+        rc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len);
+        if ( rc ) 
+            ERROR("error setting the HVM context");
+       
+        goto out;
+    }
+
+    /* Non-HVM guests only from here on */
 
     if ((pt_levels == 3) && !pae_extended_cr3) {
 
@@ -897,6 +1025,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
             ERROR("Couldn't build vcpu%d", i);
             goto out;
         }
+        rc = 1;
     }
 
     if (!read_exact(io_fd, shared_info_page, PAGE_SIZE)) {
@@ -938,6 +1067,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     munmap(live_p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     DPRINTF("Domain ready to be built.\n");
+    rc = 0;
 
  out:
     if ( (rc != 0) && (dom != 0) )
@@ -945,6 +1075,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     free(mmu);
     free(p2m);
     free(pfn_type);
+    free(hvm_buf);
 
     /* discard cache for save file  */
     discard_file_cache(io_fd, 1 /*flush*/);
