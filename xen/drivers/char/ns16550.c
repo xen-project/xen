@@ -239,7 +239,7 @@ static void ns16550_init_postirq(struct serial_port *port)
         uart->irqaction.name    = "ns16550";
         uart->irqaction.dev_id  = port;
         if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate na16550 IRQ %d\n", uart->irq);
+            printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
 
         /* Master interrupt enable; also keep DTR/RTS asserted. */
         ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
