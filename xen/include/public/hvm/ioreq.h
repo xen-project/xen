@@ -40,6 +40,7 @@
 #define IOREQ_TYPE_XCHG         5
 #define IOREQ_TYPE_ADD          6
 #define IOREQ_TYPE_TIMEOFFSET   7
+#define IOREQ_TYPE_INVALIDATE   8 /* mapcache */
 
 /*
  * VMExit dispatcher should cooperate with instruction decoder to

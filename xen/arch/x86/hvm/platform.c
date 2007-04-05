@@ -941,6 +941,34 @@ void send_timeoffset_req(unsigned long timeoff)
         printk("Unsuccessful timeoffset update\n");
 }
 
+/* Ask ioemu mapcache to invalidate mappings. */
+void send_invalidate_req(void)
+{
+    struct vcpu *v = current;
+    vcpu_iodata_t *vio;
+    ioreq_t *p;
+
+    vio = get_vio(v->domain, v->vcpu_id);
+    if ( vio == NULL )
+    {
+        printk("bad shared page: %lx\n", (unsigned long) vio);
+        domain_crash_synchronous();
+    }
+
+    p = &vio->vp_ioreq;
+    if ( p->state != STATE_IOREQ_NONE )
+        printk("WARNING: send invalidate req with something "
+               "already pending (%d)?\n", p->state);
+
+    p->type = IOREQ_TYPE_INVALIDATE;
+    p->size = 4;
+    p->dir = IOREQ_WRITE;
+    p->data = ~0UL; /* flush all */
+    p->io_count++;
+
+    hvm_send_assist_req(v);
+}
+
 static void mmio_operands(int type, unsigned long gpa,
                           struct hvm_io_op *mmio_op,
                           unsigned char op_size)
