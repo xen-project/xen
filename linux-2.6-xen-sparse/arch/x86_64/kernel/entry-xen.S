@@ -201,6 +201,19 @@ rff_trace:
 END(ret_from_fork)
 
 /*
+ * initial frame state for interrupts and exceptions
+ */
+	.macro _frame ref
+	CFI_STARTPROC simple
+	CFI_DEF_CFA rsp,SS+8-\ref
+	/*CFI_REL_OFFSET ss,SS-\ref*/
+	CFI_REL_OFFSET rsp,RSP-\ref
+	/*CFI_REL_OFFSET rflags,EFLAGS-\ref*/
+	/*CFI_REL_OFFSET cs,CS-\ref*/
+	CFI_REL_OFFSET rip,RIP-\ref
+	.endm
+
+/*
  * System call entry. Upto 6 arguments in registers are supported.
  *
  * SYSCALL does not save anything on the stack and does not change the
@@ -232,10 +245,7 @@ END(ret_from_fork)
  */ 			 		
 
 ENTRY(system_call)
-	CFI_STARTPROC	simple
-	CFI_DEF_CFA	rsp,PDA_STACKOFFSET
-	CFI_REGISTER	rip,rcx
-	/*CFI_REGISTER	rflags,r11*/
+	_frame (RIP-0x10)
 	SAVE_ARGS -8,0
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp) 
 	/*
@@ -273,9 +283,7 @@ sysret_check:
 	 */
 	TRACE_IRQS_ON
         XEN_UNBLOCK_EVENTS(%rsi)                
-	CFI_REGISTER	rip,rcx
 	RESTORE_ARGS 0,8,0
-	/*CFI_REGISTER	rflags,r11*/
         HYPERVISOR_IRET VGCF_IN_SYSCALL
 
 	/* Handle reschedules */
@@ -505,24 +513,16 @@ ENTRY(stub_rt_sigreturn)
 	CFI_ENDPROC
 END(stub_rt_sigreturn)
 
-/*
- * initial frame state for interrupts and exceptions
- */
-	.macro _frame ref
-	CFI_STARTPROC simple
-	CFI_DEF_CFA rsp,SS+8-\ref
-	/*CFI_REL_OFFSET ss,SS-\ref*/
-	CFI_REL_OFFSET rsp,RSP-\ref
-	/*CFI_REL_OFFSET rflags,EFLAGS-\ref*/
-	/*CFI_REL_OFFSET cs,CS-\ref*/
-	CFI_REL_OFFSET rip,RIP-\ref
-	.endm
-
 /* initial frame state for interrupts (and exceptions without error code) */
-#define INTR_FRAME _frame RIP
+#define INTR_FRAME _frame (RIP-0x10); \
+	CFI_REL_OFFSET rcx,0; \
+	CFI_REL_OFFSET r11,8
+
 /* initial frame state for exceptions with error code (and interrupts with
    vector already pushed) */
-#define XCPT_FRAME _frame ORIG_RAX
+#define XCPT_FRAME _frame (RIP-0x18); \
+	CFI_REL_OFFSET rcx,0; \
+	CFI_REL_OFFSET r11,8
 
 /* 
  * Interrupt exit.
@@ -599,8 +599,9 @@ retint_kernel:
 #endif	
 
 	CFI_ENDPROC
-END(common_interrupt)
+END(retint_check)
 	
+#ifndef CONFIG_XEN
 /*
  * APIC interrupts.
  */		
@@ -613,7 +614,6 @@ END(common_interrupt)
 	CFI_ENDPROC
 	.endm
 
-#ifndef CONFIG_XEN
 ENTRY(thermal_interrupt)
 	apicinterrupt THERMAL_APIC_VECTOR,smp_thermal_interrupt
 END(thermal_interrupt)
@@ -668,12 +668,16 @@ END(spurious_interrupt)
 	.macro zeroentry sym
 	INTR_FRAME
         movq (%rsp),%rcx
+	CFI_RESTORE rcx
         movq 8(%rsp),%r11
+	CFI_RESTORE r11
         addq $0x10,%rsp /* skip rcx and r11 */
+	CFI_ADJUST_CFA_OFFSET -0x10
 	pushq $0	/* push error code/oldrax */ 
 	CFI_ADJUST_CFA_OFFSET 8
 	pushq %rax	/* push real oldrax to the rdi slot */ 
 	CFI_ADJUST_CFA_OFFSET 8
+	CFI_REL_OFFSET rax,0
 	leaq  \sym(%rip),%rax
 	jmp error_entry
 	CFI_ENDPROC
@@ -682,10 +686,14 @@ END(spurious_interrupt)
 	.macro errorentry sym
 	XCPT_FRAME
         movq (%rsp),%rcx
+	CFI_RESTORE rcx
         movq 8(%rsp),%r11
+	CFI_RESTORE r11
         addq $0x10,%rsp /* rsp points to the error code */
+	CFI_ADJUST_CFA_OFFSET -0x10
 	pushq %rax
 	CFI_ADJUST_CFA_OFFSET 8
+	CFI_REL_OFFSET rax,0
 	leaq  \sym(%rip),%rax
 	jmp error_entry
 	CFI_ENDPROC
@@ -799,6 +807,7 @@ paranoid_schedule\trace:
  */ 		  				
 ENTRY(error_entry)
 	_frame RDI
+	CFI_REL_OFFSET rax,0
 	/* rdi slot contains rax, oldrax contains error code */
 	cld	
 	subq  $14*8,%rsp
@@ -806,6 +815,7 @@ ENTRY(error_entry)
 	movq %rsi,13*8(%rsp)
 	CFI_REL_OFFSET	rsi,RSI
 	movq 14*8(%rsp),%rsi	/* load rax from rdi slot */
+	CFI_REGISTER	rax,rsi
 	movq %rdx,12*8(%rsp)
 	CFI_REL_OFFSET	rdx,RDX
 	movq %rcx,11*8(%rsp)
@@ -839,6 +849,7 @@ ENTRY(error_entry)
 #endif        
 error_call_handler:
 	movq %rdi, RDI(%rsp)            
+	CFI_REL_OFFSET	rdi,RDI
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi	# get error code 
 	movq $-1,ORIG_RAX(%rsp)
@@ -1186,7 +1197,7 @@ END(int3)
 
 ENTRY(overflow)
 	zeroentry do_overflow
-END(debug)
+END(overflow)
 
 ENTRY(bounds)
 	zeroentry do_bounds
