@@ -276,9 +276,11 @@ static int decrease_reservation(unsigned long nr_pages)
 		if (!PageHighMem(page)) {
 			v = phys_to_virt(pfn << PAGE_SHIFT);
 			scrub_pages(v, 1);
+#ifdef CONFIG_XEN
 			ret = HYPERVISOR_update_va_mapping(
 				(unsigned long)v, __pte_ma(0), 0);
 			BUG_ON(ret);
+#endif
 		}
 #ifdef CONFIG_XEN_SCRUB_PAGES
 		else {
