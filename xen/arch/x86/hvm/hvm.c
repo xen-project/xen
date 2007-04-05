@@ -521,32 +521,19 @@ static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(hvm_op)
 };
 
-int hvm_do_hypercall(struct cpu_user_regs *pregs)
+static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    if ( unlikely(ring_3(pregs)) )
-    {
-        pregs->eax = -EPERM;
-        return 0;
-    }
-
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
         if ( pregs->eax != __HYPERVISOR_grant_table_op )
             gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %d.\n",
                      current->domain->domain_id, current->vcpu_id, pregs->eax);
         pregs->eax = -ENOSYS;
-        return 0;
+        return;
     }
-
-    /* Check for preemption: EIP will be modified from this dummy value. */
-    pregs->eip = 0xF0F0F0FF;
 
     pregs->eax = hvm_hypercall_table[pregs->eax](
         pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
-
-    /* XXX: put fake IO instr here to inform the emulator to flush mapcache */
-
-    return (pregs->eip != 0xF0F0F0FF); /* preempted? */
 }
 
 #else /* defined(__x86_64__) */
@@ -606,14 +593,8 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(event_channel_op)
 };
 
-int hvm_do_hypercall(struct cpu_user_regs *pregs)
+static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    if ( unlikely(ring_3(pregs)) )
-    {
-        pregs->rax = -EPERM;
-        return 0;
-    }
-
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
     if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
     {
@@ -621,11 +602,8 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs)
             gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %ld.\n",
                      current->domain->domain_id, current->vcpu_id, pregs->rax);
         pregs->rax = -ENOSYS;
-        return 0;
+        return;
     }
-
-    /* Check for preemption: RIP will be modified from this dummy value. */
-    pregs->rip = 0xF0F0F0FF;
 
     if ( current->arch.paging.mode->guest_levels == 4 )
     {
@@ -643,13 +621,40 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs)
                                                        (uint32_t)pregs->esi,
                                                        (uint32_t)pregs->edi);
     }
-
-    /* XXX: put fake IO instr here to inform the emulator to flush mapcache */
-
-    return (pregs->rip != 0xF0F0F0FF); /* preempted? */
 }
 
 #endif /* defined(__x86_64__) */
+
+int hvm_do_hypercall(struct cpu_user_regs *pregs)
+{
+    int flush, preempted;
+    unsigned long old_eip;
+
+    if ( unlikely(ring_3(pregs)) )
+    {
+        pregs->eax = -EPERM;
+        return 0;
+    }
+
+    /*
+     * NB. In future flush only on decrease_reservation.
+     * For now we also need to flush when pages are added, as qemu-dm is not
+     * yet capable of faulting pages into an existing valid mapcache bucket.
+     */
+    flush = ((uint32_t)pregs->eax == __HYPERVISOR_memory_op);
+
+    /* Check for preemption: RIP will be modified from this dummy value. */
+    old_eip = pregs->eip;
+    pregs->eip = 0xF0F0F0FF;
+
+    __hvm_do_hypercall(pregs);
+
+    preempted = (pregs->eip != 0xF0F0F0FF);
+    pregs->eip = old_eip;
+
+    return (preempted ? HVM_HCALL_preempted :
+            flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
+}
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3)
 {

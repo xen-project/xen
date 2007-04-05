@@ -512,7 +512,6 @@ $\mathit{RO}_\mathit{run}$ &  {\tt session} & session ref & the session that cre
 $\mathit{RO}_\mathit{run}$ &  {\tt progress} & int & if the task is still pending, this field contains the estimated percentage complete (0-100). If task has completed (successfully or unsuccessfully) this should be 100. \\
 $\mathit{RO}_\mathit{run}$ &  {\tt type} & string & if the task has completed successfully, this field contains the type of the encoded result (i.e. name of the class whose reference is in the result field). Undefined otherwise. \\
 $\mathit{RO}_\mathit{run}$ &  {\tt result} & string & if the task has completed successfully, this field contains the result value (either Void or an object reference). Undefined otherwise. \\
-$\mathit{RO}_\mathit{run}$ &  {\tt error\_code} & int & if the task has failed, this field contains the error code. Undefined otherwise. \\
 $\mathit{RO}_\mathit{run}$ &  {\tt error\_info} & string Set & if the task has failed, this field contains the set of associated error strings. Undefined otherwise. \\
 $\mathit{RO}_\mathit{run}$ &  {\tt allowed\_operations} & (task\_allowed\_operations) Set & Operations allowed on this task \\
 \hline
@@ -826,38 +825,6 @@ Get the result field of the given task.
  \noindent {\bf Return Type:} 
 {\tt 
 string
-}
-
-
-value of the field
-\vspace{0.3cm}
-\vspace{0.3cm}
-\vspace{0.3cm}
-\subsubsection{RPC name:~get\_error\_code}
-
-{\bf Overview:} 
-Get the error\_code field of the given task.
-
- \noindent {\bf Signature:} 
-\begin{verbatim} int get_error_code (session_id s, task ref self)\end{verbatim}
-
-
-\noindent{\bf Arguments:}
-
- 
-\vspace{0.3cm}
-\begin{tabular}{|c|c|p{7cm}|}
- \hline
-{\bf type} & {\bf name} & {\bf description} \\ \hline
-{\tt task ref } & self & reference to the object \\ \hline 
-
-\end{tabular}
-
-\vspace{0.3cm}
-
- \noindent {\bf Return Type:} 
-{\tt 
-int
 }
 
 

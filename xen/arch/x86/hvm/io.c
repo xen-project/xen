@@ -845,10 +845,17 @@ void hvm_io_assist(void)
 
     p->state = STATE_IOREQ_NONE;
 
-    if ( p->type == IOREQ_TYPE_PIO )
+    switch ( p->type )
+    {
+    case IOREQ_TYPE_INVALIDATE:
+        goto out;
+    case IOREQ_TYPE_PIO:
         hvm_pio_assist(regs, p, io_opp);
-    else
+        break;
+    default:
         hvm_mmio_assist(regs, p, io_opp);
+        break;
+    }
 
     /* Copy register changes back into current guest state. */
     hvm_load_cpu_guest_regs(v, regs);
@@ -861,6 +868,7 @@ void hvm_io_assist(void)
         mark_dirty(d, gmfn);
     }
 
+ out:
     vcpu_end_shutdown_deferral(v);
 }
 

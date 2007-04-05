@@ -205,7 +205,6 @@ END(ret_from_fork)
  */
 	.macro _frame ref
 	CFI_STARTPROC simple
-	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA rsp,SS+8-\ref
 	/*CFI_REL_OFFSET ss,SS-\ref*/
 	CFI_REL_OFFSET rsp,RSP-\ref
@@ -1198,7 +1197,7 @@ END(int3)
 
 ENTRY(overflow)
 	zeroentry do_overflow
-END(debug)
+END(overflow)
 
 ENTRY(bounds)
 	zeroentry do_bounds

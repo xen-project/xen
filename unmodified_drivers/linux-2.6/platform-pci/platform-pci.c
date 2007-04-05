@@ -208,14 +208,6 @@ static uint64_t get_callback_via(struct pci_dev *pdev)
 		((uint64_t)(pin - 1) & 3));
 }
 
-/* Invalidate foreign mappings (e.g., in qemu-based device model). */
-static uint16_t invlmap_port;
-void xen_invalidate_foreign_mappings(void)
-{
-	outb(0, invlmap_port);
-}
-EXPORT_SYMBOL(xen_invalidate_foreign_mappings);
-
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
@@ -239,8 +231,6 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		printk(KERN_WARNING DRV_NAME ":no resources found\n");
 		return -ENOENT;
 	}
-
-	invlmap_port = ioaddr;
 
 	if (request_mem_region(mmio_addr, mmio_len, DRV_NAME) == NULL)
 	{

@@ -2166,7 +2166,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     unsigned long eip;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int inst_len;
+    int inst_len, rc;
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, regs);
@@ -2275,8 +2275,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         inst_len = __get_instruction_length(v, INSTR_VMCALL, NULL);
         ASSERT(inst_len > 0);
         HVMTRACE_1D(VMMCALL, v, regs->eax);
-        if ( !hvm_do_hypercall(regs) )
-            __update_guest_eip(vmcb, inst_len); /* not preempted */
+        rc = hvm_do_hypercall(regs);
+        if ( rc != HVM_HCALL_preempted )
+        {
+            __update_guest_eip(vmcb, inst_len);
+            if ( rc == HVM_HCALL_invalidate )
+                send_invalidate_req();
+        }
         break;
 
     case VMEXIT_CR0_READ:

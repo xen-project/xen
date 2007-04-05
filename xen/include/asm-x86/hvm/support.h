@@ -228,6 +228,9 @@ int hvm_copy_from_guest_virt(void *buf, unsigned long vaddr, int size);
 void hvm_print_line(struct vcpu *v, const char c);
 void hlt_timer_fn(void *data);
 
+#define HVM_HCALL_completed  0 /* hypercall completed - no further action */
+#define HVM_HCALL_preempted  1 /* hypercall preempted - re-execute VMCALL */
+#define HVM_HCALL_invalidate 2 /* invalidate ioemu-dm memory cache        */
 int hvm_do_hypercall(struct cpu_user_regs *pregs);
 
 void hvm_hlt(unsigned long rflags);

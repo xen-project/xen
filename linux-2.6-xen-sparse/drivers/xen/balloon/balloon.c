@@ -306,14 +306,6 @@ static int decrease_reservation(unsigned long nr_pages)
 		balloon_append(pfn_to_page(pfn));
 	}
 
-#ifndef CONFIG_XEN
-	/* XXX Temporary hack. */
-	{
-		extern void xen_invalidate_foreign_mappings(void);
-		xen_invalidate_foreign_mappings(); 
-	}
-#endif
-
 	set_xen_guest_handle(reservation.extent_start, frame_list);
 	reservation.nr_extents   = nr_pages;
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);

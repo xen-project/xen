@@ -506,8 +506,11 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         cpu_ioreq_xchg(env, req);
         break;
     case IOREQ_TYPE_TIMEOFFSET:
-	cpu_ioreq_timeoffset(env, req);
-	break;
+        cpu_ioreq_timeoffset(env, req);
+        break;
+    case IOREQ_TYPE_INVALIDATE:
+        qemu_invalidate_map_cache();
+        break;
     default:
         hw_error("Invalid ioreq type 0x%x\n", req->type);
     }
