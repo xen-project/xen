@@ -36,8 +36,37 @@
 #define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 
-#define ptep_get_and_clear(mm,addr,xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
+#define pte_none(x) (!(x).pte_low)
+
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	pte_t pte = *ptep;
+	if (!pte_none(pte)) {
+		if (mm != &init_mm)
+			pte = __pte_ma(xchg(&ptep->pte_low, 0));
+		else
+			HYPERVISOR_update_va_mapping(addr, __pte(0), 0);
+	}
+	return pte;
+}
+
+#define ptep_clear_flush(vma, addr, ptep)			\
+({								\
+	pte_t *__ptep = (ptep);					\
+	pte_t __res = *__ptep;					\
+	if (!pte_none(__res) &&					\
+	    ((vma)->vm_mm != current->mm ||			\
+	     HYPERVISOR_update_va_mapping(addr, __pte(0),	\
+			(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+				UVMF_INVLPG|UVMF_MULTI))) {	\
+		__ptep->pte_low = 0;				\
+		flush_tlb_page(vma, addr);			\
+	}							\
+	__res;							\
+})
+
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
+
 #define __pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
 #define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
 	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
@@ -46,7 +75,6 @@
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 
-#define pte_none(x)		(!(x).pte_low)
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 

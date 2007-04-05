@@ -99,6 +99,11 @@ static inline void pud_clear (pud_t * pud) { }
 #define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 
+static inline int pte_none(pte_t pte)
+{
+	return !(pte.pte_low | pte.pte_high);
+}
+
 /*
  * For PTEs and PDEs, we must clear the P-bit first when clearing a page table
  * entry, so clear the bottom half first and enforce ordering with a compiler
@@ -106,24 +111,50 @@ static inline void pud_clear (pud_t * pud) { }
  */
 static inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	ptep->pte_low = 0;
-	smp_wmb();
-	ptep->pte_high = 0;
+	if ((mm != current->mm && mm != &init_mm)
+	    || HYPERVISOR_update_va_mapping(addr, __pte(0), 0)) {
+		ptep->pte_low = 0;
+		smp_wmb();
+		ptep->pte_high = 0;
+	}
 }
 
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	pte_t res;
-
-	/* xchg acts as a barrier before the setting of the high bits */
-	res.pte_low = xchg(&ptep->pte_low, 0);
-	res.pte_high = ptep->pte_high;
-	ptep->pte_high = 0;
-
-	return res;
+	pte_t pte = *ptep;
+	if (!pte_none(pte)) {
+		if (mm != &init_mm) {
+			uint64_t val = pte_val_ma(pte);
+			if (__cmpxchg64(ptep, val, 0) != val) {
+				/* xchg acts as a barrier before the setting of the high bits */
+				pte.pte_low = xchg(&ptep->pte_low, 0);
+				pte.pte_high = ptep->pte_high;
+				ptep->pte_high = 0;
+			}
+		} else
+			HYPERVISOR_update_va_mapping(addr, __pte(0), 0);
+	}
+	return pte;
 }
+
+#define ptep_clear_flush(vma, addr, ptep)			\
+({								\
+	pte_t *__ptep = (ptep);					\
+	pte_t __res = *__ptep;					\
+	if (!pte_none(__res) &&					\
+	    ((vma)->vm_mm != current->mm ||			\
+	     HYPERVISOR_update_va_mapping(addr,	__pte(0),	\
+			(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+				UVMF_INVLPG|UVMF_MULTI))) {	\
+		__ptep->pte_low = 0;				\
+		smp_wmb();					\
+		__ptep->pte_high = 0;				\
+		flush_tlb_page(vma, addr);			\
+	}							\
+	__res;							\
+})
 
 static inline int pte_same(pte_t a, pte_t b)
 {
@@ -131,11 +162,6 @@ static inline int pte_same(pte_t a, pte_t b)
 }
 
 #define pte_page(x)	pfn_to_page(pte_pfn(x))
-
-static inline int pte_none(pte_t pte)
-{
-	return !pte.pte_low && !pte.pte_high;
-}
 
 #define __pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) | \
 			 ((_pte).pte_high << (32-PAGE_SHIFT)))

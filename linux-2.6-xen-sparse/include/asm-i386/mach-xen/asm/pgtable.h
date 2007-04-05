@@ -210,9 +210,13 @@ extern unsigned long pg0[];
 
 /* To avoid harmful races, pmd_none(x) should check only the lower when PAE */
 #define pmd_none(x)	(!(unsigned long)pmd_val(x))
+#ifdef CONFIG_XEN_COMPAT_030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
+#else
+#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#endif
 #define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
@@ -252,36 +256,47 @@ static inline pte_t pte_mkhuge(pte_t pte)	{ (pte).pte_low |= _PAGE_PSE; return p
 # include <asm/pgtable-2level.h>
 #endif
 
-static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
-{
-	if (!pte_dirty(*ptep))
-		return 0;
-	return test_and_clear_bit(_PAGE_BIT_DIRTY, &ptep->pte_low);
-}
+#define ptep_test_and_clear_dirty(vma, addr, ptep)			\
+({									\
+	pte_t __pte = *(ptep);						\
+	int __ret = pte_dirty(__pte);					\
+	if (__ret) {							\
+		__pte = pte_mkclean(__pte);				\
+		if ((vma)->vm_mm != current->mm ||			\
+		    HYPERVISOR_update_va_mapping(addr, __pte, 0))	\
+			(ptep)->pte_low = __pte.pte_low;		\
+	}								\
+	__ret;								\
+})
 
-static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
-{
-	if (!pte_young(*ptep))
-		return 0;
-	return test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low);
-}
+#define ptep_test_and_clear_young(vma, addr, ptep)			\
+({									\
+	pte_t __pte = *(ptep);						\
+	int __ret = pte_young(__pte);					\
+	if (__ret)							\
+		__pte = pte_mkold(__pte);				\
+		if ((vma)->vm_mm != current->mm ||			\
+		    HYPERVISOR_update_va_mapping(addr, __pte, 0))	\
+			(ptep)->pte_low = __pte.pte_low;		\
+	__ret;								\
+})
 
-static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
-{
-	pte_t pte;
-	if (full) {
-		pte = *ptep;
-		pte_clear(mm, addr, ptep);
-	} else {
-		pte = ptep_get_and_clear(mm, addr, ptep);
-	}
-	return pte;
-}
+#define ptep_get_and_clear_full(mm, addr, ptep, full)			\
+	((full) ? ({							\
+		pte_t __res = *(ptep);					\
+		if (test_bit(PG_pinned, &virt_to_page((mm)->pgd)->flags)) \
+			xen_l1_entry_update(ptep, __pte(0));		\
+		else							\
+			*(ptep) = __pte(0);				\
+		__res;							\
+	 }) :								\
+	 ptep_get_and_clear(mm, addr, ptep))
 
 static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	if (pte_write(*ptep))
-		clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
+	pte_t pte = *ptep;
+	if (pte_write(pte))
+		set_pte_at(mm, addr, ptep, pte_wrprotect(pte));
 }
 
 /*
@@ -418,6 +433,20 @@ extern void noexec_setup(const char *str);
 #define pte_unmap_nested(pte) do { } while (0)
 #endif
 
+#define __HAVE_ARCH_PTEP_ESTABLISH
+#define ptep_establish(vma, address, ptep, pteval)			\
+	do {								\
+		if ( likely((vma)->vm_mm == current->mm) ) {		\
+			BUG_ON(HYPERVISOR_update_va_mapping(address,	\
+				pteval,					\
+				(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+					UVMF_INVLPG|UVMF_MULTI));	\
+		} else {						\
+			xen_l1_entry_update(ptep, pteval);		\
+			flush_tlb_page(vma, address);			\
+		}							\
+	} while (0)
+
 /*
  * The i386 doesn't have any external MMU info: the kernel page
  * tables contain all the necessary information.
@@ -430,26 +459,11 @@ extern void noexec_setup(const char *str);
  */
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
-#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
-	do {								  \
-		if (__dirty) {						  \
-			if ( likely((__vma)->vm_mm == current->mm) ) {	  \
-				BUG_ON(HYPERVISOR_update_va_mapping(__address, \
-					__entry,			  \
-					(unsigned long)(__vma)->vm_mm->cpu_vm_mask.bits| \
-					UVMF_INVLPG|UVMF_MULTI));	  \
-			} else {					  \
-				xen_l1_entry_update(__ptep, __entry);	  \
-				flush_tlb_page(__vma, __address);	  \
-			}						  \
-		}							  \
+#define ptep_set_access_flags(vma, address, ptep, entry, dirty)		\
+	do {								\
+		if (dirty)						\
+			ptep_establish(vma, address, ptep, entry);	\
 	} while (0)
-
-#define __HAVE_ARCH_PTEP_ESTABLISH
-#define ptep_establish(__vma, __address, __ptep, __entry)		\
-do {				  					\
-	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
-} while (0)
 
 #include <xen/features.h>
 void make_lowmem_page_readonly(void *va, unsigned int feature);
@@ -508,6 +522,7 @@ direct_remap_pfn_range(vma,from,pfn,size,prot,DOMID_IO)
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR_FULL
+#define __HAVE_ARCH_PTEP_CLEAR_FLUSH
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
