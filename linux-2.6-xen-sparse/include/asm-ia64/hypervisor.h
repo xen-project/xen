@@ -55,7 +55,7 @@ extern int running_on_xen;
 #include <xen/interface/event_channel.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
-#include <asm/hypercall.h>
+#include <xen/hypercall.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 

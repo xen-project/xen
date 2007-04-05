@@ -1511,7 +1511,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 	struct sk_buff *skb;
 	unsigned long mfn;
 	int xfer = 0, noxfer = 0, unused = 0;
-	int id, ref;
+	int id, ref, rc;
 
 	if (np->copying_receiver) {
 		WPRINTK("%s: fix me for copying receiver.\n", __FUNCTION__);
@@ -1579,7 +1579,9 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 			mcl->args[2] = 0;
 			mcl->args[3] = DOMID_SELF;
 			mcl++;
-			HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
+			rc = HYPERVISOR_multicall_check(
+				np->rx_mcl, mcl - np->rx_mcl, NULL);
+			BUG_ON(rc);
 		}
 	}
 

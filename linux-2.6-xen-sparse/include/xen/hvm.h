@@ -3,7 +3,6 @@
 #define XEN_HVM_H__
 
 #include <xen/interface/hvm/params.h>
-#include <asm/hypercall.h>
 
 static inline unsigned long hvm_get_parameter(int idx)
 {

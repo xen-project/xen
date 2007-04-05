@@ -128,7 +128,7 @@ u64 jiffies_to_st(unsigned long jiffies);
 #define scrub_pages(_p,_n) ((void)0)
 #endif
 
-#include <asm/hypercall.h>
+#include <xen/hypercall.h>
 
 #if defined(CONFIG_X86_64)
 #define MULTI_UVMFLAGS_INDEX 2

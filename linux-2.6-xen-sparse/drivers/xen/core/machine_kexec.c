@@ -7,7 +7,6 @@
 #include <xen/interface/kexec.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
-#include <asm/hypercall.h>
 
 extern void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, 
 					 struct kimage *image);

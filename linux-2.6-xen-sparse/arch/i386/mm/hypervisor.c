@@ -303,7 +303,7 @@ int xen_create_contiguous_region(
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
 	}
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	/* 2. Get a new contiguous memory extent. */
@@ -342,7 +342,7 @@ int xen_create_contiguous_region(
 	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
 						   ? UVMF_TLB_FLUSH|UVMF_ALL
 						   : UVMF_INVLPG|UVMF_ALL;
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	if (success)
@@ -400,7 +400,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			INVALID_P2M_ENTRY);
 		out_frames[i] = (__pa(vstart) >> PAGE_SHIFT) + i;
 	}
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	/* 3. Do the exchange for non-contiguous MFNs. */
@@ -432,7 +432,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
 						   ? UVMF_TLB_FLUSH|UVMF_ALL
 						   : UVMF_INVLPG|UVMF_ALL;
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	balloon_unlock(flags);
