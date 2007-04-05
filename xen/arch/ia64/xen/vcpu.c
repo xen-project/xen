@@ -175,6 +175,9 @@ void vcpu_init_regs(struct vcpu *v)
 		VCPU(v, itv) = (1 << 16);	/* timer vector masked */
 	}
 
+	/* pta.size must not be 0.  The minimum is 15 (32k) */
+	VCPU(v, pta) = 15 << 2;
+
 	v->arch.domain_itm_last = -1L;
 }
 
