@@ -248,12 +248,8 @@ void xenstore_process_logdirty_event(void)
         key = (key_t) strtoull(key_terminated, NULL, 16);
 
         /* Figure out how bit the log-dirty bitmaps are */
-        logdirty_bitmap_size = ((phys_ram_size + 0x20 
-                                 - (vga_ram_size + bios_size)) 
-                                >> (TARGET_PAGE_BITS)); /* nr of bits in map*/
-        if (logdirty_bitmap_size > HVM_BELOW_4G_MMIO_START >> TARGET_PAGE_BITS)
-            logdirty_bitmap_size += 
-                HVM_BELOW_4G_MMIO_LENGTH >> TARGET_PAGE_BITS; /* still bits */
+        logdirty_bitmap_size = xc_memory_op(xc_handle, 
+                                            XENMEM_maximum_gpfn, &domid) + 1;
         logdirty_bitmap_size = ((logdirty_bitmap_size + HOST_LONG_BITS - 1)
                                 / HOST_LONG_BITS); /* longs */
         logdirty_bitmap_size *= sizeof (unsigned long); /* bytes */
