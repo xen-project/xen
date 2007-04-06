@@ -59,9 +59,10 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 }
 
 int
-xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
+xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                  unsigned int store_evtchn, unsigned long *store_mfn,
-                 unsigned int console_evtchn, unsigned long *console_mfn)
+                 unsigned int console_evtchn, unsigned long *console_mfn,
+                 unsigned int hvm, unsigned int pae)
 {
     DECLARE_DOMCTL;
     int rc = 1, i;
@@ -80,6 +81,11 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
+
+    if (hvm) {
+        ERROR("HVM Restore is unsupported");
+        goto out;
+    }
 
     /* For info only */
     nr_pfns = 0;
