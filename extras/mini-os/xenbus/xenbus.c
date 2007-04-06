@@ -178,6 +178,7 @@ static void release_xenbus_id(int id)
 {
     BUG_ON(!req_info[id].in_use);
     spin_lock(&req_lock);
+    req_info[id].in_use = 0;
     nr_live_reqs--;
     req_info[id].in_use = 0;
     if (nr_live_reqs == NR_REQS - 1)
@@ -335,6 +336,7 @@ xenbus_msg_reply(int type,
     xb_write(type, id, trans, io, nr_reqs);
 
     schedule();
+    remove_waiter(w);
     wake(current);
 
     rep = req_info[id].reply;
