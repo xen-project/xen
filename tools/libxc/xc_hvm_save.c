@@ -45,36 +45,10 @@
 #define DEF_MAX_ITERS   29   /* limit us to 30 times round loop   */
 #define DEF_MAX_FACTOR   3   /* never send more than 3x nr_pfns   */
 
-/* max mfn of the whole machine */
-static unsigned long max_mfn;
-
-/* virtual starting address of the hypervisor */
-static unsigned long hvirt_start;
-
-/* #levels of page tables used by the current guest */
-static unsigned int pt_levels;
-
 /* Shared-memory bitmaps for getting log-dirty bits from qemu */
 static unsigned long *qemu_bitmaps[2];
 static int qemu_active;
 static int qemu_non_active;
-
-int xc_hvm_drain_io(int handle, domid_t dom)
-{
-    DECLARE_HYPERCALL;
-    xen_hvm_drain_io_t arg;
-    int rc;
-
-    hypercall.op     = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_drain_io;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domid = dom;
-    if ( lock_pages(&arg, sizeof(arg)) != 0 )
-        return -1;
-    rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(&arg, sizeof(arg));
-    return rc;
-}
 
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track
@@ -291,9 +265,8 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     xc_dominfo_t info;
 
     int rc = 1, i, j, last_iter, iter = 0;
-    int live  = (flags & XCFLAGS_LIVE);
-    int debug = (flags & XCFLAGS_DEBUG);
-    int stdvga = (flags & XCFLAGS_STDVGA);
+    int live  = !!(flags & XCFLAGS_LIVE);
+    int debug = !!(flags & XCFLAGS_DEBUG);
     int sent_last_iter, skip_this_iter;
 
     /* The highest guest-physical frame number used by the current guest */
@@ -302,8 +275,8 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* The size of an array big enough to contain all guest pfns */
     unsigned long pfn_array_size;
 
-    /* Other magic frames: ioreqs and xenstore comms */
-    unsigned long ioreq_pfn, bufioreq_pfn, store_pfn;
+    /* Magic frames: ioreqs and xenstore comms. */
+    uint64_t magic_pfns[3]; /* ioreq_pfn, bufioreq_pfn, store_pfn */
 
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
@@ -330,122 +303,97 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     xc_shadow_op_stats_t stats;
 
-    unsigned long total_sent    = 0;
+    unsigned long total_sent = 0;
+
+    uint64_t vcpumap = 1ULL;
 
     DPRINTF("xc_hvm_save: dom=%d, max_iters=%d, max_factor=%d, flags=0x%x, "
             "live=%d, debug=%d.\n", dom, max_iters, max_factor, flags,
             live, debug);
     
     /* If no explicit control parameters given, use defaults */
-    if(!max_iters)
-        max_iters = DEF_MAX_ITERS;
-    if(!max_factor)
-        max_factor = DEF_MAX_FACTOR;
+    max_iters  = max_iters  ? : DEF_MAX_ITERS;
+    max_factor = max_factor ? : DEF_MAX_FACTOR;
 
     initialize_mbit_rate();
 
-    if(!get_platform_info(xc_handle, dom,
-                          &max_mfn, &hvirt_start, &pt_levels)) {
-        ERROR("HVM:Unable to get platform info.");
-        return 1;
-    }
-
-    if (xc_domain_getinfo(xc_handle, dom, 1, &info) != 1) {
-        ERROR("HVM:Could not get domain info");
+    if ( xc_domain_getinfo(xc_handle, dom, 1, &info) != 1 )
+    {
+        ERROR("HVM: Could not get domain info");
         return 1;
     }
     nr_vcpus = info.nr_online_vcpus;
 
-    if (mlock(&ctxt, sizeof(ctxt))) {
-        ERROR("HVM:Unable to mlock ctxt");
+    if ( mlock(&ctxt, sizeof(ctxt)) )
+    {
+        ERROR("HVM: Unable to mlock ctxt");
         return 1;
     }
 
     /* Only have to worry about vcpu 0 even for SMP */
-    if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
-        ERROR("HVM:Could not get vcpu context");
-        goto out;
-    }
-
-    /* cheesy sanity check */
-    if ((info.max_memkb >> (PAGE_SHIFT - 10)) > max_mfn) {
-        ERROR("Invalid HVM state record -- pfn count out of range: %lu",
-            (info.max_memkb >> (PAGE_SHIFT - 10)));
-        goto out;
-    }
-
-    if ( xc_get_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, &store_pfn)
-         || xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, &ioreq_pfn)
-         || xc_get_hvm_param(xc_handle, dom, 
-                             HVM_PARAM_BUFIOREQ_PFN, &bufioreq_pfn) )
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
     {
-        ERROR("HVM: Could not read magic PFN parameters");
+        ERROR("HVM: Could not get vcpu context");
         goto out;
     }
-    DPRINTF("saved hvm domain info:max_memkb=0x%lx, max_mfn=0x%lx, "
-            "nr_pages=0x%lx\n", info.max_memkb, max_mfn, info.nr_pages); 
 
-    if (live) {
-        
-        if (xc_shadow_control(xc_handle, dom,
-                              XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
-                              NULL, 0, NULL, 0, NULL) < 0) {
+    DPRINTF("saved hvm domain info: max_memkb=0x%lx, nr_pages=0x%lx\n",
+            info.max_memkb, info.nr_pages); 
+
+    if ( live )
+    {
+        /* Live suspend. Enable log-dirty mode. */
+        if ( xc_shadow_control(xc_handle, dom,
+                               XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
+                               NULL, 0, NULL, 0, NULL) < 0 )
+        {
             ERROR("Couldn't enable shadow mode");
             goto out;
         }
 
-        last_iter = 0;
-
         DPRINTF("hvm domain live migration debug start: logdirty enable.\n");
-    } else {
-        /* This is a non-live suspend. Issue the call back to get the
-           domain suspended */
-
-        last_iter = 1;
-
-        /* suspend hvm domain */
-        if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info, &ctxt)) {
+    }
+    else
+    {
+        /* This is a non-live suspend. Suspend the domain .*/
+        if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info, &ctxt) )
+        {
             ERROR("HVM Domain appears not to have suspended");
             goto out;
         }
     }
 
-    DPRINTF("after 1st handle hvm domain nr_pages=0x%lx, "
-            "max_memkb=0x%lx, live=%d.\n",
-            info.nr_pages, info.max_memkb, live);
+    last_iter = !live;
 
-    /* Calculate the highest PFN of "normal" memory:
-     * HVM memory is sequential except for the VGA and MMIO holes. */
-    max_pfn = info.nr_pages - 1;
-    /* If the domain has a Cirrus framebuffer and we haven't already 
-     * suspended qemu-dm, it will have 8MB of framebuffer memory 
-     * still allocated, which we don't want to copy: qemu will save it 
-     * for us later */
-    if ( live && !stdvga )
-        max_pfn -= 0x800;
-    /* Skip the VGA hole from 0xa0000 to 0xc0000 */
-    max_pfn += 0x20;
-    /* Skip the MMIO hole: 256MB just below 4GB */
-    if ( max_pfn >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT) )
-        max_pfn += (HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT); 
+    max_pfn = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
+
+    DPRINTF("after 1st handle hvm domain max_pfn=0x%lx, "
+            "max_memkb=0x%lx, live=%d.\n",
+            max_pfn, info.max_memkb, live);
 
     /* Size of any array that covers 0 ... max_pfn */
     pfn_array_size = max_pfn + 1;
+    if ( !write_exact(io_fd, &pfn_array_size, sizeof(unsigned long)) )
+    {
+        ERROR("Error when writing to state file (1)");
+        goto out;
+    }
+    
 
     /* pretend we sent all the pages last iteration */
     sent_last_iter = pfn_array_size;
 
     /* calculate the power of 2 order of pfn_array_size, e.g.
        15->4 16->4 17->5 */
-    for (i = pfn_array_size-1, order_nr = 0; i ; i >>= 1, order_nr++)
+    for ( i = pfn_array_size-1, order_nr = 0; i ; i >>= 1, order_nr++ )
         continue;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
     to_send = malloc(BITMAP_SIZE);
     to_skip = malloc(BITMAP_SIZE);
 
-
-    if (live) {
+    if ( live )
+    {
         /* Get qemu-dm logging dirty pages too */
         void *seg = init_qemu_maps(dom, BITMAP_SIZE);
         qemu_bitmaps[0] = seg;
@@ -462,44 +410,40 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
     hvm_buf = malloc(hvm_buf_size);
 
-    if (!to_send ||!to_skip ||!hvm_buf) {
+    if ( !to_send || !to_skip || !hvm_buf )
+    {
         ERROR("Couldn't allocate memory");
         goto out;
     }
 
     memset(to_send, 0xff, BITMAP_SIZE);
 
-    if (lock_pages(to_send, BITMAP_SIZE)) {
+    if ( lock_pages(to_send, BITMAP_SIZE) )
+    {
         ERROR("Unable to lock to_send");
         return 1;
     }
 
     /* (to fix is local only) */
-    if (lock_pages(to_skip, BITMAP_SIZE)) {
+    if ( lock_pages(to_skip, BITMAP_SIZE) )
+    {
         ERROR("Unable to lock to_skip");
         return 1;
     }
 
     analysis_phase(xc_handle, dom, pfn_array_size, to_skip, 0);
 
-
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
-
-    if (pfn_batch == NULL) {
+    if ( pfn_batch == NULL )
+    {
         ERROR("failed to alloc memory for pfn_batch array");
         errno = ENOMEM;
         goto out;
     }
 
-    /* Start writing out the saved-domain record. */
-    if (!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
-        ERROR("write: max_pfn");
-        goto out;
-    }
-
-    while(1) {
-
+    for ( ; ; )
+    {
         unsigned int prev_pc, sent_this_iter, N, batch;
 
         iter++;
@@ -510,51 +454,56 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         DPRINTF("Saving HVM domain memory pages: iter %d   0%%", iter);
 
-        while( N < pfn_array_size ){
-
+        while ( N < pfn_array_size )
+        {
             unsigned int this_pc = (N * 100) / pfn_array_size;
             int rc;
 
-            if ((this_pc - prev_pc) >= 5) {
+            if ( (this_pc - prev_pc) >= 5 )
+            {
                 DPRINTF("\b\b\b\b%3d%%", this_pc);
                 prev_pc = this_pc;
             }
 
-            /* slightly wasteful to peek the whole array evey time,
-               but this is fast enough for the moment. */
-            if (!last_iter && (rc = xc_shadow_control(
+            if ( !last_iter )
+            {
+                /* Slightly wasteful to peek the whole array evey time,
+                   but this is fast enough for the moment. */
+                rc = xc_shadow_control(
                     xc_handle, dom, XEN_DOMCTL_SHADOW_OP_PEEK, to_skip, 
-                    pfn_array_size, NULL, 0, NULL)) != pfn_array_size) {
-                ERROR("Error peeking HVM shadow bitmap");
-                goto out;
+                    pfn_array_size, NULL, 0, NULL);
+                if ( rc != pfn_array_size )
+                {
+                    ERROR("Error peeking HVM shadow bitmap");
+                    goto out;
+                }
             }
-
 
             /* load pfn_batch[] with the mfn of all the pages we're doing in
                this batch. */
-            for (batch = 0; batch < MAX_BATCH_SIZE && N < pfn_array_size; N++){
-
+            for ( batch = 0;
+                  (batch < MAX_BATCH_SIZE) && (N < pfn_array_size);
+                  N++ )
+            {
                 int n = permute(N, pfn_array_size, order_nr);
 
-                if (0&&debug) {
+                if ( 0 && debug )
                     DPRINTF("%d pfn= %08lx %d \n",
                             iter, (unsigned long)n, test_bit(n, to_send));
-                }
 
-                if (!last_iter && test_bit(n, to_send)&& test_bit(n, to_skip))
+                if ( !last_iter &&
+                     test_bit(n, to_send) &&
+                     test_bit(n, to_skip) )
                     skip_this_iter++; /* stats keeping */
 
-                if (!((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
-                      (test_bit(n, to_send) && last_iter)))
+                if ( !((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
+                       (test_bit(n, to_send) && last_iter)) )
                     continue;
 
                 /* Skip PFNs that aren't really there */
-                if ((n >= 0xa0 && n < 0xc0) /* VGA hole */
-                    || (n >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT)
-                        && n < (1ULL << 32) >> PAGE_SHIFT) /* 4G MMIO hole */
-                    || n == store_pfn
-                    || n == ioreq_pfn
-                    || n == bufioreq_pfn)
+                if ( (n >= 0xa0 && n < 0xc0) /* VGA hole */
+                     || (n >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT) &&
+                         n < (1ULL << 32) >> PAGE_SHIFT) /* 4G MMIO hole */ )
                     continue;
 
                 /*
@@ -568,24 +517,27 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 batch++;
             }
 
-            if (batch == 0)
+            if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
 
-            /* map_foreign use pfns now !*/
-            if ((region_base = xc_map_foreign_batch(
-                     xc_handle, dom, PROT_READ, pfn_batch, batch)) == 0) {
+            region_base = xc_map_foreign_batch(
+                xc_handle, dom, PROT_READ, pfn_batch, batch);
+            if ( region_base == 0 )
+            {
                 ERROR("map batch failed");
                 goto out;
             }
 
             /* write num of pfns */
-            if(!write_exact(io_fd, &batch, sizeof(unsigned int))) {
+            if ( !write_exact(io_fd, &batch, sizeof(unsigned int)) )
+            {
                 ERROR("Error when writing to state file (2)");
                 goto out;
             }
 
             /* write all the pfns */
-            if(!write_exact(io_fd, pfn_batch, sizeof(unsigned long)*batch)) {
+            if ( !write_exact(io_fd, pfn_batch, sizeof(unsigned long)*batch) )
+            {
                 ERROR("Error when writing to state file (3)");
                 goto out;
             }
@@ -615,21 +567,23 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         DPRINTF("\r %d: sent %d, skipped %d, ",
                 iter, sent_this_iter, skip_this_iter );
 
-        if (last_iter) {
+        if ( last_iter )
+        {
             print_stats( xc_handle, dom, sent_this_iter, &stats, 1);
-
             DPRINTF("Total pages sent= %ld (%.2fx)\n",
                     total_sent, ((float)total_sent)/pfn_array_size );
         }
 
-        if (last_iter && debug){
+        if ( last_iter && debug )
+        {
             int minusone = -1;
             memset(to_send, 0xff, BITMAP_SIZE);
             debug = 0;
             DPRINTF("Entering debug resend-all mode\n");
 
             /* send "-1" to put receiver into debug mode */
-            if(!write_exact(io_fd, &minusone, sizeof(int))) {
+            if ( !write_exact(io_fd, &minusone, sizeof(int)) )
+            {
                 ERROR("Error when writing to state file (6)");
                 goto out;
             }
@@ -637,22 +591,22 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             continue;
         }
 
-        if (last_iter) break;
+        if ( last_iter )
+            break;
 
-        if (live) {
-
-
-            if(
-                ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
-                (iter >= max_iters) ||
-                (sent_this_iter+skip_this_iter < 50) ||
-                (total_sent > pfn_array_size*max_factor) ) {
-
+        if ( live )
+        {
+            if ( ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
+                 (iter >= max_iters) ||
+                 (sent_this_iter+skip_this_iter < 50) ||
+                 (total_sent > pfn_array_size*max_factor) )
+            {
                 DPRINTF("Start last iteration for HVM domain\n");
                 last_iter = 1;
 
-                if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info,
-                                      &ctxt)) {
+                if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info,
+                                       &ctxt))
+                {
                     ERROR("Domain appears not to have suspended");
                     goto out;
                 }
@@ -662,25 +616,30 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         (unsigned long)ctxt.user_regs.edx);
             }
 
-            if (xc_shadow_control(xc_handle, dom, 
-                                  XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
-                                  pfn_array_size, NULL, 
-                                  0, &stats) != pfn_array_size) {
+            if ( xc_shadow_control(xc_handle, dom, 
+                                   XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
+                                   pfn_array_size, NULL, 
+                                   0, &stats) != pfn_array_size )
+            {
                 ERROR("Error flushing shadow PT");
                 goto out;
             }
 
             /* Pull in the dirty bits from qemu too */
-            if (!last_iter) {
+            if ( !last_iter )
+            {
                 qemu_active = qemu_non_active;
                 qemu_non_active = qemu_active ? 0 : 1;
                 qemu_flip_buffer(dom, qemu_active);
-                for (j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++) {
+                for ( j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++ )
+                {
                     to_send[j] |= qemu_bitmaps[qemu_non_active][j];
                     qemu_bitmaps[qemu_non_active][j] = 0;
                 }
-            } else {
-                for (j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++) 
+            }
+            else
+            {
+                for ( j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++ )
                     to_send[j] |= qemu_bitmaps[qemu_active][j];
             }
 
@@ -688,61 +647,96 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
         }
-
-
     } /* end of while 1 */
 
 
     DPRINTF("All HVM memory is saved\n");
 
+    {
+        struct {
+            int minustwo;
+            int max_vcpu_id;
+            uint64_t vcpumap;
+        } chunk = { -2, info.max_vcpu_id };
+
+        if (info.max_vcpu_id >= 64) {
+            ERROR("Too many VCPUS in guest!");
+            goto out;
+        }
+
+        for (i = 1; i <= info.max_vcpu_id; i++) {
+            xc_vcpuinfo_t vinfo;
+            if ((xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) &&
+                vinfo.online)
+                vcpumap |= 1ULL << i;
+        }
+
+        chunk.vcpumap = vcpumap;
+        if(!write_exact(io_fd, &chunk, sizeof(chunk))) {
+            ERROR("Error when writing to state file (errno %d)", errno);
+            goto out;
+        }
+    }
+
     /* Zero terminate */
     i = 0;
-    if (!write_exact(io_fd, &i, sizeof(int))) {
+    if ( !write_exact(io_fd, &i, sizeof(int)) )
+    {
         ERROR("Error when writing to state file (6)");
         goto out;
     }
 
-
-    /* save vcpu/vmcs context */
-    if (!write_exact(io_fd, &nr_vcpus, sizeof(uint32_t))) {
-        ERROR("error write nr vcpus");
+    /* Save magic-page locations. */
+    memset(magic_pfns, 0, sizeof(magic_pfns));
+    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN,
+                     (unsigned long *)&magic_pfns[0]);
+    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN,
+                     (unsigned long *)&magic_pfns[1]);
+    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN,
+                     (unsigned long *)&magic_pfns[2]);
+    if ( !write_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
+    {
+        ERROR("Error when writing to state file (7)");
         goto out;
     }
 
-    /*XXX: need a online map to exclude down cpu */
-    for (i = 0; i < nr_vcpus; i++) {
+    /* save vcpu/vmcs contexts */
+    for ( i = 0; i < nr_vcpus; i++ )
+    {
+        if (!(vcpumap & (1ULL << i)))
+            continue;
 
-        if (xc_vcpu_getcontext(xc_handle, dom, i, &ctxt)) {
+        if ( xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
+        {
             ERROR("HVM:Could not get vcpu context");
             goto out;
         }
 
-        rec_size = sizeof(ctxt);
-        DPRINTF("write %d vcpucontext of total %d.\n", i, nr_vcpus); 
-        if (!write_exact(io_fd, &rec_size, sizeof(uint32_t))) {
-            ERROR("error write vcpu ctxt size");
-            goto out;
-        }
-
-        if (!write_exact(io_fd, &(ctxt), sizeof(ctxt)) ) {
-            ERROR("write vmcs failed!\n");
+        DPRINTF("write vcpu %d context.\n", i); 
+        if ( !write_exact(io_fd, &(ctxt), sizeof(ctxt)) )
+        {
+            ERROR("write vcpu context failed!\n");
             goto out;
         }
     }
 
     if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
-                                              hvm_buf_size)) == -1) {
+                                              hvm_buf_size)) == -1 )
+    {
         ERROR("HVM:Could not get hvm buffer");
         goto out;
     }
 
-    if (!write_exact(io_fd, &rec_size, sizeof(uint32_t))) {
+    if ( !write_exact(io_fd, &rec_size, sizeof(uint32_t)) )
+    {
         ERROR("error write hvm buffer size");
         goto out;
     }
 
-    if ( !write_exact(io_fd, hvm_buf, rec_size) ) {
+    if ( !write_exact(io_fd, hvm_buf, rec_size) )
+    {
         ERROR("write HVM info failed!\n");
+        goto out;
     }
 
     /* Success! */
@@ -750,12 +744,11 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
  out:
 
-    if (live) {
-        if(xc_shadow_control(xc_handle, dom, 
-                             XEN_DOMCTL_SHADOW_OP_OFF,
-                             NULL, 0, NULL, 0, NULL) < 0) {
+    if ( live )
+    {
+        if ( xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
+                               NULL, 0, NULL, 0, NULL) < 0 )
             DPRINTF("Warning - couldn't disable shadow mode");
-        }
     }
 
     free(hvm_buf);

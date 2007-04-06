@@ -147,9 +147,10 @@ static inline int irq_masked(unsigned long eflags)
 extern void send_pio_req(unsigned long port, unsigned long count, int size,
                          paddr_t value, int dir, int df, int value_is_ptr);
 void send_timeoffset_req(unsigned long timeoff);
+void send_invalidate_req(void);
 extern void handle_mmio(unsigned long gpa);
 extern void hvm_interrupt_post(struct vcpu *v, int vector, int type);
-extern void hvm_io_assist(struct vcpu *v);
+extern void hvm_io_assist(void);
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

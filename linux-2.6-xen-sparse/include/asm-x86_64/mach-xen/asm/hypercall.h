@@ -241,7 +241,7 @@ HYPERVISOR_memory_op(
 
 static inline int
 HYPERVISOR_multicall(
-	void *call_list, int nr_calls)
+	multicall_entry_t *call_list, int nr_calls)
 {
 	return _hypercall2(int, multicall, call_list, nr_calls);
 }
@@ -259,7 +259,7 @@ HYPERVISOR_event_channel_op(
 {
 	int rc = _hypercall2(int, event_channel_op, cmd, arg);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		struct evtchn_op op;
 		op.cmd = cmd;
@@ -299,7 +299,7 @@ HYPERVISOR_physdev_op(
 {
 	int rc = _hypercall2(int, physdev_op, cmd, arg);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		struct physdev_op op;
 		op.cmd = cmd;
@@ -359,7 +359,7 @@ HYPERVISOR_suspend(
 	int rc = _hypercall3(int, sched_op, SCHEDOP_shutdown,
 			     &sched_shutdown, srec);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (rc == -ENOSYS)
 		rc = _hypercall3(int, sched_op_compat, SCHEDOP_shutdown,
 				 SHUTDOWN_suspend, srec);

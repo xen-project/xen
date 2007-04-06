@@ -29,9 +29,15 @@
  */
 
 #include <linux/capability.h>
+#include <linux/errno.h>
 #include <linux/stat.h>
+#include <linux/string.h>
 #include <linux/sysdev.h>
 #include "common.h"
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 #define BALLOON_CLASS_NAME "memory"
 

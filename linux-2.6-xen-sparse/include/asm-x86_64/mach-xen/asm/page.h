@@ -24,12 +24,6 @@
 })
 #define HAVE_ARCH_FREE_PAGE
 
-#ifdef CONFIG_XEN_SCRUB_PAGES
-#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
-#else
-#define scrub_pages(_p,_n) ((void)0)
-#endif
-
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	12
 #ifdef __ASSEMBLY__
@@ -110,7 +104,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pmd_val(pmd_t x)
 {
 	unsigned long ret = x.pmd;
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret) ret = pte_machine_to_phys(ret) | _PAGE_PRESENT;
 #else
 	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
@@ -172,10 +166,10 @@ static inline pgd_t __pgd(unsigned long x)
 #define __PAGE_OFFSET           0xffff880000000000
 #endif /* !__ASSEMBLY__ */
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 #undef LOAD_OFFSET
 #define LOAD_OFFSET		0
-#endif /* CONFIG_XEN_COMPAT_030002 */
+#endif
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)

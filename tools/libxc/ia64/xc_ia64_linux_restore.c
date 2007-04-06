@@ -20,9 +20,6 @@ static unsigned long p2m_size;
 /* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
 static unsigned long nr_pfns;
 
-/* largest possible value of nr_pfns (i.e. domain's maximum memory size) */
-static unsigned long max_nr_pfns;
-
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
 {
@@ -62,10 +59,10 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 }
 
 int
-xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
-                 unsigned long p2msize, unsigned long maxnrpfns,
+xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                  unsigned int store_evtchn, unsigned long *store_mfn,
-                 unsigned int console_evtchn, unsigned long *console_mfn)
+                 unsigned int console_evtchn, unsigned long *console_mfn,
+                 unsigned int hvm, unsigned int pae)
 {
     DECLARE_DOMCTL;
     int rc = 1, i;
@@ -85,12 +82,19 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
 
-    p2m_size = p2msize;
-    max_nr_pfns = maxnrpfns;
+    if (hvm) {
+        ERROR("HVM Restore is unsupported");
+        goto out;
+    }
 
     /* For info only */
     nr_pfns = 0;
 
+    if ( !read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    {
+        ERROR("read: p2m_size");
+        goto out;
+    }
     DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
     if (!read_exact(io_fd, &ver, sizeof(unsigned long))) {
@@ -106,11 +110,6 @@ xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
         /* needed for build domctl, but might as well do early */
         ERROR("Unable to mlock ctxt");
         return 1;
-    }
-
-    if (xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_nr_pfns)) != 0) {
-        errno = ENOMEM;
-        goto out;
     }
 
     /* Get pages.  */

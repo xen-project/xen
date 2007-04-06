@@ -70,5 +70,9 @@ typedef u64 dma64_addr_t;
 
 typedef unsigned short xmem_bufctl_t;
 
+typedef int bool_t;
+#define test_and_set_bool(b)   xchg(&(b), 1)
+#define test_and_clear_bool(b) xchg(&(b), 0)
+
 #endif  /* __ASSEMBLY__ */
 #endif

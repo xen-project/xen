@@ -289,8 +289,12 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 
 long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs);
 
-static inline void set_eflags_CF(int size, unsigned long v1,
-                                 unsigned long v2, struct cpu_user_regs *regs)
+static inline void set_eflags_CF(int size,
+                                 unsigned int instr,
+                                 unsigned long result,
+                                 unsigned long src,
+                                 unsigned long dst,
+                                 struct cpu_user_regs *regs)
 {
     unsigned long mask;
 
@@ -300,14 +304,28 @@ static inline void set_eflags_CF(int size, unsigned long v1,
 
     mask = ~0UL >> (8 * (sizeof(mask) - size));
 
-    if ((v1 & mask) > (v2 & mask))
-        regs->eflags |= X86_EFLAGS_CF;
+    if ( instr == INSTR_ADD )
+    {
+        /* CF=1 <==> result is less than the augend and addend) */
+        if ( (result & mask) < (dst & mask) )
+        {
+            ASSERT((result & mask) < (src & mask));
+            regs->eflags |= X86_EFLAGS_CF;
+        }
+    }
     else
-        regs->eflags &= ~X86_EFLAGS_CF;
+    {
+        ASSERT( instr == INSTR_CMP || instr == INSTR_SUB );
+        if ( (src & mask) > (dst & mask) )
+            regs->eflags |= X86_EFLAGS_CF;
+    }
 }
 
-static inline void set_eflags_OF(int size, unsigned long v1,
-                                 unsigned long v2, unsigned long v3,
+static inline void set_eflags_OF(int size,
+                                 unsigned int instr,
+                                 unsigned long result,
+                                 unsigned long src,
+                                 unsigned long dst,
                                  struct cpu_user_regs *regs)
 {
     unsigned long mask;
@@ -316,21 +334,32 @@ static inline void set_eflags_OF(int size, unsigned long v1,
         size = BYTE;
     ASSERT((size <= sizeof(mask)) && (size > 0));
 
-    mask = ~0UL >> (8 * (sizeof(mask) - size));
+    mask =  1UL << ((8*size) - 1);
 
-    if ((v3 ^ v2) & (v3 ^ v1) & mask)
-        regs->eflags |= X86_EFLAGS_OF;
+    if ( instr == INSTR_ADD )
+    {
+        if ((src ^ result) & (dst ^ result) & mask);
+            regs->eflags |= X86_EFLAGS_OF;
+    }
+    else
+    {
+        ASSERT(instr == INSTR_CMP || instr == INSTR_SUB);
+        if ((dst ^ src) & (dst ^ result) & mask)
+            regs->eflags |= X86_EFLAGS_OF;
+    }
 }
 
-static inline void set_eflags_AF(int size, unsigned long v1,
-                                 unsigned long v2, unsigned long v3,
+static inline void set_eflags_AF(int size,
+                                 unsigned long result,
+                                 unsigned long src,
+                                 unsigned long dst,
                                  struct cpu_user_regs *regs)
 {
-    if ((v1 ^ v2 ^ v3) & 0x10)
+    if ((result ^ src ^ dst) & 0x10)
         regs->eflags |= X86_EFLAGS_AF;
 }
 
-static inline void set_eflags_ZF(int size, unsigned long v1,
+static inline void set_eflags_ZF(int size, unsigned long result,
                                  struct cpu_user_regs *regs)
 {
     unsigned long mask;
@@ -341,11 +370,11 @@ static inline void set_eflags_ZF(int size, unsigned long v1,
 
     mask = ~0UL >> (8 * (sizeof(mask) - size));
 
-    if ((v1 & mask) == 0)
+    if ((result & mask) == 0)
         regs->eflags |= X86_EFLAGS_ZF;
 }
 
-static inline void set_eflags_SF(int size, unsigned long v1,
+static inline void set_eflags_SF(int size, unsigned long result,
                                  struct cpu_user_regs *regs)
 {
     unsigned long mask;
@@ -354,9 +383,9 @@ static inline void set_eflags_SF(int size, unsigned long v1,
         size = BYTE;
     ASSERT((size <= sizeof(mask)) && (size > 0));
 
-    mask = ~0UL >> (8 * (sizeof(mask) - size));
+    mask = 1UL << ((8*size) - 1);
 
-    if (v1 & mask)
+    if (result & mask)
         regs->eflags |= X86_EFLAGS_SF;
 }
 
@@ -379,10 +408,10 @@ static char parity_table[256] = {
     1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
 };
 
-static inline void set_eflags_PF(int size, unsigned long v1,
+static inline void set_eflags_PF(int size, unsigned long result,
                                  struct cpu_user_regs *regs)
 {
-    if (parity_table[v1 & 0xFF])
+    if (parity_table[result & 0xFF])
         regs->eflags |= X86_EFLAGS_PF;
 }
 
@@ -454,7 +483,7 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 {
     int sign = p->df ? -1 : 1;
     int size = -1, index = -1;
-    unsigned long value = 0, diff = 0;
+    unsigned long value = 0, result = 0;
     unsigned long src, dst;
 
     src = mmio_opp->operand[0];
@@ -575,114 +604,42 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data & value;
+            result = (unsigned long) p->data & value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data & value;
+            result = (unsigned long) p->data & value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data & value;
-            set_reg_value(size, index, 0, regs, diff);
+            result = (unsigned long) p->data & value;
+            set_reg_value(size, index, 0, regs, result);
         }
+
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_ADD:
         if (src & REGISTER) {
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data + value;
+            result = (unsigned long) p->data + value;
         } else if (src & IMMEDIATE) {
             value = mmio_opp->immediate;
-            diff = (unsigned long) p->data + value;
+            result = (unsigned long) p->data + value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data + value;
-            set_reg_value(size, index, 0, regs, diff);
-        }
-
-        /*
-         * The OF and CF flags are cleared; the SF, ZF, and PF
-         * flags are set according to the result. The state of
-         * the AF flag is undefined.
-         */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
-        break;
-
-    case INSTR_OR:
-        if (src & REGISTER) {
-            index = operand_index(src);
-            value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data | value;
-        } else if (src & IMMEDIATE) {
-            value = mmio_opp->immediate;
-            diff = (unsigned long) p->data | value;
-        } else if (src & MEMORY) {
-            index = operand_index(dst);
-            value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data | value;
-            set_reg_value(size, index, 0, regs, diff);
-        }
-
-        /*
-         * The OF and CF flags are cleared; the SF, ZF, and PF
-         * flags are set according to the result. The state of
-         * the AF flag is undefined.
-         */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
-        break;
-
-    case INSTR_XOR:
-        if (src & REGISTER) {
-            index = operand_index(src);
-            value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data ^ value;
-        } else if (src & IMMEDIATE) {
-            value = mmio_opp->immediate;
-            diff = (unsigned long) p->data ^ value;
-        } else if (src & MEMORY) {
-            index = operand_index(dst);
-            value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data ^ value;
-            set_reg_value(size, index, 0, regs, diff);
-        }
-
-        /*
-         * The OF and CF flags are cleared; the SF, ZF, and PF
-         * flags are set according to the result. The state of
-         * the AF flag is undefined.
-         */
-        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
-        break;
-
-    case INSTR_CMP:
-    case INSTR_SUB:
-        if (src & REGISTER) {
-            index = operand_index(src);
-            value = get_reg_value(size, index, 0, regs);
-            diff = (unsigned long) p->data - value;
-        } else if (src & IMMEDIATE) {
-            value = mmio_opp->immediate;
-            diff = (unsigned long) p->data - value;
-        } else if (src & MEMORY) {
-            index = operand_index(dst);
-            value = get_reg_value(size, index, 0, regs);
-            diff = value - (unsigned long) p->data;
-            if ( mmio_opp->instr == INSTR_SUB )
-                set_reg_value(size, index, 0, regs, diff);
+            result = (unsigned long) p->data + value;
+            set_reg_value(size, index, 0, regs, result);
         }
 
         /*
@@ -691,12 +648,111 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_CF(size, value, (unsigned long) p->data, regs);
-        set_eflags_OF(size, diff, value, (unsigned long) p->data, regs);
-        set_eflags_AF(size, diff, value, (unsigned long) p->data, regs);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_CF(size, mmio_opp->instr, result, value,
+                      (unsigned long) p->data, regs);
+        set_eflags_OF(size, mmio_opp->instr, result, value,
+                      (unsigned long) p->data, regs);
+        set_eflags_AF(size, result, value, (unsigned long) p->data, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
+        break;
+
+    case INSTR_OR:
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            result = (unsigned long) p->data | value;
+        } else if (src & IMMEDIATE) {
+            value = mmio_opp->immediate;
+            result = (unsigned long) p->data | value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            result = (unsigned long) p->data | value;
+            set_reg_value(size, index, 0, regs, result);
+        }
+
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
+        break;
+
+    case INSTR_XOR:
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            result = (unsigned long) p->data ^ value;
+        } else if (src & IMMEDIATE) {
+            value = mmio_opp->immediate;
+            result = (unsigned long) p->data ^ value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            result = (unsigned long) p->data ^ value;
+            set_reg_value(size, index, 0, regs, result);
+        }
+
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
+        break;
+
+    case INSTR_CMP:
+    case INSTR_SUB:
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            result = (unsigned long) p->data - value;
+        } else if (src & IMMEDIATE) {
+            value = mmio_opp->immediate;
+            result = (unsigned long) p->data - value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            result = value - (unsigned long) p->data;
+            if ( mmio_opp->instr == INSTR_SUB )
+                set_reg_value(size, index, 0, regs, result);
+        }
+
+        /*
+         * The CF, OF, SF, ZF, AF, and PF flags are set according
+         * to the result
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        if ( src & (REGISTER | IMMEDIATE) )
+        {
+            set_eflags_CF(size, mmio_opp->instr, result, value,
+                          (unsigned long) p->data, regs);
+            set_eflags_OF(size, mmio_opp->instr, result, value,
+                          (unsigned long) p->data, regs);
+        }
+        else
+        {
+            set_eflags_CF(size, mmio_opp->instr, result,
+                          (unsigned long) p->data, value, regs);
+            set_eflags_OF(size, mmio_opp->instr, result,
+                          (unsigned long) p->data, value, regs);
+        }
+        set_eflags_AF(size, result, value, (unsigned long) p->data, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_TEST:
@@ -709,16 +765,16 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
         }
-        diff = (unsigned long) p->data & value;
+        result = (unsigned long) p->data & value;
 
         /*
          * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
          */
         regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
                           X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-        set_eflags_ZF(size, diff, regs);
-        set_eflags_SF(size, diff, regs);
-        set_eflags_PF(size, diff, regs);
+        set_eflags_ZF(size, result, regs);
+        set_eflags_SF(size, result, regs);
+        set_eflags_PF(size, result, regs);
         break;
 
     case INSTR_BT:
@@ -764,13 +820,14 @@ static void hvm_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     }
 }
 
-void hvm_io_assist(struct vcpu *v)
+void hvm_io_assist(void)
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct cpu_user_regs *regs;
     struct hvm_io_op *io_opp;
     unsigned long gmfn;
+    struct vcpu *v = current;
     struct domain *d = v->domain;
 
     io_opp = &v->arch.hvm_vcpu.io_op;
@@ -788,10 +845,17 @@ void hvm_io_assist(struct vcpu *v)
 
     p->state = STATE_IOREQ_NONE;
 
-    if ( p->type == IOREQ_TYPE_PIO )
+    switch ( p->type )
+    {
+    case IOREQ_TYPE_INVALIDATE:
+        goto out;
+    case IOREQ_TYPE_PIO:
         hvm_pio_assist(regs, p, io_opp);
-    else
+        break;
+    default:
         hvm_mmio_assist(regs, p, io_opp);
+        break;
+    }
 
     /* Copy register changes back into current guest state. */
     hvm_load_cpu_guest_regs(v, regs);
@@ -804,6 +868,7 @@ void hvm_io_assist(struct vcpu *v)
         mark_dirty(d, gmfn);
     }
 
+ out:
     vcpu_end_shutdown_deferral(v);
 }
 

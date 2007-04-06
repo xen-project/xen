@@ -24,7 +24,7 @@ class XendTask(threading.Thread):
     """Represents a Asynchronous Task used by Xen API.
 
     Basically proxies the callable object in a thread and returns the
-    results via self.{type,result,error_code,error_info}.
+    results via self.{type,result,error_info}.
 
     @cvar task_progress: Thread local storage for progress tracking.
                          It is a dict indexed by thread_id. Note that the
@@ -71,7 +71,6 @@ class XendTask(threading.Thread):
         self.uuid = uuid
         
         self.result = None
-        self.error_code = ''
         self.error_info = []
         
         self.name_label = label or func.__name__
@@ -118,13 +117,11 @@ class XendTask(threading.Thread):
                 self.result = result['Value']
                 self.set_status(XEN_API_TASK_STATUS_TYPE[1])
             else:
-                self.error_code = result['ErrorDescription'][0]
-                self.error_info = result['ErrorDescription'][1:]
+                self.error_info = result['ErrorDescription']
                 self.set_status(XEN_API_TASK_STATUS_TYPE[2])                
         except Exception, e:
             log.exception('Error running Async Task')
-            self.error_code = 'INTERNAL ERROR'
-            self.error_info = [str(e)]
+            self.error_info = ['INTERNAL ERROR', str(e)]
             self.set_status(XEN_API_TASK_STATUS_TYPE[2])
 
         self.task_progress_lock.acquire()
@@ -144,7 +141,6 @@ class XendTask(threading.Thread):
             'progress': self.get_progress(),
             'type': self.type,
             'result': self.result,
-            'error_code': self.error_code,
             'error_info': self.error_info,
             'allowed_operations': {},
             'session': self.session,

@@ -661,9 +661,10 @@ void do_blkif_request(request_queue_t *rq)
 		if (RING_FULL(&info->ring))
 			goto wait;
 
-		DPRINTK("do_blk_req %p: cmd %p, sec %lx, "
+		DPRINTK("do_blk_req %p: cmd %p, sec %llx, "
 			"(%u/%li) buffer:%p [%s]\n",
-			req, req->cmd, req->sector, req->current_nr_sectors,
+			req, req->cmd, (long long)req->sector,
+			req->current_nr_sectors,
 			req->nr_sectors, req->buffer,
 			rq_data_dir(req) ? "write" : "read");
 

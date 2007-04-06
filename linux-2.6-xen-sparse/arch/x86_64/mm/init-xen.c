@@ -54,7 +54,7 @@
 struct dma_mapping_ops* dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 unsigned int __kernel_page_user;
 EXPORT_SYMBOL(__kernel_page_user);
 #endif
@@ -551,7 +551,7 @@ void __init xen_init_pt(void)
 	addr = page[pud_index(__START_KERNEL_map)];
 	addr_to_page(addr, page);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	/* On Xen 3.0.2 and older we may need to explicitly specify _PAGE_USER
 	   in kernel PTEs. We check that here. */
 	if (HYPERVISOR_xen_version(XENVER_version, NULL) <= 0x30000) {

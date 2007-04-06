@@ -91,7 +91,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         # more information.
         cmd = [xen.util.auxbin.pathTo(XC_SAVE), str(fd),
                str(dominfo.getDomid()), "0", "0", 
-               str(int(live) | (int(hvm) << 2) | (int(stdvga) << 3)) ]
+               str(int(live) | (int(hvm) << 2)) ]
         log.debug("[xc_save]: %s", string.join(cmd))
 
         def saveInputHandler(line, tochild):
@@ -187,7 +187,6 @@ def restore(xd, fd, dominfo = None, paused = False):
     assert console_port
 
     nr_pfns = (dominfo.getMemoryTarget() + 3) / 4 
-    max_nr_pfns = (dominfo.getMemoryMaximum() + 3) / 4 
 
     # if hvm, pass mem size to calculate the store_mfn
     image_cfg = dominfo.info.get('image', {})
@@ -202,27 +201,21 @@ def restore(xd, fd, dominfo = None, paused = False):
         pae  = 0
 
     try:
-        l = read_exact(fd, sizeof_unsigned_long,
-                       "not a valid guest state file: pfn count read")
-        p2m_size = unpack("L", l)[0]    # native sizeof long
-
-        if p2m_size > 16*1024*1024:     # XXX 
-            raise XendError(
-                "not a valid guest state file: pfn count out of range")
-
         shadow = dominfo.info['shadow_memory']
-        log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, "
-                  "p2m_size=0x%x.", dominfo.info['shadow_memory'],
+        log.debug("restore:shadow=0x%x, _static_max=0x%x, _static_min=0x%x, ",
+                  dominfo.info['shadow_memory'],
                   dominfo.info['memory_static_max'],
-                  dominfo.info['memory_static_min'], p2m_size)
+                  dominfo.info['memory_static_min'])
 
         balloon.free(xc.pages_to_kib(nr_pfns) + shadow * 1024)
 
         shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow)
         dominfo.info['shadow_memory'] = shadow_cur
 
+        xc.domain_setmaxmem(dominfo.getDomid(), dominfo.getMemoryMaximum())
+
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
-                        fd, dominfo.getDomid(), p2m_size, max_nr_pfns, 
+                        fd, dominfo.getDomid(),
                         store_port, console_port, int(is_hvm), pae, apic])
         log.debug("[xc_restore]: %s", string.join(cmd))
 

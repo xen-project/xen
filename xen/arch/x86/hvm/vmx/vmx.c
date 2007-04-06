@@ -957,6 +957,13 @@ static int vmx_pae_enabled(struct vcpu *v)
     return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
+static int vmx_interrupts_enabled(struct vcpu *v) 
+{
+    unsigned long eflags = __vmread(GUEST_RFLAGS); 
+    return !irq_masked(eflags); 
+}
+
+
 static void vmx_update_host_cr3(struct vcpu *v)
 {
     ASSERT( (v == current) || !vcpu_runnable(v) );
@@ -1030,6 +1037,7 @@ static struct hvm_function_table vmx_function_table = {
     .paging_enabled       = vmx_paging_enabled,
     .long_mode_enabled    = vmx_long_mode_enabled,
     .pae_enabled          = vmx_pae_enabled,
+    .interrupts_enabled   = vmx_interrupts_enabled,
     .guest_x86_mode       = vmx_guest_x86_mode,
     .get_guest_ctrl_reg   = vmx_get_ctrl_reg,
     .get_segment_base     = vmx_get_segment_base,
@@ -2618,10 +2626,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
     case EXIT_REASON_VMCALL:
     {
+        int rc;
         HVMTRACE_1D(VMMCALL, v, regs->eax);
         inst_len = __get_instruction_length(); /* Safe: VMCALL */
-        __update_guest_eip(inst_len);
-        hvm_do_hypercall(regs);
+        rc = hvm_do_hypercall(regs);
+        if ( rc != HVM_HCALL_preempted )
+        {
+            __update_guest_eip(inst_len);
+            if ( rc == HVM_HCALL_invalidate )
+                send_invalidate_req();
+        }
         break;
     }
     case EXIT_REASON_CR_ACCESS:

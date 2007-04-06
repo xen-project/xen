@@ -508,39 +508,6 @@ xen_vdi_remove_from_other_config(xen_session *session, xen_vdi vdi, char *key)
 
 
 bool
-xen_vdi_snapshot(xen_session *session, xen_vdi *result, xen_vdi vdi)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi }
-        };
-
-    abstract_type result_type = abstract_type_string;
-
-    *result = NULL;
-    XEN_CALL_("VDI.snapshot");
-    return session->ok;
-}
-
-
-bool
-xen_vdi_resize(xen_session *session, xen_vdi vdi, int64_t size)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vdi },
-            { .type = &abstract_type_int,
-              .u.int_val = size }
-        };
-
-    xen_call_(session, "VDI.resize", param_values, 2, NULL, NULL);
-    return session->ok;
-}
-
-
-bool
 xen_vdi_get_all(xen_session *session, struct xen_vdi_set **result)
 {
 

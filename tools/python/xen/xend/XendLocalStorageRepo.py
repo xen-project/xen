@@ -30,13 +30,13 @@ import sys
 import struct
 
 from xen.util import mkdir
-from xen.xend import uuid
-from xen.xend.XendError import XendError
-from xen.xend.XendVDI import *
-from xen.xend.XendTask import XendTask
-from xen.xend.XendStorageRepository import XendStorageRepository
-from xen.xend.XendStateStore import XendStateStore
-from xen.xend.XendOptions import instance as xendoptions
+import uuid
+from XendError import XendError
+from XendVDI import *
+from XendTask import XendTask
+from XendStorageRepository import XendStorageRepository
+from XendStateStore import XendStateStore
+from XendOptions import instance as xendoptions
 
 MB = 1024 * 1024
 
@@ -58,8 +58,7 @@ class XendLocalStorageRepo(XendStorageRepository):
         """
 
         XendStorageRepository.__init__(self, sr_uuid, sr_type,
-                                       name_label, name_description,
-                                       '/')
+                                       name_label, name_description)
         
         self.state = XendStateStore(xendoptions().get_xend_state_path()
                                     + '/local_sr')

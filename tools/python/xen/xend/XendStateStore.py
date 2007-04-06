@@ -204,7 +204,7 @@ class XendStateStore:
                 if type(val) == dict:
                     for val_uuid in val.keys():
                         val_node = doc.createElement(key)
-                        if key == 'other_config':
+                        if key in ['other_config', 'device_config']:
                             val_node.setAttribute('key', str(val_uuid))
                             val_node.setAttribute('value', str(val[val_uuid]))
                         else:

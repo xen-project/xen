@@ -9,6 +9,10 @@
 #include <xen/xenbus.h>
 #include <linux/kthread.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 MODULE_LICENSE("Dual BSD/GPL");
 
 #define SHUTDOWN_INVALID  -1

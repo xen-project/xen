@@ -14,6 +14,7 @@
 .*\.orig$
 .*\.rej$
 .*/a\.out$
+.*/Modules\.symvers$
 .*/cscope\..*$
 ^cscope.*$
 ^[^/]*\.bz2$

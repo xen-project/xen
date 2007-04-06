@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_pbd_decl.h"
 #include "xen_sr_decl.h"
+#include "xen_string_set.h"
 #include "xen_vdi_decl.h"
 
 
@@ -72,7 +73,7 @@ typedef struct xen_sr_record
     int64_t physical_utilisation;
     int64_t physical_size;
     char *type;
-    char *location;
+    char *content_type;
 } xen_sr_record;
 
 /**
@@ -169,20 +170,6 @@ xen_sr_get_by_uuid(xen_session *session, xen_sr *result, char *uuid);
 
 
 /**
- * Create a new SR instance, and return its handle.
- */
-extern bool
-xen_sr_create(xen_session *session, xen_sr *result, xen_sr_record *record);
-
-
-/**
- * Destroy the specified SR instance.
- */
-extern bool
-xen_sr_destroy(xen_session *session, xen_sr sr);
-
-
-/**
  * Get all the SR instances with the given label.
  */
 extern bool
@@ -253,10 +240,10 @@ xen_sr_get_type(xen_session *session, char **result, xen_sr sr);
 
 
 /**
- * Get the location field of the given SR.
+ * Get the content_type field of the given SR.
  */
 extern bool
-xen_sr_get_location(xen_session *session, char **result, xen_sr sr);
+xen_sr_get_content_type(xen_session *session, char **result, xen_sr sr);
 
 
 /**
@@ -274,11 +261,10 @@ xen_sr_set_name_description(xen_session *session, xen_sr sr, char *description);
 
 
 /**
- * Take an exact copy of the Storage Repository; the cloned storage
- * repository has the same type as its parent
+ * Return a set of all the SR types supported by the system.
  */
 extern bool
-xen_sr_clone(xen_session *session, xen_sr *result, xen_sr sr, char *loc, char *name);
+xen_sr_get_supported_types(xen_session *session, struct xen_string_set **result);
 
 
 /**

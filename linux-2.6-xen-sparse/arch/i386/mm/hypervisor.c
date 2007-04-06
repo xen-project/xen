@@ -303,7 +303,7 @@ int xen_create_contiguous_region(
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
 	}
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	/* 2. Get a new contiguous memory extent. */
@@ -312,7 +312,7 @@ int xen_create_contiguous_region(
 	success = (exchange.nr_exchanged == (1UL << order));
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -342,7 +342,7 @@ int xen_create_contiguous_region(
 	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
 						   ? UVMF_TLB_FLUSH|UVMF_ALL
 						   : UVMF_INVLPG|UVMF_ALL;
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	if (success)
@@ -400,7 +400,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			INVALID_P2M_ENTRY);
 		out_frames[i] = (__pa(vstart) >> PAGE_SHIFT) + i;
 	}
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	/* 3. Do the exchange for non-contiguous MFNs. */
@@ -408,7 +408,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	success = (exchange.nr_exchanged == 1);
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -432,7 +432,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
 						   ? UVMF_TLB_FLUSH|UVMF_ALL
 						   : UVMF_INVLPG|UVMF_ALL;
-	if (HYPERVISOR_multicall(cr_mcl, i))
+	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
 	balloon_unlock(flags);

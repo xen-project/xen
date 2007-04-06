@@ -235,13 +235,12 @@ choice
 
 endchoice
 
-config XEN_COMPAT_030002
-	bool
-	default XEN_COMPAT_030002_AND_LATER
-
-config XEN_COMPAT_030004
-	bool
-	default XEN_COMPAT_030002_AND_LATER || XEN_COMPAT_030004_AND_LATER
+config XEN_COMPAT
+	hex
+	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x030004 if XEN_COMPAT_030004_AND_LATER
+	default 0x030002 if XEN_COMPAT_030002_AND_LATER
+	default 0
 
 endmenu
 

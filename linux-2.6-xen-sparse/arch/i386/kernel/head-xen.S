@@ -142,7 +142,7 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xf0 - unused */
 	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 /*
  * __xen_guest information
  */
@@ -180,18 +180,18 @@ ENTRY(cpu_gdt_table)
 #endif
 	.ascii	",LOADER=generic"
 	.byte	0
-#endif /* CONFIG_XEN_COMPAT_030002 */
+#endif /* CONFIG_XEN_COMPAT <= 0x030002 */
 
 
 	ELFNOTE(Xen, XEN_ELFNOTE_GUEST_OS,       .asciz, "linux")	
 	ELFNOTE(Xen, XEN_ELFNOTE_GUEST_VERSION,  .asciz, "2.6")
 	ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION,    .asciz, "xen-3.0")
 	ELFNOTE(Xen, XEN_ELFNOTE_VIRT_BASE,      .long,  __PAGE_OFFSET)
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   .long,  __PAGE_OFFSET)
 #else
 	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   .long,  0)
-#endif /* !CONFIG_XEN_COMPAT_030002 */
+#endif
 	ELFNOTE(Xen, XEN_ELFNOTE_ENTRY,          .long,  startup_32)
 	ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, .long,  hypercall_page)
 	ELFNOTE(Xen, XEN_ELFNOTE_HV_START_LOW,   .long,  HYPERVISOR_VIRT_START)

@@ -307,7 +307,7 @@ void domain_kill(struct domain *d)
     domain_pause(d);
 
     /* Already dying? Then bail. */
-    if ( xchg(&d->is_dying, 1) )
+    if ( test_and_set_bool(d->is_dying) )
     {
         domain_unpause(d);
         return;
@@ -453,7 +453,7 @@ void domain_pause_for_debugger(void)
     struct vcpu *v;
 
     atomic_inc(&d->pause_count);
-    if ( xchg(&d->is_paused_by_controller, 1) )
+    if ( test_and_set_bool(d->is_paused_by_controller) )
         domain_unpause(d); /* race-free atomic_dec(&d->pause_count) */
 
     for_each_vcpu ( d, v )
@@ -553,13 +553,13 @@ void domain_unpause(struct domain *d)
 void domain_pause_by_systemcontroller(struct domain *d)
 {
     domain_pause(d);
-    if ( xchg(&d->is_paused_by_controller, 1) )
+    if ( test_and_set_bool(d->is_paused_by_controller) )
         domain_unpause(d);
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)
 {
-    if ( xchg(&d->is_paused_by_controller, 0) )
+    if ( test_and_clear_bool(d->is_paused_by_controller) )
         domain_unpause(d);
 }
 

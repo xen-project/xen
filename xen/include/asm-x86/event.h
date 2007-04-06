@@ -35,12 +35,13 @@ static inline void vcpu_mark_events_pending(struct vcpu *v)
         vcpu_kick(v);
 }
 
+int hvm_local_events_need_delivery(struct vcpu *v);
 static inline int local_events_need_delivery(void)
 {
     struct vcpu *v = current;
-    return ((vcpu_info(v, evtchn_upcall_pending) &&
-             !vcpu_info(v, evtchn_upcall_mask)) ||
-            (is_hvm_vcpu(v) && cpu_has_pending_irq(v)));
+    return (is_hvm_vcpu(v) ? hvm_local_events_need_delivery(v) :
+            (vcpu_info(v, evtchn_upcall_pending) &&
+             !vcpu_info(v, evtchn_upcall_mask)));
 }
 
 static inline int local_event_delivery_is_enabled(void)

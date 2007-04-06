@@ -136,9 +136,6 @@ void cpu_reset(CPUX86State *env)
     int xcHandle;
     int sts;
 
-    /* pause domain first, to avoid repeated reboot request*/
-    xc_domain_pause(xc_handle, domid);
-
     xcHandle = xc_interface_open();
     if (xcHandle < 0)
         fprintf(logfile, "Cannot acquire xenctrl handle\n");
@@ -509,8 +506,11 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         cpu_ioreq_xchg(env, req);
         break;
     case IOREQ_TYPE_TIMEOFFSET:
-	cpu_ioreq_timeoffset(env, req);
-	break;
+        cpu_ioreq_timeoffset(env, req);
+        break;
+    case IOREQ_TYPE_INVALIDATE:
+        qemu_invalidate_map_cache();
+        break;
     default:
         hw_error("Invalid ioreq type 0x%x\n", req->type);
     }
@@ -597,6 +597,7 @@ int main_loop(void)
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
+    char qemu_file[20];
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
@@ -604,52 +605,23 @@ int main_loop(void)
 
     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
 
-    while (1) {
-        if (vm_running) {
-            if (shutdown_requested)
-                break;
-            if (reset_requested) {
-                qemu_system_reset();
-                reset_requested = 0;
-            }
-            if (suspend_requested) {
-                fprintf(logfile, "device model received suspend signal!\n");
-                break;
-            }
-        }
-
+    while (!(vm_running && suspend_requested))
         /* Wait up to 10 msec. */
         main_loop_wait(10);
-    }
-    if (!suspend_requested)
-        destroy_hvm_domain();
-    else {
-        char qemu_file[20];
-        ioreq_t *req;
-        int rc;
 
-        sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
-        xc_domain_pause(xc_handle, domid);
+    fprintf(logfile, "device model received suspend signal!\n");
 
-        /* Pull all outstanding ioreqs through the system */
-        handle_buffered_io(env);
-        main_loop_wait(1); /* For the select() on events */
-        
-        /* Stop the IDE thread */
-        ide_stop_dma_thread();
+    /* Pull all outstanding ioreqs through the system */
+    handle_buffered_io(env);
+    main_loop_wait(1); /* For the select() on events */
 
-        /* Make sure that all outstanding IO responses are handled too */ 
-        if ( xc_hvm_drain_io(xc_handle, domid) != 0 )
-        {
-            fprintf(stderr, "error clearing ioreq rings (%s)\n", 
-                    strerror(errno));
-            return -1;
-        }
+    /* Stop the IDE thread */
+    ide_stop_dma_thread();
 
-        /* Save the device state */
-        if (qemu_savevm(qemu_file) < 0)
-            fprintf(stderr, "qemu save fail.\n");
-    }
+    /* Save the device state */
+    sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
+    if (qemu_savevm(qemu_file) < 0)
+        fprintf(stderr, "qemu save fail.\n");
 
     return 0;
 }

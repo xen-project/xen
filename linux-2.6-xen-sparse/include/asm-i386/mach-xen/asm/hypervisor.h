@@ -122,7 +122,13 @@ void xen_destroy_contiguous_region(
 /* Turn jiffies into Xen system time. */
 u64 jiffies_to_st(unsigned long jiffies);
 
-#include <asm/hypercall.h>
+#ifdef CONFIG_XEN_SCRUB_PAGES
+#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
+#else
+#define scrub_pages(_p,_n) ((void)0)
+#endif
+
+#include <xen/hypercall.h>
 
 #if defined(CONFIG_X86_64)
 #define MULTI_UVMFLAGS_INDEX 2
@@ -140,7 +146,7 @@ HYPERVISOR_yield(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 #endif
@@ -154,7 +160,7 @@ HYPERVISOR_block(
 {
 	int rc = HYPERVISOR_sched_op(SCHEDOP_block, NULL);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_block, 0);
 #endif
@@ -172,7 +178,7 @@ HYPERVISOR_shutdown(
 
 	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
 #endif
@@ -192,7 +198,7 @@ HYPERVISOR_poll(
 	set_xen_guest_handle(sched_poll.ports, ports);
 
 	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 #endif

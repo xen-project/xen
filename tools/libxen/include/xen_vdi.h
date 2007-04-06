@@ -338,21 +338,6 @@ xen_vdi_remove_from_other_config(xen_session *session, xen_vdi vdi, char *key);
 
 
 /**
- * Take an exact copy of the VDI; the snapshot lives in the same
- * Storage Repository as its parent.
- */
-extern bool
-xen_vdi_snapshot(xen_session *session, xen_vdi *result, xen_vdi vdi);
-
-
-/**
- * Resize the vdi to the size.
- */
-extern bool
-xen_vdi_resize(xen_session *session, xen_vdi vdi, int64_t size);
-
-
-/**
  * Return a list of all the VDIs known to the system.
  */
 extern bool

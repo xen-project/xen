@@ -431,14 +431,8 @@ static inline int paddr_is_ram(target_phys_addr_t addr)
 {
     /* Is this guest physical address RAM-backed? */
 #if defined(CONFIG_DM) && (defined(__i386__) || defined(__x86_64__))
-    if (ram_size <= HVM_BELOW_4G_RAM_END)
-        /* RAM is contiguous */
-        return (addr < ram_size);
-    else
-        /* There is RAM below and above the MMIO hole */
-        return ((addr < HVM_BELOW_4G_MMIO_START) ||
-                ((addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH)
-                 && (addr < ram_size + HVM_BELOW_4G_MMIO_LENGTH)));
+    return ((addr < HVM_BELOW_4G_MMIO_START) ||
+            (addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH));
 #else
     return (addr < ram_size);
 #endif

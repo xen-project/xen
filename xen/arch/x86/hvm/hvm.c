@@ -131,7 +131,7 @@ void hvm_do_resume(struct vcpu *v)
         switch ( p->state )
         {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
-            hvm_io_assist(v);
+            hvm_io_assist();
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
@@ -144,48 +144,6 @@ void hvm_do_resume(struct vcpu *v)
             domain_crash_synchronous();
         }
     }
-}
-
-/* Called from the tools when saving a domain to make sure the io
- * request-response ring is entirely empty. */
-static int hvmop_drain_io(
-    XEN_GUEST_HANDLE(xen_hvm_drain_io_t) uop)
-{
-    struct xen_hvm_drain_io op;
-    struct domain *d;
-    struct vcpu *v;
-    ioreq_t *p;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    d = rcu_lock_domain_by_id(op.domid);
-    if ( d == NULL )
-        return -ESRCH;
-
-    rc = -EINVAL;
-    /* Can't do this to yourself, or to a domain without an ioreq ring */
-    if ( d == current->domain || !is_hvm_domain(d) || get_sp(d) == NULL )
-        goto out;
-
-    rc = 0;
-
-    domain_pause(d);  /* It's not safe to do this to running vcpus */
-    for_each_vcpu(d, v)
-    {
-        p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
-        if ( p->state == STATE_IORESP_READY )
-            hvm_io_assist(v);
-    }
-    domain_unpause(d);
-
- out:
-    rcu_unlock_domain(d);
-    return rc;
 }
 
 int hvm_domain_initialise(struct domain *d)
@@ -563,19 +521,13 @@ static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(hvm_op)
 };
 
-void hvm_do_hypercall(struct cpu_user_regs *pregs)
+static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    if ( unlikely(ring_3(pregs)) )
-    {
-        pregs->eax = -EPERM;
-        return;
-    }
-
     if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
     {
-        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %d.\n",
-                current->domain->domain_id, current->vcpu_id,
-                pregs->eax);
+        if ( pregs->eax != __HYPERVISOR_grant_table_op )
+            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %d.\n",
+                     current->domain->domain_id, current->vcpu_id, pregs->eax);
         pregs->eax = -ENOSYS;
         return;
     }
@@ -641,20 +593,14 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(event_channel_op)
 };
 
-void hvm_do_hypercall(struct cpu_user_regs *pregs)
+static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
 {
-    if ( unlikely(ring_3(pregs)) )
-    {
-        pregs->rax = -EPERM;
-        return;
-    }
-
     pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
     if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
     {
-        gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d did a bad hypercall %ld.\n",
-                current->domain->domain_id, current->vcpu_id,
-                pregs->rax);
+        if ( pregs->rax != __HYPERVISOR_grant_table_op )
+            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %ld.\n",
+                     current->domain->domain_id, current->vcpu_id, pregs->rax);
         pregs->rax = -ENOSYS;
         return;
     }
@@ -678,6 +624,37 @@ void hvm_do_hypercall(struct cpu_user_regs *pregs)
 }
 
 #endif /* defined(__x86_64__) */
+
+int hvm_do_hypercall(struct cpu_user_regs *pregs)
+{
+    int flush, preempted;
+    unsigned long old_eip;
+
+    if ( unlikely(ring_3(pregs)) )
+    {
+        pregs->eax = -EPERM;
+        return 0;
+    }
+
+    /*
+     * NB. In future flush only on decrease_reservation.
+     * For now we also need to flush when pages are added, as qemu-dm is not
+     * yet capable of faulting pages into an existing valid mapcache bucket.
+     */
+    flush = ((uint32_t)pregs->eax == __HYPERVISOR_memory_op);
+
+    /* Check for preemption: RIP will be modified from this dummy value. */
+    old_eip = pregs->eip;
+    pregs->eip = 0xF0F0F0FF;
+
+    __hvm_do_hypercall(pregs);
+
+    preempted = (pregs->eip != 0xF0F0F0FF);
+    pregs->eip = old_eip;
+
+    return (preempted ? HVM_HCALL_preempted :
+            flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
+}
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3)
 {
@@ -962,12 +939,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = hvmop_set_pci_link_route(
             guest_handle_cast(arg, xen_hvm_set_pci_link_route_t));
         break;
-
-    case HVMOP_drain_io:
-        rc = hvmop_drain_io(
-            guest_handle_cast(arg, xen_hvm_drain_io_t));
-        break;
-
 
     default:
     {

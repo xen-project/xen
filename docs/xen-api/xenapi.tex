@@ -1,5 +1,5 @@
 %
-% Copyright (c) 2006 XenSource, Inc.
+% Copyright (c) 2006-2007 XenSource, Inc.
 %
 % Permission is granted to copy, distribute and/or modify this document under
 % the terms of the GNU Free Documentation License, Version 1.2 or any later
@@ -17,6 +17,7 @@
 \usepackage{graphics}
 \usepackage{longtable}
 \usepackage{fancyhdr}
+\usepackage{multicol}
 
 \setlength\topskip{0cm}
 \setlength\topmargin{0cm}
@@ -40,17 +41,10 @@ This document contains a description of the Xen Management API---an interface fo
 remotely configuring and controlling virtualised guests running on a
 Xen-enabled host. 
 
-~
-
-{\bf \large This document is an early draft for discussion purposes only.}
-
-~
-
 \input{presentation}
 
 \include{wire-protocol}
 \include{vm-lifecycle}
-\include{todo}
 \include{xenapi-datamodel}
 \include{fdl}
 

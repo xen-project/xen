@@ -102,6 +102,9 @@ add_struct_value(const struct abstract_type *, void *,
                           const char *),
                  const char *, xmlNode *);
 
+static xmlNode *
+add_container(xmlNode *parent, const char *name);
+
 static void
 call_raw(xen_session *, const char *, abstract_value [], int,
          const abstract_type *, void *);
@@ -1289,6 +1292,48 @@ make_body_add_type(enum abstract_typename typename, abstract_value *v,
         }
     }
     break;
+
+    case MAP:
+    {
+        const struct struct_member *member = v->type->members;
+        arbitrary_map *map_val = v->u.struct_val;
+        xmlNode *param_node = add_param_struct(params_node);
+        for (size_t i = 0; i < map_val->size; i++) {
+            enum abstract_typename typename_key = member[0].type->typename;
+            enum abstract_typename typename_val = member[1].type->typename;
+            int offset_key = member[0].offset;
+            int offset_val = member[1].offset;
+            int struct_size = v->type->struct_size;
+
+            switch (typename_key) {
+            case STRING: {
+                char **addr = (void *)(map_val + 1) +
+                             (i * struct_size) +
+                             offset_key;
+                char *key = *addr;
+
+                switch (typename_val) {
+                case STRING: {
+                    char *val;
+                    addr = (void *)(map_val + 1) +
+                           (i * struct_size) +
+                           offset_val;
+                    val = *addr;
+                    add_struct_member(param_node, key, "string", val);
+                    break;
+                }
+                default:
+                    assert(false);
+                }
+                break;
+            }
+            default:
+                assert(false);
+            }
+        }
+    }
+    break;
+
 
     default:
         assert(false);
