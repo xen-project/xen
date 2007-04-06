@@ -96,6 +96,7 @@ unsigned int num_io_spaces;
 
 #ifdef XEN
 extern void early_cmdline_parse(char **);
+extern unsigned int ns16550_com1_gsi;
 #endif
 
 /*
@@ -358,7 +359,7 @@ acpi_oem_console_setup(void)
 	    (!strncmp(hdr->oem_table_id, "PQ", 2))){
 		ns16550_com1.baud = BAUD_AUTO;
 		ns16550_com1.io_base =	0x3f8;
-		ns16550_com1.irq = 48;
+		ns16550_com1.irq = ns16550_com1_gsi = 4;
 		return 0;
 	}
 
