@@ -284,7 +284,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Our mapping of the current region (batch) */
     char *region_base;
 
-    xc_mmu_t *mmu = NULL;
+    struct xc_mmu *mmu = NULL;
 
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
@@ -386,7 +386,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     for ( pfn = 0; pfn < p2m_size; pfn++ )
         p2m[pfn] = INVALID_P2M_ENTRY;
 
-    if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) {
+    mmu = xc_alloc_mmu_updates(xc_handle, dom);
+    if ( mmu == NULL )
+    {
         ERROR("Could not initialise for MMU updates");
         goto out;
     }
@@ -629,8 +631,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
      * Ensure we flush all machphys updates before potential PAE-specific
      * reallocations below.
      */
-    if (!hvm && xc_finish_mmu_updates(xc_handle, mmu)) {
-        ERROR("Error doing finish_mmu_updates()");
+    if (!hvm && xc_flush_mmu_updates(xc_handle, mmu)) {
+        ERROR("Error doing flush_mmu_updates()");
         goto out;
     }
 
@@ -810,8 +812,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             }
         }
 
-        if (xc_finish_mmu_updates(xc_handle, mmu)) {
-            ERROR("Error doing finish_mmu_updates()");
+        if (xc_flush_mmu_updates(xc_handle, mmu)) {
+            ERROR("Error doing xc_flush_mmu_updates()");
             goto out;
         }
     }

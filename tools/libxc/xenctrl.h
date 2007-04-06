@@ -666,21 +666,6 @@ int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl);
 
 int xc_version(int xc_handle, int cmd, void *arg);
 
-/*
- * MMU updates.
- */
-#define MAX_MMU_UPDATES 1024
-struct xc_mmu {
-    mmu_update_t updates[MAX_MMU_UPDATES];
-    int          idx;
-    domid_t      subject;
-};
-typedef struct xc_mmu xc_mmu_t;
-xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
-int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
-                   unsigned long long ptr, unsigned long long val);
-int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
-
 int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
 
 /*

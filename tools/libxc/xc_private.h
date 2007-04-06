@@ -168,4 +168,16 @@ void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(int fd, int flush);
 
+#define MAX_MMU_UPDATES 1024
+struct xc_mmu {
+    mmu_update_t updates[MAX_MMU_UPDATES];
+    int          idx;
+    domid_t      subject;
+};
+/* Structure returned by xc_alloc_mmu_updates must be free()'ed by caller. */
+struct xc_mmu *xc_alloc_mmu_updates(int xc_handle, domid_t dom);
+int xc_add_mmu_update(int xc_handle, struct xc_mmu *mmu,
+                   unsigned long long ptr, unsigned long long val);
+int xc_flush_mmu_updates(int xc_handle, struct xc_mmu *mmu);
+
 #endif /* __XC_PRIVATE_H__ */
