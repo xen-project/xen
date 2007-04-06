@@ -270,21 +270,6 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
-void show_xen_trace()
-{
-    struct cpu_user_regs regs;
-#ifdef __x86_64
-    __asm__("movq %%rsp,%0" : "=m" (regs.rsp));
-    __asm__("movq %%rbp,%0" : "=m" (regs.rbp));
-    __asm__("leaq 0(%%rip),%0" : "=a" (regs.rip));
-#else
-    __asm__("movl %%esp,%0" : "=m" (regs.esp));
-    __asm__("movl %%ebp,%0" : "=m" (regs.ebp));
-    __asm__("call 1f; 1: popl %0" : "=a" (regs.eip));
-#endif
-    show_trace(&regs);
-}
-
 void show_stack_overflow(unsigned int cpu, unsigned long esp)
 {
 #ifdef MEMORY_GUARD

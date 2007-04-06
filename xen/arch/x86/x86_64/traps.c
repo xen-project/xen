@@ -170,7 +170,8 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
            regs->r9,  regs->r10, regs->r11);
     printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
            regs->r12, regs->r13, regs->r14);
-    printk("r15: %016lx\n", regs->r15);
+    printk("r15: %016lx    cs: %016lx    ss: %016lx\n",
+           regs->r15, (long)regs->cs, (long)regs->ss);
     show_stack_overflow(cpu, regs->rsp);
 
     panic("DOUBLE FAULT -- system shutdown\n");
@@ -260,11 +261,14 @@ void __init percpu_traps_init(void)
         idt_table[TRAP_double_fault].a |= 1UL << 32; /* IST1 */
         idt_table[TRAP_nmi].a          |= 2UL << 32; /* IST2 */
 
-#ifdef CONFIG_COMPAT
-        /* The hypercall entry vector is only accessible from ring 1. */
+        /*
+         * The 32-on-64 hypercall entry vector is only accessible from ring 1.
+         * Also note that this is a trap gate, not an interrupt gate.
+         */
         _set_gate(idt_table+HYPERCALL_VECTOR, 15, 1, &compat_hypercall);
+
+        /* Fast trap for int80 (faster than taking the #GP-fixup path). */
         _set_gate(idt_table+0x80, 15, 3, &int80_direct_trap);
-#endif
     }
 
     stack_bottom = (char *)get_stack_bottom();

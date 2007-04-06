@@ -1245,9 +1245,6 @@ static unsigned int sh_set_allocation(struct domain *d,
             list_del(&sp->list);
             d->arch.paging.shadow.free_pages -= 1<<SHADOW_MAX_ORDER;
             d->arch.paging.shadow.total_pages -= 1<<SHADOW_MAX_ORDER;
-            for ( j = 0; j < 1<<SHADOW_MAX_ORDER; j++ ) 
-                /* Keep the page allocator happy */
-                ((struct page_info *)sp)[j].count_info = 0;
             free_domheap_pages((struct page_info *)sp, SHADOW_MAX_ORDER);
         }
 

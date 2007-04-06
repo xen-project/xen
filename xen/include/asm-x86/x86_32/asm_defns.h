@@ -8,9 +8,19 @@
 #define SETUP_EXCEPTION_FRAME_POINTER           \
         movl  %esp,%ebp;                        \
         notl  %ebp
+#define ASSERT_INTERRUPT_STATUS(x)              \
+        pushf;                                  \
+        testb $X86_EFLAGS_IF>>8,1(%esp);        \
+        j##x  1f;                               \
+        ud2a;                                   \
+1:      addl  $4,%esp;
 #else
 #define SETUP_EXCEPTION_FRAME_POINTER
+#define ASSERT_INTERRUPT_STATUS(x)
 #endif
+
+#define ASSERT_INTERRUPTS_ENABLED  ASSERT_INTERRUPT_STATUS(nz)
+#define ASSERT_INTERRUPTS_DISABLED ASSERT_INTERRUPT_STATUS(z)
 
 #define __SAVE_ALL_PRE                                  \
         cld;                                            \
