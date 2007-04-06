@@ -445,7 +445,19 @@ static void free_heap_pages(
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        BUG_ON(pg[i].count_info != 0);
+        /*
+         * Cannot assume that count_info == 0, as there are some corner cases
+         * where it isn't the case and yet it isn't a bug:
+         *  1. page_get_owner() is NULL
+         *  2. page_get_owner() is a domain that was never accessible by
+         *     its domid (e.g., failed to fully construct the domain).
+         *  3. page was never addressable by the guest (e.g., it's an
+         *     auto-translate-physmap guest and the page was never included
+         *     in its pseudophysical address space).
+         * In all the above cases there can be no guest mappings of this page.
+         */
+        pg[i].count_info = 0;
+
         if ( (d = page_get_owner(&pg[i])) != NULL )
         {
             pg[i].tlbflush_timestamp = tlbflush_current_time();
