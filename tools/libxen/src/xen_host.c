@@ -740,6 +740,23 @@ xen_host_dmesg(xen_session *session, char **result, xen_host host)
 
 
 bool
+xen_host_dmesg_clear(xen_session *session, char **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.dmesg_clear");
+    return session->ok;
+}
+
+
+bool
 xen_host_list_methods(xen_session *session, struct xen_string_set **result)
 {
 

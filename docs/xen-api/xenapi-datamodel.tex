@@ -4919,6 +4919,38 @@ dmesg string
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~dmesg\_clear}
+
+{\bf Overview:} 
+Get the host xen dmesg, and clear the buffer.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string dmesg_clear (session_id s, host ref host)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The Host to query \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+dmesg string
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~list\_methods}
 
 {\bf Overview:} 

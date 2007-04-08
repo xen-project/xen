@@ -414,7 +414,7 @@ xen_host_enable(xen_session *session, xen_host host);
 
 /**
  * Shutdown the host. (This function can only be called if there are no
- * currently running VMs on the host and it is disabled.)
+ * currently running VMs on the host and it is disabled.).
  */
 extern bool
 xen_host_shutdown(xen_session *session, xen_host host);
@@ -422,7 +422,7 @@ xen_host_shutdown(xen_session *session, xen_host host);
 
 /**
  * Reboot the host. (This function can only be called if there are no
- * currently running VMs on the host and it is disabled.)
+ * currently running VMs on the host and it is disabled.).
  */
 extern bool
 xen_host_reboot(xen_session *session, xen_host host);
@@ -433,6 +433,13 @@ xen_host_reboot(xen_session *session, xen_host host);
  */
 extern bool
 xen_host_dmesg(xen_session *session, char **result, xen_host host);
+
+
+/**
+ * Get the host xen dmesg, and clear the buffer.
+ */
+extern bool
+xen_host_dmesg_clear(xen_session *session, char **result, xen_host host);
 
 
 /**
