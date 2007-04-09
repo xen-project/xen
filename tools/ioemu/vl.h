@@ -161,21 +161,6 @@ extern FILE *logfile;
 
 #define MAPCACHE
 
-#if defined(__i386__) 
-#define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
-#define MCACHE_BUCKET_SHIFT 16
-#elif defined(__x86_64__)
-#define MAX_MCACHE_SIZE    0x1000000000 /* 64GB max for x86_64 */
-#define MCACHE_BUCKET_SHIFT 20
-#endif
-
-#define MCACHE_BUCKET_SIZE (1UL << MCACHE_BUCKET_SHIFT)
-
-struct map_cache {
-    unsigned long paddr_index;
-    uint8_t      *vaddr_base;
-};
-
 uint8_t *qemu_map_cache(target_phys_addr_t phys_addr);
 void     qemu_invalidate_map_cache(void);
 

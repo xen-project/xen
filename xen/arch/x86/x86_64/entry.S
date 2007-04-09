@@ -38,6 +38,7 @@ switch_to_kernel:
 
 /* %rbx: struct vcpu, interrupts disabled */
 restore_all_guest:
+        ASSERT_INTERRUPTS_DISABLED
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
         jz    iret_exit_to_guest
@@ -230,7 +231,7 @@ ENTRY(int80_direct_trap)
 
         /* Check that the callback is non-null. */
         leaq  VCPU_int80_bounce(%rbx),%rdx
-        cmp   $0, TRAPBOUNCE_flags(%rdx)
+        cmp   $0,TRAPBOUNCE_flags(%rdx)
         jz    int80_slow_path
 
         movq  VCPU_domain(%rbx),%rax
@@ -238,7 +239,7 @@ ENTRY(int80_direct_trap)
         jnz   compat_int80_direct_trap
 
         call  create_bounce_frame
-        jmp   restore_all_guest
+        jmp   test_all_events
 
 int80_slow_path:
         /* 
@@ -256,6 +257,7 @@ int80_slow_path:
 /* %rdx: trap_bounce, %rbx: struct vcpu                           */
 /* On return only %rbx is guaranteed non-clobbered.                      */
 create_bounce_frame:
+        ASSERT_INTERRUPTS_ENABLED
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jnz   1f
         /* Push new frame at registered guest-OS stack base. */

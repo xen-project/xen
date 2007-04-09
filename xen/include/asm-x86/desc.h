@@ -106,7 +106,7 @@
     ((((sel)>>3) < FIRST_RESERVED_GDT_ENTRY) || /* Guest seg? */        \
      ((sel) == (!IS_COMPAT(d) ?                                         \
                 FLAT_KERNEL_CS :                /* Xen default seg? */  \
-                FLAT_COMPAT_KERNEL_CS)) ||      /* Xen default compat seg? */  \
+                FLAT_COMPAT_KERNEL_CS)) ||                              \
      ((sel) & 4))                               /* LDT seg? */
 
 #endif /* __ASSEMBLY__ */

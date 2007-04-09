@@ -2413,7 +2413,7 @@ x86_emulate(
     goto writeback;
 
  cannot_emulate:
-#ifdef __XEN__
+#if 0
     gdprintk(XENLOG_DEBUG, "Instr:");
     for ( ea.mem.off = ctxt->regs->eip; ea.mem.off < _regs.eip; ea.mem.off++ )
     {

@@ -283,6 +283,7 @@ bad_hypercall:
 /* %edx == trap_bounce, %ebx == struct vcpu                       */
 /* %eax,%ecx are clobbered. %gs:%esi contain new UREGS_ss/UREGS_esp. */
 create_bounce_frame:
+        ASSERT_INTERRUPTS_ENABLED
         movl UREGS_eflags+4(%esp),%ecx
         movb UREGS_cs+4(%esp),%cl
         testl $(2|X86_EFLAGS_VM),%ecx

@@ -62,17 +62,17 @@ read_exact(int fd, void *buf, size_t count)
     int r = 0, s;
     unsigned char *b = buf;
 
-    while (r < count) {
+    while ( r < count )
+    {
         s = read(fd, &b[r], count - r);
-        if ((s == -1) && (errno == EINTR))
+        if ( (s == -1) && (errno == EINTR) )
             continue;
-        if (s <= 0) {
+        if ( s <= 0 )
             break;
-        }
         r += s;
     }
 
-    return (r == count) ? 1 : 0;
+    return (r == count);
 }
 
 /*
@@ -93,20 +93,21 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
     pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
 
     /* First pass: work out how many (if any) MFNs we need to alloc */
-    for(i = 0; i < pte_last; i++) {
-        
-        if(pt_levels == 2)
+    for ( i = 0; i < pte_last; i++ )
+    {
+        if ( pt_levels == 2 )
             pte = ((uint32_t *)page)[i];
         else
             pte = ((uint64_t *)page)[i];
-        
+
         /* XXX SMH: below needs fixing for PROT_NONE etc */
-        if(!(pte & _PAGE_PRESENT))
-            continue; 
+        if ( !(pte & _PAGE_PRESENT) )
+            continue;
         
         pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
         
-        if(pfn >= p2m_size) {
+        if ( pfn >= p2m_size )
+        {
             /* This "page table page" is probably not one; bail. */
             ERROR("Frame number in type %lu page table is out of range: "
                   "i=%d pfn=0x%lx p2m_size=%lu",
@@ -114,16 +115,18 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
             return 0;
         }
         
-        if(p2m[pfn] == INVALID_P2M_ENTRY) {
+        if ( p2m[pfn] == INVALID_P2M_ENTRY )
+        {
             /* Have a 'valid' PFN without a matching MFN - need to alloc */
             p2m_batch[nr_mfns++] = pfn; 
         }
     }
-    
-    
-    /* Allocate the requistite number of mfns */
-    if (nr_mfns && xc_domain_memory_populate_physmap(
-            xc_handle, dom, nr_mfns, 0, 0, p2m_batch) != 0) { 
+
+    /* Allocate the requisite number of mfns. */
+    if ( nr_mfns &&
+         (xc_domain_memory_populate_physmap(xc_handle, dom, nr_mfns, 0, 0,
+                                            p2m_batch) != 0) )
+    { 
         ERROR("Failed to allocate memory for batch.!\n"); 
         errno = ENOMEM;
         return 0; 
@@ -131,26 +134,26 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
     
     /* Second pass: uncanonicalize each present PTE */
     nr_mfns = 0;
-    for(i = 0; i < pte_last; i++) {
-
-        if(pt_levels == 2)
+    for ( i = 0; i < pte_last; i++ )
+    {
+        if ( pt_levels == 2 )
             pte = ((uint32_t *)page)[i];
         else
             pte = ((uint64_t *)page)[i];
         
         /* XXX SMH: below needs fixing for PROT_NONE etc */
-        if(!(pte & _PAGE_PRESENT))
+        if ( !(pte & _PAGE_PRESENT) )
             continue;
         
         pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
         
-        if(p2m[pfn] == INVALID_P2M_ENTRY)
+        if ( p2m[pfn] == INVALID_P2M_ENTRY )
             p2m[pfn] = p2m_batch[nr_mfns++];
 
         pte &= ~MADDR_MASK_X86;
         pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
 
-        if(pt_levels == 2)
+        if ( pt_levels == 2 )
             ((uint32_t *)page)[i] = (uint32_t)pte;
         else
             ((uint64_t *)page)[i] = (uint64_t)pte;
@@ -161,62 +164,72 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 
 
 /* Load the p2m frame list, plus potential extended info chunk */
-static xen_pfn_t * load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
+static xen_pfn_t *load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
 {
     xen_pfn_t *p2m_frame_list;
     vcpu_guest_context_t ctxt;
 
-    if (!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
+    if ( (p2m_frame_list = malloc(P2M_FL_SIZE)) == NULL )
+    {
         ERROR("Couldn't allocate p2m_frame_list array");
         return NULL;
     }
     
     /* Read first entry of P2M list, or extended-info signature (~0UL). */
-    if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
-            ERROR("read extended-info signature failed");
-            return NULL;
-        }
+    if ( !read_exact(io_fd, p2m_frame_list, sizeof(long)) )
+    {
+        ERROR("read extended-info signature failed");
+        return NULL;
+    }
     
-    if (p2m_frame_list[0] == ~0UL) {
+    if ( p2m_frame_list[0] == ~0UL )
+    {
         uint32_t tot_bytes;
         
         /* Next 4 bytes: total size of following extended info. */
-        if (!read_exact(io_fd, &tot_bytes, sizeof(tot_bytes))) {
+        if ( !read_exact(io_fd, &tot_bytes, sizeof(tot_bytes)) )
+        {
             ERROR("read extended-info size failed");
             return NULL;
         }
         
-        while (tot_bytes) {
+        while ( tot_bytes )
+        {
             uint32_t chunk_bytes;
             char     chunk_sig[4];
             
             /* 4-character chunk signature + 4-byte remaining chunk size. */
-            if (!read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
-                !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes))) {
+            if ( !read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
+                 !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes)) )
+            {
                 ERROR("read extended-info chunk signature failed");
                 return NULL;
             }
             tot_bytes -= 8;
-            
+
             /* VCPU context structure? */
-            if (!strncmp(chunk_sig, "vcpu", 4)) {
-                if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
+            if ( !strncmp(chunk_sig, "vcpu", 4) )
+            {
+                if ( !read_exact(io_fd, &ctxt, sizeof(ctxt)) )
+                {
                     ERROR("read extended-info vcpu context failed");
                     return NULL;
                 }
                 tot_bytes   -= sizeof(struct vcpu_guest_context);
                 chunk_bytes -= sizeof(struct vcpu_guest_context);
                 
-                if (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3))
+                if ( ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3) )
                     *pae_extended_cr3 = 1;
             }
             
             /* Any remaining bytes of this chunk: read and discard. */
-            while (chunk_bytes) {
+            while ( chunk_bytes )
+            {
                 unsigned long sz = chunk_bytes;
                 if ( sz > P2M_FL_SIZE )
                     sz = P2M_FL_SIZE;
-                if (!read_exact(io_fd, p2m_frame_list, sz)) {
+                if ( !read_exact(io_fd, p2m_frame_list, sz) )
+                {
                     ERROR("read-and-discard extended-info chunk bytes failed");
                     return NULL;
                 }
@@ -224,24 +237,24 @@ static xen_pfn_t * load_p2m_frame_list(int io_fd, int *pae_extended_cr3)
                 tot_bytes   -= sz;
             }
         }
-        
+
         /* Now read the real first entry of P2M list. */
-        if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
+        if ( !read_exact(io_fd, p2m_frame_list, sizeof(long)) )
+        {
             ERROR("read first entry of p2m_frame_list failed");
             return NULL;
         }
     }
-    
+
     /* First entry is already read into the p2m array. */
-    if (!read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long))) {
-            ERROR("read p2m_frame_list failed");
-            return NULL;
+    if ( !read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long)) )
+    {
+        ERROR("read p2m_frame_list failed");
+        return NULL;
     }
     
     return p2m_frame_list;
 }
-
-
 
 int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
@@ -284,7 +297,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Our mapping of the current region (batch) */
     char *region_base;
 
-    xc_mmu_t *mmu = NULL;
+    struct xc_mmu *mmu = NULL;
 
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
@@ -323,20 +336,23 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         domctl.cmd    = XEN_DOMCTL_set_address_size;
         domctl.u.address_size.size = sizeof(unsigned long) * 8;
         rc = do_domctl(xc_handle, &domctl);
-        if ( rc != 0 ) {
+        if ( rc != 0 )
+        {
             ERROR("Unable to set guest address size.");
             goto out;
         }
         rc = 1;
     }
 
-    if(!get_platform_info(xc_handle, dom,
-                          &max_mfn, &hvirt_start, &pt_levels)) {
+    if ( !get_platform_info(xc_handle, dom,
+                            &max_mfn, &hvirt_start, &pt_levels) )
+    {
         ERROR("Unable to get platform info.");
         return 1;
     }
 
-    if (lock_pages(&ctxt, sizeof(ctxt))) {
+    if ( lock_pages(&ctxt, sizeof(ctxt)) )
+    {
         /* needed for build domctl, but might as well do early */
         ERROR("Unable to lock ctxt");
         return 1;
@@ -356,19 +372,22 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
     p2m_batch  = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
 
-    if ((p2m == NULL) || (pfn_type == NULL) ||
-        (region_mfn == NULL) || (p2m_batch == NULL)) {
+    if ( (p2m == NULL) || (pfn_type == NULL) ||
+         (region_mfn == NULL) || (p2m_batch == NULL) )
+    {
         ERROR("memory alloc failed");
         errno = ENOMEM;
         goto out;
     }
 
-    if (lock_pages(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
+    if ( lock_pages(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
+    {
         ERROR("Could not lock region_mfn");
         goto out;
     }
 
-    if (lock_pages(p2m_batch, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
+    if ( lock_pages(p2m_batch, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
+    {
         ERROR("Could not lock p2m_batch");
         goto out;
     }
@@ -376,7 +395,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Get the domain's shared-info frame. */
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)dom;
-    if (xc_domctl(xc_handle, &domctl) < 0) {
+    if ( xc_domctl(xc_handle, &domctl) < 0 )
+    {
         ERROR("Could not get information on new domain");
         goto out;
     }
@@ -386,7 +406,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     for ( pfn = 0; pfn < p2m_size; pfn++ )
         p2m[pfn] = INVALID_P2M_ENTRY;
 
-    if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) {
+    mmu = xc_alloc_mmu_updates(xc_handle, dom);
+    if ( mmu == NULL )
+    {
         ERROR("Could not initialise for MMU updates");
         goto out;
     }
@@ -400,8 +422,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     prev_pc = 0;
 
     n = m = 0;
-    while (1) {
-
+    for ( ; ; )
+    {
         int j, nr_mfns = 0; 
 
         this_pc = (n * 100) / p2m_size;
@@ -411,39 +433,45 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             prev_pc = this_pc;
         }
 
-        if (!read_exact(io_fd, &j, sizeof(int))) {
+        if ( !read_exact(io_fd, &j, sizeof(int)) )
+        {
             ERROR("Error when reading batch size");
             goto out;
         }
 
         PPRINTF("batch %d\n",j);
 
-        if (j == -1) {
+        if ( j == -1 )
+        {
             verify = 1;
             DPRINTF("Entering page verify mode\n");
             continue;
         }
 
-        if (j == -2) {
+        if ( j == -2 )
+        {
             new_ctxt_format = 1;
-            if (!read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
-                (max_vcpu_id >= 64) ||
-                !read_exact(io_fd, &vcpumap, sizeof(uint64_t))) {
+            if ( !read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
+                 (max_vcpu_id >= 64) ||
+                 !read_exact(io_fd, &vcpumap, sizeof(uint64_t)) )
+            {
                 ERROR("Error when reading max_vcpu_id");
                 goto out;
             }
             continue;
         }
 
-        if (j == 0)
+        if ( j == 0 )
             break;  /* our work here is done */
 
-        if (j > MAX_BATCH_SIZE) {
+        if ( j > MAX_BATCH_SIZE )
+        {
             ERROR("Max batch size exceeded. Giving up.");
             goto out;
         }
 
-        if (!read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long))) {
+        if ( !read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long)) )
+        {
             ERROR("Error when reading region pfn types");
             goto out;
         }
@@ -464,10 +492,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             }
         } 
 
-
         /* Now allocate a bunch of mfns for this batch */
-        if (nr_mfns && xc_domain_memory_populate_physmap(
-                xc_handle, dom, nr_mfns, 0, 0, p2m_batch) != 0) { 
+        if ( nr_mfns &&
+             (xc_domain_memory_populate_physmap(xc_handle, dom, nr_mfns, 0,
+                                                0, p2m_batch) != 0) )
+        { 
             ERROR("Failed to allocate memory for batch.!\n"); 
             errno = ENOMEM;
             goto out;
@@ -481,11 +510,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
             pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
-            if ( pagetype == XEN_DOMCTL_PFINFO_XTAB)
+            if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
                 region_mfn[i] = ~0UL; /* map will fail but we don't care */
             else 
             {
-                if (p2m[pfn] == INVALID_P2M_ENTRY) {
+                if ( p2m[pfn] == INVALID_P2M_ENTRY )
+                {
                     /* We just allocated a new mfn above; update p2m */
                     p2m[pfn] = p2m_batch[nr_mfns++]; 
                     nr_pfns++; 
@@ -532,7 +562,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             /* In verify mode, we use a copy; otherwise we work in place */
             page = verify ? (void *)buf : (region_base + i*PAGE_SIZE);
 
-            if (!read_exact(io_fd, page, PAGE_SIZE)) {
+            if ( !read_exact(io_fd, page, PAGE_SIZE) )
+            {
                 ERROR("Error when reading page (type was %lx)", pagetype);
                 goto out;
             }
@@ -577,13 +608,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
             }
 
-
-            if (verify) {
-
+            if ( verify )
+            {
                 int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE);
-
-                if (res) {
-
+                if ( res )
+                {
                     int v;
 
                     DPRINTF("************** pfn=%lx type=%lx gotcs=%08lx "
@@ -591,20 +620,21 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                             csum_page(region_base + i*PAGE_SIZE),
                             csum_page(buf));
 
-                    for (v = 0; v < 4; v++) {
-
+                    for ( v = 0; v < 4; v++ )
+                    {
                         unsigned long *p = (unsigned long *)
                             (region_base + i*PAGE_SIZE);
-                        if (buf[v] != p[v])
+                        if ( buf[v] != p[v] )
                             DPRINTF("    %d: %08lx %08lx\n", v, buf[v], p[v]);
                     }
                 }
             }
 
-            if (!hvm 
-                && xc_add_mmu_update(xc_handle, mmu,
-                                     (((unsigned long long)mfn) << PAGE_SHIFT)
-                                     | MMU_MACHPHYS_UPDATE, pfn)) {
+            if ( !hvm &&
+                 xc_add_mmu_update(xc_handle, mmu,
+                                   (((unsigned long long)mfn) << PAGE_SHIFT)
+                                   | MMU_MACHPHYS_UPDATE, pfn) )
+            {
                 ERROR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
                 goto out;
             }
@@ -629,8 +659,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
      * Ensure we flush all machphys updates before potential PAE-specific
      * reallocations below.
      */
-    if (!hvm && xc_finish_mmu_updates(xc_handle, mmu)) {
-        ERROR("Error doing finish_mmu_updates()");
+    if ( !hvm && xc_flush_mmu_updates(xc_handle, mmu) )
+    {
+        ERROR("Error doing flush_mmu_updates()");
         goto out;
     }
 
@@ -664,9 +695,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         *store_mfn = magic_pfns[2];
 
         /* Read vcpu contexts */
-        for (i = 0; i <= max_vcpu_id; i++) 
+        for ( i = 0; i <= max_vcpu_id; i++ )
         {
-            if (!(vcpumap & (1ULL << i)))
+            if ( !(vcpumap & (1ULL << i)) )
                 continue;
 
             if ( !read_exact(io_fd, &(ctxt), sizeof(ctxt)) )
@@ -713,8 +744,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Non-HVM guests only from here on */
 
-    if ((pt_levels == 3) && !pae_extended_cr3) {
-
+    if ( (pt_levels == 3) && !pae_extended_cr3 )
+    {
         /*
         ** XXX SMH on PAE we need to ensure PGDs are in MFNs < 4G. This
         ** is a little awkward and involves (a) finding all such PGDs and
@@ -744,21 +775,24 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                     xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                          PROT_READ, p2m[i]);
 
-                for(j = 0; j < 4; j++)
+                for ( j = 0; j < 4; j++ )
                     l3ptes[j] = l3tab[j];
 
                 munmap(l3tab, PAGE_SIZE);
 
-                if (!(new_mfn=xc_make_page_below_4G(xc_handle, dom, p2m[i]))) {
+                new_mfn = xc_make_page_below_4G(xc_handle, dom, p2m[i]);
+                if ( !new_mfn )
+                {
                     ERROR("Couldn't get a page below 4GB :-(");
                     goto out;
                 }
 
                 p2m[i] = new_mfn;
-                if (xc_add_mmu_update(xc_handle, mmu,
-                                      (((unsigned long long)new_mfn)
-                                       << PAGE_SHIFT) |
-                                      MMU_MACHPHYS_UPDATE, i)) {
+                if ( xc_add_mmu_update(xc_handle, mmu,
+                                       (((unsigned long long)new_mfn)
+                                        << PAGE_SHIFT) |
+                                       MMU_MACHPHYS_UPDATE, i) )
+                {
                     ERROR("Couldn't m2p on PAE root pgdir");
                     goto out;
                 }
@@ -767,11 +801,10 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                     xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                          PROT_READ | PROT_WRITE, p2m[i]);
 
-                for(j = 0; j < 4; j++)
+                for ( j = 0; j < 4; j++ )
                     l3tab[j] = l3ptes[j];
 
                 munmap(l3tab, PAGE_SIZE);
-
             }
         }
 
@@ -787,19 +820,22 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 j++;
             }
 
-            if(i == (p2m_size-1) || j == MAX_BATCH_SIZE) {
-
-                if (!(region_base = xc_map_foreign_batch(
-                          xc_handle, dom, PROT_READ | PROT_WRITE,
-                          region_mfn, j))) {
+            if ( (i == (p2m_size-1)) || (j == MAX_BATCH_SIZE) )
+            {
+                region_base = xc_map_foreign_batch(
+                    xc_handle, dom, PROT_READ | PROT_WRITE, region_mfn, j);
+                if ( region_base == NULL )
+                {
                     ERROR("map batch failed");
                     goto out;
                 }
 
-                for(k = 0; k < j; k++) {
-                    if(!uncanonicalize_pagetable(xc_handle, dom, 
-                                                 XEN_DOMCTL_PFINFO_L1TAB,
-                                                 region_base + k*PAGE_SIZE)) {
+                for ( k = 0; k < j; k++ )
+                {
+                    if ( !uncanonicalize_pagetable(
+                        xc_handle, dom, XEN_DOMCTL_PFINFO_L1TAB,
+                        region_base + k*PAGE_SIZE) )
+                    {
                         ERROR("failed uncanonicalize pt!");
                         goto out;
                     }
@@ -810,8 +846,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             }
         }
 
-        if (xc_finish_mmu_updates(xc_handle, mmu)) {
-            ERROR("Error doing finish_mmu_updates()");
+        if ( xc_flush_mmu_updates(xc_handle, mmu) )
+        {
+            ERROR("Error doing xc_flush_mmu_updates()");
             goto out;
         }
     }
@@ -852,8 +889,10 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         nr_pins++;
 
         /* Batch full? Then flush. */
-        if (nr_pins == MAX_PIN_BATCH) {
-            if (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) {
+        if ( nr_pins == MAX_PIN_BATCH )
+        {
+            if ( xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )
+            {
                 ERROR("Failed to pin batch of %d page tables", nr_pins);
                 goto out;
             }
@@ -862,7 +901,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Flush final partial batch. */
-    if ((nr_pins != 0) && (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0)) {
+    if ( (nr_pins != 0) && (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) )
+    {
         ERROR("Failed to pin batch of %d page tables", nr_pins);
         goto out;
     }
@@ -876,36 +916,40 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         unsigned long *pfntab;
         int nr_frees, rc;
 
-        if (!read_exact(io_fd, &count, sizeof(count))) {
+        if ( !read_exact(io_fd, &count, sizeof(count)) )
+        {
             ERROR("Error when reading pfn count");
             goto out;
         }
 
-        if(!(pfntab = malloc(sizeof(unsigned long) * count))) {
+        if ( !(pfntab = malloc(sizeof(unsigned long) * count)) )
+        {
             ERROR("Out of memory");
             goto out;
         }
 
-        if (!read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) {
+        if ( !read_exact(io_fd, pfntab, sizeof(unsigned long)*count) )
+        {
             ERROR("Error when reading pfntab");
             goto out;
         }
 
         nr_frees = 0; 
-        for (i = 0; i < count; i++) {
-
+        for ( i = 0; i < count; i++ )
+        {
             unsigned long pfn = pfntab[i];
 
-            if(p2m[pfn] != INVALID_P2M_ENTRY) {
+            if ( p2m[pfn] != INVALID_P2M_ENTRY )
+            {
                 /* pfn is not in physmap now, but was at some point during 
                    the save/migration process - need to free it */
                 pfntab[nr_frees++] = p2m[pfn];
-                p2m[pfn]  = INVALID_P2M_ENTRY; // not in pseudo-physical map
+                p2m[pfn]  = INVALID_P2M_ENTRY; /* not in pseudo-physical map */
             }
         }
 
-        if (nr_frees > 0) {
-
+        if ( nr_frees > 0 )
+        {
             struct xen_memory_reservation reservation = {
                 .nr_extents   = nr_frees,
                 .extent_order = 0,
@@ -913,20 +957,24 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             };
             set_xen_guest_handle(reservation.extent_start, pfntab);
 
-            if ((rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
-                                   &reservation)) != nr_frees) {
+            if ( (rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
+                                    &reservation)) != nr_frees )
+            {
                 ERROR("Could not decrease reservation : %d", rc);
                 goto out;
-            } else
+            }
+            else
                 DPRINTF("Decreased reservation by %d pages\n", count);
         }
     }
 
-    for (i = 0; i <= max_vcpu_id; i++) {
-        if (!(vcpumap & (1ULL << i)))
+    for ( i = 0; i <= max_vcpu_id; i++ )
+    {
+        if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
+        if ( !read_exact(io_fd, &ctxt, sizeof(ctxt)) )
+        {
             ERROR("Error when reading ctxt %d", i);
             goto out;
         }
@@ -934,14 +982,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         if ( !new_ctxt_format )
             ctxt.flags |= VGCF_online;
 
-        if (i == 0) {
+        if ( i == 0 )
+        {
             /*
              * Uncanonicalise the suspend-record frame number and poke
              * resume record.
              */
             pfn = ctxt.user_regs.edx;
-            if ((pfn >= p2m_size) ||
-                (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
+            if ( (pfn >= p2m_size) ||
+                 (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
+            {
                 ERROR("Suspend record frame number is bad");
                 goto out;
             }
@@ -960,15 +1010,18 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         }
 
         /* Uncanonicalise each GDT frame number. */
-        if (ctxt.gdt_ents > 8192) {
+        if ( ctxt.gdt_ents > 8192 )
+        {
             ERROR("GDT entry count out of range");
             goto out;
         }
 
-        for (j = 0; (512*j) < ctxt.gdt_ents; j++) {
+        for ( j = 0; (512*j) < ctxt.gdt_ents; j++ )
+        {
             pfn = ctxt.gdt_frames[j];
-            if ((pfn >= p2m_size) ||
-                (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
+            if ( (pfn >= p2m_size) ||
+                 (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
+            {
                 ERROR("GDT frame number is bad");
                 goto out;
             }
@@ -978,14 +1031,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         /* Uncanonicalise the page table base pointer. */
         pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
 
-        if (pfn >= p2m_size) {
+        if ( pfn >= p2m_size )
+        {
             ERROR("PT base is bad: pfn=%lu p2m_size=%lu type=%08lx",
                   pfn, p2m_size, pfn_type[pfn]);
             goto out;
         }
 
         if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-             ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
+             ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
+        {
             ERROR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
                   pfn, p2m_size, pfn_type[pfn],
                   (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
@@ -999,14 +1054,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         {
             pfn = xen_cr3_to_pfn(ctxt.ctrlreg[1]);
 
-            if (pfn >= p2m_size) {
+            if ( pfn >= p2m_size )
+            {
                 ERROR("User PT base is bad: pfn=%lu p2m_size=%lu type=%08lx",
                       pfn, p2m_size, pfn_type[pfn]);
                 goto out;
             }
 
             if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-                 ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) ) {
+                 ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
+            {
                 ERROR("User PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
                       pfn, p2m_size, pfn_type[pfn],
                       (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
@@ -1021,14 +1078,16 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         domctl.u.vcpucontext.vcpu = i;
         set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
         rc = xc_domctl(xc_handle, &domctl);
-        if (rc != 0) {
+        if ( rc != 0 )
+        {
             ERROR("Couldn't build vcpu%d", i);
             goto out;
         }
         rc = 1;
     }
 
-    if (!read_exact(io_fd, shared_info_page, PAGE_SIZE)) {
+    if ( !read_exact(io_fd, shared_info_page, PAGE_SIZE) )
+    {
         ERROR("Error when reading shared info page");
         goto out;
     }
@@ -1046,9 +1105,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     munmap(page, PAGE_SIZE);
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
-    for (i = 0; i < P2M_FL_ENTRIES; i++) {
+    for ( i = 0; i < P2M_FL_ENTRIES; i++ )
+    {
         pfn = p2m_frame_list[i];
-        if ((pfn >= p2m_size) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB)) {
+        if ( (pfn >= p2m_size) || (pfn_type[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
+        {
             ERROR("PFN-to-MFN frame number is bad");
             goto out;
         }
@@ -1057,8 +1118,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Copy the P2M we've constructed to the 'live' P2M */
-    if (!(live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
-                                          p2m_frame_list, P2M_FL_ENTRIES))) {
+    if ( !(live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
+                                           p2m_frame_list, P2M_FL_ENTRIES)) )
+    {
         ERROR("Couldn't map p2m table");
         goto out;
     }

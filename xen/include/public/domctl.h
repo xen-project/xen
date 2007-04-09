@@ -123,15 +123,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 #define XEN_DOMCTL_getpageframeinfo   7
 
 #define XEN_DOMCTL_PFINFO_LTAB_SHIFT 28
-#define XEN_DOMCTL_PFINFO_NOTAB   (0x0<<28)
-#define XEN_DOMCTL_PFINFO_L1TAB   (0x1<<28)
-#define XEN_DOMCTL_PFINFO_L2TAB   (0x2<<28)
-#define XEN_DOMCTL_PFINFO_L3TAB   (0x3<<28)
-#define XEN_DOMCTL_PFINFO_L4TAB   (0x4<<28)
-#define XEN_DOMCTL_PFINFO_LTABTYPE_MASK (0x7<<28)
-#define XEN_DOMCTL_PFINFO_LPINTAB (0x1<<31)
-#define XEN_DOMCTL_PFINFO_XTAB    (0xf<<28) /* invalid page */
-#define XEN_DOMCTL_PFINFO_LTAB_MASK (0xf<<28)
+#define XEN_DOMCTL_PFINFO_NOTAB   (0x0U<<28)
+#define XEN_DOMCTL_PFINFO_L1TAB   (0x1U<<28)
+#define XEN_DOMCTL_PFINFO_L2TAB   (0x2U<<28)
+#define XEN_DOMCTL_PFINFO_L3TAB   (0x3U<<28)
+#define XEN_DOMCTL_PFINFO_L4TAB   (0x4U<<28)
+#define XEN_DOMCTL_PFINFO_LTABTYPE_MASK (0x7U<<28)
+#define XEN_DOMCTL_PFINFO_LPINTAB (0x1U<<31)
+#define XEN_DOMCTL_PFINFO_XTAB    (0xfU<<28) /* invalid page */
+#define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
 
 struct xen_domctl_getpageframeinfo {
     /* IN variables. */

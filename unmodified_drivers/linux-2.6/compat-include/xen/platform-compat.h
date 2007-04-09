@@ -96,6 +96,10 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 #define handle_sysrq(x,y,z) handle_sysrq(x,y)
 #endif
 
+#if defined(_PAGE_PRESENT) && !defined(_PAGE_NX)
+#define _PAGE_NX 0
+#endif
+
 /*
  * This variable at present is referenced by netfront, but only in code that
  * is dead when running in hvm guests. To detect potential active uses of it

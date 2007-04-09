@@ -128,11 +128,9 @@ char *logfilename = "/tmp/qemu.log";
 FILE *logfile;
 int loglevel;
 
-
 #ifdef MAPCACHE
 pthread_mutex_t mapcache_mutex;
 #endif
-
 
 void cpu_exec_init(CPUState *env)
 {
@@ -427,21 +425,10 @@ int iomem_index(target_phys_addr_t addr)
         return 0;
 }
 
-static inline int paddr_is_ram(target_phys_addr_t addr)
-{
-    /* Is this guest physical address RAM-backed? */
-#if defined(CONFIG_DM) && (defined(__i386__) || defined(__x86_64__))
-    return ((addr < HVM_BELOW_4G_MMIO_START) ||
-            (addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH));
-#else
-    return (addr < ram_size);
-#endif
-}
-
 #if defined(__i386__) || defined(__x86_64__)
 #define phys_ram_addr(x) (qemu_map_cache(x))
 #elif defined(__ia64__)
-#define phys_ram_addr(x) (phys_ram_base + (x))
+#define phys_ram_addr(x) ((addr < ram_size) ? (phys_ram_base + (x)) : NULL)
 #endif
 
 extern unsigned long *logdirty_bitmap;
@@ -481,16 +468,15 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);
                     l = 1;
                 }
-            } else if (paddr_is_ram(addr)) {
+            } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                 /* Writing to RAM */
-                ptr = phys_ram_addr(addr);
                 memcpy(ptr, buf, l);
                 if (logdirty_bitmap != NULL) {
                     /* Record that we have dirtied this frame */
                     unsigned long pfn = addr >> TARGET_PAGE_BITS;
                     if (pfn / 8 >= logdirty_bitmap_size) {
-                        fprintf(logfile, "dirtying pfn %x >= bitmap size %x\n",
-                                pfn, logdirty_bitmap_size * 8);
+                        fprintf(logfile, "dirtying pfn %lx >= bitmap "
+                                "size %lx\n", pfn, logdirty_bitmap_size * 8);
                     } else {
                         logdirty_bitmap[pfn / HOST_LONG_BITS]
                             |= 1UL << pfn % HOST_LONG_BITS;
@@ -518,9 +504,8 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     stb_raw(buf, val);
                     l = 1;
                 }
-            } else if (paddr_is_ram(addr)) {
+            } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                 /* Reading from RAM */
-                ptr = phys_ram_addr(addr);
                 memcpy(buf, ptr, l);
             } else {
                 /* Neither RAM nor known MMIO space */

@@ -145,7 +145,7 @@ int xc_mmuext_op(
     return ret;
 }
 
-static int flush_mmu_updates(int xc_handle, xc_mmu_t *mmu)
+static int flush_mmu_updates(int xc_handle, struct xc_mmu *mmu)
 {
     int err = 0;
     DECLARE_HYPERCALL;
@@ -180,9 +180,9 @@ static int flush_mmu_updates(int xc_handle, xc_mmu_t *mmu)
     return err;
 }
 
-xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
+struct xc_mmu *xc_alloc_mmu_updates(int xc_handle, domid_t dom)
 {
-    xc_mmu_t *mmu = malloc(sizeof(xc_mmu_t));
+    struct xc_mmu *mmu = malloc(sizeof(*mmu));
     if ( mmu == NULL )
         return mmu;
     mmu->idx     = 0;
@@ -190,7 +190,7 @@ xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
     return mmu;
 }
 
-int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
+int xc_add_mmu_update(int xc_handle, struct xc_mmu *mmu,
                       unsigned long long ptr, unsigned long long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
@@ -202,7 +202,7 @@ int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
     return 0;
 }
 
-int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu)
+int xc_flush_mmu_updates(int xc_handle, struct xc_mmu *mmu)
 {
     return flush_mmu_updates(xc_handle, mmu);
 }

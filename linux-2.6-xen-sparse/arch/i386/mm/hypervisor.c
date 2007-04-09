@@ -353,6 +353,7 @@ int xen_create_contiguous_region(
 
 	return success ? 0 : -ENOMEM;
 }
+EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
 
 void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 {
@@ -437,6 +438,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 
 	balloon_unlock(flags);
 }
+EXPORT_SYMBOL_GPL(xen_destroy_contiguous_region);
 
 #ifdef __i386__
 int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)

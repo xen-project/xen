@@ -1,6 +1,6 @@
 /******************************************************************************
- * evtchn-pci.c
- * xen event channel fake PCI device driver
+ * platform-pci.c
+ * Xen platform PCI device driver
  * Copyright (C) 2005, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it

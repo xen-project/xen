@@ -137,6 +137,7 @@ compat_bad_hypercall:
 
 /* %rbx: struct vcpu, interrupts disabled */
 compat_restore_all_guest:
+        ASSERT_INTERRUPTS_DISABLED
         RESTORE_ALL
         addq  $8,%rsp
 .Lft0:  iretq
@@ -188,13 +189,14 @@ ENTRY(compat_post_handle_exception)
 
 ENTRY(compat_int80_direct_trap)
         call  compat_create_bounce_frame
-        jmp   compat_restore_all_guest
+        jmp   compat_test_all_events
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
 /* On return only %rbx is guaranteed non-clobbered.                      */
 compat_create_bounce_frame:
+        ASSERT_INTERRUPTS_ENABLED
         mov   %fs,%edi
         testb $2,UREGS_cs+8(%rsp)
         jz    1f
