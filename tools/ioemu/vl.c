@@ -5894,7 +5894,32 @@ void suspend(int sig)
     suspend_requested = 1;
 }
 
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(MAPCACHE)
+
+#if defined(__i386__) 
+#define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
+#define MCACHE_BUCKET_SHIFT 16
+#elif defined(__x86_64__)
+#define MAX_MCACHE_SIZE    0x1000000000 /* 64GB max for x86_64 */
+#define MCACHE_BUCKET_SHIFT 20
+#endif
+
+#define MCACHE_BUCKET_SIZE (1UL << MCACHE_BUCKET_SHIFT)
+
+#define BITS_PER_LONG (sizeof(long)*8)
+#define BITS_TO_LONGS(bits) \
+    (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
+#define DECLARE_BITMAP(name,bits) \
+    unsigned long name[BITS_TO_LONGS(bits)]
+#define test_bit(bit,map) \
+    (!!((map)[(bit)/BITS_PER_LONG] & (1UL << ((bit)%BITS_PER_LONG))))
+
+struct map_cache {
+    unsigned long paddr_index;
+    uint8_t      *vaddr_base;
+    DECLARE_BITMAP(valid_mapping, MCACHE_BUCKET_SIZE>>PAGE_SHIFT);
+};
+
 static struct map_cache *mapcache_entry;
 static unsigned long nr_buckets;
 
@@ -5928,6 +5953,44 @@ static int qemu_map_cache_init(void)
     return 0;
 }
 
+static void qemu_remap_bucket(struct map_cache *entry,
+                              unsigned long address_index)
+{
+    uint8_t *vaddr_base;
+    unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
+    unsigned int i, j;
+
+    if (entry->vaddr_base != NULL) {
+        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
+        if (errno) {
+            fprintf(logfile, "unmap fails %d\n", errno);
+            exit(-1);
+        }
+    }
+
+    for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i++)
+        pfns[i] = (address_index << (MCACHE_BUCKET_SHIFT-PAGE_SHIFT)) + i;
+
+    vaddr_base = xc_map_foreign_batch(xc_handle, domid, PROT_READ|PROT_WRITE,
+                                      pfns, MCACHE_BUCKET_SIZE >> PAGE_SHIFT);
+    if (vaddr_base == NULL) {
+        fprintf(logfile, "xc_map_foreign_batch error %d\n", errno);
+        exit(-1);
+    }
+
+    entry->vaddr_base  = vaddr_base;
+    entry->paddr_index = address_index;
+
+    for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i += BITS_PER_LONG) {
+        unsigned long word = 0;
+        j = ((i + BITS_PER_LONG) > (MCACHE_BUCKET_SIZE >> PAGE_SHIFT)) ?
+            (MCACHE_BUCKET_SIZE >> PAGE_SHIFT) % BITS_PER_LONG : BITS_PER_LONG;
+        while (j > 0)
+            word = (word << 1) | !(pfns[i + --j] & 0xF0000000UL);
+        entry->valid_mapping[i / BITS_PER_LONG] = word;
+    }
+}
+
 uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
 {
     struct map_cache *entry;
@@ -5939,34 +6002,12 @@ uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
 
     entry = &mapcache_entry[address_index % nr_buckets];
 
-    if (entry->vaddr_base == NULL || entry->paddr_index != address_index) {
-        /* We need to remap a bucket. */
-        uint8_t *vaddr_base;
-        unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
-        unsigned int i;
+    if (entry->vaddr_base == NULL || entry->paddr_index != address_index ||
+        !test_bit(address_offset>>PAGE_SHIFT, entry->valid_mapping))
+        qemu_remap_bucket(entry, address_index);
 
-        if (entry->vaddr_base != NULL) {
-            errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
-            if (errno) {
-                fprintf(logfile, "unmap fails %d\n", errno);
-                exit(-1);
-            }
-        }
-
-        for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i++)
-            pfns[i] = (address_index << (MCACHE_BUCKET_SHIFT-PAGE_SHIFT)) + i;
-
-        vaddr_base = xc_map_foreign_batch(
-            xc_handle, domid, PROT_READ|PROT_WRITE,
-            pfns, MCACHE_BUCKET_SIZE >> PAGE_SHIFT);
-        if (vaddr_base == NULL) {
-            fprintf(logfile, "xc_map_foreign_batch error %d\n", errno);
-            exit(-1);
-        }
-
-        entry->vaddr_base  = vaddr_base;
-        entry->paddr_index = address_index;;
-    }
+    if (!test_bit(address_offset>>PAGE_SHIFT, entry->valid_mapping))
+        return NULL;
 
     last_address_index = address_index;
     last_address_vaddr = entry->vaddr_base;
@@ -6001,7 +6042,8 @@ void qemu_invalidate_map_cache(void)
 
     mapcache_unlock();
 }
-#endif
+
+#endif /* defined(MAPCACHE) */
 
 int main(int argc, char **argv)
 {
