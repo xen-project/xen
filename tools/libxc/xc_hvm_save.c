@@ -119,8 +119,8 @@ static uint64_t llgettimeofday(void)
 
 static uint64_t tv_delta(struct timeval *new, struct timeval *old)
 {
-    return ((new->tv_sec - old->tv_sec)*1000000 ) +
-        (new->tv_usec - old->tv_usec);
+    return (((new->tv_sec - old->tv_sec)*1000000) +
+            (new->tv_usec - old->tv_usec));
 }
 
 
@@ -130,9 +130,7 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
 
 static inline ssize_t write_exact(int fd, void *buf, size_t count)
 {
-    if(write(fd, buf, count) != count)
-        return 0;
-    return 1;
+    return (write(fd, buf, count) == count);
 }
 
 static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
@@ -156,15 +154,14 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
         DPRINTF("ARRHHH!!\n");
 
     wall_delta = tv_delta(&wall_now,&wall_last)/1000;
-
-    if (wall_delta == 0) wall_delta = 1;
+    if ( wall_delta == 0 )
+        wall_delta = 1;
 
     d0_cpu_delta = (d0_cpu_now - d0_cpu_last)/1000;
     d1_cpu_delta = (d1_cpu_now - d1_cpu_last)/1000;
 
-    if (print)
-        DPRINTF(
-                "delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
+    if ( print )
+        DPRINTF("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
                 "dirtied %dMb/s %" PRId32 " pages\n",
                 wall_delta,
                 (int)((d0_cpu_delta*100)/wall_delta),
@@ -189,18 +186,19 @@ static int analysis_phase(int xc_handle, uint32_t domid, int pfn_array_size,
 
     start = llgettimeofday();
 
-    for (j = 0; j < runs; j++) {
+    for ( j = 0; j < runs; j++ )
+    {
         int i;
 
         xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
                           arr, pfn_array_size, NULL, 0, NULL);
         DPRINTF("#Flush\n");
-        for ( i = 0; i < 40; i++ ) {
+        for ( i = 0; i < 40; i++ )
+        {
             usleep(50000);
             now = llgettimeofday();
             xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_PEEK,
                               NULL, 0, NULL, 0, &stats);
-
             DPRINTF("now= %lld faults= %"PRId32" dirty= %"PRId32"\n",
                     ((now-start)+500)/1000,
                     stats.fault_count, stats.dirty_count);
@@ -216,39 +214,39 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 {
     int i = 0;
 
-    if (!(*suspend)(dom)) {
+    if ( !(*suspend)(dom) )
+    {
         ERROR("Suspend request failed");
         return -1;
     }
 
  retry:
 
-    if (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) {
+    if ( xc_domain_getinfo(xc_handle, dom, 1, info) != 1 )
+    {
         ERROR("Could not get domain info");
         return -1;
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0 /* XXX */, ctxt))
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, ctxt) )
         ERROR("Could not get vcpu context");
 
+    if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_suspend) )
+        return 0; /* success */
 
-    if (info->shutdown && info->shutdown_reason == SHUTDOWN_suspend)
-        return 0; // success        
-
-    if (info->paused) {
-        // try unpausing domain, wait, and retest
+    if ( info->paused )
+    {
+        /* Try unpausing domain, wait, and retest. */
         xc_domain_unpause( xc_handle, dom );
-
         ERROR("Domain was paused. Wait and re-test.");
-        usleep(10000);  // 10ms
-
+        usleep(10000);  /* 10ms */
         goto retry;
     }
 
-
-    if( ++i < 100 ) {
+    if ( ++i < 100 )
+    {
         ERROR("Retry suspend domain.");
-        usleep(10000);  // 10ms
+        usleep(10000); /* 10ms */
         goto retry;
     }
 
@@ -350,8 +348,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("Couldn't enable shadow mode");
             goto out;
         }
-
-        DPRINTF("hvm domain live migration debug start: logdirty enable.\n");
     }
     else
     {
@@ -378,7 +374,6 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("Error when writing to state file (1)");
         goto out;
     }
-    
 
     /* pretend we sent all the pages last iteration */
     sent_last_iter = pfn_array_size;
@@ -452,7 +447,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         prev_pc = 0;
         N=0;
 
-        DPRINTF("Saving HVM domain memory pages: iter %d   0%%", iter);
+        DPRINTF("Saving memory pages: iter %d   0%%", iter);
 
         while ( N < pfn_array_size )
         {
@@ -474,7 +469,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     pfn_array_size, NULL, 0, NULL);
                 if ( rc != pfn_array_size )
                 {
-                    ERROR("Error peeking HVM shadow bitmap");
+                    ERROR("Error peeking shadow bitmap");
                     goto out;
                 }
             }
@@ -703,7 +698,7 @@ int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* save vcpu/vmcs contexts */
     for ( i = 0; i < nr_vcpus; i++ )
     {
-        if (!(vcpumap & (1ULL << i)))
+        if ( !(vcpumap & (1ULL << i)) )
             continue;
 
         if ( xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
