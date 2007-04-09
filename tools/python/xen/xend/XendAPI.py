@@ -87,7 +87,16 @@ def xen_api_todo():
 
 
 def now():
-    return xmlrpclib.DateTime(time.strftime("%Y%m%dT%H:%M:%S", time.gmtime()))
+    return datetime()
+
+
+def datetime(when = None):
+    """Marshall the given time as a Xen-API DateTime.
+
+    @param when The time in question, given as seconds since the epoch, UTC.
+                May be None, in which case the current time is used.
+    """
+    return xmlrpclib.DateTime(time.gmtime(when))
 
 
 # ---------------------------------------------------

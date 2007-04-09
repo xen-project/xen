@@ -757,11 +757,31 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
     my_strftime(time, 256, "Metrics updated at %c, local time.\n", tm);
     printf(time);
 
+    tm = localtime(&vm_metrics_record->start_time);
+    my_strftime(time, 256, "VM running since %c, local time.\n", tm);
+    printf(time);
+
     for (size_t i = 0; i < vm_metrics_record->vcpus_utilisation->size; i++)
     {
         printf("%"PRId64" -> %lf.\n",
                vm_metrics_record->vcpus_utilisation->contents[i].key,
                vm_metrics_record->vcpus_utilisation->contents[i].val);
+    }
+
+    printf("VCPU -> PCPU mapping:\n");
+    for (size_t i = 0; i < vm_metrics_record->vcpus_cpu->size; i++)
+    {
+        printf("  %"PRId64" -> %"PRId64".\n",
+               vm_metrics_record->vcpus_cpu->contents[i].key,
+               vm_metrics_record->vcpus_cpu->contents[i].val);
+    }
+
+    printf("Live scheduling parameters:\n");
+    for (size_t i = 0; i < vm_metrics_record->vcpus_params->size; i++)
+    {
+        printf("  %s -> %s.\n",
+               vm_metrics_record->vcpus_params->contents[i].key,
+               vm_metrics_record->vcpus_params->contents[i].val);
     }
 
     xen_vm_metrics_record_free(vm_metrics_record);

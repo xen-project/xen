@@ -138,7 +138,9 @@ class XendVMMetrics:
             return {}
 
     def get_start_time(self):
-        return self.xend_domain_instance.info.get("start_time", -1)
+        import xen.xend.XendAPI as XendAPI
+        return XendAPI.datetime(
+            self.xend_domain_instance.info.get("start_time", 0))
     
     def get_last_updated(self):
         import xen.xend.XendAPI as XendAPI

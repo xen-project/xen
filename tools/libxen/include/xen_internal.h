@@ -86,6 +86,7 @@ extern const abstract_type abstract_type_ref_set;
 
 extern const abstract_type abstract_type_string_string_map;
 extern const abstract_type abstract_type_int_float_map;
+extern const abstract_type abstract_type_int_int_map;
 
 
 typedef struct abstract_value
