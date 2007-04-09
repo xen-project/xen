@@ -4744,6 +4744,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt API\_version/vendor\_implementation} & (strin
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt capabilities} & string Set & Xen capabilities \\
+$\mathit{RO}_\mathit{run}$ &  {\tt cpu\_configuration} & (string $\rightarrow$ string) Map & The CPU configuration on this host.  May contain keys such as ``nr\_nodes'', ``sockets\_per\_node'', ``cores\_per\_socket'', or ``threads\_per\_core'' \\
+$\mathit{RO}_\mathit{run}$ &  {\tt sched\_policy} & string & Scheduler policy currently in force on this host \\
 $\mathit{RO}_\mathit{run}$ &  {\tt supported\_bootloaders} & string Set & a list of the bootloaders installed on the machine \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RW}$ &  {\tt logging} & (string $\rightarrow$ string) Map & logging configuration \\
@@ -5545,6 +5547,70 @@ Get the capabilities field of the given host.
  \noindent {\bf Return Type:} 
 {\tt 
 string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_cpu\_configuration}
+
+{\bf Overview:} 
+Get the cpu\_configuration field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_cpu_configuration (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_sched\_policy}
+
+{\bf Overview:} 
+Get the sched\_policy field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_sched_policy (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
 }
 
 

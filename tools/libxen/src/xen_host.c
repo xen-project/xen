@@ -73,6 +73,12 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "capabilities",
           .type = &abstract_type_string_set,
           .offset = offsetof(xen_host_record, capabilities) },
+        { .key = "cpu_configuration",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_host_record, cpu_configuration) },
+        { .key = "sched_policy",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_host_record, sched_policy) },
         { .key = "supported_bootloaders",
           .type = &abstract_type_string_set,
           .offset = offsetof(xen_host_record, supported_bootloaders) },
@@ -128,6 +134,8 @@ xen_host_record_free(xen_host_record *record)
     xen_string_string_map_free(record->software_version);
     xen_string_string_map_free(record->other_config);
     xen_string_set_free(record->capabilities);
+    xen_string_string_map_free(record->cpu_configuration);
+    free(record->sched_policy);
     xen_string_set_free(record->supported_bootloaders);
     xen_vm_record_opt_set_free(record->resident_vms);
     xen_string_string_map_free(record->logging);
@@ -345,6 +353,40 @@ xen_host_get_capabilities(xen_session *session, struct xen_string_set **result, 
 
     *result = NULL;
     XEN_CALL_("host.get_capabilities");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_cpu_configuration(xen_session *session, xen_string_string_map **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("host.get_cpu_configuration");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_sched_policy(xen_session *session, char **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_sched_policy");
     return session->ok;
 }
 

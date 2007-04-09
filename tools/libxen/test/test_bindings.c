@@ -285,6 +285,40 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    xen_string_string_map *cpu_configuration;
+    if (!xen_host_get_cpu_configuration(session, &cpu_configuration, host))
+    {
+        print_error(session);
+        free(dmesg);
+        xen_string_set_free(capabilities);
+        xen_string_set_free(supported_bootloaders);
+        xen_string_string_map_free(versions);
+        xen_host_free(host);
+        xen_vm_record_free(vm_record);
+        xen_uuid_bytes_free(vm_uuid_bytes);
+        xen_uuid_free(vm_uuid);
+        xen_vm_free(vm);
+        CLEANUP;
+        return 1;
+    }
+
+    char *sched_policy;
+    if (!xen_host_get_sched_policy(session, &sched_policy, host))
+    {
+        print_error(session);
+        xen_string_string_map_free(cpu_configuration);
+        xen_string_set_free(capabilities);
+        xen_string_set_free(supported_bootloaders);
+        xen_string_string_map_free(versions);
+        xen_host_free(host);
+        xen_vm_record_free(vm_record);
+        xen_uuid_bytes_free(vm_uuid_bytes);
+        xen_uuid_free(vm_uuid);
+        xen_vm_free(vm);
+        CLEANUP;
+        return 1;
+    }
+
     printf("%s.\n", vm_uuid);
 
     printf("In bytes, the VM UUID is ");
@@ -318,6 +352,15 @@ int main(int argc, char **argv)
     }
     printf("\n");
 
+    printf("Host has the following CPU configuration:\n");
+    for (size_t i = 0; i < cpu_configuration->size; i++)
+    {
+        printf("  %s -> %s.\n", cpu_configuration->contents[i].key,
+               cpu_configuration->contents[i].val);
+    }
+
+    printf("Current scheduler policy: %s.\n\n", sched_policy);
+
     printf("%s.\n", vm_record->uuid);
 
     printf("Resident on %s.\n", (char *)vm_record->resident_on->u.handle);
@@ -334,6 +377,8 @@ int main(int argc, char **argv)
     free(dmesg);
     xen_string_set_free(supported_bootloaders);
     xen_string_set_free(capabilities);
+    xen_string_string_map_free(cpu_configuration);
+    free(sched_policy);
 
     print_vm_metrics(session, vm);
     if (!session->ok)

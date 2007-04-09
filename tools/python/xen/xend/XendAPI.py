@@ -860,13 +860,13 @@ class XendAPI(object):
                     'metrics',
                     'capabilities',
                     'supported_bootloaders',
+                    'sched_policy',
                     'API_version_major',
                     'API_version_minor',
                     'API_version_vendor',
                     'API_version_vendor_implementation']
     
     host_attr_rw = ['name_label',
-                    'sched_policy',
                     'name_description',
                     'other_config']
 
