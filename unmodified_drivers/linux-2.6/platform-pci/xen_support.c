@@ -51,6 +51,19 @@ int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 	return xencomm_mini_hypercall_grant_table_op(cmd, uop, count);
 }
 EXPORT_SYMBOL(HYPERVISOR_grant_table_op);
+
+/* without using balloon driver on PV-on-HVM for ia64 */
+void balloon_update_driver_allowance(long delta)
+{
+	/* nothing */
+}
+EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
+
+void balloon_release_driver_page(struct page *page)
+{
+	/* nothing */
+}
+EXPORT_SYMBOL_GPL(balloon_release_driver_page);
 #endif /* __ia64__ */
 
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
