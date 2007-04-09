@@ -443,6 +443,20 @@ xen_host_dmesg_clear(xen_session *session, char **result, xen_host host);
 
 
 /**
+ * Get the host's log file.
+ */
+extern bool
+xen_host_get_log(xen_session *session, char **result, xen_host host);
+
+
+/**
+ * Inject the given string as debugging keys into Xen.
+ */
+extern bool
+xen_host_send_debug_keys(xen_session *session, xen_host host, char *keys);
+
+
+/**
  * List all supported methods.
  */
 extern bool

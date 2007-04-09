@@ -757,6 +757,39 @@ xen_host_dmesg_clear(xen_session *session, char **result, xen_host host)
 
 
 bool
+xen_host_get_log(xen_session *session, char **result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("host.get_log");
+    return session->ok;
+}
+
+
+bool
+xen_host_send_debug_keys(xen_session *session, xen_host host, char *keys)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host },
+            { .type = &abstract_type_string,
+              .u.string_val = keys }
+        };
+
+    xen_call_(session, "host.send_debug_keys", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_host_list_methods(xen_session *session, struct xen_string_set **result)
 {
 

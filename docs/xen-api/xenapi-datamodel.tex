@@ -4951,6 +4951,72 @@ dmesg string
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_log}
+
+{\bf Overview:} 
+Get the host's log file.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_log (session_id s, host ref host)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The Host to query \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+The contents of the host's primary log file
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~send\_debug\_keys}
+
+{\bf Overview:} 
+Inject the given string as debugging keys into Xen.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void send_debug_keys (session_id s, host ref host, string keys)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The host \\ \hline 
+
+{\tt string } & keys & The keys to send \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~list\_methods}
 
 {\bf Overview:} 
