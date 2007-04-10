@@ -732,8 +732,10 @@ def xm_restore(args):
 
 
 def datetime_to_secs(v):
-    return time.mktime(time.strptime(str(v) + 'UTC', '%Y%m%dT%H:%M:%S%Z'))
-
+    unwanted = ":-."
+    for c in unwanted:
+        v = str(v).replace(c, "")
+    return time.mktime(time.strptime(v[0:14], '%Y%m%dT%H%M%S'))
 
 def getDomains(domain_names, state, full = 0):
     if serverType == SERVER_XEN_API:
