@@ -127,8 +127,10 @@ static int take_machine_down(void *p_fast_suspend)
 	extern void time_resume(void);
 
 	if (fast_suspend) {
-		preempt_disable();
+		BUG_ON(!irqs_disabled());
 	} else {
+		BUG_ON(irqs_disabled());
+
 		for (;;) {
 			err = smp_suspend();
 			if (err)
@@ -143,11 +145,11 @@ static int take_machine_down(void *p_fast_suspend)
 			preempt_enable();
 			xenbus_suspend_cancel();
 		}
+
+		local_irq_disable();
 	}
 
 	mm_pin_all();
-	local_irq_disable();
-	preempt_enable();
 	gnttab_suspend();
 	pre_suspend();
 
@@ -178,7 +180,9 @@ static int take_machine_down(void *p_fast_suspend)
 #endif
 	}
 	time_resume();
-	local_irq_enable();
+
+	if (!fast_suspend)
+		local_irq_enable();
 
 	return suspend_cancelled;
 }
