@@ -119,6 +119,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         {
             /* Have a 'valid' PFN without a matching MFN - need to alloc */
             p2m_batch[nr_mfns++] = pfn; 
+            p2m[pfn]--;
         }
     }
 
@@ -146,8 +147,8 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
             continue;
         
         pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
-        
-        if ( p2m[pfn] == INVALID_P2M_ENTRY )
+
+        if ( p2m[pfn] == (INVALID_P2M_ENTRY-1) )
             p2m[pfn] = p2m_batch[nr_mfns++];
 
         pte &= ~MADDR_MASK_X86;
@@ -489,6 +490,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             {
                 /* Have a live PFN which hasn't had an MFN allocated */
                 p2m_batch[nr_mfns++] = pfn; 
+                p2m[pfn]--;
             }
         } 
 
@@ -514,7 +516,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 region_mfn[i] = ~0UL; /* map will fail but we don't care */
             else 
             {
-                if ( p2m[pfn] == INVALID_P2M_ENTRY )
+                if ( p2m[pfn] == (INVALID_P2M_ENTRY-1) )
                 {
                     /* We just allocated a new mfn above; update p2m */
                     p2m[pfn] = p2m_batch[nr_mfns++]; 
