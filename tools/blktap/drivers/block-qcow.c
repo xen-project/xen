@@ -949,8 +949,14 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 		goto fail;
 	}
 	init_fds(dd);
-	s->fd_end = (final_cluster == 0 ? (s->l1_table_offset + l1_table_size) : 
-				(final_cluster + s->cluster_size));
+
+	if (!final_cluster)
+		s->fd_end = s->l1_table_offset + l1_table_size;
+	else {
+		s->fd_end = lseek64(fd, 0, SEEK_END);
+		if (s->fd_end == (off64_t)-1)
+			goto fail;
+	}
 
 	return 0;
 	
