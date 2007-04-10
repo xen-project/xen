@@ -4184,6 +4184,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/CPU} & (int $\rightarrow$ int) Map & VCPU to PCPU map \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & The live equivalent to VM.VCPUs\_params \\
+$\mathit{RO}_\mathit{run}$ &  {\tt state} & string Set & The state of the guest, eg blocked, dying etc \\
 $\mathit{RO}_\mathit{run}$ &  {\tt start\_time} & datetime & Time at which this VM was last booted \\
 $\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
@@ -4395,6 +4396,38 @@ Get the VCPUs/params field of the given VM\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 (string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_state}
+
+{\bf Overview:} 
+Get the state field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_state (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
 }
 
 
