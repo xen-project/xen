@@ -231,7 +231,7 @@ static int shutdown_event(struct notifier_block *notifier,
 static int __init setup_shutdown_event(void)
 {
 	static struct notifier_block xenstore_notifier = {
-		.notifier_call = setup_shutdown_watcher
+		.notifier_call = shutdown_event
 	};
 	register_xenstore_notifier(&xenstore_notifier);
 
