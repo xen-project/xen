@@ -1558,6 +1558,81 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~send\_sysrq}
+
+{\bf Overview:} 
+Send the given key as a sysrq to this VM.  The key is specified as a single
+character (a String of length 1).  This can only be called when the
+specified VM is in the Running state.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void send_sysrq (session_id s, VM ref vm, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & vm & The VM \\ \hline 
+
+{\tt string } & key & The key to send \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
+\subsubsection{RPC name:~send\_trigger}
+
+{\bf Overview:} 
+Send the named trigger to this VM.  This can only be called when the
+specified VM is in the Running state.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void send_trigger (session_id s, VM ref vm, string trigger)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & vm & The VM \\ \hline 
+
+{\tt string } & trigger & The trigger to send \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 

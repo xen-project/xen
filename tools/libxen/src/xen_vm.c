@@ -1610,6 +1610,38 @@ xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu)
 
 
 bool
+xen_vm_send_sysrq(xen_session *session, xen_vm vm, char *key)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = key }
+        };
+
+    xen_call_(session, "VM.send_sysrq", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_send_trigger(xen_session *session, xen_vm vm, char *trigger)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = trigger }
+        };
+
+    xen_call_(session, "VM.send_trigger", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result)
 {
 
