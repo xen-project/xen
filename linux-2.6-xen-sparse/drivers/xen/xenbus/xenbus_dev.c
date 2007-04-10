@@ -394,8 +394,7 @@ static const struct file_operations xenbus_dev_file_ops = {
 	.poll = xenbus_dev_poll,
 };
 
-int __init
-xenbus_dev_init(void)
+int xenbus_dev_init(void)
 {
 	xenbus_dev_intf = create_xen_proc_entry("xenbus", 0400);
 	if (xenbus_dev_intf)

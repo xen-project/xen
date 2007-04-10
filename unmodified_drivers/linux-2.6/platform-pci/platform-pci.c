@@ -1,7 +1,9 @@
 /******************************************************************************
  * platform-pci.c
+ * 
  * Xen platform PCI device driver
- * Copyright (C) 2005, Intel Corporation.
+ * Copyright (c) 2005, Intel Corporation.
+ * Copyright (c) 2007, XenSource Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -35,7 +37,9 @@
 #include <asm/hypervisor.h>
 #include <asm/pgtable.h>
 #include <xen/interface/memory.h>
+#include <xen/interface/hvm/params.h>
 #include <xen/features.h>
+#include <xen/evtchn.h>
 #include <xen/gnttab.h>
 #ifdef __ia64__
 #include <asm/xen/xencomm.h>
@@ -54,13 +58,9 @@
 char *hypercall_stubs;
 EXPORT_SYMBOL(hypercall_stubs);
 
-// Used to be xiaofeng.ling@intel.com
 MODULE_AUTHOR("ssmith@xensource.com");
 MODULE_DESCRIPTION("Xen platform PCI device");
 MODULE_LICENSE("GPL");
-
-unsigned long *phys_to_machine_mapping;
-EXPORT_SYMBOL(phys_to_machine_mapping);
 
 static unsigned long shared_info_frame;
 static uint64_t callback_via;
@@ -89,28 +89,9 @@ static int __devinit init_xen_info(void)
 	if (shared_info_area == NULL)
 		panic("can't map shared info\n");
 
-	phys_to_machine_mapping = NULL;
-
 	gnttab_init();
 
 	return 0;
-}
-
-static void __devexit platform_pci_remove(struct pci_dev *pdev)
-{
-	long ioaddr, iolen;
-	long mmio_addr, mmio_len;
-
-	ioaddr = pci_resource_start(pdev, 0);
-	iolen = pci_resource_len(pdev, 0);
-	mmio_addr = pci_resource_start(pdev, 1);
-	mmio_len = pci_resource_len(pdev, 1);
-
-	release_region(ioaddr, iolen);
-	release_mem_region(mmio_addr, mmio_len);
-
-	pci_set_drvdata(pdev, NULL);
-	free_irq(pdev->irq, pdev);
 }
 
 static unsigned long platform_mmio;
@@ -208,6 +189,19 @@ static uint64_t get_callback_via(struct pci_dev *pdev)
 		((uint64_t)(pin - 1) & 3));
 }
 
+static int set_callback_via(uint64_t via)
+{
+	struct xen_hvm_param a;
+
+	a.domid = DOMID_SELF;
+	a.index = HVM_PARAM_CALLBACK_IRQ;
+	a.value = via;
+	return HYPERVISOR_hvm_op(HVMOP_set_param, &a);
+}
+
+int xenbus_init(void);
+int xen_reboot_init(void);
+
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
@@ -232,15 +226,13 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		return -ENOENT;
 	}
 
-	if (request_mem_region(mmio_addr, mmio_len, DRV_NAME) == NULL)
-	{
+	if (request_mem_region(mmio_addr, mmio_len, DRV_NAME) == NULL) {
 		printk(KERN_ERR ":MEM I/O resource 0x%lx @ 0x%lx busy\n",
 		       mmio_addr, mmio_len);
 		return -EBUSY;
 	}
 
-	if (request_region(ioaddr, iolen, DRV_NAME) == NULL)
-	{
+	if (request_region(ioaddr, iolen, DRV_NAME) == NULL) {
 		printk(KERN_ERR DRV_NAME ":I/O resource 0x%lx @ 0x%lx busy\n",
 		       iolen, ioaddr);
 		release_mem_region(mmio_addr, mmio_len);
@@ -263,6 +255,12 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 		goto out;
 
 	if ((ret = set_callback_via(callback_via)))
+		goto out;
+
+	if ((ret = xenbus_init()))
+		goto out;
+
+	if ((ret = xen_reboot_init()))
 		goto out;
 
  out:
@@ -289,7 +287,6 @@ MODULE_DEVICE_TABLE(pci, platform_pci_tbl);
 static struct pci_driver platform_driver = {
 	name:     DRV_NAME,
 	probe:    platform_pci_init,
-	remove:   __devexit_p(platform_pci_remove),
 	id_table: platform_pci_tbl,
 };
 
@@ -298,13 +295,18 @@ static int pci_device_registered;
 void platform_pci_suspend(void)
 {
 	gnttab_suspend();
+	irq_suspend();
 }
-EXPORT_SYMBOL_GPL(platform_pci_suspend);
+
+void platform_pci_suspend_cancel(void)
+{
+	irq_suspend_cancel();
+	gnttab_resume();
+}
 
 void platform_pci_resume(void)
 {
 	struct xen_add_to_physmap xatp;
-	phys_to_machine_mapping = NULL;
 
 	/* do 2 things for PV driver restore on HVM
 	 * 1: rebuild share info
@@ -317,34 +319,27 @@ void platform_pci_resume(void)
 	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
 		BUG();
 
-	if (( set_callback_via(callback_via)))
+	irq_resume();
+
+	if (set_callback_via(callback_via))
 		printk("platform_pci_resume failure!\n");
 
 	gnttab_resume();
 }
-EXPORT_SYMBOL_GPL(platform_pci_resume);
 
 static int __init platform_pci_module_init(void)
 {
 	int rc;
 
 	rc = pci_module_init(&platform_driver);
-	if (rc)
-		printk(KERN_INFO DRV_NAME ":No platform pci device model found\n");
-	else
-		pci_device_registered = 1;
+	if (rc) {
+		printk(KERN_INFO DRV_NAME
+		       ": No platform pci device model found\n");
+		return rc;
+	}
 
-	return rc;
-}
-
-static void __exit platform_pci_module_cleanup(void)
-{
-	printk(KERN_INFO DRV_NAME ":Do platform module cleanup\n");
-	/* disable hypervisor for callback irq */
-	set_callback_via(0);
-	if (pci_device_registered)
-		pci_unregister_driver(&platform_driver);
+	pci_device_registered = 1;
+	return 0;
 }
 
 module_init(platform_pci_module_init);
-module_exit(platform_pci_module_cleanup);

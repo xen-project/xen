@@ -34,28 +34,7 @@ static int fast_suspend;
 static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
-#ifdef CONFIG_XEN
 int __xen_suspend(int fast_suspend);
-#else
-extern void xenbus_suspend(void);
-extern void xenbus_resume(void);
-extern void platform_pci_suspend(void);
-extern void platform_pci_resume(void);
-int __xen_suspend(int fast_suspend)
-{
-	xenbus_suspend();
-	platform_pci_suspend();
-
-	/* pvdrv sleep in this hyper-call when save */
-	HYPERVISOR_shutdown(SHUTDOWN_suspend);
-
-	platform_pci_resume();
-	xenbus_resume();
-	printk("PV stuff on HVM resume successfully!\n");
-
-	return 0;
-}
-#endif
 
 static int shutdown_process(void *__unused)
 {
@@ -210,13 +189,11 @@ static struct xenbus_watch shutdown_watch = {
 };
 
 static struct xenbus_watch sysrq_watch = {
-	.node ="control/sysrq",
+	.node = "control/sysrq",
 	.callback = sysrq_handler
 };
 
-static int setup_shutdown_watcher(struct notifier_block *notifier,
-				  unsigned long event,
-				  void *data)
+static int setup_shutdown_watcher(void)
 {
 	int err;
 
@@ -225,17 +202,29 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 		     "%d", &fast_suspend);
 
 	err = register_xenbus_watch(&shutdown_watch);
-	if (err)
+	if (err) {
 		printk(KERN_ERR "Failed to set shutdown watcher\n");
-	else
-		xenbus_write(XBT_NIL, "control", "feature-reboot", "1");
+		return err;
+	}
+	xenbus_write(XBT_NIL, "control", "feature-reboot", "1");
 
 	err = register_xenbus_watch(&sysrq_watch);
-	if (err)
+	if (err) {
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
-	else
-		xenbus_write(XBT_NIL, "control", "feature-sysrq", "1");
+		return err;
+	}
+	xenbus_write(XBT_NIL, "control", "feature-sysrq", "1");
 
+	return 0;
+}
+
+#ifdef CONFIG_XEN
+
+static int shutdown_event(struct notifier_block *notifier,
+			  unsigned long event,
+			  void *data)
+{
+	setup_shutdown_watcher();
 	return NOTIFY_DONE;
 }
 
@@ -250,3 +239,12 @@ static int __init setup_shutdown_event(void)
 }
 
 subsys_initcall(setup_shutdown_event);
+
+#else /* !defined(CONFIG_XEN) */
+
+int xen_reboot_init(void)
+{
+	return setup_shutdown_watcher();
+}
+
+#endif /* !defined(CONFIG_XEN) */

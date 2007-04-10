@@ -863,7 +863,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 }
 #endif
 
-static int __init xenbus_probe_init(void)
+static int xenbus_probe_init(void)
 {
 	int err = 0;
 	unsigned long page = 0;
@@ -978,10 +978,15 @@ static int __init xenbus_probe_init(void)
 	return err;
 }
 
+#ifdef CONFIG_XEN
 postcore_initcall(xenbus_probe_init);
-
 MODULE_LICENSE("Dual BSD/GPL");
-
+#else
+int xenbus_init(void)
+{
+	return xenbus_probe_init();
+}
+#endif
 
 static int is_disconnected_device(struct device *dev, void *data)
 {
