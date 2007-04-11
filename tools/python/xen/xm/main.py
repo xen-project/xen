@@ -731,6 +731,12 @@ def xm_restore(args):
         server.xend.domain.restore(savefile, paused)
 
 
+def datetime_to_secs(v):
+    unwanted = ":-."
+    for c in unwanted:
+        v = str(v).replace(c, "")
+    return time.mktime(time.strptime(v[0:14], '%Y%m%dT%H%M%S'))
+
 def getDomains(domain_names, state, full = 0):
     if serverType == SERVER_XEN_API:
         doms_sxp = []
@@ -756,7 +762,8 @@ def getDomains(domain_names, state, full = 0):
                             'vcpus':    dom_metrics['VCPUs_number'],
                             'state':    state_str,
                             'cpu_time': dom_metrics['VCPUs_utilisation'],
-                            'start_time': dom_metrics['start_time']})
+                            'start_time': datetime_to_secs(
+                                              dom_metrics['start_time'])})
 
             doms_sxp.append(['domain'] + map2sxp(dom_rec))
             doms_dict.append(dom_rec)

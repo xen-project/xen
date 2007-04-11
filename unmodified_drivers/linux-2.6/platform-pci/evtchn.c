@@ -41,16 +41,42 @@
 
 void *shared_info_area;
 
-#define MAX_EVTCHN 256
+static DEFINE_MUTEX(irq_evtchn_mutex);
+
+#define is_valid_evtchn(x)	((x) != 0)
+#define evtchn_from_irq(x)	(irq_evtchn[irq].evtchn)
+
 static struct {
 	irqreturn_t(*handler) (int, void *, struct pt_regs *);
 	void *dev_id;
-	int close; /* close on unbind_from_irqhandler()? */
-} evtchns[MAX_EVTCHN];
+	int evtchn;
+	int close:1; /* close on unbind_from_irqhandler()? */
+	int inuse:1;
+} irq_evtchn[256];
+static int evtchn_to_irq[NR_EVENT_CHANNELS] = {
+	[0 ...  NR_EVENT_CHANNELS-1] = -1 };
+
+static int find_unbound_irq(void)
+{
+	static int warned;
+	int irq;
+
+	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++)
+		if (!irq_evtchn[irq].inuse)
+			return irq;
+
+	if (!warned) {
+		warned = 1;
+		printk(KERN_WARNING "No available IRQ to bind to: "
+		       "increase irq_evtchn[] size in evtchn.c.\n");
+	}
+
+	return -ENOSPC;
+}
 
 int irq_to_evtchn_port(int irq)
 {
-	return irq;
+	return irq_evtchn[irq].evtchn;
 }
 EXPORT_SYMBOL(irq_to_evtchn_port);
 
@@ -107,21 +133,37 @@ int bind_listening_port_to_irqhandler(
 	void *dev_id)
 {
 	struct evtchn_alloc_unbound alloc_unbound;
-	int err;
+	int err, irq;
+
+	mutex_lock(&irq_evtchn_mutex);
+
+	irq = find_unbound_irq();
+	if (irq < 0) {
+		mutex_unlock(&irq_evtchn_mutex);
+		return irq;
+	}
 
 	alloc_unbound.dom        = DOMID_SELF;
 	alloc_unbound.remote_dom = remote_domain;
-
 	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
 					  &alloc_unbound);
-	if (err)
+	if (err) {
+		mutex_unlock(&irq_evtchn_mutex);
 		return err;
+	}
 
-	evtchns[alloc_unbound.port].handler = handler;
-	evtchns[alloc_unbound.port].dev_id  = dev_id;
-	evtchns[alloc_unbound.port].close   = 1;
+	irq_evtchn[irq].handler = handler;
+	irq_evtchn[irq].dev_id  = dev_id;
+	irq_evtchn[irq].evtchn  = alloc_unbound.port;
+	irq_evtchn[irq].close   = 1;
+	irq_evtchn[irq].inuse   = 1;
+
+	evtchn_to_irq[alloc_unbound.port] = irq;
+
 	unmask_evtchn(alloc_unbound.port);
-	return alloc_unbound.port;
+
+	mutex_unlock(&irq_evtchn_mutex);
+	return irq;
 }
 EXPORT_SYMBOL(bind_listening_port_to_irqhandler);
 
@@ -132,35 +174,59 @@ int bind_caller_port_to_irqhandler(
 	const char *devname,
 	void *dev_id)
 {
-	if (caller_port >= MAX_EVTCHN)
-		return -EINVAL;
-	evtchns[caller_port].handler = handler;
-	evtchns[caller_port].dev_id  = dev_id;
-	evtchns[caller_port].close   = 0;
+	int irq;
+
+	mutex_lock(&irq_evtchn_mutex);
+
+	irq = find_unbound_irq();
+	if (irq < 0) {
+		mutex_unlock(&irq_evtchn_mutex);
+		return irq;
+	}
+
+	irq_evtchn[irq].handler = handler;
+	irq_evtchn[irq].dev_id  = dev_id;
+	irq_evtchn[irq].evtchn  = caller_port;
+	irq_evtchn[irq].close   = 0;
+	irq_evtchn[irq].inuse   = 1;
+
+	evtchn_to_irq[caller_port] = irq;
+
 	unmask_evtchn(caller_port);
-	return caller_port;
+
+	mutex_unlock(&irq_evtchn_mutex);
+	return irq;
 }
 EXPORT_SYMBOL(bind_caller_port_to_irqhandler);
 
-void unbind_from_irqhandler(unsigned int evtchn, void *dev_id)
+void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 {
-	if (evtchn >= MAX_EVTCHN)
-		return;
+	int evtchn = evtchn_from_irq(irq);
 
-	mask_evtchn(evtchn);
-	evtchns[evtchn].handler = NULL;
+	mutex_lock(&irq_evtchn_mutex);
 
-	if (evtchns[evtchn].close) {
-		struct evtchn_close close = { .port = evtchn };
-		HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+	if (is_valid_evtchn(evtchn)) {
+		evtchn_to_irq[irq] = -1;
+		mask_evtchn(evtchn);
+		if (irq_evtchn[irq].close) {
+			struct evtchn_close close = { .port = evtchn };
+			HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+		}
 	}
+
+	irq_evtchn[irq].handler = NULL;
+	irq_evtchn[irq].evtchn  = 0;
+	irq_evtchn[irq].inuse   = 0;
+
+	mutex_unlock(&irq_evtchn_mutex);
 }
 EXPORT_SYMBOL(unbind_from_irqhandler);
 
 void notify_remote_via_irq(int irq)
 {
-	int evtchn = irq;
-	notify_remote_via_evtchn(evtchn);
+	int evtchn = evtchn_from_irq(irq);
+	if (is_valid_evtchn(evtchn))
+		notify_remote_via_evtchn(evtchn);
 }
 EXPORT_SYMBOL(notify_remote_via_irq);
 
@@ -183,9 +249,10 @@ irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		while ((l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i])) {
 			port = (l1i * BITS_PER_LONG) + __ffs(l2);
 			synch_clear_bit(port, &s->evtchn_pending[0]);
-			if ((handler = evtchns[port].handler) != NULL)
-				handler(port, evtchns[port].dev_id,
-					regs);
+			irq = evtchn_to_irq[port];
+			if ((irq >= 0) &&
+			    ((handler = irq_evtchn[irq].handler) != NULL))
+				handler(irq, irq_evtchn[irq].dev_id, regs);
 			else
 				printk(KERN_WARNING "unexpected event channel "
 				       "upcall on port %d!\n", port);
@@ -200,3 +267,28 @@ void force_evtchn_callback(void)
 	(void)HYPERVISOR_xen_version(0, NULL);
 }
 EXPORT_SYMBOL(force_evtchn_callback);
+
+void irq_suspend(void)
+{
+	mutex_lock(&irq_evtchn_mutex);
+}
+
+void irq_suspend_cancel(void)
+{
+	mutex_unlock(&irq_evtchn_mutex);
+}
+
+void irq_resume(void)
+{
+	int evtchn, irq;
+
+	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++) {
+		mask_evtchn(evtchn);
+		evtchn_to_irq[evtchn] = -1;
+	}
+
+	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++)
+		irq_evtchn[irq].evtchn = 0;
+
+	mutex_unlock(&irq_evtchn_mutex);
+}

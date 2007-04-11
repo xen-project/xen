@@ -87,7 +87,16 @@ def xen_api_todo():
 
 
 def now():
-    return xmlrpclib.DateTime(time.strftime("%Y%m%dT%H:%M:%S", time.gmtime()))
+    return datetime()
+
+
+def datetime(when = None):
+    """Marshall the given time as a Xen-API DateTime.
+
+    @param when The time in question, given as seconds since the epoch, UTC.
+                May be None, in which case the current time is used.
+    """
+    return xmlrpclib.DateTime(time.gmtime(when))
 
 
 # ---------------------------------------------------
@@ -860,13 +869,13 @@ class XendAPI(object):
                     'metrics',
                     'capabilities',
                     'supported_bootloaders',
+                    'sched_policy',
                     'API_version_major',
                     'API_version_minor',
                     'API_version_vendor',
                     'API_version_vendor_implementation']
     
     host_attr_rw = ['name_label',
-                    'sched_policy',
                     'name_description',
                     'other_config']
 

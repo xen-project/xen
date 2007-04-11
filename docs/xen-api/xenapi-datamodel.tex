@@ -1558,6 +1558,81 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~send\_sysrq}
+
+{\bf Overview:} 
+Send the given key as a sysrq to this VM.  The key is specified as a single
+character (a String of length 1).  This can only be called when the
+specified VM is in the Running state.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void send_sysrq (session_id s, VM ref vm, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & vm & The VM \\ \hline 
+
+{\tt string } & key & The key to send \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
+\subsubsection{RPC name:~send\_trigger}
+
+{\bf Overview:} 
+Send the named trigger to this VM.  This can only be called when the
+specified VM is in the Running state.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void send_trigger (session_id s, VM ref vm, string trigger)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & vm & The VM \\ \hline 
+
+{\tt string } & trigger & The trigger to send \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 
@@ -4107,6 +4182,9 @@ $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object ref
 $\mathit{RO}_\mathit{run}$ &  {\tt memory/actual} & int & Guest's actual memory (bytes) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/CPU} & (int $\rightarrow$ int) Map & VCPU to PCPU map \\
+$\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & The live equivalent to VM.VCPUs\_params \\
+$\mathit{RO}_\mathit{run}$ &  {\tt start\_time} & datetime & Time at which this VM was last booted \\
 $\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
 \end{longtable}
@@ -4253,6 +4331,102 @@ Get the VCPUs/utilisation field of the given VM\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 (int $\rightarrow$ float) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VCPUs\_CPU}
+
+{\bf Overview:} 
+Get the VCPUs/CPU field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((int -> int) Map) get_VCPUs_CPU (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(int $\rightarrow$ int) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VCPUs\_params}
+
+{\bf Overview:} 
+Get the VCPUs/params field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_VCPUs_params (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_start\_time}
+
+{\bf Overview:} 
+Get the start\_time field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} datetime get_start_time (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+datetime
 }
 
 
@@ -4744,6 +4918,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt API\_version/vendor\_implementation} & (strin
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt capabilities} & string Set & Xen capabilities \\
+$\mathit{RO}_\mathit{run}$ &  {\tt cpu\_configuration} & (string $\rightarrow$ string) Map & The CPU configuration on this host.  May contain keys such as ``nr\_nodes'', ``sockets\_per\_node'', ``cores\_per\_socket'', or ``threads\_per\_core'' \\
+$\mathit{RO}_\mathit{run}$ &  {\tt sched\_policy} & string & Scheduler policy currently in force on this host \\
 $\mathit{RO}_\mathit{run}$ &  {\tt supported\_bootloaders} & string Set & a list of the bootloaders installed on the machine \\
 $\mathit{RO}_\mathit{run}$ &  {\tt resident\_VMs} & (VM ref) Set & list of VMs currently resident on host \\
 $\mathit{RW}$ &  {\tt logging} & (string $\rightarrow$ string) Map & logging configuration \\
@@ -4916,6 +5092,104 @@ string
 
 
 dmesg string
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~dmesg\_clear}
+
+{\bf Overview:} 
+Get the host xen dmesg, and clear the buffer.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string dmesg_clear (session_id s, host ref host)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The Host to query \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+dmesg string
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_log}
+
+{\bf Overview:} 
+Get the host's log file.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_log (session_id s, host ref host)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The Host to query \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+The contents of the host's primary log file
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~send\_debug\_keys}
+
+{\bf Overview:} 
+Inject the given string as debugging keys into Xen.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void send_debug_keys (session_id s, host ref host, string keys)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & host & The host \\ \hline 
+
+{\tt string } & keys & The keys to send \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -5447,6 +5721,70 @@ Get the capabilities field of the given host.
  \noindent {\bf Return Type:} 
 {\tt 
 string Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_cpu\_configuration}
+
+{\bf Overview:} 
+Get the cpu\_configuration field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_cpu_configuration (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_sched\_policy}
+
+{\bf Overview:} 
+Get the sched\_policy field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_sched_policy (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
 }
 
 

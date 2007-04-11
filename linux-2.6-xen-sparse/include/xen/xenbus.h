@@ -293,7 +293,7 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,
 void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 		      ...);
 
-int __init xenbus_dev_init(void);
+int xenbus_dev_init(void);
 
 const char *xenbus_strstate(enum xenbus_state state);
 int xenbus_dev_is_online(struct xenbus_device *dev);

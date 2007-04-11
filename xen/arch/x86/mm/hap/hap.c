@@ -443,6 +443,7 @@ void hap_final_teardown(struct domain *d)
         hap_teardown(d);
 
     p2m_teardown(d);
+    ASSERT( d->arch.paging.hap.p2m_pages == 0 );
 }
 
 void hap_teardown(struct domain *d)
@@ -635,12 +636,60 @@ void hap_update_paging_modes(struct vcpu *v)
     hap_unlock(d);
 }
 
+#if CONFIG_PAGING_LEVELS == 3
+static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e) 
+/* Special case, only used for external-mode domains on PAE hosts:
+ * update the mapping of the p2m table.  Once again, this is trivial in
+ * other paging modes (one top-level entry points to the top-level p2m,
+ * no maintenance needed), but PAE makes life difficult by needing a
+ * copy l3es of the p2m table in eight l2h slots in the monitor table.  This 
+ * function makes fresh copies when a p2m l3e changes. */
+{
+    l2_pgentry_t *ml2e;
+    struct vcpu *v;
+    unsigned int index;
+    
+    index = ((unsigned long)l3e & ~PAGE_MASK) / sizeof(l3_pgentry_t);
+    ASSERT(index < MACHPHYS_MBYTES>>1);
+    
+    for_each_vcpu(d, v) {
+	if ( pagetable_get_pfn(v->arch.monitor_table) == 0 ) 
+	    continue;
+
+	ASSERT(paging_mode_external(v->domain));
+
+        if ( v == current ) /* OK to use linear map of monitor_table */
+	    ml2e = __linear_l2_table + l2_linear_offset(RO_MPT_VIRT_START);
+        else {
+	    l3_pgentry_t *ml3e;
+            ml3e = hap_map_domain_page(pagetable_get_mfn(v->arch.monitor_table));
+	    ASSERT(l3e_get_flags(ml3e[3]) & _PAGE_PRESENT);
+            ml2e = hap_map_domain_page(_mfn(l3e_get_pfn(ml3e[3])));
+            ml2e += l2_table_offset(RO_MPT_VIRT_START);
+	    hap_unmap_domain_page(ml3e);
+        }
+	ml2e[index] = l2e_from_pfn(l3e_get_pfn(*l3e), __PAGE_HYPERVISOR);
+        if ( v != current )
+            hap_unmap_domain_page(ml2e);
+    }
+}
+#endif
+
 void 
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     l1_pgentry_t new, unsigned int level)
 {
     hap_lock(v->domain);
     safe_write_pte(p, new);
+#if CONFIG_PAGING_LEVELS == 3
+    /* install P2M in monitor table for PAE Xen */
+    if ( level == 3 ) {
+	/* We have written to the p2m l3: need to sync the per-vcpu
+         * copies of it in the monitor tables */
+	p2m_install_entry_in_monitors(v->domain, (l3_pgentry_t *)p);
+	
+    }
+#endif
     hap_unlock(v->domain);
 }
 

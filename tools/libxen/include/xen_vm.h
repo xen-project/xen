@@ -838,6 +838,23 @@ xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu);
 
 
 /**
+ * Send the given key as a sysrq to this VM.  The key is specified as a
+ * single character (a String of length 1).  This can only be called when the
+ * specified VM is in the Running state.
+ */
+extern bool
+xen_vm_send_sysrq(xen_session *session, xen_vm vm, char *key);
+
+
+/**
+ * Send the named trigger to this VM.  This can only be called when the
+ * specified VM is in the Running state.
+ */
+extern bool
+xen_vm_send_trigger(xen_session *session, xen_vm vm, char *trigger);
+
+
+/**
  * Return a list of all the VMs known to the system.
  */
 extern bool

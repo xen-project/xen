@@ -21,6 +21,8 @@
 
 #include "xen_common.h"
 #include "xen_int_float_map.h"
+#include "xen_int_int_map.h"
+#include "xen_string_string_map.h"
 #include "xen_vm_metrics_decl.h"
 
 
@@ -66,6 +68,9 @@ typedef struct xen_vm_metrics_record
     int64_t memory_actual;
     int64_t vcpus_number;
     xen_int_float_map *vcpus_utilisation;
+    xen_int_int_map *vcpus_cpu;
+    xen_string_string_map *vcpus_params;
+    time_t start_time;
     time_t last_updated;
 } xen_vm_metrics_record;
 
@@ -188,6 +193,27 @@ xen_vm_metrics_get_vcpus_number(xen_session *session, int64_t *result, xen_vm_me
  */
 extern bool
 xen_vm_metrics_get_vcpus_utilisation(xen_session *session, xen_int_float_map **result, xen_vm_metrics vm_metrics);
+
+
+/**
+ * Get the VCPUs/CPU field of the given VM_metrics.
+ */
+extern bool
+xen_vm_metrics_get_vcpus_cpu(xen_session *session, xen_int_int_map **result, xen_vm_metrics vm_metrics);
+
+
+/**
+ * Get the VCPUs/params field of the given VM_metrics.
+ */
+extern bool
+xen_vm_metrics_get_vcpus_params(xen_session *session, xen_string_string_map **result, xen_vm_metrics vm_metrics);
+
+
+/**
+ * Get the start_time field of the given VM_metrics.
+ */
+extern bool
+xen_vm_metrics_get_start_time(xen_session *session, time_t *result, xen_vm_metrics vm_metrics);
 
 
 /**

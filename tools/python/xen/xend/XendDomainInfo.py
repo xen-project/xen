@@ -430,6 +430,7 @@ class XendDomainInfo:
                 self._endRestore()
             except:
                 log.exception('VM resume failed')
+                self.destroy()
                 raise
         else:
             raise XendError('VM already running')

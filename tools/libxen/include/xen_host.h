@@ -79,6 +79,8 @@ typedef struct xen_host_record
     xen_string_string_map *software_version;
     xen_string_string_map *other_config;
     struct xen_string_set *capabilities;
+    xen_string_string_map *cpu_configuration;
+    char *sched_policy;
     struct xen_string_set *supported_bootloaders;
     struct xen_vm_record_opt_set *resident_vms;
     xen_string_string_map *logging;
@@ -261,6 +263,20 @@ xen_host_get_capabilities(xen_session *session, struct xen_string_set **result, 
 
 
 /**
+ * Get the cpu_configuration field of the given host.
+ */
+extern bool
+xen_host_get_cpu_configuration(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
+ * Get the sched_policy field of the given host.
+ */
+extern bool
+xen_host_get_sched_policy(xen_session *session, char **result, xen_host host);
+
+
+/**
  * Get the supported_bootloaders field of the given host.
  */
 extern bool
@@ -414,7 +430,7 @@ xen_host_enable(xen_session *session, xen_host host);
 
 /**
  * Shutdown the host. (This function can only be called if there are no
- * currently running VMs on the host and it is disabled.)
+ * currently running VMs on the host and it is disabled.).
  */
 extern bool
 xen_host_shutdown(xen_session *session, xen_host host);
@@ -422,7 +438,7 @@ xen_host_shutdown(xen_session *session, xen_host host);
 
 /**
  * Reboot the host. (This function can only be called if there are no
- * currently running VMs on the host and it is disabled.)
+ * currently running VMs on the host and it is disabled.).
  */
 extern bool
 xen_host_reboot(xen_session *session, xen_host host);
@@ -433,6 +449,27 @@ xen_host_reboot(xen_session *session, xen_host host);
  */
 extern bool
 xen_host_dmesg(xen_session *session, char **result, xen_host host);
+
+
+/**
+ * Get the host xen dmesg, and clear the buffer.
+ */
+extern bool
+xen_host_dmesg_clear(xen_session *session, char **result, xen_host host);
+
+
+/**
+ * Get the host's log file.
+ */
+extern bool
+xen_host_get_log(xen_session *session, char **result, xen_host host);
+
+
+/**
+ * Inject the given string as debugging keys into Xen.
+ */
+extern bool
+xen_host_send_debug_keys(xen_session *session, xen_host host, char *keys);
 
 
 /**
