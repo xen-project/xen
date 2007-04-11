@@ -67,7 +67,7 @@ static int alloc_xen_irq(void)
 
 	spin_lock(&irq_alloc_lock);
 
-	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++) {
+	for (irq = 1; irq < ARRAY_SIZE(irq_evtchn); irq++) {
 		if (irq_evtchn[irq].inuse) 
 			continue;
 		irq_evtchn[irq].inuse = 1;

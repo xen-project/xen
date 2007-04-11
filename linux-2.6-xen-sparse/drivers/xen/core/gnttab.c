@@ -617,7 +617,6 @@ int __devinit gnttab_init(void)
 	gnttab_free_count = nr_init_grefs - NR_RESERVED_ENTRIES;
 	gnttab_free_head  = NR_RESERVED_ENTRIES;
 
-	printk("Grant table initialized\n");
 	return 0;
 
  ini_nomem:
