@@ -60,9 +60,6 @@ static grant_ref_t gnttab_free_head;
 static DEFINE_SPINLOCK(gnttab_list_lock);
 
 static struct grant_entry *shared;
-#ifndef CONFIG_XEN
-static unsigned long resume_frames;
-#endif
 
 static struct gnttab_free_callback *gnttab_free_callback_list;
 
@@ -514,6 +511,8 @@ int gnttab_suspend(void)
 
 #include <platform-pci.h>
 
+static unsigned long resume_frames;
+
 static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 {
 	struct xen_add_to_physmap xatp;
@@ -543,23 +542,17 @@ int gnttab_resume(void)
 	if (max_nr_gframes < nr_gframes)
 		return -ENOSYS;
 
-	resume_frames = alloc_xen_mmio(PAGE_SIZE * max_nr_gframes);
+	if (!resume_frames) {
+		resume_frames = alloc_xen_mmio(PAGE_SIZE * max_nr_gframes);
+		shared = ioremap(resume_frames, PAGE_SIZE * max_nr_gframes);
+		if (shared == NULL) {
+			printk("error to ioremap gnttab share frames\n");
+			return -1;
+		}
+	}
 
 	gnttab_map(0, nr_gframes - 1);
 
-	shared = ioremap(resume_frames, PAGE_SIZE * max_nr_gframes);
-	if (shared == NULL) {
-		printk("error to ioremap gnttab share frames\n");
-		return -1;
-	}
-
-	return 0;
-}
-
-int gnttab_suspend(void)
-{
-	iounmap(shared);
-	resume_frames = 0;
 	return 0;
 }
 

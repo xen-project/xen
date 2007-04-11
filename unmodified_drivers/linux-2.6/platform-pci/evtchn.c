@@ -28,8 +28,10 @@
  * IN THE SOFTWARE.
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/spinlock.h>
 #include <xen/evtchn.h>
 #include <xen/interface/hvm/ioreq.h>
 #include <xen/features.h>
@@ -41,29 +43,37 @@
 
 void *shared_info_area;
 
-static DEFINE_MUTEX(irq_evtchn_mutex);
-
 #define is_valid_evtchn(x)	((x) != 0)
 #define evtchn_from_irq(x)	(irq_evtchn[irq].evtchn)
 
 static struct {
+	spinlock_t lock;
 	irqreturn_t(*handler) (int, void *, struct pt_regs *);
 	void *dev_id;
 	int evtchn;
 	int close:1; /* close on unbind_from_irqhandler()? */
 	int inuse:1;
+	int in_handler:1;
 } irq_evtchn[256];
 static int evtchn_to_irq[NR_EVENT_CHANNELS] = {
 	[0 ...  NR_EVENT_CHANNELS-1] = -1 };
 
-static int find_unbound_irq(void)
+static DEFINE_SPINLOCK(irq_alloc_lock);
+
+static int alloc_xen_irq(void)
 {
 	static int warned;
 	int irq;
 
-	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++)
-		if (!irq_evtchn[irq].inuse)
-			return irq;
+	spin_lock(&irq_alloc_lock);
+
+	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++) {
+		if (irq_evtchn[irq].inuse) 
+			continue;
+		irq_evtchn[irq].inuse = 1;
+		spin_unlock(&irq_alloc_lock);
+		return irq;
+	}
 
 	if (!warned) {
 		warned = 1;
@@ -71,7 +81,16 @@ static int find_unbound_irq(void)
 		       "increase irq_evtchn[] size in evtchn.c.\n");
 	}
 
+	spin_unlock(&irq_alloc_lock);
+
 	return -ENOSPC;
+}
+
+static void free_xen_irq(int irq)
+{
+	spin_lock(&irq_alloc_lock);
+	irq_evtchn[irq].inuse = 0;
+	spin_unlock(&irq_alloc_lock);
 }
 
 int irq_to_evtchn_port(int irq)
@@ -93,8 +112,7 @@ void unmask_evtchn(int port)
 	shared_info_t *s = shared_info_area;
 	vcpu_info_t *vcpu_info;
 
-	preempt_disable();
-	cpu = smp_processor_id();
+	cpu = get_cpu();
 	vcpu_info = &s->vcpu_info[cpu];
 
 	/* Slow path (hypercall) if this is a non-local port.  We only
@@ -103,7 +121,7 @@ void unmask_evtchn(int port)
 		evtchn_unmask_t op = { .port = port };
 		(void)HYPERVISOR_event_channel_op(EVTCHNOP_unmask,
 						  &op);
-		preempt_enable();
+		put_cpu();
 		return;
 	}
 
@@ -121,7 +139,8 @@ void unmask_evtchn(int port)
 		if (!vcpu_info->evtchn_upcall_mask)
 			force_evtchn_callback();
 	}
-	preempt_enable();
+
+	put_cpu();
 }
 EXPORT_SYMBOL(unmask_evtchn);
 
@@ -135,20 +154,19 @@ int bind_listening_port_to_irqhandler(
 	struct evtchn_alloc_unbound alloc_unbound;
 	int err, irq;
 
-	mutex_lock(&irq_evtchn_mutex);
-
-	irq = find_unbound_irq();
-	if (irq < 0) {
-		mutex_unlock(&irq_evtchn_mutex);
+	irq = alloc_xen_irq();
+	if (irq < 0)
 		return irq;
-	}
+
+	spin_lock_irq(&irq_evtchn[irq].lock);
 
 	alloc_unbound.dom        = DOMID_SELF;
 	alloc_unbound.remote_dom = remote_domain;
 	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
 					  &alloc_unbound);
 	if (err) {
-		mutex_unlock(&irq_evtchn_mutex);
+		spin_unlock_irq(&irq_evtchn[irq].lock);
+		free_xen_irq(irq);
 		return err;
 	}
 
@@ -156,13 +174,13 @@ int bind_listening_port_to_irqhandler(
 	irq_evtchn[irq].dev_id  = dev_id;
 	irq_evtchn[irq].evtchn  = alloc_unbound.port;
 	irq_evtchn[irq].close   = 1;
-	irq_evtchn[irq].inuse   = 1;
 
 	evtchn_to_irq[alloc_unbound.port] = irq;
 
 	unmask_evtchn(alloc_unbound.port);
 
-	mutex_unlock(&irq_evtchn_mutex);
+	spin_unlock_irq(&irq_evtchn[irq].lock);
+
 	return irq;
 }
 EXPORT_SYMBOL(bind_listening_port_to_irqhandler);
@@ -176,34 +194,34 @@ int bind_caller_port_to_irqhandler(
 {
 	int irq;
 
-	mutex_lock(&irq_evtchn_mutex);
-
-	irq = find_unbound_irq();
-	if (irq < 0) {
-		mutex_unlock(&irq_evtchn_mutex);
+	irq = alloc_xen_irq();
+	if (irq < 0)
 		return irq;
-	}
+
+	spin_lock_irq(&irq_evtchn[irq].lock);
 
 	irq_evtchn[irq].handler = handler;
 	irq_evtchn[irq].dev_id  = dev_id;
 	irq_evtchn[irq].evtchn  = caller_port;
 	irq_evtchn[irq].close   = 0;
-	irq_evtchn[irq].inuse   = 1;
 
 	evtchn_to_irq[caller_port] = irq;
 
 	unmask_evtchn(caller_port);
 
-	mutex_unlock(&irq_evtchn_mutex);
+	spin_unlock_irq(&irq_evtchn[irq].lock);
+
 	return irq;
 }
 EXPORT_SYMBOL(bind_caller_port_to_irqhandler);
 
 void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 {
-	int evtchn = evtchn_from_irq(irq);
+	int evtchn;
 
-	mutex_lock(&irq_evtchn_mutex);
+	spin_lock_irq(&irq_evtchn[irq].lock);
+
+	evtchn = evtchn_from_irq(irq);
 
 	if (is_valid_evtchn(evtchn)) {
 		evtchn_to_irq[irq] = -1;
@@ -216,21 +234,28 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 
 	irq_evtchn[irq].handler = NULL;
 	irq_evtchn[irq].evtchn  = 0;
-	irq_evtchn[irq].inuse   = 0;
 
-	mutex_unlock(&irq_evtchn_mutex);
+	spin_unlock_irq(&irq_evtchn[irq].lock);
+
+	while (irq_evtchn[irq].in_handler)
+		cpu_relax();
+
+	free_xen_irq(irq);
 }
 EXPORT_SYMBOL(unbind_from_irqhandler);
 
 void notify_remote_via_irq(int irq)
 {
-	int evtchn = evtchn_from_irq(irq);
+	int evtchn;
+
+	evtchn = evtchn_from_irq(irq);
 	if (is_valid_evtchn(evtchn))
 		notify_remote_via_evtchn(evtchn);
 }
 EXPORT_SYMBOL(notify_remote_via_irq);
 
-irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t evtchn_interrupt(int irq, void *dev_id,
+				    struct pt_regs *regs)
 {
 	unsigned int l1i, port;
 	/* XXX: All events are bound to vcpu0 but irq may be redirected. */
@@ -249,13 +274,30 @@ irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		while ((l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i])) {
 			port = (l1i * BITS_PER_LONG) + __ffs(l2);
 			synch_clear_bit(port, &s->evtchn_pending[0]);
+
 			irq = evtchn_to_irq[port];
-			if ((irq >= 0) &&
-			    ((handler = irq_evtchn[irq].handler) != NULL))
-				handler(irq, irq_evtchn[irq].dev_id, regs);
-			else
-				printk(KERN_WARNING "unexpected event channel "
-				       "upcall on port %d!\n", port);
+			if (irq < 0)
+				continue;
+
+			spin_lock(&irq_evtchn[irq].lock);
+			handler = irq_evtchn[irq].handler;
+			dev_id  = irq_evtchn[irq].dev_id;
+			if (unlikely(handler == NULL)) {
+				printk("Xen IRQ%d (port %d) has no handler!\n",
+				       irq, port);
+				spin_unlock(&irq_evtchn[irq].lock);
+				continue;
+			}
+			irq_evtchn[irq].in_handler = 1;
+			spin_unlock(&irq_evtchn[irq].lock);
+
+			local_irq_enable();
+			handler(irq, irq_evtchn[irq].dev_id, regs);
+			local_irq_disable();
+
+			spin_lock(&irq_evtchn[irq].lock);
+			irq_evtchn[irq].in_handler = 0;
+			spin_unlock(&irq_evtchn[irq].lock);
 		}
 	}
 
@@ -268,16 +310,6 @@ void force_evtchn_callback(void)
 }
 EXPORT_SYMBOL(force_evtchn_callback);
 
-void irq_suspend(void)
-{
-	mutex_lock(&irq_evtchn_mutex);
-}
-
-void irq_suspend_cancel(void)
-{
-	mutex_unlock(&irq_evtchn_mutex);
-}
-
 void irq_resume(void)
 {
 	int evtchn, irq;
@@ -289,6 +321,16 @@ void irq_resume(void)
 
 	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++)
 		irq_evtchn[irq].evtchn = 0;
+}
 
-	mutex_unlock(&irq_evtchn_mutex);
+int xen_irq_init(struct pci_dev *pdev)
+{
+	int irq;
+
+	for (irq = 0; irq < ARRAY_SIZE(irq_evtchn); irq++)
+		spin_lock_init(&irq_evtchn[irq].lock);
+
+	return request_irq(pdev->irq, evtchn_interrupt,
+			   SA_SHIRQ | SA_SAMPLE_RANDOM | SA_INTERRUPT,
+			   "xen-platform-pci", pdev);
 }
