@@ -411,7 +411,7 @@ static inline int pmd_large(pmd_t pte) {
 #define pmd_offset(dir, address) ((pmd_t *) pud_page(*(dir)) + \
                                   pmd_index(address))
 #define pmd_none(x)	(!pmd_val(x))
-#ifdef CONFIG_XEN_COMPAT <= 0x030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
