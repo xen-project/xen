@@ -6634,7 +6634,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt vendor} & string & the vendor of the physical
 $\mathit{RO}_\mathit{run}$ &  {\tt speed} & int & the speed of the physical CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt modelname} & string & the model name of the physical CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt stepping} & string & the stepping of the physical CPU \\
-$\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU (a decoded version of the features field) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt features} & string & the physical CPU feature bitmap \\
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
 \end{longtable}
@@ -6891,6 +6892,38 @@ Get the flags field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_flags (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_features}
+
+{\bf Overview:} 
+Get the features field of the given host\_cpu.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_features (session_id s, host_cpu ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}
