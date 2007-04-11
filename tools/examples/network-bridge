@@ -183,12 +183,12 @@ op_start () {
 	return
     fi
 
-    if ! link_exists "$vdev"; then
-        if link_exists "$pdev"; then
-            # The device is already up.
-            return
-        else
-            echo "
+    if link_exists "$pdev"; then
+	# The device is already up.
+	return
+    fi
+    if link_exists veth0 && ! link_exists "$vdev"; then
+	echo "
 Link $vdev is missing.
 This may be because you have reached the limit of the number of interfaces
 that the loopback driver supports.  If the loopback driver is a module, you
@@ -196,8 +196,7 @@ may raise this limit by passing it as a parameter (nloopbacks=<N>); if the
 driver is compiled statically into the kernel, then you may set the parameter
 using netloop.nloopbacks=<N> on the domain 0 kernel command line.
 " >&2
-            exit 1
-        fi
+	exit 1
     fi
 
     create_bridge ${bridge}
@@ -224,9 +223,13 @@ using netloop.nloopbacks=<N> on the domain 0 kernel command line.
 	add_to_bridge2 ${bridge} ${pdev}
 	do_ifup ${netdev}
     else
+	ip link set ${bridge} arp on
+	ip link set ${bridge} multicast on
 	# old style without ${vdev}
 	transfer_addrs  ${netdev} ${bridge}
 	transfer_routes ${netdev} ${bridge}
+	# Attach the real interface to the bridge.
+	add_to_bridge ${bridge} ${netdev}
     fi
 
     if [ ${antispoof} = 'yes' ] ; then
