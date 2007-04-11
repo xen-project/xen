@@ -2013,33 +2013,6 @@ END(ia32_interrupt)
 	DBG_FAULT(66)
 	FAULT(66)
 
-#ifdef CONFIG_XEN
-	/*
-	 * There is no particular reason for this code to be here, other than that
-	 * there happens to be space here that would go unused otherwise.  If this
-	 * fault ever gets "unreserved", simply moved the following code to a more
-	 * suitable spot...
-	 */
-
-GLOBAL_ENTRY(xen_bsw1)
-	/* FIXME: THIS CODE IS NOT NaT SAFE! */
-	movl r30=XSI_BANKNUM;
-	mov r31=1;;
-	st4 [r30]=r31;
-	movl r30=XSI_BANK1_R16;
-	movl r31=XSI_BANK1_R16+8;;
-	ld8 r16=[r30],16; ld8 r17=[r31],16;;
-	ld8 r18=[r30],16; ld8 r19=[r31],16;;
-	ld8 r20=[r30],16; ld8 r21=[r31],16;;
-	ld8 r22=[r30],16; ld8 r23=[r31],16;;
-	ld8 r24=[r30],16; ld8 r25=[r31],16;;
-	ld8 r26=[r30],16; ld8 r27=[r31],16;;
-	ld8 r28=[r30],16; ld8 r29=[r31],16;;
-	ld8 r30=[r30]; ld8 r31=[r31];;
-	br.ret.sptk.many b0
-END(xen_bsw1)
-#endif
-
 	.org ia64_ivt+0x7f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7f00 Entry 67 (size 16 bundles) Reserved
@@ -2167,4 +2140,38 @@ GLOBAL_ENTRY(xen_event_callback)
 	(p6) br.spnt.few 1b	// call evtchn_do_upcall again.
 	br.sptk.many ia64_leave_kernel   
 END(xen_event_callback)
+
+
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 */
+
+GLOBAL_ENTRY(xen_bsw1)
+	/* FIXME: THIS CODE IS NOT NaT SAFE! */
+	mov r14=ar.unat
+	movl r30=XSI_B1NAT
+	;;
+	ld8 r30=[r30];;
+	mov ar.unat=r30
+	movl r30=XSI_BANKNUM;
+	mov r31=1;;
+	st4 [r30]=r31;
+	movl r30=XSI_BANK1_R16;
+	movl r31=XSI_BANK1_R16+8;;
+	ld8.fill r16=[r30],16; ld8.fill r17=[r31],16;;
+	ld8.fill r18=[r30],16; ld8.fill r19=[r31],16;;
+	ld8.fill r20=[r30],16; ld8.fill r21=[r31],16;;
+	ld8.fill r22=[r30],16; ld8.fill r23=[r31],16;;
+	ld8.fill r24=[r30],16; ld8.fill r25=[r31],16;;
+	ld8.fill r26=[r30],16; ld8.fill r27=[r31],16;;
+	ld8.fill r28=[r30],16; ld8.fill r29=[r31],16;;
+	ld8.fill r30=[r30]; ld8.fill r31=[r31];;
+	mov ar.unat=r14
+	br.ret.sptk.many b0
+END(xen_bsw1)
+
+   
 #endif

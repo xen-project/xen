@@ -614,6 +614,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 #ifdef CONFIG_XEN
 	;;
 	// r16-r31 all now hold bank1 values
+	mov r15=ar.unat
 	movl r2=XSI_BANK1_R16
 	movl r3=XSI_BANK1_R16+8
 	;;
@@ -641,6 +642,11 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 .mem.offset 0,0; st8.spill [r2]=r30,16
 .mem.offset 8,0; st8.spill [r3]=r31,16
 	;;
+	mov r3=ar.unat
+	movl r2=XSI_B1NAT
+	;;
+	st8 [r2]=r3
+	mov ar.unat=r15
 	movl r2=XSI_BANKNUM;;
 	st4 [r2]=r0;
 #else
