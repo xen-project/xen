@@ -16,26 +16,19 @@
 
 
 /**
- * This function will save a domain running Linux.
+ * This function will save a running domain.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm fd the file descriptor to save a domain to
  * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                  int (*suspend)(int domid));
+int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+                   uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
+                   int (*suspend)(int domid), int hvm,
+                   void *(*init_qemu_maps)(int, unsigned),  /* HVM only */
+                   void (*qemu_flip_buffer)(int, int));     /* HVM only */
 
-/**
- * This function will save a hvm domain running unmodified guest.
- * @return 0 on success, -1 on failure
- */
-int xc_hvm_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                int (*suspend)(int domid),  
-                void *(*init_qemu_maps)(int, unsigned), 
-                void (*qemu_flip_buffer)(int, int));
 
 /**
  * This function will restore a saved domain.

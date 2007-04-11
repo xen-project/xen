@@ -174,12 +174,9 @@ main(int argc, char **argv)
     max_f = atoi(argv[4]);
     flags = atoi(argv[5]);
 
-    if (flags & XCFLAGS_HVM)
-        ret = xc_hvm_save(xc_fd, io_fd, domid, maxit, max_f, flags, 
-                          &suspend, &init_qemu_maps, &qemu_flip_buffer);
-    else 
-        ret = xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags, 
-                            &suspend);
+    ret = xc_domain_save(xc_fd, io_fd, domid, maxit, max_f, flags, 
+                         &suspend, !!(flags & XCFLAGS_HVM),
+                         &init_qemu_maps, &qemu_flip_buffer);
 
     xc_interface_close(xc_fd);
 
