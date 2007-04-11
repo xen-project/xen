@@ -116,7 +116,7 @@ char phys_ram_file[1024];
 void *ioport_opaque[MAX_IOPORTS];
 IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
 IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
-BlockDriverState *bs_table[MAX_DISKS], *fd_table[MAX_FD];
+BlockDriverState *bs_table[MAX_DISKS+MAX_SCSI_DISKS], *fd_table[MAX_FD];
 int vga_ram_size;
 int bios_size;
 static DisplayState display_state;
