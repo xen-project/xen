@@ -75,13 +75,6 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
 
         image_cfg = dominfo.info.get('image', {})
         hvm = dominfo.info.is_hvm()
-        stdvga = 0
-
-        if hvm:
-            log.info("save hvm domain")
-            if dominfo.info['platform'].has_key('stdvga'):
-                if dominfo.info['platform']['stdvga'] == 1:
-                    stdvga = 1
 
         # xc_save takes three customization parameters: maxit, max_f, and
         # flags the last controls whether or not save is 'live', while the
