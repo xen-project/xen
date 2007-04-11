@@ -16,6 +16,7 @@
 import os, sys, string, struct, tempfile, re
 import copy
 import logging
+import platform
 
 import curses, _curses, curses.wrapper, curses.textpad, curses.ascii
 import getopt
@@ -24,6 +25,7 @@ sys.path = [ '/usr/lib/python' ] + sys.path
 
 import fsimage
 import grub.GrubConf
+import grub.LiloConf
 
 PYGRUB_VER = 0.5
 
@@ -353,7 +355,13 @@ class Grub:
         if not os.access(fn, os.R_OK):
             raise RuntimeError, "Unable to access %s" %(fn,)
 
-        self.cf = grub.GrubConf.GrubConfigFile()
+        if platform.machine() == 'ia64':
+            self.cf = grub.LiloConf.LiloConfigFile()
+            file_list = ("/efi/redhat/elilo.conf",)
+        else:
+            self.cf = grub.GrubConf.GrubConfigFile()
+            file_list = ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                         "/grub/menu.lst", "/grub/grub.conf")
 
         if not fs:
             # set the config file and parse it
@@ -361,18 +369,15 @@ class Grub:
             self.cf.parse()
             return
 
-        grubfile = None
-        for f in ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                  "/grub/menu.lst", "/grub/grub.conf"):
+        for f in file_list:
             if fs.file_exists(f):
-                grubfile = f
+                self.cf.filename = f
                 break
-        if grubfile is None:
-            raise RuntimeError, "we couldn't find grub config file in the image provided."
-        f = fs.open_file(grubfile)
+        if self.cf.filename is None:
+            raise RuntimeError, "couldn't find bootloader config file in the image provided."
+        f = fs.open_file(self.cf.filename)
         buf = f.read()
         del f
-        # then parse the grub config
         self.cf.parse(buf)
 
     def run(self):
