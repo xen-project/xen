@@ -820,7 +820,7 @@ int vnc_start_viewer(int port);
 #define MAX_DISKS 4
 #define MAX_SCSI_DISKS 7
 
-extern BlockDriverState *bs_table[MAX_DISKS+MAX_SCSI_DISKS];
+extern BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS];
 
 void isa_ide_init(int iobase, int iobase2, int irq,
                   BlockDriverState *hd0, BlockDriverState *hd1);

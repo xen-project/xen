@@ -116,7 +116,7 @@ char phys_ram_file[1024];
 void *ioport_opaque[MAX_IOPORTS];
 IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
 IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
-BlockDriverState *bs_table[MAX_DISKS+MAX_SCSI_DISKS], *fd_table[MAX_FD];
+BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS], *fd_table[MAX_FD];
 int vga_ram_size;
 int bios_size;
 static DisplayState display_state;
@@ -1396,7 +1396,7 @@ static void stdio_received_byte(int ch)
         case 's': 
             {
                 int i;
-                for (i = 0; i < MAX_DISKS; i++) {
+                for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
                     if (bs_table[i])
                         bdrv_commit(bs_table[i]);
                 }
@@ -6057,7 +6057,7 @@ int main(int argc, char **argv)
     int snapshot, linux_boot;
     const char *initrd_filename;
 #ifndef CONFIG_DM
-    const char *hd_filename[MAX_DISKS];
+    const char *hd_filename[MAX_DISKS + MAX_SCSI_DISKS];
 #endif /* !CONFIG_DM */
     const char *fd_filename[MAX_FD];
     const char *kernel_filename, *kernel_cmdline;
@@ -6126,7 +6126,7 @@ int main(int argc, char **argv)
     for(i = 0; i < MAX_FD; i++)
         fd_filename[i] = NULL;
 #ifndef CONFIG_DM
-    for(i = 0; i < MAX_DISKS; i++)
+    for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
         hd_filename[i] = NULL;
 #endif /* !CONFIG_DM */
     ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
@@ -6724,7 +6724,7 @@ int main(int argc, char **argv)
     }
 
     /* open the virtual block devices */
-    for(i = 0; i < MAX_DISKS; i++) {
+    for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
         if (hd_filename[i]) {
             if (!bs_table[i]) {
                 char buf[64];

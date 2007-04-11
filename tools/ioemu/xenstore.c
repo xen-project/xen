@@ -18,7 +18,7 @@
 #include <fcntl.h>
 
 static struct xs_handle *xsh = NULL;
-static char *media_filename[MAX_DISKS];
+static char *media_filename[MAX_DISKS + MAX_SCSI_DISKS];
 static QEMUTimer *insert_timer = NULL;
 
 #define UWAIT_MAX (30*1000000) /* thirty seconds */
@@ -44,7 +44,7 @@ static void insert_media(void *opaque)
 {
     int i;
 
-    for (i = 0; i < MAX_DISKS; i++) {
+    for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
         if (media_filename[i] && bs_table[i]) {
             do_change(bs_table[i]->device_name, media_filename[i]);
             free(media_filename[i]);
@@ -86,7 +86,7 @@ void xenstore_parse_domain_config(int domid)
     int i, is_scsi;
     unsigned int len, num, hd_index;
 
-    for(i = 0; i < MAX_DISKS; i++)
+    for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
         media_filename[i] = NULL;
 
     xsh = xs_daemon_open();
