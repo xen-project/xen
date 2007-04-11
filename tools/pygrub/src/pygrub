@@ -59,6 +59,13 @@ def get_active_partition(file):
         if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
             return buf[poff:poff+16]
 
+        # type=0xee: GUID partition table
+        # XXX assume the first partition is active
+        if struct.unpack("<c", buf[poff+4:poff+5]) == ('\xee',):
+            os.lseek(fd, 0x400, 0)
+            buf = os.read(fd, 512)
+            return buf[24:40] # XXX buf[32:40]
+
     # if there's not a partition marked as active, fall back to
     # the first partition
     return buf[446:446+16]
