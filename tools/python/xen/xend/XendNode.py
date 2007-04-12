@@ -603,7 +603,7 @@ class XendNode:
         return [[k, info[k]] for k in ITEM_ORDER]
 
     def xendinfo(self):
-        return [['xend_config_format', 3]]
+        return [['xend_config_format', 4]]
 
     #
     # utilisation tracking
