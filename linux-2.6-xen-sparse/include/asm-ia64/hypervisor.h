@@ -64,7 +64,6 @@ extern start_info_t *xen_start_info;
 
 void force_evtchn_callback(void);
 
-#ifndef CONFIG_VMX_GUEST
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
 
@@ -116,6 +115,7 @@ HYPERVISOR_poll(
 	return rc;
 }
 
+#ifndef CONFIG_VMX_GUEST
 // for drivers/xen/privcmd/privcmd.c
 #define machine_to_phys_mapping 0
 struct vm_area_struct;
