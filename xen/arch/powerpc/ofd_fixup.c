@@ -264,7 +264,7 @@ static ofdn_t ofd_chosen_props(void *m, const char *cmdline)
     ofdn_t n;
     ofdn_t p;
     static const char path[] = "/chosen";
-    char bootargs[256];
+    char bootargs[256] = { 0, };
     int bsz;
     int sz;
     int rm;
@@ -276,7 +276,8 @@ static ofdn_t ofd_chosen_props(void *m, const char *cmdline)
                      &path[1], sizeof (path) - 1);
     }
 
-    strlcpy(bootargs, cmdline, sizeof(bootargs));
+    if (cmdline)
+        strlcpy(bootargs, cmdline, sizeof(bootargs));
     bsz = strlen(bootargs) + 1;
     rm = sizeof (bootargs) - bsz;
 
