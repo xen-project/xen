@@ -75,6 +75,7 @@ typedef struct xen_vif_record
     bool currently_attached;
     int64_t status_code;
     char *status_detail;
+    xen_string_string_map *runtime_properties;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
     struct xen_string_set *qos_supported_algorithms;
@@ -252,6 +253,13 @@ xen_vif_get_status_detail(xen_session *session, char **result, xen_vif vif);
 
 
 /**
+ * Get the runtime_properties field of the given VIF.
+ */
+extern bool
+xen_vif_get_runtime_properties(xen_session *session, xen_string_string_map **result, xen_vif vif);
+
+
+/**
  * Get the qos/algorithm_type field of the given VIF.
  */
 extern bool
@@ -333,7 +341,7 @@ xen_vif_remove_from_qos_algorithm_params(xen_session *session, xen_vif vif, char
 
 /**
  * Hotplug the specified VIF, dynamically attaching it to the running
- * VM
+ * VM.
  */
 extern bool
 xen_vif_plug(xen_session *session, xen_vif self);
@@ -341,7 +349,7 @@ xen_vif_plug(xen_session *session, xen_vif self);
 
 /**
  * Hot-unplug the specified VIF, dynamically unattaching it from the
- * running VM
+ * running VM.
  */
 extern bool
 xen_vif_unplug(xen_session *session, xen_vif self);

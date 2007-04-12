@@ -78,6 +78,7 @@ typedef struct xen_vbd_record
     bool currently_attached;
     int64_t status_code;
     char *status_detail;
+    xen_string_string_map *runtime_properties;
     char *qos_algorithm_type;
     xen_string_string_map *qos_algorithm_params;
     struct xen_string_set *qos_supported_algorithms;
@@ -259,6 +260,13 @@ xen_vbd_get_status_code(xen_session *session, int64_t *result, xen_vbd vbd);
  */
 extern bool
 xen_vbd_get_status_detail(xen_session *session, char **result, xen_vbd vbd);
+
+
+/**
+ * Get the runtime_properties field of the given VBD.
+ */
+extern bool
+xen_vbd_get_runtime_properties(xen_session *session, xen_string_string_map **result, xen_vbd vbd);
 
 
 /**

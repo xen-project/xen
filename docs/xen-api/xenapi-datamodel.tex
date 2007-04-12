@@ -7742,6 +7742,7 @@ $\mathit{RW}$ &  {\tt MTU} & int & MTU in octets \\
 $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the device currently attached (erased on reboot) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt status\_code} & int & error/success code associated with last attach-operation (erased on reboot) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success information associated with last attach-operation status (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt runtime\_properties} & (string $\rightarrow$ string) Map & Device runtime properties \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VIF \\
@@ -8218,6 +8219,38 @@ Get the status\_detail field of the given VIF.
  \noindent {\bf Return Type:} 
 {\tt 
 string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_runtime\_properties}
+
+{\bf Overview:} 
+Get the runtime\_properties field of the given VIF.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_runtime_properties (session_id s, VIF ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VIF ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
 }
 
 
@@ -11108,6 +11141,7 @@ $\mathit{RW}$ &  {\tt type} & vbd\_type & how the VBD will appear to the guest (
 $\mathit{RO}_\mathit{run}$ &  {\tt currently\_attached} & bool & is the device currently attached (erased on reboot) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt status\_code} & int & error/success code associated with last attach-operation (erased on reboot) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt status\_detail} & string & error/success information associated with last attach-operation status (erased on reboot) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt runtime\_properties} & (string $\rightarrow$ string) Map & Device runtime properties \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_type} & string & QoS algorithm to use \\
 $\mathit{RW}$ &  {\tt qos/algorithm\_params} & (string $\rightarrow$ string) Map & parameters for chosen QoS algorithm \\
 $\mathit{RO}_\mathit{run}$ &  {\tt qos/supported\_algorithms} & string Set & supported QoS algorithms for this VBD \\
@@ -11685,6 +11719,38 @@ Get the status\_detail field of the given VBD.
  \noindent {\bf Return Type:} 
 {\tt 
 string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_runtime\_properties}
+
+{\bf Overview:} 
+Get the runtime\_properties field of the given VBD.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_runtime_properties (session_id s, VBD ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VBD ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
 }
 
 

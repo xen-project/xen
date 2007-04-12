@@ -67,6 +67,9 @@ static const struct_member xen_vif_record_struct_members[] =
         { .key = "status_detail",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vif_record, status_detail) },
+        { .key = "runtime_properties",
+          .type = &abstract_type_string_string_map,
+          .offset = offsetof(xen_vif_record, runtime_properties) },
         { .key = "qos_algorithm_type",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vif_record, qos_algorithm_type) },
@@ -105,6 +108,7 @@ xen_vif_record_free(xen_vif_record *record)
     xen_vm_record_opt_free(record->vm);
     free(record->mac);
     free(record->status_detail);
+    xen_string_string_map_free(record->runtime_properties);
     free(record->qos_algorithm_type);
     xen_string_string_map_free(record->qos_algorithm_params);
     xen_string_set_free(record->qos_supported_algorithms);
@@ -313,6 +317,23 @@ xen_vif_get_status_detail(xen_session *session, char **result, xen_vif vif)
 
     *result = NULL;
     XEN_CALL_("VIF.get_status_detail");
+    return session->ok;
+}
+
+
+bool
+xen_vif_get_runtime_properties(xen_session *session, xen_string_string_map **result, xen_vif vif)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vif }
+        };
+
+    abstract_type result_type = abstract_type_string_string_map;
+
+    *result = NULL;
+    XEN_CALL_("VIF.get_runtime_properties");
     return session->ok;
 }
 
