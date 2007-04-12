@@ -696,26 +696,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
         *store_mfn = magic_pfns[2];
 
-        /* Read vcpu contexts */
-        for ( i = 0; i <= max_vcpu_id; i++ )
-        {
-            if ( !(vcpumap & (1ULL << i)) )
-                continue;
-
-            if ( !read_exact(io_fd, &(ctxt), sizeof(ctxt)) )
-            {
-                ERROR("error read vcpu context.\n");
-                goto out;
-            }
-            
-            if ( (rc = xc_vcpu_setcontext(xc_handle, dom, i, &ctxt)) )
-            {
-                ERROR("Could not set vcpu context, rc=%d", rc);
-                goto out;
-            }
-            rc = 1;
-        }
-
         /* Read HVM context */
         if ( !read_exact(io_fd, &rec_len, sizeof(uint32_t)) )
         {

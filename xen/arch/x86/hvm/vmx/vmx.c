@@ -370,11 +370,12 @@ static inline void __restore_debug_registers(struct vcpu *v)
 
 int vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {    
-    c->eip = __vmread(GUEST_RIP);
-    c->esp = __vmread(GUEST_RSP);
-    c->eflags = __vmread(GUEST_RFLAGS);
+    c->rip = __vmread(GUEST_RIP);
+    c->rsp = __vmread(GUEST_RSP);
+    c->rflags = __vmread(GUEST_RFLAGS);
 
     c->cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
+    c->cr2 = v->arch.hvm_vmx.cpu_cr2;
     c->cr3 = v->arch.hvm_vmx.cpu_cr3;
     c->cr4 = v->arch.hvm_vmx.cpu_shadow_cr4;
 
@@ -444,12 +445,14 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     vmx_vmcs_enter(v);
 
-    __vmwrite(GUEST_RIP, c->eip);
-    __vmwrite(GUEST_RSP, c->esp);
-    __vmwrite(GUEST_RFLAGS, c->eflags);
+    __vmwrite(GUEST_RIP, c->rip);
+    __vmwrite(GUEST_RSP, c->rsp);
+    __vmwrite(GUEST_RFLAGS, c->rflags);
 
     v->arch.hvm_vmx.cpu_shadow_cr0 = c->cr0;
     __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
+
+    v->arch.hvm_vmx.cpu_cr2 = c->cr2;
 
 #ifdef HVM_DEBUG_SUSPEND
     printk("vmx_vmcs_restore: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
@@ -555,6 +558,8 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     __vmwrite(GUEST_SYSENTER_ESP, c->sysenter_esp);
     __vmwrite(GUEST_SYSENTER_EIP, c->sysenter_eip);
 
+    __vmwrite(GUEST_DR7, c->dr7);
+
     vmx_vmcs_exit(v);
 
     paging_update_paging_modes(v);
@@ -590,7 +595,7 @@ void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->shadow_gs = guest_state->shadow_gs;
 
     /* save msrs */
-    data->flags = guest_flags;
+    data->msr_flags        = guest_flags;
     data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
     data->msr_cstar        = guest_state->msrs[VMX_INDEX_MSR_CSTAR];
@@ -607,7 +612,7 @@ void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
-    guest_state->flags = data->flags;
+    guest_state->flags = data->msr_flags;
     guest_state->msrs[VMX_INDEX_MSR_LSTAR]        = data->msr_lstar;
     guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
     guest_state->msrs[VMX_INDEX_MSR_CSTAR]        = data->msr_cstar;

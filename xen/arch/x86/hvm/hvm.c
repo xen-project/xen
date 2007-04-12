@@ -191,6 +191,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
+    struct vcpu_guest_context *vc;
 
     for_each_vcpu(d, v)
     {
@@ -199,7 +200,40 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         if ( test_bit(_VPF_down, &v->pause_flags) ) 
             continue;
 
+        /* Architecture-specific vmcs/vmcb bits */
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
+
+        /* Other vcpu register state */
+        vc = &v->arch.guest_context;
+        if ( vc->flags & VGCF_i387_valid )
+            memcpy(ctxt.fpu_regs, &vc->fpu_ctxt, sizeof(ctxt.fpu_regs));
+        else 
+            memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
+        ctxt.rax = vc->user_regs.eax;
+        ctxt.rbx = vc->user_regs.ebx;
+        ctxt.rcx = vc->user_regs.ecx;
+        ctxt.rdx = vc->user_regs.edx;
+        ctxt.rbp = vc->user_regs.ebp;
+        ctxt.rsi = vc->user_regs.esi;
+        ctxt.rdi = vc->user_regs.edi;
+        /* %rsp handled by arch-specific call above */
+#ifdef __x86_64__        
+        ctxt.r8  = vc->user_regs.r8;
+        ctxt.r9  = vc->user_regs.r9;
+        ctxt.r10 = vc->user_regs.r10;
+        ctxt.r11 = vc->user_regs.r11;
+        ctxt.r12 = vc->user_regs.r12;
+        ctxt.r13 = vc->user_regs.r13;
+        ctxt.r14 = vc->user_regs.r14;
+        ctxt.r15 = vc->user_regs.r15;
+#endif
+        ctxt.dr0 = vc->debugreg[0];
+        ctxt.dr1 = vc->debugreg[1];
+        ctxt.dr2 = vc->debugreg[2];
+        ctxt.dr3 = vc->debugreg[3];
+        ctxt.dr6 = vc->debugreg[6];
+        ctxt.dr7 = vc->debugreg[7];
+
         if ( hvm_save_entry(CPU, v->vcpu_id, h, &ctxt) != 0 )
             return 1; 
     }
@@ -208,9 +242,10 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    int vcpuid;
+    int vcpuid, rc;
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
+    struct vcpu_guest_context *vc;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -219,12 +254,51 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
         return -EINVAL;
     }
+    vc = &v->arch.guest_context;
+
+    /* Need to init this vcpu before loading its contents */
+    LOCK_BIGLOCK(d);
+    if ( !v->is_initialised )
+        if ( (rc = boot_vcpu(d, vcpuid, vc)) != 0 )
+            return rc;
+    UNLOCK_BIGLOCK(d);
 
     if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;
 
+    /* Architecture-specific vmcs/vmcb bits */
     if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
         return -EINVAL;
+
+    /* Other vcpu register state */
+    memcpy(&vc->fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
+    vc->user_regs.eax = ctxt.rax;
+    vc->user_regs.ebx = ctxt.rbx;
+    vc->user_regs.ecx = ctxt.rcx;
+    vc->user_regs.edx = ctxt.rdx;
+    vc->user_regs.ebp = ctxt.rbp;
+    vc->user_regs.esi = ctxt.rsi;
+    vc->user_regs.edi = ctxt.rdi;
+    vc->user_regs.esp = ctxt.rsp;
+#ifdef __x86_64__
+    vc->user_regs.r8; = ctxt.r8; 
+    vc->user_regs.r9; = ctxt.r9; 
+    vc->user_regs.r10 = ctxt.r10;
+    vc->user_regs.r11 = ctxt.r11;
+    vc->user_regs.r12 = ctxt.r12;
+    vc->user_regs.r13 = ctxt.r13;
+    vc->user_regs.r14 = ctxt.r14;
+    vc->user_regs.r15 = ctxt.r15;
+#endif
+    vc->debugreg[0] = ctxt.dr0;
+    vc->debugreg[1] = ctxt.dr1;
+    vc->debugreg[2] = ctxt.dr2;
+    vc->debugreg[3] = ctxt.dr3;
+    vc->debugreg[6] = ctxt.dr6;
+    vc->debugreg[7] = ctxt.dr7;
+
+    vc->flags = VGCF_i387_valid | VGCF_online;
+    v->fpu_initialised = 1;
 
     /* Auxiliary processors should be woken immediately. */
     if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )

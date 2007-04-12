@@ -378,8 +378,7 @@ static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
 
 
 static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
-                             int dom, xc_dominfo_t *info,
-                             vcpu_guest_context_t *ctxt)
+                             int dom, xc_dominfo_t *info)
 {
     int i = 0;
 
@@ -396,10 +395,6 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
         ERROR("Could not get domain info");
         return -1;
     }
-
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, ctxt) )
-        ERROR("Could not get vcpu context");
-
 
     if ( info->dying )
     {
@@ -663,10 +658,11 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
 static xen_pfn_t *map_and_save_p2m_table(int xc_handle, 
                                          int io_fd, 
                                          uint32_t dom,
-                                         vcpu_guest_context_t *ctxt,
                                          unsigned long p2m_size,
                                          shared_info_t *live_shinfo)
 {
+    vcpu_guest_context_t ctxt;
+
     /* Double and single indirect references to the live P2M table */
     xen_pfn_t *live_p2m_frame_list_list = NULL;
     xen_pfn_t *live_p2m_frame_list = NULL;
@@ -730,13 +726,19 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
         }
     }
 
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    {
+        ERROR("Could not get vcpu context");
+        goto out;
+    }
+
     /*
      * Write an extended-info structure to inform the restore code that
      * a PAE guest understands extended CR3 (PDPTs above 4GB). Turns off
      * slow paths in the restore code.
      */
     if ( (pt_levels == 3) &&
-         (ctxt->vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3)) )
+         (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3)) )
     {
         unsigned long signature = ~0UL;
         uint32_t tot_sz   = sizeof(struct vcpu_guest_context) + 8;
@@ -746,7 +748,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
              !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
              !write_exact(io_fd, &chunk_sig, 4) ||
              !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
-             !write_exact(io_fd, ctxt,       sizeof(*ctxt)) )
+             !write_exact(io_fd, &ctxt,      sizeof(ctxt)) )
         {
             ERROR("write: extended info");
             goto out;
@@ -853,11 +855,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         return 1;
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
-    {
-        ERROR("Could not get vcpu context");
-        goto out;
-    }
     shared_info_frame = info.shared_info_frame;
 
     /* Map the shared info frame */
@@ -900,7 +897,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     else
     {
         /* This is a non-live suspend. Suspend the domain .*/
-        if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info, &ctxt) )
+        if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info) )
         {
             ERROR("Domain appears not to have suspended");
             goto out;
@@ -999,7 +996,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         /* Map the P2M table, and write the list of P2M frames */
         live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, 
-                                          &ctxt, p2m_size, live_shinfo);
+                                          p2m_size, live_shinfo);
         if ( live_p2m == NULL )
         {
             ERROR("Failed to map/save the p2m frame list");
@@ -1304,17 +1301,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info,
-                                       &ctxt) )
+                if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info) )
                 {
                     ERROR("Domain appears not to have suspended");
                     goto out;
                 }
 
-                DPRINTF("SUSPEND shinfo %08lx eip %08lx edx %08lx\n",
-                        info.shared_info_frame,
-                        (unsigned long)ctxt.user_regs.eip,
-                        (unsigned long)ctxt.user_regs.edx);
+                DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
             }
 
             if ( xc_shadow_control(xc_handle, dom, 
@@ -1410,27 +1403,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             goto out;
         }
 
-        /* Save vcpu contexts */
-
-        for ( i = 0; i <= info.max_vcpu_id; i++ )
-        {
-            if ( !(vcpumap & (1ULL << i)) )
-                continue;
-            
-            if ( xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
-            {
-                ERROR("HVM:Could not get vcpu context");
-                goto out;
-            }
-            
-            DPRINTF("write vcpu %d context.\n", i); 
-            if ( !write_exact(io_fd, &(ctxt), sizeof(ctxt)) )
-            {
-                ERROR("write vcpu context failed!\n");
-                goto out;
-            }
-        }
-
         /* Get HVM context from Xen and save it too */
         if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
                                                   hvm_buf_size)) == -1 )
@@ -1492,6 +1464,12 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 j = 0;
             }
         }
+    }
+
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    {
+        ERROR("Could not get vcpu context");
+        goto out;
     }
 
     /* Canonicalise the suspend-record frame number. */
