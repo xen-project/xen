@@ -3,24 +3,71 @@
 #include "xg_save_restore.h"
 
 #if defined(__i386__) || defined(__x86_64__)
+
+#include <xen/foreign/x86_32.h>
+#include <xen/foreign/x86_64.h>
+#include <xen/hvm/params.h>
+
+/* Need to provide the right flavour of vcpu context for Xen */
+typedef union
+{
+    vcpu_guest_context_x86_64_t c64;
+    vcpu_guest_context_x86_32_t c32;   
+    vcpu_guest_context_t c;
+} vcpu_guest_context_either_t;
+
 static int modify_returncode(int xc_handle, uint32_t domid)
 {
-    vcpu_guest_context_t ctxt;
+    vcpu_guest_context_either_t ctxt;
+    xc_dominfo_t info;
+    xen_capabilities_info_t caps;
     int rc;
 
-    if ( (rc = xc_vcpu_getcontext(xc_handle, domid, 0, &ctxt)) != 0 )
+    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
+    {
+        PERROR("Could not get domain info");
+        return -1;
+    }
+
+    /* HVM guests without PV drivers do not have a return code to modify. */
+    if ( info.hvm )
+    {
+        unsigned long irq = 0;
+        xc_get_hvm_param(xc_handle, domid, HVM_PARAM_CALLBACK_IRQ, &irq);
+        if ( !irq )
+            return 0;
+    }
+
+    if ( xc_version(xc_handle, XENVER_capabilities, &caps) != 0 )
+    {
+        PERROR("Could not get Xen capabilities\n");
+        return -1;
+    }
+
+    if ( (rc = xc_vcpu_getcontext(xc_handle, domid, 0, &ctxt.c)) != 0 )
         return rc;
-    ctxt.user_regs.eax = 1;
-    if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt)) != 0 )
+
+    if ( !info.hvm )
+        ctxt.c.user_regs.eax = 1;
+    else if ( strstr(caps, "x86_64") )
+        ctxt.c64.user_regs.eax = 1;
+    else
+        ctxt.c32.user_regs.eax = 1;
+
+    if ( (rc = xc_vcpu_setcontext(xc_handle, domid, 0, &ctxt.c)) != 0 )
         return rc;
 
     return 0;
 }
+
 #else
+
 static int modify_returncode(int xc_handle, uint32_t domid)
 {
     return 0;
+
 }
+
 #endif
 
 static int xc_domain_resume_cooperative(int xc_handle, uint32_t domid)
@@ -65,6 +112,12 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
      * (x86 only) Rewrite store_mfn and console_mfn back to MFN (from PFN).
      */
 #if defined(__i386__) || defined(__x86_64__)
+    if ( info.hvm )
+    {
+        ERROR("Cannot resume uncooperative HVM guests");
+        return rc;
+    }
+
     /* Map the shared info frame */
     shinfo = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                   PROT_READ, info.shared_info_frame);

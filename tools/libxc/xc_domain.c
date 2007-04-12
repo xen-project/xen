@@ -8,6 +8,7 @@
 
 #include "xc_private.h"
 #include <xen/memory.h>
+#include <xen/hvm/hvm_op.h>
 
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
@@ -655,6 +656,44 @@ int xc_domain_send_trigger(int xc_handle,
     domctl.u.sendtrigger.vcpu = vcpu;
 
     return do_domctl(xc_handle, &domctl);
+}
+
+int xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domid = dom;
+    arg.index = param;
+    arg.value = value;
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
+        return -1;
+    rc = do_xen_hypercall(handle, &hypercall);
+    unlock_pages(&arg, sizeof(arg));
+    return rc;
+}
+
+int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
+{
+    DECLARE_HYPERCALL;
+    xen_hvm_param_t arg;
+    int rc;
+
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_get_param;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domid = dom;
+    arg.index = param;
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
+        return -1;
+    rc = do_xen_hypercall(handle, &hypercall);
+    unlock_pages(&arg, sizeof(arg));
+    *value = arg.value;
+    return rc;
 }
 
 /*

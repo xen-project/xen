@@ -284,14 +284,16 @@ class HVMImageHandler(ImageHandler):
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
-        return xc.hvm_build(domid          = self.vm.getDomid(),
-                            image          = self.kernel,
-                            store_evtchn   = store_evtchn,
-                            memsize        = mem_mb,
-                            vcpus          = self.vm.getVCpuCount(),
-                            pae            = self.pae,
-                            acpi           = self.acpi,
-                            apic           = self.apic)
+        rc = xc.hvm_build(domid          = self.vm.getDomid(),
+                          image          = self.kernel,
+                          store_evtchn   = store_evtchn,
+                          memsize        = mem_mb,
+                          vcpus          = self.vm.getVCpuCount(),
+                          pae            = self.pae,
+                          acpi           = self.acpi,
+                          apic           = self.apic)
+        rc['notes'] = { 'SUSPEND_CANCEL': 1 }
+        return rc
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
