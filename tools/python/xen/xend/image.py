@@ -415,6 +415,8 @@ class HVMImageHandler(ImageHandler):
         else:
             ret.append('-nographic')
 
+        if int(vmConfig['platform'].get('monitor', 0)) != 0:
+            ret.append('-monitor vc')
         return ret
 
     def createDeviceModel(self, restore = False):

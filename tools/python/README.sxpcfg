@@ -63,6 +63,7 @@ image
   - fdb
   - soundhw
   - localtime
+  - monitor
   - serial
   - stdvga
   - isa

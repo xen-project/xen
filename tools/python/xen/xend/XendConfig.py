@@ -117,7 +117,7 @@ LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
 
 # Platform configuration keys.
 XENAPI_PLATFORM_CFG = [ 'acpi', 'apic', 'boot', 'device_model', 'display', 
-                        'fda', 'fdb', 'keymap', 'isa', 'localtime',
+                        'fda', 'fdb', 'keymap', 'isa', 'localtime', 'monitor', 
                         'nographic', 'pae', 'rtc_timeoffset', 'serial', 'sdl',
                         'soundhw','stdvga', 'usb', 'usbdevice', 'vnc',
                         'vncconsole', 'vncdisplay', 'vnclisten',
