@@ -28,7 +28,11 @@
 #include <asm/processor.h>
 #include <asm/msr.h>
 
-#define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
+#define xchg(ptr,x) 							       \
+({									       \
+	__typeof__(*(ptr)) _x_ = (x);					       \
+	(__typeof__(*(ptr))) __xchg((ptr), (unsigned long)_x_, sizeof(*(ptr))); \
+})
 
 static __inline__ unsigned long
 __xchg_u32(volatile int *m, unsigned long val)
