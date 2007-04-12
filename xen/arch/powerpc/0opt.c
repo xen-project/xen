@@ -21,6 +21,12 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 
+extern void __xchg_called_with_bad_pointer(void);
+void __xchg_called_with_bad_pointer(void)
+{
+    BUG();
+}
+
 extern void __cmpxchg_called_with_bad_pointer(void);
 void __cmpxchg_called_with_bad_pointer(void)
 {
