@@ -70,6 +70,7 @@ typedef struct xen_host_cpu_record
     char *modelname;
     char *stepping;
     char *flags;
+    char *features;
     double utilisation;
 } xen_host_cpu_record;
 
@@ -220,6 +221,13 @@ xen_host_cpu_get_stepping(xen_session *session, char **result, xen_host_cpu host
  */
 extern bool
 xen_host_cpu_get_flags(xen_session *session, char **result, xen_host_cpu host_cpu);
+
+
+/**
+ * Get the features field of the given host_cpu.
+ */
+extern bool
+xen_host_cpu_get_features(xen_session *session, char **result, xen_host_cpu host_cpu);
 
 
 /**

@@ -44,7 +44,11 @@ def getXendNetConfig():
     if not xconfig:
         xconfig = "/etc/xen/xend-config.sxp"
 
-    configfile = open(xconfig, 'r')
+    try:
+        configfile = open(xconfig, 'r')
+    except:
+        return "bridge"
+    
     S = configfile.read()
     pin = Parser()
     pin.input(S)

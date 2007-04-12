@@ -12,11 +12,10 @@ static int system_state = 1;
 EXPORT_SYMBOL(system_state);
 #endif
 
-static inline void ctrl_alt_del(void)
+void ctrl_alt_del(void)
 {
 	kill_proc(1, SIGINT, 1); /* interrupt init */
 }
-EXPORT_SYMBOL(ctrl_alt_del);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 size_t strcspn(const char *s, const char *reject)

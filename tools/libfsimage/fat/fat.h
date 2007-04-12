@@ -84,17 +84,17 @@ struct fat_bpb {
 #define FAT_DIRENTRY_LENGTH       32
 
 #define FAT_DIRENTRY_ATTRIB(entry) \
-  (*((unsigned char *) (entry+11)))
+  (*((__u8 *) (entry+11)))
 #define FAT_DIRENTRY_VALID(entry) \
-  ( ((*((unsigned char *) entry)) != 0) \
-    && ((*((unsigned char *) entry)) != 0xE5) \
+  ( ((*((__u8 *) entry)) != 0) \
+    && ((*((__u8 *) entry)) != 0xE5) \
     && !(FAT_DIRENTRY_ATTRIB(entry) & FAT_ATTRIB_NOT_OK_MASK) )
 #define FAT_DIRENTRY_FIRST_CLUSTER(entry) \
-  ((*((unsigned short *) (entry+26)))+(*((unsigned short *) (entry+20)) << 16))
+  ((*((__u16 *) (entry+26)))+(*((__u16 *) (entry+20)) << 16))
 #define FAT_DIRENTRY_FILELENGTH(entry) \
-  (*((unsigned long *) (entry+28)))
+  (*((__u32 *) (entry+28)))
 
 #define FAT_LONGDIR_ID(entry) \
-  (*((unsigned char *) (entry)))
+  (*((__u8 *) (entry)))
 #define FAT_LONGDIR_ALIASCHECKSUM(entry) \
-  (*((unsigned char *) (entry+13)))
+  (*((__u8 *) (entry+13)))

@@ -180,7 +180,7 @@ static void do_commit(void)
 {
     int i;
 
-    for (i = 0; i < MAX_DISKS; i++) {
+    for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
         if (bs_table[i]) {
             bdrv_commit(bs_table[i]);
         }

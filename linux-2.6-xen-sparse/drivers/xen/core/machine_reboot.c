@@ -209,6 +209,8 @@ int __xen_suspend(int fast_suspend)
 	if (fast_suspend) {
 		xenbus_suspend();
 		err = stop_machine_run(take_machine_down, &fast_suspend, 0);
+		if (err < 0)
+			xenbus_suspend_cancel();
 	} else {
 		err = take_machine_down(&fast_suspend);
 	}

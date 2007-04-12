@@ -22,16 +22,11 @@
 #ifndef _XEN_PLATFORM_PCI_H
 #define _XEN_PLATFORM_PCI_H
 
-#include <linux/interrupt.h>
+#include <linux/pci.h>
 
 unsigned long alloc_xen_mmio(unsigned long len);
-int gnttab_init(void);
-irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-void irq_suspend(void);
-void irq_suspend_cancel(void);
-
-void platform_pci_suspend(void);
-void platform_pci_suspend_cancel(void);
 void platform_pci_resume(void);
+
+extern struct pci_dev *xen_platform_pdev;
 
 #endif /* _XEN_PLATFORM_PCI_H */

@@ -838,6 +838,28 @@ xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu);
 
 
 /**
+ * Add the given key-value pair to VM.VCPUs_params, and apply that
+ * value on the running VM.
+ */
+extern bool
+xen_vm_add_to_vcpus_params_live(xen_session *session, xen_vm self, char *key, char *value);
+
+
+/**
+ * Set memory_dynamic_max in database and on running VM.
+ */
+extern bool
+xen_vm_set_memory_dynamic_max_live(xen_session *session, xen_vm self, int64_t max);
+
+
+/**
+ * Set memory_dynamic_min in database and on running VM.
+ */
+extern bool
+xen_vm_set_memory_dynamic_min_live(xen_session *session, xen_vm self, int64_t min);
+
+
+/**
  * Send the given key as a sysrq to this VM.  The key is specified as a
  * single character (a String of length 1).  This can only be called when the
  * specified VM is in the Running state.

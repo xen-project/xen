@@ -29,47 +29,6 @@ typedef union
     vcpu_guest_context_t c;
 } vcpu_guest_context_either_t;
 
-
-int xc_set_hvm_param(
-    int handle, domid_t dom, int param, unsigned long value)
-{
-    DECLARE_HYPERCALL;
-    xen_hvm_param_t arg;
-    int rc;
-
-    hypercall.op     = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_set_param;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domid = dom;
-    arg.index = param;
-    arg.value = value;
-    if ( lock_pages(&arg, sizeof(arg)) != 0 )
-        return -1;
-    rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(&arg, sizeof(arg));
-    return rc;
-}
-
-int xc_get_hvm_param(
-    int handle, domid_t dom, int param, unsigned long *value)
-{
-    DECLARE_HYPERCALL;
-    xen_hvm_param_t arg;
-    int rc;
-
-    hypercall.op     = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_get_param;
-    hypercall.arg[1] = (unsigned long)&arg;
-    arg.domid = dom;
-    arg.index = param;
-    if ( lock_pages(&arg, sizeof(arg)) != 0 )
-        return -1;
-    rc = do_xen_hypercall(handle, &hypercall);
-    unlock_pages(&arg, sizeof(arg));
-    *value = arg.value;
-    return rc;
-}
-
 static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =

@@ -840,6 +840,9 @@ const char *xc_error_code_to_desc(int code);
  */
 xc_error_handler xc_set_error_handler(xc_error_handler handler);
 
+int xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value);
+int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value);
+
 /* PowerPC specific. */
 int xc_alloc_real_mode_area(int xc_handle,
                             uint32_t domid,

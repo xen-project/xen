@@ -128,14 +128,12 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		break;
 	}
 
-	printk("Registering block device major %i\n", ptr->major);
 	if (register_blkdev(ptr->major, ptr->type->devname)) {
-		WPRINTK("can't get major %d with name %s\n",
-			ptr->major, ptr->type->devname);
 		kfree(ptr);
 		return NULL;
 	}
 
+	printk("xen-vbd: registered block device major %i\n", ptr->major);
 	major_info[index] = ptr;
 	return ptr;
 }

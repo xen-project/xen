@@ -88,46 +88,6 @@ def parseRate(ratestr):
     return "%lu,%lu" % (bytes_per_interval, interval_usecs)
 
 
-write_rate_G_re = re.compile('^([0-9]+)000000000(B/s@[0-9]+us)$')
-write_rate_M_re = re.compile('^([0-9]+)000000(B/s@[0-9]+us)$')
-write_rate_K_re = re.compile('^([0-9]+)000(B/s@[0-9]+us)$')
-write_rate_s_re = re.compile('^([0-9]+[GMK]?B/s@[0-9]+)000000us$')
-write_rate_m_re = re.compile('^([0-9]+[GMK]?B/s@[0-9]+)000us$')
-
-def formatRate(rate):
-    (bytes_per_interval, interval_usecs) = map(long, rate.split(','))
-
-    if interval_usecs != 0:
-        bytes_per_second = (bytes_per_interval * 1000 * 1000) / interval_usecs
-    else:
-        bytes_per_second = 0xffffffffL
-
-    ratestr = "%uB/s@%uus" % (bytes_per_second, interval_usecs)
-
-    # look for '000's
-    m = write_rate_G_re.match(ratestr)
-    if m:
-        ratestr = m.group(1) + "G" + m.group(2)
-    else:
-        m = write_rate_M_re.match(ratestr)
-        if m:
-            ratestr = m.group(1) + "M" + m.group(2)
-        else:
-            m = write_rate_K_re.match(ratestr)
-            if m:
-                ratestr = m.group(1) + "K" + m.group(2)
-
-    m = write_rate_s_re.match(ratestr)
-    if m:
-        ratestr = m.group(1) + "s"
-    else:
-        m = write_rate_m_re.match(ratestr)
-        if m:
-            ratestr = m.group(1) + "ms"
-
-    return ratestr
-
-
 class NetifController(DevController):
     """Network interface controller. Handles all network devices for a domain.
     """
@@ -138,8 +98,7 @@ class NetifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
-        script = os.path.join(xoptions.network_script_dir,
-                              config.get('script', xoptions.get_vif_script()))
+        script  = config.get('script', xoptions.get_vif_script())
         typ     = config.get('type')
         bridge  = config.get('bridge')
         mac     = config.get('mac')
@@ -149,24 +108,17 @@ class NetifController(DevController):
         ipaddr  = config.get('ip')
         model   = config.get('model')
 
-        devid = self.allocateDeviceID()
-
         if not typ:
             typ = xoptions.netback_type
-            
+
         if not mac:
             mac = randomMAC()
 
+        devid = self.allocateDeviceID()
+
         back = { 'script' : script,
                  'mac'    : mac,
-                 'handle' : "%i" % devid,
                  'type'   : typ }
-
-        if typ == 'ioemu':
-            front = {}
-        else:
-            front = { 'handle' : "%i" % devid,
-                      'mac'    : mac }
         if ipaddr:
             back['ip'] = ipaddr
         if bridge:
@@ -174,11 +126,25 @@ class NetifController(DevController):
         if vifname:
             back['vifname'] = vifname
         if rate:
-            back['rate'] = parseRate(rate)
+            back['rate'] = rate
         if uuid:
             back['uuid'] = uuid
         if model:
             back['model'] = model
+
+        config_path = "device/%s/%d/" % (self.deviceClass, devid)
+        for x in back:
+            self.vm._writeVm(config_path + x, back[x])
+
+        back['handle'] = "%i" % devid
+        back['script'] = os.path.join(xoptions.network_script_dir, script)
+        if rate:
+            back['rate'] = parseRate(rate)
+
+        front = {}
+        if typ != 'ioemu':
+            front = { 'handle' : "%i" % devid,
+                      'mac'    : mac }
 
         return (devid, back, front)
 
@@ -187,14 +153,17 @@ class NetifController(DevController):
         """@see DevController.configuration"""
 
         result = DevController.getDeviceConfiguration(self, devid)
-        devinfo =  self.readBackend(devid, 'script', 'ip', 'bridge',
-                                    'mac', 'type', 'vifname', 'rate',
-                                    'uuid', 'model')
+
+        config_path = "device/%s/%d/" % (self.deviceClass, devid)
+        devinfo = ()
+        for x in ( 'script', 'ip', 'bridge', 'mac',
+                   'type', 'vifname', 'rate', 'uuid', 'model' ):
+            y = self.vm._readVm(config_path + x)
+            devinfo += (y,)
         (script, ip, bridge, mac, typ, vifname, rate, uuid, model) = devinfo
 
         if script:
-            network_script_dir = xoptions.network_script_dir + os.sep
-            result['script'] = script.replace(network_script_dir, "")
+            result['script'] = script
         if ip:
             result['ip'] = ip
         if bridge:
@@ -206,11 +175,10 @@ class NetifController(DevController):
         if vifname:
             result['vifname'] = vifname
         if rate:
-            result['rate'] = formatRate(rate)
+            result['rate'] = rate
         if uuid:
             result['uuid'] = uuid
         if model:
             result['model'] = model
             
         return result
-

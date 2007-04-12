@@ -56,20 +56,6 @@
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 
-#if 1
-#define IPRINTK(fmt, args...)				\
-	printk(KERN_INFO "xen_blk: " fmt, ##args)
-#else
-#define IPRINTK(fmt, args...) ((void)0)
-#endif
-
-#if 1
-#define WPRINTK(fmt, args...)				\
-	printk(KERN_WARNING "xen_blk: " fmt, ##args)
-#else
-#define WPRINTK(fmt, args...) ((void)0)
-#endif
-
 #define DPRINTK(_f, _a...) pr_debug(_f, ## _a)
 
 #if 0

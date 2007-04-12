@@ -40,7 +40,6 @@
 #include <xen/interface/hvm/params.h>
 #include <xen/features.h>
 #include <xen/evtchn.h>
-#include <xen/gnttab.h>
 #ifdef __ia64__
 #include <asm/xen/xencomm.h>
 #endif
@@ -61,6 +60,8 @@ EXPORT_SYMBOL(hypercall_stubs);
 MODULE_AUTHOR("ssmith@xensource.com");
 MODULE_DESCRIPTION("Xen platform PCI device");
 MODULE_LICENSE("GPL");
+
+struct pci_dev *xen_platform_pdev;
 
 static unsigned long shared_info_frame;
 static uint64_t callback_via;
@@ -88,8 +89,6 @@ static int __devinit init_xen_info(void)
 		ioremap(shared_info_frame << PAGE_SHIFT, PAGE_SIZE);
 	if (shared_info_area == NULL)
 		panic("can't map shared info\n");
-
-	gnttab_init();
 
 	return 0;
 }
@@ -199,8 +198,10 @@ static int set_callback_via(uint64_t via)
 	return HYPERVISOR_hvm_op(HVMOP_set_param, &a);
 }
 
+int xen_irq_init(struct pci_dev *pdev);
 int xenbus_init(void);
 int xen_reboot_init(void);
+int gnttab_init(void);
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
@@ -208,6 +209,10 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	int i, ret;
 	long ioaddr, iolen;
 	long mmio_addr, mmio_len;
+
+	if (xen_platform_pdev)
+		return -EBUSY;
+	xen_platform_pdev = pdev;
 
 	i = pci_enable_device(pdev);
 	if (i)
@@ -249,9 +254,10 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if ((ret = init_xen_info()))
 		goto out;
 
-	if ((ret = request_irq(pdev->irq, evtchn_interrupt,
-			       SA_SHIRQ | SA_SAMPLE_RANDOM,
-			       "xen-platform-pci", pdev)))
+	if ((ret = gnttab_init()))
+		goto out;
+
+	if ((ret = xen_irq_init(pdev)))
 		goto out;
 
 	if ((ret = set_callback_via(callback_via)))
@@ -292,18 +298,6 @@ static struct pci_driver platform_driver = {
 
 static int pci_device_registered;
 
-void platform_pci_suspend(void)
-{
-	gnttab_suspend();
-	irq_suspend();
-}
-
-void platform_pci_suspend_cancel(void)
-{
-	irq_suspend_cancel();
-	gnttab_resume();
-}
-
 void platform_pci_resume(void)
 {
 	struct xen_add_to_physmap xatp;
@@ -319,12 +313,8 @@ void platform_pci_resume(void)
 	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
 		BUG();
 
-	irq_resume();
-
 	if (set_callback_via(callback_via))
 		printk("platform_pci_resume failure!\n");
-
-	gnttab_resume();
 }
 
 static int __init platform_pci_module_init(void)

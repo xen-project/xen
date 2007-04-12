@@ -2,8 +2,8 @@
 #define COMPAT_INCLUDE_XEN_PLATFORM_COMPAT_H
 
 #include <linux/version.h>
-
 #include <linux/spinlock.h>
+#include <asm/maddr.h>
 
 #if defined(__LINUX_COMPILER_H) && !defined(__always_inline)
 #define __always_inline inline
@@ -98,8 +98,6 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
 
 #if defined(_PAGE_PRESENT) && !defined(_PAGE_NX)
 #define _PAGE_NX 0
-#endif
-
 /*
  * This variable at present is referenced by netfront, but only in code that
  * is dead when running in hvm guests. To detect potential active uses of it
@@ -107,5 +105,6 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
  * mappings created with it will fault when accessed.
  */
 #define __supported_pte_mask ((maddr_t)0)
+#endif
 
 #endif

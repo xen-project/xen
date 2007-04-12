@@ -118,6 +118,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	err = xenbus_transaction_start(&xbt);
 	if (err)
 		return;
+
 	str = (char *)xenbus_read(xbt, "control", "shutdown", NULL);
 	/* Ignore read errors and empty reads. */
 	if (XENBUS_IS_ERR_READ(str)) {
@@ -206,14 +207,12 @@ static int setup_shutdown_watcher(void)
 		printk(KERN_ERR "Failed to set shutdown watcher\n");
 		return err;
 	}
-	xenbus_write(XBT_NIL, "control", "feature-reboot", "1");
 
 	err = register_xenbus_watch(&sysrq_watch);
 	if (err) {
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
 		return err;
 	}
-	xenbus_write(XBT_NIL, "control", "feature-sysrq", "1");
 
 	return 0;
 }

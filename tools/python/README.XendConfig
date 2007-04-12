@@ -115,6 +115,7 @@ otherConfig
                                 image.nographic
                                 image.vnc
                                 image.sdl
+                                image.monitor
                                 image.vncdisplay
                                 image.vncunused
                                 image.hvm.device_model

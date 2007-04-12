@@ -95,7 +95,7 @@
                  src             %URI; #REQUIRED
                  type            %VDI_TYPE; #REQUIRED
                  size            CDATA #REQUIRED
-                 shareable       CDATA #REQUIRED
+                 sharable        CDATA #REQUIRED
                  read_only       CDATA #REQUIRED>
 
 <!ELEMENT name   (label, 

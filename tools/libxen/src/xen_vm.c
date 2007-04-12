@@ -1610,6 +1610,56 @@ xen_vm_set_vcpus_number_live(xen_session *session, xen_vm self, int64_t nvcpu)
 
 
 bool
+xen_vm_add_to_vcpus_params_live(xen_session *session, xen_vm self, char *key, char *value)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self },
+            { .type = &abstract_type_string,
+              .u.string_val = key },
+            { .type = &abstract_type_string,
+              .u.string_val = value }
+        };
+
+    xen_call_(session, "VM.add_to_VCPUs_params_live", param_values, 3, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_memory_dynamic_max_live(xen_session *session, xen_vm self, int64_t max)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self },
+            { .type = &abstract_type_int,
+              .u.int_val = max }
+        };
+
+    xen_call_(session, "VM.set_memory_dynamic_max_live", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_memory_dynamic_min_live(xen_session *session, xen_vm self, int64_t min)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = self },
+            { .type = &abstract_type_int,
+              .u.int_val = min }
+        };
+
+    xen_call_(session, "VM.set_memory_dynamic_min_live", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_send_sysrq(xen_session *session, xen_vm vm, char *key)
 {
     abstract_value param_values[] =

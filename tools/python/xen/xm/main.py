@@ -1544,34 +1544,59 @@ def xm_info(args):
 
         host_metrics_record = server.xenapi.host_metrics.get_record(host_record["metrics"])
 
+        def getVal(keys, default=""):
+            data = host_record
+            for key in keys:
+                if key in data:
+                    data = data[key]
+                else:
+                    return default
+            return data
+
+        def getCpuMhz():
+            cpu_speeds = [int(host_cpu_record["speed"])
+                          for host_cpu_record in host_cpu_records
+                          if "speed" in host_cpu_record]
+            if len(cpu_speeds) > 0:
+                return sum(cpu_speeds) / len(cpu_speeds)
+            else:
+                return 0
+
+        getCpuMhz()
+
+        def getCpuFeatures():
+            if len(host_cpu_records) > 0:
+                return host_cpu_records[0].get("features", "")
+            else:
+                return ""
+                
         info = {
-            "host":              host_record["name_label"],
-            "release":           host_record["software_version"]["release"],
-            "version":           host_record["software_version"]["version"],
-            "machine":           host_record["software_version"]["machine"],
-            "nr_cpus":           len(host_record["host_CPUs"]),
-            "nr_nodes":          host_record["cpu_configuration"]["nr_nodes"],
-            "sockets_per_node":  host_record["cpu_configuration"]["sockets_per_node"],
-            "cores_per_socket":  host_record["cpu_configuration"]["cores_per_socket"],
-            "threads_per_core":  host_record["cpu_configuration"]["threads_per_core"],
-            "cpu_mhz":           sum([int(host_cpu_record["speed"]) for host_cpu_record in host_cpu_records])
-                                   / len(host_cpu_records),
-            "hw_caps":           host_cpu_records[0]["features"],
+            "host":              getVal(["name_label"]),
+            "release":           getVal(["software_version", "release"]),
+            "version":           getVal(["software_version", "version"]),
+            "machine":           getVal(["software_version", "machine"]),
+            "nr_cpus":           len(getVal(["host_CPUs"], [])),
+            "nr_nodes":          getVal(["cpu_configuration", "nr_nodes"]),
+            "sockets_per_node":  getVal(["cpu_configuration", "sockets_per_node"]),
+            "cores_per_socket":  getVal(["cpu_configuration", "cores_per_socket"]),
+            "threads_per_core":  getVal(["cpu_configuration", "threads_per_core"]),
+            "cpu_mhz":           getCpuMhz(),
+            "hw_caps":           getCpuFeatures(),
             "total_memory":      int(host_metrics_record["memory_total"])/1024/1024,
             "free_memory":       int(host_metrics_record["memory_free"])/1024/1024,
-            "xen_major":         host_record["software_version"]["xen_major"],
-            "xen_minor":         host_record["software_version"]["xen_minor"],
-            "xen_extra":         host_record["software_version"]["xen_extra"],
-            "xen_caps":          " ".join(host_record["capabilities"]),
-            "xen_scheduler":     host_record["sched_policy"],
-            "xen_pagesize":      host_record["other_config"]["xen_pagesize"],
-            "platform_params":   host_record["other_config"]["platform_params"],
-            "xen_changeset":     host_record["software_version"]["xen_changeset"],
-            "cc_compiler":       host_record["software_version"]["cc_compiler"],
-            "cc_compile_by":     host_record["software_version"]["cc_compile_by"],
-            "cc_compile_domain": host_record["software_version"]["cc_compile_domain"],
-            "cc_compile_date":   host_record["software_version"]["cc_compile_date"],
-            "xend_config_format":host_record["software_version"]["xend_config_format"]                                
+            "xen_major":         getVal(["software_version", "xen_major"]),
+            "xen_minor":         getVal(["software_version", "xen_minor"]),
+            "xen_extra":         getVal(["software_version", "xen_extra"]),
+            "xen_caps":          " ".join(getVal(["capabilities"], [])),
+            "xen_scheduler":     getVal(["sched_policy"]),
+            "xen_pagesize":      getVal(["other_config", "xen_pagesize"]),
+            "platform_params":   getVal(["other_config", "platform_params"]),
+            "xen_changeset":     getVal(["software_version", "xen_changeset"]),
+            "cc_compiler":       getVal(["software_version", "cc_compiler"]),
+            "cc_compile_by":     getVal(["software_version", "cc_compile_by"]),
+            "cc_compile_domain": getVal(["software_version", "cc_compile_domain"]),
+            "cc_compile_date":   getVal(["software_version", "cc_compile_date"]),
+            "xend_config_format":getVal(["software_version", "xend_config_format"])                                
         }
 
         sorted = info.items()
