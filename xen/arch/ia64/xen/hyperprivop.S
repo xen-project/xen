@@ -1526,8 +1526,10 @@ ENTRY(hyper_get_psr)
 	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	ld1 r21=[r20];;
-	dep r8=r21,r8,IA64_PSR_I_BIT,1
+	cmp.eq p8,p9=r0,r21
 	;;
+(p8)	dep r8=-1,r8,IA64_PSR_I_BIT,1
+(p9)	dep r8=0,r8,IA64_PSR_I_BIT,1
 	// set vpsr.dfh
 	adds r20=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
 	ld1 r21=[r20];;
