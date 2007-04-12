@@ -229,7 +229,7 @@ int construct_dom0(struct domain *d,
     /* Load the dom0 kernel. */
     elf.dest = (void *)dst;
     elf_load_binary(&elf);
-    v->arch.ctxt.pc = dst - rma;
+    v->arch.ctxt.pc = dst - rma + (parms.virt_entry - parms.virt_kstart);
     dst = ALIGN_UP(dst + parms.virt_kend, PAGE_SIZE);
 
     /* Load the initrd. */
