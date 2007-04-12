@@ -212,8 +212,8 @@ class xenapi_create:
             "SR":               self.DEFAULT_STORAGE_REPOSITORY,  
             "virtual_size":     vdi.attributes["size"].value,
             "type":             vdi.attributes["type"].value,
-            "shareable":        vdi.attributes["shareable"].value,
-            "read_only":        vdi.attributes["read_only"].value,
+            "sharable":         bool(vdi.attributes["sharable"].value),
+            "read_only":        bool(vdi.attributes["read_only"].value),
             "other_config":     {"location":
                 vdi.attributes["src"].value}
             }
@@ -629,10 +629,10 @@ class sxp2xml:
         vdi.attributes["src"] = src
         vdi.attributes["read_only"] \
             = (get_child_by_name(vbd_sxp, "mode") != "w") \
-               and "true" or "false"
+               and "True" or "False"
         vdi.attributes["size"] = '-1'
         vdi.attributes["type"] = "system"
-        vdi.attributes["shareable"] = "false"
+        vdi.attributes["sharable"] = "False"
         vdi.attributes["name"] = name
 
         vdi.appendChild(self.make_name_tag(name, document))
