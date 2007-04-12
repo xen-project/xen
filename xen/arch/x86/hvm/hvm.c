@@ -281,8 +281,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc->user_regs.edi = ctxt.rdi;
     vc->user_regs.esp = ctxt.rsp;
 #ifdef __x86_64__
-    vc->user_regs.r8; = ctxt.r8; 
-    vc->user_regs.r9; = ctxt.r9; 
+    vc->user_regs.r8  = ctxt.r8; 
+    vc->user_regs.r9  = ctxt.r9; 
     vc->user_regs.r10 = ctxt.r10;
     vc->user_regs.r11 = ctxt.r11;
     vc->user_regs.r12 = ctxt.r12;
