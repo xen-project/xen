@@ -96,7 +96,10 @@ def datetime(when = None):
     @param when The time in question, given as seconds since the epoch, UTC.
                 May be None, in which case the current time is used.
     """
-    return xmlrpclib.DateTime(time.gmtime(when))
+    if when is None:
+        return xmlrpclib.DateTime(time.gmtime())
+    else:
+        return xmlrpclib.DateTime(time.gmtime(when))
 
 
 # ---------------------------------------------------
