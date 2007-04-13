@@ -87,12 +87,39 @@ DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
  */
 
 struct hvm_hw_cpu {
-    uint64_t eip;
-    uint64_t esp;
-    uint64_t eflags;
+    uint8_t  fpu_regs[512];
+
+    uint64_t rax;
+    uint64_t rbx;
+    uint64_t rcx;
+    uint64_t rdx;
+    uint64_t rbp;
+    uint64_t rsi;
+    uint64_t rdi;
+    uint64_t rsp;
+    uint64_t r8;
+    uint64_t r9;
+    uint64_t r10;
+    uint64_t r11;
+    uint64_t r12;
+    uint64_t r13;
+    uint64_t r14;
+    uint64_t r15;
+
+    uint64_t rip;
+    uint64_t rflags;
+
     uint64_t cr0;
+    uint64_t cr2;
     uint64_t cr3;
     uint64_t cr4;
+
+    uint64_t dr0;
+    uint64_t dr1;
+    uint64_t dr2;
+    uint64_t dr3;
+    uint64_t dr6;
+    uint64_t dr7;    
 
     uint32_t cs_sel;
     uint32_t ds_sel;
@@ -142,9 +169,9 @@ struct hvm_hw_cpu {
 
     /* msr for em64t */
     uint64_t shadow_gs;
-    uint64_t flags;
 
     /* msr content saved/restored. */
+    uint64_t msr_flags;
     uint64_t msr_lstar;
     uint64_t msr_star;
     uint64_t msr_cstar;

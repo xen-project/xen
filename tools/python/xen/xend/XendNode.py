@@ -150,8 +150,10 @@ class XendNode:
                 
         # Get a mapping from interface to bridge
 
-        if_to_br = dict(reduce(lambda ls,(b,ifs):[(i,b) for i in ifs] + ls,
-                               Brctl.get_state().items(), []))
+        if_to_br = dict([(i,b)
+                         for (b,ifs) in Brctl.get_state().items()
+                         for i in ifs])
+
         # initialise PIFs
         saved_pifs = self.state_store.load_state('pif')
         if saved_pifs:

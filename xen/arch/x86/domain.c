@@ -1540,8 +1540,10 @@ void domain_relinquish_resources(struct domain *d)
     relinquish_memory(d, &d->xenpage_list, PGT_l2_page_table);
     relinquish_memory(d, &d->page_list, PGT_l2_page_table);
 
-    /* Free page used by xen oprofile buffer */
+    /* Free page used by xen oprofile buffer. */
     free_xenoprof_pages(d);
+
+    hvm_domain_relinquish_resources(d);
 }
 
 void arch_dump_domain_info(struct domain *d)

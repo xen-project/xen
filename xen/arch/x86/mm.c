@@ -2041,7 +2041,7 @@ int do_mmuext_op(
                 MEM_LOG("Error while pinning mfn %lx", mfn);
                 break;
             }
-            
+
             if ( unlikely(test_and_set_bit(_PGT_pinned,
                                            &page->u.inuse.type_info)) )
             {
@@ -2054,14 +2054,18 @@ int do_mmuext_op(
             /* A page is dirtied when its pin status is set. */
             mark_dirty(d, mfn);
            
-            /*
-             * We can race domain destruction (domain_relinquish_resources).
-             * NB. The dying-flag test must happen /after/ setting PGT_pinned.
-             */
-            if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) &&
-                 this_cpu(percpu_mm_info).foreign->is_dying &&
-                 test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
-                put_page_and_type(page);
+            /* We can race domain destruction (domain_relinquish_resources). */
+            if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) )
+            {
+                int drop_ref;
+                spin_lock(&FOREIGNDOM->page_alloc_lock);
+                drop_ref = (FOREIGNDOM->is_dying &&
+                            test_and_clear_bit(_PGT_pinned,
+                                               &page->u.inuse.type_info));
+                spin_unlock(&FOREIGNDOM->page_alloc_lock);
+                if ( drop_ref )
+                    put_page_and_type(page);
+            }
 
             break;
 

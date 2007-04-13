@@ -832,7 +832,7 @@ void hvm_io_assist(void)
 
     io_opp = &v->arch.hvm_vcpu.io_op;
     regs   = &io_opp->io_context;
-    vio    = get_vio(d, v->vcpu_id);
+    vio    = get_ioreq(v);
 
     p = &vio->vp_ioreq;
     if ( p->state != STATE_IORESP_READY )

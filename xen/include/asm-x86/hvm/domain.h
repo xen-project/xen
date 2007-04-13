@@ -28,10 +28,16 @@
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 
+struct hvm_ioreq_page {
+    spinlock_t lock;
+    struct page_info *page;
+    void *va;
+};
+
 struct hvm_domain {
-    unsigned long          shared_page_va;
-    unsigned long          buffered_io_va;
-    spinlock_t             buffered_io_lock;
+    struct hvm_ioreq_page  ioreq;
+    struct hvm_ioreq_page  buf_ioreq;
+
     s64                    tsc_frequency;
     struct pl_time         pl_time;
 

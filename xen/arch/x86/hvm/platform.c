@@ -221,7 +221,6 @@ static inline unsigned long get_immediate(int ad_size, const unsigned char *inst
 
     inst++; //skip ModR/M byte
     if ( ad_size != WORD && mod != 3 && rm == 4 ) {
-        rm = *inst & 7;
         inst++; //skip SIB byte
     }
 
@@ -255,6 +254,33 @@ static inline unsigned long get_immediate(int ad_size, const unsigned char *inst
     }
 
     return val;
+}
+
+/* Some instructions, like "add $imm8, r/m16"/"MOV $imm32, r/m64" require
+ * the src immediate operand be sign-extented befere the op is executed. Here
+ * we always sign-extend the operand to a "unsigned long" variable.
+ *
+ * Note: to simplify the logic here, the sign-extension here may be performed
+ * redundantly against some instructions, like "MOV $imm16, r/m16" -- however
+ * this is harmless, since we always remember the operand's size.
+ */
+static inline unsigned long get_immediate_sign_ext(int ad_size,
+                                                   const unsigned char *inst,
+                                                   int op_size)
+{
+    unsigned long result = get_immediate(ad_size, inst, op_size);
+
+    if ( op_size == QUAD )
+        op_size = LONG;
+
+    ASSERT( op_size == BYTE || op_size == WORD || op_size == LONG );
+
+    if ( result & (1UL << ((8*op_size) - 1)) )
+    {
+        unsigned long mask = ~0UL >> (8 * (sizeof(mask) - op_size));
+        result = ~mask | (result & mask);
+    }
+    return result;
 }
 
 static inline int get_index(const unsigned char *inst, unsigned char rex)
@@ -394,7 +420,9 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
     case 8:
         if ( *op_size == 0 )
             *op_size = rex & 0x8 ? QUAD : LONG;
-        if ( *ad_size == 0 )
+        if ( *ad_size == WORD )
+            *ad_size = LONG;
+        else if ( *ad_size == 0 )
             *ad_size = QUAD;
         break;
 #endif
@@ -520,10 +548,10 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
         /* opcode 0x83 always has a single byte operand */
         if ( opcode[0] == 0x83 )
             mmio_op->immediate =
-                (signed char)get_immediate(*ad_size, opcode + 1, BYTE);
+                get_immediate_sign_ext(*ad_size, opcode + 1, BYTE);
         else
             mmio_op->immediate =
-                get_immediate(*ad_size, opcode + 1, *op_size);
+                get_immediate_sign_ext(*ad_size, opcode + 1, *op_size);
 
         mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
         mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
@@ -677,7 +705,7 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
 
             mmio_op->operand[0] = mk_operand(*op_size, 0, 0, IMMEDIATE);
             mmio_op->immediate =
-                    get_immediate(*ad_size, opcode + 1, *op_size);
+                    get_immediate_sign_ext(*ad_size, opcode + 1, *op_size);
             mmio_op->operand[1] = mk_operand(*op_size, 0, 0, MEMORY);
 
             return DECODE_success;
@@ -699,7 +727,7 @@ static int mmio_decode(int address_bytes, unsigned char *opcode,
 
             mmio_op->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
             mmio_op->immediate =
-                    get_immediate(*ad_size, opcode + 1, *op_size);
+                    get_immediate_sign_ext(*ad_size, opcode + 1, *op_size);
             mmio_op->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
             return DECODE_success;
@@ -838,7 +866,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
                port, count, size, value, dir, value_is_ptr);
     }
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_ioreq(v);
     if ( vio == NULL ) {
         printk("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
@@ -887,7 +915,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
                type, gpa, count, size, value, dir, value_is_ptr);
     }
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_ioreq(v);
     if (vio == NULL) {
         printk("bad shared page\n");
         domain_crash_synchronous();
@@ -948,7 +976,7 @@ void send_invalidate_req(void)
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_ioreq(v);
     if ( vio == NULL )
     {
         printk("bad shared page: %lx\n", (unsigned long) vio);

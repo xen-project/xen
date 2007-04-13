@@ -233,7 +233,7 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    c->eip = vmcb->rip;
+    c->rip = vmcb->rip;
 
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: eip=0x%"PRIx64".\n", 
@@ -241,10 +241,11 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
            inst_len, c->eip);
 #endif
 
-    c->esp = vmcb->rsp;
-    c->eflags = vmcb->rflags;
+    c->rsp = vmcb->rsp;
+    c->rflags = vmcb->rflags;
 
     c->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+    c->cr2 = v->arch.hvm_svm.cpu_cr2;
     c->cr3 = v->arch.hvm_svm.cpu_cr3;
     c->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
 
@@ -315,14 +316,14 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     unsigned long mfn, old_base_mfn;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    vmcb->rip    = c->eip;
-    vmcb->rsp    = c->esp;
-    vmcb->rflags = c->eflags;
+    vmcb->rip    = c->rip;
+    vmcb->rsp    = c->rsp;
+    vmcb->rflags = c->rflags;
 
     v->arch.hvm_svm.cpu_shadow_cr0 = c->cr0;
-    vmcb->cr0 = c->cr0 | X86_CR0_WP | X86_CR0_ET;
-    if ( !paging_mode_hap(v->domain) ) 
-        vmcb->cr0 |= X86_CR0_PG;
+    vmcb->cr0 = c->cr0 | X86_CR0_WP | X86_CR0_ET | X86_CR0_PG;
+
+    v->arch.hvm_svm.cpu_cr2 = c->cr2;
 
 #ifdef HVM_DEBUG_SUSPEND
     printk("%s: cr3=0x%"PRIx64", cr0=0x%"PRIx64", cr4=0x%"PRIx64".\n",
@@ -421,6 +422,19 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->sysenter_esp = c->sysenter_esp;
     vmcb->sysenter_eip = c->sysenter_eip;
 
+    /* update VMCB for nested paging restore */
+    if ( paging_mode_hap(v->domain) ) {
+        vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+        vmcb->cr3 = c->cr3;
+        vmcb->np_enable = 1;
+        vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
+        vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+    }
+
+    vmcb->dr6 = c->dr6;
+    vmcb->dr7 = c->dr7;
+
     paging_update_paging_modes(v);
     return 0;
  
@@ -440,6 +454,7 @@ void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
     data->msr_efer         = v->arch.hvm_svm.cpu_shadow_efer;
+    data->msr_flags        = -1ULL;
 
     data->tsc = hvm_get_guest_time(v);
 }

@@ -48,7 +48,7 @@ def get_name_description(node):
 
 def get_text_in_child_node(node, child):
     tag_node = node.getElementsByTagName(child)[0]
-    return tag_node.nodeValue
+    return " ".join([child.nodeValue for child in tag_node.childNodes])
 
 def get_child_node_attribute(node, child, attribute):
     tag_node = node.getElementsByTagName(child)[0]
@@ -264,7 +264,23 @@ class xenapi_create:
             "platform":
                 get_child_nodes_as_dict(vm, "platform", "key", "value"),
             "other_config":
-                get_child_nodes_as_dict(vm, "other_config", "key", "value")
+                get_child_nodes_as_dict(vm, "other_config", "key", "value"),
+            "PV_bootloader":
+                "",
+            "PV_kernel":
+                "",
+            "PV_ramdisk":
+                "",
+            "PV_args":
+                "",
+            "PV_bootloader_args":
+                "",
+            "HVM_boot_policy":
+                "",
+            "HVM_boot_params":
+                {},
+            "PCI_bus":
+               ""
             }
 
         if len(vm.getElementsByTagName("pv")) > 0:
@@ -494,7 +510,7 @@ class sxp2xml:
         # Make version tag
 
         version = document.createElement("version")
-        version.appendChild(document.createTextNode("1.0"))
+        version.appendChild(document.createTextNode("0"))
         vm.appendChild(version)
         
         # Make pv or hvm tag

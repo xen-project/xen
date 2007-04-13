@@ -688,33 +688,22 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             ERROR("error zeroing magic pages");
             goto out;
         }
-        
-        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN, magic_pfns[0]);
-        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN, magic_pfns[1]);
-        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN, magic_pfns[2]);
-        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_PAE_ENABLED, pae);
-        xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_EVTCHN, store_evtchn);
-        *store_mfn = magic_pfns[2];
-
-        /* Read vcpu contexts */
-        for ( i = 0; i <= max_vcpu_id; i++ )
+                
+        if ( (rc = xc_set_hvm_param(xc_handle, dom, 
+                                    HVM_PARAM_IOREQ_PFN, magic_pfns[0]))
+             || (rc = xc_set_hvm_param(xc_handle, dom, 
+                                       HVM_PARAM_BUFIOREQ_PFN, magic_pfns[1]))
+             || (rc = xc_set_hvm_param(xc_handle, dom, 
+                                       HVM_PARAM_STORE_PFN, magic_pfns[2]))
+             || (rc = xc_set_hvm_param(xc_handle, dom, 
+                                       HVM_PARAM_PAE_ENABLED, pae))
+             || (rc = xc_set_hvm_param(xc_handle, dom, 
+                                       HVM_PARAM_STORE_EVTCHN, store_evtchn)) )
         {
-            if ( !(vcpumap & (1ULL << i)) )
-                continue;
-
-            if ( !read_exact(io_fd, &(ctxt), sizeof(ctxt)) )
-            {
-                ERROR("error read vcpu context.\n");
-                goto out;
-            }
-            
-            if ( (rc = xc_vcpu_setcontext(xc_handle, dom, i, &ctxt)) )
-            {
-                ERROR("Could not set vcpu context, rc=%d", rc);
-                goto out;
-            }
-            rc = 1;
+            ERROR("error setting HVM params: %i", rc);
+            goto out;
         }
+        *store_mfn = magic_pfns[2];
 
         /* Read HVM context */
         if ( !read_exact(io_fd, &rec_len, sizeof(uint32_t)) )
