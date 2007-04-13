@@ -34,6 +34,7 @@
 #include <asm/vcpu.h>
 #include <xen/irq.h>
 #include <xen/errno.h>
+#include <xen/sched-if.h>
 
 /*
  * Get the machine page frame number in 16KB unit
@@ -613,8 +614,14 @@ again: /* Try again if VCPU has migrated.  */
         } else if (v == vcpu) {
             vmx_vcpu_ptc_l(v, va, ps);
         } else {
-            ptc_ga_remote_func(&args);
-            if (proc != v->processor)
+            vcpu_schedule_lock_irq(v);
+            proc = v->processor;
+            if (proc == vcpu->processor)
+                ptc_ga_remote_func(&args);
+            else
+                proc = INVALID_PROCESSOR;
+            vcpu_schedule_unlock_irq(v);
+            if (proc == INVALID_PROCESSOR)
                 goto again;
         }
     }
