@@ -622,14 +622,14 @@ static int network_open(struct net_device *dev)
 
 	memset(&np->stats, 0, sizeof(np->stats));
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 	if (netfront_carrier_ok(np)) {
 		network_alloc_rx_buffers(dev);
 		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
 			netif_rx_schedule(dev);
 	}
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 
 	network_maybe_wake_tx(dev);
 
@@ -1307,10 +1307,10 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	int pages_flipped = 0;
 	int err;
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 
 	if (unlikely(!netfront_carrier_ok(np))) {
-		spin_unlock(&np->rx_lock);
+		spin_unlock_bh(&np->rx_lock);
 		return 0;
 	}
 
@@ -1478,7 +1478,7 @@ err:
 		local_irq_restore(flags);
 	}
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 
 	return more_to_do;
 }
@@ -1520,7 +1520,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 
 	skb_queue_head_init(&free_list);
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 
 	for (id = 0; id < NET_RX_RING_SIZE; id++) {
 		if ((ref = np->grant_rx_ref[id]) == GRANT_INVALID_REF) {
@@ -1588,7 +1588,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 	while ((skb = __skb_dequeue(&free_list)) != NULL)
 		dev_kfree_skb(skb);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 }
 
 static int network_close(struct net_device *dev)
@@ -1708,8 +1708,8 @@ static int network_connect(struct net_device *dev)
 	IPRINTK("device %s has %sing receive path.\n",
 		dev->name, np->copying_receiver ? "copy" : "flipp");
 
+	spin_lock_bh(&np->rx_lock);
 	spin_lock_irq(&np->tx_lock);
-	spin_lock(&np->rx_lock);
 
 	/*
 	 * Recovery procedure:
@@ -1761,7 +1761,7 @@ static int network_connect(struct net_device *dev)
 	network_tx_buf_gc(dev);
 	network_alloc_rx_buffers(dev);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
 
 	return 0;
@@ -1818,7 +1818,7 @@ static ssize_t store_rxbuf_min(struct class_device *cd,
 	if (target > RX_MAX_TARGET)
 		target = RX_MAX_TARGET;
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 	if (target > np->rx_max_target)
 		np->rx_max_target = target;
 	np->rx_min_target = target;
@@ -1827,7 +1827,7 @@ static ssize_t store_rxbuf_min(struct class_device *cd,
 
 	network_alloc_rx_buffers(netdev);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 	return len;
 }
 
@@ -1861,7 +1861,7 @@ static ssize_t store_rxbuf_max(struct class_device *cd,
 	if (target > RX_MAX_TARGET)
 		target = RX_MAX_TARGET;
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 	if (target < np->rx_min_target)
 		np->rx_min_target = target;
 	np->rx_max_target = target;
@@ -1870,7 +1870,7 @@ static ssize_t store_rxbuf_max(struct class_device *cd,
 
 	network_alloc_rx_buffers(netdev);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 	return len;
 }
 
@@ -2033,10 +2033,10 @@ inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 static void netif_disconnect_backend(struct netfront_info *info)
 {
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
+	spin_lock_bh(&info->rx_lock);
 	spin_lock_irq(&info->tx_lock);
-	spin_lock(&info->rx_lock);
 	netfront_carrier_off(info);
-	spin_unlock(&info->rx_lock);
+	spin_unlock_bh(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
 
 	if (info->irq)
