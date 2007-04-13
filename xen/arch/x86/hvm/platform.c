@@ -866,7 +866,7 @@ void send_pio_req(unsigned long port, unsigned long count, int size,
                port, count, size, value, dir, value_is_ptr);
     }
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_ioreq(v);
     if ( vio == NULL ) {
         printk("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
@@ -915,7 +915,7 @@ static void send_mmio_req(unsigned char type, unsigned long gpa,
                type, gpa, count, size, value, dir, value_is_ptr);
     }
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_ioreq(v);
     if (vio == NULL) {
         printk("bad shared page\n");
         domain_crash_synchronous();
@@ -976,7 +976,7 @@ void send_invalidate_req(void)
     vcpu_iodata_t *vio;
     ioreq_t *p;
 
-    vio = get_vio(v->domain, v->vcpu_id);
+    vio = get_ioreq(v);
     if ( vio == NULL )
     {
         printk("bad shared page: %lx\n", (unsigned long) vio);

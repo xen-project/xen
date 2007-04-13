@@ -313,9 +313,6 @@ void domain_kill(struct domain *d)
         return;
     }
 
-    /* Tear down state /after/ setting the dying flag. */
-    smp_mb();
-
     gnttab_release_mappings(d);
     domain_relinquish_resources(d);
     put_domain(d);

@@ -32,14 +32,13 @@
 #define HVM_DEBUG 1
 #endif
 
-static inline shared_iopage_t *get_sp(struct domain *d)
+static inline vcpu_iodata_t *get_ioreq(struct vcpu *v)
 {
-    return (shared_iopage_t *) d->arch.hvm_domain.shared_page_va;
-}
-
-static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
-{
-    return &get_sp(d)->vcpu_iodata[cpu];
+    struct domain *d = v->domain;
+    shared_iopage_t *p = d->arch.hvm_domain.ioreq.va;
+    ASSERT((v == current) || spin_is_locked(&d->arch.hvm_domain.ioreq.lock));
+    ASSERT(d->arch.hvm_domain.ioreq.va != NULL);
+    return &p->vcpu_iodata[v->vcpu_id];
 }
 
 /* XXX these are really VMX specific */

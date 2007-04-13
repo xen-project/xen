@@ -158,34 +158,26 @@ static inline void hvm_mmio_access(struct vcpu *v,
 int hvm_buffered_io_send(ioreq_t *p)
 {
     struct vcpu *v = current;
-    spinlock_t  *buffered_io_lock;
-    buffered_iopage_t *buffered_iopage =
-        (buffered_iopage_t *)(v->domain->arch.hvm_domain.buffered_io_va);
-    unsigned long tmp_write_pointer = 0;
+    struct hvm_ioreq_page *iorp = &v->domain->arch.hvm_domain.buf_ioreq;
+    buffered_iopage_t *pg = iorp->va;
 
-    buffered_io_lock = &v->domain->arch.hvm_domain.buffered_io_lock;
-    spin_lock(buffered_io_lock);
+    spin_lock(&iorp->lock);
 
-    if ( buffered_iopage->write_pointer - buffered_iopage->read_pointer ==
-         (unsigned int)IOREQ_BUFFER_SLOT_NUM ) {
-        /* the queue is full.
-         * send the iopacket through the normal path.
-         * NOTE: The arithimetic operation could handle the situation for
-         * write_pointer overflow.
-         */
-        spin_unlock(buffered_io_lock);
+    if ( (pg->write_pointer - pg->read_pointer) == IOREQ_BUFFER_SLOT_NUM )
+    {
+        /* The queue is full: send the iopacket through the normal path. */
+        spin_unlock(&iorp->lock);
         return 0;
     }
 
-    tmp_write_pointer = buffered_iopage->write_pointer % IOREQ_BUFFER_SLOT_NUM;
+    memcpy(&pg->ioreq[pg->write_pointer % IOREQ_BUFFER_SLOT_NUM],
+           p, sizeof(ioreq_t));
 
-    memcpy(&buffered_iopage->ioreq[tmp_write_pointer], p, sizeof(ioreq_t));
-
-    /*make the ioreq_t visible before write_pointer*/
+    /* Make the ioreq_t visible /before/ write_pointer. */
     wmb();
-    buffered_iopage->write_pointer++;
+    pg->write_pointer++;
 
-    spin_unlock(buffered_io_lock);
+    spin_unlock(&iorp->lock);
 
     return 1;
 }

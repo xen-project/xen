@@ -34,13 +34,6 @@ void unmap_domain_page(void *va);
 void *map_domain_page_global(unsigned long mfn);
 void unmap_domain_page_global(void *va);
 
-/* 
- * Convert a VA (within a page previously mapped in the context of the
- * currently-executing VCPU via a call to map_domain_page(), or via a
- * previous call to map_domain_page_global()) to the mapped page frame.
- */
-unsigned long mfn_from_mapped_domain_page(void *va);
-
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
 
@@ -108,8 +101,6 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #define map_domain_page_global(mfn)         mfn_to_virt(mfn)
 #define unmap_domain_page_global(va)        ((void)(va))
-
-#define mfn_from_mapped_domain_page(va)     virt_to_mfn(va)
 
 struct domain_mmap_cache { 
 };

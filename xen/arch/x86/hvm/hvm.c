@@ -101,7 +101,7 @@ void hvm_set_guest_time(struct vcpu *v, u64 gtime)
 
 u64 hvm_get_guest_time(struct vcpu *v)
 {
-    u64    host_tsc;
+    u64 host_tsc;
 
     rdtscll(host_tsc);
     return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
@@ -125,7 +125,7 @@ void hvm_do_resume(struct vcpu *v)
     pt_thaw_time(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    p = &get_ioreq(v)->vp_ioreq;
     while ( p->state != STATE_IOREQ_NONE )
     {
         switch ( p->state )
@@ -146,54 +146,68 @@ void hvm_do_resume(struct vcpu *v)
     }
 }
 
-static void hvm_clear_ioreq_pfn(
-    struct domain *d, unsigned long *pva)
+static void hvm_init_ioreq_page(
+    struct domain *d, struct hvm_ioreq_page *iorp)
 {
-    unsigned long va, mfn;
-
-    BUG_ON(!d->is_dying);
-
-    if ( (va = xchg(pva, 0UL)) == 0UL )
-        return;
-
-    mfn = mfn_from_mapped_domain_page((void *)va);
-    unmap_domain_page_global((void *)va);
-    put_page_and_type(mfn_to_page(mfn));
+    memset(iorp, 0, sizeof(*iorp));
+    spin_lock_init(&iorp->lock);
+    domain_pause(d);
 }
 
-static int hvm_set_ioreq_pfn(
-    struct domain *d, unsigned long *pva, unsigned long gmfn)
+static void hvm_destroy_ioreq_page(
+    struct domain *d, struct hvm_ioreq_page *iorp)
 {
+    spin_lock(&iorp->lock);
+
+    ASSERT(d->is_dying);
+
+    if ( iorp->va != NULL )
+    {
+        unmap_domain_page_global(iorp->va);
+        put_page_and_type(iorp->page);
+        iorp->va = NULL;
+    }
+
+    spin_unlock(&iorp->lock);
+}
+
+static int hvm_set_ioreq_page(
+    struct domain *d, struct hvm_ioreq_page *iorp, unsigned long gmfn)
+{
+    struct page_info *page;
     unsigned long mfn;
     void *va;
 
     mfn = gmfn_to_mfn(d, gmfn);
-    if ( !mfn_valid(mfn) ||
-         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+    if ( !mfn_valid(mfn) )
+        return -EINVAL;
+
+    page = mfn_to_page(mfn);
+    if ( !get_page_and_type(page, d, PGT_writable_page) )
         return -EINVAL;
 
     va = map_domain_page_global(mfn);
     if ( va == NULL )
     {
-        put_page_and_type(mfn_to_page(mfn));
+        put_page_and_type(page);
         return -ENOMEM;
     }
 
-    if ( cmpxchg(pva, 0UL, (unsigned long)va) != 0UL )
+    spin_lock(&iorp->lock);
+
+    if ( (iorp->va != NULL) || d->is_dying )
     {
+        spin_unlock(&iorp->lock);
         unmap_domain_page_global(va);
         put_page_and_type(mfn_to_page(mfn));
         return -EINVAL;
     }
 
-    /*
-     * Check dying status /after/ setting *pva. cmpxchg() is a barrier.
-     * We race against hvm_domain_relinquish_resources(). 
-     */
-    if ( d->is_dying )
-        hvm_clear_ioreq_pfn(d, pva);
+    iorp->va = va;
+    iorp->page = page;
 
-    /* Balance the domain_pause() in hvm_domain_initialise(). */
+    spin_unlock(&iorp->lock);
+
     domain_unpause(d);
 
     return 0;
@@ -211,7 +225,6 @@ int hvm_domain_initialise(struct domain *d)
     }
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
-    spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
@@ -221,17 +234,16 @@ int hvm_domain_initialise(struct domain *d)
     vpic_init(d);
     vioapic_init(d);
 
-    /* Do not allow domain to run until it has ioreq shared pages. */
-    domain_pause(d); /* HVM_PARAM_IOREQ_PFN */
-    domain_pause(d); /* HVM_PARAM_BUFIOREQ_PFN */
+    hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
+    hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
     return 0;
 }
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
-    hvm_clear_ioreq_pfn(d, &d->arch.hvm_domain.shared_page_va);
-    hvm_clear_ioreq_pfn(d, &d->arch.hvm_domain.buffered_io_va);
+    hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
+    hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 }
 
 void hvm_domain_destroy(struct domain *d)
@@ -379,10 +391,20 @@ int hvm_vcpu_initialise(struct vcpu *v)
     }
 
     /* Create ioreq event channel. */
-    v->arch.hvm_vcpu.xen_port = alloc_unbound_xen_event_channel(v, 0);
-    if ( get_sp(v->domain) && get_vio(v->domain, v->vcpu_id) )
-        get_vio(v->domain, v->vcpu_id)->vp_eport =
-            v->arch.hvm_vcpu.xen_port;
+    rc = alloc_unbound_xen_event_channel(v, 0);
+    if ( rc < 0 )
+    {
+        hvm_funcs.vcpu_destroy(v);
+        vlapic_destroy(v);
+        return rc;
+    }
+
+    /* Register ioreq event channel. */
+    v->arch.hvm_vcpu.xen_port = rc;
+    spin_lock(&v->domain->arch.hvm_domain.ioreq.lock);
+    if ( v->domain->arch.hvm_domain.ioreq.va != NULL )
+        get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
+    spin_unlock(&v->domain->arch.hvm_domain.ioreq.lock);
 
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
@@ -463,7 +485,7 @@ void hvm_send_assist_req(struct vcpu *v)
     if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
         return; /* implicitly bins the i/o operation */
 
-    p = &get_vio(v->domain, v->vcpu_id)->vp_ioreq;
+    p = &get_ioreq(v)->vp_ioreq;
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {
         /* This indicates a bug in the device model.  Crash the domain. */
@@ -981,6 +1003,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     case HVMOP_get_param:
     {
         struct xen_hvm_param a;
+        struct hvm_ioreq_page *iorp;
         struct domain *d;
         struct vcpu *v;
 
@@ -1009,19 +1032,18 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             switch ( a.index )
             {
             case HVM_PARAM_IOREQ_PFN:
-                rc = hvm_set_ioreq_pfn(
-                    d, &d->arch.hvm_domain.shared_page_va, a.value);
-                if ( rc == 0 )
-                {
+                iorp = &d->arch.hvm_domain.ioreq;
+                rc = hvm_set_ioreq_page(d, iorp, a.value);
+                spin_lock(&iorp->lock);
+                if ( (rc == 0) && (iorp->va != NULL) )
                     /* Initialise evtchn port info if VCPUs already created. */
                     for_each_vcpu ( d, v )
-                        get_vio(d, v->vcpu_id)->vp_eport =
-                        v->arch.hvm_vcpu.xen_port;
-                }
+                        get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
+                spin_unlock(&iorp->lock);
                 break;
-            case HVM_PARAM_BUFIOREQ_PFN:
-                rc = hvm_set_ioreq_pfn(
-                    d, &d->arch.hvm_domain.buffered_io_va, a.value);
+            case HVM_PARAM_BUFIOREQ_PFN: 
+                iorp = &d->arch.hvm_domain.buf_ioreq;
+                rc = hvm_set_ioreq_page(d, iorp, a.value);
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
                 hvm_set_callback_via(d, a.value);
