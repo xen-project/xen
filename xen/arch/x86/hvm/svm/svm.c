@@ -321,9 +321,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->rflags = c->rflags;
 
     v->arch.hvm_svm.cpu_shadow_cr0 = c->cr0;
-    vmcb->cr0 = c->cr0 | X86_CR0_WP | X86_CR0_ET;
-    if ( !paging_mode_hap(v->domain) ) 
-        vmcb->cr0 |= X86_CR0_PG;
+    vmcb->cr0 = c->cr0 | X86_CR0_WP | X86_CR0_ET | X86_CR0_PG;
 
     v->arch.hvm_svm.cpu_cr2 = c->cr2;
 
@@ -423,6 +421,16 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->sysenter_cs =  c->sysenter_cs;
     vmcb->sysenter_esp = c->sysenter_esp;
     vmcb->sysenter_eip = c->sysenter_eip;
+
+    /* update VMCB for nested paging restore */
+    if ( paging_mode_hap(v->domain) ) {
+        vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+        vmcb->cr3 = c->cr3;
+        vmcb->np_enable = 1;
+        vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
+        vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+    }
 
     vmcb->dr6 = c->dr6;
     vmcb->dr7 = c->dr7;
