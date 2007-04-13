@@ -23,6 +23,7 @@
 #include "xen_common.h"
 #include "xen_int_float_map.h"
 #include "xen_int_int_map.h"
+#include "xen_int_string_set_map.h"
 #include "xen_internal.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_metrics.h"
@@ -57,6 +58,9 @@ static const struct_member xen_vm_metrics_record_struct_members[] =
         { .key = "VCPUs_params",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_metrics_record, vcpus_params) },
+        { .key = "VCPUs_flags",
+          .type = &abstract_type_int_string_set_map,
+          .offset = offsetof(xen_vm_metrics_record, vcpus_flags) },
         { .key = "state",
           .type = &abstract_type_string_set,
           .offset = offsetof(xen_vm_metrics_record, state) },
@@ -90,6 +94,7 @@ xen_vm_metrics_record_free(xen_vm_metrics_record *record)
     xen_int_float_map_free(record->vcpus_utilisation);
     xen_int_int_map_free(record->vcpus_cpu);
     xen_string_string_map_free(record->vcpus_params);
+    xen_int_string_set_map_free(record->vcpus_flags);
     xen_string_set_free(record->state);
     free(record);
 }
@@ -214,6 +219,23 @@ xen_vm_metrics_get_vcpus_params(xen_session *session, xen_string_string_map **re
 
     *result = NULL;
     XEN_CALL_("VM_metrics.get_VCPUs_params");
+    return session->ok;
+}
+
+
+bool
+xen_vm_metrics_get_vcpus_flags(xen_session *session, xen_int_string_set_map **result, xen_vm_metrics vm_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_metrics }
+        };
+
+    abstract_type result_type = abstract_type_int_string_set_map;
+
+    *result = NULL;
+    XEN_CALL_("VM_metrics.get_VCPUs_flags");
     return session->ok;
 }
 

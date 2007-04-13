@@ -684,6 +684,8 @@ static void print_session_info(xen_session *session)
 
     if (!session->ok)
     {
+        free(uuid);
+        free(this_user);
         xen_session_record_free(record);
         print_error(session);
         return;
@@ -692,6 +694,8 @@ static void print_session_info(xen_session *session)
     assert(!strcmp(record->uuid, uuid));
     assert(!strcmp(record->this_user, this_user));
 
+    free(uuid);
+    free(this_user);
     xen_session_record_free(record);
 
     fflush(stdout);
@@ -782,6 +786,22 @@ static void print_vm_metrics(xen_session *session, xen_vm vm)
         printf("  %s -> %s.\n",
                vm_metrics_record->vcpus_params->contents[i].key,
                vm_metrics_record->vcpus_params->contents[i].val);
+    }
+
+    for (size_t i = 0; i < vm_metrics_record->vcpus_flags->size; i++)
+    {
+        printf("%"PRId64" -> ",
+               vm_metrics_record->vcpus_flags->contents[i].key);
+        xen_string_set *s = vm_metrics_record->vcpus_flags->contents[i].val;
+        for (size_t j = 0; j < s->size; j++)
+        {
+            printf("%s", s->contents[j]);
+            if (j + 1 != s->size)
+            {
+                printf(", ");
+            }
+        }
+        printf("\n");
     }
 
     xen_vm_metrics_record_free(vm_metrics_record);
