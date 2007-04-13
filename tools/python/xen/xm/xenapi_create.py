@@ -72,7 +72,7 @@ class xenapi_create:
     def __init__(self):
         self.DEFAULT_STORAGE_REPOSITORY = get_default_SR()
 
-        self.dtd = "/usr/lib/python/xen/xm/create.dtd"
+        self.dtd = "/usr/share/xen/create.dtd"
 
     def create(self, filename=None, document=None, skipdtd=False):
         """
