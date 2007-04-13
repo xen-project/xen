@@ -1558,6 +1558,111 @@ void
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_VCPUs\_params\_live}
+
+{\bf Overview:} 
+Add the given key-value pair to VM.VCPUs\_params, and apply that value on
+the running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void add_to_VCPUs_params_live (session_id s, VM ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & The VM \\ \hline 
+
+{\tt string } & key & The key \\ \hline 
+
+{\tt string } & value & The value \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_memory\_dynamic\_max\_live}
+
+{\bf Overview:} 
+Set memory\_dynamic\_max in database and on running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_memory_dynamic_max_live (session_id s, VM ref self, int max)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & The VM \\ \hline 
+
+{\tt int } & max & The memory\_dynamic\_max value \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_memory\_dynamic\_min\_live}
+
+{\bf Overview:} 
+Set memory\_dynamic\_min in database and on running VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void set_memory_dynamic_min_live (session_id s, VM ref self, int min)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & The VM \\ \hline 
+
+{\tt int } & min & The memory\_dynamic\_min value \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~send\_sysrq}
 
 {\bf Overview:} 
@@ -4184,6 +4289,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/number} & int & Current number of VCPUs
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/utilisation} & (int $\rightarrow$ float) Map & Utilisation for all of guest's current VCPUs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/CPU} & (int $\rightarrow$ int) Map & VCPU to PCPU map \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VCPUs/params} & (string $\rightarrow$ string) Map & The live equivalent to VM.VCPUs\_params \\
+$\mathit{RO}_\mathit{run}$ &  {\tt state} & string Set & The state of the guest, eg blocked, dying etc \\
 $\mathit{RO}_\mathit{run}$ &  {\tt start\_time} & datetime & Time at which this VM was last booted \\
 $\mathit{RO}_\mathit{run}$ &  {\tt last\_updated} & datetime & Time at which this information was last updated \\
 \hline
@@ -4395,6 +4501,38 @@ Get the VCPUs/params field of the given VM\_metrics.
  \noindent {\bf Return Type:} 
 {\tt 
 (string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_state}
+
+{\bf Overview:} 
+Get the state field of the given VM\_metrics.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (string Set) get_state (session_id s, VM_metrics ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM\_metrics ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string Set
 }
 
 
@@ -6601,7 +6739,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt vendor} & string & the vendor of the physical
 $\mathit{RO}_\mathit{run}$ &  {\tt speed} & int & the speed of the physical CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt modelname} & string & the model name of the physical CPU \\
 $\mathit{RO}_\mathit{run}$ &  {\tt stepping} & string & the stepping of the physical CPU \\
-$\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU \\
+$\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU (a decoded version of the features field) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt features} & string & the physical CPU feature bitmap \\
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
 \hline
 \end{longtable}
@@ -6858,6 +6997,38 @@ Get the flags field of the given host\_cpu.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_flags (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_features}
+
+{\bf Overview:} 
+Get the features field of the given host\_cpu.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_features (session_id s, host_cpu ref self)\end{verbatim}
 
 
 \noindent{\bf Arguments:}

@@ -304,6 +304,8 @@ ENTRY(hyper_ssm_i)
 	;;
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	// temporarily save ar.unat
+	mov r28=ar.unat   
 	bsw.1;;
 	// FIXME?: ar.unat is not really handled correctly,
 	// but may not matter if the OS is NaT-clean
@@ -324,6 +326,12 @@ ENTRY(hyper_ssm_i)
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 	bsw.0 ;;
+	mov r27=ar.unat
+	adds r26=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	//save bank1 ar.unat
+	st8 [r26]=r27
+	//restore ar.unat
+	mov ar.unat=r28
 	mov r2=r30
 	mov r3=r29
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -1518,8 +1526,10 @@ ENTRY(hyper_get_psr)
 	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	ld1 r21=[r20];;
-	dep r8=r21,r8,IA64_PSR_I_BIT,1
+	cmp.eq p8,p9=r0,r21
 	;;
+(p8)	dep r8=-1,r8,IA64_PSR_I_BIT,1
+(p9)	dep r8=0,r8,IA64_PSR_I_BIT,1
 	// set vpsr.dfh
 	adds r20=XSI_VPSR_DFH_OFS-XSI_PSR_IC_OFS,r18;;
 	ld1 r21=[r20];;

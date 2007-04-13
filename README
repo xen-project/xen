@@ -199,3 +199,7 @@ Xend (the Xen daemon) has the following runtime dependencies:
     * For optional PAM support, PyPAM:
           URL:    http://www.pangalactic.org/PyPAM/
           Debian: python-pam
+
+    * For optional XenAPI support in XM, PyXML:
+          URL:    http://pyxml.sourceforge.net
+          YUM:    PyXML

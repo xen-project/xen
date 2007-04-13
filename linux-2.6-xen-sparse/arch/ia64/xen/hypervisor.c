@@ -852,6 +852,9 @@ time_resume(void)
 
 	/* Just trigger a tick.  */
 	ia64_cpu_local_tick();
+
+	/* Time interpolator remembers the last timer status.  Forget it */
+	time_interpolator_reset();
 }
 
 ///////////////////////////////////////////////////////////////////////////

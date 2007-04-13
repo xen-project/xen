@@ -1601,7 +1601,6 @@ class XendDomainInfo:
             self.image = image.create(self, self.info)
             if self.image:
                 self.image.createDeviceModel(True)
-                self.image.register_shutdown_watch()
         self._storeDomDetails()
         self._registerWatches()
         self.refreshShutdown()

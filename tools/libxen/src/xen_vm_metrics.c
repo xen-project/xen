@@ -57,6 +57,9 @@ static const struct_member xen_vm_metrics_record_struct_members[] =
         { .key = "VCPUs_params",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_vm_metrics_record, vcpus_params) },
+        { .key = "state",
+          .type = &abstract_type_string_set,
+          .offset = offsetof(xen_vm_metrics_record, state) },
         { .key = "start_time",
           .type = &abstract_type_datetime,
           .offset = offsetof(xen_vm_metrics_record, start_time) },
@@ -87,6 +90,7 @@ xen_vm_metrics_record_free(xen_vm_metrics_record *record)
     xen_int_float_map_free(record->vcpus_utilisation);
     xen_int_int_map_free(record->vcpus_cpu);
     xen_string_string_map_free(record->vcpus_params);
+    xen_string_set_free(record->state);
     free(record);
 }
 
@@ -210,6 +214,23 @@ xen_vm_metrics_get_vcpus_params(xen_session *session, xen_string_string_map **re
 
     *result = NULL;
     XEN_CALL_("VM_metrics.get_VCPUs_params");
+    return session->ok;
+}
+
+
+bool
+xen_vm_metrics_get_state(xen_session *session, struct xen_string_set **result, xen_vm_metrics vm_metrics)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm_metrics }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("VM_metrics.get_state");
     return session->ok;
 }
 

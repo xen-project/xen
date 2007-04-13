@@ -113,6 +113,11 @@ stdvga=0
 serial='pty'
 
 #-----------------------------------------------------------------------------
+#   Qemu Monitor, default is disable
+#   Use ctrl-alt-2 to connect
+#monitor=1
+
+#-----------------------------------------------------------------------------
 #   enable sound card support, [sb16|es1370|all|..,..], default none
 #soundhw='sb16'
 

@@ -17,9 +17,12 @@
 #include "xg_private.h"
 #include "xg_save_restore.h"
 
+#include <xen/hvm/params.h>
+#include <xen/hvm/e820.h>
+
 /*
 ** Default values for important tuning parameters. Can override by passing
-** non-zero replacement values to xc_linux_save().
+** non-zero replacement values to xc_domain_save().
 **
 ** XXX SMH: should consider if want to be able to override MAX_MBIT_RATE too.
 **
@@ -35,6 +38,11 @@ static unsigned long hvirt_start;
 
 /* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
+
+/* HVM: shared-memory bitmaps for getting log-dirty bits from qemu-dm */
+static unsigned long *qemu_bitmaps[2];
+static int qemu_active;
+static int qemu_non_active;
 
 /* number of pfns this guest has (i.e. number of entries in the P2M) */
 static unsigned long p2m_size;
@@ -77,7 +85,8 @@ static unsigned long m2p_mfn0;
 */
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8)
-#define BITMAP_SIZE   ((p2m_size + BITS_PER_LONG - 1) / 8)
+#define BITS_TO_LONGS(bits) (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
+#define BITMAP_SIZE   (BITS_TO_LONGS(p2m_size) * sizeof(unsigned long))
 
 #define BITMAP_ENTRY(_nr,_bmap) \
    ((volatile unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
@@ -369,8 +378,7 @@ static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
 
 
 static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
-                             int dom, xc_dominfo_t *info,
-                             vcpu_guest_context_t *ctxt)
+                             int dom, xc_dominfo_t *info)
 {
     int i = 0;
 
@@ -387,10 +395,6 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
         ERROR("Could not get domain info");
         return -1;
     }
-
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, ctxt) )
-        ERROR("Could not get vcpu context");
-
 
     if ( info->dying )
     {
@@ -650,8 +654,138 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
     return m2p;
 }
 
-int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                  uint32_t max_factor, uint32_t flags, int (*suspend)(int))
+
+static xen_pfn_t *map_and_save_p2m_table(int xc_handle, 
+                                         int io_fd, 
+                                         uint32_t dom,
+                                         unsigned long p2m_size,
+                                         shared_info_t *live_shinfo)
+{
+    vcpu_guest_context_t ctxt;
+
+    /* Double and single indirect references to the live P2M table */
+    xen_pfn_t *live_p2m_frame_list_list = NULL;
+    xen_pfn_t *live_p2m_frame_list = NULL;
+
+    /* A copy of the pfn-to-mfn table frame list. */
+    xen_pfn_t *p2m_frame_list = NULL;
+
+    /* The mapping of the live p2m table itself */
+    xen_pfn_t *p2m = NULL;
+
+    int i, success = 0;
+
+    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom,
+                                                   live_shinfo);
+    if ( !live_p2m_frame_list_list )
+        goto out;
+
+    live_p2m_frame_list =
+        xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+                             live_p2m_frame_list_list,
+                             P2M_FLL_ENTRIES);
+    if ( !live_p2m_frame_list )
+    {
+        ERROR("Couldn't map p2m_frame_list");
+        goto out;
+    }
+
+
+    /* Map all the frames of the pfn->mfn table. For migrate to succeed,
+       the guest must not change which frames are used for this purpose.
+       (its not clear why it would want to change them, and we'll be OK
+       from a safety POV anyhow. */
+
+    p2m = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+                               live_p2m_frame_list,
+                               P2M_FL_ENTRIES);
+    if ( !p2m )
+    {
+        ERROR("Couldn't map p2m table");
+        goto out;
+    }
+    live_p2m = p2m; /* So that translation macros will work */
+    
+    /* Get a local copy of the live_P2M_frame_list */
+    if ( !(p2m_frame_list = malloc(P2M_FL_SIZE)) )
+    {
+        ERROR("Couldn't allocate p2m_frame_list array");
+        goto out;
+    }
+    memcpy(p2m_frame_list, live_p2m_frame_list, P2M_FL_SIZE);
+
+    /* Canonicalise the pfn-to-mfn table frame-number list. */
+    for ( i = 0; i < p2m_size; i += fpp )
+    {
+        if ( !translate_mfn_to_pfn(&p2m_frame_list[i/fpp]) )
+        {
+            ERROR("Frame# in pfn-to-mfn frame list is not in pseudophys");
+            ERROR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64, i, i/fpp,
+                  (uint64_t)p2m_frame_list[i/fpp]);
+            goto out;
+        }
+    }
+
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    {
+        ERROR("Could not get vcpu context");
+        goto out;
+    }
+
+    /*
+     * Write an extended-info structure to inform the restore code that
+     * a PAE guest understands extended CR3 (PDPTs above 4GB). Turns off
+     * slow paths in the restore code.
+     */
+    if ( (pt_levels == 3) &&
+         (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3)) )
+    {
+        unsigned long signature = ~0UL;
+        uint32_t tot_sz   = sizeof(struct vcpu_guest_context) + 8;
+        uint32_t chunk_sz = sizeof(struct vcpu_guest_context);
+        char chunk_sig[]  = "vcpu";
+        if ( !write_exact(io_fd, &signature, sizeof(signature)) ||
+             !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
+             !write_exact(io_fd, &chunk_sig, 4) ||
+             !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
+             !write_exact(io_fd, &ctxt,      sizeof(ctxt)) )
+        {
+            ERROR("write: extended info");
+            goto out;
+        }
+    }
+
+    if ( !write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE) )
+    {
+        ERROR("write: p2m_frame_list");
+        goto out;
+    }    
+
+    success = 1;
+
+ out:
+    
+    if ( !success && p2m )
+        munmap(p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));
+
+    if ( live_p2m_frame_list_list )
+        munmap(live_p2m_frame_list_list, PAGE_SIZE);
+
+    if ( live_p2m_frame_list )
+        munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
+
+    if ( p2m_frame_list ) 
+        free(p2m_frame_list);
+
+    return success ? p2m : NULL;
+}
+
+
+
+int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+                   uint32_t max_factor, uint32_t flags, int (*suspend)(int),
+                   int hvm, void *(*init_qemu_maps)(int, unsigned), 
+                   void (*qemu_flip_buffer)(int, int))
 {
     xc_dominfo_t info;
 
@@ -666,19 +800,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
-    /* A table containg the type of each PFN (/not/ MFN!). */
+    /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
     unsigned long *pfn_batch = NULL;
 
-    /* A temporary mapping, and a copy, of one frame of guest memory. */
+    /* A copy of one frame of guest memory. */
     char page[PAGE_SIZE];
-
-    /* Double and single indirect references to the live P2M table */
-    xen_pfn_t *live_p2m_frame_list_list = NULL;
-    xen_pfn_t *live_p2m_frame_list = NULL;
-
-    /* A copy of the pfn-to-mfn table frame list. */
-    xen_pfn_t *p2m_frame_list = NULL;
 
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
@@ -702,6 +829,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     uint64_t vcpumap = 1ULL;
 
+    /* HVM: a buffer for holding HVM context */
+    uint32_t hvm_buf_size = 0;
+    uint8_t *hvm_buf = NULL;
+
+    /* HVM: magic frames for ioreqs and xenstore comms. */
+    uint64_t magic_pfns[3]; /* ioreq_pfn, bufioreq_pfn, store_pfn */
+
     /* If no explicit control parameters given, use defaults */
     max_iters  = max_iters  ? : DEF_MAX_ITERS;
     max_factor = max_factor ? : DEF_MAX_FACTOR;
@@ -721,79 +855,22 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         return 1;
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
-    {
-        ERROR("Could not get vcpu context");
-        goto out;
-    }
     shared_info_frame = info.shared_info_frame;
 
     /* Map the shared info frame */
-    if ( !(live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                              PROT_READ, shared_info_frame)) )
+    if ( !hvm )
     {
-        ERROR("Couldn't map live_shinfo");
-        goto out;
-    }
-
-    p2m_size = live_shinfo->arch.max_pfn;
-
-    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom,
-                                                   live_shinfo);
-    if ( !live_p2m_frame_list_list )
-        goto out;
-
-    live_p2m_frame_list =
-        xc_map_foreign_batch(xc_handle, dom, PROT_READ,
-                             live_p2m_frame_list_list,
-                             P2M_FLL_ENTRIES);
-    if ( !live_p2m_frame_list )
-    {
-        ERROR("Couldn't map p2m_frame_list");
-        goto out;
-    }
-
-    /* Map all the frames of the pfn->mfn table. For migrate to succeed,
-       the guest must not change which frames are used for this purpose.
-       (its not clear why it would want to change them, and we'll be OK
-       from a safety POV anyhow. */
-
-    live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
-                                    live_p2m_frame_list,
-                                    P2M_FL_ENTRIES);
-    if ( !live_p2m )
-    {
-        ERROR("Couldn't map p2m table");
-        goto out;
-    }
-
-    /* Setup the mfn_to_pfn table mapping */
-    if ( !(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ)) )
-    {
-        ERROR("Failed to map live M2P table");
-        goto out;
-    }
-
-
-    /* Get a local copy of the live_P2M_frame_list */
-    if ( !(p2m_frame_list = malloc(P2M_FL_SIZE)) )
-    {
-        ERROR("Couldn't allocate p2m_frame_list array");
-        goto out;
-    }
-    memcpy(p2m_frame_list, live_p2m_frame_list, P2M_FL_SIZE);
-
-    /* Canonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < p2m_size; i += fpp )
-    {
-        if ( !translate_mfn_to_pfn(&p2m_frame_list[i/fpp]) )
+        live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                           PROT_READ, shared_info_frame);
+        if ( !live_shinfo )
         {
-            ERROR("Frame# in pfn-to-mfn frame list is not in pseudophys");
-            ERROR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64, i, i/fpp,
-                  (uint64_t)p2m_frame_list[i/fpp]);
+            ERROR("Couldn't map live_shinfo");
             goto out;
         }
     }
+
+    /* Get the size of the P2M table */
+    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
 
     /* Domain is still running at this point */
     if ( live )
@@ -806,11 +883,21 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("Couldn't enable shadow mode");
             goto out;
         }
+
+        if ( hvm )
+        {
+            /* Get qemu-dm logging dirty pages too */
+            void *seg = init_qemu_maps(dom, BITMAP_SIZE);
+            qemu_bitmaps[0] = seg;
+            qemu_bitmaps[1] = seg + BITMAP_SIZE;
+            qemu_active = 0;
+            qemu_non_active = 1;
+        }
     }
     else
     {
         /* This is a non-live suspend. Suspend the domain .*/
-        if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info, &ctxt) )
+        if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info) )
         {
             ERROR("Domain appears not to have suspended");
             goto out;
@@ -853,6 +940,23 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         return 1;
     }
 
+    if ( hvm ) 
+    {
+        /* Need another buffer for HVM context */
+        hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
+        if ( hvm_buf_size == -1 )
+        {
+            ERROR("Couldn't get HVM context size from Xen");
+            goto out;
+        }
+        hvm_buf = malloc(hvm_buf_size);
+        if ( !hvm_buf )
+        {
+            ERROR("Couldn't allocate memory");
+            goto out;
+        }
+    }
+
     analysis_phase(xc_handle, dom, p2m_size, to_skip, 0);
 
     /* We want zeroed memory so use calloc rather than malloc. */
@@ -871,12 +975,38 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    /*
-     * Quick belt and braces sanity check.
-     */
+    /* Setup the mfn_to_pfn table mapping */
+    if ( !(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ)) )
     {
-        int err=0;
+        ERROR("Failed to map live M2P table");
+        goto out;
+    }
+
+    /* Start writing out the saved-domain record. */
+    if ( !write_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    {
+        ERROR("write: p2m_size");
+        goto out;
+    }
+
+    if ( !hvm )
+    {
+        int err = 0;
         unsigned long mfn;
+
+        /* Map the P2M table, and write the list of P2M frames */
+        live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, 
+                                          p2m_size, live_shinfo);
+        if ( live_p2m == NULL )
+        {
+            ERROR("Failed to map/save the p2m frame list");
+            goto out;
+        }
+
+        /*
+         * Quick belt and braces sanity check.
+         */
+        
         for ( i = 0; i < p2m_size; i++ )
         {
             mfn = live_p2m[i];
@@ -888,42 +1018,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
         }
         DPRINTF("Had %d unexplained entries in p2m table\n", err);
-    }
-
-    /* Start writing out the saved-domain record. */
-    if ( !write_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
-    {
-        ERROR("write: p2m_size");
-        goto out;
-    }
-
-    /*
-     * Write an extended-info structure to inform the restore code that
-     * a PAE guest understands extended CR3 (PDPTs above 4GB). Turns off
-     * slow paths in the restore code.
-     */
-    if ( (pt_levels == 3) &&
-         (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3)) )
-    {
-        unsigned long signature = ~0UL;
-        uint32_t tot_sz   = sizeof(struct vcpu_guest_context) + 8;
-        uint32_t chunk_sz = sizeof(struct vcpu_guest_context);
-        char chunk_sig[]  = "vcpu";
-        if ( !write_exact(io_fd, &signature, sizeof(signature)) ||
-             !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
-             !write_exact(io_fd, &chunk_sig, 4) ||
-             !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
-             !write_exact(io_fd, &ctxt,      sizeof(ctxt)) )
-        {
-            ERROR("write: extended info");
-            goto out;
-        }
-    }
-
-    if ( !write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE) )
-    {
-        ERROR("write: p2m_frame_list");
-        goto out;
     }
 
     print_stats(xc_handle, dom, 0, &stats, 0);
@@ -976,9 +1070,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                 if ( debug )
                     DPRINTF("%d pfn= %08lx mfn= %08lx %d  [mfn]= %08lx\n",
-                            iter, (unsigned long)n, live_p2m[n],
+                            iter, (unsigned long)n, hvm ? 0 : live_p2m[n],
                             test_bit(n, to_send),
-                            mfn_to_pfn(live_p2m[n]&0xFFFFF));
+                            hvm ? 0 : mfn_to_pfn(live_p2m[n]&0xFFFFF));
 
                 if ( !last_iter &&
                      test_bit(n, to_send) &&
@@ -990,6 +1084,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                        (test_bit(n, to_fix)  && last_iter)) )
                     continue;
 
+                /* Skip PFNs that aren't really there */
+                if ( hvm && ((n >= 0xa0 && n < 0xc0) /* VGA hole */
+                             || (n >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT) 
+                                 && n < (1ULL<<32) >> PAGE_SHIFT)) /* MMIO */ )
+                    continue;
+
                 /*
                 ** we get here if:
                 **  1. page is marked to_send & hasn't already been re-dirtied
@@ -998,15 +1098,21 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 */
 
                 pfn_batch[batch] = n;
-                pfn_type[batch]  = live_p2m[n];
 
+                /* Hypercall interfaces operate in PFNs for HVM guests
+                * and MFNs for PV guests */
+                if ( hvm ) 
+                    pfn_type[batch] = n;
+                else
+                    pfn_type[batch] = live_p2m[n];
+                    
                 if ( !is_mapped(pfn_type[batch]) )
                 {
                     /*
                     ** not currently in psuedo-physical map -- set bit
                     ** in to_fix since we must send this page in last_iter
                     ** unless its sent sooner anyhow, or it never enters
-                    ** pseudo-physical map (e.g. for ballooned down domains)
+                    ** pseudo-physical map (e.g. for ballooned down doms)
                     */
                     set_bit(n, to_fix);
                     continue;
@@ -1020,9 +1126,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     DPRINTF("Fix! iter %d, pfn %x. mfn %lx\n",
                             iter, n, pfn_type[batch]);
                 }
-
+                
                 clear_bit(n, to_fix);
-
+                
                 batch++;
             }
 
@@ -1037,41 +1143,46 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            for ( j = 0; j < batch; j++ )
-                ((uint32_t *)pfn_type)[j] = pfn_type[j];
-            if ( xc_get_pfn_type_batch(xc_handle, dom, batch,
-                                       (uint32_t *)pfn_type) )
+            if ( !hvm )
             {
-                ERROR("get_pfn_type_batch failed");
-                goto out;
-            }
-            for ( j = batch-1; j >= 0; j-- )
-                pfn_type[j] = ((uint32_t *)pfn_type)[j];
-
-            for ( j = 0; j < batch; j++ )
-            {
-
-                if ( (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
-                     XEN_DOMCTL_PFINFO_XTAB )
+                /* Get page types */
+                for ( j = 0; j < batch; j++ )
+                    ((uint32_t *)pfn_type)[j] = pfn_type[j];
+                if ( xc_get_pfn_type_batch(xc_handle, dom, batch,
+                                           (uint32_t *)pfn_type) )
                 {
-                    DPRINTF("type fail: page %i mfn %08lx\n", j, pfn_type[j]);
-                    continue;
+                    ERROR("get_pfn_type_batch failed");
+                    goto out;
                 }
+                for ( j = batch-1; j >= 0; j-- )
+                    pfn_type[j] = ((uint32_t *)pfn_type)[j];
 
-                if ( debug )
-                    DPRINTF("%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
-                            " sum= %08lx\n",
-                            iter,
-                            (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
-                            pfn_batch[j],
-                            pfn_type[j],
-                            mfn_to_pfn(pfn_type[j] &
-                                       ~XEN_DOMCTL_PFINFO_LTAB_MASK),
-                            csum_page(region_base + (PAGE_SIZE*j)));
-
-                /* canonicalise mfn->pfn */
-                pfn_type[j] = (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
-                    pfn_batch[j];
+                for ( j = 0; j < batch; j++ )
+                {
+                    
+                    if ( (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
+                         XEN_DOMCTL_PFINFO_XTAB )
+                    {
+                        DPRINTF("type fail: page %i mfn %08lx\n", 
+                                j, pfn_type[j]);
+                        continue;
+                    }
+                    
+                    if ( debug )
+                        DPRINTF("%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
+                                " sum= %08lx\n",
+                                iter,
+                                (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
+                                pfn_batch[j],
+                                pfn_type[j],
+                                mfn_to_pfn(pfn_type[j] &
+                                           ~XEN_DOMCTL_PFINFO_LTAB_MASK),
+                                csum_page(region_base + (PAGE_SIZE*j)));
+                    
+                    /* canonicalise mfn->pfn */
+                    pfn_type[j] = (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
+                        pfn_batch[j];
+                }
             }
 
             if ( !write_exact(io_fd, &batch, sizeof(unsigned int)) )
@@ -1081,7 +1192,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            if ( !write_exact(io_fd, pfn_type, sizeof(unsigned long)*j) )
+            if ( !write_exact(io_fd, pfn_type, sizeof(unsigned long)*batch) )
             {
                 ERROR("Error when writing to state file (3) (errno %d)",
                       errno);
@@ -1190,17 +1301,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info,
-                                       &ctxt) )
+                if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info) )
                 {
                     ERROR("Domain appears not to have suspended");
                     goto out;
                 }
 
-                DPRINTF("SUSPEND shinfo %08lx eip %08lx edx %08lx\n",
-                        info.shared_info_frame,
-                        (unsigned long)ctxt.user_regs.eip,
-                        (unsigned long)ctxt.user_regs.edx);
+                DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
             }
 
             if ( xc_shadow_control(xc_handle, dom, 
@@ -1209,6 +1316,27 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             {
                 ERROR("Error flushing shadow PT");
                 goto out;
+            }
+
+            if ( hvm ) 
+            {
+                /* Pull in the dirty bits from qemu-dm too */
+                if ( !last_iter )
+                {
+                    qemu_active = qemu_non_active;
+                    qemu_non_active = qemu_active ? 0 : 1;
+                    qemu_flip_buffer(dom, qemu_active);
+                    for ( j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++ )
+                    {
+                        to_send[j] |= qemu_bitmaps[qemu_non_active][j];
+                        qemu_bitmaps[qemu_non_active][j] = 0;
+                    }
+                }
+                else
+                {
+                    for ( j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++ )
+                        to_send[j] |= qemu_bitmaps[qemu_active][j];
+                }
             }
 
             sent_last_iter = sent_this_iter;
@@ -1257,6 +1385,51 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
+    if ( hvm ) 
+    {
+        uint32_t rec_size;
+
+        /* Save magic-page locations. */
+        memset(magic_pfns, 0, sizeof(magic_pfns));
+        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN,
+                         (unsigned long *)&magic_pfns[0]);
+        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN,
+                         (unsigned long *)&magic_pfns[1]);
+        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN,
+                         (unsigned long *)&magic_pfns[2]);
+        if ( !write_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
+        {
+            ERROR("Error when writing to state file (7)");
+            goto out;
+        }
+
+        /* Get HVM context from Xen and save it too */
+        if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
+                                                  hvm_buf_size)) == -1 )
+        {
+            ERROR("HVM:Could not get hvm buffer");
+            goto out;
+        }
+        
+        if ( !write_exact(io_fd, &rec_size, sizeof(uint32_t)) )
+        {
+            ERROR("error write hvm buffer size");
+            goto out;
+        }
+        
+        if ( !write_exact(io_fd, hvm_buf, rec_size) )
+        {
+            ERROR("write HVM info failed!\n");
+            goto out;
+        }
+        
+        /* HVM guests are done now */
+        rc = 0;
+        goto out;
+    }
+
+    /* PV guests only from now on */
+
     /* Send through a list of all the PFNs that were not in map at the close */
     {
         unsigned int i,j;
@@ -1291,6 +1464,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 j = 0;
             }
         }
+    }
+
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    {
+        ERROR("Could not get vcpu context");
+        goto out;
     }
 
     /* Canonicalise the suspend-record frame number. */
@@ -1379,12 +1558,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     if ( live_shinfo )
         munmap(live_shinfo, PAGE_SIZE);
-
-    if ( live_p2m_frame_list_list )
-        munmap(live_p2m_frame_list_list, PAGE_SIZE);
-
-    if ( live_p2m_frame_list )
-        munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
 
     if ( live_p2m )
         munmap(live_p2m, ROUNDUP(p2m_size * sizeof(xen_pfn_t), PAGE_SHIFT));

@@ -594,6 +594,10 @@ setup_arch (char **cmdline_p)
 
 
 	/* enable IA-64 Machine Check Abort Handling unless disabled */
+#ifdef CONFIG_XEN
+	if (is_running_on_xen() && !is_initial_xendomain())
+		nomca = 1;
+#endif
 	if (!nomca)
 		ia64_mca_init();
 

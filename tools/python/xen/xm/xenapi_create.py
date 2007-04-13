@@ -48,7 +48,7 @@ def get_name_description(node):
 
 def get_text_in_child_node(node, child):
     tag_node = node.getElementsByTagName(child)[0]
-    return tag_node.nodeValue
+    return " ".join([child.nodeValue for child in tag_node.childNodes])
 
 def get_child_node_attribute(node, child, attribute):
     tag_node = node.getElementsByTagName(child)[0]
@@ -212,8 +212,8 @@ class xenapi_create:
             "SR":               self.DEFAULT_STORAGE_REPOSITORY,  
             "virtual_size":     vdi.attributes["size"].value,
             "type":             vdi.attributes["type"].value,
-            "shareable":        vdi.attributes["shareable"].value,
-            "read_only":        vdi.attributes["read_only"].value,
+            "sharable":         bool(vdi.attributes["sharable"].value),
+            "read_only":        bool(vdi.attributes["read_only"].value),
             "other_config":     {"location":
                 vdi.attributes["src"].value}
             }
@@ -264,7 +264,23 @@ class xenapi_create:
             "platform":
                 get_child_nodes_as_dict(vm, "platform", "key", "value"),
             "other_config":
-                get_child_nodes_as_dict(vm, "other_config", "key", "value")
+                get_child_nodes_as_dict(vm, "other_config", "key", "value"),
+            "PV_bootloader":
+                "",
+            "PV_kernel":
+                "",
+            "PV_ramdisk":
+                "",
+            "PV_args":
+                "",
+            "PV_bootloader_args":
+                "",
+            "HVM_boot_policy":
+                "",
+            "HVM_boot_params":
+                {},
+            "PCI_bus":
+               ""
             }
 
         if len(vm.getElementsByTagName("pv")) > 0:
@@ -494,7 +510,7 @@ class sxp2xml:
         # Make version tag
 
         version = document.createElement("version")
-        version.appendChild(document.createTextNode("1.0"))
+        version.appendChild(document.createTextNode("0"))
         vm.appendChild(version)
         
         # Make pv or hvm tag
@@ -629,10 +645,10 @@ class sxp2xml:
         vdi.attributes["src"] = src
         vdi.attributes["read_only"] \
             = (get_child_by_name(vbd_sxp, "mode") != "w") \
-               and "true" or "false"
+               and "True" or "False"
         vdi.attributes["size"] = '-1'
         vdi.attributes["type"] = "system"
-        vdi.attributes["shareable"] = "false"
+        vdi.attributes["sharable"] = "False"
         vdi.attributes["name"] = name
 
         vdi.appendChild(self.make_name_tag(name, document))

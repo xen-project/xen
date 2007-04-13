@@ -421,6 +421,10 @@ gopts.var('serial', val='FILE',
           fn=set_value, default='',
           use="Path to serial or pty or vc")
 
+gopts.var('monitor', val='no|yes',
+          fn=set_bool, default=0,
+          use="""Should the device model use monitor?""")
+
 gopts.var('localtime', val='no|yes',
           fn=set_bool, default=0,
           use="Is RTC set to localtime?")

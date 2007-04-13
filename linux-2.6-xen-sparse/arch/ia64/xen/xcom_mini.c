@@ -418,3 +418,39 @@ xencomm_mini_hypercall_perfmon_op(unsigned long cmd, void* arg,
 	return xencomm_arch_hypercall_perfmon_op(cmd, desc, count);
 }
 EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_perfmon_op);
+
+int
+xencomm_mini_hypercall_sched_op(int cmd, void *arg)
+{
+	int rc, nbr_area = 2;
+	struct xencomm_mini xc_area[2];
+	struct xencomm_handle *desc;
+	unsigned int argsize;
+
+	switch (cmd) {
+	case SCHEDOP_yield:
+	case SCHEDOP_block:
+		argsize = 0;
+		break;
+	case SCHEDOP_shutdown:
+		argsize = sizeof(sched_shutdown_t);
+		break;
+	case SCHEDOP_poll:
+		argsize = sizeof(sched_poll_t);
+		break;
+	case SCHEDOP_remote_shutdown:
+		argsize = sizeof(sched_remote_shutdown_t);
+		break;
+
+	default:
+		printk("%s: unknown sched op %d\n", __func__, cmd);
+		return -ENOSYS;
+	}
+
+	rc = xencomm_create_mini(xc_area, &nbr_area, arg, argsize, &desc);
+	if (rc)
+		return rc;
+
+	return xencomm_arch_hypercall_sched_op(cmd, desc);
+}
+EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_sched_op);

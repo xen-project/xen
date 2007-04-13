@@ -673,7 +673,7 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
     } else if (mpaddr - IO_PORTS_PADDR < IO_PORTS_SIZE) {
         /* Log I/O port probing, but complain less loudly about it */
         gdprintk(XENLOG_INFO, "vcpu %d iip 0x%016lx: bad I/O port access "
-                 "0x%lx\n ", current->vcpu_id, PSCB(current, iip),
+                 "0x%lx\n", current->vcpu_id, PSCB(current, iip),
                  IO_SPACE_SPARSE_DECODING(mpaddr - IO_PORTS_PADDR));
     } else {
         gdprintk(XENLOG_WARNING, "vcpu %d iip 0x%016lx: bad mpa 0x%lx "
