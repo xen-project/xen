@@ -146,6 +146,59 @@ void hvm_do_resume(struct vcpu *v)
     }
 }
 
+static void hvm_clear_ioreq_pfn(
+    struct domain *d, unsigned long *pva)
+{
+    unsigned long va, mfn;
+
+    BUG_ON(!d->is_dying);
+
+    if ( (va = xchg(pva, 0UL)) == 0UL )
+        return;
+
+    mfn = mfn_from_mapped_domain_page((void *)va);
+    unmap_domain_page_global((void *)va);
+    put_page_and_type(mfn_to_page(mfn));
+}
+
+static int hvm_set_ioreq_pfn(
+    struct domain *d, unsigned long *pva, unsigned long gmfn)
+{
+    unsigned long mfn;
+    void *va;
+
+    mfn = gmfn_to_mfn(d, gmfn);
+    if ( !mfn_valid(mfn) ||
+         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        return -EINVAL;
+
+    va = map_domain_page_global(mfn);
+    if ( va == NULL )
+    {
+        put_page_and_type(mfn_to_page(mfn));
+        return -ENOMEM;
+    }
+
+    if ( cmpxchg(pva, 0UL, (unsigned long)va) != 0UL )
+    {
+        unmap_domain_page_global(va);
+        put_page_and_type(mfn_to_page(mfn));
+        return -EINVAL;
+    }
+
+    /*
+     * Check dying status /after/ setting *pva. cmpxchg() is a barrier.
+     * We race against hvm_domain_relinquish_resources(). 
+     */
+    if ( d->is_dying )
+        hvm_clear_ioreq_pfn(d, pva);
+
+    /* Balance the domain_pause() in hvm_domain_initialise(). */
+    domain_unpause(d);
+
+    return 0;
+}
+
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -161,7 +214,6 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.buffered_io_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
 
-    /* paging support will be determined inside paging.c */
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
         return rc;
@@ -169,7 +221,17 @@ int hvm_domain_initialise(struct domain *d)
     vpic_init(d);
     vioapic_init(d);
 
+    /* Do not allow domain to run until it has ioreq shared pages. */
+    domain_pause(d); /* HVM_PARAM_IOREQ_PFN */
+    domain_pause(d); /* HVM_PARAM_BUFIOREQ_PFN */
+
     return 0;
+}
+
+void hvm_domain_relinquish_resources(struct domain *d)
+{
+    hvm_clear_ioreq_pfn(d, &d->arch.hvm_domain.shared_page_va);
+    hvm_clear_ioreq_pfn(d, &d->arch.hvm_domain.buffered_io_va);
 }
 
 void hvm_domain_destroy(struct domain *d)
@@ -178,13 +240,6 @@ void hvm_domain_destroy(struct domain *d)
     rtc_deinit(d);
     pmtimer_deinit(d);
     hpet_deinit(d);
-
-    if ( d->arch.hvm_domain.shared_page_va )
-        unmap_domain_page_global(
-            (void *)d->arch.hvm_domain.shared_page_va);
-
-    if ( d->arch.hvm_domain.buffered_io_va )
-        unmap_domain_page_global((void *)d->arch.hvm_domain.buffered_io_va);
 }
 
 static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -928,8 +983,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         struct xen_hvm_param a;
         struct domain *d;
         struct vcpu *v;
-        unsigned long mfn;
-        void *p;
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
@@ -956,30 +1009,19 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             switch ( a.index )
             {
             case HVM_PARAM_IOREQ_PFN:
-                if ( d->arch.hvm_domain.shared_page_va )
-                    goto param_fail;
-                mfn = gmfn_to_mfn(d, a.value);
-                if ( mfn == INVALID_MFN )
-                    goto param_fail;
-                p = map_domain_page_global(mfn);
-                if ( p == NULL )
-                    goto param_fail;
-                d->arch.hvm_domain.shared_page_va = (unsigned long)p;
-                /* Initialise evtchn port info if VCPUs already created. */
-                for_each_vcpu ( d, v )
-                    get_vio(d, v->vcpu_id)->vp_eport =
-                    v->arch.hvm_vcpu.xen_port;
+                rc = hvm_set_ioreq_pfn(
+                    d, &d->arch.hvm_domain.shared_page_va, a.value);
+                if ( rc == 0 )
+                {
+                    /* Initialise evtchn port info if VCPUs already created. */
+                    for_each_vcpu ( d, v )
+                        get_vio(d, v->vcpu_id)->vp_eport =
+                        v->arch.hvm_vcpu.xen_port;
+                }
                 break;
             case HVM_PARAM_BUFIOREQ_PFN:
-                if ( d->arch.hvm_domain.buffered_io_va )
-                    goto param_fail;
-                mfn = gmfn_to_mfn(d, a.value);
-                if ( mfn == INVALID_MFN )
-                    goto param_fail;
-                p = map_domain_page_global(mfn);
-                if ( p == NULL )
-                    goto param_fail;
-                d->arch.hvm_domain.buffered_io_va = (unsigned long)p;
+                rc = hvm_set_ioreq_pfn(
+                    d, &d->arch.hvm_domain.buffered_io_va, a.value);
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
                 hvm_set_callback_via(d, a.value);
