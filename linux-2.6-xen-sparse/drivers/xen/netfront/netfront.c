@@ -1307,10 +1307,10 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	int pages_flipped = 0;
 	int err;
 
-	spin_lock_bh(&np->rx_lock);
+	spin_lock(&np->rx_lock); /* no need for spin_lock_bh() in ->poll() */
 
 	if (unlikely(!netfront_carrier_ok(np))) {
-		spin_unlock_bh(&np->rx_lock);
+		spin_unlock(&np->rx_lock);
 		return 0;
 	}
 
@@ -1478,7 +1478,7 @@ err:
 		local_irq_restore(flags);
 	}
 
-	spin_unlock_bh(&np->rx_lock);
+	spin_unlock(&np->rx_lock);
 
 	return more_to_do;
 }
@@ -1761,8 +1761,8 @@ static int network_connect(struct net_device *dev)
 	network_tx_buf_gc(dev);
 	network_alloc_rx_buffers(dev);
 
-	spin_unlock_bh(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
+	spin_unlock_bh(&np->rx_lock);
 
 	return 0;
 }
@@ -2036,8 +2036,8 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	spin_lock_bh(&info->rx_lock);
 	spin_lock_irq(&info->tx_lock);
 	netfront_carrier_off(info);
-	spin_unlock_bh(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
+	spin_unlock_bh(&info->rx_lock);
 
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info->netdev);
