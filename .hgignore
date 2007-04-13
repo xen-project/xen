@@ -22,7 +22,7 @@
 ^\.pc
 ^TAGS$
 ^tags$
-^build.*$
+^build-.*$
 ^dist/.*$
 ^docs/.*\.aux$
 ^docs/.*\.dvi$
