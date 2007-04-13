@@ -23,7 +23,7 @@ import sys
 
 from xen.xm.opts import *
 
-from main import server
+from main import server, serverType, get_single_vm, SERVER_XEN_API
 
 gopts = Opts(use="""[options] DOM HOST
 
@@ -60,5 +60,16 @@ def main(argv):
 
     dom = args[0]
     dst = args[1]
-    server.xend.domain.migrate(dom, dst, opts.vals.live, opts.vals.resource,
-                               opts.vals.port)
+
+    if serverType == SERVER_XEN_API:
+        vm_ref = get_single_vm(dom)
+        other_config = {
+            "port":     opts.vals.port,
+            "resource": opts.vals.resource
+            }
+        server.xenapi.VM.migrate(vm_ref, dst, bool(opts.vals.live),
+                                 other_config)
+    else:
+        server.xend.domain.migrate(dom, dst, opts.vals.live,
+                                   opts.vals.resource,
+                                   opts.vals.port)

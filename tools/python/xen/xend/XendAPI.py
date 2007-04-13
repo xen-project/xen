@@ -1304,6 +1304,7 @@ class XendAPI(object):
                   ('set_memory_dynamic_max_live', None),
                   ('set_memory_dynamic_min_live', None),
                   ('send_trigger', None),
+                  ('migrate', None),
                   ('destroy', None)]
     
     VM_funcs  = [('create', 'VM'),
@@ -1821,6 +1822,17 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         xeninfo = xendom.get_vm_by_uuid(vm_ref)
         xendom.domain_send_trigger(xeninfo.getDomid(), trigger, vcpu)
+        return xen_api_success_void()
+
+    def VM_migrate(self, _, vm_ref, destination_url, live, other_config):
+        xendom = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+
+        resource = other_config.get("resource", 0)
+        port = other_config.get("port", 0)
+        
+        xendom.domain_migrate(xeninfo.getDomid(), destination_url,
+                              bool(live), resource, port)
         return xen_api_success_void()
 
     def VM_save(self, _, vm_ref, dest, checkpoint):
