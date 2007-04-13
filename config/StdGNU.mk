@@ -10,6 +10,7 @@ OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
 MSGFMT     = msgfmt
+MSGMERGE   = msgmerge
 
 INSTALL      = install
 INSTALL_DIR  = $(INSTALL) -d -m0755 -p
