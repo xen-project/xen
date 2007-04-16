@@ -5086,6 +5086,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt API\_version/major} & int & major version num
 $\mathit{RO}_\mathit{run}$ &  {\tt API\_version/minor} & int & minor version number \\
 $\mathit{RO}_\mathit{run}$ &  {\tt API\_version/vendor} & string & identification of vendor \\
 $\mathit{RO}_\mathit{run}$ &  {\tt API\_version/vendor\_implementation} & (string $\rightarrow$ string) Map & details of vendor implementation \\
+$\mathit{RO}_\mathit{run}$ &  {\tt enabled} & bool & True if the host is currently enabled \\
 $\mathit{RO}_\mathit{run}$ &  {\tt software\_version} & (string $\rightarrow$ string) Map & version strings \\
 $\mathit{RW}$ &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
 $\mathit{RO}_\mathit{run}$ &  {\tt capabilities} & string Set & Xen capabilities \\
@@ -5691,6 +5692,38 @@ Get the API\_version/vendor\_implementation field of the given host.
  \noindent {\bf Return Type:} 
 {\tt 
 (string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_enabled}
+
+{\bf Overview:} 
+Get the enabled field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} bool get_enabled (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+bool
 }
 
 

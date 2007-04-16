@@ -876,7 +876,8 @@ class XendAPI(object):
                     'API_version_major',
                     'API_version_minor',
                     'API_version_vendor',
-                    'API_version_vendor_implementation']
+                    'API_version_vendor_implementation',
+                    'enabled']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -933,8 +934,8 @@ class XendAPI(object):
         return xen_api_success(XEN_API_VERSION_VENDOR)
     def host_get_API_version_vendor_implementation(self, _, ref):
         return xen_api_success(XEN_API_VERSION_VENDOR_IMPLEMENTATION)
-    def host_get_software_version(self, session, host_ref):
-        return xen_api_success(XendNode.instance().xen_version())
+    def host_get_enabled(self, _, _):
+        return xen_api_success(XendDomain.instance().allow_new_domains())
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
     def host_get_PBDs(self, _, ref):

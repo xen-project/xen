@@ -76,6 +76,7 @@ typedef struct xen_host_record
     int64_t api_version_minor;
     char *api_version_vendor;
     xen_string_string_map *api_version_vendor_implementation;
+    bool enabled;
     xen_string_string_map *software_version;
     xen_string_string_map *other_config;
     struct xen_string_set *capabilities;
@@ -239,6 +240,13 @@ xen_host_get_api_version_vendor(xen_session *session, char **result, xen_host ho
  */
 extern bool
 xen_host_get_api_version_vendor_implementation(xen_session *session, xen_string_string_map **result, xen_host host);
+
+
+/**
+ * Get the enabled field of the given host.
+ */
+extern bool
+xen_host_get_enabled(xen_session *session, bool *result, xen_host host);
 
 
 /**
