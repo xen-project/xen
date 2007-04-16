@@ -1543,7 +1543,8 @@ void domain_relinquish_resources(struct domain *d)
     /* Free page used by xen oprofile buffer. */
     free_xenoprof_pages(d);
 
-    hvm_domain_relinquish_resources(d);
+    if ( is_hvm_domain(d) )
+        hvm_domain_relinquish_resources(d);
 }
 
 void arch_dump_domain_info(struct domain *d)
