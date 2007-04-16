@@ -152,14 +152,14 @@ def _ctor_event_dispatch(xenapi, ctor, api_cls, session, args):
     result = ctor(xenapi, session, *args)
     if result['Status'] == 'Success':
         ref = result['Value']
-        _event_dispatch('add', api_cls, ref, '')
+        event_dispatch('add', api_cls, ref, '')
     return result
 
 
 def _dtor_event_dispatch(xenapi, dtor, api_cls, session, ref, args):
     result = dtor(xenapi, session, ref, *args)
     if result['Status'] == 'Success':
-        _event_dispatch('del', api_cls, ref, '')
+        event_dispatch('del', api_cls, ref, '')
     return result
 
 
@@ -167,11 +167,12 @@ def _setter_event_dispatch(xenapi, setter, api_cls, attr_name, session, ref,
                            args):
     result = setter(xenapi, session, ref, *args)
     if result['Status'] == 'Success':
-        _event_dispatch('mod', api_cls, ref, attr_name)
+        event_dispatch('mod', api_cls, ref, attr_name)
     return result
 
 
-def _event_dispatch(operation, api_cls, ref, attr_name):
+def event_dispatch(operation, api_cls, ref, attr_name):
+    assert operation in ['add', 'del', 'mod']
     event = {
         'timestamp' : now(),
         'class'     : api_cls,
@@ -934,7 +935,9 @@ class XendAPI(object):
         return xen_api_success(XEN_API_VERSION_VENDOR)
     def host_get_API_version_vendor_implementation(self, _, ref):
         return xen_api_success(XEN_API_VERSION_VENDOR_IMPLEMENTATION)
-    def host_get_enabled(self, _, _):
+    def host_get_software_version(self, session, host_ref):
+        return xen_api_success(XendNode.instance().xen_version())
+    def host_get_enabled(self, _1, _2):
         return xen_api_success(XendDomain.instance().allow_new_domains())
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
@@ -999,6 +1002,7 @@ class XendAPI(object):
                   'API_version_vendor_implementation':
                   XEN_API_VERSION_VENDOR_IMPLEMENTATION,
                   'software_version': node.xen_version(),
+                  'enabled': XendDomain.instance().allow_new_domains(),
                   'other_config': node.other_config,
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),

@@ -1986,6 +1986,9 @@ class XendDomainInfo:
             if self.state != state:
                 self.state = state
                 self.state_updated.notifyAll()
+                import XendAPI
+                XendAPI.event_dispatch('mod', 'VM', self.info['uuid'],
+                                       'power_state')
         finally:
             self.state_updated.release()
 
