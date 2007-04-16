@@ -733,15 +733,17 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     HYPERCALL(xen_version),
-    HYPERCALL(hvm_op),
-    HYPERCALL(event_channel_op)
+    HYPERCALL(event_channel_op),
+    HYPERCALL(sched_op),
+    HYPERCALL(hvm_op)
 };
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL_COMPAT32(memory_op),
     HYPERCALL(xen_version),
-    HYPERCALL(hvm_op),
-    HYPERCALL(event_channel_op)
+    HYPERCALL(event_channel_op),
+    HYPERCALL(sched_op),
+    HYPERCALL(hvm_op)
 };
 
 static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
