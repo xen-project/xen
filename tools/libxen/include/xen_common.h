@@ -160,6 +160,13 @@ xen_session_logout(xen_session *session);
 
 
 /**
+ * Clear any error condition recorded on this session.
+ */
+void
+xen_session_clear_error(xen_session *session);
+
+
+/**
  * Get the UUID of the second given session.  Set *result to point at a
  * string, yours to free.
  */

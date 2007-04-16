@@ -207,6 +207,23 @@ xen_session_logout(xen_session *session)
 }
 
 
+void
+xen_session_clear_error(xen_session *session)
+{
+    if (session->error_description != NULL)
+    {
+        for (int i = 0; i < session->error_description_count; i++)
+        {
+            free(session->error_description[i]);
+        }
+        free(session->error_description);
+    }
+    session->error_description = NULL;
+    session->error_description_count = 0;
+    session->ok = true;
+}
+
+
 bool
 xen_session_get_uuid(xen_session *session, char **result,
                      xen_session *self_session)
