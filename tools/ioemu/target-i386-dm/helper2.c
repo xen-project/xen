@@ -408,6 +408,21 @@ void cpu_ioreq_add(CPUState *env, ioreq_t *req)
     req->data = tmp1;
 }
 
+void cpu_ioreq_sub(CPUState *env, ioreq_t *req)
+{
+    unsigned long tmp1, tmp2;
+
+    if (req->data_is_ptr != 0)
+        hw_error("expected scalar value");
+
+    read_physical(req->addr, req->size, &tmp1);
+    if (req->dir == IOREQ_WRITE) {
+        tmp2 = tmp1 - (unsigned long) req->data;
+        write_physical(req->addr, req->size, &tmp2);
+    }
+    req->data = tmp1;
+}
+
 void cpu_ioreq_or(CPUState *env, ioreq_t *req)
 {
     unsigned long tmp1, tmp2;
@@ -495,6 +510,9 @@ void __handle_ioreq(CPUState *env, ioreq_t *req)
         break;
     case IOREQ_TYPE_ADD:
         cpu_ioreq_add(env, req);
+        break;
+    case IOREQ_TYPE_SUB:
+        cpu_ioreq_sub(env, req);
         break;
     case IOREQ_TYPE_OR:
         cpu_ioreq_or(env, req);

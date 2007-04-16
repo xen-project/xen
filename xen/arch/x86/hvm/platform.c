@@ -1240,6 +1240,10 @@ void handle_mmio(unsigned long gpa)
         mmio_operands(IOREQ_TYPE_ADD, gpa, mmio_op, op_size);
         break;
 
+    case INSTR_SUB:
+        mmio_operands(IOREQ_TYPE_SUB, gpa, mmio_op, op_size);
+        break;
+
     case INSTR_XOR:
         mmio_operands(IOREQ_TYPE_XOR, gpa, mmio_op, op_size);
         break;
@@ -1261,7 +1265,6 @@ void handle_mmio(unsigned long gpa)
 
     case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
-    case INSTR_SUB:
         /* send the request and wait for the value */
         send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, op_size, 0, IOREQ_READ, df, 0);
         break;
