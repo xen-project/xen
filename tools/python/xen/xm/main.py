@@ -741,11 +741,12 @@ def getDomains(domain_names, state, full = 0):
     if serverType == SERVER_XEN_API:
         doms_sxp = []
         doms_dict = []
-        dom_refs = server.xenapi.VM.get_all()
-        for dom_ref in dom_refs:
-            dom_rec = server.xenapi.VM.get_record(dom_ref)
-            dom_metrics_ref = server.xenapi.VM.get_metrics(dom_ref)
-            dom_metrics = server.xenapi.VM_metrics.get_record(dom_metrics_ref)
+
+        dom_recs = server.xenapi.VM.get_all_records()
+        dom_metrics_recs = dict(map(lambda x: (x['uuid'], x), server.xenapi.VM_metrics.get_all_records()))
+
+        for dom_rec in dom_recs:
+            dom_metrics  = dom_metrics_recs[dom_rec['metrics']]
 
             states = ('running', 'blocked', 'paused', 'shutdown',
                       'crashed', 'dying')

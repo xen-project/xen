@@ -575,15 +575,25 @@ class XendAPI(object):
             
             get_by_uuid = '%s_get_by_uuid' % api_cls
             get_uuid = '%s_get_uuid' % api_cls
+            get_all_records = '%s_get_all_records' % api_cls    
+
             def _get_by_uuid(_1, _2, ref):
                 return xen_api_success(ref)
 
             def _get_uuid(_1, _2, ref):
                 return xen_api_success(ref)
 
+            def unpack(v):
+                return v['Value']
+
+            def _get_all_records(_api_cls):
+                return lambda s, session: \
+                    xen_api_success([unpack(getattr(cls, '%s_get_record' % _api_cls)(s, session, ref))\
+                                     for ref in unpack(getattr(cls, '%s_get_all' % _api_cls)(s, session))])
+
             setattr(cls, get_by_uuid, _get_by_uuid)
             setattr(cls, get_uuid,    _get_uuid)
-
+            setattr(cls, get_all_records, _get_all_records(api_cls))
 
         # Autoplugging classes
         # --------------------
@@ -721,7 +731,7 @@ class XendAPI(object):
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
     Base_methods = [('get_record', 'Struct')]
-    Base_funcs   = [('get_all', 'Set'), ('get_by_uuid', None)]
+    Base_funcs   = [('get_all', 'Set'), ('get_by_uuid', None), ('get_all_records', 'Set')]
 
     # Xen API: Class Session
     # ----------------------------------------------------------------
