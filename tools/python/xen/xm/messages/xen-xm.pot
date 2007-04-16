@@ -1,0 +1,63 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2007-04-05 14:17-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: xen/xm/XenAPI.py:58
+#, python-format
+msgid "Internal error: %(1)s."
+msgstr ""
+
+#: xen/xm/XenAPI.py:59
+#, python-format
+msgid "This map already contains %(1)s -> %(2)s."
+msgstr ""
+
+#: xen/xm/XenAPI.py:60
+#, python-format
+msgid "The method %(1)s is unsupported."
+msgstr ""
+
+#: xen/xm/XenAPI.py:61
+#, python-format
+msgid "The method %(1)s takes %(2)s argument(s) (%(3)s given)."
+msgstr ""
+
+#: xen/xm/XenAPI.py:62
+msgid "Permission denied."
+msgstr ""
+
+#: xen/xm/XenAPI.py:63
+#, python-format
+msgid ""
+"Value \"%(2)s\" for %(1)s is not supported by this server.  The server said "
+"\"%(3)s\"."
+msgstr ""
+
+#: xen/xm/XenAPI.py:64
+#, python-format
+msgid "The %(1)s handle %(2)s is invalid."
+msgstr ""
+
+#: xen/xm/XenAPI.py:65
+msgid "You attempted an operation that was not allowed."
+msgstr ""
+
+#: xen/xm/XenAPI.py:66
+msgid ""
+"The network you specified already has a PIF attached to it, and so another "
+"one may not be attached."
+msgstr ""
