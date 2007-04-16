@@ -1738,6 +1738,47 @@ void
 \noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
 
 \vspace{0.6cm}
+\subsubsection{RPC name:~migrate}
+
+{\bf Overview:} 
+Migrate the VM to another host.  This can only be called when the specified
+VM is in the Running state.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void migrate (session_id s, VM ref vm, string dest, bool live, (string -> string) Map options)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & vm & The VM \\ \hline 
+
+{\tt string } & dest & The destination host \\ \hline 
+
+{\tt bool } & live & Live migration \\ \hline 
+
+{\tt (string $\rightarrow$ string) Map } & options & Other parameters \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt VM\_BAD\_POWER\_STATE}
+
+\vspace{0.6cm}
 \subsubsection{RPC name:~get\_all}
 
 {\bf Overview:} 

@@ -877,6 +877,14 @@ xen_vm_send_trigger(xen_session *session, xen_vm vm, char *trigger);
 
 
 /**
+ * Migrate the VM to another host.  This can only be called when the
+ * specified VM is in the Running state.
+ */
+extern bool
+xen_vm_migrate(xen_session *session, xen_vm vm, char *dest, bool live, xen_string_string_map *options);
+
+
+/**
  * Return a list of all the VMs known to the system.
  */
 extern bool
