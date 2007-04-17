@@ -148,6 +148,15 @@ static inline void hvm_mmio_access(struct vcpu *v,
         p->data = tmp1;
         break;
 
+    case IOREQ_TYPE_SUB:
+        tmp1 = read_handler(v, p->addr, p->size);
+        if ( p->dir == IOREQ_WRITE ) {
+            tmp2 = tmp1 - (unsigned long) p->data;
+            write_handler(v, p->addr, p->size, tmp2);
+        }
+        p->data = tmp1;
+        break;
+
     default:
         printk("hvm_mmio_access: error ioreq type %x\n", p->type);
         domain_crash_synchronous();
