@@ -67,6 +67,13 @@
 #include <xen/platform-compat.h>
 #endif
 
+struct netfront_cb {
+	struct page *page;
+	unsigned offset;
+};
+
+#define NETFRONT_SKB_CB(skb)	((struct netfront_cb *)((skb)->cb))
+
 /*
  * Mutually-exclusive module options to select receive data path:
  *  rx_copy : Packets are copied by network backend into local memory
@@ -1354,8 +1361,8 @@ err:
 			}
 		}
 
-		skb->nh.raw = (void *)skb_shinfo(skb)->frags[0].page;
-		skb->h.raw = skb->nh.raw + rx->offset;
+		NETFRONT_SKB_CB(skb)->page = skb_shinfo(skb)->frags[0].page;
+		NETFRONT_SKB_CB(skb)->offset = rx->offset;
 
 		len = rx->status;
 		if (len > RX_COPY_THRESHOLD)
@@ -1439,11 +1446,11 @@ err:
 		kfree_skb(skb);
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
-		struct page *page = (struct page *)skb->nh.raw;
+		struct page *page = NETFRONT_SKB_CB(skb)->page;
 		void *vaddr = page_address(page);
+		unsigned offset = NETFRONT_SKB_CB(skb)->offset;
 
-		memcpy(skb->data, vaddr + (skb->h.raw - skb->nh.raw),
-		       skb_headlen(skb));
+		memcpy(skb->data, vaddr + offset, skb_headlen(skb));
 
 		if (page != skb_shinfo(skb)->frags[0].page)
 			__free_page(page);
