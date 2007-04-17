@@ -64,6 +64,7 @@ install: install-messages install-dtd
 endif
 
 install-dtd: all
+	$(INSTALL) -m 755 -d $(DESTDIR)/usr/share/xen
 	$(INSTALL) -m 755 xen/xm/create.dtd $(DESTDIR)/usr/share/xen
 
 install-messages: all
