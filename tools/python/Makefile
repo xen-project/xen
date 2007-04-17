@@ -64,16 +64,16 @@ install: install-messages install-dtd
 endif
 
 install-dtd: all
-	$(INSTALL) -m 755 -d $(DESTDIR)/usr/share/xen
-	$(INSTALL) -m 755 xen/xm/create.dtd $(DESTDIR)/usr/share/xen
+	$(INSTALL_DIR) $(DESTDIR)/usr/share/xen
+	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)/usr/share/xen
 
 install-messages: all
 	if which $(MSGFMT) >/dev/null ; then \
 		mkdir -p $(DESTDIR)$(NLSDIR); \
 		for l in $(LINGUAS); do \
-			$(INSTALL) -m 755 -d $(DESTDIR)$(NLSDIR)/$$l; \
-			$(INSTALL) -m 755 -d $(DESTDIR)$(NLSDIR)/$$l/LC_MESSAGES; \
-			$(INSTALL) -m 644 $(PODIR)/$$l.mo \
+			$(INSTALL_DIR) $(DESTDIR)$(NLSDIR)/$$l; \
+			$(INSTALL_DIR) $(DESTDIR)$(NLSDIR)/$$l/LC_MESSAGES; \
+			$(INSTALL_DATA) $(PODIR)/$$l.mo \
 				$(DESTDIR)$(NLSDIR)/$$l/LC_MESSAGES/$(POPACKAGE).mo; \
 		done ; \
 	fi
