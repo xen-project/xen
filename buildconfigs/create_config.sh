@@ -20,6 +20,7 @@ systype=$4
 #
 skeleton=buildconfigs/linux-defconfig_${extraversion}_${target_arch}${systype}
 [ -r $skeleton ] || skeleton=buildconfigs/linux-defconfig_xen_x86_32
+[ -r $skeleton.local ] && skeleton=$skeleton.local
 cp $skeleton $config_file
 
 
