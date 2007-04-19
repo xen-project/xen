@@ -335,12 +335,13 @@ uint32_t e820_malloc(uint32_t size)
         ent[i].addr = addr;
         ent[i].size = size;
         ent[i].type = E820_RESERVED;
-        break;
+
+        e820_collapse();
+
+        return addr;
     }
 
-    e820_collapse();
-
-    return addr;
+    return 0;
 }
 
 uint32_t ioapic_read(uint32_t reg)
