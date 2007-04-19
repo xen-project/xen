@@ -79,8 +79,8 @@ void uuid_to_string(char *dest, uint8_t *uuid);
 int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
-/* Allocate region of specified type in the e820 table. */
-uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask);
+/* Reserve a RAM region in the e820 table. */
+uint32_t e820_malloc(uint32_t size);
 
 /* General e820 access. */
 #include <xen/hvm/e820.h>

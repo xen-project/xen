@@ -121,13 +121,9 @@ static void copy_jumptable(char *elfarray)
 
 static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
 {
-    uint32_t mask = (64 * 1024) - 1;
     char *highbiosarea;
 
-    highbiosarea = (char *)(long)
-        e820_malloc((elfarraysize + mask) & ~mask, /* round to 64kb */
-                    E820_RESERVED,
-                    (uint64_t)0xffffffff);
+    highbiosarea = (char *)(long)e820_malloc(elfarraysize);
     if ( highbiosarea == NULL )
     {
         printf("No available memory for BIOS high memory area\n");

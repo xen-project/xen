@@ -32,7 +32,7 @@ clean:
 	done;
 
 $(TARGET): subdirs 32bitbios.o util.o
-	$(LD) $(LDFLAGS_DIRECT) -r 32bitbios.o $(MODULES) util.o -o 32bitbios_all.o
+	$(LD) $(LDFLAGS_DIRECT) -s -r 32bitbios.o $(MODULES) util.o -o 32bitbios_all.o
 	@nm 32bitbios_all.o |                                \
 	  grep -E -q '^ +U ' && {                            \
 	    echo "There are undefined symbols in the BIOS:"; \

@@ -269,8 +269,7 @@ int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.oem_revision = ACPI_OEM_REVISION;
         tcpa->header.creator_id   = ACPI_CREATOR_ID;
         tcpa->header.creator_revision = ACPI_CREATOR_REVISION;
-        tcpa->lasa = e820_malloc(
-            ACPI_2_0_TCPA_LAML_SIZE, E820_RESERVED, (uint32_t)~0);
+        tcpa->lasa = e820_malloc(ACPI_2_0_TCPA_LAML_SIZE);
         if ( tcpa->lasa )
         {
             tcpa->laml = ACPI_2_0_TCPA_LAML_SIZE;
