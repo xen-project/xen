@@ -2372,7 +2372,7 @@ class XendAPI(object):
         if not cfg:
             return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
         if not cfg.has_key('backend'):
-            return xen_api_error(['VTPM backend not set'])
+            return xen_api_error(['INTERNAL_ERROR', 'VTPM backend not set'])
         return xen_api_success(cfg['backend'])
 
     def VTPM_get_VM(self, session, vtpm_ref):
