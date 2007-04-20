@@ -691,7 +691,7 @@ class XendConfig(dict):
         self['vtpm_refs'] = cfg.get('vtpm_refs', [])
 
         # coalesce hvm vnc frame buffer with vfb config
-        if self.is_hvm() and self['platform'].get('vnc', 0):
+        if self.is_hvm() and int(self['platform'].get('vnc', 0)) != 0:
             # add vfb device if it isn't there already
             has_rfb = False
             for console_uuid in self['console_refs']:
