@@ -870,7 +870,7 @@ class XendConfig(dict):
                 sxpr.append([legacy, self[legacy]])
 
         sxpr.append(['image', self.image_sxpr()])
-        sxpr.append(['status', domain.state])
+        sxpr.append(['status', domain._stateGet()])
 
         if domain.getDomid() is not None:
             sxpr.append(['state', self._get_old_state_string()])
