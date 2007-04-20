@@ -24,8 +24,8 @@ around Xen.
 The 3.0 release offers excellent performance, hardware support and
 enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
 live relocation of VMs. This install tree contains source for a Linux
-2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris will follow
-later (and are already available for previous Xen releases).
+2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris are
+available from the community.
 
 This file contains some quick-start instructions to install Xen on
 your system. For full documentation, see the Xen User Manual. If this
@@ -86,7 +86,7 @@ First, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
 visiting the project webpage or installing a pre-built package
 provided by your Linux distributor:
-    * GCC (preferably v3.2.x or v3.3.x; older versions are unsupported)
+    * GCC v3.4 or later
     * GNU Make
     * GNU Binutils
     * Development install of zlib (e.g., zlib-dev)
