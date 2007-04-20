@@ -1,9 +1,0 @@
-XEN_LINUX_HGREPO ?= http://xenbits.xensource.com/linux-$(LINUX_VER)-xen.hg
-XEN_LINUX_HGREV  ?= tip
-
-$(LINUX_SRCDIR)/.valid-src:
-# TODO handle updating an existing clone?
-	if [ ! -d $(LINUX_SRCDIR) ] ; then \
-	    hg clone -r $(XEN_LINUX_HGREV) $(XEN_LINUX_HGREPO) $(LINUX_SRCDIR); \
-	fi
-	touch $@

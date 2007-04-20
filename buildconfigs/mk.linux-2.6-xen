@@ -1,16 +1,7 @@
 LINUX_SERIES = 2.6
-LINUX_VER    ?= 2.6.18
+LINUX_VER    = 2.6.18
 
 EXTRAVERSION ?= xen
-
-XEN_LINUX_SOURCE ?= sparse
-
-# Let XEN_TARGET_ARCH override ARCH.
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-LINUX_ARCH	?= i386
-else
-LINUX_ARCH	?= $(XEN_TARGET_ARCH)
-endif
 
 LINUX_SRCDIR = linux-$(LINUX_VER)-xen
 LINUX_DIR    = build-linux-$(LINUX_VER)-$(EXTRAVERSION)_$(XEN_TARGET_ARCH)
@@ -24,6 +15,8 @@ endif
 
 LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 
+include buildconfigs/Rules.mk
+
 # The real action starts here!
 .PHONY: build
 build: $(LINUX_DIR)/include/linux/autoconf.h
@@ -35,56 +28,31 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	mkdir -p $(INSTALL_BOOT_PATH)
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(INSTALL_BOOT_PATH) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: CONFIG_FILE=$(PWD)/$(LINUX_DIR)/.config
+$(LINUX_SRCDIR)/.valid-src: ref-linux-$(LINUX_VER)/.valid-ref
+	rm -rf $(LINUX_SRCDIR)
+	cp -al $(<D) $(LINUX_SRCDIR)
+	# Apply arch-xen patches
+	( cd linux-$(LINUX_SERIES)-xen-sparse && \
+          LINUX_ARCH=$(LINUX_ARCH) bash ./mkbuildtree ../$(LINUX_SRCDIR) )
+	# Patch kernel Makefile to set EXTRAVERSION
+	( cd $(LINUX_SRCDIR) ; \
+	  sed -e 's,^EXTRAVERSION.*,&$$(XENGUEST),' \
+	      -e 's,^KERNELRELEASE,XENGUEST := $$(shell [ -r $$(objtree)/.xenguest ] \&\& cat $$(objtree)/.xenguest)\n&,' Makefile >Mk.tmp ; \
+	  rm -f Makefile ; mv Mk.tmp Makefile )
+	touch $@
+
 $(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
 	rm -rf $(LINUX_DIR)
 	mkdir -p $(LINUX_DIR)
-	# Re-use config from install dir if one exists else use the create_config.sh provided
-	# by the source tree.
+	# Re-use config from install dir if one exits else use default config
 	CONFIG_VERSION=$$(sed -ne 's/$$(XENGUEST)//; s/^EXTRAVERSION = //p' $(LINUX_SRCDIR)/Makefile); \
-	if [ -r $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) ] ; then \
-	  cp $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) $(CONFIG_FILE) ; \
-        else \
-	  cd $(LINUX_SRCDIR) && sh buildconfigs/create_config.sh \
-		$(CONFIG_FILE) $(EXTRAVERSION) $(XEN_TARGET_ARCH) $(XEN_SYSTYPE) ; \
-	fi
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-ifeq ($(XEN_TARGET_X86_PAE),y)
-	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)
-else
-	grep '^CONFIG_HIGHMEM64G=y' $(CONFIG_FILE) >/dev/null && ( sed -e 's!^CONFIG_HIGHMEM64G=y$$!\# CONFIG_HIGHMEM64G is not set!;s!^\# CONFIG_HIGHMEM4G is not set$$!CONFIG_HIGHMEM4G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE) ) || true
-endif
-endif
-	echo "-$(EXTRAVERSION)" >$(LINUX_DIR)/localversion-xen
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
+	  || sh buildconfigs/create_config.sh $(LINUX_DIR)/.config $(EXTRAVERSION) $(XEN_TARGET_ARCH) $(XEN_SYSTYPE)
+	# See if we need to munge config to enable PAE
+	$(MAKE) CONFIG_FILE=$(LINUX_DIR)/.config -f buildconfigs/Rules.mk config-update-pae
+	echo "-$(EXTRAVERSION)" >$(LINUX_DIR)/.xenguest
 	$(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
-	@if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
-	    echo "***********************************"; \
-	    echo "oldconfig did not create a Makefile"; \
-	    echo "Generating $(LINUX_DIR)/Makefile   "; \
-	    echo "***********************************"; \
-	    ( echo "# Automatically generated: don't edit"; \
-	      echo ""; \
-	      echo "VERSION = 2"; \
-	      echo "PATCHLEVEL = 6"; \
-	      echo ""; \
-	      echo "KERNELSRC    := $(PWD)/$(LINUX_SRCDIR)"; \
-	      echo "KERNELOUTPUT := $(PWD)/$(LINUX_DIR)"; \
-	      echo ""; \
-	      echo "MAKEFLAGS += --no-print-directory"; \
-	      echo ""; \
-	      echo ".PHONY: all \$$(MAKECMDGOALS)"; \
-	      echo ""; \
-	      echo "all:"; \
-	      echo "	\$$(MAKE) -C \$$(KERNELSRC) O=\$$(KERNELOUTPUT)"; \
-	      echo ""; \
-	      echo "Makefile:;"; \
-	      echo ""; \
-	      echo "\$$(filter-out all Makefile,\$$(MAKECMDGOALS)) %/:"; \
-	      echo "	\$$(MAKE) -C \$$(KERNELSRC) O=\$$(KERNELOUTPUT) \$$@"; \
-	    ) > $(LINUX_DIR)/Makefile ; \
-	fi
-
-include buildconfigs/src.$(XEN_LINUX_SOURCE)
 
 .PHONY: prep
 prep: $(LINUX_DIR)/include/linux/autoconf.h
@@ -99,11 +67,12 @@ clean::
 	[ ! -d $(LINUX_DIR) ] || \
 		$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
 
+
 .PHONY: delete
 delete: 
 	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 
 
-.PHONY: mrproper
-mrproper:
+.PHONY: mrpropper
+mrpropper:
 	rm -rf $(LINUX_SRCDIR)
 	rm -f linux-$(LINUX_VER).tar.bz2

@@ -125,7 +125,7 @@ vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
 install:
-	$(Q)$(MAKE) $(build)=$(boot) $@
+	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
 else
 all: bzImage
 
