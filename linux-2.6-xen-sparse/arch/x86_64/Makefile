@@ -91,7 +91,7 @@ vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
 install:
-	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
+	$(Q)$(MAKE) $(build)=$(boot) $@
 else
 #Default target when executing "make"
 all: bzImage
