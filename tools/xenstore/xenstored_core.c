@@ -1163,6 +1163,13 @@ static void do_debug(struct connection *conn, struct buffered_data *in)
 {
 	int num;
 
+#ifndef TESTING
+	if (conn->id != 0) {
+		send_error(conn, EACCES);
+		return;
+	}
+#endif
+
 	num = xs_count_strings(in->buffer, in->used);
 
 	if (streq(in->buffer, "print")) {
