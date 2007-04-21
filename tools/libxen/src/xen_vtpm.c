@@ -21,10 +21,10 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
 #include "xen_internal.h"
-#include "xen_vm.h"
-#include "xen_vtpm.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_vm.h>
+#include <xen/api/xen_vtpm.h>
 
 
 XEN_FREE(xen_vtpm)
@@ -46,7 +46,7 @@ static const struct_member xen_vtpm_record_struct_members[] =
           .offset = offsetof(xen_vtpm_record, vm) },
         { .key = "backend",
           .type = &abstract_type_ref,
-          .offset = offsetof(xen_vtpm_record, backend) },
+          .offset = offsetof(xen_vtpm_record, backend) }
     };
 
 const abstract_type xen_vtpm_record_abstract_type_ =

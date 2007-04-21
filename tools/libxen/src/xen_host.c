@@ -20,16 +20,16 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
-#include "xen_host.h"
-#include "xen_host_cpu.h"
-#include "xen_host_metrics.h"
 #include "xen_internal.h"
-#include "xen_pbd.h"
-#include "xen_pif.h"
-#include "xen_sr.h"
-#include "xen_string_string_map.h"
-#include "xen_vm.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_host.h>
+#include <xen/api/xen_host_cpu.h>
+#include <xen/api/xen_host_metrics.h>
+#include <xen/api/xen_pbd.h>
+#include <xen/api/xen_pif.h>
+#include <xen/api/xen_sr.h>
+#include <xen/api/xen_string_string_map.h>
+#include <xen/api/xen_vm.h>
 
 
 XEN_FREE(xen_host)

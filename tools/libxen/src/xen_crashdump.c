@@ -20,11 +20,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
-#include "xen_crashdump.h"
 #include "xen_internal.h"
-#include "xen_vdi.h"
-#include "xen_vm.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_crashdump.h>
+#include <xen/api/xen_vdi.h>
+#include <xen/api/xen_vm.h>
 
 
 XEN_FREE(xen_crashdump)

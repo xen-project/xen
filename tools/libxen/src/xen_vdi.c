@@ -20,14 +20,14 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
-#include "xen_crashdump.h"
 #include "xen_internal.h"
-#include "xen_sr.h"
-#include "xen_string_string_map.h"
-#include "xen_vbd.h"
-#include "xen_vdi.h"
 #include "xen_vdi_type_internal.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_crashdump.h>
+#include <xen/api/xen_sr.h>
+#include <xen/api/xen_string_string_map.h>
+#include <xen/api/xen_vbd.h>
+#include <xen/api/xen_vdi.h>
 
 
 XEN_FREE(xen_vdi)

@@ -17,9 +17,9 @@
  */
 
 
-#include "xen_common.h"
-#include "xen_int_int_map.h"
 #include "xen_internal.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_int_int_map.h>
 
 
 xen_int_int_map *

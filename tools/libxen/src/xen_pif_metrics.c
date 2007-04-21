@@ -20,9 +20,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
 #include "xen_internal.h"
-#include "xen_pif_metrics.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_pif_metrics.h>
 
 
 XEN_FREE(xen_pif_metrics)

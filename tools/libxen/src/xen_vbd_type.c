@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "xen_internal.h"
-#include "xen_vbd_type.h"
+#include <xen/api/xen_vbd_type.h>
 #include "xen_vbd_type_internal.h"
 
 

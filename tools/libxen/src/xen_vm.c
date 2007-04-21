@@ -20,22 +20,22 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
-#include "xen_console.h"
-#include "xen_crashdump.h"
-#include "xen_host.h"
 #include "xen_internal.h"
 #include "xen_on_crash_behaviour_internal.h"
 #include "xen_on_normal_exit_internal.h"
-#include "xen_string_string_map.h"
-#include "xen_vbd.h"
-#include "xen_vdi.h"
-#include "xen_vif.h"
-#include "xen_vm.h"
-#include "xen_vm_guest_metrics.h"
-#include "xen_vm_metrics.h"
 #include "xen_vm_power_state_internal.h"
-#include "xen_vtpm.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_console.h>
+#include <xen/api/xen_crashdump.h>
+#include <xen/api/xen_host.h>
+#include <xen/api/xen_string_string_map.h>
+#include <xen/api/xen_vbd.h>
+#include <xen/api/xen_vdi.h>
+#include <xen/api/xen_vif.h>
+#include <xen/api/xen_vm.h>
+#include <xen/api/xen_vm_guest_metrics.h>
+#include <xen/api/xen_vm_metrics.h>
+#include <xen/api/xen_vtpm.h>
 
 
 XEN_FREE(xen_vm)

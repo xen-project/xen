@@ -18,7 +18,7 @@
 
 
 #include "xen_internal.h"
-#include "xen_string_set.h"
+#include <xen/api/xen_string_set.h>
 
 
 xen_string_set *
