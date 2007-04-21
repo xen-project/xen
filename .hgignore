@@ -126,6 +126,7 @@
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
 ^tools/libxc/xen/.*$
+^tools/libxen/libxenapi-
 ^tools/libxen/test/test_bindings$
 ^tools/libxen/test/test_event_handling$
 ^tools/libaio/src/.*\.ol$
