@@ -177,14 +177,14 @@ static int get_tapdisk_pid(blkif_t *blkif)
  *   return 0 on success, -1 on error.
  */
 
-static int test_path(char *path, char **dev, int *type, blkif_t *blkif)
+static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
 {
 	char *ptr, handle[10];
 	int i, size, found = 0;
 
 	size = sizeof(dtypes)/sizeof(disk_info_t *);
 	*type = MAX_DISK_TYPES + 1;
-        blkif = NULL;
+        *blkif = NULL;
 
 	if ( (ptr = strstr(path, ":"))!=NULL) {
 		memcpy(handle, path, (ptr - path));
@@ -207,9 +207,9 @@ static int test_path(char *path, char **dev, int *type, blkif_t *blkif)
                                 /* Check whether tapdisk process 
                                    already exists */
                                 if (active_disks[dtypes[i]->idnum] == NULL) 
-                                        blkif = NULL;
+                                        *blkif = NULL;
                                 else 
-                                        blkif = active_disks[dtypes[i]
+                                        *blkif = active_disks[dtypes[i]
                                                              ->idnum]->blkif;
                         }
                         return 0;
@@ -478,19 +478,20 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 	char *rdctldev, *wrctldev, *cmd, *ptr;
 	image_t *image;
 	blkif_t *exist = NULL;
+	static uint16_t next_cookie = 0;
 
 	DPRINTF("Received a poll for a new vbd\n");
 	if ( ((blk=blkif->info) != NULL) && (blk->params != NULL) ) {
 		if (get_new_dev(&major, &minor, blkif)<0)
 			return -1;
 
-		if (test_path(blk->params, &ptr, &type, exist) != 0) {
+		if (test_path(blk->params, &ptr, &type, &exist) != 0) {
                         DPRINTF("Error in blktap device string(%s).\n",
                                 blk->params);
                         return -1;
                 }
 		blkif->drivertype = type;
-		blkif->cookie = lrand48() % MAX_RAND_VAL;
+		blkif->cookie = next_cookie++;
 
 		if (!exist) {
 			DPRINTF("Process does not exist:\n");
