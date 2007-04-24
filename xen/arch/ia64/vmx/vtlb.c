@@ -168,6 +168,7 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     else{
         cch = __alloc_chain(hcb);
     }
+    local_irq_disable();
     *cch = *head;
     head->page_flags=pte;
     head->itir = rr.ps << 2;
@@ -175,6 +176,7 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     head->next = cch;
     head->len = cch->len+1;
     cch->len = 0;
+    local_irq_enable();
     return;
 }
 
@@ -424,14 +426,14 @@ void vtlb_insert(VCPU *v, u64 pte, u64 itir, u64 va)
     else {
         cch = __alloc_chain(hcb);
     }
-    *cch = *hash_table;
-    hash_table->page_flags = pte;
-    hash_table->itir=itir;
-    hash_table->etag=tag;
+    cch->page_flags = pte;
+    cch->itir = itir;
+    cch->etag = tag;
+    cch->next = hash_table->next;
+    wmb();
     hash_table->next = cch;
-    hash_table->len = cch->len + 1;
-    cch->len = 0;
-    return ;
+    hash_table->len += 1;
+    return;
 }
 
 
