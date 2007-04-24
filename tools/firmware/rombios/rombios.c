@@ -4158,11 +4158,9 @@ BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
 
 ASM_START
       ;; Get the count in eax
-      SEG SS
-        mov  ax, .int15_function32.CX [bp]
+      mov  ax, .int15_function32.CX [bp]
       shl  eax, #16
-      SEG SS
-        mov  ax, .int15_function32.DX [bp]
+      mov  ax, .int15_function32.DX [bp]
 
       ;; convert to numbers of 15usec ticks
       mov ebx, #15
