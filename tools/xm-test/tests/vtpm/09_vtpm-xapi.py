@@ -91,7 +91,7 @@ if vtpm_uuid not in vm_vtpms:
 try:
     console = domain.start()
 except DomainError, e:
-    FAIL("Unable to create domain (%s)")
+    FAIL("Unable to create domain.")
 
 try:
     console.sendInput("input")

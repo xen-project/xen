@@ -253,8 +253,28 @@ def restore(xd, fd, dominfo = None, paused = False):
         os.read(fd, 1)           # Wait for source to close connection
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
-        
-        dominfo.waitForDevices() # Wait for backends to set up
+
+        #
+        # We shouldn't hold the domains_lock over a waitForDevices
+        # As this function sometime gets called holding this lock,
+        # we must release it and re-acquire it appropriately
+        #
+        from xen.xend import XendDomain
+
+        lock = True;
+        try:
+            XendDomain.instance().domains_lock.release()
+        except:
+            lock = False;
+
+        try:
+            dominfo.waitForDevices() # Wait for backends to set up
+        except Exception, exn:
+            log.exception(exn)
+
+        if lock:
+            XendDomain.instance().domains_lock.acquire()
+
         if not paused:
             dominfo.unpause()
 

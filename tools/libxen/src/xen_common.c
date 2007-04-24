@@ -36,6 +36,7 @@
 #include "xen_internal.h"
 #include "xen_int_float_map.h"
 #include "xen_int_int_map.h"
+#include "xen_int_string_set_map.h"
 #include "xen_string_string_map.h"
 
 
@@ -1715,4 +1716,22 @@ const abstract_type abstract_type_int_int_map =
         .typename = MAP,
         .struct_size = sizeof(xen_int_int_map_contents),
         .members = int_int_members
+    };
+
+static struct struct_member int_string_set_members[] =
+{
+    {
+        .type = &abstract_type_int,
+        .offset = offsetof(xen_int_string_set_map_contents, key)
+    },
+    {
+        .type = &abstract_type_string_set,
+        .offset = offsetof(xen_int_string_set_map_contents, val)
+    }
+};
+const abstract_type abstract_type_int_string_set_map =
+    {
+        .typename = MAP,
+        .struct_size = sizeof(xen_int_string_set_map_contents),
+        .members = int_string_set_members
     };

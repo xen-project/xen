@@ -30,6 +30,7 @@ import threading
 import re
 import copy
 import os
+import traceback
 from types import StringTypes
 
 import xen.lowlevel.xc
@@ -309,8 +310,8 @@ class XendDomainInfo:
     @type shutdownWatch: xen.xend.xenstore.xswatch
     @ivar shutdownStartTime: UNIX Time when domain started shutting down.
     @type shutdownStartTime: float or None
-    @ivar state: Domain state
-    @type state: enum(DOM_STATE_HALTED, DOM_STATE_RUNNING, ...)
+#    @ivar state: Domain state
+#    @type state: enum(DOM_STATE_HALTED, DOM_STATE_RUNNING, ...)
     @ivar state_updated: lock for self.state
     @type state_updated: threading.Condition
     @ivar refresh_shutdown_lock: lock for polling shutdown state
@@ -361,9 +362,9 @@ class XendDomainInfo:
         self.shutdownStartTime = None
         self._resume = resume
 
-        self.state = DOM_STATE_HALTED
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
+        self._stateSet(DOM_STATE_HALTED)
 
         self._deviceControllers = {}
 
@@ -389,7 +390,7 @@ class XendDomainInfo:
         """
         from xen.xend import XendDomain
 
-        if self.state == DOM_STATE_HALTED:
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_HALTED, XEN_API_VM_POWER_STATE_SUSPENDED):
             try:
                 XendTask.log_progress(0, 30, self._constructDomain)
                 XendTask.log_progress(31, 60, self._initDomain)
@@ -420,7 +421,8 @@ class XendDomainInfo:
 
     def resume(self):
         """Resumes a domain that has come back from suspension."""
-        if self.state in (DOM_STATE_HALTED, DOM_STATE_SUSPENDED):
+        state = self._stateGet()
+        if state in (DOM_STATE_SUSPENDED, DOM_STATE_HALTED):
             try:
                 self._constructDomain()
                 self._storeVmDetails()
@@ -433,12 +435,13 @@ class XendDomainInfo:
                 self.destroy()
                 raise
         else:
-            raise XendError('VM already running')
+            raise XendError('VM is not susupened; it is %s'
+                            % XEN_API_VM_POWER_STATE[state])
 
     def shutdown(self, reason):
         """Shutdown a domain by signalling this via xenstored."""
         log.debug('XendDomainInfo.shutdown(%s)', reason)
-        if self.state in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
+        if self._stateGet() in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
             raise XendError('Domain cannot be shutdown')
 
         if self.domid == 0:
@@ -558,8 +561,7 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
     def getDeviceSxprs(self, deviceClass):
-        if self.state == DOM_STATE_RUNNING \
-               or self.state == DOM_STATE_PAUSED:
+        if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
             return self.getDeviceController(deviceClass).sxprs()
         else:
             sxprs = []
@@ -1579,11 +1581,10 @@ class XendDomainInfo:
     def waitForShutdown(self):
         self.state_updated.acquire()
         try:
-            while self.state in (DOM_STATE_RUNNING,DOM_STATE_PAUSED):
+            while self._stateGet() in (DOM_STATE_RUNNING,DOM_STATE_PAUSED):
                 self.state_updated.wait()
         finally:
             self.state_updated.release()
-
 
     #
     # TODO: recategorise - called from XendCheckpoint
@@ -1980,14 +1981,59 @@ class XendDomainInfo:
     # Utility functions
     #
 
+    def __getattr__(self, name):
+         if name == "state":
+             log.warn("Somebody tried to read XendDomainInfo.state... should us _stateGet()!!!")
+             log.warn("".join(traceback.format_stack()))
+             return self._stateGet()
+         else:
+             raise AttributeError()
+
+    def __setattr__(self, name, value):
+        if name == "state":
+            log.warn("Somebody tried to set XendDomainInfo.state... should us _stateGet()!!!")
+            log.warn("".join(traceback.format_stack()))
+            self._stateSet(value)
+        else:
+            self.__dict__[name] = value
+
     def _stateSet(self, state):
         self.state_updated.acquire()
         try:
-            if self.state != state:
-                self.state = state
+            # TODO Not sure this is correct...
+            # _stateGet is live now. Why not fire event
+            # even when it hasn't changed?
+            if self._stateGet() != state:
                 self.state_updated.notifyAll()
+                import XendAPI
+                XendAPI.event_dispatch('mod', 'VM', self.info['uuid'],
+                                       'power_state')
         finally:
             self.state_updated.release()
+
+    def _stateGet(self):
+        # Lets try and reconsitute the state from xc
+        # first lets try and get the domain info
+        # from xc - this will tell us if the domain
+        # exists
+        info = dom_get(self.getDomid())
+        if info is None or info['shutdown']:
+            # We are either HALTED or SUSPENDED
+            # check saved image exists
+            from xen.xend import XendDomain
+            managed_config_path = \
+                XendDomain.instance()._managed_check_point_path( \
+                    self.get_uuid())
+            if os.path.exists(managed_config_path):
+                return XEN_API_VM_POWER_STATE_SUSPENDED
+            else:
+                return XEN_API_VM_POWER_STATE_HALTED
+        else:
+            # We are either RUNNING or PAUSED
+            if info['paused']:
+                return XEN_API_VM_POWER_STATE_PAUSED
+            else:
+                return XEN_API_VM_POWER_STATE_RUNNING
 
     def _infoIsSet(self, name):
         return name in self.info and self.info[name] is not None
@@ -2104,7 +2150,7 @@ class XendDomainInfo:
         retval = xc.sched_credit_domain_get(self.getDomid())
         return retval
     def get_power_state(self):
-        return XEN_API_VM_POWER_STATE[self.state]
+        return XEN_API_VM_POWER_STATE[self._stateGet()]
     def get_platform(self):
         return self.info.get('platform', {})    
     def get_pci_bus(self):
@@ -2153,7 +2199,7 @@ class XendDomainInfo:
         # shortcut if the domain isn't started because
         # the devcontrollers will have no better information
         # than XendConfig.
-        if self.state in (XEN_API_VM_POWER_STATE_HALTED,):
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_HALTED,):
             if dev_config:
                 return copy.deepcopy(dev_config)
             return None
@@ -2212,7 +2258,7 @@ class XendDomainInfo:
 
             config['MTU'] = 1500 # TODO
             
-            if self.state not in (XEN_API_VM_POWER_STATE_HALTED,):
+            if self._stateGet() not in (XEN_API_VM_POWER_STATE_HALTED,):
                 xennode = XendNode.instance()
                 rx_bps, tx_bps = xennode.get_vif_util(self.domid, devid)
                 config['io_read_kbs'] = rx_bps/1024
@@ -2223,7 +2269,7 @@ class XendDomainInfo:
 
         if dev_class == 'vbd':
 
-            if self.state not in (XEN_API_VM_POWER_STATE_HALTED,):
+            if self._stateGet() not in (XEN_API_VM_POWER_STATE_HALTED,):
                 controller = self.getDeviceController(dev_class)
                 devid, _1, _2 = controller.getDeviceDetails(config)
                 xennode = XendNode.instance()
@@ -2309,8 +2355,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
 
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING or \
-               self.state == XEN_API_VM_POWER_STATE_PAUSED:
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_RUNNING,
+                                XEN_API_VM_POWER_STATE_PAUSED):
             _, config = self.info['devices'][dev_uuid]
             
             if vdi_image_path.startswith('tap'):
@@ -2344,7 +2390,7 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
 
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING:
+        if self._stateGet() == XEN_API_VM_POWER_STATE_RUNNING:
             _, config = self.info['devices'][dev_uuid]
             config['devid'] = self.getDeviceController('tap').createDevice(config)
 
@@ -2361,8 +2407,8 @@ class XendDomainInfo:
         if not dev_uuid:
             raise XendError('Failed to create device')
         
-        if self.state == XEN_API_VM_POWER_STATE_RUNNING \
-               or self.state == XEN_API_VM_POWER_STATE_PAUSED:
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_RUNNING,
+                                XEN_API_VM_POWER_STATE_PAUSED):
 
             _, config = self.info['devices'][dev_uuid]
             dev_control = self.getDeviceController('vif')
@@ -2387,7 +2433,7 @@ class XendDomainInfo:
         @rtype: string
         """
 
-        if self.state not in (DOM_STATE_HALTED,):
+        if self._stateGet() not in (DOM_STATE_HALTED,):
             raise VmError("Can only add vTPM to a halted domain.")
         if self.get_vtpms() != []:
             raise VmError('Domain already has a vTPM.')
@@ -2403,7 +2449,7 @@ class XendDomainInfo:
         @return: uuid of device
         @rtype: string
         """
-        if self.state not in (DOM_STATE_HALTED,):
+        if self._stateGet() not in (DOM_STATE_HALTED,):
             raise VmError("Can only add console to a halted domain.")
 
         dev_uuid = self.info.device_add('console', cfg_xenapi = xenapi_console)
@@ -2417,8 +2463,8 @@ class XendDomainInfo:
             raise XendError('Device does not exist')
 
         try:
-            if self.state == XEN_API_VM_POWER_STATE_RUNNING \
-                   or self.state == XEN_API_VM_POWER_STATE_PAUSED:
+            if self._stateGet() in (XEN_API_VM_POWER_STATE_RUNNING,
+                                    XEN_API_VM_POWER_STATE_PAUSED):
                 _, config = self.info['devices'][dev_uuid]
                 devid = config.get('devid')
                 if devid != None:
@@ -2445,7 +2491,7 @@ class XendDomainInfo:
     def __str__(self):
         return '<domain id=%s name=%s memory=%s state=%s>' % \
                (str(self.domid), self.info['name_label'],
-                str(self.info['memory_dynamic_max']), DOM_STATES[self.state])
+                str(self.info['memory_dynamic_max']), DOM_STATES[self._stateGet()])
 
     __repr__ = __str__
 

@@ -221,6 +221,7 @@ static inline unsigned long get_immediate(int ad_size, const unsigned char *inst
 
     inst++; //skip ModR/M byte
     if ( ad_size != WORD && mod != 3 && rm == 4 ) {
+        rm = *inst & 7;
         inst++; //skip SIB byte
     }
 
@@ -256,31 +257,15 @@ static inline unsigned long get_immediate(int ad_size, const unsigned char *inst
     return val;
 }
 
-/* Some instructions, like "add $imm8, r/m16"/"MOV $imm32, r/m64" require
- * the src immediate operand be sign-extented befere the op is executed. Here
- * we always sign-extend the operand to a "unsigned long" variable.
- *
- * Note: to simplify the logic here, the sign-extension here may be performed
- * redundantly against some instructions, like "MOV $imm16, r/m16" -- however
- * this is harmless, since we always remember the operand's size.
- */
-static inline unsigned long get_immediate_sign_ext(int ad_size,
-                                                   const unsigned char *inst,
-                                                   int op_size)
+static inline unsigned long get_immediate_sign_ext(
+    int ad_size, const unsigned char *inst, int op_size)
 {
     unsigned long result = get_immediate(ad_size, inst, op_size);
-
-    if ( op_size == QUAD )
-        op_size = LONG;
-
-    ASSERT( op_size == BYTE || op_size == WORD || op_size == LONG );
-
-    if ( result & (1UL << ((8*op_size) - 1)) )
-    {
-        unsigned long mask = ~0UL >> (8 * (sizeof(mask) - op_size));
-        result = ~mask | (result & mask);
-    }
-    return result;
+    if ( op_size == BYTE )
+        return (int8_t)result;
+    if ( op_size == WORD )
+        return (int16_t)result;
+    return (int32_t)result;
 }
 
 static inline int get_index(const unsigned char *inst, unsigned char rex)
@@ -1240,6 +1225,10 @@ void handle_mmio(unsigned long gpa)
         mmio_operands(IOREQ_TYPE_ADD, gpa, mmio_op, op_size);
         break;
 
+    case INSTR_SUB:
+        mmio_operands(IOREQ_TYPE_SUB, gpa, mmio_op, op_size);
+        break;
+
     case INSTR_XOR:
         mmio_operands(IOREQ_TYPE_XOR, gpa, mmio_op, op_size);
         break;
@@ -1261,7 +1250,6 @@ void handle_mmio(unsigned long gpa)
 
     case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
-    case INSTR_SUB:
         /* send the request and wait for the value */
         send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, op_size, 0, IOREQ_READ, df, 0);
         break;

@@ -46,6 +46,8 @@
 
 #define NULL_LABEL_NAME "__NULL_LABEL__"
 
+#define ROUND8(x)   ((x + 7) & ~7)
+
 /* primary / secondary policy component setting */
 enum policycomponent { CHWALL, STE, NULLPOLICY }
     primary = NULLPOLICY, secondary = NULLPOLICY;
@@ -1152,6 +1154,19 @@ unsigned char *write_ste_binary(u_int32_t * len_ste)
     return buf;                 /* for now */
 }
 
+static ssize_t write_padded(int fd, const void *buf, size_t count)
+{
+    int rc;
+    static const char padding[7] = {0,0,0,0,0,0,0};
+    unsigned int len = ROUND8(count) - count;
+
+    rc = write(fd, buf, count);
+    if (rc == count && len > 0) {
+        write(fd, padding, len);
+    }
+    return rc;
+}
+
 int write_binary(char *filename)
 {
     struct acm_policy_buffer header;
@@ -1183,35 +1198,37 @@ int write_binary(char *filename)
     header.xml_pol_version.major = htonl(major);
     header.xml_pol_version.minor = htonl(minor);
 
-    len = sizeof(struct acm_policy_buffer);
+    len = ROUND8(sizeof(struct acm_policy_buffer));
     if (have_chwall)
-        len += len_chwall;
+        len += ROUND8(len_chwall);
     if (have_ste)
-        len += len_ste;
-    len += len_pr;              /* policy reference is mandatory */
+        len += ROUND8(len_ste);
+    len += ROUND8(len_pr);           /* policy reference is mandatory */
     header.len = htonl(len);
 
     header.policy_reference_offset =
-        htonl(sizeof(struct acm_policy_buffer));
+        htonl(ROUND8(sizeof(struct acm_policy_buffer)));
 
     header.primary_buffer_offset =
-        htonl(sizeof(struct acm_policy_buffer) + len_pr);
+        htonl(ROUND8(sizeof(struct acm_policy_buffer)) +
+              ROUND8(len_pr));
     if (primary == CHWALL) {
         header.primary_policy_code = htonl(ACM_CHINESE_WALL_POLICY);
         header.secondary_buffer_offset =
-            htonl((sizeof(struct acm_policy_buffer)) + len_pr +
-                  len_chwall);
+            htonl(ROUND8(sizeof(struct acm_policy_buffer)) +
+                  ROUND8(len_pr) +
+                  ROUND8(len_chwall));
     } else if (primary == STE) {
         header.primary_policy_code =
             htonl(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
         header.secondary_buffer_offset =
-            htonl((sizeof(struct acm_policy_buffer)) + len_pr +
-                  len_ste);
+            htonl(ROUND8(sizeof(struct acm_policy_buffer)) +
+                  ROUND8(len_pr) +
+                  ROUND8(len_ste));
     } else {
         /* null policy */
         header.primary_policy_code = htonl(ACM_NULL_POLICY);
-        header.secondary_buffer_offset =
-            htonl(header.primary_buffer_offset);
+        header.secondary_buffer_offset = header.primary_buffer_offset;
     }
 
     if (secondary == CHWALL)
@@ -1222,25 +1239,25 @@ int write_binary(char *filename)
     else
         header.secondary_policy_code = htonl(ACM_NULL_POLICY);
 
-    if (write(fd, (void *) &header, sizeof(struct acm_policy_buffer))
+    if (write_padded(fd, (void *) &header, sizeof(struct acm_policy_buffer))
         != sizeof(struct acm_policy_buffer)) {
         ret = -EIO;
         goto out1;
     }
 
     /* write label reference name */
-    if (write(fd, policy_reference_buffer, len_pr) != len_pr) {
+    if (write_padded(fd, policy_reference_buffer, len_pr) != len_pr) {
         ret = -EIO;
         goto out1;
     }
     /* write primary policy component */
     if (primary == CHWALL) {
-        if (write(fd, chwall_buffer, len_chwall) != len_chwall) {
+        if (write_padded(fd, chwall_buffer, len_chwall) != len_chwall) {
             ret = -EIO;
             goto out1;
         }
     } else if (primary == STE) {
-        if (write(fd, ste_buffer, len_ste) != len_ste) {
+        if (write_padded(fd, ste_buffer, len_ste) != len_ste) {
             ret = -EIO;
             goto out1;
         }
@@ -1248,12 +1265,12 @@ int write_binary(char *filename)
 
     /* write secondary policy component */
     if (secondary == CHWALL) {
-        if (write(fd, chwall_buffer, len_chwall) != len_chwall) {
+        if (write_padded(fd, chwall_buffer, len_chwall) != len_chwall) {
             ret = -EIO;
             goto out1;
         }
     } else if (secondary == STE) {
-        if (write(fd, ste_buffer, len_ste) != len_ste) {
+        if (write_padded(fd, ste_buffer, len_ste) != len_ste) {
             ret = -EIO;
             goto out1;
         }

@@ -20,7 +20,6 @@
  * Author: Stefan Berger <stefanb@us.ibm.com>
  */
 #include "rombios_compat.h"
-#include "jumptable.h"
 #include "32bitprotos.h"
 
 /*
@@ -29,7 +28,7 @@
    here.
  */
 #define TABLE_ENTRY(idx, func) [idx] = (uint32_t)func
-uint32_t jumptable[IDX_LAST+1] __attribute__((section (JUMPTABLE_SECTION_NAME))) =
+uint32_t jumptable[IDX_LAST+1] __attribute__((section (".biosjumptable"))) =
 {
 	TABLE_ENTRY(IDX_TCPA_ACPI_INIT, tcpa_acpi_init),
 	TABLE_ENTRY(IDX_TCPA_EXTEND_ACPI_LOG, tcpa_extend_acpi_log),

@@ -334,7 +334,7 @@ static void cmos_write_memory_size(void)
         alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
     }
 
-    /* All BIOSes: conventional memory (640kB). */
+    /* All BIOSes: conventional memory (CMOS *always* reports 640kB). */
     cmos_outb(0x15, (uint8_t)(base_mem >> 0));
     cmos_outb(0x16, (uint8_t)(base_mem >> 8));
 

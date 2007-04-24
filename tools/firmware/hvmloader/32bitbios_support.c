@@ -4,6 +4,9 @@
  * Stefan Berger, stefanb@us.ibm.com
  * Copyright (c) 2006, International Business Machines Corporation.
  *
+ * Keir Fraser, keir@xensource.com
+ * Copyright (c) 2007, XenSource Inc.
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
@@ -28,24 +31,94 @@
 #include "config.h"
 
 #include "../rombios/32bit/32bitbios_flat.h"
-#include "../rombios/32bit/jumptable.h"
 
-/* Relocate ELF file of type ET_REL */
-static void relocate_elf(char *elfarray)
+static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
 {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfarray;
     Elf32_Shdr *shdr = (Elf32_Shdr *)&elfarray[ehdr->e_shoff];
-    Elf32_Sym  *syms, *sym;
-    Elf32_Rel  *rels;
-    char       *code;
-    uint32_t   *loc, fix;
-    int i, j;
+    char *secstrings = &elfarray[shdr[ehdr->e_shstrndx].sh_offset];
+    char *jump_table;
+    uint32_t reloc_off, reloc_size;
+    char *highbiosarea;
+    int i, jump_sec_idx = 0;
 
-    for ( i = 0; i < ehdr->e_shnum; i++ )
-        shdr[i].sh_addr = (Elf32_Addr)&elfarray[shdr[i].sh_offset];
-
+    /*
+     * Step 1. General elf cleanup, and compute total relocation size.
+     */
+    reloc_off = 0;
     for ( i = 0; i < ehdr->e_shnum; i++ )
     {
+        /* By default all section data points into elf image data array. */
+        shdr[i].sh_addr = (Elf32_Addr)&elfarray[shdr[i].sh_offset];
+
+        if ( !strcmp(".biosjumptable", secstrings + shdr[i].sh_name) )
+        {
+            /* We do not relocate the BIOS jump table to high memory. */
+            shdr[i].sh_flags &= ~SHF_ALLOC;
+            jump_sec_idx = i;
+        }
+
+        /* Fix up a corner case of address alignment. */
+        if ( shdr[i].sh_addralign == 0 )
+            shdr[i].sh_addralign = 1;
+
+        /* Any section which contains run-time data must be relocated. */
+        if ( shdr[i].sh_flags & SHF_ALLOC )
+        {
+            uint32_t mask = shdr[i].sh_addralign - 1;
+            reloc_off = (reloc_off + mask) & ~mask;
+            reloc_off += shdr[i].sh_size;
+        }
+    }
+
+    /*
+     * Step 2. Now we know the relocation size, allocate a chunk of high mem.
+     */
+    reloc_size = reloc_off;
+    printf("%d bytes of ROMBIOS high-memory extensions:\n", reloc_size);
+    highbiosarea = (char *)(long)e820_malloc(reloc_size);
+    BUG_ON(highbiosarea == NULL);
+    printf("  Relocating to 0x%x-0x%x ... ",
+           (uint32_t)&highbiosarea[0],
+           (uint32_t)&highbiosarea[reloc_size]);
+
+    /*
+     * Step 3. Copy run-time data into the newly-allocated high-memory chunk.
+     */
+    reloc_off = 0;
+    for ( i = 0; i < ehdr->e_shnum; i++ )
+    {
+        uint32_t mask = shdr[i].sh_addralign - 1;
+
+        /* Nothing to do for non-run-time sections. */
+        if ( !(shdr[i].sh_flags & SHF_ALLOC) )
+            continue;
+
+        /* Copy from old location. */
+        reloc_off = (reloc_off + mask) & ~mask;
+        if ( shdr[i].sh_type == SHT_NOBITS )
+            memset(&highbiosarea[reloc_off], 0, shdr[i].sh_size);
+        else
+            memcpy(&highbiosarea[reloc_off], (void *)shdr[i].sh_addr,
+                   shdr[i].sh_size);
+
+        /* Update address to new location. */
+        shdr[i].sh_addr = (Elf32_Addr)&highbiosarea[reloc_off];
+        reloc_off += shdr[i].sh_size;
+    }
+    BUG_ON(reloc_off != reloc_size);
+
+    /*
+     * Step 4. Perform relocations in high memory.
+     */
+    for ( i = 0; i < ehdr->e_shnum; i++ )
+    {
+        Elf32_Sym  *syms, *sym;
+        Elf32_Rel  *rels;
+        char       *code;
+        uint32_t   *loc, fix;
+        int         j;
+
         if ( shdr[i].sh_type == SHT_RELA )
             printf("Unsupported section type SHT_RELA\n");
 
@@ -74,69 +147,19 @@ static void relocate_elf(char *elfarray)
             }
         }
     }
-}
 
-/* Scan the rombios for the destination of the jump table. */
-static char *get_jump_table_start(void)
-{
-    char *bios_mem;
-
-    for ( bios_mem = (char *)ROMBIOS_BEGIN;
-          bios_mem != (char *)ROMBIOS_END;
-          bios_mem++ )
-        if ( !strncmp(bios_mem, "___JMPT", 7) )
-            return bios_mem;
-
-    return NULL;
-}
-
-/* Copy relocated jumptable into the rombios. */
-static void copy_jumptable(char *elfarray)
-{
-    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfarray;
-    Elf32_Shdr *shdr = (Elf32_Shdr *)&elfarray[ehdr->e_shoff];
-    char *secstrings = &elfarray[shdr[ehdr->e_shstrndx].sh_offset];
-    char *jump_table = get_jump_table_start();
-    int i;
-
-    /* Find the section with the jump table and copy to lower BIOS memory. */
-    for ( i = 0; i < ehdr->e_shnum; i++ )
-        if ( !strcmp(JUMPTABLE_SECTION_NAME, secstrings + shdr[i].sh_name) )
+    /* Step 5. Find the ROMBIOS jump-table stub and copy in the real table. */
+    for ( jump_table = (char *)ROMBIOS_BEGIN;
+          jump_table != (char *)ROMBIOS_END;
+          jump_table++ )
+        if ( !strncmp(jump_table, "___JMPT", 7) )
             break;
+    BUG_ON(jump_table == NULL);
+    BUG_ON(jump_sec_idx == 0);
+    memcpy(jump_table, (char *)shdr[jump_sec_idx].sh_addr,
+           shdr[jump_sec_idx].sh_size);
 
-    if ( i == ehdr->e_shnum )
-    {
-        printf("Could not find " JUMPTABLE_SECTION_NAME " section in file.\n");
-        return;
-    }
-
-    if ( jump_table == NULL )
-    {
-        printf("Could not find jump table in file.\n");
-        return;
-    }
-
-    memcpy(jump_table, (char *)shdr[i].sh_addr, shdr[i].sh_size);
-}
-
-static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
-{
-    uint32_t mask = (64 * 1024) - 1;
-    char *highbiosarea;
-
-    highbiosarea = (char *)(long)
-        e820_malloc((elfarraysize + mask) & ~mask, /* round to 64kb */
-                    E820_RESERVED,
-                    (uint64_t)0xffffffff);
-    if ( highbiosarea == NULL )
-    {
-        printf("No available memory for BIOS high memory area\n");
-        return;
-    }
-
-    memcpy(highbiosarea, elfarray, elfarraysize);
-    relocate_elf(highbiosarea);
-    copy_jumptable(highbiosarea);
+    printf("done\n");
 }
 
 void highbios_setup(void)

@@ -64,6 +64,9 @@ static const struct_member xen_host_record_struct_members[] =
         { .key = "API_version_vendor_implementation",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_host_record, api_version_vendor_implementation) },
+        { .key = "enabled",
+          .type = &abstract_type_bool,
+          .offset = offsetof(xen_host_record, enabled) },
         { .key = "software_version",
           .type = &abstract_type_string_string_map,
           .offset = offsetof(xen_host_record, software_version) },
@@ -302,6 +305,22 @@ xen_host_get_api_version_vendor_implementation(xen_session *session, xen_string_
 
     *result = NULL;
     XEN_CALL_("host.get_API_version_vendor_implementation");
+    return session->ok;
+}
+
+
+bool
+xen_host_get_enabled(xen_session *session, bool *result, xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_bool;
+
+    XEN_CALL_("host.get_enabled");
     return session->ok;
 }
 

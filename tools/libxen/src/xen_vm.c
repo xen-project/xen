@@ -1692,6 +1692,26 @@ xen_vm_send_trigger(xen_session *session, xen_vm vm, char *trigger)
 
 
 bool
+xen_vm_migrate(xen_session *session, xen_vm vm, char *dest, bool live, xen_string_string_map *options)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = dest },
+            { .type = &abstract_type_bool,
+              .u.bool_val = live },
+            { .type = &abstract_type_string_string_map,
+              .u.set_val = (arbitrary_set *)options }
+        };
+
+    xen_call_(session, "VM.migrate", param_values, 4, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
 xen_vm_get_all(xen_session *session, struct xen_vm_set **result)
 {
 

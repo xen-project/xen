@@ -22,6 +22,7 @@
 #include "xen_common.h"
 #include "xen_int_float_map.h"
 #include "xen_int_int_map.h"
+#include "xen_int_string_set_map.h"
 #include "xen_string_set.h"
 #include "xen_string_string_map.h"
 #include "xen_vm_metrics_decl.h"
@@ -71,6 +72,7 @@ typedef struct xen_vm_metrics_record
     xen_int_float_map *vcpus_utilisation;
     xen_int_int_map *vcpus_cpu;
     xen_string_string_map *vcpus_params;
+    xen_int_string_set_map *vcpus_flags;
     struct xen_string_set *state;
     time_t start_time;
     time_t last_updated;
@@ -209,6 +211,13 @@ xen_vm_metrics_get_vcpus_cpu(xen_session *session, xen_int_int_map **result, xen
  */
 extern bool
 xen_vm_metrics_get_vcpus_params(xen_session *session, xen_string_string_map **result, xen_vm_metrics vm_metrics);
+
+
+/**
+ * Get the VCPUs/flags field of the given VM_metrics.
+ */
+extern bool
+xen_vm_metrics_get_vcpus_flags(xen_session *session, xen_int_string_set_map **result, xen_vm_metrics vm_metrics);
 
 
 /**

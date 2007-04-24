@@ -134,19 +134,11 @@ void *memcpy(void *dest, const void *src, unsigned n)
 
 void *memmove(void *dest, const void *src, unsigned n)
 {
-    if ( (long)dest > (long)src )
-    {
-        n--;
-        while ( n > 0 )
-        {
+    if ( (unsigned long)dest > (unsigned long)src )
+        while ( n-- != 0 )
             ((char *)dest)[n] = ((char *)src)[n];
-            n--;
-        }
-    }
     else
-    {
         memcpy(dest, src, n);
-    }
     return dest;
 }
 
@@ -292,38 +284,64 @@ uuid_to_string(char *dest, uint8_t *uuid)
     *p = '\0';
 }
 
-uint64_t e820_malloc(uint64_t size, uint32_t type, uint64_t mask)
+static void e820_collapse(void)
 {
-    uint64_t addr = 0;
-    int c = *E820_MAP_NR - 1;
-    struct e820entry *e820entry = (struct e820entry *)E820_MAP;
+    int i = 0;
+    struct e820entry *ent = (struct e820entry *)E820_MAP;
 
-    while ( c >= 0 )
+    while ( i < (*E820_MAP_NR-1) )
     {
-        if ( (e820entry[c].type  == E820_RAM) &&
-             ((e820entry[c].addr & (~mask)) == 0) &&
-             (e820entry[c].size >= size) )
+        if ( (ent[i].type == ent[i+1].type) &&
+             ((ent[i].addr + ent[i].size) == ent[i+1].addr) )
         {
-            addr = e820entry[c].addr;
-            if ( e820entry[c].size != size )
-            {
-                (*E820_MAP_NR)++;
-                memmove(&e820entry[c+1],
-                        &e820entry[c],
-                        (*E820_MAP_NR - c) *
-                        sizeof(struct e820entry));
-                e820entry[c].size -= size;
-                addr += e820entry[c].size;
-                c++;
-            }
-            e820entry[c].addr = addr;
-            e820entry[c].size = size;
-            e820entry[c].type = type;
-            break;
+            ent[i].size += ent[i+1].size;
+            memcpy(&ent[i+1], &ent[i+2], *E820_MAP_NR - i - 2);
+            (*E820_MAP_NR)--;
         }
-        c--;
+        else
+        {
+            i++;
+        }
     }
-    return addr;
+}
+
+uint32_t e820_malloc(uint32_t size)
+{
+    uint32_t addr;
+    int i;
+    struct e820entry *ent = (struct e820entry *)E820_MAP;
+
+    /* Align allocation request to a reasonable boundary (1kB). */
+    size = (size + 1023) & ~1023;
+
+    for ( i = *E820_MAP_NR - 1; i >= 0; i-- )
+    {
+        addr = ent[i].addr;
+        if ( (ent[i].type != E820_RAM) || /* not ram? */
+             (ent[i].size < size) ||      /* too small? */
+             (addr != ent[i].addr) ||     /* starts above 4gb? */
+             ((addr + size) < addr) )     /* ends above 4gb? */
+            continue;
+        
+        if ( ent[i].size != size )
+        {
+            memmove(&ent[i+1], &ent[i], (*E820_MAP_NR - i) * sizeof(*ent));
+            (*E820_MAP_NR)++;
+            ent[i].size -= size;
+            addr += ent[i].size;
+            i++;
+        }
+
+        ent[i].addr = addr;
+        ent[i].size = size;
+        ent[i].type = E820_RESERVED;
+
+        e820_collapse();
+
+        return addr;
+    }
+
+    return 0;
 }
 
 uint32_t ioapic_read(uint32_t reg)

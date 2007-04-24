@@ -49,6 +49,22 @@ import xmlrpclib
 
 import xen.util.xmlrpcclient as xmlrpcclient
 
+def gettext_noop(str):
+    return str
+
+N_ = gettext_noop
+
+errormap = {
+    "INTERNAL_ERROR": N_("Internal error: %(1)s."),
+    "MAP_DUPLICATE_KEY": N_("This map already contains %(1)s -> %(2)s."),
+    "MESSAGE_METHOD_UNKNOWN": N_("The method %(1)s is unsupported."),
+    "MESSAGE_PARAMETER_COUNT_MISMATCH": N_("The method %(1)s takes %(2)s argument(s) (%(3)s given)."),
+    "SESSION_AUTHENTICATION_FAILED": N_("Permission denied."),
+    "VALUE_NOT_SUPPORTED": N_("Value \"%(2)s\" for %(1)s is not supported by this server.  The server said \"%(3)s\"."),
+    "HANDLE_INVALID": N_("The %(1)s handle %(2)s is invalid."),
+    "OPERATION_NOT_ALLOWED": N_("You attempted an operation that was not allowed."),
+    "NETWORK_ALREADY_CONNECTED": N_("The network you specified already has a PIF attached to it, and so another one may not be attached."),
+    }
 
 translation = gettext.translation('xen-xm', fallback = True)
 
@@ -68,7 +84,7 @@ class Failure(Exception):
 
     def __str__(self):
         try:
-            return translation.ugettext(self.details[0]) % self._details_map()
+            return translation.ugettext(errormap[self.details[0]]) % self._details_map()
         except TypeError, exn:
             return "Message database broken: %s.\nXen-API failure: %s" % \
                    (exn, str(self.details))

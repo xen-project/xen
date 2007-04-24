@@ -45,6 +45,7 @@ from xen.xend.XendConstants import DOM_STATE_RUNNING, DOM_STATE_SUSPENDED
 from xen.xend.XendConstants import DOM_STATE_SHUTDOWN, DOM_STATE_UNKNOWN
 from xen.xend.XendConstants import TRIGGER_TYPE
 from xen.xend.XendDevices import XendDevices
+from xen.xend.XendAPIConstants import *
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
@@ -457,7 +458,7 @@ class XendDomain:
             if domid == None:
                 domid = info.getDomid()
 
-            if info.state != DOM_STATE_HALTED:
+            if info._stateGet() != DOM_STATE_HALTED:
                 info.cleanupDomain()
             
             if domid in self.domains:
@@ -577,7 +578,7 @@ class XendDomain:
         self.domains_lock.acquire()
         try:
             for dom_uuid, dom in self.managed_domains.items():
-                if dom and dom.state == DOM_STATE_HALTED:
+                if dom and dom._stateGet() == DOM_STATE_HALTED:
                     on_xend_start = dom.info.get('on_xend_start', 'ignore')
                     auto_power_on = dom.info.get('auto_power_on', False)
                     should_start = (on_xend_start == 'start') or auto_power_on
@@ -602,7 +603,7 @@ class XendDomain:
                 if dom.getName() == DOM0_NAME:
                     continue
                 
-                if dom.state == DOM_STATE_RUNNING:
+                if dom._stateGet() == DOM_STATE_RUNNING:
                     shutdownAction = dom.info.get('on_xend_stop', 'ignore')
                     if shutdownAction == 'shutdown':
                         log.debug('Shutting down domain: %s' % dom.getName())
@@ -780,7 +781,7 @@ class XendDomain:
                 return active_domains + inactive_domains
             else:
                 return filter(lambda x:
-                                  POWER_STATE_NAMES[x.state].lower() == state,
+                                  POWER_STATE_NAMES[x._stateGet()].lower() == state,
                               active_domains + inactive_domains)
         finally:
             self.domains_lock.release()
@@ -825,10 +826,10 @@ class XendDomain:
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot save privileged domain %s" % domname)
 
-            if dominfo.state != DOM_STATE_RUNNING:
+            if dominfo._stateGet() != DOM_STATE_RUNNING:
                 raise VMBadState("Domain is not running",
                                  POWER_STATE_NAMES[DOM_STATE_RUNNING],
-                                 POWER_STATE_NAMES[dominfo.state])
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
 
             dom_uuid = dominfo.get_uuid()
 
@@ -869,8 +870,8 @@ class XendDomain:
                 if dominfo.getDomid() == DOM0_ID:
                     raise XendError("Cannot save privileged domain %s" % domname)
 
-                if dominfo.state != DOM_STATE_HALTED:
-                    raise XendError("Cannot resume domain that is not halted.")
+                if dominfo._stateGet() != XEN_API_VM_POWER_STATE_SUSPENDED:
+                    raise XendError("Cannot resume domain that is not suspended.")
 
                 dom_uuid = dominfo.get_uuid()
                 chkpath = self._managed_check_point_path(dom_uuid)
@@ -879,7 +880,7 @@ class XendDomain:
 
                 # Restore that replaces the existing XendDomainInfo
                 try:
-                    log.debug('Current DomainInfo state: %d' % dominfo.state)
+                    log.debug('Current DomainInfo state: %d' % dominfo._stateGet())
                     oflags = os.O_RDONLY
                     if hasattr(os, "O_LARGEFILE"):
                         oflags |= os.O_LARGEFILE
@@ -974,10 +975,10 @@ class XendDomain:
             if not dominfo:
                 raise XendInvalidDomain(str(domid))
 
-            if dominfo.state != DOM_STATE_HALTED:
+            if dominfo._stateGet() != DOM_STATE_HALTED:
                 raise VMBadState("Domain is already running",
                                  POWER_STATE_NAMES[DOM_STATE_HALTED],
-                                 POWER_STATE_NAMES[dominfo.state])
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
             
             dominfo.start(is_managed = True)
         finally:
@@ -1003,10 +1004,10 @@ class XendDomain:
                 if not dominfo:
                     raise XendInvalidDomain(str(domid))
 
-                if dominfo.state != DOM_STATE_HALTED:
-                    raise VMBadState("Domain is still running",
+                if dominfo._stateGet() != XEN_API_VM_POWER_STATE_HALTED:
+                    raise VMBadState("Domain is not halted.",
                                      POWER_STATE_NAMES[DOM_STATE_HALTED],
-                                     POWER_STATE_NAMES[dominfo.state])
+                                     POWER_STATE_NAMES[dominfo._stateGet()])
                 
                 self._domain_delete_by_info(dominfo)
             except Exception, ex:

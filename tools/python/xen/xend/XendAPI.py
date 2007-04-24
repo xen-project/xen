@@ -152,14 +152,14 @@ def _ctor_event_dispatch(xenapi, ctor, api_cls, session, args):
     result = ctor(xenapi, session, *args)
     if result['Status'] == 'Success':
         ref = result['Value']
-        _event_dispatch('add', api_cls, ref, '')
+        event_dispatch('add', api_cls, ref, '')
     return result
 
 
 def _dtor_event_dispatch(xenapi, dtor, api_cls, session, ref, args):
     result = dtor(xenapi, session, ref, *args)
     if result['Status'] == 'Success':
-        _event_dispatch('del', api_cls, ref, '')
+        event_dispatch('del', api_cls, ref, '')
     return result
 
 
@@ -167,11 +167,12 @@ def _setter_event_dispatch(xenapi, setter, api_cls, attr_name, session, ref,
                            args):
     result = setter(xenapi, session, ref, *args)
     if result['Status'] == 'Success':
-        _event_dispatch('mod', api_cls, ref, attr_name)
+        event_dispatch('mod', api_cls, ref, attr_name)
     return result
 
 
-def _event_dispatch(operation, api_cls, ref, attr_name):
+def event_dispatch(operation, api_cls, ref, attr_name):
+    assert operation in ['add', 'del', 'mod']
     event = {
         'timestamp' : now(),
         'class'     : api_cls,
@@ -574,15 +575,25 @@ class XendAPI(object):
             
             get_by_uuid = '%s_get_by_uuid' % api_cls
             get_uuid = '%s_get_uuid' % api_cls
+            get_all_records = '%s_get_all_records' % api_cls    
+
             def _get_by_uuid(_1, _2, ref):
                 return xen_api_success(ref)
 
             def _get_uuid(_1, _2, ref):
                 return xen_api_success(ref)
 
+            def unpack(v):
+                return v['Value']
+
+            def _get_all_records(_api_cls):
+                return lambda s, session: \
+                    xen_api_success([unpack(getattr(cls, '%s_get_record' % _api_cls)(s, session, ref))\
+                                     for ref in unpack(getattr(cls, '%s_get_all' % _api_cls)(s, session))])
+
             setattr(cls, get_by_uuid, _get_by_uuid)
             setattr(cls, get_uuid,    _get_uuid)
-
+            setattr(cls, get_all_records, _get_all_records(api_cls))
 
         # Autoplugging classes
         # --------------------
@@ -720,7 +731,7 @@ class XendAPI(object):
     Base_attr_ro = ['uuid']
     Base_attr_rw = []
     Base_methods = [('get_record', 'Struct')]
-    Base_funcs   = [('get_all', 'Set'), ('get_by_uuid', None)]
+    Base_funcs   = [('get_all', 'Set'), ('get_by_uuid', None), ('get_all_records', 'Set')]
 
     # Xen API: Class Session
     # ----------------------------------------------------------------
@@ -876,7 +887,8 @@ class XendAPI(object):
                     'API_version_major',
                     'API_version_minor',
                     'API_version_vendor',
-                    'API_version_vendor_implementation']
+                    'API_version_vendor_implementation',
+                    'enabled']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -935,6 +947,8 @@ class XendAPI(object):
         return xen_api_success(XEN_API_VERSION_VENDOR_IMPLEMENTATION)
     def host_get_software_version(self, session, host_ref):
         return xen_api_success(XendNode.instance().xen_version())
+    def host_get_enabled(self, _1, _2):
+        return xen_api_success(XendDomain.instance().allow_new_domains())
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
     def host_get_PBDs(self, _, ref):
@@ -998,6 +1012,7 @@ class XendAPI(object):
                   'API_version_vendor_implementation':
                   XEN_API_VERSION_VENDOR_IMPLEMENTATION,
                   'software_version': node.xen_version(),
+                  'enabled': XendDomain.instance().allow_new_domains(),
                   'other_config': node.other_config,
                   'resident_VMs': dom.get_domain_refs(),
                   'host_CPUs': node.get_host_cpu_refs(),
@@ -2357,7 +2372,7 @@ class XendAPI(object):
         if not cfg:
             return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
         if not cfg.has_key('backend'):
-            return xen_api_error(['VTPM backend not set'])
+            return xen_api_error(['INTERNAL_ERROR', 'VTPM backend not set'])
         return xen_api_success(cfg['backend'])
 
     def VTPM_get_VM(self, session, vtpm_ref):

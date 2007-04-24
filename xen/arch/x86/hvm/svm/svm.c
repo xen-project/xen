@@ -397,6 +397,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->ss.limit      = c->ss_limit;
     vmcb->ss.base       = c->ss_base;
     vmcb->ss.attr.bytes = c->ss_arbytes;
+    vmcb->cpl           = vmcb->ss.attr.fields.dpl;
 
     vmcb->fs.sel        = c->fs_sel;
     vmcb->fs.limit      = c->fs_limit;

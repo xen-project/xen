@@ -3424,7 +3424,7 @@ int map_pages_to_xen(
         {
             /* Super-page mapping. */
             ol2e = *pl2e;
-            l2e_write(pl2e, l2e_from_pfn(mfn, flags|_PAGE_PSE));
+            l2e_write_atomic(pl2e, l2e_from_pfn(mfn, flags|_PAGE_PSE));
 
             if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
@@ -3454,14 +3454,14 @@ int map_pages_to_xen(
                     l1e_write(&pl1e[i],
                               l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
                                            l2e_get_flags(*pl2e) & ~_PAGE_PSE));
-                l2e_write(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
-                                             __PAGE_HYPERVISOR));
+                l2e_write_atomic(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                                                    __PAGE_HYPERVISOR));
                 local_flush_tlb_pge();
             }
 
             pl1e  = l2e_to_l1e(*pl2e) + l1_table_offset(virt);
             ol1e  = *pl1e;
-            l1e_write(pl1e, l1e_from_pfn(mfn, flags));
+            l1e_write_atomic(pl1e, l1e_from_pfn(mfn, flags));
             if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
                 local_flush_tlb_one(virt);
 
