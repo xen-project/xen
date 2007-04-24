@@ -10,6 +10,7 @@
 #include <public/xen.h>
 #include <public/domctl.h>
 #include <public/vcpu.h>
+#include <public/acm.h>
 #include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/grant_table.h>
@@ -296,7 +297,8 @@ static inline struct domain *get_current_domain(void)
     return d;
 }
 
-struct domain *domain_create(domid_t domid, unsigned int domcr_flags);
+struct domain *domain_create(
+    domid_t domid, unsigned int domcr_flags, ssidref_t ssidref);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
 #define _DOMCRF_hvm 0
 #define DOMCRF_hvm  (1U<<_DOMCRF_hvm)

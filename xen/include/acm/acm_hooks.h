@@ -96,10 +96,9 @@ struct acm_operations {
     int  (*dump_statistics)            (u8 *buffer, u16 buf_size);
     int  (*dump_ssid_types)            (ssidref_t ssidref, u8 *buffer, u16 buf_size);
     /* domain management control hooks (can be NULL) */
-    int  (*pre_domain_create)          (void *subject_ssid, ssidref_t ssidref);
-    void (*post_domain_create)         (domid_t domid, ssidref_t ssidref);
-    void (*fail_domain_create)         (void *subject_ssid, ssidref_t ssidref);
-    void (*post_domain_destroy)        (void *object_ssid, domid_t id);
+    int  (*domain_create)              (void *subject_ssid, ssidref_t ssidref,
+                                        domid_t domid);
+    void (*domain_destroy)             (void *object_ssid, struct domain *d);
     /* event channel control hooks  (can be NULL) */
     int  (*pre_eventchannel_unbound)      (domid_t id1, domid_t id2);
     void (*fail_eventchannel_unbound)     (domid_t id1, domid_t id2);
@@ -128,14 +127,9 @@ extern struct acm_operations *acm_secondary_ops;
 # define traceprintk(fmt, args...)
 #endif
 
+
 #ifndef ACM_SECURITY
 
-static inline int acm_pre_domctl(struct xen_domctl *op, void **ssid) 
-{ return 0; }
-static inline void acm_post_domctl(struct xen_domctl *op, void *ssid) 
-{ return; }
-static inline void acm_fail_domctl(struct xen_domctl *op, void *ssid) 
-{ return; }
 static inline int acm_pre_eventchannel_unbound(domid_t id1, domid_t id2)
 { return 0; }
 static inline int acm_pre_eventchannel_interdomain(domid_t id)
@@ -148,53 +142,17 @@ static inline int acm_init(char *policy_start, unsigned long policy_len)
 { return 0; }
 static inline int acm_is_policy(char *buf, unsigned long len)
 { return 0; }
-static inline void acm_post_domain0_create(domid_t domid) 
-{ return; }
 static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
 { return 0; }
+static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
+{ return 0; }
+static inline void acm_domain_destroy(struct domain *d)
+{ return; }
+
+#define DOM0_SSIDREF 0x0
 
 #else
 
-static inline int acm_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
-{
-    if ((acm_primary_ops->pre_domain_create != NULL) && 
-        acm_primary_ops->pre_domain_create(subject_ssid, ssidref))
-        return ACM_ACCESS_DENIED;
-    else if ((acm_secondary_ops->pre_domain_create != NULL) && 
-             acm_secondary_ops->pre_domain_create(subject_ssid, ssidref)) {
-        /* roll-back primary */
-        if (acm_primary_ops->fail_domain_create != NULL)
-            acm_primary_ops->fail_domain_create(subject_ssid, ssidref);
-        return ACM_ACCESS_DENIED;
-    } else
-        return ACM_ACCESS_PERMITTED;
-}
-
-static inline void acm_post_domain_create(domid_t domid, ssidref_t ssidref)
-{
-    if (acm_primary_ops->post_domain_create != NULL)
-        acm_primary_ops->post_domain_create(domid, ssidref);
-    if (acm_secondary_ops->post_domain_create != NULL)
-        acm_secondary_ops->post_domain_create(domid, ssidref);
-}
-
-static inline void acm_fail_domain_create(
-    void *subject_ssid, ssidref_t ssidref)
-{
-    if (acm_primary_ops->fail_domain_create != NULL)
-        acm_primary_ops->fail_domain_create(subject_ssid, ssidref);
-    if (acm_secondary_ops->fail_domain_create != NULL)
-        acm_secondary_ops->fail_domain_create(subject_ssid, ssidref);
-}
-
-static inline void acm_post_domain_destroy(void *object_ssid, domid_t id)
-{
-    if (acm_primary_ops->post_domain_destroy != NULL)
-        acm_primary_ops->post_domain_destroy(object_ssid, id);
-    if (acm_secondary_ops->post_domain_destroy != NULL)
-        acm_secondary_ops->post_domain_destroy(object_ssid, id);
-    return;
-}
 
 static inline int acm_pre_eventchannel_unbound(domid_t id1, domid_t id2)
 {
@@ -226,85 +184,6 @@ static inline int acm_pre_eventchannel_interdomain(domid_t id)
         return ACM_ACCESS_PERMITTED;
 }
 
-static inline int acm_pre_domctl(struct xen_domctl *op, void **ssid) 
-{
-    int ret = -EACCES;
-    struct domain *d;
-
-    switch(op->cmd) {
-    case XEN_DOMCTL_createdomain:
-        ret = acm_pre_domain_create(
-            current->domain->ssid, op->u.createdomain.ssidref);
-        break;
-    case XEN_DOMCTL_destroydomain:
-        if (*ssid != NULL) {
-            printkd("%s: Warning. Overlapping destruction.\n", 
-                    __func__);
-            return -EACCES;
-        }
-        d = rcu_lock_domain_by_id(op->domain);
-        if (d != NULL) {
-            *ssid = d->ssid; /* save for post destroy when d is gone */
-            if (*ssid == NULL) {
-                printk("%s: Warning. Destroying domain without ssid pointer.\n", 
-                       __func__);
-                rcu_unlock_domain(d);
-                return -EACCES;
-            }
-            d->ssid = NULL; /* make sure it's not used any more */
-             /* no policy-specific hook */
-            rcu_unlock_domain(d);
-            ret = 0;
-        }
-        break;
-    default:
-        ret = 0; /* ok */
-    }
-    return ret;
-}
-
-static inline void acm_post_domctl(struct xen_domctl *op, void **ssid)
-{
-    switch(op->cmd) {
-    case XEN_DOMCTL_createdomain:
-        /* initialialize shared sHype security labels for new domain */
-        acm_init_domain_ssid(
-            op->domain, op->u.createdomain.ssidref);
-        acm_post_domain_create(
-            op->domain, op->u.createdomain.ssidref);
-        break;
-    case XEN_DOMCTL_destroydomain:
-        if (*ssid == NULL) {
-            printkd("%s: ERROR. SSID unset.\n",
-                    __func__);
-            break;
-        }
-        acm_post_domain_destroy(*ssid, op->domain);
-        /* free security ssid for the destroyed domain (also if null policy */
-        acm_free_domain_ssid((struct acm_ssid_domain *)(*ssid));
-        *ssid = NULL;
-        break;
-    }
-}
-
-static inline void acm_fail_domctl(struct xen_domctl *op, void **ssid)
-{
-    switch(op->cmd) {
-    case XEN_DOMCTL_createdomain:
-        acm_fail_domain_create(
-            current->domain->ssid, op->u.createdomain.ssidref);
-        break;
-    case XEN_DOMCTL_destroydomain:
-        /*  we don't handle domain destroy failure but at least free the ssid */
-        if (*ssid == NULL) {
-            printkd("%s: ERROR. SSID unset.\n",
-                    __func__);
-            break;
-        }
-        acm_free_domain_ssid((struct acm_ssid_domain *)(*ssid));
-        *ssid = NULL;
-    }
-}
 
 static inline int acm_pre_grant_map_ref(domid_t id)
 {
@@ -348,14 +227,51 @@ static inline int acm_pre_grant_setup(domid_t id)
     }
 }
 
-static inline void acm_post_domain0_create(domid_t domid)
-{
-    /* initialialize shared sHype security labels for new domain */
-    int dom0_ssidref = dom0_ste_ssidref << 16 | dom0_chwall_ssidref;
 
-    acm_init_domain_ssid(domid, dom0_ssidref);
-    acm_post_domain_create(domid, dom0_ssidref);
+static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
+{
+    void *subject_ssid = current->domain->ssid;
+    domid_t domid = d->domain_id;
+    int rc;
+
+    /*
+       To be called when a domain is created; returns '0' if the
+       domain is allowed to be created, != '0' if not.
+     */
+    rc = acm_init_domain_ssid_new(d, ssidref);
+    if (rc != ACM_OK)
+        return rc;
+
+    if ((acm_primary_ops->domain_create != NULL) &&
+        acm_primary_ops->domain_create(subject_ssid, ssidref, domid)) {
+        return ACM_ACCESS_DENIED;
+    } else if ((acm_secondary_ops->domain_create != NULL) &&
+                acm_secondary_ops->domain_create(subject_ssid, ssidref,
+                                                 domid)) {
+        /* roll-back primary */
+        if (acm_primary_ops->domain_destroy != NULL)
+            acm_primary_ops->domain_destroy(d->ssid, d);
+        acm_free_domain_ssid(d->ssid);
+        return ACM_ACCESS_DENIED;
+    }
+
+    return 0;
 }
+
+
+static inline void acm_domain_destroy(struct domain *d)
+{
+    void *ssid = d->ssid;
+    if (ssid != NULL) {
+        if (acm_primary_ops->domain_destroy != NULL)
+            acm_primary_ops->domain_destroy(ssid, d);
+        if (acm_secondary_ops->domain_destroy != NULL)
+            acm_secondary_ops->domain_destroy(ssid, d);
+        /* free security ssid for the destroyed domain (also if null policy */
+        acm_free_domain_ssid((struct acm_ssid_domain *)(ssid));
+    }
+}
+
 
 static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
 {
@@ -374,6 +290,8 @@ extern int acm_init(char *policy_start, unsigned long policy_len);
 
 /* Return true iff buffer has an acm policy magic number.  */
 extern int acm_is_policy(char *buf, unsigned long len);
+
+#define DOM0_SSIDREF (dom0_ste_ssidref << 16 | dom0_chwall_ssidref)
 
 #endif
 

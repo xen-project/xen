@@ -162,7 +162,7 @@ static void __init start_of_day(void)
     scheduler_init();
 
     /* create idle domain */
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
     if ((idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL))
         BUG();
     set_current(idle_domain->vcpu[0]);
@@ -370,7 +370,7 @@ static void __init __start_xen(multiboot_info_t *mbi)
     percpu_free_unused_areas();
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0);
+    dom0 = domain_create(0, 0, DOM0_SSIDREF);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
 
@@ -379,9 +379,6 @@ static void __init __start_xen(multiboot_info_t *mbi)
     dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
     dom0->is_privileged = 1;
-
-    /* Post-create hook sets security label. */
-    acm_post_domain0_create(dom0->domain_id);
 
     cmdline = (char *)(mod[0].string ? __va((ulong)mod[0].string) : NULL);
 

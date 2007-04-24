@@ -421,7 +421,7 @@ void start_kernel(void)
 
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
     if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
         BUG();
 
@@ -508,7 +508,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     expose_p2m_init();
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0);
+    dom0 = domain_create(0, 0, DOM0_SSIDREF);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
     dom0_vcpu0 = alloc_vcpu(dom0, 0, 0);

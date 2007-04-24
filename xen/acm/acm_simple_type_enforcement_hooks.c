@@ -500,11 +500,18 @@ ste_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
     return ACM_ACCESS_PERMITTED;
 }
 
+static int
+ste_domain_create(void *subject_ssid, ssidref_t ssidref, domid_t  domid)
+{
+    return ste_pre_domain_create(subject_ssid, ssidref);
+}
+
+
 static void 
-ste_post_domain_destroy(void *subject_ssid, domid_t id)
+ste_domain_destroy(void *subject_ssid, struct domain *d)
 {
     /* clean all cache entries for destroyed domain (might be re-used) */
-    clean_id_from_cache(id);
+    clean_id_from_cache(d->domain_id);
 }
 
 /* -------- EVENTCHANNEL OPERATIONS -----------*/
@@ -685,10 +692,8 @@ struct acm_operations acm_simple_type_enforcement_ops = {
     .dump_ssid_types        = ste_dump_ssid_types,
 
     /* domain management control hooks */
-    .pre_domain_create       = ste_pre_domain_create,
-    .post_domain_create     = NULL,
-    .fail_domain_create     = NULL,
-    .post_domain_destroy    = ste_post_domain_destroy,
+    .domain_create = ste_domain_create,
+    .domain_destroy    = ste_domain_destroy,
 
     /* event channel control hooks */
     .pre_eventchannel_unbound   = ste_pre_eventchannel_unbound,

@@ -62,10 +62,8 @@ struct acm_operations acm_null_ops = {
     .dump_statistics = null_dump_stats,
     .dump_ssid_types = null_dump_ssid_types,
     /* domain management control hooks */
-    .pre_domain_create = NULL,
-    .post_domain_create = NULL,
-    .fail_domain_create = NULL,
-    .post_domain_destroy = NULL,
+    .domain_create = NULL,
+    .domain_destroy = NULL,
     /* event channel control hooks */
     .pre_eventchannel_unbound = NULL,
     .fail_eventchannel_unbound = NULL,
