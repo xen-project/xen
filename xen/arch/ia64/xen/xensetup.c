@@ -28,6 +28,7 @@
 #include <asm/iosapic.h>
 #include <xen/softirq.h>
 #include <xen/rcupdate.h>
+#include <acm/acm_hooks.h>
 
 unsigned long xenheap_phys_end, total_pages;
 
