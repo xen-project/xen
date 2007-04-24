@@ -48,6 +48,8 @@ void perfc_printall(unsigned char key)
         case TYPE_S_SINGLE:
             for_each_online_cpu ( cpu )
                 sum += per_cpu(perfcounters, cpu)[j];
+            if ( perfc_info[i].type == TYPE_S_SINGLE ) 
+                sum = (perfc_t) sum;
             printk("TOTAL[%12Lu]", sum);
             if ( sum )
             {
@@ -71,6 +73,8 @@ void perfc_printall(unsigned char key)
                 for ( k = 0; k < perfc_info[i].nr_elements; k++ )
                     sum += counters[k];
             }
+            if ( perfc_info[i].type == TYPE_S_ARRAY ) 
+                sum = (perfc_t) sum;
             printk("TOTAL[%12Lu]", sum);
             if (sum)
             {
@@ -80,6 +84,8 @@ void perfc_printall(unsigned char key)
                     sum = 0;
                     for_each_online_cpu ( cpu )
                         sum += per_cpu(perfcounters, cpu)[j + k];
+                    if ( perfc_info[i].type == TYPE_S_ARRAY ) 
+                        sum = (perfc_t) sum;
                     if ( (k % 4) == 0 )
                         printk("\n%16s", "");
                     printk("  ARR%02u[%10Lu]", k, sum);
@@ -94,6 +100,8 @@ void perfc_printall(unsigned char key)
                     sum = 0;
                     for ( n = 0; n < perfc_info[i].nr_elements; n++ )
                         sum += counters[n];
+                    if ( perfc_info[i].type == TYPE_S_ARRAY ) 
+                        sum = (perfc_t) sum;
                     if ( k > 0 && (k % 4) == 0 )
                         printk("\n%46s", "");
                     printk("  CPU%02u[%10Lu]", cpu, sum);
