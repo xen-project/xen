@@ -120,6 +120,7 @@ struct ste_ssid {
 
 /* protos */
 int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
+int acm_init_domain_ssid_new(struct domain *, ssidref_t ssidref);
 void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
 int acm_init_binary_policy(u32 policy_code);
 int acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
