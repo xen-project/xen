@@ -1049,6 +1049,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
                 hvm_set_callback_via(d, a.value);
+#if defined(__x86_64__)
+                /*
+                 * Since this operation is one of the very first executed
+                 * by PV drivers on initialisation or after save/restore, it
+                 * is a sensible point at which to sample the execution mode of
+                 * the guest and latch 32- or 64-bit format for shared state.
+                 */
+                d->is_compat = (hvm_guest_x86_mode(current) == 4);
+#endif
                 break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;
