@@ -119,7 +119,7 @@ class Daemon:
         try:
             parent = os.path.dirname(XEND_DEBUG_LOG)
             mkdir.parents(parent, stat.S_IRWXU)
-            fd = os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+            fd = os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0600)
         except Exception, exn:
             print >>sys.stderr, exn
             print >>sys.stderr, ("Xend failed to open %s.  Exiting!" %
