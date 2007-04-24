@@ -321,7 +321,6 @@ void domain_kill(struct domain *d)
         return;
     }
 
-    acm_domain_destroy(d);
     gnttab_release_mappings(d);
     domain_relinquish_resources(d);
     put_domain(d);
@@ -472,6 +471,8 @@ void domain_pause_for_debugger(void)
 static void complete_domain_destroy(struct rcu_head *head)
 {
     struct domain *d = container_of(head, struct domain, rcu);
+
+    acm_domain_destroy(d);
 
     rangeset_domain_destroy(d);
 
