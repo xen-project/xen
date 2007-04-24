@@ -28,6 +28,7 @@
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
+#include <acm/acm_hooks.h>
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);
@@ -178,7 +179,7 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
         return v;
 
     d = (vcpu_id == 0) ?
-        domain_create(IDLE_DOMAIN_ID, 0) :
+        domain_create(IDLE_DOMAIN_ID, 0, 0) :
         idle_vcpu[cpu_id - vcpu_id]->domain;
     BUG_ON(d == NULL);
 
@@ -188,7 +189,8 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     return v;
 }
 
-struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
+struct domain *domain_create(
+    domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
     struct domain *d, **pd;
 
@@ -210,18 +212,21 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 
         if ( grant_table_create(d) != 0 )
             goto fail2;
+
+        if ( acm_domain_create(d, ssidref) != 0 )
+            goto fail3;
     }
 
     if ( arch_domain_create(d) != 0 )
-        goto fail3;
+        goto fail4;
 
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
-        goto fail4;
+        goto fail5;
 
     if ( sched_init_domain(d) != 0 )
-        goto fail4;
+        goto fail5;
 
     if ( !is_idle_domain(d) )
     {
@@ -243,8 +248,11 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags)
 
     return d;
 
- fail4:
+ fail5:
     arch_domain_destroy(d);
+ fail4:
+    if ( !is_idle_domain(d) )
+        acm_domain_destroy(d);
  fail3:
     if ( !is_idle_domain(d) )
         grant_table_destroy(d);
@@ -313,6 +321,7 @@ void domain_kill(struct domain *d)
         return;
     }
 
+    acm_domain_destroy(d);
     gnttab_release_mappings(d);
     domain_relinquish_resources(d);
     put_domain(d);

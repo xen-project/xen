@@ -65,9 +65,10 @@ struct ioreq {
 typedef struct ioreq ioreq_t;
 
 struct vcpu_iodata {
-    struct ioreq         vp_ioreq;
-    /* Event channel port */
-    unsigned int    vp_eport;   /* VMX vcpu uses this to notify DM */
+    struct ioreq vp_ioreq;
+    /* Event channel port, used for notifications to/from the device model. */
+    uint32_t vp_eport;
+    uint32_t _pad0;
 };
 typedef struct vcpu_iodata vcpu_iodata_t;
 
@@ -81,7 +82,7 @@ struct buffered_iopage {
     unsigned int    read_pointer;
     unsigned int    write_pointer;
     ioreq_t         ioreq[IOREQ_BUFFER_SLOT_NUM];
-};            /* sizeof this structure must be in one page */
+}; /* NB. Size of this structure must be no greater than one page. */
 typedef struct buffered_iopage buffered_iopage_t;
 
 #if defined(__ia64__)

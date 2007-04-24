@@ -17,10 +17,10 @@
  */
 
 
-#include "xen_common.h"
-#include "xen_int_string_set_map.h"
 #include "xen_internal.h"
-#include "xen_string_set.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_int_string_set_map.h>
+#include <xen/api/xen_string_set.h>
 
 
 xen_int_string_set_map *

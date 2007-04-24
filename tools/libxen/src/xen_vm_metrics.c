@@ -20,13 +20,13 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
-#include "xen_int_float_map.h"
-#include "xen_int_int_map.h"
-#include "xen_int_string_set_map.h"
 #include "xen_internal.h"
-#include "xen_string_string_map.h"
-#include "xen_vm_metrics.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_int_float_map.h>
+#include <xen/api/xen_int_int_map.h>
+#include <xen/api/xen_int_string_set_map.h>
+#include <xen/api/xen_string_string_map.h>
+#include <xen/api/xen_vm_metrics.h>
 
 
 XEN_FREE(xen_vm_metrics)

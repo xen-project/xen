@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "xen_internal.h"
-#include "xen_event_operation.h"
+#include <xen/api/xen_event_operation.h>
 #include "xen_event_operation_internal.h"
 
 

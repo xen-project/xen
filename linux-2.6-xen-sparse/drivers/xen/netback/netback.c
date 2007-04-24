@@ -252,8 +252,11 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Copy the packet here if it's destined for a flipping interface
 	 * but isn't flippable (e.g. extra references to data).
+	 * XXX For now we also copy skbuffs whose head crosses a page
+	 * boundary, because netbk_gop_skb can't handle them.
 	 */
-	if (!netif->copying_receiver) {
+	if (!netif->copying_receiver ||
+	    ((skb_headlen(skb) + offset_in_page(skb->data)) >= PAGE_SIZE)) {
 		struct sk_buff *nskb = netbk_copy_skb(skb);
 		if ( unlikely(nskb == NULL) )
 			goto drop;
@@ -425,8 +428,9 @@ static void netbk_gop_skb(struct sk_buff *skb,
 	}
 
 	/*
-	 * This must occur at the end to ensure that we don't trash
-	 * skb_shinfo until we're done.
+	 * This must occur at the end to ensure that we don't trash skb_shinfo
+	 * until we're done. We know that the head doesn't cross a page
+	 * boundary because such packets get copied in netif_be_start_xmit.
 	 */
 	head_meta->id = netbk_gop_frag(netif, head_meta, 0, npo,
 				       virt_to_page(skb->data),

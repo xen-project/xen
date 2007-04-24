@@ -20,11 +20,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
 #include "xen_internal.h"
-#include "xen_pbd.h"
-#include "xen_sr.h"
-#include "xen_vdi.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_pbd.h>
+#include <xen/api/xen_sr.h>
+#include <xen/api/xen_vdi.h>
 
 
 XEN_FREE(xen_sr)

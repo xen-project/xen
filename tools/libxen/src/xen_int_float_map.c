@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,9 +17,9 @@
  */
 
 
-#include "xen_common.h"
-#include "xen_int_float_map.h"
 #include "xen_internal.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_int_float_map.h>
 
 
 xen_int_float_map *

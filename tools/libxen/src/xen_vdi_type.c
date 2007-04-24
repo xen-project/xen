@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006, XenSource Inc.
+ * Copyright (c) 2006-2007, XenSource Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "xen_internal.h"
-#include "xen_vdi_type.h"
+#include <xen/api/xen_vdi_type.h>
 #include "xen_vdi_type_internal.h"
 
 

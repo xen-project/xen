@@ -725,7 +725,7 @@ def configure_hvm(config_image, vals):
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
-             'sdl', 'display', 'xauthority', 'rtc_timeoffset',
+             'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap' ]
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

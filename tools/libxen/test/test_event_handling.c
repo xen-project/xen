@@ -25,8 +25,7 @@
 
 #include <libxml/parser.h>
 #include <curl/curl.h>
-
-#include "xen_event.h"
+#include <xen/api/xen_event.h>
 
 //#define PRINT_XML
 

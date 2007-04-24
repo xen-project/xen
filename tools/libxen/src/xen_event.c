@@ -20,10 +20,10 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
-#include "xen_event.h"
 #include "xen_event_operation_internal.h"
 #include "xen_internal.h"
+#include <xen/api/xen_common.h>
+#include <xen/api/xen_event.h>
 
 
 XEN_ALLOC(xen_event_record)

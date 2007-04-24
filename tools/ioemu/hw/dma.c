@@ -340,6 +340,8 @@ static void channel_run (int ncont, int ichan)
 #endif
 
     r = dma_controllers[ncont].regs + ichan;
+    if (r->transfer_handler == NULL)
+	return;
     n = r->transfer_handler (r->opaque, ichan + (ncont << 2),
                              r->now[COUNT], (r->base[COUNT] + 1) << ncont);
     r->now[COUNT] = n;

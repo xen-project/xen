@@ -25,14 +25,7 @@
 
 #include <libxml/parser.h>
 #include <curl/curl.h>
-
-#include "xen_host.h"
-#include "xen_sr.h"
-#include "xen_vbd.h"
-#include "xen_vdi.h"
-#include "xen_console.h"
-#include "xen_vm.h"
-#include "xen_vm_metrics.h"
+#include <xen/api/xen_all.h>
 
 //#define PRINT_XML
 

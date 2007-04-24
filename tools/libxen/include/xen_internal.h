@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006 XenSource, Inc.
+ * Copyright (c) 2006-2007 XenSource, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "xen_common.h"
+#include <xen/api/xen_common.h>
 
 
 enum abstract_typename
@@ -147,7 +147,12 @@ type__ ## _free(type__ handle)                  \
 }                                               \
 
 
-#define XEN_SET_ALLOC_FREE(type__)                                      \
+#define XEN_SET_ALLOC_FREE(type__)              \
+    XEN_SET_ALLOC(type__)                       \
+    XEN_SET_FREE(type__)
+
+
+#define XEN_SET_ALLOC(type__)                                           \
 type__ ## _set *                                                        \
 type__ ## _set_alloc(size_t size)                                       \
 {                                                                       \
@@ -155,43 +160,29 @@ type__ ## _set_alloc(size_t size)                                       \
                                     size * sizeof(type__));             \
     result->size = size;                                                \
     return result;                                                      \
-}                                                                       \
-                                                                        \
-void                                                                    \
-type__ ## _set_free(type__ ## _set *set)                                \
+}
+
+
+#define XEN_SET_FREE(type__)                                            \
+void type__ ## _set_free(type__ ## _set *set)                           \
 {                                                                       \
     if (set == NULL)                                                    \
-    {                                                                   \
         return;                                                         \
-    }                                                                   \
-    size_t n = set->size;                                               \
-    for (size_t i = 0; i < n; i++)                                      \
-    {                                                                   \
+    for (size_t i = 0; i < set->size; i++)                              \
        type__ ## _free(set->contents[i]);                               \
-    }                                                                   \
-                                                                        \
     free(set);                                                          \
-}                                                                       \
+}
 
 
-#define XEN_RECORD_OPT_FREE(type__)                     \
-void                                                    \
-type__ ## _record_opt_free(type__ ## _record_opt *opt)  \
-{                                                       \
-    if (opt == NULL)                                    \
-    {                                                   \
-        return;                                         \
-    }                                                   \
-    if (opt->is_record)                                 \
-    {                                                   \
-        type__ ## _record_free(opt->u.record);          \
-    }                                                   \
-    else                                                \
-    {                                                   \
-        type__ ## _free(opt->u.handle);                 \
-    }                                                   \
-    free(opt);                                          \
-}                                                       \
+#define XEN_RECORD_OPT_FREE(type__)                                     \
+void type__ ## _record_opt_free(type__ ## _record_opt *opt) {           \
+    if (opt == NULL) return;                                            \
+    if (opt->is_record)                                                 \
+        type__ ## _record_free(opt->u.record);                          \
+    else                                                                \
+        type__ ## _free(opt->u.handle);                                 \
+    free(opt);                                                          \
+}
 
 
 #endif

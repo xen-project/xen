@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2006, XenSource Inc.
+# Copyright (c) 2006-2007, XenSource Inc.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -18,20 +18,21 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = 0.1
-MINOR = 0
+MAJOR = 0.9
+MINOR = 1
 
 CFLAGS = -Iinclude                     \
-	 $(shell xml2-config --cflags) \
+         $(shell xml2-config --cflags) \
          $(shell curl-config --cflags) \
          -W -Wall -Wmissing-prototypes -Werror -std=c99 -O2 -fPIC
 
 LDFLAGS = $(shell xml2-config --libs) \
           $(shell curl-config --libs)
 
-LIBXENAPI_HDRS = $(wildcard include/*.h)
+LIBXENAPI_HDRS = $(wildcard include/xen/api/*.h) include/xen/api/xen_all.h
 LIBXENAPI_OBJS = $(patsubst %.c, %.o, $(wildcard src/*.c))
 
+TEST_PROGRAMS = test/test_bindings test/test_event_handling
 
 .PHONY: all
 all: libxenapi.so libxenapi.a
@@ -48,13 +49,7 @@ libxenapi.so.$(MAJOR).$(MINOR): $(LIBXENAPI_OBJS)
 libxenapi.a: $(LIBXENAPI_OBJS)
 	$(AR) rcs libxenapi.a $^
 
-test/test_bindings: test/test_bindings.o libxenapi.so
-	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
-
-test/test_event_handling: test/test_event_handling.o libxenapi.so
-	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
-
-test/test_hvm_bindings: test/test_hvm_bindings.o libxenapi.so
+$(TEST_PROGRAMS): test/%: test/%.o libxenapi.so
 	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenapi
 
 
@@ -70,9 +65,10 @@ install: all
 	    $(INSTALL_DATA) $$i $(DESTDIR)/usr/include/xen/api; \
 	done
 
+
 .PHONY: clean
 clean:
 	rm -f `find -name *.o`
 	rm -f libxenapi.so*
 	rm -f libxenapi.a
-	rm -f test/test_bindings
+	rm -f $(TEST_PROGRAMS)

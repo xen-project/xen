@@ -50,7 +50,7 @@ typedef struct tpmif_tx_request tpmif_tx_request_t;
  */
 typedef uint32_t TPMIF_RING_IDX;
 
-#define TPMIF_TX_RING_SIZE 10
+#define TPMIF_TX_RING_SIZE 1
 
 /* This structure must fit in a memory page. */
 

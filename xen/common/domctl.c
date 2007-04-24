@@ -176,7 +176,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
     struct xen_domctl curop, *op = &curop;
-    void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
     static DEFINE_SPINLOCK(domctl_lock);
 
     if ( !IS_PRIV(current->domain) )
@@ -187,9 +186,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
     if ( op->interface_version != XEN_DOMCTL_INTERFACE_VERSION )
         return -EACCES;
-
-    if ( acm_pre_domctl(op, &ssid) )
-        return -EPERM;
 
     spin_lock(&domctl_lock);
 
@@ -300,9 +296,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         static domid_t rover = 0;
         unsigned int domcr_flags;
 
+        ret = -EINVAL;
         if ( supervisor_mode_kernel ||
              (op->u.createdomain.flags & ~XEN_DOMCTL_CDF_hvm_guest) )
-            return -EINVAL;
+            break;
 
         dom = op->domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
@@ -333,7 +330,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             domcr_flags |= DOMCRF_hvm;
 
         ret = -ENOMEM;
-        if ( (d = domain_create(dom, domcr_flags)) == NULL )
+        d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref);
+        if ( d == NULL )
             break;
 
         ret = 0;
@@ -715,11 +713,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
 
     spin_unlock(&domctl_lock);
-
-    if ( ret == 0 )
-        acm_post_domctl(op, &ssid);
-    else
-        acm_fail_domctl(op, &ssid);
 
     return ret;
 }

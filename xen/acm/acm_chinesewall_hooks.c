@@ -407,26 +407,23 @@ static int chwall_dump_ssid_types(ssidref_t ssidref, u8 * buf, u16 len)
 
 /* -------- DOMAIN OPERATION HOOKS -----------*/
 
-static int chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
+static int _chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 {
     ssidref_t chwall_ssidref;
     int i, j;
     traceprintk("%s.\n", __func__);
 
-    read_lock(&acm_bin_pol_rwlock);
     chwall_ssidref = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
     if (chwall_ssidref == ACM_DEFAULT_LOCAL_SSID)
     {
         printk("%s: ERROR CHWALL SSID is NOT SET but policy enforced.\n",
                __func__);
-        read_unlock(&acm_bin_pol_rwlock);
         return ACM_ACCESS_DENIED;       /* catching and indicating config error */
     }
     if (chwall_ssidref >= chwall_bin_pol.max_ssidrefs)
     {
         printk("%s: ERROR chwall_ssidref > max(%x).\n",
                __func__, chwall_bin_pol.max_ssidrefs - 1);
-        read_unlock(&acm_bin_pol_rwlock);
         return ACM_ACCESS_DENIED;
     }
     /* A: chinese wall check for conflicts */
@@ -436,7 +433,6 @@ static int chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
                                    chwall_bin_pol.max_types + i])
         {
             printk("%s: CHINESE WALL CONFLICT in type %02x.\n", __func__, i);
-            read_unlock(&acm_bin_pol_rwlock);
             return ACM_ACCESS_DENIED;
         }
 
@@ -465,17 +461,16 @@ static int chwall_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
                                            chwall_bin_pol.max_types + j])
                 chwall_bin_pol.conflict_aggregate_set[j]++;
     }
-    read_unlock(&acm_bin_pol_rwlock);
     return ACM_ACCESS_PERMITTED;
 }
 
-static void chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
+
+static void _chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
 {
     int i, j;
     ssidref_t chwall_ssidref;
     traceprintk("%s.\n", __func__);
 
-    read_lock(&acm_bin_pol_rwlock);
     chwall_ssidref = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
     /* adjust types ref-count for running domains */
     for (i = 0; i < chwall_bin_pol.max_types; i++)
@@ -484,7 +479,6 @@ static void chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
                                    chwall_bin_pol.max_types + i];
     if (domid)
     {
-        read_unlock(&acm_bin_pol_rwlock);
         return;
     }
     /* Xen does not call pre-create hook for DOM0;
@@ -519,48 +513,34 @@ static void chwall_post_domain_create(domid_t domid, ssidref_t ssidref)
                                            chwall_bin_pol.max_types + j])
                 chwall_bin_pol.conflict_aggregate_set[j]++;
     }
-    read_unlock(&acm_bin_pol_rwlock);
     return;
 }
 
-static void
-chwall_fail_domain_create(void *subject_ssid, ssidref_t ssidref)
-{
-    int i, j;
-    ssidref_t chwall_ssidref;
-    traceprintk("%s.\n", __func__);
 
+/*
+ * To be called when creating a domain. If this call is unsuccessful,
+ * no state changes have occurred (adjustments of counters etc.). If it
+ * was successful, state was changed and can be undone using
+ * chwall_domain_destroy.
+ */
+static int chwall_domain_create(void *subject_ssid, ssidref_t ssidref,
+                                domid_t domid)
+{
+    int rc;
     read_lock(&acm_bin_pol_rwlock);
-    chwall_ssidref = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
-    /* roll-back: re-adjust conflicting types aggregate */
-    for (i = 0; i < chwall_bin_pol.max_conflictsets; i++)
-    {
-        int common = 0;
-        /* check if conflict_set_i and ssidref have common types */
-        for (j = 0; j < chwall_bin_pol.max_types; j++)
-            if (chwall_bin_pol.
-                conflict_sets[i * chwall_bin_pol.max_types + j]
-                && chwall_bin_pol.ssidrefs[chwall_ssidref *
-                                          chwall_bin_pol.max_types + j])
-            {
-                common = 1;
-                break;
-            }
-        if (common == 0)
-            continue;           /* try next conflict set, this one does not include any type of chwall_ssidref */
-        /* now add types of the conflict set to conflict_aggregate_set (except types in chwall_ssidref) */
-        for (j = 0; j < chwall_bin_pol.max_types; j++)
-            if (chwall_bin_pol.
-                conflict_sets[i * chwall_bin_pol.max_types + j]
-                && !chwall_bin_pol.ssidrefs[chwall_ssidref *
-                                           chwall_bin_pol.max_types + j])
-                chwall_bin_pol.conflict_aggregate_set[j]--;
+    rc = _chwall_pre_domain_create(subject_ssid, ssidref);
+    if (rc == ACM_ACCESS_PERMITTED) {
+        _chwall_post_domain_create(domid, ssidref);
     }
     read_unlock(&acm_bin_pol_rwlock);
+    return rc;
 }
 
-
-static void chwall_post_domain_destroy(void *object_ssid, domid_t id)
+/*
+ * This function undoes everything a successful call to
+ * chwall_domain_create has done.
+ */
+static void chwall_domain_destroy(void *object_ssid, struct domain *d)
 {
     int i, j;
     struct chwall_ssid *chwall_ssidp = GET_SSIDP(ACM_CHINESE_WALL_POLICY,
@@ -614,10 +594,8 @@ struct acm_operations acm_chinesewall_ops = {
     .dump_statistics = chwall_dump_stats,
     .dump_ssid_types = chwall_dump_ssid_types,
     /* domain management control hooks */
-    .pre_domain_create = chwall_pre_domain_create,
-    .post_domain_create = chwall_post_domain_create,
-    .fail_domain_create = chwall_fail_domain_create,
-    .post_domain_destroy = chwall_post_domain_destroy,
+    .domain_create = chwall_domain_create,
+    .domain_destroy = chwall_domain_destroy,
     /* event channel control hooks */
     .pre_eventchannel_unbound = NULL,
     .fail_eventchannel_unbound = NULL,

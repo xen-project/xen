@@ -31,13 +31,13 @@
 #include <libxml/xmlstring.h>
 #include <libxml/xpath.h>
 
-#include "xen_common.h"
-#include "xen_host.h"
+#include "xen/api/xen_common.h"
+#include "xen/api/xen_host.h"
 #include "xen_internal.h"
-#include "xen_int_float_map.h"
-#include "xen_int_int_map.h"
-#include "xen_int_string_set_map.h"
-#include "xen_string_string_map.h"
+#include "xen/api/xen_int_float_map.h"
+#include "xen/api/xen_int_int_map.h"
+#include "xen/api/xen_int_string_set_map.h"
+#include "xen/api/xen_string_string_map.h"
 
 
 /*
@@ -204,6 +204,23 @@ xen_session_logout(xen_session *session)
 
     free((char *)session->session_id);
     free(session);
+}
+
+
+void
+xen_session_clear_error(xen_session *session)
+{
+    if (session->error_description != NULL)
+    {
+        for (int i = 0; i < session->error_description_count; i++)
+        {
+            free(session->error_description[i]);
+        }
+        free(session->error_description);
+    }
+    session->error_description = NULL;
+    session->error_description_count = 0;
+    session->ok = true;
 }
 
 

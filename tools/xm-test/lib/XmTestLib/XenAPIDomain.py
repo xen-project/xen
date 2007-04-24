@@ -41,6 +41,8 @@ class XenAPIConfig:
 
     def setOpt(self, name, value):
         """Set an option in the config"""
+        if name == "memory":
+            value <<= 20
         if name in self.opttrlate.keys():
             _name = self.opttrlate[name]
         else:

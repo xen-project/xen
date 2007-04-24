@@ -1071,8 +1071,13 @@ static uint8_t lsi_reg_readb(LSIState *s, int offset)
         shift = (offset & 3) * 8;
         return (s->scratch[n] >> shift) & 0xff;
     }
+#ifndef CONFIG_DM
     BADF("readb 0x%x\n", offset);
     exit(1);
+#else
+    /* XEN: This path can be triggered (e.g. ASPI8DOS.SYS reads 0x8). */
+    return 0;
+#endif
 #undef CASE_GET_REG32
 }
 
