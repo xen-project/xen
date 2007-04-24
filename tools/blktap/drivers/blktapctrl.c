@@ -495,11 +495,13 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 
 		if (!exist) {
 			DPRINTF("Process does not exist:\n");
-			asprintf(&rdctldev, "/dev/xen/tapctrlread%d", minor);
+			asprintf(&rdctldev, 
+				 "%s/tapctrlread%d", BLKTAP_DEV_DIR, minor);
 			blkif->fds[READ] = open_ctrl_socket(rdctldev);
 
 
-			asprintf(&wrctldev, "/dev/xen/tapctrlwrite%d", minor);
+			asprintf(&wrctldev, 
+				 "%s/tapctrlwrite%d", BLKTAP_DEV_DIR, minor);
 			blkif->fds[WRITE] = open_ctrl_socket(wrctldev);
 			
 			if (blkif->fds[READ] == -1 || blkif->fds[WRITE] == -1) 

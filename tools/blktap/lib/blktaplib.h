@@ -78,7 +78,7 @@ static inline int BLKTAP_MODE_VALID(unsigned long arg)
 
 #define BLKTAP_IOCTL_KICK 1
 #define MAX_PENDING_REQS	BLK_RING_SIZE
-#define BLKTAP_DEV_DIR   "/dev/xen"
+#define BLKTAP_DEV_DIR   "/var/run/tap"
 #define BLKTAP_DEV_NAME  "blktap"
 #define BLKTAP_DEV_MINOR 0
 
