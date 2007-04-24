@@ -300,9 +300,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         static domid_t rover = 0;
         unsigned int domcr_flags;
 
+        ret = -EINVAL;
         if ( supervisor_mode_kernel ||
              (op->u.createdomain.flags & ~XEN_DOMCTL_CDF_hvm_guest) )
-            return -EINVAL;
+            break;
 
         dom = op->domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
