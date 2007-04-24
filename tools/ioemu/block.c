@@ -420,6 +420,8 @@ int bdrv_read(BlockDriverState *bs, int64_t sector_num,
 
     if (!bs->inserted)
         return -1;
+    if (sector_num < 0)
+	return -1;
 
     while (nb_sectors > 0) {
         if (sector_num == 0 && bs->boot_sector_enabled) {
@@ -458,6 +460,8 @@ int bdrv_write(BlockDriverState *bs, int64_t sector_num,
         return -1;
     if (bs->read_only)
         return -1;
+    if (sector_num < 0)
+	return -1;
     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
         memcpy(bs->boot_sector_data, buf, 512);   
     }
