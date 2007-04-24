@@ -394,57 +394,17 @@ int vprintf(const char *fmt, va_list ap)
     return 0;
 }
 
-
-/*
- * sleep by synchronizing with the PIT on channel 2
- * http://bochs.sourceforge.net/techspec/intel-82c54-timer.pdf.gz
- */
-#define PIT_CTR2       0x80
-#define PIT_CTR1       0x40
-#define PIT_CTR0       0x00
-
-#define PIT_RW_LSB     0x10
-
-#define PIT_MODE0      0x0
-
-#define PIT_CTR_16BIT  0x0
-
-#define PIT_CMD_LATCH  0x0
-
-#define PORT_PIT_CMD     0x43
-#define PORT_PIT_CTR2    0x42
-#define PORT_PIT_CTR1    0x41
-#define PORT_PIT_CTR0    0x40
-
-#define PIT_FREQ         1193182 /* Hz */
-
-#define PORT_PPI         0x61
-
 void mssleep(uint32_t waittime)
 {
-	long int timeout = 0;
-	uint8_t last = 0x0;
-	uint8_t old_ppi = inb(PORT_PPI);
+    uint32_t i;
+    uint8_t  x, y = inb(0x61) & 0x10;
 
-	/* use ctr2; ctr0 is used by the Bochs BIOS */
-	/* ctr2 drives speaker -- turn it off */
-	outb(PORT_PPI, old_ppi & 0xfc);
-
-	outb(PORT_PIT_CMD, PIT_CTR2 | PIT_RW_LSB | PIT_MODE0 | PIT_CTR_16BIT);
-	outb(PORT_PIT_CTR2, last);         /* start countdown */
-
-	while (timeout < (waittime * PIT_FREQ / 1000)) {
-		uint8_t cur, delta;
-		outb(PORT_PIT_CMD, PIT_CTR2 | PIT_CMD_LATCH);
-		cur = inb(PORT_PIT_CTR2);
-		delta = last - cur;
-		timeout += delta;
-		last = cur;
-	}
-	/* turn ctr2 off */
-	outb(PORT_PIT_CMD, PIT_CTR2 | PIT_RW_LSB | PIT_MODE0 | PIT_CTR_16BIT);
-	outb(PORT_PIT_CTR2, 0xff); /* start countdown */
-	outb(PORT_PIT_CTR2, 0x0);  /* stop */
-
-	outb(PORT_PPI, old_ppi);
+    /* Poll the DRAM refresh timer: I/O port 61h, bit 4 toggles every 15us. */
+    waittime *= 67; /* Convert milliseconds to multiples of 15us. */
+    for ( i = 0; i < waittime; i++ )
+    {
+        while ( (x = inb(0x61) & 0x10) == y )
+            continue;
+        y = x;
+    }
 }
