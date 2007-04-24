@@ -601,7 +601,8 @@ static void cirrus_invalidate_region(CirrusVGAState * s, int off_begin,
 	off_cur_end = off_cur + bytesperline;
 	off_cur &= TARGET_PAGE_MASK;
 	while (off_cur < off_cur_end) {
-	    cpu_physical_memory_set_dirty(s->vram_offset + off_cur);
+	    cpu_physical_memory_set_dirty(s->vram_offset +
+					  (off_cur & s->cirrus_addr_mask));
 	    off_cur += TARGET_PAGE_SIZE;
 	}
 	off_begin += off_pitch;
