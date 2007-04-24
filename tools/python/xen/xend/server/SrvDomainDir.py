@@ -191,7 +191,7 @@ class SrvDomainDir(SrvDir):
                 state = DOM_STATE_RUNNING
                 if 'state' in req.args and len(req.args['state']) > 0:
                     state = req.args['state'][0]
-                log.debug("Listing domains in state " + str(state))
+                log.trace("Listing domains in state " + str(state))
                 sxp.show(self.xd.list_names(state), out=req)
         else:
             domains = self.xd.list_sorted()
