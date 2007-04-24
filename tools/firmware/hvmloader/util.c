@@ -295,7 +295,7 @@ static void e820_collapse(void)
              ((ent[i].addr + ent[i].size) == ent[i+1].addr) )
         {
             ent[i].size += ent[i+1].size;
-            memcpy(&ent[i+1], &ent[i+2], *E820_MAP_NR - i - 2);
+            memcpy(&ent[i+1], &ent[i+2], (*E820_MAP_NR-i-2) * sizeof(*ent));
             (*E820_MAP_NR)--;
         }
         else
@@ -322,10 +322,10 @@ uint32_t e820_malloc(uint32_t size)
              (addr != ent[i].addr) ||     /* starts above 4gb? */
              ((addr + size) < addr) )     /* ends above 4gb? */
             continue;
-        
+
         if ( ent[i].size != size )
         {
-            memmove(&ent[i+1], &ent[i], (*E820_MAP_NR - i) * sizeof(*ent));
+            memmove(&ent[i+1], &ent[i], (*E820_MAP_NR-i) * sizeof(*ent));
             (*E820_MAP_NR)++;
             ent[i].size -= size;
             addr += ent[i].size;
