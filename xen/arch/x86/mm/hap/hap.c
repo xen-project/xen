@@ -504,16 +504,6 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
     }
     
     switch ( sc->op ) {
-    case XEN_DOMCTL_SHADOW_OP_OFF:
-    case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
-    case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
-    case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
-    case XEN_DOMCTL_SHADOW_OP_CLEAN:
-    case XEN_DOMCTL_SHADOW_OP_PEEK:
-    case XEN_DOMCTL_SHADOW_OP_ENABLE:
-        HAP_ERROR("Bad hap domctl op %u\n", sc->op);
-        domain_crash(d);
-        return -EINVAL;
     case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
         hap_lock(d);
         rc = hap_set_allocation(d, sc->mb << (20 - PAGE_SHIFT), &preempted);
