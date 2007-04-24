@@ -72,7 +72,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	struct mmuext_op _op[3], *op = _op;
 
 	if (likely(prev != next)) {
-		BUG_ON(!next->context.pinned);
+		BUG_ON(!xen_feature(XENFEAT_writable_page_tables) &&
+		       !next->context.pinned);
 
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);
