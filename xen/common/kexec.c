@@ -81,20 +81,25 @@ void kexec_crash_save_cpu(void)
 crash_xen_info_t *kexec_crash_save_info(void)
 {
     int cpu = smp_processor_id();
-    crash_xen_info_t *info = (crash_xen_info_t *)ELFNOTE_DESC(xen_crash_note);
+    crash_xen_info_t info;
+    crash_xen_info_t *out = (crash_xen_info_t *)ELFNOTE_DESC(xen_crash_note);
 
     BUG_ON(!cpu_test_and_set(cpu, crash_saved_cpus));
 
-    info->xen_major_version = xen_major_version();
-    info->xen_minor_version = xen_minor_version();
-    info->xen_extra_version = __pa(xen_extra_version());
-    info->xen_changeset = __pa(xen_changeset());
-    info->xen_compiler = __pa(xen_compiler());
-    info->xen_compile_date = __pa(xen_compile_date());
-    info->xen_compile_time = __pa(xen_compile_time());
-    info->tainted = tainted;
+    memset(&info, 0, sizeof(info));
+    info.xen_major_version = xen_major_version();
+    info.xen_minor_version = xen_minor_version();
+    info.xen_extra_version = __pa(xen_extra_version());
+    info.xen_changeset = __pa(xen_changeset());
+    info.xen_compiler = __pa(xen_compiler());
+    info.xen_compile_date = __pa(xen_compile_date());
+    info.xen_compile_time = __pa(xen_compile_time());
+    info.tainted = tainted;
 
-    return info;
+    /* Copy from guaranteed-aligned local copy to possibly-unaligned dest. */
+    memcpy(out, &info, sizeof(info));
+
+    return out;
 }
 
 void kexec_crash(void)
