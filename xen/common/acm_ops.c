@@ -216,6 +216,42 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case ACMOP_chgpolicy: {
+        struct acm_change_policy chgpolicy;
+
+        if (copy_from_guest(&chgpolicy, arg, 1) != 0)
+            return -EFAULT;
+        if (chgpolicy.interface_version != ACM_INTERFACE_VERSION)
+            return -EACCES;
+
+        rc = acm_change_policy(&chgpolicy);
+
+        if (rc == 0) {
+            if (copy_to_guest(arg, &chgpolicy, 1) != 0) {
+                rc = -EFAULT;
+            }
+        }
+        break;
+    }
+
+    case ACMOP_relabeldoms: {
+        struct acm_relabel_doms relabeldoms;
+
+        if (copy_from_guest(&relabeldoms, arg, 1) != 0)
+            return -EFAULT;
+        if (relabeldoms.interface_version != ACM_INTERFACE_VERSION)
+            return -EACCES;
+
+        rc = acm_relabel_domains(&relabeldoms);
+
+        if (rc == 0) {
+            if (copy_to_guest(arg, &relabeldoms, 1) != 0) {
+                rc = -EFAULT;
+            }
+        }
+        break;
+    }
+
     default:
         rc = -ENOSYS;
         break;

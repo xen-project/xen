@@ -91,8 +91,10 @@ struct acm_operations {
     int  (*init_domain_ssid)           (void **ssid, ssidref_t ssidref);
     void (*free_domain_ssid)           (void *ssid);
     int  (*dump_binary_policy)         (u8 *buffer, u32 buf_size);
-    int  (*set_binary_policy)          (u8 *buffer, u32 buf_size,
-                                        int is_bootpolicy);
+    int  (*test_binary_policy)         (u8 *buffer, u32 buf_size,
+                                        int is_bootpolicy,
+                                        struct acm_sized_buffer *);
+    int  (*set_binary_policy)          (u8 *buffer, u32 buf_size);
     int  (*dump_statistics)            (u8 *buffer, u16 buf_size);
     int  (*dump_ssid_types)            (ssidref_t ssidref, u8 *buffer, u16 buf_size);
     /* domain management control hooks (can be NULL) */
@@ -228,37 +230,6 @@ static inline int acm_pre_grant_setup(domid_t id)
 }
 
 
-static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
-{
-    void *subject_ssid = current->domain->ssid;
-    domid_t domid = d->domain_id;
-    int rc;
-
-    /*
-       To be called when a domain is created; returns '0' if the
-       domain is allowed to be created, != '0' if not.
-     */
-    rc = acm_init_domain_ssid_new(d, ssidref);
-    if (rc != ACM_OK)
-        return rc;
-
-    if ((acm_primary_ops->domain_create != NULL) &&
-        acm_primary_ops->domain_create(subject_ssid, ssidref, domid)) {
-        return ACM_ACCESS_DENIED;
-    } else if ((acm_secondary_ops->domain_create != NULL) &&
-                acm_secondary_ops->domain_create(subject_ssid, ssidref,
-                                                 domid)) {
-        /* roll-back primary */
-        if (acm_primary_ops->domain_destroy != NULL)
-            acm_primary_ops->domain_destroy(d->ssid, d);
-        acm_free_domain_ssid(d->ssid);
-        return ACM_ACCESS_DENIED;
-    }
-
-    return 0;
-}
-
-
 static inline void acm_domain_destroy(struct domain *d)
 {
     void *ssid = d->ssid;
@@ -270,6 +241,44 @@ static inline void acm_domain_destroy(struct domain *d)
         /* free security ssid for the destroyed domain (also if null policy */
         acm_free_domain_ssid((struct acm_ssid_domain *)(ssid));
     }
+}
+
+
+static inline int acm_domain_create(struct domain *d, ssidref_t ssidref)
+{
+    void *subject_ssid = current->domain->ssid;
+    domid_t domid = d->domain_id;
+    int rc = 0;
+
+    read_lock(&acm_bin_pol_rwlock);
+    /*
+       To be called when a domain is created; returns '0' if the
+       domain is allowed to be created, != '0' if not.
+     */
+
+    if ((acm_primary_ops->domain_create != NULL) &&
+        acm_primary_ops->domain_create(subject_ssid, ssidref, domid)) {
+        rc = ACM_ACCESS_DENIED;
+    } else if ((acm_secondary_ops->domain_create != NULL) &&
+                acm_secondary_ops->domain_create(subject_ssid, ssidref,
+                                                 domid)) {
+        /* roll-back primary */
+        if (acm_primary_ops->domain_destroy != NULL)
+            acm_primary_ops->domain_destroy(d->ssid, d);
+        acm_free_domain_ssid(d->ssid);
+        rc = ACM_ACCESS_DENIED;
+    }
+
+    if (rc == 0) {
+        rc = acm_init_domain_ssid_new(d, ssidref);
+
+        if (rc != ACM_OK) {
+            acm_domain_destroy(d);
+        }
+    }
+
+    read_unlock(&acm_bin_pol_rwlock);
+    return rc;
 }
 
 

@@ -179,7 +179,7 @@ ste_dump_policy(u8 *buf, u32 buf_size) {
  * (right now: event_channels, future: also grant_tables)
  */ 
 static int
-ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
+ste_init_state(struct acm_sized_buffer *errors)
 {
     int violation = 1;
     struct ste_ssid *ste_ssid, *ste_rssid;
@@ -190,7 +190,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     int port, i;
 
     rcu_read_lock(&domlist_read_lock);
-    /* go by domain? or directly by global? event/grant list */
+    read_lock(&ssid_list_rwlock);
     /* go through all domains and adjust policy as if this domain was started now */
     for_each_domain ( d )
     {
@@ -232,11 +232,16 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                             "%x -> domain %x.\n",
                             __func__, d->domain_id, rdomid);
                     spin_unlock(&d->evtchn_lock);
+
+                    acm_array_append_tuple(errors,
+                                           ACM_EVTCHN_SHARING_VIOLATION,
+                                           d->domain_id << 16 | rdomid);
                     goto out;
                 }
             }
             spin_unlock(&d->evtchn_lock);
         } 
+
 
         /* b) check for grant table conflicts on shared pages */
         spin_lock(&d->grant_table->lock);
@@ -252,6 +257,10 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                 if ((rdom = rcu_lock_domain_by_id(rdomid)) == NULL) {
                     spin_unlock(&d->grant_table->lock);
                     printkd("%s: domain not found ERROR!\n", __func__);
+
+                    acm_array_append_tuple(errors,
+                                           ACM_DOMAIN_LOOKUP,
+                                           rdomid);
                     goto out;
                 }
                 /* rdom now has remote domain */
@@ -264,6 +273,10 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
                     printkd("%s: Policy violation in grant table "
                             "sharing domain %x -> domain %x.\n",
                             __func__, d->domain_id, rdomid);
+
+                    acm_array_append_tuple(errors,
+                                           ACM_GNTTAB_SHARING_VIOLATION,
+                                           d->domain_id << 16 | rdomid);
                     goto out;
                 }
             }
@@ -272,6 +285,7 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
     }
     violation = 0;
  out:
+    read_unlock(&ssid_list_rwlock);
     rcu_read_unlock(&domlist_read_lock);
     return violation;
     /* returning "violation != 0" means that existing sharing between domains would not 
@@ -281,15 +295,98 @@ ste_init_state(struct acm_ste_policy_buffer *ste_buf, domaintype_t *ssidrefs)
      * type in their typesets referenced by their ssidrefs */
 }
 
+
+/*
+ * Call ste_init_state with the current policy.
+ */
+int
+do_ste_init_state_curr(struct acm_sized_buffer *errors)
+{
+    return ste_init_state(errors);
+}
+
+
 /* set new policy; policy write-locked already */
 static int
-ste_set_policy(u8 *buf, u32 buf_size, int is_bootpolicy)
+_ste_update_policy(u8 *buf, u32 buf_size, int test_only,
+                   struct acm_sized_buffer *errors)
 {
+    int rc = -EFAULT;
     struct acm_ste_policy_buffer *ste_buf = (struct acm_ste_policy_buffer *)buf;
     void *ssidrefsbuf;
     struct ste_ssid *ste_ssid;
-    struct domain *d;
+    struct acm_ssid_domain *rawssid;
     int i;
+
+
+    /* 1. create and copy-in new ssidrefs buffer */
+    ssidrefsbuf = xmalloc_array(u8, sizeof(domaintype_t)*ste_buf->ste_max_types*ste_buf->ste_max_ssidrefs);
+    if (ssidrefsbuf == NULL) {
+        return -ENOMEM;
+    }
+    if (ste_buf->ste_ssid_offset + sizeof(domaintype_t) * ste_buf->ste_max_ssidrefs*ste_buf->ste_max_types > buf_size)
+        goto error_free;
+
+    arrcpy(ssidrefsbuf, 
+           buf + ste_buf->ste_ssid_offset,
+           sizeof(domaintype_t),
+           ste_buf->ste_max_ssidrefs*ste_buf->ste_max_types);
+
+
+    /* 3. in test mode: re-calculate sharing decisions based on running domains;
+     *    this can fail if new policy is conflicting with sharing of running domains 
+     *    now: reject violating new policy; future: adjust sharing through revoking sharing */
+
+    if (test_only) {
+        /* temporarily replace old policy with new one for the testing */
+        struct ste_binary_policy orig_ste_bin_pol = ste_bin_pol;
+        ste_bin_pol.max_types = ste_buf->ste_max_types;
+        ste_bin_pol.max_ssidrefs = ste_buf->ste_max_ssidrefs;
+        ste_bin_pol.ssidrefs = (domaintype_t *)ssidrefsbuf;
+
+        if (ste_init_state(NULL)) {
+            /* new policy conflicts with sharing of running domains */
+            printk("%s: New policy conflicts with running domains. "
+                   "Policy load aborted.\n", __func__);
+        } else {
+            rc = ACM_OK;
+        }
+        /* revert changes, no matter whether testing was successful or not */
+        ste_bin_pol = orig_ste_bin_pol;
+        goto error_free;
+    }
+
+    /* 3. replace old policy (activate new policy) */
+    ste_bin_pol.max_types = ste_buf->ste_max_types;
+    ste_bin_pol.max_ssidrefs = ste_buf->ste_max_ssidrefs;
+    xfree(ste_bin_pol.ssidrefs);
+    ste_bin_pol.ssidrefs = (domaintype_t *)ssidrefsbuf;
+
+    /* clear all ste caches */
+    read_lock(&ssid_list_rwlock);
+
+    for_each_acmssid( rawssid ) {
+        ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, rawssid);
+        for (i=0; i<ACM_TE_CACHE_SIZE; i++)
+            ste_ssid->ste_cache[i].valid = ACM_STE_free;
+    }
+
+    read_unlock(&ssid_list_rwlock);
+
+    return ACM_OK;
+
+ error_free:
+    if (!test_only) printk("%s: ERROR setting policy.\n", __func__);
+    xfree(ssidrefsbuf);
+    return rc;
+}
+
+static int
+ste_test_policy(u8 *buf, u32 buf_size, int is_bootpolicy,
+                struct acm_sized_buffer *errors)
+{
+    struct acm_ste_policy_buffer *ste_buf =
+             (struct acm_ste_policy_buffer *)buf;
 
     if (buf_size < sizeof(struct acm_ste_policy_buffer))
         return -EINVAL;
@@ -306,52 +403,17 @@ ste_set_policy(u8 *buf, u32 buf_size, int is_bootpolicy)
         (ste_buf->policy_version != ACM_STE_VERSION))
         return -EINVAL;
 
-    /* 1. create and copy-in new ssidrefs buffer */
-    ssidrefsbuf = xmalloc_array(u8, sizeof(domaintype_t)*ste_buf->ste_max_types*ste_buf->ste_max_ssidrefs);
-    if (ssidrefsbuf == NULL) {
-        return -ENOMEM;
-    }
-    if (ste_buf->ste_ssid_offset + sizeof(domaintype_t) * ste_buf->ste_max_ssidrefs*ste_buf->ste_max_types > buf_size)
-        goto error_free;
-
     /* during boot dom0_chwall_ssidref is set */
-    if (is_bootpolicy && (dom0_ste_ssidref >= ste_buf->ste_max_ssidrefs)) {
-        goto error_free;
-    }
+    if (is_bootpolicy && (dom0_ste_ssidref >= ste_buf->ste_max_ssidrefs))
+        return -EINVAL;
 
-    arrcpy(ssidrefsbuf, 
-           buf + ste_buf->ste_ssid_offset,
-           sizeof(domaintype_t),
-           ste_buf->ste_max_ssidrefs*ste_buf->ste_max_types);
+    return _ste_update_policy(buf, buf_size, 1, errors);
+}
 
-    /* 2. now re-calculate sharing decisions based on running domains;
-     *    this can fail if new policy is conflicting with sharing of running domains 
-     *    now: reject violating new policy; future: adjust sharing through revoking sharing */
-    if (ste_init_state(ste_buf, (domaintype_t *)ssidrefsbuf)) {
-        printk("%s: New policy conflicts with running domains. Policy load aborted.\n", __func__);
-        goto error_free; /* new policy conflicts with sharing of running domains */
-    }
-    /* 3. replace old policy (activate new policy) */
-    ste_bin_pol.max_types = ste_buf->ste_max_types;
-    ste_bin_pol.max_ssidrefs = ste_buf->ste_max_ssidrefs;
-    xfree(ste_bin_pol.ssidrefs);
-    ste_bin_pol.ssidrefs = (domaintype_t *)ssidrefsbuf;
-
-    /* clear all ste caches */
-    rcu_read_lock(&domlist_read_lock);
-    for_each_domain ( d ) {
-        ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                             (struct acm_ssid_domain *)(d)->ssid);
-        for (i=0; i<ACM_TE_CACHE_SIZE; i++)
-            ste_ssid->ste_cache[i].valid = ACM_STE_free;
-    }
-    rcu_read_unlock(&domlist_read_lock);
-    return ACM_OK;
-
- error_free:
-    printk("%s: ERROR setting policy.\n", __func__);
-    xfree(ssidrefsbuf);
-    return -EFAULT;
+static int
+ste_set_policy(u8 *buf, u32 buf_size)
+{
+    return _ste_update_policy(buf, buf_size, 0, NULL);
 }
 
 static int 
@@ -447,18 +509,15 @@ clean_id_from_cache(domid_t id)
 {
     struct ste_ssid *ste_ssid;
     int i;
-    struct domain *d;
-    struct acm_ssid_domain *ssid;
+    struct acm_ssid_domain *rawssid;
 
     printkd("deleting cache for dom %x.\n", id);
-    rcu_read_lock(&domlist_read_lock);
+    read_lock(&ssid_list_rwlock);
     /* look through caches of all domains */
-    for_each_domain ( d ) {
-        ssid = (struct acm_ssid_domain *)(d->ssid);
 
-        if (ssid == NULL)
-            continue; /* hanging domain structure, no ssid any more ... */
-        ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, ssid);
+    for_each_acmssid ( rawssid ) {
+
+        ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, rawssid);
         if (!ste_ssid) {
             printk("%s: deleting ID from cache ERROR (no ste_ssid)!\n",
                    __func__);
@@ -469,8 +528,9 @@ clean_id_from_cache(domid_t id)
                 (ste_ssid->ste_cache[i].id == id))
                 ste_ssid->ste_cache[i].valid = ACM_STE_free;
     }
+
  out:
-    rcu_read_unlock(&domlist_read_lock);
+    read_unlock(&ssid_list_rwlock);
 }
 
 /***************************
@@ -687,6 +747,7 @@ struct acm_operations acm_simple_type_enforcement_ops = {
     .init_domain_ssid  = ste_init_domain_ssid,
     .free_domain_ssid  = ste_free_domain_ssid,
     .dump_binary_policy     = ste_dump_policy,
+    .test_binary_policy     = ste_test_policy,
     .set_binary_policy      = ste_set_policy,
     .dump_statistics  = ste_dump_stats,
     .dump_ssid_types        = ste_dump_ssid_types,

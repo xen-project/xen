@@ -20,9 +20,11 @@
 #define _ACM_CORE_H
 
 #include <xen/spinlock.h>
+#include <xen/list.h>
 #include <public/acm.h>
 #include <xen/acm_policy.h>
 #include <public/acm_ops.h>
+#include <acm/acm_endian.h>
 
 /* Xen-internal representation of the binary policy */
 struct acm_binary_policy {
@@ -58,6 +60,7 @@ extern struct chwall_binary_policy chwall_bin_pol;
 extern struct ste_binary_policy ste_bin_pol;
 /* use the lock when reading / changing binary policy ! */
 extern rwlock_t acm_bin_pol_rwlock;
+extern rwlock_t ssid_list_rwlock;
 
 /* subject and object type definitions */
 #define ACM_DATATYPE_domain 1
@@ -80,12 +83,14 @@ struct acm_ste_cache_line {
 
 /* general definition of a subject security id */
 struct acm_ssid_domain {
-    int datatype; /* type of subject (e.g., partition): ACM_DATATYPE_* */
-    ssidref_t ssidref;   /* combined security reference */
-    void *primary_ssid;   /* primary policy ssid part (e.g. chinese wall) */
-    void *secondary_ssid;    /* secondary policy ssid part (e.g. type enforcement) */
-    struct domain *subject;     /* backpointer to subject structure */
-    domid_t domainid;   /* replicate id */
+    struct list_head node; /* all are chained together */
+    int datatype;          /* type of subject (e.g., partition): ACM_DATATYPE_* */
+    ssidref_t ssidref;     /* combined security reference */
+    ssidref_t old_ssidref; /* holds previous value of ssidref during relabeling */
+    void *primary_ssid;    /* primary policy ssid part (e.g. chinese wall) */
+    void *secondary_ssid;  /* secondary policy ssid part (e.g. type enforcement) */
+    struct domain *subject;/* backpointer to subject structure */
+    domid_t domainid;      /* replicate id */
 };
 
 /* chinese wall ssid type */
@@ -118,25 +123,64 @@ struct ste_ssid {
  ((POLICY) == acm_bin_pol.primary_policy_code) ? \
  ((ssid)->primary_ssid) : ((ssid)->secondary_ssid)
 
+#define ACM_INVALID_SSIDREF  (0xffffffff)
+
+struct acm_sized_buffer
+{
+    uint32_t *array;
+    uint num_items;
+    uint position;
+};
+
+static inline int acm_array_append_tuple(struct acm_sized_buffer *buf,
+                                         uint32_t a, uint32_t b)
+{
+    uint i;
+    if (buf == NULL)
+        return 0;
+
+    i = buf->position;
+
+    if ((i + 2) > buf->num_items)
+        return 0;
+
+    buf->array[i]   = cpu_to_be32(a);
+    buf->array[i+1] = cpu_to_be32(b);
+    buf->position += 2;
+    return 1;
+}
+
 /* protos */
 int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
 int acm_init_domain_ssid_new(struct domain *, ssidref_t ssidref);
 void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
 int acm_init_binary_policy(u32 policy_code);
 int acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
-int do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy);
+int do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy,
+                      struct acm_sized_buffer *, struct acm_sized_buffer *,
+                      struct acm_sized_buffer *);
 int acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
 int acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size);
 int acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE(void) buf, u16 buf_size);
 int acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook);
 int acm_set_policy_reference(u8 * buf, u32 buf_size);
 int acm_dump_policy_reference(u8 *buf, u32 buf_size);
-
+int acm_change_policy(struct acm_change_policy *);
+int acm_relabel_domains(struct acm_relabel_doms *);
+int do_chwall_init_state_curr(struct acm_sized_buffer *);
+int do_ste_init_state_curr(struct acm_sized_buffer *);
 
 /* variables */
 extern ssidref_t dom0_chwall_ssidref;
 extern ssidref_t dom0_ste_ssidref;
 #define ACM_MAX_NUM_TYPES   (256)
+
+/* traversing the list of ssids */
+extern struct list_head ssid_list;
+#define for_each_acmssid( N )                               \
+   for ( N =  (struct acm_ssid_domain *)ssid_list.next;     \
+         N != (struct acm_ssid_domain *)&ssid_list;         \
+         N =  (struct acm_ssid_domain *)N->node.next     )
 
 #endif
 

@@ -62,9 +62,13 @@ struct acm_binary_policy acm_bin_pol;
 /* acm binary policy lock */
 DEFINE_RWLOCK(acm_bin_pol_rwlock);
 
-/* ACM's only accepted policy name */
+/* ACM's only accepted policy name during boot */
 char polname[80];
 char *acm_accepted_boot_policy_name = NULL;
+
+/* a lits of all chained ssid structures */
+LIST_HEAD(ssid_list);
+DEFINE_RWLOCK(ssid_list_rwlock);
 
 static void __init set_dom0_ssidref(const char *val)
 {
@@ -77,7 +81,7 @@ static void __init set_dom0_ssidref(const char *val)
     int i;
     int dom0_ssidref = simple_strtoull(val, &c, 0);
 
-    if (!strncmp(&c[0],":sHype:", 7)) {
+    if (!strncmp(&c[0],":ACM:", 5)) {
         lo = dom0_ssidref & 0xffff;
         if (lo < ACM_MAX_NUM_TYPES && lo >= 1)
             dom0_chwall_ssidref = lo;
@@ -249,7 +253,8 @@ acm_setup(char *policy_start,
         return rc;
 
     rc = do_acm_set_policy((void *)policy_start, (u32)policy_len,
-                           is_bootpolicy);
+                           is_bootpolicy,
+                           NULL, NULL, NULL);
     if (rc == ACM_OK)
     {
         printkd("Policy len  0x%lx, start at %p.\n",policy_len,policy_start);
@@ -337,9 +342,10 @@ int acm_init_domain_ssid_new(struct domain *subj, ssidref_t ssidref)
         return ACM_INIT_SSID_ERROR;
     }
 
+    INIT_LIST_HEAD(&ssid->node);
     ssid->datatype       = ACM_DATATYPE_domain;
     ssid->subject        = subj;
-    ssid->domainid      = subj->domain_id;
+    ssid->domainid       = subj->domain_id;
     ssid->primary_ssid   = NULL;
     ssid->secondary_ssid = NULL;
 
@@ -367,6 +373,11 @@ int acm_init_domain_ssid_new(struct domain *subj, ssidref_t ssidref)
         acm_free_domain_ssid(ssid);
         return ACM_INIT_SSID_ERROR;
     }
+
+    write_lock(&ssid_list_rwlock);
+    list_add(&ssid->node, &ssid_list);
+    write_unlock(&ssid_list_rwlock);
+
     printkd("%s: assigned domain %x the ssidref=%x.\n",
            __func__, subj->domain_id, ssid->ssidref);
     return ACM_OK;
@@ -387,6 +398,11 @@ acm_free_domain_ssid(struct acm_ssid_domain *ssid)
     if (acm_secondary_ops->free_domain_ssid != NULL)
         acm_secondary_ops->free_domain_ssid(ssid->secondary_ssid);
     ssid->secondary_ssid = NULL;
+
+    write_lock(&ssid_list_rwlock);
+    list_del(&ssid->node);
+    write_unlock(&ssid_list_rwlock);
+
     xfree(ssid);
     printkd("%s: Freed individual domain ssid (domain=%02x).\n",
             __func__, id);

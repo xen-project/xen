@@ -183,29 +183,33 @@ static int chwall_dump_policy(u8 * buf, u32 buf_size)
     return ret;
 }
 
-/* adapt security state (running_types and conflict_aggregate_set) to all running
- * domains; chwall_init_state is called when a policy is changed to bring the security
- * information into a consistent state and to detect violations (return != 0).
- * from a security point of view, we simulate that all running domains are re-started
+/*
+ * Adapt security state (running_types and conflict_aggregate_set) to all
+ * running domains; chwall_init_state is called when a policy is changed
+ * to bring the security information into a consistent state and to detect
+ * violations (return != 0) from a security point of view, we simulate
+ * that all running domains are re-started
  */
 static int
 chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
-                  domaintype_t * ssidrefs, domaintype_t * conflict_sets,
+                  domaintype_t * ssidrefs,
+                  domaintype_t * conflict_sets,
                   domaintype_t * running_types,
-                  domaintype_t * conflict_aggregate_set)
+                  domaintype_t * conflict_aggregate_set,
+                  struct acm_sized_buffer *errors /* may be NULL */)
 {
     int violation = 0, i, j;
     struct chwall_ssid *chwall_ssid;
     ssidref_t chwall_ssidref;
-    struct domain *d;
+    struct acm_ssid_domain *rawssid;
 
-    spin_lock(&domlist_update_lock);
+    read_lock(&ssid_list_rwlock);
+
     /* go through all domains and adjust policy as if this domain was started now */
-    for_each_domain ( d )
+    for_each_acmssid( rawssid )
     {
         chwall_ssid =
-            GET_SSIDP(ACM_CHINESE_WALL_POLICY,
-                      (struct acm_ssid_domain *)d->ssid);
+            GET_SSIDP(ACM_CHINESE_WALL_POLICY, rawssid);
         chwall_ssidref = chwall_ssid->chwall_ssidref;
         traceprintk("%s: validating policy for domain %x (chwall-REF=%x).\n",
                     __func__, d->domain_id, chwall_ssidref);
@@ -222,6 +226,9 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
                 printk("%s: CHINESE WALL CONFLICT in type %02x.\n",
                        __func__, i);
                 violation = 1;
+
+                acm_array_append_tuple(errors, ACM_CHWALL_CONFLICT, i);
+
                 goto out;
             }
         /* set violation and break out of the loop */
@@ -249,7 +256,7 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
         }
     }
  out:
-    spin_unlock(&domlist_update_lock);
+    read_unlock(&ssid_list_rwlock);
     return violation;
     /* returning "violation != 0" means that the currently running set of domains would
      * not be possible if the new policy had been enforced before starting them; for chinese
@@ -257,43 +264,44 @@ chwall_init_state(struct acm_chwall_policy_buffer *chwall_buf,
      * more than one type is currently running */
 }
 
-static int chwall_set_policy(u8 * buf, u32 buf_size, int is_bootpolicy)
+
+int
+do_chwall_init_state_curr(struct acm_sized_buffer *errors)
 {
+    struct acm_chwall_policy_buffer chwall_buf = {
+         /* only these two are important */
+         .chwall_max_types        = chwall_bin_pol.max_types,
+         .chwall_max_conflictsets = chwall_bin_pol.max_conflictsets,
+    };
+    /* reset running_types and aggregate set for recalculation */
+    memset(chwall_bin_pol.running_types,
+           0x0,
+           sizeof(domaintype_t) * chwall_bin_pol.max_types);
+    memset(chwall_bin_pol.conflict_aggregate_set,
+           0x0,
+           sizeof(domaintype_t) * chwall_bin_pol.max_types);
+    return chwall_init_state(&chwall_buf,
+                             chwall_bin_pol.ssidrefs,
+                             chwall_bin_pol.conflict_sets,
+                             chwall_bin_pol.running_types,
+                             chwall_bin_pol.conflict_aggregate_set,
+                             errors);
+}
+
+/*
+ * Attempt to set the policy. This function must be called in test_only
+ * mode first to only perform checks. A second call then does the
+ * actual changes.
+ */
+static int _chwall_update_policy(u8 *buf, u32 buf_size, int test_only,
+                                 struct acm_sized_buffer *errors)
+{
+    int rc = -EFAULT;
     /* policy write-locked already */
     struct acm_chwall_policy_buffer *chwall_buf =
         (struct acm_chwall_policy_buffer *) buf;
     void *ssids = NULL, *conflict_sets = NULL, *running_types =
         NULL, *conflict_aggregate_set = NULL;
-
-    if (buf_size < sizeof(struct acm_chwall_policy_buffer))
-        return -EINVAL;
-
-    /* rewrite the policy due to endianess */
-    chwall_buf->policy_code = be32_to_cpu(chwall_buf->policy_code);
-    chwall_buf->policy_version = be32_to_cpu(chwall_buf->policy_version);
-    chwall_buf->chwall_max_types = be32_to_cpu(chwall_buf->chwall_max_types);
-    chwall_buf->chwall_max_ssidrefs =
-        be32_to_cpu(chwall_buf->chwall_max_ssidrefs);
-    chwall_buf->chwall_max_conflictsets =
-        be32_to_cpu(chwall_buf->chwall_max_conflictsets);
-    chwall_buf->chwall_ssid_offset = be32_to_cpu(chwall_buf->chwall_ssid_offset);
-    chwall_buf->chwall_conflict_sets_offset =
-        be32_to_cpu(chwall_buf->chwall_conflict_sets_offset);
-    chwall_buf->chwall_running_types_offset =
-        be32_to_cpu(chwall_buf->chwall_running_types_offset);
-    chwall_buf->chwall_conflict_aggregate_offset =
-        be32_to_cpu(chwall_buf->chwall_conflict_aggregate_offset);
-
-    /* policy type and version checks */
-    if ((chwall_buf->policy_code != ACM_CHINESE_WALL_POLICY) ||
-        (chwall_buf->policy_version != ACM_CHWALL_VERSION))
-        return -EINVAL;
-
-    /* during boot dom0_chwall_ssidref is set */
-    if (is_bootpolicy &&
-        (dom0_chwall_ssidref >= chwall_buf->chwall_max_ssidrefs)) {
-        goto error_free;
-    }
 
     /* 1. allocate new buffers */
     ssids =
@@ -343,12 +351,20 @@ static int chwall_set_policy(u8 * buf, u32 buf_size, int is_bootpolicy)
      *    this can fail if new policy is conflicting with running domains */
     if (chwall_init_state(chwall_buf, ssids,
                           conflict_sets, running_types,
-                          conflict_aggregate_set))
+                          conflict_aggregate_set,
+                          errors))
     {
         printk("%s: New policy conflicts with running domains. Policy load aborted.\n",
                __func__);
         goto error_free;        /* new policy conflicts with running domains */
     }
+
+    /* if this was only a test run, exit with ACM_OK */
+    if (test_only) {
+        rc = ACM_OK;
+        goto error_free;
+    }
+
     /* 4. free old policy buffers, replace with new ones */
     chwall_bin_pol.max_types = chwall_buf->chwall_max_types;
     chwall_bin_pol.max_ssidrefs = chwall_buf->chwall_max_ssidrefs;
@@ -364,12 +380,61 @@ static int chwall_set_policy(u8 * buf, u32 buf_size, int is_bootpolicy)
     return ACM_OK;
 
  error_free:
-    printk("%s: ERROR setting policy.\n", __func__);
+    if (!test_only) printk("%s: ERROR setting policy.\n", __func__);
     xfree(ssids);
     xfree(conflict_sets);
     xfree(running_types);
     xfree(conflict_aggregate_set);
-    return -EFAULT;
+    return rc;
+}
+
+/*
+ * This function MUST be called before the chwall_ste_policy function!
+ */
+static int chwall_test_policy(u8 *buf, u32 buf_size, int is_bootpolicy,
+                              struct acm_sized_buffer *errors)
+{
+    struct acm_chwall_policy_buffer *chwall_buf =
+        (struct acm_chwall_policy_buffer *) buf;
+
+    if (buf_size < sizeof(struct acm_chwall_policy_buffer))
+        return -EINVAL;
+
+    /* rewrite the policy due to endianess */
+    chwall_buf->policy_code = be32_to_cpu(chwall_buf->policy_code);
+    chwall_buf->policy_version = be32_to_cpu(chwall_buf->policy_version);
+    chwall_buf->chwall_max_types =
+        be32_to_cpu(chwall_buf->chwall_max_types);
+    chwall_buf->chwall_max_ssidrefs =
+        be32_to_cpu(chwall_buf->chwall_max_ssidrefs);
+    chwall_buf->chwall_max_conflictsets =
+        be32_to_cpu(chwall_buf->chwall_max_conflictsets);
+    chwall_buf->chwall_ssid_offset =
+        be32_to_cpu(chwall_buf->chwall_ssid_offset);
+    chwall_buf->chwall_conflict_sets_offset =
+        be32_to_cpu(chwall_buf->chwall_conflict_sets_offset);
+    chwall_buf->chwall_running_types_offset =
+        be32_to_cpu(chwall_buf->chwall_running_types_offset);
+    chwall_buf->chwall_conflict_aggregate_offset =
+        be32_to_cpu(chwall_buf->chwall_conflict_aggregate_offset);
+
+    /* policy type and version checks */
+    if ((chwall_buf->policy_code != ACM_CHINESE_WALL_POLICY) ||
+        (chwall_buf->policy_version != ACM_CHWALL_VERSION))
+        return -EINVAL;
+
+    /* during boot dom0_chwall_ssidref is set */
+    if (is_bootpolicy &&
+        (dom0_chwall_ssidref >= chwall_buf->chwall_max_ssidrefs))
+        return -EINVAL;
+
+
+    return _chwall_update_policy(buf, buf_size, 1, errors);
+}
+
+static int chwall_set_policy(u8 *buf, u32 buf_size)
+{
+    return _chwall_update_policy(buf, buf_size, 0, NULL);
 }
 
 static int chwall_dump_stats(u8 * buf, u16 len)
@@ -590,6 +655,7 @@ struct acm_operations acm_chinesewall_ops = {
     .init_domain_ssid = chwall_init_domain_ssid,
     .free_domain_ssid = chwall_free_domain_ssid,
     .dump_binary_policy = chwall_dump_policy,
+    .test_binary_policy = chwall_test_policy,
     .set_binary_policy = chwall_set_policy,
     .dump_statistics = chwall_dump_stats,
     .dump_ssid_types = chwall_dump_ssid_types,

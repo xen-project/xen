@@ -33,7 +33,14 @@ null_dump_binary_policy(u8 *buf, u32 buf_size)
 }
 
 static int
-null_set_binary_policy(u8 *buf, u32 buf_size, int is_bootpolicy)
+null_test_binary_policy(u8 *buf, u32 buf_size, int is_bootpolicy,
+                        struct acm_sized_buffer *errors)
+{
+    return ACM_OK;
+}
+
+static int
+null_set_binary_policy(u8 *buf, u32 buf_size)
 { 
     return ACM_OK;
 }
@@ -58,6 +65,7 @@ struct acm_operations acm_null_ops = {
     .init_domain_ssid = null_init_domain_ssid,
     .free_domain_ssid = null_free_domain_ssid,
     .dump_binary_policy = null_dump_binary_policy,
+    .test_binary_policy = null_test_binary_policy,
     .set_binary_policy = null_set_binary_policy,
     .dump_statistics = null_dump_stats,
     .dump_ssid_types = null_dump_ssid_types,

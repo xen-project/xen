@@ -56,6 +56,19 @@
 #define ACM_ACCESS_DENIED           -111
 #define ACM_NULL_POINTER_ERROR      -200
 
+/*
+   Error codes reported in when trying to test for a new policy
+   These error codes are reported in an array of tuples where
+   each error code is followed by a parameter describing the error
+   more closely, such as a domain id.
+*/
+#define ACM_EVTCHN_SHARING_VIOLATION       0x100
+#define ACM_GNTTAB_SHARING_VIOLATION       0x101
+#define ACM_DOMAIN_LOOKUP                  0x102
+#define ACM_CHWALL_CONFLICT                0x103
+#define ACM_SSIDREF_IN_USE                 0x104
+
+
 /* primary policy in lower 4 bits */
 #define ACM_NULL_POLICY 0
 #define ACM_CHINESE_WALL_POLICY 1
