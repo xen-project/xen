@@ -48,10 +48,6 @@ class PIFIsPhysical(XendError):
     def __init__(self):
         XendError.__init__(self, 'PIF is physical')
 
-class VLANTagInvalid(XendError):
-    def __init__(self):
-        XendError.__init__(self, 'VLAN tag invalid')
-
 class VmError(XendError):
     """Vm construction error."""
     pass
@@ -62,7 +58,111 @@ class HVMRequired(VmError):
                            'HVM guest support is unavailable: is VT/AMD-V '
                            'supported by your CPU and enabled in your BIOS?')
 
+class XendAPIError(XendError):
+    """Extend this class for all error thrown by
+    autoplugged classes"""
+    def __init__(self):
+        XendError.__init__(self, 'XendAPI Error: You should never see this'
+                           ' message; this class need to be overidden')
 
+    def get_api_error(self):
+        return ['INTERNAL_ERROR', 'You should never see this message; '
+                'this method needs to be overidden']
+
+class CreateUnspecifiedAttributeError(XendAPIError):
+    def __init__(self, attr_name, class_name):
+        XendAPIError.__init__(self)
+        self.attr_name = attr_name
+        self.class_name = class_name
+
+    def get_api_error(self):
+        return ['CREATE_UNSPECIFIED_ATTRIBUTE', self.attr_name,
+                self.class_name]
+
+    def __str__(self):
+        return "CREATE_UNSPECIFIED_ATTRIBUTE: %s, %s" % (self.attr_name,
+                 self.class_name)
+
+class UnmanagedNetworkError(XendAPIError):
+    def __init__(self, attr_name):
+        XendAPIError.__init__(self)
+        self.attr_name = attr_name
+
+    def get_api_error(self):
+        return ['UNMANAGED_NETWORK_ERROR', self.attr_name]
+
+    def __str__(self):
+        return "UNMANAGED_NETWORK_ERROR: %s" % self.attr_name
+
+class UniqueNameError(XendAPIError):
+    def __init__(self, name, class_name):
+        XendAPIError.__init__(self)
+        self.name = name
+        self.class_name = class_name
+        
+    def get_api_error(self):
+        return ['UNIQUE_NAME_ERROR', self.name, self.class_name]        
+
+    def __str__(self):
+        return 'UNIQUE_NAME_ERROR: %s, %s' % (self.name, self.class_name)
+
+class InvalidDeviceError(XendAPIError):
+    def __init__(self, dev):
+        XendAPIError.__init__(self)
+        self.dev = dev
+        
+    def get_api_error(self):
+        return ['INVALID_DEVICE_ERROR', self.dev]        
+
+    def __str__(self):
+        return 'INVALID_DEVICE_ERROR: %s' % self.dev
+    
+class DeviceExistsError(XendAPIError):
+    def __init__(self, dev):
+        XendAPIError.__init__(self)
+        self.dev = dev
+        
+    def get_api_error(self):
+        return ['DEVICE_EXISTS_ERROR', self.dev]        
+
+    def __str__(self):
+        return 'DEVICE_EXISTS_ERROR: %s' % self.dev
+
+class InvalidHandleError(XendAPIError):
+    def __init__(self, klass, handle):
+        XendAPIError.__init__(self)
+        self.klass = klass
+        self.handle = handle
+        
+    def get_api_error(self):
+        return ['HANDLE_INVALID', self.klass, self.handle]        
+
+    def __str__(self):
+        return 'HANDLE_INVALID: %s %s' % (self.klass, self.handle)
+
+class ImplementationError(XendAPIError):
+    def __init__(self, klass, func):
+        XendAPIError.__init__(self)
+        self.klass = klass
+        self.func = func
+
+    def get_api_error(self):
+        return ['IMPLEMENTATION_ERROR', self.klass, self.func]        
+
+    def __str__(self):
+        return 'IMPLEMENTATION_ERROR: %s %s' % (self.klass, self.func)
+
+class VLANTagInvalid(XendAPIError):
+    def __init__(self, vlan):
+        XendAPIError.__init__(self)
+        self.vlan = vlan
+
+    def get_api_error(self):
+        return ['VLAN_TAG_INVALID', self.vlan]
+
+    def __str__(self):
+        return 'VLAN_TAG_INVALID: %s' % self.vlan
+    
 XEND_ERROR_AUTHENTICATION_FAILED = ('ELUSER', 'Authentication Failed')
 XEND_ERROR_SESSION_INVALID       = ('EPERMDENIED', 'Session Invalid')
 XEND_ERROR_DOMAIN_INVALID        = ('EINVALIDDOMAIN', 'Domain Invalid')
