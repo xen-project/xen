@@ -341,7 +341,7 @@ class XendConfig(dict):
     # try and 'fix it up' but acutually fix the cause ;-)
     #
     def _memory_sanity_check(self):
-        log.debug("_memory_sanity_check memory_static_min: %s, "
+        log.trace("_memory_sanity_check memory_static_min: %s, "
                       "memory_static_max: %i, "
                       "memory_dynamic_min: %i, " 
                       "memory_dynamic_max: %i",
@@ -1049,6 +1049,11 @@ class XendConfig(dict):
                     dev_info['type'] = cfg_xenapi.get('type')
                 if cfg_xenapi.get('name'):
                     dev_info['name'] = cfg_xenapi.get('name')
+                if cfg_xenapi.get('network'):
+                    from xen.xend.XendNode import XendAPIInstanceStore
+                    network = XendAPIInstanceStore.get(
+                        cfg_xenapi.get('network'), 'network')
+                    dev_info['bridge'] = network.get_name_label()
                 
                 dev_uuid = cfg_xenapi.get('uuid', None)
                 if not dev_uuid:
