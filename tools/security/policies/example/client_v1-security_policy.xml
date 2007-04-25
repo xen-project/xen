@@ -5,9 +5,10 @@
 <!--             Currently: Chinese Wall and Simple Type Enforcement-->
 <SecurityPolicyDefinition xmlns="http://www.ibm.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ibm.com ../../security_policy.xsd ">
 	<PolicyHeader>
-		<PolicyName>example.chwall_ste.client_v1</PolicyName>
-		<PolicyUrl>www.ibm.com/example/chwall_ste/client_v1</PolicyUrl>
+		<PolicyName>example.client_v1</PolicyName>
+		<PolicyUrl>www.ibm.com/example/client_v1</PolicyUrl>
 		<Date>2006-03-31</Date>
+		<Version>1.0</Version>
 	</PolicyHeader>
 	<!--                                                        -->
 	<!-- example of a simple type enforcement policy definition -->

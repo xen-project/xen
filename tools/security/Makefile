@@ -16,12 +16,6 @@ LDFLAGS    += $(shell xml2-config --libs ) # if this does not work, try -L/usr/l
 ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_NULL_POLICY)
 POLICY=null
 endif
-ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_CHINESE_WALL_POLICY)
-POLICY=chwall
-endif
-ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
-POLICY=ste
-endif
 ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)
 POLICY=chwall_ste
 endif
@@ -46,7 +40,7 @@ ACM_SECGEN_HTMLDIR= /var/lib/xensec_gen
 ACM_SECGEN_CGIDIR = $(ACM_SECGEN_HTMLDIR)/cgi-bin
 
 ACM_SCHEMA        = security_policy.xsd
-ACM_EXAMPLES      = chwall ste chwall_ste
+ACM_EXAMPLES      = client_v1 test
 ACM_POLICY_SUFFIX = security_policy.xml
 
 ifeq ($(ACM_SECURITY),y)
@@ -66,8 +60,7 @@ install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DATA) policies/$(ACM_SCHEMA) $(DESTDIR)$(ACM_POLICY_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)/example
 	for i in $(ACM_EXAMPLES); do \
-		$(INSTALL_DIR) $(DESTDIR)$(ACM_POLICY_DIR)/example/$$i; \
-		$(INSTALL_DATA) policies/example/$$i/client_v1-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR)/example/$$i; \
+		$(INSTALL_DATA) policies/example/$$i-$(ACM_POLICY_SUFFIX) $(DESTDIR)$(ACM_POLICY_DIR)/example/; \
 	done
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_SCRIPT_DIR)
 	$(INSTALL_PROG) $(ACM_SCRIPTS) $(DESTDIR)$(ACM_SCRIPT_DIR)
@@ -94,10 +87,10 @@ build: $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	chmod 700 $(ACM_SCRIPTS)
 
 xensec_tool: $(OBJS_TOOL)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -L$(XEN_LIBXC) -lxenctrl
+	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^ -L$(XEN_LIBXC) -lxenctrl
 
 xensec_xml2bin: $(OBJS_XML2BIN)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) -g $(CFLAGS) $(LDFLAGS) -O0 -o $@ $^
 
 xensec_gen: xensec_gen.py
 	cp -f $^ $@

@@ -2673,33 +2673,34 @@ one of these workload types. The XML Policy consists of four parts:
       xsi:schemaLocation=
           "http://www.ibm.com ../../security_policy.xsd ">
 04     <PolicyHeader>
-05         <PolicyName>example.chwall_ste.test</PolicyName>
+05         <PolicyName>example.test</PolicyName>
 06         <Date>Wed Jul 12 17:32:59 2006</Date>
-07     </PolicyHeader>
-08
-09     <SimpleTypeEnforcement>
-10         <SimpleTypeEnforcementTypes>
-11             <Type>SystemManagement</Type>
-12             <Type>PepsiCo</Type>
-13             <Type>CocaCola</Type>
-14         </SimpleTypeEnforcementTypes>
-15     </SimpleTypeEnforcement>
-16
-17     <ChineseWall priority="PrimaryPolicyComponent">
-18         <ChineseWallTypes>
-19             <Type>SystemManagement</Type>
-20             <Type>PepsiCo</Type>
-21             <Type>CocaCola</Type>
-22         </ChineseWallTypes>
-23
-24         <ConflictSets>
-25             <Conflict name="RER1">
-26                 <Type>CocaCola</Type>
-27                 <Type>PepsiCo</Type>
-28             </Conflict>
-29        </ConflictSets>
-30     </ChineseWall>
-31
+07         <Version>1.0</Version>
+08     </PolicyHeader>
+09
+10     <SimpleTypeEnforcement>
+11         <SimpleTypeEnforcementTypes>
+12             <Type>SystemManagement</Type>
+13             <Type>PepsiCo</Type>
+14             <Type>CocaCola</Type>
+15         </SimpleTypeEnforcementTypes>
+16     </SimpleTypeEnforcement>
+17
+18     <ChineseWall priority="PrimaryPolicyComponent">
+19         <ChineseWallTypes>
+20             <Type>SystemManagement</Type>
+21             <Type>PepsiCo</Type>
+22             <Type>CocaCola</Type>
+23         </ChineseWallTypes>
+24
+25         <ConflictSets>
+26             <Conflict name="RER1">
+27                 <Type>CocaCola</Type>
+28                 <Type>PepsiCo</Type>
+29             </Conflict>
+30        </ConflictSets>
+31     </ChineseWall>
+32
 \end{verbatim}
 \end{scriptsize}
 \caption{Example XML security policy file -- Part I: Types and Rules Definition.}

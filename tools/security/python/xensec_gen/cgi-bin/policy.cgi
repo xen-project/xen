@@ -1816,6 +1816,7 @@ def sendPHeaderXml( ):
 	# Policy header definition
 	print '<PolicyHeader>'
 	print '  <PolicyName>' + formPolicyName[1] + '</PolicyName>'
+	print '  <Version>1.0</Version>'
 	if len( formPolicyUrl[1] ) > 0:
 		print '  <PolicyUrl>' + formPolicyUrl[1] + '</PolicyUrl>'
 	if len( formPolicyRef[1] ) > 0:
