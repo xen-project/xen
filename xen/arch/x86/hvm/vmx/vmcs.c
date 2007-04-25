@@ -38,12 +38,12 @@
 #include <asm/shadow.h>
 
 /* Dynamic (run-time adjusted) execution control flags. */
-u32 vmx_pin_based_exec_control;
-u32 vmx_cpu_based_exec_control;
-u32 vmx_vmexit_control;
-u32 vmx_vmentry_control;
+u32 vmx_pin_based_exec_control __read_mostly;
+u32 vmx_cpu_based_exec_control __read_mostly;
+u32 vmx_vmexit_control __read_mostly;
+u32 vmx_vmentry_control __read_mostly;
 
-static u32 vmcs_revision_id;
+static u32 vmcs_revision_id __read_mostly;
 
 static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
 {
