@@ -24,15 +24,122 @@ import socket
 import XendDomain
 import XendNode
 from XendLogging import log
+from xen.xend import uuid as genuuid
+from xen.xend.XendBase import XendBase
+from xen.xend.XendError import *
+from xen.util import Brctl
+from xen.xend import XendAPIStore
 
 IP_ROUTE_RE = r'^default via ([\d\.]+) dev (\w+)'
 
-class XendNetwork:
-    def __init__(self, uuid, record):
-        self.uuid = uuid
-        self.name_label = record.get('name_label', '')
-        self.name_description = record.get('name_description', '')
-        self.other_config = record.get('other_config', {})
+def bridge_exists(name):
+    return name in Brctl.get_state().keys()
+
+class XendNetwork(XendBase):
+    """We're going to assert that the name_label of this
+    network is just the name of the bridge"""
+
+    def getClass(self):
+        return "network"
+
+    def getAttrRW(self):
+        attrRW = ['name_label',
+                  'name_description',
+                  'other_config',
+                  'default_gateway',
+                  'default_netmask']
+        return XendBase.getAttrRW() + attrRW
+
+    def getAttrRO(self):
+        attrRO =  ['VIFs',
+                   'PIFs']
+        return XendBase.getAttrRO() + attrRO
+
+    def getAttrInst(self):
+        return XendBase.getAttrInst() + self.getAttrRW()
+
+    def getMethods(self):
+        methods = ['add_to_other_config',
+                   'remove_from_other_config']
+        return XendBase.getMethods() + methods
+
+    def getFuncs(self):
+        funcs = ['create']
+        return XendBase.getFuncs() + funcs
+
+    getClass    = classmethod(getClass)
+    getAttrRO   = classmethod(getAttrRO)
+    getAttrRW   = classmethod(getAttrRW)
+    getAttrInst = classmethod(getAttrInst)
+    getMethods  = classmethod(getMethods)
+    getFuncs    = classmethod(getFuncs)
+
+    def create_phy(self, name):
+        """
+        Called when a new bridge is found on xend start
+        """
+        # Create new uuids
+        uuid = genuuid.createString()
+
+        # Create instance
+        record = {
+                'name_label':       name,
+                'name_description': '',
+                'other_config':     {},
+                'default_gateway':  '',
+                'default_netmask':  ''
+            }
+        network = XendNetwork(record, uuid)
+
+        return uuid
+        
+    def recreate(self, record, uuid):
+        """
+        Called on xend start / restart, or machine
+        restart, when read from saved config.
+        Needs to check network exists, create it otherwise
+        """
+
+        # Create instance (do this first, to check record)
+        network = XendNetwork(record, uuid)
+
+        # Create network if it doesn't already exist
+        if not bridge_exists(network.name_label):
+            Brctl.bridge_create(network.name_label)
+
+        return uuid
+
+    def create(self, record):
+        """
+        Called from API, to create a new network
+        """
+        # Create new uuids
+        uuid = genuuid.createString()
+
+        # Create instance (do this first, to check record)
+        network = XendNetwork(record, uuid)
+
+        # Check network doesn't already exist
+        name_label = network.name_label
+        if bridge_exists(name_label):
+            del network
+            raise UniqueNameError(name_label, "network")
+
+        # Create the bridge
+        Brctl.bridge_create(network.name_label)
+
+        return uuid
+
+    create_phy  = classmethod(create_phy)
+    recreate    = classmethod(recreate)
+    create      = classmethod(create)
+        
+    def __init__(self, record, uuid):       
+        XendBase.__init__(self, uuid, record)
+        
+    #
+    # XenAPI Mehtods
+    #
 
     def get_name_label(self):
         return self.name_label
@@ -41,9 +148,8 @@ class XendNetwork:
         return self.name_description
 
     def set_name_label(self, new_name):
-        self.name_label = new_name
-        XendNode.instance().save_networks()
-
+        pass
+        
     def set_name_description(self, new_desc):
         self.name_description = new_desc
         XendNode.instance().save_networks()
@@ -55,13 +161,14 @@ class XendNetwork:
             vifs = vm.get_vifs()
             for vif in vifs:
                 vif_cfg = vm.get_dev_xenapi_config('vif', vif)
-                if vif_cfg.get('network') == self.uuid:
+                if vif_cfg.get('network') == self.get_uuid():
                     result.append(vif)
         return result
 
     def get_PIFs(self):
-        return [x.uuid for x in XendNode.instance().pifs.values()
-                if x.network == self]
+        pifs = XendAPIStore.get_all("PIF")
+        return [pif.get_uuid() for pif in pifs
+                if pif.get_network() == self.get_uuid()]
 
     def get_other_config(self):
         return self.other_config
@@ -79,17 +186,16 @@ class XendNetwork:
             del self.other_config[key]
         XendNode.instance().save_networks()
 
-    def get_record(self):
-        return self.get_record_internal(True)
+    def get_default_gateway(self):
+        return self.default_gateway
 
-    def get_record_internal(self, transient):
-        result = {
-            'uuid': self.uuid,
-            'name_label': self.name_label,
-            'name_description': self.name_description,
-            'other_config' : self.other_config,
-        }
-        if transient:
-            result['VIFs'] = self.get_VIFs()
-            result['PIFs'] = self.get_PIFs()
-        return result
+    def set_default_gateway(self, gateway):
+        self.default_gateway = gateway
+        XendNode.instance().save_networks()
+
+    def get_default_netmask(self):
+        return self.default_netmask
+
+    def set_default_netmask(self, netmask):
+        self.default_netmask = netmask
+        XendNode.instance().save_networks()
