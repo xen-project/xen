@@ -132,7 +132,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
     if (pt_levels >= 3)
         pde = *(unsigned long long *)(pd + 8 * ((virt >> L2_PAGETABLE_SHIFT_PAE) & L2_PAGETABLE_MASK_PAE));
     else
-        pde = *(unsigned long long *)(pd + 4 * ((virt >> L2_PAGETABLE_SHIFT) & L2_PAGETABLE_MASK));
+        pde = *(unsigned long *)(pd + 4 * ((virt >> L2_PAGETABLE_SHIFT) & L2_PAGETABLE_MASK));
 
     if ((pde & 1) == 0) {
         DPRINTF("page entry not present in PD\n");
@@ -156,9 +156,9 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
         if (pt_levels >= 3)
             pte = *(unsigned long long *)(pt + 8 * ((virt >> L1_PAGETABLE_SHIFT_PAE) & L1_PAGETABLE_MASK_PAE));
         else
-            pte = *(unsigned long long *)(pt + 4 * ((virt >> L1_PAGETABLE_SHIFT) & L1_PAGETABLE_MASK));
+            pte = *(unsigned long *)(pt + 4 * ((virt >> L1_PAGETABLE_SHIFT) & L1_PAGETABLE_MASK));
 
-        if ((pte & 0x00000001) == 0) {
+        if ((pte & 1) == 0) {
             DPRINTF("page entry not present in PT\n");
             goto out_unmap_pt;
         }
