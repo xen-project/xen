@@ -57,10 +57,12 @@ class XendStateStore:
 
     <hosts>
        <host uuid='49c01812-3c28-1ad4-a59d-2a3f81b13ec2'>
-           <name type='string'>norwich</name>
-           <description type='string'>Test Xen Host</description>
-           <cpu uuid='6fc2d1ed-7eb0-4c9d-8006-3657d5483ae0' />
-           <cpu uuid='669df3b8-62be-4e61-800b-bbe8ee63a760' />
+          <name type='string'>norwich</name>
+          <description type='string'>Test Xen Host</description>
+          <cpu type='dict'>
+             <item uuid='6fc2d1ed-7eb0-4c9d-8006-3657d5483ae0' />
+             <item uuid='669df3b8-62be-4e61-800b-bbe8ee63a760' />
+          </cpu>
        </host>
     </hosts>
 
@@ -121,18 +123,20 @@ class XendStateStore:
                 if val_elem.firstChild:
                     val_text = val_elem.firstChild.nodeValue.strip()
                 
-                if val_type == '' and val_uuid != '':
-                    # this is a reference
-                    if val_name not in cls_dict:
-                        cls_dict[val_name] = {}
-                    cls_dict[val_name][val_uuid] = None
-                elif val_type == '':
-                    # dictionary
-                    k = val_elem.getAttribute('key').encode('utf8')
-                    v = val_elem.getAttribute('value').encode('utf8')
-                    if val_name not in cls_dict:
-                        cls_dict[val_name] = {}
-                    cls_dict[val_name][k] = v
+                if val_type == 'list':
+                    cls_dict[val_name] = []
+                    for item in val_elem.childNodes:
+                        if item.nodeType != Node.ELEMENT_NODE:
+                            continue # skip non element nodes
+                        cls_dict[val_name].append(item.getAttribute('uuid'))
+                elif val_type == 'dict':
+                    cls_dict[val_name] = {}
+                    for item in val_elem.childNodes:
+                        if item.nodeType != Node.ELEMENT_NODE:
+                            continue # skip non element nodes
+                        k = item.getAttribute('key').encode('utf8')
+                        v = item.getAttribute('value').encode('utf8')
+                        cls_dict[val_name][k] = v
                 elif val_type == 'string':
                     cls_dict[val_name] = val_text.encode('utf8')
                 elif val_type == 'float':
@@ -158,8 +162,7 @@ class XendStateStore:
         @param state: a Xen API struct of the state of the class.
         @type  state: dict
         @rtype: None
-        """
-        
+        """        
         xml_path = self._xml_file(cls)
 
         doc = minidom.getDOMImplementation().createDocument(None,
@@ -191,7 +194,7 @@ class XendStateStore:
                     store_val = str(int(val))
                     store_type = 'bool'
 
-                if store_type != None:
+                if store_type is not None:
                     val_node = doc.createElement(key)
                     val_node.setAttribute('type', store_type)
                     node.appendChild(val_node)
@@ -202,19 +205,25 @@ class XendStateStore:
 
                 # deal with dicts and lists
                 if type(val) == dict:
-                    for val_uuid in val.keys():
-                        val_node = doc.createElement(key)
+                    val_node = doc.createElement(key)
+                    val_node.setAttribute('type', 'dict')
+                    for val_item in val.keys():
+                        tmp = doc.createElement("item")
                         if key in ['other_config', 'device_config']:
-                            val_node.setAttribute('key', str(val_uuid))
-                            val_node.setAttribute('value', str(val[val_uuid]))
+                            tmp.setAttribute('key', str(val_item))
+                            tmp.setAttribute('value', str(val[val_item]))
                         else:
-                            val_node.setAttribute('uuid', val_uuid)
-                        node.appendChild(val_node)
+                            tmp.setAttribute('uuid', val_uuid)
+                        val_node.appendChild(tmp)
+                    node.appendChild(val_node)
                 elif type(val) in (list, tuple):
+                    val_node = doc.createElement(key)
+                    val_node.setAttribute('type', 'list')
                     for val_uuid in val:
-                        val_node = doc.createElement(key)
-                        val_node.setAttribute('uuid', val_uuid)
-                        node.appendChild(val_node)
+                        tmp = doc.createElement("item")
+                        tmp.setAttribute('uuid', val_uuid)
+                        val_node.appendChild(tmp)
+                    node.appendChild(val_node)
 
         open(xml_path, 'w').write(doc.toprettyxml())
         
