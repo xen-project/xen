@@ -109,8 +109,6 @@ class XendServers:
         signal.signal(signal.SIGHUP, self.reloadConfig)
 
         while True:
-            XendNode.instance().refreshBridges()
-
             threads = []
             for server in self.servers:
                 if server.ready:
