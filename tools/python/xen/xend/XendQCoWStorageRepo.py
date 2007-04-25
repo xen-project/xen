@@ -30,7 +30,7 @@ import struct
 
 from xen.util import mkdir
 import uuid
-import XendPBD
+from XendPBD import XendPBD
 from XendError import XendError
 from XendVDI import *
 from XendTask import XendTask

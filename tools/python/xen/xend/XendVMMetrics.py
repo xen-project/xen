@@ -17,38 +17,36 @@
 #============================================================================
 
 from xen.xend.XendLogging import log
+from xen.xend.XendBase import XendBase
 import xen.lowlevel.xc
 
 xc = xen.lowlevel.xc.xc()
 
-instances = {}
-
-class XendVMMetrics:
+class XendVMMetrics(XendBase):
     """VM Metrics."""
 
-    def get_by_uuid(_, uuid):
-        return instances[uuid]
+    def getClass(self):
+        return "VM_metrics"
+    
+    def getAttrRO(self):
+        attrRO = ['memory_actual',
+                  'VCPUs_number',
+                  'VCPUs_utilisation',
+                  'VCPUs_CPU',
+                  'VCPUs_flags',
+                  'VCPUs_params',
+                  'state',
+                  'start_time',
+                  'last_updated']
+        return XendBase.getAttrRO() + attrRO
 
-    get_by_uuid = classmethod(get_by_uuid)
+    getClass    = classmethod(getClass)
+    getAttrRO   = classmethod(getAttrRO)
 
-    def is_valid_vm_metrics(_, uuid):
-        return uuid in instances
-
-    is_valid_vm_metrics = classmethod(is_valid_vm_metrics)
-
-    def get_all(_):
-        return instances.keys()
-
-    get_all = classmethod(get_all)
-   
     def __init__(self, uuid, xend_domain_instance):
-        self.uuid = uuid
+        XendBase.__init__(self, uuid, {})
         self.xend_domain_instance = xend_domain_instance
-        instances[uuid] = self
-
-    def get_uuid(self):
-        return self.uuid
-
+        
     def get_memory_actual(self):
         domInfo = self.xend_domain_instance.getDomInfo()
         if domInfo:
@@ -145,16 +143,3 @@ class XendVMMetrics:
     def get_last_updated(self):
         import xen.xend.XendAPI as XendAPI
         return XendAPI.now()
-    
-    def get_record(self):
-        return { 'uuid'              : self.uuid,
-                 'memory_actual'     : self.get_memory_actual(),
-                 'VCPUs_number'      : self.get_VCPUs_number(),
-                 'VCPUs_utilisation' : self.get_VCPUs_utilisation(),
-                 'VCPUs_CPU'         : self.get_VCPUs_CPU(),
-                 'VCPUs_flags'       : self.get_VCPUs_flags(),
-                 'VCPUs_params'      : self.get_VCPUs_params(),
-                 'start_time'        : self.get_start_time(),
-                 'state'             : self.get_state(),
-                 'last_updated'      : self.get_last_updated(),
-               }
