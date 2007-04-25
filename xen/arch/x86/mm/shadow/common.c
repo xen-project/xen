@@ -2668,8 +2668,7 @@ sh_alloc_log_dirty_bitmap(struct domain *d)
 {
     ASSERT(d->arch.paging.shadow.dirty_bitmap == NULL);
     d->arch.paging.shadow.dirty_bitmap_size =
-        (domain_get_maximum_gpfn(d) + (BITS_PER_LONG - 1)) &
-        ~(BITS_PER_LONG - 1);
+        (domain_get_maximum_gpfn(d) + BITS_PER_LONG) & ~(BITS_PER_LONG - 1);
     d->arch.paging.shadow.dirty_bitmap =
         xmalloc_array(unsigned long,
                       d->arch.paging.shadow.dirty_bitmap_size / BITS_PER_LONG);
