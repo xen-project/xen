@@ -72,6 +72,9 @@ static void update_tpr_threshold(struct vlapic *vlapic)
 {
     int max_irr, tpr;
 
+    if ( !cpu_has_vmx_tpr_shadow )
+        return;
+
     if ( !vlapic_enabled(vlapic) || 
          ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
     {
