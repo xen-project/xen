@@ -8,10 +8,10 @@
 #include <asm/e820.h>
 
 struct trap_bounce {
-    unsigned long  error_code;
-    unsigned short flags; /* TBF_ */
-    unsigned short cs;
-    unsigned long  eip;
+    uint32_t      error_code;
+    uint8_t       flags; /* TBF_ */
+    uint16_t      cs;
+    unsigned long eip;
 };
 
 #define MAPHASH_ENTRIES 8

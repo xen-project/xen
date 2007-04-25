@@ -102,7 +102,7 @@ compat_test_guest_events:
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  VCPU_event_sel(%rbx),%eax
         movl  %eax,TRAPBOUNCE_cs(%rdx)
-        movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
@@ -127,7 +127,7 @@ compat_process_nmi:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  $FLAT_COMPAT_KERNEL_CS,TRAPBOUNCE_cs(%rdx)
-        movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
@@ -165,12 +165,11 @@ compat_failsafe_callback:
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  VCPU_failsafe_sel(%rbx),%eax
         movl  %eax,TRAPBOUNCE_cs(%rdx)
-        movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
+        movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
         btq   $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
         jnc   1f
-        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-1:
-        call  compat_create_bounce_frame
+        orb   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+1:      call  compat_create_bounce_frame
         jmp   compat_test_all_events
 .previous
 .section __pre_ex_table,"a"
@@ -185,6 +184,7 @@ ENTRY(compat_post_handle_exception)
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    compat_test_all_events
         call  compat_create_bounce_frame
+        movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
 
 ENTRY(compat_int80_direct_trap)
@@ -194,7 +194,7 @@ ENTRY(compat_int80_direct_trap)
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
-/* On return only %rbx is guaranteed non-clobbered.                      */
+/* On return only %rbx and %rdx are guaranteed non-clobbered.            */
 compat_create_bounce_frame:
         ASSERT_INTERRUPTS_ENABLED
         mov   %fs,%edi
@@ -253,7 +253,6 @@ compat_create_bounce_frame:
 2:
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
         andl  $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
         mov   %fs,UREGS_ss+8(%rsp)
@@ -266,7 +265,6 @@ compat_create_bounce_frame:
         movl  %eax,UREGS_cs+8(%rsp)
         movl  TRAPBOUNCE_eip(%rdx),%eax
         movl  %eax,UREGS_rip+8(%rsp)
-        movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section .fixup,"ax"
 .Lfx13:

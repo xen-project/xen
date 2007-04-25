@@ -29,10 +29,10 @@ switch_to_kernel:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movw  $0,TRAPBOUNCE_flags(%rdx)
+        movb  $0,TRAPBOUNCE_flags(%rdx)
         bt    $_VGCF_syscall_disables_events,VCPU_guest_context_flags(%rbx)
         jnc   1f
-        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
 1:      call  create_bounce_frame
         jmp   test_all_events
 
@@ -80,10 +80,10 @@ failsafe_callback:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_failsafe_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
+        movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
         bt    $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
         jnc   1f
-        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        orb   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
 1:      call  create_bounce_frame
         jmp   test_all_events
 .previous
@@ -191,7 +191,7 @@ test_guest_events:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_event_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
         jmp   test_all_events
 
@@ -215,7 +215,7 @@ process_nmi:
         sti
         leaq VCPU_trap_bounce(%rbx),%rdx
         movq %rax,TRAPBOUNCE_eip(%rdx)
-        movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call create_bounce_frame
         jmp  test_all_events
 
@@ -231,7 +231,7 @@ ENTRY(int80_direct_trap)
 
         /* Check that the callback is non-null. */
         leaq  VCPU_int80_bounce(%rbx),%rdx
-        cmp   $0,TRAPBOUNCE_flags(%rdx)
+        cmpb  $0,TRAPBOUNCE_flags(%rdx)
         jz    int80_slow_path
 
         movq  VCPU_domain(%rbx),%rax
@@ -249,13 +249,13 @@ int80_slow_path:
         movl  $((0x80 << 3) | 0x2),UREGS_error_code(%rsp)
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         /* A GPF wouldn't have incremented the instruction pointer. */
-        sub   $2,UREGS_rip(%rsp)
+        subq  $2,UREGS_rip(%rsp)
         jmp   handle_exception_saved
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
-/* %rdx: trap_bounce, %rbx: struct vcpu                           */
-/* On return only %rbx is guaranteed non-clobbered.                      */
+/* %rdx: trap_bounce, %rbx: struct vcpu                                  */
+/* On return only %rbx and %rdx are guaranteed non-clobbered.            */
 create_bounce_frame:
         ASSERT_INTERRUPTS_ENABLED
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
@@ -336,7 +336,6 @@ create_bounce_frame:
         testq %rax,%rax
         jz    domain_crash_synchronous
         movq  %rax,UREGS_rip+8(%rsp)
-        movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section __ex_table,"a"
         .quad  .Lft2,domain_crash_synchronous ,  .Lft3,domain_crash_synchronous
@@ -401,6 +400,7 @@ handle_exception_saved:
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
         call  create_bounce_frame
+        movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   test_all_events
 
 /* No special register assumptions. */
