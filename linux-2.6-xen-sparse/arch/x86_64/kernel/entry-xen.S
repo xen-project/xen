@@ -160,7 +160,7 @@ NMI_MASK = 0x80000000
 	testl $NMI_MASK,2*8(%rsp)
 	jnz   2f
 
-	cmp   $0x00,(xen_features+XENFEAT_supervisor_mode_kernel)(%rip)
+	cmpb  $0,(xen_features+XENFEAT_supervisor_mode_kernel)(%rip)
 	jne   1f
 
 	/* Direct iret to kernel space. Correct CS and SS. */
