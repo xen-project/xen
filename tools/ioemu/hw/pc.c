@@ -923,11 +923,12 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 #else
     if (pci_enabled) {
         void *scsi;
-
-        scsi = lsi_scsi_init(pci_bus, -1);
         for (i = 0; i < MAX_SCSI_DISKS ; i++) {
-            if (bs_table[i + MAX_DISKS]) 
-                lsi_scsi_attach(scsi, bs_table[i + MAX_DISKS], -1);
+            if (!bs_table[i + MAX_DISKS])
+                continue;
+            if (!scsi)
+                scsi = lsi_scsi_init(pci_bus, -1);
+            lsi_scsi_attach(scsi, bs_table[i + MAX_DISKS], -1);
         }
     }
 #endif /* !CONFIG_DM */
