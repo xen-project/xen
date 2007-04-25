@@ -45,9 +45,9 @@ u32 vmx_vmentry_control;
 
 static u32 vmcs_revision_id;
 
-static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_max, u32 msr)
+static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
 {
-    u32 vmx_msr_low, vmx_msr_high, ctl = ctl_max;
+    u32 vmx_msr_low, vmx_msr_high, ctl = ctl_min | ctl_opt;
 
     rdmsr(msr, vmx_msr_low, vmx_msr_high);
 
@@ -56,46 +56,55 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_max, u32 msr)
 
     /* Ensure minimum (required) set of control bits are supported. */
     BUG_ON(ctl_min & ~ctl);
-    BUG_ON(ctl_min & ~ctl_max);
 
     return ctl;
 }
 
 void vmx_init_vmcs_config(void)
 {
-    u32 vmx_msr_low, vmx_msr_high, min, max;
+    u32 vmx_msr_low, vmx_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
 
-    min = max = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
+    min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
+    opt = 0;
     _vmx_pin_based_exec_control = adjust_vmx_controls(
-        min, max, MSR_IA32_VMX_PINBASED_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_PINBASED_CTLS_MSR);
 
-    min = max = (CPU_BASED_HLT_EXITING |
-                 CPU_BASED_INVDPG_EXITING |
-                 CPU_BASED_MWAIT_EXITING |
-                 CPU_BASED_MOV_DR_EXITING |
-                 CPU_BASED_ACTIVATE_IO_BITMAP |
-                 CPU_BASED_USE_TSC_OFFSETING);
+    min = (CPU_BASED_HLT_EXITING |
+           CPU_BASED_INVDPG_EXITING |
+           CPU_BASED_MWAIT_EXITING |
+           CPU_BASED_MOV_DR_EXITING |
+           CPU_BASED_ACTIVATE_IO_BITMAP |
+           CPU_BASED_USE_TSC_OFFSETING);
+    opt = CPU_BASED_ACTIVATE_MSR_BITMAP;
 #ifdef __x86_64__
-    min = max |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
+    opt |= CPU_BASED_TPR_SHADOW;
 #endif
-    max |= CPU_BASED_ACTIVATE_MSR_BITMAP;
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
-        min, max, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
-
-    min = max = VM_EXIT_ACK_INTR_ON_EXIT;
+        min, opt, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
 #ifdef __x86_64__
-    min = max |= VM_EXIT_IA32E_MODE;
+    if ( !(_vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW) )
+    {
+        min |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
+        _vmx_cpu_based_exec_control = adjust_vmx_controls(
+            min, opt, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
+    }
+#endif
+
+    min = VM_EXIT_ACK_INTR_ON_EXIT;
+    opt = 0;
+#ifdef __x86_64__
+    min |= VM_EXIT_IA32E_MODE;
 #endif
     _vmx_vmexit_control = adjust_vmx_controls(
-        min, max, MSR_IA32_VMX_EXIT_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_EXIT_CTLS_MSR);
 
-    min = max = 0;
+    min = opt = 0;
     _vmx_vmentry_control = adjust_vmx_controls(
-        min, max, MSR_IA32_VMX_ENTRY_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_ENTRY_CTLS_MSR);
 
     rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
 
@@ -414,13 +423,12 @@ static void construct_vmcs(struct vcpu *v)
 
 #ifdef __x86_64__ 
     /* VLAPIC TPR optimisation. */
-    v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_TPR_SHADOW;
-    v->arch.hvm_vcpu.u.vmx.exec_control &=
-        ~(CPU_BASED_CR8_STORE_EXITING | CPU_BASED_CR8_LOAD_EXITING);
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vcpu.u.vmx.exec_control);
-    __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
-              page_to_maddr(vcpu_vlapic(v)->regs_page));
-    __vmwrite(TPR_THRESHOLD, 0);
+    if ( cpu_has_vmx_tpr_shadow )
+    {
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
+                  page_to_maddr(vcpu_vlapic(v)->regs_page));
+        __vmwrite(TPR_THRESHOLD, 0);
+    }
 #endif
 
     __vmwrite(GUEST_LDTR_SELECTOR, 0);
