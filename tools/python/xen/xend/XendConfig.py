@@ -22,6 +22,7 @@ import types
 
 from xen.xend import sxp
 from xen.xend import uuid
+from xen.xend import XendAPIStore
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
@@ -1050,8 +1051,7 @@ class XendConfig(dict):
                 if cfg_xenapi.get('name'):
                     dev_info['name'] = cfg_xenapi.get('name')
                 if cfg_xenapi.get('network'):
-                    from xen.xend.XendNode import XendAPIInstanceStore
-                    network = XendAPIInstanceStore.get(
+                    network = XendAPIStore.get(
                         cfg_xenapi.get('network'), 'network')
                     dev_info['bridge'] = network.get_name_label()
                 
