@@ -2246,9 +2246,18 @@ class XendDomainInfo:
 
             if not config.has_key('network'):
                 try:
+                    bridge = config.get('bridge', None)
+                    if bridge is None:
+                        from xen.util import Brctl
+                        if_to_br = dict([(i,b)
+                            for (b,ifs) in Brctl.get_state().items()
+                                for i in ifs])
+                        vifname = "vif%s.%s" % (self.getDomid(),
+                                                config.get('id'))
+                        bridge = if_to_br.get(vifname, None)
                     config['network'] = \
                         XendNode.instance().bridge_to_network(
-                        config.get('bridge')).uuid
+                        config.get('bridge')).get_uuid()
                 except Exception:
                     log.exception('bridge_to_network')
                     # Ignore this for now -- it may happen if the device
