@@ -1278,10 +1278,21 @@ class XendConfig(dict):
         return sxpr
 
     def ordered_device_refs(self):
-        result = (self['console_refs'] +
-                  self['vbd_refs'] +
-                  self['vif_refs'] +
-                  self['vtpm_refs'])
+        result = []
+        # vkbd devices *must* be before vfb devices, otherwise
+        # there is a race condition when setting up devices
+        # where the daemon spawned for the vfb may write stuff
+        # into xenstore vkbd backend, before DevController has
+        # setup permissions on the vkbd backend path. This race
+        # results in domain creation failing with 'device already
+        # connected' messages
+        result.extend([u for u in self['devices'].keys() if self['devices'][u][0] == 'vkbd'])
+
+        result.extend(self['console_refs'] +
+                      self['vbd_refs'] +
+                      self['vif_refs'] +
+                      self['vtpm_refs'])
+
         result.extend([u for u in self['devices'].keys() if u not in result])
         return result
 
