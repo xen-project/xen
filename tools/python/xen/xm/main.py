@@ -510,6 +510,10 @@ def xenapi_unsupported():
     if serverType == SERVER_XEN_API:
         raise XenAPIUnsupportedException, "This function is not supported by Xen-API"
 
+def xenapi_only():
+    if serverType != SERVER_XEN_API:
+        raise XenAPIUnsupportedException, "This function is only supported by Xen-API"
+
 def map2sxp(m):
     return [[k, m[k]] for k in m.keys()]
 
@@ -2070,8 +2074,14 @@ def xm_network_attach(args):
             record[keys[-1]] = val
 
         def get_net_from_bridge(bridge):
-            raise "Not supported just yet"
-         
+            # In OSS, we just assert network.name_label == bridge name
+            networks = dict([(record['name_label'], record['uuid'])
+                             for record in server.xenapi.network
+                             .get_all_records()])
+            if bridge not in networks.keys():
+                raise "Unknown bridge name!"
+            return networks[bridge]
+
         vif_conv = {
             'type':
                 lambda x: None,
@@ -2102,7 +2112,6 @@ def xm_network_attach(args):
             else:
                 vif_conv[vif_param[0]](vif_param[1])
 
-        print str(vif_record)
         server.xenapi.VIF.create(vif_record)
     else:
         for a in args[1:]:
@@ -2222,6 +2231,21 @@ def xm_vnet_delete(args):
     vnet = args[0]
     server.xend_vnet_delete(vnet)
 
+def xm_network_new(args):
+    xenapi_only()
+    arg_check(args, "xm_network_new", 1)
+    network = args[0]
+
+    record = {
+        "name_label":       network,
+        "name_description": "",
+        "other_config":     {},
+        "default_gateway":  "",
+        "default_netmask":  ""
+        }
+    
+    server.xenapi.network.create(record)
+
 commands = {
     "shell": xm_shell,
     "event-monitor": xm_event_monitor,
@@ -2271,10 +2295,12 @@ commands = {
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
     "block-configure": xm_block_configure,
-    # network
+    # network (AKA vifs)
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,
     "network-list": xm_network_list,
+    # network (as in XenAPI)
+    "network-new": xm_network_new,
     # vnet
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,
