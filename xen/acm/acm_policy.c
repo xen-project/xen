@@ -46,7 +46,7 @@ static ssidref_t oldssid_to_newssid(const struct acm_ssid_domain *,
 
 
 int
-acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
+acm_set_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size)
 {
     u8 *policy_buffer = NULL;
     int ret = -EFAULT;
@@ -213,7 +213,7 @@ do_acm_set_policy(void *buf, u32 buf_size, int is_bootpolicy,
 }
 
 int
-acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
+acm_get_policy(XEN_GUEST_HANDLE_64(void) buf, u32 buf_size)
 { 
     u8 *policy_buffer;
     int ret;
@@ -278,7 +278,7 @@ acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
 }
 
 int
-acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size)
+acm_dump_statistics(XEN_GUEST_HANDLE_64(void) buf, u16 buf_size)
 { 
     /* send stats to user space */
     u8 *stats_buffer;
@@ -324,7 +324,7 @@ acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size)
 
 
 int
-acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE(void) buf, u16 buf_size)
+acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE_64(void) buf, u16 buf_size)
 {
     /* send stats to user space */
     u8 *ssid_buffer;
