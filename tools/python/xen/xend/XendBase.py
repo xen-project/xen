@@ -90,6 +90,9 @@ class XendBase:
         # Finally register it
         XendAPIStore.register(uuid, self.getClass(), self)
 
+    def destroy(self):
+        XendAPIStore.deregister(self.get_uuid(), self.getClass())
+
     def get_uuid(self):
         return self.__uuid
 

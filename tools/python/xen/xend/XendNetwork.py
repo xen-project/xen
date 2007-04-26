@@ -60,7 +60,8 @@ class XendNetwork(XendBase):
 
     def getMethods(self):
         methods = ['add_to_other_config',
-                   'remove_from_other_config']
+                   'remove_from_other_config',
+                   'destroy']
         return XendBase.getMethods() + methods
 
     def getFuncs(self):
@@ -128,6 +129,8 @@ class XendNetwork(XendBase):
         # Create the bridge
         Brctl.bridge_create(network.name_label)
 
+        XendNode.instance().save_networks()
+
         return uuid
 
     create_phy  = classmethod(create_phy)
@@ -140,6 +143,20 @@ class XendNetwork(XendBase):
     #
     # XenAPI Mehtods
     #
+
+    def destroy(self):
+        # check no VIFs or PIFs attached
+        if len(self.get_VIFs()) > 0:
+            raise NetworkError("Cannot destroy network with VIFs attached",
+                               self.get_name_label())
+
+        if len(self.get_PIFs()) > 0:
+            raise NetworkError("Cannot destroy network with PIFs attached",
+                               self.get_name_label())        
+        
+        XendBase.destroy(self)
+        Brctl.bridge_del(self.get_name_label())
+        XendNode.instance().save_networks()
 
     def get_name_label(self):
         return self.name_label

@@ -88,3 +88,6 @@ msgstr "Class %s does not implement %s"
 
 msgid "VLAN_TAG_INVALID"
 msgstr "VLAN tag invalid %s"
+
+msgid "NETWORK_ERROR"
+msgstr "Network Error: %s - %s"

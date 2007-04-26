@@ -162,6 +162,18 @@ class VLANTagInvalid(XendAPIError):
 
     def __str__(self):
         return 'VLAN_TAG_INVALID: %s' % self.vlan
+
+class NetworkError(XendAPIError):
+    def __init__(self, error, network):
+        XendAPIError.__init__(self)
+        self.network = network
+        self.error = error
+
+    def get_api_error(self):
+        return ['NETWORK_ERROR', self.error, self.network]
+
+    def __str__(self):
+        return 'NETWORK_ERROR: %s %s' % (self.error, self.network)
     
 XEND_ERROR_AUTHENTICATION_FAILED = ('ELUSER', 'Authentication Failed')
 XEND_ERROR_SESSION_INVALID       = ('EPERMDENIED', 'Session Invalid')
