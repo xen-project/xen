@@ -2233,7 +2233,7 @@ def xm_vnet_delete(args):
 
 def xm_network_new(args):
     xenapi_only()
-    arg_check(args, "xm_network_new", 1)
+    arg_check(args, "network-new", 1)
     network = args[0]
 
     record = {
@@ -2245,7 +2245,71 @@ def xm_network_new(args):
         }
     
     server.xenapi.network.create(record)
+    
+def xm_network_del(args):
+    xenapi_only()
+    arg_check(args, "network-del", 1)
+    network = args[0]
 
+    networks = dict([(record['name_label'], record['uuid'])
+                     for record in
+                     server.xenapi.network.get_all_records()])
+
+    if network not in networks.keys():
+        raise ValueError("'%s' is not a valid network name" % network)
+    
+    server.xenapi.network.destroy(networks[network])
+
+def uuid_dict_trans(records):
+    return dict([(record['uuid'], record)
+                 for record in records])
+
+def xm_network_show(args):
+    xenapi_only()
+    arg_check(args, "network-show", 0)
+
+    networks = server.xenapi.network.get_all_records()
+    pifs     = uuid_dict_trans(
+        server.xenapi.PIF.get_all_records())
+    vifs     = uuid_dict_trans(
+        server.xenapi.VIF.get_all_records())
+
+    print '%-20s %-40s %-10s' % \
+          ('Name', 'VIFs', 'PIFs')
+    
+    format2 = "%(name_label)-20s %(vif)-40s %(pif)-10s"
+
+    for network in networks:
+        for i in range(max(len(network['PIFs']),
+                           len(network['VIFs']), 1)):
+            if i < len(network['PIFs']):
+                pif_uuid = network['PIFs'][i]
+            else:
+                pif_uuid = None
+                
+            if i < len(network['VIFs']):
+                vif_uuid = network['VIFs'][i]
+            else:
+                vif_uuid = None
+                
+            pif = pifs.get(pif_uuid, {'device':''}) 
+            vif = vifs.get(vif_uuid, None)
+
+            if vif:
+                dom_name = server.xenapi.VM.get_name_label(vif['VM'])
+                vif = "%s.%s" % (dom_name, vif['device'])
+            else:
+                vif = '' 
+
+            if i == 0:
+                r = {'name_label':network['name_label'],
+                     'vif':vif, 'pif':pif['device']}
+            else:
+                r = {'name_label':'','vif':vif,'pif':pif['device']}
+
+            print format2 % r
+
+            
 commands = {
     "shell": xm_shell,
     "event-monitor": xm_event_monitor,
@@ -2301,6 +2365,8 @@ commands = {
     "network-list": xm_network_list,
     # network (as in XenAPI)
     "network-new": xm_network_new,
+    "network-del": xm_network_del,
+    "network-show": xm_network_show,
     # vnet
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,
