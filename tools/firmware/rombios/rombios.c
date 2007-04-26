@@ -26,6 +26,8 @@
 
 // ROM BIOS for use with Bochs/Plex x86 emulation environment
 
+#include "../hvmloader/config.h"
+
 #define HVMASSIST
 #undef HVMTEST
 
@@ -9409,9 +9411,9 @@ rom_scan_increment:
 
 #ifdef HVMASSIST
 
-; Copy the SMBIOS entry point over from 0x9f000, where hvmloader left it.
+; Copy the SMBIOS entry point from where hvmloader left it.
 ; The entry point must be somewhere in 0xf0000-0xfffff on a 16-byte boundary,
-; but the tables themeselves can be elsewhere.
+; but the tables themselves can be elsewhere.
 smbios_init:
   push ax
   push cx
@@ -9424,9 +9426,9 @@ smbios_init:
   mov ax, #0xf000
   mov es, ax      ; destination segment is 0xf0000
   mov di, #smbios_entry_point ; destination offset
-  mov ax, #0x9f00
-  mov ds, ax      ; source segment is 0x9f000
-  mov si, #0x0000 ; source offset is 0
+  mov ax, #(SMBIOS_PHYSICAL_ADDRESS>>4)
+  mov ds, ax
+  mov si, #(SMBIOS_PHYSICAL_ADDRESS&15)
   cld
   rep
     movsb

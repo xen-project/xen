@@ -22,12 +22,11 @@
 
 #include <stdint.h>
 #include <xen/version.h>
-#include "smbios.h"
 #include "smbios_types.h"
 #include "util.h"
 #include "hypercall.h"
 
-static size_t
+static int
 write_smbios_tables(void *start,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
@@ -82,7 +81,7 @@ get_cpu_manufacturer(char *buf, int len)
         strncpy(buf, "unknown", len);
 }
 
-static size_t
+static int
 write_smbios_tables(void *start,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
@@ -125,7 +124,7 @@ write_smbios_tables(void *start,
         SMBIOS_PHYSICAL_ADDRESS + sizeof(struct smbios_entry_point),
         nr_structs);
 
-    return (size_t)((char *)p - (char *)start);
+    return ((char *)p - (char *)start);
 }
 
 /* Calculate how much pseudo-physical memory (in MB) is allocated to us. */
@@ -156,7 +155,7 @@ get_memsize(void)
     return (memsize + (1 << 20) - 1) >> 20;
 }
 
-void
+int
 hvm_write_smbios_tables(void)
 {
     uint8_t uuid[16]; /* ** This will break if xen_domain_handle_t is
@@ -221,16 +220,17 @@ hvm_write_smbios_tables(void)
                               get_vcpu_nr(), get_memsize(),
                               uuid, xen_version_str,
                               xen_major_version, xen_minor_version);
-    if ( len > SMBIOS_SIZE_LIMIT )
+    if ( len > SMBIOS_MAXIMUM_SIZE )
         goto error_out;
     /* Okay, not too large: copy out of scratch to final location. */
     memcpy((void *)SMBIOS_PHYSICAL_ADDRESS, (void *)0xC0000, len);
 
-    return;
+    return len;
 
  error_out:
     printf("Could not write SMBIOS tables, error in hvmloader.c:"
            "hvm_write_smbios_tables()\n");
+    return 0;
 }
 
 

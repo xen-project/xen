@@ -18,7 +18,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-#include "acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
 #include "util.h"
 #include "config.h"
 #include <stdint.h>

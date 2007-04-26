@@ -47,20 +47,15 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
         mem_size = HVM_BELOW_4G_RAM_END;
     }
 
-    /* 0x0-0x9F000: Ordinary RAM. */
+    /* 0x0-0x9FC00: Ordinary RAM. */
     e820entry[nr_map].addr = 0x0;
-    e820entry[nr_map].size = 0x9F000;
+    e820entry[nr_map].size = 0x9FC00;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
-    /*
-     * 0x9F000-0x9F800: SMBIOS tables.
-     * 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA).
-     * TODO: SMBIOS tables should be moved higher (>=0xE0000).
-     *       They are unusually low in our memory map: could cause problems?
-     */
-    e820entry[nr_map].addr = 0x9F000;
-    e820entry[nr_map].size = 0x1000;
+    /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
+    e820entry[nr_map].addr = 0x9FC00;
+    e820entry[nr_map].size = 0x400;
     e820entry[nr_map].type = E820_RESERVED;
     nr_map++;
 

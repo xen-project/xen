@@ -31,17 +31,18 @@
 #ifndef __HVMLOADER_HYPERCALL_H__
 #define __HVMLOADER_HYPERCALL_H__
 
+#include <stdint.h>
 #include <xen/xen.h>
+#include "config.h"
+
+#define __STR(...) #__VA_ARGS__
+#define STR(...) __STR(__VA_ARGS__)
 
 /*
  * NB. Hypercall address needs to be relative to a linkage symbol for
  * some version of ld to relocate the relative calls properly.
- * Keep this in sync with HYPERCALL_PHYSICAL_ADDRESS in hvmloader.c!
  */
-#define hypercall_pa "_start - 0x80000"
-
-#define __STR(x) #x
-#define STR(x) __STR(x)
+#define hypercall_pa "_start - " STR(HYPERCALL_PHYSICAL_ADDRESS)
 
 #define _hypercall0(type, name)						\
 ({									\
