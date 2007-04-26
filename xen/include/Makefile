@@ -3,8 +3,6 @@ ifneq ($(CONFIG_COMPAT),)
 compat-arch-$(CONFIG_X86) := x86_32
 
 headers-y := \
-    compat/acm.h \
-    compat/acm_ops.h \
     compat/callback.h \
     compat/elfnote.h \
     compat/event_channel.h \

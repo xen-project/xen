@@ -9,7 +9,6 @@
 !	cpu_user_regs			arch-x86/xen-@arch@.h
 !	trap_info			arch-x86/xen.h
 !	vcpu_guest_context		arch-x86/xen.h
-?	acm_getdecision			acm_ops.h
 ?	evtchn_alloc_unbound		event_channel.h
 ?	evtchn_bind_interdomain		event_channel.h
 ?	evtchn_bind_ipi			event_channel.h

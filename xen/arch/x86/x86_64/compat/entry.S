@@ -331,7 +331,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_vcpu_op
         .quad compat_ni_hypercall       /* 25 */
         .quad compat_mmuext_op
-        .quad compat_acm_op
+        .quad do_acm_op
         .quad compat_nmi_op
         .quad compat_sched_op
         .quad compat_callback_op        /* 30 */
@@ -374,7 +374,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 3 /* compat_vcpu_op           */
         .byte 0 /* compat_ni_hypercall      */  /* 25 */
         .byte 4 /* compat_mmuext_op         */
-        .byte 1 /* compat_acm_op            */
+        .byte 1 /* do_acm_op                */
         .byte 2 /* compat_nmi_op            */
         .byte 2 /* compat_sched_op          */
         .byte 2 /* compat_callback_op       */  /* 30 */

@@ -12,10 +12,8 @@
  * License.
  *
  * Process acm command requests from guest OS.
- *
  */
 
-#ifndef COMPAT
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
@@ -29,38 +27,25 @@
 #include <xen/guest_access.h>
 #include <acm/acm_hooks.h>
 
-typedef long ret_t;
-
-#endif /* !COMPAT */
-
 #ifndef ACM_SECURITY
-
 
 long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     return -ENOSYS;
 }
 
-
 #else
 
-
-#ifndef COMPAT
 int acm_authorize_acm_ops(struct domain *d)
 {
-    /* currently, policy management functions are restricted to privileged domains */
-    if (!IS_PRIV(d))
-        return -EPERM;
-    return 0;
+    return (IS_PRIV(d) ? 0 : -EPERM);
 }
-#endif
 
-
-ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    ret_t rc = -EFAULT;
+    long rc = -EFAULT;
 
-    if (acm_authorize_acm_ops(current->domain))
+    if ( acm_authorize_acm_ops(current->domain) )
         return -EPERM;
 
     switch ( cmd )
@@ -226,11 +211,9 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         rc = acm_change_policy(&chgpolicy);
 
-        if (rc == 0) {
-            if (copy_to_guest(arg, &chgpolicy, 1) != 0) {
+        if (rc == 0)
+            if (copy_to_guest(arg, &chgpolicy, 1) != 0)
                 rc = -EFAULT;
-            }
-        }
         break;
     }
 
@@ -244,11 +227,9 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         rc = acm_relabel_domains(&relabeldoms);
 
-        if (rc == 0) {
-            if (copy_to_guest(arg, &relabeldoms, 1) != 0) {
+        if (rc == 0)
+            if (copy_to_guest(arg, &relabeldoms, 1) != 0)
                 rc = -EFAULT;
-            }
-        }
         break;
     }
 
@@ -260,11 +241,7 @@ ret_t do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
-#endif
-
-#if defined(CONFIG_COMPAT) && !defined(COMPAT)
-#include "compat/acm_ops.c"
-#endif
+#endif /* defined(ACM_SECURITY) */
 
 /*
  * Local variables:
