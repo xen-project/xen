@@ -8,7 +8,7 @@ import re
 import time
 
 from XmTestLib import *
-from network_utils import *
+from XmTestLib.network_utils import *
 
 if ENABLE_HVM_SUPPORT:
     SKIP("Network-attach not supported for HVM domains")

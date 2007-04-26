@@ -24,9 +24,13 @@ def get_state(domain_name, number):
     else:
         return int(o)
 
-def network_attach(domain_name, console):
+def network_attach(domain_name, console, bridge=None):
     eths_before = count_eth(console)
-    status, output = traceCommand("xm network-attach %s" % domain_name)
+    if bridge:
+        status, output = traceCommand("xm network-attach %s bridge=%s"
+                                      % (domain_name, bridge))
+    else:
+        status, output = traceCommand("xm network-attach %s" % domain_name)
     if status != 0:
         return -1, "xm network-attach returned invalid %i != 0" % status
 
