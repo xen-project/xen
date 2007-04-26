@@ -101,7 +101,7 @@ compat_test_guest_events:
         movl  VCPU_event_addr(%rbx),%eax
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  VCPU_event_sel(%rbx),%eax
-        movl  %eax,TRAPBOUNCE_cs(%rdx)
+        movw  %ax,TRAPBOUNCE_cs(%rdx)
         movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
@@ -126,7 +126,7 @@ compat_process_nmi:
         sti
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movl  %eax,TRAPBOUNCE_eip(%rdx)
-        movl  $FLAT_COMPAT_KERNEL_CS,TRAPBOUNCE_cs(%rdx)
+        movw  $FLAT_COMPAT_KERNEL_CS,TRAPBOUNCE_cs(%rdx)
         movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
@@ -164,7 +164,7 @@ compat_failsafe_callback:
         movl  VCPU_failsafe_addr(%rbx),%eax
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  VCPU_failsafe_sel(%rbx),%eax
-        movl  %eax,TRAPBOUNCE_cs(%rdx)
+        movw  %ax,TRAPBOUNCE_cs(%rdx)
         movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
         btq   $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
         jnc   1f
