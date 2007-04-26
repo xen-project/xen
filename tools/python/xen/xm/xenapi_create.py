@@ -93,10 +93,13 @@ class xenapi_create:
 
         vdis = document.getElementsByTagName("vdi")
         vdi_refs_dict = self.create_vdis(vdis)
+
+        networks = document.getElementsByTagName("network")
+        network_refs_dict = self.create_networks(networks)
         
         try:    
             vms = document.getElementsByTagName("vm")
-            return self.create_vms(vms, vdi_refs_dict)
+            return self.create_vms(vms, vdi_refs_dict, network_refs_dict)
         except Exception, exn:
             try_quietly(self.cleanup_vdis(vdi_refs_dict))
             raise exn
@@ -223,11 +226,33 @@ class xenapi_create:
         
         return (key, value)
 
-    def create_vms(self, vms, vdis):
-        log(DEBUG, "create_vms")
-        return map(lambda vm: self.create_vm(vm, vdis), vms)
+    def create_networks(self, networks):
+        log(DEBUG, "create_networks")
+        return dict(map(self.create_network, networks))
 
-    def create_vm(self, vm, vdis):
+    def create_network(self, network):
+        log(DEBUG, "create_network")
+
+        network_record = {
+            "name_label":       get_name_label(network),
+            "name_description": get_name_description(network),
+            "other_config":
+                get_child_nodes_as_dict(network, "other_config",
+                                        "key", "value"),
+            "default_netmask":  network.attributes["default_netmask"].value,
+            "default_gateway":  network.attributes["default_gateway"].value
+            }
+
+        key = network.attributes["name"].value
+        value = server.xenapi.network.create(network_record)
+
+        return (key, value)
+        
+    def create_vms(self, vms, vdis, networks):
+        log(DEBUG, "create_vms")
+        return map(lambda vm: self.create_vm(vm, vdis, networks), vms)
+
+    def create_vm(self, vm, vdis, networks):
         log(DEBUG, "create_vm")
 
         vm_record = {
@@ -321,7 +346,7 @@ class xenapi_create:
 
             vifs = vm.getElementsByTagName("vif")
 
-            self.create_vifs(vm_ref, vifs)
+            self.create_vifs(vm_ref, vifs, networks)
 
             # Now create consoles
 
@@ -363,31 +388,35 @@ class xenapi_create:
 
         return server.xenapi.VBD.create(vbd_record)
 
-    def create_vifs(self, vm_ref, vifs):
+    def create_vifs(self, vm_ref, vifs, networks):
         log(DEBUG, "create_vifs")
-        return map(lambda vif: self.create_vif(vm_ref, vif), vifs)
+        return map(lambda vif: self.create_vif(vm_ref, vif, networks), vifs)
 
-    def create_vif(self, vm_ref, vif):
+    def create_vif(self, vm_ref, vif, networks):
         log(DEBUG, "create_vif")
 
-        if "network" in vif.attributes.keys():
-            networks = [network_ref
-                for network_ref in server.xenapi.network.get_all()
-                if server.xenapi.network.get_name_label(network_ref)
-                       == vif.attributes["network"].value]
-            if len(networks) > 0:
-                network = networks[0]
+        if 'network' in vif.attributes.keys():
+            network_name = vif.attributes['network'].value
+
+            if network_name in networks.keys():
+                network_uuid = networks[network_name]
             else:
-                raise OptionError("Network %s doesn't exist"
+                networks = dict([(record['name_label'], record['uuid'])
+                                 for record in
+                                 server.xenapi.network.get_all_record()])
+                if network_name in networks.keys():
+                    network_uuid = networks[network_name]
+                else:
+                    raise OptionError("Network %s doesn't exist"
                                   % vif.attributes["network"].value)
         else:
-            network = self._get_network_ref()
+            network_uuid = self._get_network_ref()
 
         vif_record = {
             "device":
                 vif.attributes["device"].value,
             "network":
-                network,
+                network_uuid,
             "VM":
                 vm_ref,
             "MAC":
