@@ -922,7 +922,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 #endif
 #else
     if (pci_enabled) {
-        void *scsi;
+        void *scsi = NULL;
         for (i = 0; i < MAX_SCSI_DISKS ; i++) {
             if (!bs_table[i + MAX_DISKS])
                 continue;
