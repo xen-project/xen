@@ -1437,7 +1437,7 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
     int i;
 #else
 
-    if ( !pv_32bit_guest(v) )
+    if ( !pv_32bit_vcpu(v) )
         return;
 #endif
 
@@ -1685,7 +1685,7 @@ sh_make_monitor_table(struct vcpu *v)
             l4e = sh_map_domain_page(m4mfn);
             l4e[0] = l4e_from_pfn(mfn_x(m3mfn), __PAGE_HYPERVISOR);
             sh_unmap_domain_page(l4e);
-            if ( pv_32bit_guest(v) )
+            if ( pv_32bit_vcpu(v) )
             {
                 // Install a monitor l2 table in slot 3 of the l3 table.
                 // This is used for all Xen entries.
@@ -2111,7 +2111,7 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
         l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
         ASSERT(l4e_get_flags(l4e[0]) & _PAGE_PRESENT);
         m3mfn = _mfn(l4e_get_pfn(l4e[0]));
-        if ( pv_32bit_guest(v) )
+        if ( pv_32bit_vcpu(v) )
         {
             /* Need to destroy the l2 monitor page in slot 3 too */
             l3_pgentry_t *l3e = sh_map_domain_page(m3mfn);

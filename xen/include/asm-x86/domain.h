@@ -7,6 +7,19 @@
 #include <asm/hvm/domain.h>
 #include <asm/e820.h>
 
+#ifdef __x86_64__
+#define pv_32bit_vcpu(v)    (!is_hvm_vcpu(v) && IS_COMPAT((v)->domain))
+#define pv_32bit_domain(d)  (!is_hvm_domain(d) && IS_COMPAT(d))
+#define pv_32on64_vcpu(v)   (pv_32bit_vcpu(v))
+#define pv_32on64_domain(d) (pv_32bit_domain(d))
+#else
+#define pv_32bit_vcpu(v)    (!is_hvm_vcpu(v))
+#define pv_32bit_domain(d)  (!is_hvm_domain(d))
+#define pv_32on64_vcpu(v)   (0)
+#define pv_32on64_domain(d) (0)
+#endif
+
+
 struct trap_bounce {
     uint32_t      error_code;
     uint8_t       flags; /* TBF_ */
