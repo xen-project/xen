@@ -354,9 +354,6 @@ class XendConfig(dict):
         if not self["memory_static_min"] <= self["memory_static_max"]:
             raise XendConfigError("memory_static_min must be less " \
                                   "than or equal to memory_static_max") 
-        if not self["memory_dynamic_min"] <= self["memory_dynamic_max"]:
-            raise XendConfigError("memory_dynamic_min must be less " \
-                                  "than or equal to memory_dynamic_max")
         if not self["memory_static_min"] <= self["memory_dynamic_min"]:
             raise XendConfigError("memory_static_min must be less " \
                                   "than or equal to memory_dynamic_min")
