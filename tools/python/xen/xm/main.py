@@ -2301,11 +2301,19 @@ def xm_network_show(args):
             else:
                 vif = '' 
 
+            if pif:
+                if int(pif['VLAN']) > -1:
+                    pif = '%s.%s' % (pif['device'], pif['VLAN'])
+                else:
+                    pif = pif['device']
+            else:
+                pif = ''
+
             if i == 0:
                 r = {'name_label':network['name_label'],
-                     'vif':vif, 'pif':pif['device']}
+                     'vif':vif, 'pif':pif}
             else:
-                r = {'name_label':'','vif':vif,'pif':pif['device']}
+                r = {'name_label':'', 'vif':vif, 'pif':pif}
 
             print format2 % r
 
