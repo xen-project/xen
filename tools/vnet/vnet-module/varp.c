@@ -1530,12 +1530,7 @@ void varp_exit(void){
     dprintf("<\n");
 }
 
-#ifdef MODULE_PARM
-MODULE_PARM(varp_mcaddr, "s");
-MODULE_PARM(varp_device, "s");
-#else
 module_param(varp_mcaddr, charp, 0644);
 module_param(varp_device, charp, 0644);
-#endif
 MODULE_PARM_DESC(varp_mcaddr, "VARP multicast address");
 MODULE_PARM_DESC(varp_device, "VARP network device");

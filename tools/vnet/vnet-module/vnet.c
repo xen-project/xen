@@ -693,12 +693,7 @@ module_init(vnet_module_init);
 module_exit(vnet_module_exit);
 MODULE_LICENSE("GPL");
 
-#ifdef MODULE_PARM
-MODULE_PARM(vnet_encaps, "s");
-#else
 module_param(vnet_encaps, charp, 0644);
-#endif
-
 MODULE_PARM_DESC(vnet_encaps, "Vnet encapsulation: etherip or udp.");
 
 #endif

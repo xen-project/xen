@@ -45,6 +45,7 @@
 #define module_exit(x)
 #define MODULE_LICENSE(x)
 #define MODULE_PARM(v, t)
+#define module_param(v, t, s)
 #define MODULE_PARM_DESC(v, s)
 
 enum {

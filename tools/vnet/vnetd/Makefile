@@ -16,7 +16,7 @@
 # Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #----------------------------------------------------------------------------
 
-VNET_ROOT = $(shell cd .. && pwd)
+VNET_ROOT ?= $(shell cd .. && pwd)
 include $(VNET_ROOT)/Make.env
 
 .PHONY: all
@@ -26,6 +26,8 @@ all: vnetd
 
 # Comment out when outside xen.
 #include $(XEN_ROOT)/tools/Rules.mk
+
+INSTALL_PROG ?= $(INSTALL) -m0755 -p
 
 VNETD_INSTALL_DIR = /usr/sbin
 
