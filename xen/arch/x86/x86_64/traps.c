@@ -357,9 +357,6 @@ void init_int80_direct_trap(struct vcpu *v)
     struct trap_info *ti = &v->arch.guest_context.trap_ctxt[0x80];
     struct trap_bounce *tb = &v->arch.int80_bounce;
 
-    if ( !guest_gate_selector_okay(v->domain, ti->cs) )
-         return;
-
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
     tb->eip   = ti->address;

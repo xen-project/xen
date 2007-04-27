@@ -55,7 +55,6 @@
 
 /******AIO DEFINES******/
 #define REQUEST_ASYNC_FD 1
-#define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ)
 
 struct pending_aio {
         td_callback_t cb;
@@ -146,18 +145,37 @@ struct tdqcow_state {
 	AES_KEY aes_encrypt_key;       /*AES key*/
 	AES_KEY aes_decrypt_key;       /*AES key*/
         /* libaio state */
-        io_context_t       aio_ctx;
-        struct iocb        iocb_list  [MAX_AIO_REQS];
-        struct iocb       *iocb_free  [MAX_AIO_REQS];
-        struct pending_aio pending_aio[MAX_AIO_REQS];
-        int                iocb_free_count;
-        struct iocb       *iocb_queue[MAX_AIO_REQS];
-        int                iocb_queued;
-        int                poll_fd;      /* NB: we require aio_poll support */
-        struct io_event    aio_events[MAX_AIO_REQS];
+        io_context_t        aio_ctx;
+        int                 max_aio_reqs;
+        struct iocb        *iocb_list;
+        struct iocb       **iocb_free;
+        struct pending_aio *pending_aio;
+        int                 iocb_free_count;
+        struct iocb       **iocb_queue;
+        int                 iocb_queued;
+        int                 poll_fd;      /* NB: we require aio_poll support */
+        struct io_event    *aio_events;
 };
 
 static int decompress_cluster(struct tdqcow_state *s, uint64_t cluster_offset);
+
+static void free_aio_state(struct disk_driver *dd)
+{
+        struct tdqcow_state *s = (struct tdqcow_state *)dd->private;
+
+        if (s->sector_lock)
+                free(s->sector_lock);
+        if (s->iocb_list)
+                free(s->iocb_list);
+        if (s->pending_aio)
+                free(s->pending_aio);
+        if (s->aio_events)
+                free(s->aio_events);
+        if (s->iocb_free)
+                free(s->iocb_free);
+        if (s->iocb_queue)
+                free(s->iocb_queue);
+}
 
 static int init_aio_state(struct disk_driver *dd)
 {
@@ -165,6 +183,12 @@ static int init_aio_state(struct disk_driver *dd)
 	struct td_state     *bs = dd->td_state;
 	struct tdqcow_state  *s = (struct tdqcow_state *)dd->private;
         long     ioidx;
+
+        s->iocb_list = NULL;
+        s->pending_aio = NULL;
+        s->aio_events = NULL;
+        s->iocb_free = NULL;
+        s->iocb_queue = NULL;
 
         /*Initialize Locking bitmap*/
 	s->sector_lock = calloc(1, bs->size);
@@ -174,13 +198,26 @@ static int init_aio_state(struct disk_driver *dd)
 		goto fail;
 	}
 
+        /* A segment (i.e. a page) can span multiple clusters */
+        s->max_aio_reqs = (getpagesize() / s->cluster_size) + 1;
+
         /* Initialize AIO */
-        s->iocb_free_count = MAX_AIO_REQS;
+        s->iocb_free_count = s->max_aio_reqs;
         s->iocb_queued     = 0;
+
+        if (!(s->iocb_list = malloc(sizeof(struct iocb) * s->max_aio_reqs)) ||
+            !(s->pending_aio = malloc(sizeof(struct pending_aio) * s->max_aio_reqs)) ||
+            !(s->aio_events = malloc(sizeof(struct io_event) * s->max_aio_reqs)) ||
+            !(s->iocb_free = malloc(sizeof(struct iocb *) * s->max_aio_reqs)) ||
+            !(s->iocb_queue = malloc(sizeof(struct iocb *) * s->max_aio_reqs))) {
+                DPRINTF("Failed to allocate AIO structs (max_aio_reqs = %d)\n",
+                        s->max_aio_reqs);
+                goto fail;
+        }
 
         /*Signal kernel to create Poll FD for Asyc completion events*/
         s->aio_ctx = (io_context_t) REQUEST_ASYNC_FD;   
-        s->poll_fd = io_setup(MAX_AIO_REQS, &s->aio_ctx);
+        s->poll_fd = io_setup(s->max_aio_reqs, &s->aio_ctx);
 
 	if (s->poll_fd < 0) {
                 if (s->poll_fd == -EAGAIN) {
@@ -198,7 +235,7 @@ static int init_aio_state(struct disk_driver *dd)
 		goto fail;
 	}
 
-        for (i=0;i<MAX_AIO_REQS;i++)
+        for (i=0;i<s->max_aio_reqs;i++)
                 s->iocb_free[i] = &s->iocb_list[i];
 
         DPRINTF("AIO state initialised\n");
@@ -946,6 +983,7 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
  end_xenhdr:
 	if (init_aio_state(dd)!=0) {
 		DPRINTF("Unable to initialise AIO state\n");
+                free_aio_state(dd);
 		goto fail;
 	}
 	init_fds(dd);
@@ -962,6 +1000,7 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	
 fail:
 	DPRINTF("QCOW Open failed\n");
+	free_aio_state(dd);
 	free(s->l1_table);
 	free(s->l2_cache);
 	free(s->cluster_cache);
@@ -1145,7 +1184,7 @@ int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
         if (sid > MAX_IOFD) return 1;
 	
 	/* Non-blocking test for completed io. */
-        ret = io_getevents(prv->aio_ctx, 0, MAX_AIO_REQS, prv->aio_events,
+        ret = io_getevents(prv->aio_ctx, 0, prv->max_aio_reqs, prv->aio_events,
                            NULL);
 
         for (ep = prv->aio_events, i = ret; i-- > 0; ep++) {

@@ -67,3 +67,27 @@ msgstr "HVM guest support is unavailable: is VT/AMD-V supported by your CPU and 
 
 msgid "SESSION_NOT_REGISTERED"
 msgstr "This session is not registered to receive events.  You must call event.register before event.next.  (Session handle is %(1)s.)"
+
+msgid "CREATE_UNSPECIFIED_ATTRIBUTE"
+msgstr "You need to specify %s when creating a new %s"
+ 
+msgid "UNMANAGED_NETWORK_ERROR"
+msgstr "Cannot change %s on an unmanaged network"
+ 
+msgid "UNIQUE_NAME_ERROR"
+msgstr "Name %s for class %s is not unique"
+
+msgid "INVALID_DEVICE_ERROR"
+msgstr "Invalid device %s"
+
+msgid "DEVICE_EXISTS_ERROR"
+msgstr "Device already exists %s"
+
+msgid "IMPLEMENTATION_ERROR"
+msgstr "Class %s does not implement %s"
+
+msgid "VLAN_TAG_INVALID"
+msgstr "VLAN tag invalid %s"
+
+msgid "NETWORK_ERROR"
+msgstr "Network Error: %s - %s"

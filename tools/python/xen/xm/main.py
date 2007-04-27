@@ -510,6 +510,10 @@ def xenapi_unsupported():
     if serverType == SERVER_XEN_API:
         raise XenAPIUnsupportedException, "This function is not supported by Xen-API"
 
+def xenapi_only():
+    if serverType != SERVER_XEN_API:
+        raise XenAPIUnsupportedException, "This function is only supported by Xen-API"
+
 def map2sxp(m):
     return [[k, m[k]] for k in m.keys()]
 
@@ -2070,8 +2074,14 @@ def xm_network_attach(args):
             record[keys[-1]] = val
 
         def get_net_from_bridge(bridge):
-            raise "Not supported just yet"
-         
+            # In OSS, we just assert network.name_label == bridge name
+            networks = dict([(record['name_label'], record['uuid'])
+                             for record in server.xenapi.network
+                             .get_all_records()])
+            if bridge not in networks.keys():
+                raise "Unknown bridge name!"
+            return networks[bridge]
+
         vif_conv = {
             'type':
                 lambda x: None,
@@ -2102,7 +2112,6 @@ def xm_network_attach(args):
             else:
                 vif_conv[vif_param[0]](vif_param[1])
 
-        print str(vif_record)
         server.xenapi.VIF.create(vif_record)
     else:
         for a in args[1:]:
@@ -2222,6 +2231,93 @@ def xm_vnet_delete(args):
     vnet = args[0]
     server.xend_vnet_delete(vnet)
 
+def xm_network_new(args):
+    xenapi_only()
+    arg_check(args, "network-new", 1)
+    network = args[0]
+
+    record = {
+        "name_label":       network,
+        "name_description": "",
+        "other_config":     {},
+        "default_gateway":  "",
+        "default_netmask":  ""
+        }
+    
+    server.xenapi.network.create(record)
+    
+def xm_network_del(args):
+    xenapi_only()
+    arg_check(args, "network-del", 1)
+    network = args[0]
+
+    networks = dict([(record['name_label'], record['uuid'])
+                     for record in
+                     server.xenapi.network.get_all_records()])
+
+    if network not in networks.keys():
+        raise ValueError("'%s' is not a valid network name" % network)
+    
+    server.xenapi.network.destroy(networks[network])
+
+def uuid_dict_trans(records):
+    return dict([(record['uuid'], record)
+                 for record in records])
+
+def xm_network_show(args):
+    xenapi_only()
+    arg_check(args, "network-show", 0)
+
+    networks = server.xenapi.network.get_all_records()
+    pifs     = uuid_dict_trans(
+        server.xenapi.PIF.get_all_records())
+    vifs     = uuid_dict_trans(
+        server.xenapi.VIF.get_all_records())
+
+    print '%-20s %-40s %-10s' % \
+          ('Name', 'VIFs', 'PIFs')
+    
+    format2 = "%(name_label)-20s %(vif)-40s %(pif)-10s"
+
+    for network in networks:
+        for i in range(max(len(network['PIFs']),
+                           len(network['VIFs']), 1)):
+            if i < len(network['PIFs']):
+                pif_uuid = network['PIFs'][i]
+            else:
+                pif_uuid = None
+                
+            if i < len(network['VIFs']):
+                vif_uuid = network['VIFs'][i]
+            else:
+                vif_uuid = None
+                
+            pif = pifs.get(pif_uuid, {'device':''}) 
+            vif = vifs.get(vif_uuid, None)
+
+            if vif:
+                dom_name = server.xenapi.VM.get_name_label(vif['VM'])
+                vif = "%s.%s" % (dom_name, vif['device'])
+            else:
+                vif = '' 
+
+            if pif:
+                if int(pif['VLAN']) > -1:
+                    pif = '%s.%s' % (pif['device'], pif['VLAN'])
+                else:
+                    pif = pif['device']
+            else:
+                pif = ''
+
+            if i == 0:
+                r = {'name_label':network['name_label'],
+                     'vif':vif, 'pif':pif}
+            else:
+                r = {'name_label':'', 'vif':vif, 'pif':pif}
+
+            print format2 % r
+
+            
 commands = {
     "shell": xm_shell,
     "event-monitor": xm_event_monitor,
@@ -2271,10 +2367,14 @@ commands = {
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
     "block-configure": xm_block_configure,
-    # network
+    # network (AKA vifs)
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,
     "network-list": xm_network_list,
+    # network (as in XenAPI)
+    "network-new": xm_network_new,
+    "network-del": xm_network_del,
+    "network-show": xm_network_show,
     # vnet
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,

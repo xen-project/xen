@@ -75,6 +75,7 @@
 
         ALIGN
 restore_all_guest:
+        ASSERT_INTERRUPTS_DISABLED
         testl $X86_EFLAGS_VM,UREGS_eflags(%esp)
         jnz  restore_all_vm86
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
@@ -129,10 +130,10 @@ failsafe_callback:
         movl  %eax,TRAPBOUNCE_eip(%edx)
         movl  VCPU_failsafe_sel(%ebx),%eax
         movw  %ax,TRAPBOUNCE_cs(%edx)
-        movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
+        movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
         bt    $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%ebx)
         jnc   1f
-        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
+        orb   $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
 1:      call  create_bounce_frame
         xorl  %eax,%eax
         movl  %eax,UREGS_ds(%esp)
@@ -247,7 +248,7 @@ test_guest_events:
         movl %eax,TRAPBOUNCE_eip(%edx)
         movl VCPU_event_sel(%ebx),%eax
         movw %ax,TRAPBOUNCE_cs(%edx)
-        movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
+        movb $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
         jmp  test_all_events
 
@@ -270,7 +271,7 @@ process_nmi:
         leal VCPU_trap_bounce(%ebx),%edx
         movl %eax,TRAPBOUNCE_eip(%edx)
         movw $FLAT_KERNEL_CS,TRAPBOUNCE_cs(%edx)
-        movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
+        movb $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
         jmp  test_all_events
 
@@ -383,7 +384,6 @@ ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl %eax,UREGS_cs+4(%esp)
         movl TRAPBOUNCE_eip(%edx),%eax
         movl %eax,UREGS_eip+4(%esp)
-        movb $0,TRAPBOUNCE_flags(%edx)
         ret
 .section __ex_table,"a"
         .long  .Lft6,domain_crash_synchronous ,  .Lft7,domain_crash_synchronous
@@ -441,6 +441,7 @@ handle_exception:
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
         jz    test_all_events
         call  create_bounce_frame
+        movb  $0,TRAPBOUNCE_flags(%edx)
         jmp   test_all_events
 
 exception_with_ints_disabled:

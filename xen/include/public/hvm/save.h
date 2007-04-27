@@ -32,7 +32,8 @@
 /*
  * Structures in this header *must* have the same layout in 32bit 
  * and 64bit environments: this means that all fields must be explicitly 
- * sized types and aligned to their sizes.
+ * sized types and aligned to their sizes, and the structs must be 
+ * a multiple of eight bytes long.
  *
  * Only the state necessary for saving and restoring (i.e. fields 
  * that are analogous to actual hardware state) should go in this file. 
@@ -77,6 +78,7 @@ struct hvm_save_header {
     uint32_t version;           /* File format version */
     uint64_t changeset;         /* Version of Xen that saved this file */
     uint32_t cpuid;             /* CPUID[0x01][%eax] on the saving machine */
+    uint32_t pad0;
 };
 
 DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
@@ -340,6 +342,7 @@ struct hvm_hw_pci_link {
      * The router provides a programmable mapping from each link to a GSI.
      */
     uint8_t route[4];
+    uint8_t pad0[4];
 };
 
 DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
@@ -364,6 +367,7 @@ struct hvm_hw_pit {
         uint8_t gate; /* timer start */
     } channels[3];  /* 3 x 16 bytes */
     uint32_t speaker_data_on;
+    uint32_t pad0;
 };
 
 DECLARE_HVM_SAVE_TYPE(PIT, 10, struct hvm_hw_pit);
@@ -379,6 +383,7 @@ struct hvm_hw_rtc {
     uint8_t cmos_data[RTC_CMOS_SIZE];
     /* Index register for 2-part operations */
     uint8_t cmos_index;
+    uint8_t pad0;
 };
 
 DECLARE_HVM_SAVE_TYPE(RTC, 11, struct hvm_hw_rtc);

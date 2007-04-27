@@ -2,6 +2,7 @@
 #define __HVMLOADER_UTIL_H__
 
 #include <stdarg.h>
+#include <stdint.h>
 
 #undef offsetof
 #define offsetof(t, m) ((unsigned long)&((t *)0)->m)

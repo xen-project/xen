@@ -394,8 +394,6 @@ struct acpi_20_madt_intsrcovr {
 
 #pragma pack ()
 
-#define ACPI_PHYSICAL_ADDRESS 0xEA000
-
 int acpi_build_tables(uint8_t *);
 
 #endif /* _ACPI_2_0_H_ */

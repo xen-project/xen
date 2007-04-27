@@ -19,23 +19,16 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+
 #include "roms.h"
-#include "acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
+#include "acpi/acpi2_0.h"
 #include "hypercall.h"
 #include "util.h"
-#include "smbios.h"
 #include "config.h"
 #include "apic_regs.h"
 #include "pci_regs.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
-
-/* memory map */
-#define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
-#define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
-#define ETHERBOOT_PHYSICAL_ADDRESS    0x000C8000
-#define VMXASSIST_PHYSICAL_ADDRESS    0x000D0000
-#define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
 
 asm(
     "    .text                       \n"
@@ -103,7 +96,8 @@ asm(
     "stack_top:                      \n"
     );
 
-extern void create_mp_tables(void);
+void create_mp_tables(void);
+int hvm_write_smbios_tables(void);
 
 static int
 cirrus_check(void)
@@ -351,17 +345,20 @@ static void cmos_write_memory_size(void)
 
 int main(void)
 {
-    int acpi_sz;
+    int acpi_sz = 0, vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
 
     printf("HVM Loader\n");
 
     init_hypercalls();
 
     printf("Writing SMBIOS tables ...\n");
-    hvm_write_smbios_tables();
+    smbios_sz = hvm_write_smbios_tables();
 
     printf("Loading ROMBIOS ...\n");
-    memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
+    rombios_sz = sizeof(rombios);
+    if ( rombios_sz > 0x10000 )
+        rombios_sz = 0x10000;
+    memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, rombios_sz);
     highbios_setup();
 
     apic_setup();
@@ -375,12 +372,14 @@ int main(void)
         printf("Loading Cirrus VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_cirrusvga, sizeof(vgabios_cirrusvga));
+        vgabios_sz = sizeof(vgabios_cirrusvga);
     }
     else
     {
         printf("Loading Standard VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_stdvga, sizeof(vgabios_stdvga));
+        vgabios_sz = sizeof(vgabios_stdvga);
     }
 
     if ( must_load_nic() )
@@ -388,9 +387,10 @@ int main(void)
         printf("Loading ETHERBOOT ...\n");
         memcpy((void *)ETHERBOOT_PHYSICAL_ADDRESS,
                etherboot, sizeof(etherboot));
+        etherboot_sz = sizeof(etherboot);
     }
 
-    if ( get_acpi_enabled() != 0 )
+    if ( get_acpi_enabled() )
     {
         printf("Loading ACPI ...\n");
         acpi_sz = acpi_build_tables((uint8_t *)ACPI_PHYSICAL_ADDRESS);
@@ -398,6 +398,32 @@ int main(void)
     }
 
     cmos_write_memory_size();
+
+    printf("BIOS map:\n");
+    if ( vgabios_sz )
+        printf(" %05x-%05x: VGA BIOS\n",
+               VGABIOS_PHYSICAL_ADDRESS,
+               VGABIOS_PHYSICAL_ADDRESS + vgabios_sz - 1);
+    if ( etherboot_sz )
+        printf(" %05x-%05x: Etherboot ROM\n",
+               ETHERBOOT_PHYSICAL_ADDRESS,
+               ETHERBOOT_PHYSICAL_ADDRESS + etherboot_sz - 1);
+    if ( !check_amd() )
+        printf(" %05x-%05x: VMXAssist\n",
+               VMXASSIST_PHYSICAL_ADDRESS,
+               VMXASSIST_PHYSICAL_ADDRESS + sizeof(vmxassist) - 1);
+    if ( smbios_sz )
+        printf(" %05x-%05x: SMBIOS tables\n",
+               SMBIOS_PHYSICAL_ADDRESS,
+               SMBIOS_PHYSICAL_ADDRESS + smbios_sz - 1);
+    if ( acpi_sz )
+        printf(" %05x-%05x: ACPI tables\n",
+               ACPI_PHYSICAL_ADDRESS,
+               ACPI_PHYSICAL_ADDRESS + acpi_sz - 1);
+    if ( rombios_sz )
+        printf(" %05x-%05x: Main BIOS\n",
+               ROMBIOS_PHYSICAL_ADDRESS,
+               ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
     if ( !check_amd() )
     {

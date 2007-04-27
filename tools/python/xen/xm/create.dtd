@@ -27,7 +27,8 @@
                             | crashdump )">
 
 <!ELEMENT xm (vm*, 
-              vdi*)> 
+              vdi*,
+              network*)> 
 
 <!ELEMENT version (#PCDATA)>
  
@@ -97,6 +98,12 @@
                  size            CDATA #REQUIRED
                  sharable        CDATA #REQUIRED
                  read_only       CDATA #REQUIRED>
+
+<!ELEMENT network (name,
+                  other_config*)>
+<!ATTLIST network %NAMEID;
+                  default_gateway CDATA #REQUIRED
+                  default_netmask CDATA #REQUIRED>
 
 <!ELEMENT name   (label, 
                   description)> 

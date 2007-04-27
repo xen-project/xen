@@ -27,7 +27,7 @@ import time
 import xmlrpclib
 
 import XendDomain, XendDomainInfo, XendNode, XendDmesg
-import XendLogging, XendTaskManager
+import XendLogging, XendTaskManager, XendAPIStore
 
 from XendAPIVersion import *
 from XendAuthSessions import instance as auth_manager
@@ -38,8 +38,8 @@ from XendNetwork import XendNetwork
 from XendTask import XendTask
 from XendPIFMetrics import XendPIFMetrics
 from XendVMMetrics import XendVMMetrics
-
-import XendPBD
+from XendPIF import XendPIF
+from XendPBD import XendPBD
 
 from XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
@@ -237,6 +237,8 @@ def catch_typeerror(func):
                     finally:
                         del tb
             raise
+        except XendAPIError, exn:
+            return xen_api_error(exn.get_api_error())
 
     return f
 
@@ -306,26 +308,6 @@ def valid_vm(func):
     return lambda *args, **kwargs: \
            _check_ref(XendDomain.instance().is_valid_vm,
                       'VM', func, *args, **kwargs)
-
-def valid_vm_metrics(func):
-    """Decorator to verify if vm_metrics_ref is valid before calling method.
-
-    @param func: function with params: (self, session, vm_metrics_ref, ...)
-    @rtype: callable object
-    """    
-    return lambda *args, **kwargs: \
-           _check_ref(XendVMMetrics.is_valid_vm_metrics,
-                      'VM_metrics', func, *args, **kwargs)
-
-def valid_network(func):
-    """Decorator to verify if network_ref is valid before calling method.
-
-    @param func: function with params: (self, session, network_ref, ...)
-    @rtype: callable object
-    """    
-    return lambda *args, **kwargs: \
-           _check_ref(XendNode.instance().is_valid_network,
-                      'network', func, *args, **kwargs)
 
 def valid_vbd(func):
     """Decorator to verify if vbd_ref is valid before calling method.
@@ -409,39 +391,6 @@ def valid_sr(func):
            _check_ref(lambda r: XendNode.instance().is_valid_sr,
                       'SR', func, *args, **kwargs)
 
-def valid_pbd(func):
-    """Decorator to verify if pbd_ref is valid before calling
-    method.
-
-    @param func: function with params: (self, session, pbd_ref)
-    @rtype: callable object
-    """
-    return lambda *args, **kwargs: \
-           _check_ref(lambda r: r in XendPBD.get_all_refs(),
-                      'PBD', func, *args, **kwargs)
-
-def valid_pif(func):
-    """Decorator to verify if pif_ref is valid before calling
-    method.
-
-    @param func: function with params: (self, session, pif_ref)
-    @rtype: callable object
-    """
-    return lambda *args, **kwargs: \
-           _check_ref(lambda r: r in XendNode.instance().pifs,
-                      'PIF', func, *args, **kwargs)
-
-def valid_pif_metrics(func):
-    """Decorator to verify if pif_metrics_ref is valid before calling
-    method.
-
-    @param func: function with params: (self, session, pif_metrics_ref)
-    @rtype: callable object
-    """
-    return lambda *args, **kwargs: \
-           _check_ref(lambda r: r in XendNode.instance().pif_metrics,
-                      'PIF_metrics', func, *args, **kwargs)
-
 def valid_task(func):
     """Decorator to verify if task_ref is valid before calling
     method.
@@ -463,6 +412,20 @@ def valid_debug(func):
     return lambda *args, **kwargs: \
            _check_ref(lambda r: r in XendAPI._debug,
                       'debug', func, *args, **kwargs)
+
+
+def valid_object(class_name):
+    """Decorator to verify if object is valid before calling
+    method.
+
+    @param func: function with params: (self, session, pif_ref)
+    @rtype: callable object
+    """
+    return lambda func: \
+           lambda *args, **kwargs: \
+           _check_ref(lambda r: \
+                          XendAPIStore.get(r, class_name) is not None,
+                      'PIF', func, *args, **kwargs)
 
 # -----------------------------
 # Bridge to Legacy XM API calls
@@ -494,9 +457,7 @@ classes = {
     'host'         : valid_host,
     'host_cpu'     : valid_host_cpu,
     'host_metrics' : valid_host_metrics,
-    'network'      : valid_network,
     'VM'           : valid_vm,
-    'VM_metrics'   : valid_vm_metrics,
     'VBD'          : valid_vbd,
     'VBD_metrics'  : valid_vbd_metrics,
     'VIF'          : valid_vif,
@@ -505,20 +466,22 @@ classes = {
     'VTPM'         : valid_vtpm,
     'console'      : valid_console,
     'SR'           : valid_sr,
-    'PBD'          : valid_pbd,
-    'PIF'          : valid_pif,
-    'PIF_metrics'  : valid_pif_metrics,
     'task'         : valid_task,
     'debug'        : valid_debug,
+    'network'      : valid_object("network"),
+    'PIF'          : valid_object("PIF"),
+    'VM_metrics'   : valid_object("VM_metrics"),
+    'PBD'          : valid_object("PBD"),
+    'PIF_metrics'  : valid_object("PIF_metrics")
 }
 
 autoplug_classes = {
     'network'     : XendNetwork,
+    'PIF'         : XendPIF,
     'VM_metrics'  : XendVMMetrics,
-    'PBD'         : XendPBD.XendPBD,
+    'PBD'         : XendPBD,
     'PIF_metrics' : XendPIFMetrics,
 }
-
 
 class XendAPI(object):
     """Implementation of the Xen-API in Xend. Expects to be
@@ -570,7 +533,9 @@ class XendAPI(object):
         #    all get_by_uuid() methods.
         
         for api_cls in classes.keys():
-            if api_cls == 'session':
+            # We'll let the autoplug classes implement these functions
+            # themselves - its much cleaner to do it in the base class
+            if api_cls == 'session' or api_cls in autoplug_classes.keys():
                 continue
             
             get_by_uuid = '%s_get_by_uuid' % api_cls
@@ -599,34 +564,48 @@ class XendAPI(object):
         # --------------------
         # These have all of their methods grabbed out from the implementation
         # class, and wrapped up to be compatible with the Xen-API.
+
+        def getter(ref, type):
+            return XendAPIStore.get(ref, type)
         
         for api_cls, impl_cls in autoplug_classes.items():
-            def doit(n):
-                getter = getattr(cls, '_%s_get' % api_cls)
+            def doit(n):           
                 dot_n = '%s.%s' % (api_cls, n)
                 full_n = '%s_%s' % (api_cls, n)
                 if not hasattr(cls, full_n):
                     f = getattr(impl_cls, n)
                     argcounts[dot_n] = f.func_code.co_argcount + 1
-                    setattr(cls, full_n,
+                    g = lambda api_cls: \
+                    setattr(cls, full_n, \
                             lambda s, session, ref, *args: \
                                xen_api_success( \
-                                   f(getter(s, session, ref), *args)))
+                                   f(getter(ref, api_cls), *args)))
+                    g(api_cls) # Force api_cls to be captured
+                    
+            def doit_func(n):           
+                dot_n = '%s.%s' % (api_cls, n)
+                full_n = '%s_%s' % (api_cls, n)
+                if not hasattr(cls, full_n):
+                    f = getattr(impl_cls, n)
+                    argcounts[dot_n] = f.func_code.co_argcount
+                    setattr(cls, full_n, \
+                            lambda s, session, *args: \
+                               xen_api_success( \
+                                   f(*args)))
 
-            ro_attrs = getattr(cls, '%s_attr_ro' % api_cls, [])
-            rw_attrs = getattr(cls, '%s_attr_rw' % api_cls, [])
-            methods  = getattr(cls, '%s_methods' % api_cls, [])
-            funcs    = getattr(cls, '%s_funcs'   % api_cls, [])
+            ro_attrs = impl_cls.getAttrRO()
+            rw_attrs = impl_cls.getAttrRW()
+            methods  = impl_cls.getMethods()
+            funcs    = impl_cls.getFuncs()
             
             for attr_name in ro_attrs + rw_attrs:
                 doit('get_%s' % attr_name)
-            for attr_name in rw_attrs + cls.Base_attr_rw:
+            for attr_name in rw_attrs:
                 doit('set_%s' % attr_name)
-            for method_name, return_type in methods + cls.Base_methods:
-                doit('%s' % method_name)
-            for func_name, return_type in funcs + cls.Base_funcs:
-                doit('%s' % func_name)
-
+            for method in methods:
+                doit('%s' % method)
+            for func in funcs:
+                doit_func('%s' % func)
 
         def wrap_method(name, new_f):
             try:
@@ -692,31 +671,42 @@ class XendAPI(object):
                 except AttributeError:
                     log.warn("API call: %s not found" % n)
 
-
-            ro_attrs = getattr(cls, '%s_attr_ro' % api_cls, [])
-            rw_attrs = getattr(cls, '%s_attr_rw' % api_cls, [])
-            methods  = getattr(cls, '%s_methods' % api_cls, [])
-            funcs    = getattr(cls, '%s_funcs'   % api_cls, [])
+            if api_cls in autoplug_classes.keys():
+                impl_cls = autoplug_classes[api_cls]
+                ro_attrs = impl_cls.getAttrRO()
+                rw_attrs = impl_cls.getAttrRW()
+                methods  = map(lambda x: (x, ""), impl_cls.getMethods())
+                funcs    = map(lambda x: (x, ""), impl_cls.getFuncs())
+            else:
+                ro_attrs = getattr(cls, '%s_attr_ro' % api_cls, []) \
+                           + cls.Base_attr_ro
+                rw_attrs = getattr(cls, '%s_attr_rw' % api_cls, []) \
+                           + cls.Base_attr_rw
+                methods  = getattr(cls, '%s_methods' % api_cls, []) \
+                           + cls.Base_methods
+                funcs    = getattr(cls, '%s_funcs'   % api_cls, []) \
+                           + cls.Base_funcs
 
             # wrap validators around readable class attributes
-            for attr_name in ro_attrs + rw_attrs + cls.Base_attr_ro:
+            for attr_name in ro_attrs + rw_attrs:
                 doit('%s.get_%s' % (api_cls, attr_name), True,
                      async_support = False)
 
             # wrap validators around writable class attrributes
-            for attr_name in rw_attrs + cls.Base_attr_rw:
+            for attr_name in rw_attrs:
                 doit('%s.set_%s' % (api_cls, attr_name), True,
                      async_support = False)
                 setter_event_wrapper(api_cls, attr_name)
 
             # wrap validators around methods
-            for method_name, return_type in methods + cls.Base_methods:
+            for method_name, return_type in methods:
                 doit('%s.%s' % (api_cls, method_name), True,
                      async_support = True)
 
             # wrap validators around class functions
-            for func_name, return_type in funcs + cls.Base_funcs:
-                doit('%s.%s' % (api_cls, func_name), False, async_support = True,
+            for func_name, return_type in funcs:
+                doit('%s.%s' % (api_cls, func_name), False,
+                     async_support = True,
                      return_type = return_type)
 
             ctor_event_wrapper(api_cls)
@@ -952,7 +942,7 @@ class XendAPI(object):
     def host_get_resident_VMs(self, session, host_ref):
         return xen_api_success(XendDomain.instance().get_domain_refs())
     def host_get_PBDs(self, _, ref):
-        return xen_api_success(XendPBD.get_all_refs())
+        return xen_api_success(XendPBD.get_all())
     def host_get_PIFs(self, session, ref):
         return xen_api_success(XendNode.instance().get_PIF_refs())
     def host_get_host_CPUs(self, session, host_ref):
@@ -1130,130 +1120,6 @@ class XendAPI(object):
     def _host_metrics_get_memory_free(self):
         node = XendNode.instance()
         return node.xc.physinfo()['free_memory'] * 1024
-
-
-    # Xen API: Class network
-    # ----------------------------------------------------------------
-
-    network_attr_ro = ['VIFs', 'PIFs']
-    network_attr_rw = ['name_label',
-                       'name_description',
-                       'other_config']
-    network_methods = [('add_to_other_config', None),
-                       ('remove_from_other_config', None),
-                       ('destroy', None)]
-    network_funcs = [('create', None)]
-    
-    def _network_get(self, _, ref):
-        return XendNode.instance().get_network(ref)
-
-    def network_get_all(self, _):
-        return xen_api_success(XendNode.instance().get_network_refs())
-
-    def network_create(self, _, record):
-        return xen_api_success(XendNode.instance().network_create(record))
-
-    def network_destroy(self, _, ref):
-        return xen_api_success(XendNode.instance().network_destroy(ref))
-
-
-    # Xen API: Class PIF
-    # ----------------------------------------------------------------
-
-    PIF_attr_ro = ['network',
-                   'host',
-                   'metrics']
-    PIF_attr_rw = ['device',
-                   'MAC',
-                   'MTU',
-                   'VLAN']
-
-    PIF_attr_inst = PIF_attr_rw
-
-    PIF_methods = [('create_VLAN', 'int'), ('destroy', None)]
-
-    def _get_PIF(self, ref):
-        return XendNode.instance().pifs[ref]
-
-    def PIF_destroy(self, _, ref):
-        try:
-            return xen_api_success(XendNode.instance().PIF_destroy(ref))
-        except PIFIsPhysical, exn:
-            return xen_api_error(['PIF_IS_PHYSICAL', ref])
-
-    # object methods
-    def PIF_get_record(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).get_record())
-
-    def PIF_get_all(self, _):
-        return xen_api_success(XendNode.instance().pifs.keys())
-
-    def PIF_get_metrics(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).metrics.uuid)
-
-    def PIF_get_device(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).device)
-
-    def PIF_get_network(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).network.uuid)
-
-    def PIF_get_host(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).host.uuid)
-
-    def PIF_get_MAC(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).mac)
-
-    def PIF_get_MTU(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).mtu)
-
-    def PIF_get_VLAN(self, _, ref):
-        return xen_api_success(self._get_PIF(ref).vlan)
-
-    def PIF_set_device(self, _, ref, device):
-        return xen_api_success(self._get_PIF(ref).set_device(device))
-
-    def PIF_set_MAC(self, _, ref, mac):
-        return xen_api_success(self._get_PIF(ref).set_mac(mac))
-
-    def PIF_set_MTU(self, _, ref, mtu):
-        return xen_api_success(self._get_PIF(ref).set_mtu(mtu))
-
-    def PIF_create_VLAN(self, _, ref, network, vlan):
-        try:
-            vlan = int(vlan)
-        except:
-            return xen_api_error(['VLAN_TAG_INVALID', vlan])
-
-        try:
-            node = XendNode.instance()
-            
-            if _is_valid_ref(network, node.is_valid_network):
-                return xen_api_success(
-                    node.PIF_create_VLAN(ref, network, vlan))
-            else:
-                return xen_api_error(['HANDLE_INVALID', 'network', network])
-        except NetworkAlreadyConnected, exn:
-            return xen_api_error(['NETWORK_ALREADY_CONNECTED',
-                                  network, exn.pif_uuid])
-        except VLANTagInvalid:
-            return xen_api_error(['VLAN_TAG_INVALID', vlan])
-
-
-    # Xen API: Class PIF_metrics
-    # ----------------------------------------------------------------
-
-    PIF_metrics_attr_ro = ['io_read_kbs',
-                           'io_write_kbs',
-                           'last_updated']
-    PIF_metrics_attr_rw = []
-    PIF_metrics_methods = []
-
-    def PIF_metrics_get_all(self, _):
-        return xen_api_success(XendNode.instance().pif_metrics.keys())
-
-    def _PIF_metrics_get(self, _, ref):
-        return XendNode.instance().pif_metrics[ref]
-
 
     # Xen API: Class VM
     # ----------------------------------------------------------------        
@@ -1863,28 +1729,6 @@ class XendAPI(object):
         xendom = XendDomain.instance()
         xendom.domain_restore(src, bool(paused))
         return xen_api_success_void()
-
-
-    # Xen API: Class VM_metrics
-    # ----------------------------------------------------------------
-
-    VM_metrics_attr_ro = ['memory_actual',
-                          'VCPUs_number',
-                          'VCPUs_utilisation',
-                          'VCPUs_CPU',
-                          'VCPUs_flags',
-                          'VCPUs_params',
-                          'state',
-                          'start_time',
-                          'last_updated']
-    VM_metrics_attr_rw = []
-    VM_metrics_methods = []
-
-    def _VM_metrics_get(self, _, ref):
-        return XendVMMetrics.get_by_uuid(ref)
-
-    def VM_metrics_get_all(self, _):
-        return xen_api_success(XendVMMetrics.get_all())
 
 
     # Xen API: Class VBD
@@ -2568,33 +2412,6 @@ class XendAPI(object):
             sr.name_description = value
             XendNode.instance().save()        
         return xen_api_success_void()
-
-
-    # Xen API: Class PBD
-    # ----------------------------------------------------------------
-
-    PBD_attr_ro = ['host',
-                   'SR',
-                   'device_config',
-                   'currently_attached']
-    PBD_attr_rw = []
-    PBD_methods = [('destroy', None)]
-    PBD_funcs   = [('create', None)]
-
-    def PBD_get_all(self, _):
-        return xen_api_success(XendPBD.get_all_refs())
-
-    def _PBD_get(self, _, ref):
-        return XendPBD.get(ref)
-
-    def PBD_create(self, _, record):
-        if 'uuid' in record:
-            return xen_api_error(['VALUE_NOT_SUPPORTED',
-                                  'uuid', record['uuid'],
-                                  'You may not specify a UUID on creation'])
-        new_uuid = XendPBD.XendPBD(record).get_uuid()
-        XendNode.instance().save()
-        return xen_api_success(new_uuid)
 
 
     # Xen API: Class event

@@ -555,29 +555,29 @@ B<EXAMPLES>
 I<normal EDF (20ms/5ms):>
 
     xm sched-sedf <dom-id> 20000000 5000000 0 0 0
-  
+
 I<best-effort domains (i.e. non-realtime):>
 
     xm sched-sedf <dom-id> 20000000 0 0 1 0
- 
+
 I<normal EDF (20ms/5ms) + share of extra-time:>
-  
+
     xm sched-sedf <dom-id> 20000000 5000000 0 1 0
 
 I<4 domains with weights 2:3:4:2>
 
     xm sched-sedf <d1> 0 0 0 0 2
-    xm sched-sedf <d2> 0 0 0 0 3
-    xm sched-sedf <d3> 0 0 0 0 4
-    xm sched-sedf <d4> 0 0 0 0 2
+    xm sched-sedf <d2> 0 0 0 0 3
+    xm sched-sedf <d3> 0 0 0 0 4
+    xm sched-sedf <d4> 0 0 0 0 2
   
 I<1 fully-specified (10ms/3ms) domain, 3 other domains share available
 rest in 2:7:3 ratio:>
 
-    xm sched-sedf <d1> 10000000 3000000 0 0 0   
-    xm sched-sedf <d2> 0 0 0 0 2   
+    xm sched-sedf <d1> 10000000 3000000 0 0 0
+    xm sched-sedf <d2> 0 0 0 0 2
     xm sched-sedf <d3> 0 0 0 0 7
-    xm sched-sedf <d4> 0 0 0 0 3
+    xm sched-sedf <d4> 0 0 0 0 3
 
 =back
 

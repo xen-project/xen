@@ -18,62 +18,82 @@
 
 import uuid
 from XendLogging import log
+from xen.xend.XendBase import XendBase
+from xen.xend import XendAPIStore
 
-
-attr_inst = ['uuid',
-             'host',
-             'SR',
-             'device_config']
-attr_ro = attr_inst + ['currently_attached']
-
-
-_all = {}
-
-
-def get(ref):
-    return _all[ref]
-
-
-def get_all():
-    return _all.values()
-
-
-def get_all_refs():
-    return _all.keys()
-
-
-def get_by_SR(sr_ref):
-    return [k for (k, v) in _all.items() if v.get_SR() == sr_ref]
-
-
-class XendPBD:
+class XendPBD(XendBase):
     """Physical block devices."""
+
+    def getClass(self):
+        return "PBD"
     
-    def __init__(self, record):
-        if 'uuid' not in record:
-            record['uuid'] = uuid.createString()
+    def getAttrRO(self):
+        attrRO = ['host',
+                  'SR',
+                  'device_config',
+                  'currently_attached']
+        return XendBase.getAttrRO() + attrRO
 
-        import XendAPI
-        for v in attr_inst:
-            setattr(self, v, record[v])
-        self.currently_attached = True
-        _all[record['uuid']] = self
+    def getAttrRW(self):
+        attrRW = []
+        return XendBase.getAttrRW() + attrRW
 
+    def getAttrInst(self):
+        return ['uuid',
+                'host',
+                'SR',
+                'device_config']
+
+    def getMethods(self):
+        methods = ['destroy']
+        return XendBase.getMethods() + methods
+
+    def getFuncs(self):
+        funcs = ['create',
+                 'get_by_SR']
+        return XendBase.getFuncs() + funcs
+
+    getClass    = classmethod(getClass)
+    getAttrRO   = classmethod(getAttrRO)
+    getAttrRW   = classmethod(getAttrRW)
+    getAttrInst = classmethod(getAttrInst)
+    getMethods  = classmethod(getMethods)
+    getFuncs    = classmethod(getFuncs)
+
+    def recreate(uuid, record):
+        pbd = XendPBD(uuid, record)
+        return uuid
+    
+    def create(cls, record):
+        uuid = genuuid.createString()
+        pbd = XendPBD(uuid, record)
+        return uuid       
+
+    create = classmethod(create)
+    
+    def __init__(self, uuid, record):
+        XendBase.__init__(self, uuid, record)
+        this.currently_attached = True
+
+    def get_host(self):
+        return this.host
+    
+    def get_SR(self):
+        return this.SR
+
+    def get_device_config(self):
+        return this.device_config
+
+    def get_currently_attached(self):
+        return this.currently_attached
 
     def destroy(self):
-        if self.uuid in _all:
-            del _all[self.uuid]
+        pass
+    
+    def get_by_SR(cls, sr_ref):
+        pbds = XendAPIStore.get_all("PBD")
+        return [pbd.get_uuid()
+                for pbd in pbds
+                if pbd.get_SR() == sr_ref]
 
-
-    def get_record(self):
-        import XendAPI
-        result = {}
-        for v in attr_ro:
-            result[v] = getattr(self, v)
-        return result
-
-
-for v in attr_ro:
-    def f(v_):
-        setattr(XendPBD, 'get_' + v_, lambda s: getattr(s, v_))
-    f(v)
+    get_by_SR = classmethod(get_by_SR)

@@ -209,13 +209,13 @@ size_t xc_dom_check_gzip(void *blob, size_t ziplen)
     unsigned char *gzlen;
     size_t unziplen;
 
-    if (strncmp(blob, "\037\213", 2))
+    if ( strncmp(blob, "\037\213", 2) )
         /* not gzipped */
         return 0;
 
     gzlen = blob + ziplen - 4;
     unziplen = gzlen[3] << 24 | gzlen[2] << 16 | gzlen[1] << 8 | gzlen[0];
-    if ( (unziplen < ziplen) || (unziplen > (ziplen * 8)) )
+    if ( (unziplen < 0) || (unziplen > (1024*1024*1024)) ) /* 1GB limit */
     {
         xc_dom_printf
             ("%s: size (zip %zd, unzip %zd) looks insane, skip gunzip\n",

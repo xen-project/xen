@@ -48,16 +48,6 @@
  * not yet supported */
 #define shadow_mode_trap_reads(_d) ({ (void)(_d); 0; })
 
-/*
- * 32on64 support
- */
-#ifdef __x86_64__
-#define pv_32bit_guest(_v) (!is_hvm_vcpu(_v) && IS_COMPAT((_v)->domain))
-#else
-#define pv_32bit_guest(_v) (!is_hvm_vcpu(_v))
-#endif
-
-
 /*****************************************************************************
  * Entry points into the shadow code */
 

@@ -101,8 +101,8 @@ compat_test_guest_events:
         movl  VCPU_event_addr(%rbx),%eax
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  VCPU_event_sel(%rbx),%eax
-        movl  %eax,TRAPBOUNCE_cs(%rdx)
-        movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movw  %ax,TRAPBOUNCE_cs(%rdx)
+        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
@@ -126,8 +126,8 @@ compat_process_nmi:
         sti
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movl  %eax,TRAPBOUNCE_eip(%rdx)
-        movl  $FLAT_COMPAT_KERNEL_CS,TRAPBOUNCE_cs(%rdx)
-        movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        movw  $FLAT_COMPAT_KERNEL_CS,TRAPBOUNCE_cs(%rdx)
+        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
@@ -164,13 +164,12 @@ compat_failsafe_callback:
         movl  VCPU_failsafe_addr(%rbx),%eax
         movl  %eax,TRAPBOUNCE_eip(%rdx)
         movl  VCPU_failsafe_sel(%rbx),%eax
-        movl  %eax,TRAPBOUNCE_cs(%rdx)
-        movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
+        movw  %ax,TRAPBOUNCE_cs(%rdx)
+        movb  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
         btq   $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
         jnc   1f
-        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-1:
-        call  compat_create_bounce_frame
+        orb   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+1:      call  compat_create_bounce_frame
         jmp   compat_test_all_events
 .previous
 .section __pre_ex_table,"a"
@@ -185,6 +184,7 @@ ENTRY(compat_post_handle_exception)
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    compat_test_all_events
         call  compat_create_bounce_frame
+        movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
 
 ENTRY(compat_int80_direct_trap)
@@ -194,7 +194,7 @@ ENTRY(compat_int80_direct_trap)
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
-/* On return only %rbx is guaranteed non-clobbered.                      */
+/* On return only %rbx and %rdx are guaranteed non-clobbered.            */
 compat_create_bounce_frame:
         ASSERT_INTERRUPTS_ENABLED
         mov   %fs,%edi
@@ -253,7 +253,6 @@ compat_create_bounce_frame:
 2:
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
         andl  $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
         mov   %fs,UREGS_ss+8(%rsp)
@@ -266,7 +265,6 @@ compat_create_bounce_frame:
         movl  %eax,UREGS_cs+8(%rsp)
         movl  TRAPBOUNCE_eip(%rdx),%eax
         movl  %eax,UREGS_rip+8(%rsp)
-        movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section .fixup,"ax"
 .Lfx13:
@@ -333,7 +331,7 @@ ENTRY(compat_hypercall_table)
         .quad compat_vcpu_op
         .quad compat_ni_hypercall       /* 25 */
         .quad compat_mmuext_op
-        .quad compat_acm_op
+        .quad do_acm_op
         .quad compat_nmi_op
         .quad compat_sched_op
         .quad compat_callback_op        /* 30 */
@@ -376,7 +374,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 3 /* compat_vcpu_op           */
         .byte 0 /* compat_ni_hypercall      */  /* 25 */
         .byte 4 /* compat_mmuext_op         */
-        .byte 1 /* compat_acm_op            */
+        .byte 1 /* do_acm_op                */
         .byte 2 /* compat_nmi_op            */
         .byte 2 /* compat_sched_op          */
         .byte 2 /* compat_callback_op       */  /* 30 */

@@ -21,9 +21,10 @@ import socket
 import xen.lowlevel.xc
 
 from xen.util import Brctl
+from xen.xend import XendAPIStore
 
 import uuid, arch
-import XendPBD
+from XendPBD import XendPBD
 from XendError import *
 from XendOptions import instance as xendoptions
 from XendQCoWStorageRepo import XendQCoWStorageRepo
@@ -34,7 +35,7 @@ from XendPIFMetrics import XendPIFMetrics
 from XendNetwork import *
 from XendStateStore import XendStateStore
 from XendMonitor import XendMonitor
-
+     
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
     
@@ -133,70 +134,78 @@ class XendNode:
                       'features' : cpu_features,
                     })
 
-        self.pifs = {}
-        self.pif_metrics = {}
-        self.networks = {}
         self.srs = {}
-        
-        # initialise networks
+
+        # Initialise networks
+        # First configure ones off disk
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
             for net_uuid, network in saved_networks.items():
-                self.network_create(network, False, net_uuid)
-        else:
-            bridges = Brctl.get_state().keys()
-            for bridge in bridges:
-                self.network_create({'name_label' : bridge }, False)
+                try:
+                    XendNetwork.recreate(network, net_uuid)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating network %s", net_uuid)
                 
-        # Get a mapping from interface to bridge
+        # Next discover any existing bridges and check
+        # they are not already configured
+        bridges = Brctl.get_state().keys()
+        configured_bridges = [XendAPIStore.get(
+                                  network_uuid, "network")
+                                      .get_name_label()
+                              for network_uuid in XendNetwork.get_all()]
+        unconfigured_bridges = [bridge
+                                for bridge in bridges
+                                if bridge not in configured_bridges]
+        for unconfigured_bridge in unconfigured_bridges:
+            XendNetwork.create_phy(unconfigured_bridge)
 
-        if_to_br = dict([(i,b)
-                         for (b,ifs) in Brctl.get_state().items()
-                         for i in ifs])
-
-        # initialise PIFs
+        # Initialise PIFs
+        # First configure ones off disk
         saved_pifs = self.state_store.load_state('pif')
         if saved_pifs:
             for pif_uuid, pif in saved_pifs.items():
-                if pif.get('network') in self.networks:
-                    network = self.networks[pif['network']]
-                    try:
-                        if 'device' not in pif and 'name' in pif:
-                            # Compatibility hack, can go pretty soon.
-                            pif['device'] = pif['name']
-                        if 'metrics' not in pif:
-                            # Compatibility hack, can go pretty soon.
-                            pif['metrics'] = uuid.createString()
+                try:
+                    XendPIF.recreate(pif, pif_uuid)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating PIF %s", pif_uuid)
+        
+        # Next discover any existing PIFs and check
+        # they are not already configured
+        configured_pifs = [XendAPIStore.get(
+                               pif_uuid, "PIF")
+                                   .get_interface_name()
+                           for pif_uuid in XendPIF.get_all()]
+        unconfigured_pifs = [(name, mtu, mac)
+                             for name, mtu, mac in linux_get_phy_ifaces()
+                             if name not in configured_pifs]
 
-                        try:
-                            pif['VLAN'] = int(pif.get('VLAN', -1))
-                        except (ValueError, TypeError):
-                            pif['VLAN'] = -1
+        # Get a mapping from interface to bridge          
+        if_to_br = dict([(i,b)
+                         for (b,ifs) in Brctl.get_state().items()
+                             for i in ifs])
 
-                        self._PIF_create(pif['device'], pif['MTU'],
-                                         pif['VLAN'],
-                                         pif['MAC'], network, False, pif_uuid,
-                                         pif['metrics'])
-                    except NetworkAlreadyConnected, exn:
-                        log.error('Cannot load saved PIF %s, as network %s ' +
-                                  'is already connected to PIF %s',
-                                  pif_uuid, pif['network'], exn.pif_uuid)
-        else:
-            for name, mtu, mac in linux_get_phy_ifaces():
-                bridge_name = if_to_br.get(name, None)
-                if bridge_name is not None:
-                    networks = [network for
-                                network in self.networks.values()
-                                if network.get_name_label() == bridge_name]
-                    if len(networks) > 0:
-                        network = networks[0]
-                        self._PIF_create(name, mtu, -1, mac, network, False)
-
+        for name, mtu, mac in unconfigured_pifs:
+            # Check PIF is on bridge
+            # if not, ignore
+            bridge_name = if_to_br.get(name, None)
+            if bridge_name is not None:
+                # Translate bridge name to network uuid
+                for network_uuid in XendNetwork.get_all():
+                    network = XendAPIStore.get(
+                        network_uuid, 'network')
+                    if network.get_name_label() == bridge_name:
+                        XendPIF.create_phy(network_uuid, name,
+                                           mtu, mac)
+                        break
+                else:
+                    log.debug("Cannot find network for bridge %s "
+                              "when configuring PIF %s",
+                              (bridge_name, name))     
+        
         # initialise storage
         saved_srs = self.state_store.load_state('sr')
         if saved_srs:
             for sr_uuid, sr_cfg in saved_srs.items():
-                log.error("SAved SRS %s %s", sr_uuid, sr_cfg['type'])
                 if sr_cfg['type'] == 'qcow_file':
                     self.srs[sr_uuid] = XendQCoWStorageRepo(sr_uuid)
                 elif sr_cfg['type'] == 'local':
@@ -214,69 +223,50 @@ class XendNode:
         saved_pbds = self.state_store.load_state('pbd')
         if saved_pbds:
             for pbd_uuid, pbd_cfg in saved_pbds.items():
-                pbd_cfg['uuid'] = pbd_uuid
-                XendPBD.XendPBD(pbd_cfg)
+                try:
+                    XendPBD.recreate(pbd_uuid, pbd_cfg)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating PBD %s", pbd_uuid) 
+
+##    def network_destroy(self, net_uuid):
+ ##       del self.networks[net_uuid]
+  ##      self.save_networks()
 
 
-    def network_create(self, record, persist = True, net_uuid = None):
-        if net_uuid is None:
-            net_uuid = uuid.createString()
-        self.networks[net_uuid] = XendNetwork(net_uuid, record)
-        if persist:
-            self.save_networks()
-        return net_uuid
+##    def get_PIF_refs(self):
+##       return self.pifs[:]
 
+##   def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
+##                     pif_uuid = None, metrics_uuid = None):
+##         for pif in self.pifs.values():
+##             if pif.network == network:
+##                 raise NetworkAlreadyConnected(pif.uuid)
 
-    def network_destroy(self, net_uuid):
-        del self.networks[net_uuid]
-        self.save_networks()
+##         if pif_uuid is None:
+##             pif_uuid = uuid.createString()
+##         if metrics_uuid is None:
+##             metrics_uuid = uuid.createString()
 
+##         metrics = XendPIFMetrics(metrics_uuid)
+##         pif = XendPIF(pif_uuid, metrics, name, mtu, vlan, mac, network, self)
+##         metrics.set_PIF(pif)
 
-    def get_PIF_refs(self):
-        return self.pifs.keys()
+##         self.pif_metrics[metrics_uuid] = metrics
+##         self.pifs[pif_uuid] = pif
 
+##         if persist:
+##             self.save_PIFs()
+##             self.refreshBridges()
+##         return pif_uuid
 
-    def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
-                    pif_uuid = None, metrics_uuid = None):
-        for pif in self.pifs.values():
-            if pif.network == network:
-                raise NetworkAlreadyConnected(pif.uuid)
+##     def PIF_destroy(self, pif_uuid):
+##         pif = self.pifs[pif_uuid]
 
-        if pif_uuid is None:
-            pif_uuid = uuid.createString()
-        if metrics_uuid is None:
-            metrics_uuid = uuid.createString()
+##         if pif.vlan == -1:
+##             raise PIFIsPhysical()
 
-        metrics = XendPIFMetrics(metrics_uuid)
-        pif = XendPIF(pif_uuid, metrics, name, mtu, vlan, mac, network, self)
-        metrics.set_PIF(pif)
-
-        self.pif_metrics[metrics_uuid] = metrics
-        self.pifs[pif_uuid] = pif
-
-        if persist:
-            self.save_PIFs()
-            self.refreshBridges()
-        return pif_uuid
-
-
-    def PIF_create_VLAN(self, pif_uuid, network_uuid, vlan):
-        if vlan < 0 or vlan >= 4096:
-            raise VLANTagInvalid()
-            
-        pif = self.pifs[pif_uuid]
-        network = self.networks[network_uuid]
-        return self._PIF_create(pif.device, pif.mtu, vlan, pif.mac, network)
-
-
-    def PIF_destroy(self, pif_uuid):
-        pif = self.pifs[pif_uuid]
-
-        if pif.vlan == -1:
-            raise PIFIsPhysical()
-
-        del self.pifs[pif_uuid]
-        self.save_PIFs()
+##         del self.pifs[pif_uuid]
+##         self.save_PIFs()
 
 
     def save(self):
@@ -284,7 +274,7 @@ class XendNode:
         host_record = {self.uuid: {'name_label':self.name,
                                    'name_description':self.desc,
                                    'metrics_uuid': self.host_metrics_uuid,
-                                   'other_config': repr(self.other_config)}}
+                                   'other_config': self.other_config}}
         self.state_store.save_state('host',host_record)
         self.state_store.save_state('cpu', self.cpus)
         self.save_PIFs()
@@ -293,18 +283,21 @@ class XendNode:
         self.save_SRs()
 
     def save_PIFs(self):
-        pif_records = dict([(k, v.get_record())
-                            for k, v in self.pifs.items()])
+        pif_records = dict([(pif_uuid, XendAPIStore.get(
+                                 pif_uuid, "PIF").get_record())
+                            for pif_uuid in XendPIF.get_all()])
         self.state_store.save_state('pif', pif_records)
 
     def save_networks(self):
-        net_records = dict([(k, v.get_record_internal(False))
-                            for k, v in self.networks.items()])
+        net_records = dict([(network_uuid, XendAPIStore.get(
+                                 network_uuid, "network").get_record())
+                            for network_uuid in XendNetwork.get_all()])
         self.state_store.save_state('network', net_records)
 
     def save_PBDs(self):
-        pbd_records = dict([(v.get_uuid(), v.get_record())
-                            for v in XendPBD.get_all()])
+        pbd_records = dict([(pbd_uuid, XendAPIStore.get(
+                                 pbd_uuid, "PBD").get_record())
+                            for pbd_uuid in XendPBD.get_all()])
         self.state_store.save_state('pbd', pbd_records)
 
     def save_SRs(self):
@@ -330,9 +323,6 @@ class XendNode:
 
     def is_valid_cpu(self, cpu_ref):
         return (cpu_ref in self.cpus)
-
-    def is_valid_network(self, network_ref):
-        return (network_ref in self.networks)
 
     def is_valid_sr(self, sr_ref):
         return (sr_ref in self.srs)
@@ -495,12 +485,6 @@ class XendNode:
     # Network Functions
     #
     
-    def get_network_refs(self):
-        return self.networks.keys()
-
-    def get_network(self, network_ref):
-        return self.networks[network_ref]
-
     def bridge_to_network(self, bridge):
         """
         Determine which network a particular bridge is attached to.
@@ -518,13 +502,12 @@ class XendNode:
                 raise Exception(
                     'Could not find default bridge, and none was specified')
 
-        bridges = Brctl.get_state()
-        if bridge not in bridges:
-            raise Exception('Bridge %s is not up' % bridge)
-        for pif in self.pifs.values():
-            if pif.interface_name() in bridges[bridge]:
-                return pif.network
-        raise Exception('Bridge %s is not connected to a network' % bridge)
+        for network_uuid in XendNetwork.get_all():
+            network = XendAPIStore.get(network_uuid, "network")
+            if network.get_name_label() == bridge:
+                return network
+        else:
+            raise Exception('Cannot find network for bridge %s' % bridge)
 
     #
     # Debug keys.
@@ -641,12 +624,6 @@ class XendNode:
         return dict(self.physinfo())
     def info_dict(self):
         return dict(self.info())
-
-
-    def refreshBridges(self):
-        for pif in self.pifs.values():
-            pif.refresh(Brctl.get_state())
-
 
 def parse_proc_cpuinfo():
     cpuinfo = {}

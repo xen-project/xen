@@ -237,7 +237,8 @@ static int setup_compat_l4(struct vcpu *v)
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_page(pg, __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_paddr(__pa(v->domain->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
+        l4e_from_paddr(__pa(v->domain->arch.mm_perdomain_l3),
+                       __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_page(pg);
     v->arch.guest_table_user = v->arch.guest_table;
 
@@ -259,7 +260,7 @@ static void release_compat_l4(struct vcpu *v)
 
 static inline int may_switch_mode(struct domain *d)
 {
-    return (d->tot_pages == 0);
+    return (!is_hvm_domain(d) && (d->tot_pages == 0));
 }
 
 int switch_native(struct domain *d)
@@ -371,15 +372,12 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
-    if ( IS_COMPAT(d) && (rc = setup_compat_l4(v)) != 0 )
-        return rc;
-
-    return 0;
+    return (pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
 }
 
 void vcpu_destroy(struct vcpu *v)
 {
-    if ( IS_COMPAT(v->domain) )
+    if ( pv_32on64_vcpu(v) )
         release_compat_l4(v);
 }
 
@@ -491,7 +489,7 @@ void arch_domain_destroy(struct domain *d)
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
 
-    if ( IS_COMPAT(d) )
+    if ( pv_32on64_domain(d) )
         release_arg_xlat_area(d);
 
     free_xenheap_page(d->shared_info);
@@ -508,7 +506,7 @@ int arch_set_info_guest(
 
     /* The context is a compat-mode one if the target domain is compat-mode;
      * we expect the tools to DTRT even in compat-mode callers. */
-    compat = IS_COMPAT(d);
+    compat = pv_32on64_domain(d);
 
 #ifdef CONFIG_COMPAT
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
@@ -1268,7 +1266,7 @@ unsigned long hypercall_create_continuation(
         else
 #endif
         {
-            if ( supervisor_mode_kernel || is_hvm_vcpu(current) )
+            if ( supervisor_mode_kernel )
                 regs->eip &= ~31; /* re-execute entire hypercall entry stub */
 
             for ( i = 0; *p != '\0'; i++ )
@@ -1449,14 +1447,11 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     struct domain *d = v->domain;
     unsigned long pfn;
 
-#ifdef CONFIG_COMPAT
-    if ( IS_COMPAT(d) )
+#ifdef __x86_64__
+    if ( pv_32on64_vcpu(v) )
     {
-        if ( is_hvm_vcpu(v) )
-            pfn = pagetable_get_pfn(v->arch.guest_table);
-        else
-            pfn = l4e_get_pfn(*(l4_pgentry_t *)
-                              __va(pagetable_get_paddr(v->arch.guest_table)));
+        pfn = l4e_get_pfn(*(l4_pgentry_t *)
+                          __va(pagetable_get_paddr(v->arch.guest_table)));
 
         if ( pfn != 0 )
         {
@@ -1466,12 +1461,9 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
                 put_page_and_type(mfn_to_page(pfn));
         }
 
-        if ( is_hvm_vcpu(v) )
-            v->arch.guest_table = pagetable_null();
-        else
-            l4e_write(
-                (l4_pgentry_t *) __va(pagetable_get_paddr(v->arch.guest_table)),
-                l4e_empty());
+        l4e_write(
+            (l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)),
+            l4e_empty());
 
         v->arch.cr3 = 0;
         return;

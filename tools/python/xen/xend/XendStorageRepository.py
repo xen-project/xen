@@ -24,7 +24,7 @@ import sys
 
 from XendError import XendError
 from XendVDI import *
-import XendPBD
+from XendPBD import XendPBD
 
 XEND_STORAGE_NO_MAXIMUM = sys.maxint
 

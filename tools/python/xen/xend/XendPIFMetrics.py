@@ -15,15 +15,30 @@
 # Copyright (c) 2006-2007 Xensource Inc.
 #============================================================================
 
+from XendBase import XendBase
 
-class XendPIFMetrics:
+class XendPIFMetrics(XendBase):
     """PIF Metrics."""
-    
-    def __init__(self, uuid):
-        self.uuid = uuid
 
-    def set_PIF(self, pif):
-        self.pif = pif
+    def getClass(self):
+        return "PIF_metrics"
+    
+    def getAttrRO(self):
+        attrRO =  ['io_read_kbs',
+                   'io_write_kbs',
+                   'last_updated',
+                   'pif']
+        return XendBase.getAttrRO() + attrRO
+
+    getClass    = classmethod(getClass)
+    getAttrRO   = classmethod(getAttrRO)
+
+    def __init__(self, uuid, pif_uuid):
+        XendBase.__init__(self, uuid, {})
+        self.pif_uuid = pif_uuid
+
+    def get_pif(self):
+        return self.pif_uuid
 
     def get_io_read_kbs(self):
         return self._get_stat(0)
@@ -33,19 +48,12 @@ class XendPIFMetrics:
 
     def _get_stat(self, n):
         from xen.xend.XendNode import instance as xennode
-        pifname = self.pif.device
-        pifs_util = xennode().monitor.get_pifs_util()
-        if pifname in pifs_util:
-            return pifs_util[pifname][n]
+        #pifname = self.pif.device
+        #pifs_util = xennode().monitor.get_pifs_util()
+        #if pifname in pifs_util:
+        #    return pifs_util[pifname][n]
         return 0.0
 
     def get_last_updated(self):
         import xen.xend.XendAPI as XendAPI
         return XendAPI.now()
-
-    def get_record(self):
-        return {'uuid'         : self.uuid,
-                'io_read_kbs'  : self.get_io_read_kbs(),
-                'io_write_kbs' : self.get_io_write_kbs(),
-                'last_updated' : self.get_last_updated(),
-                }

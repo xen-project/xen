@@ -870,7 +870,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Get the size of the P2M table */
-    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
+    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
 
     /* Domain is still running at this point */
     if ( live )
