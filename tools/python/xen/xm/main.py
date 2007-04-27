@@ -569,14 +569,14 @@ def get_single_vm(dom):
 
         try:
             domid = int(dom)
-            uuids = [server.xenapi.VM.get_domid(vm_ref)
-                     for vm_ref in server.xenapi.VM.get_all()
-                     if int(server.xenapi.VM.get_domid(vm_ref)) == domid]
+            refs = [vm_ref
+                    for vm_ref in server.xenapi.VM.get_all()
+                    if int(server.xenapi.VM.get_domid(vm_ref)) == domid]
         except:
             pass
             
-        if len(uuids) > 0:
-            return uuids[0]
+        if len(refs) > 0:
+            return refs[0]
 
         raise OptionError("Domain '%s' not found." % dom)
     else:
@@ -747,15 +747,15 @@ def getDomains(domain_names, state, full = 0):
         doms_dict = []
 
         dom_recs = server.xenapi.VM.get_all_records()
-        dom_metrics_recs = dict(map(lambda x: (x['uuid'], x), server.xenapi.VM_metrics.get_all_records()))
+        dom_metrics_recs = server.xenapi.VM_metrics.get_all_records()
 
-        for dom_rec in dom_recs:
-            dom_metrics  = dom_metrics_recs[dom_rec['metrics']]
+        for dom_ref, dom_rec in dom_recs.items():
+            dom_metrics_rec = dom_metrics_recs[dom_rec['metrics']]
 
             states = ('running', 'blocked', 'paused', 'shutdown',
                       'crashed', 'dying')
             def state_on_off(state):
-                if state in dom_metrics['state']:
+                if state in dom_metrics_rec['state']:
                     return state[0]
                 else:
                     return "-"
@@ -763,12 +763,12 @@ def getDomains(domain_names, state, full = 0):
                                  for state in states])
             
             dom_rec.update({'name':     dom_rec['name_label'],
-                            'memory_actual': int(dom_metrics['memory_actual'])/1024,
-                            'vcpus':    dom_metrics['VCPUs_number'],
+                            'memory_actual': int(dom_metrics_rec['memory_actual'])/1024,
+                            'vcpus':    dom_metrics_rec['VCPUs_number'],
                             'state':    state_str,
-                            'cpu_time': dom_metrics['VCPUs_utilisation'],
+                            'cpu_time': dom_metrics_rec['VCPUs_utilisation'],
                             'start_time': datetime_to_secs(
-                                              dom_metrics['start_time'])})
+                                              dom_metrics_rec['start_time'])})
 
             doms_sxp.append(['domain'] + map2sxp(dom_rec))
             doms_dict.append(dom_rec)
@@ -2075,9 +2075,9 @@ def xm_network_attach(args):
 
         def get_net_from_bridge(bridge):
             # In OSS, we just assert network.name_label == bridge name
-            networks = dict([(record['name_label'], record['uuid'])
-                             for record in server.xenapi.network
-                             .get_all_records()])
+            networks = dict([(record['name_label'], ref)
+                             for ref, record in server.xenapi.network
+                             .get_all_records().items()])
             if bridge not in networks.keys():
                 raise "Unknown bridge name!"
             return networks[bridge]
@@ -2251,35 +2251,29 @@ def xm_network_del(args):
     arg_check(args, "network-del", 1)
     network = args[0]
 
-    networks = dict([(record['name_label'], record['uuid'])
-                     for record in
-                     server.xenapi.network.get_all_records()])
+    networks = dict([(record['name_label'], ref)
+                     for ref, record in
+                     server.xenapi.network.get_all_records().items()])
 
     if network not in networks.keys():
         raise ValueError("'%s' is not a valid network name" % network)
     
     server.xenapi.network.destroy(networks[network])
 
-def uuid_dict_trans(records):
-    return dict([(record['uuid'], record)
-                 for record in records])
-
 def xm_network_show(args):
     xenapi_only()
     arg_check(args, "network-show", 0)
 
     networks = server.xenapi.network.get_all_records()
-    pifs     = uuid_dict_trans(
-        server.xenapi.PIF.get_all_records())
-    vifs     = uuid_dict_trans(
-        server.xenapi.VIF.get_all_records())
+    pifs     = server.xenapi.PIF.get_all_records()
+    vifs     = server.xenapi.VIF.get_all_records()
 
     print '%-20s %-40s %-10s' % \
           ('Name', 'VIFs', 'PIFs')
     
     format2 = "%(name_label)-20s %(vif)-40s %(pif)-10s"
 
-    for network in networks:
+    for network_ref, network in networks.items():
         for i in range(max(len(network['PIFs']),
                            len(network['VIFs']), 1)):
             if i < len(network['PIFs']):
@@ -2292,7 +2286,7 @@ def xm_network_show(args):
             else:
                 vif_uuid = None
                 
-            pif = pifs.get(pif_uuid, {'device':''}) 
+            pif = pifs.get(pif_uuid, None) 
             vif = vifs.get(vif_uuid, None)
 
             if vif:

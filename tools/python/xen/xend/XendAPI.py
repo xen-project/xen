@@ -553,8 +553,8 @@ class XendAPI(object):
 
             def _get_all_records(_api_cls):
                 return lambda s, session: \
-                    xen_api_success([unpack(getattr(cls, '%s_get_record' % _api_cls)(s, session, ref))\
-                                     for ref in unpack(getattr(cls, '%s_get_all' % _api_cls)(s, session))])
+                    xen_api_success(dict([(ref, unpack(getattr(cls, '%s_get_record' % _api_cls)(s, session, ref)))\
+                                          for ref in unpack(getattr(cls, '%s_get_all' % _api_cls)(s, session))]))
 
             setattr(cls, get_by_uuid, _get_by_uuid)
             setattr(cls, get_uuid,    _get_uuid)

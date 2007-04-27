@@ -118,8 +118,8 @@ class XendBase:
             raise "Big Error.. TODO!"
 
     def get_all_records(cls):
-        return [inst.get_record()
-                for inst in XendAPIStore.get_all(cls.getClass())]
+        return dict([(inst.get_uuid(), inst.get_record())
+                     for inst in XendAPIStore.get_all(cls.getClass())])
 
     get_all = classmethod(get_all)
     get_by_uuid = classmethod(get_by_uuid)
