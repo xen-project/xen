@@ -1336,7 +1336,7 @@ static void handle_input(struct connection *conn)
 
 	bytes = conn->read(conn, in->buffer + in->used,
 			   in->hdr.msg.len - in->used);
-	if (bytes < 0)
+	if (bytes <= 0)
 		goto bad_client;
 
 	in->used += bytes;
