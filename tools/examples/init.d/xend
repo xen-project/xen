@@ -6,6 +6,18 @@
 #
 # chkconfig: 2345 98 01
 # description: Starts and stops the Xen control daemon.
+### BEGIN INIT INFO
+# Provides:          xend
+# Required-Start:    $syslog $remote_fs
+# Should-Start:
+# Required-Stop:     $syslog $remote_fs
+# Should-Stop:
+# Default-Start:     3 4 5
+# Default-Stop:      0 1 2 6
+# Default-Enabled:   yes
+# Short-Description: Start/stop xend
+# Description:       Starts and stops the Xen control daemon.
+### END INIT INFO
 
 if ! grep -q "control_d" /proc/xen/capabilities ; then
 	exit 0
