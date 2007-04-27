@@ -580,12 +580,9 @@ class XendDomainInfo:
         log.debug("Setting memory target of domain %s (%s) to %d MiB.",
                   self.info['name_label'], str(self.domid), target)
         
-        if target <= 0:
-            raise XendError('Invalid memory size')
-        
         MiB = 1024 * 1024
-        self.info['memory_dynamic_min'] = target * MiB
-        self.info['memory_dynamic_max'] = target * MiB
+        self._safe_set_memory('memory_dynamic_min', target * MiB)
+        self._safe_set_memory('memory_dynamic_max', target * MiB)
 
         if self.domid >= 0:
             self.storeVm("memory", target)
@@ -2134,14 +2131,24 @@ class XendDomainInfo:
     def get_memory_dynamic_min(self):
         return self.info.get('memory_dynamic_min', 0)
 
+    # only update memory-related config values if they maintain sanity 
+    def _safe_set_memory(self, key, newval):
+        oldval = self.info.get(key, 0)
+        try:
+            self.info[key] = newval
+            self.info._memory_sanity_check()
+        except Exception, ex:
+            self.info[key] = oldval
+            raise 
+    
     def set_memory_static_max(self, val):
-        self.info['memory_static_max'] = val
+        self._safe_set_memory('memory_static_max', val)
     def set_memory_static_min(self, val):
-        self.info['memory_static_min'] = val
+        self._safe_set_memory('memory_static_min', val)
     def set_memory_dynamic_max(self, val):
-        self.info['memory_dynamic_max'] = val
+        self._safe_set_memory('memory_dynamic_max', val)
     def set_memory_dynamic_min(self, val):
-        self.info['memory_dynamic_min'] = val
+        self._safe_set_memory('memory_dynamic_min', val)
     
     def get_vcpus_params(self):
         if self.getDomid() is None:
