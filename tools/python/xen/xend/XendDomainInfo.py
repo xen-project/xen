@@ -1419,6 +1419,9 @@ class XendDomainInfo:
                 raise VmError("HVM guest support is unavailable: is VT/AMD-V "
                               "supported by your CPU and enabled in your "
                               "BIOS?")
+            # Hack to pre-reserve some memory for HVM setup.
+            # Needed because Xen allocates 1MB by default immediately.
+            balloon.free(2*1024) # 2MB should be plenty
 
         self.domid = xc.domain_create(
             domid = 0,
