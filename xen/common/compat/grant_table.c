@@ -133,7 +133,7 @@ int compat_grant_table_op(unsigned int cmd,
             break;
 
         case GNTTABOP_transfer:
-            for ( n = 0; i < COMPAT_ARG_XLAT_SIZE / sizeof(*nat.xfer) && i < count && rc == 0; ++i, ++n )
+            for ( n = 0; n < COMPAT_ARG_XLAT_SIZE / sizeof(*nat.xfer) && i < count && rc == 0; ++i, ++n )
             {
                 if ( unlikely(__copy_from_guest_offset(&cmp.xfer, cmp_uop, i, 1)) )
                     rc = -EFAULT;
@@ -160,7 +160,7 @@ int compat_grant_table_op(unsigned int cmd,
             break;
 
         case GNTTABOP_copy:
-            for ( n = 0; i < COMPAT_ARG_XLAT_SIZE / sizeof(*nat.copy) && i < count && rc == 0; ++i, ++n )
+            for ( n = 0; n < COMPAT_ARG_XLAT_SIZE / sizeof(*nat.copy) && i < count && rc == 0; ++i, ++n )
             {
                 if ( unlikely(__copy_from_guest_offset(&cmp.copy, cmp_uop, i, 1)) )
                     rc = -EFAULT;
