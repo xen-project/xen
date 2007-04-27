@@ -93,7 +93,22 @@ def linux_set_mtu(iface, mtu):
 def _create_VLAN(dev, vlan):
     rc, _ = commands.getstatusoutput('vconfig add %s %d' %
                                      (dev, vlan))
-    return rc == 0   
+    if rc != 0:
+        return False
+
+    rc, _ = commands.getstatusoutput('ifconfig %s.%d up' %
+                                     (dev, vlan))
+    return rc == 0
+
+def _destroy_VLAN(dev, vlan):
+    rc, _ = commands.getstatusoutput('ifconfig %s.%d down' %
+                                     (dev, vlan))
+    if rc != 0:
+        return False
+                                     
+    rc, _ = commands.getstatusoutput('vconfig rem %s.%d' %
+                                     (dev, vlan))
+    return rc == 0
 
 class XendPIF(XendBase):
     """Representation of a Physical Network Interface."""
@@ -105,13 +120,13 @@ class XendPIF(XendBase):
         attrRO = ['network',
                   'host',
                   'metrics',
-                  'device']
+                  'device',
+                  'VLAN']
         return XendBase.getAttrRO() + attrRO
     
     def getAttrRW(self):
         attrRW = ['MAC',
-                  'MTU',
-                  'VLAN']
+                  'MTU']
         return XendBase.getAttrRW() + attrRW
 
     def getAttrInst(self):
@@ -124,7 +139,8 @@ class XendPIF(XendBase):
 
     def getMethods(self):
         methods = ['plug',
-                   'unplug']
+                   'unplug',
+                   'destroy']
         return XendBase.getMethods() + methods
 
     def getFuncs(self):
@@ -189,12 +205,13 @@ class XendPIF(XendBase):
         ifs = [dev for dev, _1, _2 in linux_get_phy_ifaces()]
         if pif.get_VLAN() == -1:
             if pif.get_device() not in ifs:
-                del pif
-                del metrics
+                pif.destroy()
+                metrics.destroy()
                 return None
         else:
             if pif.get_interface_name() not in ifs:
                 _create_VLAN(pif.get_device(), pif.get_VLAN())
+                pif.plug()
 
         return pif_uuid
 
@@ -218,12 +235,12 @@ class XendPIF(XendBase):
             raise DeviceExistsError("%s.%d" % (device, vlan))
 
         # Check network ref is valid
-        from xen.xend import XendNode
-        network_uuids = XendNode.instance().networks
-        if network_uuid in network_uuids:
-            raise InvalidHandleError("Network", network_ref)
+        from XendNetwork import XendNetwork
+        if network_uuid not in XendNetwork.get_all():
+            raise InvalidHandleError("Network", network_uuid)
 
         # Check host_ref is this host
+        import XendNode
         if host_ref != XendNode.instance().get_uuid():
             raise InvalidHandleError("Host", host_ref)
 
@@ -239,20 +256,18 @@ class XendPIF(XendBase):
             "device":  device,
             "MAC":     '',
             "MTU":     '',
-            "network": network_ref,
+            "network": network_uuid,
             "VLAN":    vlan
             }
 
         # Create instances
         metrics = XendPIFMetrics(metrics_uuid, pif_uuid)
         pif = XendPIF(record, pif_uuid, metrics_uuid)
-        
-        # Add it to list of PIFs
-        XendNode.instance().pifs.append(pif_ref)        
 
-        # Add it to network
-        network.add_pif(pif_ref)
+        # Not sure if they should be created plugged or not...
+        pif.plug()
 
+        XendNode.instance().save_PIFs()
         return pif_uuid
 
     create_phy  = classmethod(create_phy)
@@ -269,6 +284,7 @@ class XendPIF(XendBase):
                                    "network")
         bridge_name = network.get_name_label()
 
+        from xen.util import Brctl
         Brctl.vif_bridge_add({
             "bridge": bridge_name,
             "vif":    self.get_interface_name()
@@ -276,7 +292,30 @@ class XendPIF(XendBase):
 
     def unplug(self):
         """Unplug the PIF from the network"""
-        pass
+        network = XendAPIStore.get(self.network,
+                                   "network")
+        bridge_name = network.get_name_label()
+
+        from xen.util import Brctl
+        Brctl.vif_bridge_rem({
+            "bridge": bridge_name,
+            "vif":    self.get_interface_name()
+            })
+
+    def destroy(self):
+        # Figure out if this is a physical device
+        if self.get_interface_name() == \
+           self.get_device():
+            raise PIFIsPhysical(self.get_uuid())
+
+        self.unplug()
+
+        if _destroy_VLAN(self.get_device(), self.get_VLAN()):
+            XendBase.destroy(self)
+            import XendNode
+            XendNode.instance().save_PIFs()
+        else:
+            raise NetworkError("Unable to delete VLAN", self.get_uuid())
 
     def get_interface_name(self):
         if self.get_VLAN() == -1:
@@ -310,6 +349,8 @@ class XendPIF(XendBase):
         success = linux_set_mac(self.device, new_mac)
         if success:
             self.MAC = new_mac
+            import XendNode
+            XendNode.instance().save_PIFs()
         return success
 
     def get_MTU(self):
@@ -319,10 +360,9 @@ class XendPIF(XendBase):
         success = linux_set_mtu(self.device, new_mtu)
         if success:
             self.MTU = new_mtu
+            import XendNode
+            XendNode.instance().save_PIFs()
         return success
 
     def get_VLAN(self):
         return self.VLAN
-
-    def set_VLAN(self, VLAN):
-        pass
