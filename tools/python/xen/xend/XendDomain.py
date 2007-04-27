@@ -293,10 +293,12 @@ class XendDomain:
                                 width = 78)
                 finally:
                     f.close()
+                    
                 try:
-                    os.rename(fn, self._managed_config_path(dom_uuid))
+                    shutil.move(fn, self._managed_config_path(dom_uuid))
                 except:
-                    log.exception("Renaming %s" % fn)
+                    log.exception("Renaming %s to %s", fn,
+                                  self._managed_config_path(dom_uuid))
                     os.remove(fn)
             except:
                 log.exception("Error occurred saving configuration file " +
