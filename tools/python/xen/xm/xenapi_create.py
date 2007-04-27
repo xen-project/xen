@@ -403,7 +403,7 @@ class xenapi_create:
             else:
                 networks = dict([(record['name_label'], record['uuid'])
                                  for record in
-                                 server.xenapi.network.get_all_record()])
+                                 server.xenapi.network.get_all_records()])
                 if network_name in networks.keys():
                     network_uuid = networks[network_name]
                 else:
