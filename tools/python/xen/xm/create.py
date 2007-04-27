@@ -777,8 +777,11 @@ def make_config(vals):
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
             config.append(['bootloader_args', vals.bootargs])
-        else: 
-            config.append(['bootloader_args', '-q'])        
+        else:
+            if vals.console_autoconnect:
+                config.append(['bootloader_args', ''])
+            else:
+                config.append(['bootloader_args', '-q'])
     config.append(['image', config_image])
 
     config_devs = []
