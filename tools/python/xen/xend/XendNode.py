@@ -141,7 +141,10 @@ class XendNode:
         saved_networks = self.state_store.load_state('network')
         if saved_networks:
             for net_uuid, network in saved_networks.items():
-                XendNetwork.recreate(network, net_uuid)
+                try:
+                    XendNetwork.recreate(network, net_uuid)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating network %s", net_uuid)
                 
         # Next discover any existing bridges and check
         # they are not already configured
@@ -161,8 +164,11 @@ class XendNode:
         saved_pifs = self.state_store.load_state('pif')
         if saved_pifs:
             for pif_uuid, pif in saved_pifs.items():
-                XendPIF.recreate(pif, pif_uuid)
- 
+                try:
+                    XendPIF.recreate(pif, pif_uuid)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating PIF %s", pif_uuid)
+        
         # Next discover any existing PIFs and check
         # they are not already configured
         configured_pifs = [XendAPIStore.get(
@@ -217,7 +223,10 @@ class XendNode:
         saved_pbds = self.state_store.load_state('pbd')
         if saved_pbds:
             for pbd_uuid, pbd_cfg in saved_pbds.items():
-                XendPBD.recreate(pbd_uuid, pbd_cfg)
+                try:
+                    XendPBD.recreate(pbd_uuid, pbd_cfg)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating PBD %s", pbd_uuid) 
 
 ##    def network_destroy(self, net_uuid):
  ##       del self.networks[net_uuid]
