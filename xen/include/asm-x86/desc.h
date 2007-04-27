@@ -64,7 +64,7 @@
 #define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
 
 #if defined(__x86_64__)
-#define GUEST_KERNEL_RPL(d) (!IS_COMPAT(d) ? 3 : 1)
+#define GUEST_KERNEL_RPL(d) (is_pv_32bit_domain(d) ? 1 : 3)
 #elif defined(__i386__)
 #define GUEST_KERNEL_RPL(d) ((void)(d), 1)
 #endif
@@ -104,7 +104,7 @@
  */
 #define guest_gate_selector_okay(d, sel)                                \
     ((((sel)>>3) < FIRST_RESERVED_GDT_ENTRY) || /* Guest seg? */        \
-     ((sel) == (!IS_COMPAT(d) ?                                         \
+     ((sel) == (!is_pv_32on64_domain(d) ?                               \
                 FLAT_KERNEL_CS :                /* Xen default seg? */  \
                 FLAT_COMPAT_KERNEL_CS)) ||                              \
      ((sel) & 4))                               /* LDT seg? */

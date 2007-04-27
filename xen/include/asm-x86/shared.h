@@ -3,66 +3,66 @@
 
 #ifdef CONFIG_COMPAT
 
-#define nmi_reason(d) (!IS_COMPAT(d) ? \
+#define nmi_reason(d) (!has_32bit_shinfo(d) ?                              \
                        (void *)&(d)->shared_info->native.arch.nmi_reason : \
                        (void *)&(d)->shared_info->compat.arch.nmi_reason)
 
-#define GET_SET_SHARED(type, field) \
-static inline type arch_get_##field(const struct domain *d) \
-{ \
-    return !IS_COMPAT(d) ? \
-           d->shared_info->native.arch.field : \
-           d->shared_info->compat.arch.field; \
-} \
-static inline void arch_set_##field(struct domain *d, \
-                                    type val) \
-{ \
-    if ( !IS_COMPAT(d) ) \
-        d->shared_info->native.arch.field = val; \
-    else \
-        d->shared_info->compat.arch.field = val; \
+#define GET_SET_SHARED(type, field)                             \
+static inline type arch_get_##field(const struct domain *d)     \
+{                                                               \
+    return !has_32bit_shinfo(d) ?                               \
+           d->shared_info->native.arch.field :                  \
+           d->shared_info->compat.arch.field;                   \
+}                                                               \
+static inline void arch_set_##field(struct domain *d,           \
+                                    type val)                   \
+{                                                               \
+    if ( !has_32bit_shinfo(d) )                                 \
+        d->shared_info->native.arch.field = val;                \
+    else                                                        \
+        d->shared_info->compat.arch.field = val;                \
 }
 
-#define GET_SET_VCPU(type, field) \
-static inline type arch_get_##field(const struct vcpu *v) \
-{ \
-    return !IS_COMPAT(v->domain) ? \
-           v->vcpu_info->native.arch.field : \
-           v->vcpu_info->compat.arch.field; \
-} \
-static inline void arch_set_##field(struct vcpu *v, \
-                                    type val) \
-{ \
-    if ( !IS_COMPAT(v->domain) ) \
-        v->vcpu_info->native.arch.field = val; \
-    else \
-        v->vcpu_info->compat.arch.field = val; \
+#define GET_SET_VCPU(type, field)                               \
+static inline type arch_get_##field(const struct vcpu *v)       \
+{                                                               \
+    return !has_32bit_shinfo(v->domain) ?                       \
+           v->vcpu_info->native.arch.field :                    \
+           v->vcpu_info->compat.arch.field;                     \
+}                                                               \
+static inline void arch_set_##field(struct vcpu *v,             \
+                                    type val)                   \
+{                                                               \
+    if ( !has_32bit_shinfo(v->domain) )                         \
+        v->vcpu_info->native.arch.field = val;                  \
+    else                                                        \
+        v->vcpu_info->compat.arch.field = val;                  \
 }
 
 #else
 
 #define nmi_reason(d) ((void *)&(d)->shared_info->arch.nmi_reason)
 
-#define GET_SET_SHARED(type, field) \
-static inline type arch_get_##field(const struct domain *d) \
-{ \
-    return d->shared_info->arch.field; \
-} \
-static inline void arch_set_##field(struct domain *d, \
-                                    type val) \
-{ \
-    d->shared_info->arch.field = val; \
+#define GET_SET_SHARED(type, field)                             \
+static inline type arch_get_##field(const struct domain *d)     \
+{                                                               \
+    return d->shared_info->arch.field;                          \
+}                                                               \
+static inline void arch_set_##field(struct domain *d,           \
+                                    type val)                   \
+{                                                               \
+    d->shared_info->arch.field = val;                           \
 }
 
-#define GET_SET_VCPU(type, field) \
-static inline type arch_get_##field(const struct vcpu *v) \
-{ \
-    return v->vcpu_info->arch.field; \
-} \
-static inline void arch_set_##field(struct vcpu *v, \
-                                    type val) \
-{ \
-    v->vcpu_info->arch.field = val; \
+#define GET_SET_VCPU(type, field)                               \
+static inline type arch_get_##field(const struct vcpu *v)       \
+{                                                               \
+    return v->vcpu_info->arch.field;                            \
+}                                                               \
+static inline void arch_set_##field(struct vcpu *v,             \
+                                    type val)                   \
+{                                                               \
+    v->vcpu_info->arch.field = val;                             \
 }
 #endif
 

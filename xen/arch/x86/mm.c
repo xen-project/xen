@@ -149,8 +149,8 @@ unsigned long total_pages;
 
 #ifdef CONFIG_COMPAT
 l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
-#define l3_disallow_mask(d) (!IS_COMPAT(d) ? \
-                             L3_DISALLOW_MASK : \
+#define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
+                             L3_DISALLOW_MASK :         \
                              COMPAT_L3_DISALLOW_MASK)
 #else
 #define l3_disallow_mask(d) L3_DISALLOW_MASK
@@ -721,7 +721,7 @@ get_page_from_l4e(
 #define adjust_guest_l1e(pl1e, d)                                            \
     do {                                                                     \
         if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) &&                \
-             likely(!IS_COMPAT(d)) )                                         \
+             likely(!is_pv_32on64_domain(d)) )                               \
         {                                                                    \
             /* _PAGE_GUEST_KERNEL page cannot have the Global bit set. */    \
             if ( (l1e_get_flags((pl1e)) & (_PAGE_GUEST_KERNEL|_PAGE_GLOBAL)) \
@@ -738,7 +738,7 @@ get_page_from_l4e(
 #define adjust_guest_l1e(pl1e, d)                               \
     do {                                                        \
         if ( likely(l1e_get_flags((pl1e)) & _PAGE_PRESENT) &&   \
-             likely(!IS_COMPAT(d)) )                            \
+             likely(!is_pv_32on64_domain(d)) )                  \
             l1e_add_flags((pl1e), _PAGE_USER);                  \
     } while ( 0 )
 #endif
@@ -746,22 +746,22 @@ get_page_from_l4e(
 #define adjust_guest_l2e(pl2e, d)                               \
     do {                                                        \
         if ( likely(l2e_get_flags((pl2e)) & _PAGE_PRESENT) &&   \
-             likely(!IS_COMPAT(d)) )                            \
+             likely(!is_pv_32on64_domain(d)) )                  \
             l2e_add_flags((pl2e), _PAGE_USER);                  \
     } while ( 0 )
 
-#define adjust_guest_l3e(pl3e, d)                               \
-    do {                                                        \
-        if ( likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )    \
-            l3e_add_flags((pl3e), likely(!IS_COMPAT(d)) ?       \
-                                         _PAGE_USER :           \
-                                         _PAGE_USER|_PAGE_RW);  \
+#define adjust_guest_l3e(pl3e, d)                                   \
+    do {                                                            \
+        if ( likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )        \
+            l3e_add_flags((pl3e), likely(!is_pv_32on64_domain(d)) ? \
+                                         _PAGE_USER :               \
+                                         _PAGE_USER|_PAGE_RW);      \
     } while ( 0 )
 
 #define adjust_guest_l4e(pl4e, d)                               \
     do {                                                        \
         if ( likely(l4e_get_flags((pl4e)) & _PAGE_PRESENT) &&   \
-             likely(!IS_COMPAT(d)) )                            \
+             likely(!is_pv_32on64_domain(d)) )                  \
             l4e_add_flags((pl4e), _PAGE_USER);                  \
     } while ( 0 )
 
@@ -774,11 +774,11 @@ get_page_from_l4e(
 #endif
 
 #ifdef CONFIG_COMPAT
-#define unadjust_guest_l3e(pl3e, d)                             \
-    do {                                                        \
-        if ( unlikely(IS_COMPAT(d)) &&                          \
-             likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )    \
-            l3e_remove_flags((pl3e), _PAGE_USER|_PAGE_RW|_PAGE_ACCESSED); \
+#define unadjust_guest_l3e(pl3e, d)                                         \
+    do {                                                                    \
+        if ( unlikely(is_pv_32on64_domain(d)) &&                            \
+             likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )                \
+            l3e_remove_flags((pl3e), _PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);   \
     } while ( 0 )
 #else
 #define unadjust_guest_l3e(_p, _d) ((void)(_d))
@@ -910,11 +910,10 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
 #ifndef CONFIG_COMPAT
     l2_pgentry_t     l2e;
     int              i;
-#else
-
-    if ( !IS_COMPAT(d) )
-        return 1;
 #endif
+
+    if ( !is_pv_32bit_domain(d) )
+        return 1;
 
     pl3e = (l3_pgentry_t *)((unsigned long)pl3e & PAGE_MASK);
 
@@ -1109,13 +1108,13 @@ static int alloc_l3_table(struct page_info *page)
      * 512 entries must be valid/verified, which is most easily achieved
      * by clearing them out.
      */
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
         memset(pl3e + 4, 0, (L3_PAGETABLE_ENTRIES - 4) * sizeof(*pl3e));
 
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {
 #if defined(CONFIG_X86_PAE) || defined(CONFIG_COMPAT)
-        if ( (CONFIG_PAGING_LEVELS < 4 || IS_COMPAT(d)) && i == 3 )
+        if ( is_pv_32bit_domain(d) && (i == 3) )
         {
             if ( !(l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ||
                  (l3e_get_flags(pl3e[i]) & l3_disallow_mask(d)) ||
@@ -1179,7 +1178,7 @@ static int alloc_l4_table(struct page_info *page)
     pl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_page(virt_to_page(d->arch.mm_perdomain_l3),
                       __PAGE_HYPERVISOR);
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
         pl4e[l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
             l4e_from_page(virt_to_page(d->arch.mm_arg_xlat_l3),
                           __PAGE_HYPERVISOR);
@@ -1446,8 +1445,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
      * Disallow updates to final L3 slot. It contains Xen mappings, and it
      * would be a pain to ensure they remain continuously valid throughout.
      */
-    if ( (CONFIG_PAGING_LEVELS < 4 || IS_COMPAT(d)) &&
-         pgentry_ptr_to_slot(pl3e) >= 3 )
+    if ( is_pv_32bit_domain(d) && (pgentry_ptr_to_slot(pl3e) >= 3) )
         return 0;
 #endif 
 
@@ -1794,7 +1792,7 @@ int new_guest_cr3(unsigned long mfn)
     unsigned long old_base_mfn;
 
 #ifdef CONFIG_COMPAT
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
     {
         okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
@@ -2026,7 +2024,7 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_PIN_L4_TABLE:
-            if ( IS_COMPAT(FOREIGNDOM) )
+            if ( is_pv_32bit_domain(FOREIGNDOM) )
                 break;
             type = PGT_l4_page_table;
 
@@ -2771,7 +2769,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             flush_tlb_mask(d->domain_dirty_cpumask);
             break;
         default:
-            if ( unlikely(!IS_COMPAT(d) ?
+            if ( unlikely(!is_pv_32on64_domain(d) ?
                           get_user(vmask, (unsigned long *)bmap_ptr) :
                           get_user(vmask, (unsigned int *)bmap_ptr)) )
                 rc = -EFAULT;
@@ -2793,7 +2791,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             flush_tlb_one_mask(d->domain_dirty_cpumask, va);
             break;
         default:
-            if ( unlikely(!IS_COMPAT(d) ?
+            if ( unlikely(!is_pv_32on64_domain(d) ?
                           get_user(vmask, (unsigned long *)bmap_ptr) :
                           get_user(vmask, (unsigned int *)bmap_ptr)) )
                 rc = -EFAULT;
@@ -3250,7 +3248,7 @@ static int ptwr_emulated_update(
     nl1e = l1e_from_intpte(val);
     if ( unlikely(!get_page_from_l1e(gl1e_to_ml1e(d, nl1e), d)) )
     {
-        if ( (CONFIG_PAGING_LEVELS == 3 || IS_COMPAT(d)) &&
+        if ( (CONFIG_PAGING_LEVELS >= 3) && is_pv_32bit_domain(d) &&
              (bytes == 4) && (addr & 4) && !do_cmpxchg &&
              (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
         {
@@ -3387,7 +3385,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 
     ptwr_ctxt.ctxt.regs = regs;
     ptwr_ctxt.ctxt.addr_size = ptwr_ctxt.ctxt.sp_size =
-        IS_COMPAT(d) ? 32 : BITS_PER_LONG;
+        is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
     ptwr_ctxt.cr2 = addr;
     ptwr_ctxt.pte = pte;
 

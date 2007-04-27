@@ -7,18 +7,16 @@
 #include <asm/hvm/domain.h>
 #include <asm/e820.h>
 
+#define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
+#define is_pv_32bit_domain(d)  ((d)->arch.is_32bit_pv)
+#define is_pv_32bit_vcpu(v)    (is_pv_32bit_domain((v)->domain))
 #ifdef __x86_64__
-#define pv_32bit_vcpu(v)    (!is_hvm_vcpu(v) && IS_COMPAT((v)->domain))
-#define pv_32bit_domain(d)  (!is_hvm_domain(d) && IS_COMPAT(d))
-#define pv_32on64_vcpu(v)   (pv_32bit_vcpu(v))
-#define pv_32on64_domain(d) (pv_32bit_domain(d))
+#define is_pv_32on64_domain(d) (is_pv_32bit_domain(d))
 #else
-#define pv_32bit_vcpu(v)    (!is_hvm_vcpu(v))
-#define pv_32bit_domain(d)  (!is_hvm_domain(d))
-#define pv_32on64_vcpu(v)   (0)
-#define pv_32on64_domain(d) (0)
+#define is_pv_32on64_domain(d) (0)
 #endif
-
+#define is_pv_32on64_vcpu(v)   (is_pv_32on64_domain((v)->domain))
+#define IS_COMPAT(d)           (is_pv_32on64_domain(d))
 
 struct trap_bounce {
     uint32_t      error_code;
@@ -213,6 +211,11 @@ struct arch_domain
 
     /* Maximum physical-address bitwidth supported by this guest. */
     unsigned int physaddr_bitsize;
+
+    /* Is a 32-bit PV (non-HVM) guest? */
+    bool_t is_32bit_pv;
+    /* Is shared-info page in 32-bit format? */
+    bool_t has_32bit_shinfo;
 } __cacheline_aligned;
 
 #ifdef CONFIG_X86_PAE

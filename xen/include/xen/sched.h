@@ -188,8 +188,6 @@ struct domain
     bool_t           is_privileged;
     /* Is this guest being debugged by dom0? */
     bool_t           debugger_attached;
-    /* Is a 'compatibility mode' guest (semantics are arch specific)? */
-    bool_t           is_compat;
     /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
     bool_t           is_polling;
     /* Is this guest dying (i.e., a zombie)? */
@@ -489,10 +487,8 @@ static inline void vcpu_unblock(struct vcpu *v)
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 
-#ifdef CONFIG_COMPAT
-#define IS_COMPAT(_d) ((_d)->is_compat)
-#else
-#define IS_COMPAT(_d) 0
+#ifndef IS_COMPAT
+#define IS_COMPAT(d) 0
 #endif
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))

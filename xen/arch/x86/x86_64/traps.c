@@ -179,7 +179,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 
 void toggle_guest_mode(struct vcpu *v)
 {
-    if ( IS_COMPAT(v->domain) )
+    if ( is_pv_32bit_vcpu(v) )
         return;
     v->arch.flags ^= TF_kernel_mode;
     __asm__ __volatile__ ( "swapgs" );
@@ -534,7 +534,7 @@ void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
     if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
-    else if ( !IS_COMPAT(d) )
+    else if ( !is_pv_32bit_domain(d) )
         hypercall_page_initialise_ring3_kernel(hypercall_page);
     else
         hypercall_page_initialise_ring1_kernel(hypercall_page);

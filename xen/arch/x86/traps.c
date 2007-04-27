@@ -124,7 +124,7 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     if ( is_hvm_vcpu(current) )
         return;
 
-    if ( IS_COMPAT(container_of(regs, struct cpu_info, guest_cpu_user_regs)->current_vcpu->domain) )
+    if ( is_pv_32on64_vcpu(current) )
     {
         compat_show_guest_stack(regs, debug_stack_lines);
         return;
@@ -1568,7 +1568,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
             
         case 3: /* Read CR3 */
-            if ( !IS_COMPAT(v->domain) )
+            if ( !is_pv_32on64_vcpu(v) )
                 *reg = xen_pfn_to_cr3(mfn_to_gmfn(
                     v->domain, pagetable_get_pfn(v->arch.guest_table)));
 #ifdef CONFIG_COMPAT
@@ -1625,7 +1625,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
-            if ( !IS_COMPAT(v->domain) )
+            if ( !is_pv_32on64_vcpu(v) )
                 rc = new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
 #ifdef CONFIG_COMPAT
             else
@@ -1663,7 +1663,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
-            if ( IS_COMPAT(v->domain) )
+            if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_FS_BASE, regs->eax, regs->edx) )
                 goto fail;
@@ -1671,7 +1671,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 ((u64)regs->edx << 32) | regs->eax;
             break;
         case MSR_GS_BASE:
-            if ( IS_COMPAT(v->domain) )
+            if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_GS_BASE, regs->eax, regs->edx) )
                 goto fail;
@@ -1679,7 +1679,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 ((u64)regs->edx << 32) | regs->eax;
             break;
         case MSR_SHADOW_GS_BASE:
-            if ( IS_COMPAT(v->domain) )
+            if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_SHADOW_GS_BASE, regs->eax, regs->edx) )
                 goto fail;
@@ -1705,19 +1705,19 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
-            if ( IS_COMPAT(v->domain) )
+            if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             regs->eax = v->arch.guest_context.fs_base & 0xFFFFFFFFUL;
             regs->edx = v->arch.guest_context.fs_base >> 32;
             break;
         case MSR_GS_BASE:
-            if ( IS_COMPAT(v->domain) )
+            if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             regs->eax = v->arch.guest_context.gs_base_kernel & 0xFFFFFFFFUL;
             regs->edx = v->arch.guest_context.gs_base_kernel >> 32;
             break;
         case MSR_SHADOW_GS_BASE:
-            if ( IS_COMPAT(v->domain) )
+            if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             regs->eax = v->arch.guest_context.gs_base_user & 0xFFFFFFFFUL;
             regs->edx = v->arch.guest_context.gs_base_user >> 32;

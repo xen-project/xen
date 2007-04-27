@@ -320,11 +320,11 @@ int construct_dom0(struct domain *d,
     }
 
 #ifdef CONFIG_COMPAT
-    if (compat32)
+    if ( compat32 )
     {
         l1_pgentry_t gdt_l1e;
 
-        d->is_compat = 1;
+        d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
 
         if ( nr_pages != (unsigned int)nr_pages )
@@ -350,19 +350,19 @@ int construct_dom0(struct domain *d,
 #if CONFIG_PAGING_LEVELS < 4
         unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
 #else
-        unsigned long mask = !IS_COMPAT(d)
-                             ? (1UL << L4_PAGETABLE_SHIFT) - 1
-                             : (1UL << L2_PAGETABLE_SHIFT) - 1;
+        unsigned long mask = is_pv_32bit_domain(d)
+                             ? (1UL << L2_PAGETABLE_SHIFT) - 1
+                             : (1UL << L4_PAGETABLE_SHIFT) - 1;
 #endif
 
         value = (parms.virt_hv_start_low + mask) & ~mask;
 #ifdef CONFIG_COMPAT
         HYPERVISOR_COMPAT_VIRT_START(d) =
             max_t(unsigned int, m2p_compat_vstart, value);
-        d->arch.physaddr_bitsize = !IS_COMPAT(d) ? 64 :
+        d->arch.physaddr_bitsize = !is_pv_32on64_domain(d) ? 64 :
             fls((1UL << 32) - HYPERVISOR_COMPAT_VIRT_START(d)) - 1
             + (PAGE_SIZE - 2);
-        if ( value > (!IS_COMPAT(d) ?
+        if ( value > (!is_pv_32on64_domain(d) ?
                       HYPERVISOR_VIRT_START :
                       __HYPERVISOR_COMPAT_VIRT_START) )
 #else
@@ -387,7 +387,7 @@ int construct_dom0(struct domain *d,
     vinitrd_start    = round_pgup(vkern_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
-    vphysmap_end     = vphysmap_start + (nr_pages * (!IS_COMPAT(d) ?
+    vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32on64_domain(d) ?
                                                      sizeof(unsigned long) :
                                                      sizeof(unsigned int)));
     vstartinfo_start = round_pgup(vphysmap_end);
@@ -418,7 +418,7 @@ int construct_dom0(struct domain *d,
        ((_l) & ~((1UL<<(_s))-1))) >> (_s))
         if ( (1 + /* # L4 */
               NR(v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
-              (!IS_COMPAT(d) ?
+              (!is_pv_32on64_domain(d) ?
                NR(v_start, v_end, L3_PAGETABLE_SHIFT) : /* # L2 */
                4) + /* # compat L2 */
               NR(v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
@@ -613,7 +613,7 @@ int construct_dom0(struct domain *d,
 #elif defined(__x86_64__)
 
     /* Overlap with Xen protected area? */
-    if ( !IS_COMPAT(d) ?
+    if ( !is_pv_32on64_domain(d) ?
          ((v_start < HYPERVISOR_VIRT_END) &&
           (v_end > HYPERVISOR_VIRT_START)) :
          (v_end > HYPERVISOR_COMPAT_VIRT_START(d)) )
@@ -622,14 +622,14 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
     {
         v->arch.guest_context.failsafe_callback_cs = FLAT_COMPAT_KERNEL_CS;
         v->arch.guest_context.event_callback_cs    = FLAT_COMPAT_KERNEL_CS;
     }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
-    if ( !IS_COMPAT(d) )
+    if ( !is_pv_32on64_domain(d) )
     {
         maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
         l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
@@ -647,7 +647,7 @@ int construct_dom0(struct domain *d,
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
     {
         v->arch.guest_table_user = v->arch.guest_table;
         if ( setup_arg_xlat_area(v, l4start) < 0 )
@@ -689,7 +689,8 @@ int construct_dom0(struct domain *d,
             *l2tab = l2e_from_paddr(__pa(l1start), L2_PROT);
             l2tab++;
         }
-        *l1tab = l1e_from_pfn(mfn, !IS_COMPAT(d) ? L1_PROT : COMPAT_L1_PROT);
+        *l1tab = l1e_from_pfn(mfn, (!is_pv_32on64_domain(d) ?
+                                    L1_PROT : COMPAT_L1_PROT));
         l1tab++;
 
         page = mfn_to_page(mfn);
@@ -701,7 +702,7 @@ int construct_dom0(struct domain *d,
     }
 
 #ifdef CONFIG_COMPAT
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
     {
         /* Ensure the first four L3 entries are all populated. */
         for ( i = 0, l3tab = l3start; i < 4; ++i, ++l3tab )
@@ -743,7 +744,8 @@ int construct_dom0(struct domain *d,
 
         /* Top-level p.t. is pinned. */
         if ( (page->u.inuse.type_info & PGT_type_mask) ==
-             (!IS_COMPAT(d) ? PGT_l4_page_table : PGT_l3_page_table) )
+             (!is_pv_32on64_domain(d) ?
+              PGT_l4_page_table : PGT_l3_page_table) )
         {
             page->count_info        += 1;
             page->u.inuse.type_info += 1 | PGT_pinned;
@@ -823,7 +825,7 @@ int construct_dom0(struct domain *d,
     si->shared_info = virt_to_maddr(d->shared_info);
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
-    si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!IS_COMPAT(d);
+    si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!is_pv_32on64_domain(d);
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
     snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-x86_%d%s",
@@ -840,7 +842,7 @@ int construct_dom0(struct domain *d,
         if ( pfn > REVERSE_START )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
-        if ( !IS_COMPAT(d) )
+        if ( !is_pv_32on64_domain(d) )
             ((unsigned long *)vphysmap_start)[pfn] = mfn;
         else
             ((unsigned int *)vphysmap_start)[pfn] = mfn;
@@ -856,7 +858,7 @@ int construct_dom0(struct domain *d,
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
-            if ( !IS_COMPAT(d) )
+            if ( !is_pv_32on64_domain(d) )
                 ((unsigned long *)vphysmap_start)[pfn] = mfn;
             else
                 ((unsigned int *)vphysmap_start)[pfn] = mfn;
@@ -885,7 +887,7 @@ int construct_dom0(struct domain *d,
     }
 
 #ifdef CONFIG_COMPAT
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
         xlat_start_info(si, XLAT_start_info_console_dom0);
 #endif
 
@@ -913,11 +915,12 @@ int construct_dom0(struct domain *d,
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
     regs = &v->arch.guest_context.user_regs;
-    regs->ds = regs->es = regs->fs = regs->gs = !IS_COMPAT(d)
-                                                ? FLAT_KERNEL_DS
-                                                : FLAT_COMPAT_KERNEL_DS;
-    regs->ss = !IS_COMPAT(d) ? FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS;
-    regs->cs = !IS_COMPAT(d) ? FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS;
+    regs->ds = regs->es = regs->fs = regs->gs =
+        !is_pv_32on64_domain(d) ? FLAT_KERNEL_DS : FLAT_COMPAT_KERNEL_DS;
+    regs->ss = (!is_pv_32on64_domain(d) ?
+                FLAT_KERNEL_SS : FLAT_COMPAT_KERNEL_SS);
+    regs->cs = (!is_pv_32on64_domain(d) ?
+                FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS);
     regs->eip = parms.virt_entry;
     regs->esp = vstack_end;
     regs->esi = vstartinfo_start;

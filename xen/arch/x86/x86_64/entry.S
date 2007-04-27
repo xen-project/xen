@@ -235,7 +235,7 @@ ENTRY(int80_direct_trap)
         jz    int80_slow_path
 
         movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_compat(%rax)
+        testb $1,DOMAIN_is_32bit_pv(%rax)
         jnz   compat_int80_direct_trap
 
         call  create_bounce_frame
@@ -356,7 +356,7 @@ ENTRY(domain_crash_synchronous)
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
         movq  CPUINFO_current_vcpu(%rax),%rax
         movq  VCPU_domain(%rax),%rax
-        testb $1,DOMAIN_is_compat(%rax)
+        testb $1,DOMAIN_is_32bit_pv(%rax)
         setz  %al
         leal  (%rax,%rax,2),%eax
         orb   %al,UREGS_cs(%rsp)
@@ -373,7 +373,7 @@ ENTRY(ret_from_intr)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_compat(%rax)
+        testb $1,DOMAIN_is_32bit_pv(%rax)
         jz    test_all_events
         jmp   compat_test_all_events
 
@@ -395,7 +395,7 @@ handle_exception_saved:
         jz    restore_all_xen
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_compat(%rax)
+        testb $1,DOMAIN_is_32bit_pv(%rax)
         jnz   compat_post_handle_exception
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events

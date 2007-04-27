@@ -44,9 +44,8 @@ int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
         else
         {
             /* Odd pages: va for previous ma. */
-            if ( IS_COMPAT(dom0) )
+            if ( is_pv_32on64_domain(dom0) )
             {
-
                 /*
                  * The compatability bounce code sets up a page table
                  * with a 1-1 mapping of the first 1G of memory so
@@ -119,7 +118,7 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
 void machine_kexec(xen_kexec_image_t *image)
 {
 #ifdef CONFIG_COMPAT
-    if ( IS_COMPAT(dom0) )
+    if ( is_pv_32on64_domain(dom0) )
     {
         extern void compat_machine_kexec(unsigned long rnk,
                                          unsigned long indirection_page,

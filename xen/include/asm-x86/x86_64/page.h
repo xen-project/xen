@@ -55,12 +55,12 @@ typedef l4_pgentry_t root_pgentry_t;
 
 #define is_guest_l1_slot(_s) (1)
 #define is_guest_l2_slot(_d, _t, _s)                   \
-    ( !IS_COMPAT(_d) ||                                \
+    ( !is_pv_32bit_domain(_d) ||                       \
       !((_t) & PGT_pae_xen_l2) ||                      \
       ((_s) < COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_d)) )
 #define is_guest_l3_slot(_s) (1)
 #define is_guest_l4_slot(_d, _s)                    \
-    ( IS_COMPAT(_d)                                 \
+    ( is_pv_32bit_domain(_d)                        \
       ? ((_s) == 0)                                 \
       : (((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT) ||  \
          ((_s) > ROOT_PAGETABLE_LAST_XEN_SLOT)))

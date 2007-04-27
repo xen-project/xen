@@ -435,12 +435,12 @@ long arch_do_domctl(
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 #ifdef CONFIG_COMPAT
-#define c(fld) (!IS_COMPAT(v->domain) ? (c.nat->fld) : (c.cmp->fld))
+#define c(fld) (!is_pv_32on64_domain(v->domain) ? (c.nat->fld) : (c.cmp->fld))
 #else
 #define c(fld) (c.nat->fld)
 #endif
 
-    if ( !IS_COMPAT(v->domain) )
+    if ( !is_pv_32on64_domain(v->domain) )
         memcpy(c.nat, &v->arch.guest_context, sizeof(*c.nat));
 #ifdef CONFIG_COMPAT
     else
@@ -455,7 +455,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
     if ( is_hvm_vcpu(v) )
     {
-        if ( !IS_COMPAT(v->domain) )
+        if ( !is_pv_32on64_domain(v->domain) )
             hvm_store_cpu_guest_regs(v, &c.nat->user_regs, c.nat->ctrlreg);
 #ifdef CONFIG_COMPAT
         else
@@ -477,7 +477,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         BUG_ON((c(user_regs.eflags) & EF_IOPL) != 0);
         c(user_regs.eflags |= v->arch.iopl << 12);
 
-        if ( !IS_COMPAT(v->domain) )
+        if ( !is_pv_32on64_domain(v->domain) )
         {
             c.nat->ctrlreg[3] = xen_pfn_to_cr3(
                 pagetable_get_pfn(v->arch.guest_table));

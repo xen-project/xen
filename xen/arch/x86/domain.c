@@ -272,10 +272,10 @@ int switch_native(struct domain *d)
         return -EINVAL;
     if ( !may_switch_mode(d) )
         return -EACCES;
-    if ( !IS_COMPAT(d) )
+    if ( !is_pv_32on64_domain(d) )
         return 0;
 
-    d->is_compat = 0;
+    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
     release_arg_xlat_area(d);
 
     /* switch gdt */
@@ -304,10 +304,10 @@ int switch_compat(struct domain *d)
         return -ENOSYS;
     if ( !may_switch_mode(d) )
         return -EACCES;
-    if ( IS_COMPAT(d) )
+    if ( is_pv_32on64_domain(d) )
         return 0;
 
-    d->is_compat = 1;
+    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
 
     /* switch gdt */
     gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table), PAGE_HYPERVISOR);
@@ -372,12 +372,12 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
-    return (pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
+    return (is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
 }
 
 void vcpu_destroy(struct vcpu *v)
 {
-    if ( pv_32on64_vcpu(v) )
+    if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
 }
 
@@ -453,7 +453,20 @@ int arch_domain_create(struct domain *d)
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
-    return is_hvm_domain(d) ? hvm_domain_initialise(d) : 0;
+    if ( is_hvm_domain(d) )
+    {
+        if ( (rc = hvm_domain_initialise(d)) != 0 )
+            goto fail;
+    }
+    else
+    {
+        /* 32-bit PV guest by default only if Xen is not 64-bit. */
+        d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
+            (CONFIG_PAGING_LEVELS != 4);
+    }
+        
+
+    return 0;
 
  fail:
     free_xenheap_page(d->shared_info);
@@ -489,7 +502,7 @@ void arch_domain_destroy(struct domain *d)
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
 
-    if ( pv_32on64_domain(d) )
+    if ( is_pv_32on64_domain(d) )
         release_arg_xlat_area(d);
 
     free_xenheap_page(d->shared_info);
@@ -506,7 +519,7 @@ int arch_set_info_guest(
 
     /* The context is a compat-mode one if the target domain is compat-mode;
      * we expect the tools to DTRT even in compat-mode callers. */
-    compat = pv_32on64_domain(d);
+    compat = is_pv_32on64_domain(d);
 
 #ifdef CONFIG_COMPAT
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
@@ -831,7 +844,7 @@ static void load_segments(struct vcpu *n)
             all_segs_okay &= loadsegment(gs, nctxt->user_regs.gs);
     }
 
-    if ( !IS_COMPAT(n->domain) )
+    if ( !is_pv_32on64_domain(n->domain) )
     {
         /* This can only be non-zero if selector is NULL. */
         if ( nctxt->fs_base )
@@ -865,7 +878,7 @@ static void load_segments(struct vcpu *n)
             (unsigned long *)nctxt->kernel_sp;
         unsigned long cs_and_mask, rflags;
 
-        if ( IS_COMPAT(n->domain) )
+        if ( is_pv_32on64_domain(n->domain) )
         {
             unsigned int *esp = ring_1(regs) ?
                                 (unsigned int *)regs->rsp :
@@ -975,7 +988,7 @@ static void save_segments(struct vcpu *v)
     if ( regs->es )
         dirty_segment_mask |= DIRTY_ES;
 
-    if ( regs->fs || IS_COMPAT(v->domain) )
+    if ( regs->fs || is_pv_32on64_domain(v->domain) )
     {
         dirty_segment_mask |= DIRTY_FS;
         ctxt->fs_base = 0; /* != 0 selector kills fs_base */
@@ -985,7 +998,7 @@ static void save_segments(struct vcpu *v)
         dirty_segment_mask |= DIRTY_FS_BASE;
     }
 
-    if ( regs->gs || IS_COMPAT(v->domain) )
+    if ( regs->gs || is_pv_32on64_domain(v->domain) )
     {
         dirty_segment_mask |= DIRTY_GS;
         ctxt->gs_base_user = 0; /* != 0 selector kills gs_base_user */
@@ -1121,15 +1134,17 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         __context_switch();
 
 #ifdef CONFIG_COMPAT
-        if ( is_idle_vcpu(prev)
-             || IS_COMPAT(prev->domain) != IS_COMPAT(next->domain) )
+        if ( is_idle_vcpu(prev) ||
+             (is_pv_32on64_domain(prev->domain) !=
+              is_pv_32on64_domain(next->domain)) )
         {
             uint32_t efer_lo, efer_hi;
 
-            local_flush_tlb_one(GDT_VIRT_START(next) + FIRST_RESERVED_GDT_BYTE);
+            local_flush_tlb_one(GDT_VIRT_START(next) +
+                                FIRST_RESERVED_GDT_BYTE);
 
             rdmsr(MSR_EFER, efer_lo, efer_hi);
-            if ( !IS_COMPAT(next->domain) == !(efer_lo & EFER_SCE) )
+            if ( !is_pv_32on64_domain(next->domain) == !(efer_lo & EFER_SCE) )
             {
                 efer_lo ^= EFER_SCE;
                 wrmsr(MSR_EFER, efer_lo, efer_hi);
@@ -1152,7 +1167,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     /* Update per-VCPU guest runstate shared memory area (if registered). */
     if ( !guest_handle_is_null(runstate_guest(next)) )
     {
-        if ( !IS_COMPAT(next->domain) )
+        if ( !is_pv_32on64_domain(next->domain) )
             __copy_to_guest(runstate_guest(next), &next->runstate, 1);
 #ifdef CONFIG_COMPAT
         else
@@ -1234,7 +1249,7 @@ unsigned long hypercall_create_continuation(
 
         for ( i = 0; *p != '\0'; i++ )
             mcs->call.args[i] = next_arg(p, args);
-        if ( IS_COMPAT(current->domain) )
+        if ( is_pv_32on64_domain(current->domain) )
         {
             for ( ; i < 6; i++ )
                 mcs->call.args[i] = 0;
@@ -1247,7 +1262,7 @@ unsigned long hypercall_create_continuation(
         regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
 
 #ifdef __x86_64__
-        if ( !IS_COMPAT(current->domain) )
+        if ( !is_pv_32on64_domain(current->domain) )
         {
             for ( i = 0; *p != '\0'; i++ )
             {
@@ -1448,7 +1463,7 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     unsigned long pfn;
 
 #ifdef __x86_64__
-    if ( pv_32on64_vcpu(v) )
+    if ( is_pv_32on64_vcpu(v) )
     {
         pfn = l4e_get_pfn(*(l4_pgentry_t *)
                           __va(pagetable_get_paddr(v->arch.guest_table)));

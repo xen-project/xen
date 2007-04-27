@@ -384,9 +384,9 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
     /* All code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )
     {
-        if ( !IS_COMPAT(dom) || !(b & _SEGMENT_L) )
-            goto good;
-        goto bad;
+        if ( is_pv_32bit_domain(dom) && (b & _SEGMENT_L) )
+            goto bad;
+        goto good;
     }
 
     /* Invalid type 0 is harmless. It is used for 2nd half of a call gate. */
