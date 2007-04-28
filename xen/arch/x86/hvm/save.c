@@ -100,6 +100,8 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     else 
         hdr.changeset = -1ULL; /* Unknown */
 
+    hdr.pad0 = 0;
+
     if ( hvm_save_entry(HEADER, 0, h, &hdr) != 0 )
     {
         gdprintk(XENLOG_ERR, "HVM save: failed to write header\n");
