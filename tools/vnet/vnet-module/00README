@@ -9,8 +9,8 @@ can be set in your env or on the make command line:
 LINUX_SERIES:   linux release to compile for: 2.4, or 2.6 (default).
 XEN_ROOT:       root of the xen tree containing kernel source.
 KERNEL_VERSION: kernel version, default got from XEN_ROOT.
-KERNEL_MINOR:   kernel minor version, default -xen0.
-KERNEL_SRC:     path to kernel source, default linux-<VERSION> under XEN_ROOT.
+KERNEL_SRC:     path to kernel source, default build-linux-<VERSION> 
+                under XEN_ROOT.
 
 *) For 2.4 kernel
 

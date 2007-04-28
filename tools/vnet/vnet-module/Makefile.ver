@@ -18,14 +18,7 @@
 # 59 Temple Place, suite 330, Boston, MA 02111-1307 USA
 #============================================================================
 
-include $(XEN_ROOT)/Config.mk
-
 LINUX_SERIES?=2.6
-ifeq ($(XEN_SPLIT_KERNEL),y)
-  KERNEL_MINOR=-xen0
-else
-  KERNEL_MINOR=-xen
-endif
 
 LINUX_VERSION?=$(shell (/bin/ls -d $(XEN_ROOT)/pristine-linux-$(LINUX_SERIES).* 2>/dev/null) | \
                       sed -e 's!^.*linux-\(.\+\)!\1!' )
@@ -34,16 +27,19 @@ ifeq ($(LINUX_VERSION),)
 $(error Kernel source for linux $(LINUX_SERIES) not found)
 endif
 
-KERNEL_VERSION=$(LINUX_VERSION)$(KERNEL_MINOR)
+KERNEL_VERSION?=$(shell (/bin/ls -d $(XEN_ROOT)/build-linux-$(LINUX_VERSION)-xen* 2>/dev/null) | \
+                      grep -v -m 1 -e '-xenU' | \
+                      sed -e 's!^.*linux-\(.\+\)!\1!' )
 
-KERNEL_SRC ?= $(shell cd $(XEN_ROOT)/build-linux-$(KERNEL_VERSION)_$(XEN_TARGET_ARCH) && pwd)
+KERNEL_SRC ?= $(XEN_ROOT)/build-linux-$(KERNEL_VERSION)
 
 ifeq ($(KERNEL_SRC),)
 $(error Kernel source for kernel $(KERNEL_VERSION) not found)
 endif
 
 # Get the full kernel release version from its makefile, as the source path
-# may not have the extraversion, e.g. linux-2.6.12-xen0 may contain release 2.6.12.6-xen0.
+# may not have the extraversion, e.g. linux-2.6.12-xen0 may contain release 
+# 2.6.12.6-xen0.
 KERNEL_RELEASE=$(shell make -s -C $(KERNEL_SRC) kernelrelease)
 
 KERNEL_MODULE_DIR=/lib/modules/$(KERNEL_RELEASE)/kernel
