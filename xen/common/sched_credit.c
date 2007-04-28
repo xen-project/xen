@@ -1355,6 +1355,10 @@ static __init int csched_start_tickers(void)
     struct csched_pcpu *spc;
     unsigned int cpu;
 
+    /* Is the credit scheduler initialised? */
+    if ( csched_priv.ncpus == 0 )
+        return 0;
+
     for_each_online_cpu ( cpu )
     {
         spc = CSCHED_PCPU(cpu);
