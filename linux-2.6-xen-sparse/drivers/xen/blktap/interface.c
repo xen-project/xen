@@ -137,6 +137,7 @@ int tap_blkif_map(blkif_t *blkif, unsigned long shared_page,
 	if (err < 0) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
+		blkif->blk_rings.common.sring = NULL;
 		return err;
 	}
 	blkif->irq = err;
