@@ -18,8 +18,8 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR = 0.9
-MINOR = 1
+MAJOR = 1.0
+MINOR = 0
 
 CFLAGS = -Iinclude                     \
          $(shell xml2-config --cflags) \

@@ -16,7 +16,7 @@
 #============================================================================
 
 
-XEN_API_VERSION_MAJOR = 0
-XEN_API_VERSION_MINOR = 5
+XEN_API_VERSION_MAJOR = 1
+XEN_API_VERSION_MINOR = 0
 XEN_API_VERSION_VENDOR = 'xenbits'
 XEN_API_VERSION_VENDOR_IMPLEMENTATION = {}
