@@ -215,6 +215,7 @@ static name2keysym_t name2keysym[]={
 {"Shift_R", 0xffe2},   /* XK_Shift_R */
 {"Super_L", 0xffeb},   /* XK_Super_L */
 {"Super_R", 0xffec},   /* XK_Super_R */
+{"ISO_Level3_Shift", 0xfe03}, /* XK_ISO_Level3_Shift */
 
     /* special keys */
 {"BackSpace", 0xff08}, /* XK_BackSpace */
