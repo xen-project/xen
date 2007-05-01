@@ -306,7 +306,7 @@ class XendPIF(XendBase):
         # Figure out if this is a physical device
         if self.get_interface_name() == \
            self.get_device():
-            raise PIFIsPhysical(self.get_uuid())
+            raise PIFIsPhysical()
 
         self.unplug()
 
