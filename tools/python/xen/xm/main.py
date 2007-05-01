@@ -567,6 +567,8 @@ def get_single_vm(dom):
         if len(uuids) > 0:
             return uuids[0]
 
+        refs = []
+
         try:
             domid = int(dom)
             refs = [vm_ref
