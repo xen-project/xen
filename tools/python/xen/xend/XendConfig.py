@@ -988,19 +988,16 @@ class XendConfig(dict):
                 if param not in target:
                     target[param] = []
                 if dev_uuid not in target[param]:
-                    if dev_type == 'vbd' and not target[param]:
-                        # Compat hack -- this is the first disk, so mark it
-                        # bootable.
-                        dev_info['bootable'] = 1
+                    if dev_type == 'vbd':
+                        # Compat hack -- mark first disk bootable
+                        dev_info['bootable'] = int(not target[param])
                     target[param].append(dev_uuid)
             elif dev_type == 'tap':
                 if 'vbd_refs' not in target:
                     target['vbd_refs'] = []
                 if dev_uuid not in target['vbd_refs']:
-                    if not target['vbd_refs']:
-                        # Compat hack -- this is the first disk, so mark it
-                        # bootable.
-                        dev_info['bootable'] = 1
+                    # Compat hack -- mark first disk bootable
+                    dev_info['bootable'] = int(not target['vbd_refs'])
                     target['vbd_refs'].append(dev_uuid)
                     
             elif dev_type == 'vfb':
