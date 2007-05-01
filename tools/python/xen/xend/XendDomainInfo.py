@@ -1419,9 +1419,13 @@ class XendDomainInfo:
                 raise VmError("HVM guest support is unavailable: is VT/AMD-V "
                               "supported by your CPU and enabled in your "
                               "BIOS?")
-            # Hack to pre-reserve some memory for HVM setup.
-            # Needed because Xen allocates 1MB by default immediately.
-            balloon.free(2*1024) # 2MB should be plenty
+
+        # Hack to pre-reserve some memory for initial domain creation.
+        # There is an implicit memory overhead for any domain creation. This
+        # overhead is greater for some types of domain than others. For
+        # example, an x86 HVM domain will have a default shadow-pagetable
+        # allocation of 1MB. We free up 2MB here to be on the safe side.
+        balloon.free(2*1024) # 2MB should be plenty
 
         self.domid = xc.domain_create(
             domid = 0,
