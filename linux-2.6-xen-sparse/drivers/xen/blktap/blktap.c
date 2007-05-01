@@ -136,7 +136,7 @@ module_param(debug_lvl, int, 0644);
  */
 typedef struct {
 	blkif_t       *blkif;
-	unsigned long  id;
+	u64            id;
 	unsigned short mem_idx;
 	int            nr_pages;
 	atomic_t       pendcnt;
@@ -741,7 +741,7 @@ static int do_block_io_op(blkif_t *blkif);
 static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
-static void make_response(blkif_t *blkif, unsigned long id, 
+static void make_response(blkif_t *blkif, u64 id,
                           unsigned short op, int st);
 
 /******************************************************************
@@ -1408,7 +1408,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
  */
 
 
-static void make_response(blkif_t *blkif, unsigned long id, 
+static void make_response(blkif_t *blkif, u64 id,
                           unsigned short op, int st)
 {
 	blkif_response_t  resp;
