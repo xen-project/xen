@@ -880,8 +880,17 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                                XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                                NULL, 0, NULL, 0, NULL) < 0 )
         {
-            ERROR("Couldn't enable shadow mode");
-            goto out;
+            /* log-dirty already enabled? There's no test op,
+               so attempt to disable then reenable it */
+            if ( !(xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
+                                     NULL, 0, NULL, 0, NULL) >= 0 &&
+                   xc_shadow_control(xc_handle, dom,
+                                     XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
+                                     NULL, 0, NULL, 0, NULL) >= 0) )
+            {
+                ERROR("Couldn't enable shadow mode");
+                goto out;
+            }
         }
 
         if ( hvm )
