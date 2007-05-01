@@ -885,7 +885,7 @@ class XendDomainInfo:
 
         # Check whether image definition has been updated
         image_sxp = self._readVm('image')
-        if image_sxp and image_sxp != self.info.image_sxpr():
+        if image_sxp and image_sxp != sxp.to_string(self.info.image_sxpr()):
             self.info.update_with_image_sxp(sxp.from_string(image_sxp))
             changed = True
 
