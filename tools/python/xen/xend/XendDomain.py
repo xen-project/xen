@@ -1227,7 +1227,7 @@ class XendDomain:
         XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
         sock.close()
 
-    def domain_save(self, domid, dst, checkpoint):
+    def domain_save(self, domid, dst, checkpoint=False):
         """Start saving a domain to file.
 
         @param domid: Domain ID or Name
