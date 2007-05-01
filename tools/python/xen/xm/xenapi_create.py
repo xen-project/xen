@@ -374,7 +374,7 @@ class xenapi_create:
             "device":
                 vbd.attributes["device"].value,
             "bootable":
-                vbd.attributes["bootable"].value,
+                vbd.attributes["bootable"].value == "True",
             "mode":
                 vbd.attributes["mode"].value,
             "type":
@@ -401,9 +401,9 @@ class xenapi_create:
             if network_name in networks.keys():
                 network_uuid = networks[network_name]
             else:
-                networks = dict([(record['name_label'], record['uuid'])
-                                 for record in
-                                 server.xenapi.network.get_all_records()])
+                networks = dict([(record['name_label'], ref)
+                                 for ref, record in
+                                 server.xenapi.network.get_all_records().items()])
                 if network_name in networks.keys():
                     network_uuid = networks[network_name]
                 else:
