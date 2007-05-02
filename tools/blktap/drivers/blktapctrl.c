@@ -496,12 +496,12 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 		if (!exist) {
 			DPRINTF("Process does not exist:\n");
 			asprintf(&rdctldev, 
-				 "%s/tapctrlread%d", BLKTAP_DEV_DIR, minor);
+				 "%s/tapctrlread%d", BLKTAP_CTRL_DIR, minor);
 			blkif->fds[READ] = open_ctrl_socket(rdctldev);
 
 
 			asprintf(&wrctldev, 
-				 "%s/tapctrlwrite%d", BLKTAP_DEV_DIR, minor);
+				 "%s/tapctrlwrite%d", BLKTAP_CTRL_DIR, minor);
 			blkif->fds[WRITE] = open_ctrl_socket(wrctldev);
 			
 			if (blkif->fds[READ] == -1 || blkif->fds[WRITE] == -1) 
@@ -601,6 +601,8 @@ int open_ctrl_socket(char *devname)
 	fd_set socks;
 	struct timeval timeout;
 
+	if (mkdir(BLKTAP_CTRL_DIR, 0755) == 0)
+		DPRINTF("Created %s directory\n", BLKTAP_CTRL_DIR);
 	ret = mkfifo(devname,S_IRWXU|S_IRWXG|S_IRWXO);
 	if ( (ret != 0) && (errno != EEXIST) ) {
 		DPRINTF("ERROR: pipe failed (%d)\n", errno);
