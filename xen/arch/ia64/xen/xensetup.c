@@ -551,8 +551,8 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
-    int major = xen_major_version();
-    int minor = xen_minor_version();
+    /* Interface name is always xen-3.0-* for Xen-3.x. */
+    int major = 3, minor = 0;
     char s[32];
 
     (*info)[0] = '\0';
