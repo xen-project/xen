@@ -307,6 +307,41 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->sysenter_esp = vmcb->sysenter_esp;
     c->sysenter_eip = vmcb->sysenter_eip;
 
+    /* Save any event/interrupt that was being injected when we last
+     * exited.  Although there are three(!) VMCB fields that can contain
+     * active events, we only need to save at most one: because the
+     * intr_assist logic never delivers an IRQ when any other event is
+     * active, we know that the only possible collision is if we inject
+     * a fault while exitintinfo contains a valid event (the delivery of
+     * which caused the last exit).  In that case replaying just the
+     * first event should cause the same behaviour when we restore. */
+    if ( vmcb->vintr.fields.irq 
+         && /* Check it's not a fake interrupt (see svm_intr_assist()) */
+         !(vmcb->general1_intercepts & GENERAL1_INTERCEPT_VINTR) )
+    {
+        c->pending_vector = vmcb->vintr.fields.vector;
+        c->pending_type = 0; /* External interrupt */
+        c->pending_error_valid = 0;
+        c->pending_reserved = 0;
+        c->pending_valid = 1;
+        c->error_code = 0;
+    }
+    else if ( vmcb->exitintinfo.fields.v )
+    {
+        c->pending_event = vmcb->exitintinfo.bytes & 0xffffffff;
+        c->error_code = vmcb->exitintinfo.fields.errorcode;
+    }
+    else if ( vmcb->eventinj.fields.v ) 
+    {
+        c->pending_event = vmcb->eventinj.bytes & 0xffffffff;
+        c->error_code = vmcb->eventinj.fields.errorcode;
+    }
+    else 
+    {
+        c->pending_event = 0;
+        c->error_code = 0;
+    }
+
     return 1;
 }
 
@@ -335,7 +370,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( !svm_paging_enabled(v) ) 
     {
-        printk("%s: paging not enabled.", __func__);
+        printk("%s: paging not enabled.\n", __func__);
         goto skip_cr3;
     }
 
@@ -436,11 +471,33 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmcb->dr6 = c->dr6;
     vmcb->dr7 = c->dr7;
 
+    if ( c->pending_valid ) 
+    {
+        gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
+                 c->pending_event, c->error_code);
+
+        /* VMX uses a different type for #OF and #BP; fold into "Exception"  */
+        if ( c->pending_type == 6 ) 
+            c->pending_type = 3;
+        /* Sanity check */
+        if ( c->pending_type == 1 || c->pending_type > 4 
+             || c->pending_reserved != 0 )
+        {
+            gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32"\n", 
+                     c->pending_event);
+            return -EINVAL;
+        }
+        /* Put this pending event in exitintinfo and svm_intr_assist()
+         * will reinject it when we return to the guest. */
+        vmcb->exitintinfo.bytes = c->pending_event;
+        vmcb->exitintinfo.fields.errorcode = c->error_code;
+    }
+
     paging_update_paging_modes(v);
     return 0;
  
  bad_cr3:
-    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"", c->cr3);
+    gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n", c->cr3);
     return -EINVAL;
 }
 

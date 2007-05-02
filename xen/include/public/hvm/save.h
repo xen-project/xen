@@ -182,6 +182,20 @@ struct hvm_hw_cpu {
 
     /* guest's idea of what rdtsc() would return */
     uint64_t tsc;
+
+    /* pending event, if any */
+    union {
+        uint32_t pending_event;
+        struct {
+            uint8_t  pending_vector:8;
+            uint8_t  pending_type:3;
+            uint8_t  pending_error_valid:1;
+            uint32_t pending_reserved:19;
+            uint8_t  pending_valid:1;
+        };
+    };
+    /* error code for pending event */
+    uint32_t error_code;
 };
 
 DECLARE_HVM_SAVE_TYPE(CPU, 2, struct hvm_hw_cpu);

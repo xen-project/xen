@@ -370,6 +370,8 @@ static inline void __restore_debug_registers(struct vcpu *v)
 
 int vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {    
+    uint32_t ev;
+
     c->rip = __vmread(GUEST_RIP);
     c->rsp = __vmread(GUEST_RSP);
     c->rflags = __vmread(GUEST_RFLAGS);
@@ -435,6 +437,28 @@ int vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->sysenter_cs = __vmread(GUEST_SYSENTER_CS);
     c->sysenter_esp = __vmread(GUEST_SYSENTER_ESP);
     c->sysenter_eip = __vmread(GUEST_SYSENTER_EIP);
+
+    /* Save any event/interrupt that was being injected when we last
+     * exited.  IDT_VECTORING_INFO_FIELD has priority, as anything in
+     * VM_ENTRY_INTR_INFO_FIELD is either a fault caused by the first
+     * event, which will happen the next time, or an interrupt, which we
+     * never inject when IDT_VECTORING_INFO_FIELD is valid.*/
+    if ( (ev = __vmread(IDT_VECTORING_INFO_FIELD)) & INTR_INFO_VALID_MASK ) 
+    {
+        c->pending_event = ev;
+        c->error_code = __vmread(IDT_VECTORING_ERROR_CODE);
+    }
+    else if ( (ev = __vmread(VM_ENTRY_INTR_INFO_FIELD)) 
+              & INTR_INFO_VALID_MASK ) 
+    {
+        c->pending_event = ev;
+        c->error_code = __vmread(VM_ENTRY_EXCEPTION_ERROR_CODE);
+    }
+    else 
+    {
+        c->pending_event = 0;
+        c->error_code = 0;
+    }
 
     return 1;
 }
@@ -563,6 +587,48 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     vmx_vmcs_exit(v);
 
     paging_update_paging_modes(v);
+
+    if ( c->pending_valid ) 
+    {
+        vmx_vmcs_enter(v);
+        gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
+                 c->pending_event, c->error_code);
+
+        /* SVM uses type 3 ("Exception") for #OF and #BP; VMX uses type 6 */
+        if ( c->pending_type == 3 
+             && (c->pending_vector == 3 || c->pending_vector == 4) ) 
+            c->pending_type = 6;
+
+        /* For software exceptions, we need to tell the hardware the 
+         * instruction length as well (hmmm). */
+        if ( c->pending_type > 4 ) 
+        {
+            int addrbytes, ilen; 
+            if ( (c->cs_arbytes & (1u<<13)) && (c->msr_efer & EFER_LMA) ) 
+                addrbytes = 8;
+            else if ( (c->cs_arbytes & (1u<<14)) ) 
+                addrbytes = 4;
+            else 
+                addrbytes = 2;
+            ilen = hvm_instruction_length(c->rip, hvm_guest_x86_mode(v));
+            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, ilen);
+        }
+
+        /* Sanity check */
+        if ( c->pending_type == 1 || c->pending_type > 6
+             || c->pending_reserved != 0 )
+        {
+            gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32"\n", 
+                     c->pending_event);
+            return -EINVAL;
+        }
+        /* Re-inject the exception */
+        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, c->pending_event);
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, c->error_code);
+        v->arch.hvm_vmx.vector_injected = 1;
+        vmx_vmcs_exit(v);
+    }
+
     return 0;
 
  bad_cr3:
