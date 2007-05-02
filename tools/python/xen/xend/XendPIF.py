@@ -205,7 +205,7 @@ class XendPIF(XendBase):
         ifs = [dev for dev, _1, _2 in linux_get_phy_ifaces()]
         if pif.get_VLAN() == -1:
             if pif.get_device() not in ifs:
-                XendBase.destroy(self)
+                XendBase.destroy(pif)
                 metrics.destroy()
                 return None
         else:
