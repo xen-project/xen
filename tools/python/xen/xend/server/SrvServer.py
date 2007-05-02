@@ -95,14 +95,6 @@ class XendServers:
         self.cleanup(signum, frame, reloading = True)
 
     def start(self, status):
-        # Running the network script will spawn another process, which takes
-        # the status fd with it unless we set FD_CLOEXEC.  Failing to do this
-        # causes the read in SrvDaemon to hang even when we have written here.
-        if status:
-            fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
-        
-        Vifctl.network('start')
-
         # Prepare to catch SIGTERM (received when 'xend stop' is executed)
         # and call each server's cleanup if possible
         signal.signal(signal.SIGTERM, self.cleanup)
@@ -249,7 +241,15 @@ def _loadConfig(servers, root, reload):
         servers.add(XMLRPCServer(XendAPI.AUTH_PAM, False))
 
 
-def create():
+def create(status):
+    # Running the network script will spawn another process, which takes
+    # the status fd with it unless we set FD_CLOEXEC.  Failing to do this
+    # causes the read in SrvDaemon to hang even when we have written here.
+    if status:
+        fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+    
+    Vifctl.network('start')
+
     root = SrvDir()
     root.putChild('xend', SrvRoot())
     servers = XendServers(root)
