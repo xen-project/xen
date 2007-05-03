@@ -65,6 +65,15 @@ machine_to_phys_for_dma(unsigned long machine)
 	return phys;
 }
 
+#ifdef CONFIG_SPARSEMEM
+/*
+ * When CONFIG_SPARSEMEM=y, pfn_valid() is defined in
+ * linux/include/linux/mmzone.h. Hoever #include <linux/mmzone.h>
+ * causes the header inclusion hell.
+ */
+static inline int pfn_valid(unsigned long pfn);
+#endif
+
 static inline unsigned long
 mfn_to_local_pfn(unsigned long mfn)
 {
