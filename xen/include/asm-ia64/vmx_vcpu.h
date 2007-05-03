@@ -61,7 +61,7 @@ extern u64 vmx_vcpu_sync_mpsr(u64 mipsr, u64 value);
 extern void vmx_vcpu_set_psr_sync_mpsr(VCPU * vcpu, u64 value);
 extern IA64FAULT vmx_vcpu_cover(VCPU * vcpu);
 extern IA64FAULT vmx_vcpu_set_rr(VCPU * vcpu, u64 reg, u64 val);
-extern IA64FAULT vmx_vcpu_get_pkr(VCPU * vcpu, u64 reg, u64 * pval);
+extern u64 vmx_vcpu_get_pkr(VCPU * vcpu, u64 reg);
 IA64FAULT vmx_vcpu_set_pkr(VCPU * vcpu, u64 reg, u64 val);
 extern IA64FAULT vmx_vcpu_itc_i(VCPU * vcpu, u64 pte, u64 itir, u64 ifa);
 extern IA64FAULT vmx_vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa);
@@ -75,11 +75,11 @@ extern IA64FAULT vmx_vcpu_ptc_l(VCPU * vcpu, u64 vadr, u64 ps);
 extern IA64FAULT vmx_vcpu_ptc_e(VCPU * vcpu, u64 vadr);
 extern IA64FAULT vmx_vcpu_ptc_g(VCPU * vcpu, u64 vadr, u64 ps);
 extern IA64FAULT vmx_vcpu_ptc_ga(VCPU * vcpu, u64 vadr, u64 ps);
-extern IA64FAULT vmx_vcpu_thash(VCPU * vcpu, u64 vadr, u64 * pval);
+extern u64 vmx_vcpu_thash(VCPU * vcpu, u64 vadr);
 extern u64 vmx_vcpu_get_itir_on_fault(VCPU * vcpu, u64 ifa);
-extern IA64FAULT vmx_vcpu_ttag(VCPU * vcpu, u64 vadr, u64 * pval);
+extern u64 vmx_vcpu_ttag(VCPU * vcpu, u64 vadr);
 extern IA64FAULT vmx_vcpu_tpa(VCPU * vcpu, u64 vadr, u64 * padr);
-extern IA64FAULT vmx_vcpu_tak(VCPU * vcpu, u64 vadr, u64 * key);
+extern u64 vmx_vcpu_tak(VCPU * vcpu, u64 vadr);
 extern IA64FAULT vmx_vcpu_rfi(VCPU * vcpu);
 extern u64 vmx_vcpu_get_psr(VCPU * vcpu);
 extern IA64FAULT vmx_vcpu_get_bgr(VCPU * vcpu, unsigned int reg, u64 * val);
@@ -132,100 +132,84 @@ extern void vmx_ia64_set_dcr(VCPU * v);
  VCPU control register access routines
 **************************************************************************/
 
-static inline IA64FAULT vmx_vcpu_get_itm(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_itm(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, itm);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, itm));
 }
 
-static inline IA64FAULT vmx_vcpu_get_iva(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_iva(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, iva);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, iva));
 }
 
-static inline IA64FAULT vmx_vcpu_get_pta(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_pta(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, pta);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, pta));
 }
 
-static inline IA64FAULT vmx_vcpu_get_lid(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_lid(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, lid);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, lid));
 }
 
-static inline IA64FAULT vmx_vcpu_get_ivr(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_ivr(VCPU * vcpu)
 {
-	*pval = guest_read_vivr(vcpu);
-	return IA64_NO_FAULT;
+	return ((u64)guest_read_vivr(vcpu));
 }
 
-static inline IA64FAULT vmx_vcpu_get_tpr(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_tpr(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, tpr);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, tpr));
 }
 
-static inline IA64FAULT vmx_vcpu_get_eoi(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_eoi(VCPU * vcpu)
 {
-	*pval = 0L;		// reads of eoi always return 0
-	return IA64_NO_FAULT;
+	return (0UL);		// reads of eoi always return 0
 }
 
-static inline IA64FAULT vmx_vcpu_get_irr0(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_irr0(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, irr[0]);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, irr[0]));
 }
 
-static inline IA64FAULT vmx_vcpu_get_irr1(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_irr1(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, irr[1]);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, irr[1]));
 }
 
-static inline IA64FAULT vmx_vcpu_get_irr2(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_irr2(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, irr[2]);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, irr[2]));
 }
 
-static inline IA64FAULT vmx_vcpu_get_irr3(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_irr3(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, irr[3]);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, irr[3]));
 }
 
-static inline IA64FAULT vmx_vcpu_get_itv(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_itv(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, itv);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, itv));
 }
 
-static inline IA64FAULT vmx_vcpu_get_pmv(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_pmv(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, pmv);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, pmv));
 }
 
-static inline IA64FAULT vmx_vcpu_get_cmcv(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_cmcv(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, cmcv);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, cmcv));
 }
 
-static inline IA64FAULT vmx_vcpu_get_lrr0(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_lrr0(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, lrr0);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, lrr0));
 }
 
-static inline IA64FAULT vmx_vcpu_get_lrr1(VCPU * vcpu, u64 * pval)
+static inline u64 vmx_vcpu_get_lrr1(VCPU * vcpu)
 {
-	*pval = VCPU(vcpu, lrr1);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, lrr1));
 }
 
 static inline IA64FAULT vmx_vcpu_set_itm(VCPU * vcpu, u64 val)
@@ -299,10 +283,9 @@ static inline IA64FAULT vmx_vcpu_set_itc(VCPU * vcpu, u64 val)
 	return IA64_NO_FAULT;
 }
 
-static inline IA64FAULT vmx_vcpu_get_itc(VCPU * vcpu, u64 * val)
+static inline u64 vmx_vcpu_get_itc(VCPU * vcpu)
 {
-	*val = vtm_get_itc(vcpu);
-	return IA64_NO_FAULT;
+	return ((u64)vtm_get_itc(vcpu));
 }
 
 /*
@@ -317,7 +300,7 @@ IA64FAULT vmx_vcpu_get_rr(VCPU *vcpu, u64 reg, u64 *pval)
  VCPU debug breakpoint register access routines
 **************************************************************************/
 
-static inline IA64FAULT vmx_vcpu_get_cpuid(VCPU * vcpu, u64 reg, u64 * pval)
+static inline u64 vmx_vcpu_get_cpuid(VCPU * vcpu, u64 reg)
 {
 	// TODO: unimplemented DBRs return a reserved register fault
 	// TODO: Should set Logical CPU state, not just physical
@@ -325,8 +308,7 @@ static inline IA64FAULT vmx_vcpu_get_cpuid(VCPU * vcpu, u64 reg, u64 * pval)
 		panic_domain(vcpu_regs(vcpu),
 			     "there are only five cpuid registers");
 	}
-	*pval = VCPU(vcpu, vcpuid[reg]);
-	return IA64_NO_FAULT;
+	return ((u64)VCPU(vcpu, vcpuid[reg]));
 }
 
 static inline IA64FAULT vmx_vcpu_set_dbr(VCPU * vcpu, u64 reg, u64 val)
@@ -345,20 +327,16 @@ static inline IA64FAULT vmx_vcpu_set_ibr(VCPU * vcpu, u64 reg, u64 val)
 	return IA64_NO_FAULT;
 }
 
-static inline IA64FAULT vmx_vcpu_get_dbr(VCPU * vcpu, u64 reg, u64 * pval)
+static inline u64 vmx_vcpu_get_dbr(VCPU * vcpu, u64 reg)
 {
 	// TODO: unimplemented DBRs return a reserved register fault
-	u64 val = ia64_get_dbr(reg);
-	*pval = val;
-	return IA64_NO_FAULT;
+	return ((u64)ia64_get_dbr(reg));
 }
 
-static inline IA64FAULT vmx_vcpu_get_ibr(VCPU * vcpu, u64 reg, u64 * pval)
+static inline u64 vmx_vcpu_get_ibr(VCPU * vcpu, u64 reg)
 {
 	// TODO: unimplemented IBRs return a reserved register fault
-	u64 val = ia64_get_ibr(reg);
-	*pval = val;
-	return IA64_NO_FAULT;
+	return ((u64)ia64_get_ibr(reg));
 }
 
 /**************************************************************************
@@ -380,20 +358,16 @@ static inline IA64FAULT vmx_vcpu_set_pmd(VCPU * vcpu, u64 reg, u64 val)
 	return IA64_NO_FAULT;
 }
 
-static inline IA64FAULT vmx_vcpu_get_pmc(VCPU * vcpu, u64 reg, u64 * pval)
+static inline u64 vmx_vcpu_get_pmc(VCPU * vcpu, u64 reg)
 {
 	// NOTE: Reads from unimplemented PMC registers return zero
-	u64 val = (u64) ia64_get_pmc(reg);
-	*pval = val;
-	return IA64_NO_FAULT;
+	return ((u64)ia64_get_pmc(reg));
 }
 
-static inline IA64FAULT vmx_vcpu_get_pmd(VCPU * vcpu, u64 reg, u64 * pval)
+static inline u64 vmx_vcpu_get_pmd(VCPU * vcpu, u64 reg)
 {
 	// NOTE: Reads from unimplemented PMD registers return zero
-	u64 val = (u64) ia64_get_pmd(reg);
-	*pval = val;
-	return IA64_NO_FAULT;
+	return ((u64)ia64_get_pmd(reg));
 }
 
 /**************************************************************************

@@ -202,11 +202,9 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, u64 reg, u64 val)
  VCPU protection key register access routines
 **************************************************************************/
 
-IA64FAULT vmx_vcpu_get_pkr(VCPU *vcpu, u64 reg, u64 *pval)
+u64 vmx_vcpu_get_pkr(VCPU *vcpu, u64 reg)
 {
-    u64 val = (u64)ia64_get_pkr(reg);
-    *pval = val;
-    return (IA64_NO_FAULT);
+    return ((u64)ia64_get_pkr(reg));
 }
 
 IA64FAULT vmx_vcpu_set_pkr(VCPU *vcpu, u64 reg, u64 val)

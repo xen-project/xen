@@ -295,7 +295,7 @@ int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
 
     vpsr.val = VCPU(vcpu, vpsr);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
-    vmx_vcpu_get_pta(vcpu,&vpta.val);
+    vpta.val = vmx_vcpu_get_pta(vcpu);
 
     if ( vrr.ve & vpta.ve ) {
         switch ( ref ) {
@@ -629,38 +629,41 @@ again: /* Try again if VCPU has migrated.  */
 }
 
 
-IA64FAULT vmx_vcpu_thash(VCPU *vcpu, u64 vadr, u64 *pval)
+u64 vmx_vcpu_thash(VCPU *vcpu, u64 vadr)
 {
     PTA vpta;
     ia64_rr vrr;
+    u64 pval;
     u64 vhpt_offset;
-    vmx_vcpu_get_pta(vcpu, &vpta.val);
+    vpta.val = vmx_vcpu_get_pta(vcpu);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     if(vpta.vf){
-        *pval = ia64_call_vsa(PAL_VPS_THASH,vadr,vrr.rrval,vpta.val,0,0,0,0);
-        *pval = vpta.val & ~0xffff;
+        pval = ia64_call_vsa(PAL_VPS_THASH, vadr, vrr.rrval,
+                             vpta.val, 0, 0, 0, 0);
+        pval = vpta.val & ~0xffff;
     }else{
         vhpt_offset=((vadr>>vrr.ps)<<3)&((1UL<<(vpta.size))-1);
-        *pval = (vadr&VRN_MASK)|
+        pval = (vadr & VRN_MASK) |
             (vpta.val<<3>>(vpta.size+3)<<(vpta.size))|
             vhpt_offset;
     }
-    return  IA64_NO_FAULT;
+    return  pval;
 }
 
 
-IA64FAULT vmx_vcpu_ttag(VCPU *vcpu, u64 vadr, u64 *pval)
+u64 vmx_vcpu_ttag(VCPU *vcpu, u64 vadr)
 {
     ia64_rr vrr;
     PTA vpta;
-    vmx_vcpu_get_pta(vcpu, &vpta.val);
+    u64 pval;
+    vpta.val = vmx_vcpu_get_pta(vcpu);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     if(vpta.vf){
-        *pval = ia64_call_vsa(PAL_VPS_TTAG,vadr,vrr.rrval,0,0,0,0,0);
+        pval = ia64_call_vsa(PAL_VPS_TTAG, vadr, vrr.rrval, 0, 0, 0, 0, 0);
     }else{
-        *pval = 1;
+        pval = 1;
     }
-    return  IA64_NO_FAULT;
+    return  pval;
 }
 
 
@@ -725,7 +728,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
             }
         }
         else{
-            vmx_vcpu_thash(vcpu, vadr, &vhpt_adr);
+            vhpt_adr = vmx_vcpu_thash(vcpu, vadr);
             data = vtlb_lookup(vcpu, vhpt_adr, DSIDE_TLB);
             if(data){
                 if(vpsr.ic){
@@ -753,20 +756,21 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, u64 vadr, u64 *padr)
     }
 }
 
-IA64FAULT vmx_vcpu_tak(VCPU *vcpu, u64 vadr, u64 *key)
+u64 vmx_vcpu_tak(VCPU *vcpu, u64 vadr)
 {
     thash_data_t *data;
     PTA vpta;
-    vmx_vcpu_get_pta(vcpu, &vpta.val);
+    u64 key;
+    vpta.val = vmx_vcpu_get_pta(vcpu);
     if(vpta.vf==0 || unimplemented_gva(vcpu, vadr)){
-        *key=1;
-        return IA64_NO_FAULT;
+        key=1;
+        return key;
     }
     data = vtlb_lookup(vcpu, vadr, DSIDE_TLB);
     if(!data||!data->p){
-        *key=1;
+        key = 1;
     }else{
-        *key=data->key;
+        key = data->key;
     }
-    return IA64_NO_FAULT;
+    return key;
 }

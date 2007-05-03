@@ -353,7 +353,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }
         }
 
-        vmx_vcpu_get_pta(v, &vpta.val);
+        vpta.val = vmx_vcpu_get_pta(v);
         if (vpta.vf) {
             /* Long format is not yet supported.  */
             if (vpsr.ic) {
@@ -378,7 +378,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }
         }
             
-        vmx_vcpu_thash(v, vadr, &vhpt_adr);
+        vhpt_adr = vmx_vcpu_thash(v, vadr);
         if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
             /* VHPT successfully read.  */
             if (!(pteval & _PAGE_P)) {
@@ -424,7 +424,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             return IA64_FAULT;
         }
 
-        vmx_vcpu_get_pta(v, &vpta.val);
+        vpta.val = vmx_vcpu_get_pta(v);
         if (vpta.vf) {
             /* Long format is not yet supported.  */
             vcpu_set_isr(v, misr.val);
@@ -433,7 +433,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         }
 
 
-        vmx_vcpu_thash(v, vadr, &vhpt_adr);
+        vhpt_adr = vmx_vcpu_thash(v, vadr);
         if (!guest_vhpt_lookup(vhpt_adr, &pteval)) {
             /* VHPT successfully read.  */
             if (pteval & _PAGE_P) {

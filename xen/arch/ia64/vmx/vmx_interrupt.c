@@ -105,7 +105,7 @@ inject_guest_interruption(VCPU *vcpu, u64 vec)
     collect_interruption(vcpu);
     vmx_ia64_set_dcr(vcpu);
 
-    vmx_vcpu_get_iva(vcpu,&viva);
+    viva = vmx_vcpu_get_iva(vcpu);
     regs->cr_iip = viva + vec;
 }
 
@@ -135,7 +135,7 @@ set_ifa_itir_iha (VCPU *vcpu, u64 vadr,
         }
 
         if ( set_iha) {
-            vmx_vcpu_thash(vcpu, vadr, &value);
+            value = vmx_vcpu_thash(vcpu, vadr);
             vcpu_set_iha(vcpu, value);
         }
     }
