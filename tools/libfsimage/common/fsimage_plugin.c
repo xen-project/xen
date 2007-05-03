@@ -137,6 +137,9 @@ static int load_plugins(void)
 
 	if (sizeof(void *) == 8)
 		isadir = "64/";
+#elif defined(__ia64__)
+	if (fsdir == NULL)
+		fsdir = "/usr/lib/fs";
 #else
 	if (fsdir == NULL) {
 		if (sizeof(void *) == 8)
