@@ -342,7 +342,7 @@ class Daemon:
                 log.info("Xend version: Unknown.")
 
             relocate.listenRelocation()
-            servers = SrvServer.create(status)
+            servers = SrvServer.create()
             servers.start(status)
             del servers
             
