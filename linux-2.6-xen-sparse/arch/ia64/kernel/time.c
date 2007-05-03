@@ -267,6 +267,62 @@ static void init_missing_ticks_accounting(int cpu)
 	per_cpu(processed_stolen_time, cpu) = runstate->time[RUNSTATE_runnable]
 					    + runstate->time[RUNSTATE_offline];
 }
+
+static int xen_ia64_settimefoday_after_resume;
+
+static int __init __xen_ia64_settimeofday_after_resume(char *str)
+{
+	xen_ia64_settimefoday_after_resume = 1;
+	return 1;
+}
+
+__setup("xen_ia64_settimefoday_after_resume",
+	 __xen_ia64_settimeofday_after_resume);
+
+/* Called after suspend, to resume time.  */
+void
+time_resume(void)
+{
+	unsigned int cpu;
+	
+	/* Just trigger a tick.  */
+	ia64_cpu_local_tick();
+
+	if (xen_ia64_settimefoday_after_resume) {
+		/* do_settimeofday() resets timer interplator */
+		struct timespec xen_time;
+		int ret;
+		efi_gettimeofday(&xen_time);
+
+		ret = do_settimeofday(&xen_time);
+		WARN_ON(ret);
+	} else {
+#if 0
+		/* adjust EFI time */
+		struct timespec my_time = CURRENT_TIME;
+		struct timespec xen_time;
+		static timespec diff;
+		struct xen_domctl domctl;
+		int ret;
+
+		efi_gettimeofday(&xen_time);
+		diff = timespec_sub(&xen_time, &my_time);
+		domctl.cmd = XEN_DOMCTL_settimeoffset;
+		domctl.domain = DOMID_SELF;
+		domctl.u.settimeoffset.timeoffset_seconds = diff.tv_sec;
+		ret = HYPERVISOR_domctl_op(&domctl);
+		WARN_ON(ret);
+#endif
+		/* Time interpolator remembers the last timer status.
+		   Forget it */
+		write_seqlock_irq(&xtime_lock);
+		time_interpolator_reset();
+		write_sequnlock_irq(&xtime_lock);
+	}
+
+	for_each_online_cpu(cpu)
+		init_missing_ticks_accounting(cpu);
+}
 #else
 #define init_missing_ticks_accounting(cpu) do {} while (0)
 #endif

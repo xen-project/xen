@@ -863,19 +863,6 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 }
 
 
-/* Called after suspend, to resume time.  */
-void
-time_resume(void)
-{
-	extern void ia64_cpu_local_tick(void);
-
-	/* Just trigger a tick.  */
-	ia64_cpu_local_tick();
-
-	/* Time interpolator remembers the last timer status.  Forget it */
-	time_interpolator_reset();
-}
-
 ///////////////////////////////////////////////////////////////////////////
 // expose p2m table
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
