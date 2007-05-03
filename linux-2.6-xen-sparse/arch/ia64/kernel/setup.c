@@ -602,6 +602,9 @@ setup_arch (char **cmdline_p)
 		ia64_mca_init();
 
 	platform_setup(cmdline_p);
+#ifdef CONFIG_XEN
+	xen_setup();
+#endif
 	paging_init();
 #ifdef CONFIG_XEN
 	contiguous_bitmap_init(max_pfn);

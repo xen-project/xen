@@ -24,8 +24,6 @@
 #include <asm/machvec.h>
 #include <asm/system.h>
 
-#include <xen/xencons.h>
-
 void __init
 dig_setup (char **cmdline_p)
 {
@@ -69,19 +67,4 @@ dig_setup (char **cmdline_p)
 	screen_info.orig_video_mode = 3;	/* XXX fake */
 	screen_info.orig_video_isVGA = 1;	/* XXX fake */
 	screen_info.orig_video_ega_bx = 3;	/* XXX fake */
-#ifdef CONFIG_XEN
-	if (!is_running_on_xen() || !is_initial_xendomain())
-		return;
-
-	if (xen_start_info->console.dom0.info_size >=
-	    sizeof(struct dom0_vga_console_info)) {
-		const struct dom0_vga_console_info *info =
-		        (struct dom0_vga_console_info *)(
-		                (char *)xen_start_info +
-		                xen_start_info->console.dom0.info_off);
-		dom0_init_screen_info(info);
-	}
-	xen_start_info->console.domU.mfn = 0;
-	xen_start_info->console.domU.evtchn = 0;
-#endif
 }

@@ -36,6 +36,7 @@
 #ifdef CONFIG_XEN
 extern int running_on_xen;
 #define is_running_on_xen()			(running_on_xen)
+extern void xen_setup(void);
 #else /* CONFIG_XEN */
 # ifdef CONFIG_VMX_GUEST
 #  define is_running_on_xen()			(1)
@@ -43,6 +44,7 @@ extern int running_on_xen;
 #  define is_running_on_xen()			(0)
 #  define HYPERVISOR_ioremap(offset, size)	(offset)
 # endif /* CONFIG_VMX_GUEST */
+#define xen_setup()				do { } while (0)
 #endif /* CONFIG_XEN */
 
 #if defined(CONFIG_XEN) || defined(CONFIG_VMX_GUEST)

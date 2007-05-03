@@ -32,6 +32,7 @@
 #include <asm/hypervisor.h>
 #include <asm/hypercall.h>
 #include <xen/interface/memory.h>
+#include <xen/xencons.h>
 #include <xen/balloon.h>
 
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)XSI_BASE;
@@ -50,6 +51,24 @@ static int p2m_expose_init(void);
 #endif
 
 EXPORT_SYMBOL(__hypercall);
+
+void
+xen_setup(void)
+{
+	if (!is_running_on_xen() || !is_initial_xendomain())
+		return;
+
+	if (xen_start_info->console.dom0.info_size >=
+	    sizeof(struct dom0_vga_console_info)) {
+		const struct dom0_vga_console_info *info =
+		        (struct dom0_vga_console_info *)(
+		                (char *)xen_start_info +
+		                xen_start_info->console.dom0.info_off);
+		dom0_init_screen_info(info);
+	}
+	xen_start_info->console.domU.mfn = 0;
+	xen_start_info->console.domU.evtchn = 0;
+}
 
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?
