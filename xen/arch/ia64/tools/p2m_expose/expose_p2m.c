@@ -64,7 +64,7 @@ do_p2m(unsigned long (*conv)(unsigned long),
 	unsigned long gpfn;
 	unsigned long mfn;
 	unsigned long count;
-	nsec_t nsec;
+	s64 nsec;
 
 	count = 0;
 	do_gettimeofday(&before_tv);

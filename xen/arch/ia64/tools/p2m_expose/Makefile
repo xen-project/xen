@@ -3,12 +3,15 @@ obj-m += expose_p2m.o
 else
 PWD := $(shell pwd)
 TOPDIR ?= $(abspath $(PWD)/../../../../..)
-KDIR ?= $(TOPDIR)/linux-$(shell awk '/^LINUX_VER\>/{print $$3}' $(TOPDIR)/buildconfigs/mk.linux-2.6-xen)-xen
+KVER ?= $(shell awk '/^LINUX_VER\>/{print $$3}' $(TOPDIR)/buildconfigs/mk.linux-2.6-xen)
+KDIR ?= $(TOPDIR)/linux-$(KVER)-xen
 #CROSS_COMPILE ?= ia64-unknown-linux-
 #ARCH ?= ia64
 
 ifneq ($(O),)
 OPT_O := O=$(realpath $(O))
+else
+OPT_O ?= O=$(TOPDIR)/build-linux-$(KVER)-xen_ia64
 endif
 
 ifneq ($(V),)
