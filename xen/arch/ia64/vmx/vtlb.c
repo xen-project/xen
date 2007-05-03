@@ -150,33 +150,41 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     tag = ia64_ttag(ifa);
     cch = head;
     while (cch) {    
-        if (INVALID_VHPT(cch)) {
-            len = cch->len;
-            cch->page_flags = pte;
-            cch->len = len;
-            cch->itir = rr.ps << 2;
-            cch->etag = tag;
-            return;
-        }
+        if (INVALID_VHPT(cch))
+            break;
         cch = cch->next;
     }
-
-    if(head->len>=MAX_CCN_DEPTH){
-        thash_recycle_cch(hcb, head);
-        cch = cch_alloc(hcb);
+    if (cch) {
+        if (cch == head) {
+            len = head->len;
+        } else {
+            local_irq_disable();
+            cch->page_flags = head->page_flags;
+            cch->itir = head->itir;
+            cch->etag  = head->etag;
+            len = head->len;
+            local_irq_enable();
+        }
     }
     else{
-        cch = __alloc_chain(hcb);
+        if (head->len >= MAX_CCN_DEPTH) {
+            thash_recycle_cch(hcb, head);
+            cch = cch_alloc(hcb);
+        } else {
+            cch = __alloc_chain(hcb);
+        }
+        local_irq_disable();
+        *cch = *head;
+        head->next = cch;
+        len = cch->len+1;
+        cch->len = 0;
+        local_irq_enable();
     }
-    local_irq_disable();
-    *cch = *head;
+
     head->page_flags=pte;
+    head->len = len;
     head->itir = rr.ps << 2;
     head->etag=tag;
-    head->next = cch;
-    head->len = cch->len+1;
-    cch->len = 0;
-    local_irq_enable();
     return;
 }
 
