@@ -1,0 +1,13 @@
+Index: ioemu/hw/dma.c
+===================================================================
+--- ioemu.orig/hw/dma.c	2007-05-02 10:30:05.000000000 +0100
++++ ioemu/hw/dma.c	2007-05-03 14:59:53.000000000 +0100
+@@ -340,6 +340,8 @@
+ #endif
+ 
+     r = dma_controllers[ncont].regs + ichan;
++    if (r->transfer_handler == NULL)
++	return;
+     n = r->transfer_handler (r->opaque, ichan + (ncont << 2),
+                              r->now[COUNT], (r->base[COUNT] + 1) << ncont);
+     r->now[COUNT] = n;

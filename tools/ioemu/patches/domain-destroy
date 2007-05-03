@@ -1,7 +1,7 @@
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-12-08 01:26:07.000000000 +0000
-+++ ioemu/monitor.c	2006-12-08 01:26:08.000000000 +0000
+--- ioemu.orig/monitor.c	2007-05-03 14:54:59.000000000 +0100
++++ ioemu/monitor.c	2007-05-03 14:55:01.000000000 +0100
 @@ -308,6 +308,7 @@
  
  static void do_quit(void)
@@ -12,13 +12,14 @@ Index: ioemu/monitor.c
  
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2006-12-08 01:26:08.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-12-08 01:26:08.000000000 +0000
-@@ -507,5 +507,25 @@
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-03 14:55:00.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-03 14:55:01.000000000 +0100
+@@ -549,5 +549,26 @@
          /* Wait up to 10 msec. */
          main_loop_wait(10);
-     }
+ 
 +    destroy_hvm_domain();
++
      return 0;
  }
 +
@@ -42,8 +43,8 @@ Index: ioemu/target-i386-dm/helper2.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 01:26:08.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 01:26:08.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 14:55:00.000000000 +0100
++++ ioemu/vl.h	2007-05-03 14:55:01.000000000 +0100
 @@ -1190,4 +1190,7 @@
  void kqemu_record_dump(void);
  

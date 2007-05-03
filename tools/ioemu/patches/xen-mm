@@ -1,7 +1,7 @@
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-08 02:00:38.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-08 02:02:07.000000000 +0000
+--- ioemu.orig/hw/pc.c	2007-05-03 09:54:24.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 09:56:32.000000000 +0100
 @@ -646,7 +646,9 @@
      }
  
@@ -25,9 +25,17 @@ Index: ioemu/hw/pc.c
      isa_bios_size = bios_size;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-08 02:00:39.000000000 +0000
-+++ ioemu/vl.c	2006-12-08 02:02:28.000000000 +0000
-@@ -158,6 +158,8 @@
+--- ioemu.orig/vl.c	2007-05-03 09:54:24.000000000 +0100
++++ ioemu/vl.c	2007-05-03 10:04:06.000000000 +0100
+@@ -88,6 +88,7 @@
+ 
+ #include "exec-all.h"
+ 
++#include <xen/hvm/params.h>
+ #define DEFAULT_NETWORK_SCRIPT "/etc/xen/qemu-ifup"
+ 
+ //#define DEBUG_UNUSED_IOPORT
+@@ -158,6 +159,8 @@
  int acpi_enabled = 1;
  int fd_bootchk = 1;
  
@@ -36,17 +44,17 @@ Index: ioemu/vl.c
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -5650,6 +5652,9 @@
+@@ -5650,6 +5653,9 @@
      QEMUMachine *machine;
      char usb_devices[MAX_USB_CMDLINE][128];
      int usb_devices_index;
-+    unsigned long nr_pages, tmp_nr_pages, shared_page_nr;
-+    xen_pfn_t *page_array;
++    unsigned long ioreq_pfn;
 +    extern void *shared_page;
++    unsigned long nr_pages;
  
      char qemu_dm_logfilename[64];
  
-@@ -5917,11 +5922,13 @@
+@@ -5921,11 +5927,13 @@
                  ram_size = atol(optarg) * 1024 * 1024;
                  if (ram_size <= 0)
                      help();
@@ -60,7 +68,7 @@ Index: ioemu/vl.c
                  break;
              case QEMU_OPTION_l:
                  {
-@@ -6133,12 +6140,61 @@
+@@ -6137,12 +6145,53 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
@@ -68,44 +76,36 @@ Index: ioemu/vl.c
 +
 +    xc_handle = xc_interface_open();
 +
-+    nr_pages = ram_size/PAGE_SIZE;
-+    tmp_nr_pages = nr_pages;
-+
 +#if defined(__i386__) || defined(__x86_64__)
-+    if (ram_size > HVM_BELOW_4G_RAM_END) {
-+        tmp_nr_pages += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
-+        shared_page_nr = (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT) - 1;
-+    } else
-+        shared_page_nr = nr_pages - 1;
-+#endif
 +
-+    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
++    nr_pages = ram_size/PAGE_SIZE;
++
++    page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
 +    if (page_array == NULL) {
 +        fprintf(logfile, "malloc returned error %d\n", errno);
 +        exit(-1);
 +    }
 +
-+    for ( i = 0; i < tmp_nr_pages; i++)
++    for ( i = 0; i < nr_pages; i++)
 +        page_array[i] = i;
 +
 +    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
 +                                         PROT_READ|PROT_WRITE, page_array,
-+                                         tmp_nr_pages);
++                                         nr_pages);
 +    if (phys_ram_base == NULL) {
 +        fprintf(logfile, "batch map guest memory returned error %d\n", errno);
 +        exit(-1);
 +    }
 +
++    xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
++    fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
 +    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 +                                       PROT_READ|PROT_WRITE,
-+                                       page_array[shared_page_nr]);
++                                       page_array[ioreq_pfn]);
 +    if (shared_page == NULL) {
 +        fprintf(logfile, "map shared IO page returned error %d\n", errno);
 +        exit(-1);
 +    }
-+
-+    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
-+            shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
 +
 +    free(page_array);
 +
@@ -124,8 +124,8 @@ Index: ioemu/vl.c
      if (cdrom_index >= 0) {
 Index: ioemu/hw/piix_pci.c
 ===================================================================
---- ioemu.orig/hw/piix_pci.c	2006-12-08 02:00:36.000000000 +0000
-+++ ioemu/hw/piix_pci.c	2006-12-08 02:02:06.000000000 +0000
+--- ioemu.orig/hw/piix_pci.c	2007-05-03 09:54:18.000000000 +0100
++++ ioemu/hw/piix_pci.c	2007-05-03 09:56:32.000000000 +0100
 @@ -399,7 +399,7 @@
      uint8_t elcr[2];
  
@@ -137,8 +137,8 @@ Index: ioemu/hw/piix_pci.c
      elcr[0] = 0x00;
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 02:00:39.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 02:02:07.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 09:54:24.000000000 +0100
++++ ioemu/vl.h	2007-05-03 09:56:32.000000000 +0100
 @@ -39,6 +39,7 @@
  #include <sys/stat.h>
  #include "xenctrl.h"

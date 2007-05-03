@@ -1,19 +1,18 @@
 Index: ioemu/xenstore.c
 ===================================================================
---- ioemu.orig/xenstore.c	2006-12-20 15:21:53.000000000 +0000
-+++ ioemu/xenstore.c	2006-12-20 15:21:54.000000000 +0000
-@@ -185,3 +185,31 @@
-     free(image);
+--- ioemu.orig/xenstore.c	2007-05-03 15:18:05.000000000 +0100
++++ ioemu/xenstore.c	2007-05-03 15:18:17.000000000 +0100
+@@ -225,6 +225,34 @@
      free(vec);
  }
-+
+ 
 +void xenstore_write_vncport(int display)
 +{
 +    char *buf = NULL, *path;
 +    char *portstr = NULL;
 +
 +    if (xsh == NULL)
-+	return;
++        return;
 +
 +    path = xs_get_domain_path(xsh, domid);
 +    if (path == NULL) {
@@ -22,10 +21,10 @@ Index: ioemu/xenstore.c
 +    }
 +
 +    if (pasprintf(&buf, "%s/console/vnc-port", path) == -1)
-+	goto out;
++        goto out;
 +
 +    if (pasprintf(&portstr, "%d", 5900 + display) == -1)
-+	goto out;
++        goto out;
 +
 +    if (xs_write(xsh, XBT_NULL, buf, portstr, strlen(portstr)) == 0)
 +        fprintf(logfile, "xs_write() vncport failed\n");
@@ -34,11 +33,15 @@ Index: ioemu/xenstore.c
 +    free(portstr);
 +    free(buf);
 +}
++
+ char *xenstore_vm_read(int domid, char *key, int *len)
+ {
+     char *buf = NULL, *path = NULL, *value = NULL;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-20 15:21:53.000000000 +0000
-+++ ioemu/vl.c	2006-12-20 15:21:54.000000000 +0000
-@@ -6527,6 +6527,7 @@
+--- ioemu.orig/vl.c	2007-05-03 15:18:05.000000000 +0100
++++ ioemu/vl.c	2007-05-03 15:18:17.000000000 +0100
+@@ -6604,6 +6604,7 @@
  	vnc_display = vnc_display_init(ds, vnc_display, vncunused, &vnclisten_addr);
  	if (vncviewer)
  	    vnc_start_viewer(vnc_display);
@@ -48,13 +51,13 @@ Index: ioemu/vl.c
          sdl_display_init(ds, full_screen);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-20 15:21:53.000000000 +0000
-+++ ioemu/vl.h	2006-12-20 15:21:54.000000000 +0000
-@@ -1210,6 +1210,7 @@
+--- ioemu.orig/vl.h	2007-05-03 15:18:05.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:18:17.000000000 +0100
+@@ -1211,6 +1211,7 @@
  int xenstore_fd(void);
  void xenstore_process_event(void *opaque);
  void xenstore_check_new_media_present(int timeout);
 +void xenstore_write_vncport(int vnc_display);
  
- 
- void kqemu_record_dump(void);
+ int xenstore_vm_write(int domid, char *key, char *val);
+ char *xenstore_vm_read(int domid, char *key, int *len);

@@ -16,10 +16,11 @@ This patch make UHC & USB mouse/tablet behave consistently with spec.
 
 Signed-off-by: Xinmei Huang <xinmei.huang@intel.com>
 
-diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
---- a/tools/ioemu/hw/usb-hid.c	Thu Dec 07 11:51:22 2006 +0000
-+++ b/tools/ioemu/hw/usb-hid.c	Thu Dec 07 11:52:26 2006 +0000
-@@ -39,6 +39,7 @@ typedef struct USBMouseState {
+Index: ioemu/hw/usb-hid.c
+===================================================================
+--- ioemu.orig/hw/usb-hid.c	2007-05-02 14:21:51.000000000 +0100
++++ ioemu/hw/usb-hid.c	2007-05-02 14:23:54.000000000 +0100
+@@ -39,6 +39,7 @@
      int x, y;
      int kind;
      int mouse_grabbed;
@@ -27,7 +28,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
  } USBMouseState;
  
  /* mostly the same values as the Bochs USB Mouse device */
-@@ -231,6 +232,7 @@ static void usb_mouse_event(void *opaque
+@@ -231,6 +232,7 @@
      s->dy += dy1;
      s->dz += dz1;
      s->buttons_state = buttons_state;
@@ -35,7 +36,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
  }
  
  static void usb_tablet_event(void *opaque,
-@@ -242,6 +244,7 @@ static void usb_tablet_event(void *opaqu
+@@ -242,6 +244,7 @@
      s->y = y;
      s->dz += dz;
      s->buttons_state = buttons_state;
@@ -43,7 +44,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
  }
  
  static inline int int_clamp(int val, int vmin, int vmax)
-@@ -483,10 +486,16 @@ static int usb_mouse_handle_data(USBDevi
+@@ -483,10 +486,16 @@
      switch(pid) {
      case USB_TOKEN_IN:
          if (devep == 1) {
@@ -64,7 +65,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
          } else {
              goto fail;
          }
-@@ -523,6 +532,7 @@ USBDevice *usb_tablet_init(void)
+@@ -566,6 +575,7 @@
      s->dev.handle_data = usb_mouse_handle_data;
      s->dev.handle_destroy = usb_mouse_handle_destroy;
      s->kind = USB_TABLET;
@@ -72,7 +73,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
  
      pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Tablet");
  
-@@ -544,6 +554,7 @@ USBDevice *usb_mouse_init(void)
+@@ -589,6 +599,7 @@
      s->dev.handle_data = usb_mouse_handle_data;
      s->dev.handle_destroy = usb_mouse_handle_destroy;
      s->kind = USB_MOUSE;
@@ -80,27 +81,45 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-hid.c
  
      pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Mouse");
  
-diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-uhci.c
---- a/tools/ioemu/hw/usb-uhci.c	Thu Dec 07 11:51:22 2006 +0000
-+++ b/tools/ioemu/hw/usb-uhci.c	Thu Dec 07 11:52:26 2006 +0000
-@@ -424,12 +424,10 @@ static int uhci_handle_td(UHCIState *s, 
+Index: ioemu/hw/usb-uhci.c
+===================================================================
+--- ioemu.orig/hw/usb-uhci.c	2007-05-02 14:23:54.000000000 +0100
++++ ioemu/hw/usb-uhci.c	2007-05-02 14:23:54.000000000 +0100
+@@ -43,9 +43,15 @@
+ #define TD_CTRL_IOC     (1 << 24)
+ #define TD_CTRL_ACTIVE  (1 << 23)
+ #define TD_CTRL_STALL   (1 << 22)
++#define TD_CTRL_BUFFER  (1 << 21)
+ #define TD_CTRL_BABBLE  (1 << 20)
+ #define TD_CTRL_NAK     (1 << 19)
+ #define TD_CTRL_TIMEOUT (1 << 18)
++#define TD_CTRL_BITSTUFF                                 \
++                        (1 << 17)
++#define TD_CTRL_MASK                                     \
++    (TD_CTRL_BITSTUFF | TD_CTRL_TIMEOUT | TD_CTRL_NAK    \
++     | TD_CTRL_BABBLE | TD_CTRL_BUFFER | TD_CTRL_STALL)
+ 
+ #define UHCI_PORT_RESET (1 << 9)
+ #define UHCI_PORT_LSDA  (1 << 8)
+@@ -424,12 +430,12 @@
      uint8_t buf[2048];
      int len, max_len, err, ret;
  
 -    if (td->ctrl & TD_CTRL_IOC) {
 -        *int_mask |= 0x01;
--    }
--    
--    if (!(td->ctrl & TD_CTRL_ACTIVE))
--        return 1;
 +    if (!(td->ctrl & TD_CTRL_ACTIVE)){
 +        ret = 1;
 +        goto out;
-+    }
+     }
+-    
+-    if (!(td->ctrl & TD_CTRL_ACTIVE))
+-        return 1;
++    /* Clear TD's status field explicitly */
++    td->ctrl = td->ctrl & (~TD_CTRL_MASK);
  
      /* TD is active */
      max_len = ((td->token >> 21) + 1) & 0x7ff;
-@@ -467,7 +465,8 @@ static int uhci_handle_td(UHCIState *s, 
+@@ -467,7 +473,8 @@
          /* invalid pid : frame interrupted */
          s->status |= UHCI_STS_HCPERR;
          uhci_update_irq(s);
@@ -110,7 +129,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-uhci.c
      }
      if (td->ctrl & TD_CTRL_IOS)
          td->ctrl &= ~TD_CTRL_ACTIVE;
-@@ -479,10 +478,12 @@ static int uhci_handle_td(UHCIState *s, 
+@@ -479,10 +486,12 @@
              len < max_len) {
              *int_mask |= 0x02;
              /* short packet: do not update QH */
@@ -125,7 +144,7 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-uhci.c
          }
      } else {
          switch(ret) {
-@@ -501,23 +502,34 @@ static int uhci_handle_td(UHCIState *s, 
+@@ -501,23 +510,34 @@
              }
              td->ctrl = (td->ctrl & ~(3 << TD_CTRL_ERROR_SHIFT)) | 
                  (err << TD_CTRL_ERROR_SHIFT);
@@ -150,12 +169,10 @@ diff -r fb3cb6f52a29 -r 60bbcf799384 tools/ioemu/hw/usb-uhci.c
              td->ctrl &= ~TD_CTRL_ACTIVE;
              /* frame interrupted */
 -            return -1;
--        }
--    }
 +            ret = -1;
 +            goto out;
-+        }
-+    }
+         }
+     }
 +   
 +out:
 +    /* If TD is inactive and IOC bit set to 1 then update int_mask */ 

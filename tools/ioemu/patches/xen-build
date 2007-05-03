@@ -1,7 +1,7 @@
 Index: ioemu/Makefile
 ===================================================================
---- ioemu.orig/Makefile	2006-12-08 01:26:04.000000000 +0000
-+++ ioemu/Makefile	2006-12-08 01:26:06.000000000 +0000
+--- ioemu.orig/Makefile	2007-05-03 15:38:37.000000000 +0100
++++ ioemu/Makefile	2007-05-03 15:38:39.000000000 +0100
 @@ -1,11 +1,14 @@
  # Makefile for QEMU.
  
@@ -41,7 +41,17 @@ Index: ioemu/Makefile
          done
  
  distclean: clean
-@@ -68,12 +73,12 @@
+@@ -60,24 +65,24 @@
+ 
+ install-doc: $(DOCS)
+ 	mkdir -p "$(DESTDIR)$(docdir)"
+-	$(INSTALL) -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
++	$(INSTALL_DATA) qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
+ ifndef CONFIG_WIN32
+ 	mkdir -p "$(DESTDIR)$(mandir)/man1"
+-	$(INSTALL) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
++	$(INSTALL_DATA) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
+ endif
  
  install: all $(if $(BUILD_DOCS),install-doc)
  	mkdir -p "$(DESTDIR)$(bindir)"
@@ -55,11 +65,16 @@ Index: ioemu/Makefile
 +#	mkdir -p "$(DESTDIR)$(datadir)"
 +#	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
 +#			video.x openbios-sparc32 linux_boot.bin; do \
-+#		$(INSTALL) -m 644 $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
++#		$(INSTALL_DATA) $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
 +#	done
  ifndef CONFIG_WIN32
  	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
  	for x in $(KEYMAPS); do \
+-		$(INSTALL) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
++		$(INSTALL_DATA) $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
+ 	done
+ endif
+ 	for d in $(TARGET_DIRS); do \
 @@ -89,7 +94,7 @@
  	$(MAKE) -C tests $@
  
@@ -85,8 +100,8 @@ Index: ioemu/Makefile
  info: qemu-doc.info qemu-tech.info
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-08 01:26:04.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-08 01:41:05.000000000 +0000
+--- ioemu.orig/Makefile.target	2007-05-03 15:38:37.000000000 +0100
++++ ioemu/Makefile.target	2007-05-03 15:38:39.000000000 +0100
 @@ -1,5 +1,8 @@
  include config.mak
  
@@ -163,8 +178,8 @@ Index: ioemu/Makefile.target
  include .depend
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-12-08 01:26:04.000000000 +0000
-+++ ioemu/configure	2006-12-08 01:40:58.000000000 +0000
+--- ioemu.orig/configure	2007-05-03 15:38:37.000000000 +0100
++++ ioemu/configure	2007-05-03 15:38:39.000000000 +0100
 @@ -18,8 +18,8 @@
  
  # default parameters

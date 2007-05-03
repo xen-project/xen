@@ -5,9 +5,11 @@
 [HVM] Enable DMA mode for CD-ROM IDE ATAPI interface.
 Signed-off-by: Winston Wang <winston.l.wang@intel.com
 
---- ioemu/hw/ide.c	Wed Oct 18 18:37:18 2006 +0100
-+++ ioemu/hw/ide.c	Wed Oct 18 18:41:47 2006 +0100
-@@ -557,9 +557,9 @@ static void ide_atapi_identify(IDEState 
+Index: ioemu/hw/ide.c
+===================================================================
+--- ioemu.orig/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
+@@ -713,9 +713,9 @@
      padstr((uint8_t *)(p + 23), QEMU_VERSION, 8); /* firmware version */
      padstr((uint8_t *)(p + 27), "QEMU CD-ROM", 40); /* model */
      put_le16(p + 48, 1); /* dword I/O (XXX: should not be set on CDROM) */

@@ -1,7 +1,7 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-09-21 18:54:22.000000000 +0100
-+++ ioemu/vnc.c	2006-09-21 19:05:39.000000000 +0100
+--- ioemu.orig/vnc.c	2007-05-03 09:56:31.000000000 +0100
++++ ioemu/vnc.c	2007-05-03 10:07:55.000000000 +0100
 @@ -143,13 +143,16 @@
  static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
  {
@@ -90,9 +90,9 @@ Index: ioemu/vnc.c
  static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-09-21 18:55:38.000000000 +0100
-+++ ioemu/vl.c	2006-09-21 19:00:48.000000000 +0100
-@@ -5120,10 +5120,10 @@
+--- ioemu.orig/vl.c	2007-05-03 10:07:54.000000000 +0100
++++ ioemu/vl.c	2007-05-03 10:07:55.000000000 +0100
+@@ -5195,10 +5195,10 @@
          /* XXX: better handling of removal */
          for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
              ioh_next = ioh->next;

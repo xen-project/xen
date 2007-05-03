@@ -17,44 +17,116 @@ Signed-off-by: Keir Fraser <keir@xensource.com>
 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-20 15:21:55.000000000 +0000
-+++ ioemu/vl.c	2006-12-20 15:21:56.000000000 +0000
-@@ -5808,6 +5808,91 @@
+--- ioemu.orig/vl.c	2007-05-03 15:12:21.000000000 +0100
++++ ioemu/vl.c	2007-05-03 15:12:41.000000000 +0100
+@@ -286,7 +286,7 @@
+     for(i = start; i < start + length; i += size) {
+         ioport_write_table[bsize][i] = func;
+         if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
+-            hw_error("register_ioport_read: invalid opaque");
++            hw_error("register_ioport_write: invalid opaque");
+         ioport_opaque[i] = opaque;
+     }
      return 0;
+@@ -5894,6 +5894,157 @@
+     suspend_requested = 1;
  }
  
-+#if defined(__i386__) || defined(__x86_64__)
++#if defined(MAPCACHE)
++
++#if defined(__i386__) 
++#define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
++#define MCACHE_BUCKET_SHIFT 16
++#elif defined(__x86_64__)
++#define MAX_MCACHE_SIZE    0x1000000000 /* 64GB max for x86_64 */
++#define MCACHE_BUCKET_SHIFT 20
++#endif
++
++#define MCACHE_BUCKET_SIZE (1UL << MCACHE_BUCKET_SHIFT)
++
++#define BITS_PER_LONG (sizeof(long)*8)
++#define BITS_TO_LONGS(bits) \
++    (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
++#define DECLARE_BITMAP(name,bits) \
++    unsigned long name[BITS_TO_LONGS(bits)]
++#define test_bit(bit,map) \
++    (!!((map)[(bit)/BITS_PER_LONG] & (1UL << ((bit)%BITS_PER_LONG))))
++
++struct map_cache {
++    unsigned long paddr_index;
++    uint8_t      *vaddr_base;
++    DECLARE_BITMAP(valid_mapping, MCACHE_BUCKET_SIZE>>PAGE_SHIFT);
++};
++
 +static struct map_cache *mapcache_entry;
 +static unsigned long nr_buckets;
 +
-+static int qemu_map_cache_init(unsigned long nr_pages)
++/* For most cases (>99.9%), the page address is the same. */
++static unsigned long last_address_index = ~0UL;
++static uint8_t      *last_address_vaddr;
++
++static int qemu_map_cache_init(void)
 +{
-+    unsigned long max_pages = MAX_MCACHE_SIZE >> PAGE_SHIFT;
-+    int i;
++    unsigned long size;
 +
-+    if (nr_pages < max_pages)
-+        max_pages = nr_pages;
-+
-+    nr_buckets   = max_pages + (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1;
-+    nr_buckets >>= (MCACHE_BUCKET_SHIFT - PAGE_SHIFT);
++    nr_buckets = (((MAX_MCACHE_SIZE >> PAGE_SHIFT) +
++                   (1UL << (MCACHE_BUCKET_SHIFT - PAGE_SHIFT)) - 1) >>
++                  (MCACHE_BUCKET_SHIFT - PAGE_SHIFT));
 +    fprintf(logfile, "qemu_map_cache_init nr_buckets = %lx\n", nr_buckets);
 +
-+    mapcache_entry = malloc(nr_buckets * sizeof(struct map_cache));
-+    if (mapcache_entry == NULL) {
++    /*
++     * Use mmap() directly: lets us allocate a big hash table with no up-front
++     * cost in storage space. The OS will allocate memory only for the buckets
++     * that we actually use. All others will contain all zeroes.
++     */
++    size = nr_buckets * sizeof(struct map_cache);
++    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
++    mapcache_entry = mmap(NULL, size, PROT_READ|PROT_WRITE,
++                          MAP_SHARED|MAP_ANONYMOUS, 0, 0);
++    if (mapcache_entry == MAP_FAILED) {
 +        errno = ENOMEM;
 +        return -1;
 +    }
 +
-+    memset(mapcache_entry, 0, nr_buckets * sizeof(struct map_cache));
-+
-+    /*
-+     * To avoid ENOMEM from xc_map_foreign_batch() at runtime, we
-+     * pre-fill all the map caches in advance.
-+     */
-+    for (i = 0; i < nr_buckets; i++)
-+       (void)qemu_map_cache(((target_phys_addr_t)i) << MCACHE_BUCKET_SHIFT);
-+
 +    return 0;
++}
++
++static void qemu_remap_bucket(struct map_cache *entry,
++                              unsigned long address_index)
++{
++    uint8_t *vaddr_base;
++    unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
++    unsigned int i, j;
++
++    if (entry->vaddr_base != NULL) {
++        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
++        if (errno) {
++            fprintf(logfile, "unmap fails %d\n", errno);
++            exit(-1);
++        }
++    }
++
++    for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i++)
++        pfns[i] = (address_index << (MCACHE_BUCKET_SHIFT-PAGE_SHIFT)) + i;
++
++    vaddr_base = xc_map_foreign_batch(xc_handle, domid, PROT_READ|PROT_WRITE,
++                                      pfns, MCACHE_BUCKET_SIZE >> PAGE_SHIFT);
++    if (vaddr_base == NULL) {
++        fprintf(logfile, "xc_map_foreign_batch error %d\n", errno);
++        exit(-1);
++    }
++
++    entry->vaddr_base  = vaddr_base;
++    entry->paddr_index = address_index;
++
++    for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i += BITS_PER_LONG) {
++        unsigned long word = 0;
++        j = ((i + BITS_PER_LONG) > (MCACHE_BUCKET_SIZE >> PAGE_SHIFT)) ?
++            (MCACHE_BUCKET_SIZE >> PAGE_SHIFT) % BITS_PER_LONG : BITS_PER_LONG;
++        while (j > 0)
++            word = (word << 1) | !(pfns[i + --j] & 0xF0000000UL);
++        entry->valid_mapping[i / BITS_PER_LONG] = word;
++    }
 +}
 +
 +uint8_t *qemu_map_cache(target_phys_addr_t phys_addr)
@@ -63,55 +135,71 @@ Index: ioemu/vl.c
 +    unsigned long address_index  = phys_addr >> MCACHE_BUCKET_SHIFT;
 +    unsigned long address_offset = phys_addr & (MCACHE_BUCKET_SIZE-1);
 +
-+    /* For most cases (>99.9%), the page address is the same. */
-+    static unsigned long last_address_index = ~0UL;
-+    static uint8_t      *last_address_vaddr;
-+
 +    if (address_index == last_address_index)
 +        return last_address_vaddr + address_offset;
 +
 +    entry = &mapcache_entry[address_index % nr_buckets];
 +
-+    if (entry->vaddr_base == NULL || entry->paddr_index != address_index) {
-+        /* We need to remap a bucket. */
-+        uint8_t *vaddr_base;
-+        unsigned long pfns[MCACHE_BUCKET_SIZE >> PAGE_SHIFT];
-+        unsigned int i;
++    if (entry->vaddr_base == NULL || entry->paddr_index != address_index ||
++        !test_bit(address_offset>>PAGE_SHIFT, entry->valid_mapping))
++        qemu_remap_bucket(entry, address_index);
 +
-+        if (entry->vaddr_base != NULL) {
-+            errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
-+            if (errno) {
-+                fprintf(logfile, "unmap fails %d\n", errno);
-+                exit(-1);
-+            }
-+        }
-+
-+        for (i = 0; i < MCACHE_BUCKET_SIZE >> PAGE_SHIFT; i++)
-+            pfns[i] = (address_index << (MCACHE_BUCKET_SHIFT-PAGE_SHIFT)) + i;
-+
-+        vaddr_base = xc_map_foreign_batch(
-+            xc_handle, domid, PROT_READ|PROT_WRITE,
-+            pfns, MCACHE_BUCKET_SIZE >> PAGE_SHIFT);
-+        if (vaddr_base == NULL) {
-+            fprintf(logfile, "xc_map_foreign_batch error %d\n", errno);
-+            exit(-1);
-+        }
-+
-+        entry->vaddr_base  = vaddr_base;
-+        entry->paddr_index = address_index;;
-+    }
++    if (!test_bit(address_offset>>PAGE_SHIFT, entry->valid_mapping))
++        return NULL;
 +
 +    last_address_index = address_index;
 +    last_address_vaddr = entry->vaddr_base;
 +
 +    return last_address_vaddr + address_offset;
 +}
-+#endif
++
++void qemu_invalidate_map_cache(void)
++{
++    unsigned long i;
++
++    mapcache_lock();
++
++    for (i = 0; i < nr_buckets; i++) {
++        struct map_cache *entry = &mapcache_entry[i];
++
++        if (entry->vaddr_base == NULL)
++            continue;
++
++        errno = munmap(entry->vaddr_base, MCACHE_BUCKET_SIZE);
++        if (errno) {
++            fprintf(logfile, "unmap fails %d\n", errno);
++            exit(-1);
++        }
++
++        entry->paddr_index = 0;
++        entry->vaddr_base  = NULL;
++    }
++
++    last_address_index =  ~0UL;
++    last_address_vaddr = NULL;
++
++    mapcache_unlock();
++}
++
++#endif /* defined(MAPCACHE) */
 +
  int main(int argc, char **argv)
  {
  #ifdef CONFIG_GDBSTUB
-@@ -6130,6 +6215,7 @@
+@@ -5930,8 +6081,11 @@
+     unsigned long ioreq_pfn;
+     extern void *shared_page;
+     extern void *buffered_io_page;
+-    extern void *buffered_pio_page;
++#ifdef __ia64__
+     unsigned long nr_pages;
++    xen_pfn_t *page_array;
++    extern void *buffered_pio_page;
++#endif
+ 
+     char qemu_dm_logfilename[64];
+ 
+@@ -6221,6 +6375,7 @@
                  break;
              case QEMU_OPTION_m:
                  ram_size = atol(optarg) * 1024 * 1024;
@@ -119,75 +207,61 @@ Index: ioemu/vl.c
                  if (ram_size <= 0)
                      help();
  #ifndef CONFIG_DM
-@@ -6404,50 +6490,41 @@
-         shared_page_nr = nr_pages - 1;
- #endif
+@@ -6482,30 +6637,15 @@
  
--    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
+ #if defined(__i386__) || defined(__x86_64__)
+ 
+-    nr_pages = ram_size/PAGE_SIZE;
+-
+-    page_array = (xen_pfn_t *)malloc(nr_pages * sizeof(xen_pfn_t));
 -    if (page_array == NULL) {
 -        fprintf(logfile, "malloc returned error %d\n", errno);
 -        exit(-1);
 -    }
 -
- #if defined(__i386__) || defined(__x86_64__)
--    for ( i = 0; i < tmp_nr_pages; i++)
+-    for ( i = 0; i < nr_pages; i++)
 -        page_array[i] = i;
- 
+-
 -    phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
 -                                         PROT_READ|PROT_WRITE, page_array,
--                                         tmp_nr_pages);
+-                                         nr_pages);
 -    if (phys_ram_base == NULL) {
 -        fprintf(logfile, "batch map guest memory returned error %d\n", errno);
-+    if ( qemu_map_cache_init(tmp_nr_pages) )
-+    {
++    if (qemu_map_cache_init()) {
 +        fprintf(logfile, "qemu_map_cache_init returned: error %d\n", errno);
          exit(-1);
      }
  
+     xc_get_hvm_param(xc_handle, domid, HVM_PARAM_IOREQ_PFN, &ioreq_pfn);
+     fprintf(logfile, "shared page at pfn %lx\n", ioreq_pfn);
      shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 -                                       PROT_READ|PROT_WRITE,
--                                       page_array[shared_page_nr]);
-+                                       PROT_READ|PROT_WRITE, shared_page_nr);
+-                                       page_array[ioreq_pfn]);
++                                       PROT_READ|PROT_WRITE, ioreq_pfn);
      if (shared_page == NULL) {
          fprintf(logfile, "map shared IO page returned error %d\n", errno);
          exit(-1);
-     }
- 
--    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n",
--            shared_page_nr, (uint64_t)(page_array[shared_page_nr]));
-+    fprintf(logfile, "shared page at pfn:%lx\n", shared_page_nr);
- 
+@@ -6514,15 +6654,12 @@
+     xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
+     fprintf(logfile, "buffered io page at pfn %lx\n", ioreq_pfn);
      buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                             PROT_READ|PROT_WRITE,
--                                            page_array[shared_page_nr - 2]);
-+                                            shared_page_nr - 2);
+-                                            PROT_READ|PROT_WRITE,
+-                                            page_array[ioreq_pfn]);
++                                            PROT_READ|PROT_WRITE, ioreq_pfn);
      if (buffered_io_page == NULL) {
          fprintf(logfile, "map buffered IO page returned error %d\n", errno);
          exit(-1);
      }
  
--    fprintf(logfile, "buffered io page at pfn:%lx, mfn: %"PRIx64"\n",
--            shared_page_nr - 2, (uint64_t)(page_array[shared_page_nr - 2]));
--
 -    free(page_array);
-+    fprintf(logfile, "buffered io page at pfn:%lx\n", shared_page_nr - 2);
- 
+-
  #elif defined(__ia64__)
--  
-+
-+    page_array = (xen_pfn_t *)malloc(tmp_nr_pages * sizeof(xen_pfn_t));
-+    if (page_array == NULL) {
-+        fprintf(logfile, "malloc returned error %d\n", errno);
-+        exit(-1);
-+    }
-+
-     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        IO_PAGE_START >> PAGE_SHIFT);
+ 
+     nr_pages = ram_size/PAGE_SIZE;
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2006-12-20 15:21:42.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2006-12-21 11:32:29.000000000 +0000
+--- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-03 15:10:22.000000000 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2007-05-03 15:12:34.000000000 +0100
 @@ -36,6 +36,7 @@
  
  #include "cpu.h"
@@ -196,25 +270,13 @@ Index: ioemu/target-i386-dm/exec-dm.c
  
  //#define DEBUG_TB_INVALIDATE
  //#define DEBUG_FLUSH
-@@ -127,10 +128,29 @@
+@@ -127,10 +128,17 @@
  FILE *logfile;
  int loglevel;
  
-+
-+#if defined(__i386__) || defined(__x86_64__)
-+#define MAPCACHE
-+#endif
-+
 +#ifdef MAPCACHE
-+#include <pthread.h>
-+static pthread_mutex_t mapcache_mutex;
-+#define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
-+#define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)
-+#else 
-+#define mapcache_lock() ( (void)0 )
-+#define mapcache_unlock() ( (void)0 )
++pthread_mutex_t mapcache_mutex;
 +#endif
-+
 +
  void cpu_exec_init(CPUState *env)
  {
@@ -226,7 +288,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
  
      env->next_cpu = NULL;
      penv = &first_cpu;
-@@ -144,6 +164,14 @@
+@@ -144,6 +152,14 @@
  
      /* alloc dirty bits array */
      phys_ram_dirty = qemu_malloc(phys_ram_size >> TARGET_PAGE_BITS);
@@ -241,19 +303,28 @@ Index: ioemu/target-i386-dm/exec-dm.c
  }
  
  /* enable or disable low levels log */
-@@ -426,19 +454,27 @@
- #endif
+@@ -409,16 +425,11 @@
+         return 0;
  }
  
+-static inline int paddr_is_ram(target_phys_addr_t addr)
+-{
+-    /* Is this guest physical address RAM-backed? */
+-#if defined(CONFIG_DM) && (defined(__i386__) || defined(__x86_64__))
+-    return ((addr < HVM_BELOW_4G_MMIO_START) ||
+-            (addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH));
+-#else
+-    return (addr < ram_size);
 +#if defined(__i386__) || defined(__x86_64__)
 +#define phys_ram_addr(x) (qemu_map_cache(x))
 +#elif defined(__ia64__)
-+#define phys_ram_addr(x) (phys_ram_base + (x))
-+#endif
-+
++#define phys_ram_addr(x) ((addr < ram_size) ? (phys_ram_base + (x)) : NULL)
+ #endif
+-}
+ 
  void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                              int len, int is_write)
- {
+@@ -426,13 +437,15 @@
      int l, io_index;
      uint8_t *ptr;
      uint32_t val;
@@ -271,12 +342,14 @@ Index: ioemu/target-i386-dm/exec-dm.c
          io_index = iomem_index(addr);
          if (is_write) {
              if (io_index) {
-@@ -460,9 +496,10 @@
+@@ -452,11 +465,11 @@
+                     io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);
+                     l = 1;
                  }
-             } else if (paddr_is_ram(addr)) {
+-            } else if (paddr_is_ram(addr)) {
++            } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                  /* Reading from RAM */
 -                memcpy(phys_ram_base + addr, buf, l);
-+                ptr = phys_ram_addr(addr);
 +                memcpy(ptr, buf, l);
  #ifdef __ia64__
 -                sync_icache((unsigned long)(phys_ram_base + addr), l);
@@ -284,17 +357,19 @@ Index: ioemu/target-i386-dm/exec-dm.c
  #endif 
              }
          } else {
-@@ -485,7 +522,8 @@
+@@ -477,9 +490,9 @@
+                     stb_raw(buf, val);
+                     l = 1;
                  }
-             } else if (paddr_is_ram(addr)) {
+-            } else if (paddr_is_ram(addr)) {
++            } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                  /* Reading from RAM */
 -                memcpy(buf, phys_ram_base + addr, l);
-+                ptr = phys_ram_addr(addr);
 +                memcpy(buf, ptr, l);
              } else {
                  /* Neither RAM nor known MMIO space */
                  memset(buf, 0xff, len); 
-@@ -495,6 +533,8 @@
+@@ -489,6 +502,8 @@
          buf += l;
          addr += l;
      }
@@ -305,30 +380,32 @@ Index: ioemu/target-i386-dm/exec-dm.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-20 15:21:55.000000000 +0000
-+++ ioemu/vl.h	2006-12-20 15:21:56.000000000 +0000
-@@ -156,6 +156,26 @@
+--- ioemu.orig/vl.h	2007-05-03 15:12:20.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:12:34.000000000 +0100
+@@ -156,6 +156,28 @@
  
  extern FILE *logfile;
  
 +
 +#if defined(__i386__) || defined(__x86_64__)
-+#if defined(__i386__) 
-+#define MAX_MCACHE_SIZE    0x40000000 /* 1GB max for x86 */
-+#define MCACHE_BUCKET_SHIFT 16
-+#elif defined(__x86_64__)
-+#define MAX_MCACHE_SIZE    0x1000000000 /* 64GB max for x86_64 */
-+#define MCACHE_BUCKET_SHIFT 20
-+#endif
 +
-+#define MCACHE_BUCKET_SIZE (1UL << MCACHE_BUCKET_SHIFT)
-+
-+struct map_cache {
-+    unsigned long paddr_index;
-+    uint8_t      *vaddr_base;
-+};
++#define MAPCACHE
 +
 +uint8_t *qemu_map_cache(target_phys_addr_t phys_addr);
++void     qemu_invalidate_map_cache(void);
++
++#include <pthread.h>
++extern  pthread_mutex_t mapcache_mutex;
++#define mapcache_lock() pthread_mutex_lock(&mapcache_mutex)
++#define mapcache_unlock() pthread_mutex_unlock(&mapcache_mutex)
++
++#else 
++
++#define qemu_invalidate_map_cache() ((void)0)
++
++#define mapcache_lock()   ((void)0)
++#define mapcache_unlock() ((void)0)
++
 +#endif
 +
  extern int xc_handle;
@@ -336,8 +413,8 @@ Index: ioemu/vl.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2006-12-20 15:21:45.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2006-12-20 15:21:56.000000000 +0000
+--- ioemu.orig/target-i386-dm/cpu.h	2007-05-03 15:10:22.000000000 +0100
++++ ioemu/target-i386-dm/cpu.h	2007-05-03 15:12:21.000000000 +0100
 @@ -25,7 +25,8 @@
  #ifdef TARGET_X86_64
  #define TARGET_LONG_BITS 64
@@ -348,3 +425,17 @@ Index: ioemu/target-i386-dm/cpu.h
  #endif
  
  /* target supports implicit self modifying code */
+Index: ioemu/target-i386-dm/helper2.c
+===================================================================
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-03 15:12:19.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-03 15:12:21.000000000 +0100
+@@ -526,6 +526,9 @@
+     case IOREQ_TYPE_TIMEOFFSET:
+         cpu_ioreq_timeoffset(env, req);
+         break;
++    case IOREQ_TYPE_INVALIDATE:
++        qemu_invalidate_map_cache();
++        break;
+     default:
+         hw_error("Invalid ioreq type 0x%x\n", req->type);
+     }

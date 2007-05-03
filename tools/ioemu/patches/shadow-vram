@@ -1,7 +1,7 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-08-17 19:49:52.159002688 +0100
-+++ ioemu/hw/vga.c	2006-08-17 19:49:54.575735565 +0100
+--- ioemu.orig/hw/vga.c	2007-05-02 10:32:35.000000000 +0100
++++ ioemu/hw/vga.c	2007-05-02 10:35:05.000000000 +0100
 @@ -1359,6 +1359,105 @@
      }
  }
@@ -120,10 +120,11 @@ Index: ioemu/hw/vga.c
      addr1 = (s->start_addr * 4);
      bwidth = width * 4;
      y_start = -1;
-@@ -1889,6 +1993,14 @@
+@@ -1889,7 +1993,18 @@
  
      vga_reset(s);
  
+-    s->vram_ptr = qemu_malloc(vga_ram_size);
 +    check_sse2();
 +    s->vram_shadow = qemu_malloc(vga_ram_size+TARGET_PAGE_SIZE+1);
 +    if (s->vram_shadow == NULL)
@@ -132,16 +133,43 @@ Index: ioemu/hw/vga.c
 +    s->vram_shadow = (uint8_t *)((long)(s->vram_shadow + TARGET_PAGE_SIZE - 1)
 +                                 & ~(TARGET_PAGE_SIZE - 1));
 +
-     s->vram_ptr = qemu_malloc(vga_ram_size);
++    /* Video RAM must be 128-bit aligned for SSE optimizations later */
++    s->vram_alloc = qemu_malloc(vga_ram_size + 15);
++    s->vram_ptr = (uint8_t *)((long)(s->vram_alloc + 15) & ~15L);
++
      s->vram_offset = vga_ram_offset;
      s->vram_size = vga_ram_size;
+     s->ds = ds;
+@@ -2013,7 +2128,7 @@
+     }
+ 
+     if (!vga_ram_base) {
+-        vga_ram_base = qemu_malloc(vga_ram_size);
++        vga_ram_base = qemu_malloc(vga_ram_size + TARGET_PAGE_SIZE + 1);
+         if (!vga_ram_base) {
+             fprintf(stderr, "reallocate error\n");
+             return NULL;
+@@ -2021,8 +2136,10 @@
+     }
+ 
+     /* XXX lock needed? */
++    old_pointer = s->vram_alloc;
++    s->vram_alloc = vga_ram_base;
++    vga_ram_base = (uint8_t *)((long)(vga_ram_base + 15) & ~15L);
+     memcpy(vga_ram_base, s->vram_ptr, vga_ram_size);
+-    old_pointer = s->vram_ptr;
+     s->vram_ptr = vga_ram_base;
+ 
+     return old_pointer;
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2006-08-17 19:49:52.159002688 +0100
-+++ ioemu/hw/vga_int.h	2006-08-17 19:49:54.575735565 +0100
-@@ -79,6 +79,7 @@
+--- ioemu.orig/hw/vga_int.h	2007-05-02 10:32:35.000000000 +0100
++++ ioemu/hw/vga_int.h	2007-05-02 10:35:10.000000000 +0100
+@@ -78,7 +78,9 @@
+ #define VGA_MAX_HEIGHT 2048
  
  #define VGA_STATE_COMMON                                                \
++    uint8_t *vram_alloc;                                                \
      uint8_t *vram_ptr;                                                  \
 +    uint8_t *vram_shadow;                                               \
      unsigned long vram_offset;                                          \

@@ -33,9 +33,9 @@ Signed-off-by: Keir Fraser <keir@xensource.com>
 
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2006-12-08 18:21:36.000000000 +0000
-+++ ioemu/hw/ide.c	2006-12-08 18:23:18.000000000 +0000
-@@ -680,7 +680,7 @@
+--- ioemu.orig/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-03 15:07:17.000000000 +0100
+@@ -838,7 +838,7 @@
  static void ide_sector_read(IDEState *s)
  {
      int64_t sector_num;
@@ -44,7 +44,7 @@ Index: ioemu/hw/ide.c
  
      s->status = READY_STAT | SEEK_STAT;
      s->error = 0; /* not needed by IDE spec, but needed by Windows */
-@@ -695,7 +695,11 @@
+@@ -853,7 +853,11 @@
  #endif
          if (n > s->req_nb_sectors)
              n = s->req_nb_sectors;
@@ -57,7 +57,7 @@ Index: ioemu/hw/ide.c
          ide_transfer_start(s, s->io_buffer, 512 * n, ide_sector_read);
          ide_set_irq(s);
          ide_set_sector(s, sector_num + n);
-@@ -721,7 +725,11 @@
+@@ -879,7 +883,11 @@
              if (n > MAX_MULT_SECTORS)
                  n = MAX_MULT_SECTORS;
              sector_num = ide_get_sector(s);
@@ -70,7 +70,7 @@ Index: ioemu/hw/ide.c
              s->io_buffer_index = 0;
              s->io_buffer_size = n * 512;
              len = s->io_buffer_size;
-@@ -767,7 +775,7 @@
+@@ -925,7 +933,7 @@
  static void ide_sector_write(IDEState *s)
  {
      int64_t sector_num;
@@ -79,7 +79,7 @@ Index: ioemu/hw/ide.c
  
      s->status = READY_STAT | SEEK_STAT;
      sector_num = ide_get_sector(s);
-@@ -777,7 +785,11 @@
+@@ -935,7 +943,11 @@
      n = s->nsector;
      if (n > s->req_nb_sectors)
          n = s->req_nb_sectors;
@@ -92,7 +92,7 @@ Index: ioemu/hw/ide.c
      s->nsector -= n;
      if (s->nsector == 0) {
          /* no more sector to write */
-@@ -823,8 +835,13 @@
+@@ -981,8 +993,13 @@
          if (len == 0) {
              n = s->io_buffer_size >> 9;
              sector_num = ide_get_sector(s);

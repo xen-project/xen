@@ -1,7 +1,7 @@
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-08-06 02:14:09.796902750 +0100
-+++ ioemu/cpu-all.h	2006-08-06 02:15:39.707879423 +0100
+--- ioemu.orig/cpu-all.h	2007-05-02 16:04:46.000000000 +0100
++++ ioemu/cpu-all.h	2007-05-02 16:05:50.000000000 +0100
 @@ -822,7 +822,7 @@
  
  /* memory API */
@@ -13,8 +13,8 @@ Index: ioemu/cpu-all.h
  extern uint8_t *phys_ram_dirty;
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-08-06 02:14:09.797902638 +0100
-+++ ioemu/hw/pc.c	2006-08-06 02:15:39.708879311 +0100
+--- ioemu.orig/hw/pc.c	2007-05-02 16:04:46.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-02 16:05:50.000000000 +0100
 @@ -155,7 +155,7 @@
  }
  
@@ -53,8 +53,8 @@ Index: ioemu/hw/pc.c
                          const char *kernel_filename, 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:15:31.040845624 +0100
-+++ ioemu/vl.c	2006-08-06 02:15:39.711878977 +0100
+--- ioemu.orig/vl.c	2007-05-02 16:05:50.000000000 +0100
++++ ioemu/vl.c	2007-05-02 16:05:50.000000000 +0100
 @@ -122,7 +122,7 @@
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
@@ -64,7 +64,7 @@ Index: ioemu/vl.c
  int pit_min_timer_count = 0;
  int nb_nics;
  NICInfo nd_table[MAX_NICS];
-@@ -5895,7 +5895,7 @@
+@@ -5899,7 +5899,7 @@
                  help();
                  break;
              case QEMU_OPTION_m:
@@ -75,8 +75,8 @@ Index: ioemu/vl.c
                  if (ram_size > PHYS_RAM_MAX_SIZE) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-06 02:15:10.368150219 +0100
-+++ ioemu/vl.h	2006-08-06 02:15:39.711878977 +0100
+--- ioemu.orig/vl.h	2007-05-02 16:05:50.000000000 +0100
++++ ioemu/vl.h	2007-05-02 16:05:50.000000000 +0100
 @@ -146,7 +146,7 @@
  extern int xc_handle;
  extern int domid;
@@ -97,8 +97,8 @@ Index: ioemu/vl.h
               const char *kernel_filename, const char *kernel_cmdline,
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-08-06 02:15:10.364150665 +0100
-+++ ioemu/hw/vga.c	2006-08-06 02:15:39.712878866 +0100
+--- ioemu.orig/hw/vga.c	2007-05-02 16:05:50.000000000 +0100
++++ ioemu/hw/vga.c	2007-05-02 16:05:50.000000000 +0100
 @@ -1365,7 +1365,8 @@
  static void vga_draw_graphic(VGAState *s, int full_update)
  {

@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-10-24 14:36:58.000000000 +0100
-+++ ioemu/vl.c	2006-10-24 14:37:03.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-02 16:05:51.000000000 +0100
++++ ioemu/vl.c	2007-05-02 16:05:51.000000000 +0100
 @@ -5234,7 +5234,7 @@
             "-S              freeze CPU at startup (use 'c' to start execution)\n"
             "-s              wait gdb connection to port %d\n"
@@ -38,7 +38,7 @@ Index: ioemu/vl.c
      LIST_INIT (&vm_change_state_head);
  #ifndef _WIN32
      {
-@@ -5715,6 +5717,11 @@
+@@ -5719,6 +5721,11 @@
      nb_nics = 0;
      /* default mac address of the first network interface */
      
@@ -50,7 +50,7 @@ Index: ioemu/vl.c
      optind = 1;
      for(;;) {
          if (optind >= argc)
-@@ -5905,7 +5912,7 @@
+@@ -5909,7 +5916,7 @@
                      exit(1);
                  }
                  break;

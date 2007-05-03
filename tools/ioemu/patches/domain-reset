@@ -1,16 +1,13 @@
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2006-12-08 01:26:06.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-12-08 01:26:08.000000000 +0000
-@@ -127,6 +127,25 @@
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-03 14:54:46.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-03 14:55:00.000000000 +0100
+@@ -127,6 +127,22 @@
  /* called from main_cpu_reset */
  void cpu_reset(CPUX86State *env)
  {
 +    int xcHandle;
 +    int sts;
-+
-+    /* pause domain first, to avoid repeated reboot request*/
-+    xc_domain_pause(xc_handle, domid);
 +
 +    xcHandle = xc_interface_open();
 +    if (xcHandle < 0)
@@ -28,22 +25,28 @@ Index: ioemu/target-i386-dm/helper2.c
  }
  
  void cpu_x86_close(CPUX86State *env)
-@@ -479,6 +498,10 @@
-         if (vm_running) {
-             if (shutdown_requested)
-                 break;
-+            if (reset_requested) {
-+                qemu_system_reset();
-+                reset_requested = 0;
-+            }
-         }
+@@ -529,14 +545,9 @@
  
+     qemu_set_fd_handler(evtchn_fd, cpu_handle_ioreq, NULL, env);
+ 
+-    while (1) {
+-        if (vm_running) {
+-            if (shutdown_requested)
+-                break;
+-        }
+-
++    while (!(vm_running && suspend_requested))
          /* Wait up to 10 msec. */
+         main_loop_wait(10);
+-    }
++
+     return 0;
+ }
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-08 01:26:08.000000000 +0000
-+++ ioemu/vl.c	2006-12-08 01:26:08.000000000 +0000
-@@ -4948,7 +4948,7 @@
+--- ioemu.orig/vl.c	2007-05-03 14:55:00.000000000 +0100
++++ ioemu/vl.c	2007-05-03 14:55:00.000000000 +0100
+@@ -4957,7 +4957,7 @@
  } QEMUResetEntry;
  
  static QEMUResetEntry *first_reset_entry;
@@ -54,8 +57,8 @@ Index: ioemu/vl.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 01:26:07.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 01:26:08.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 14:55:00.000000000 +0100
++++ ioemu/vl.h	2007-05-03 14:55:00.000000000 +0100
 @@ -131,6 +131,7 @@
  
  void qemu_register_reset(QEMUResetHandler *func, void *opaque);

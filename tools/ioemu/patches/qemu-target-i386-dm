@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-08 01:41:10.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-08 01:41:11.000000000 +0000
+--- ioemu.orig/Makefile.target	2007-05-03 14:53:03.000000000 +0100
++++ ioemu/Makefile.target	2007-05-03 14:53:58.000000000 +0100
 @@ -62,6 +62,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
@@ -32,8 +32,8 @@ Index: ioemu/Makefile.target
  DEFINES += -DHAS_AUDIO
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-12-08 01:41:10.000000000 +0000
-+++ ioemu/configure	2006-12-08 01:41:11.000000000 +0000
+--- ioemu.orig/configure	2007-05-03 14:53:03.000000000 +0100
++++ ioemu/configure	2007-05-03 14:53:57.000000000 +0100
 @@ -373,6 +373,8 @@
      if [ "$user" = "yes" ] ; then
          target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
@@ -45,8 +45,8 @@ Index: ioemu/configure
  fi
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-12-08 01:41:10.000000000 +0000
-+++ ioemu/monitor.c	2006-12-08 01:41:11.000000000 +0000
+--- ioemu.orig/monitor.c	2007-05-03 14:53:03.000000000 +0100
++++ ioemu/monitor.c	2007-05-03 14:53:58.000000000 +0100
 @@ -1262,6 +1262,10 @@
        "", "show profiling information", },
      { "capture", "", do_info_capture,
@@ -60,8 +60,8 @@ Index: ioemu/monitor.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-08 01:41:10.000000000 +0000
-+++ ioemu/vl.c	2006-12-08 01:41:11.000000000 +0000
+--- ioemu.orig/vl.c	2007-05-03 14:53:03.000000000 +0100
++++ ioemu/vl.c	2007-05-03 14:53:59.000000000 +0100
 @@ -87,7 +87,7 @@
  
  #include "exec-all.h"
@@ -98,8 +98,8 @@ Index: ioemu/vl.c
  {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 01:40:58.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 01:41:11.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 14:52:58.000000000 +0100
++++ ioemu/vl.h	2007-05-03 14:53:59.000000000 +0100
 @@ -37,6 +37,8 @@
  #include <unistd.h>
  #include <fcntl.h>
@@ -132,7 +132,7 @@ Index: ioemu/vl.h
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2006-12-08 01:41:11.000000000 +0000
++++ ioemu/target-i386-dm/cpu.h	2007-05-03 14:53:58.000000000 +0100
 @@ -0,0 +1,84 @@
 +/*
 + * i386 virtual CPU header
@@ -221,8 +221,8 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2006-12-08 01:41:11.000000000 +0000
-@@ -0,0 +1,546 @@
++++ ioemu/target-i386-dm/exec-dm.c	2007-05-03 14:53:56.000000000 +0100
+@@ -0,0 +1,540 @@
 +/*
 + *  virtual page mapping and translated block handling
 + * 
@@ -638,14 +638,8 @@ Index: ioemu/target-i386-dm/exec-dm.c
 +{
 +    /* Is this guest physical address RAM-backed? */
 +#if defined(CONFIG_DM) && (defined(__i386__) || defined(__x86_64__))
-+    if (ram_size <= HVM_BELOW_4G_RAM_END)
-+        /* RAM is contiguous */
-+        return (addr < ram_size);
-+    else
-+        /* There is RAM below and above the MMIO hole */
-+        return ((addr < HVM_BELOW_4G_MMIO_START) ||
-+                ((addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH)
-+                 && (addr < ram_size + HVM_BELOW_4G_MMIO_LENGTH)));
++    return ((addr < HVM_BELOW_4G_MMIO_START) ||
++            (addr >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH));
 +#else
 +    return (addr < ram_size);
 +#endif
@@ -772,8 +766,8 @@ Index: ioemu/target-i386-dm/exec-dm.c
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2006-12-08 01:41:11.000000000 +0000
-@@ -0,0 +1,488 @@
++++ ioemu/target-i386-dm/helper2.c	2007-05-03 14:54:46.000000000 +0100
+@@ -0,0 +1,542 @@
 +/*
 + *  i386 helpers (without register variable usage)
 + *
@@ -1162,6 +1156,21 @@ Index: ioemu/target-i386-dm/helper2.c
 +    req->data = tmp1;
 +}
 +
++void cpu_ioreq_sub(CPUState *env, ioreq_t *req)
++{
++    unsigned long tmp1, tmp2;
++
++    if (req->data_is_ptr != 0)
++        hw_error("expected scalar value");
++
++    read_physical(req->addr, req->size, &tmp1);
++    if (req->dir == IOREQ_WRITE) {
++        tmp2 = tmp1 - (unsigned long) req->data;
++        write_physical(req->addr, req->size, &tmp2);
++    }
++    req->data = tmp1;
++}
++
 +void cpu_ioreq_or(CPUState *env, ioreq_t *req)
 +{
 +    unsigned long tmp1, tmp2;
@@ -1192,8 +1201,22 @@ Index: ioemu/target-i386-dm/helper2.c
 +    req->data = tmp1;
 +}
 +
++void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
++{
++    unsigned long tmp1;
++
++    if (req->data_is_ptr != 0)
++        hw_error("expected scalar value");
++
++    read_physical(req->addr, req->size, &tmp1);
++    write_physical(req->addr, req->size, &req->data);
++    req->data = tmp1;
++}
++
 +void cpu_handle_ioreq(void *opaque)
 +{
++    extern int vm_running;
++    extern int shutdown_requested;
 +    CPUState *env = opaque;
 +    ioreq_t *req = cpu_get_ioreq();
 +
@@ -1216,11 +1239,17 @@ Index: ioemu/target-i386-dm/helper2.c
 +        case IOREQ_TYPE_ADD:
 +            cpu_ioreq_add(env, req);
 +            break;
++        case IOREQ_TYPE_SUB:
++            cpu_ioreq_sub(env, req);
++            break;
 +        case IOREQ_TYPE_OR:
 +            cpu_ioreq_or(env, req);
 +            break;
 +        case IOREQ_TYPE_XOR:
 +            cpu_ioreq_xor(env, req);
++            break;
++        case IOREQ_TYPE_XCHG:
++            cpu_ioreq_xchg(env, req);
 +            break;
 +        default:
 +            hw_error("Invalid ioreq type 0x%x\n", req->type);
@@ -1237,6 +1266,25 @@ Index: ioemu/target-i386-dm/helper2.c
 +        }
 +
 +        wmb(); /* Update ioreq contents /then/ update state. */
++
++	/*
++         * We do this before we send the response so that the tools
++         * have the opportunity to pick up on the reset before the
++         * guest resumes and does a hlt with interrupts disabled which
++         * causes Xen to powerdown the domain.
++         */
++        if (vm_running) {
++            if (shutdown_requested) {
++		fprintf(logfile, "shutdown requested in cpu_handle_ioreq\n");
++		destroy_hvm_domain();
++	    }
++	    if (reset_requested) {
++		fprintf(logfile, "reset requested in cpu_handle_ioreq.\n");
++		qemu_system_reset();
++		reset_requested = 0;
++	    }
++	}
++
 +        req->state = STATE_IORESP_READY;
 +        xc_evtchn_notify(xce_handle, ioreq_local_port[send_vcpu]);
 +    }
@@ -1265,7 +1313,7 @@ Index: ioemu/target-i386-dm/helper2.c
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2006-12-08 01:41:11.000000000 +0000
++++ ioemu/target-i386-dm/i8259-dm.c	2007-05-03 14:53:57.000000000 +0100
 @@ -0,0 +1,67 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1337,7 +1385,7 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/qemu-dm.debug
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-dm.debug	2006-12-08 01:41:11.000000000 +0000
++++ ioemu/target-i386-dm/qemu-dm.debug	2007-05-03 14:53:03.000000000 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +
@@ -1352,15 +1400,14 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2006-12-08 01:41:11.000000000 +0000
-@@ -0,0 +1,10 @@
++++ ioemu/target-i386-dm/qemu-ifup	2007-05-03 14:53:03.000000000 +0100
+@@ -0,0 +1,9 @@
 +#!/bin/sh
 +
 +#. /etc/rc.d/init.d/functions
 +#ulimit -c unlimited
 +
-+echo -c 'config qemu network with xen bridge for '
-+echo $*
++echo 'config qemu network with xen bridge for ' $*
 +
 +ifconfig $1 0.0.0.0 up
 +brctl addif $2 $1

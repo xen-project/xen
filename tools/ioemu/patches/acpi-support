@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-08 02:00:40.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-08 02:00:40.000000000 +0000
+--- ioemu.orig/Makefile.target	2007-05-03 15:06:42.000000000 +0100
++++ ioemu/Makefile.target	2007-05-03 15:07:21.000000000 +0100
 @@ -358,6 +358,7 @@
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
@@ -12,11 +12,11 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-08 02:00:40.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-08 02:00:40.000000000 +0000
-@@ -874,13 +874,19 @@
+--- ioemu.orig/hw/pc.c	2007-05-03 15:06:42.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 15:07:21.000000000 +0100
+@@ -873,13 +873,19 @@
  
-     cmos_init(ram_size, boot_device, bs_table, timeoffset);
+     cmos_init(ram_size, boot_device, bs_table);
  
 +    /* using PIIX4 acpi model */
 +    if (pci_enabled && acpi_enabled)
@@ -35,7 +35,7 @@ Index: ioemu/hw/pc.c
  
  #if 0
      /* ??? Need to figure out some way for the user to
-@@ -903,8 +909,10 @@
+@@ -902,8 +908,10 @@
      /* XXX: should be done in the Bochs BIOS */
      if (pci_enabled) {
          pci_bios_init();
@@ -49,8 +49,8 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/piix4acpi.c	2006-12-08 02:00:40.000000000 +0000
-@@ -0,0 +1,396 @@
++++ ioemu/hw/piix4acpi.c	2007-05-03 15:07:31.000000000 +0100
+@@ -0,0 +1,186 @@
 +/*
 + * PIIX4 ACPI controller emulation
 + *
@@ -101,22 +101,10 @@ Index: ioemu/hw/piix4acpi.c
 +typedef struct AcpiDeviceState AcpiDeviceState;
 +AcpiDeviceState *acpi_device_table;
 +
-+/* Bits of PM1a register define here  */
-+typedef struct PM1Event_BLK {
-+    uint16_t pm1_status; /* pm1a_EVT_BLK */
-+    uint16_t pm1_enable; /* pm1a_EVT_BLK+2 */
-+}PM1Event_BLK;
-+
 +typedef struct PCIAcpiState {
 +    PCIDevice dev;
-+    uint16_t irq;
-+    uint16_t pm1_status; /* pm1a_EVT_BLK */
-+    uint16_t pm1_enable; /* pm1a_EVT_BLK+2 */
 +    uint16_t pm1_control; /* pm1a_ECNT_BLK */
-+    uint32_t pm1_timer; /* pmtmr_BLK */
 +} PCIAcpiState;
-+
-+static PCIAcpiState *acpi_state;
 +
 +static inline void acpi_set_irq(PCIAcpiState *s)
 +{
@@ -125,108 +113,11 @@ Index: ioemu/hw/piix4acpi.c
 +    printf("acpi_set_irq: s->irq %x \n",s->irq);
 +}
 +
-+static void acpi_reset(PCIAcpiState *s)
-+{
-+    uint8_t *pci_conf;
-+    pci_conf = s->dev.config;
-+
-+    pci_conf[0x42] = 0x00;
-+    pci_conf[0x43] = 0x00;
-+    s->irq = 9;
-+    s->pm1_status = 0;
-+    s->pm1_enable = 0x00;    /* TMROF_EN should cleared */
-+    s->pm1_control = SCI_EN; /* SCI_EN */
-+    s->pm1_timer = 0;
-+}
-+
-+/*byte access  */
-+static void acpiPm1Status_writeb(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    if ((val&TMROF_STS)==TMROF_STS)
-+        s->pm1_status = s->pm1_status&!TMROF_STS;
-+
-+    if ((val&GBL_STS)==GBL_STS)
-+        s->pm1_status = s->pm1_status&!GBL_STS;     
-+    
-+/*     printf("acpiPm1Status_writeb \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
-+}
-+
-+static uint32_t acpiPm1Status_readb(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = s->pm1_status;
-+/*         printf("acpiPm1Status_readb \n addr %x val:%x\n", addr, val); */
-+
-+   return val;
-+}
-+
-+static void acpiPm1StatusP1_writeb(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+     s->pm1_status = (val<<8)||(s->pm1_status);
-+/*     printf("acpiPm1StatusP1_writeb \n addr %x val:%x\n", addr, val); */
-+}
-+
-+static uint32_t acpiPm1StatusP1_readb(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = (s->pm1_status)>>8;
-+    printf("acpiPm1StatusP1_readb \n addr %x val:%x\n", addr, val);
-+
-+    return val;
-+}
-+
-+static void acpiPm1Enable_writeb(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    s->pm1_enable = val;
-+/*   printf("acpiPm1Enable_writeb \n addr %x val:%x\n", addr, val); */
-+}
-+
-+static uint32_t acpiPm1Enable_readb(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = (s->pm1_enable)||0x1;
-+/*  printf("acpiPm1Enable_readb \n addr %x val:%x\n", addr, val); */
-+
-+    return val;
-+}
-+
-+static void acpiPm1EnableP1_writeb(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    s->pm1_enable = (val<<8)||(s->pm1_enable);
-+/*    printf("acpiPm1EnableP1_writeb \n addr %x val:%x\n", addr, val); */
-+
-+}
-+
-+static uint32_t acpiPm1EnableP1_readb(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = (s->pm1_enable)>>8;
-+/*  printf("acpiPm1EnableP1_readb \n addr %x val:%x\n", addr, val); */
-+
-+    return val;
-+}
-+
 +static void acpiPm1Control_writeb(void *opaque, uint32_t addr, uint32_t val)
 +{
 +    PCIAcpiState *s = opaque;
 +
-+    s->pm1_control = val;
++    s->pm1_control = (s->pm1_control & 0xff00) | (val & 0xff);
 +/*  printf("acpiPm1Control_writeb \n addr %x val:%x\n", addr, val); */
 +
 +}
@@ -236,7 +127,8 @@ Index: ioemu/hw/piix4acpi.c
 +    PCIAcpiState *s = opaque;
 +    uint32_t val;
 +
-+    val = s->pm1_control;
++    /* Mask out the write-only bits */
++    val = s->pm1_control & ~(GBL_RLS|SLP_EN) & 0xff;
 +/*    printf("acpiPm1Control_readb \n addr %x val:%x\n", addr, val); */
 +
 +    return val;
@@ -246,7 +138,7 @@ Index: ioemu/hw/piix4acpi.c
 +{
 +    PCIAcpiState *s = opaque;
 +
-+    s->pm1_control = (val<<8)||(s->pm1_control);
++    s->pm1_control = (s->pm1_control & 0xff) | (val << 8);
 +/*    printf("acpiPm1ControlP1_writeb \n addr %x val:%x\n", addr, val); */
 +
 +} 
@@ -256,7 +148,8 @@ Index: ioemu/hw/piix4acpi.c
 +    PCIAcpiState *s = opaque;
 +    uint32_t val;
 +
-+    val = (s->pm1_control)>>8;
++    /* Mask out the write-only bits */
++    val = (s->pm1_control & ~(GBL_RLS|SLP_EN)) >> 8;
 +/*    printf("acpiPm1ControlP1_readb \n addr %x val:%x\n", addr, val); */
 +
 +    return val;
@@ -264,50 +157,6 @@ Index: ioemu/hw/piix4acpi.c
 +
 +
 +/* word access   */
-+
-+static void acpiPm1Status_writew(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    if ((val&TMROF_STS)==TMROF_STS)
-+        s->pm1_status = s->pm1_status&!TMROF_STS;
-+
-+    if ((val&GBL_STS)==GBL_STS)
-+        s->pm1_status = s->pm1_status&!GBL_STS;     
-+
-+/*    printf("acpiPm1Status_writew \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
-+}
-+
-+static uint32_t acpiPm1Status_readw(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = s->pm1_status;
-+/*    printf("acpiPm1Status_readw \n addr %x val:%x\n", addr, val); */
-+
-+    return val;
-+}
-+
-+static void acpiPm1Enable_writew(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    s->pm1_enable = val;
-+/*    printf("acpiPm1Enable_writew \n addr %x val:%x\n", addr, val); */
-+
-+}
-+
-+static uint32_t acpiPm1Enable_readw(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = s->pm1_enable;
-+/*    printf("acpiPm1Enable_readw \n addr %x val:%x\n", addr, val); */
-+
-+   return val;
-+}
 +
 +static void acpiPm1Control_writew(void *opaque, uint32_t addr, uint32_t val)
 +{
@@ -323,50 +172,13 @@ Index: ioemu/hw/piix4acpi.c
 +    PCIAcpiState *s = opaque;
 +    uint32_t val;
 +
-+    val = s->pm1_control;
++    /* Mask out the write-only bits */
++    val = s->pm1_control & ~(GBL_RLS|SLP_EN);
 +/*    printf("acpiPm1Control_readw \n addr %x val:%x\n", addr, val);  */
 +
 +    return val;
 +}
 +
-+/* dword access */
-+
-+static void acpiPm1Event_writel(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    s->pm1_status = val;
-+    s->pm1_enable = val>>16;
-+/*     printf("acpiPm1Event_writel \n addr %x val:%x \n", addr, val); */
-+
-+}
-+
-+static void acpiPm1Event_readl(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val=s->pm1_status|(s->pm1_enable<<16);
-+/*    printf("acpiPm1Event_readl \n addr %x val:%x\n", addr, val);    */
-+}
-+
-+static void acpiPm1Timer_writel(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    PCIAcpiState *s = opaque;
-+
-+    s->pm1_timer = val;
-+/*    printf("acpiPm1Timer_writel \n addr %x val:%x\n", addr, val); */
-+}
-+
-+static uint32_t acpiPm1Timer_readl(void *opaque, uint32_t addr)
-+{
-+    PCIAcpiState *s = opaque;
-+    uint32_t val;
-+
-+    val = s->pm1_timer;
-+/*    printf("acpiPm1Timer_readl \n addr %x val:%x\n", addr, val); */
-+    return val;
-+}
 +
 +static void acpi_map(PCIDevice *pci_dev, int region_num,
 +                    uint32_t addr, uint32_t size, int type)
@@ -376,39 +188,15 @@ Index: ioemu/hw/piix4acpi.c
 +    printf("register acpi io \n");
 +
 +    /* Byte access */
-+    register_ioport_write(addr, 1, 1, acpiPm1Status_writeb, d);
-+    register_ioport_read(addr, 1, 1, acpiPm1Status_readb, d);
-+    register_ioport_write(addr+1, 1, 1, acpiPm1StatusP1_writeb, d);
-+    register_ioport_read(addr+1, 1, 1, acpiPm1StatusP1_readb, d);
-+
-+    register_ioport_write(addr + 2, 1, 1, acpiPm1Enable_writeb, d);
-+    register_ioport_read(addr + 2, 1, 1, acpiPm1Enable_readb, d);
-+    register_ioport_write(addr + 2 +1, 1, 1, acpiPm1EnableP1_writeb, d);
-+    register_ioport_read(addr + 2 +1, 1, 1, acpiPm1EnableP1_readb, d);
-+
 +    register_ioport_write(addr + 4, 1, 1, acpiPm1Control_writeb, d);
 +    register_ioport_read(addr + 4, 1, 1, acpiPm1Control_readb, d);
 +    register_ioport_write(addr + 4 + 1, 1, 1, acpiPm1ControlP1_writeb, d);
-+    register_ioport_read(addr + 4 +1, 1, 1, acpiPm1ControlP1_readb, d);	
++    register_ioport_read(addr + 4 +1, 1, 1, acpiPm1ControlP1_readb, d);
 +
 +    /* Word access */
-+    register_ioport_write(addr, 2, 2, acpiPm1Status_writew, d);
-+    register_ioport_read(addr, 2, 2, acpiPm1Status_readw, d);
-+
-+    register_ioport_write(addr + 2, 2, 2, acpiPm1Enable_writew, d);
-+    register_ioport_read(addr + 2, 2, 2, acpiPm1Enable_readw, d); 
-+
 +    register_ioport_write(addr + 4, 2, 2, acpiPm1Control_writew, d);
 +    register_ioport_read(addr + 4, 2, 2, acpiPm1Control_readw, d);
-+
-+    /* DWord access */
-+    register_ioport_write(addr, 4, 4, acpiPm1Event_writel, d);
-+    register_ioport_read(addr, 4, 4, acpiPm1Event_readl, d);
-+		
-+    register_ioport_write(addr + 8, 4, 4, acpiPm1Timer_writel, d);
-+    register_ioport_read(addr + 8, 4, 4, acpiPm1Timer_readl, d);
 +}
-+													
 +
 +/* PIIX4 acpi pci configuration space, func 2 */
 +void pci_piix4_acpi_init(PCIBus *bus, int devfn)
@@ -421,7 +209,6 @@ Index: ioemu/hw/piix4acpi.c
 +        bus, "PIIX4 ACPI", sizeof(PCIAcpiState),
 +        devfn, NULL, NULL);
 +
-+    acpi_state = d;
 +    pci_conf = d->dev.config;
 +    pci_conf[0x00] = 0x86;  /* Intel */
 +    pci_conf[0x01] = 0x80;
@@ -444,14 +231,17 @@ Index: ioemu/hw/piix4acpi.c
 +     */
 +    pci_conf[0x40] = 0x41; /* Special device-specific BAR at 0x40 */
 +    pci_conf[0x41] = 0x1f;
++    pci_conf[0x42] = 0x00;
++    pci_conf[0x43] = 0x00;
++    d->pm1_control = SCI_EN;
++
 +    acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
-+    acpi_reset(d);
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-08 02:00:40.000000000 +0000
-+++ ioemu/vl.c	2006-12-08 02:00:40.000000000 +0000
-@@ -156,7 +156,7 @@
+--- ioemu.orig/vl.c	2007-05-03 15:06:42.000000000 +0100
++++ ioemu/vl.c	2007-05-03 15:07:21.000000000 +0100
+@@ -157,7 +157,7 @@
  #else
  #define MAX_CPUS 1
  #endif
@@ -460,33 +250,33 @@ Index: ioemu/vl.c
  int fd_bootchk = 1;
  
  extern int vcpus;
-@@ -5341,6 +5341,7 @@
+@@ -5415,6 +5415,7 @@
+ #endif
             "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
  	   "-vnc display    start a VNC server on display\n"
-            "-timeoffset     time offset (in seconds) from local time\n"
 +           "-acpi           disable or enable ACPI of HVM domain \n"
             "\n"
             "During emulation, the following keys are useful:\n"
             "ctrl-alt-f      toggle full screen\n"
-@@ -5426,6 +5427,7 @@
+@@ -5499,6 +5500,7 @@
+ 
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
-     QEMU_OPTION_timeoffset,
 +    QEMU_OPTION_acpi,
  };
  
  typedef struct QEMUOption {
-@@ -5509,6 +5511,7 @@
+@@ -5581,6 +5583,7 @@
+     
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
-     { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
 +    { "acpi", 0, QEMU_OPTION_acpi },
      { NULL },
  };
  
-@@ -6240,6 +6243,9 @@
-             case QEMU_OPTION_timeoffset:
-                 timeoffset = strtol(optarg, NULL, 0);
+@@ -6322,6 +6325,9 @@
+                 vcpus = atoi(optarg);
+                 fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                  break;
 +            case QEMU_OPTION_acpi:
 +                acpi_enabled = 1;
@@ -496,8 +286,8 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 02:00:40.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 02:00:40.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 15:06:42.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:07:21.000000000 +0100
 @@ -168,6 +168,7 @@
  extern int kqemu_allowed;
  extern int win2k_install_hack;
@@ -506,7 +296,7 @@ Index: ioemu/vl.h
  extern int smp_cpus;
  
  /* XXX: make it dynamic */
-@@ -923,6 +924,9 @@
+@@ -924,6 +925,9 @@
  void piix4_pm_init(PCIBus *bus, int devfn);
  void acpi_bios_init(void);
  
@@ -518,8 +308,8 @@ Index: ioemu/vl.h
  extern QEMUMachine isapc_machine;
 Index: ioemu/hw/piix_pci.c
 ===================================================================
---- ioemu.orig/hw/piix_pci.c	2006-12-08 02:00:39.000000000 +0000
-+++ ioemu/hw/piix_pci.c	2006-12-08 02:00:40.000000000 +0000
+--- ioemu.orig/hw/piix_pci.c	2007-05-03 15:06:42.000000000 +0100
++++ ioemu/hw/piix_pci.c	2007-05-03 15:07:13.000000000 +0100
 @@ -241,7 +241,7 @@
  static uint32_t pci_bios_io_addr;
  static uint32_t pci_bios_mem_addr;
