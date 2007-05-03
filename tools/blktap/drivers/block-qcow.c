@@ -199,7 +199,8 @@ static int init_aio_state(struct disk_driver *dd)
 	}
 
         /* A segment (i.e. a page) can span multiple clusters */
-        s->max_aio_reqs = (getpagesize() / s->cluster_size) + 1;
+        s->max_aio_reqs = ((getpagesize() / s->cluster_size) + 1) *
+            MAX_SEGMENTS_PER_REQ * MAX_REQUESTS;
 
         /* Initialize AIO */
         s->iocb_free_count = s->max_aio_reqs;
