@@ -161,6 +161,24 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
 #define _VCPU_SSHOTTMR_future (0)
 #define VCPU_SSHOTTMR_future  (1U << _VCPU_SSHOTTMR_future)
 
+/* 
+ * Register a memory location in the guest address space for the
+ * vcpu_info structure.  This allows the guest to place the vcpu_info
+ * structure in a convenient place, such as in a per-cpu data area.
+ * The pointer need not be page aligned, but the structure must not
+ * cross a page boundary.
+ *
+ * If the specified mfn is INVALID_MFN, then it reverts to using the
+ * vcpu_info structure in the shared_info page.
+ */
+#define VCPUOP_register_vcpu_info   10  /* arg == struct vcpu_info */
+struct vcpu_register_vcpu_info {
+    xen_pfn_t mfn;              /* mfn of page to place vcpu_info */
+    uint32_t offset;            /* offset within page */
+};
+typedef struct vcpu_register_vcpu_info vcpu_register_vcpu_info_t;
+DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
+
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 
 /*
