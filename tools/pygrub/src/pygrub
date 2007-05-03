@@ -361,7 +361,12 @@ class Grub:
 
         if platform.machine() == 'ia64':
             self.cf = grub.LiloConf.LiloConfigFile()
-            file_list = ("/efi/redhat/elilo.conf",)
+            # common distributions
+            file_list = ("/efi/debian/elilo.conf", "/efi/gentoo/elilo.conf", 
+                         "/efi/redflag/elilo.conf", "/efi/redhat/elilo.conf", 
+                         "/efi/SuSE/elilo.conf",)
+            # fallbacks
+            file_list += ("/efi/boot/elilo.conf", "/elilo.conf",)
         else:
             self.cf = grub.GrubConf.GrubConfigFile()
             file_list = ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
