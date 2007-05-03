@@ -173,6 +173,10 @@ void vcpu_init_regs(struct vcpu *v)
 		    (unsigned char *)v->domain->arch.shared_info_va +
 		    INT_ENABLE_OFFSET(v);
 		VCPU(v, itv) = (1 << 16);	/* timer vector masked */
+
+		/* SAL specification 3.2.4 */
+		VCPU(v, vpsr) = IA64_PSR_AC | IA64_PSR_IC | IA64_PSR_BN;
+		v->vcpu_info->evtchn_upcall_mask = -1;
 	}
 
 	/* pta.size must not be 0.  The minimum is 15 (32k) */
