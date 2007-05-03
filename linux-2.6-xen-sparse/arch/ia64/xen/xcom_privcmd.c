@@ -172,6 +172,15 @@ xencomm_privcmd_sysctl(privcmd_hypercall_t *hypercall)
 		set_xen_guest_handle(kern_op.u.getdomaininfolist.buffer,
 				     (void *)desc);
 		break;
+	case XEN_SYSCTL_debug_keys:
+		ret = xencomm_create(
+			xen_guest_handle(kern_op.u.debug_keys.keys),
+			kern_op.u.debug_keys.nr_keys,
+			&desc, GFP_KERNEL);
+		set_xen_guest_handle(kern_op.u.debug_keys.keys,
+				     (void *)desc);
+		break;
+
 #ifdef IA64_NUMA_PHYSINFO
 	case XEN_SYSCTL_physinfo:
 		ret = xencomm_create(
