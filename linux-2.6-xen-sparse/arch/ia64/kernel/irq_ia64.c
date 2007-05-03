@@ -319,9 +319,9 @@ static struct irqaction resched_irqaction = {
  * required.
  */
 static void
-xen_register_percpu_irq (unsigned int vec, struct irqaction *action, int save)
+xen_register_percpu_irq(unsigned int cpu, unsigned int vec,
+			 struct irqaction *action, int save)
 {
-	unsigned int cpu = smp_processor_id();
 	irq_desc_t *desc;
 	int irq = 0;
 
@@ -423,7 +423,8 @@ xen_bind_early_percpu_irq (void)
 	 * BSP will face with such step shortly
 	 */
 	for (i = 0; i < late_irq_cnt; i++)
-		xen_register_percpu_irq(saved_percpu_irqs[i].irq,
+		xen_register_percpu_irq(smp_processor_id(),
+					saved_percpu_irqs[i].irq,
 		                        saved_percpu_irqs[i].action, 0);
 }
 
@@ -479,11 +480,21 @@ static struct notifier_block unbind_evtchn_notifier = {
 #endif
 
 DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
+void xen_smp_intr_init_early(unsigned int cpu)
+{
+#ifdef CONFIG_SMP
+	unsigned int i;
+
+	for (i = 0; i < saved_irq_cnt; i++)
+		xen_register_percpu_irq(cpu, saved_percpu_irqs[i].irq,
+		                        saved_percpu_irqs[i].action, 0);
+#endif
+}
+
 void xen_smp_intr_init(void)
 {
 #ifdef CONFIG_SMP
 	unsigned int cpu = smp_processor_id();
-	unsigned int i = 0;
 	struct callback_register event = {
 		.type = CALLBACKTYPE_event,
 		.address = (unsigned long)&xen_event_callback,
@@ -500,12 +511,9 @@ void xen_smp_intr_init(void)
 
 	/* This should be piggyback when setup vcpu guest context */
 	BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
-
-	for (i = 0; i < saved_irq_cnt; i++)
-		xen_register_percpu_irq(saved_percpu_irqs[i].irq,
-		                        saved_percpu_irqs[i].action, 0);
 #endif /* CONFIG_SMP */
 }
+
 #endif /* CONFIG_XEN */
 
 void
@@ -516,7 +524,8 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 
 #ifdef CONFIG_XEN
 	if (is_running_on_xen())
-		return xen_register_percpu_irq(vec, action, 1);
+		return xen_register_percpu_irq(smp_processor_id(), 
+					       vec, action, 1);
 #endif
 
 	for (irq = 0; irq < NR_IRQS; ++irq)
@@ -572,6 +581,14 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 		/* TODO: we need to call vcpu_up here */
 		if (unlikely(vector == ap_wakeup_vector)) {
 			extern void xen_send_ipi (int cpu, int vec);
+
+			/* XXX
+			 * This should be in __cpu_up(cpu) in ia64 smpboot.c
+			 * like x86. But don't want to modify it,
+			 * keep it untouched.
+			 */
+			xen_smp_intr_init_early(cpu);
+
 			xen_send_ipi (cpu, vector);
 			//vcpu_prepare_and_up(cpu);
 			return;
