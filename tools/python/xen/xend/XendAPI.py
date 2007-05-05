@@ -1009,7 +1009,7 @@ class XendAPI(object):
                   'cpu_configuration': node.get_cpu_configuration(),
                   'metrics': node.host_metrics_uuid,
                   'capabilities': node.get_capabilities(),
-                  'supported_bootloaders': 'pygrub',
+                  'supported_bootloaders': ['pygrub'],
                   'sched_policy': node.get_vcpus_policy()}
         return xen_api_success(record)
 
