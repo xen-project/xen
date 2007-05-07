@@ -109,6 +109,10 @@ const char *acpi_get_sysname(void)
 		return "hpzx1";
 	} else if (!strcmp(hdr->oem_id, "SGI")) {
 		return "sn2";
+#ifdef CONFIG_XEN
+	} else if (is_running_on_xen() && !strcmp(hdr->oem_id, "XEN")) {
+		return "xen";
+#endif
 	}
 
 	return "dig";
@@ -123,6 +127,8 @@ const char *acpi_get_sysname(void)
 	return "sn2";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
+# elif defined (CONFIG_IA64_XEN)
+	return "xen";
 # else
 #	error Unknown platform.  Fix acpi.c.
 # endif

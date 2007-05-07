@@ -161,6 +161,10 @@ config IA64_SGI_SN2
 config IA64_HP_SIM
 	bool "Ski-simulator"
 
+config IA64_XEN
+	bool "Xen guest"
+	depends on XEN
+
 endchoice
 
 choice
