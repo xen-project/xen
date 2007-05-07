@@ -607,63 +607,210 @@ int arch_vcpu_reset(struct vcpu *v)
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
-	struct vcpu_extra_regs *er = &c.nat->extra_regs;
+	struct vcpu_tr_regs *tr = &c.nat->regs.tr;
+	struct cpu_user_regs *uregs = vcpu_regs(v);
+	int is_hvm = VMX_DOMAIN(v);
 
-	c.nat->user_regs = *vcpu_regs(v);
- 	c.nat->privregs_pfn = get_gpfn_from_mfn(virt_to_maddr(v->arch.privregs) >>
-                                                PAGE_SHIFT);
+	c.nat->regs.b[6] = uregs->b6;
+	c.nat->regs.b[7] = uregs->b7;
+
+	c.nat->regs.ar.csd = uregs->ar_csd;
+	c.nat->regs.ar.ssd = uregs->ar_ssd;
+
+	c.nat->regs.r[8] = uregs->r8;
+	c.nat->regs.r[9] = uregs->r9;
+	c.nat->regs.r[10] = uregs->r10;
+	c.nat->regs.r[11] = uregs->r11;
+
+	if (is_hvm) {
+		c.nat->regs.psr = vmx_vcpu_get_psr (v);
+	} else {
+		/* FIXME: get the vpsr.  */
+		c.nat->regs.psr = uregs->cr_ipsr;
+	}
+
+	c.nat->regs.ip = uregs->cr_iip;
+	c.nat->regs.cfm = uregs->cr_ifs;
+
+	c.nat->regs.ar.unat = uregs->ar_unat;
+	c.nat->regs.ar.pfs = uregs->ar_pfs;
+	c.nat->regs.ar.rsc = uregs->ar_rsc;
+	c.nat->regs.ar.rnat = uregs->ar_rnat;
+	c.nat->regs.ar.bspstore = uregs->ar_bspstore;
+
+	c.nat->regs.pr = uregs->pr;
+	c.nat->regs.b[0] = uregs->b0;
+	c.nat->regs.ar.bsp = uregs->ar_bspstore + (uregs->loadrs >> 16);
+
+	c.nat->regs.r[1] = uregs->r1;
+	c.nat->regs.r[12] = uregs->r12;
+	c.nat->regs.r[13] = uregs->r13;
+	c.nat->regs.ar.fpsr = uregs->ar_fpsr;
+	c.nat->regs.r[15] = uregs->r15;
+
+	c.nat->regs.r[14] = uregs->r14;
+	c.nat->regs.r[2] = uregs->r2;
+	c.nat->regs.r[3] = uregs->r3;
+	c.nat->regs.r[16] = uregs->r16;
+	c.nat->regs.r[17] = uregs->r17;
+	c.nat->regs.r[18] = uregs->r18;
+	c.nat->regs.r[19] = uregs->r19;
+	c.nat->regs.r[20] = uregs->r20;
+	c.nat->regs.r[21] = uregs->r21;
+	c.nat->regs.r[22] = uregs->r22;
+	c.nat->regs.r[23] = uregs->r23;
+	c.nat->regs.r[24] = uregs->r24;
+	c.nat->regs.r[25] = uregs->r25;
+	c.nat->regs.r[26] = uregs->r26;
+	c.nat->regs.r[27] = uregs->r27;
+	c.nat->regs.r[28] = uregs->r28;
+	c.nat->regs.r[29] = uregs->r29;
+	c.nat->regs.r[30] = uregs->r30;
+	c.nat->regs.r[31] = uregs->r31;
+
+	c.nat->regs.ar.ccv = uregs->ar_ccv;
+
+	c.nat->regs.f[6] = uregs->f6;
+	c.nat->regs.f[7] = uregs->f7;
+	c.nat->regs.f[8] = uregs->f8;
+	c.nat->regs.f[9] = uregs->f9;
+	c.nat->regs.f[10] = uregs->f10;
+	c.nat->regs.f[11] = uregs->f11;
+
+	c.nat->regs.r[4] = uregs->r4;
+	c.nat->regs.r[5] = uregs->r5;
+	c.nat->regs.r[6] = uregs->r6;
+	c.nat->regs.r[7] = uregs->r7;
+
+	/* FIXME: to be reordered.  */
+	c.nat->regs.nats = uregs->eml_unat;
+
+ 	c.nat->privregs_pfn = get_gpfn_from_mfn
+		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
 
 	/* Fill extra regs.  */
 	for (i = 0; i < 8; i++) {
-		er->itrs[i].pte = v->arch.itrs[i].pte.val;
-		er->itrs[i].itir = v->arch.itrs[i].itir;
-		er->itrs[i].vadr = v->arch.itrs[i].vadr;
-		er->itrs[i].rid = v->arch.itrs[i].rid;
+		tr->itrs[i].pte = v->arch.itrs[i].pte.val;
+		tr->itrs[i].itir = v->arch.itrs[i].itir;
+		tr->itrs[i].vadr = v->arch.itrs[i].vadr;
+		tr->itrs[i].rid = v->arch.itrs[i].rid;
 	}
 	for (i = 0; i < 8; i++) {
-		er->dtrs[i].pte = v->arch.dtrs[i].pte.val;
-		er->dtrs[i].itir = v->arch.dtrs[i].itir;
-		er->dtrs[i].vadr = v->arch.dtrs[i].vadr;
-		er->dtrs[i].rid = v->arch.dtrs[i].rid;
+		tr->dtrs[i].pte = v->arch.dtrs[i].pte.val;
+		tr->dtrs[i].itir = v->arch.dtrs[i].itir;
+		tr->dtrs[i].vadr = v->arch.dtrs[i].vadr;
+		tr->dtrs[i].rid = v->arch.dtrs[i].rid;
 	}
-	er->event_callback_ip = v->arch.event_callback_ip;
-	er->dcr = v->arch.privregs ? PSCB(v,dcr) : 0;
-	er->iva = v->arch.iva;
+	c.nat->event_callback_ip = v->arch.event_callback_ip;
+
+	/* If PV and privregs is not set, we can't read mapped registers.  */
+ 	if (!v->domain->arch.is_vti && v->arch.privregs == NULL)
+		return;
+
+	vcpu_get_dcr (v, &c.nat->regs.cr.dcr);
+	vcpu_get_iva (v, &c.nat->regs.cr.iva);
 }
 
 int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
-	struct pt_regs *regs = vcpu_regs (v);
+	struct cpu_user_regs *uregs = vcpu_regs(v);
 	struct domain *d = v->domain;
 	int rc;
+
+	uregs->b6 = c.nat->regs.b[6];
+	uregs->b7 = c.nat->regs.b[7];
 	
-	*regs = c.nat->user_regs;
- 	
+	uregs->ar_csd = c.nat->regs.ar.csd;
+	uregs->ar_ssd = c.nat->regs.ar.ssd;
+	
+	uregs->r8 = c.nat->regs.r[8];
+	uregs->r9 = c.nat->regs.r[9];
+	uregs->r10 = c.nat->regs.r[10];
+	uregs->r11 = c.nat->regs.r[11];
+	
+	uregs->cr_ipsr = c.nat->regs.psr;
+	uregs->cr_iip = c.nat->regs.ip;
+	uregs->cr_ifs = c.nat->regs.cfm;
+	
+	uregs->ar_unat = c.nat->regs.ar.unat;
+	uregs->ar_pfs = c.nat->regs.ar.pfs;
+	uregs->ar_rsc = c.nat->regs.ar.rsc;
+	uregs->ar_rnat = c.nat->regs.ar.rnat;
+	uregs->ar_bspstore = c.nat->regs.ar.bspstore;
+	
+	uregs->pr = c.nat->regs.pr;
+	uregs->b0 = c.nat->regs.b[0];
+	uregs->loadrs = (c.nat->regs.ar.bsp - c.nat->regs.ar.bspstore) << 16;
+
+	uregs->r1 = c.nat->regs.r[1];
+	uregs->r12 = c.nat->regs.r[12];
+	uregs->r13 = c.nat->regs.r[13];
+	uregs->ar_fpsr = c.nat->regs.ar.fpsr;
+	uregs->r15 = c.nat->regs.r[15];
+
+	uregs->r14 = c.nat->regs.r[14];
+	uregs->r2 = c.nat->regs.r[2];
+	uregs->r3 = c.nat->regs.r[3];
+	uregs->r16 = c.nat->regs.r[16];
+	uregs->r17 = c.nat->regs.r[17];
+	uregs->r18 = c.nat->regs.r[18];
+	uregs->r19 = c.nat->regs.r[19];
+	uregs->r20 = c.nat->regs.r[20];
+	uregs->r21 = c.nat->regs.r[21];
+	uregs->r22 = c.nat->regs.r[22];
+	uregs->r23 = c.nat->regs.r[23];
+	uregs->r24 = c.nat->regs.r[24];
+	uregs->r25 = c.nat->regs.r[25];
+	uregs->r26 = c.nat->regs.r[26];
+	uregs->r27 = c.nat->regs.r[27];
+	uregs->r28 = c.nat->regs.r[28];
+	uregs->r29 = c.nat->regs.r[29];
+	uregs->r30 = c.nat->regs.r[30];
+	uregs->r31 = c.nat->regs.r[31];
+	
+	uregs->ar_ccv = c.nat->regs.ar.ccv;
+	
+	uregs->f6 = c.nat->regs.f[6];
+	uregs->f7 = c.nat->regs.f[7];
+	uregs->f8 = c.nat->regs.f[8];
+	uregs->f9 = c.nat->regs.f[9];
+	uregs->f10 = c.nat->regs.f[10];
+	uregs->f11 = c.nat->regs.f[11];
+	
+	uregs->r4 = c.nat->regs.r[4];
+	uregs->r5 = c.nat->regs.r[5];
+	uregs->r6 = c.nat->regs.r[6];
+	uregs->r7 = c.nat->regs.r[7];
+	
+	/* FIXME: to be reordered and restored.  */
+	/* uregs->eml_unat = c.nat->regs.nat; */
+	uregs->eml_unat = 0;
+	
  	if (!d->arch.is_vti) {
  		/* domain runs at PL2/3 */
- 		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
- 		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
+ 		uregs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
+ 		uregs->ar_rsc |= (2 << 2); /* force PL2/3 */
  	}
 
 	if (c.nat->flags & VGCF_EXTRA_REGS) {
 		int i;
-		struct vcpu_extra_regs *er = &c.nat->extra_regs;
+		struct vcpu_tr_regs *tr = &c.nat->regs.tr;
 
 		for (i = 0; i < 8; i++) {
-			vcpu_set_itr(v, i, er->itrs[i].pte,
-			             er->itrs[i].itir,
-			             er->itrs[i].vadr,
-			             er->itrs[i].rid);
+			vcpu_set_itr(v, i, tr->itrs[i].pte,
+			             tr->itrs[i].itir,
+			             tr->itrs[i].vadr,
+			             tr->itrs[i].rid);
 		}
 		for (i = 0; i < 8; i++) {
 			vcpu_set_dtr(v, i,
-			             er->dtrs[i].pte,
-			             er->dtrs[i].itir,
-			             er->dtrs[i].vadr,
-			             er->dtrs[i].rid);
+			             tr->dtrs[i].pte,
+			             tr->dtrs[i].itir,
+			             tr->dtrs[i].vadr,
+			             tr->dtrs[i].rid);
 		}
-		v->arch.event_callback_ip = er->event_callback_ip;
-		v->arch.iva = er->iva;
+		v->arch.event_callback_ip = c.nat->event_callback_ip;
+		v->arch.iva = c.nat->regs.cr.iva;
 	}
 
 	if (v->is_initialised)

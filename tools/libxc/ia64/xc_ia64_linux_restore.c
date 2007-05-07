@@ -226,8 +226,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt.user_regs.cr_iip,
-            ctxt.user_regs.b0);
+    fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt.regs.ip, ctxt.regs.b[0]);
 
     /* First to initialize.  */
     domctl.cmd = XEN_DOMCTL_setvcpucontext;

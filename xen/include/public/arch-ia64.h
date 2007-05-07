@@ -337,20 +337,120 @@ struct ia64_tr_entry {
     unsigned long rid;
 };
 
-struct vcpu_extra_regs {
+struct vcpu_tr_regs {
     struct ia64_tr_entry itrs[8];
     struct ia64_tr_entry dtrs[8];
-    unsigned long iva;
-    unsigned long dcr;
-    unsigned long event_callback_ip;
+};
+
+union vcpu_ar_regs {
+    unsigned long ar[128];
+    struct {
+        unsigned long kr[8];
+        unsigned long rsv1[8];
+        unsigned long rsc;
+        unsigned long bsp;
+        unsigned long bspstore;
+        unsigned long rnat;
+        unsigned long rsv2;
+        unsigned long fcr;
+        unsigned long rsv3[2];
+        unsigned long eflag;
+        unsigned long csd;
+        unsigned long ssd;
+        unsigned long cflg;
+        unsigned long fsr;
+        unsigned long fir;
+        unsigned long fdr;
+        unsigned long rsv4;
+        unsigned long ccv; /* 32 */
+        unsigned long rsv5[3];
+        unsigned long unat;
+        unsigned long rsv6[3];
+        unsigned long fpsr;
+        unsigned long rsv7[3];
+        unsigned long itc;
+        unsigned long rsv8[3];
+        unsigned long ign1[16];
+        unsigned long pfs; /* 64 */
+        unsigned long lc;
+        unsigned long ec;
+        unsigned long rsv9[45];
+        unsigned long ign2[16];
+    };
+};
+
+union vcpu_cr_regs {
+    unsigned long cr[128];
+    struct {
+        unsigned long dcr;  // CR0
+        unsigned long itm;
+        unsigned long iva;
+        unsigned long rsv1[5];
+        unsigned long pta;  // CR8
+        unsigned long rsv2[7];
+        unsigned long ipsr;  // CR16
+        unsigned long isr;
+        unsigned long rsv3;
+        unsigned long iip;
+        unsigned long ifa;
+        unsigned long itir;
+        unsigned long iipa;
+        unsigned long ifs;
+        unsigned long iim;  // CR24
+        unsigned long iha;
+        unsigned long rsv4[38];
+        unsigned long lid;  // CR64
+        unsigned long ivr;
+        unsigned long tpr;
+        unsigned long eoi;
+        unsigned long irr[4];
+        unsigned long itv;  // CR72
+        unsigned long pmv;
+        unsigned long cmcv;
+        unsigned long rsv5[5];
+        unsigned long lrr0;  // CR80
+        unsigned long lrr1;
+        unsigned long rsv6[46];
+    };
+};
+
+struct vcpu_guest_context_regs {
+        unsigned long r[32];
+        unsigned long b[8];
+        unsigned long bank[16];
+        unsigned long ip;
+        unsigned long psr;
+        unsigned long cfm;
+        unsigned long pr;
+        unsigned long nats; /* NaT bits for r1-r31.  */
+        union vcpu_ar_regs ar;
+        union vcpu_cr_regs cr;
+        struct pt_fpreg f[128];
+        unsigned long dbr[8];
+        unsigned long ibr[8];
+        unsigned long rr[8];
+        unsigned long pkr[16];
+
+        /* FIXME: cpuid,pmd,pmc */
+
+        unsigned long xip;
+        unsigned long xpsr;
+        unsigned long xfs;
+        unsigned long xr[4];
+
+        struct vcpu_tr_regs tr;
+
+        /* Note: loadrs is 2**14 bytes == 2**11 slots.  */
+        unsigned long rbs[2048];
 };
 
 struct vcpu_guest_context {
 #define VGCF_EXTRA_REGS (1<<1)	/* Get/Set extra regs.  */
     unsigned long flags;       /* VGCF_* flags */
 
-    struct cpu_user_regs user_regs;
-    struct vcpu_extra_regs extra_regs;
+    struct vcpu_guest_context_regs regs;
+
+    unsigned long event_callback_ip;
     unsigned long privregs_pfn;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;

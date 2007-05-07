@@ -92,13 +92,13 @@ static int vcpu_ia64(struct xc_dom_image *dom, void *ptr)
     memset(ctxt, 0, sizeof(*ctxt));
 
     ctxt->flags = 0;
-    ctxt->user_regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
-    ctxt->user_regs.cr_iip = dom->parms.virt_entry;
-    ctxt->user_regs.cr_ifs = (uint64_t) 1 << 63;
-#ifdef __ia64__   /* FIXME */
-    ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
+    ctxt->regs.psr = 0;	/* all necessary bits filled by hypervisor */
+    ctxt->regs.ip = dom->parms.virt_entry;
+    ctxt->regs.cfm = (uint64_t) 1 << 63;
+#ifdef __ia64__			/* FIXME */
+    ctxt->regs.ar.fpsr = xc_ia64_fpsr_default();
 #endif
-    ctxt->user_regs.r28 = (dom->start_info_pfn << PAGE_SHIFT_IA64)
+    ctxt->regs.r[28] = (dom->start_info_pfn << PAGE_SHIFT_IA64)
         + sizeof(start_info_ia64_t);
     return 0;
 }

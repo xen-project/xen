@@ -738,7 +738,7 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 
     free(image);
 
-    ctxt->user_regs.cr_iip = 0x80000000ffffffb0UL;
+    ctxt->regs.ip = 0x80000000ffffffb0UL;
 
     memset(&launch_domctl, 0, sizeof(launch_domctl));
 
