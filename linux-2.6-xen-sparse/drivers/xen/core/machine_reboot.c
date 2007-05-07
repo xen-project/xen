@@ -113,10 +113,18 @@ static void post_suspend(int suspend_cancelled)
 
 #else /* !(defined(__i386__) || defined(__x86_64__)) */
 
+#ifndef HAVE_XEN_PRE_SUSPEND
+#define xen_pre_suspend()	((void)0)
+#endif
+
+#ifndef HAVE_XEN_POST_SUSPEND
+#define xen_post_suspend(x)	((void)0)
+#endif
+
 #define switch_idle_mm()	((void)0)
 #define mm_pin_all()		((void)0)
-#define pre_suspend()		((void)0)
-#define post_suspend(x)		((void)0)
+#define pre_suspend()		xen_pre_suspend()
+#define post_suspend(x)		xen_post_suspend(x)
 
 #endif
 
