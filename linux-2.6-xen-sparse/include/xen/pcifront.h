@@ -62,6 +62,7 @@ static inline void pcifront_init_sd(struct pcifront_sd *sd, int domain,
 	sd->segment = domain;
 	sd->acpi_handle = NULL;
 	sd->iommu = NULL;
+	sd->node = -1;
 	sd->windows = 0;
 	sd->window = NULL;
 	sd->platform_data = pdev;
