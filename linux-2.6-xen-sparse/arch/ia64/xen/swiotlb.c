@@ -32,11 +32,22 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 
+#ifdef CONFIG_XEN
+/*
+ * What DMA mask should Xen use to remap the bounce buffer pool?  Most
+ * reports seem to indicate 30 bits is sufficient, except maybe for old
+ * sound cards that we probably don't care about anyway.  If we need to,
+ * we could put in some smarts to try to lower, but hopefully it's not
+ * necessary.
+ */
+#define DMA_BITS	(30)
+#endif
+
 #define OFFSET(val,align) ((unsigned long)	\
 	                   ( (val) & ( (align) - 1)))
 
 #define SG_ENT_VIRT_ADDRESS(sg)	(page_address((sg)->page) + (sg)->offset)
-#define SG_ENT_PHYS_ADDRESS(SG)	virt_to_phys(SG_ENT_VIRT_ADDRESS(SG))
+#define SG_ENT_PHYS_ADDRESS(SG)	virt_to_bus(SG_ENT_VIRT_ADDRESS(SG))
 
 /*
  * Maximum allowable number of contiguous slabs to map,
@@ -139,6 +150,10 @@ swiotlb_init_with_default_size (size_t default_size)
 		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
 	}
 
+#ifdef CONFIG_XEN
+	if (is_running_on_xen())
+		io_tlb_nslabs = roundup_pow_of_two(io_tlb_nslabs);
+#endif
 	/*
 	 * Get IO TLB memory from the low pages
 	 */
@@ -146,6 +161,17 @@ swiotlb_init_with_default_size (size_t default_size)
 	if (!io_tlb_start)
 		panic("Cannot allocate SWIOTLB buffer");
 	io_tlb_end = io_tlb_start + io_tlb_nslabs * (1 << IO_TLB_SHIFT);
+
+#ifdef CONFIG_XEN
+	for (i = 0 ; i < io_tlb_nslabs ; i += IO_TLB_SEGSIZE) {
+		if (xen_create_contiguous_region(
+				(unsigned long)io_tlb_start +
+				(i << IO_TLB_SHIFT),
+				get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
+				DMA_BITS))
+			panic("Failed to setup Xen contiguous region");
+	}
+#endif
 
 	/*
 	 * Allocate and initialize the free list array.  This array is used
@@ -162,6 +188,11 @@ swiotlb_init_with_default_size (size_t default_size)
 	 * Get the overflow emergency buffer
 	 */
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
+#ifdef CONFIG_XEN
+	if (xen_create_contiguous_region((unsigned long)io_tlb_overflow_buffer,
+					 get_order(io_tlb_overflow), DMA_BITS))
+		panic("Failed to setup Xen contiguous region for overflow");
+#endif
 	printk(KERN_INFO "Placing software IO TLB between 0x%lx - 0x%lx\n",
 	       virt_to_phys(io_tlb_start), virt_to_phys(io_tlb_end));
 }
@@ -188,6 +219,10 @@ swiotlb_late_init_with_default_size (size_t default_size)
 		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
 	}
 
+#ifdef CONFIG_XEN
+	if (is_running_on_xen())
+		io_tlb_nslabs = roundup_pow_of_two(io_tlb_nslabs);
+#endif
 	/*
 	 * Get IO TLB memory from the low pages
 	 */
@@ -213,6 +248,16 @@ swiotlb_late_init_with_default_size (size_t default_size)
 	io_tlb_end = io_tlb_start + io_tlb_nslabs * (1 << IO_TLB_SHIFT);
 	memset(io_tlb_start, 0, io_tlb_nslabs * (1 << IO_TLB_SHIFT));
 
+#ifdef CONFIG_XEN
+	for (i = 0 ; i < io_tlb_nslabs ; i += IO_TLB_SEGSIZE) {
+		if (xen_create_contiguous_region(
+				(unsigned long)io_tlb_start +
+				(i << IO_TLB_SHIFT),
+				get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
+				DMA_BITS))
+			panic("Failed to setup Xen contiguous region");
+	}
+#endif
 	/*
 	 * Allocate and initialize the free list array.  This array is used
 	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
@@ -242,6 +287,11 @@ swiotlb_late_init_with_default_size (size_t default_size)
 	if (!io_tlb_overflow_buffer)
 		goto cleanup4;
 
+#ifdef CONFIG_XEN
+	if (xen_create_contiguous_region((unsigned long)io_tlb_overflow_buffer,
+					 get_order(io_tlb_overflow), DMA_BITS))
+		panic("Failed to setup Xen contiguous region for overflow");
+#endif
 	printk(KERN_INFO "Placing %ldMB software IO TLB between 0x%lx - "
 	       "0x%lx\n", (io_tlb_nslabs * (1 << IO_TLB_SHIFT)) >> 20,
 	       virt_to_phys(io_tlb_start), virt_to_phys(io_tlb_end));
@@ -445,7 +495,25 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 	flags |= GFP_DMA;
 
 	ret = (void *)__get_free_pages(flags, order);
-	if (ret && address_needs_mapping(hwdev, virt_to_phys(ret))) {
+#ifdef CONFIG_XEN
+	if (ret && is_running_on_xen()) {
+		if (xen_create_contiguous_region((unsigned long)ret, order,
+					fls64(hwdev->coherent_dma_mask))) {
+			free_pages((unsigned long)ret, order);
+			ret = NULL;
+		} else {
+			/*
+			 * Short circuit the rest, xen_create_contiguous_region
+			 * should fail if it didn't give us an address within
+			 * the mask requested.  
+			 */
+			memset(ret, 0, size);
+			*dma_handle = virt_to_bus(ret);
+			return ret;
+		}
+	}
+#endif
+	if (ret && address_needs_mapping(hwdev, virt_to_bus(ret))) {
 		/*
 		 * The allocated memory isn't reachable by the device.
 		 * Fall back on swiotlb_map_single().
@@ -465,11 +533,11 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 		if (swiotlb_dma_mapping_error(handle))
 			return NULL;
 
-		ret = phys_to_virt(handle);
+		ret = bus_to_virt(handle);
 	}
 
 	memset(ret, 0, size);
-	dev_addr = virt_to_phys(ret);
+	dev_addr = virt_to_bus(ret);
 
 	/* Confirm address can be DMA'd by device */
 	if (address_needs_mapping(hwdev, dev_addr)) {
@@ -487,9 +555,13 @@ swiotlb_free_coherent(struct device *hwdev, size_t size, void *vaddr,
 		      dma_addr_t dma_handle)
 {
 	if (!(vaddr >= (void *)io_tlb_start
-                    && vaddr < (void *)io_tlb_end))
+                    && vaddr < (void *)io_tlb_end)) {
+#ifdef CONFIG_XEN
+		xen_destroy_contiguous_region((unsigned long)vaddr,
+					      get_order(size));
+#endif
 		free_pages((unsigned long) vaddr, get_order(size));
-	else
+	} else
 		/* DMA_TO_DEVICE to avoid memcpy in unmap_single */
 		swiotlb_unmap_single (hwdev, dma_handle, size, DMA_TO_DEVICE);
 }
@@ -525,7 +597,7 @@ swiotlb_full(struct device *dev, size_t size, int dir, int do_panic)
 dma_addr_t
 swiotlb_map_single(struct device *hwdev, void *ptr, size_t size, int dir)
 {
-	unsigned long dev_addr = virt_to_phys(ptr);
+	unsigned long dev_addr = virt_to_bus(ptr);
 	void *map;
 
 	BUG_ON(dir == DMA_NONE);
@@ -534,7 +606,8 @@ swiotlb_map_single(struct device *hwdev, void *ptr, size_t size, int dir)
 	 * we can safely return the device addr and not worry about bounce
 	 * buffering it.
 	 */
-	if (!address_needs_mapping(hwdev, dev_addr) && !swiotlb_force)
+	if (!range_straddles_page_boundary(ptr, size) &&
+	    !address_needs_mapping(hwdev, dev_addr) && !swiotlb_force)
 		return dev_addr;
 
 	/*
@@ -546,7 +619,7 @@ swiotlb_map_single(struct device *hwdev, void *ptr, size_t size, int dir)
 		map = io_tlb_overflow_buffer;
 	}
 
-	dev_addr = virt_to_phys(map);
+	dev_addr = virt_to_bus(map);
 
 	/*
 	 * Ensure that the address returned is DMA'ble
@@ -566,6 +639,12 @@ static void
 mark_clean(void *addr, size_t size)
 {
 	unsigned long pg_addr, end;
+
+#ifdef CONFIG_XEN
+	/* XXX: Bad things happen when starting domUs if this is enabled. */
+	if (is_running_on_xen())
+		return;
+#endif
 
 	pg_addr = PAGE_ALIGN((unsigned long) addr);
 	end = (unsigned long) addr + size;
@@ -588,7 +667,7 @@ void
 swiotlb_unmap_single(struct device *hwdev, dma_addr_t dev_addr, size_t size,
 		     int dir)
 {
-	char *dma_addr = phys_to_virt(dev_addr);
+	char *dma_addr = bus_to_virt(dev_addr);
 
 	BUG_ON(dir == DMA_NONE);
 	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
@@ -611,7 +690,7 @@ static inline void
 swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
 		    size_t size, int dir, int target)
 {
-	char *dma_addr = phys_to_virt(dev_addr);
+	char *dma_addr = bus_to_virt(dev_addr);
 
 	BUG_ON(dir == DMA_NONE);
 	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
@@ -642,7 +721,7 @@ swiotlb_sync_single_range(struct device *hwdev, dma_addr_t dev_addr,
 			  unsigned long offset, size_t size,
 			  int dir, int target)
 {
-	char *dma_addr = phys_to_virt(dev_addr) + offset;
+	char *dma_addr = bus_to_virt(dev_addr) + offset;
 
 	BUG_ON(dir == DMA_NONE);
 	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
@@ -695,7 +774,7 @@ swiotlb_map_sg(struct device *hwdev, struct scatterlist *sg, int nelems,
 
 	for (i = 0; i < nelems; i++, sg++) {
 		addr = SG_ENT_VIRT_ADDRESS(sg);
-		dev_addr = virt_to_phys(addr);
+		dev_addr = virt_to_bus(addr);
 		if (swiotlb_force || address_needs_mapping(hwdev, dev_addr)) {
 			void *map = map_single(hwdev, addr, sg->length, dir);
 			sg->dma_address = virt_to_bus(map);
@@ -728,7 +807,7 @@ swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nelems,
 
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
-			unmap_single(hwdev, (void *) phys_to_virt(sg->dma_address), sg->dma_length, dir);
+			unmap_single(hwdev, (void *) bus_to_virt(sg->dma_address), sg->dma_length, dir);
 		else if (dir == DMA_FROM_DEVICE)
 			mark_clean(SG_ENT_VIRT_ADDRESS(sg), sg->dma_length);
 }
@@ -771,7 +850,7 @@ swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
 int
 swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 {
-	return (dma_addr == virt_to_phys(io_tlb_overflow_buffer));
+	return (dma_addr == virt_to_bus(io_tlb_overflow_buffer));
 }
 
 /*
@@ -783,7 +862,7 @@ swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 int
 swiotlb_dma_supported (struct device *hwdev, u64 mask)
 {
-	return (virt_to_phys (io_tlb_end) - 1) <= mask;
+	return (virt_to_bus(io_tlb_end) - 1) <= mask;
 }
 
 EXPORT_SYMBOL(swiotlb_init);
