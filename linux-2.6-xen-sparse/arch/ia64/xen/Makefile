@@ -3,7 +3,7 @@
 #
 
 obj-y := hypercall.o xenivt.o xenentry.o xensetup.o xenpal.o xenhpski.o \
-	 hypervisor.o pci-dma-xen.o util.o xencomm.o xcom_hcall.o \
-	 xcom_mini.o xcom_privcmd.o mem.o
+	 hypervisor.o util.o xencomm.o xcom_hcall.o xcom_mini.o \
+	 xcom_privcmd.o mem.o xen_dma.o
 
-pci-dma-xen-y := ../../i386/kernel/pci-dma-xen.o
+obj-$(CONFIG_IA64_GENERIC) += machvec.o
