@@ -322,6 +322,8 @@ time_resume(void)
 
 	for_each_online_cpu(cpu)
 		init_missing_ticks_accounting(cpu);
+
+	touch_softlockup_watchdog();
 }
 #else
 #define init_missing_ticks_accounting(cpu) do {} while (0)
@@ -411,6 +413,9 @@ ia64_init_itm (void)
 
 	if (is_running_on_xen())
 		init_missing_ticks_accounting(smp_processor_id());
+
+	/* avoid softlock up message when cpu is unplug and plugged again. */
+	touch_softlockup_watchdog();
 
 	/* Setup the CPU local timer tick */
 	ia64_cpu_local_tick();
