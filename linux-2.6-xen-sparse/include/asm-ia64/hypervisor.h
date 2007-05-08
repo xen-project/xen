@@ -168,6 +168,9 @@ xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		__xen_destroy_contiguous_region(vstart, order);
 }
 
+/* For drivers/xen/core/machine_reboot.c */
+#define HAVE_XEN_POST_SUSPEND
+void xen_post_suspend(int suspend_cancelled);
 #endif /* !CONFIG_VMX_GUEST */
 
 // for netfront.c, netback.c

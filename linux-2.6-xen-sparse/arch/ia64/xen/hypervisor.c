@@ -48,6 +48,7 @@ EXPORT_SYMBOL(running_on_xen);
 static int p2m_expose_init(void);
 #else
 #define p2m_expose_init() (-ENOSYS)
+#define p2m_expose_resume() ((void)0)
 #endif
 
 EXPORT_SYMBOL(__hypercall);
@@ -882,6 +883,8 @@ static struct resource p2m_resource = {
 };
 static unsigned long p2m_assign_start_pfn __read_mostly;
 static unsigned long p2m_assign_end_pfn __read_mostly;
+static unsigned long p2m_expose_size;	// this is referenced only when resume.
+					// so __read_mostly doesn't make sense.
 volatile const pte_t* p2m_pte __read_mostly;
 
 #define GRNULE_PFN	PTRS_PER_PTE
@@ -942,8 +945,15 @@ p2m_expose_dtr_call(struct notifier_block *self,
 	unsigned int cpu = (unsigned int)(long)ptr;
 	if (event != CPU_ONLINE)
 		return 0;
-	if (!(p2m_initialized && xen_ia64_p2m_expose_use_dtr))
-		smp_call_function_single(cpu, &p2m_itr, &p2m_itr_arg, 1, 1);
+	if (p2m_initialized && xen_ia64_p2m_expose_use_dtr) {
+		unsigned int me = get_cpu();
+		if (cpu == me)
+			p2m_itr(&p2m_itr_arg);
+		else
+			smp_call_function_single(cpu, &p2m_itr, &p2m_itr_arg,
+						 1, 1);
+		put_cpu();
+	}
 	return 0;
 }
 
@@ -958,7 +968,6 @@ static int
 p2m_expose_init(void)
 {
 	unsigned long num_pfn;
-	unsigned long size = 0;
 	unsigned long p2m_size = 0;
 	unsigned long align = ~0UL;
 	int error = 0;
@@ -1010,7 +1019,7 @@ p2m_expose_init(void)
 			p2m_convert_max_pfn = ROUNDUP(p2m_max_low_pfn,
 			                              granule_pfn);
 			num_pfn = p2m_convert_max_pfn - p2m_convert_min_pfn;
-			size = num_pfn << PAGE_SHIFT;
+			p2m_expose_size = num_pfn << PAGE_SHIFT;
 			p2m_size = num_pfn / PTRS_PER_PTE;
 			p2m_size = ROUNDUP(p2m_size, granule_pfn << PAGE_SHIFT);
 			if (p2m_size == page_size)
@@ -1030,7 +1039,7 @@ p2m_expose_init(void)
 		                                p2m_granule_pfn);
 		p2m_convert_max_pfn = ROUNDUP(p2m_max_low_pfn, p2m_granule_pfn);
 		num_pfn = p2m_convert_max_pfn - p2m_convert_min_pfn;
-		size = num_pfn << PAGE_SHIFT;
+		p2m_expose_size = num_pfn << PAGE_SHIFT;
 		p2m_size = num_pfn / PTRS_PER_PTE;
 		p2m_size = ROUNDUP(p2m_size, p2m_granule_pfn << PAGE_SHIFT);
 		align = max(privcmd_resource_align,
@@ -1054,14 +1063,14 @@ p2m_expose_init(void)
 	
 	error = HYPERVISOR_expose_p2m(p2m_convert_min_pfn,
 	                              p2m_assign_start_pfn,
-	                              size, p2m_granule_pfn);
+	                              p2m_expose_size, p2m_granule_pfn);
 	if (error) {
 		printk(KERN_ERR P2M_PREFIX "failed expose p2m hypercall %d\n",
 		       error);
 		printk(KERN_ERR P2M_PREFIX "conv 0x%016lx assign 0x%016lx "
-		       "size 0x%016lx granule 0x%016lx\n",
+		       "expose_size 0x%016lx granule 0x%016lx\n",
 		       p2m_convert_min_pfn, p2m_assign_start_pfn,
-		       size, p2m_granule_pfn);;
+		       p2m_expose_size, p2m_granule_pfn);;
 		release_resource(&p2m_resource);
 		goto out;
 	}
@@ -1103,6 +1112,49 @@ p2m_expose_cleanup(void)
 	release_resource(&p2m_resource);
 }
 #endif
+
+static void
+p2m_expose_resume(void)
+{
+	int error;
+
+	if (!xen_ia64_p2m_expose || !p2m_initialized)
+		return;
+
+	/*
+	 * We can't call {lock, unlock}_cpu_hotplug() because
+	 * they require process context.
+	 * We don't need them because we're the only one cpu and
+	 * interrupts are masked when resume.
+	 */
+	error = HYPERVISOR_expose_p2m(p2m_convert_min_pfn,
+	                              p2m_assign_start_pfn,
+	                              p2m_expose_size, p2m_granule_pfn);
+	if (error) {
+		printk(KERN_ERR P2M_PREFIX "failed expose p2m hypercall %d\n",
+		       error);
+		printk(KERN_ERR P2M_PREFIX "conv 0x%016lx assign 0x%016lx "
+		       "expose_size 0x%016lx granule 0x%016lx\n",
+		       p2m_convert_min_pfn, p2m_assign_start_pfn,
+		       p2m_expose_size, p2m_granule_pfn);;
+		p2m_initialized = 0;
+		smp_mb();
+		ia64_ptr(0x2, p2m_itr_arg.vaddr, p2m_itr_arg.log_page_size);
+		
+		/*
+		 * We can't call those clean up functions because they
+		 * require process context.
+		 */
+#if 0
+#ifdef CONFIG_XEN_IA64_EXPOSE_P2M_USE_DTR
+		if (xen_ia64_p2m_expose_use_dtr)
+			unregister_cpu_notifier(
+				&p2m_expose_dtr_hotplug_notifier);
+#endif
+		release_resource(&p2m_resource);
+#endif
+	}
+}
 
 //XXX inlinize?
 unsigned long
@@ -1187,3 +1239,15 @@ xen_ia64_unmap_resource(struct resource* res)
 	xen_ia64_release_resource(res);
 }
 EXPORT_SYMBOL_GPL(xen_ia64_unmap_resource);
+
+///////////////////////////////////////////////////////////////////////////
+// suspend/resume
+void
+xen_post_suspend(int suspend_cancelled)
+{
+	if (suspend_cancelled)
+		return;
+	
+	p2m_expose_resume();
+	/* add more if necessary */
+}
