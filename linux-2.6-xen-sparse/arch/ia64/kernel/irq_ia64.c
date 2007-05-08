@@ -514,6 +514,69 @@ void xen_smp_intr_init(void)
 #endif /* CONFIG_SMP */
 }
 
+void
+xen_irq_init(void)
+{
+	struct callback_register event = {
+		.type = CALLBACKTYPE_event,
+		.address = (unsigned long)&xen_event_callback,
+	};
+
+	xen_init_IRQ();
+	BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
+	late_time_init = xen_bind_early_percpu_irq;
+#ifdef CONFIG_SMP
+	register_percpu_irq(IA64_IPI_RESCHEDULE, &resched_irqaction);
+#endif
+}
+
+void
+xen_platform_send_ipi(int cpu, int vector, int delivery_mode, int redirect)
+{
+	int irq = -1;
+
+#ifdef CONFIG_SMP
+	/* TODO: we need to call vcpu_up here */
+	if (unlikely(vector == ap_wakeup_vector)) {
+		extern void xen_send_ipi (int cpu, int vec);
+
+		/* XXX
+		 * This should be in __cpu_up(cpu) in ia64 smpboot.c
+		 * like x86. But don't want to modify it,
+		 * keep it untouched.
+		 */
+		xen_smp_intr_init_early(cpu);
+
+		xen_send_ipi (cpu, vector);
+		//vcpu_prepare_and_up(cpu);
+		return;
+	}
+#endif
+
+	switch (vector) {
+		case IA64_IPI_VECTOR:
+			irq = per_cpu(ipi_to_irq, cpu)[IPI_VECTOR];
+			break;
+		case IA64_IPI_RESCHEDULE:
+			irq = per_cpu(ipi_to_irq, cpu)[RESCHEDULE_VECTOR];
+			break;
+		case IA64_CMCP_VECTOR:
+			irq = per_cpu(ipi_to_irq, cpu)[CMCP_VECTOR];
+			break;
+		case IA64_CPEP_VECTOR:
+			irq = per_cpu(ipi_to_irq, cpu)[CPEP_VECTOR];
+			break;
+		default:
+			printk(KERN_WARNING "Unsupported IPI type 0x%x\n",
+			       vector);
+			irq = 0;
+			break;
+	}		
+	
+	BUG_ON(irq < 0);
+	notify_remote_via_irq(irq);
+	return;
+}
 #endif /* CONFIG_XEN */
 
 void
@@ -541,21 +604,6 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 void __init
 init_IRQ (void)
 {
-#ifdef CONFIG_XEN
-	/* Maybe put into platform_irq_init later */
-	if (is_running_on_xen()) {
-		struct callback_register event = {
-			.type = CALLBACKTYPE_event,
-			.address = (unsigned long)&xen_event_callback,
-		};
-		xen_init_IRQ();
-		BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
-		late_time_init = xen_bind_early_percpu_irq;
-#ifdef CONFIG_SMP
-		register_percpu_irq(IA64_IPI_RESCHEDULE, &resched_irqaction);
-#endif /* CONFIG_SMP */
-	}
-#endif /* CONFIG_XEN */
 	register_percpu_irq(IA64_SPURIOUS_INT_VECTOR, NULL);
 #ifdef CONFIG_SMP
 	register_percpu_irq(IA64_IPI_VECTOR, &ipi_irqaction);
@@ -564,6 +612,10 @@ init_IRQ (void)
 	pfm_init_percpu();
 #endif
 	platform_irq_init();
+#ifdef CONFIG_XEN
+	if (is_running_on_xen() && !ia64_platform_is("xen"))
+		xen_irq_init();
+#endif
 }
 
 void
@@ -574,52 +626,11 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 	unsigned long phys_cpu_id;
 
 #ifdef CONFIG_XEN
-        if (is_running_on_xen()) {
-		int irq = -1;
-
-#ifdef CONFIG_SMP
-		/* TODO: we need to call vcpu_up here */
-		if (unlikely(vector == ap_wakeup_vector)) {
-			extern void xen_send_ipi (int cpu, int vec);
-
-			/* XXX
-			 * This should be in __cpu_up(cpu) in ia64 smpboot.c
-			 * like x86. But don't want to modify it,
-			 * keep it untouched.
-			 */
-			xen_smp_intr_init_early(cpu);
-
-			xen_send_ipi (cpu, vector);
-			//vcpu_prepare_and_up(cpu);
-			return;
-		}
-#endif
-
-		switch(vector) {
-		case IA64_IPI_VECTOR:
-			irq = per_cpu(ipi_to_irq, cpu)[IPI_VECTOR];
-			break;
-		case IA64_IPI_RESCHEDULE:
-			irq = per_cpu(ipi_to_irq, cpu)[RESCHEDULE_VECTOR];
-			break;
-		case IA64_CMCP_VECTOR:
-			irq = per_cpu(ipi_to_irq, cpu)[CMCP_VECTOR];
-			break;
-		case IA64_CPEP_VECTOR:
-			irq = per_cpu(ipi_to_irq, cpu)[CPEP_VECTOR];
-			break;
-		default:
-			printk(KERN_WARNING "Unsupported IPI type 0x%x\n",
-			       vector);
-			irq = 0;
-			break;
-		}		
-	
-		BUG_ON(irq < 0);
-		notify_remote_via_irq(irq);
+	if (is_running_on_xen()) {
+		xen_platform_send_ipi(cpu, vector, delivery_mode, redirect);
 		return;
-        }
-#endif /* CONFIG_XEN */
+	}
+#endif
 
 #ifdef CONFIG_SMP
 	phys_cpu_id = cpu_physical_id(cpu);

@@ -53,9 +53,13 @@ static int p2m_expose_init(void);
 
 EXPORT_SYMBOL(__hypercall);
 
-void
-xen_setup(void)
+void __init
+xen_setup(char **cmdline_p)
 {
+	extern void dig_setup(char **cmdline_p);
+	if (ia64_platform_is("xen"))
+		dig_setup(cmdline_p);
+	
 	if (!is_running_on_xen() || !is_initial_xendomain())
 		return;
 
@@ -69,6 +73,13 @@ xen_setup(void)
 	}
 	xen_start_info->console.domU.mfn = 0;
 	xen_start_info->console.domU.evtchn = 0;
+}
+
+void __cpuinit
+xen_cpu_init(void)
+{
+	extern void xen_smp_intr_init(void);
+	xen_smp_intr_init();
 }
 
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()

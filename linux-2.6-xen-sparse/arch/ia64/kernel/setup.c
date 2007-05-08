@@ -603,7 +603,10 @@ setup_arch (char **cmdline_p)
 
 	platform_setup(cmdline_p);
 #ifdef CONFIG_XEN
-	xen_setup();
+	if (!is_running_on_xen() && !ia64_platform_is("xen")) {
+		extern ia64_mv_setup_t xen_setup;
+		xen_setup(cmdline_p);
+	}
 #endif
 	paging_init();
 #ifdef CONFIG_XEN
@@ -993,12 +996,10 @@ cpu_init (void)
 	/* size of physical stacked register partition plus 8 bytes: */
 	__get_cpu_var(ia64_phys_stacked_size_p8) = num_phys_stacked*8 + 8;
 	platform_cpu_init();
-
 #ifdef CONFIG_XEN
-	/* Need to be moved into platform_cpu_init later */
-	if (is_running_on_xen()) {
-		extern void xen_smp_intr_init(void);
-		xen_smp_intr_init();
+	if (is_running_on_xen() && !ia64_platform_is("xen")) {
+		extern ia64_mv_cpu_init_t xen_cpu_init;
+		xen_cpu_init();
 	}
 #endif
 
