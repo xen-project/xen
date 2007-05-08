@@ -54,8 +54,9 @@ extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 extern void do_ssc(unsigned long ssc, struct pt_regs *regs);
 
 // should never panic domain... if it does, stack may have been overrun
-void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs,
-                                   unsigned long vector)
+static void check_bad_nested_interruption(unsigned long isr,
+					  struct pt_regs *regs,
+					  unsigned long vector)
 {
 	struct vcpu *v = current;
 
@@ -74,8 +75,8 @@ void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs,
 	}
 }
 
-void reflect_interruption(unsigned long isr, struct pt_regs *regs,
-                          unsigned long vector)
+static void reflect_interruption(unsigned long isr, struct pt_regs *regs,
+				 unsigned long vector)
 {
 	struct vcpu *v = current;
 
@@ -101,26 +102,6 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 	PSCB(v, interrupt_collection_enabled) = 0;
 
 	perfc_incra(slow_reflect, vector >> 8);
-}
-
-static unsigned long pending_false_positive = 0;
-
-void reflect_extint(struct pt_regs *regs)
-{
-	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
-	struct vcpu *v = current;
-	static int first_extint = 1;
-
-	if (first_extint) {
-		printk("Delivering first extint to domain: isr=0x%lx, "
-		       "iip=0x%lx\n", isr, regs->cr_iip);
-		first_extint = 0;
-	}
-	if (vcpu_timer_pending_early(v))
-		printk("*#*#*#* about to deliver early timer to domain %d!!\n",
-		       v->domain->domain_id);
-	PSCB(current, itir) = 0;
-	reflect_interruption(isr, regs, IA64_EXTINT_VECTOR);
 }
 
 void reflect_event(void)
@@ -164,22 +145,6 @@ void reflect_event(void)
 	PSCB(v, vpsr_dfh) = 0;
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v, interrupt_collection_enabled) = 0;
-}
-
-// ONLY gets called from ia64_leave_kernel
-// ONLY call with interrupts disabled?? (else might miss one?)
-// NEVER successful if already reflecting a trap/fault because psr.i==0
-void deliver_pending_interrupt(struct pt_regs *regs)
-{
-	struct domain *d = current->domain;
-	struct vcpu *v = current;
-	// FIXME: Will this work properly if doing an RFI???
-	if (!is_idle_domain(d) && user_mode(regs)) {
-		if (vcpu_deliverable_interrupts(v))
-			reflect_extint(regs);
-		else if (PSCB(v, pending_interruption))
-			++pending_false_positive;
-	}
 }
 
 static int handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
@@ -593,7 +558,7 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 	unsigned long psr = regs->cr_ipsr;
 	unsigned long status;
 
-	/* Following faults shouldn'g be seen from Xen itself */
+	/* Following faults shouldn't be seen from Xen itself */
 	BUG_ON(!(psr & IA64_PSR_CPL));
 
 	switch (vector) {
