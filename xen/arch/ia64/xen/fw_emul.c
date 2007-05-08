@@ -512,12 +512,13 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				(struct pal_freq_ratio *) &r11);
 		break;
 	    case PAL_PTCE_INFO:
-		{
-			// return hard-coded xen-specific values because ptc.e
-			// is emulated on xen to always flush everything
-			// these values result in only one ptc.e instruction
-			status = 0; r9 = 0; r10 = (1L << 32) | 1L; r11 = 0;
-		}
+		/*
+		 * return hard-coded xen-specific values because ptc.e
+		 * is emulated on xen to always flush everything
+		 * these values result in only one ptc.e instruction
+		 */
+		status = PAL_STATUS_SUCCESS;
+		r10 = (1L << 32) | 1L;
 		break;
 	    case PAL_VERSION:
 		status = ia64_pal_version(
@@ -620,14 +621,11 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			/* Only support PAGE_SIZE tc.  */
 			r10 = PAGE_SIZE;
 			status = PAL_STATUS_SUCCESS;
-		}
-	        else
+		} else
 			status = PAL_STATUS_EINVAL;
 		break;
 	    case PAL_RSE_INFO:
-		status = ia64_pal_rse_info(
-				&r9,
-				(pal_hints_u_t *) &r10);
+		status = ia64_pal_rse_info(&r9, (pal_hints_u_t *)&r10);
 		break;
 	    case PAL_REGISTER_INFO:
 		status = ia64_pal_register_info(in1, &r9, &r10);
@@ -699,13 +697,14 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		{
 			pal_cache_config_info_t ci;
 			status = ia64_pal_cache_config_info(in1,in2,&ci);
-			if (status != 0) break;
+			if (status != 0)
+				break;
 			r9 = ci.pcci_info_1.pcci1_data;
 			r10 = ci.pcci_info_2.pcci2_data;
 		}
 		break;
 	    case PAL_VM_TR_READ:	/* FIXME: vcpu_get_tr?? */
-		printk("PAL_VM_TR_READ NOT IMPLEMENTED, IGNORED!\n");
+		printk("%s: PAL_VM_TR_READ unimplmented, ignored\n", __func__);
 		break;
 	    case PAL_HALT_INFO:
 	        {
@@ -744,12 +743,15 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		if (VMX_DOMAIN(current))
 			status = PAL_STATUS_SUCCESS;
 		break;
+	    case PAL_FIXED_ADDR:
+		status = PAL_STATUS_SUCCESS;
+		r9 = current->vcpu_id;
+		break;
 	    case PAL_LOGICAL_TO_PHYSICAL:
 		/* Optional, no need to complain about being unimplemented */
 		break;
 	    default:
-		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",
-				index);
+		printk("%s: Unimplemented PAL Call %lu\n", __func__, index);
 		break;
 	}
 	return ((struct ia64_pal_retval) {status, r9, r10, r11});
