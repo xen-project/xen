@@ -867,7 +867,10 @@ class XendDomainInfo:
 
         # convert two lists into a python dictionary
         vm_details = dict(zip(cfg_vm, vm_details))
-        
+
+        if vm_details['rtc/timeoffset'] == None:
+            vm_details['rtc/timeoffset'] = "0"
+
         for arg, val in vm_details.items():
             if arg in XendConfig.LEGACY_CFG_TO_XENAPI_CFG:
                 xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
