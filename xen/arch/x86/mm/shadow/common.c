@@ -1764,12 +1764,15 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
 #if CONFIG_PAGING_LEVELS >= 4
         else if ( v->arch.paging.mode->guest_levels == 4 )
         {
-            /* 64bit w2k3: linear map at 0x0000070000000000 */
+            /* 64bit w2k3: linear map at 0xfffff68000000000 */
             switch ( level ) 
             {
-            case 1: GUESS(0x70000000000UL + (fault_addr >> 9), 3); break;
-            case 2: GUESS(0x70380000000UL + (fault_addr >> 18), 3); break;
-            case 3: GUESS(0x70381C00000UL + (fault_addr >> 27), 3); break;
+            case 1: GUESS(0xfffff68000000000UL 
+                          + ((fault_addr & VADDR_MASK) >> 9), 3); break;
+            case 2: GUESS(0xfffff6fb40000000UL
+                          + ((fault_addr & VADDR_MASK) >> 18), 3); break;
+            case 3: GUESS(0xfffff6fb7da00000UL 
+                          + ((fault_addr & VADDR_MASK) >> 27), 3); break;
             }
 
             /* 64bit Linux direct map at 0xffff810000000000; older kernels 
