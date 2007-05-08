@@ -108,43 +108,45 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
     *(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map;
 }
 
-static int
-loadelfimage(struct elf_binary *elf, int xch, uint32_t dom, unsigned long *parray)
+static int loadelfimage(
+    struct elf_binary *elf, int xch, uint32_t dom, unsigned long *parray)
 {
     privcmd_mmap_entry_t *entries = NULL;
     int pages = (elf->pend - elf->pstart + PAGE_SIZE - 1) >> PAGE_SHIFT;
     int i, rc = -1;
 
-    /* map hvmloader address space */
+    /* Map address space for initial elf image. */
     entries = malloc(pages * sizeof(privcmd_mmap_entry_t));
-    if (NULL == entries)
+    if ( entries == NULL )
         goto err;
     elf->dest = mmap(NULL, pages << PAGE_SHIFT, PROT_READ | PROT_WRITE,
                      MAP_SHARED, xch, 0);
-    if (MAP_FAILED == elf->dest)
+    if ( elf->dest == MAP_FAILED )
         goto err;
 
-    for (i = 0; i < pages; i++)
+    for ( i = 0; i < pages; i++ )
     {
         entries[i].va = (uintptr_t)elf->dest + (i << PAGE_SHIFT);
         entries[i].mfn = parray[(elf->pstart >> PAGE_SHIFT) + i];
         entries[i].npages = 1;
     }
+
     rc = xc_map_foreign_ranges(xch, dom, entries, pages);
-    if (rc < 0)
+    if ( rc < 0 )
         goto err;
 
-    /* load hvmloader */
+    /* Load the initial elf image. */
     elf_load_binary(elf);
     rc = 0;
 
  err:
-    /* cleanup */
-    if (elf->dest) {
+    if ( elf->dest )
+    {
         munmap(elf->dest, pages << PAGE_SHIFT);
         elf->dest = NULL;
     }
-    if (entries)
+
+    if ( entries )
         free(entries);
 
     return rc;
@@ -166,13 +168,17 @@ static int setup_guest(int xc_handle,
     int rc;
     xen_capabilities_info_t caps;
 
-    if (0 != elf_init(&elf, image, image_size))
+    /* An HVM guest must be initialised with at least 2MB memory. */
+    if ( memsize < 2 )
+        goto error_out;
+
+    if ( elf_init(&elf, image, image_size) != 0 )
         goto error_out;
     elf_parse_binary(&elf);
     v_start = 0;
     v_end = (unsigned long long)memsize << 20;
 
-    if (xc_version(xc_handle, XENVER_capabilities, &caps) != 0)
+    if ( xc_version(xc_handle, XENVER_capabilities, &caps) != 0 )
     {
         PERROR("Could not get Xen capabilities\n");
         goto error_out;
@@ -185,9 +191,9 @@ static int setup_guest(int xc_handle,
     }
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
-            "  Loaded HVM loader:    %016"PRIx64"->%016"PRIx64"\n"
-            "  TOTAL:                %016"PRIx64"->%016"PRIx64"\n"
-            "  ENTRY ADDRESS:        %016"PRIx64"\n",
+            "  Loader:        %016"PRIx64"->%016"PRIx64"\n"
+            "  TOTAL:         %016"PRIx64"->%016"PRIx64"\n"
+            "  ENTRY ADDRESS: %016"PRIx64"\n",
             elf.pstart, elf.pend,
             v_start, v_end,
             elf_uval(&elf, elf.ehdr, e_entry));
@@ -205,9 +211,8 @@ static int setup_guest(int xc_handle,
 
     /* Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000. */
     rc = xc_domain_memory_populate_physmap(
-        xc_handle, dom, (nr_pages > 0xa0) ? 0xa0 : nr_pages,
-        0, 0, &page_array[0x00]);
-    if ( (rc == 0) && (nr_pages > 0xc0) )
+        xc_handle, dom, 0xa0, 0, 0, &page_array[0x00]);
+    if ( rc == 0 )
         rc = xc_domain_memory_populate_physmap(
             xc_handle, dom, nr_pages - 0xc0, 0, 0, &page_array[0xc0]);
     if ( rc != 0 )
@@ -216,7 +221,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    loadelfimage(&elf, xc_handle, dom, page_array);
+    if ( loadelfimage(&elf, xc_handle, dom, page_array) != 0 )
+        goto error_out;
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
@@ -328,12 +334,9 @@ static inline int is_loadable_phdr(Elf32_Phdr *phdr)
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
 }
 
-/* xc_hvm_build
- *
- * Create a domain for a virtualized Linux, using files/filenames
- *
+/* xc_hvm_build:
+ * Create a domain for a virtualized Linux, using files/filenames.
  */
-
 int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
@@ -354,12 +357,9 @@ int xc_hvm_build(int xc_handle,
     return sts;
 }
 
-/* xc_hvm_build_mem
- *
- * Create a domain for a virtualized Linux, using buffers
- *
+/* xc_hvm_build_mem:
+ * Create a domain for a virtualized Linux, using memory buffers.
  */
-
 int xc_hvm_build_mem(int xc_handle,
                      uint32_t domid,
                      int memsize,
@@ -379,7 +379,7 @@ int xc_hvm_build_mem(int xc_handle,
     }
 
     img = xc_inflate_buffer(image_buffer, image_size, &img_len);
-    if (img == NULL)
+    if ( img == NULL )
     {
         ERROR("unable to inflate ram disk buffer");
         return -1;

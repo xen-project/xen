@@ -1,0 +1,34 @@
+Index: ioemu/hw/piix4acpi.c
+===================================================================
+--- ioemu.orig/hw/piix4acpi.c	2007-05-03 15:07:43.000000000 +0100
++++ ioemu/hw/piix4acpi.c	2007-05-03 15:07:43.000000000 +0100
+@@ -57,6 +57,20 @@
+     uint16_t pm1_control; /* pm1a_ECNT_BLK */
+ } PCIAcpiState;
+ 
++static void piix4acpi_save(QEMUFile *f, void *opaque)
++{
++    PCIAcpiState *s = opaque;
++    qemu_put_be16s(f, &s->pm1_control);
++}
++
++static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
++{
++    PCIAcpiState *s = opaque;
++    if (version_id > 1) 
++        return -EINVAL;
++    qemu_get_be16s(f, &s->pm1_control);
++}
++
+ static void acpiPm1Control_writeb(void *opaque, uint32_t addr, uint32_t val)
+ {
+     PCIAcpiState *s = opaque;
+@@ -193,4 +207,8 @@
+     d->pm1_control = SCI_EN;
+ 
+     acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
++
++    register_savevm("piix4acpi", 0, 1, piix4acpi_save, piix4acpi_load, d);    
++    register_savevm("piix4acpi_pci", 0, 1, generic_pci_save, generic_pci_load, 
++                    &d->dev);
+ }

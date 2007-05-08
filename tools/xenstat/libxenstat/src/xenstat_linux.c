@@ -206,10 +206,8 @@ int xenstat_collect_vbds(xenstat_node * node)
 
 
 		ret = sscanf(dp->d_name, "vbd-%u-%u", &domid, &vbd.dev);
-		if (ret != 2) {
+		if (ret != 2)
 			continue;
-		}
-		printf("%s is VBD.\n",dp->d_name);
 
 		domain = xenstat_node_domain(node, domid);
 		if (domain == NULL) {

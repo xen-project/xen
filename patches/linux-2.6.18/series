@@ -21,3 +21,4 @@ git-c06cb8b1c4d25e5b4d7a2d7c2462619de1e0dbc4.patch
 softlockup-no-idle-hz.patch
 allow-i386-crash-kernels-to-handle-x86_64-dumps.patch
 allow-i386-crash-kernels-to-handle-x86_64-dumps-fix.patch
+git-5ee7737379b1d7f0c977c0f1661fbaf01a8d4721.patch

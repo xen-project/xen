@@ -1,0 +1,194 @@
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2007-05-03 15:20:45.000000000 +0100
++++ ioemu/vl.c	2007-05-03 15:20:45.000000000 +0100
+@@ -116,7 +116,7 @@
+ void *ioport_opaque[MAX_IOPORTS];
+ IOPortReadFunc *ioport_read_table[3][MAX_IOPORTS];
+ IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
+-BlockDriverState *bs_table[MAX_DISKS], *fd_table[MAX_FD];
++BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS], *fd_table[MAX_FD];
+ int vga_ram_size;
+ int bios_size;
+ static DisplayState display_state;
+@@ -1396,7 +1396,7 @@
+         case 's': 
+             {
+                 int i;
+-                for (i = 0; i < MAX_DISKS; i++) {
++                for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
+                     if (bs_table[i])
+                         bdrv_commit(bs_table[i]);
+                 }
+@@ -6057,7 +6057,7 @@
+     int snapshot, linux_boot;
+     const char *initrd_filename;
+ #ifndef CONFIG_DM
+-    const char *hd_filename[MAX_DISKS];
++    const char *hd_filename[MAX_DISKS + MAX_SCSI_DISKS];
+ #endif /* !CONFIG_DM */
+     const char *fd_filename[MAX_FD];
+     const char *kernel_filename, *kernel_cmdline;
+@@ -6126,7 +6126,7 @@
+     for(i = 0; i < MAX_FD; i++)
+         fd_filename[i] = NULL;
+ #ifndef CONFIG_DM
+-    for(i = 0; i < MAX_DISKS; i++)
++    for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
+         hd_filename[i] = NULL;
+ #endif /* !CONFIG_DM */
+     ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
+@@ -6724,7 +6724,7 @@
+     }
+ 
+     /* open the virtual block devices */
+-    for(i = 0; i < MAX_DISKS; i++) {
++    for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
+         if (hd_filename[i]) {
+             if (!bs_table[i]) {
+                 char buf[64];
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2007-05-03 15:20:45.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:20:45.000000000 +0100
+@@ -818,8 +818,9 @@
+ 
+ /* ide.c */
+ #define MAX_DISKS 4
++#define MAX_SCSI_DISKS 7
+ 
+-extern BlockDriverState *bs_table[MAX_DISKS];
++extern BlockDriverState *bs_table[MAX_DISKS + MAX_SCSI_DISKS];
+ 
+ void isa_ide_init(int iobase, int iobase2, int irq,
+                   BlockDriverState *hd0, BlockDriverState *hd1);
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2007-05-03 15:20:44.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 15:20:45.000000000 +0100
+@@ -902,7 +902,6 @@
+     if (pci_enabled && acpi_enabled) {
+         piix4_pm_init(pci_bus, piix3_devfn + 3);
+     }
+-#endif /* !CONFIG_DM */
+ 
+ #if 0
+     /* ??? Need to figure out some way for the user to
+@@ -921,6 +920,18 @@
+         lsi_scsi_attach(scsi, bdrv, -1);
+     }
+ #endif
++#else
++    if (pci_enabled) {
++        void *scsi = NULL;
++        for (i = 0; i < MAX_SCSI_DISKS ; i++) {
++            if (!bs_table[i + MAX_DISKS])
++                continue;
++            if (!scsi)
++                scsi = lsi_scsi_init(pci_bus, -1);
++            lsi_scsi_attach(scsi, bs_table[i + MAX_DISKS], -1);
++        }
++    }
++#endif /* !CONFIG_DM */
+     /* must be done after all PCI devices are instanciated */
+     /* XXX: should be done in the Bochs BIOS */
+     if (pci_enabled) {
+Index: ioemu/xenstore.c
+===================================================================
+--- ioemu.orig/xenstore.c	2007-05-03 15:20:45.000000000 +0100
++++ ioemu/xenstore.c	2007-05-03 15:20:45.000000000 +0100
+@@ -18,7 +18,7 @@
+ #include <fcntl.h>
+ 
+ static struct xs_handle *xsh = NULL;
+-static char *media_filename[MAX_DISKS];
++static char *media_filename[MAX_DISKS + MAX_SCSI_DISKS];
+ static QEMUTimer *insert_timer = NULL;
+ 
+ #define UWAIT_MAX (30*1000000) /* thirty seconds */
+@@ -44,7 +44,7 @@
+ {
+     int i;
+ 
+-    for (i = 0; i < MAX_DISKS; i++) {
++    for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
+         if (media_filename[i] && bs_table[i]) {
+             do_change(bs_table[i]->device_name, media_filename[i]);
+             free(media_filename[i]);
+@@ -83,10 +83,10 @@
+     char *buf = NULL, *path;
+     char *fpath = NULL, *bpath = NULL,
+         *dev = NULL, *params = NULL, *type = NULL;
+-    int i;
++    int i, is_scsi;
+     unsigned int len, num, hd_index;
+ 
+-    for(i = 0; i < MAX_DISKS; i++)
++    for(i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++)
+         media_filename[i] = NULL;
+ 
+     xsh = xs_daemon_open();
+@@ -123,10 +123,11 @@
+         dev = xs_read(xsh, XBT_NULL, buf, &len);
+         if (dev == NULL)
+             continue;
+-        if (strncmp(dev, "hd", 2) || strlen(dev) != 3)
++        is_scsi = !strncmp(dev, "sd", 2);
++        if ((strncmp(dev, "hd", 2) && !is_scsi) || strlen(dev) != 3 )
+             continue;
+         hd_index = dev[2] - 'a';
+-        if (hd_index >= MAX_DISKS)
++        if (hd_index >= (is_scsi ? MAX_SCSI_DISKS : MAX_DISKS))
+             continue;
+         /* read the type of the device */
+         if (pasprintf(&buf, "%s/device/vbd/%s/device-type", path, e[i]) == -1)
+@@ -163,7 +164,7 @@
+             }
+         }
+ 
+-        bs_table[hd_index] = bdrv_new(dev);
++        bs_table[hd_index + (is_scsi ? MAX_DISKS : 0)] = bdrv_new(dev);
+         /* check if it is a cdrom */
+         if (type && !strcmp(type, "cdrom")) {
+             bdrv_set_type_hint(bs_table[hd_index], BDRV_TYPE_CDROM);
+@@ -172,7 +173,8 @@
+         }
+         /* open device now if media present */
+         if (params[0]) {
+-            if (bdrv_open(bs_table[hd_index], params, 0 /* snapshot */) < 0)
++            if (bdrv_open(bs_table[hd_index + (is_scsi ? MAX_DISKS : 0)],
++                          params, 0 /* snapshot */) < 0)
+                 fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
+                         params);
+         }
+Index: ioemu/monitor.c
+===================================================================
+--- ioemu.orig/monitor.c	2007-05-03 15:18:43.000000000 +0100
++++ ioemu/monitor.c	2007-05-03 15:20:45.000000000 +0100
+@@ -180,7 +180,7 @@
+ {
+     int i;
+ 
+-    for (i = 0; i < MAX_DISKS; i++) {
++    for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
+         if (bs_table[i]) {
+             bdrv_commit(bs_table[i]);
+         }
+Index: ioemu/hw/lsi53c895a.c
+===================================================================
+--- ioemu.orig/hw/lsi53c895a.c	2007-05-03 15:18:43.000000000 +0100
++++ ioemu/hw/lsi53c895a.c	2007-05-03 15:20:45.000000000 +0100
+@@ -1071,8 +1071,13 @@
+         shift = (offset & 3) * 8;
+         return (s->scratch[n] >> shift) & 0xff;
+     }
++#ifndef CONFIG_DM
+     BADF("readb 0x%x\n", offset);
+     exit(1);
++#else
++    /* XEN: This path can be triggered (e.g. ASPI8DOS.SYS reads 0x8). */
++    return 0;
++#endif
+ #undef CASE_GET_REG32
+ }
+ 

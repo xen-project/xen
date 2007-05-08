@@ -1,8 +1,8 @@
 Index: ioemu/hw/pci.c
 ===================================================================
---- ioemu.orig/hw/pci.c	2006-12-08 02:02:05.000000000 +0000
-+++ ioemu/hw/pci.c	2006-12-08 18:16:55.000000000 +0000
-@@ -286,6 +286,7 @@
+--- ioemu.orig/hw/pci.c	2007-05-03 15:20:35.000000000 +0100
++++ ioemu/hw/pci.c	2007-05-03 15:20:43.000000000 +0100
+@@ -289,6 +289,7 @@
              case 0x0b:
              case 0x0e:
              case 0x10 ... 0x27: /* base */
@@ -10,7 +10,7 @@ Index: ioemu/hw/pci.c
              case 0x30 ... 0x33: /* rom */
              case 0x3d:
                  can_write = 0;
-@@ -318,6 +319,18 @@
+@@ -321,6 +322,18 @@
              break;
          }
          if (can_write) {
@@ -31,9 +31,9 @@ Index: ioemu/hw/pci.c
          addr++;
 Index: ioemu/hw/rtl8139.c
 ===================================================================
---- ioemu.orig/hw/rtl8139.c	2006-12-08 02:02:05.000000000 +0000
-+++ ioemu/hw/rtl8139.c	2006-12-08 18:16:47.000000000 +0000
-@@ -3423,6 +3423,8 @@
+--- ioemu.orig/hw/rtl8139.c	2007-05-03 15:20:35.000000000 +0100
++++ ioemu/hw/rtl8139.c	2007-05-03 15:20:43.000000000 +0100
+@@ -3424,6 +3424,8 @@
      pci_conf[0x0e] = 0x00; /* header_type */
      pci_conf[0x3d] = 1;    /* interrupt pin 0 */
      pci_conf[0x34] = 0xdc;
@@ -44,9 +44,9 @@ Index: ioemu/hw/rtl8139.c
  
 Index: ioemu/hw/usb-uhci.c
 ===================================================================
---- ioemu.orig/hw/usb-uhci.c	2006-12-08 02:02:05.000000000 +0000
-+++ ioemu/hw/usb-uhci.c	2006-12-08 02:02:38.000000000 +0000
-@@ -659,6 +659,8 @@
+--- ioemu.orig/hw/usb-uhci.c	2007-05-03 15:20:35.000000000 +0100
++++ ioemu/hw/usb-uhci.c	2007-05-03 15:20:43.000000000 +0100
+@@ -704,6 +704,8 @@
      pci_conf[0x0e] = 0x00; // header_type
      pci_conf[0x3d] = 4; // interrupt pin 3
      pci_conf[0x60] = 0x10; // release number
@@ -57,8 +57,8 @@ Index: ioemu/hw/usb-uhci.c
          qemu_register_usb_port(&s->ports[i].port, s, i, uhci_attach);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 18:16:47.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 18:16:55.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 15:20:43.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:20:43.000000000 +0100
 @@ -650,8 +650,11 @@
  #define PCI_MAX_LAT		0x3f	/* 8 bits */
  

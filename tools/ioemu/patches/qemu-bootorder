@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-20 15:12:08.000000000 +0000
-+++ ioemu/vl.c	2006-12-20 15:21:19.000000000 +0000
-@@ -125,7 +125,7 @@
+--- ioemu.orig/vl.c	2007-05-03 15:20:35.000000000 +0100
++++ ioemu/vl.c	2007-05-03 15:20:43.000000000 +0100
+@@ -126,7 +126,7 @@
  struct sockaddr_in vnclisten_addr;
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
@@ -11,7 +11,7 @@ Index: ioemu/vl.c
  uint64_t ram_size;
  int pit_min_timer_count = 0;
  int nb_nics;
-@@ -6059,14 +6059,14 @@
+@@ -6150,14 +6150,14 @@
                  break;
  #endif /* !CONFIG_DM */
              case QEMU_OPTION_boot:
@@ -34,7 +34,7 @@ Index: ioemu/vl.c
                      exit(1);
                  }
                  break;
-@@ -6333,6 +6333,7 @@
+@@ -6424,6 +6424,7 @@
          fd_filename[0] == '\0')
          help();
      
@@ -42,7 +42,7 @@ Index: ioemu/vl.c
      /* boot to cd by default if no hard disk */
      if (hd_filename[0] == '\0' && boot_device == 'c') {
          if (fd_filename[0] != '\0')
-@@ -6340,6 +6341,7 @@
+@@ -6431,6 +6432,7 @@
          else
              boot_device = 'd';
      }
@@ -50,7 +50,7 @@ Index: ioemu/vl.c
  #endif /* !CONFIG_DM */
  
      setvbuf(stdout, NULL, _IOLBF, 0);
-@@ -6590,6 +6592,7 @@
+@@ -6692,6 +6694,7 @@
                    ds, fd_filename, snapshot,
                    kernel_filename, kernel_cmdline, initrd_filename,
                    timeoffset);
@@ -60,8 +60,8 @@ Index: ioemu/vl.c
      if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-20 15:12:08.000000000 +0000
-+++ ioemu/vl.h	2006-12-20 15:21:14.000000000 +0000
+--- ioemu.orig/vl.h	2007-05-03 15:20:39.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:20:43.000000000 +0100
 @@ -578,7 +578,7 @@
  #ifndef QEMU_TOOL
  
@@ -71,7 +71,7 @@ Index: ioemu/vl.h
               DisplayState *ds, const char **fd_filename, int snapshot,
               const char *kernel_filename, const char *kernel_cmdline,
               const char *initrd_filename, time_t timeoffset);
-@@ -1023,7 +1023,7 @@
+@@ -1024,7 +1024,7 @@
                      uint32_t start, uint32_t count);
  int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
                            const unsigned char *arch,
@@ -82,8 +82,8 @@ Index: ioemu/vl.h
                            uint32_t initrd_image, uint32_t initrd_size,
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-20 15:12:08.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-20 15:21:19.000000000 +0000
+--- ioemu.orig/hw/pc.c	2007-05-03 15:20:35.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 15:20:43.000000000 +0100
 @@ -158,8 +158,25 @@
      rtc_set_memory(s, info_ofs + 8, sectors);
  }

@@ -1,0 +1,22 @@
+Index: ioemu/block.c
+===================================================================
+--- ioemu.orig/block.c	2007-05-03 14:55:04.000000000 +0100
++++ ioemu/block.c	2007-05-03 14:59:20.000000000 +0100
+@@ -420,6 +420,8 @@
+ 
+     if (!bs->inserted)
+         return -1;
++    if (sector_num < 0)
++	return -1;
+ 
+     while (nb_sectors > 0) {
+         if (sector_num == 0 && bs->boot_sector_enabled) {
+@@ -458,6 +460,8 @@
+         return -1;
+     if (bs->read_only)
+         return -1;
++    if (sector_num < 0)
++	return -1;
+     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
+         memcpy(bs->boot_sector_data, buf, 512);   
+     }

@@ -3,8 +3,8 @@ will come later.
 
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-08 01:41:14.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-08 01:41:15.000000000 +0000
+--- ioemu.orig/Makefile.target	2007-05-03 15:16:41.000000000 +0100
++++ ioemu/Makefile.target	2007-05-03 15:20:35.000000000 +0100
 @@ -360,6 +360,7 @@
  VL_OBJS+= usb-uhci.o
  VL_OBJS+= piix4acpi.o
@@ -15,8 +15,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-08 01:41:13.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-08 01:41:15.000000000 +0000
+--- ioemu.orig/hw/pc.c	2007-05-03 15:18:17.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 15:20:35.000000000 +0100
 @@ -823,6 +823,9 @@
      }
  #endif /* !CONFIG_DM */
@@ -30,8 +30,8 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/xen_platform.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/xen_platform.c	2006-12-08 01:41:15.000000000 +0000
-@@ -0,0 +1,144 @@
++++ ioemu/hw/xen_platform.c	2007-05-03 15:18:17.000000000 +0100
+@@ -0,0 +1,133 @@
 +/*
 + * XEN platform fake pci device, formerly known as the event channel device
 + * 
@@ -63,21 +63,10 @@ Index: ioemu/hw/xen_platform.c
 +
 +extern FILE *logfile;
 +
-+static void platform_ioport_write(void *opaque, uint32_t addr, uint32_t val)
-+{
-+    return;
-+}
-+
-+static uint32_t platform_ioport_read(void *opaque, uint32_t addr)
-+{
-+    return 0;
-+}
-+
 +static void platform_ioport_map(PCIDevice *pci_dev, int region_num,
 +                                uint32_t addr, uint32_t size, int type)
 +{
-+    register_ioport_write(addr, 16, 4, platform_ioport_write, NULL);
-+    register_ioport_read(addr, 16, 1, platform_ioport_read, NULL);
++    /* nothing yet */
 +}
 +
 +static uint32_t platform_mmio_read(void *opaque, target_phys_addr_t addr)
@@ -178,15 +167,16 @@ Index: ioemu/hw/xen_platform.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-08 01:41:14.000000000 +0000
-+++ ioemu/vl.h	2006-12-08 01:41:15.000000000 +0000
-@@ -1212,6 +1212,9 @@
- void xenstore_check_new_media_present(int timeout);
- void xenstore_write_vncport(int vnc_display);
+--- ioemu.orig/vl.h	2007-05-03 15:18:17.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:20:39.000000000 +0100
+@@ -1220,6 +1220,10 @@
+ extern long time_offset;
+ void timeoffset_get(void);
  
 +/* xen_platform.c */
 +void pci_xen_platform_init(PCIBus *bus);
 +
- 
++
  void kqemu_record_dump(void);
  
+ extern char domain_name[];

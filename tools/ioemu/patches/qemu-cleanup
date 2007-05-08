@@ -1,7 +1,7 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-10-24 14:44:03.000000000 +0100
-+++ ioemu/hw/vga.c	2006-10-24 14:45:22.000000000 +0100
+--- ioemu.orig/hw/vga.c	2007-05-02 16:04:46.000000000 +0100
++++ ioemu/hw/vga.c	2007-05-02 16:05:50.000000000 +0100
 @@ -1622,7 +1622,9 @@
  static void vga_save(QEMUFile *f, void *opaque)
  {
@@ -26,8 +26,8 @@ Index: ioemu/hw/vga.c
          return -EINVAL;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-10-24 14:44:08.000000000 +0100
-+++ ioemu/vl.c	2006-10-24 14:45:29.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-02 16:05:50.000000000 +0100
++++ ioemu/vl.c	2007-05-02 16:05:50.000000000 +0100
 @@ -39,6 +39,7 @@
  #include <sys/ioctl.h>
  #include <sys/socket.h>
@@ -74,7 +74,7 @@ Index: ioemu/vl.c
  #ifdef USE_KQEMU
      { "no-kqemu", 0, QEMU_OPTION_no_kqemu },
      { "kernel-kqemu", 0, QEMU_OPTION_kernel_kqemu },
-@@ -5849,9 +5854,11 @@
+@@ -5853,9 +5858,11 @@
                  fd_bootchk = 0;
                  break;
  #endif
@@ -88,8 +88,8 @@ Index: ioemu/vl.c
                      fprintf(stderr, "qemu: too many network clients\n");
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-10-24 14:44:08.000000000 +0100
-+++ ioemu/vl.h	2006-10-24 14:45:22.000000000 +0100
+--- ioemu.orig/vl.h	2007-05-02 16:05:50.000000000 +0100
++++ ioemu/vl.h	2007-05-02 16:05:50.000000000 +0100
 @@ -957,7 +957,7 @@
  	       unsigned long vram_offset, int vram_size, int width, int height);
  
@@ -101,8 +101,8 @@ Index: ioemu/vl.h
  void slavio_irq_info(void *opaque);
 Index: ioemu/usb-linux.c
 ===================================================================
---- ioemu.orig/usb-linux.c	2006-10-24 14:44:03.000000000 +0100
-+++ ioemu/usb-linux.c	2006-10-24 14:44:08.000000000 +0100
+--- ioemu.orig/usb-linux.c	2007-05-02 16:04:46.000000000 +0100
++++ ioemu/usb-linux.c	2007-05-02 16:05:50.000000000 +0100
 @@ -26,7 +26,9 @@
  #if defined(__linux__)
  #include <dirent.h>

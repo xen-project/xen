@@ -1,7 +1,7 @@
 Index: ioemu/sdl.c
 ===================================================================
---- ioemu.orig/sdl.c	2006-08-06 02:03:48.563137711 +0100
-+++ ioemu/sdl.c	2006-08-06 02:17:16.063137816 +0100
+--- ioemu.orig/sdl.c	2007-05-02 16:04:45.000000000 +0100
++++ ioemu/sdl.c	2007-05-02 16:05:51.000000000 +0100
 @@ -273,14 +273,14 @@
  static void sdl_update_caption(void)
  {
@@ -21,8 +21,8 @@ Index: ioemu/sdl.c
  static void sdl_hide_cursor(void)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:16:31.246133963 +0100
-+++ ioemu/vl.c	2006-08-06 02:17:31.428424918 +0100
+--- ioemu.orig/vl.c	2007-05-02 16:05:51.000000000 +0100
++++ ioemu/vl.c	2007-05-02 16:05:51.000000000 +0100
 @@ -158,6 +158,8 @@
  int acpi_enabled = 1;
  int fd_bootchk = 1;
@@ -56,7 +56,7 @@ Index: ioemu/vl.c
      { "serial", 1, QEMU_OPTION_serial },
      { "parallel", 1, QEMU_OPTION_parallel },
      { "loadvm", HAS_ARG, QEMU_OPTION_loadvm },
-@@ -6062,6 +6067,9 @@
+@@ -6066,6 +6071,9 @@
              case QEMU_OPTION_no_acpi:
                  acpi_enabled = 0;
                  break;
@@ -68,8 +68,8 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-08-06 02:15:39.711878977 +0100
-+++ ioemu/vl.h	2006-08-06 02:17:16.068137258 +0100
+--- ioemu.orig/vl.h	2007-05-02 16:05:50.000000000 +0100
++++ ioemu/vl.h	2007-05-02 16:05:51.000000000 +0100
 @@ -1185,4 +1185,5 @@
  
  void kqemu_record_dump(void);

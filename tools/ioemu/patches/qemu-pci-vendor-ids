@@ -1,0 +1,47 @@
+Index: ioemu/hw/cirrus_vga.c
+===================================================================
+--- ioemu.orig/hw/cirrus_vga.c	2007-05-03 15:06:41.000000000 +0100
++++ ioemu/hw/cirrus_vga.c	2007-05-03 15:07:16.000000000 +0100
+@@ -3339,6 +3339,10 @@
+     pci_conf[0x0a] = PCI_CLASS_SUB_VGA;
+     pci_conf[0x0b] = PCI_CLASS_BASE_DISPLAY;
+     pci_conf[0x0e] = PCI_CLASS_HEADERTYPE_00h;
++    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
++    pci_conf[0x2d] = 0x58;
++    pci_conf[0x2e] = 0x01; /* subsystem device */
++    pci_conf[0x2f] = 0x00;
+ 
+     /* setup VGA */
+     s = &d->cirrus_vga;
+Index: ioemu/hw/rtl8139.c
+===================================================================
+--- ioemu.orig/hw/rtl8139.c	2007-05-03 15:07:16.000000000 +0100
++++ ioemu/hw/rtl8139.c	2007-05-03 15:07:16.000000000 +0100
+@@ -3424,8 +3424,10 @@
+     pci_conf[0x0e] = 0x00; /* header_type */
+     pci_conf[0x3d] = 1;    /* interrupt pin 0 */
+     pci_conf[0x34] = 0xdc;
+-    pci_conf[0x2c] = pci_conf[0x00]; // same as Vendor ID
+-    pci_conf[0x2d] = pci_conf[0x01];
++    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
++    pci_conf[0x2d] = 0x58;
++    pci_conf[0x2e] = 0x01; /* subsystem device */
++    pci_conf[0x2f] = 0x00;
+ 
+     s = &d->rtl8139;
+ 
+Index: ioemu/hw/ide.c
+===================================================================
+--- ioemu.orig/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
+@@ -2763,6 +2763,10 @@
+     pci_conf[0x0a] = 0x01; // class_sub = PCI_IDE
+     pci_conf[0x0b] = 0x01; // class_base = PCI_mass_storage
+     pci_conf[0x0e] = 0x00; // header_type
++    pci_conf[0x2c] = 0x53; /* subsystem vendor: XenSource */
++    pci_conf[0x2d] = 0x58;
++    pci_conf[0x2e] = 0x01; /* subsystem device */
++    pci_conf[0x2f] = 0x00;
+ 
+     pci_register_io_region((PCIDevice *)d, 4, 0x10, 
+                            PCI_ADDRESS_SPACE_IO, bmdma_map);

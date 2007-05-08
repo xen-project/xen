@@ -1,7 +1,7 @@
 Index: ioemu/hw/mc146818rtc.c
 ===================================================================
---- ioemu.orig/hw/mc146818rtc.c	2006-12-20 15:21:33.000000000 +0000
-+++ ioemu/hw/mc146818rtc.c	2006-12-20 15:21:50.000000000 +0000
+--- ioemu.orig/hw/mc146818rtc.c	2007-05-03 15:38:35.000000000 +0100
++++ ioemu/hw/mc146818rtc.c	2007-05-03 15:38:45.000000000 +0100
 @@ -178,10 +178,27 @@
      }
  }
@@ -46,8 +46,8 @@ Index: ioemu/hw/mc146818rtc.c
  static void rtc_copy_date(RTCState *s)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-20 15:21:49.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-20 15:21:50.000000000 +0000
+--- ioemu.orig/hw/pc.c	2007-05-03 15:38:44.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 15:38:45.000000000 +0100
 @@ -159,7 +159,7 @@
  }
  
@@ -81,9 +81,9 @@ Index: ioemu/hw/pc.c
 -    cmos_init(ram_size, boot_device, bs_table);
 +    cmos_init(ram_size, boot_device, bs_table, timeoffset);
  
-     if (pci_enabled && usb_enabled) {
-         usb_uhci_init(pci_bus, piix3_devfn + 2);
-@@ -912,12 +913,13 @@
+     /* using PIIX4 acpi model */
+     if (pci_enabled && acpi_enabled)
+@@ -920,12 +921,13 @@
                          int snapshot, 
                          const char *kernel_filename, 
                          const char *kernel_cmdline,
@@ -99,7 +99,7 @@ Index: ioemu/hw/pc.c
  }
  
  static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
-@@ -925,12 +927,13 @@
+@@ -933,12 +935,13 @@
                          int snapshot, 
                          const char *kernel_filename, 
                          const char *kernel_cmdline,
@@ -117,9 +117,9 @@ Index: ioemu/hw/pc.c
  QEMUMachine pc_machine = {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-12-20 15:21:49.000000000 +0000
-+++ ioemu/vl.c	2006-12-20 15:21:50.000000000 +0000
-@@ -163,6 +163,8 @@
+--- ioemu.orig/vl.c	2007-05-03 15:38:45.000000000 +0100
++++ ioemu/vl.c	2007-05-03 15:38:45.000000000 +0100
+@@ -167,6 +167,8 @@
  
  int xc_handle;
  
@@ -128,41 +128,51 @@ Index: ioemu/vl.c
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -5338,6 +5340,7 @@
- #endif
-            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
- 	   "-vnc display    start a VNC server on display\n"
+@@ -5435,6 +5437,7 @@
+            "-vncviewer      start a vncviewer process for this domain\n"
+            "-vncunused      bind the VNC server to an unused port\n"
+            "-vnclisten      bind the VNC server to this address\n"
 +           "-timeoffset     time offset (in seconds) from local time\n"
+            "-acpi           disable or enable ACPI of HVM domain \n"
             "\n"
             "During emulation, the following keys are useful:\n"
-            "ctrl-alt-f      toggle full screen\n"
-@@ -5422,6 +5425,7 @@
+@@ -5522,6 +5525,7 @@
  
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
 +    QEMU_OPTION_timeoffset,
- };
- 
- typedef struct QEMUOption {
-@@ -5504,6 +5508,7 @@
+     QEMU_OPTION_acpi,
+     QEMU_OPTION_vncviewer,
+     QEMU_OPTION_vncunused,
+@@ -5613,6 +5617,7 @@
      
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
 +    { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
+     { "acpi", 0, QEMU_OPTION_acpi },
      { NULL },
  };
- 
-@@ -6232,6 +6237,9 @@
+@@ -6377,6 +6382,9 @@
                  vcpus = atoi(optarg);
                  fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                  break;
 +            case QEMU_OPTION_timeoffset:
 +                timeoffset = strtol(optarg, NULL, 0);
 +                break;
-             }
-         }
+             case QEMU_OPTION_acpi:
+                 acpi_enabled = 1;
+                 break;
+@@ -6531,6 +6539,9 @@
      }
-@@ -6484,7 +6492,8 @@
+     free(page_array);
+ #endif
++
++    timeoffset_get();
++
+ #else  /* !CONFIG_DM */
+ 
+     phys_ram_base = qemu_vmalloc(phys_ram_size);
+@@ -6662,7 +6673,8 @@
  
      machine->init(ram_size, vga_ram_size, boot_device,
                    ds, fd_filename, snapshot,
@@ -174,9 +184,9 @@ Index: ioemu/vl.c
      if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2006-12-20 15:21:49.000000000 +0000
-+++ ioemu/vl.h	2006-12-20 15:21:50.000000000 +0000
-@@ -576,7 +576,7 @@
+--- ioemu.orig/vl.h	2007-05-03 15:38:45.000000000 +0100
++++ ioemu/vl.h	2007-05-03 15:38:45.000000000 +0100
+@@ -581,7 +581,7 @@
                                   int boot_device,
               DisplayState *ds, const char **fd_filename, int snapshot,
               const char *kernel_filename, const char *kernel_cmdline,
@@ -185,3 +195,72 @@ Index: ioemu/vl.h
  
  typedef struct QEMUMachine {
      const char *name;
+@@ -1216,6 +1216,10 @@
+ int xenstore_vm_write(int domid, char *key, char *val);
+ char *xenstore_vm_read(int domid, char *key, int *len);
+ 
++/* helper2.c */
++extern long time_offset;
++void timeoffset_get(void);
++
+ void kqemu_record_dump(void);
+ 
+ extern char domain_name[];
+Index: ioemu/target-i386-dm/helper2.c
+===================================================================
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-03 15:38:44.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-03 15:38:45.000000000 +0100
+@@ -74,6 +74,8 @@
+ 
+ int xc_handle;
+ 
++long time_offset = 0;
++
+ shared_iopage_t *shared_page = NULL;
+ 
+ /* the evtchn fd for polling */
+@@ -447,6 +449,34 @@
+     req->data = tmp1;
+ }
+ 
++void timeoffset_get()
++{
++    char *p;
++
++    p = xenstore_vm_read(domid, "rtc/timeoffset", NULL);
++    if (!p)
++	return;
++
++    if (sscanf(p, "%ld", &time_offset) == 1)
++	fprintf(logfile, "Time offset set %ld\n", time_offset);
++    else
++	time_offset = 0;
++
++    xc_domain_set_time_offset(xc_handle, domid, time_offset);
++
++    free(p);
++}
++
++void cpu_ioreq_timeoffset(CPUState *env, ioreq_t *req)
++{
++    char b[64];
++
++    time_offset += (ulong)req->data;
++
++    sprintf(b, "%ld", time_offset);
++    xenstore_vm_write(domid, "rtc/timeoffset", b);
++}
++
+ void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
+ {
+     unsigned long tmp1;
+@@ -497,6 +527,9 @@
+         case IOREQ_TYPE_XCHG:
+             cpu_ioreq_xchg(env, req);
+             break;
++	case IOREQ_TYPE_TIMEOFFSET:
++            cpu_ioreq_timeoffset(env, req);
++            break;
+         default:
+             hw_error("Invalid ioreq type 0x%x\n", req->type);
+         }
