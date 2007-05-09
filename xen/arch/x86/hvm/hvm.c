@@ -778,14 +778,16 @@ static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
 
 #endif /* defined(__x86_64__) */
 
-int hvm_do_hypercall(struct cpu_user_regs *pregs)
+int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
     int flush, preempted;
     unsigned long old_eip;
 
-    if ( unlikely(ring_3(pregs)) )
+    hvm_store_cpu_guest_regs(current, regs, NULL);
+
+    if ( unlikely(ring_3(regs)) )
     {
-        pregs->eax = -EPERM;
+        regs->eax = -EPERM;
         return 0;
     }
 
@@ -794,16 +796,18 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs)
      * For now we also need to flush when pages are added, as qemu-dm is not
      * yet capable of faulting pages into an existing valid mapcache bucket.
      */
-    flush = ((uint32_t)pregs->eax == __HYPERVISOR_memory_op);
+    flush = ((uint32_t)regs->eax == __HYPERVISOR_memory_op);
 
     /* Check for preemption: RIP will be modified from this dummy value. */
-    old_eip = pregs->eip;
-    pregs->eip = 0xF0F0F0FF;
+    old_eip = regs->eip;
+    regs->eip = 0xF0F0F0FF;
 
-    __hvm_do_hypercall(pregs);
+    __hvm_do_hypercall(regs);
 
-    preempted = (pregs->eip != 0xF0F0F0FF);
-    pregs->eip = old_eip;
+    preempted = (regs->eip != 0xF0F0F0FF);
+    regs->eip = old_eip;
+
+    hvm_load_cpu_guest_regs(current, regs);
 
     return (preempted ? HVM_HCALL_preempted :
             flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
