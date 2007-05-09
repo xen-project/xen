@@ -15,8 +15,8 @@ Signed-off-by: Stefan Berger <stefanb@us.ibm.com>
 
 Index: ioemu/xenstore.c
 ===================================================================
---- ioemu.orig/xenstore.c	2007-05-03 15:21:22.000000000 +0100
-+++ ioemu/xenstore.c	2007-05-03 15:22:05.000000000 +0100
+--- ioemu.orig/xenstore.c	2007-05-03 20:38:49.000000000 +0100
++++ ioemu/xenstore.c	2007-05-03 20:38:53.000000000 +0100
 @@ -304,6 +304,143 @@
      return rc;
  }
@@ -163,9 +163,9 @@ Index: ioemu/xenstore.c
      char *buf = NULL, *path = NULL, *value = NULL;
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 15:21:09.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 15:21:47.000000000 +0100
-@@ -1217,6 +1217,24 @@
+--- ioemu.orig/vl.h	2007-05-03 20:38:49.000000000 +0100
++++ ioemu/vl.h	2007-05-03 20:38:53.000000000 +0100
+@@ -1436,6 +1436,24 @@
  void xenstore_write_vncport(int vnc_display);
  int xenstore_read_vncpasswd(int domid);
  

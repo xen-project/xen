@@ -3122,6 +3122,8 @@ static void rtl8139_save(QEMUFile* f,void* opaque)
     RTL8139State* s=(RTL8139State*)opaque;
     int i;
 
+    pci_device_save(s->pci_dev, f);
+
     qemu_put_buffer(f, s->phys, 6);
     qemu_put_buffer(f, s->mult, 8);
 
@@ -3203,11 +3205,17 @@ static void rtl8139_save(QEMUFile* f,void* opaque)
 static int rtl8139_load(QEMUFile* f,void* opaque,int version_id)
 {
     RTL8139State* s=(RTL8139State*)opaque;
-    int i;
+    int i, ret;
 
     /* just 2 versions for now */
-    if (version_id > 2)
+    if (version_id > 3)
             return -EINVAL;
+
+    if (version_id >= 3) {
+        ret = pci_device_load(s->pci_dev, f);
+        if (ret < 0)
+            return ret;
+    }
 
     /* saved since version 1 */
     qemu_get_buffer(f, s->phys, 6);
@@ -3401,7 +3409,7 @@ static void rtl8139_timer(void *opaque)
 }
 #endif /* RTL8139_ONBOARD_TIMER */
 
-void pci_rtl8139_init(PCIBus *bus, NICInfo *nd)
+void pci_rtl8139_init(PCIBus *bus, NICInfo *nd, int devfn)
 {
     PCIRTL8139State *d;
     RTL8139State *s;
@@ -3410,7 +3418,7 @@ void pci_rtl8139_init(PCIBus *bus, NICInfo *nd)
     
     d = (PCIRTL8139State *)pci_register_device(bus,
                                               "RTL8139", sizeof(PCIRTL8139State),
-                                              -1, 
+                                              devfn, 
                                               NULL, NULL);
     pci_conf = d->dev.config;
     pci_conf[0x00] = 0xec; /* Realtek 8139 */
@@ -3462,9 +3470,7 @@ void pci_rtl8139_init(PCIBus *bus, NICInfo *nd)
     s->cplus_txbuffer_offset = 0;
              
     instance = pci_bus_num(bus) << 8 | s->pci_dev->devfn;
-    register_savevm("rtl8139", instance, 2, rtl8139_save, rtl8139_load, s);
-    register_savevm("rtl8139_pci", instance, 1, generic_pci_save, 
-                    generic_pci_load, &d->dev);
+    register_savevm("rtl8139", instance, 3, rtl8139_save, rtl8139_load, s);
 
 #if RTL8139_ONBOARD_TIMER
     s->timer = qemu_new_timer(vm_clock, rtl8139_timer, s);

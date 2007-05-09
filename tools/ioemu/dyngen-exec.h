@@ -62,6 +62,9 @@ typedef signed long long int64_t;
 #endif
 #endif
 
+/* XXX: This may be wrong for 64-bit ILP32 hosts.  */
+typedef void * host_reg_t;
+
 #define INT8_MIN		(-128)
 #define INT16_MIN		(-32767-1)
 #define INT32_MIN		(-2147483647-1)
@@ -188,7 +191,7 @@ extern int printf(const char *, ...);
 #endif
 
 /* force GCC to generate only one epilog at the end of the function */
-#define FORCE_RET() asm volatile ("");
+#define FORCE_RET() __asm__ __volatile__("" : : : "memory");
 
 #ifndef OPPROTO
 #define OPPROTO

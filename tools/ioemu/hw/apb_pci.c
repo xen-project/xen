@@ -21,6 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+/* XXX This file and most of its contests are somewhat misnamed.  The
+   Ultrasparc PCI host is called the PCI Bus Module (PBM).  The APB is
+   the secondary PCI bridge.  */
+
 #include "vl.h"
 typedef target_phys_addr_t pci_addr_t;
 #include "pci_host.h"
@@ -179,10 +184,26 @@ static CPUReadMemoryFunc *pci_apb_ioread[] = {
     &pci_apb_ioreadl,
 };
 
-/* ??? This is probably wrong.  */
-static void pci_apb_set_irq(PCIDevice *d, void *pic, int irq_num, int level)
+/* The APB host has an IRQ line for each IRQ line of each slot.  */
+static int pci_apb_map_irq(PCIDevice *pci_dev, int irq_num)
 {
-    pic_set_irq_new(pic, d->config[PCI_INTERRUPT_LINE], level);
+    return ((pci_dev->devfn & 0x18) >> 1) + irq_num;
+}
+
+static int pci_pbm_map_irq(PCIDevice *pci_dev, int irq_num)
+{
+    int bus_offset;
+    if (pci_dev->devfn & 1)
+        bus_offset = 16;
+    else
+        bus_offset = 0;
+    return bus_offset + irq_num;
+}
+
+static void pci_apb_set_irq(void *pic, int irq_num, int level)
+{
+    /* PCI IRQ map onto the first 32 INO.  */
+    pic_set_irq_new(pic, irq_num, level);
 }
 
 PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base,
@@ -191,10 +212,12 @@ PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base,
     APBState *s;
     PCIDevice *d;
     int pci_mem_config, pci_mem_data, apb_config, pci_ioport;
+    PCIDevice *apb;
+    PCIBus *secondary;
 
     s = qemu_mallocz(sizeof(APBState));
-    /* Ultrasparc APB main bus */
-    s->bus = pci_register_bus(pci_apb_set_irq, pic, 0);
+    /* Ultrasparc PBM main bus */
+    s->bus = pci_register_bus(pci_apb_set_irq, pci_pbm_map_irq, pic, 0, 32);
 
     pci_mem_config = cpu_register_io_memory(0, pci_apb_config_read,
                                             pci_apb_config_write, s);
@@ -211,7 +234,7 @@ PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base,
     cpu_register_physical_memory(mem_base, 0x10000000, pci_mem_data); // XXX size should be 4G-prom
 
     d = pci_register_device(s->bus, "Advanced PCI Bus", sizeof(PCIDevice), 
-                            -1, NULL, NULL);
+                            0, NULL, NULL);
     d->config[0x00] = 0x8e; // vendor_id : Sun
     d->config[0x01] = 0x10;
     d->config[0x02] = 0x00; // device_id
@@ -226,7 +249,11 @@ PCIBus *pci_apb_init(target_ulong special_base, target_ulong mem_base,
     d->config[0x0B] = 0x06; // class_base = PCI_bridge
     d->config[0x0D] = 0x10; // latency_timer
     d->config[0x0E] = 0x00; // header_type
-    return s->bus;
+
+    /* APB secondary busses */
+    secondary = pci_bridge_init(s->bus, 8, 0x108e5000, pci_apb_map_irq, "Advanced PCI Bus secondary bridge 1");
+    pci_bridge_init(s->bus, 9, 0x108e5000, pci_apb_map_irq, "Advanced PCI Bus secondary bridge 2");
+    return secondary;
 }
 
 

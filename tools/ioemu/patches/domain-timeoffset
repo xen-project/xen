@@ -1,7 +1,7 @@
 Index: ioemu/hw/mc146818rtc.c
 ===================================================================
---- ioemu.orig/hw/mc146818rtc.c	2007-05-03 15:38:35.000000000 +0100
-+++ ioemu/hw/mc146818rtc.c	2007-05-03 15:38:45.000000000 +0100
+--- ioemu.orig/hw/mc146818rtc.c	2007-05-09 14:12:16.000000000 +0100
++++ ioemu/hw/mc146818rtc.c	2007-05-09 14:12:43.000000000 +0100
 @@ -178,10 +178,27 @@
      }
  }
@@ -44,11 +44,19 @@ Index: ioemu/hw/mc146818rtc.c
  }
  
  static void rtc_copy_date(RTCState *s)
+@@ -392,6 +415,7 @@
+ 
+     /* set the CMOS date */
+     time(&ti);
++    ti += timeoffset;
+     if (rtc_utc)
+         tm = gmtime(&ti);
+     else
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-03 15:38:44.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-03 15:38:45.000000000 +0100
-@@ -159,7 +159,7 @@
+--- ioemu.orig/hw/pc.c	2007-05-09 14:12:16.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-09 14:12:43.000000000 +0100
+@@ -160,7 +160,7 @@
  }
  
  /* hd_table must contain 4 block drivers */
@@ -57,15 +65,7 @@ Index: ioemu/hw/pc.c
  {
      RTCState *s = rtc_state;
      int val;
-@@ -170,6 +170,7 @@
- 
-     /* set the CMOS date */
-     time(&ti);
-+    ti += timeoffset;
-     if (rtc_utc)
-         tm = gmtime(&ti);
-     else
-@@ -619,7 +620,7 @@
+@@ -454,7 +454,7 @@
  static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
                       DisplayState *ds, const char **fd_filename, int snapshot,
                       const char *kernel_filename, const char *kernel_cmdline,
@@ -74,7 +74,7 @@ Index: ioemu/hw/pc.c
                       int pci_enabled)
  {
  #ifndef NOBIOS
-@@ -871,7 +872,7 @@
+@@ -725,7 +725,7 @@
  
      floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
  
@@ -83,7 +83,7 @@ Index: ioemu/hw/pc.c
  
      /* using PIIX4 acpi model */
      if (pci_enabled && acpi_enabled)
-@@ -920,12 +921,13 @@
+@@ -774,12 +774,13 @@
                          int snapshot, 
                          const char *kernel_filename, 
                          const char *kernel_cmdline,
@@ -99,7 +99,7 @@ Index: ioemu/hw/pc.c
  }
  
  static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
-@@ -933,12 +935,13 @@
+@@ -787,12 +788,13 @@
                          int snapshot, 
                          const char *kernel_filename, 
                          const char *kernel_cmdline,
@@ -117,9 +117,9 @@ Index: ioemu/hw/pc.c
  QEMUMachine pc_machine = {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 15:38:45.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 15:38:45.000000000 +0100
-@@ -167,6 +167,8 @@
+--- ioemu.orig/vl.c	2007-05-09 14:12:43.000000000 +0100
++++ ioemu/vl.c	2007-05-09 14:12:43.000000000 +0100
+@@ -184,6 +184,8 @@
  
  int xc_handle;
  
@@ -128,23 +128,23 @@ Index: ioemu/vl.c
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
  
-@@ -5435,6 +5437,7 @@
+@@ -6329,6 +6331,7 @@
             "-vncviewer      start a vncviewer process for this domain\n"
             "-vncunused      bind the VNC server to an unused port\n"
             "-vnclisten      bind the VNC server to this address\n"
 +           "-timeoffset     time offset (in seconds) from local time\n"
-            "-acpi           disable or enable ACPI of HVM domain \n"
-            "\n"
-            "During emulation, the following keys are useful:\n"
-@@ -5522,6 +5525,7 @@
- 
+ #ifndef _WIN32
+ 	   "-daemonize      daemonize QEMU after initializing\n"
+ #endif
+@@ -6425,6 +6428,7 @@
+     ,
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
 +    QEMU_OPTION_timeoffset,
      QEMU_OPTION_acpi,
      QEMU_OPTION_vncviewer,
      QEMU_OPTION_vncunused,
-@@ -5613,6 +5617,7 @@
+@@ -6526,6 +6530,7 @@
      
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
@@ -152,7 +152,7 @@ Index: ioemu/vl.c
      { "acpi", 0, QEMU_OPTION_acpi },
      { NULL },
  };
-@@ -6377,6 +6382,9 @@
+@@ -7313,6 +7318,9 @@
                  vcpus = atoi(optarg);
                  fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                  break;
@@ -162,7 +162,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_acpi:
                  acpi_enabled = 1;
                  break;
-@@ -6531,6 +6539,9 @@
+@@ -7545,6 +7553,9 @@
      }
      free(page_array);
  #endif
@@ -172,7 +172,7 @@ Index: ioemu/vl.c
  #else  /* !CONFIG_DM */
  
      phys_ram_base = qemu_vmalloc(phys_ram_size);
-@@ -6662,7 +6673,8 @@
+@@ -7681,7 +7692,8 @@
  
      machine->init(ram_size, vga_ram_size, boot_device,
                    ds, fd_filename, snapshot,
@@ -184,9 +184,9 @@ Index: ioemu/vl.c
      if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 15:38:45.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 15:38:45.000000000 +0100
-@@ -581,7 +581,7 @@
+--- ioemu.orig/vl.h	2007-05-09 14:12:43.000000000 +0100
++++ ioemu/vl.h	2007-05-09 14:12:43.000000000 +0100
+@@ -708,7 +708,7 @@
                                   int boot_device,
               DisplayState *ds, const char **fd_filename, int snapshot,
               const char *kernel_filename, const char *kernel_cmdline,
@@ -195,7 +195,7 @@ Index: ioemu/vl.h
  
  typedef struct QEMUMachine {
      const char *name;
-@@ -1216,6 +1216,10 @@
+@@ -1435,6 +1435,10 @@
  int xenstore_vm_write(int domid, char *key, char *val);
  char *xenstore_vm_read(int domid, char *key, int *len);
  
@@ -208,8 +208,8 @@ Index: ioemu/vl.h
  extern char domain_name[];
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2007-05-03 15:38:44.000000000 +0100
-+++ ioemu/target-i386-dm/helper2.c	2007-05-03 15:38:45.000000000 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-09 14:12:16.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-09 14:12:43.000000000 +0100
 @@ -74,6 +74,8 @@
  
  int xc_handle;

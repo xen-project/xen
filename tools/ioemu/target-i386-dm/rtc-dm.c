@@ -24,12 +24,17 @@
 
 #include "vl.h"
 
-//#define DEBUG_CMOS
+// #define DEBUG_CMOS
 
 struct RTCState {
     uint8_t cmos_data[128];
     uint8_t cmos_index;
 };
+
+static inline int to_bcd(RTCState *s, int a)
+{
+    return ((a / 10) << 4) | (a % 10);
+}
 
 void rtc_set_memory(RTCState *s, int addr, int val)
 {
@@ -92,10 +97,22 @@ static int rtc_load(QEMUFile *f, void *opaque, int version_id)
 RTCState *rtc_init(int base, int irq)
 {
     RTCState *s;
+    time_t ti;
+    struct tm *tm;
+    int val;
 
     s = qemu_mallocz(sizeof(RTCState));
     if (!s)
         return NULL;
+
+/* PC cmos mappings */
+#define REG_IBM_CENTURY_BYTE        0x32
+#define REG_IBM_PS2_CENTURY_BYTE    0x37
+    time(&ti);
+    tm = gmtime(&ti);		/* XXX localtime and update from guest? */
+    val = to_bcd(s, (tm->tm_year / 100) + 19);
+    rtc_set_memory(s, REG_IBM_CENTURY_BYTE, val);
+    rtc_set_memory(s, REG_IBM_PS2_CENTURY_BYTE, val);
 
     register_ioport_write(base, 2, 1, cmos_ioport_write, s);
     register_ioport_read(base, 2, 1, cmos_ioport_read, s);

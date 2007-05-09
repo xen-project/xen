@@ -1,8 +1,8 @@
 Index: ioemu/hw/cirrus_vga.c
 ===================================================================
---- ioemu.orig/hw/cirrus_vga.c	2007-05-03 15:06:41.000000000 +0100
-+++ ioemu/hw/cirrus_vga.c	2007-05-03 15:07:16.000000000 +0100
-@@ -3339,6 +3339,10 @@
+--- ioemu.orig/hw/cirrus_vga.c	2007-05-03 19:16:30.000000000 +0100
++++ ioemu/hw/cirrus_vga.c	2007-05-03 20:36:50.000000000 +0100
+@@ -3354,6 +3354,10 @@
      pci_conf[0x0a] = PCI_CLASS_SUB_VGA;
      pci_conf[0x0b] = PCI_CLASS_BASE_DISPLAY;
      pci_conf[0x0e] = PCI_CLASS_HEADERTYPE_00h;
@@ -15,9 +15,9 @@ Index: ioemu/hw/cirrus_vga.c
      s = &d->cirrus_vga;
 Index: ioemu/hw/rtl8139.c
 ===================================================================
---- ioemu.orig/hw/rtl8139.c	2007-05-03 15:07:16.000000000 +0100
-+++ ioemu/hw/rtl8139.c	2007-05-03 15:07:16.000000000 +0100
-@@ -3424,8 +3424,10 @@
+--- ioemu.orig/hw/rtl8139.c	2007-05-03 20:36:46.000000000 +0100
++++ ioemu/hw/rtl8139.c	2007-05-03 20:36:50.000000000 +0100
+@@ -3432,8 +3432,10 @@
      pci_conf[0x0e] = 0x00; /* header_type */
      pci_conf[0x3d] = 1;    /* interrupt pin 0 */
      pci_conf[0x34] = 0xdc;
@@ -32,9 +32,9 @@ Index: ioemu/hw/rtl8139.c
  
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
-+++ ioemu/hw/ide.c	2007-05-03 15:07:16.000000000 +0100
-@@ -2763,6 +2763,10 @@
+--- ioemu.orig/hw/ide.c	2007-05-03 20:35:19.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-03 20:36:50.000000000 +0100
+@@ -2747,6 +2747,10 @@
      pci_conf[0x0a] = 0x01; // class_sub = PCI_IDE
      pci_conf[0x0b] = 0x01; // class_base = PCI_mass_storage
      pci_conf[0x0e] = 0x00; // header_type
@@ -43,5 +43,5 @@ Index: ioemu/hw/ide.c
 +    pci_conf[0x2e] = 0x01; /* subsystem device */
 +    pci_conf[0x2f] = 0x00;
  
-     pci_register_io_region((PCIDevice *)d, 4, 0x10, 
-                            PCI_ADDRESS_SPACE_IO, bmdma_map);
+     piix3_reset(d);
+ 

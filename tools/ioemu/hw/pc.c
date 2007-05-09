@@ -44,6 +44,7 @@ static PITState *pit;
 #ifndef CONFIG_DM
 static IOAPICState *ioapic;
 #endif /* !CONFIG_DM */
+static PCIDevice *i440fx_state;
 
 static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
 {
@@ -78,6 +79,14 @@ uint64_t cpu_get_tsc(CPUX86State *env)
 }
 
 #ifndef CONFIG_DM
+/* SMM support */
+void cpu_smm_update(CPUState *env)
+{
+    if (i440fx_state && env == first_cpu)
+        i440fx_set_smm(i440fx_state, (env->hflags >> HF_SMM_SHIFT) & 1);
+}
+
+
 /* IRQ handling */
 int cpu_get_pic_interrupt(CPUState *env)
 {
@@ -108,14 +117,6 @@ static void pic_irq_request(void *opaque, int level)
 /* PC cmos mappings */
 
 #define REG_EQUIPMENT_BYTE          0x14
-#define REG_IBM_CENTURY_BYTE        0x32
-#define REG_IBM_PS2_CENTURY_BYTE    0x37
-
-
-static inline int to_bcd(RTCState *s, int a)
-{
-    return ((a / 10) << 4) | (a % 10);
-}
 
 static int cmos_get_fd_drive_type(int fd0)
 {
@@ -181,22 +182,7 @@ static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **h
     RTCState *s = rtc_state;
     int val;
     int fd0, fd1, nb;
-    time_t ti;
-    struct tm *tm;
     int i;
-
-    /* set the CMOS date */
-    time(&ti);
-    ti += timeoffset;
-    if (rtc_utc)
-        tm = gmtime(&ti);
-    else
-        tm = localtime(&ti);
-    rtc_set_date(s, tm);
-
-    val = to_bcd(s, (tm->tm_year / 100) + 19);
-    rtc_set_memory(s, REG_IBM_CENTURY_BYTE, val);
-    rtc_set_memory(s, REG_IBM_PS2_CENTURY_BYTE, val);
 
     /* various important CMOS locations needed by PC/Bochs bios */
 
@@ -415,158 +401,6 @@ static void main_cpu_reset(void *opaque)
     cpu_reset(env);
 }
 
-/*************************************************/
-
-#ifndef CONFIG_DM
-static void putb(uint8_t **pp, int val)
-{
-    uint8_t *q;
-    q = *pp;
-    *q++ = val;
-    *pp = q;
-}
-
-static void putstr(uint8_t **pp, const char *str)
-{
-    uint8_t *q;
-    q = *pp;
-    while (*str)
-        *q++ = *str++;
-    *pp = q;
-}
-
-static void putle16(uint8_t **pp, int val)
-{
-    uint8_t *q;
-    q = *pp;
-    *q++ = val;
-    *q++ = val >> 8;
-    *pp = q;
-}
-
-static void putle32(uint8_t **pp, int val)
-{
-    uint8_t *q;
-    q = *pp;
-    *q++ = val;
-    *q++ = val >> 8;
-    *q++ = val >> 16;
-    *q++ = val >> 24;
-    *pp = q;
-}
-
-static int mpf_checksum(const uint8_t *data, int len)
-{
-    int sum, i;
-    sum = 0;
-    for(i = 0; i < len; i++)
-        sum += data[i];
-    return sum & 0xff;
-}
-
-/* Build the Multi Processor table in the BIOS. Same values as Bochs. */
-static void bios_add_mptable(uint8_t *bios_data)
-{
-    uint8_t *mp_config_table, *q, *float_pointer_struct;
-    int ioapic_id, offset, i, len;
-    
-    if (smp_cpus <= 1)
-        return;
-
-    mp_config_table = bios_data + 0xb000;
-    q = mp_config_table;
-    putstr(&q, "PCMP"); /* "PCMP signature */
-    putle16(&q, 0); /* table length (patched later) */
-    putb(&q, 4); /* spec rev */
-    putb(&q, 0); /* checksum (patched later) */
-    putstr(&q, "QEMUCPU "); /* OEM id */
-    putstr(&q, "0.1         "); /* vendor id */
-    putle32(&q, 0); /* OEM table ptr */
-    putle16(&q, 0); /* OEM table size */
-    putle16(&q, 20); /* entry count */
-    putle32(&q, 0xfee00000); /* local APIC addr */
-    putle16(&q, 0); /* ext table length */
-    putb(&q, 0); /* ext table checksum */
-    putb(&q, 0); /* reserved */
-    
-    for(i = 0; i < smp_cpus; i++) {
-        putb(&q, 0); /* entry type = processor */
-        putb(&q, i); /* APIC id */
-        putb(&q, 0x11); /* local APIC version number */
-        if (i == 0)
-            putb(&q, 3); /* cpu flags: enabled, bootstrap cpu */
-        else
-            putb(&q, 1); /* cpu flags: enabled */
-        putb(&q, 0); /* cpu signature */
-        putb(&q, 6);
-        putb(&q, 0);
-        putb(&q, 0);
-        putle16(&q, 0x201); /* feature flags */
-        putle16(&q, 0);
-
-        putle16(&q, 0); /* reserved */
-        putle16(&q, 0);
-        putle16(&q, 0);
-        putle16(&q, 0);
-    }
-
-    /* isa bus */
-    putb(&q, 1); /* entry type = bus */
-    putb(&q, 0); /* bus ID */
-    putstr(&q, "ISA   ");
-    
-    /* ioapic */
-    ioapic_id = smp_cpus;
-    putb(&q, 2); /* entry type = I/O APIC */
-    putb(&q, ioapic_id); /* apic ID */
-    putb(&q, 0x11); /* I/O APIC version number */
-    putb(&q, 1); /* enable */
-    putle32(&q, 0xfec00000); /* I/O APIC addr */
-
-    /* irqs */
-    for(i = 0; i < 16; i++) {
-        putb(&q, 3); /* entry type = I/O interrupt */
-        putb(&q, 0); /* interrupt type = vectored interrupt */
-        putb(&q, 0); /* flags: po=0, el=0 */
-        putb(&q, 0);
-        putb(&q, 0); /* source bus ID = ISA */
-        putb(&q, i); /* source bus IRQ */
-        putb(&q, ioapic_id); /* dest I/O APIC ID */
-        putb(&q, i); /* dest I/O APIC interrupt in */
-    }
-    /* patch length */
-    len = q - mp_config_table;
-    mp_config_table[4] = len;
-    mp_config_table[5] = len >> 8;
-
-    mp_config_table[7] = -mpf_checksum(mp_config_table, q - mp_config_table);
-
-    /* align to 16 */
-    offset = q - bios_data;
-    offset = (offset + 15) & ~15;
-    float_pointer_struct = bios_data + offset;
-    
-    /* floating pointer structure */
-    q = float_pointer_struct;
-    putstr(&q, "_MP_");
-    /* pointer to MP config table */
-    putle32(&q, mp_config_table - bios_data + 0x000f0000); 
-
-    putb(&q, 1); /* length in 16 byte units */
-    putb(&q, 4); /* MP spec revision */
-    putb(&q, 0); /* checksum (patched later) */
-    putb(&q, 0); /* MP feature byte 1 */
-
-    putb(&q, 0);
-    putb(&q, 0);
-    putb(&q, 0);
-    putb(&q, 0);
-    float_pointer_struct[10] = 
-        -mpf_checksum(float_pointer_struct, q - float_pointer_struct);
-}
-#endif /* !CONFIG_DM */
-
-
 static const int ide_iobase[2] = { 0x1f0, 0x170 };
 static const int ide_iobase2[2] = { 0x3f6, 0x376 };
 static const int ide_irq[2] = { 14, 15 };
@@ -636,10 +470,10 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 #ifndef NOBIOS
     char buf[1024];
     int ret, initrd_size;
-#endif
+#endif /* !NOBIOS */
     int linux_boot, i;
 #ifndef NOBIOS
-    unsigned long bios_offset, vga_bios_offset;
+    unsigned long bios_offset, vga_bios_offset, option_rom_offset;
     int bios_size, isa_bios_size;
 #endif /* !NOBIOS */
     PCIBus *pci_bus;
@@ -660,7 +494,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
             env->cpuid_features |= CPUID_APIC;
         }
 #endif /* !CONFIG_DM */
-        register_savevm("cpu", i, 3, cpu_save, cpu_load, env);
+        register_savevm("cpu", i, 4, cpu_save, cpu_load, env);
         qemu_register_reset(main_cpu_reset, env);
 #ifndef CONFIG_DM
         if (pci_enabled) {
@@ -692,9 +526,6 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
         fprintf(stderr, "qemu: could not load PC bios '%s'\n", buf);
         exit(1);
     }
-    if (bios_size == 65536) {
-        bios_add_mptable(phys_ram_base + bios_offset);
-    }
 
     /* VGA BIOS load */
     if (cirrus_vga_enabled) {
@@ -721,6 +552,23 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     cpu_register_physical_memory(0x100000 - isa_bios_size, 
                                  isa_bios_size, 
                                  (bios_offset + bios_size - isa_bios_size) | IO_MEM_ROM);
+
+    option_rom_offset = 0;
+    for (i = 0; i < nb_option_roms; i++) {
+	int offset = bios_offset + bios_size + option_rom_offset;
+	int size;
+
+	size = load_image(option_rom[i], phys_ram_base + offset);
+	if ((size + option_rom_offset) > 0x10000) {
+	    fprintf(stderr, "Too many option ROMS\n");
+	    exit(1);
+	}
+	cpu_register_physical_memory(0xd0000 + option_rom_offset,
+				     size, offset | IO_MEM_ROM);
+	option_rom_offset += size + 2047;
+	option_rom_offset -= (option_rom_offset % 2048);
+    }
+
     /* map all the bios at the top of memory */
     cpu_register_physical_memory((uint32_t)(-bios_size), 
                                  bios_size, bios_offset | IO_MEM_ROM);
@@ -787,8 +635,8 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 #endif /* !CONFIG_DM */
 
     if (pci_enabled) {
-        pci_bus = i440fx_init();
-        piix3_devfn = piix3_init(pci_bus);
+        pci_bus = i440fx_init(&i440fx_state);
+        piix3_devfn = piix3_init(pci_bus, -1);
     } else {
         pci_bus = NULL;
     }
@@ -801,15 +649,20 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
     if (cirrus_vga_enabled) {
         if (pci_enabled) {
             pci_cirrus_vga_init(pci_bus, 
-                                ds, NULL, ram_size,
+                                ds, NULL, ram_size, 
                                 vga_ram_size);
         } else {
-            isa_cirrus_vga_init(ds, NULL, ram_size,
+            isa_cirrus_vga_init(ds, NULL, ram_size, 
                                 vga_ram_size);
         }
     } else {
-        vga_initialize(pci_bus, ds, NULL, ram_size,
-                       vga_ram_size, 0, 0);
+        if (pci_enabled) {
+            pci_vga_init(pci_bus, ds, NULL, ram_size, 
+                         vga_ram_size, 0, 0);
+        } else {
+            isa_vga_init(ds, NULL, ram_size, 
+                         vga_ram_size);
+        }
     }
 
     rtc_state = rtc_init(0x70, 8);
@@ -861,7 +714,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
         if (strcmp(nd->model, "ne2k_isa") == 0) {
             pc_init_ne2k_isa(nd);
         } else if (pci_enabled) {
-            pci_nic_init(pci_bus, nd);
+            pci_nic_init(pci_bus, nd, -1);
         } else {
             fprintf(stderr, "qemu: Unsupported NIC: %s\n", nd->model);
             exit(1);
@@ -900,9 +753,18 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 
 #ifndef CONFIG_DM
     if (pci_enabled && acpi_enabled) {
+        uint8_t *eeprom_buf = qemu_mallocz(8 * 256); /* XXX: make this persistent */
         piix4_pm_init(pci_bus, piix3_devfn + 3);
+        for (i = 0; i < 8; i++) {
+            SMBusDevice *eeprom = smbus_eeprom_device_init(0x50 + i,
+                eeprom_buf + (i * 256));
+            piix4_smbus_register_device(eeprom, 0x50 + i);
+        }
     }
-
+    
+    if (i440fx_state) {
+        i440fx_init_memory_mappings(i440fx_state);
+    }
 #if 0
     /* ??? Need to figure out some way for the user to
        specify SCSI devices.  */
@@ -932,15 +794,6 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
         }
     }
 #endif /* !CONFIG_DM */
-    /* must be done after all PCI devices are instanciated */
-    /* XXX: should be done in the Bochs BIOS */
-    if (pci_enabled) {
-        pci_bios_init();
-#ifndef CONFIG_DM
-        if (acpi_enabled)
-            acpi_bios_init();
-#endif /* !CONFIG_DM */
-    }
 }
 
 static void pc_init_pci(uint64_t ram_size, int vga_ram_size, char *boot_device,

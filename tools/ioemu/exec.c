@@ -41,6 +41,7 @@
 //#define DEBUG_TB_INVALIDATE
 //#define DEBUG_FLUSH
 //#define DEBUG_TLB
+//#define DEBUG_UNASSIGNED
 
 /* make various TB consistency checks */
 //#define DEBUG_TB_CHECK 
@@ -1288,14 +1289,13 @@ void tlb_flush_page(CPUState *env, target_ulong addr)
     tlb_flush_entry(&env->tlb_table[0][i], addr);
     tlb_flush_entry(&env->tlb_table[1][i], addr);
 
-    for(i = 0; i < TB_JMP_CACHE_SIZE; i++) {
-        tb = env->tb_jmp_cache[i];
-        if (tb && 
-            ((tb->pc & TARGET_PAGE_MASK) == addr ||
-             ((tb->pc + tb->size - 1) & TARGET_PAGE_MASK) == addr)) {
-            env->tb_jmp_cache[i] = NULL;
-        }
-    }
+    /* Discard jump cache entries for any tb which might potentially
+       overlap the flushed page.  */
+    i = tb_jmp_cache_hash_page(addr - TARGET_PAGE_SIZE);
+    memset (&env->tb_jmp_cache[i], 0, TB_JMP_PAGE_SIZE * sizeof(tb));
+
+    i = tb_jmp_cache_hash_page(addr);
+    memset (&env->tb_jmp_cache[i], 0, TB_JMP_PAGE_SIZE * sizeof(tb));
 
 #if !defined(CONFIG_SOFTMMU)
     if (addr < MMAP_AREA_END)
@@ -1801,13 +1801,30 @@ void cpu_register_physical_memory(target_phys_addr_t start_addr,
     }
 }
 
+/* XXX: temporary until new memory mapping API */
+uint32_t cpu_get_physical_page_desc(target_phys_addr_t addr)
+{
+    PhysPageDesc *p;
+
+    p = phys_page_find(addr >> TARGET_PAGE_BITS);
+    if (!p)
+        return IO_MEM_UNASSIGNED;
+    return p->phys_offset;
+}
+
 static uint32_t unassigned_mem_readb(void *opaque, target_phys_addr_t addr)
 {
+#ifdef DEBUG_UNASSIGNED
+    printf("Unassigned mem read  0x%08x\n", (int)addr);
+#endif
     return 0;
 }
 
 static void unassigned_mem_writeb(void *opaque, target_phys_addr_t addr, uint32_t val)
 {
+#ifdef DEBUG_UNASSIGNED
+    printf("Unassigned mem write 0x%08x = 0x%x\n", (int)addr, val);
+#endif
 }
 
 static CPUReadMemoryFunc *unassigned_mem_read[3] = {

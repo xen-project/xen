@@ -56,6 +56,7 @@ typedef struct term_cmd_t {
 } term_cmd_t;
 
 static CharDriverState *monitor_hd;
+static int hide_banner;
 
 static term_cmd_t term_cmds[];
 static term_cmd_t info_cmds[];
@@ -111,6 +112,33 @@ void term_printf(const char *fmt, ...)
     va_start(ap, fmt);
     term_vprintf(fmt, ap);
     va_end(ap);
+}
+
+void term_print_filename(const char *filename)
+{
+    int i;
+
+    for (i = 0; filename[i]; i++) {
+	switch (filename[i]) {
+	case ' ':
+	case '"':
+	case '\\':
+	    term_printf("\\%c", filename[i]);
+	    break;
+	case '\t':
+	    term_printf("\\t");
+	    break;
+	case '\r':
+	    term_printf("\\r");
+	    break;
+	case '\n':
+	    term_printf("\\n");
+	    break;
+	default:
+	    term_printf("%c", filename[i]);
+	    break;
+	}
+    }
 }
 
 #ifndef CONFIG_DM
@@ -176,13 +204,16 @@ static void do_help(const char *name)
     help_cmd(name);
 }
 
-static void do_commit(void)
+static void do_commit(const char *device)
 {
-    int i;
-
+    int i, all_devices;
+    
+    all_devices = !strcmp(device, "all");
     for (i = 0; i < MAX_DISKS + MAX_SCSI_DISKS; i++) {
         if (bs_table[i]) {
-            bdrv_commit(bs_table[i]);
+            if (all_devices || 
+                !strcmp(bdrv_get_device_name(bs_table[i]), device))
+                bdrv_commit(bs_table[i]);
         }
     }
 }
@@ -390,18 +421,6 @@ static void do_log(const char *items)
 }
 
 #ifndef CONFIG_DM
-static void do_savevm(const char *filename)
-{
-    if (qemu_savevm(filename) < 0)
-        term_printf("I/O error when saving VM to '%s'\n", filename);
-}
-
-static void do_loadvm(const char *filename)
-{
-    if (qemu_loadvm(filename) < 0) 
-        term_printf("I/O error when loading VM from '%s'\n", filename);
-}
-
 static void do_stop(void)
 {
     vm_stop(EXCP_INTERRUPT);
@@ -417,7 +436,7 @@ static void do_gdbserver(int has_port, int port)
 {
     if (!has_port)
         port = DEFAULT_GDBSTUB_PORT;
-    if (gdbserver_start(port) < 0) {
+    if (gdbserver_start_port(port) < 0) {
         qemu_printf("Could not open gdbserver socket on port %d\n", port);
     } else {
         qemu_printf("Waiting gdb connection on port %d\n", port);
@@ -635,6 +654,36 @@ static void do_print(int count, int format, int size, unsigned int valh, unsigne
     }
 #endif
     term_printf("\n");
+}
+
+static void do_memory_save(unsigned int valh, unsigned int vall, 
+                           uint32_t size, const char *filename)
+{
+    FILE *f;
+    target_long addr = GET_TLONG(valh, vall);
+    uint32_t l;
+    CPUState *env;
+    uint8_t buf[1024];
+
+    env = mon_get_cpu();
+    if (!env)
+        return;
+
+    f = fopen(filename, "wb");
+    if (!f) {
+        term_printf("could not open '%s'\n", filename);
+        return;
+    }
+    while (size != 0) {
+        l = sizeof(buf);
+        if (l > size)
+            l = size;
+        cpu_memory_rw_debug(env, addr, buf, l, 0);
+        fwrite(buf, 1, l, f);
+        addr += l;
+        size -= l;
+    }
+    fclose(f);
 }
 #endif /* !CONFIG_DM */
 
@@ -1154,8 +1203,8 @@ static void do_wav_capture (const char *path,
 static term_cmd_t term_cmds[] = {
     { "help|?", "s?", do_help, 
       "[cmd]", "show the help" },
-    { "commit", "", do_commit, 
-      "", "commit changes to the disk images (if -snapshot is used)" },
+    { "commit", "s", do_commit, 
+      "device|all", "commit changes to the disk images (if -snapshot is used) or backing files" },
     { "info", "s?", do_info,
       "subcommand", "show various information about the system state" },
     { "q|quit", "", do_quit,
@@ -1169,10 +1218,12 @@ static term_cmd_t term_cmds[] = {
     { "log", "s", do_log,
       "item1[,...]", "activate logging of the specified items to '/tmp/qemu.log'" }, 
 #ifndef CONFIG_DM
-    { "savevm", "F", do_savevm,
-      "filename", "save the whole virtual machine state to 'filename'" }, 
-    { "loadvm", "F", do_loadvm,
-      "filename", "restore the whole virtual machine state from 'filename'" }, 
+    { "savevm", "s?", do_savevm,
+      "tag|id", "save a VM snapshot. If no tag or id are provided, a new snapshot is created" }, 
+    { "loadvm", "s", do_loadvm,
+      "tag|id", "restore a VM snapshot from its tag or id" }, 
+    { "delvm", "s", do_delvm,
+      "tag|id", "delete a VM snapshot from its tag or id" }, 
     { "stop", "", do_stop, 
       "", "stop emulation", },
     { "c|cont", "", do_cont, 
@@ -1213,6 +1264,8 @@ static term_cmd_t term_cmds[] = {
       "dx dy [dz]", "send mouse move events" },
     { "mouse_button", "i", do_mouse_button, 
       "state", "change mouse button state (1=L, 2=M, 4=R)" },
+    { "mouse_set", "i", do_mouse_set,
+      "index", "set which mouse device receives events" },
 #ifdef HAS_AUDIO
     { "wavcapture", "si?i?i?", do_wav_capture,
       "path [frequency bits channels]",
@@ -1220,6 +1273,10 @@ static term_cmd_t term_cmds[] = {
 #endif
      { "stopcapture", "i", do_stop_capture,
        "capture index", "stop capture" },
+#ifndef CONFIG_DM
+    { "memsave", "lis", do_memory_save, 
+      "addr size file", "save to disk virtual memory dump starting at 'addr' of size 'size'", },
+#endif /* !CONFIG_DM */
     { NULL, NULL, }, 
 };
 
@@ -1263,10 +1320,16 @@ static term_cmd_t info_cmds[] = {
     { "profile", "", do_info_profile,
       "", "show profiling information", },
     { "capture", "", do_info_capture,
-      "show capture information" },
+      "", "show capture information" },
+    { "snapshots", "", do_info_snapshots,
+      "", "show the currently saved VM snapshots" },
+    { "mice", "", do_info_mice,
+      "", "show which guest mouse is receiving events" },
+    { "vnc", "", do_info_vnc,
+      "", "show the vnc server status"},
 #ifdef CONFIG_DM
     { "hvmiopage", "", sp_info,
-      "", "show HVM device model shared page info", },
+      "", "show HVM device model shared page info" },
 #endif /* CONFIG_DM */
     { NULL, NULL, },
 };
@@ -2430,14 +2493,22 @@ static void monitor_start_input(void)
     readline_start("(HVMXen) ", 0, monitor_handle_command1, NULL);
 }
 
+static void term_event(void *opaque, int event)
+{
+    if (event != CHR_EVENT_RESET)
+	return;
+
+    if (!hide_banner)
+	term_printf("HVM device model. type 'q' to exit\n");
+    monitor_start_input();
+}
+
 void monitor_init(CharDriverState *hd, int show_banner)
 {
     monitor_hd = hd;
-    if (show_banner) {
-        term_printf("HVM device model. type 'q' to exit\n");
-    }
-    qemu_chr_add_read_handler(hd, term_can_read, term_read, NULL);
-    monitor_start_input();
+    hide_banner = !show_banner;
+
+    qemu_chr_add_handlers(hd, term_can_read, term_read, term_event, NULL);
 }
 
 /* XXX: use threads ? */

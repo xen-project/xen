@@ -382,8 +382,6 @@ static void apic_init_ipi(APICState *s)
 {
     int i;
 
-    for(i = 0; i < APIC_LVT_NB; i++)
-        s->lvt[i] = 1 << 16; /* mask LVT */
     s->tpr = 0;
     s->spurious_vec = 0xff;
     s->log_dest = 0;
@@ -391,7 +389,8 @@ static void apic_init_ipi(APICState *s)
     memset(s->isr, 0, sizeof(s->isr));
     memset(s->tmr, 0, sizeof(s->tmr));
     memset(s->irr, 0, sizeof(s->irr));
-    memset(s->lvt, 0, sizeof(s->lvt));
+    for(i = 0; i < APIC_LVT_NB; i++)
+        s->lvt[i] = 1 << 16; /* mask LVT */
     s->esr = 0;
     memset(s->icr, 0, sizeof(s->icr));
     s->divide_conf = 0;
@@ -477,9 +476,9 @@ int apic_get_interrupt(CPUState *env)
     intno = get_highest_priority_int(s->irr);
     if (intno < 0)
         return -1;
-    reset_bit(s->irr, intno);
     if (s->tpr && intno <= s->tpr)
         return s->spurious_vec & 0xff;
+    reset_bit(s->irr, intno);
     set_bit(s->isr, intno);
     apic_update_irq(s);
     return intno;
@@ -745,6 +744,8 @@ static void apic_save(QEMUFile *f, void *opaque)
     qemu_put_be32s(f, &s->initial_count);
     qemu_put_be64s(f, &s->initial_count_load_time);
     qemu_put_be64s(f, &s->next_time);
+
+    qemu_put_timer(f, s->timer);
 }
 
 static int apic_load(QEMUFile *f, void *opaque, int version_id)
@@ -752,7 +753,7 @@ static int apic_load(QEMUFile *f, void *opaque, int version_id)
     APICState *s = opaque;
     int i;
 
-    if (version_id != 1)
+    if (version_id > 2)
         return -EINVAL;
 
     /* XXX: what if the base changes? (registered memory regions) */
@@ -779,6 +780,9 @@ static int apic_load(QEMUFile *f, void *opaque, int version_id)
     qemu_get_be32s(f, &s->initial_count);
     qemu_get_be64s(f, &s->initial_count_load_time);
     qemu_get_be64s(f, &s->next_time);
+
+    if (version_id >= 2)
+        qemu_get_timer(f, s->timer);
     return 0;
 }
 
@@ -827,7 +831,7 @@ int apic_init(CPUState *env)
     }
     s->timer = qemu_new_timer(vm_clock, apic_timer, s);
 
-    register_savevm("apic", 0, 1, apic_save, apic_load, s);
+    register_savevm("apic", 0, 2, apic_save, apic_load, s);
     qemu_register_reset(apic_reset, s);
     
     local_apics[s->id] = s;

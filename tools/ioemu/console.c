@@ -121,6 +121,7 @@ struct TextConsole {
     int total_height;
     int backscroll_height;
     int x, y;
+    int x_saved, y_saved;
     int y_displayed;
     int y_base;
     TextAttributes t_attrib_default; /* default text attributes */
@@ -131,10 +132,7 @@ struct TextConsole {
     int esc_params[MAX_ESC_PARAMS];
     int nb_esc_params;
 
-    /* kbd read handler */
-    IOCanRWHandler *fd_can_read; 
-    IOReadHandler *fd_read;
-    void *fd_opaque;
+    CharDriverState *chr;
     /* fifo for key pressed */
     QEMUFIFO out_fifo;
     uint8_t out_fifo_buf[16];
@@ -147,7 +145,7 @@ static int nb_consoles = 0;
 
 void vga_hw_update(void)
 {
-    if (active_console->hw_update)
+    if (active_console && active_console->hw_update)
         active_console->hw_update(active_console->hw);
 }
 
@@ -659,10 +657,6 @@ static void console_handle_escape(TextConsole *s)
 {
     int i;
 
-    if (s->nb_esc_params == 0) { /* ESC[m sets all attributes to default */
-        s->t_attrib = s->t_attrib_default;
-        return;
-    }
     for (i=0; i<s->nb_esc_params; i++) {
         switch (s->esc_params[i]) {
             case 0: /* reset all console attributes to default */
@@ -752,10 +746,21 @@ static void console_handle_escape(TextConsole *s)
     }
 }
 
+static void console_clear_xy(TextConsole *s, int x, int y)
+{
+    int y1 = (s->y_base + y) % s->total_height;
+    TextCell *c = &s->cells[y1 * s->width + x];
+    c->ch = ' ';
+    c->t_attrib = s->t_attrib_default;
+    c++;
+    update_xy(s, x, y);
+}
+
 static void console_putchar(TextConsole *s, int ch)
 {
     TextCell *c;
-    int y1, i, x;
+    int y1, i;
+    int x, y;
 
     switch(s->state) {
     case TTY_STATE_NORM:
@@ -781,20 +786,31 @@ static void console_putchar(TextConsole *s, int ch)
         case '\a':  /* alert aka. bell */
             /* TODO: has to be implemented */
             break;
+        case 14:
+            /* SI (shift in), character set 0 (ignored) */
+            break;
+        case 15:
+            /* SO (shift out), character set 1 (ignored) */
+            break;
         case 27:    /* esc (introducing an escape sequence) */
             s->state = TTY_STATE_ESC;
             break;
         default:
+            if (s->x >= s->width - 1) {
+                break;
+            }
             y1 = (s->y_base + s->y) % s->total_height;
             c = &s->cells[y1 * s->width + s->x];
             c->ch = ch;
             c->t_attrib = s->t_attrib;
             update_xy(s, s->x, s->y);
             s->x++;
+#if 0 /* line wrap disabled */
             if (s->x >= s->width) {
                 s->x = 0;
                 console_put_lf(s);
             }
+#endif
             break;
         }
         break;
@@ -818,31 +834,149 @@ static void console_putchar(TextConsole *s, int ch)
             s->nb_esc_params++;
             if (ch == ';')
                 break;
+#ifdef DEBUG_CONSOLE
+            fprintf(stderr, "escape sequence CSI%d;%d%c, %d parameters\n",
+                    s->esc_params[0], s->esc_params[1], ch, s->nb_esc_params);
+#endif
             s->state = TTY_STATE_NORM;
             switch(ch) {
-            case 'D':
-                if (s->x > 0)
-                    s->x--;
-                break;
-            case 'C':
-                if (s->x < (s->width - 1))
-                    s->x++;
-                break;
-            case 'K':
-                /* clear to eol */
-                y1 = (s->y_base + s->y) % s->total_height;
-                for(x = s->x; x < s->width; x++) {
-                    c = &s->cells[y1 * s->width + x];
-                    c->ch = ' ';
-                    c->t_attrib = s->t_attrib_default;
-                    c++;
-                    update_xy(s, x, s->y);
+            case 'A':
+                /* move cursor up */
+                if (s->esc_params[0] == 0) {
+                    s->esc_params[0] = 1;
+                }
+                s->y -= s->esc_params[0];
+                if (s->y < 0) {
+                    s->y = 0;
                 }
                 break;
-            default:
+            case 'B':
+                /* move cursor down */
+                if (s->esc_params[0] == 0) {
+                    s->esc_params[0] = 1;
+                }
+                s->y += s->esc_params[0];
+                if (s->y >= s->height) {
+                    s->y = s->height - 1;
+                }
+                break;
+            case 'C':
+                /* move cursor right */
+                if (s->esc_params[0] == 0) {
+                    s->esc_params[0] = 1;
+                }
+                s->x += s->esc_params[0];
+                if (s->x >= s->width) {
+                    s->x = s->width - 1;
+                }
+                break;
+            case 'D':
+                /* move cursor left */
+                if (s->esc_params[0] == 0) {
+                    s->esc_params[0] = 1;
+                }
+                s->x -= s->esc_params[0];
+                if (s->x < 0) {
+                    s->x = 0;
+                }
+                break;
+            case 'G':
+                /* move cursor to column */
+                s->x = s->esc_params[0] - 1;
+                if (s->x < 0) {
+                    s->x = 0;
+                }
+                break;
+            case 'f':
+            case 'H':
+                /* move cursor to row, column */
+                s->x = s->esc_params[1] - 1;
+                if (s->x < 0) {
+                    s->x = 0;
+                }
+                s->y = s->esc_params[0] - 1;
+                if (s->y < 0) {
+                    s->y = 0;
+                }
+                break;
+            case 'J':
+                switch (s->esc_params[0]) {
+                case 0:
+                    /* clear to end of screen */
+                    for (y = s->y; y < s->height; y++) {
+                        for (x = 0; x < s->width; x++) {
+                            if (y == s->y && x < s->x) {
+                                continue;
+                            }
+                            console_clear_xy(s, x, y);
+                        }
+                    }
+                    break;
+                case 1:
+                    /* clear from beginning of screen */
+                    for (y = 0; y <= s->y; y++) {
+                        for (x = 0; x < s->width; x++) {
+                            if (y == s->y && x > s->x) {
+                                break;
+                            }
+                            console_clear_xy(s, x, y);
+                        }
+                    }
+                    break;
+                case 2:
+                    /* clear entire screen */
+                    for (y = 0; y <= s->height; y++) {
+                        for (x = 0; x < s->width; x++) {
+                            console_clear_xy(s, x, y);
+                        }
+                    }
+                break;
+                }
+            case 'K':
+                switch (s->esc_params[0]) {
+                case 0:
+                /* clear to eol */
+                for(x = s->x; x < s->width; x++) {
+                        console_clear_xy(s, x, s->y);
+                }
+                break;
+                case 1:
+                    /* clear from beginning of line */
+                    for (x = 0; x <= s->x; x++) {
+                        console_clear_xy(s, x, s->y);
+                    }
+                    break;
+                case 2:
+                    /* clear entire line */
+                    for(x = 0; x < s->width; x++) {
+                        console_clear_xy(s, x, s->y);
+                    }
                 break;
             }
+                break;
+            case 'm':
             console_handle_escape(s);
+            break;
+            case 'n':
+                /* report cursor position */
+                /* TODO: send ESC[row;colR */
+                break;
+            case 's':
+                /* save cursor position */
+                s->x_saved = s->x;
+                s->y_saved = s->y;
+                break;
+            case 'u':
+                /* restore cursor position */
+                s->x = s->x_saved;
+                s->y = s->y_saved;
+                break;
+            default:
+#ifdef DEBUG_CONSOLE
+                fprintf(stderr, "unhandled escape character '%c'\n", ch);
+#endif
+                break;
+            }
             break;
         }
     }
@@ -884,16 +1018,6 @@ static int console_puts(CharDriverState *chr, const uint8_t *buf, int len)
     return len;
 }
 
-static void console_chr_add_read_handler(CharDriverState *chr, 
-                                         IOCanRWHandler *fd_can_read, 
-                                         IOReadHandler *fd_read, void *opaque)
-{
-    TextConsole *s = chr->opaque;
-    s->fd_can_read = fd_can_read;
-    s->fd_read = fd_read;
-    s->fd_opaque = opaque;
-}
-
 static void console_send_event(CharDriverState *chr, int event)
 {
     TextConsole *s = chr->opaque;
@@ -915,14 +1039,14 @@ static void kbd_send_chars(void *opaque)
     int len;
     uint8_t buf[16];
     
-    len = s->fd_can_read(s->fd_opaque);
+    len = qemu_chr_can_read(s->chr);
     if (len > s->out_fifo.count)
         len = s->out_fifo.count;
     if (len > 0) {
         if (len > sizeof(buf))
             len = sizeof(buf);
         qemu_fifo_read(&s->out_fifo, buf, len);
-        s->fd_read(s->fd_opaque, buf, len);
+        qemu_chr_read(s->chr, buf, len);
     }
     /* characters are pending: we send them a bit later (XXX:
        horrible, should change char device API) */
@@ -973,7 +1097,7 @@ void kbd_put_keysym(int keysym)
         } else {
                 *q++ = keysym;
         }
-        if (s->fd_read) {
+        if (s->chr->chr_read) {
             qemu_fifo_write(&s->out_fifo, buf, q - buf);
             kbd_send_chars(s);
         }
@@ -1059,9 +1183,9 @@ CharDriverState *text_console_init(DisplayState *ds)
     }
     chr->opaque = s;
     chr->chr_write = console_puts;
-    chr->chr_add_read_handler = console_chr_add_read_handler;
     chr->chr_send_event = console_send_event;
 
+    s->chr = chr;
     s->out_fifo.buf = s->out_fifo_buf;
     s->out_fifo.buf_size = sizeof(s->out_fifo_buf);
     s->kbd_timer = qemu_new_timer(rt_clock, kbd_send_chars, s);
@@ -1090,6 +1214,8 @@ CharDriverState *text_console_init(DisplayState *ds)
     /* set current text attributes to default */
     s->t_attrib = s->t_attrib_default;
     text_console_resize(s);
+
+    qemu_chr_reset(chr);
 
     return chr;
 }

@@ -60,15 +60,21 @@ typedef struct PCIAcpiState {
 static void piix4acpi_save(QEMUFile *f, void *opaque)
 {
     PCIAcpiState *s = opaque;
+    pci_device_save(&s->dev, f);
     qemu_put_be16s(f, &s->pm1_control);
 }
 
 static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
 {
     PCIAcpiState *s = opaque;
+    int ret;
     if (version_id > 1) 
         return -EINVAL;
+    ret = pci_device_load(&s->dev, f);
+    if (ret < 0)
+	return ret;
     qemu_get_be16s(f, &s->pm1_control);
+    return 0;
 }
 
 static void acpiPm1Control_writeb(void *opaque, uint32_t addr, uint32_t val)
@@ -206,9 +212,7 @@ void pci_piix4_acpi_init(PCIBus *bus, int devfn)
     pci_conf[0x43] = 0x00;
     d->pm1_control = SCI_EN;
 
-    acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
+    acpi_map((PCIDevice *)d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
 
-    register_savevm("piix4acpi", 0, 1, piix4acpi_save, piix4acpi_load, d);    
-    register_savevm("piix4acpi_pci", 0, 1, generic_pci_save, generic_pci_load, 
-                    &d->dev);
+    register_savevm("piix4acpi", 0, 1, piix4acpi_save, piix4acpi_load, d);
 }

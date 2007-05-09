@@ -1,7 +1,7 @@
 Index: ioemu/xenstore.c
 ===================================================================
---- ioemu.orig/xenstore.c	2007-05-03 15:17:52.000000000 +0100
-+++ ioemu/xenstore.c	2007-05-03 15:18:05.000000000 +0100
+--- ioemu.orig/xenstore.c	2007-05-09 13:47:15.000000000 +0100
++++ ioemu/xenstore.c	2007-05-09 13:47:15.000000000 +0100
 @@ -9,8 +9,15 @@
   */
  
@@ -206,9 +206,9 @@ Index: ioemu/xenstore.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 15:17:52.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 15:18:05.000000000 +0100
-@@ -5331,9 +5331,11 @@
+--- ioemu.orig/vl.c	2007-05-09 13:47:15.000000000 +0100
++++ ioemu/vl.c	2007-05-09 13:47:15.000000000 +0100
+@@ -6220,9 +6220,11 @@
             "Standard options:\n"
             "-M machine      select emulated machine (-M ? for list)\n"
             "-fda/-fdb file  use 'file' as floppy disk 0/1 image\n"
@@ -217,10 +217,10 @@ Index: ioemu/vl.c
             "-hdc/-hdd file  use 'file' as IDE hard disk 2/3 image\n"
             "-cdrom file     use 'file' as IDE cdrom image (cdrom is ide1 master)\n"
 +#endif /* !CONFIG_DM */
-            "-boot [a|c|d]   boot on floppy (a), hard disk (c) or CD-ROM (d)\n"
- 	   "-snapshot       write to temporary files instead of disk image files\n"
- #ifdef TARGET_I386
-@@ -5460,11 +5462,13 @@
+            "-boot [a|c|d|n] boot on floppy (a), hard disk (c), CD-ROM (d), or network (n)\n"
+            "-snapshot       write to temporary files instead of disk image files\n"
+ #ifdef CONFIG_SDL
+@@ -6358,11 +6360,13 @@
      QEMU_OPTION_M,
      QEMU_OPTION_fda,
      QEMU_OPTION_fdb,
@@ -234,7 +234,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_boot,
      QEMU_OPTION_snapshot,
  #ifdef TARGET_I386
-@@ -5536,11 +5540,13 @@
+@@ -6440,11 +6444,13 @@
      { "M", HAS_ARG, QEMU_OPTION_M },
      { "fda", HAS_ARG, QEMU_OPTION_fda },
      { "fdb", HAS_ARG, QEMU_OPTION_fdb },
@@ -248,7 +248,7 @@ Index: ioemu/vl.c
      { "boot", HAS_ARG, QEMU_OPTION_boot },
      { "snapshot", 0, QEMU_OPTION_snapshot },
  #ifdef TARGET_I386
-@@ -5882,10 +5888,16 @@
+@@ -6797,10 +6803,16 @@
  #ifdef CONFIG_GDBSTUB
      int use_gdbstub, gdbstub_port;
  #endif
@@ -267,7 +267,7 @@ Index: ioemu/vl.c
      const char *kernel_filename, *kernel_cmdline;
      DisplayState *ds = &display_state;
      int cyls, heads, secs, translation;
-@@ -5946,8 +5958,10 @@
+@@ -6861,8 +6873,10 @@
      initrd_filename = NULL;
      for(i = 0; i < MAX_FD; i++)
          fd_filename[i] = NULL;
@@ -278,7 +278,7 @@ Index: ioemu/vl.c
      ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
      vga_ram_size = VGA_RAM_SIZE;
      bios_size = BIOS_SIZE;
-@@ -5961,11 +5975,13 @@
+@@ -6876,11 +6890,13 @@
      vncunused = 0;
      kernel_filename = NULL;
      kernel_cmdline = "";
@@ -292,7 +292,7 @@ Index: ioemu/vl.c
      cyls = heads = secs = 0;
      translation = BIOS_ATA_TRANSLATION_AUTO;
      pstrcpy(monitor_device, sizeof(monitor_device), "null");
-@@ -6004,7 +6020,11 @@
+@@ -6919,7 +6935,11 @@
              break;
          r = argv[optind];
          if (r[0] != '-') {
@@ -304,7 +304,7 @@ Index: ioemu/vl.c
          } else {
              const QEMUOption *popt;
  
-@@ -6048,6 +6068,7 @@
+@@ -6966,6 +6986,7 @@
              case QEMU_OPTION_initrd:
                  initrd_filename = optarg;
                  break;
@@ -312,7 +312,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_hda:
              case QEMU_OPTION_hdb:
              case QEMU_OPTION_hdc:
-@@ -6060,6 +6081,7 @@
+@@ -6978,6 +6999,7 @@
                          cdrom_index = -1;
                  }
                  break;
@@ -320,7 +320,7 @@ Index: ioemu/vl.c
              case QEMU_OPTION_snapshot:
                  snapshot = 1;
                  break;
-@@ -6112,11 +6134,13 @@
+@@ -7030,11 +7052,13 @@
              case QEMU_OPTION_append:
                  kernel_cmdline = optarg;
                  break;
@@ -334,23 +334,23 @@ Index: ioemu/vl.c
              case QEMU_OPTION_boot:
                  boot_device = optarg[0];
                  if (boot_device != 'a' && 
-@@ -6372,6 +6396,7 @@
-     }
+@@ -7354,6 +7378,7 @@
+ #endif
  
  #ifdef CONFIG_DM
 +    bdrv_init();
      xenstore_parse_domain_config(domid);
  #endif /* CONFIG_DM */
  
-@@ -6381,6 +6406,7 @@
+@@ -7363,6 +7388,7 @@
  #endif
      linux_boot = (kernel_filename != NULL);
-         
+ 
 +#ifndef CONFIG_DM
-     if (!linux_boot && 
+     if (!linux_boot &&
          hd_filename[0] == '\0' && 
          (cdrom_index >= 0 && hd_filename[cdrom_index] == '\0') &&
-@@ -6394,6 +6420,7 @@
+@@ -7376,6 +7402,7 @@
          else
              boot_device = 'd';
      }
@@ -358,7 +358,7 @@ Index: ioemu/vl.c
  
      setvbuf(stdout, NULL, _IOLBF, 0);
      
-@@ -6514,6 +6541,7 @@
+@@ -7528,6 +7555,7 @@
  
  #endif /* !CONFIG_DM */
  
@@ -366,7 +366,7 @@ Index: ioemu/vl.c
      /* we always create the cdrom drive, even if no disk is there */
      bdrv_init();
      if (cdrom_index >= 0) {
-@@ -6540,6 +6568,7 @@
+@@ -7554,6 +7582,7 @@
              }
          }
      }
@@ -376,8 +376,8 @@ Index: ioemu/vl.c
      fd_table[0] = bdrv_new("fda");
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2007-05-03 15:17:52.000000000 +0100
-+++ ioemu/monitor.c	2007-05-03 15:18:05.000000000 +0100
+--- ioemu.orig/monitor.c	2007-05-09 13:44:51.000000000 +0100
++++ ioemu/monitor.c	2007-05-09 13:47:15.000000000 +0100
 @@ -24,6 +24,7 @@
  #include "vl.h"
  #include "disas.h"
@@ -386,7 +386,7 @@ Index: ioemu/monitor.c
  
  //#define DEBUG
  //#define DEBUG_COMPLETION
-@@ -330,7 +331,7 @@
+@@ -361,7 +362,7 @@
      return 0;
  }
  
@@ -395,7 +395,7 @@ Index: ioemu/monitor.c
  {
      BlockDriverState *bs;
  
-@@ -342,7 +343,7 @@
+@@ -373,7 +374,7 @@
      eject_device(bs, force);
  }
  
@@ -404,23 +404,11 @@ Index: ioemu/monitor.c
  {
      BlockDriverState *bs;
      int i;
-Index: ioemu/block.c
-===================================================================
---- ioemu.orig/block.c	2007-05-03 15:17:52.000000000 +0100
-+++ ioemu/block.c	2007-05-03 15:18:05.000000000 +0100
-@@ -758,6 +758,7 @@
- static void raw_close(BlockDriverState *bs)
- {
-     BDRVRawState *s = bs->opaque;
-+    bs->total_sectors = 0;
-     close(s->fd);
- }
- 
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 15:18:00.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 15:18:05.000000000 +0100
-@@ -1192,6 +1192,8 @@
+--- ioemu.orig/vl.h	2007-05-09 13:47:15.000000000 +0100
++++ ioemu/vl.h	2007-05-09 13:47:15.000000000 +0100
+@@ -1411,6 +1411,8 @@
  void term_print_help(void);
  void monitor_readline(const char *prompt, int is_password,
                        char *buf, int buf_size);
@@ -429,7 +417,7 @@ Index: ioemu/vl.h
  
  /* readline.c */
  typedef void ReadLineFunc(void *opaque, const char *str);
-@@ -1206,6 +1208,9 @@
+@@ -1425,6 +1427,9 @@
  
  /* xenstore.c */
  void xenstore_parse_domain_config(int domid);
@@ -441,9 +429,9 @@ Index: ioemu/vl.h
  char *xenstore_vm_read(int domid, char *key, int *len);
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2007-05-03 15:17:52.000000000 +0100
-+++ ioemu/hw/ide.c	2007-05-03 15:18:05.000000000 +0100
-@@ -1199,6 +1199,7 @@
+--- ioemu.orig/hw/ide.c	2007-05-09 13:44:51.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-09 13:47:15.000000000 +0100
+@@ -1221,6 +1221,7 @@
          } else {
              ide_atapi_cmd_error(s, SENSE_NOT_READY, 
                                  ASC_MEDIUM_NOT_PRESENT);
@@ -451,3 +439,15 @@ Index: ioemu/hw/ide.c
          }
          break;
      case GPCMD_MODE_SENSE_10:
+Index: ioemu/block-raw.c
+===================================================================
+--- ioemu.orig/block-raw.c	2007-05-09 13:44:51.000000000 +0100
++++ ioemu/block-raw.c	2007-05-09 13:47:15.000000000 +0100
+@@ -383,6 +383,7 @@
+ static void raw_close(BlockDriverState *bs)
+ {
+     BDRVRawState *s = bs->opaque;
++    bs->total_sectors = 0;
+     if (s->fd >= 0) {
+         close(s->fd);
+         s->fd = -1;

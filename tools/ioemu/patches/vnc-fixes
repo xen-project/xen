@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:24:05.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:24:05.000000000 +0100
-@@ -6597,8 +6597,10 @@
+--- ioemu.orig/vl.c	2007-05-03 19:46:19.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:46:21.000000000 +0100
+@@ -7616,8 +7616,10 @@
          }
      }
  
@@ -17,8 +17,8 @@ Index: ioemu/vl.c
      if (use_gdbstub) {
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2007-05-03 10:24:05.000000000 +0100
-+++ ioemu/vnc.c	2007-05-03 10:24:05.000000000 +0100
+--- ioemu.orig/vnc.c	2007-05-03 19:46:19.000000000 +0100
++++ ioemu/vnc.c	2007-05-03 19:49:33.000000000 +0100
 @@ -3,6 +3,7 @@
   * 
   * Copyright (C) 2006 Anthony Liguori <anthony@codemonkey.ws>
@@ -52,7 +52,7 @@ Index: ioemu/vnc.c
      char *old_data;
      int depth; /* internal VNC frame buffer byte per pixel */
      int has_resize;
-@@ -81,13 +88,25 @@
+@@ -88,12 +95,26 @@
  
      VncReadEvent *read_handler;
      size_t read_handler_expect;
@@ -63,7 +63,12 @@ Index: ioemu/vnc.c
 +    int visible_h;
 +
 +    int slow_client;
++
+     /* input */
+     uint8_t modifiers_state[256];
  };
+ 
+ static VncState *vnc_state; /* needed for info vnc */
  
 +#define DIRTY_PIXEL_BITS 64
 +#define X2DP_DOWN(vs, x) ((x) >> (vs)->dirty_pixel_shift)
@@ -71,15 +76,10 @@ Index: ioemu/vnc.c
 +  (((x) + (1ULL << (vs)->dirty_pixel_shift) - 1) >> (vs)->dirty_pixel_shift)
 +#define DP2X(vs, x) ((x) << (vs)->dirty_pixel_shift)
 +
- /* TODO
-    1) Get the queue working for IO.
-    2) there is some weirdness when using the -S option (the screen is grey
-       and not totally invalidated
--   3) resolutions > 1024
- */
- 
- static void vnc_write(VncState *vs, const void *data, size_t len);
-@@ -96,9 +115,12 @@
+ void do_info_vnc(void)
+ {
+     if (vnc_state == NULL)
+@@ -123,9 +144,12 @@
  static void vnc_write_u16(VncState *vs, uint16_t value);
  static void vnc_write_u8(VncState *vs, uint8_t value);
  static void vnc_flush(VncState *vs);
@@ -92,7 +92,7 @@ Index: ioemu/vnc.c
  static inline void vnc_set_bit(uint32_t *d, int k)
  {
      d[k >> 5] |= 1 << (k & 0x1f);
-@@ -139,20 +161,37 @@
+@@ -166,20 +190,37 @@
      }
      return 0;
  }
@@ -136,9 +136,9 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
-@@ -169,16 +208,23 @@
- static void vnc_dpy_resize(DisplayState *ds, int w, int h)
+@@ -197,16 +238,23 @@
  {
+     int size_changed;
      VncState *vs = ds->opaque;
 +    int o;
  
@@ -159,10 +159,10 @@ Index: ioemu/vnc.c
 +        ds->depth = vs->depth * 8;
 +        set_color_table(ds);
 +    }
+     size_changed = ds->width != w || ds->height != h;
      ds->width = w;
      ds->height = h;
-     ds->linesize = w * vs->depth;
-@@ -191,6 +237,10 @@
+@@ -220,6 +268,10 @@
  	vs->width = ds->width;
  	vs->height = ds->height;
      }
@@ -173,7 +173,7 @@ Index: ioemu/vnc.c
  }
  
  /* fastest code */
-@@ -326,8 +376,20 @@
+@@ -355,8 +407,20 @@
      int y = 0;
      int pitch = ds->linesize;
      VncState *vs = ds->opaque;
@@ -195,7 +195,7 @@ Index: ioemu/vnc.c
  
      if (dst_y > src_y) {
  	y = h - 1;
-@@ -349,31 +411,34 @@
+@@ -378,31 +442,34 @@
  	old_row += pitch;
      }
  
@@ -242,7 +242,7 @@ Index: ioemu/vnc.c
  {
      VncState *vs = opaque;
      int64_t now = qemu_get_clock(rt_clock);
-@@ -382,14 +447,18 @@
+@@ -411,14 +478,18 @@
  	int y;
  	char *row;
  	char *old_row;
@@ -264,7 +264,7 @@ Index: ioemu/vnc.c
  
  	/* Walk through the dirty map and eliminate tiles that
  	   really aren't dirty */
-@@ -397,23 +466,25 @@
+@@ -426,23 +497,25 @@
  	old_row = vs->old_data;
  
  	for (y = 0; y < vs->ds->height; y++) {
@@ -299,7 +299,7 @@ Index: ioemu/vnc.c
  		}
  	    }
  
-@@ -421,7 +492,8 @@
+@@ -450,7 +523,8 @@
  	    old_row += vs->ds->linesize;
  	}
  
@@ -309,7 +309,7 @@ Index: ioemu/vnc.c
  	    return;
  
  	/* Count rectangles */
-@@ -431,34 +503,56 @@
+@@ -460,34 +534,56 @@
  	saved_offset = vs->output.offset;
  	vnc_write_u16(vs, 0);
  
@@ -377,7 +377,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_timer_init(VncState *vs)
-@@ -469,8 +563,6 @@
+@@ -498,8 +594,6 @@
  
  static void vnc_dpy_refresh(DisplayState *ds)
  {
@@ -386,7 +386,7 @@ Index: ioemu/vnc.c
      vga_hw_update();
  }
  
-@@ -506,7 +598,7 @@
+@@ -535,7 +629,7 @@
  
  static void buffer_reset(Buffer *buffer)
  {
@@ -395,7 +395,7 @@ Index: ioemu/vnc.c
  }
  
  static void buffer_append(Buffer *buffer, const void *data, size_t len)
-@@ -547,12 +639,12 @@
+@@ -576,12 +670,12 @@
      if (!ret)
  	return;
  
@@ -411,7 +411,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_read_when(VncState *vs, VncReadEvent *func, size_t expecting)
-@@ -584,11 +676,11 @@
+@@ -613,11 +707,11 @@
  	    return;
  
  	if (!ret) {
@@ -426,7 +426,7 @@ Index: ioemu/vnc.c
      }
  }
  
-@@ -596,9 +688,9 @@
+@@ -625,9 +719,9 @@
  {
      buffer_reserve(&vs->output, len);
  
@@ -439,7 +439,7 @@ Index: ioemu/vnc.c
  
      buffer_append(&vs->output, data, len);
  }
-@@ -720,22 +812,25 @@
+@@ -848,22 +942,25 @@
      do_key_event(vs, down, sym);
  }
  
@@ -476,7 +476,7 @@ Index: ioemu/vnc.c
  
      qemu_mod_timer(vs->timer, qemu_get_clock(rt_clock));
  }
-@@ -843,8 +938,6 @@
+@@ -978,8 +1075,6 @@
      }
  
      vnc_dpy_resize(vs->ds, vs->ds->width, vs->ds->height);
@@ -485,7 +485,7 @@ Index: ioemu/vnc.c
  
      vga_hw_invalidate();
      vga_hw_update();
-@@ -924,6 +1017,8 @@
+@@ -1059,6 +1154,8 @@
  {
      char pad[3] = { 0, 0, 0 };
  
@@ -494,7 +494,7 @@ Index: ioemu/vnc.c
      vs->width = vs->ds->width;
      vs->height = vs->ds->height;
      vnc_write_u16(vs, vs->ds->width);
-@@ -1010,11 +1105,11 @@
+@@ -1145,11 +1242,11 @@
  	vnc_write(vs, "RFB 003.003\n", 12);
  	vnc_flush(vs);
  	vnc_read_when(vs, protocol_version, 12);
@@ -508,32 +508,20 @@ Index: ioemu/vnc.c
      }
  }
  
-@@ -1071,17 +1166,15 @@
- 	exit(1);
-     }
- 
--    ret = qemu_set_fd_handler2(vs->lsock, vnc_listen_poll, vnc_listen_read, NULL, vs);
--    if (ret == -1) {
-+    ret = qemu_set_fd_handler2(vs->lsock, vnc_listen_poll, vnc_listen_read,
-+			       NULL, vs);
-+    if (ret == -1)
- 	exit(1);
--    }
- 
-     vs->ds->data = NULL;
-     vs->ds->dpy_update = vnc_dpy_update;
+@@ -1195,8 +1292,6 @@
      vs->ds->dpy_resize = vnc_dpy_resize;
      vs->ds->dpy_refresh = vnc_dpy_refresh;
  
 -    memset(vs->dirty_row, 0xFF, sizeof(vs->dirty_row));
 -
      vnc_dpy_resize(vs->ds, 640, 400);
- }
+ 
+ #ifndef _WIN32
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 10:24:05.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 10:24:05.000000000 +0100
-@@ -319,6 +319,7 @@
+--- ioemu.orig/vl.h	2007-05-03 19:36:00.000000000 +0100
++++ ioemu/vl.h	2007-05-03 19:46:21.000000000 +0100
+@@ -356,6 +356,7 @@
  int is_graphic_console(void);
  CharDriverState *text_console_init(DisplayState *ds);
  void console_select(unsigned int index);

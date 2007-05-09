@@ -37,10 +37,9 @@
 #define PHYS_JJ_IOMMU	0x10000000	/* I/O MMU */
 #define PHYS_JJ_TCX_FB	0x50000000	/* TCX frame buffer */
 #define PHYS_JJ_SLAVIO	0x70000000	/* Slavio base */
-#define PHYS_JJ_ESPDMA  0x78400000      /* ESP DMA controller */
+#define PHYS_JJ_DMA     0x78400000      /* DMA controller */
 #define PHYS_JJ_ESP     0x78800000      /* ESP SCSI */
 #define PHYS_JJ_ESP_IRQ    18
-#define PHYS_JJ_LEDMA   0x78400010      /* Lance DMA controller */
 #define PHYS_JJ_LE      0x78C00000      /* Lance ethernet */
 #define PHYS_JJ_LE_IRQ     16
 #define PHYS_JJ_CLOCK	0x71D00000      /* Per-CPU timer/counter, L14 */
@@ -56,6 +55,9 @@
 #define PHYS_JJ_FDC	0x71400000	/* Floppy */
 #define PHYS_JJ_FLOPPY_IRQ 22
 #define PHYS_JJ_ME_IRQ 30		/* Module error, power fail */
+#define PHYS_JJ_CS      0x6c000000      /* Crystal CS4231 */
+#define PHYS_JJ_CS_IRQ  5
+
 #define MAX_CPUS 16
 
 /* TSC handling */
@@ -192,13 +194,6 @@ void pic_set_irq_cpu(int irq, int level, unsigned int cpu)
     slavio_pic_set_irq_cpu(slavio_intctl, irq, level, cpu);
 }
 
-static void *iommu;
-
-uint32_t iommu_translate(uint32_t addr)
-{
-    return iommu_translate_local(iommu, addr);
-}
-
 static void *slavio_misc;
 
 void qemu_system_powerdown(void)
@@ -223,6 +218,7 @@ static void sun4m_init(int ram_size, int vga_ram_size, int boot_device,
     int ret, linux_boot;
     unsigned int i;
     long vram_size = 0x100000, prom_offset, initrd_size, kernel_size;
+    void *iommu, *dma, *main_esp, *main_lance = NULL;
 
     linux_boot = (kernel_filename != NULL);
 
@@ -243,12 +239,13 @@ static void sun4m_init(int ram_size, int vga_ram_size, int boot_device,
     for(i = 0; i < smp_cpus; i++) {
         slavio_intctl_set_cpu(slavio_intctl, i, envs[i]);
     }
+    dma = sparc32_dma_init(PHYS_JJ_DMA, PHYS_JJ_ESP_IRQ, PHYS_JJ_LE_IRQ, iommu, slavio_intctl);
 
     tcx_init(ds, PHYS_JJ_TCX_FB, phys_ram_base + ram_size, ram_size, vram_size, graphic_width, graphic_height);
     if (nd_table[0].vlan) {
         if (nd_table[0].model == NULL
             || strcmp(nd_table[0].model, "lance") == 0) {
-            lance_init(&nd_table[0], PHYS_JJ_LE_IRQ, PHYS_JJ_LE, PHYS_JJ_LEDMA);
+            main_lance = lance_init(&nd_table[0], PHYS_JJ_LE, dma);
         } else {
             fprintf(stderr, "qemu: Unsupported NIC: %s\n", nd_table[0].model);
             exit (1);
@@ -264,8 +261,17 @@ static void sun4m_init(int ram_size, int vga_ram_size, int boot_device,
     // Slavio TTYB (base+0, Linux ttyS1) is the second Qemu serial device
     slavio_serial_init(PHYS_JJ_SER, PHYS_JJ_SER_IRQ, serial_hds[1], serial_hds[0]);
     fdctrl_init(PHYS_JJ_FLOPPY_IRQ, 0, 1, PHYS_JJ_FDC, fd_table);
-    esp_init(bs_table, PHYS_JJ_ESP_IRQ, PHYS_JJ_ESP, PHYS_JJ_ESPDMA);
+    main_esp = esp_init(bs_table, PHYS_JJ_ESP, dma);
+
+    for (i = 0; i < MAX_DISKS; i++) {
+        if (bs_table[i]) {
+            esp_scsi_attach(main_esp, bs_table[i], i);
+        }
+    }
+
     slavio_misc = slavio_misc_init(PHYS_JJ_SLAVIO, PHYS_JJ_ME_IRQ);
+    cs_init(PHYS_JJ_CS, PHYS_JJ_CS_IRQ, slavio_intctl);
+    sparc32_dma_set_reset_data(dma, main_esp, main_lance);
 
     prom_offset = ram_size + vram_size;
     cpu_register_physical_memory(PROM_ADDR, 

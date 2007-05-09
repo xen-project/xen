@@ -104,6 +104,10 @@ static uint8_t sdl_keyevent_to_keycode_generic(const SDL_KeyboardEvent *ev)
     keysym = ev->keysym.sym;
     if (keysym == 0 && ev->keysym.scancode == 113)
         keysym = SDLK_MODE;
+    /* For Japanese key '\' and '|' */
+    if (keysym == 92 && ev->keysym.scancode == 133) {
+        keysym = 0xa5;
+    }
     return keysym2scancode(kbd_layout, keysym);
 }
 
@@ -118,70 +122,6 @@ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
 
 #else
 
-static const uint8_t x_keycode_to_pc_keycode[61] = {
-   0xc7,      /*  97  Home   */
-   0xc8,      /*  98  Up     */
-   0xc9,      /*  99  PgUp   */
-   0xcb,      /* 100  Left   */
-   0x4c,        /* 101  KP-5   */
-   0xcd,      /* 102  Right  */
-   0xcf,      /* 103  End    */
-   0xd0,      /* 104  Down   */
-   0xd1,      /* 105  PgDn   */
-   0xd2,      /* 106  Ins    */
-   0xd3,      /* 107  Del    */
-   0x9c,      /* 108  Enter  */
-   0x9d,      /* 109  Ctrl-R */
-   0x0,       /* 110  Pause  */
-   0xb7,      /* 111  Print  */
-   0xb5,      /* 112  Divide */
-   0xb8,      /* 113  Alt-R  */
-   0xc6,      /* 114  Break  */   
-   0x0,         /* 115 */
-   0x0,         /* 116 */
-   0x0,         /* 117 */
-   0x0,         /* 118 */
-   0x0,         /* 119 */
-   0x70,         /* 120 Hiragana_Katakana */
-   0x0,         /* 121 */
-   0x0,         /* 122 */
-   0x73,         /* 123 backslash */
-   0x0,         /* 124 */
-   0x0,         /* 125 */
-   0x0,         /* 126 */
-   0x0,         /* 127 */
-   0x0,         /* 128 */
-   0x79,         /* 129 Henkan */
-   0x0,         /* 130 */
-   0x7b,         /* 131 Muhenkan */
-   0x0,         /* 132 */
-   0x7d,         /* 133 Yen */
-   0x0,         /* 134 */
-   0x0,         /* 135 */
-   0x47,         /* 136 KP_7 */
-   0x48,         /* 137 KP_8 */
-   0x49,         /* 138 KP_9 */
-   0x4b,         /* 139 KP_4 */
-   0x4c,         /* 140 KP_5 */
-   0x4d,         /* 141 KP_6 */
-   0x4f,         /* 142 KP_1 */
-   0x50,         /* 143 KP_2 */
-   0x51,         /* 144 KP_3 */
-   0x52,         /* 145 KP_0 */
-   0x53,         /* 146 KP_. */
-   0x47,         /* 147 KP_HOME */
-   0x48,         /* 148 KP_UP */
-   0x49,         /* 149 KP_PgUp */
-   0x4b,         /* 150 KP_Left */
-   0x4c,         /* 151 KP_ */
-   0x4d,         /* 152 KP_Right */
-   0x4f,         /* 153 KP_End */
-   0x50,         /* 154 KP_Down */
-   0x51,         /* 155 KP_PgDn */
-   0x52,         /* 156 KP_Ins */
-   0x53,         /* 157 KP_Del */
-};
-
 static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
 {
     int keycode;
@@ -192,9 +132,9 @@ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
         keycode = 0;
     } else if (keycode < 97) {
         keycode -= 8; /* just an offset */
-    } else if (keycode < 158) {
+    } else if (keycode < 212) {
         /* use conversion table */
-        keycode = x_keycode_to_pc_keycode[keycode - 97];
+        keycode = _translate_keycode(keycode - 97);
     } else {
         keycode = 0;
     }
@@ -297,6 +237,7 @@ static void sdl_show_cursor(void)
 {
     if (!kbd_mouse_is_absolute()) {
         SDL_ShowCursor(1);
+        SDL_SetCursor(sdl_cursor_normal);
     }
 }
 
@@ -342,6 +283,9 @@ static void sdl_send_mouse_event(int dz)
 	SDL_GetMouseState(&dx, &dy);
 	dx = dx * 0x7FFF / width;
 	dy = dy * 0x7FFF / height;
+    } else if (absolute_enabled) {
+	sdl_show_cursor();
+	absolute_enabled = 0;
     }
 
     kbd_mouse_event(dx, dy, dz, buttons);
@@ -394,6 +338,8 @@ static void sdl_refresh(DisplayState *ds)
                         gui_keysym = 1;
                         break;
                     case 0x02 ... 0x0a: /* '1' to '9' keys */ 
+                        /* Reset the modifiers sent to the current console */
+                        reset_keys();
                         console_select(keycode - 0x02);
                         if (!is_graphic_console()) {
                             /* display grab if going to a text console */
@@ -468,14 +414,17 @@ static void sdl_refresh(DisplayState *ds)
                     }
                 }
             }
-            if (is_graphic_console()) 
+            if (is_graphic_console() && !gui_keysym) 
                 sdl_process_key(&ev->key);
             break;
         case SDL_QUIT:
-            qemu_system_shutdown_request();
+            if (!no_quit) {
+               qemu_system_shutdown_request();
+            }
             break;
         case SDL_MOUSEMOTION:
-            if (gui_grab || kbd_mouse_is_absolute()) {
+            if (gui_grab || kbd_mouse_is_absolute() ||
+                absolute_enabled) {
                 sdl_send_mouse_event(0);
             }
             break;

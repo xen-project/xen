@@ -17,9 +17,9 @@ Signed-off-by: Keir Fraser <keir@xensource.com>
 
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-20 15:04:55.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-20 15:08:16.000000000 +0000
-@@ -296,9 +296,9 @@
+--- ioemu.orig/Makefile.target	2007-05-09 13:56:55.000000000 +0100
++++ ioemu/Makefile.target	2007-05-09 13:56:55.000000000 +0100
+@@ -325,9 +325,9 @@
  
  # qemu-dm objects
  ifeq ($(ARCH),ia64)
@@ -31,19 +31,19 @@ Index: ioemu/Makefile.target
  endif
  
  all: $(PROGS)
-@@ -364,7 +364,7 @@
+@@ -395,7 +395,7 @@
  else
  VL_OBJS+= fdc.o serial.o pc.o
  endif
 -VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
 +VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o
- VL_OBJS+= usb-uhci.o
+ VL_OBJS+= usb-uhci.o smbus_eeprom.o
  VL_OBJS+= piix4acpi.o
  VL_OBJS+= xenstore.o
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/i8259-dm.c	2006-12-20 15:04:54.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2006-12-20 15:04:55.000000000 +0000
+--- ioemu.orig/target-i386-dm/i8259-dm.c	2007-05-09 13:56:35.000000000 +0100
++++ ioemu/target-i386-dm/i8259-dm.c	2007-05-09 13:56:55.000000000 +0100
 @@ -33,7 +33,7 @@
  
  void pic_set_irq_new(void *opaque, int irq, int level)
@@ -56,8 +56,8 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/piix_pci-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/piix_pci-dm.c	2006-12-20 15:08:13.000000000 +0000
-@@ -0,0 +1,397 @@
++++ ioemu/target-i386-dm/piix_pci-dm.c	2007-05-09 14:07:46.000000000 +0100
+@@ -0,0 +1,447 @@
 +/*
 + * QEMU i440FX/PIIX3 PCI Bridge Emulation
 + *
@@ -100,20 +100,60 @@ Index: ioemu/target-i386-dm/piix_pci-dm.c
 +    return s->config_reg;
 +}
 +
-+static void i440fx_set_irq(PCIDevice *pci_dev, void *pic, int intx, int level)
++/* return the global irq number corresponding to a given device irq
++   pin. We could also use the bus number to have a more precise
++   mapping. */
++static int pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num)
 +{
-+    xc_hvm_set_pci_intx_level(xc_handle, domid, 0, 0, pci_dev->devfn >> 3,
-+                              intx, level);
++#ifndef CONFIG_DM
++    int slot_addend;
++    slot_addend = (pci_dev->devfn >> 3) - 1;
++    return (irq_num + slot_addend) & 3;
++#else  /* !CONFIG_DM */
++    return irq_num + ((pci_dev->devfn >> 3) << 2);
++#endif /* !CONFIG_DM */
 +}
 +
-+PCIBus *i440fx_init(void)
++static void i440fx_set_irq(void *pic, int irq_num, int level)
++{
++    xc_hvm_set_pci_intx_level(xc_handle, domid, 0, 0, irq_num >> 2,
++                              irq_num & 3, level);
++}
++
++static void i440fx_save(QEMUFile* f, void *opaque)
++{
++    PCIDevice *d = opaque;
++    pci_device_save(d, f);
++#ifndef CONFIG_DM
++    qemu_put_8s(f, &smm_enabled);
++#endif /* !CONFIG_DM */
++}
++
++static int i440fx_load(QEMUFile* f, void *opaque, int version_id)
++{
++    PCIDevice *d = opaque;
++    int ret;
++
++    if (version_id != 1)
++        return -EINVAL;
++    ret = pci_device_load(d, f);
++    if (ret < 0)
++        return ret;
++#ifndef CONFIG_DM
++    i440fx_update_memory_mappings(d);
++    qemu_get_8s(f, &smm_enabled);
++#endif /* !CONFIG_DM */
++    return 0;
++}
++
++PCIBus *i440fx_init(PCIDevice **pi440fx_state)
 +{
 +    PCIBus *b;
 +    PCIDevice *d;
 +    I440FXState *s;
 +
 +    s = qemu_mallocz(sizeof(I440FXState));
-+    b = pci_register_bus(i440fx_set_irq, NULL, 0);
++    b = pci_register_bus(i440fx_set_irq, pci_slot_get_pirq, NULL, 0, 128);
 +    s->bus = b;
 +
 +    register_ioport_write(0xcf8, 4, 4, i440fx_addr_writel, s);
@@ -137,18 +177,15 @@ Index: ioemu/target-i386-dm/piix_pci-dm.c
 +    d->config[0x0a] = 0x00; // class_sub = host2pci
 +    d->config[0x0b] = 0x06; // class_base = PCI_bridge
 +    d->config[0x0e] = 0x00; // header_type
++
++    register_savevm("I440FX", 0, 1, i440fx_save, i440fx_load, d);
++    *pi440fx_state = d;
 +    return b;
 +}
 +
 +/* PIIX3 PCI to ISA bridge */
 +
 +static PCIDevice *piix3_dev;
-+
-+static int pci_slot_get_pirq(PCIDevice *pci_dev, int irq_num)
-+{
-+    /* This is the barber's pole mapping used by Xen. */
-+    return (irq_num + (pci_dev->devfn >> 3)) & 3;
-+}
 +
 +static void piix3_write_config(PCIDevice *d, 
 +                               uint32_t address, uint32_t val, int len)
@@ -193,7 +230,6 @@ Index: ioemu/target-i386-dm/piix_pci-dm.c
 +    pci_conf[0x80] = 0x00;
 +    pci_conf[0x82] = 0x00;
 +    pci_conf[0xa0] = 0x08;
-+    pci_conf[0xa0] = 0x08;
 +    pci_conf[0xa2] = 0x00;
 +    pci_conf[0xa3] = 0x00;
 +    pci_conf[0xa4] = 0x00;
@@ -207,14 +243,28 @@ Index: ioemu/target-i386-dm/piix_pci-dm.c
 +    pci_conf[0xae] = 0x00;
 +}
 +
-+int piix3_init(PCIBus *bus)
++static void piix_save(QEMUFile* f, void *opaque)
++{
++    PCIDevice *d = opaque;
++    pci_device_save(d, f);
++}
++
++static int piix_load(QEMUFile* f, void *opaque, int version_id)
++{
++    PCIDevice *d = opaque;
++    if (version_id != 2)
++        return -EINVAL;
++    return pci_device_load(d, f);
++}
++
++int piix3_init(PCIBus *bus, int devfn)
 +{
 +    PCIDevice *d;
 +    uint8_t *pci_conf;
 +
 +    d = pci_register_device(bus, "PIIX3", sizeof(PCIDevice),
-+                                    -1, NULL, piix3_write_config);
-+    register_savevm("PIIX3", 0, 1, generic_pci_save, generic_pci_load, d);
++                                    devfn, NULL, piix3_write_config);
++    register_savevm("PIIX3", 0, 2, piix_save, piix_load, d);
 +
 +    piix3_dev = d;
 +    pci_conf = d->config;

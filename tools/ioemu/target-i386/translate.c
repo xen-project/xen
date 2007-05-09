@@ -1615,6 +1615,56 @@ static void gen_lea_modrm(DisasContext *s, int modrm, int *reg_ptr, int *offset_
     *offset_ptr = disp;
 }
 
+static void gen_nop_modrm(DisasContext *s, int modrm)
+{
+    int mod, rm, base, code;
+
+    mod = (modrm >> 6) & 3;
+    if (mod == 3)
+        return;
+    rm = modrm & 7;
+
+    if (s->aflag) {
+
+        base = rm;
+        
+        if (base == 4) {
+            code = ldub_code(s->pc++);
+            base = (code & 7);
+        }
+        
+        switch (mod) {
+        case 0:
+            if (base == 5) {
+                s->pc += 4;
+            }
+            break;
+        case 1:
+            s->pc++;
+            break;
+        default:
+        case 2:
+            s->pc += 4;
+            break;
+        }
+    } else {
+        switch (mod) {
+        case 0:
+            if (rm == 6) {
+                s->pc += 2;
+            }
+            break;
+        case 1:
+            s->pc++;
+            break;
+        default:
+        case 2:
+            s->pc += 2;
+            break;
+        }
+    }
+}
+
 /* used for LEA and MOV AX, mem */
 static void gen_add_A0_ds_seg(DisasContext *s)
 {
@@ -2571,12 +2621,28 @@ static void gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
             gen_sto_env_A0[s->mem_index >> 2](offsetof(CPUX86State,xmm_regs[reg]));
             break;
         case 0x6e: /* movd mm, ea */
-            gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 0);
-            gen_op_movl_mm_T0_mmx(offsetof(CPUX86State,fpregs[reg].mmx));
+#ifdef TARGET_X86_64
+            if (s->dflag == 2) {
+                gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 0);
+                gen_op_movq_mm_T0_mmx(offsetof(CPUX86State,fpregs[reg].mmx));
+            } else 
+#endif
+            {
+                gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 0);
+                gen_op_movl_mm_T0_mmx(offsetof(CPUX86State,fpregs[reg].mmx));
+            }
             break;
         case 0x16e: /* movd xmm, ea */
-            gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 0);
-            gen_op_movl_mm_T0_xmm(offsetof(CPUX86State,xmm_regs[reg]));
+#ifdef TARGET_X86_64
+            if (s->dflag == 2) {
+                gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 0);
+                gen_op_movq_mm_T0_xmm(offsetof(CPUX86State,xmm_regs[reg]));
+            } else 
+#endif
+            {
+                gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 0);
+                gen_op_movl_mm_T0_xmm(offsetof(CPUX86State,xmm_regs[reg]));
+            }
             break;
         case 0x6f: /* movq mm, ea */
             if (mod != 3) {
@@ -2700,12 +2766,28 @@ static void gen_sse(DisasContext *s, int b, target_ulong pc_start, int rex_r)
                         offsetof(CPUX86State,xmm_regs[reg].XMM_L(3)));
             break;
         case 0x7e: /* movd ea, mm */
-            gen_op_movl_T0_mm_mmx(offsetof(CPUX86State,fpregs[reg].mmx));
-            gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 1);
+#ifdef TARGET_X86_64
+            if (s->dflag == 2) {
+                gen_op_movq_T0_mm_mmx(offsetof(CPUX86State,fpregs[reg].mmx));
+                gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 1);
+            } else 
+#endif
+            {
+                gen_op_movl_T0_mm_mmx(offsetof(CPUX86State,fpregs[reg].mmx));
+                gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 1);
+            }
             break;
         case 0x17e: /* movd ea, xmm */
-            gen_op_movl_T0_mm_xmm(offsetof(CPUX86State,xmm_regs[reg]));
-            gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 1);
+#ifdef TARGET_X86_64
+            if (s->dflag == 2) {
+                gen_op_movq_T0_mm_xmm(offsetof(CPUX86State,xmm_regs[reg]));
+                gen_ldst_modrm(s, modrm, OT_QUAD, OR_TMP0, 1);
+            } else 
+#endif
+            {
+                gen_op_movl_T0_mm_xmm(offsetof(CPUX86State,xmm_regs[reg]));
+                gen_ldst_modrm(s, modrm, OT_LONG, OR_TMP0, 1);
+            }
             break;
         case 0x27e: /* movq xmm, ea */
             if (mod != 3) {
@@ -5791,9 +5873,14 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
             /* nothing more to do */
             break;
-        default:
-            goto illegal_op;
+        default: /* nop (multi byte) */
+            gen_nop_modrm(s, modrm);
+            break;
         }
+        break;
+    case 0x119 ... 0x11f: /* nop (multi byte) */
+        modrm = ldub_code(s->pc++);
+        gen_nop_modrm(s, modrm);
         break;
     case 0x120: /* mov reg, crN */
     case 0x122: /* mov crN, reg */
@@ -5956,6 +6043,17 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         modrm = ldub_code(s->pc++);
         gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
         /* ignore for now */
+        break;
+    case 0x1aa: /* rsm */
+        if (!(s->flags & HF_SMM_MASK))
+            goto illegal_op;
+        if (s->cc_op != CC_OP_DYNAMIC) {
+            gen_op_set_cc_op(s->cc_op);
+            s->cc_op = CC_OP_DYNAMIC;
+        }
+        gen_jmp_im(s->pc - s->cs_base);
+        gen_op_rsm();
+        gen_eob(s);
         break;
     case 0x110 ... 0x117:
     case 0x128 ... 0x12f:

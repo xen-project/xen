@@ -1,20 +1,20 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-03 15:06:42.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-03 15:07:21.000000000 +0100
-@@ -358,6 +358,7 @@
+--- ioemu.orig/Makefile.target	2007-05-09 13:47:48.000000000 +0100
++++ ioemu/Makefile.target	2007-05-09 13:53:57.000000000 +0100
+@@ -389,6 +389,7 @@
  VL_OBJS+= fdc.o mc146818rtc.o serial.o pc.o
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
- VL_OBJS+= usb-uhci.o
+ VL_OBJS+= usb-uhci.o smbus_eeprom.o
 +VL_OBJS+= piix4acpi.o
- DEFINES += -DHAS_AUDIO
+ CPPFLAGS += -DHAS_AUDIO
  endif
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-03 15:06:42.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-03 15:07:21.000000000 +0100
-@@ -873,13 +873,19 @@
+--- ioemu.orig/hw/pc.c	2007-05-09 13:47:48.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-09 13:53:56.000000000 +0100
+@@ -727,10 +727,15 @@
  
      cmos_init(ram_size, boot_device, bs_table);
  
@@ -29,27 +29,20 @@ Index: ioemu/hw/pc.c
  
 +#ifndef CONFIG_DM
      if (pci_enabled && acpi_enabled) {
+         uint8_t *eeprom_buf = qemu_mallocz(8 * 256); /* XXX: make this persistent */
          piix4_pm_init(pci_bus, piix3_devfn + 3);
+@@ -740,6 +745,7 @@
+             piix4_smbus_register_device(eeprom, 0x50 + i);
+         }
      }
 +#endif /* !CONFIG_DM */
- 
- #if 0
-     /* ??? Need to figure out some way for the user to
-@@ -902,8 +908,10 @@
-     /* XXX: should be done in the Bochs BIOS */
-     if (pci_enabled) {
-         pci_bios_init();
-+#ifndef CONFIG_DM
-         if (acpi_enabled)
-             acpi_bios_init();
-+#endif /* !CONFIG_DM */
-     }
- }
- 
+     
+     if (i440fx_state) {
+         i440fx_init_memory_mappings(i440fx_state);
 Index: ioemu/hw/piix4acpi.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/piix4acpi.c	2007-05-03 15:07:31.000000000 +0100
++++ ioemu/hw/piix4acpi.c	2007-05-09 13:54:18.000000000 +0100
 @@ -0,0 +1,186 @@
 +/*
 + * PIIX4 ACPI controller emulation
@@ -235,38 +228,38 @@ Index: ioemu/hw/piix4acpi.c
 +    pci_conf[0x43] = 0x00;
 +    d->pm1_control = SCI_EN;
 +
-+    acpi_map(d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
++    acpi_map((PCIDevice *)d, 0, 0x1f40, 0x10, PCI_ADDRESS_SPACE_IO);
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 15:06:42.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 15:07:21.000000000 +0100
-@@ -157,7 +157,7 @@
+--- ioemu.orig/vl.c	2007-05-09 13:47:48.000000000 +0100
++++ ioemu/vl.c	2007-05-09 13:53:57.000000000 +0100
+@@ -168,7 +168,7 @@
  #else
  #define MAX_CPUS 1
  #endif
 -int acpi_enabled = 1;
 +int acpi_enabled = 0;
  int fd_bootchk = 1;
- 
- extern int vcpus;
-@@ -5415,6 +5415,7 @@
+ int no_reboot = 0;
+ int daemonize = 0;
+@@ -6313,6 +6313,7 @@
+ 	   "-daemonize      daemonize QEMU after initializing\n"
  #endif
-            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
- 	   "-vnc display    start a VNC server on display\n"
+ 	   "-option-rom rom load a file, rom, into the option ROM space\n"
 +           "-acpi           disable or enable ACPI of HVM domain \n"
             "\n"
             "During emulation, the following keys are useful:\n"
             "ctrl-alt-f      toggle full screen\n"
-@@ -5499,6 +5500,7 @@
- 
+@@ -6402,6 +6403,7 @@
+     ,
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
 +    QEMU_OPTION_acpi,
  };
  
  typedef struct QEMUOption {
-@@ -5581,6 +5583,7 @@
+@@ -6494,6 +6496,7 @@
      
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "vcpus", 1, QEMU_OPTION_vcpus },
@@ -274,7 +267,7 @@ Index: ioemu/vl.c
      { NULL },
  };
  
-@@ -6322,6 +6325,9 @@
+@@ -7258,6 +7261,9 @@
                  vcpus = atoi(optarg);
                  fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                  break;
@@ -286,19 +279,19 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 15:06:42.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 15:07:21.000000000 +0100
-@@ -168,6 +168,7 @@
+--- ioemu.orig/vl.h	2007-05-09 13:47:48.000000000 +0100
++++ ioemu/vl.h	2007-05-09 13:53:57.000000000 +0100
+@@ -173,6 +173,7 @@
  extern int kqemu_allowed;
  extern int win2k_install_hack;
  extern int usb_enabled;
 +extern int acpi_enabled;
  extern int smp_cpus;
- 
- /* XXX: make it dynamic */
-@@ -924,6 +925,9 @@
- void piix4_pm_init(PCIBus *bus, int devfn);
- void acpi_bios_init(void);
+ extern int no_quit;
+ extern int semihosting_enabled;
+@@ -1079,6 +1080,9 @@
+ /* smbus_eeprom.c */
+ SMBusDevice *smbus_eeprom_device_init(uint8_t addr, uint8_t *buf);
  
 +/* piix4acpi.c */
 +extern void pci_piix4_acpi_init(PCIBus *bus, int devfn);
@@ -306,35 +299,3 @@ Index: ioemu/vl.h
  /* pc.c */
  extern QEMUMachine pc_machine;
  extern QEMUMachine isapc_machine;
-Index: ioemu/hw/piix_pci.c
-===================================================================
---- ioemu.orig/hw/piix_pci.c	2007-05-03 15:06:42.000000000 +0100
-+++ ioemu/hw/piix_pci.c	2007-05-03 15:07:13.000000000 +0100
-@@ -241,7 +241,7 @@
- static uint32_t pci_bios_io_addr;
- static uint32_t pci_bios_mem_addr;
- /* host irqs corresponding to PCI irqs A-D */
--static uint8_t pci_irqs[4] = { 11, 9, 11, 9 };
-+static uint8_t pci_irqs[4] = { 10, 11, 10, 11 };
- 
- static void pci_config_writel(PCIDevice *d, uint32_t addr, uint32_t val)
- {
-@@ -336,6 +336,18 @@
-             pci_set_io_region_addr(d, 3, 0x374);
-         }
-         break;
-+    case 0x0680:
-+        if (vendor_id == 0x8086 && device_id == 0x7113) {
-+            /*
-+             * PIIX4 ACPI PM.
-+             * Special device with special PCI config space. No ordinary BARs.
-+             */
-+            pci_config_writew(d, 0x20, 0x0000); // No smb bus IO enable
-+            pci_config_writew(d, 0x22, 0x0000);
-+            pci_config_writew(d, 0x3c, 0x0009); // Hardcoded IRQ9
-+            pci_config_writew(d, 0x3d, 0x0001);
-+        }
-+        break;
-     case 0x0300:
-         if (vendor_id != 0x1234)
-             goto default_map;

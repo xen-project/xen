@@ -1,7 +1,7 @@
 Index: ioemu/xenstore.c
 ===================================================================
---- ioemu.orig/xenstore.c	2007-05-03 10:42:11.000000000 +0100
-+++ ioemu/xenstore.c	2007-05-03 14:17:13.000000000 +0100
+--- ioemu.orig/xenstore.c	2007-05-03 20:38:53.000000000 +0100
++++ ioemu/xenstore.c	2007-05-03 20:49:57.000000000 +0100
 @@ -11,6 +11,11 @@
  #include "vl.h"
  #include "block_int.h"
@@ -15,7 +15,7 @@ Index: ioemu/xenstore.c
  static struct xs_handle *xsh = NULL;
  static char *media_filename[MAX_DISKS];
 @@ -173,6 +178,13 @@
- 	}
+         }
      }
  
 +    /* Set a watch for log-dirty requests from the migration tools */
@@ -143,7 +143,7 @@ Index: ioemu/xenstore.c
      char **vec, *image = NULL;
 @@ -200,6 +318,11 @@
      if (!vec)
- 	return;
+         return;
  
 +    if (!strcmp(vec[XS_WATCH_TOKEN], "logdirty")) {
 +        xenstore_process_logdirty_event();
@@ -151,12 +151,12 @@ Index: ioemu/xenstore.c
 +    }
 +
      if (strncmp(vec[XS_WATCH_TOKEN], "hd", 2) ||
- 	strlen(vec[XS_WATCH_TOKEN]) != 3)
- 	goto out;
+         strlen(vec[XS_WATCH_TOKEN]) != 3)
+         goto out;
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-03 14:13:38.000000000 +0100
-+++ ioemu/target-i386-dm/exec-dm.c	2007-05-03 14:18:14.000000000 +0100
+--- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-03 20:49:54.000000000 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2007-05-03 20:49:57.000000000 +0100
 @@ -431,6 +431,9 @@
  #define phys_ram_addr(x) ((addr < ram_size) ? (phys_ram_base + (x)) : NULL)
  #endif

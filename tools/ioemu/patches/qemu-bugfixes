@@ -1,8 +1,8 @@
 Index: ioemu/console.c
 ===================================================================
---- ioemu.orig/console.c	2006-08-06 02:03:45.803444993 +0100
-+++ ioemu/console.c	2006-08-06 02:15:48.546894051 +0100
-@@ -505,7 +505,7 @@
+--- ioemu.orig/console.c	2007-05-03 18:17:55.000000000 +0100
++++ ioemu/console.c	2007-05-03 19:00:14.000000000 +0100
+@@ -503,7 +503,7 @@
              c++;
          }
      }
@@ -11,7 +11,7 @@ Index: ioemu/console.c
      s->cells = cells;
  }
  
-@@ -1032,11 +1032,21 @@
+@@ -1156,11 +1156,21 @@
      return !active_console->text_console;
  }
  
@@ -34,7 +34,7 @@ Index: ioemu/console.c
      static int color_inited;
  
      chr = qemu_mallocz(sizeof(CharDriverState));
-@@ -1058,12 +1068,7 @@
+@@ -1182,12 +1192,7 @@
      
      if (!color_inited) {
          color_inited = 1;
@@ -48,15 +48,3 @@ Index: ioemu/console.c
      }
      s->y_displayed = 0;
      s->y_base = 0;
-Index: ioemu/vl.c
-===================================================================
---- ioemu.orig/vl.c	2006-08-06 02:15:39.711878977 +0100
-+++ ioemu/vl.c	2006-08-06 02:15:48.550893605 +0100
-@@ -3671,6 +3671,7 @@
-             if (net_tap_fd_init(vlan, fd))
-                 ret = 0;
-         } else {
-+            ifname[0] = '\0';
-             get_param_value(ifname, sizeof(ifname), "ifname", p);
-             if (get_param_value(setup_script, sizeof(setup_script), "script", p) == 0) {
-                 pstrcpy(setup_script, sizeof(setup_script), DEFAULT_NETWORK_SCRIPT);

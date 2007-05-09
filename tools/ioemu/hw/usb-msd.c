@@ -32,11 +32,36 @@ enum USBMSDMode {
 typedef struct {
     USBDevice dev;
     enum USBMSDMode mode;
+    uint32_t scsi_len;
+    uint8_t *scsi_buf;
+    uint32_t usb_len;
+    uint8_t *usb_buf;
     uint32_t data_len;
+    uint32_t residue;
     uint32_t tag;
+    BlockDriverState *bs;
     SCSIDevice *scsi_dev;
     int result;
+    /* For async completion.  */
+    USBPacket *packet;
 } MSDState;
+
+struct usb_msd_cbw {
+    uint32_t sig;
+    uint32_t tag;
+    uint32_t data_len;
+    uint8_t flags;
+    uint8_t lun;
+    uint8_t cmd_len;
+    uint8_t cmd[16];
+};
+
+struct usb_msd_csw {
+    uint32_t sig;
+    uint32_t tag;
+    uint32_t residue;
+    uint8_t status;
+};
 
 static const uint8_t qemu_msd_dev_descriptor[] = {
 	0x12,       /*  u8 bLength; */
@@ -103,13 +128,91 @@ static const uint8_t qemu_msd_config_descriptor[] = {
 	0x00        /*  u8  ep_bInterval; */
 };
 
-static void usb_msd_command_complete(void *opaque, uint32_t tag, int fail)
+static void usb_msd_copy_data(MSDState *s)
+{
+    uint32_t len;
+    len = s->usb_len;
+    if (len > s->scsi_len)
+        len = s->scsi_len;
+    if (s->mode == USB_MSDM_DATAIN) {
+        memcpy(s->usb_buf, s->scsi_buf, len);
+    } else {
+        memcpy(s->scsi_buf, s->usb_buf, len);
+    }
+    s->usb_len -= len;
+    s->scsi_len -= len;
+    s->usb_buf += len;
+    s->scsi_buf += len;
+    s->data_len -= len;
+    if (s->scsi_len == 0) {
+        if (s->mode == USB_MSDM_DATAIN) {
+            scsi_read_data(s->scsi_dev, s->tag);
+        } else if (s->mode == USB_MSDM_DATAOUT) {
+            scsi_write_data(s->scsi_dev, s->tag);
+        }
+    }
+}
+
+static void usb_msd_send_status(MSDState *s)
+{
+    struct usb_msd_csw csw;
+
+    csw.sig = cpu_to_le32(0x53425355);
+    csw.tag = cpu_to_le32(s->tag);
+    csw.residue = s->residue;
+    csw.status = s->result;
+    memcpy(s->usb_buf, &csw, 13);
+}
+
+static void usb_msd_command_complete(void *opaque, int reason, uint32_t tag,
+                                     uint32_t arg)
 {
     MSDState *s = (MSDState *)opaque;
+    USBPacket *p = s->packet;
 
-    DPRINTF("Command complete\n");
-    s->result = fail;
-    s->mode = USB_MSDM_CSW;
+    if (tag != s->tag) {
+        fprintf(stderr, "usb-msd: Unexpected SCSI Tag 0x%x\n", tag);
+    }
+    if (reason == SCSI_REASON_DONE) {
+        DPRINTF("Command complete %d\n", arg);
+        s->residue = s->data_len;
+        s->result = arg != 0;
+        if (s->packet) {
+            if (s->data_len == 0 && s->mode == USB_MSDM_DATAOUT) {
+                /* A deferred packet with no write data remaining must be
+                   the status read packet.  */
+                usb_msd_send_status(s);
+                s->mode = USB_MSDM_CBW;
+            } else {
+                if (s->data_len) {
+                    s->data_len -= s->usb_len;
+                    if (s->mode == USB_MSDM_DATAIN)
+                        memset(s->usb_buf, 0, s->usb_len);
+                    s->usb_len = 0;
+                }
+                if (s->data_len == 0)
+                    s->mode = USB_MSDM_CSW;
+            }
+            s->packet = NULL;
+            usb_packet_complete(p);
+        } else if (s->data_len == 0) {
+            s->mode = USB_MSDM_CSW;
+        }
+        return;
+    }
+    s->scsi_len = arg;
+    s->scsi_buf = scsi_get_buf(s->scsi_dev, tag);
+    if (p) {
+        usb_msd_copy_data(s);
+        if (s->usb_len == 0) {
+            /* Set s->packet to NULL before calling usb_packet_complete
+               because annother request may be issued before
+               usb_packet_complete returns.  */
+            DPRINTF("Packet complete %p\n", p);
+            s->packet = NULL;
+            usb_packet_complete(p);
+        }
+    }
 }
 
 static void usb_msd_handle_reset(USBDevice *dev)
@@ -233,32 +336,24 @@ static int usb_msd_handle_control(USBDevice *dev, int request, int value,
     return ret;
 }
 
-struct usb_msd_cbw {
-    uint32_t sig;
-    uint32_t tag;
-    uint32_t data_len;
-    uint8_t flags;
-    uint8_t lun;
-    uint8_t cmd_len;
-    uint8_t cmd[16];
-};
+static void usb_msd_cancel_io(USBPacket *p, void *opaque)
+{
+    MSDState *s = opaque;
+    scsi_cancel_io(s->scsi_dev, s->tag);
+    s->packet = NULL;
+    s->scsi_len = 0;
+}
 
-struct usb_msd_csw {
-    uint32_t sig;
-    uint32_t tag;
-    uint32_t residue;
-    uint8_t status;
-};
-
-static int usb_msd_handle_data(USBDevice *dev, int pid, uint8_t devep,
-                               uint8_t *data, int len)
+static int usb_msd_handle_data(USBDevice *dev, USBPacket *p)
 {
     MSDState *s = (MSDState *)dev;
     int ret = 0;
     struct usb_msd_cbw cbw;
-    struct usb_msd_csw csw;
+    uint8_t devep = p->devep;
+    uint8_t *data = p->data;
+    int len = p->len;
 
-    switch (pid) {
+    switch (p->pid) {
     case USB_TOKEN_OUT:
         if (devep != 2)
             goto fail;
@@ -291,7 +386,17 @@ static int usb_msd_handle_data(USBDevice *dev, int pid, uint8_t devep,
             }
             DPRINTF("Command tag 0x%x flags %08x len %d data %d\n",
                     s->tag, cbw.flags, cbw.cmd_len, s->data_len);
+            s->residue = 0;
             scsi_send_command(s->scsi_dev, s->tag, cbw.cmd, 0);
+            /* ??? Should check that USB and SCSI data transfer
+               directions match.  */
+            if (s->residue == 0) {
+                if (s->mode == USB_MSDM_DATAIN) {
+                    scsi_read_data(s->scsi_dev, s->tag);
+                } else if (s->mode == USB_MSDM_DATAOUT) {
+                    scsi_write_data(s->scsi_dev, s->tag);
+                }
+            }
             ret = len;
             break;
 
@@ -300,13 +405,25 @@ static int usb_msd_handle_data(USBDevice *dev, int pid, uint8_t devep,
             if (len > s->data_len)
                 goto fail;
 
-            if (scsi_write_data(s->scsi_dev, data, len))
-                goto fail;
-
-            s->data_len -= len;
-            if (s->data_len == 0)
-                s->mode = USB_MSDM_CSW;
-            ret = len;
+            s->usb_buf = data;
+            s->usb_len = len;
+            if (s->scsi_len) {
+                usb_msd_copy_data(s);
+            }
+            if (s->residue && s->usb_len) {
+                s->data_len -= s->usb_len;
+                if (s->data_len == 0)
+                    s->mode = USB_MSDM_CSW;
+                s->usb_len = 0;
+            }
+            if (s->usb_len) {
+                DPRINTF("Deferring packet %p\n", p);
+                usb_defer_packet(p, usb_msd_cancel_io, s);
+                s->packet = p;
+                ret = USB_RET_ASYNC;
+            } else {
+                ret = len;
+            }
             break;
 
         default:
@@ -320,33 +437,52 @@ static int usb_msd_handle_data(USBDevice *dev, int pid, uint8_t devep,
             goto fail;
 
         switch (s->mode) {
+        case USB_MSDM_DATAOUT:
+            if (s->data_len != 0 || len < 13)
+                goto fail;
+            /* Waiting for SCSI write to complete.  */
+            usb_defer_packet(p, usb_msd_cancel_io, s);
+            s->packet = p;
+            ret = USB_RET_ASYNC;
+            break;
+
         case USB_MSDM_CSW:
             DPRINTF("Command status %d tag 0x%x, len %d\n",
                     s->result, s->tag, len);
             if (len < 13)
                 goto fail;
 
-            csw.sig = cpu_to_le32(0x53425355);
-            csw.tag = cpu_to_le32(s->tag);
-            csw.residue = 0;
-            csw.status = s->result;
-            memcpy(data, &csw, 13);
-            ret = 13;
+            s->usb_len = len;
+            s->usb_buf = data;
+            usb_msd_send_status(s);
             s->mode = USB_MSDM_CBW;
+            ret = 13;
             break;
 
         case USB_MSDM_DATAIN:
             DPRINTF("Data in %d/%d\n", len, s->data_len);
             if (len > s->data_len)
                 len = s->data_len;
-
-            if (scsi_read_data(s->scsi_dev, data, len))
-                goto fail;
-
-            s->data_len -= len;
-            if (s->data_len == 0)
-                s->mode = USB_MSDM_CSW;
-            ret = len;
+            s->usb_buf = data;
+            s->usb_len = len;
+            if (s->scsi_len) {
+                usb_msd_copy_data(s);
+            }
+            if (s->residue && s->usb_len) {
+                s->data_len -= s->usb_len;
+                memset(s->usb_buf, 0, s->usb_len);
+                if (s->data_len == 0)
+                    s->mode = USB_MSDM_CSW;
+                s->usb_len = 0;
+            }
+            if (s->usb_len) {
+                DPRINTF("Deferring packet %p\n", p);
+                usb_defer_packet(p, usb_msd_cancel_io, s);
+                s->packet = p;
+                ret = USB_RET_ASYNC;
+            } else {
+                ret = len;
+            }
             break;
 
         default:
@@ -370,6 +506,7 @@ static void usb_msd_handle_destroy(USBDevice *dev)
     MSDState *s = (MSDState *)dev;
 
     scsi_disk_destroy(s->scsi_dev);
+    bdrv_delete(s->bs);
     qemu_free(s);
 }
 
@@ -383,7 +520,9 @@ USBDevice *usb_msd_init(const char *filename)
         return NULL;
 
     bdrv = bdrv_new("usb");
-    bdrv_open(bdrv, filename, 0);
+    if (bdrv_open(bdrv, filename, 0) < 0)
+        goto fail;
+    s->bs = bdrv;
 
     s->dev.speed = USB_SPEED_FULL;
     s->dev.handle_packet = usb_generic_handle_packet;
@@ -396,7 +535,10 @@ USBDevice *usb_msd_init(const char *filename)
     snprintf(s->dev.devname, sizeof(s->dev.devname), "QEMU USB MSD(%.16s)",
              filename);
 
-    s->scsi_dev = scsi_disk_init(bdrv, usb_msd_command_complete, s);
+    s->scsi_dev = scsi_disk_init(bdrv, 0, usb_msd_command_complete, s);
     usb_msd_handle_reset((USBDevice *)s);
     return (USBDevice *)s;
+ fail:
+    qemu_free(s);
+    return NULL;
 }

@@ -52,26 +52,30 @@ enum RSState {
     RS_GETLINE,
     RS_CHKSUM1,
     RS_CHKSUM2,
+    RS_SYSCALL,
 };
-/* XXX: This is not thread safe.  Do we care?  */
-static int gdbserver_fd = -1;
-
 typedef struct GDBState {
     CPUState *env; /* current CPU */
     enum RSState state; /* parsing state */
-    int fd;
     char line_buf[4096];
     int line_buf_index;
     int line_csum;
+    char last_packet[4100];
+    int last_packet_len;
 #ifdef CONFIG_USER_ONLY
+    int fd;
     int running_state;
+#else
+    CharDriverState *chr;
 #endif
 } GDBState;
 
 #ifdef CONFIG_USER_ONLY
+/* XXX: This is not thread safe.  Do we care?  */
+static int gdbserver_fd = -1;
+
 /* XXX: remove this hack.  */
 static GDBState gdbserver_state;
-#endif
 
 static int get_char(GDBState *s)
 {
@@ -91,9 +95,32 @@ static int get_char(GDBState *s)
     }
     return ch;
 }
+#endif
+
+/* GDB stub state for use by semihosting syscalls.  */
+static GDBState *gdb_syscall_state;
+static gdb_syscall_complete_cb gdb_current_syscall_cb;
+
+enum {
+    GDB_SYS_UNKNOWN,
+    GDB_SYS_ENABLED,
+    GDB_SYS_DISABLED,
+} gdb_syscall_mode;
+
+/* If gdb is connected when the first semihosting syscall occurs then use
+   remote gdb syscalls.  Otherwise use native file IO.  */
+int use_gdb_syscalls(void)
+{
+    if (gdb_syscall_mode == GDB_SYS_UNKNOWN) {
+        gdb_syscall_mode = (gdb_syscall_state ? GDB_SYS_ENABLED
+                                              : GDB_SYS_DISABLED);
+    }
+    return gdb_syscall_mode == GDB_SYS_ENABLED;
+}
 
 static void put_buffer(GDBState *s, const uint8_t *buf, int len)
 {
+#ifdef CONFIG_USER_ONLY
     int ret;
 
     while (len > 0) {
@@ -106,6 +133,9 @@ static void put_buffer(GDBState *s, const uint8_t *buf, int len)
             len -= ret;
         }
     }
+#else
+    qemu_chr_write(s->chr, buf, len);
+#endif
 }
 
 static inline int fromhex(int v)
@@ -154,33 +184,39 @@ static void hextomem(uint8_t *mem, const char *buf, int len)
 /* return -1 if error, 0 if OK */
 static int put_packet(GDBState *s, char *buf)
 {
-    char buf1[3];
-    int len, csum, ch, i;
+    int len, csum, i;
+    char *p;
 
 #ifdef DEBUG_GDB
     printf("reply='%s'\n", buf);
 #endif
 
     for(;;) {
-        buf1[0] = '$';
-        put_buffer(s, buf1, 1);
+        p = s->last_packet;
+        *(p++) = '$';
         len = strlen(buf);
-        put_buffer(s, buf, len);
+        memcpy(p, buf, len);
+        p += len;
         csum = 0;
         for(i = 0; i < len; i++) {
             csum += buf[i];
         }
-        buf1[0] = '#';
-        buf1[1] = tohex((csum >> 4) & 0xf);
-        buf1[2] = tohex((csum) & 0xf);
+        *(p++) = '#';
+        *(p++) = tohex((csum >> 4) & 0xf);
+        *(p++) = tohex((csum) & 0xf);
 
-        put_buffer(s, buf1, 3);
+        s->last_packet_len = p - s->last_packet;
+        put_buffer(s, s->last_packet, s->last_packet_len);
 
-        ch = get_char(s);
-        if (ch < 0)
+#ifdef CONFIG_USER_ONLY
+        i = get_char(s);
+        if (i < 0)
             return -1;
-        if (ch == '+')
+        if (i == '+')
             break;
+#else
+        break;
+#endif
     }
     return 0;
 }
@@ -434,6 +470,73 @@ static void cpu_gdb_write_registers(CPUState *env, uint8_t *mem_buf, int size)
     ptr += 8 * 12 + 4;
     cpsr_write (env, tswapl(*(uint32_t *)ptr), 0xffffffff);
 }
+#elif defined (TARGET_M68K)
+static int cpu_gdb_read_registers(CPUState *env, uint8_t *mem_buf)
+{
+    int i;
+    uint8_t *ptr;
+    CPU_DoubleU u;
+
+    ptr = mem_buf;
+    /* D0-D7 */
+    for (i = 0; i < 8; i++) {
+        *(uint32_t *)ptr = tswapl(env->dregs[i]);
+        ptr += 4;
+    }
+    /* A0-A7 */
+    for (i = 0; i < 8; i++) {
+        *(uint32_t *)ptr = tswapl(env->aregs[i]);
+        ptr += 4;
+    }
+    *(uint32_t *)ptr = tswapl(env->sr);
+    ptr += 4;
+    *(uint32_t *)ptr = tswapl(env->pc);
+    ptr += 4;
+    /* F0-F7.  The 68881/68040 have 12-bit extended precision registers.
+       ColdFire has 8-bit double precision registers.  */
+    for (i = 0; i < 8; i++) {
+        u.d = env->fregs[i];
+        *(uint32_t *)ptr = tswap32(u.l.upper);
+        *(uint32_t *)ptr = tswap32(u.l.lower);
+    }
+    /* FP control regs (not implemented).  */
+    memset (ptr, 0, 3 * 4);
+    ptr += 3 * 4;
+
+    return ptr - mem_buf;
+}
+
+static void cpu_gdb_write_registers(CPUState *env, uint8_t *mem_buf, int size)
+{
+    int i;
+    uint8_t *ptr;
+    CPU_DoubleU u;
+
+    ptr = mem_buf;
+    /* D0-D7 */
+    for (i = 0; i < 8; i++) {
+        env->dregs[i] = tswapl(*(uint32_t *)ptr);
+        ptr += 4;
+    }
+    /* A0-A7 */
+    for (i = 0; i < 8; i++) {
+        env->aregs[i] = tswapl(*(uint32_t *)ptr);
+        ptr += 4;
+    }
+    env->sr = tswapl(*(uint32_t *)ptr);
+    ptr += 4;
+    env->pc = tswapl(*(uint32_t *)ptr);
+    ptr += 4;
+    /* F0-F7.  The 68881/68040 have 12-bit extended precision registers.
+       ColdFire has 8-bit double precision registers.  */
+    for (i = 0; i < 8; i++) {
+        u.l.upper = tswap32(*(uint32_t *)ptr); 
+        u.l.lower = tswap32(*(uint32_t *)ptr);
+        env->fregs[i] = u.d;
+    }
+    /* FP control regs (not implemented).  */
+    ptr += 3 * 4;
+}
 #elif defined (TARGET_MIPS)
 static int cpu_gdb_read_registers(CPUState *env, uint8_t *mem_buf)
 {
@@ -465,10 +568,36 @@ static int cpu_gdb_read_registers(CPUState *env, uint8_t *mem_buf)
     *(uint32_t *)ptr = tswapl(env->PC);
     ptr += 4;
 
+#ifdef MIPS_USES_FPU
+    for (i = 0; i < 32; i++)
+      {
+        *(uint32_t *)ptr = tswapl(FPR_W (env, i));
+        ptr += 4;
+      }
+
+    *(uint32_t *)ptr = tswapl(env->fcr31);
+    ptr += 4;
+
+    *(uint32_t *)ptr = tswapl(env->fcr0);
+    ptr += 4;
+#endif
+
     /* 32 FP registers, fsr, fir, fp.  Not yet implemented.  */
+    /* what's 'fp' mean here?  */
 
     return ptr - mem_buf;
 }
+
+/* convert MIPS rounding mode in FCR31 to IEEE library */
+static unsigned int ieee_rm[] =
+  {
+    float_round_nearest_even,
+    float_round_to_zero,
+    float_round_up,
+    float_round_down
+  };
+#define RESTORE_ROUNDING_MODE \
+    set_float_rounding_mode(ieee_rm[env->fcr31 & 3], &env->fp_status)
 
 static void cpu_gdb_write_registers(CPUState *env, uint8_t *mem_buf, int size)
 {
@@ -499,6 +628,28 @@ static void cpu_gdb_write_registers(CPUState *env, uint8_t *mem_buf, int size)
 
     env->PC = tswapl(*(uint32_t *)ptr);
     ptr += 4;
+
+#ifdef MIPS_USES_FPU
+    for (i = 0; i < 32; i++)
+      {
+	FPR_W (env, i) = tswapl(*(uint32_t *)ptr);
+        ptr += 4;
+      }
+
+    env->fcr31 = tswapl(*(uint32_t *)ptr) & 0x0183FFFF;
+    ptr += 4;
+
+    env->fcr0 = tswapl(*(uint32_t *)ptr);
+    ptr += 4;
+
+    /* set rounding mode */
+    RESTORE_ROUNDING_MODE;
+
+#ifndef CONFIG_SOFTFLOAT
+    /* no floating point exception for native float */
+    SET_FP_ENABLE(env->fcr31, 0);
+#endif
+#endif
 }
 #elif defined (TARGET_SH4)
 static int cpu_gdb_read_registers(CPUState *env, uint8_t *mem_buf)
@@ -626,6 +777,34 @@ static int gdb_handle_packet(GDBState *s, CPUState *env, const char *line_buf)
         vm_start();
 #endif
 	return RS_IDLE;
+    case 'F':
+        {
+            target_ulong ret;
+            target_ulong err;
+
+            ret = strtoull(p, (char **)&p, 16);
+            if (*p == ',') {
+                p++;
+                err = strtoull(p, (char **)&p, 16);
+            } else {
+                err = 0;
+            }
+            if (*p == ',')
+                p++;
+            type = *p;
+            if (gdb_current_syscall_cb)
+                gdb_current_syscall_cb(s->env, ret, err);
+            if (type == 'C') {
+                put_packet(s, "T02");
+            } else {
+#ifdef CONFIG_USER_ONLY
+                s->running_state = 1;
+#else
+                vm_start();
+#endif
+            }
+        }
+        break;
     case 'g':
         reg_size = cpu_gdb_read_registers(env, mem_buf);
         memtohex(buf, mem_buf, reg_size);
@@ -695,7 +874,7 @@ static int gdb_handle_packet(GDBState *s, CPUState *env, const char *line_buf)
             goto breakpoint_error;
         }
         break;
-#ifdef CONFIG_USER_ONLY
+#ifdef CONFIG_LINUX_USER
     case 'q':
         if (strncmp(p, "Offsets", 7) == 0) {
             TaskState *ts = env->opaque;
@@ -726,6 +905,9 @@ static void gdb_vm_stopped(void *opaque, int reason)
     char buf[256];
     int ret;
 
+    if (s->state == RS_SYSCALL)
+        return;
+
     /* disable single step if it was enable */
     cpu_single_step(s->env, 0);
 
@@ -742,6 +924,60 @@ static void gdb_vm_stopped(void *opaque, int reason)
 }
 #endif
 
+/* Send a gdb syscall request.
+   This accepts limited printf-style format specifiers, specifically:
+    %x - target_ulong argument printed in hex.
+    %s - string pointer (target_ulong) and length (int) pair.  */
+void gdb_do_syscall(gdb_syscall_complete_cb cb, char *fmt, ...)
+{
+    va_list va;
+    char buf[256];
+    char *p;
+    target_ulong addr;
+    GDBState *s;
+
+    s = gdb_syscall_state;
+    if (!s)
+        return;
+    gdb_current_syscall_cb = cb;
+    s->state = RS_SYSCALL;
+#ifndef CONFIG_USER_ONLY
+    vm_stop(EXCP_DEBUG);
+#endif
+    s->state = RS_IDLE;
+    va_start(va, fmt);
+    p = buf;
+    *(p++) = 'F';
+    while (*fmt) {
+        if (*fmt == '%') {
+            fmt++;
+            switch (*fmt++) {
+            case 'x':
+                addr = va_arg(va, target_ulong);
+                p += sprintf(p, TARGET_FMT_lx, addr);
+                break;
+            case 's':
+                addr = va_arg(va, target_ulong);
+                p += sprintf(p, TARGET_FMT_lx "/%x", addr, va_arg(va, int));
+                break;
+            default:
+                fprintf(stderr, "gdbstub: Bad syscall format string '%s'\n",
+                        fmt - 1);
+                break;
+            }
+        } else {
+            *(p++) = *(fmt++);
+        }
+    }
+    va_end(va);
+    put_packet(s, buf);
+#ifdef CONFIG_USER_ONLY
+    gdb_handlesig(s->env, 0);
+#else
+    cpu_interrupt(s->env, CPU_INTERRUPT_EXIT);
+#endif
+}
+
 static void gdb_read_byte(GDBState *s, int ch)
 {
     CPUState *env = s->env;
@@ -749,6 +985,26 @@ static void gdb_read_byte(GDBState *s, int ch)
     char reply[1];
 
 #ifndef CONFIG_USER_ONLY
+    if (s->last_packet_len) {
+        /* Waiting for a response to the last packet.  If we see the start
+           of a new command then abandon the previous response.  */
+        if (ch == '-') {
+#ifdef DEBUG_GDB
+            printf("Got NACK, retransmitting\n");
+#endif
+            put_buffer(s, s->last_packet, s->last_packet_len);
+        }
+#ifdef DEBUG_GDB
+        else if (ch == '+')
+            printf("Got ACK\n");
+        else
+            printf("Got '%c' when expecting ACK/NACK\n", ch);
+#endif
+        if (ch == '+' || ch == '$')
+            s->last_packet_len = 0;
+        if (ch != '$')
+            return;
+    }
     if (vm_running) {
         /* when the CPU is running, we cannot do anything except stop
            it when receiving a char */
@@ -793,6 +1049,8 @@ static void gdb_read_byte(GDBState *s, int ch)
                 s->state = gdb_handle_packet(s, env, s->line_buf);
             }
             break;
+        default:
+            abort();
         }
     }
 }
@@ -857,29 +1115,6 @@ void gdb_exit(CPUState *env, int code)
   put_packet(s, buf);
 }
 
-#else
-static void gdb_read(void *opaque)
-{
-    GDBState *s = opaque;
-    int i, size;
-    uint8_t buf[4096];
-
-    size = recv(s->fd, buf, sizeof(buf), 0);
-    if (size < 0)
-        return;
-    if (size == 0) {
-        /* end of connection */
-        qemu_del_vm_stop_handler(gdb_vm_stopped, s);
-        qemu_set_fd_handler(s->fd, NULL, NULL, NULL);
-        qemu_free(s);
-        vm_start();
-    } else {
-        for(i = 0; i < size; i++)
-            gdb_read_byte(s, buf[i]);
-    }
-}
-
-#endif
 
 static void gdb_accept(void *opaque)
 {
@@ -903,32 +1138,14 @@ static void gdb_accept(void *opaque)
     val = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&val, sizeof(val));
     
-#ifdef CONFIG_USER_ONLY
     s = &gdbserver_state;
     memset (s, 0, sizeof (GDBState));
-#else
-    s = qemu_mallocz(sizeof(GDBState));
-    if (!s) {
-        close(fd);
-        return;
-    }
-#endif
     s->env = first_cpu; /* XXX: allow to change CPU */
     s->fd = fd;
 
-#ifdef CONFIG_USER_ONLY
+    gdb_syscall_state = s;
+
     fcntl(fd, F_SETFL, O_NONBLOCK);
-#else
-    socket_set_nonblock(fd);
-
-    /* stop the VM */
-    vm_stop(EXCP_INTERRUPT);
-
-    /* start handling I/O */
-    qemu_set_fd_handler(s->fd, gdb_read, NULL, s);
-    /* when the VM is stopped, the following callback is called */
-    qemu_add_vm_stop_handler(gdb_vm_stopped, s);
-#endif
 }
 
 static int gdbserver_open(int port)
@@ -959,9 +1176,6 @@ static int gdbserver_open(int port)
         perror("listen");
         return -1;
     }
-#ifndef CONFIG_USER_ONLY
-    socket_set_nonblock(fd);
-#endif
     return fd;
 }
 
@@ -971,10 +1185,67 @@ int gdbserver_start(int port)
     if (gdbserver_fd < 0)
         return -1;
     /* accept connections */
-#ifdef CONFIG_USER_ONLY
     gdb_accept (NULL);
-#else
-    qemu_set_fd_handler(gdbserver_fd, gdb_accept, NULL, NULL);
-#endif
     return 0;
 }
+#else
+static int gdb_chr_can_recieve(void *opaque)
+{
+  return 1;
+}
+
+static void gdb_chr_recieve(void *opaque, const uint8_t *buf, int size)
+{
+    GDBState *s = opaque;
+    int i;
+
+    for (i = 0; i < size; i++) {
+        gdb_read_byte(s, buf[i]);
+    }
+}
+
+static void gdb_chr_event(void *opaque, int event)
+{
+    switch (event) {
+    case CHR_EVENT_RESET:
+        vm_stop(EXCP_INTERRUPT);
+        gdb_syscall_state = opaque;
+        break;
+    default:
+        break;
+    }
+}
+
+int gdbserver_start(CharDriverState *chr)
+{
+    GDBState *s;
+
+    if (!chr)
+        return -1;
+
+    s = qemu_mallocz(sizeof(GDBState));
+    if (!s) {
+        return -1;
+    }
+    s->env = first_cpu; /* XXX: allow to change CPU */
+    s->chr = chr;
+    qemu_chr_add_handlers(chr, gdb_chr_can_recieve, gdb_chr_recieve,
+                          gdb_chr_event, s);
+    qemu_add_vm_stop_handler(gdb_vm_stopped, s);
+    return 0;
+}
+
+int gdbserver_start_port(int port)
+{
+    CharDriverState *chr;
+    char gdbstub_port_name[128];
+
+    snprintf(gdbstub_port_name, sizeof(gdbstub_port_name),
+             "tcp::%d,nowait,nodelay,server", port);
+    chr = qemu_chr_open(gdbstub_port_name);
+    if (!chr) 
+        return -EIO;
+    return gdbserver_start(chr);
+}
+
+#endif

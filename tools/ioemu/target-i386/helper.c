@@ -553,6 +553,20 @@ static inline unsigned int get_sp_mask(unsigned int e2)
         return 0xffff;
 }
 
+#ifdef TARGET_X86_64
+#define SET_ESP(val, sp_mask)\
+do {\
+    if ((sp_mask) == 0xffff)\
+        ESP = (ESP & ~0xffff) | ((val) & 0xffff);\
+    else if ((sp_mask) == 0xffffffffLL)\
+        ESP = (uint32_t)(val);\
+    else\
+        ESP = (val);\
+} while (0)
+#else
+#define SET_ESP(val, sp_mask) ESP = (ESP & ~(sp_mask)) | ((val) & (sp_mask))
+#endif
+
 /* XXX: add a is_user flag to have proper security support */
 #define PUSHW(ssp, sp, sp_mask, val)\
 {\
@@ -584,10 +598,10 @@ static void do_interrupt_protected(int intno, int is_int, int error_code,
 {
     SegmentCache *dt;
     target_ulong ptr, ssp;
-    int type, dpl, selector, ss_dpl, cpl, sp_mask;
+    int type, dpl, selector, ss_dpl, cpl;
     int has_error_code, new_stack, shift;
     uint32_t e1, e2, offset, ss, esp, ss_e1, ss_e2;
-    uint32_t old_eip;
+    uint32_t old_eip, sp_mask;
 
     has_error_code = 0;
     if (!is_int && !is_hw) {
@@ -623,7 +637,8 @@ static void do_interrupt_protected(int intno, int is_int, int error_code,
             raise_exception_err(EXCP0B_NOSEG, intno * 8 + 2);
         switch_tss(intno * 8, e1, e2, SWITCH_TSS_CALL, old_eip);
         if (has_error_code) {
-            int mask, type;
+            int type;
+            uint32_t mask;
             /* push the error code */
             type = (env->tr.flags >> DESC_TYPE_SHIFT) & 0xf;
             shift = type >> 3;
@@ -637,7 +652,7 @@ static void do_interrupt_protected(int intno, int is_int, int error_code,
                 stl_kernel(ssp, error_code);
             else
                 stw_kernel(ssp, error_code);
-            ESP = (esp & mask) | (ESP & ~mask);
+            SET_ESP(esp, mask);
         }
         return;
     case 6: /* 286 interrupt gate */
@@ -765,7 +780,7 @@ static void do_interrupt_protected(int intno, int is_int, int error_code,
         cpu_x86_load_seg_cache(env, R_SS, ss, 
                                ssp, get_seg_limit(ss_e1, ss_e2), ss_e2);
     }
-    ESP = (ESP & ~sp_mask) | (esp & sp_mask);
+    SET_ESP(esp, sp_mask);
 
     selector = (selector & ~3) | dpl;
     cpu_x86_load_seg_cache(env, R_CS, selector, 
@@ -962,7 +977,7 @@ void helper_syscall(int next_eip_addend)
         cpu_x86_set_cpl(env, 0);
         cpu_x86_load_seg_cache(env, R_CS, selector & 0xfffc, 
                            0, 0xffffffff, 
-                               DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
+                               DESC_G_MASK | DESC_P_MASK |
                                DESC_S_MASK |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK | DESC_L_MASK);
         cpu_x86_load_seg_cache(env, R_SS, (selector + 8) & 0xfffc, 
@@ -1013,7 +1028,7 @@ void helper_sysret(int dflag)
         if (dflag == 2) {
             cpu_x86_load_seg_cache(env, R_CS, (selector + 16) | 3, 
                                    0, 0xffffffff, 
-                                   DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
+                                   DESC_G_MASK | DESC_P_MASK |
                                    DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
                                    DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK | 
                                    DESC_L_MASK);
@@ -1214,6 +1229,289 @@ void raise_exception(int exception_index)
 {
     raise_interrupt(exception_index, 0, 0, 0);
 }
+
+/* SMM support */
+
+#if defined(CONFIG_USER_ONLY) 
+
+void do_smm_enter(void)
+{
+}
+
+void helper_rsm(void)
+{
+}
+
+#else
+
+#ifdef TARGET_X86_64
+#define SMM_REVISION_ID 0x00020064
+#else
+#define SMM_REVISION_ID 0x00020000
+#endif
+
+void do_smm_enter(void)
+{
+    target_ulong sm_state;
+    SegmentCache *dt;
+    int i, offset;
+
+    if (loglevel & CPU_LOG_INT) {
+        fprintf(logfile, "SMM: enter\n");
+        cpu_dump_state(env, logfile, fprintf, X86_DUMP_CCOP);
+    }
+
+    env->hflags |= HF_SMM_MASK;
+    cpu_smm_update(env);
+
+    sm_state = env->smbase + 0x8000;
+    
+#ifdef TARGET_X86_64
+    for(i = 0; i < 6; i++) {
+        dt = &env->segs[i];
+        offset = 0x7e00 + i * 16;
+        stw_phys(sm_state + offset, dt->selector);
+        stw_phys(sm_state + offset + 2, (dt->flags >> 8) & 0xf0ff);
+        stl_phys(sm_state + offset + 4, dt->limit);
+        stq_phys(sm_state + offset + 8, dt->base);
+    }
+
+    stq_phys(sm_state + 0x7e68, env->gdt.base);
+    stl_phys(sm_state + 0x7e64, env->gdt.limit);
+
+    stw_phys(sm_state + 0x7e70, env->ldt.selector);
+    stq_phys(sm_state + 0x7e78, env->ldt.base);
+    stl_phys(sm_state + 0x7e74, env->ldt.limit);
+    stw_phys(sm_state + 0x7e72, (env->ldt.flags >> 8) & 0xf0ff);
+    
+    stq_phys(sm_state + 0x7e88, env->idt.base);
+    stl_phys(sm_state + 0x7e84, env->idt.limit);
+
+    stw_phys(sm_state + 0x7e90, env->tr.selector);
+    stq_phys(sm_state + 0x7e98, env->tr.base);
+    stl_phys(sm_state + 0x7e94, env->tr.limit);
+    stw_phys(sm_state + 0x7e92, (env->tr.flags >> 8) & 0xf0ff);
+    
+    stq_phys(sm_state + 0x7ed0, env->efer);
+
+    stq_phys(sm_state + 0x7ff8, EAX);
+    stq_phys(sm_state + 0x7ff0, ECX);
+    stq_phys(sm_state + 0x7fe8, EDX);
+    stq_phys(sm_state + 0x7fe0, EBX);
+    stq_phys(sm_state + 0x7fd8, ESP);
+    stq_phys(sm_state + 0x7fd0, EBP);
+    stq_phys(sm_state + 0x7fc8, ESI);
+    stq_phys(sm_state + 0x7fc0, EDI);
+    for(i = 8; i < 16; i++) 
+        stq_phys(sm_state + 0x7ff8 - i * 8, env->regs[i]);
+    stq_phys(sm_state + 0x7f78, env->eip);
+    stl_phys(sm_state + 0x7f70, compute_eflags());
+    stl_phys(sm_state + 0x7f68, env->dr[6]);
+    stl_phys(sm_state + 0x7f60, env->dr[7]);
+
+    stl_phys(sm_state + 0x7f48, env->cr[4]);
+    stl_phys(sm_state + 0x7f50, env->cr[3]);
+    stl_phys(sm_state + 0x7f58, env->cr[0]);
+
+    stl_phys(sm_state + 0x7efc, SMM_REVISION_ID);
+    stl_phys(sm_state + 0x7f00, env->smbase);
+#else
+    stl_phys(sm_state + 0x7ffc, env->cr[0]);
+    stl_phys(sm_state + 0x7ff8, env->cr[3]);
+    stl_phys(sm_state + 0x7ff4, compute_eflags());
+    stl_phys(sm_state + 0x7ff0, env->eip);
+    stl_phys(sm_state + 0x7fec, EDI);
+    stl_phys(sm_state + 0x7fe8, ESI);
+    stl_phys(sm_state + 0x7fe4, EBP);
+    stl_phys(sm_state + 0x7fe0, ESP);
+    stl_phys(sm_state + 0x7fdc, EBX);
+    stl_phys(sm_state + 0x7fd8, EDX);
+    stl_phys(sm_state + 0x7fd4, ECX);
+    stl_phys(sm_state + 0x7fd0, EAX);
+    stl_phys(sm_state + 0x7fcc, env->dr[6]);
+    stl_phys(sm_state + 0x7fc8, env->dr[7]);
+    
+    stl_phys(sm_state + 0x7fc4, env->tr.selector);
+    stl_phys(sm_state + 0x7f64, env->tr.base);
+    stl_phys(sm_state + 0x7f60, env->tr.limit);
+    stl_phys(sm_state + 0x7f5c, (env->tr.flags >> 8) & 0xf0ff);
+    
+    stl_phys(sm_state + 0x7fc0, env->ldt.selector);
+    stl_phys(sm_state + 0x7f80, env->ldt.base);
+    stl_phys(sm_state + 0x7f7c, env->ldt.limit);
+    stl_phys(sm_state + 0x7f78, (env->ldt.flags >> 8) & 0xf0ff);
+    
+    stl_phys(sm_state + 0x7f74, env->gdt.base);
+    stl_phys(sm_state + 0x7f70, env->gdt.limit);
+
+    stl_phys(sm_state + 0x7f58, env->idt.base);
+    stl_phys(sm_state + 0x7f54, env->idt.limit);
+
+    for(i = 0; i < 6; i++) {
+        dt = &env->segs[i];
+        if (i < 3)
+            offset = 0x7f84 + i * 12;
+        else
+            offset = 0x7f2c + (i - 3) * 12;
+        stl_phys(sm_state + 0x7fa8 + i * 4, dt->selector);
+        stl_phys(sm_state + offset + 8, dt->base);
+        stl_phys(sm_state + offset + 4, dt->limit);
+        stl_phys(sm_state + offset, (dt->flags >> 8) & 0xf0ff);
+    }
+    stl_phys(sm_state + 0x7f14, env->cr[4]);
+
+    stl_phys(sm_state + 0x7efc, SMM_REVISION_ID);
+    stl_phys(sm_state + 0x7ef8, env->smbase);
+#endif
+    /* init SMM cpu state */
+
+#ifdef TARGET_X86_64
+    env->efer = 0;
+    env->hflags &= ~HF_LMA_MASK;
+#endif
+    load_eflags(0, ~(CC_O | CC_S | CC_Z | CC_A | CC_P | CC_C | DF_MASK));
+    env->eip = 0x00008000;
+    cpu_x86_load_seg_cache(env, R_CS, (env->smbase >> 4) & 0xffff, env->smbase,
+                           0xffffffff, 0);
+    cpu_x86_load_seg_cache(env, R_DS, 0, 0, 0xffffffff, 0);
+    cpu_x86_load_seg_cache(env, R_ES, 0, 0, 0xffffffff, 0);
+    cpu_x86_load_seg_cache(env, R_SS, 0, 0, 0xffffffff, 0);
+    cpu_x86_load_seg_cache(env, R_FS, 0, 0, 0xffffffff, 0);
+    cpu_x86_load_seg_cache(env, R_GS, 0, 0, 0xffffffff, 0);
+    
+    cpu_x86_update_cr0(env, 
+                       env->cr[0] & ~(CR0_PE_MASK | CR0_EM_MASK | CR0_TS_MASK | CR0_PG_MASK));
+    cpu_x86_update_cr4(env, 0);
+    env->dr[7] = 0x00000400;
+    CC_OP = CC_OP_EFLAGS;
+}
+
+void helper_rsm(void)
+{
+    target_ulong sm_state;
+    int i, offset;
+    uint32_t val;
+
+    sm_state = env->smbase + 0x8000;
+#ifdef TARGET_X86_64
+    env->efer = ldq_phys(sm_state + 0x7ed0);
+    if (env->efer & MSR_EFER_LMA)
+        env->hflags |= HF_LMA_MASK;
+    else
+        env->hflags &= ~HF_LMA_MASK;
+
+    for(i = 0; i < 6; i++) {
+        offset = 0x7e00 + i * 16;
+        cpu_x86_load_seg_cache(env, i, 
+                               lduw_phys(sm_state + offset),
+                               ldq_phys(sm_state + offset + 8),
+                               ldl_phys(sm_state + offset + 4),
+                               (lduw_phys(sm_state + offset + 2) & 0xf0ff) << 8);
+    }
+
+    env->gdt.base = ldq_phys(sm_state + 0x7e68);
+    env->gdt.limit = ldl_phys(sm_state + 0x7e64);
+
+    env->ldt.selector = lduw_phys(sm_state + 0x7e70);
+    env->ldt.base = ldq_phys(sm_state + 0x7e78);
+    env->ldt.limit = ldl_phys(sm_state + 0x7e74);
+    env->ldt.flags = (lduw_phys(sm_state + 0x7e72) & 0xf0ff) << 8;
+    
+    env->idt.base = ldq_phys(sm_state + 0x7e88);
+    env->idt.limit = ldl_phys(sm_state + 0x7e84);
+
+    env->tr.selector = lduw_phys(sm_state + 0x7e90);
+    env->tr.base = ldq_phys(sm_state + 0x7e98);
+    env->tr.limit = ldl_phys(sm_state + 0x7e94);
+    env->tr.flags = (lduw_phys(sm_state + 0x7e92) & 0xf0ff) << 8;
+    
+    EAX = ldq_phys(sm_state + 0x7ff8);
+    ECX = ldq_phys(sm_state + 0x7ff0);
+    EDX = ldq_phys(sm_state + 0x7fe8);
+    EBX = ldq_phys(sm_state + 0x7fe0);
+    ESP = ldq_phys(sm_state + 0x7fd8);
+    EBP = ldq_phys(sm_state + 0x7fd0);
+    ESI = ldq_phys(sm_state + 0x7fc8);
+    EDI = ldq_phys(sm_state + 0x7fc0);
+    for(i = 8; i < 16; i++) 
+        env->regs[i] = ldq_phys(sm_state + 0x7ff8 - i * 8);
+    env->eip = ldq_phys(sm_state + 0x7f78);
+    load_eflags(ldl_phys(sm_state + 0x7f70), 
+                ~(CC_O | CC_S | CC_Z | CC_A | CC_P | CC_C | DF_MASK));
+    env->dr[6] = ldl_phys(sm_state + 0x7f68);
+    env->dr[7] = ldl_phys(sm_state + 0x7f60);
+
+    cpu_x86_update_cr4(env, ldl_phys(sm_state + 0x7f48));
+    cpu_x86_update_cr3(env, ldl_phys(sm_state + 0x7f50));
+    cpu_x86_update_cr0(env, ldl_phys(sm_state + 0x7f58));
+
+    val = ldl_phys(sm_state + 0x7efc); /* revision ID */
+    if (val & 0x20000) {
+        env->smbase = ldl_phys(sm_state + 0x7f00) & ~0x7fff;
+    }
+#else
+    cpu_x86_update_cr0(env, ldl_phys(sm_state + 0x7ffc));
+    cpu_x86_update_cr3(env, ldl_phys(sm_state + 0x7ff8));
+    load_eflags(ldl_phys(sm_state + 0x7ff4), 
+                ~(CC_O | CC_S | CC_Z | CC_A | CC_P | CC_C | DF_MASK));
+    env->eip = ldl_phys(sm_state + 0x7ff0);
+    EDI = ldl_phys(sm_state + 0x7fec);
+    ESI = ldl_phys(sm_state + 0x7fe8);
+    EBP = ldl_phys(sm_state + 0x7fe4);
+    ESP = ldl_phys(sm_state + 0x7fe0);
+    EBX = ldl_phys(sm_state + 0x7fdc);
+    EDX = ldl_phys(sm_state + 0x7fd8);
+    ECX = ldl_phys(sm_state + 0x7fd4);
+    EAX = ldl_phys(sm_state + 0x7fd0);
+    env->dr[6] = ldl_phys(sm_state + 0x7fcc);
+    env->dr[7] = ldl_phys(sm_state + 0x7fc8);
+    
+    env->tr.selector = ldl_phys(sm_state + 0x7fc4) & 0xffff;
+    env->tr.base = ldl_phys(sm_state + 0x7f64);
+    env->tr.limit = ldl_phys(sm_state + 0x7f60);
+    env->tr.flags = (ldl_phys(sm_state + 0x7f5c) & 0xf0ff) << 8;
+    
+    env->ldt.selector = ldl_phys(sm_state + 0x7fc0) & 0xffff;
+    env->ldt.base = ldl_phys(sm_state + 0x7f80);
+    env->ldt.limit = ldl_phys(sm_state + 0x7f7c);
+    env->ldt.flags = (ldl_phys(sm_state + 0x7f78) & 0xf0ff) << 8;
+    
+    env->gdt.base = ldl_phys(sm_state + 0x7f74);
+    env->gdt.limit = ldl_phys(sm_state + 0x7f70);
+
+    env->idt.base = ldl_phys(sm_state + 0x7f58);
+    env->idt.limit = ldl_phys(sm_state + 0x7f54);
+
+    for(i = 0; i < 6; i++) {
+        if (i < 3)
+            offset = 0x7f84 + i * 12;
+        else
+            offset = 0x7f2c + (i - 3) * 12;
+        cpu_x86_load_seg_cache(env, i, 
+                               ldl_phys(sm_state + 0x7fa8 + i * 4) & 0xffff,
+                               ldl_phys(sm_state + offset + 8),
+                               ldl_phys(sm_state + offset + 4),
+                               (ldl_phys(sm_state + offset) & 0xf0ff) << 8);
+    }
+    cpu_x86_update_cr4(env, ldl_phys(sm_state + 0x7f14));
+
+    val = ldl_phys(sm_state + 0x7efc); /* revision ID */
+    if (val & 0x20000) {
+        env->smbase = ldl_phys(sm_state + 0x7ef8) & ~0x7fff;
+    }
+#endif
+    CC_OP = CC_OP_EFLAGS;
+    env->hflags &= ~HF_SMM_MASK;
+    cpu_smm_update(env);
+
+    if (loglevel & CPU_LOG_INT) {
+        fprintf(logfile, "SMM: after RSM\n");
+        cpu_dump_state(env, logfile, fprintf, X86_DUMP_CCOP);
+    }
+}
+
+#endif /* !CONFIG_USER_ONLY */
+
 
 #ifdef BUGGY_GCC_DIV64
 /* gcc 2.95.4 on PowerPC does not seem to like using __udivdi3, so we
@@ -1732,7 +2030,7 @@ void helper_lcall_real_T0_T1(int shift, int next_eip)
         PUSHW(ssp, esp, esp_mask, next_eip);
     }
 
-    ESP = (ESP & ~esp_mask) | (esp & esp_mask);
+    SET_ESP(esp, esp_mask);
     env->eip = new_eip;
     env->segs[R_CS].selector = new_cs;
     env->segs[R_CS].base = (new_cs << 4);
@@ -1818,7 +2116,7 @@ void helper_lcall_protected_T0_T1(int shift, int next_eip_addend)
             if (new_eip > limit)
                 raise_exception_err(EXCP0D_GPF, new_cs & 0xfffc);
             /* from this point, not restartable */
-            ESP = (ESP & ~sp_mask) | (sp & sp_mask);
+            SET_ESP(sp, sp_mask);
             cpu_x86_load_seg_cache(env, R_CS, (new_cs & 0xfffc) | cpl,
                                    get_seg_base(e1, e2), limit, e2);
             EIP = new_eip;
@@ -1947,7 +2245,7 @@ void helper_lcall_protected_T0_T1(int shift, int next_eip_addend)
                        get_seg_limit(e1, e2),
                        e2);
         cpu_x86_set_cpl(env, dpl);
-        ESP = (ESP & ~sp_mask) | (sp & sp_mask);
+        SET_ESP(sp, sp_mask);
         EIP = offset;
     }
 #ifdef USE_KQEMU
@@ -2124,12 +2422,14 @@ static inline void helper_ret_protected(int shift, int is_iret, int addend)
         if ((new_ss & 0xfffc) == 0) {
 #ifdef TARGET_X86_64
             /* NULL ss is allowed in long mode if cpl != 3*/
+            /* XXX: test CS64 ? */
             if ((env->hflags & HF_LMA_MASK) && rpl != 3) {
                 cpu_x86_load_seg_cache(env, R_SS, new_ss, 
                                        0, 0xffffffff,
                                        DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
                                        DESC_S_MASK | (rpl << DESC_DPL_SHIFT) |
                                        DESC_W_MASK | DESC_A_MASK);
+                ss_e2 = DESC_B_MASK; /* XXX: should not be needed ? */
             } else 
 #endif
             {
@@ -2176,7 +2476,7 @@ static inline void helper_ret_protected(int shift, int is_iret, int addend)
 
         sp += addend;
     }
-    ESP = (ESP & ~sp_mask) | (sp & sp_mask);
+    SET_ESP(sp, sp_mask);
     env->eip = new_eip;
     if (is_iret) {
         /* NOTE: 'cpl' is the _old_ CPL */
@@ -3418,14 +3718,14 @@ void helper_hlt(void)
 
 void helper_monitor(void)
 {
-    if (ECX != 0)
+    if ((uint32_t)ECX != 0)
         raise_exception(EXCP0D_GPF);
     /* XXX: store address ? */
 }
 
 void helper_mwait(void)
 {
-    if (ECX != 0)
+    if ((uint32_t)ECX != 0)
         raise_exception(EXCP0D_GPF);
     /* XXX: not complete but not completely erroneous */
     if (env->cpu_index != 0 || env->next_cpu != NULL) {

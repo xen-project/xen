@@ -1,22 +1,23 @@
 Index: ioemu/block.c
 ===================================================================
---- ioemu.orig/block.c	2007-05-03 14:55:04.000000000 +0100
-+++ ioemu/block.c	2007-05-03 14:59:20.000000000 +0100
-@@ -420,6 +420,8 @@
+--- ioemu.orig/block.c	2007-05-09 13:31:35.000000000 +0100
++++ ioemu/block.c	2007-05-09 13:32:33.000000000 +0100
+@@ -502,6 +502,9 @@
+     if (!drv)
+         return -ENOMEDIUM;
  
-     if (!bs->inserted)
-         return -1;
 +    if (sector_num < 0)
-+	return -1;
- 
-     while (nb_sectors > 0) {
-         if (sector_num == 0 && bs->boot_sector_enabled) {
-@@ -458,6 +460,8 @@
-         return -1;
++	return -EINVAL;
++
+     if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
+             memcpy(buf, bs->boot_sector_data, 512);
+         sector_num++;
+@@ -539,6 +542,8 @@
+         return -ENOMEDIUM;
      if (bs->read_only)
-         return -1;
+         return -EACCES;
 +    if (sector_num < 0)
-+	return -1;
++	return -EINVAL;
      if (sector_num == 0 && bs->boot_sector_enabled && nb_sectors > 0) {
          memcpy(bs->boot_sector_data, buf, 512);   
      }

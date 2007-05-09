@@ -633,13 +633,9 @@ int main_loop(void)
     handle_buffered_io(env);
     main_loop_wait(1); /* For the select() on events */
 
-    /* Stop the IDE thread */
-    ide_stop_dma_thread();
-
     /* Save the device state */
     sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
-    if (qemu_savevm(qemu_file) < 0)
-        fprintf(stderr, "qemu save fail.\n");
+    do_savevm(qemu_file);
 
     return 0;
 }

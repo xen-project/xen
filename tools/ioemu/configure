@@ -22,6 +22,8 @@ static="no"
 libdir="lib"
 cross_prefix=""
 cc="gcc"
+gcc3_search="yes"
+gcc3_list="gcc-3.4 gcc34 gcc-3.3 gcc33 gcc-3.2 gcc32"
 host_cc="gcc"
 ar="ar"
 make="make"
@@ -89,14 +91,13 @@ bsd="no"
 linux="no"
 kqemu="no"
 profiler="no"
-kernel_path=""
 cocoa="no"
 check_gfx="yes"
 check_gcc="no"
 softmmu="yes"
-user="no"
+linux_user="no"
+darwin_user="no"
 build_docs="no"
-build_acpi_tables="no"
 uname_release=""
 
 # OS specific
@@ -104,7 +105,7 @@ targetos=`uname -s`
 case $targetos in
 CYGWIN*)
 mingw32="yes"
-CFLAGS="-O2 -mno-cygwin"
+OS_CFLAGS="-mno-cygwin"
 ;;
 MINGW32*)
 mingw32="yes"
@@ -127,6 +128,10 @@ oss="yes"
 Darwin)
 bsd="yes"
 darwin="yes"
+darwin_user="yes"
+cocoa="yes"
+coreaudio="yes"
+OS_CFLAGS="-mdynamic-no-pic"
 ;;
 SunOS)
 solaris="yes"
@@ -134,7 +139,7 @@ solaris="yes"
 *)
 oss="yes"
 linux="yes"
-user="yes"
+linux_user="yes"
 if [ "$cpu" = "i386" -o "$cpu" = "x86_64" ] ; then
     kqemu="yes"
 fi
@@ -151,6 +156,11 @@ if [ "$solaris" = "yes" ] ; then
     make="gmake"
     install="ginstall"
     solarisrev=`uname -r | cut -f2 -d.`
+    if [ "$cpu" = "i386" -o "$cpu" = "x86_64" ] ; then
+        if test "$solarisrev" -gt 10 ; then
+            kqemu="yes"
+        fi
+    fi
 fi
 
 # find source path
@@ -181,6 +191,7 @@ for opt do
   --cross-prefix=*) cross_prefix="$optarg"
   ;;
   --cc=*) cc="$optarg"
+  gcc3_search="no"
   ;;
   --host-cc=*) host_cc="$optarg"
   ;;
@@ -224,8 +235,6 @@ for opt do
   ;;
   --enable-profiler) profiler="yes"
   ;;
-  --kernel-path=*) kernel_path="$optarg"
-  ;;
   --enable-cocoa) cocoa="yes" ; coreaudio="yes" ; sdl="no"
   ;;
   --disable-gcc-check) check_gcc="no"
@@ -234,21 +243,22 @@ for opt do
   ;;
   --enable-system) softmmu="yes"
   ;;
-  --disable-user) user="no"
+  --disable-linux-user) linux_user="no"
   ;;
-  --enable-user) user="yes"
+  --enable-linux-user) linux_user="yes"
+  ;;
+  --disable-darwin-user) darwin_user="no"
+  ;;
+  --enable-darwin-user) darwin_user="yes"
   ;;
   --enable-uname-release=*) uname_release="$optarg"
-  ;;
-  --enable-iasl) build_acpi_tables="yes"
   ;;
   esac
 done
 
-# Checking for CFLAGS
-if test -z "$CFLAGS"; then
-    CFLAGS="-O2"
-fi
+# default flags for all hosts
+CFLAGS="$CFLAGS -Wall -O2 -g -fno-strict-aliasing"
+LDFLAGS="$LDFLAGS -g"
 
 if test x"$show_help" = x"yes" ; then
 cat << EOF
@@ -266,7 +276,6 @@ echo "  --target-list=LIST       set target list [$target_list]"
 echo ""
 echo "kqemu kernel acceleration support:"
 echo "  --disable-kqemu          disable kqemu support"
-echo "  --kernel-path=PATH       set the kernel path (configure probes it)"
 echo ""
 echo "Advanced options (experts only):"
 echo "  --source-path=PATH       path of source code [$source_path]"
@@ -285,14 +294,15 @@ echo "  --enable-fmod            enable FMOD audio driver"
 echo "  --enabled-dsound         enable DirectSound audio driver"
 echo "  --enable-system          enable all system emulation targets"
 echo "  --disable-system         disable all system emulation targets"
-echo "  --enable-user            enable all linux usermode emulation targets"
-echo "  --disable-user           disable all linux usermode emulation targets"
+echo "  --enable-linux-user      enable all linux usermode emulation targets"
+echo "  --disable-linux-user     disable all linux usermode emulation targets"
+echo "  --enable-darwin-user     enable all darwin usermode emulation targets"
+echo "  --disable-darwin-user    disable all darwin usermode emulation targets"
 echo "  --fmod-lib               path to FMOD library"
 echo "  --fmod-inc               path to FMOD includes"
 echo "  --enable-uname-release=R Return R for uname -r in usermode emulation"
-echo "  --enable-iasl            compilation of ACPI tables with the IASL compiler"
 echo ""
-echo "NOTE: The object files are build at the place where configure is launched"
+echo "NOTE: The object files are built at the place where configure is launched"
 exit 1
 fi
 
@@ -318,6 +328,45 @@ if test "$mingw32" = "yes" ; then
     oss="no"
     if [ "$cpu" = "i386" ] ; then
         kqemu="yes"
+    fi
+fi
+
+# Check for gcc4, error if pre-gcc4 
+if test "$check_gcc" = "yes" ; then
+    cat > $TMPC <<EOF
+#if __GNUC__ < 4
+#error gcc3
+#endif
+int main(){return 0;}
+EOF
+    check_cc() {
+	which "$1" >&/dev/null
+	return $?
+    }
+
+    if "$cc" -o $TMPE $TMPC 2>/dev/null ; then
+	echo "WARNING: \"$cc\" looks like gcc 4.x"
+	found_compat_cc="no"
+	if test "$gcc3_search" = "yes" ; then
+	    echo "Looking for gcc 3.x"
+	    for compat_cc in $gcc3_list ; do
+		if check_cc "$compat_cc" ; then
+		    echo "Found \"$compat_cc\""
+		    cc="$compat_cc"
+		    found_compat_cc="yes"
+		    break
+		fi
+	    done
+	    if test "$found_compat_cc" = "no" ; then
+		echo "gcc 3.x not found!"
+	    fi
+	fi
+	if test "$found_compat_cc" = "no" ; then
+	    echo "QEMU is known to have problems when compiled with gcc 4.x"
+	    echo "It is recommended that you use gcc 3.x to build QEMU"
+	    echo "To use this compiler anyway, configure with --disable-gcc-check"
+	    exit 1;
+	fi
     fi
 fi
 
@@ -368,8 +417,12 @@ if test -z "$target_list" ; then
         target_list="i386-softmmu ppc-softmmu sparc-softmmu x86_64-softmmu mips-softmmu mipsel-softmmu arm-softmmu"
     fi
 # the following are Linux specific
-    if [ "$user" = "yes" ] ; then
-        target_list="i386-user arm-user armeb-user sparc-user ppc-user mips-user mipsel-user $target_list"
+    if [ "$linux_user" = "yes" ] ; then
+        target_list="i386-linux-user arm-linux-user armeb-linux-user sparc-linux-user ppc-linux-user mips-linux-user mipsel-linux-user m68k-linux-user $target_list"
+    fi
+# the following are Darwin specific
+    if [ "$darwin_user" = "yes" ] ; then
+        target_list="i386-darwin-user ppc-darwin-user $target_list"
     fi
 # the i386-dm target
     target_list="i386-dm"
@@ -427,23 +480,6 @@ if $cc -fno-reorder-blocks -fno-optimize-sibling-calls -o $TMPO $TMPC 2> /dev/nu
    have_gcc3_options="yes"
 fi
 
-# Check for gcc4, error if pre-gcc4 
-if test "$check_gcc" = "yes" ; then
-    cat > $TMPC <<EOF
-#if __GNUC__ < 4
-#error gcc3
-#endif
-int main(){return 0;}
-EOF
-    if $cc -o $TMPO $TMPC 2>/dev/null ; then
-        echo "ERROR: \"$cc\" looks like gcc 4.x"
-        echo "QEMU is known to have problems when compiled with gcc 4.x"
-        echo "It is recommended that you use gcc 3.x to build QEMU"
-        echo "To use this compiler anyway, configure with --disable-gcc-check"
-        exit 1;
-    fi
-fi
-
 ##########################################
 # SDL probe
 
@@ -472,7 +508,9 @@ _sdlversion=`$sdl_config --version | sed 's/[^0-9]//g'`
 if test "$_sdlversion" -lt 121 ; then
 sdl_too_old=yes
 else
-sdl=yes
+ if test "$cocoa" = "no" ; then
+   sdl=yes
+ fi
 fi
 
 # static link with sdl ?
@@ -493,7 +531,33 @@ fi # static link
 fi # sdl compile test
 
 fi # cross compilation
+
+else
+ # Make sure to disable cocoa if sdl was set
+ if test "$sdl" = "yes" ; then
+   cocoa="no"
+   coreaudio="no"
+ fi
 fi # -z $sdl
+
+##########################################
+# alsa sound support libraries
+
+if test "$alsa" = "yes" ; then
+  cat > $TMPC << EOF
+#include <alsa/asoundlib.h>
+int main(void) { snd_pcm_t **handle; return snd_pcm_close(*handle); }
+EOF
+  if $cc -o $TMPE $TMPC -lasound 2> /dev/null ; then
+    :
+  else
+    echo
+    echo "Error: Could not find alsa"
+    echo "Make sure to have the alsa libs and headers installed."
+    echo
+    exit 1
+  fi
+fi
 
 # Check if tools are available to build documentation.
 if [ -x "`which texi2html`" ] && [ -x "`which pod2man`" ]; then
@@ -600,6 +664,7 @@ fi
 echo "HOST_CC=$host_cc" >> $config_mak
 echo "AR=$ar" >> $config_mak
 echo "STRIP=$strip -s -R .comment -R .note" >> $config_mak
+echo "OS_CFLAGS=$OS_CFLAGS" >> $config_mak
 echo "CFLAGS=$CFLAGS" >> $config_mak
 echo "LDFLAGS=$LDFLAGS" >> $config_mak
 echo "EXESUF=$EXESUF" >> $config_mak
@@ -719,9 +784,6 @@ echo "TARGET_DIRS=$target_list" >> $config_mak
 if [ "$build_docs" = "yes" ] ; then
   echo "BUILD_DOCS=yes" >> $config_mak
 fi
-if [ "$build_acpi_tables" = "yes" ] ; then
-  echo "BUILD_ACPI_TABLES=yes" >> $config_mak
-fi
 
 # XXX: suppress that
 if [ "$bsd" = "yes" ] ; then
@@ -745,6 +807,7 @@ target_bigendian="no"
 [ "$target_cpu" = "ppc64" ] && target_bigendian=yes
 [ "$target_cpu" = "mips" ] && target_bigendian=yes
 [ "$target_cpu" = "sh4eb" ] && target_bigendian=yes
+[ "$target_cpu" = "m68k" ] && target_bigendian=yes
 target_softmmu="no"
 if expr $target : '.*-softmmu' > /dev/null ; then
   target_softmmu="yes"
@@ -756,11 +819,21 @@ if expr $target : '.*-user' > /dev/null ; then
   target_user_only="yes"
 fi
 
+target_linux_user="no"
+if expr $target : '.*-linux-user' > /dev/null ; then
+  target_linux_user="yes"
+fi
+
+target_darwin_user="no"
+if expr $target : '.*-darwin-user' > /dev/null ; then
+  target_darwin_user="yes"
+fi
+
 #echo "Creating $config_mak, $config_h and $target_dir/Makefile"
 
 mkdir -p $target_dir
 mkdir -p $target_dir/fpu
-if test "$target" = "arm-user" -o "$target" = "armeb-user" ; then
+if test "$target" = "arm-linux-user" -o "$target" = "armeb-linux-user" ; then
   mkdir -p $target_dir/nwfpe
 fi
 if test "$target_user_only" = "no" ; then
@@ -840,6 +913,11 @@ elif test "$target_cpu" = "sh4" -o "$target_cpu" = "sh4eb" ; then
   echo "#define TARGET_ARCH \"sh4\"" >> $config_h
   echo "#define TARGET_SH4 1" >> $config_h
   bflt="yes"
+elif test "$target_cpu" = "m68k" ; then
+  echo "TARGET_ARCH=m68k" >> $config_mak
+  echo "#define TARGET_ARCH \"m68k\"" >> $config_h
+  echo "#define TARGET_M68K 1" >> $config_h
+  bflt="yes"
 else
   echo "Unsupported target CPU"
   exit 1
@@ -856,12 +934,19 @@ if test "$target_user_only" = "yes" ; then
   echo "CONFIG_USER_ONLY=yes" >> $config_mak
   echo "#define CONFIG_USER_ONLY 1" >> $config_h
 fi
-
+if test "$target_linux_user" = "yes" ; then
+  echo "CONFIG_LINUX_USER=yes" >> $config_mak
+  echo "#define CONFIG_LINUX_USER 1" >> $config_h
+fi
+if test "$target_darwin_user" = "yes" ; then
+  echo "CONFIG_DARWIN_USER=yes" >> $config_mak
+  echo "#define CONFIG_DARWIN_USER 1" >> $config_h
+fi
 if expr $target : '.*-dm' > /dev/null ; then
   echo "#define CONFIG_DM 1" >> $config_h
 fi
 
-if test "$target_cpu" = "arm" -o "$target_cpu" = "armeb" -o "$target_cpu" = "sparc" -o "$target_cpu" = "sparc64"; then
+if test "$target_cpu" = "arm" -o "$target_cpu" = "armeb" -o "$target_cpu" = "sparc" -o "$target_cpu" = "sparc64" -o "$target_cpu" = "m68k"; then
   echo "CONFIG_SOFTFLOAT=yes" >> $config_mak
   echo "#define CONFIG_SOFTFLOAT 1" >> $config_h
 fi

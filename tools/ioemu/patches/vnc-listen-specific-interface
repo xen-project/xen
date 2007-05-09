@@ -20,9 +20,9 @@ Signed-off-by:  Daniel P. Berrange <berrange@redhat.com>
 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:24:06.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:24:06.000000000 +0100
-@@ -123,6 +123,7 @@
+--- ioemu.orig/vl.c	2007-05-09 14:12:16.000000000 +0100
++++ ioemu/vl.c	2007-05-09 14:12:43.000000000 +0100
+@@ -133,6 +133,7 @@
  int nographic;
  int vncviewer;
  int vncunused;
@@ -30,7 +30,7 @@ Index: ioemu/vl.c
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
  int boot_device = 'c';
-@@ -2831,10 +2832,22 @@
+@@ -3008,10 +3009,22 @@
      return -1;
  }
  
@@ -54,7 +54,7 @@ Index: ioemu/vl.c
      const char *p, *r;
      int port;
  
-@@ -2845,14 +2858,8 @@
+@@ -3022,14 +3035,8 @@
      if (buf[0] == '\0') {
          saddr->sin_addr.s_addr = 0;
      } else {
@@ -71,15 +71,15 @@ Index: ioemu/vl.c
      }
      port = strtol(p, (char **)&r, 0);
      if (r == p)
-@@ -5419,6 +5426,7 @@
+@@ -6313,6 +6320,7 @@
  	   "-vnc display    start a VNC server on display\n"
             "-vncviewer      start a vncviewer process for this domain\n"
             "-vncunused      bind the VNC server to an unused port\n"
 +           "-vnclisten      bind the VNC server to this address\n"
-            "-acpi           disable or enable ACPI of HVM domain \n"
-            "\n"
-            "During emulation, the following keys are useful:\n"
-@@ -5507,6 +5515,7 @@
+ #ifndef _WIN32
+ 	   "-daemonize      daemonize QEMU after initializing\n"
+ #endif
+@@ -6410,6 +6418,7 @@
      QEMU_OPTION_acpi,
      QEMU_OPTION_vncviewer,
      QEMU_OPTION_vncunused,
@@ -87,15 +87,15 @@ Index: ioemu/vl.c
  };
  
  typedef struct QEMUOption {
-@@ -5583,6 +5592,7 @@
+@@ -6490,6 +6499,7 @@
      { "vnc", HAS_ARG, QEMU_OPTION_vnc },
      { "vncviewer", 0, QEMU_OPTION_vncviewer },
      { "vncunused", 0, QEMU_OPTION_vncunused },
 +    { "vnclisten", HAS_ARG, QEMU_OPTION_vnclisten },
-     
+ 
      /* temporary options */
      { "usb", 0, QEMU_OPTION_usb },
-@@ -5974,6 +5984,8 @@
+@@ -6889,6 +6899,8 @@
  
      nb_nics = 0;
      /* default mac address of the first network interface */
@@ -104,9 +104,9 @@ Index: ioemu/vl.c
      
      /* init debug */
      sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%ld.log", (long)getpid());
-@@ -6346,6 +6358,9 @@
-                 if (vnc_display == -1)
-                     vnc_display = 0;
+@@ -7280,6 +7292,9 @@
+             case QEMU_OPTION_vncunused:
+                 vncunused++;
                  break;
 +            case QEMU_OPTION_vnclisten:
 +                parse_host(&vnclisten_addr, optarg);
@@ -114,19 +114,20 @@ Index: ioemu/vl.c
              }
          }
      }
-@@ -6547,7 +6562,7 @@
-     if (nographic) {
+@@ -7563,7 +7578,8 @@
          dumb_display_init(ds);
-     } else if (vnc_display != -1) {
--	vnc_display = vnc_display_init(ds, vnc_display, vncunused);
-+	vnc_display = vnc_display_init(ds, vnc_display, vncunused, &vnclisten_addr);
+     } else if (vnc_display != NULL || vncunused != 0) {
+ 	int vnc_display_port;
+-	vnc_display_port = vnc_display_init(ds, vnc_display, vncunused);
++	vnc_display_port = vnc_display_init(ds, vnc_display, vncunused,
++					    &vnclisten_addr);
  	if (vncviewer)
- 	    vnc_start_viewer(vnc_display);
+ 	    vnc_start_viewer(vnc_display_port);
      } else {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 10:24:06.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 10:24:06.000000000 +0100
+--- ioemu.orig/vl.h	2007-05-09 14:12:16.000000000 +0100
++++ ioemu/vl.h	2007-05-09 14:12:43.000000000 +0100
 @@ -37,6 +37,8 @@
  #include <unistd.h>
  #include <fcntl.h>
@@ -136,42 +137,72 @@ Index: ioemu/vl.h
  #include "xenctrl.h"
  #include "xs.h"
  #include <xen/hvm/e820.h>
-@@ -785,7 +787,7 @@
+@@ -928,7 +930,7 @@
  void cocoa_display_init(DisplayState *ds, int full_screen);
  
  /* vnc.c */
--int vnc_display_init(DisplayState *ds, int display, int find_unused);
-+int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr);
+-int vnc_display_init(DisplayState *ds, const char *display, int find_unused);
++int vnc_display_init(DisplayState *ds, const char *display, int find_unused, struct sockaddr_in *iaddr);
+ void do_info_vnc(void);
  int vnc_start_viewer(int port);
  
- /* ide.c */
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2007-05-03 10:24:06.000000000 +0100
-+++ ioemu/vnc.c	2007-05-03 10:24:06.000000000 +0100
-@@ -1197,9 +1197,8 @@
+--- ioemu.orig/vnc.c	2007-05-09 14:12:21.000000000 +0100
++++ ioemu/vnc.c	2007-05-09 14:12:43.000000000 +0100
+@@ -1270,10 +1270,9 @@
+ 
+ extern int parse_host_port(struct sockaddr_in *saddr, const char *str);
+ 
+-int vnc_display_init(DisplayState *ds, const char *arg, int find_unused)
++int vnc_display_init(DisplayState *ds, const char *arg, int find_unused, struct sockaddr_in *iaddr)
+ {
+     struct sockaddr *addr;
+-    struct sockaddr_in iaddr;
+ #ifndef _WIN32
+     struct sockaddr_un uaddr;
+ #endif
+@@ -1334,8 +1333,8 @@
+     } else
+ #endif
+     {
+-	addr = (struct sockaddr *)&iaddr;
+-	addrlen = sizeof(iaddr);
++	addr = (struct sockaddr *)iaddr;
++	addrlen = sizeof(*iaddr);
+ 
+ 	vs->lsock = socket(PF_INET, SOCK_STREAM, 0);
+ 	if (vs->lsock == -1) {
+@@ -1343,12 +1342,12 @@
+ 	    exit(1);
+ 	}
+ 
+-	if (parse_host_port(&iaddr, arg) < 0) {
++	if (parse_host_port(iaddr, arg) < 0) {
+ 	    fprintf(stderr, "Could not parse VNC address\n");
+ 	    exit(1);
+ 	}
+ 	    
+-	iaddr.sin_port = htons(ntohs(iaddr.sin_port) + 5900);
++	iaddr->sin_port = htons(ntohs(iaddr->sin_port) + 5900);
+ 
+ 	reuse_addr = 1;
+ 	ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
+@@ -1361,7 +1360,7 @@
+ 
+     while (bind(vs->lsock, addr, addrlen) == -1) {
+ 	if (find_unused && errno == EADDRINUSE) {
+-	    iaddr.sin_port = htons(ntohs(iaddr.sin_port) + 1);
++	    iaddr->sin_port = htons(ntohs(iaddr->sin_port) + 1);
+ 	    continue;
+ 	}
+ 	fprintf(stderr, "bind() failed\n");
+@@ -1378,7 +1377,7 @@
+ 	exit(1);
      }
+ 
+-    return ntohs(iaddr.sin_port);
++    return ntohs(iaddr->sin_port);
  }
  
--int vnc_display_init(DisplayState *ds, int display, int find_unused)
-+int vnc_display_init(DisplayState *ds, int display, int find_unused, struct sockaddr_in *addr)
- {
--    struct sockaddr_in addr;
-     int reuse_addr, ret;
-     VncState *vs;
- 
-@@ -1237,11 +1236,10 @@
-     }
- 
-  retry:
--    addr.sin_family = AF_INET;
--    addr.sin_port = htons(5900 + display);
--    memset(&addr.sin_addr, 0, sizeof(addr.sin_addr));
-+    addr->sin_family = AF_INET;
-+    addr->sin_port = htons(5900 + display);
- 
--    if (bind(vs->lsock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
-+    if (bind(vs->lsock, (struct sockaddr *)addr, sizeof(struct sockaddr_in)) == -1) {
- 	if (find_unused && errno == EADDRINUSE) {
- 	    display++;
- 	    goto retry;
+ int vnc_start_viewer(int port)

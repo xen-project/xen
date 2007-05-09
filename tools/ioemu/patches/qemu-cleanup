@@ -1,8 +1,8 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2007-05-02 16:04:46.000000000 +0100
-+++ ioemu/hw/vga.c	2007-05-02 16:05:50.000000000 +0100
-@@ -1622,7 +1622,9 @@
+--- ioemu.orig/hw/vga.c	2007-05-03 18:18:01.000000000 +0100
++++ ioemu/hw/vga.c	2007-05-03 18:59:25.000000000 +0100
+@@ -1636,7 +1636,9 @@
  static void vga_save(QEMUFile *f, void *opaque)
  {
      VGAState *s = opaque;
@@ -10,25 +10,25 @@ Index: ioemu/hw/vga.c
      int i;
 +#endif
  
-     qemu_put_be32s(f, &s->latch);
-     qemu_put_8s(f, &s->sr_index);
-@@ -1663,7 +1665,10 @@
+     if (s->pci_dev)
+         pci_device_save(s->pci_dev, f);
+@@ -1680,7 +1682,10 @@
  static int vga_load(QEMUFile *f, void *opaque, int version_id)
  {
      VGAState *s = opaque;
--    int is_vbe, i;
-+    int is_vbe;
+-    int is_vbe, i, ret;
++    int is_vbe, ret;
 +#ifdef CONFIG_BOCHS_VBE
 +    int i;
 +#endif
  
-     if (version_id != 1)
+     if (version_id > 2)
          return -EINVAL;
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-02 16:05:50.000000000 +0100
-+++ ioemu/vl.c	2007-05-02 16:05:50.000000000 +0100
-@@ -39,6 +39,7 @@
+--- ioemu.orig/vl.c	2007-05-03 18:57:13.000000000 +0100
++++ ioemu/vl.c	2007-05-03 18:57:23.000000000 +0100
+@@ -40,6 +40,7 @@
  #include <sys/ioctl.h>
  #include <sys/socket.h>
  #include <netinet/in.h>
@@ -36,7 +36,7 @@ Index: ioemu/vl.c
  #include <dirent.h>
  #include <netdb.h>
  #ifdef _BSD
-@@ -2932,7 +2933,7 @@
+@@ -3129,7 +3130,7 @@
      }
  
      /* XXX: better tmp dir construction */
@@ -45,7 +45,7 @@ Index: ioemu/vl.c
      if (mkdir(smb_dir, 0700) < 0) {
          fprintf(stderr, "qemu: could not create samba server dir '%s'\n", smb_dir);
          exit(1);
-@@ -3893,7 +3894,7 @@
+@@ -4092,7 +4093,7 @@
                  perror("Opening pidfile");
                  exit(1);
              }
@@ -54,7 +54,7 @@ Index: ioemu/vl.c
              fclose(f);
              pid_filename = qemu_strdup(filename);
              if (!pid_filename) {
-@@ -5308,7 +5309,9 @@
+@@ -6207,7 +6208,9 @@
      QEMU_OPTION_d,
      QEMU_OPTION_hdachs,
      QEMU_OPTION_L,
@@ -64,7 +64,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_k,
      QEMU_OPTION_localtime,
      QEMU_OPTION_cirrusvga,
-@@ -5379,7 +5382,9 @@
+@@ -6284,7 +6287,9 @@
      { "d", HAS_ARG, QEMU_OPTION_d },
      { "hdachs", HAS_ARG, QEMU_OPTION_hdachs },
      { "L", HAS_ARG, QEMU_OPTION_L },
@@ -74,7 +74,7 @@ Index: ioemu/vl.c
  #ifdef USE_KQEMU
      { "no-kqemu", 0, QEMU_OPTION_no_kqemu },
      { "kernel-kqemu", 0, QEMU_OPTION_kernel_kqemu },
-@@ -5853,9 +5858,11 @@
+@@ -6772,9 +6777,11 @@
                  fd_bootchk = 0;
                  break;
  #endif
@@ -88,9 +88,9 @@ Index: ioemu/vl.c
                      fprintf(stderr, "qemu: too many network clients\n");
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-02 16:05:50.000000000 +0100
-+++ ioemu/vl.h	2007-05-02 16:05:50.000000000 +0100
-@@ -957,7 +957,7 @@
+--- ioemu.orig/vl.h	2007-05-03 18:49:10.000000000 +0100
++++ ioemu/vl.h	2007-05-03 18:57:23.000000000 +0100
+@@ -1133,7 +1133,7 @@
  	       unsigned long vram_offset, int vram_size, int width, int height);
  
  /* slavio_intctl.c */
@@ -101,13 +101,12 @@ Index: ioemu/vl.h
  void slavio_irq_info(void *opaque);
 Index: ioemu/usb-linux.c
 ===================================================================
---- ioemu.orig/usb-linux.c	2007-05-02 16:04:46.000000000 +0100
-+++ ioemu/usb-linux.c	2007-05-02 16:05:50.000000000 +0100
-@@ -26,7 +26,9 @@
+--- ioemu.orig/usb-linux.c	2007-05-03 18:17:59.000000000 +0100
++++ ioemu/usb-linux.c	2007-05-03 18:59:55.000000000 +0100
+@@ -26,6 +26,9 @@
  #if defined(__linux__)
  #include <dirent.h>
  #include <sys/ioctl.h>
--#include <linux/compiler.h>
 +/* Some versions of usbdevice_fs.h need __user to be defined for them.   */
 +/* This may (harmlessly) conflict with a definition in linux/compiler.h. */
 +#define __user

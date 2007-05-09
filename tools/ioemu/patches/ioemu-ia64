@@ -1,7 +1,7 @@
 Index: ioemu/hw/iommu.c
 ===================================================================
---- ioemu.orig/hw/iommu.c	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/hw/iommu.c	2007-05-03 10:05:51.000000000 +0100
+--- ioemu.orig/hw/iommu.c	2007-05-03 18:18:01.000000000 +0100
++++ ioemu/hw/iommu.c	2007-05-03 19:09:15.000000000 +0100
 @@ -82,7 +82,11 @@
  #define IOPTE_VALID         0x00000002 /* IOPTE is valid */
  #define IOPTE_WAZ           0x00000001 /* Write as zeros */
@@ -16,9 +16,9 @@ Index: ioemu/hw/iommu.c
  
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/cpu-all.h	2007-05-03 10:05:51.000000000 +0100
-@@ -835,6 +835,31 @@
+--- ioemu.orig/cpu-all.h	2007-05-03 19:00:55.000000000 +0100
++++ ioemu/cpu-all.h	2007-05-03 19:09:15.000000000 +0100
+@@ -843,6 +843,31 @@
                  :"=m" (*(volatile long *)addr)
                  :"dIr" (nr));
  }
@@ -52,11 +52,11 @@ Index: ioemu/cpu-all.h
  /* memory API */
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:04:06.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:25:23.000000000 +0100
-@@ -6142,6 +6142,11 @@
-             exit(1);
+--- ioemu.orig/vl.c	2007-05-03 19:08:57.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:09:15.000000000 +0100
+@@ -7149,6 +7149,11 @@
      }
+ #endif
  
 +#if defined (__ia64__)
 +    if (ram_size > MMIO_START)
@@ -66,7 +66,7 @@ Index: ioemu/vl.c
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
-@@ -6182,6 +6187,44 @@
+@@ -7198,6 +7203,44 @@
  
      free(page_array);
  
@@ -113,9 +113,9 @@ Index: ioemu/vl.c
      phys_ram_base = qemu_vmalloc(phys_ram_size);
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/exec-all.h	2007-05-03 10:05:51.000000000 +0100
-@@ -462,12 +462,13 @@
+--- ioemu.orig/exec-all.h	2007-05-03 18:38:09.000000000 +0100
++++ ioemu/exec-all.h	2007-05-03 19:09:15.000000000 +0100
+@@ -472,12 +472,13 @@
  }
  #endif
  
@@ -134,8 +134,8 @@ Index: ioemu/exec-all.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/target-i386-dm/cpu.h	2007-05-03 10:25:13.000000000 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2007-05-03 18:49:10.000000000 +0100
++++ ioemu/target-i386-dm/cpu.h	2007-05-03 19:09:15.000000000 +0100
 @@ -78,7 +78,11 @@
  /* helper2.c */
  int main_loop(void);
@@ -151,7 +151,7 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/ia64_intrinsic.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/ia64_intrinsic.h	2007-05-03 10:05:51.000000000 +0100
++++ ioemu/ia64_intrinsic.h	2007-05-03 19:09:15.000000000 +0100
 @@ -0,0 +1,276 @@
 +#ifndef IA64_INTRINSIC_H
 +#define IA64_INTRINSIC_H

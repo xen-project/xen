@@ -1,7 +1,8 @@
-diff -r ead4d7bbf711 cpu-all.h
---- a/cpu-all.h	Tue May 30 13:32:07 2006 +0100
-+++ b/cpu-all.h	Tue May 30 13:32:25 2006 +0100
-@@ -820,6 +820,23 @@ int cpu_inl(CPUState *env, int addr);
+Index: ioemu/cpu-all.h
+===================================================================
+--- ioemu.orig/cpu-all.h	2007-05-03 19:00:05.000000000 +0100
++++ ioemu/cpu-all.h	2007-05-03 19:00:55.000000000 +0100
+@@ -828,6 +828,23 @@
  int cpu_inl(CPUState *env, int addr);
  #endif
  

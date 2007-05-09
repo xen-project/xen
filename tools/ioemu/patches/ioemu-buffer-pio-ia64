@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 15:07:15.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 15:07:15.000000000 +0100
-@@ -5924,6 +5924,7 @@
+--- ioemu.orig/vl.c	2007-05-09 13:47:16.000000000 +0100
++++ ioemu/vl.c	2007-05-09 13:47:16.000000000 +0100
+@@ -6839,6 +6839,7 @@
      unsigned long ioreq_pfn;
      extern void *shared_page;
      extern void *buffered_io_page;
@@ -10,7 +10,7 @@ Index: ioemu/vl.c
      unsigned long nr_pages;
  
      char qemu_dm_logfilename[64];
-@@ -6530,6 +6531,10 @@
+@@ -7544,6 +7545,10 @@
                                         PROT_READ|PROT_WRITE,
                                         BUFFER_IO_PAGE_START >> PAGE_SHIFT);
  
@@ -23,11 +23,11 @@ Index: ioemu/vl.c
  	
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2007-05-03 15:07:15.000000000 +0100
-+++ ioemu/hw/ide.c	2007-05-03 15:07:15.000000000 +0100
-@@ -474,6 +474,121 @@
- }
- #endif /* DMA_MULTI_THREAD */
+--- ioemu.orig/hw/ide.c	2007-05-09 13:47:15.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-09 13:47:16.000000000 +0100
+@@ -393,6 +393,121 @@
+     int type; /* see IDE_TYPE_xxx */
+ } PCIIDEState;
  
 +#if defined(__ia64__)
 +#include <xen/hvm/ioreq.h>
@@ -144,10 +144,10 @@ Index: ioemu/hw/ide.c
 +#define buffered_pio_read(I,A,S)    do {} while (0)
 +#endif
 +
- static void ide_dma_start(IDEState *s, IDEDMAFunc *dma_cb);
+ static void ide_dma_start(IDEState *s, BlockDriverCompletionFunc *dma_cb);
+ static void ide_atapi_cmd_read_dma_cb(void *opaque, int ret);
  
- static void padstr(char *str, const char *src, int len)
-@@ -658,6 +773,7 @@
+@@ -587,6 +702,7 @@
      s->data_ptr = buf;
      s->data_end = buf + size;
      s->status |= DRQ_STAT;
@@ -155,7 +155,7 @@ Index: ioemu/hw/ide.c
  }
  
  static void ide_transfer_stop(IDEState *s)
-@@ -666,6 +782,7 @@
+@@ -595,6 +711,7 @@
      s->data_ptr = s->io_buffer;
      s->data_end = s->io_buffer;
      s->status &= ~DRQ_STAT;
@@ -163,7 +163,7 @@ Index: ioemu/hw/ide.c
  }
  
  static int64_t ide_get_sector(IDEState *s)
-@@ -1578,6 +1695,7 @@
+@@ -1596,6 +1713,7 @@
          ide_if[0].select = (val & ~0x10) | 0xa0;
          ide_if[1].select = (val | 0x10) | 0xa0;
          /* select drive */
@@ -171,7 +171,7 @@ Index: ioemu/hw/ide.c
          unit = (val >> 4) & 1;
          s = ide_if + unit;
          ide_if->cur_drive = s;
-@@ -1936,6 +2054,7 @@
+@@ -1954,6 +2072,7 @@
      IDEState *s = ((IDEState *)opaque)->cur_drive;
      uint8_t *p;
  
@@ -179,7 +179,7 @@ Index: ioemu/hw/ide.c
      p = s->data_ptr;
      *(uint16_t *)p = le16_to_cpu(val);
      p += 2;
-@@ -1949,6 +2068,8 @@
+@@ -1967,6 +2086,8 @@
      IDEState *s = ((IDEState *)opaque)->cur_drive;
      uint8_t *p;
      int ret;
@@ -188,7 +188,7 @@ Index: ioemu/hw/ide.c
      p = s->data_ptr;
      ret = cpu_to_le16(*(uint16_t *)p);
      p += 2;
-@@ -1963,6 +2084,7 @@
+@@ -1981,6 +2102,7 @@
      IDEState *s = ((IDEState *)opaque)->cur_drive;
      uint8_t *p;
  
@@ -196,7 +196,7 @@ Index: ioemu/hw/ide.c
      p = s->data_ptr;
      *(uint32_t *)p = le32_to_cpu(val);
      p += 4;
-@@ -1977,6 +2099,7 @@
+@@ -1995,6 +2117,7 @@
      uint8_t *p;
      int ret;
      
@@ -204,12 +204,21 @@ Index: ioemu/hw/ide.c
      p = s->data_ptr;
      ret = cpu_to_le32(*(uint32_t *)p);
      p += 4;
-@@ -2634,6 +2757,8 @@
+@@ -2624,6 +2747,8 @@
      ide_init_ioport(&d->ide_if[0], 0x1f0, 0x3f6);
      ide_init_ioport(&d->ide_if[2], 0x170, 0x376);
  
 +    buffered_pio_init();
 +
-     register_savevm("ide_pci", 0, 1, generic_pci_save, generic_pci_load, d);
      register_savevm("ide", 0, 1, pci_ide_save, pci_ide_load, d);
+ }
+ 
+@@ -2663,6 +2788,8 @@
+     ide_init_ioport(&d->ide_if[0], 0x1f0, 0x3f6);
+     ide_init_ioport(&d->ide_if[2], 0x170, 0x376);
+ 
++    buffered_pio_init();
++
+     register_savevm("ide", 0, 1, pci_ide_save, pci_ide_load, d);
+ }
  

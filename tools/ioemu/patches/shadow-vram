@@ -1,8 +1,8 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2007-05-02 10:32:35.000000000 +0100
-+++ ioemu/hw/vga.c	2007-05-02 10:35:05.000000000 +0100
-@@ -1359,6 +1359,105 @@
+--- ioemu.orig/hw/vga.c	2007-05-03 19:15:06.000000000 +0100
++++ ioemu/hw/vga.c	2007-05-03 19:15:57.000000000 +0100
+@@ -1373,6 +1373,105 @@
      }
  }
  
@@ -108,7 +108,7 @@ Index: ioemu/hw/vga.c
  /* 
   * graphic modes
   */
-@@ -1454,6 +1553,11 @@
+@@ -1468,6 +1567,11 @@
      printf("w=%d h=%d v=%d line_offset=%d cr[0x09]=0x%02x cr[0x17]=0x%02x linecmp=%d sr[0x01]=0x%02x\n",
             width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
  #endif
@@ -120,7 +120,7 @@ Index: ioemu/hw/vga.c
      addr1 = (s->start_addr * 4);
      bwidth = width * 4;
      y_start = -1;
-@@ -1889,7 +1993,18 @@
+@@ -1918,7 +2022,18 @@
  
      vga_reset(s);
  
@@ -140,7 +140,7 @@ Index: ioemu/hw/vga.c
      s->vram_offset = vga_ram_offset;
      s->vram_size = vga_ram_size;
      s->ds = ds;
-@@ -2013,7 +2128,7 @@
+@@ -2058,7 +2173,7 @@
      }
  
      if (!vga_ram_base) {
@@ -149,7 +149,7 @@ Index: ioemu/hw/vga.c
          if (!vga_ram_base) {
              fprintf(stderr, "reallocate error\n");
              return NULL;
-@@ -2021,8 +2136,10 @@
+@@ -2066,8 +2181,10 @@
      }
  
      /* XXX lock needed? */
@@ -163,9 +163,9 @@ Index: ioemu/hw/vga.c
      return old_pointer;
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2007-05-02 10:32:35.000000000 +0100
-+++ ioemu/hw/vga_int.h	2007-05-02 10:35:10.000000000 +0100
-@@ -78,7 +78,9 @@
+--- ioemu.orig/hw/vga_int.h	2007-05-03 19:15:06.000000000 +0100
++++ ioemu/hw/vga_int.h	2007-05-03 19:15:57.000000000 +0100
+@@ -80,7 +80,9 @@
  #define VGA_MAX_HEIGHT 2048
  
  #define VGA_STATE_COMMON                                                \

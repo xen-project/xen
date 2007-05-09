@@ -186,14 +186,14 @@ void target_disas(FILE *out, target_ulong code, target_ulong size, int flags)
     disasm_info.mach = bfd_mach_ppc;
 #endif
     print_insn = print_insn_ppc;
+#elif defined(TARGET_M68K)
+    print_insn = print_insn_m68k;
 #elif defined(TARGET_MIPS)
 #ifdef TARGET_WORDS_BIGENDIAN
     print_insn = print_insn_big_mips;
 #else
     print_insn = print_insn_little_mips;
 #endif
-#elif defined(TARGET_M68K)
-    print_insn = print_insn_m68k;
 #elif defined(TARGET_SH4)
     disasm_info.mach = bfd_mach_sh4;
     print_insn = print_insn_sh;
@@ -271,11 +271,9 @@ void disas(FILE *out, void *code, unsigned long size)
     for (pc = (unsigned long)code; pc < (unsigned long)code + size; pc += count) {
 	fprintf(out, "0x%08lx:  ", pc);
 #ifdef __arm__
-        /* since data are included in the code, it is better to
+        /* since data is included in the code, it is better to
            display code data too */
-        if (is_host) {
-            fprintf(out, "%08x  ", (int)bfd_getl32((const bfd_byte *)pc));
-        }
+        fprintf(out, "%08x  ", (int)bfd_getl32((const bfd_byte *)pc));
 #endif
 	count = print_insn(pc, &disasm_info);
 	fprintf(out, "\n");
@@ -387,14 +385,14 @@ void monitor_disas(CPUState *env,
     disasm_info.mach = bfd_mach_ppc;
 #endif
     print_insn = print_insn_ppc;
+#elif defined(TARGET_M68K)
+    print_insn = print_insn_m68k;
 #elif defined(TARGET_MIPS)
 #ifdef TARGET_WORDS_BIGENDIAN
     print_insn = print_insn_big_mips;
 #else
     print_insn = print_insn_little_mips;
 #endif
-#elif defined(TARGET_M68K)
-    print_insn = print_insn_m68k;
 #else
     term_printf("0x" TARGET_FMT_lx
 		": Asm output not supported on this arch\n", pc);

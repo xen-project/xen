@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 15:20:35.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 15:20:43.000000000 +0100
-@@ -126,7 +126,7 @@
+--- ioemu.orig/vl.c	2007-05-09 13:48:26.000000000 +0100
++++ ioemu/vl.c	2007-05-09 13:49:06.000000000 +0100
+@@ -136,7 +136,7 @@
  struct sockaddr_in vnclisten_addr;
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
@@ -11,46 +11,59 @@ Index: ioemu/vl.c
  uint64_t ram_size;
  int pit_min_timer_count = 0;
  int nb_nics;
-@@ -6150,14 +6150,14 @@
+@@ -7068,14 +7068,14 @@
                  break;
  #endif /* !CONFIG_DM */
              case QEMU_OPTION_boot:
 -                boot_device = optarg[0];
 -                if (boot_device != 'a' && 
--#ifdef TARGET_SPARC
--		    // Network boot
++                boot_device = strdup(optarg);
++                if (strspn(boot_device, "a"
+ #if defined(TARGET_SPARC) || defined(TARGET_I386)
+ 		    // Network boot
 -		    boot_device != 'n' &&
--#endif
++		    "n"
+ #endif
 -                    boot_device != 'c' && boot_device != 'd') {
 -                    fprintf(stderr, "qemu: invalid boot device '%c'\n", boot_device);
-+                boot_device = strdup(optarg);
-+                if (strspn(boot_device, "acd"
-+#if defined(TARGET_SPARC) || defined(TARGET_I386)
-+                           "n"
-+#endif
-+                        ) != strlen(boot_device)) {
-+                    fprintf(stderr, "qemu: invalid boot device in '%s'\n",
-+                            boot_device);
++		    "cd") != strlen(boot_device)) {
++                    fprintf(stderr, "qemu: invalid boot device in '%s'\n", boot_device);
                      exit(1);
                  }
                  break;
-@@ -6424,6 +6424,7 @@
-         fd_filename[0] == '\0')
-         help();
-     
-+#if 0
-     /* boot to cd by default if no hard disk */
-     if (hd_filename[0] == '\0' && boot_device == 'c') {
-         if (fd_filename[0] != '\0')
-@@ -6431,6 +6432,7 @@
-         else
-             boot_device = 'd';
+@@ -7442,6 +7442,7 @@
+             exit(1);
      }
-+#endif
- #endif /* !CONFIG_DM */
  
-     setvbuf(stdout, NULL, _IOLBF, 0);
-@@ -6692,6 +6694,7 @@
++#ifndef CONFIG_DM
+ #ifdef TARGET_I386
+     if (boot_device == 'n') {
+ 	for (i = 0; i < nb_nics; i++) {
+@@ -7463,6 +7464,7 @@
+ 	boot_device = 'c'; /* to prevent confusion by the BIOS */
+     }
+ #endif
++#endif /* !CONFIG_DM */
+ 
+ #if defined (__ia64__)
+     if (ram_size > MMIO_START)
+@@ -7472,6 +7474,7 @@
+     /* init the memory */
+     phys_ram_size = ram_size + vga_ram_size + bios_size;
+ 
++#ifndef CONFIG_DM
+     for (i = 0; i < nb_option_roms; i++) {
+ 	int ret = get_image_size(option_rom[i]);
+ 	if (ret == -1) {
+@@ -7480,6 +7483,7 @@
+ 	}
+ 	phys_ram_size += ret;
+     }
++#endif /* !CONFIG_DM */
+ 
+ #ifdef CONFIG_DM
+ 
+@@ -7711,6 +7715,7 @@
                    ds, fd_filename, snapshot,
                    kernel_filename, kernel_cmdline, initrd_filename,
                    timeoffset);
@@ -60,9 +73,9 @@ Index: ioemu/vl.c
      if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 15:20:39.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 15:20:43.000000000 +0100
-@@ -578,7 +578,7 @@
+--- ioemu.orig/vl.h	2007-05-09 13:48:26.000000000 +0100
++++ ioemu/vl.h	2007-05-09 13:48:55.000000000 +0100
+@@ -705,7 +705,7 @@
  #ifndef QEMU_TOOL
  
  typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
@@ -71,7 +84,7 @@ Index: ioemu/vl.h
               DisplayState *ds, const char **fd_filename, int snapshot,
               const char *kernel_filename, const char *kernel_cmdline,
               const char *initrd_filename, time_t timeoffset);
-@@ -1024,7 +1024,7 @@
+@@ -1219,7 +1219,7 @@
                      uint32_t start, uint32_t count);
  int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
                            const unsigned char *arch,
@@ -82,9 +95,9 @@ Index: ioemu/vl.h
                            uint32_t initrd_image, uint32_t initrd_size,
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-03 15:20:35.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-03 15:20:43.000000000 +0100
-@@ -158,8 +158,25 @@
+--- ioemu.orig/hw/pc.c	2007-05-09 13:48:26.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-09 13:48:55.000000000 +0100
+@@ -159,8 +159,25 @@
      rtc_set_memory(s, info_ofs + 8, sectors);
  }
  
@@ -111,7 +124,7 @@ Index: ioemu/hw/pc.c
  {
      RTCState *s = rtc_state;
      int val;
-@@ -205,21 +222,14 @@
+@@ -191,21 +208,14 @@
      rtc_set_memory(s, 0x34, val);
      rtc_set_memory(s, 0x35, val >> 8);
      
@@ -141,7 +154,7 @@ Index: ioemu/hw/pc.c
  
      /* floppy type */
  
-@@ -617,7 +627,7 @@
+@@ -451,7 +461,7 @@
  #define NOBIOS 1
  
  /* PC hardware initialisation */
@@ -150,8 +163,8 @@ Index: ioemu/hw/pc.c
                       DisplayState *ds, const char **fd_filename, int snapshot,
                       const char *kernel_filename, const char *kernel_cmdline,
                       const char *initrd_filename, time_t timeoffset,
-@@ -919,7 +929,7 @@
-     }
+@@ -772,7 +782,7 @@
+ #endif
  }
  
 -static void pc_init_pci(uint64_t ram_size, int vga_ram_size, int boot_device,
@@ -159,7 +172,7 @@ Index: ioemu/hw/pc.c
                          DisplayState *ds, const char **fd_filename, 
                          int snapshot, 
                          const char *kernel_filename, 
-@@ -933,7 +943,7 @@
+@@ -786,7 +796,7 @@
               initrd_filename, timeoffset, 1);
  }
  

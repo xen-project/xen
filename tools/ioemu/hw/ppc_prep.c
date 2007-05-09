@@ -525,7 +525,6 @@ static void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
 {
     CPUState *env;
     char buf[1024];
-    SetIRQFunc *set_irq;
     m48t59_t *nvram;
     int PPC_io_memory;
     int linux_boot, i, nb_nics1, bios_size;
@@ -612,8 +611,8 @@ static void ppc_prep_init(int ram_size, int vga_ram_size, int boot_device,
     cpu_register_physical_memory(0x80000000, 0x00800000, PPC_io_memory);
 
     /* init basic PC hardware */
-    vga_initialize(pci_bus, ds, phys_ram_base + ram_size, ram_size, 
-                   vga_ram_size, 0, 0);
+    pci_vga_init(pci_bus, ds, phys_ram_base + ram_size, ram_size, 
+                 vga_ram_size, 0, 0);
     rtc_init(0x70, 8);
     //    openpic = openpic_init(0x00000000, 0xF0000000, 1);
     isa_pic = pic_init(pic_irq_request, first_cpu);

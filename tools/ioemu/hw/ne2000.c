@@ -340,7 +340,7 @@ static void ne2000_receive(void *opaque, const uint8_t *buf, int size)
     }
     s->curpag = next >> 8;
 
-    /* now we can signal we have receive something */
+    /* now we can signal we have received something */
     s->isr |= ENISR_RX;
     ne2000_update_irq(s);
 }
@@ -679,6 +679,9 @@ static void ne2000_save(QEMUFile* f,void* opaque)
 {
 	NE2000State* s=(NE2000State*)opaque;
 
+        if (s->pci_dev)
+            pci_device_save(s->pci_dev, f);
+
         qemu_put_8s(f, &s->rxcr);
 
 	qemu_put_8s(f, &s->cmd);
@@ -704,13 +707,21 @@ static void ne2000_save(QEMUFile* f,void* opaque)
 static int ne2000_load(QEMUFile* f,void* opaque,int version_id)
 {
 	NE2000State* s=(NE2000State*)opaque;
+        int ret;
 
-        if (version_id == 2) {
-            qemu_get_8s(f, &s->rxcr);
-        } else if (version_id == 1) {
-            s->rxcr = 0x0c;
-        } else {
+        if (version_id > 3)
             return -EINVAL;
+
+        if (s->pci_dev && version_id >= 3) {
+            ret = pci_device_load(s->pci_dev, f);
+            if (ret < 0)
+                return ret;
+        }
+
+        if (version_id >= 2) {
+            qemu_get_8s(f, &s->rxcr);
+        } else {
+            s->rxcr = 0x0c;
         }
 
 	qemu_get_8s(f, &s->cmd);
@@ -801,16 +812,15 @@ static void ne2000_map(PCIDevice *pci_dev, int region_num,
     register_ioport_read(addr + 0x1f, 1, 1, ne2000_reset_ioport_read, s);
 }
 
-void pci_ne2000_init(PCIBus *bus, NICInfo *nd)
+void pci_ne2000_init(PCIBus *bus, NICInfo *nd, int devfn)
 {
     PCINE2000State *d;
     NE2000State *s;
     uint8_t *pci_conf;
-    int instance;
     
     d = (PCINE2000State *)pci_register_device(bus,
                                               "NE2000", sizeof(PCINE2000State),
-                                              -1, 
+                                              devfn, 
                                               NULL, NULL);
     pci_conf = d->dev.config;
     pci_conf[0x00] = 0xec; // Realtek 8029
@@ -841,8 +851,6 @@ void pci_ne2000_init(PCIBus *bus, NICInfo *nd)
              s->macaddr[4],
              s->macaddr[5]);
              
-    instance = pci_bus_num(bus) << 8 | s->pci_dev->devfn;
-    register_savevm("ne2000", instance, 2, ne2000_save, ne2000_load, s);
-    register_savevm("ne2000_pci", instance, 1, generic_pci_save, 
-                    generic_pci_load, &d->dev);
+    /* XXX: instance number ? */
+    register_savevm("ne2000", 0, 3, ne2000_save, ne2000_load, s);
 }

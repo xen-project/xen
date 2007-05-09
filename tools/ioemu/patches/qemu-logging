@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-02 16:05:51.000000000 +0100
-+++ ioemu/vl.c	2007-05-02 16:05:51.000000000 +0100
-@@ -5234,7 +5234,7 @@
+--- ioemu.orig/vl.c	2007-05-03 19:00:14.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:00:51.000000000 +0100
+@@ -6127,7 +6127,7 @@
             "-S              freeze CPU at startup (use 'c' to start execution)\n"
             "-s              wait gdb connection to port %d\n"
             "-p port         change gdb connection port\n"
@@ -10,8 +10,8 @@ Index: ioemu/vl.c
 +           "-l item1,...    output log to %s (use -d ? for a list of log items)\n"
             "-hdachs c,h,s[,t]  force hard disk 0 physical geometry and the optional BIOS\n"
             "                translation (t=none or lba) (usually qemu can guess them)\n"
-            "-L path         set the directory for the BIOS and VGA BIOS\n"
-@@ -5307,7 +5307,7 @@
+            "-L path         set the directory for the BIOS, VGA BIOS and keymaps\n"
+@@ -6205,7 +6205,7 @@
      QEMU_OPTION_S,
      QEMU_OPTION_s,
      QEMU_OPTION_p,
@@ -20,7 +20,7 @@ Index: ioemu/vl.c
      QEMU_OPTION_hdachs,
      QEMU_OPTION_L,
  #ifdef USE_CODE_COPY
-@@ -5380,7 +5380,7 @@
+@@ -6284,7 +6284,7 @@
      { "S", 0, QEMU_OPTION_S },
      { "s", 0, QEMU_OPTION_s },
      { "p", HAS_ARG, QEMU_OPTION_p },
@@ -29,16 +29,16 @@ Index: ioemu/vl.c
      { "hdachs", HAS_ARG, QEMU_OPTION_hdachs },
      { "L", HAS_ARG, QEMU_OPTION_L },
  #ifdef USE_CODE_COPY
-@@ -5640,6 +5640,8 @@
-     char usb_devices[MAX_USB_CMDLINE][128];
+@@ -6555,6 +6555,8 @@
      int usb_devices_index;
+     int fds[2];
  
 +    char qemu_dm_logfilename[64];
 +
      LIST_INIT (&vm_change_state_head);
  #ifndef _WIN32
      {
-@@ -5719,6 +5721,11 @@
+@@ -6634,6 +6636,11 @@
      nb_nics = 0;
      /* default mac address of the first network interface */
      
@@ -50,7 +50,7 @@ Index: ioemu/vl.c
      optind = 1;
      for(;;) {
          if (optind >= argc)
-@@ -5909,7 +5916,7 @@
+@@ -6827,7 +6834,7 @@
                      exit(1);
                  }
                  break;

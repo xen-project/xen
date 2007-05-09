@@ -40,6 +40,7 @@ typedef struct USBMouseState {
     int kind;
     int mouse_grabbed;
     int status_changed;
+    QEMUPutMouseEntry *eh_entry;
 } USBMouseState;
 
 /* mostly the same values as the Bochs USB Mouse device */
@@ -262,7 +263,8 @@ static int usb_mouse_poll(USBMouseState *s, uint8_t *buf, int len)
     int dx, dy, dz, b, l;
 
     if (!s->mouse_grabbed) {
-	qemu_add_mouse_event_handler(usb_mouse_event, s, 0);
+	s->eh_entry = qemu_add_mouse_event_handler(usb_mouse_event, s,
+                                                  0, "QEMU USB Mouse");
 	s->mouse_grabbed = 1;
     }
     
@@ -298,7 +300,8 @@ static int usb_tablet_poll(USBMouseState *s, uint8_t *buf, int len)
     int dz, b, l;
 
     if (!s->mouse_grabbed) {
-	qemu_add_mouse_event_handler(usb_tablet_event, s, 1);
+	s->eh_entry = qemu_add_mouse_event_handler(usb_tablet_event, s,
+                                                  1, "QEMU USB Tablet");
 	s->mouse_grabbed = 1;
     }
     
@@ -477,19 +480,18 @@ static int usb_mouse_handle_control(USBDevice *dev, int request, int value,
     return ret;
 }
 
-static int usb_mouse_handle_data(USBDevice *dev, int pid, 
-                                 uint8_t devep, uint8_t *data, int len)
+static int usb_mouse_handle_data(USBDevice *dev, USBPacket *p)
 {
     USBMouseState *s = (USBMouseState *)dev;
     int ret = 0;
 
-    switch(pid) {
+    switch(p->pid) {
     case USB_TOKEN_IN:
-        if (devep == 1) {
+        if (p->devep == 1) {
             if (s->kind == USB_MOUSE)
-                ret = usb_mouse_poll(s, data, len);
+                ret = usb_mouse_poll(s, p->data, p->len);
             else if (s->kind == USB_TABLET)
-                ret = usb_tablet_poll(s, data, len);
+                ret = usb_tablet_poll(s, p->data, p->len);
 
             if (!s->status_changed)
                 ret = USB_RET_NAK;
@@ -513,7 +515,7 @@ static void usb_mouse_handle_destroy(USBDevice *dev)
 {
     USBMouseState *s = (USBMouseState *)dev;
 
-    qemu_add_mouse_event_handler(NULL, NULL, 0);
+    qemu_remove_mouse_event_handler(s->eh_entry);
     qemu_free(s);
 }
 
@@ -552,11 +554,13 @@ int usb_mouse_load(QEMUFile *f, void *opaque, int version_id)
 
     if ( s->kind == USB_TABLET) {
         fprintf(logfile, "usb_mouse_load:add usb_tablet_event.\n");
-        qemu_add_mouse_event_handler(usb_tablet_event, s, 1);
+        qemu_add_mouse_event_handler(usb_tablet_event, s, 1, "QEMU USB Tablet");
     } else if ( s->kind == USB_MOUSE) {
         fprintf(logfile, "usb_mouse_load:add usb_mouse_event.\n");
-        qemu_add_mouse_event_handler(usb_mouse_event, s, 0);
+        qemu_add_mouse_event_handler(usb_mouse_event, s, 0, "QEMU USB MOUSE");
     }
+
+    return 0;
 }
 
 

@@ -97,6 +97,23 @@ struct pci_config_header {
     uint8_t  max_lat;
 };
 
+void xen_pci_save(QEMUFile *f, void *opaque)
+{
+    PCIDevice *d = opaque;
+
+    pci_device_save(d, f);
+}
+
+int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
+{
+    PCIDevice *d = opaque;
+
+    if (version_id != 1)
+        return -EINVAL;
+
+    return pci_device_load(d, f);
+}
+
 void pci_xen_platform_init(PCIBus *bus)
 {
     PCIDevice *d;
@@ -128,6 +145,6 @@ void pci_xen_platform_init(PCIBus *bus)
     pci_register_io_region(d, 1, 0x1000000, PCI_ADDRESS_SPACE_MEM_PREFETCH,
 			   platform_mmio_map);
 
-    register_savevm("platform", 0, 1, generic_pci_save, generic_pci_load, d);
+    register_savevm("platform", 0, 1, xen_pci_save, xen_pci_load, d);
     printf("Done register platform.\n");
 }
