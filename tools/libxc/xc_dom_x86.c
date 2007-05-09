@@ -153,17 +153,98 @@ static int setup_pgtables_x86_32(struct xc_dom_image *dom)
     return 0;
 }
 
+/*
+ * Move the l3 page table page below 4G for guests which do not
+ * support the extended-cr3 format.  The l3 is currently empty so we
+ * do not need to preserve the current contents.
+ */
+static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
+                                  xen_pfn_t l3pfn,
+                                  xen_pfn_t l3mfn)
+{
+    xen_pfn_t new_l3mfn;
+    struct xc_mmu *mmu;
+    void *l3tab;
+    int xc = dom->guest_xc;
+
+    mmu = xc_alloc_mmu_updates(xc, dom->guest_domid);
+    if ( mmu == NULL )
+    {
+        xc_dom_printf("%s: failed at %d\n", __FUNCTION__, __LINE__);
+        return l3mfn;
+    }
+
+    xc_dom_unmap_one(dom, l3pfn);
+
+    new_l3mfn = xc_make_page_below_4G(dom->guest_xc, dom->guest_domid, l3mfn);
+    if ( !new_l3mfn )
+        goto out;
+
+    dom->p2m_host[l3pfn] = new_l3mfn;
+    if ( xc_dom_update_guest_p2m(dom) != 0 )
+        goto out;
+
+    if ( xc_add_mmu_update(xc, mmu,
+                           (((unsigned long long)new_l3mfn)
+                            << XC_DOM_PAGE_SHIFT(dom)) |
+                           MMU_MACHPHYS_UPDATE, l3pfn) )
+        goto out;
+
+    if ( xc_flush_mmu_updates(xc, mmu) )
+        goto out;
+
+    /*
+     * This ensures that the entire pgtables_seg is mapped by a single
+     * mmap region. arch_setup_bootlate() relies on this to be able to
+     * unmap and pin the pagetables.
+     */
+    if ( xc_dom_seg_to_ptr(dom, &dom->pgtables_seg) == NULL )
+        goto out;
+
+    l3tab = xc_dom_pfn_to_ptr(dom, l3pfn, 1);
+    memset(l3tab, 0, XC_DOM_PAGE_SIZE(dom));
+
+    xc_dom_printf("%s: successfully relocated L3 below 4G. "
+                  "(L3 PFN %#"PRIpfn" MFN %#"PRIpfn"=>%#"PRIpfn")\n",
+                  __FUNCTION__, l3pfn, l3mfn, new_l3mfn);
+
+    l3mfn = new_l3mfn;
+
+ out:
+    free(mmu);
+
+    return l3mfn;
+}
+
 static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
     xen_pfn_t l3pfn = dom->pgtables_seg.pfn;
     xen_pfn_t l2pfn = dom->pgtables_seg.pfn + dom->pg_l3;
     xen_pfn_t l1pfn = dom->pgtables_seg.pfn + dom->pg_l3 + dom->pg_l2;
-    l3_pgentry_64_t *l3tab = xc_dom_pfn_to_ptr(dom, l3pfn, 1);
+    l3_pgentry_64_t *l3tab;
     l2_pgentry_64_t *l2tab = NULL;
     l1_pgentry_64_t *l1tab = NULL;
     unsigned long l3off, l2off, l1off;
     xen_vaddr_t addr;
     xen_pfn_t pgpfn;
+    xen_pfn_t l3mfn = xc_dom_p2m_guest(dom, l3pfn);
+
+    if ( dom->parms.pae == 1 )
+    {
+        if ( l3mfn >= 0x100000 )
+            l3mfn = move_l3_below_4G(dom, l3pfn, l3mfn);
+
+        if ( l3mfn >= 0x100000 )
+        {
+            xc_dom_panic(XC_INTERNAL_ERROR,"%s: cannot move L3 below 4G. "
+                         "extended-cr3 not supported by guest. "
+                         "(L3 PFN %#"PRIpfn" MFN %#"PRIpfn")\n",
+                         __FUNCTION__, l3pfn, l3mfn);
+            return -EINVAL;
+        }
+    }
+
+    l3tab = xc_dom_pfn_to_ptr(dom, l3pfn, 1);
 
     for ( addr = dom->parms.virt_base; addr < dom->virt_pgtab_end;
           addr += PAGE_SIZE_X86 )
