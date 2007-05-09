@@ -412,7 +412,7 @@ void rtc_set_date_from_host(RTCState *s)
     time_t ti;
     struct tm *tm;
     int val;
-    extern timer_t timeoffset;
+    extern time_t timeoffset;
 
     /* set the CMOS date */
     time(&ti);
