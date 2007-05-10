@@ -177,7 +177,7 @@ static int get_bios_disk(char *boot_device, int index) {
 }
 
 /* hd_table must contain 4 block drivers */
-static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **hd_table, time_t timeoffset)
+static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **hd_table)
 {
     RTCState *s = rtc_state;
     int val;
@@ -464,7 +464,7 @@ static void pc_init_ne2k_isa(NICInfo *nd)
 static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
                      DisplayState *ds, const char **fd_filename, int snapshot,
                      const char *kernel_filename, const char *kernel_cmdline,
-                     const char *initrd_filename, time_t timeoffset,
+                     const char *initrd_filename,
                      int pci_enabled)
 {
 #ifndef NOBIOS
@@ -741,7 +741,7 @@ static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
 
     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
 
-    cmos_init(ram_size, boot_device, bs_table, timeoffset);
+    cmos_init(ram_size, boot_device, bs_table);
 
     /* using PIIX4 acpi model */
     if (pci_enabled && acpi_enabled)
@@ -801,13 +801,12 @@ static void pc_init_pci(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         int snapshot, 
                         const char *kernel_filename, 
                         const char *kernel_cmdline,
-                        const char *initrd_filename,
-                        time_t timeoffset)
+                        const char *initrd_filename)
 {
     pc_init1(ram_size, vga_ram_size, boot_device,
              ds, fd_filename, snapshot,
              kernel_filename, kernel_cmdline,
-             initrd_filename, timeoffset, 1);
+             initrd_filename, 1);
 }
 
 static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
@@ -815,13 +814,12 @@ static void pc_init_isa(uint64_t ram_size, int vga_ram_size, char *boot_device,
                         int snapshot, 
                         const char *kernel_filename, 
                         const char *kernel_cmdline,
-                        const char *initrd_filename,
-                        time_t timeoffset)
+                        const char *initrd_filename)
 {
     pc_init1(ram_size, vga_ram_size, boot_device,
              ds, fd_filename, snapshot,
              kernel_filename, kernel_cmdline,
-             initrd_filename, timeoffset, 0);
+             initrd_filename, 0);
 }
 
 QEMUMachine pc_machine = {

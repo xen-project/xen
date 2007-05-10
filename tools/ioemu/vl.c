@@ -183,8 +183,6 @@ extern int vcpus;
 
 int xc_handle;
 
-time_t timeoffset = 0;
-
 char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 extern int domid;
 
@@ -6326,7 +6324,6 @@ void help(void)
 	   "-vnc display    start a VNC server on display\n"
            "-vncviewer      start a vncviewer process for this domain\n"
            "-vncunused      bind the VNC server to an unused port\n"
-           "-timeoffset     time offset (in seconds) from local time\n"
 #ifndef _WIN32
 	   "-daemonize      daemonize QEMU after initializing\n"
 #endif
@@ -6423,7 +6420,6 @@ enum {
     ,
     QEMU_OPTION_d,
     QEMU_OPTION_vcpus,
-    QEMU_OPTION_timeoffset,
     QEMU_OPTION_acpi,
     QEMU_OPTION_vncviewer,
     QEMU_OPTION_vncunused,
@@ -6523,7 +6519,6 @@ const QEMUOption qemu_options[] = {
     
     { "d", HAS_ARG, QEMU_OPTION_d },
     { "vcpus", 1, QEMU_OPTION_vcpus },
-    { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
     { "acpi", 0, QEMU_OPTION_acpi },
     { NULL },
 };
@@ -7468,9 +7463,6 @@ int main(int argc, char **argv)
                 vcpus = atoi(optarg);
                 fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
                 break;
-            case QEMU_OPTION_timeoffset:
-                timeoffset = strtol(optarg, NULL, 0);
-                break;
             case QEMU_OPTION_acpi:
                 acpi_enabled = 1;
                 break;
@@ -7842,8 +7834,7 @@ int main(int argc, char **argv)
 
     machine->init(ram_size, vga_ram_size, boot_device,
                   ds, fd_filename, snapshot,
-                  kernel_filename, kernel_cmdline, initrd_filename,
-                  timeoffset);
+                  kernel_filename, kernel_cmdline, initrd_filename);
     free(boot_device);
 
     /* init USB devices */
