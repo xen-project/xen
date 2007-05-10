@@ -387,18 +387,14 @@ class HVMImageHandler(ImageHandler):
                     if key in vmConfig['platform']:
                         vnc_config[key] = vmConfig['platform'][key]
 
-            if not vnc_config.get('vncunused', 0) and \
-                   vnc_config.get('vncdisplay', 0):
-                vncdisplay = vnc_config.get('vncdisplay')
-                ret.append('-vnc')
-                ret.append(str(vncdisplay))
-            else:
-                ret.append('-vncunused')
-
             vnclisten = vnc_config.get('vnclisten',
                                        xenopts().get_vnclisten_address())
-            ret.append('-vnclisten')
-            ret.append(str(vnclisten))
+            vncdisplay = vnc_config.get('vncdisplay', 0)
+            ret.append('-vnc')
+            ret.append("%s:%d" % (vnclisten, vncdisplay))
+            
+            if vnc_config.get('vncunused', 0):
+                ret.append('-vncunused')
 
             # Store vncpassword in xenstore
             vncpasswd = vnc_config.get('vncpasswd')
