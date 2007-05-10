@@ -997,7 +997,7 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
 
 static void key_event(VncState *vs, int down, uint32_t sym)
 {
-    if (sym >= 'A' && sym <= 'Z')
+    if (sym >= 'A' && sym <= 'Z' && is_graphic_console())
 	sym = sym - 'A' + 'a';
     do_key_event(vs, down, sym);
 }
