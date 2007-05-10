@@ -110,15 +110,11 @@ static void svm_store_cpu_guest_regs(
 
     if ( regs != NULL )
     {
-        regs->eip    = vmcb->rip;
+        regs->ss     = vmcb->ss.sel;
         regs->esp    = vmcb->rsp;
         regs->eflags = vmcb->rflags;
         regs->cs     = vmcb->cs.sel;
-        regs->ds     = vmcb->ds.sel;
-        regs->es     = vmcb->es.sel;
-        regs->ss     = vmcb->ss.sel;
-        regs->gs     = vmcb->gs.sel;
-        regs->fs     = vmcb->fs.sel;
+        regs->eip    = vmcb->rip;
     }
 
     if ( crs != NULL )
@@ -752,28 +748,10 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
-static void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    ctxt->eax = vmcb->rax;
-    ctxt->ss = vmcb->ss.sel;
-    ctxt->esp = vmcb->rsp;
-    ctxt->eflags = vmcb->rflags;
-    ctxt->cs = vmcb->cs.sel;
-    ctxt->eip = vmcb->rip;
-    
-    ctxt->gs = vmcb->gs.sel;
-    ctxt->fs = vmcb->fs.sel;
-    ctxt->es = vmcb->es.sel;
-    ctxt->ds = vmcb->ds.sel;
-}
-
 static void svm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    
-    vmcb->rax      = regs->eax;
+
     vmcb->ss.sel   = regs->ss;
     vmcb->rsp      = regs->esp;   
     vmcb->rflags   = regs->eflags | 2UL;
@@ -2242,7 +2220,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     int inst_len, rc;
 
     exit_reason = vmcb->exitcode;
-    save_svm_cpu_user_regs(v, regs);
 
     HVMTRACE_2D(VMEXIT, v, vmcb->rip, exit_reason);
 
