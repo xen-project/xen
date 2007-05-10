@@ -462,7 +462,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
 
     /*
-     * Iterate over all superpage-aligned RAM regions.
+     * Iterate backwards over all superpage-aligned RAM regions.
      * 
      * We require superpage alignment because the boot allocator is not yet
      * initialised. Hence we can only map superpages in the address range
@@ -475,7 +475,7 @@ void __init __start_xen(multiboot_info_t *mbi)
      * x86/64, we relocate Xen to higher memory.
      */
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
-    for ( i = 0; i < boot_e820.nr_map; i++ )
+    for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
 
@@ -490,19 +490,6 @@ void __init __start_xen(multiboot_info_t *mbi)
         map_pages_to_xen(
             (unsigned long)maddr_to_bootstrap_virt(s),
             s >> PAGE_SHIFT, (e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
-
-        /* Is the region suitable for relocating the multiboot modules? */
-        if ( !initial_images_start && ((e-s) >= modules_length) )
-        {
-            e -= modules_length;
-            e &= ~mask;
-            initial_images_start = e;
-            initial_images_end = initial_images_start + modules_length;
-            move_memory(initial_images_start, 
-                        mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
-            if ( s >= e )
-                continue;
-        }
 
 #if defined(CONFIG_X86_64)
         /* Is the region suitable for relocating Xen? */
@@ -571,6 +558,16 @@ void __init __start_xen(multiboot_info_t *mbi)
                 "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE) : "memory" );
         }
 #endif
+
+        /* Is the region suitable for relocating the multiboot modules? */
+        if ( !initial_images_start && (s < e) && ((e-s) >= modules_length) )
+        {
+            e -= modules_length;
+            initial_images_start = e;
+            initial_images_end = initial_images_start + modules_length;
+            move_memory(initial_images_start, 
+                        mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
+        }
     }
 
     if ( !initial_images_start )
