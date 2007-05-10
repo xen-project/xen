@@ -2145,6 +2145,37 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case XENMEM_machine_memory_map:
+    {
+        struct xen_memory_map memmap;
+        struct xen_ia64_memmap_info memmap_info;
+        XEN_GUEST_HANDLE(char) buffer;
+
+        if (!IS_PRIV(current->domain))
+            return -EINVAL;
+        if (copy_from_guest(&memmap, arg, 1))
+            return -EFAULT;
+        if (memmap.nr_entries <
+            sizeof(memmap_info) + ia64_boot_param->efi_memmap_size)
+            return -EINVAL;
+
+        memmap.nr_entries =
+            sizeof(memmap_info) + ia64_boot_param->efi_memmap_size;
+        memset(&memmap_info, 0, sizeof(memmap_info));
+        memmap_info.efi_memmap_size = ia64_boot_param->efi_memmap_size;
+        memmap_info.efi_memdesc_size = ia64_boot_param->efi_memdesc_size;
+        memmap_info.efi_memdesc_version = ia64_boot_param->efi_memdesc_version;
+
+        buffer = guest_handle_cast(memmap.buffer, char);
+        if (copy_to_guest(buffer, (char*)&memmap_info, sizeof(memmap_info)) ||
+            copy_to_guest_offset(buffer, sizeof(memmap_info),
+                                 (char*)__va(ia64_boot_param->efi_memmap),
+                                 ia64_boot_param->efi_memmap_size) ||
+            copy_to_guest(arg, &memmap, 1))
+            return -EFAULT;
+        return 0;
+    }
+
     default:
         return -ENOSYS;
     }

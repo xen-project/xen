@@ -238,6 +238,19 @@ xencomm_mini_hypercall_memory_op(unsigned int cmd, void *arg)
 		argsize = sizeof (xen_add_to_physmap_t);
 		break;
 
+	case XENMEM_machine_memory_map:
+	{
+		xen_memory_map_t *memmap = (xen_memory_map_t *)arg;
+		argsize = sizeof(*memmap);
+		rc = xencomm_create_mini(xc_area, &nbr_area,
+					 xen_guest_handle(memmap->buffer),
+					 memmap->nr_entries, &desc);
+		if (rc)
+			return rc;
+		set_xen_guest_handle(memmap->buffer, (void *)desc);
+		break;
+	}
+
 	default:
 		printk("%s: unknown mini memory op %d\n", __func__, cmd);
 		return -ENOSYS;

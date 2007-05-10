@@ -317,6 +317,21 @@ struct arch_vcpu_info {
 };
 typedef struct arch_vcpu_info arch_vcpu_info_t;
 
+/*
+ * This structure is used for magic page in domain pseudo physical address
+ * space and the result of XENMEM_machine_memory_map.
+ * As the XENMEM_machine_memory_map result,
+ * xen_memory_map::nr_entries indicates the size in bytes 
+ * including struct xen_ia64_memmap_info. Not the number of entries.
+ */
+struct xen_ia64_memmap_info {
+    uint64_t efi_memmap_size;       /* size of EFI memory map */
+    uint64_t efi_memdesc_size;      /* size of an EFI memory map descriptor */
+    uint32_t efi_memdesc_version;   /* memory descriptor version */
+    void *memdesc[0];               /* array of efi_memory_desc_t */
+};
+typedef struct xen_ia64_memmap_info xen_ia64_memmap_info_t;
+
 struct arch_shared_info {
     /* PFN of the start_info page.  */
     unsigned long start_info_pfn;

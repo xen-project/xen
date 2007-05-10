@@ -226,6 +226,8 @@ xencomm_hypercall_memory_op(unsigned int cmd, void *arg)
 {
 	XEN_GUEST_HANDLE(xen_pfn_t) extent_start_va[2];
 	xen_memory_reservation_t *xmr = NULL, *xme_in = NULL, *xme_out = NULL;
+	xen_memory_map_t *memmap = NULL;
+	XEN_GUEST_HANDLE(void) buffer;
 	int rc;
 
 	switch (cmd) {
@@ -254,6 +256,14 @@ xencomm_hypercall_memory_op(unsigned int cmd, void *arg)
 			(&((xen_memory_exchange_t *)arg)->out);
 		break;
 
+	case XENMEM_machine_memory_map:
+		memmap = (xen_memory_map_t *)arg;
+		xen_guest_handle(buffer) = xen_guest_handle(memmap->buffer);
+		set_xen_guest_handle(memmap->buffer,
+			(void *)xencomm_create_inline(
+				xen_guest_handle(memmap->buffer)));
+		break;
+
 	default:
 		printk("%s: unknown memory op %d\n", __func__, cmd);
 		return -ENOSYS;
@@ -274,6 +284,10 @@ xencomm_hypercall_memory_op(unsigned int cmd, void *arg)
 			xen_guest_handle(extent_start_va[0]);
 		xen_guest_handle(xme_out->extent_start) =
 			xen_guest_handle(extent_start_va[1]);
+		break;
+
+	case XENMEM_machine_memory_map:
+		xen_guest_handle(memmap->buffer) = xen_guest_handle(buffer);
 		break;
 	}
 
