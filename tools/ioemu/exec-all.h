@@ -357,6 +357,7 @@ extern CPUWriteMemoryFunc *io_mem_write[IO_MEM_NB_ENTRIES][4];
 extern CPUReadMemoryFunc *io_mem_read[IO_MEM_NB_ENTRIES][4];
 extern void *io_mem_opaque[IO_MEM_NB_ENTRIES];
 
+#ifndef CONFIG_DM
 #ifdef __powerpc__
 static inline int testandset (int *p)
 {
@@ -472,15 +473,15 @@ static inline int testandset (int *p)
 }
 #endif
 
-#ifdef __ia64__
-#include "ia64_intrinsic.h"
+#ifdef __ia64
+#include <ia64intrin.h>
 
 static inline int testandset (int *p)
 {
-    uint32_t o = 0, n = 1;
-    return (int)cmpxchg_acq(p, o, n);
+    return __sync_lock_test_and_set (p, 1);
 }
 #endif
+#endif /* !CONFIG_DM */
 
 typedef int spinlock_t;
 
