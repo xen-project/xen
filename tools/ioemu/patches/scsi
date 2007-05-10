@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 13:49:10.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-10 15:35:25.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:35:25.000000000 +0100
 @@ -124,7 +124,7 @@
  IOPortWriteFunc *ioport_write_table[3][MAX_IOPORTS];
  /* Note: bs_table[MAX_DISKS] is a dummy block driver if none available
@@ -11,7 +11,7 @@ Index: ioemu/vl.c
  /* point to the block driver where the snapshots are managed */
  BlockDriverState *bs_snapshots;
  int vga_ram_size;
-@@ -1529,7 +1529,7 @@
+@@ -1526,7 +1526,7 @@
          case 's': 
              {
                  int i;
@@ -20,7 +20,7 @@ Index: ioemu/vl.c
                      if (bs_table[i])
                          bdrv_commit(bs_table[i]);
                  }
-@@ -6969,7 +6969,7 @@
+@@ -6954,7 +6954,7 @@
      int snapshot, linux_boot;
      const char *initrd_filename;
  #ifndef CONFIG_DM
@@ -29,7 +29,7 @@ Index: ioemu/vl.c
  #endif /* !CONFIG_DM */
      const char *fd_filename[MAX_FD];
      const char *kernel_filename, *kernel_cmdline;
-@@ -7038,7 +7038,7 @@
+@@ -7023,7 +7023,7 @@
      for(i = 0; i < MAX_FD; i++)
          fd_filename[i] = NULL;
  #ifndef CONFIG_DM
@@ -38,7 +38,7 @@ Index: ioemu/vl.c
          hd_filename[i] = NULL;
  #endif /* !CONFIG_DM */
      ram_size = DEFAULT_RAM_SIZE * 1024 * 1024;
-@@ -7737,7 +7737,7 @@
+@@ -7714,7 +7714,7 @@
      }
  
      /* open the virtual block devices */
@@ -49,9 +49,9 @@ Index: ioemu/vl.c
                  char buf[64];
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 13:49:10.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 13:51:28.000000000 +0100
-@@ -965,8 +965,9 @@
+--- ioemu.orig/vl.h	2007-05-10 15:35:25.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:35:25.000000000 +0100
+@@ -963,8 +963,9 @@
  
  /* ide.c */
  #define MAX_DISKS 4
@@ -64,8 +64,8 @@ Index: ioemu/vl.h
                    BlockDriverState *hd0, BlockDriverState *hd1);
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-09 13:49:09.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/hw/pc.c	2007-05-10 15:35:25.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-10 15:35:25.000000000 +0100
 @@ -761,7 +761,6 @@
              piix4_smbus_register_device(eeprom, 0x50 + i);
          }
@@ -95,8 +95,8 @@ Index: ioemu/hw/pc.c
  static void pc_init_pci(uint64_t ram_size, int vga_ram_size, char *boot_device,
 Index: ioemu/xenstore.c
 ===================================================================
---- ioemu.orig/xenstore.c	2007-05-09 13:49:10.000000000 +0100
-+++ ioemu/xenstore.c	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/xenstore.c	2007-05-10 15:35:25.000000000 +0100
++++ ioemu/xenstore.c	2007-05-10 15:35:25.000000000 +0100
 @@ -18,7 +18,7 @@
  #include <fcntl.h>
  
@@ -163,8 +163,8 @@ Index: ioemu/xenstore.c
          }
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2007-05-09 13:48:54.000000000 +0100
-+++ ioemu/monitor.c	2007-05-09 13:49:19.000000000 +0100
+--- ioemu.orig/monitor.c	2007-05-10 15:32:53.000000000 +0100
++++ ioemu/monitor.c	2007-05-10 15:35:25.000000000 +0100
 @@ -209,7 +209,7 @@
      int i, all_devices;
      
@@ -176,8 +176,8 @@ Index: ioemu/monitor.c
                  !strcmp(bdrv_get_device_name(bs_table[i]), device))
 Index: ioemu/hw/lsi53c895a.c
 ===================================================================
---- ioemu.orig/hw/lsi53c895a.c	2007-05-09 13:48:54.000000000 +0100
-+++ ioemu/hw/lsi53c895a.c	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/hw/lsi53c895a.c	2007-05-10 15:32:53.000000000 +0100
++++ ioemu/hw/lsi53c895a.c	2007-05-10 15:35:25.000000000 +0100
 @@ -1351,8 +1351,13 @@
          shift = (offset & 3) * 8;
          return (s->scratch[n] >> shift) & 0xff;

@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-09 13:47:24.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-09 14:08:42.000000000 +0100
+--- ioemu.orig/Makefile.target	2007-05-10 15:36:06.000000000 +0100
++++ ioemu/Makefile.target	2007-05-10 15:56:20.000000000 +0100
 @@ -332,7 +332,7 @@
  endif
  
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  VL_OBJS+=block-cow.o block-qcow.o aes.o block-vmdk.o block-cloop.o block-dmg.o block-bochs.o block-vpc.o block-vvfat.o block-qcow2.o
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2007-05-09 13:47:24.000000000 +0100
-+++ ioemu/configure	2007-05-09 14:08:42.000000000 +0100
+--- ioemu.orig/configure	2007-05-10 15:36:06.000000000 +0100
++++ ioemu/configure	2007-05-10 15:56:20.000000000 +0100
 @@ -77,8 +77,8 @@
  bigendian="no"
  mingw32="no"
@@ -37,8 +37,8 @@ Index: ioemu/configure
    target_user_only="yes"
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/cpu-all.h	2007-05-09 14:08:42.000000000 +0100
+--- ioemu.orig/cpu-all.h	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/cpu-all.h	2007-05-10 15:56:20.000000000 +0100
 @@ -690,7 +690,9 @@
  void page_set_flags(target_ulong start, target_ulong end, int flags);
  void page_unprotect_range(target_ulong data, target_ulong data_size);
@@ -64,8 +64,8 @@ Index: ioemu/cpu-all.h
  void cpu_dump_state(CPUState *env, FILE *f, 
 Index: ioemu/disas.h
 ===================================================================
---- ioemu.orig/disas.h	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/disas.h	2007-05-09 13:47:24.000000000 +0100
+--- ioemu.orig/disas.h	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/disas.h	2007-05-10 15:36:06.000000000 +0100
 @@ -1,6 +1,7 @@
  #ifndef _QEMU_DISAS_H
  #define _QEMU_DISAS_H
@@ -83,9 +83,25 @@ Index: ioemu/disas.h
  #endif /* _QEMU_DISAS_H */
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/exec-all.h	2007-05-09 14:08:42.000000000 +0100
-@@ -519,7 +519,7 @@
+--- ioemu.orig/exec-all.h	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/exec-all.h	2007-05-10 15:56:40.000000000 +0100
+@@ -357,6 +357,7 @@
+ extern CPUReadMemoryFunc *io_mem_read[IO_MEM_NB_ENTRIES][4];
+ extern void *io_mem_opaque[IO_MEM_NB_ENTRIES];
+ 
++#ifndef CONFIG_DM
+ #ifdef __powerpc__
+ static inline int testandset (int *p)
+ {
+@@ -480,6 +481,7 @@
+     return __sync_lock_test_and_set (p, 1);
+ }
+ #endif
++#endif /* !CONFIG_DM */
+ 
+ typedef int spinlock_t;
+ 
+@@ -519,7 +521,7 @@
  
  extern int tb_invalidated_flag;
  
@@ -94,7 +110,7 @@ Index: ioemu/exec-all.h
  
  void tlb_fill(target_ulong addr, int is_write, int is_user, 
                void *retaddr);
-@@ -546,7 +546,7 @@
+@@ -546,7 +548,7 @@
  
  #endif
  
@@ -105,8 +121,8 @@ Index: ioemu/exec-all.h
      return addr;
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-09 14:08:42.000000000 +0100
+--- ioemu.orig/hw/pc.c	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-10 15:56:20.000000000 +0100
 @@ -74,6 +74,7 @@
      }
  }
@@ -168,8 +184,8 @@ Index: ioemu/hw/pc.c
          if (serial_hds[i]) {
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/hw/vga_int.h	2007-05-09 14:08:41.000000000 +0100
+--- ioemu.orig/hw/vga_int.h	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/hw/vga_int.h	2007-05-10 15:56:19.000000000 +0100
 @@ -28,7 +28,7 @@
  #define ST01_DISP_ENABLE    0x01
  
@@ -181,8 +197,8 @@ Index: ioemu/hw/vga_int.h
  #define VBE_DISPI_MAX_YRES              1200
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/monitor.c	2007-05-09 14:08:59.000000000 +0100
+--- ioemu.orig/monitor.c	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/monitor.c	2007-05-10 15:56:20.000000000 +0100
 @@ -69,6 +69,12 @@
  
  void term_flush(void)
@@ -424,8 +440,8 @@ Index: ioemu/monitor.c
  {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 13:47:22.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 14:08:42.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-10 15:36:04.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:56:20.000000000 +0100
 @@ -396,12 +396,15 @@
  void hw_error(const char *fmt, ...)
  {

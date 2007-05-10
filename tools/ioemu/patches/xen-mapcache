@@ -17,9 +17,9 @@ Signed-off-by: Keir Fraser <keir@xensource.com>
 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 13:49:09.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 13:49:10.000000000 +0100
-@@ -278,7 +278,7 @@
+--- ioemu.orig/vl.c	2007-05-10 15:35:25.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:35:25.000000000 +0100
+@@ -275,7 +275,7 @@
      for(i = start; i < start + length; i += size) {
          ioport_read_table[bsize][i] = func;
          if (ioport_opaque[i] != NULL && ioport_opaque[i] != opaque)
@@ -28,7 +28,7 @@ Index: ioemu/vl.c
          ioport_opaque[i] = opaque;
      }
      return 0;
-@@ -6806,6 +6806,157 @@
+@@ -6791,6 +6791,157 @@
      suspend_requested = 1;
  }
  
@@ -186,7 +186,7 @@ Index: ioemu/vl.c
  int main(int argc, char **argv)
  {
  #ifdef CONFIG_GDBSTUB
-@@ -6842,8 +6993,11 @@
+@@ -6827,8 +6978,11 @@
      unsigned long ioreq_pfn;
      extern void *shared_page;
      extern void *buffered_io_page;
@@ -199,7 +199,7 @@ Index: ioemu/vl.c
  
      char qemu_dm_logfilename[64];
  
-@@ -7136,6 +7290,7 @@
+@@ -7119,6 +7273,7 @@
                  break;
              case QEMU_OPTION_m:
                  ram_size = atol(optarg) * 1024 * 1024;
@@ -207,7 +207,7 @@ Index: ioemu/vl.c
                  if (ram_size <= 0)
                      help();
  #ifndef CONFIG_DM
-@@ -7495,30 +7650,15 @@
+@@ -7472,30 +7627,15 @@
  
  #if defined(__i386__) || defined(__x86_64__)
  
@@ -241,7 +241,7 @@ Index: ioemu/vl.c
      if (shared_page == NULL) {
          fprintf(logfile, "map shared IO page returned error %d\n", errno);
          exit(-1);
-@@ -7527,15 +7667,12 @@
+@@ -7504,15 +7644,12 @@
      xc_get_hvm_param(xc_handle, domid, HVM_PARAM_BUFIOREQ_PFN, &ioreq_pfn);
      fprintf(logfile, "buffered io page at pfn %lx\n", ioreq_pfn);
      buffered_io_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
@@ -260,8 +260,8 @@ Index: ioemu/vl.c
      nr_pages = ram_size/PAGE_SIZE;
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-09 13:48:54.000000000 +0100
-+++ ioemu/target-i386-dm/exec-dm.c	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-10 15:32:53.000000000 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2007-05-10 15:35:25.000000000 +0100
 @@ -36,6 +36,7 @@
  
  #include "cpu.h"
@@ -380,9 +380,9 @@ Index: ioemu/target-i386-dm/exec-dm.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 13:49:09.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 13:49:10.000000000 +0100
-@@ -161,6 +161,28 @@
+--- ioemu.orig/vl.h	2007-05-10 15:35:25.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:35:25.000000000 +0100
+@@ -159,6 +159,28 @@
  
  extern FILE *logfile;
  
@@ -413,8 +413,8 @@ Index: ioemu/vl.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2007-05-09 13:48:54.000000000 +0100
-+++ ioemu/target-i386-dm/cpu.h	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2007-05-10 15:32:53.000000000 +0100
++++ ioemu/target-i386-dm/cpu.h	2007-05-10 15:35:25.000000000 +0100
 @@ -25,7 +25,8 @@
  #ifdef TARGET_X86_64
  #define TARGET_LONG_BITS 64
@@ -427,8 +427,8 @@ Index: ioemu/target-i386-dm/cpu.h
  /* target supports implicit self modifying code */
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2007-05-09 13:48:54.000000000 +0100
-+++ ioemu/target-i386-dm/helper2.c	2007-05-09 13:49:10.000000000 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-10 15:34:24.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-10 15:35:25.000000000 +0100
 @@ -526,6 +526,9 @@
      case IOREQ_TYPE_TIMEOFFSET:
          cpu_ioreq_timeoffset(env, req);

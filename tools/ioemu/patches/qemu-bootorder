@@ -1,9 +1,9 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 13:48:26.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 13:49:06.000000000 +0100
-@@ -136,7 +136,7 @@
- struct sockaddr_in vnclisten_addr;
+--- ioemu.orig/vl.c	2007-05-10 15:34:25.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:35:16.000000000 +0100
+@@ -135,7 +135,7 @@
+ int vncunused;
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
 -int boot_device = 'c';
@@ -11,7 +11,7 @@ Index: ioemu/vl.c
  uint64_t ram_size;
  int pit_min_timer_count = 0;
  int nb_nics;
-@@ -7068,14 +7068,14 @@
+@@ -7051,14 +7051,14 @@
                  break;
  #endif /* !CONFIG_DM */
              case QEMU_OPTION_boot:
@@ -31,7 +31,7 @@ Index: ioemu/vl.c
                      exit(1);
                  }
                  break;
-@@ -7442,6 +7442,7 @@
+@@ -7419,6 +7419,7 @@
              exit(1);
      }
  
@@ -39,7 +39,7 @@ Index: ioemu/vl.c
  #ifdef TARGET_I386
      if (boot_device == 'n') {
  	for (i = 0; i < nb_nics; i++) {
-@@ -7463,6 +7464,7 @@
+@@ -7440,6 +7441,7 @@
  	boot_device = 'c'; /* to prevent confusion by the BIOS */
      }
  #endif
@@ -47,7 +47,7 @@ Index: ioemu/vl.c
  
  #if defined (__ia64__)
      if (ram_size > MMIO_START)
-@@ -7472,6 +7474,7 @@
+@@ -7449,6 +7451,7 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
@@ -55,7 +55,7 @@ Index: ioemu/vl.c
      for (i = 0; i < nb_option_roms; i++) {
  	int ret = get_image_size(option_rom[i]);
  	if (ret == -1) {
-@@ -7480,6 +7483,7 @@
+@@ -7457,6 +7460,7 @@
  	}
  	phys_ram_size += ret;
      }
@@ -63,19 +63,19 @@ Index: ioemu/vl.c
  
  #ifdef CONFIG_DM
  
-@@ -7711,6 +7715,7 @@
+@@ -7686,6 +7690,7 @@
+     machine->init(ram_size, vga_ram_size, boot_device,
                    ds, fd_filename, snapshot,
-                   kernel_filename, kernel_cmdline, initrd_filename,
-                   timeoffset);
+                   kernel_filename, kernel_cmdline, initrd_filename);
 +    free(boot_device);
  
      /* init USB devices */
      if (usb_enabled) {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 13:48:26.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 13:48:55.000000000 +0100
-@@ -705,7 +705,7 @@
+--- ioemu.orig/vl.h	2007-05-10 15:34:25.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:34:28.000000000 +0100
+@@ -703,7 +703,7 @@
  #ifndef QEMU_TOOL
  
  typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
@@ -83,8 +83,8 @@ Index: ioemu/vl.h
 +                                 char *boot_device,
               DisplayState *ds, const char **fd_filename, int snapshot,
               const char *kernel_filename, const char *kernel_cmdline,
-              const char *initrd_filename, time_t timeoffset);
-@@ -1219,7 +1219,7 @@
+              const char *initrd_filename);
+@@ -1217,7 +1217,7 @@
                      uint32_t start, uint32_t count);
  int PPC_NVRAM_set_params (m48t59_t *nvram, uint16_t NVRAM_size,
                            const unsigned char *arch,
@@ -95,8 +95,8 @@ Index: ioemu/vl.h
                            uint32_t initrd_image, uint32_t initrd_size,
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-09 13:48:26.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-09 13:48:55.000000000 +0100
+--- ioemu.orig/hw/pc.c	2007-05-10 15:34:25.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-10 15:34:59.000000000 +0100
 @@ -159,8 +159,25 @@
      rtc_set_memory(s, info_ofs + 8, sectors);
  }
@@ -119,8 +119,8 @@ Index: ioemu/hw/pc.c
 +}
 +
  /* hd_table must contain 4 block drivers */
--static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table, time_t timeoffset)
-+static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **hd_table, time_t timeoffset)
+-static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table)
++static void cmos_init(uint64_t ram_size, char *boot_device, BlockDriverState **hd_table)
  {
      RTCState *s = rtc_state;
      int val;
@@ -162,7 +162,7 @@ Index: ioemu/hw/pc.c
 +static void pc_init1(uint64_t ram_size, int vga_ram_size, char *boot_device,
                       DisplayState *ds, const char **fd_filename, int snapshot,
                       const char *kernel_filename, const char *kernel_cmdline,
-                      const char *initrd_filename, time_t timeoffset,
+                      const char *initrd_filename,
 @@ -772,7 +782,7 @@
  #endif
  }
@@ -172,8 +172,8 @@ Index: ioemu/hw/pc.c
                          DisplayState *ds, const char **fd_filename, 
                          int snapshot, 
                          const char *kernel_filename, 
-@@ -786,7 +796,7 @@
-              initrd_filename, timeoffset, 1);
+@@ -785,7 +795,7 @@
+              initrd_filename, 1);
  }
  
 -static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,

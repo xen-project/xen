@@ -1,8 +1,8 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2007-05-09 14:12:04.000000000 +0100
-+++ ioemu/vnc.c	2007-05-09 14:12:21.000000000 +0100
-@@ -1270,7 +1270,7 @@
+--- ioemu.orig/vnc.c	2007-05-10 15:11:41.000000000 +0100
++++ ioemu/vnc.c	2007-05-10 15:11:41.000000000 +0100
+@@ -1266,7 +1266,7 @@
  
  extern int parse_host_port(struct sockaddr_in *saddr, const char *str);
  
@@ -11,7 +11,7 @@ Index: ioemu/vnc.c
  {
      struct sockaddr *addr;
      struct sockaddr_in iaddr;
-@@ -1312,6 +1312,9 @@
+@@ -1308,6 +1308,9 @@
  
      vnc_dpy_resize(vs->ds, 640, 400);
  
@@ -21,7 +21,7 @@ Index: ioemu/vnc.c
  #ifndef _WIN32
      if (strstart(arg, "unix:", &p)) {
  	addr = (struct sockaddr *)&uaddr;
-@@ -1356,7 +1359,11 @@
+@@ -1352,7 +1355,11 @@
  	}
      }
  
@@ -34,7 +34,7 @@ Index: ioemu/vnc.c
  	fprintf(stderr, "bind() failed\n");
  	exit(1);
      }
-@@ -1370,6 +1377,8 @@
+@@ -1366,6 +1373,8 @@
      if (ret == -1) {
  	exit(1);
      }
@@ -45,8 +45,8 @@ Index: ioemu/vnc.c
  int vnc_start_viewer(int port)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 14:12:03.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 14:12:16.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-10 15:11:41.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:11:41.000000000 +0100
 @@ -132,6 +132,7 @@
  static DisplayState display_state;
  int nographic;
@@ -130,8 +130,8 @@ Index: ioemu/vl.c
      }
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 14:12:03.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 14:12:16.000000000 +0100
+--- ioemu.orig/vl.h	2007-05-10 15:11:41.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:11:41.000000000 +0100
 @@ -928,7 +928,7 @@
  void cocoa_display_init(DisplayState *ds, int full_screen);
  

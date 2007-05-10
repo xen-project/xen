@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 13:47:16.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 13:47:16.000000000 +0100
-@@ -6839,6 +6839,7 @@
+--- ioemu.orig/vl.c	2007-05-10 15:34:24.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:34:24.000000000 +0100
+@@ -6824,6 +6824,7 @@
      unsigned long ioreq_pfn;
      extern void *shared_page;
      extern void *buffered_io_page;
@@ -10,7 +10,7 @@ Index: ioemu/vl.c
      unsigned long nr_pages;
  
      char qemu_dm_logfilename[64];
-@@ -7544,6 +7545,10 @@
+@@ -7521,6 +7522,10 @@
                                         PROT_READ|PROT_WRITE,
                                         BUFFER_IO_PAGE_START >> PAGE_SHIFT);
  
@@ -23,8 +23,8 @@ Index: ioemu/vl.c
  	
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2007-05-09 13:47:15.000000000 +0100
-+++ ioemu/hw/ide.c	2007-05-09 13:47:16.000000000 +0100
+--- ioemu.orig/hw/ide.c	2007-05-10 15:32:53.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-10 15:34:24.000000000 +0100
 @@ -393,6 +393,121 @@
      int type; /* see IDE_TYPE_xxx */
  } PCIIDEState;

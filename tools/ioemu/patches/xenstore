@@ -1,7 +1,7 @@
 Index: ioemu/xenstore.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/xenstore.c	2007-05-09 13:47:15.000000000 +0100
++++ ioemu/xenstore.c	2007-05-10 15:19:05.000000000 +0100
 @@ -0,0 +1,139 @@
 +/*
 + * This file is subject to the terms and conditions of the GNU General
@@ -144,9 +144,9 @@ Index: ioemu/xenstore.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 13:47:15.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 13:47:15.000000000 +0100
-@@ -1423,6 +1423,12 @@
+--- ioemu.orig/vl.h	2007-05-10 15:18:58.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:19:05.000000000 +0100
+@@ -1421,6 +1421,12 @@
  void readline_start(const char *prompt, int is_password,
                      ReadLineFunc *readline_func, void *opaque);
  
@@ -161,8 +161,8 @@ Index: ioemu/vl.h
  extern char domain_name[];
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-09 13:44:51.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-09 13:47:15.000000000 +0100
+--- ioemu.orig/Makefile.target	2007-05-10 15:17:54.000000000 +0100
++++ ioemu/Makefile.target	2007-05-10 15:19:05.000000000 +0100
 @@ -390,6 +390,7 @@
  VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
  VL_OBJS+= usb-uhci.o smbus_eeprom.o
@@ -173,9 +173,9 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 13:47:15.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 13:47:15.000000000 +0100
-@@ -7353,6 +7353,10 @@
+--- ioemu.orig/vl.c	2007-05-10 15:18:58.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:19:05.000000000 +0100
+@@ -7338,6 +7338,10 @@
      }
  #endif
  
@@ -186,7 +186,7 @@ Index: ioemu/vl.c
  #ifdef USE_KQEMU
      if (smp_cpus > 1)
          kqemu_allowed = 0;
-@@ -7643,6 +7647,8 @@
+@@ -7627,6 +7631,8 @@
          }
      }
  

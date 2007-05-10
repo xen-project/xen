@@ -1,7 +1,7 @@
 Index: ioemu/hw/ide.c
 ===================================================================
---- ioemu.orig/hw/ide.c	2007-05-03 20:31:55.000000000 +0100
-+++ ioemu/hw/ide.c	2007-05-03 20:35:19.000000000 +0100
+--- ioemu.orig/hw/ide.c	2007-05-10 15:04:31.000000000 +0100
++++ ioemu/hw/ide.c	2007-05-10 15:05:02.000000000 +0100
 @@ -306,6 +306,7 @@
      PCIDevice *pci_dev;
      struct BMDMAState *bmdma;
@@ -20,7 +20,17 @@ Index: ioemu/hw/ide.c
  #ifdef TARGET_I386
      if (win2k_install_hack && ((++s->irq_count % 16) == 0)) {
          /* It seems there is a bug in the Windows 2000 installer HDD
-@@ -1849,7 +1853,15 @@
+@@ -956,6 +960,9 @@
+ 
+     /* end of transfer ? */
+     if (s->nsector == 0) {
++        /* Ensure the data hit disk before telling the guest OS so. */
++        if (!s->write_cache)
++            bdrv_flush(s->bs);
+         s->status = READY_STAT | SEEK_STAT;
+         ide_set_irq(s);
+     eot:
+@@ -1849,7 +1856,15 @@
              /* XXX: valid for CDROM ? */
              switch(s->feature) {
              case 0x02: /* write cache enable */
@@ -36,7 +46,7 @@ Index: ioemu/hw/ide.c
              case 0xaa: /* read look-ahead enable */
              case 0x55: /* read look-ahead disable */
                  s->status = READY_STAT | SEEK_STAT;
-@@ -2282,6 +2294,7 @@
+@@ -2282,6 +2297,7 @@
          s->irq = irq;
          s->sector_write_timer = qemu_new_timer(vm_clock, 
                                                 ide_sector_write_timer_cb, s);

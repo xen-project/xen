@@ -5,7 +5,6 @@ qemu-cleanup
 qemu-64bit
 qemu-bugfixes
 qemu-logging
-qemu-infrastructure
 qemu-hvm-banner
 xen-domain-name
 xen-domid
@@ -41,9 +40,7 @@ vnc-fixes
 vnc-protocol-fixes
 vnc-start-vncviewer
 vnc-title-domain-name
-vnc-access-monitor-vt
 vnc-display-find-unused
-vnc-listen-specific-interface
 vnc-backoff-screen-scan
 xenstore
 xenstore-block-device-config
@@ -79,3 +76,4 @@ scsi
 qemu-cirrus-bounds-checks
 qemu-block-device-bounds-checks
 qemu-dma-null-pointer-check
+vnc-fix-text-display-shift-key

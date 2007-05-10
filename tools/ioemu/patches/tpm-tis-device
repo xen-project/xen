@@ -22,8 +22,8 @@ Signed-off-by: Stefan Berger <stefanb@us.ibm.com>
 
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-03 20:38:49.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-03 20:39:04.000000000 +0100
+--- ioemu.orig/Makefile.target	2007-05-10 15:19:29.000000000 +0100
++++ ioemu/Makefile.target	2007-05-10 15:19:29.000000000 +0100
 @@ -400,6 +400,7 @@
  VL_OBJS+= piix4acpi.o
  VL_OBJS+= xenstore.o
@@ -34,8 +34,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-03 20:32:20.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-03 20:38:55.000000000 +0100
+--- ioemu.orig/hw/pc.c	2007-05-10 15:19:28.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-10 15:19:29.000000000 +0100
 @@ -730,6 +730,9 @@
          }
      }
@@ -49,7 +49,7 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/tpm_tis.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/tpm_tis.c	2007-05-03 20:38:55.000000000 +0100
++++ ioemu/hw/tpm_tis.c	2007-05-10 15:19:29.000000000 +0100
 @@ -0,0 +1,1128 @@
 +/*
 + * tpm_tis.c - QEMU emulator for a 1.2 TPM with TIS interface
@@ -1181,9 +1181,9 @@ Index: ioemu/hw/tpm_tis.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 20:38:53.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 20:38:55.000000000 +0100
-@@ -1088,6 +1088,10 @@
+--- ioemu.orig/vl.h	2007-05-10 15:19:29.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:19:29.000000000 +0100
+@@ -1086,6 +1086,10 @@
  /* smbus_eeprom.c */
  SMBusDevice *smbus_eeprom_device_init(uint8_t addr, uint8_t *buf);
  

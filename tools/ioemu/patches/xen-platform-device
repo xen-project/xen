@@ -3,8 +3,8 @@ will come later.
 
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-09 13:56:21.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-09 13:56:35.000000000 +0100
+--- ioemu.orig/Makefile.target	2007-05-10 15:19:05.000000000 +0100
++++ ioemu/Makefile.target	2007-05-10 15:19:28.000000000 +0100
 @@ -391,6 +391,7 @@
  VL_OBJS+= usb-uhci.o smbus_eeprom.o
  VL_OBJS+= piix4acpi.o
@@ -15,8 +15,8 @@ Index: ioemu/Makefile.target
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-09 13:56:21.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-09 13:56:35.000000000 +0100
+--- ioemu.orig/hw/pc.c	2007-05-10 15:19:11.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-10 15:19:28.000000000 +0100
 @@ -676,6 +676,9 @@
      }
  #endif /* !CONFIG_DM */
@@ -30,7 +30,7 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/xen_platform.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/xen_platform.c	2007-05-09 13:56:47.000000000 +0100
++++ ioemu/hw/xen_platform.c	2007-05-10 15:19:28.000000000 +0100
 @@ -0,0 +1,150 @@
 +/*
 + * XEN platform fake pci device, formerly known as the event channel device
@@ -184,9 +184,9 @@ Index: ioemu/hw/xen_platform.c
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 13:56:21.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 13:56:35.000000000 +0100
-@@ -1439,6 +1439,10 @@
+--- ioemu.orig/vl.h	2007-05-10 15:19:11.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:19:28.000000000 +0100
+@@ -1437,6 +1437,10 @@
  extern long time_offset;
  void timeoffset_get(void);
  
