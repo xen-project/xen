@@ -968,6 +968,9 @@ static void ide_write_dma_cb(void *opaque, int ret)
 
     /* end of transfer ? */
     if (s->nsector == 0) {
+        /* Ensure the data hit disk before telling the guest OS so. */
+        if (!s->write_cache)
+            bdrv_flush(s->bs);
         s->status = READY_STAT | SEEK_STAT;
         ide_set_irq(s);
     eot:
