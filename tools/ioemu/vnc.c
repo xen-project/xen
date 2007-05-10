@@ -46,10 +46,6 @@
 #include "keymaps.c"
 #include "d3des.h"
 
-#define XK_MISCELLANY
-#define XK_LATIN1
-#include <X11/keysymdef.h>
-
 typedef struct Buffer
 {
     size_t capacity;
