@@ -909,6 +909,12 @@ static void reset_keys(VncState *vs)
     }
 }
 
+static void press_key(VncState *vs, int keysym)
+{
+    kbd_put_keycode(keysym2scancode(vs->kbd_layout, keysym) & 0x7f);
+    kbd_put_keycode(keysym2scancode(vs->kbd_layout, keysym) | 0x80);
+}
+
 static void do_key_event(VncState *vs, int down, uint32_t sym)
 {
     int keycode;
@@ -936,6 +942,28 @@ static void do_key_event(VncState *vs, int down, uint32_t sym)
             return;
         }
         break;
+    case 0x45:			/* NumLock */
+	if (!down)
+	    vs->modifiers_state[keycode] ^= 1;
+	break;
+    }
+
+    if (keycodeIsKeypad(vs->kbd_layout, keycode)) {
+        /* If the numlock state needs to change then simulate an additional
+           keypress before sending this one.  This will happen if the user
+           toggles numlock away from the VNC window.
+        */
+        if (keysymIsNumlock(vs->kbd_layout, sym & 0xFFFF)) {
+	    if (!vs->modifiers_state[0x45]) {
+		vs->modifiers_state[0x45] = 1;
+		press_key(vs, 0xff7f);
+	    }
+	} else {
+	    if (vs->modifiers_state[0x45]) {
+		vs->modifiers_state[0x45] = 0;
+		press_key(vs, 0xff7f);
+	    }
+        }
     }
 
     if (is_graphic_console()) {
@@ -1427,6 +1455,7 @@ int vnc_display_init(DisplayState *ds, const char *arg, int find_unused)
     vs->kbd_layout = init_keyboard_layout(keyboard_layout);
     if (!vs->kbd_layout)
 	exit(1);
+    vs->modifiers_state[0x45] = 1; /* NumLock on - on boot */
 
     vs->ds->data = NULL;
     vs->ds->dpy_update = vnc_dpy_update;
