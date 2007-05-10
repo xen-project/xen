@@ -79,7 +79,7 @@ void console_print(char *msg)
 
 void die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
-	if (user_mode(regs))
+	if (guest_mode(regs))
 		return;
 
 	printk("%s: %s %ld\n", __func__, str, err);

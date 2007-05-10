@@ -209,7 +209,7 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 
 	if (is_ptc_l_needed)
 		vcpu_ptc_l(current, address, logps);
-	if (!user_mode(regs)) {
+	if (!guest_mode(regs)) {
 		/* The fault occurs inside Xen.  */
 		if (!ia64_done_with_exception(regs)) {
 			// should never happen.  If it does, region 0 addr may

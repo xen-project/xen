@@ -164,7 +164,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
         if (iim == 0) 
             vmx_die_if_kernel("Break 0 in Hypervisor.", regs, iim);
 
-        if (!user_mode(regs)) {
+        if (ia64_psr(regs)->cpl == 0) {
             /* Allow hypercalls only when cpl = 0.  */
             if (iim == d->arch.breakimm) {
                 ia64_hypercall(regs);
