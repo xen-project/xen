@@ -1393,9 +1393,10 @@ static void vnc_listen_read(void *opaque)
 
 extern int parse_host_port(struct sockaddr_in *saddr, const char *str);
 
-int vnc_display_init(DisplayState *ds, const char *arg, int find_unused, struct sockaddr_in *iaddr)
+int vnc_display_init(DisplayState *ds, const char *arg, int find_unused)
 {
     struct sockaddr *addr;
+    struct sockaddr_in iaddr;
 #ifndef _WIN32
     struct sockaddr_un uaddr;
 #endif
@@ -1456,8 +1457,8 @@ int vnc_display_init(DisplayState *ds, const char *arg, int find_unused, struct 
     } else
 #endif
     {
-	addr = (struct sockaddr *)iaddr;
-	addrlen = sizeof(*iaddr);
+	addr = (struct sockaddr *)&iaddr;
+	addrlen = sizeof(iaddr);
 
 	vs->lsock = socket(PF_INET, SOCK_STREAM, 0);
 	if (vs->lsock == -1) {
@@ -1465,12 +1466,12 @@ int vnc_display_init(DisplayState *ds, const char *arg, int find_unused, struct 
 	    exit(1);
 	}
 
-	if (parse_host_port(iaddr, arg) < 0) {
+	if (parse_host_port(&iaddr, arg) < 0) {
 	    fprintf(stderr, "Could not parse VNC address\n");
 	    exit(1);
 	}
 	    
-	iaddr->sin_port = htons(ntohs(iaddr->sin_port) + 5900);
+	iaddr.sin_port = htons(ntohs(iaddr.sin_port) + 5900);
 
 	reuse_addr = 1;
 	ret = setsockopt(vs->lsock, SOL_SOCKET, SO_REUSEADDR,
@@ -1483,7 +1484,7 @@ int vnc_display_init(DisplayState *ds, const char *arg, int find_unused, struct 
 
     while (bind(vs->lsock, addr, addrlen) == -1) {
 	if (find_unused && errno == EADDRINUSE) {
-	    iaddr->sin_port = htons(ntohs(iaddr->sin_port) + 1);
+	    iaddr.sin_port = htons(ntohs(iaddr.sin_port) + 1);
 	    continue;
 	}
 	fprintf(stderr, "bind() failed\n");
@@ -1500,7 +1501,7 @@ int vnc_display_init(DisplayState *ds, const char *arg, int find_unused, struct 
 	exit(1);
     }
 
-    return ntohs(iaddr->sin_port);
+    return ntohs(iaddr.sin_port);
 }
 
 int vnc_start_viewer(int port)
