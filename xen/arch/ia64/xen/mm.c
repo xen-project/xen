@@ -666,19 +666,22 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
             return GPFN_INV_MASK;
     }
 
-    if (mpaddr < d->arch.convmem_end) {
+    if (mpaddr < d->arch.convmem_end && !d->is_dying) {
         gdprintk(XENLOG_WARNING, "vcpu %d iip 0x%016lx: non-allocated mpa "
-                 "0x%lx (< 0x%lx)\n", current->vcpu_id, PSCB(current, iip),
-                 mpaddr, d->arch.convmem_end);
+                 "d %"PRId16" 0x%lx (< 0x%lx)\n",
+                 current->vcpu_id, PSCB(current, iip),
+                 d->domain_id, mpaddr, d->arch.convmem_end);
     } else if (mpaddr - IO_PORTS_PADDR < IO_PORTS_SIZE) {
         /* Log I/O port probing, but complain less loudly about it */
         gdprintk(XENLOG_INFO, "vcpu %d iip 0x%016lx: bad I/O port access "
-                 "0x%lx\n", current->vcpu_id, PSCB(current, iip),
+                 "d %"PRId16" 0x%lx\n",
+                 current->vcpu_id, PSCB(current, iip), d->domain_id,
                  IO_SPACE_SPARSE_DECODING(mpaddr - IO_PORTS_PADDR));
     } else {
-        gdprintk(XENLOG_WARNING, "vcpu %d iip 0x%016lx: bad mpa 0x%lx "
-                 "(=> 0x%lx)\n", current->vcpu_id, PSCB(current, iip),
-                 mpaddr, d->arch.convmem_end);
+        gdprintk(XENLOG_WARNING, "vcpu %d iip 0x%016lx: bad mpa "
+                 "d %"PRId16" 0x%lx (=> 0x%lx)\n",
+                 current->vcpu_id, PSCB(current, iip),
+                 d->domain_id, mpaddr, d->arch.convmem_end);
     }
 
     if (entry != NULL)
