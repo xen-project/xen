@@ -168,11 +168,11 @@ vmx_itlb_loop:
     adds r16 = VLE_TITAG_OFFSET, r17
     adds r19 = VLE_CCHAIN_OFFSET, r17
     ;;
-    ld8 r22 = [r16]
+    ld8 r24 = [r16]
     ld8 r23 = [r19]
     ;;
     lfetch [r23]
-    cmp.eq  p6,p7 = r20, r22
+    cmp.eq  p6,p7 = r20, r24
     ;;
 (p7)mov r17 = r23;
 (p7)br.sptk vmx_itlb_loop
@@ -180,10 +180,12 @@ vmx_itlb_loop:
     ld8 r25 = [r17]
     ld8 r27 = [r18]
     ld8 r29 = [r28]
+    dep r22 = -1,r24,63,1    //set ti=1
     ;;
     st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     extr.u r19 = r27, 56, 4
+    mf
     ;;
     ld8 r29 = [r16]
     ld8 r22 = [r28]
@@ -191,10 +193,11 @@ vmx_itlb_loop:
     dep r25 = r19, r25, 56, 4
     ;;
     st8 [r16] = r22
-    st8 [r28] = r29
+    st8 [r28] = r29, VLE_TITAG_OFFSET - VLE_ITIR_OFFSET
     st8 [r18] = r25
     st8 [r17] = r27
     ;;
+    st8.rel [r28] = r24
     itc.i r25
     dv_serialize_data
     mov r17=cr.isr
@@ -246,11 +249,11 @@ vmx_dtlb_loop:
     adds r16 = VLE_TITAG_OFFSET, r17
     adds r19 = VLE_CCHAIN_OFFSET, r17
     ;;
-    ld8 r22 = [r16]
+    ld8 r24 = [r16]
     ld8 r23 = [r19]
     ;;
     lfetch [r23]
-    cmp.eq  p6,p7 = r20, r22
+    cmp.eq  p6,p7 = r20, r24
     ;;
 (p7)mov r17 = r23;
 (p7)br.sptk vmx_dtlb_loop
@@ -258,10 +261,12 @@ vmx_dtlb_loop:
     ld8 r25 = [r17]
     ld8 r27 = [r18]
     ld8 r29 = [r28]
+    dep r22 = -1,r24,63,1    //set ti=1
     ;;
     st8 [r16] = r29, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     st8 [r28] = r22, VLE_ITIR_OFFSET - VLE_TITAG_OFFSET
     extr.u r19 = r27, 56, 4
+    mf
     ;;
     ld8 r29 = [r16]
     ld8 r22 = [r28]
@@ -269,10 +274,11 @@ vmx_dtlb_loop:
     dep r25 = r19, r25, 56, 4
     ;;
     st8 [r16] = r22
-    st8 [r28] = r29
+    st8 [r28] = r29, VLE_TITAG_OFFSET - VLE_ITIR_OFFSET
     st8 [r18] = r25
     st8 [r17] = r27
-    ;;    
+    ;;
+    st8.rel [r28] = r24 
     itc.d r25
     dv_serialize_data
     mov r17=cr.isr

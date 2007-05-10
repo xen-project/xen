@@ -141,7 +141,7 @@ static void thash_recycle_cch(thash_cb_t *hcb, thash_data_t *hash)
 
 static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
 {
-    u64 tag ,len;
+    u64 tag;
     ia64_rr rr;
     thash_data_t *head, *cch;
     pte = pte & ~PAGE_FLAGS_RV_MASK;
@@ -155,14 +155,12 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
         cch = cch->next;
     }
     if (cch) {
-        if (cch == head) {
-            len = head->len;
-        } else {
+        if (cch != head) {
             local_irq_disable();
             cch->page_flags = head->page_flags;
             cch->itir = head->itir;
             cch->etag  = head->etag;
-            len = head->len;
+            head->ti = 1;
             local_irq_enable();
         }
     }
@@ -175,16 +173,17 @@ static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
         }
         local_irq_disable();
         *cch = *head;
+        head->ti = 1;
         head->next = cch;
-        len = cch->len+1;
+        head->len = cch->len + 1;
         cch->len = 0;
         local_irq_enable();
     }
-
+    //here head is invalid
+    wmb();
     head->page_flags=pte;
-    head->len = len;
     head->itir = rr.ps << 2;
-    head->etag=tag;
+    *(volatile unsigned long*)&head->etag = tag;
     return;
 }
 

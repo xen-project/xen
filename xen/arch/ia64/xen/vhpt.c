@@ -78,11 +78,13 @@ void vhpt_insert (unsigned long vadr, unsigned long pte, unsigned long logps)
 	struct vhpt_lf_entry *vlfe = (struct vhpt_lf_entry *)ia64_thash(vadr);
 	unsigned long tag = ia64_ttag (vadr);
 
-	/* No need to first disable the entry, since VHPT is per LP
-	   and VHPT is TR mapped.  */
+	/* Even though VHPT is per VCPU, still need to first disable the entry,
+	 * because the processor may support speculative VHPT walk.  */
+	vlfe->ti_tag = INVALID_TI_TAG;
+	wmb();
 	vlfe->itir = logps;
 	vlfe->page_flags = pte | _PAGE_P;
-	vlfe->ti_tag = tag;
+	*(volatile unsigned long*)&vlfe->ti_tag = tag;
 }
 
 void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long logps)
