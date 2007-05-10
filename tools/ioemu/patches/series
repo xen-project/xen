@@ -77,3 +77,4 @@ qemu-cirrus-bounds-checks
 qemu-block-device-bounds-checks
 qemu-dma-null-pointer-check
 vnc-fix-text-display-shift-key
+vnc-keypad-handling
