@@ -2118,7 +2118,7 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         /* Remove previously mapped page if it was present. */
         if (prev_mfn && mfn_valid(prev_mfn)) {
-            if (IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)))
+            if (is_xen_heap_frame(mfn_to_page(prev_mfn)))
                 /* Xen heap frames are simply unhooked from this phys slot. */
                 guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
             else

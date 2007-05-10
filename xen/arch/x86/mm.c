@@ -3037,7 +3037,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
         if ( mfn_valid(prev_mfn) )
         {
-            if ( IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)) )
+            if ( is_xen_heap_frame(mfn_to_page(prev_mfn)) )
                 /* Xen heap frames are simply unhooked from this phys slot. */
                 guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
             else
@@ -3487,8 +3487,17 @@ void __set_fixmap(
 void memguard_init(void)
 {
     map_pages_to_xen(
-        PAGE_OFFSET, 0, xenheap_phys_end >> PAGE_SHIFT,
+        (unsigned long)__va(xen_phys_start),
+        xen_phys_start >> PAGE_SHIFT,
+        (xenheap_phys_end - xen_phys_start) >> PAGE_SHIFT,
         __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+#ifdef __x86_64__
+    map_pages_to_xen(
+        XEN_VIRT_START,
+        xen_phys_start >> PAGE_SHIFT,
+        (__pa(&_end) + PAGE_SIZE - 1 - xen_phys_start) >> PAGE_SHIFT,
+        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+#endif
 }
 
 static void __memguard_change_range(void *p, unsigned long l, int guard)

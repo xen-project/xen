@@ -32,7 +32,7 @@ static void __init add_memory_region(unsigned long long start,
     }
 } /* add_memory_region */
 
-static void __init print_e820_memory_map(struct e820entry *map, int entries)
+/*static*/ void __init print_e820_memory_map(struct e820entry *map, int entries)
 {
     int i;
 

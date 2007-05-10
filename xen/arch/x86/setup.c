@@ -34,6 +34,14 @@
 #include <acm/acm_hooks.h>
 #include <xen/kexec.h>
 
+#if defined(CONFIG_X86_64)
+#define BOOTSTRAP_DIRECTMAP_END (1UL << 32)
+#define maddr_to_bootstrap_virt(m) maddr_to_virt(m)
+#else
+#define BOOTSTRAP_DIRECTMAP_END HYPERVISOR_VIRT_START
+#define maddr_to_bootstrap_virt(m) ((void *)(long)(m))
+#endif
+
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
 extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
@@ -82,6 +90,8 @@ int early_boot = 1;
 
 cpumask_t cpu_present_map;
 
+unsigned long xen_phys_start;
+
 /* Limits of Xen heap, used to initialise the allocator. */
 unsigned long xenheap_phys_start, xenheap_phys_end;
 
@@ -93,7 +103,7 @@ extern void early_cpu_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
 
-extern unsigned long cpu0_stack[];
+char __attribute__ ((__section__(".bss.page_aligned"))) cpu0_stack[STACK_SIZE];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
@@ -108,7 +118,7 @@ int acpi_disabled;
 
 int acpi_force;
 char acpi_param[10] = "";
-static void parse_acpi_param(char *s)
+static void __init parse_acpi_param(char *s)
 {
     /* Save the parameter so it can be propagated to domain0. */
     safe_strcpy(acpi_param, s);
@@ -147,20 +157,23 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-#define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
+#define EARLY_FAIL(f, a...) do {                \
+    printk( f , ## a );                         \
+    for ( ; ; ) __asm__ __volatile__ ( "hlt" ); \
+} while (0)
 
-static struct e820entry e820_raw[E820MAX];
+static struct e820entry __initdata e820_raw[E820MAX];
 
-static unsigned long initial_images_start, initial_images_end;
+static unsigned long __initdata initial_images_start, initial_images_end;
 
-unsigned long initial_images_nrpages(void)
+unsigned long __init initial_images_nrpages(void)
 {
     unsigned long s = initial_images_start + PAGE_SIZE - 1;
     unsigned long e = initial_images_end;
     return ((e >> PAGE_SHIFT) - (s >> PAGE_SHIFT));
 }
 
-void discard_initial_images(void)
+void __init discard_initial_images(void)
 {
     init_domheap_pages(initial_images_start, initial_images_end);
 }
@@ -170,33 +183,15 @@ extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
 static void __init percpu_init_areas(void)
 {
     unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
+    unsigned int first_unused;
 
     BUG_ON(data_size > PERCPU_SIZE);
 
-    for_each_cpu ( i )
-    {
-        memguard_unguard_range(__per_cpu_start + (i << PERCPU_SHIFT),
-                               1 << PERCPU_SHIFT);
-        if ( i != 0 )
-            memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
-                   __per_cpu_start,
-                   data_size);
-    }
-}
-
-static void __init percpu_guard_areas(void)
-{
-    memguard_guard_range(__per_cpu_start, __per_cpu_end - __per_cpu_start);
-}
-
-static void __init percpu_free_unused_areas(void)
-{
-    unsigned int i, first_unused;
-
-    /* Find first unused CPU number. */
-    for ( i = 0; i < NR_CPUS; i++ )
-        if ( !cpu_possible(i) )
-            break;
+    /* Initialise per-cpu data area for all possible secondary CPUs. */
+    for ( i = 1; (i < NR_CPUS) && cpu_possible(i); i++ )
+        memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
+               __per_cpu_start,
+               data_size);
     first_unused = i;
 
     /* Check that there are no holes in cpu_possible_map. */
@@ -210,7 +205,7 @@ static void __init percpu_free_unused_areas(void)
 }
 
 /* Fetch acm policy module from multiboot modules. */
-static void extract_acm_policy(
+static void __init extract_acm_policy(
     multiboot_info_t *mbi,
     unsigned int *initrdidx,
     char **_policy_start,
@@ -228,11 +223,7 @@ static void extract_acm_policy(
     for ( i = mbi->mods_count-1; i >= 1; i-- )
     {
         start = initial_images_start + (mod[i].mod_start-mod[0].mod_start);
-#if defined(__i386__)
-        policy_start = (char *)start;
-#elif defined(__x86_64__)
-        policy_start = __va(start);
-#endif
+        policy_start = maddr_to_bootstrap_virt(start);
         policy_len   = mod[i].mod_end - mod[i].mod_start;
         if ( acm_is_policy(policy_start, policy_len) )
         {
@@ -264,7 +255,7 @@ static void __init init_idle_domain(void)
     setup_idle_pagetable();
 }
 
-static void srat_detect_node(int cpu)
+static void __init srat_detect_node(int cpu)
 {
     unsigned node;
     u8 apicid = x86_cpu_to_apicid[cpu];
@@ -278,18 +269,45 @@ static void srat_detect_node(int cpu)
         printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
-void __init move_memory(unsigned long dst,
-                          unsigned long src_start, unsigned long src_end)
+static void __init move_memory(
+    unsigned long dst, unsigned long src_start, unsigned long src_end)
 {
-#if defined(CONFIG_X86_32)
-    memmove((void *)dst,            /* use low mapping */
-            (void *)src_start,      /* use low mapping */
+    memmove(maddr_to_bootstrap_virt(dst),
+            maddr_to_bootstrap_virt(src_start),
             src_end - src_start);
-#elif defined(CONFIG_X86_64)
-    memmove(__va(dst),
-            __va(src_start),
-            src_end - src_start);
-#endif
+}
+
+/* A temporary copy of the e820 map that we can mess with during bootstrap. */
+static struct e820map __initdata boot_e820;
+
+/* Reserve area (@s,@e) in the temporary bootstrap e820 map. */
+static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
+{
+    unsigned long rs, re;
+    int i;
+
+    for ( i = 0; i < boot_e820.nr_map; i++ )
+    {
+        /* Have we found the e820 region that includes the specified range? */
+        rs = boot_e820.map[i].addr;
+        re = boot_e820.map[i].addr + boot_e820.map[i].size;
+        if ( (s < rs) || (e > re) )
+            continue;
+
+        /* Start fragment. */
+        boot_e820.map[i].size = s - rs;
+
+        /* End fragment. */
+        if ( e < re )
+        {
+            memmove(&boot_e820.map[i+1], &boot_e820.map[i],
+                    (boot_e820.nr_map-i) * sizeof(boot_e820.map[0]));
+            boot_e820.nr_map++;
+            i++;
+            boot_e820.map[i].addr = e;
+            boot_e820.map[i].size = re - e;
+        }
+    }
 }
 
 void __init __start_xen(multiboot_info_t *mbi)
@@ -301,7 +319,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long _policy_len = 0;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
-    paddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
@@ -338,17 +355,11 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
-    {
-        printk("FATAL ERROR: dom0 kernel not specified."
-               " Check bootloader configuration.\n");
-        EARLY_FAIL();
-    }
+        EARLY_FAIL("dom0 kernel not specified. "
+                   "Check bootloader configuration.\n");
 
     if ( ((unsigned long)cpu0_stack & (STACK_SIZE-1)) != 0 )
-    {
-        printk("FATAL ERROR: Misaligned CPU0 stack.\n");
-        EARLY_FAIL();
-    }
+        EARLY_FAIL("Misaligned CPU0 stack.\n");
 
     /*
      * Since there are some stubs getting built on the stacks which use
@@ -357,7 +368,6 @@ void __init __start_xen(multiboot_info_t *mbi)
      */
     if ( opt_xenheap_megabytes > 2048 )
         opt_xenheap_megabytes = 2048;
-    xenheap_phys_end = opt_xenheap_megabytes << 20;
 
     if ( mbi->flags & MBI_MEMMAP )
     {
@@ -403,8 +413,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
     else
     {
-        printk("FATAL ERROR: Bootloader provided no memory information.\n");
-        for ( ; ; ) ;
+        EARLY_FAIL("Bootloader provided no memory information.\n");
     }
 
     if ( e820_warn )
@@ -430,80 +439,190 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = init_e820(e820_raw, &e820_raw_nr);
 
-    modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
-
-    /* Find a large enough RAM extent to stash the DOM0 modules. */
-    for ( i = 0; ; i++ )
+    /*
+     * Create a temporary copy of the E820 map. Truncate it to above 16MB
+     * as anything below that is already mapped and has a statically-allocated
+     * purpose.
+     */
+    memcpy(&boot_e820, &e820, sizeof(e820));
+    for ( i = 0; i < boot_e820.nr_map; i++ )
     {
-        if ( i == e820.nr_map )
+        uint64_t s, e, min = 16 << 20; /* 16MB */
+        s = boot_e820.map[i].addr;
+        e = boot_e820.map[i].addr + boot_e820.map[i].size;
+        if ( s >= min )
+            continue;
+        if ( e > min )
         {
-            printk("Not enough memory to stash the DOM0 kernel image.\n");
-            for ( ; ; ) ;
+            boot_e820.map[i].addr = min;
+            boot_e820.map[i].size = e - min;
         }
-
-        if ( (e820.map[i].type == E820_RAM) &&
-             (e820.map[i].size >= modules_length) &&
-             ((e820.map[i].addr + e820.map[i].size) >=
-              (xenheap_phys_end + modules_length)) )
-            break;
+        else
+            boot_e820.map[i].type = E820_RESERVED;
     }
 
-    /* Stash as near as possible to the beginning of the RAM extent. */
-    initial_images_start = e820.map[i].addr;
-    if ( initial_images_start < xenheap_phys_end )
-        initial_images_start = xenheap_phys_end;
-    initial_images_end = initial_images_start + modules_length;
-
-    move_memory(initial_images_start, 
-                mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
-
-    /* Initialise boot-time allocator with all RAM situated after modules. */
-    xenheap_phys_start = init_boot_allocator(__pa(&_end));
-    nr_pages = 0;
-    for ( i = 0; i < e820.nr_map; i++ )
+    /*
+     * Iterate over all superpage-aligned RAM regions.
+     * 
+     * We require superpage alignment because the boot allocator is not yet
+     * initialised. Hence we can only map superpages in the address range
+     * 0 to BOOTSTRAP_DIRECTMAP_END, as this is guaranteed not to require
+     * dynamic allocation of pagetables.
+     * 
+     * As well as mapping superpages in that range, in preparation for
+     * initialising the boot allocator, we also look for a region to which
+     * we can relocate the dom0 kernel and other multiboot modules. Also, on
+     * x86/64, we relocate Xen to higher memory.
+     */
+    modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
+    for ( i = 0; i < boot_e820.nr_map; i++ )
     {
-        if ( e820.map[i].type != E820_RAM )
+        uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
+
+        /* Superpage-aligned chunks up to BOOTSTRAP_DIRECTMAP_END, please. */
+        s = (boot_e820.map[i].addr + mask) & ~mask;
+        e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
+        e = min_t(uint64_t, e, BOOTSTRAP_DIRECTMAP_END);
+        if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
 
-        nr_pages += e820.map[i].size >> PAGE_SHIFT;
+        /* Map the chunk. No memory will need to be allocated to do this. */
+        map_pages_to_xen(
+            (unsigned long)maddr_to_bootstrap_virt(s),
+            s >> PAGE_SHIFT, (e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
 
-        /* Initialise boot heap, skipping Xen heap and dom0 modules. */
-        s = e820.map[i].addr;
-        e = s + e820.map[i].size;
-        if ( s < xenheap_phys_end )
-            s = xenheap_phys_end;
-        if ( (s < initial_images_end) && (e > initial_images_start) )
-            s = initial_images_end;
-        init_boot_pages(s, e);
+        /* Is the region suitable for relocating the multiboot modules? */
+        if ( !initial_images_start && ((e-s) >= modules_length) )
+        {
+            e -= modules_length;
+            e &= ~mask;
+            initial_images_start = e;
+            initial_images_end = initial_images_start + modules_length;
+            move_memory(initial_images_start, 
+                        mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
+            if ( s >= e )
+                continue;
+        }
 
 #if defined(CONFIG_X86_64)
-        /*
-         * x86/64 maps all registered RAM. Points to note:
-         *  1. The initial pagetable already maps low 1GB, so skip that.
-         *  2. We must map *only* RAM areas, taking care to avoid I/O holes.
-         *     Failure to do this can cause coherency problems and deadlocks
-         *     due to cache-attribute mismatches (e.g., AMD/AGP Linux bug).
-         */
+        /* Is the region suitable for relocating Xen? */
+        if ( !xen_phys_start && (((e-s) >> 20) >= opt_xenheap_megabytes) )
         {
-            /* Calculate page-frame range, discarding partial frames. */
-            unsigned long start, end;
-            unsigned long init_mapped = 1UL << (30 - PAGE_SHIFT); /* 1GB */
-            start = PFN_UP(e820.map[i].addr);
-            end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
-            /* Clip the range to exclude what the bootstrapper initialised. */
-            if ( start < init_mapped )
-                start = init_mapped;
-            if ( end <= start )
-                continue;
-            /* Request the mapping. */
-            map_pages_to_xen(
-                PAGE_OFFSET + (start << PAGE_SHIFT),
-                start, end-start, PAGE_HYPERVISOR);
+            extern l2_pgentry_t l2_xenmap[];
+            l4_pgentry_t *pl4e;
+            l3_pgentry_t *pl3e;
+            l2_pgentry_t *pl2e;
+            int i, j;
+
+            /* Select relocation address. */
+            e = (e - (opt_xenheap_megabytes << 20)) & ~mask;
+            xen_phys_start = e;
+            boot_trampoline_va(trampoline_xen_phys_start) = e;
+
+            /*
+             * Perform relocation to new physical address.
+             * Before doing so we must sync static/global data with main memory
+             * with a barrier(). After this we must *not* modify static/global
+             * data until after we have switched to the relocated pagetables!
+             */
+            barrier();
+            move_memory(e, 0, __pa(&_end) - xen_phys_start);
+
+            /* Walk initial pagetables, relocating page directory entries. */
+            pl4e = __va(__pa(idle_pg_table));
+            for ( i = 0 ; i < L4_PAGETABLE_ENTRIES; i++, pl4e++ )
+            {
+                if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
+                    continue;
+                *pl4e = l4e_from_intpte(l4e_get_intpte(*pl4e) +
+                                        xen_phys_start);
+                pl3e = l4e_to_l3e(*pl4e);
+                for ( j = 0; j < L3_PAGETABLE_ENTRIES; j++, pl3e++ )
+                {
+                    /* Not present or already relocated? */
+                    if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
+                         (l3e_get_pfn(*pl3e) > 0x1000) )
+                        continue;
+                    *pl3e = l3e_from_intpte(l3e_get_intpte(*pl3e) +
+                                            xen_phys_start);
+                }
+            }
+
+            /* The only data mappings to be relocated are in the Xen area. */
+            pl2e = __va(__pa(l2_xenmap));
+            for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++, pl2e++ )
+            {
+                if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+                    continue;
+                *pl2e = l2e_from_intpte(l2e_get_intpte(*pl2e) +
+                                        xen_phys_start);
+            }
+
+            /* Re-sync the stack and then switch to relocated pagetables. */
+            asm volatile (
+                "rep movsb        ; " /* re-sync the stack */
+                "movq %%cr4,%%rsi ; "
+                "andb $0x7f,%%sil ; "
+                "movq %%rsi,%%cr4 ; " /* CR4.PGE == 0 */
+                "movq %0,%%cr3    ; " /* CR3 == new pagetables */
+                "orb $0x80,%%sil  ; "
+                "movq %%rsi,%%cr4   " /* CR4.PGE == 1 */
+                : : "r" (__pa(idle_pg_table)), "S" (cpu0_stack),
+                "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE) : "memory" );
         }
 #endif
     }
 
-    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0)
+    if ( !initial_images_start )
+        EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
+    reserve_in_boot_e820(initial_images_start, initial_images_end);
+
+    /*
+     * With modules (and Xen itself, on x86/64) relocated out of the way, we
+     * can now initialise the boot allocator with some memory.
+     */
+    xenheap_phys_start = init_boot_allocator(__pa(&_end));
+    xenheap_phys_end   = opt_xenheap_megabytes << 20;
+#if defined(CONFIG_X86_64)
+    if ( !xen_phys_start )
+        EARLY_FAIL("Not enough memory to relocate Xen.\n");
+    xenheap_phys_end += xen_phys_start;
+    reserve_in_boot_e820(xen_phys_start,
+                         xen_phys_start + (opt_xenheap_megabytes<<20));
+    init_boot_pages(1<<20, 16<<20); /* Initial seed: 15MB */
+#else
+    init_boot_pages(xenheap_phys_end, 16<<20); /* Initial seed: 4MB */
+#endif
+
+    /*
+     * With the boot allocator now seeded, we can walk every RAM region and
+     * map it in its entirety (on x86/64, at least) and notify it to the
+     * boot allocator.
+     */
+    for ( i = 0; i < boot_e820.nr_map; i++ )
+    {
+        uint64_t s, e, map_e, mask = PAGE_SIZE - 1;
+
+        /* Only page alignment required now. */
+        s = (boot_e820.map[i].addr + mask) & ~mask;
+        e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
+        if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
+            continue;
+
+        /* Perform the mapping (truncated in 32-bit mode). */
+        map_e = e;
+#if defined(CONFIG_X86_32)
+        map_e = min_t(uint64_t, map_e, BOOTSTRAP_DIRECTMAP_END);
+#endif
+        if ( s < map_e )
+            map_pages_to_xen(
+                (unsigned long)maddr_to_bootstrap_virt(s),
+                s >> PAGE_SHIFT, (map_e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+
+        init_boot_pages(s, e);
+    }
+
+    if ( (kexec_crash_area.size > 0) && (kexec_crash_area.start > 0) )
     {
         unsigned long kdump_start, kdump_size, k;
 
@@ -534,7 +653,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
 #if defined(CONFIG_X86_32)
         /* Must allocate within bootstrap 1:1 limits. */
-        k = alloc_boot_low_pages(k, 1); /* 0x0 - HYPERVISOR_VIRT_START */
+        k = alloc_boot_low_pages(k, 1); /* 0x0 - BOOTSTRAP_DIRECTMAP_END */
 #else
         k = alloc_boot_pages(k, 1);
 #endif
@@ -549,8 +668,11 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
 
     memguard_init();
-    percpu_guard_areas();
 
+    nr_pages = 0;
+    for ( i = 0; i < e820.nr_map; i++ )
+        if ( e820.map[i].type == E820_RAM )
+            nr_pages += e820.map[i].size >> PAGE_SHIFT;
     printk("System RAM: %luMB (%lukB)\n",
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
@@ -592,26 +714,13 @@ void __init __start_xen(multiboot_info_t *mbi)
     numa_initmem_init(0, max_page);
 
     /* Initialise the Xen heap, skipping RAM holes. */
-    nr_pages = 0;
-    for ( i = 0; i < e820.nr_map; i++ )
-    {
-        if ( e820.map[i].type != E820_RAM )
-            continue;
-
-        s = e820.map[i].addr;
-        e = s + e820.map[i].size;
-        if ( s < xenheap_phys_start )
-            s = xenheap_phys_start;
-        if ( e > xenheap_phys_end )
-            e = xenheap_phys_end;
- 
-        if ( s < e )
-        {
-            nr_pages += (e - s) >> PAGE_SHIFT;
-            init_xenheap_pages(s, e);
-        }
-    }
-
+    init_xenheap_pages(xenheap_phys_start, xenheap_phys_end);
+    nr_pages = (xenheap_phys_end - xenheap_phys_start) >> PAGE_SHIFT;
+#ifdef __x86_64__
+    init_xenheap_pages(xen_phys_start, __pa(&_start));
+    nr_pages += (__pa(&_start) - xen_phys_start) >> PAGE_SHIFT;
+#endif
+    xenheap_phys_start = xen_phys_start;
     printk("Xen heap: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
@@ -635,8 +744,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     sort_exception_tables();
 
     find_smp_config();
-
-    smp_alloc_memory();
 
     dmi_scan_machine();
 
@@ -710,8 +817,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
-
-    percpu_free_unused_areas();
 
     initialise_gdb(); /* could be moved earlier */
 

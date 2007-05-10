@@ -30,7 +30,10 @@ ENTRY(host_to_guest_gpr_switch)
         pushq %r15
         movq  UREGS_r11(%rdi), %r11
         movq  UREGS_r15(%rdi), %r15
+        pushq %rcx /* dummy push, filled by guest_to_host_gpr_switch pointer */
         pushq %rcx
+        leaq  guest_to_host_gpr_switch(%rip),%rcx
+        movq  %rcx,8(%rsp)
         movq  UREGS_rcx(%rdi), %rcx
         movq  UREGS_rdi(%rdi), %rdi
         ret

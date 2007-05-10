@@ -39,7 +39,6 @@ obj-y += srat.o
 obj-y += string.o
 obj-y += sysctl.o
 obj-y += time.o
-obj-y += trampoline.o
 obj-y += traps.o
 obj-y += usercopy.o
 obj-y += x86_emulate.o
@@ -52,20 +51,19 @@ $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
-$(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
+ALL_OBJS := $(BASEDIR)/arch/x86/boot/built_in.o $(ALL_OBJS)
+
+$(TARGET)-syms: $(ALL_OBJS) xen.lds
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
-	$(LD) $(LDFLAGS) -T xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
+	$(LD) $(LDFLAGS) -T xen.lds -N $(ALL_OBJS) \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
 	$(NM) -n $(@D)/.$(@F).0 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).0.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
-	$(LD) $(LDFLAGS) -T xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
+	$(LD) $(LDFLAGS) -T xen.lds -N $(ALL_OBJS) \
 	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
 	$(NM) -n $(@D)/.$(@F).1 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).1.S
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
-	$(LD) $(LDFLAGS) -T xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) \
+	$(LD) $(LDFLAGS) -T xen.lds -N $(ALL_OBJS) \
 	    $(@D)/.$(@F).1.o -o $@
 	rm -f $(@D)/.$(@F).[0-9]*
 

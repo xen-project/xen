@@ -84,6 +84,19 @@
 
 #define CONFIG_DMA_BITSIZE 32
 
+#define BOOT_TRAMPOLINE 0x90000
+#define boot_trampoline_pa(sym)                                 \
+    (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+BOOT_TRAMPOLINE)
+#define boot_trampoline_va(sym)                                 \
+    (*RELOC_HIDE((typeof(&(sym)))__va(__pa(&(sym))),            \
+                 BOOT_TRAMPOLINE-__pa(trampoline_start)))
+#ifndef __ASSEMBLY__
+extern char trampoline_start[], trampoline_end[];
+extern char trampoline_realmode_entry[];
+extern unsigned int trampoline_xen_phys_start;
+extern unsigned char trampoline_cpu_started;
+#endif
+
 #if defined(__x86_64__)
 
 #define CONFIG_X86_64 1
@@ -116,7 +129,7 @@
  *  0xffff804000000000 - 0xffff807fffffffff [256GB, 2^38 bytes, PML4:256]
  *    Reserved for future shared info with the guest OS (GUEST ACCESSIBLE).
  *  0xffff808000000000 - 0xffff80ffffffffff [512GB, 2^39 bytes, PML4:257]
- *    Read-only guest linear page table (GUEST ACCESSIBLE).
+ *    Reserved for future use.
  *  0xffff810000000000 - 0xffff817fffffffff [512GB, 2^39 bytes, PML4:258]
  *    Guest linear page table.
  *  0xffff818000000000 - 0xffff81ffffffffff [512GB, 2^39 bytes, PML4:259]
@@ -133,10 +146,12 @@
  *    Compatibility machine-to-phys translation table.
  *  0xffff828c40000000 - 0xffff828c7fffffff [1GB,   2^30 bytes, PML4:261]
  *    High read-only compatibility machine-to-phys translation table.
- *  0xffff828c80000000 - 0xffff82ffffffffff [462GB,             PML4:261]
+ *  0xffff828c80000000 - 0xffff828cbfffffff [1GB,   2^30 bytes, PML4:261]
+ *    Xen text, static data, bss.
+ *  0xffff828cc0000000 - 0xffff82ffffffffff [461GB,             PML4:261]
  *    Reserved for future use.
  *  0xffff830000000000 - 0xffff83ffffffffff [1TB,   2^40 bytes, PML4:262-263]
- *    1:1 direct mapping of all physical memory. Xen and its heap live here.
+ *    1:1 direct mapping of all physical memory.
  *  0xffff840000000000 - 0xffff87ffffffffff [4TB,   2^42 bytes, PML4:264-271]
  *    Reserved for future use.
  *  0xffff880000000000 - 0xffffffffffffffff [120TB, PML4:272-511]
@@ -167,14 +182,6 @@
 /* Slot 256: read-only guest-accessible machine-to-phys translation table. */
 #define RO_MPT_VIRT_START       (PML4_ADDR(256))
 #define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + PML4_ENTRY_BYTES/2)
-
-// current unused?
-#if 0
-/* Slot 257: read-only guest-accessible linear page table. */
-#define RO_LINEAR_PT_VIRT_START (PML4_ADDR(257))
-#define RO_LINEAR_PT_VIRT_END   (RO_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
-#endif
-
 /* Slot 258: linear page table (guest table). */
 #define LINEAR_PT_VIRT_START    (PML4_ADDR(258))
 #define LINEAR_PT_VIRT_END      (LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
@@ -197,9 +204,12 @@
 /* Slot 261: compatibility machine-to-phys conversion table (1GB). */
 #define RDWR_COMPAT_MPT_VIRT_START IOREMAP_VIRT_END
 #define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + (1UL << 30))
-/* Slot 261: high read-only compatibility machine-to-phys conversion table (1GB). */
+/* Slot 261: high read-only compat machine-to-phys conversion table (1GB). */
 #define HIRO_COMPAT_MPT_VIRT_START RDWR_COMPAT_MPT_VIRT_END
 #define HIRO_COMPAT_MPT_VIRT_END (HIRO_COMPAT_MPT_VIRT_START + (1UL << 30))
+/* Slot 261: xen text, static data and bss (1GB). */
+#define XEN_VIRT_START          (HIRO_COMPAT_MPT_VIRT_END)
+#define XEN_VIRT_END            (XEN_VIRT_START + (1UL << 30))
 /* Slot 262-263: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
@@ -340,7 +350,7 @@
 #endif /* __i386__ */
 
 #ifndef __ASSEMBLY__
-extern unsigned long xenheap_phys_end; /* user-configurable */
+extern unsigned long xen_phys_start, xenheap_phys_start, xenheap_phys_end;
 #endif
 
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */

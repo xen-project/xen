@@ -115,8 +115,8 @@ struct page_info
  /* 29-bit count of references to this frame. */
 #define PGC_count_mask      ((1UL<<29)-1)
 
-#define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
-				 && (page_to_maddr(_pfn) >= xen_pstart))
+#define is_xen_heap_frame(pfn) ((page_to_maddr(pfn) < xenheap_phys_end) \
+				 && (page_to_maddr(pfn) >= xen_pstart))
 
 extern void *xen_heap_start;
 #define __pickle(a)	((unsigned long)a - (unsigned long)xen_heap_start)

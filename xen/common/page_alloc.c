@@ -585,18 +585,20 @@ static unsigned long avail_heap_pages(
     return free_pages;
 }
 
+#define avail_for_domheap(mfn) \
+    (!allocated_in_map(mfn) && !is_xen_heap_frame(mfn_to_page(mfn)))
 void end_boot_allocator(void)
 {
     unsigned long i;
     int curr_free, next_free;
 
     /* Pages that are free now go to the domain sub-allocator. */
-    if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
+    if ( (curr_free = next_free = avail_for_domheap(first_valid_mfn)) )
         map_alloc(first_valid_mfn, 1);
     for ( i = first_valid_mfn; i < max_page; i++ )
     {
         curr_free = next_free;
-        next_free = !allocated_in_map(i+1);
+        next_free = avail_for_domheap(i+1);
         if ( next_free )
             map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
         if ( curr_free )
@@ -605,6 +607,7 @@ void end_boot_allocator(void)
 
     printk("Domain heap initialised: DMA width %u bits\n", dma_bitsize);
 }
+#undef avail_for_domheap
 
 /*
  * Scrub all unallocated pages in all heap zones. This function is more
@@ -635,7 +638,7 @@ void scrub_heap_pages(void)
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(mfn) )
         {
-            if ( IS_XEN_HEAP_FRAME(mfn_to_page(mfn)) )
+            if ( is_xen_heap_frame(mfn_to_page(mfn)) )
             {
                 p = page_to_virt(mfn_to_page(mfn));
                 memguard_unguard_range(p, PAGE_SIZE);
@@ -675,7 +678,9 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
      * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
      * prevent merging of power-of-two blocks across the zone boundary.
      */
-    if ( !IS_XEN_HEAP_FRAME(maddr_to_page(pe)) )
+    if ( ps && !is_xen_heap_frame(maddr_to_page(ps)-1) )
+        ps += PAGE_SIZE;
+    if ( !is_xen_heap_frame(maddr_to_page(pe)) )
         pe -= PAGE_SIZE;
 
     init_heap_pages(MEMZONE_XEN, maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
@@ -856,7 +861,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
     ASSERT(!in_irq());
 
-    if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
+    if ( unlikely(is_xen_heap_frame(pg)) )
     {
         /* NB. May recursively lock from relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);

@@ -30,6 +30,14 @@
 #include <asm/fixmap.h>
 #include <public/memory.h>
 
+#ifdef CONFIG_X86_PAE
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    idle_pg_table_l2[4 * L2_PAGETABLE_ENTRIES];
+#else
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    idle_pg_table_l2[L2_PAGETABLE_ENTRIES];
+#endif
+
 unsigned int PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 

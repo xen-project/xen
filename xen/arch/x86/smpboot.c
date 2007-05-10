@@ -54,8 +54,8 @@
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
-static inline int set_kernel_exec(unsigned long x, int y) { return 0; }
-#define alloc_bootmem_low_pages(x) __va(0x90000) /* trampoline address */
+#define set_kernel_exec(x, y) (0)
+#define setup_trampoline()    (boot_trampoline_pa(trampoline_realmode_entry))
 
 /* Set if we find a B stepping CPU */
 static int __devinitdata smp_b_stepping;
@@ -109,50 +109,7 @@ u8 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
 			{ [0 ... NR_CPUS-1] = 0xff };
 EXPORT_SYMBOL(x86_cpu_to_apicid);
 
-/*
- * Trampoline 80x86 program as an array.
- */
-
-extern unsigned char trampoline_data [];
-extern unsigned char trampoline_end  [];
-static unsigned char *trampoline_base;
-static int trampoline_exec;
-
 static void map_cpu_to_logical_apicid(void);
-
-/* State of each CPU. */
-/*DEFINE_PER_CPU(int, cpu_state) = { 0 };*/
-
-/*
- * Currently trivial. Write the real->protected mode
- * bootstrap into the page concerned. The caller
- * has made sure it's suitably aligned.
- */
-
-static unsigned long __devinit setup_trampoline(void)
-{
-	memcpy(trampoline_base, trampoline_data, trampoline_end - trampoline_data);
-	return virt_to_maddr(trampoline_base);
-}
-
-/*
- * We are called very early to get the low memory for the
- * SMP bootup trampoline page.
- */
-void __init smp_alloc_memory(void)
-{
-	trampoline_base = (void *) alloc_bootmem_low_pages(PAGE_SIZE);
-	/*
-	 * Has to be in very low memory so we can execute
-	 * real-mode AP code.
-	 */
-	if (__pa(trampoline_base) >= 0x9F000)
-		BUG();
-	/*
-	 * Make the SMP trampoline executable:
-	 */
-	trampoline_exec = set_kernel_exec((unsigned long)trampoline_base, 1);
-}
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -950,9 +907,9 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 			print_cpu_info(&cpu_data[cpu]);
 			Dprintk("CPU has booted.\n");
 		} else {
-			boot_error= 1;
-			if (*((volatile unsigned char *)trampoline_base)
-					== 0xA5)
+			boot_error = 1;
+			mb();
+			if (boot_trampoline_va(trampoline_cpu_started) == 0xA5)
 				/* trampoline started but...? */
 				printk("Stuck ??\n");
 			else
@@ -974,7 +931,8 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	}
 
 	/* mark "stuck" area as not stuck */
-	*((volatile unsigned long *)trampoline_base) = 0;
+	boot_trampoline_va(trampoline_cpu_started) = 0;
+	mb();
 
 	return boot_error;
 }
