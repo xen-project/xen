@@ -1,7 +1,7 @@
 Index: ioemu/hw/iommu.c
 ===================================================================
---- ioemu.orig/hw/iommu.c	2007-05-10 15:49:26.000000000 +0100
-+++ ioemu/hw/iommu.c	2007-05-10 15:49:53.000000000 +0100
+--- ioemu.orig/hw/iommu.c	2007-05-11 10:00:33.000000000 +0100
++++ ioemu/hw/iommu.c	2007-05-11 10:01:09.000000000 +0100
 @@ -82,7 +82,11 @@
  #define IOPTE_VALID         0x00000002 /* IOPTE is valid */
  #define IOPTE_WAZ           0x00000001 /* Write as zeros */
@@ -16,8 +16,8 @@ Index: ioemu/hw/iommu.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-10 15:49:53.000000000 +0100
-+++ ioemu/vl.c	2007-05-10 15:54:48.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-11 10:01:09.000000000 +0100
++++ ioemu/vl.c	2007-05-11 10:01:09.000000000 +0100
 @@ -7149,6 +7149,11 @@
      }
  #endif
@@ -77,8 +77,8 @@ Index: ioemu/vl.c
      phys_ram_base = qemu_vmalloc(phys_ram_size);
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2007-05-10 15:49:26.000000000 +0100
-+++ ioemu/target-i386-dm/cpu.h	2007-05-10 15:54:46.000000000 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2007-05-11 10:01:09.000000000 +0100
++++ ioemu/target-i386-dm/cpu.h	2007-05-11 10:01:09.000000000 +0100
 @@ -78,7 +78,11 @@
  /* helper2.c */
  int main_loop(void);

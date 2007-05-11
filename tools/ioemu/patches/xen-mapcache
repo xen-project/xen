@@ -17,8 +17,8 @@ Signed-off-by: Keir Fraser <keir@xensource.com>
 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-10 15:35:25.000000000 +0100
-+++ ioemu/vl.c	2007-05-10 15:35:25.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-11 10:04:51.000000000 +0100
++++ ioemu/vl.c	2007-05-11 10:04:52.000000000 +0100
 @@ -275,7 +275,7 @@
      for(i = start; i < start + length; i += size) {
          ioport_read_table[bsize][i] = func;
@@ -260,8 +260,8 @@ Index: ioemu/vl.c
      nr_pages = ram_size/PAGE_SIZE;
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
---- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-10 15:32:53.000000000 +0100
-+++ ioemu/target-i386-dm/exec-dm.c	2007-05-10 15:35:25.000000000 +0100
+--- ioemu.orig/target-i386-dm/exec-dm.c	2007-05-11 10:04:46.000000000 +0100
++++ ioemu/target-i386-dm/exec-dm.c	2007-05-11 10:04:52.000000000 +0100
 @@ -36,6 +36,7 @@
  
  #include "cpu.h"
@@ -303,7 +303,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
  }
  
  /* enable or disable low levels log */
-@@ -409,16 +425,11 @@
+@@ -414,16 +430,11 @@
          return 0;
  }
  
@@ -324,7 +324,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
  
  void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                              int len, int is_write)
-@@ -426,13 +437,15 @@
+@@ -431,13 +442,15 @@
      int l, io_index;
      uint8_t *ptr;
      uint32_t val;
@@ -342,7 +342,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
          io_index = iomem_index(addr);
          if (is_write) {
              if (io_index) {
-@@ -452,11 +465,11 @@
+@@ -457,11 +470,11 @@
                      io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);
                      l = 1;
                  }
@@ -357,7 +357,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
  #endif 
              }
          } else {
-@@ -477,9 +490,9 @@
+@@ -482,9 +495,9 @@
                      stb_raw(buf, val);
                      l = 1;
                  }
@@ -369,7 +369,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
              } else {
                  /* Neither RAM nor known MMIO space */
                  memset(buf, 0xff, len); 
-@@ -489,6 +502,8 @@
+@@ -494,6 +507,8 @@
          buf += l;
          addr += l;
      }
@@ -380,8 +380,8 @@ Index: ioemu/target-i386-dm/exec-dm.c
  
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-10 15:35:25.000000000 +0100
-+++ ioemu/vl.h	2007-05-10 15:35:25.000000000 +0100
+--- ioemu.orig/vl.h	2007-05-11 10:04:51.000000000 +0100
++++ ioemu/vl.h	2007-05-11 10:04:52.000000000 +0100
 @@ -159,6 +159,28 @@
  
  extern FILE *logfile;
@@ -413,8 +413,8 @@ Index: ioemu/vl.h
  
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
---- ioemu.orig/target-i386-dm/cpu.h	2007-05-10 15:32:53.000000000 +0100
-+++ ioemu/target-i386-dm/cpu.h	2007-05-10 15:35:25.000000000 +0100
+--- ioemu.orig/target-i386-dm/cpu.h	2007-05-11 10:04:47.000000000 +0100
++++ ioemu/target-i386-dm/cpu.h	2007-05-11 10:04:52.000000000 +0100
 @@ -25,7 +25,8 @@
  #ifdef TARGET_X86_64
  #define TARGET_LONG_BITS 64
@@ -427,8 +427,8 @@ Index: ioemu/target-i386-dm/cpu.h
  /* target supports implicit self modifying code */
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2007-05-10 15:34:24.000000000 +0100
-+++ ioemu/target-i386-dm/helper2.c	2007-05-10 15:35:25.000000000 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-11 10:04:50.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-11 10:04:52.000000000 +0100
 @@ -526,6 +526,9 @@
      case IOREQ_TYPE_TIMEOFFSET:
          cpu_ioreq_timeoffset(env, req);

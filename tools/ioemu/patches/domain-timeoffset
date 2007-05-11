@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-10 16:04:24.000000000 +0100
-+++ ioemu/vl.c	2007-05-10 16:04:24.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-11 10:04:50.000000000 +0100
++++ ioemu/vl.c	2007-05-11 10:04:50.000000000 +0100
 @@ -7530,6 +7530,9 @@
      }
      free(page_array);
@@ -14,8 +14,8 @@ Index: ioemu/vl.c
      phys_ram_base = qemu_vmalloc(phys_ram_size);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-10 16:04:24.000000000 +0100
-+++ ioemu/vl.h	2007-05-10 16:04:24.000000000 +0100
+--- ioemu.orig/vl.h	2007-05-11 10:04:50.000000000 +0100
++++ ioemu/vl.h	2007-05-11 10:04:50.000000000 +0100
 @@ -1433,6 +1433,10 @@
  int xenstore_vm_write(int domid, char *key, char *val);
  char *xenstore_vm_read(int domid, char *key, int *len);
@@ -29,8 +29,8 @@ Index: ioemu/vl.h
  extern char domain_name[];
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2007-05-10 16:04:22.000000000 +0100
-+++ ioemu/target-i386-dm/helper2.c	2007-05-10 16:04:24.000000000 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-11 10:04:48.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-11 10:04:50.000000000 +0100
 @@ -74,6 +74,8 @@
  
  int xc_handle;

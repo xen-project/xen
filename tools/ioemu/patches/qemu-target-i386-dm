@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-09 14:08:42.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-09 14:09:10.000000000 +0100
+--- ioemu.orig/Makefile.target	2007-05-11 10:00:33.000000000 +0100
++++ ioemu/Makefile.target	2007-05-11 10:04:05.000000000 +0100
 @@ -65,6 +65,8 @@
  QEMU_SYSTEM=qemu-fast
  endif
@@ -32,8 +32,8 @@ Index: ioemu/Makefile.target
  CPPFLAGS += -DHAS_AUDIO
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2007-05-09 14:08:42.000000000 +0100
-+++ ioemu/configure	2007-05-09 14:09:10.000000000 +0100
+--- ioemu.orig/configure	2007-05-11 10:00:33.000000000 +0100
++++ ioemu/configure	2007-05-11 10:04:04.000000000 +0100
 @@ -426,6 +426,8 @@
      if [ "$darwin_user" = "yes" ] ; then
          target_list="i386-darwin-user ppc-darwin-user $target_list"
@@ -45,8 +45,8 @@ Index: ioemu/configure
  fi
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2007-05-09 14:08:59.000000000 +0100
-+++ ioemu/monitor.c	2007-05-09 14:09:10.000000000 +0100
+--- ioemu.orig/monitor.c	2007-05-11 10:00:33.000000000 +0100
++++ ioemu/monitor.c	2007-05-11 10:04:06.000000000 +0100
 @@ -1325,6 +1325,10 @@
        "", "show which guest mouse is receiving events" },
      { "vnc", "", do_info_vnc,
@@ -60,8 +60,8 @@ Index: ioemu/monitor.c
  
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-09 14:08:42.000000000 +0100
-+++ ioemu/vl.c	2007-05-09 14:09:10.000000000 +0100
+--- ioemu.orig/vl.c	2007-05-11 10:00:33.000000000 +0100
++++ ioemu/vl.c	2007-05-11 10:04:06.000000000 +0100
 @@ -88,7 +88,7 @@
  
  #include "exec-all.h"
@@ -98,8 +98,8 @@ Index: ioemu/vl.c
  {
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-09 14:08:42.000000000 +0100
-+++ ioemu/vl.h	2007-05-09 14:09:10.000000000 +0100
+--- ioemu.orig/vl.h	2007-05-11 10:00:33.000000000 +0100
++++ ioemu/vl.h	2007-05-11 10:04:06.000000000 +0100
 @@ -37,6 +37,8 @@
  #include <unistd.h>
  #include <fcntl.h>
@@ -132,7 +132,7 @@ Index: ioemu/vl.h
 Index: ioemu/target-i386-dm/cpu.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/cpu.h	2007-05-09 14:09:10.000000000 +0100
++++ ioemu/target-i386-dm/cpu.h	2007-05-11 10:04:06.000000000 +0100
 @@ -0,0 +1,84 @@
 +/*
 + * i386 virtual CPU header
@@ -221,8 +221,8 @@ Index: ioemu/target-i386-dm/cpu.h
 Index: ioemu/target-i386-dm/exec-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/exec-dm.c	2007-05-09 14:09:10.000000000 +0100
-@@ -0,0 +1,540 @@
++++ ioemu/target-i386-dm/exec-dm.c	2007-05-11 10:04:04.000000000 +0100
+@@ -0,0 +1,545 @@
 +/*
 + *  virtual page mapping and translated block handling
 + * 
@@ -569,6 +569,11 @@ Index: ioemu/target-i386-dm/exec-dm.c
 +}
 +
 +#ifdef __ia64__
++
++#define __ia64_fc(addr)	asm volatile ("fc %0" :: "r"(addr) : "memory")
++#define ia64_sync_i()	asm volatile (";; sync.i" ::: "memory")
++#define ia64_srlz_i()	asm volatile (";; srlz.i ;;" ::: "memory")
++
 +/* IA64 has seperate I/D cache, with coherence maintained by DMA controller.
 + * So to emulate right behavior that guest OS is assumed, we need to flush
 + * I/D cache here.
@@ -766,7 +771,7 @@ Index: ioemu/target-i386-dm/exec-dm.c
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/helper2.c	2007-05-09 14:09:10.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-11 10:04:05.000000000 +0100
 @@ -0,0 +1,542 @@
 +/*
 + *  i386 helpers (without register variable usage)
@@ -1313,7 +1318,7 @@ Index: ioemu/target-i386-dm/helper2.c
 Index: ioemu/target-i386-dm/i8259-dm.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/i8259-dm.c	2007-05-09 14:09:10.000000000 +0100
++++ ioemu/target-i386-dm/i8259-dm.c	2007-05-11 10:04:04.000000000 +0100
 @@ -0,0 +1,67 @@
 +/* Xen 8259 stub for interrupt controller emulation
 + * 
@@ -1385,7 +1390,7 @@ Index: ioemu/target-i386-dm/i8259-dm.c
 Index: ioemu/target-i386-dm/qemu-dm.debug
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-dm.debug	2007-05-09 14:09:10.000000000 +0100
++++ ioemu/target-i386-dm/qemu-dm.debug	2007-05-11 10:01:09.000000000 +0100
 @@ -0,0 +1,10 @@
 +#!/bin/sh
 +
@@ -1400,7 +1405,7 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2007-05-09 14:09:10.000000000 +0100
++++ ioemu/target-i386-dm/qemu-ifup	2007-05-11 10:01:09.000000000 +0100
 @@ -0,0 +1,9 @@
 +#!/bin/sh
 +
