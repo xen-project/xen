@@ -22,8 +22,23 @@
 #include <public/xen.h>
 #include <public/hvm/params.h>
 #include <asm/viosapic.h>
+
+
+/* Value of guest os type */
+#define OS_BASE     0xB0
+#define OS_UNKNOWN  0xB0
+#define OS_WINDOWS  0xB1
+#define OS_LINUX    0xB2
+#define OS_END      0xB3
+
+/* port guest Firmware use to indicate os type 
+ * this port is used to trigger SMI on x86,
+ * it is not used on ia64 */
+#define OS_TYPE_PORT    0xB2
+
 struct mmio_list;
 typedef struct virtual_platform_def {
+    unsigned long       gos_type;
     unsigned long       buffered_io_va;
     spinlock_t          buffered_io_lock;
     unsigned long       buffered_pio_va;

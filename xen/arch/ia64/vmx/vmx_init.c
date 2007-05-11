@@ -305,7 +305,8 @@ vmx_final_setup_guest(struct vcpu *v)
 	v->arch.privregs = (mapped_regs_t *)vpd;
 	vcpu_share_privregs_with_guest(v);
 	vpd->vpd_low.virt_env_vaddr = vm_buffer;
-
+    
+	v->domain->arch.vmx_platform.gos_type = OS_UNKNOWN;
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
 	 * to this solution. Maybe it can be deferred until we know created
 	 * one as vmx domain */

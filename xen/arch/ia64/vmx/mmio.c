@@ -188,6 +188,21 @@ int vmx_ide_pio_intercept(ioreq_t *p, u64 *val)
 
 #define TO_LEGACY_IO(pa)  (((pa)>>12<<2)|((pa)&0x3))
 
+const char * guest_os_name[] = {
+    "Unknown",
+    "Windows 2003 server",
+    "Linux",
+};
+
+static inline void set_os_type(VCPU *v, u64 type)
+{
+    if (type > OS_BASE && type < OS_END) {
+        v->domain->arch.vmx_platform.gos_type = type;
+        gdprintk(XENLOG_INFO, "Guest OS : %s\n", guest_os_name[type - OS_BASE]);
+    }
+}
+
+
 static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 {
     struct vcpu *v = current;
@@ -210,6 +225,11 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->df = 0;
 
     p->io_count++;
+    
+    if (dir == IOREQ_WRITE && p->addr == OS_TYPE_PORT) {
+        set_os_type(v, *val);
+        return;
+    }
 
     if (vmx_ide_pio_intercept(p, val))
         return;
