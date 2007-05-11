@@ -157,9 +157,12 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	for (i = n_rid_blocks; i < MAX_RID_BLOCKS; i += n_rid_blocks) {
 		if (ridblock_owner[i] == NULL) {
 			for (j = i; j < i + n_rid_blocks; ++j) {
-				if (ridblock_owner[j])
+				if (ridblock_owner[j]) {
+					++j;
 					break;
+				}
 			}
+			--j;
 			if (ridblock_owner[j] == NULL)
 				break;
 		}
