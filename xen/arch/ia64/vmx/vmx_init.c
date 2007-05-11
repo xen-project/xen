@@ -299,6 +299,8 @@ vmx_final_setup_guest(struct vcpu *v)
 
 	vpd = alloc_vpd();
 	ASSERT(vpd);
+	if (!vpd)
+		return -ENOMEM;
 
 	v->arch.privregs = (mapped_regs_t *)vpd;
 	vcpu_share_privregs_with_guest(v);
