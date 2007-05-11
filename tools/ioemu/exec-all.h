@@ -357,7 +357,6 @@ extern CPUWriteMemoryFunc *io_mem_write[IO_MEM_NB_ENTRIES][4];
 extern CPUReadMemoryFunc *io_mem_read[IO_MEM_NB_ENTRIES][4];
 extern void *io_mem_opaque[IO_MEM_NB_ENTRIES];
 
-#ifndef CONFIG_DM
 #ifdef __powerpc__
 static inline int testandset (int *p)
 {
@@ -481,7 +480,6 @@ static inline int testandset (int *p)
     return __sync_lock_test_and_set (p, 1);
 }
 #endif
-#endif /* !CONFIG_DM */
 
 typedef int spinlock_t;
 
