@@ -159,7 +159,7 @@ void __init zap_low_mappings(l2_pgentry_t *base)
     flush_tlb_all_pge();
 }
 
-void subarch_init_memory(void)
+void __init subarch_init_memory(void)
 {
     unsigned long m2p_start_mfn;
     unsigned int i, j;

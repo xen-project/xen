@@ -269,7 +269,7 @@ acm_setup(char *policy_start,
 }
 
 
-int
+int __init
 acm_init(char *policy_start,
          unsigned long policy_len)
 {

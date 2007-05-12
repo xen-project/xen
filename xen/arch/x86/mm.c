@@ -184,7 +184,7 @@ void __init init_frametable(void)
     memset(frame_table, 0, nr_pages << PAGE_SHIFT);
 }
 
-void arch_init_memory(void)
+void __init arch_init_memory(void)
 {
     extern void subarch_init_memory(void);
 

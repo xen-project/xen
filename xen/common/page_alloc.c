@@ -50,7 +50,7 @@ string_param("badpage", opt_badpage);
  */
 static unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
 static unsigned long max_dma_mfn = (1UL<<(CONFIG_DMA_BITSIZE-PAGE_SHIFT))-1;
-static void parse_dma_bits(char *s)
+static void __init parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
     if ( v >= (BITS_PER_LONG + PAGE_SHIFT) )
@@ -74,7 +74,7 @@ custom_param("dma_bits", parse_dma_bits);
  * lowmem emergency pool.
  */
 static unsigned long dma_emergency_pool_pages;
-static void parse_dma_emergency_pool(char *s)
+static void __init parse_dma_emergency_pool(char *s)
 {
     unsigned long long bytes;
     bytes = parse_size_and_unit(s, NULL);
@@ -176,7 +176,7 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
 static unsigned long first_valid_mfn = ~0UL;
 
 /* Initialise allocator to handle up to @max_page pages. */
-paddr_t init_boot_allocator(paddr_t bitmap_start)
+paddr_t __init init_boot_allocator(paddr_t bitmap_start)
 {
     unsigned long bitmap_size;
 
@@ -197,7 +197,7 @@ paddr_t init_boot_allocator(paddr_t bitmap_start)
     return bitmap_start + bitmap_size;
 }
 
-void init_boot_pages(paddr_t ps, paddr_t pe)
+void __init init_boot_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long bad_spfn, bad_epfn, i;
     const char *p;
@@ -243,7 +243,7 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
+int __init reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
 {
     unsigned long i;
 
@@ -258,7 +258,7 @@ int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
     return 1;
 }
 
-unsigned long alloc_boot_low_pages(
+unsigned long __init alloc_boot_low_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, i;
@@ -281,7 +281,7 @@ unsigned long alloc_boot_low_pages(
     return 0;
 }
 
-unsigned long alloc_boot_pages(
+unsigned long __init alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, i;
@@ -587,7 +587,7 @@ static unsigned long avail_heap_pages(
 
 #define avail_for_domheap(mfn) \
     (!allocated_in_map(mfn) && !is_xen_heap_frame(mfn_to_page(mfn)))
-void end_boot_allocator(void)
+void __init end_boot_allocator(void)
 {
     unsigned long i;
     int curr_free, next_free;
@@ -614,7 +614,7 @@ void end_boot_allocator(void)
  * convoluted than appears necessary because we do not want to continuously
  * hold the lock while scrubbing very large memory areas.
  */
-void scrub_heap_pages(void)
+void __init scrub_heap_pages(void)
 {
     void *p;
     unsigned long mfn;

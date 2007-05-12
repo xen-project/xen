@@ -584,7 +584,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     return rc;
 }
 
-void
+void __init
 initialise_gdb(void)
 {
     gdb_ctx->serhnd = serial_parse_handle(opt_gdb);

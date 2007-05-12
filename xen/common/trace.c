@@ -168,7 +168,7 @@ static int tb_set_size(int size)
  * trace buffers.  The trace buffers are then available for debugging use, via
  * the %TRACE_xD macros exported in <xen/trace.h>.
  */
-void init_trace_bufs(void)
+void __init init_trace_bufs(void)
 {
     if ( opt_tbuf_size == 0 )
     {

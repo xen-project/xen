@@ -213,7 +213,7 @@ void __init zap_low_mappings(void)
     flush_tlb_all_pge();
 }
 
-void subarch_init_memory(void)
+void __init subarch_init_memory(void)
 {
     unsigned long i, v, m2p_start_mfn;
     l3_pgentry_t l3e;

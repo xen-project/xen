@@ -121,7 +121,7 @@ static atomic_t print_everything = ATOMIC_INIT(0);
         return (lvlnum);                                \
     }
 
-static int __parse_loglvl(char *s, char **ps)
+static int __init __parse_loglvl(char *s, char **ps)
 {
     ___parse_loglvl(s, ps, "none",    0);
     ___parse_loglvl(s, ps, "error",   1);
@@ -132,7 +132,7 @@ static int __parse_loglvl(char *s, char **ps)
     return 2; /* sane fallback */
 }
 
-static void _parse_loglvl(char *s, int *lower, int *upper)
+static void __init _parse_loglvl(char *s, int *lower, int *upper)
 {
     *lower = *upper = __parse_loglvl(s, &s);
     if ( *s == '/' )
@@ -141,17 +141,17 @@ static void _parse_loglvl(char *s, int *lower, int *upper)
         *upper = *lower;
 }
 
-static void parse_loglvl(char *s)
+static void __init parse_loglvl(char *s)
 {
     _parse_loglvl(s, &xenlog_lower_thresh, &xenlog_upper_thresh);
 }
 
-static void parse_guest_loglvl(char *s)
+static void __init parse_guest_loglvl(char *s)
 {
     _parse_loglvl(s, &xenlog_guest_lower_thresh, &xenlog_guest_upper_thresh);
 }
 
-static char *loglvl_str(int lvl)
+static char * __init loglvl_str(int lvl)
 {
     switch ( lvl )
     {
@@ -504,7 +504,7 @@ void set_printk_prefix(const char *prefix)
     safe_strcpy(printk_prefix, prefix);
 }
 
-void init_console(void)
+void __init init_console(void)
 {
     char *p;
 
@@ -540,7 +540,7 @@ void init_console(void)
     }
 }
 
-void console_endboot(void)
+void __init console_endboot(void)
 {
     int i, j;
 

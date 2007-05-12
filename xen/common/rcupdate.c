@@ -341,7 +341,7 @@ void __devinit rcu_online_cpu(int cpu)
     rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
 }
 
-void rcu_init(void)
+void __init rcu_init(void)
 {
     rcu_online_cpu(smp_processor_id());
     open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);

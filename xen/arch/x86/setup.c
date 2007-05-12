@@ -202,6 +202,14 @@ static void __init percpu_init_areas(void)
     init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
                        __pa(__per_cpu_end));
 #endif
+    memguard_guard_range(&__per_cpu_start[first_unused << PERCPU_SHIFT],
+                         (NR_CPUS - first_unused) << PERCPU_SHIFT);
+#if defined(CONFIG_X86_64)
+    /* Also zap the mapping in the 1:1 area. */
+    memguard_guard_range(__va(__pa(__per_cpu_start)) +
+                         (first_unused << PERCPU_SHIFT),
+                         (NR_CPUS - first_unused) << PERCPU_SHIFT);
+#endif
 }
 
 /* Fetch acm policy module from multiboot modules. */
@@ -308,6 +316,24 @@ static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
             boot_e820.map[i].size = re - e;
         }
     }
+}
+
+void init_done(void)
+{
+    extern char __init_begin[], __init_end[];
+
+    /* Free (or page-protect) the init areas. */
+#ifndef MEMORY_GUARD
+    init_xenheap_pages(__pa(__init_begin), __pa(__init_end));
+#endif
+    memguard_guard_range(__init_begin, __init_end - __init_begin);
+#if defined(CONFIG_X86_64)
+    /* Also zap the mapping in the 1:1 area. */
+    memguard_guard_range(__va(__pa(__init_begin)), __init_end - __init_begin);
+#endif
+    printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
+
+    startup_cpu_idle_loop();
 }
 
 void __init __start_xen(multiboot_info_t *mbi)
@@ -895,7 +921,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     domain_unpause_by_systemcontroller(dom0);
 
-    startup_cpu_idle_loop();
+    reset_stack_and_jump(init_done);
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)
