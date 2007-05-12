@@ -25,11 +25,15 @@
 
 #include "vl.h"
 
-/* PMCNTRL */
+/* PM1a_CNT bits, as defined in the ACPI specification. */
 #define SCI_EN            (1 <<  0)
 #define GBL_RLS           (1 <<  2)
-#define SUS_TYP           (7 << 10)
-#define SUS_EN            (1 << 13)
+#define SLP_TYP_Sx        (7 << 10)
+#define SLP_EN            (1 << 13)
+
+/* Sleep state type codes as defined by the \_Sx objects in the DSDT. */
+/* These must be kept in sync with the DSDT (hvmloader/acpi/dsdt.asl) */
+#define SLP_TYP_S5        (7 << 10)
 
 typedef struct AcpiDeviceState AcpiDeviceState;
 AcpiDeviceState *acpi_device_table;
@@ -69,7 +73,7 @@ static uint32_t acpiPm1Control_readb(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
     /* Mask out the write-only bits */
-    return (uint8_t)(s->pm1_control & ~(GBL_RLS|SUS_EN));
+    return (uint8_t)(s->pm1_control & ~(GBL_RLS|SLP_EN));
 }
 
 static void acpiPm1ControlP1_writeb(void *opaque, uint32_t addr, uint32_t val)
@@ -77,10 +81,10 @@ static void acpiPm1ControlP1_writeb(void *opaque, uint32_t addr, uint32_t val)
     PCIAcpiState *s = opaque;
 
     val <<= 8;
-    s->pm1_control = ((s->pm1_control & 0xff) | val) & ~SUS_EN;
+    s->pm1_control = ((s->pm1_control & 0xff) | val) & ~SLP_EN;
 
     /* Check for power off request. */
-    if ((val & (SUS_EN|SUS_TYP)) == SUS_EN)
+    if ((val & (SLP_EN|SLP_TYP_Sx)) == (SLP_EN|SLP_TYP_S5))
         qemu_system_shutdown_request();
 }
 
@@ -88,17 +92,17 @@ static uint32_t acpiPm1ControlP1_readb(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
     /* Mask out the write-only bits */
-    return (uint8_t)((s->pm1_control & ~(GBL_RLS|SUS_EN)) >> 8);
+    return (uint8_t)((s->pm1_control & ~(GBL_RLS|SLP_EN)) >> 8);
 }
 
 static void acpiPm1Control_writew(void *opaque, uint32_t addr, uint32_t val)
 {
     PCIAcpiState *s = opaque;
 
-    s->pm1_control = val & ~SUS_EN;
+    s->pm1_control = val & ~SLP_EN;
 
     /* Check for power off request. */
-    if ((val & (SUS_EN|SUS_TYP)) == SUS_EN)
+    if ((val & (SLP_EN|SLP_TYP_Sx)) == (SLP_EN|SLP_TYP_S5))
         qemu_system_shutdown_request();
 }
 
@@ -106,7 +110,7 @@ static uint32_t acpiPm1Control_readw(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
     /* Mask out the write-only bits */
-    return (s->pm1_control & ~(GBL_RLS|SUS_EN));
+    return (s->pm1_control & ~(GBL_RLS|SLP_EN));
 }
 
 static void acpi_map(PCIDevice *pci_dev, int region_num,

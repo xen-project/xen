@@ -27,13 +27,13 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Name (\APCL, 0x00010000)
     Name (\PUID, 0x00)
 
-    /* Poweroff support - ties in with qemu emulation */
+    /* S5 (power-off) type codes: must match with piix4 emulation! */
     Name (\_S5, Package (0x04)
     {
-        0x07,
-        0x07,
-        0x00,
-        0x00
+        0x07,  /* PM1a_CNT.SLP_TYP */
+        0x07,  /* PM1b_CNT.SLP_TYP */
+        0x00,  /* reserved */
+        0x00   /* reserved */
     })
 
     Name(PICD, 0)
