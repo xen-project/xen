@@ -101,12 +101,11 @@ static void vmx_save_host_msrs(void)
         rdmsrl(msr_index[i], host_msr_state->msrs[i]);
 }
 
-#define WRITE_MSR(address)                                                  \
-        guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content;     \
-        if ( !test_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags) )\
-            set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
-        wrmsrl(MSR_ ## address, msr_content);                               \
-        set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);         \
+#define WRITE_MSR(address)                                              \
+        guest_msr_state->msrs[VMX_INDEX_MSR_ ## address] = msr_content; \
+        set_bit(VMX_INDEX_MSR_ ## address, &guest_msr_state->flags);    \
+        wrmsrl(MSR_ ## address, msr_content);                           \
+        set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);     \
         break
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
