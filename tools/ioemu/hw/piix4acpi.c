@@ -24,30 +24,12 @@
  */
 
 #include "vl.h"
-#define FREQUENCE_PMTIMER  3579545
-/* acpi register bit define here  */
 
-/* PM1_STS */
-#define TMROF_STS         (1 << 0)
-#define BM_STS            (1 << 4)
-#define GBL_STS           (1 << 5)
-#define PWRBTN_STS        (1 << 8)
-#define RTC_STS           (1 << 10)
-#define PRBTNOR_STS       (1 << 11)
-#define WAK_STS           (1 << 15)
-/* PM1_EN */
-#define TMROF_EN          (1 << 0)
-#define GBL_EN            (1 << 5)
-#define PWRBTN_EN         (1 << 8)
-#define RTC_EN            (1 << 10)
-/* PM1_CNT */
-#define SCI_EN            (1 << 0)
-#define GBL_RLS           (1 << 2)
-#define SLP_EN            (1 << 13)
-
-/* Bits of PM1a register define here  */
-#define SLP_TYP_MASK    0x1C00
-#define SLP_VAL         0x1C00
+/* PMCNTRL */
+#define SCI_EN            (1 <<  0)
+#define GBL_RLS           (1 <<  2)
+#define SUS_TYP           (7 << 10)
+#define SUS_EN            (1 << 13)
 
 typedef struct AcpiDeviceState AcpiDeviceState;
 AcpiDeviceState *acpi_device_table;
@@ -80,89 +62,57 @@ static int piix4acpi_load(QEMUFile *f, void *opaque, int version_id)
 static void acpiPm1Control_writeb(void *opaque, uint32_t addr, uint32_t val)
 {
     PCIAcpiState *s = opaque;
-
     s->pm1_control = (s->pm1_control & 0xff00) | (val & 0xff);
-/*  printf("acpiPm1Control_writeb \n addr %x val:%x\n", addr, val); */
-
 }
 
 static uint32_t acpiPm1Control_readb(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
-    uint32_t val;
-
     /* Mask out the write-only bits */
-    val = s->pm1_control & ~(GBL_RLS|SLP_EN) & 0xff;
-/*    printf("acpiPm1Control_readb \n addr %x val:%x\n", addr, val); */
-
-    return val;
+    return (uint8_t)(s->pm1_control & ~(GBL_RLS|SUS_EN));
 }
 
 static void acpiPm1ControlP1_writeb(void *opaque, uint32_t addr, uint32_t val)
 {
     PCIAcpiState *s = opaque;
 
-    s->pm1_control = (s->pm1_control & 0xff) | (val << 8);
-/*    printf("acpiPm1ControlP1_writeb \n addr %x val:%x\n", addr, val); */
-
-    // Check for power off request
     val <<= 8;
-    if (((val & SLP_EN) != 0) &&
-        ((val & SLP_TYP_MASK) == SLP_VAL)) {
+    s->pm1_control = ((s->pm1_control & 0xff) | val) & ~SUS_EN;
+
+    /* Check for power off request. */
+    if ((val & (SUS_EN|SUS_TYP)) == SUS_EN)
         qemu_system_shutdown_request();
-    }
 }
 
 static uint32_t acpiPm1ControlP1_readb(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
-    uint32_t val;
-
     /* Mask out the write-only bits */
-    val = (s->pm1_control & ~(GBL_RLS|SLP_EN)) >> 8;
-/*    printf("acpiPm1ControlP1_readb \n addr %x val:%x\n", addr, val); */
-
-    return val;
+    return (uint8_t)((s->pm1_control & ~(GBL_RLS|SUS_EN)) >> 8);
 }
-
-
-/* word access   */
 
 static void acpiPm1Control_writew(void *opaque, uint32_t addr, uint32_t val)
 {
     PCIAcpiState *s = opaque;
 
-    s->pm1_control = val;
-/*    printf("acpiPm1Control_writew \n addr %x val:%x\n", addr, val); */
+    s->pm1_control = val & ~SUS_EN;
 
-    // Check for power off request
-
-    if (((val & SLP_EN) != 0) &&
-        ((val & SLP_TYP_MASK) == SLP_VAL)) {
+    /* Check for power off request. */
+    if ((val & (SUS_EN|SUS_TYP)) == SUS_EN)
         qemu_system_shutdown_request();
-    }
-
 }
 
 static uint32_t acpiPm1Control_readw(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
-    uint32_t val;
-
     /* Mask out the write-only bits */
-    val = s->pm1_control & ~(GBL_RLS|SLP_EN);
-/*    printf("acpiPm1Control_readw \n addr %x val:%x\n", addr, val);  */
-
-    return val;
+    return (s->pm1_control & ~(GBL_RLS|SUS_EN));
 }
-
 
 static void acpi_map(PCIDevice *pci_dev, int region_num,
                     uint32_t addr, uint32_t size, int type)
 {
     PCIAcpiState *d = (PCIAcpiState *)pci_dev;
-
-    printf("register acpi io\n");
 
     /* Byte access */
     register_ioport_write(addr + 4, 1, 1, acpiPm1Control_writeb, d);
