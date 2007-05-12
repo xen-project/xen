@@ -495,7 +495,7 @@ void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
 
 void __handle_ioreq(CPUState *env, ioreq_t *req)
 {
-    if (!req->data_is_ptr && req->dir == IOREQ_WRITE && req->size != 4)
+    if (!req->data_is_ptr && (req->dir == IOREQ_WRITE) && (req->size != sizeof(req->data)))
 	req->data &= (1UL << (8 * req->size)) - 1;
 
     switch (req->type) {
