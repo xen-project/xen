@@ -3503,7 +3503,8 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
 
         if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
         {
-            v += PAGE_SIZE;
+            v += 1UL << L2_PAGETABLE_SHIFT;
+            v &= ~((1UL << L2_PAGETABLE_SHIFT) - 1);
             continue;
         }
 
