@@ -30,8 +30,6 @@
 
 extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 
-extern u64 root_vmcb_pa[NR_CPUS];
-
 static inline int svm_long_mode_enabled(struct vcpu *v)
 {
     u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;

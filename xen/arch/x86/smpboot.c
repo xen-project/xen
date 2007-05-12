@@ -460,7 +460,6 @@ set_cpu_sibling_map(int cpu)
 	}
 }
 
-#ifdef CONFIG_X86_32
 static void construct_percpu_idt(unsigned int cpu)
 {
 	unsigned char idt_load[10];
@@ -472,7 +471,6 @@ static void construct_percpu_idt(unsigned int cpu)
 	*(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
 	__asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 }
-#endif
 
 /*
  * Activate a secondary processor.
@@ -500,13 +498,11 @@ void __devinit start_secondary(void *unused)
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
 
-#ifdef CONFIG_X86_32
 	/*
 	 * At this point, boot CPU has fully initialised the IDT. It is
 	 * now safe to make ourselves a private copy.
 	 */
 	construct_percpu_idt(cpu);
-#endif
 
 	setup_secondary_APIC_clock();
 	enable_APIC_timer();

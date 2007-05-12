@@ -444,11 +444,9 @@ struct vmcb_struct {
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
     u64                 vmcb_pa;
-    u32                 *msrpm;
-    u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
+    u32                *msrpm;
     int                 launch_core;
-    
-    unsigned long       flags;            /* VMCB flags */
+    bool_t              vmcb_in_sync;     /* VMCB sync'ed with VMSAVE? */
     unsigned long       cpu_shadow_cr0;   /* Guest value for CR0 */
     unsigned long       cpu_shadow_cr4;   /* Guest value for CR4 */
     unsigned long       cpu_shadow_efer;  /* Guest value for EFER */

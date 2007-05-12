@@ -54,8 +54,6 @@
         pushq %r15;
 
 #define VMRUN  .byte 0x0F,0x01,0xD8
-#define VMLOAD .byte 0x0F,0x01,0xDA
-#define VMSAVE .byte 0x0F,0x01,0xDB
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
@@ -76,10 +74,6 @@ ENTRY(svm_asm_do_resume)
         movq VCPU_svm_vmcb(%rbx),%rcx
         movq UREGS_rax(%rsp),%rax
         movq %rax,VMCB_rax(%rcx)
-        leaq root_vmcb_pa(%rip),%rax
-        movl VCPU_processor(%rbx),%ecx
-        movq (%rax,%rcx,8),%rax
-        VMSAVE
 
         movq VCPU_svm_vmcb_pa(%rbx),%rax
         popq %r15
@@ -99,20 +93,15 @@ ENTRY(svm_asm_do_resume)
         popq %rdi
         addq $(NR_SKIPPED_REGS*8),%rsp
 
-        VMLOAD
         VMRUN
-        VMSAVE
 
         HVM_SAVE_ALL_NOSEGREGS
 
         GET_CURRENT(%rbx)
+        movb $0,VCPU_svm_vmcb_in_sync(%rbx)
         movq VCPU_svm_vmcb(%rbx),%rcx
         movq VMCB_rax(%rcx),%rax
         movq %rax,UREGS_rax(%rsp)
-        leaq root_vmcb_pa(%rip),%rax
-        movl VCPU_processor(%rbx),%ecx
-        movq (%rax,%rcx,8),%rax
-        VMLOAD
 
         STGI
 .globl svm_stgi_label;

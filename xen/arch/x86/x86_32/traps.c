@@ -18,9 +18,6 @@
 
 #include <public/callback.h>
 
-/* All CPUs have their own IDT to allow int80 direct trap. */
-idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
-
 static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];
@@ -251,9 +248,6 @@ void __init percpu_traps_init(void)
 
     if ( smp_processor_id() != 0 )
         return;
-
-    /* CPU0 uses the master IDT. */
-    idt_tables[0] = idt_table;
 
     /* The hypercall entry vector is only accessible from ring 1. */
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);

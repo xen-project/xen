@@ -45,8 +45,6 @@
         pushl %ebx;
 
 #define VMRUN  .byte 0x0F,0x01,0xD8
-#define VMLOAD .byte 0x0F,0x01,0xDA
-#define VMSAVE .byte 0x0F,0x01,0xDB
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
@@ -66,9 +64,6 @@ ENTRY(svm_asm_do_resume)
         movl VCPU_svm_vmcb(%ebx),%ecx
         movl UREGS_eax(%esp),%eax
         movl %eax,VMCB_rax(%ecx)
-        movl VCPU_processor(%ebx),%eax
-        movl root_vmcb_pa(,%eax,8),%eax
-        VMSAVE
 
         movl VCPU_svm_vmcb_pa(%ebx),%eax
         popl %ebx
@@ -78,19 +73,16 @@ ENTRY(svm_asm_do_resume)
         popl %edi
         popl %ebp
         addl $(NR_SKIPPED_REGS*4),%esp
-        VMLOAD
+
         VMRUN
-        VMSAVE
 
         HVM_SAVE_ALL_NOSEGREGS
 
         GET_CURRENT(%ebx)
+        movb $0,VCPU_svm_vmcb_in_sync(%ebx)
         movl VCPU_svm_vmcb(%ebx),%ecx
         movl VMCB_rax(%ecx),%eax
         movl %eax,UREGS_eax(%esp)
-        movl VCPU_processor(%ebx),%eax
-        movl root_vmcb_pa(,%eax,8),%eax
-        VMLOAD
 
         STGI
 .globl svm_stgi_label;

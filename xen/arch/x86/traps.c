@@ -75,8 +75,11 @@ char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
-/* Master table, used by all CPUs on x86/64, and by CPU0 on x86/32.*/
+/* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];
+
+/* Pointer to the IDT of every CPU. */
+idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
 #define DECLARE_TRAP_HANDLER(_name)                     \
 asmlinkage void _name(void);                            \
@@ -2025,13 +2028,11 @@ asmlinkage int do_spurious_interrupt_bug(struct cpu_user_regs *regs)
 
 void set_intr_gate(unsigned int n, void *addr)
 {
-#ifdef __i386__
     int i;
     /* Keep secondary tables in sync with IRQ updates. */
     for ( i = 1; i < NR_CPUS; i++ )
         if ( idt_tables[i] != NULL )
             _set_gate(&idt_tables[i][n], 14, 0, addr);
-#endif
     _set_gate(&idt_table[n], 14, 0, addr);
 }
 
@@ -2093,6 +2094,9 @@ void __init trap_init(void)
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
+
+    /* CPU0 uses the master IDT. */
+    idt_tables[0] = idt_table;
 
     percpu_traps_init();
 

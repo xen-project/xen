@@ -65,9 +65,6 @@ static void *hsa[NR_CPUS] __read_mostly;
 /* vmcb used for extended host state */
 static void *root_vmcb[NR_CPUS] __read_mostly;
 
-/* physical address of above for host VMSAVE/VMLOAD */
-u64 root_vmcb_pa[NR_CPUS] __read_mostly;
-
 /* hardware assisted paging bits */
 extern int opt_hap_enabled;
 
@@ -551,13 +548,11 @@ int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
-
 static inline void svm_restore_dr(struct vcpu *v)
 {
     if ( unlikely(v->arch.guest_context.debugreg[7] & 0xFF) )
         __restore_debug_registers(v);
 }
-
 
 static int svm_realmode(struct vcpu *v)
 {
@@ -586,12 +581,12 @@ static int svm_guest_x86_mode(struct vcpu *v)
     return (vmcb->cs.attr.fields.db ? 4 : 2);
 }
 
-void svm_update_host_cr3(struct vcpu *v)
+static void svm_update_host_cr3(struct vcpu *v)
 {
     /* SVM doesn't have a HOST_CR3 equivalent to update. */
 }
 
-void svm_update_guest_cr3(struct vcpu *v)
+static void svm_update_guest_cr3(struct vcpu *v)
 {
     v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 }
@@ -603,7 +598,7 @@ static void svm_update_vtpr(struct vcpu *v, unsigned long value)
     vmcb->vintr.fields.tpr = value & 0x0f;
 }
 
-unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
+static unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
 {
     switch ( num )
     {
@@ -621,6 +616,20 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+static void svm_sync_vmcb(struct vcpu *v)
+{
+    struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
+
+    if ( arch_svm->vmcb_in_sync )
+        return;
+
+    arch_svm->vmcb_in_sync = 1;
+
+    asm volatile (
+        ".byte 0x0f,0x01,0xdb" /* vmsave */
+        : : "a" (__pa(arch_svm->vmcb)) );
+}
+
 static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -634,13 +643,13 @@ static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
     case x86_seg_cs: return long_mode ? 0 : vmcb->cs.base;
     case x86_seg_ds: return long_mode ? 0 : vmcb->ds.base;
     case x86_seg_es: return long_mode ? 0 : vmcb->es.base;
-    case x86_seg_fs: return vmcb->fs.base;
-    case x86_seg_gs: return vmcb->gs.base;
+    case x86_seg_fs: svm_sync_vmcb(v); return vmcb->fs.base;
+    case x86_seg_gs: svm_sync_vmcb(v); return vmcb->gs.base;
     case x86_seg_ss: return long_mode ? 0 : vmcb->ss.base;
-    case x86_seg_tr: return vmcb->tr.base;
+    case x86_seg_tr: svm_sync_vmcb(v); return vmcb->tr.base;
     case x86_seg_gdtr: return vmcb->gdtr.base;
     case x86_seg_idtr: return vmcb->idtr.base;
-    case x86_seg_ldtr: return vmcb->ldtr.base;
+    case x86_seg_ldtr: svm_sync_vmcb(v); return vmcb->ldtr.base;
     }
     BUG();
     return 0;
@@ -652,16 +661,40 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     switch ( seg )
     {
-    case x86_seg_cs:   memcpy(reg, &vmcb->cs,   sizeof(*reg)); break;
-    case x86_seg_ds:   memcpy(reg, &vmcb->ds,   sizeof(*reg)); break;
-    case x86_seg_es:   memcpy(reg, &vmcb->es,   sizeof(*reg)); break;
-    case x86_seg_fs:   memcpy(reg, &vmcb->fs,   sizeof(*reg)); break;
-    case x86_seg_gs:   memcpy(reg, &vmcb->gs,   sizeof(*reg)); break;
-    case x86_seg_ss:   memcpy(reg, &vmcb->ss,   sizeof(*reg)); break;
-    case x86_seg_tr:   memcpy(reg, &vmcb->tr,   sizeof(*reg)); break;
-    case x86_seg_gdtr: memcpy(reg, &vmcb->gdtr, sizeof(*reg)); break;
-    case x86_seg_idtr: memcpy(reg, &vmcb->idtr, sizeof(*reg)); break;
-    case x86_seg_ldtr: memcpy(reg, &vmcb->ldtr, sizeof(*reg)); break;
+    case x86_seg_cs:
+        memcpy(reg, &vmcb->cs, sizeof(*reg));
+        break;
+    case x86_seg_ds:
+        memcpy(reg, &vmcb->ds, sizeof(*reg));
+        break;
+    case x86_seg_es:
+        memcpy(reg, &vmcb->es, sizeof(*reg));
+        break;
+    case x86_seg_fs:
+        svm_sync_vmcb(v);
+        memcpy(reg, &vmcb->fs, sizeof(*reg));
+        break;
+    case x86_seg_gs:
+        svm_sync_vmcb(v);
+        memcpy(reg, &vmcb->gs, sizeof(*reg));
+        break;
+    case x86_seg_ss:
+        memcpy(reg, &vmcb->ss, sizeof(*reg));
+        break;
+    case x86_seg_tr:
+        svm_sync_vmcb(v);
+        memcpy(reg, &vmcb->tr, sizeof(*reg));
+        break;
+    case x86_seg_gdtr:
+        memcpy(reg, &vmcb->gdtr, sizeof(*reg));
+        break;
+    case x86_seg_idtr:
+        memcpy(reg, &vmcb->idtr, sizeof(*reg));
+        break;
+    case x86_seg_ldtr:
+        svm_sync_vmcb(v);
+        memcpy(reg, &vmcb->ldtr, sizeof(*reg));
+        break;
     default: BUG();
     }
 }
@@ -761,11 +794,26 @@ static void svm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
+    int cpu = smp_processor_id();
+
     svm_save_dr(v);
+
+    svm_sync_vmcb(v);
+
+    asm volatile (
+        ".byte 0x0f,0x01,0xda" /* vmload */
+        : : "a" (__pa(root_vmcb[cpu])) );
+
+#ifdef __x86_64__
+    /* Resume use of IST2 for NMIs now that the host TR is reinstated. */
+    idt_tables[cpu][TRAP_nmi].a |= 2UL << 32;
+#endif
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
 {
+    int cpu = smp_processor_id();
+
 #ifdef  __x86_64__
     /* 
      * This is required, because VMRUN does consistency check
@@ -776,8 +824,22 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     set_segment_register(ds, 0);
     set_segment_register(es, 0);
     set_segment_register(ss, 0);
+
+    /*
+     * Cannot use IST2 for NMIs while we are running with the guest TR. But
+     * this doesn't matter: the IST is only needed to handle SYSCALL/SYSRET.
+     */
+    idt_tables[cpu][TRAP_nmi].a &= ~(2UL << 32);
 #endif
+
     svm_restore_dr(v);
+
+    asm volatile (
+        ".byte 0x0f,0x01,0xdb" /* vmsave */
+        : : "a" (__pa(root_vmcb[cpu])) );
+    asm volatile (
+        ".byte 0x0f,0x01,0xda" /* vmload */
+        : : "a" (__pa(v->arch.hvm_svm.vmcb)) );
 }
 
 static void svm_do_resume(struct vcpu *v) 
@@ -925,8 +987,6 @@ int start_svm(void)
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
 
-    root_vmcb_pa[cpu] = virt_to_maddr(root_vmcb[cpu]);
-  
     if ( cpu != 0 )
         return 1;
 
@@ -1196,9 +1256,11 @@ static void svm_get_prefix_info(struct vcpu *v, unsigned int dir,
             *seg = &vmcb->es;
             continue;
         case 0x64: /* FS */
+            svm_sync_vmcb(v);
             *seg = &vmcb->fs;
             continue;
         case 0x65: /* GS */
+            svm_sync_vmcb(v);
             *seg = &vmcb->gs;
             continue;
         case 0x3e: /* DS */
