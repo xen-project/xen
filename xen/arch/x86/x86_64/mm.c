@@ -70,11 +70,6 @@ void *alloc_xen_pagetable(void)
     return mfn_to_virt(mfn);
 }
 
-void free_xen_pagetable(void *v)
-{
-    free_domheap_page(virt_to_page(v));
-}
-
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
 {
     l4_pgentry_t *pl4e;
@@ -209,8 +204,15 @@ void __init setup_idle_pagetable(void)
 
 void __init zap_low_mappings(void)
 {
+    BUG_ON(num_online_cpus() != 1);
+
+    /* Remove aliased mapping of first 1:1 PML4 entry. */
     l4e_write(&idle_pg_table[0], l4e_empty());
-    flush_tlb_all_pge();
+    local_flush_tlb_pge();
+
+    /* Replace with mapping of the boot trampoline only. */
+    map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
+                     0x10, __PAGE_HYPERVISOR);
 }
 
 void __init subarch_init_memory(void)

@@ -3402,6 +3402,18 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     return 0;
 }
 
+void free_xen_pagetable(void *v)
+{
+    extern int early_boot;
+
+    BUG_ON(early_boot);
+    
+    if ( is_xen_heap_frame(virt_to_page(v)) )
+        free_xenheap_page(v);
+    else
+        free_domheap_page(virt_to_page(v));
+}
+
 int map_pages_to_xen(
     unsigned long virt,
     unsigned long mfn,
@@ -3473,6 +3485,73 @@ int map_pages_to_xen(
     }
 
     return 0;
+}
+
+void destroy_xen_mappings(unsigned long s, unsigned long e)
+{
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned int  i;
+    unsigned long v = s;
+
+    ASSERT((s & ~PAGE_MASK) == 0);
+    ASSERT((e & ~PAGE_MASK) == 0);
+
+    while ( v < e )
+    {
+        pl2e = virt_to_xen_l2e(v);
+
+        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+        {
+            v += PAGE_SIZE;
+            continue;
+        }
+
+        if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
+        {
+            if ( (l1_table_offset(v) == 0) &&
+                 ((e-v) >= (1UL << L2_PAGETABLE_SHIFT)) )
+            {
+                /* PSE: whole superpage is destroyed. */
+                l2e_write_atomic(pl2e, l2e_empty());
+                v += 1UL << L2_PAGETABLE_SHIFT;
+            }
+            else
+            {
+                /* PSE: shatter the superpage and try again. */
+                pl1e = alloc_xen_pagetable();
+                for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                    l1e_write(&pl1e[i],
+                              l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
+                                           l2e_get_flags(*pl2e) & ~_PAGE_PSE));
+                l2e_write_atomic(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                                                    __PAGE_HYPERVISOR));
+            }
+        }
+        else
+        {
+            /* Ordinary 4kB mapping. */
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
+            l1e_write_atomic(pl1e, l1e_empty());
+            v += PAGE_SIZE;
+
+            /* If we are done with the L2E, check if it is now empty. */
+            if ( (v != e) && (l1_table_offset(v) != 0) )
+                continue;
+            pl1e = l2e_to_l1e(*pl2e);
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                if ( l1e_get_intpte(pl1e[i]) != 0 )
+                    break;
+            if ( i == L1_PAGETABLE_ENTRIES )
+            {
+                /* Empty: zap the L2E and free the L1 page. */
+                l2e_write_atomic(pl2e, l2e_empty());
+                free_xen_pagetable(pl1e);
+            }
+        }
+    }
+
+    flush_tlb_all_pge();
 }
 
 void __set_fixmap(

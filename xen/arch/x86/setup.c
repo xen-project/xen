@@ -779,6 +779,11 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( smp_found_config )
         get_smp_config();
 
+#ifdef CONFIG_X86_64
+    /* Low mappings were only needed for some BIOS table parsing. */
+    zap_low_mappings();
+#endif
+
     init_apic_mappings();
 
     init_IRQ();

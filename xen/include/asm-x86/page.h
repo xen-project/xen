@@ -1,4 +1,3 @@
-
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
@@ -369,6 +368,7 @@ map_pages_to_xen(
     unsigned long mfn,
     unsigned long nr_mfns,
     unsigned long flags);
+void destroy_xen_mappings(unsigned long v, unsigned long e);
 
 #endif /* !__ASSEMBLY__ */
 

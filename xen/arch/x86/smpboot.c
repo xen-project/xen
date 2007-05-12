@@ -1162,9 +1162,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 #ifdef CONFIG_X86_IO_APIC
 	setup_ioapic_dest();
 #endif
-#ifdef CONFIG_X86_64
-	zap_low_mappings();
-#endif
 #ifndef CONFIG_HOTPLUG_CPU
 	/*
 	 * Disable executability of the SMP trampoline:

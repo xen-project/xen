@@ -902,7 +902,6 @@ int __init construct_dom0(
 #if defined(__i386__)
     /* Destroy low mappings - they were only for our convenience. */
     zap_low_mappings(l2start);
-    zap_low_mappings(idle_pg_table_l2);
 #endif
 
     update_domain_wallclock_time(d);
