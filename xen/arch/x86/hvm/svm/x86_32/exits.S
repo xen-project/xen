@@ -31,26 +31,13 @@
         andl $~3,reg;            \
         movl (reg),reg;
 
-#define HVM_MONITOR_EFLAGS 0x202 /* IF on */
-#define NR_SKIPPED_REGS    7     /* Skip SS thru EAX */
-#define HVM_SAVE_ALL_NOSEGREGS                  \
-        pushl $HVM_MONITOR_EFLAGS;              \
-        popf;                                   \
-        subl $(NR_SKIPPED_REGS*4),%esp;         \
-        pushl %ebp;                             \
-        pushl %edi;                             \
-        pushl %esi;                             \
-        pushl %edx;                             \
-        pushl %ecx;                             \
-        pushl %ebx;
-
 #define VMRUN  .byte 0x0F,0x01,0xD8
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
 ENTRY(svm_asm_do_resume)
         GET_CURRENT(%ebx)
-        cli                             # tests must not race interrupts
+        CLGI
         movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         testl $~0,irq_stat(%eax,1)
@@ -58,9 +45,6 @@ ENTRY(svm_asm_do_resume)
         call svm_intr_assist
         call svm_load_cr2
 
-        CLGI                
-        sti
-        GET_CURRENT(%ebx)
         movl VCPU_svm_vmcb(%ebx),%ecx
         movl UREGS_eax(%esp),%eax
         movl %eax,VMCB_rax(%ecx)
@@ -72,11 +56,15 @@ ENTRY(svm_asm_do_resume)
         popl %esi
         popl %edi
         popl %ebp
-        addl $(NR_SKIPPED_REGS*4),%esp
 
         VMRUN
 
-        HVM_SAVE_ALL_NOSEGREGS
+        pushl %ebp
+        pushl %edi
+        pushl %esi
+        pushl %edx
+        pushl %ecx
+        pushl %ebx
 
         GET_CURRENT(%ebx)
         movb $0,VCPU_svm_vmcb_in_sync(%ebx)
@@ -95,6 +83,6 @@ svm_stgi_label:
 
         ALIGN
 svm_process_softirqs:
-        sti       
+        STGI
         call do_softirq
         jmp  svm_asm_do_resume
