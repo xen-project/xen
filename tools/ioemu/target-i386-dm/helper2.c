@@ -495,8 +495,12 @@ void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
 
 void __handle_ioreq(CPUState *env, ioreq_t *req)
 {
-    if (!req->data_is_ptr && (req->dir == IOREQ_WRITE) && (req->size != sizeof(req->data)))
-	req->data &= (1UL << (8 * req->size)) - 1;
+    if (!req->data_is_ptr && (req->dir == IOREQ_WRITE)) {
+        /* Clamp data operand to size of a long. */
+        if (req->size < sizeof(long))
+            req->data &= (1UL << (8 * req->size)) - 1;
+        req->data = (unsigned long)req->data;
+    }
 
     switch (req->type) {
     case IOREQ_TYPE_PIO:
