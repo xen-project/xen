@@ -619,7 +619,7 @@ int main_loop(void)
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
-    char qemu_file[20];
+    char qemu_file[32];
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
