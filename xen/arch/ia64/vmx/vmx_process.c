@@ -153,7 +153,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 
     perfc_incr(vmx_ia64_handle_break);
 #ifdef CRASH_DEBUG
-    if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs) &&
+    if ((iim == 0 || iim == CDB_BREAK_NUM) && !guest_mode(regs) &&
         IS_VMM_ADDRESS(regs->cr_iip)) {
         if (iim == 0)
             show_registers(regs);

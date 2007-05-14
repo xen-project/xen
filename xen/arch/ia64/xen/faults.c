@@ -507,7 +507,7 @@ ia64_handle_break(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 		do_ssc(vcpu_get_gr(current, 36), regs);
 	}
 #ifdef CRASH_DEBUG
-	else if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs)) {
+	else if ((iim == 0 || iim == CDB_BREAK_NUM) && !guest_mode(regs)) {
 		if (iim == 0)
 			show_registers(regs);
 		debugger_trap_fatal(0 /* don't care */ , regs);
