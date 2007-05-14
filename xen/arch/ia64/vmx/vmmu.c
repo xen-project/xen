@@ -563,11 +563,17 @@ struct ptc_ga_args {
 
 static void ptc_ga_remote_func (void *varg)
 {
-    u64 oldrid, moldrid, mpta, oldpsbits, vadr;
+    u64 oldrid, moldrid, mpta, oldpsbits, vadr, flags;
     struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
     VCPU *v = args->vcpu;
     vadr = args->vadr;
 
+    /* Try again if VCPU has migrated. */
+    if (v->processor != current->processor)
+        return;
+    vcpu_schedule_lock_irqsave(v, flags);
+    if (v->processor != current->processor)
+        goto bail;
     oldrid = VMX(v, vrr[0]);
     VMX(v, vrr[0]) = args->rid;
     oldpsbits = VMX(v, psbits[0]);
@@ -584,6 +590,9 @@ static void ptc_ga_remote_func (void *varg)
     ia64_set_rr(0x0,moldrid);
     ia64_set_pta(mpta);
     ia64_dv_serialize_data();
+    args->vcpu = NULL;
+bail:
+    vcpu_schedule_unlock_irqrestore(v, flags);
 }
 
 
@@ -602,28 +611,21 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
         if (!v->is_initialised)
             continue;
 
-        args.vcpu = v;
-again: /* Try again if VCPU has migrated.  */
-        proc = v->processor;
-        if (proc != vcpu->processor) {
-            /* Flush VHPT on remote processors.  */
-            smp_call_function_single(v->processor,
-                                     &ptc_ga_remote_func, &args, 0, 1);
-            if (proc != v->processor)
-                goto again;
-        } else if (v == vcpu) {
+        if (v == vcpu) {
             vmx_vcpu_ptc_l(v, va, ps);
-        } else {
-            vcpu_schedule_lock_irq(v);
-            proc = v->processor;
-            if (proc == vcpu->processor)
-                ptc_ga_remote_func(&args);
-            else
-                proc = INVALID_PROCESSOR;
-            vcpu_schedule_unlock_irq(v);
-            if (proc == INVALID_PROCESSOR)
-                goto again;
+            continue;
         }
+
+        args.vcpu = v;
+        do {
+            proc = v->processor;
+            if (proc != vcpu->processor)
+                /* Flush VHPT on remote processors. */
+                smp_call_function_single(proc, &ptc_ga_remote_func,
+                                         &args, 0, 1);
+            else
+                ptc_ga_remote_func(&args);
+        } while (args.vcpu != NULL);
     }
     return IA64_NO_FAULT;
 }
