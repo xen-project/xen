@@ -31,6 +31,12 @@
 #define OS_LINUX    0xB2
 #define OS_END      0xB3
 
+#define GOS_WINDOWS(_v) \
+    ((_v)->domain->arch.vmx_platform.gos_type == OS_WINDOWS)
+
+#define GOS_LINUX(_v) \
+    ((_v)->domain->arch.vmx_platform.gos_type == OS_LINUX)
+
 /* port guest Firmware use to indicate os type 
  * this port is used to trigger SMI on x86,
  * it is not used on ia64 */

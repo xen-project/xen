@@ -408,7 +408,6 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, u64 pte, u64 itir, u64 ifa)
 
 IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, u64 pte, u64 itir, u64 ifa)
 {
-    u64 gpfn;
 #ifdef VTLB_DEBUG    
     int slot;
     u64 ps, va;
@@ -422,9 +421,6 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, u64 pte, u64 itir, u64 ifa)
     }
 #endif //VTLB_DEBUG
     pte &= ~PAGE_FLAGS_RV_MASK;
-    gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
-    if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
-        pte |= VTLB_PTE_IO;
     thash_purge_and_insert(vcpu, pte, itir, ifa, DSIDE_TLB);
     return IA64_NO_FAULT;
 
