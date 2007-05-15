@@ -136,6 +136,7 @@ struct xc_dom_arch {
     int (*vcpu) (struct xc_dom_image * dom, void *vcpu_ctxt);
 
     char *guest_type;
+    char *native_protocol;
     int page_shift;
     int sizeof_pfn;
 
