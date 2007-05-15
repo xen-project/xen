@@ -3238,13 +3238,14 @@ static int ptwr_emulated_update(
 
     /* We are looking only for read-only mappings of p.t. pages. */
     ASSERT((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) == _PAGE_PRESENT);
+    ASSERT(mfn_valid(mfn));
     ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table);
     ASSERT((page->u.inuse.type_info & PGT_count_mask) != 0);
     ASSERT(page_get_owner(page) == d);
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
-    if ( unlikely(!get_page_from_l1e(gl1e_to_ml1e(d, nl1e), d)) )
+    if ( unlikely(!get_page_from_l1e(nl1e, d)) )
     {
         if ( (CONFIG_PAGING_LEVELS >= 3) && is_pv_32bit_domain(d) &&
              (bytes == 4) && (addr & 4) && !do_cmpxchg &&
@@ -3270,7 +3271,7 @@ static int ptwr_emulated_update(
     adjust_guest_l1e(nl1e, d);
 
     /* Checked successfully: do the update (write or cmpxchg). */
-    pl1e = map_domain_page(page_to_mfn(page));
+    pl1e = map_domain_page(mfn);
     pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
     if ( do_cmpxchg )
     {
@@ -3285,21 +3286,21 @@ static int ptwr_emulated_update(
         if ( !okay )
         {
             unmap_domain_page(pl1e);
-            put_page_from_l1e(gl1e_to_ml1e(d, nl1e), d);
+            put_page_from_l1e(nl1e, d);
             return X86EMUL_CMPXCHG_FAILED;
         }
     }
     else
     {
         ol1e = *pl1e;
-        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, page_to_mfn(page), v) )
+        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn, v) )
             BUG();
     }
 
     unmap_domain_page(pl1e);
 
     /* Finally, drop the old PTE. */
-    put_page_from_l1e(gl1e_to_ml1e(d, ol1e), d);
+    put_page_from_l1e(ol1e, d);
 
     return X86EMUL_OKAY;
 }
@@ -3365,17 +3366,13 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 
     LOCK_BIGLOCK(d);
 
-    /*
-     * Attempt to read the PTE that maps the VA being accessed. By checking for
-     * PDE validity in the L2 we avoid many expensive fixups in __get_user().
-     */
+    /* Attempt to read the PTE that maps the VA being accessed. */
     guest_get_eff_l1e(v, addr, &pte);
-    if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
-        goto bail;
     page = l1e_get_page(pte);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
+         !mfn_valid(l1e_get_pfn(pte)) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
          ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
          (page_get_owner(page) != d) )
