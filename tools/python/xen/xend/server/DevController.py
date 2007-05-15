@@ -459,6 +459,8 @@ class DevController:
             'state' : str(xenbusState['Initialising'])
             })
 
+        if self.vm.native_protocol:
+            frontDetails.update({'protocol' : self.vm.native_protocol})
 
         backDetails.update({
             'domain' : self.vm.getName(),
