@@ -128,7 +128,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "msr %x msr_content %"PRIx64"\n",
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr %x msr_content %"PRIx64,
                 ecx, msr_content);
 
     switch ( ecx )
@@ -387,7 +387,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
          * If different, make a shadow. Check if the PDBR is valid
          * first.
          */
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
         if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain) ) 
             goto bad_cr3;
@@ -1590,7 +1590,7 @@ static int svm_set_cr0(unsigned long value)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long old_base_mfn;
   
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
@@ -1615,11 +1615,11 @@ static int svm_set_cr0(unsigned long value)
         {
             if ( !svm_cr4_pae_is_set(v) )
             {
-                HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
+                HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable");
                 svm_inject_exception(v, TRAP_gp_fault, 1, 0);
                 return 0;
             }
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
+            HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode");
             v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
             vmcb->efer |= EFER_LMA | EFER_LME;
         }
@@ -1712,7 +1712,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 
     set_reg(gp, value, regs, vmcb);
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx", cr, value);
 }
 
 
@@ -1730,8 +1730,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
 
     HVMTRACE_2D(CR_WRITE, v, cr, value);
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
-    HVM_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
+    HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx, current = %p",
+                cr, value, v);
 
     switch ( cr )
     {

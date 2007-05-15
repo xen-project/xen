@@ -110,10 +110,11 @@ static void vmx_save_host_msrs(void)
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
+    u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
-    switch ( (u32)regs->ecx ) {
+    switch ( ecx ) {
     case MSR_EFER:
         msr_content = v->arch.hvm_vmx.efer;
         break;
@@ -156,7 +157,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         return 0;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_2, "msr_content: 0x%"PRIx64, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, ecx, msr_content);
 
     regs->eax = (u32)(msr_content >>  0);
     regs->edx = (u32)(msr_content >> 32);
@@ -172,8 +173,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "msr 0x%x msr_content 0x%"PRIx64"\n",
-                ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, ecx, msr_content);
 
     switch ( ecx )
     {
@@ -261,7 +261,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 
  uncanonical_address:
-    HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write %x\n", ecx);
+    HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", ecx);
  gp_fault:
     vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
     return 0;
@@ -576,7 +576,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
          * If different, make a shadow. Check if the PDBR is valid
          * first.
          */
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64"", c->cr3);
+        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
         /* current!=vcpu as not called by arch_vmx_do_launch */
         mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
         if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
@@ -2023,7 +2023,7 @@ static int vmx_set_cr0(unsigned long value)
     unsigned long old_cr0;
     unsigned long old_base_mfn;
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
@@ -2072,12 +2072,12 @@ static int vmx_set_cr0(unsigned long value)
             if ( !(v->arch.hvm_vmx.cpu_shadow_cr4 & X86_CR4_PAE) )
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Guest enabled paging "
-                            "with EFER.LME set but not CR4.PAE\n");
+                            "with EFER.LME set but not CR4.PAE");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             }
             else
             {
-                HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode\n");
+                HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
                 v->arch.hvm_vmx.efer |= EFER_LMA;
                 vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value |= VM_ENTRY_IA32E_MODE;
@@ -2138,7 +2138,7 @@ static int vmx_set_cr0(unsigned long value)
         {
             eip = __vmread(GUEST_RIP);
             HVM_DBG_LOG(DBG_LEVEL_1,
-                        "Transfering control to vmxassist %%eip 0x%lx\n", eip);
+                        "Transfering control to vmxassist %%eip 0x%lx", eip);
             return 0; /* do not update eip! */
         }
     }
@@ -2146,12 +2146,12 @@ static int vmx_set_cr0(unsigned long value)
     {
         eip = __vmread(GUEST_RIP);
         HVM_DBG_LOG(DBG_LEVEL_1,
-                    "Enabling CR0.PE at %%eip 0x%lx\n", eip);
+                    "Enabling CR0.PE at %%eip 0x%lx", eip);
         if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
         {
             eip = __vmread(GUEST_RIP);
             HVM_DBG_LOG(DBG_LEVEL_1,
-                        "Restoring to %%eip 0x%lx\n", eip);
+                        "Restoring to %%eip 0x%lx", eip);
             return 0; /* do not update eip! */
         }
     }
@@ -2309,7 +2309,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             if ( unlikely(vmx_long_mode_enabled(v)) )
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
-                            "EFER.LMA is set\n");
+                            "EFER.LMA is set");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             }
         }
@@ -2439,8 +2439,7 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
     u32 ecx = regs->ecx, eax, edx;
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, eax=%x, edx=%x",
-                ecx, (u32)regs->eax, (u32)regs->edx);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", ecx);
 
     switch (ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:

@@ -145,9 +145,8 @@ unsigned long get_effective_addr_modrm64(struct cpu_user_regs *regs,
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "get_effective_addr_modrm64(): prefix = %x, "
-            "length = %d, operand[0,1] = %x %x.\n", prefix, *size, operand [0],
-            operand [1]);
+    HVM_DBG_LOG(DBG_LEVEL_1, "prefix = %x, length = %d, operand[0,1] = %x %x",
+                prefix, *size, operand[0], operand[1]);
 
     if ((NULL == size) || (NULL == operand) || (1 > *size))
     {

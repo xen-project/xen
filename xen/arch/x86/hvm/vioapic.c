@@ -99,7 +99,7 @@ static unsigned long vioapic_read(struct vcpu *v,
     struct hvm_hw_vioapic *vioapic = domain_vioapic(v->domain);
     uint32_t result;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vioapic_read addr %lx\n", addr);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "addr %lx", addr);
 
     addr &= 0xff;
 
@@ -183,8 +183,7 @@ static void vioapic_write_indirect(
     {
         uint32_t redir_index = (vioapic->ioregsel - 0x10) >> 1;
 
-        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vioapic_write_indirect "
-                    "change redir index %x val %lx\n",
+        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "change redir index %x val %lx",
                     redir_index, val);
 
         if ( redir_index >= VIOAPIC_NUM_PINS )
@@ -252,8 +251,7 @@ static void ioapic_inj_irq(
     uint8_t trig_mode,
     uint8_t delivery_mode)
 {
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_inj_irq "
-                "irq %d trig %d delive mode %d\n",
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "irq %d trig %d deliv %d",
                 vector, trig_mode, delivery_mode);
 
     switch ( delivery_mode )
@@ -275,8 +273,8 @@ static uint32_t ioapic_get_delivery_bitmask(
     uint32_t mask = 0;
     struct vcpu *v;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask "
-                "dest %d dest_mode %d\n", dest, dest_mode);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "dest %d dest_mode %d",
+                dest, dest_mode);
 
     if ( dest_mode == 0 ) /* Physical mode. */
     {
@@ -304,7 +302,7 @@ static uint32_t ioapic_get_delivery_bitmask(
     }
 
  out:
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask mask %x\n",
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "mask %x",
                 mask);
     return mask;
 }
@@ -331,14 +329,13 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
                 "dest=%x dest_mode=%x delivery_mode=%x "
-                "vector=%x trig_mode=%x\n",
+                "vector=%x trig_mode=%x",
                 dest, dest_mode, delivery_mode, vector, trig_mode);
 
     deliver_bitmask = ioapic_get_delivery_bitmask(vioapic, dest, dest_mode);
     if ( !deliver_bitmask )
     {
-        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic deliver "
-                    "no target on destination\n");
+        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "no target on destination");
         return;
     }
 
@@ -364,7 +361,7 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
         else
         {
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "null round robin: "
-                        "mask=%x vector=%x delivery_mode=%x\n",
+                        "mask=%x vector=%x delivery_mode=%x",
                         deliver_bitmask, vector, dest_LowestPrio);
         }
         break;
@@ -412,7 +409,7 @@ void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
     struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
     union vioapic_redir_entry *ent;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_irq_positive_edge irq %x", irq);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "irq %x", irq);
 
     ASSERT(irq < VIOAPIC_NUM_PINS);
     ASSERT(spin_is_locked(&d->arch.hvm_domain.irq_lock));
