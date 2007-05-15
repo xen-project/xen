@@ -554,14 +554,6 @@ static inline void svm_restore_dr(struct vcpu *v)
         __restore_debug_registers(v);
 }
 
-static int svm_realmode(struct vcpu *v)
-{
-    unsigned long cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
-    unsigned long eflags = v->arch.hvm_svm.vmcb->rflags;
-
-    return (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE);
-}
-
 static int svm_interrupts_enabled(struct vcpu *v)
 {
     unsigned long eflags = v->arch.hvm_svm.vmcb->rflags;
@@ -572,13 +564,13 @@ static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( svm_long_mode_enabled(v) && vmcb->cs.attr.fields.l )
+    if ( unlikely(!(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PE)) )
+        return 0;
+    if ( unlikely(vmcb->rflags & X86_EFLAGS_VM) )
+        return 1;
+    if ( svm_long_mode_enabled(v) && likely(vmcb->cs.attr.fields.l) )
         return 8;
-
-    if ( svm_realmode(v) )
-        return 2;
-
-    return (vmcb->cs.attr.fields.db ? 4 : 2);
+    return (likely(vmcb->cs.attr.fields.db) ? 4 : 2);
 }
 
 static void svm_update_host_cr3(struct vcpu *v)
@@ -1950,7 +1942,9 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     case INSTR_SMSW:
         value = v->arch.hvm_svm.cpu_shadow_cr0 & 0xFFFF;
         modrm = buffer[index+2];
-        addr_size = svm_guest_x86_mode( v );
+        addr_size = svm_guest_x86_mode(v);
+        if ( addr_size < 2 )
+            addr_size = 2;
         if ( likely((modrm & 0xC0) >> 6 == 3) )
         {
             gpreg = decode_src_reg(prefix, modrm);

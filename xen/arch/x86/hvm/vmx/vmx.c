@@ -994,31 +994,20 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
-static int vmx_realmode(struct vcpu *v)
-{
-    unsigned long rflags;
-
-    ASSERT(v == current);
-
-    rflags = __vmread(GUEST_RFLAGS);
-    return rflags & X86_EFLAGS_VM;
-}
-
 static int vmx_guest_x86_mode(struct vcpu *v)
 {
-    unsigned long cs_ar_bytes;
+    unsigned int cs_ar_bytes;
 
     ASSERT(v == current);
 
+    if ( unlikely(!(v->arch.hvm_vmx.cpu_shadow_cr0 & X86_CR0_PE)) )
+        return 0;
+    if ( unlikely(__vmread(GUEST_RFLAGS) & X86_EFLAGS_VM) )
+        return 1;
     cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
-
-    if ( vmx_long_mode_enabled(v) && (cs_ar_bytes & (1u<<13)) )
+    if ( vmx_long_mode_enabled(v) && likely(cs_ar_bytes & (1u<<13)) )
         return 8;
-
-    if ( vmx_realmode(v) )
-        return 2;
-
-    return ((cs_ar_bytes & (1u<<14)) ? 4 : 2);
+    return (likely(cs_ar_bytes & (1u<<14)) ? 4 : 2);
 }
 
 static int vmx_pae_enabled(struct vcpu *v)

@@ -1037,6 +1037,9 @@ void handle_mmio(unsigned long gpa)
     df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
     address_bytes = hvm_guest_x86_mode(v);
+    if (address_bytes < 2)
+        /* real or vm86 modes */
+        address_bytes = 2;
     inst_addr = hvm_get_segment_base(v, x86_seg_cs) + regs->eip;
     inst_len = hvm_instruction_length(inst_addr, address_bytes);
     if ( inst_len <= 0 )

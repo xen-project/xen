@@ -663,7 +663,7 @@ typedef unsigned long hvm_hypercall_t(
 
 #if defined(__i386__)
 
-static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
+static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
@@ -671,21 +671,6 @@ static hvm_hypercall_t *hvm_hypercall_table[NR_hypercalls] = {
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
 };
-
-static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
-{
-    if ( (pregs->eax >= NR_hypercalls) || !hvm_hypercall_table[pregs->eax] )
-    {
-        if ( pregs->eax != __HYPERVISOR_grant_table_op )
-            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %d.\n",
-                     current->domain->domain_id, current->vcpu_id, pregs->eax);
-        pregs->eax = -ENOSYS;
-        return;
-    }
-
-    pregs->eax = hvm_hypercall_table[pregs->eax](
-        pregs->ebx, pregs->ecx, pregs->edx, pregs->esi, pregs->edi);
-}
 
 #else /* defined(__x86_64__) */
 
@@ -746,49 +731,38 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(hvm_op)
 };
 
-static void __hvm_do_hypercall(struct cpu_user_regs *pregs)
-{
-    pregs->rax = (uint32_t)pregs->eax; /* mask in case compat32 caller */
-    if ( (pregs->rax >= NR_hypercalls) || !hvm_hypercall64_table[pregs->rax] )
-    {
-        if ( pregs->rax != __HYPERVISOR_grant_table_op )
-            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %ld.\n",
-                     current->domain->domain_id, current->vcpu_id, pregs->rax);
-        pregs->rax = -ENOSYS;
-        return;
-    }
-
-    if ( current->arch.paging.mode->guest_levels == 4 )
-    {
-        pregs->rax = hvm_hypercall64_table[pregs->rax](pregs->rdi,
-                                                       pregs->rsi,
-                                                       pregs->rdx,
-                                                       pregs->r10,
-                                                       pregs->r8);
-    }
-    else
-    {
-        pregs->eax = hvm_hypercall32_table[pregs->eax]((uint32_t)pregs->ebx,
-                                                       (uint32_t)pregs->ecx,
-                                                       (uint32_t)pregs->edx,
-                                                       (uint32_t)pregs->esi,
-                                                       (uint32_t)pregs->edi);
-    }
-}
-
 #endif /* defined(__x86_64__) */
 
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
-    int flush, preempted;
-    unsigned long old_eip;
+    int flush, mode = hvm_guest_x86_mode(current);
+    uint32_t eax = regs->eax;
 
-    hvm_store_cpu_guest_regs(current, regs, NULL);
-
-    if ( unlikely(ring_3(regs)) )
+    switch ( mode )
     {
-        regs->eax = -EPERM;
-        return 0;
+#ifdef __x86_64__
+    case 8:
+#endif
+    case 4:
+    case 2:
+        hvm_store_cpu_guest_regs(current, regs, NULL);
+        if ( unlikely(ring_3(regs)) )
+        {
+    default:
+            regs->eax = -EPERM;
+            return HVM_HCALL_completed;
+        }
+    case 0:
+        break;
+    }
+
+    if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
+    {
+        if ( eax != __HYPERVISOR_grant_table_op )
+            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %u.\n",
+                     current->domain->domain_id, current->vcpu_id, eax);
+        regs->eax = -ENOSYS;
+        return HVM_HCALL_completed;
     }
 
     /*
@@ -796,20 +770,29 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
      * For now we also need to flush when pages are added, as qemu-dm is not
      * yet capable of faulting pages into an existing valid mapcache bucket.
      */
-    flush = ((uint32_t)regs->eax == __HYPERVISOR_memory_op);
+    flush = (eax == __HYPERVISOR_memory_op);
+    this_cpu(hc_preempted) = 0;
 
-    /* Check for preemption: RIP will be modified from this dummy value. */
-    old_eip = regs->eip;
-    regs->eip = 0xF0F0F0FF;
+#ifdef __x86_64__
+    if ( mode == 8 )
+    {
+        regs->rax = hvm_hypercall64_table[eax](regs->rdi,
+                                               regs->rsi,
+                                               regs->rdx,
+                                               regs->r10,
+                                               regs->r8);
+    }
+    else
+#endif
+    {
+        regs->eax = hvm_hypercall32_table[eax]((uint32_t)regs->ebx,
+                                               (uint32_t)regs->ecx,
+                                               (uint32_t)regs->edx,
+                                               (uint32_t)regs->esi,
+                                               (uint32_t)regs->edi);
+    }
 
-    __hvm_do_hypercall(regs);
-
-    preempted = (regs->eip != 0xF0F0F0FF);
-    regs->eip = old_eip;
-
-    hvm_load_cpu_guest_regs(current, regs);
-
-    return (preempted ? HVM_HCALL_preempted :
+    return (this_cpu(hc_preempted) ? HVM_HCALL_preempted :
             flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
 }
 

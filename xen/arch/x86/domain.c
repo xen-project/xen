@@ -38,6 +38,7 @@
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
 #include <asm/paging.h>
+#include <asm/hypercall.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
@@ -1231,6 +1232,8 @@ void sync_vcpu_execstate(struct vcpu *v)
     __arg;                                                                  \
 })
 
+DEFINE_PER_CPU(char, hc_preempted);
+
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...)
 {
@@ -1262,7 +1265,9 @@ unsigned long hypercall_create_continuation(
         regs->eip -= 2;  /* re-execute 'syscall' / 'int 0x82' */
 
 #ifdef __x86_64__
-        if ( !is_pv_32on64_domain(current->domain) )
+        if ( !is_hvm_vcpu(current) ?
+             !is_pv_32on64_vcpu(current) :
+             (hvm_guest_x86_mode(current) == 8) )
         {
             for ( i = 0; *p != '\0'; i++ )
             {
@@ -1298,6 +1303,8 @@ unsigned long hypercall_create_continuation(
                 }
             }
         }
+
+        this_cpu(hc_preempted) = 1;
     }
 
     va_end(args);
