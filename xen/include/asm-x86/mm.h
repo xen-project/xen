@@ -146,7 +146,6 @@ void init_frametable(void);
 
 int alloc_page_type(struct page_info *page, unsigned long type);
 void free_page_type(struct page_info *page, unsigned long type);
-void invalidate_shadow_ldt(struct vcpu *d);
 int _shadow_mode_refcounts(struct domain *d);
 
 static inline void put_page(struct page_info *page)

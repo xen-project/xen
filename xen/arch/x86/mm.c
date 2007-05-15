@@ -410,7 +410,7 @@ void update_cr3(struct vcpu *v)
 }
 
 
-void invalidate_shadow_ldt(struct vcpu *v)
+static void invalidate_shadow_ldt(struct vcpu *v)
 {
     int i;
     unsigned long pfn;
