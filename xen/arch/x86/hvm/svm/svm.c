@@ -1,7 +1,7 @@
 /*
  * svm.c: handling SVM architecture-related VM exits
  * Copyright (c) 2004, Intel Corporation.
- * Copyright (c) 2005, AMD Corporation.
+ * Copyright (c) 2005-2007, Advanced Micro Devices, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -39,6 +39,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
+#include <asm/hvm/svm/asid.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
@@ -490,6 +491,9 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
     paging_update_paging_modes(v);
+    /* signal paging update to ASID handler */
+    svm_asid_g_update_paging (v);
+
     return 0;
  
  bad_cr3:
@@ -855,6 +859,9 @@ static void svm_do_resume(struct vcpu *v)
     {
         v->arch.hvm_svm.launch_core = smp_processor_id();
         hvm_migrate_timers(v);
+
+        /* Migrating to another ASID domain.  Request a new ASID. */
+        svm_asid_init_vcpu(v);
     }
 
     hvm_do_resume(v);
@@ -945,7 +952,7 @@ void svm_npt_detect(void)
     }
 }
 
-int start_svm(void)
+int start_svm(struct cpuinfo_x86 *c)
 {
     u32 eax, ecx, edx;
     u32 phys_hsa_lo, phys_hsa_hi;   
@@ -959,7 +966,7 @@ int start_svm(void)
     if ( !(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)) )
         return 0;
 
-    /* check whether SVM feature is disabled in BIOS */
+    /* Check whether SVM feature is disabled in BIOS */
     rdmsr(MSR_K8_VM_CR, eax, edx);
     if ( eax & K8_VMCR_SVME_DISABLE )
     {
@@ -975,11 +982,14 @@ int start_svm(void)
 
     svm_npt_detect();
 
-    /* Initialize the HSA for this core */
+    /* Initialize the HSA for this core. */
     phys_hsa = (u64) virt_to_maddr(hsa[cpu]);
     phys_hsa_lo = (u32) phys_hsa;
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
+
+    /* Initialize core's ASID handling. */
+    svm_asid_init(c);
 
     if ( cpu != 0 )
         return 1;
@@ -1669,7 +1679,11 @@ static int svm_set_cr0(unsigned long value)
         vmcb->cr0 |= X86_CR0_PG | X86_CR0_WP;
 
     if ( (value ^ old_value) & X86_CR0_PG )
+    {
         paging_update_paging_modes(v);
+        /* signal paging update to ASID handler */
+        svm_asid_g_update_paging (v);
+    }
 
     return 1;
 }
@@ -1764,6 +1778,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             if ( mfn != pagetable_get_pfn(v->arch.guest_table) )
                 goto bad_cr3;
             paging_update_cr3(v);
+            /* signal paging update to ASID handler */
+            svm_asid_g_mov_to_cr3 (v);
         }
         else 
         {
@@ -1785,6 +1801,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             v->arch.hvm_svm.cpu_cr3 = value;
             update_cr3(v);
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
+            /* signal paging update to ASID handler */
+            svm_asid_g_mov_to_cr3 (v);
         }
         break;
 
@@ -1793,6 +1811,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         {
             vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 = value;
             paging_update_paging_modes(v);
+            /* signal paging update to ASID handler */
+            svm_asid_g_update_paging (v);
             break;
         }
 
@@ -1818,6 +1838,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 if ( old_base_mfn )
                     put_page(mfn_to_page(old_base_mfn));
                 paging_update_paging_modes(v);
+                /* signal paging update to ASID handler */
+                svm_asid_g_update_paging (v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
                             (unsigned long) (mfn << PAGE_SHIFT));
@@ -1844,7 +1866,11 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
          * all TLB entries except global entries.
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE))
+        {
             paging_update_paging_modes(v);
+            /* signal paging update to ASID handler */
+            svm_asid_g_update_paging (v);
+        }
         break;
 
     case 8:
@@ -2174,6 +2200,8 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
     HVMTRACE_3D(INVLPG, v, (invlpga?1:0), g_vaddr, (invlpga?regs->ecx:0));
 
     paging_invlpg(v, g_vaddr);
+    /* signal invplg to ASID handler */
+    svm_asid_g_invlpg (v, g_vaddr);
 }
 
 

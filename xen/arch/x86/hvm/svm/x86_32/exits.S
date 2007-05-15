@@ -1,7 +1,7 @@
 /*
  * exits.S: SVM architecture-specific exit handling.
+ * Copyright (c) 2005-2007, Advanced Micro Devices, Inc.
  * Copyright (c) 2004, Intel Corporation.
- * Copyright (c) 2005, AMD Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -38,6 +38,9 @@
 ENTRY(svm_asm_do_resume)
         GET_CURRENT(%ebx)
         CLGI
+        /* Run ASID stuff. */
+        call svm_asid_handle_vmrun
+
         movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         testl $~0,irq_stat(%eax,1)
