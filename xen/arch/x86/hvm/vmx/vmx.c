@@ -88,8 +88,7 @@ static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 
 static u32 msr_index[VMX_MSR_COUNT] =
 {
-    MSR_LSTAR, MSR_STAR, MSR_CSTAR,
-    MSR_SYSCALL_MASK
+    MSR_LSTAR, MSR_STAR, MSR_SYSCALL_MASK
 };
 
 static void vmx_save_host_msrs(void)
@@ -146,7 +145,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     case MSR_CSTAR:
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_CSTAR];
+        msr_content = v->arch.hvm_vmx.cstar;
         break;
 
     case MSR_SYSCALL_MASK:
@@ -249,7 +248,8 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     case MSR_CSTAR:
         if ( !is_canonical_address(msr_content) )
             goto uncanonical_address;
-        WRITE_MSR(CSTAR);
+        v->arch.hvm_vmx.cstar = msr_content;
+        break;
 
     case MSR_SYSCALL_MASK:
         WRITE_MSR(SYSCALL_MASK);
@@ -729,12 +729,12 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     unsigned long guest_flags = guest_state->flags;
 
     data->shadow_gs = v->arch.hvm_vmx.shadow_gs;
+    data->msr_cstar = v->arch.hvm_vmx.cstar;
 
     /* save msrs */
     data->msr_flags        = guest_flags;
     data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
-    data->msr_cstar        = guest_state->msrs[VMX_INDEX_MSR_CSTAR];
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
 #endif
 
@@ -754,9 +754,9 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     guest_state->flags = data->msr_flags;
     guest_state->msrs[VMX_INDEX_MSR_LSTAR]        = data->msr_lstar;
     guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
-    guest_state->msrs[VMX_INDEX_MSR_CSTAR]        = data->msr_cstar;
     guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK] = data->msr_syscall_mask;
 
+    v->arch.hvm_vmx.cstar     = data->msr_cstar;
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
 #endif
 

@@ -37,7 +37,6 @@ struct vmcs_struct {
 enum {
     VMX_INDEX_MSR_LSTAR = 0,
     VMX_INDEX_MSR_STAR,
-    VMX_INDEX_MSR_CSTAR,
     VMX_INDEX_MSR_SYSCALL_MASK,
 
     VMX_MSR_COUNT
@@ -77,6 +76,7 @@ struct arch_vmx_struct {
 #ifdef __x86_64__
     struct vmx_msr_state msr_state;
     unsigned long        shadow_gs;
+    unsigned long        cstar;
 #endif
     unsigned long        efer;
     unsigned long        vmxassist_enabled:1;
