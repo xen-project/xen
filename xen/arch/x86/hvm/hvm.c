@@ -776,6 +776,9 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 #ifdef __x86_64__
     if ( mode == 8 )
     {
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx)", eax,
+                    regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
+
         regs->rax = hvm_hypercall64_table[eax](regs->rdi,
                                                regs->rsi,
                                                regs->rdx,
@@ -785,12 +788,19 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     else
 #endif
     {
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x)", eax,
+                    (uint32_t)regs->ebx, (uint32_t)regs->ecx,
+                    (uint32_t)regs->edx, (uint32_t)regs->esi,
+                    (uint32_t)regs->edi);
+
         regs->eax = hvm_hypercall32_table[eax]((uint32_t)regs->ebx,
                                                (uint32_t)regs->ecx,
                                                (uint32_t)regs->edx,
                                                (uint32_t)regs->esi,
                                                (uint32_t)regs->edi);
     }
+
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx", eax, (unsigned long)regs->eax);
 
     return (this_cpu(hc_preempted) ? HVM_HCALL_preempted :
             flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
@@ -1053,6 +1063,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             a.value = d->arch.hvm_domain.params[a.index];
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
+
+        HVM_DBG_LOG(DBG_LEVEL_HCALL, "%s param %u = %"PRIx64,
+                    op == HVMOP_set_param ? "set" : "get",
+                    a.index, a.value);
 
     param_fail:
         rcu_unlock_domain(d);
