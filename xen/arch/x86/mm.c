@@ -1017,7 +1017,7 @@ static void pae_flush_pgd(
             l3tab_ptr = &cache->table[cache->inuse_idx][idx];
             _ol3e = l3e_get_intpte(*l3tab_ptr);
             _nl3e = l3e_get_intpte(nl3e);
-            _pl3e = cmpxchg((intpte_t *)l3tab_ptr, _ol3e, _nl3e);
+            _pl3e = cmpxchg(&l3e_get_intpte(*l3tab_ptr), _ol3e, _nl3e);
             BUG_ON(_pl3e != _ol3e);
         }
 
@@ -1316,7 +1316,7 @@ static inline int update_intpte(intpte_t *p,
 /* Macro that wraps the appropriate type-changes around update_intpte().
  * Arguments are: type, ptr, old, new, mfn, vcpu */
 #define UPDATE_ENTRY(_t,_p,_o,_n,_m,_v)                             \
-    update_intpte((intpte_t *)(_p),                                 \
+    update_intpte(&_t ## e_get_intpte(*(_p)),                       \
                   _t ## e_get_intpte(_o), _t ## e_get_intpte(_n),   \
                   (_m), (_v))
 
@@ -2498,7 +2498,7 @@ static int create_grant_pte_mapping(
     }
 
     ol1e = *(l1_pgentry_t *)va;
-    if ( !UPDATE_ENTRY(l1, va, ol1e, nl1e, mfn, v) )
+    if ( !UPDATE_ENTRY(l1, (l1_pgentry_t *)va, ol1e, nl1e, mfn, v) )
     {
         put_page_type(page);
         rc = GNTST_general_error;
@@ -3278,7 +3278,7 @@ static int ptwr_emulated_update(
         intpte_t t = old;
         ol1e = l1e_from_intpte(old);
 
-        okay = paging_cmpxchg_guest_entry(v, (intpte_t *) pl1e, 
+        okay = paging_cmpxchg_guest_entry(v, &l1e_get_intpte(*pl1e),
                                           &t, val, _mfn(mfn));
         okay = (okay && t == old);
 
