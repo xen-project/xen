@@ -60,6 +60,11 @@ static inline int svm_pae_enabled(struct vcpu *v)
     return svm_paging_enabled(v) && (guest_cr4 & X86_CR4_PAE);
 }
 
+static inline int svm_nx_enabled(struct vcpu *v)
+{
+    return v->arch.hvm_svm.cpu_shadow_efer & EFER_NX;
+}
+
 static inline int svm_pgbit_test(struct vcpu *v)
 {
     return v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PG;

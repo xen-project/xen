@@ -39,7 +39,6 @@ enum {
     VMX_INDEX_MSR_STAR,
     VMX_INDEX_MSR_CSTAR,
     VMX_INDEX_MSR_SYSCALL_MASK,
-    VMX_INDEX_MSR_EFER,
 
     VMX_MSR_COUNT
 };
@@ -47,7 +46,6 @@ enum {
 struct vmx_msr_state {
     unsigned long flags;
     unsigned long msrs[VMX_MSR_COUNT];
-    unsigned long shadow_gs;
 };
 
 struct arch_vmx_struct {
@@ -76,7 +74,11 @@ struct arch_vmx_struct {
     unsigned long        cpu_shadow_cr4; /* copy of guest read shadow CR4 */
     unsigned long        cpu_cr2; /* save CR2 */
     unsigned long        cpu_cr3;
+#ifdef __x86_64__
     struct vmx_msr_state msr_state;
+    unsigned long        shadow_gs;
+#endif
+    unsigned long        efer;
     unsigned long        vmxassist_enabled:1;
 };
 

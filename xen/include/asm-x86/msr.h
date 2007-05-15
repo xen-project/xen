@@ -3,6 +3,9 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/smp.h>
+#include <xen/percpu.h>
+
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \
 			  : "=a" (val1), "=d" (val2) \
@@ -141,6 +144,25 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define EFER_LMA (1<<_EFER_LMA)
 #define EFER_NX (1<<_EFER_NX)
 #define EFER_SVME (1<<_EFER_SVME)
+
+#ifndef __ASSEMBLY__
+
+DECLARE_PER_CPU(__u64, efer);
+
+static inline __u64 read_efer(void)
+{
+    if (!this_cpu(efer))
+        rdmsrl(MSR_EFER, this_cpu(efer));
+    return this_cpu(efer);
+}
+
+static inline void write_efer(__u64 val)
+{
+    this_cpu(efer) = val;
+    wrmsrl(MSR_EFER, val);
+}
+
+#endif
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PLATFORM_ID	0x17

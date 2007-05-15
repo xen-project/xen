@@ -89,7 +89,7 @@ static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 static u32 msr_index[VMX_MSR_COUNT] =
 {
     MSR_LSTAR, MSR_STAR, MSR_CSTAR,
-    MSR_SYSCALL_MASK, MSR_EFER,
+    MSR_SYSCALL_MASK
 };
 
 static void vmx_save_host_msrs(void)
@@ -116,8 +116,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 
     switch ( (u32)regs->ecx ) {
     case MSR_EFER:
-        HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content 0x%"PRIx64, msr_content);
-        msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_EFER];
+        msr_content = v->arch.hvm_vmx.efer;
         break;
 
     case MSR_FS_BASE:
@@ -129,7 +128,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         goto check_long_mode;
 
     case MSR_SHADOW_GS_BASE:
-        msr_content = guest_msr_state->shadow_gs;
+        msr_content = v->arch.hvm_vmx.shadow_gs;
     check_long_mode:
         if ( !(vmx_long_mode_enabled(v)) )
         {
@@ -181,7 +180,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     {
     case MSR_EFER:
         /* offending reserved bit will cause #GP */
-        if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
+        if ( (msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE)) ||
+             (!cpu_has_nx && (msr_content & EFER_NX)) ||
+             (!cpu_has_syscall && (msr_content & EFER_SCE)) )
         {
             gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                      "EFER: %"PRIx64"\n", msr_content);
@@ -189,7 +190,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         }
 
         if ( (msr_content & EFER_LME)
-             &&  !(guest_msr_state->msrs[VMX_INDEX_MSR_EFER] & EFER_LME) )
+             &&  !(v->arch.hvm_vmx.efer & EFER_LME) )
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
@@ -199,7 +200,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             }
         }
         else if ( !(msr_content & EFER_LME)
-                  && (guest_msr_state->msrs[VMX_INDEX_MSR_EFER] & EFER_LME) )
+                  && (v->arch.hvm_vmx.efer & EFER_LME) )
         {
             if ( unlikely(vmx_paging_enabled(v)) )
             {
@@ -209,7 +210,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             }
         }
 
-        guest_msr_state->msrs[VMX_INDEX_MSR_EFER] = msr_content;
+        if ( (msr_content ^ v->arch.hvm_vmx.efer) & (EFER_NX|EFER_SCE) )
+            write_efer((read_efer() & ~(EFER_NX|EFER_SCE)) |
+                       (msr_content & (EFER_NX|EFER_SCE)));
+
+        v->arch.hvm_vmx.efer = msr_content;
         break;
 
     case MSR_FS_BASE:
@@ -227,7 +232,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             __vmwrite(GUEST_GS_BASE, msr_content);
         else
         {
-            v->arch.hvm_vmx.msr_state.shadow_gs = msr_content;
+            v->arch.hvm_vmx.shadow_gs = msr_content;
             wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
         }
 
@@ -279,12 +284,14 @@ static void vmx_restore_host_msrs(void)
         wrmsrl(msr_index[i], host_msr_state->msrs[i]);
         clear_bit(i, &host_msr_state->flags);
     }
+    if ( cpu_has_nx && !(read_efer() & EFER_NX) )
+        write_efer(read_efer() | EFER_NX);
 }
 
 static void vmx_save_guest_msrs(struct vcpu *v)
 {
     /* MSR_SHADOW_GS_BASE may have been changed by swapgs instruction. */
-    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_state.shadow_gs);
+    rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.shadow_gs);
 }
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
@@ -296,11 +303,9 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     guest_msr_state = &v->arch.hvm_vmx.msr_state;
     host_msr_state = &this_cpu(host_msr_state);
 
-    wrmsrl(MSR_SHADOW_GS_BASE, guest_msr_state->shadow_gs);
+    wrmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.shadow_gs);
 
     guest_flags = guest_msr_state->flags;
-    if ( !guest_flags )
-        return;
 
     while ( guest_flags ) {
         i = find_first_set_bit(guest_flags);
@@ -312,23 +317,90 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
         wrmsrl(msr_index[i], guest_msr_state->msrs[i]);
         clear_bit(i, &guest_flags);
     }
+
+    if ( (v->arch.hvm_vmx.efer ^ read_efer()) & (EFER_NX|EFER_SCE) )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_2,
+                    "restore guest's EFER with value %lx",
+                    v->arch.hvm_vmx.efer);
+        write_efer((read_efer() & ~(EFER_NX|EFER_SCE)) |
+                   (v->arch.hvm_vmx.efer & (EFER_NX|EFER_SCE)));
+    }
 }
 
 #else  /* __i386__ */
 
 #define vmx_save_host_msrs()        ((void)0)
-#define vmx_restore_host_msrs()     ((void)0)
+
+static void vmx_restore_host_msrs(void)
+{
+    if ( cpu_has_nx && !(read_efer() & EFER_NX) )
+        write_efer(read_efer() | EFER_NX);
+}
+
 #define vmx_save_guest_msrs(v)      ((void)0)
-#define vmx_restore_guest_msrs(v)   ((void)0)
+
+static void vmx_restore_guest_msrs(struct vcpu *v)
+{
+    if ( (v->arch.hvm_vmx.efer ^ read_efer()) & EFER_NX )
+    {
+        HVM_DBG_LOG(DBG_LEVEL_2,
+                    "restore guest's EFER with value %lx",
+                    v->arch.hvm_vmx.efer);
+        write_efer((read_efer() & ~EFER_NX) |
+                   (v->arch.hvm_vmx.efer & EFER_NX));
+    }
+}
 
 static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
-    return 0;
+    u64 msr_content = 0;
+    struct vcpu *v = current;
+
+    switch ( regs->ecx ) {
+    case MSR_EFER:
+        msr_content = v->arch.hvm_vmx.efer;
+        break;
+
+    default:
+        return 0;
+    }
+
+    regs->eax = msr_content >>  0;
+    regs->edx = msr_content >> 32;
+
+    return 1;
 }
 
 static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
-    return 0;
+    u64 msr_content = regs->eax | ((u64)regs->edx << 32);
+    struct vcpu *v = current;
+
+    switch ( regs->ecx )
+    {
+    case MSR_EFER:
+        /* offending reserved bit will cause #GP */
+        if ( (msr_content & ~EFER_NX) ||
+             (!cpu_has_nx && (msr_content & EFER_NX)) )
+        {
+            gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
+                     "EFER: %"PRIx64"\n", msr_content);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            return 0;
+        }
+
+        if ( (msr_content ^ v->arch.hvm_vmx.efer) & EFER_NX )
+            write_efer((read_efer() & ~EFER_NX) | (msr_content & EFER_NX));
+
+        v->arch.hvm_vmx.efer = msr_content;
+        break;
+
+    default:
+        return 0;
+    }
+
+    return 1;
 }
 
 #endif /* __i386__ */
@@ -636,7 +708,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     return -EINVAL;
 }
 
-#ifdef HVM_DEBUG_SUSPEND
+#if defined(__x86_64__) && defined(HVM_DEBUG_SUSPEND)
 static void dump_msr_state(struct vmx_msr_state *m)
 {
     int i = 0;
@@ -647,17 +719,16 @@ static void dump_msr_state(struct vmx_msr_state *m)
     printk("\n");
 }
 #else
-static void dump_msr_state(struct vmx_msr_state *m)
-{
-}
+#define dump_msr_state(m) ((void)0)
 #endif
         
-void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
+#ifdef __x86_64__
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
     unsigned long guest_flags = guest_state->flags;
 
-    data->shadow_gs = guest_state->shadow_gs;
+    data->shadow_gs = v->arch.hvm_vmx.shadow_gs;
 
     /* save msrs */
     data->msr_flags        = guest_flags;
@@ -665,15 +736,18 @@ void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
     data->msr_cstar        = guest_state->msrs[VMX_INDEX_MSR_CSTAR];
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
-    data->msr_efer         = guest_state->msrs[VMX_INDEX_MSR_EFER];
+#endif
+
+    data->msr_efer = v->arch.hvm_vmx.efer;
 
     data->tsc = hvm_get_guest_time(v);
     
     dump_msr_state(guest_state);
 }
 
-void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
+#ifdef __x86_64__
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
@@ -682,9 +756,11 @@ void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     guest_state->msrs[VMX_INDEX_MSR_STAR]         = data->msr_star;
     guest_state->msrs[VMX_INDEX_MSR_CSTAR]        = data->msr_cstar;
     guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK] = data->msr_syscall_mask;
-    guest_state->msrs[VMX_INDEX_MSR_EFER]         = data->msr_efer;
 
-    guest_state->shadow_gs = data->shadow_gs;
+    v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
+#endif
+
+    v->arch.hvm_vmx.efer = data->msr_efer;
 
     v->arch.hvm_vmx.vmxassist_enabled = !(data->cr0 & X86_CR0_PE);
 
@@ -694,7 +770,7 @@ void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 }
 
 
-void vmx_save_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
+static void vmx_save_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
     vmx_save_cpu_state(v, ctxt);
     vmx_vmcs_enter(v);
@@ -702,7 +778,7 @@ void vmx_save_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     vmx_vmcs_exit(v);
 }
 
-int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
+static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
     vmx_load_cpu_state(v, ctxt);
     if (vmx_vmcs_restore(v, ctxt)) {
@@ -1016,6 +1092,11 @@ static int vmx_pae_enabled(struct vcpu *v)
     return (vmx_paging_enabled(v) && (cr4 & X86_CR4_PAE));
 }
 
+static int vmx_nx_enabled(struct vcpu *v)
+{
+    return v->arch.hvm_vmx.efer & EFER_NX;
+}
+
 static int vmx_interrupts_enabled(struct vcpu *v) 
 {
     unsigned long eflags = __vmread(GUEST_RFLAGS); 
@@ -1096,6 +1177,7 @@ static struct hvm_function_table vmx_function_table = {
     .paging_enabled       = vmx_paging_enabled,
     .long_mode_enabled    = vmx_long_mode_enabled,
     .pae_enabled          = vmx_pae_enabled,
+    .nx_enabled           = vmx_nx_enabled,
     .interrupts_enabled   = vmx_interrupts_enabled,
     .guest_x86_mode       = vmx_guest_x86_mode,
     .get_guest_ctrl_reg   = vmx_get_ctrl_reg,
@@ -1996,8 +2078,7 @@ static int vmx_set_cr0(unsigned long value)
             else
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode\n");
-                v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER]
-                    |= EFER_LMA;
+                v->arch.hvm_vmx.efer |= EFER_LMA;
                 vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value |= VM_ENTRY_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
@@ -2046,8 +2127,7 @@ static int vmx_set_cr0(unsigned long value)
              */
             if ( vmx_long_mode_enabled(v) )
             {
-                v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER]
-                    &= ~EFER_LMA;
+                v->arch.hvm_vmx.efer &= ~EFER_LMA;
                 vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
                 vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
@@ -2079,7 +2159,7 @@ static int vmx_set_cr0(unsigned long value)
     {
         if ( vmx_long_mode_enabled(v) )
         {
-            v->arch.hvm_vmx.msr_state.msrs[VMX_INDEX_MSR_EFER] &= ~EFER_LMA;
+            v->arch.hvm_vmx.efer &= ~EFER_LMA;
             vm_entry_value = __vmread(VM_ENTRY_CONTROLS);
             vm_entry_value &= ~VM_ENTRY_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);

@@ -93,11 +93,8 @@ static inline void svm_inject_exception(struct vcpu *v, int trap,
 
 static void stop_svm(void)
 {
-    u32 eax, edx;    
     /* We turn off the EFER_SVME bit. */
-    rdmsr(MSR_EFER, eax, edx);
-    eax &= ~EFER_SVME;
-    wrmsr(MSR_EFER, eax, edx);
+    write_efer(read_efer() & ~EFER_SVME);
 }
 
 static void svm_store_cpu_guest_regs(
@@ -138,7 +135,13 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     {
     case MSR_EFER:
         /* Offending reserved bit will cause #GP. */
-        if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
+#ifdef __x86_64__
+        if ( (msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE)) ||
+#else
+        if ( (msr_content & ~(EFER_NX | EFER_SCE)) ||
+#endif
+             (!cpu_has_nx && (msr_content & EFER_NX)) ||
+             (!cpu_has_syscall && (msr_content & EFER_SCE)) )
         {
             gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                      "EFER: %"PRIx64"\n", msr_content);
@@ -495,7 +498,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 }
 
         
-void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -511,7 +514,7 @@ void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 }
 
 
-void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
+static void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -530,13 +533,13 @@ void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     hvm_set_guest_time(v, data->tsc);
 }
 
-void svm_save_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
+static void svm_save_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
     svm_save_cpu_state(v, ctxt);
     svm_vmcb_save(v, ctxt);
 }
 
-int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
+static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
     svm_load_cpu_state(v, ctxt);
     if (svm_vmcb_restore(v, ctxt)) {
@@ -911,6 +914,7 @@ static struct hvm_function_table svm_function_table = {
     .paging_enabled       = svm_paging_enabled,
     .long_mode_enabled    = svm_long_mode_enabled,
     .pae_enabled          = svm_pae_enabled,
+    .nx_enabled           = svm_nx_enabled,
     .interrupts_enabled   = svm_interrupts_enabled,
     .guest_x86_mode       = svm_guest_x86_mode,
     .get_guest_ctrl_reg   = svm_get_ctrl_reg,
@@ -967,9 +971,7 @@ int start_svm(void)
          ((root_vmcb[cpu] = alloc_vmcb()) == NULL) )
         return 0;
 
-    rdmsr(MSR_EFER, eax, edx);
-    eax |= EFER_SVME;
-    wrmsr(MSR_EFER, eax, edx);
+    write_efer(read_efer() | EFER_SVME);
 
     svm_npt_detect();
 

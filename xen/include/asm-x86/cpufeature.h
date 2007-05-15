@@ -114,6 +114,7 @@
 #define cpu_has_xmm2		boot_cpu_has(X86_FEATURE_XMM2)
 #define cpu_has_xmm3		boot_cpu_has(X86_FEATURE_XMM3)
 #define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
+#define cpu_has_syscall		boot_cpu_has(X86_FEATURE_SYSCALL)
 #define cpu_has_mp		boot_cpu_has(X86_FEATURE_MP)
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
 #define cpu_has_k6_mtrr		boot_cpu_has(X86_FEATURE_K6_MTRR)
@@ -136,6 +137,7 @@
 #define cpu_has_xmm2		1
 #define cpu_has_xmm3		boot_cpu_has(X86_FEATURE_XMM3)
 #define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
+#define cpu_has_syscall		1
 #define cpu_has_mp		1
 #define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
 #define cpu_has_k6_mtrr		0

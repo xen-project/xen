@@ -47,6 +47,7 @@
 #endif
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
+DEFINE_PER_CPU(__u64, efer);
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
@@ -1135,21 +1136,18 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         __context_switch();
 
 #ifdef CONFIG_COMPAT
-        if ( is_idle_vcpu(prev) ||
-             (is_pv_32on64_domain(prev->domain) !=
-              is_pv_32on64_domain(next->domain)) )
+        if ( !is_hvm_vcpu(next) &&
+             (is_idle_vcpu(prev) ||
+              is_hvm_vcpu(prev) ||
+              is_pv_32on64_vcpu(prev) != is_pv_32on64_vcpu(next)) )
         {
-            uint32_t efer_lo, efer_hi;
+            uint64_t efer = read_efer();
 
             local_flush_tlb_one(GDT_VIRT_START(next) +
                                 FIRST_RESERVED_GDT_BYTE);
 
-            rdmsr(MSR_EFER, efer_lo, efer_hi);
-            if ( !is_pv_32on64_domain(next->domain) == !(efer_lo & EFER_SCE) )
-            {
-                efer_lo ^= EFER_SCE;
-                wrmsr(MSR_EFER, efer_lo, efer_hi);
-            }
+            if ( !is_pv_32on64_vcpu(next) == !(efer & EFER_SCE) )
+                write_efer(efer ^ EFER_SCE);
         }
 #endif
 
