@@ -2261,7 +2261,7 @@ int do_mmu_update(
     struct vcpu *v = current;
     struct domain *d = v->domain;
     unsigned long type_info;
-    struct domain_mmap_cache mapcache, sh_mapcache;
+    struct domain_mmap_cache mapcache;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2285,7 +2285,6 @@ int do_mmu_update(
     }
 
     domain_mmap_cache_init(&mapcache);
-    domain_mmap_cache_init(&sh_mapcache);
 
     LOCK_BIGLOCK(d);
 
@@ -2447,7 +2446,6 @@ int do_mmu_update(
     UNLOCK_BIGLOCK(d);
 
     domain_mmap_cache_destroy(&mapcache);
-    domain_mmap_cache_destroy(&sh_mapcache);
 
     perfc_add(num_page_updates, i);
 
