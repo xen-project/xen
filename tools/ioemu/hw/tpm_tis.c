@@ -148,7 +148,7 @@ static int write_local_socket(tpmState *s, const tpmBuffer *);
 static int read_local_socket(tpmState *s, tpmBuffer *);
 static int close_local_socket(tpmState *s, int force);
 static int has_channel_local_socket(tpmState *s);
-#define LOCAL_SOCKET_PATH      "/var/vtpm/vtpm_all.socket"
+#define LOCAL_SOCKET_PATH     "/var/vtpm/socks/%d.socket" 
 
 
 #define NUM_TRANSPORTS 1
@@ -238,18 +238,33 @@ static int create_local_socket(tpmState *s, uint32_t vtpm_instance)
     if (s->tpmTx.fd[0] < 0) {
         s->tpmTx.fd[0] = socket(PF_LOCAL, SOCK_STREAM, 0);
 
+#ifdef DEBUG_TPM
+        fprintf(logfile," SOCKET FD %d errno %d \n",  s->tpmTx.fd[0], errno );
+#endif
         if (has_channel_local_socket(s)) {
+            int ret; 
             struct sockaddr_un addr;
             memset(&addr, 0x0, sizeof(addr));
             addr.sun_family = AF_LOCAL;
-            strcpy(addr.sun_path, LOCAL_SOCKET_PATH);
-            if (connect(s->tpmTx.fd[0],
-                        (struct sockaddr *)&addr,
-                        sizeof(addr)) != 0) {
+            snprintf(addr.sun_path, sizeof(addr.sun_path)-1,
+		     LOCAL_SOCKET_PATH, (uint32_t) vtpm_instance);
+#ifdef DEBUG_TPM
+	    fprintf(logfile," SOCKET NAME %s \n",  addr.sun_path );
+#endif
+
+            if ((ret = connect(s->tpmTx.fd[0], (struct sockaddr *)&addr,
+			       sizeof(addr))) != 0) {
                 close_local_socket(s, 1);
+#ifdef DEBUG_TPM
+		fprintf(logfile," RET %d  errno %d\n", ret, errno );
+#endif
                 success = 0;
             } else {
                 /* put filedescriptor in non-blocking mode for polling */
+#ifdef DEBUG_TPM
+	      fprintf(logfile," put filedescriptor in non-blocking mode "
+		      "for polling \n");
+#endif
                 int flags = fcntl(s->tpmTx.fd[0], F_GETFL);
                 fcntl(s->tpmTx.fd[0], F_SETFL, flags | O_NONBLOCK);
             }
