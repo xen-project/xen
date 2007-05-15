@@ -597,6 +597,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     else if ( regs->eax == 0x80000001 )
     {
         /* Modify Feature Information. */
+        if ( is_pv_32bit_vcpu(current) )
+            clear_bit(X86_FEATURE_SYSCALL % 32, &d);
         clear_bit(X86_FEATURE_RDTSCP % 32, &d);
     }
     else
