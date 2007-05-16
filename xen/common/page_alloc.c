@@ -50,7 +50,7 @@ string_param("badpage", opt_badpage);
  */
 static unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
 static unsigned long max_dma_mfn = (1UL<<(CONFIG_DMA_BITSIZE-PAGE_SHIFT))-1;
-static void parse_dma_bits(char *s)
+static void __init parse_dma_bits(char *s)
 {
     unsigned int v = simple_strtol(s, NULL, 0);
     if ( v >= (BITS_PER_LONG + PAGE_SHIFT) )
@@ -74,7 +74,7 @@ custom_param("dma_bits", parse_dma_bits);
  * lowmem emergency pool.
  */
 static unsigned long dma_emergency_pool_pages;
-static void parse_dma_emergency_pool(char *s)
+static void __init parse_dma_emergency_pool(char *s)
 {
     unsigned long long bytes;
     bytes = parse_size_and_unit(s, NULL);
@@ -176,7 +176,7 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
 static unsigned long first_valid_mfn = ~0UL;
 
 /* Initialise allocator to handle up to @max_page pages. */
-paddr_t init_boot_allocator(paddr_t bitmap_start)
+paddr_t __init init_boot_allocator(paddr_t bitmap_start)
 {
     unsigned long bitmap_size;
 
@@ -197,7 +197,7 @@ paddr_t init_boot_allocator(paddr_t bitmap_start)
     return bitmap_start + bitmap_size;
 }
 
-void init_boot_pages(paddr_t ps, paddr_t pe)
+void __init init_boot_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long bad_spfn, bad_epfn, i;
     const char *p;
@@ -243,7 +243,7 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     }
 }
 
-int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
+int __init reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
 {
     unsigned long i;
 
@@ -258,7 +258,7 @@ int reserve_boot_pages(unsigned long first_pfn, unsigned long nr_pfns)
     return 1;
 }
 
-unsigned long alloc_boot_low_pages(
+unsigned long __init alloc_boot_low_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, i;
@@ -281,7 +281,7 @@ unsigned long alloc_boot_low_pages(
     return 0;
 }
 
-unsigned long alloc_boot_pages(
+unsigned long __init alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, i;
@@ -585,18 +585,20 @@ static unsigned long avail_heap_pages(
     return free_pages;
 }
 
-void end_boot_allocator(void)
+#define avail_for_domheap(mfn) \
+    (!allocated_in_map(mfn) && !is_xen_heap_frame(mfn_to_page(mfn)))
+void __init end_boot_allocator(void)
 {
     unsigned long i;
     int curr_free, next_free;
 
     /* Pages that are free now go to the domain sub-allocator. */
-    if ( (curr_free = next_free = !allocated_in_map(first_valid_mfn)) )
+    if ( (curr_free = next_free = avail_for_domheap(first_valid_mfn)) )
         map_alloc(first_valid_mfn, 1);
     for ( i = first_valid_mfn; i < max_page; i++ )
     {
         curr_free = next_free;
-        next_free = !allocated_in_map(i+1);
+        next_free = avail_for_domheap(i+1);
         if ( next_free )
             map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
         if ( curr_free )
@@ -605,13 +607,14 @@ void end_boot_allocator(void)
 
     printk("Domain heap initialised: DMA width %u bits\n", dma_bitsize);
 }
+#undef avail_for_domheap
 
 /*
  * Scrub all unallocated pages in all heap zones. This function is more
  * convoluted than appears necessary because we do not want to continuously
  * hold the lock while scrubbing very large memory areas.
  */
-void scrub_heap_pages(void)
+void __init scrub_heap_pages(void)
 {
     void *p;
     unsigned long mfn;
@@ -635,7 +638,7 @@ void scrub_heap_pages(void)
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(mfn) )
         {
-            if ( IS_XEN_HEAP_FRAME(mfn_to_page(mfn)) )
+            if ( is_xen_heap_frame(mfn_to_page(mfn)) )
             {
                 p = page_to_virt(mfn_to_page(mfn));
                 memguard_unguard_range(p, PAGE_SIZE);
@@ -675,7 +678,9 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
      * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
      * prevent merging of power-of-two blocks across the zone boundary.
      */
-    if ( !IS_XEN_HEAP_FRAME(maddr_to_page(pe)) )
+    if ( ps && !is_xen_heap_frame(maddr_to_page(ps)-1) )
+        ps += PAGE_SIZE;
+    if ( !is_xen_heap_frame(maddr_to_page(pe)) )
         pe -= PAGE_SIZE;
 
     init_heap_pages(MEMZONE_XEN, maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
@@ -856,7 +861,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
     ASSERT(!in_irq());
 
-    if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
+    if ( unlikely(is_xen_heap_frame(pg)) )
     {
         /* NB. May recursively lock from relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);

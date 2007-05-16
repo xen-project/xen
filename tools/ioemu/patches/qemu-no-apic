@@ -1,20 +1,20 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-12-08 01:41:11.000000000 +0000
-+++ ioemu/Makefile.target	2006-12-08 01:41:12.000000000 +0000
-@@ -356,7 +356,7 @@
+--- ioemu.orig/Makefile.target	2007-05-03 18:49:10.000000000 +0100
++++ ioemu/Makefile.target	2007-05-03 19:09:54.000000000 +0100
+@@ -387,7 +387,7 @@
  # Hardware support
  VL_OBJS+= ide.o pckbd.o ps2.o vga.o $(SOUND_HW) dma.o $(AUDIODRV)
  VL_OBJS+= fdc.o mc146818rtc.o serial.o i8254.o pcspk.o pc.o
 -VL_OBJS+= cirrus_vga.o mixeng.o apic.o parallel.o acpi.o piix_pci.o
 +VL_OBJS+= cirrus_vga.o mixeng.o parallel.o acpi.o piix_pci.o
- VL_OBJS+= usb-uhci.o
- DEFINES += -DHAS_AUDIO
+ VL_OBJS+= usb-uhci.o smbus_eeprom.o
+ CPPFLAGS += -DHAS_AUDIO
  endif
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-12-08 01:41:12.000000000 +0000
-+++ ioemu/hw/pc.c	2006-12-08 01:41:12.000000000 +0000
+--- ioemu.orig/hw/pc.c	2007-05-03 19:08:19.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-03 19:09:34.000000000 +0100
 @@ -39,7 +39,9 @@
  static fdctrl_t *floppy_controller;
  static RTCState *rtc_state;
@@ -22,12 +22,12 @@ Index: ioemu/hw/pc.c
 +#ifndef CONFIG_DM
  static IOAPICState *ioapic;
 +#endif /* !CONFIG_DM */
+ static PCIDevice *i440fx_state;
  
  static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
- {
-@@ -640,9 +642,11 @@
+@@ -475,9 +477,11 @@
  #endif /* !CONFIG_DM */
-         register_savevm("cpu", i, 3, cpu_save, cpu_load, env);
+         register_savevm("cpu", i, 4, cpu_save, cpu_load, env);
          qemu_register_reset(main_cpu_reset, env);
 +#ifndef CONFIG_DM
          if (pci_enabled) {
@@ -37,7 +37,7 @@ Index: ioemu/hw/pc.c
      }
  
      /* allocate RAM */
-@@ -789,9 +793,11 @@
+@@ -643,9 +647,11 @@
      register_ioport_read(0x92, 1, 1, ioport92_read, NULL);
      register_ioport_write(0x92, 1, 1, ioport92_write, NULL);
  

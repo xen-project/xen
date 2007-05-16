@@ -1,8 +1,8 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2007-05-03 09:56:31.000000000 +0100
-+++ ioemu/vnc.c	2007-05-03 10:07:55.000000000 +0100
-@@ -143,13 +143,16 @@
+--- ioemu.orig/vnc.c	2007-05-03 18:17:59.000000000 +0100
++++ ioemu/vnc.c	2007-05-03 19:46:19.000000000 +0100
+@@ -170,13 +170,16 @@
  static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
  {
      VncState *vs = ds->opaque;
@@ -22,7 +22,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
-@@ -373,6 +376,7 @@
+@@ -402,6 +405,7 @@
  static void vnc_update_client(void *opaque)
  {
      VncState *vs = opaque;
@@ -30,7 +30,7 @@ Index: ioemu/vnc.c
  
      if (vs->need_update && vs->csock != -1) {
  	int y;
-@@ -383,6 +387,8 @@
+@@ -412,6 +416,8 @@
  	int saved_offset;
  	int has_dirty = 0;
  
@@ -39,7 +39,7 @@ Index: ioemu/vnc.c
          vnc_set_bits(width_mask, (vs->width / 16), VNC_DIRTY_WORDS);
  
  	/* Walk through the dirty map and eliminate tiles that
-@@ -390,7 +396,7 @@
+@@ -419,7 +425,7 @@
  	row = vs->ds->data;
  	old_row = vs->old_data;
  
@@ -48,7 +48,7 @@ Index: ioemu/vnc.c
  	    if (vnc_and_bits(vs->dirty_row[y], width_mask, VNC_DIRTY_WORDS)) {
  		int x;
  		char *ptr, *old_ptr;
-@@ -415,10 +421,8 @@
+@@ -444,10 +450,8 @@
  	    old_row += vs->ds->linesize;
  	}
  
@@ -60,7 +60,7 @@ Index: ioemu/vnc.c
  
  	/* Count rectangles */
  	n_rectangles = 0;
-@@ -454,17 +458,13 @@
+@@ -483,17 +487,13 @@
  	vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
  	vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
  	vnc_flush(vs);
@@ -79,7 +79,7 @@ Index: ioemu/vnc.c
  }
  
  static void vnc_dpy_refresh(DisplayState *ds)
-@@ -736,6 +736,8 @@
+@@ -864,6 +864,8 @@
  	    old_row += vs->ds->linesize;
  	}
      }
@@ -90,9 +90,9 @@ Index: ioemu/vnc.c
  static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:07:54.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:07:55.000000000 +0100
-@@ -5195,10 +5195,10 @@
+--- ioemu.orig/vl.c	2007-05-03 19:44:49.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:46:19.000000000 +0100
+@@ -6085,10 +6085,10 @@
          /* XXX: better handling of removal */
          for(ioh = first_io_handler; ioh != NULL; ioh = ioh_next) {
              ioh_next = ioh->next;

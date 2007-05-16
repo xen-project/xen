@@ -1,4 +1,3 @@
-
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
@@ -223,10 +222,6 @@ typedef struct { u64 pfn; } pagetable_t;
 #define mfn_valid(mfn)      ((mfn) < max_page)
 
 /* Convert between Xen-heap virtual addresses and machine addresses. */
-#define PAGE_OFFSET         ((unsigned long)__PAGE_OFFSET)
-#define virt_to_maddr(va)   ((unsigned long)(va)-PAGE_OFFSET)
-#define maddr_to_virt(ma)   ((void *)((unsigned long)(ma)+PAGE_OFFSET))
-/* Shorthand versions of the above functions. */
 #define __pa(x)             (virt_to_maddr(x))
 #define __va(x)             (maddr_to_virt(x))
 
@@ -280,21 +275,19 @@ typedef struct { u64 pfn; } pagetable_t;
 
 
 #ifndef __ASSEMBLY__
+extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 #if CONFIG_PAGING_LEVELS == 3
-extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
-extern l3_pgentry_t   idle_pg_table_l3[ROOT_PAGETABLE_ENTRIES];
-extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES*L2_PAGETABLE_ENTRIES];
-#else
-extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
-extern l2_pgentry_t   idle_pg_table_l2[ROOT_PAGETABLE_ENTRIES];
-#ifdef CONFIG_COMPAT
+extern l2_pgentry_t   idle_pg_table_l2[
+    ROOT_PAGETABLE_ENTRIES * L2_PAGETABLE_ENTRIES];
+#elif CONFIG_PAGING_LEVELS == 2
+#define idle_pg_table_l2 idle_pg_table
+#elif CONFIG_PAGING_LEVELS == 4
 extern l2_pgentry_t  *compat_idle_pg_table_l2;
 extern unsigned int   m2p_compat_vstart;
 #endif
-#endif
 void paging_init(void);
 void setup_idle_pagetable(void);
-#endif
+#endif /* !defined(__ASSEMBLY__) */
 
 #define __pge_off()                                                     \
     do {                                                                \
@@ -375,6 +368,7 @@ map_pages_to_xen(
     unsigned long mfn,
     unsigned long nr_mfns,
     unsigned long flags);
+void destroy_xen_mappings(unsigned long v, unsigned long e);
 
 #endif /* !__ASSEMBLY__ */
 

@@ -8,24 +8,31 @@ include $(XEN_ROOT)/tools/Rules.mk
 .PHONY: all clean distclean dvi info install install-doc tar tarbin \
 	speed test test2 html dvi info
 
-CFLAGS+=-Wall -O2 -g -fno-strict-aliasing -I.
-ifdef CONFIG_DARWIN
-CFLAGS+= -mdynamic-no-pic
-endif
+BASE_CFLAGS=
+BASE_LDFLAGS=
+
+BASE_CFLAGS += $(OS_CFLAGS)
 ifeq ($(ARCH),sparc)
-CFLAGS+=-mcpu=ultrasparc
+BASE_CFLAGS += -mcpu=ultrasparc
 endif
-LDFLAGS=-g
+CPPFLAGS += -I. -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
 LIBS=
-DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
 TOOLS=qemu-img$(EXESUF)
 ifdef CONFIG_STATIC
-LDFLAGS+=-static
+BASE_LDFLAGS += -static
 endif
 ifdef BUILD_DOCS
 DOCS=qemu-doc.html qemu-tech.html qemu.1 qemu-img.1
 else
 DOCS=
+endif
+
+ifndef CONFIG_DARWIN
+ifndef CONFIG_WIN32
+ifndef CONFIG_SOLARIS
+LIBS+=-lrt
+endif
+endif
 endif
 
 TOOLS=
@@ -36,12 +43,12 @@ subdir-%:
 	$(MAKE) -C $(subst subdir-,,$@) all
 
 recurse-all: $(patsubst %,subdir-%, $(TARGET_DIRS))
-        
-qemu-img$(EXESUF): qemu-img.c block.c block-cow.c block-qcow.c aes.c block-vmdk.c block-cloop.c block-dmg.c block-bochs.c block-vpc.c block-vvfat.c
-	$(CC) -DQEMU_TOOL $(CFLAGS) $(LDFLAGS) $(DEFINES) -o $@ $^ -lz $(LIBS)
+
+qemu-img$(EXESUF): qemu-img.c cutils.c block.c block-raw.c block-cow.c block-qcow.c aes.c block-vmdk.c block-cloop.c block-dmg.c block-bochs.c block-vpc.c block-vvfat.c block-qcow2.c
+	$(CC) -DQEMU_TOOL $(CFLAGS) $(CPPFLAGS) $(BASE_CFLAGS) $(LDFLAGS) $(BASE_LDFLAGS) -o $@ $^ -lz $(LIBS)
 
 dyngen$(EXESUF): dyngen.c
-	$(HOST_CC) $(CFLAGS) $(DEFINES) -o $@ $^
+	$(HOST_CC) $(CFLAGS) $(CPPFLAGS) $(BASE_CFLAGS) -o $@ $^
 
 clean:
 # avoid old build problems by removing potentially incorrect old files
@@ -65,7 +72,7 @@ common  de-ch  es     fo  fr-ca  hu     ja  mk  nl-be      pt  sl     tr
 
 install-doc: $(DOCS)
 	mkdir -p "$(DESTDIR)$(docdir)"
-	$(INSTALL_DATA) qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
+	$(INSTALL_DATA) -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
 ifndef CONFIG_WIN32
 	mkdir -p "$(DESTDIR)$(mandir)/man1"
 	$(INSTALL_DATA) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
@@ -76,13 +83,14 @@ install: all $(if $(BUILD_DOCS),install-doc)
 #	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(bindir)"
 #	mkdir -p "$(DESTDIR)$(datadir)"
 #	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
-#			video.x openbios-sparc32 linux_boot.bin; do \
-#		$(INSTALL_DATA) $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
+#		video.x openbios-sparc32 linux_boot.bin pxe-ne2k_pci.bin \
+#		pxe-rtl8139.bin pxe-pcnet.bin; do \
+#		$(INSTALL) -m 644 $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
 #	done
 ifndef CONFIG_WIN32
 	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
 	for x in $(KEYMAPS); do \
-		$(INSTALL_DATA) $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
+		$(INSTALL_DATA) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
 	done
 endif
 	for d in $(TARGET_DIRS); do \
@@ -125,7 +133,8 @@ dvi: qemu-doc.dvi qemu-tech.dvi
 
 html: qemu-doc.html qemu-tech.html
 
-FILE=qemu-$(shell cat VERSION)
+VERSION ?= $(shell cat VERSION)
+FILE = qemu-$(VERSION)
 
 # tar release (use 'make -k tar' on a checkouted tree)
 tar:
@@ -159,6 +168,9 @@ tarbin:
 	$(datadir)/video.x \
 	$(datadir)/openbios-sparc32 \
 	$(datadir)/linux_boot.bin \
+        $(datadir)/pxe-ne2k_pci.bin \
+	$(datadir)/pxe-rtl8139.bin \
+        $(datadir)/pxe-pcnet.bin \
 	$(docdir)/qemu-doc.html \
 	$(docdir)/qemu-tech.html \
 	$(mandir)/man1/qemu.1 $(mandir)/man1/qemu-img.1 )

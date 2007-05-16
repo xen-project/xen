@@ -19,8 +19,11 @@
 #include <asm/shared.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
-
 #include <public/callback.h>
+
+asmlinkage void syscall_enter(void);
+asmlinkage void compat_hypercall(void);
+asmlinkage void int80_direct_trap(void);
 
 static void print_xen_info(void)
 {
@@ -246,9 +249,42 @@ unsigned long do_iret(void)
     return 0;
 }
 
-asmlinkage void syscall_enter(void);
-asmlinkage void compat_hypercall(void);
-asmlinkage void int80_direct_trap(void);
+static int write_stack_trampoline(
+    char *stack, char *stack_bottom, uint16_t cs_seg)
+{
+    /* movq %rsp, saversp(%rip) */
+    stack[0] = 0x48;
+    stack[1] = 0x89;
+    stack[2] = 0x25;
+    *(u32 *)&stack[3] = (stack_bottom - &stack[7]) - 16;
+
+    /* leaq saversp(%rip), %rsp */
+    stack[7] = 0x48;
+    stack[8] = 0x8d;
+    stack[9] = 0x25;
+    *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
+
+    /* pushq %r11 */
+    stack[14] = 0x41;
+    stack[15] = 0x53;
+
+    /* pushq $<cs_seg> */
+    stack[16] = 0x68;
+    *(u32 *)&stack[17] = cs_seg;
+
+    /* movq $syscall_enter,%r11 */
+    stack[21] = 0x49;
+    stack[22] = 0xbb;
+    *(void **)&stack[23] = (void *)syscall_enter;
+
+    /* jmpq *%r11 */
+    stack[31] = 0x41;
+    stack[32] = 0xff;
+    stack[33] = 0xe3;
+
+    return 34;
+}
+
 void __init percpu_traps_init(void)
 {
     char *stack_bottom, *stack;
@@ -280,74 +316,16 @@ void __init percpu_traps_init(void)
     /* NMI handler has its own per-CPU 1kB stack. */
     init_tss[cpu].ist[1] = (unsigned long)&stack[3072];
 
-    /*
-     * Trampoline for SYSCALL entry from long mode.
-     */
-
-    /* Skip the NMI and DF stacks. */
-    stack = &stack[3072];
+    /* Trampoline for SYSCALL entry from long mode. */
+    stack = &stack[3072]; /* Skip the NMI and DF stacks. */
     wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
+    stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS64);
 
-    /* movq %rsp, saversp(%rip) */
-    stack[0] = 0x48;
-    stack[1] = 0x89;
-    stack[2] = 0x25;
-    *(u32 *)&stack[3] = (stack_bottom - &stack[7]) - 16;
-
-    /* leaq saversp(%rip), %rsp */
-    stack[7] = 0x48;
-    stack[8] = 0x8d;
-    stack[9] = 0x25;
-    *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
-
-    /* pushq %r11 */
-    stack[14] = 0x41;
-    stack[15] = 0x53;
-
-    /* pushq $FLAT_KERNEL_CS64 */
-    stack[16] = 0x68;
-    *(u32 *)&stack[17] = FLAT_KERNEL_CS64;
-
-    /* jmp syscall_enter */
-    stack[21] = 0xe9;
-    *(u32 *)&stack[22] = (char *)syscall_enter - &stack[26];
-
-    /*
-     * Trampoline for SYSCALL entry from compatibility mode.
-     */
-
-    /* Skip the long-mode entry trampoline. */
-    stack = &stack[26];
+    /* Trampoline for SYSCALL entry from compatibility mode. */
     wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
+    stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS32);
 
-    /* movq %rsp, saversp(%rip) */
-    stack[0] = 0x48;
-    stack[1] = 0x89;
-    stack[2] = 0x25;
-    *(u32 *)&stack[3] = (stack_bottom - &stack[7]) - 16;
-
-    /* leaq saversp(%rip), %rsp */
-    stack[7] = 0x48;
-    stack[8] = 0x8d;
-    stack[9] = 0x25;
-    *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
-
-    /* pushq %r11 */
-    stack[14] = 0x41;
-    stack[15] = 0x53;
-
-    /* pushq $FLAT_KERNEL_CS32 */
-    stack[16] = 0x68;
-    *(u32 *)&stack[17] = FLAT_KERNEL_CS32;
-
-    /* jmp syscall_enter */
-    stack[21] = 0xe9;
-    *(u32 *)&stack[22] = (char *)syscall_enter - &stack[26];
-
-    /*
-     * Common SYSCALL parameters.
-     */
-
+    /* Common SYSCALL parameters. */
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
 }

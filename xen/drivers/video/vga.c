@@ -299,7 +299,7 @@ static inline void vga_wattr(void __iomem *regbase, uint8_t reg, uint8_t val)
     vga_w(regbase, VGA_ATT_W, val);
 }
 
-static int detect_video(void *video_base)
+static int __init detect_video(void *video_base)
 {
     volatile u16 *p = (volatile u16 *)video_base;
     u16 saved1 = p[0], saved2 = p[1];
@@ -322,7 +322,7 @@ static int detect_video(void *video_base)
 }
 
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
-static void *setup_vga(void)
+static void * __init setup_vga(void)
 {
     /* The following VGA state was saved from a chip in text mode 3. */
     static unsigned char regs[] = {
@@ -382,7 +382,7 @@ static void *setup_vga(void)
     return NULL;
 }
 
-static int vga_set_scanlines(unsigned scanlines)
+static int __init vga_set_scanlines(unsigned scanlines)
 {
     unsigned vtot, ovr, vss, vbs;
     uint8_t vse, vbe, misc = 0;
@@ -459,7 +459,7 @@ static int vga_set_scanlines(unsigned scanlines)
 static unsigned font_slot = 0;
 integer_param("fontslot", font_slot);
 
-static int vga_load_font(const struct font_desc *font, unsigned rows)
+static int __init vga_load_font(const struct font_desc *font, unsigned rows)
 {
     unsigned fontheight = font ? font->height : 16;
     uint8_t fsr = vga_rcrt(vgabase, VGA_CRTC_MAX_SCAN); /* Font size register */
@@ -573,7 +573,7 @@ string_param("vga", opt_vga);
 #define ATTRIBUTE   7
 #define VIDEO_SIZE  (COLUMNS * LINES * 2)
 
-void vga_init(void)
+void __init vga_init(void)
 {
     char *p;
 
@@ -624,7 +624,7 @@ void vga_init(void)
     vgacon_enabled = 1;
 }
 
-void vga_endboot(void)
+void __init vga_endboot(void)
 {
     if ( !vgacon_enabled )
         return;
@@ -670,7 +670,7 @@ void vga_putchar(int c)
     }
 }
 
-int fill_console_start_info(struct dom0_vga_console_info *ci)
+int __init fill_console_start_info(struct dom0_vga_console_info *ci)
 {
     memset(ci, 0, sizeof(*ci));
 

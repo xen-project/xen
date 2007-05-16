@@ -360,6 +360,11 @@ CPUReadMemoryFunc **cpu_get_io_memory_read(int io_index)
 }
 
 #ifdef __ia64__
+
+#define __ia64_fc(addr)	asm volatile ("fc %0" :: "r"(addr) : "memory")
+#define ia64_sync_i()	asm volatile (";; sync.i" ::: "memory")
+#define ia64_srlz_i()	asm volatile (";; srlz.i ;;" ::: "memory")
+
 /* IA64 has seperate I/D cache, with coherence maintained by DMA controller.
  * So to emulate right behavior that guest OS is assumed, we need to flush
  * I/D cache here.

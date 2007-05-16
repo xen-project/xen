@@ -36,6 +36,22 @@
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
+/* Top-level master (and idle-domain) page directory. */
+l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    idle_pg_table[L4_PAGETABLE_ENTRIES];
+
+/* Enough page directories to map bottom 4GB of the memory map. */
+l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l3_identmap[L3_PAGETABLE_ENTRIES];
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l2_identmap[4*L2_PAGETABLE_ENTRIES];
+
+/* Enough page directories to map the Xen text and static data. */
+l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l3_xenmap[L3_PAGETABLE_ENTRIES];
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l2_xenmap[L2_PAGETABLE_ENTRIES];
+
 void *alloc_xen_pagetable(void)
 {
     extern int early_boot;
@@ -52,11 +68,6 @@ void *alloc_xen_pagetable(void)
     mfn = alloc_boot_low_pages(1, 1); /* 0x0 - 0x40000000 */
     BUG_ON(mfn == 0);
     return mfn_to_virt(mfn);
-}
-
-void free_xen_pagetable(void *v)
-{
-    free_domheap_page(virt_to_page(v));
 }
 
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
@@ -193,11 +204,18 @@ void __init setup_idle_pagetable(void)
 
 void __init zap_low_mappings(void)
 {
+    BUG_ON(num_online_cpus() != 1);
+
+    /* Remove aliased mapping of first 1:1 PML4 entry. */
     l4e_write(&idle_pg_table[0], l4e_empty());
-    flush_tlb_all_pge();
+    local_flush_tlb_pge();
+
+    /* Replace with mapping of the boot trampoline only. */
+    map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
+                     0x10, __PAGE_HYPERVISOR);
 }
 
-void subarch_init_memory(void)
+void __init subarch_init_memory(void)
 {
     unsigned long i, v, m2p_start_mfn;
     l3_pgentry_t l3e;

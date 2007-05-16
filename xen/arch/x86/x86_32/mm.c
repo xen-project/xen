@@ -30,6 +30,14 @@
 #include <asm/fixmap.h>
 #include <public/memory.h>
 
+#ifdef CONFIG_X86_PAE
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    idle_pg_table_l2[4 * L2_PAGETABLE_ENTRIES];
+#else
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    idle_pg_table_l2[L2_PAGETABLE_ENTRIES];
+#endif
+
 unsigned int PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 
@@ -51,11 +59,6 @@ void *alloc_xen_pagetable(void)
     mfn = xenheap_phys_start >> PAGE_SHIFT;
     xenheap_phys_start += PAGE_SIZE;
     return mfn_to_virt(mfn);
-}
-
-void free_xen_pagetable(void *v)
-{
-    free_xenheap_page(v);
 }
 
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
@@ -133,25 +136,27 @@ void __init setup_idle_pagetable(void)
                                 __PAGE_HYPERVISOR));
 }
 
-void __init zap_low_mappings(l2_pgentry_t *base)
+void __init zap_low_mappings(l2_pgentry_t *dom0_l2)
 {
     int i;
-    u32 addr;
 
-    for ( i = 0; ; i++ )
-    {
-        addr = i << L2_PAGETABLE_SHIFT;
-        if ( addr >= HYPERVISOR_VIRT_START )
-            break;
-        if ( l2e_get_paddr(base[i]) != addr )
-            continue;
-        l2e_write(&base[i], l2e_empty());
-    }
+    /* Clear temporary idle mappings from the dom0 initial l2. */
+    for ( i = 0; i < (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT); i++ )
+        if ( l2e_get_intpte(dom0_l2[i]) ==
+             l2e_get_intpte(idle_pg_table_l2[i]) )
+            l2e_write(&dom0_l2[i], l2e_empty());
+
+    /* Now zap mappings in the idle pagetables. */
+    destroy_xen_mappings(0, HYPERVISOR_VIRT_START);
 
     flush_tlb_all_pge();
+
+    /* Replace with mapping of the boot trampoline only. */
+    map_pages_to_xen(BOOT_TRAMPOLINE, BOOT_TRAMPOLINE >> PAGE_SHIFT,
+                     0x10, __PAGE_HYPERVISOR);
 }
 
-void subarch_init_memory(void)
+void __init subarch_init_memory(void)
 {
     unsigned long m2p_start_mfn;
     unsigned int i, j;

@@ -1,8 +1,8 @@
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-08-17 19:37:35.772589281 +0100
-+++ ioemu/configure	2006-08-17 19:50:24.735401975 +0100
-@@ -228,8 +228,6 @@
+--- ioemu.orig/configure	2007-05-03 18:49:10.000000000 +0100
++++ ioemu/configure	2007-05-03 20:29:35.000000000 +0100
+@@ -237,8 +237,6 @@
    ;;
    --enable-cocoa) cocoa="yes" ; coreaudio="yes" ; sdl="no"
    ;;
@@ -11,8 +11,8 @@ Index: ioemu/configure
    --disable-gcc-check) check_gcc="no"
    ;;
    --disable-system) softmmu="no"
-@@ -758,14 +756,6 @@
-   target_user_only="yes"
+@@ -831,14 +829,6 @@
+   target_darwin_user="yes"
  fi
  
 -if test "$target_user_only" = "no" -a "$check_gfx" = "yes" \

@@ -22,8 +22,8 @@ Signed-off: Herbert Xu <herbert@gondor.apana.org.au>
 
 Index: ioemu/hw/ne2000.c
 ===================================================================
---- ioemu.orig/hw/ne2000.c	2006-12-08 18:20:45.000000000 +0000
-+++ ioemu/hw/ne2000.c	2006-12-08 18:20:53.000000000 +0000
+--- ioemu.orig/hw/ne2000.c	2007-05-03 19:30:23.000000000 +0100
++++ ioemu/hw/ne2000.c	2007-05-03 20:38:52.000000000 +0100
 @@ -137,6 +137,7 @@
      uint8_t curpag;
      uint8_t mult[8]; /* multicast mask array */

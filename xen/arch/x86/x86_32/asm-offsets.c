@@ -81,7 +81,7 @@ void __dummy__(void)
 
     OFFSET(VCPU_svm_vmcb_pa, struct vcpu, arch.hvm_svm.vmcb_pa);
     OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm_svm.vmcb);
-    OFFSET(VCPU_svm_vmexit_tsc, struct vcpu, arch.hvm_svm.vmexit_tsc);
+    OFFSET(VCPU_svm_vmcb_in_sync, struct vcpu, arch.hvm_svm.vmcb_in_sync);
     BLANK();
 
     OFFSET(VCPU_vmx_launched, struct vcpu, arch.hvm_vmx.launched);
@@ -89,7 +89,6 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
-    OFFSET(VMCB_tsc_offset, struct vmcb_struct, tsc_offset);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);

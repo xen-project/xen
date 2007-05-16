@@ -178,27 +178,10 @@ static inline int from_bcd(RTCState *s, int a)
     }
 }
 
-static void send_timeoffset_msg(time_t delta)
-{
-
-/* This routine is used to inform another entity that the
-   base time offset has changed. For instance, if you
-   were using xenstore, you might want to write to the store
-   at this point.  Or, you might use some other method.
-   Whatever you might choose, here's a hook point to implement it.
-
-   One item of note is that this delta is in addition to
-   any existing offset you might be already using. */
-
-    return;
-}
-
 static void rtc_set_time(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
-    time_t before, after;
-    
-    before = mktime(tm);
+
     tm->tm_sec = from_bcd(s, s->cmos_data[RTC_SECONDS]);
     tm->tm_min = from_bcd(s, s->cmos_data[RTC_MINUTES]);
     tm->tm_hour = from_bcd(s, s->cmos_data[RTC_HOURS] & 0x7f);
@@ -210,12 +193,6 @@ static void rtc_set_time(RTCState *s)
     tm->tm_mday = from_bcd(s, s->cmos_data[RTC_DAY_OF_MONTH]);
     tm->tm_mon = from_bcd(s, s->cmos_data[RTC_MONTH]) - 1;
     tm->tm_year = from_bcd(s, s->cmos_data[RTC_YEAR]) + 100;
-
-    /* Compute, and send, the additional time delta
-       We could compute the total time delta, but this is
-       sufficient, and simple. */
-    after = mktime(tm);
-    send_timeoffset_msg(after-before);
 }
 
 static void rtc_copy_date(RTCState *s)
@@ -403,6 +380,29 @@ void rtc_set_date(RTCState *s, const struct tm *tm)
     rtc_copy_date(s);
 }
 
+/* PC cmos mappings */
+#define REG_IBM_CENTURY_BYTE        0x32
+#define REG_IBM_PS2_CENTURY_BYTE    0x37
+
+void rtc_set_date_from_host(RTCState *s)
+{
+    time_t ti;
+    struct tm *tm;
+    int val;
+
+    /* set the CMOS date */
+    time(&ti);
+    if (rtc_utc)
+        tm = gmtime(&ti);
+    else
+        tm = localtime(&ti);
+    rtc_set_date(s, tm);
+
+    val = to_bcd(s, (tm->tm_year / 100) + 19);
+    rtc_set_memory(s, REG_IBM_CENTURY_BYTE, val);
+    rtc_set_memory(s, REG_IBM_PS2_CENTURY_BYTE, val);
+}
+
 static void rtc_save(QEMUFile *f, void *opaque)
 {
     RTCState *s = opaque;
@@ -466,6 +466,8 @@ RTCState *rtc_init(int base, int irq)
     s->cmos_data[RTC_REG_B] = 0x02;
     s->cmos_data[RTC_REG_C] = 0x00;
     s->cmos_data[RTC_REG_D] = 0x80;
+
+    rtc_set_date_from_host(s);
 
     s->periodic_timer = qemu_new_timer(vm_clock, 
                                        rtc_periodic_timer, s);

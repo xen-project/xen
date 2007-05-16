@@ -13,7 +13,7 @@ endif
 TESTS+=sha1# test_path
 #TESTS+=test_path
 
-QEMU=../i386-user/qemu-i386
+QEMU=../i386-linux-user/qemu-i386
 
 all: $(TESTS)
 
@@ -82,10 +82,17 @@ hello-arm: hello-arm.o
 hello-arm.o: hello-arm.c
 	arm-linux-gcc -Wall -g -O2 -c -o $@ $<
 
+# MIPS test
+hello-mips: hello-mips.c
+	mips-linux-gnu-gcc -nostdlib -static -mno-abicalls -fno-PIC -mabi=32 -Wall -Wextra -g -O2 -o $@ $<
+
+hello-mipsel: hello-mips.c
+	mipsel-linux-gnu-gcc -nostdlib -static -mno-abicalls -fno-PIC -mabi=32 -Wall -Wextra -g -O2 -o $@ $<
+
 # XXX: find a way to compile easily a test for each arch
 test2:
 	@for arch in i386 arm armeb sparc ppc mips mipsel; do \
-           ../$${arch}-user/qemu-$${arch} $${arch}/ls -l linux-test.c ; \
+           ../$${arch}-linux-user/qemu-$${arch} $${arch}/ls -l linux-test.c ; \
         done
 
 clean:

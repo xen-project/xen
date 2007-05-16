@@ -18,17 +18,17 @@ Signed-off-by: Xinmei Huang <xinmei.huang@intel.com>
 
 Index: ioemu/hw/usb-hid.c
 ===================================================================
---- ioemu.orig/hw/usb-hid.c	2007-05-02 14:21:51.000000000 +0100
-+++ ioemu/hw/usb-hid.c	2007-05-02 14:23:54.000000000 +0100
+--- ioemu.orig/hw/usb-hid.c	2007-05-09 14:11:27.000000000 +0100
++++ ioemu/hw/usb-hid.c	2007-05-09 14:12:06.000000000 +0100
 @@ -39,6 +39,7 @@
      int x, y;
      int kind;
      int mouse_grabbed;
 +    int status_changed;
+     QEMUPutMouseEntry *eh_entry;
  } USBMouseState;
  
- /* mostly the same values as the Bochs USB Mouse device */
-@@ -231,6 +232,7 @@
+@@ -232,6 +233,7 @@
      s->dy += dy1;
      s->dz += dz1;
      s->buttons_state = buttons_state;
@@ -36,7 +36,7 @@ Index: ioemu/hw/usb-hid.c
  }
  
  static void usb_tablet_event(void *opaque,
-@@ -242,6 +244,7 @@
+@@ -243,6 +245,7 @@
      s->y = y;
      s->dz += dz;
      s->buttons_state = buttons_state;
@@ -44,18 +44,18 @@ Index: ioemu/hw/usb-hid.c
  }
  
  static inline int int_clamp(int val, int vmin, int vmax)
-@@ -483,10 +486,16 @@
-     switch(pid) {
+@@ -485,10 +488,16 @@
+     switch(p->pid) {
      case USB_TOKEN_IN:
-         if (devep == 1) {
+         if (p->devep == 1) {
 -	    if (s->kind == USB_MOUSE)
--		ret = usb_mouse_poll(s, data, len);
+-		ret = usb_mouse_poll(s, p->data, p->len);
 -	    else if (s->kind == USB_TABLET)
--		ret = usb_tablet_poll(s, data, len);
+-		ret = usb_tablet_poll(s, p->data, p->len);
 +            if (s->kind == USB_MOUSE)
-+                ret = usb_mouse_poll(s, data, len);
++                ret = usb_mouse_poll(s, p->data, p->len);
 +            else if (s->kind == USB_TABLET)
-+                ret = usb_tablet_poll(s, data, len);
++                ret = usb_tablet_poll(s, p->data, p->len);
 +
 +            if (!s->status_changed)
 +                ret = USB_RET_NAK;
@@ -65,7 +65,7 @@ Index: ioemu/hw/usb-hid.c
          } else {
              goto fail;
          }
-@@ -566,6 +575,7 @@
+@@ -570,6 +579,7 @@
      s->dev.handle_data = usb_mouse_handle_data;
      s->dev.handle_destroy = usb_mouse_handle_destroy;
      s->kind = USB_TABLET;
@@ -73,7 +73,7 @@ Index: ioemu/hw/usb-hid.c
  
      pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Tablet");
  
-@@ -589,6 +599,7 @@
+@@ -593,6 +603,7 @@
      s->dev.handle_data = usb_mouse_handle_data;
      s->dev.handle_destroy = usb_mouse_handle_destroy;
      s->kind = USB_MOUSE;
@@ -83,8 +83,8 @@ Index: ioemu/hw/usb-hid.c
  
 Index: ioemu/hw/usb-uhci.c
 ===================================================================
---- ioemu.orig/hw/usb-uhci.c	2007-05-02 14:23:54.000000000 +0100
-+++ ioemu/hw/usb-uhci.c	2007-05-02 14:23:54.000000000 +0100
+--- ioemu.orig/hw/usb-uhci.c	2007-05-09 14:12:05.000000000 +0100
++++ ioemu/hw/usb-uhci.c	2007-05-09 14:12:06.000000000 +0100
 @@ -43,9 +43,15 @@
  #define TD_CTRL_IOC     (1 << 24)
  #define TD_CTRL_ACTIVE  (1 << 23)
@@ -101,35 +101,43 @@ Index: ioemu/hw/usb-uhci.c
  
  #define UHCI_PORT_RESET (1 << 9)
  #define UHCI_PORT_LSDA  (1 << 8)
-@@ -424,12 +430,12 @@
-     uint8_t buf[2048];
+@@ -431,13 +437,13 @@
+     uint8_t pid;
      int len, max_len, err, ret;
  
+-    /* ??? This is wrong for async completion.  */
 -    if (td->ctrl & TD_CTRL_IOC) {
 -        *int_mask |= 0x01;
-+    if (!(td->ctrl & TD_CTRL_ACTIVE)){
++    if (!(td->ctrl & TD_CTRL_ACTIVE)) {
 +        ret = 1;
-+        goto out;
++	goto out;
      }
 -    
 -    if (!(td->ctrl & TD_CTRL_ACTIVE))
 -        return 1;
++
 +    /* Clear TD's status field explicitly */
 +    td->ctrl = td->ctrl & (~TD_CTRL_MASK);
  
      /* TD is active */
      max_len = ((td->token >> 21) + 1) & 0x7ff;
-@@ -467,7 +473,8 @@
-         /* invalid pid : frame interrupted */
-         s->status |= UHCI_STS_HCPERR;
-         uhci_update_irq(s);
--        return -1;
-+        ret = -1;
-+        goto out;
+@@ -493,11 +499,13 @@
+             /* invalid pid : frame interrupted */
+             s->status |= UHCI_STS_HCPERR;
+             uhci_update_irq(s);
+-            return -1;
++            ret = -1;
++	    goto out;
+         }
+     }
+     if (ret == USB_RET_ASYNC) {
+-        return 2;
++        ret = 2;
++	goto out;
      }
      if (td->ctrl & TD_CTRL_IOS)
          td->ctrl &= ~TD_CTRL_ACTIVE;
-@@ -479,10 +486,12 @@
+@@ -509,10 +517,12 @@
              len < max_len) {
              *int_mask |= 0x02;
              /* short packet: do not update QH */
@@ -144,7 +152,7 @@ Index: ioemu/hw/usb-uhci.c
          }
      } else {
          switch(ret) {
-@@ -501,23 +510,34 @@
+@@ -531,23 +541,34 @@
              }
              td->ctrl = (td->ctrl & ~(3 << TD_CTRL_ERROR_SHIFT)) | 
                  (err << TD_CTRL_ERROR_SHIFT);
@@ -182,4 +190,4 @@ Index: ioemu/hw/usb-uhci.c
 +    return ret;
  }
  
- static void uhci_frame_timer(void *opaque)
+ static void uhci_async_complete_packet(USBPacket * packet, void *opaque)

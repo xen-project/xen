@@ -1,7 +1,7 @@
 Index: ioemu/hw/cirrus_vga.c
 ===================================================================
---- ioemu.orig/hw/cirrus_vga.c	2007-05-03 14:55:45.000000000 +0100
-+++ ioemu/hw/cirrus_vga.c	2007-05-03 14:58:05.000000000 +0100
+--- ioemu.orig/hw/cirrus_vga.c	2007-05-03 20:36:50.000000000 +0100
++++ ioemu/hw/cirrus_vga.c	2007-05-03 20:57:47.000000000 +0100
 @@ -601,7 +601,8 @@
  	off_cur_end = off_cur + bytesperline;
  	off_cur &= TARGET_PAGE_MASK;
@@ -14,8 +14,8 @@ Index: ioemu/hw/cirrus_vga.c
  	off_begin += off_pitch;
 Index: ioemu/hw/cirrus_vga_rop.h
 ===================================================================
---- ioemu.orig/hw/cirrus_vga_rop.h	2007-05-02 10:30:05.000000000 +0100
-+++ ioemu/hw/cirrus_vga_rop.h	2007-05-03 14:58:22.000000000 +0100
+--- ioemu.orig/hw/cirrus_vga_rop.h	2007-05-03 18:17:34.000000000 +0100
++++ ioemu/hw/cirrus_vga_rop.h	2007-05-03 20:57:47.000000000 +0100
 @@ -22,18 +22,36 @@
   * THE SOFTWARE.
   */
@@ -89,8 +89,8 @@ Index: ioemu/hw/cirrus_vga_rop.h
 +#undef m
 Index: ioemu/hw/cirrus_vga_rop2.h
 ===================================================================
---- ioemu.orig/hw/cirrus_vga_rop2.h	2007-05-02 10:30:05.000000000 +0100
-+++ ioemu/hw/cirrus_vga_rop2.h	2007-05-03 14:58:42.000000000 +0100
+--- ioemu.orig/hw/cirrus_vga_rop2.h	2007-05-03 18:17:34.000000000 +0100
++++ ioemu/hw/cirrus_vga_rop2.h	2007-05-03 20:57:47.000000000 +0100
 @@ -23,36 +23,42 @@
   */
  

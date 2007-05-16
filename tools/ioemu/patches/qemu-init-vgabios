@@ -1,8 +1,8 @@
 Index: ioemu/hw/vga.c
 ===================================================================
---- ioemu.orig/hw/vga.c	2006-08-06 02:22:01.441324863 +0100
-+++ ioemu/hw/vga.c	2006-08-06 02:22:46.606290142 +0100
-@@ -1728,6 +1728,136 @@
+--- ioemu.orig/hw/vga.c	2007-05-03 19:00:05.000000000 +0100
++++ ioemu/hw/vga.c	2007-05-03 19:11:39.000000000 +0100
+@@ -1757,6 +1757,136 @@
      }
  }
  
@@ -139,12 +139,12 @@ Index: ioemu/hw/vga.c
  void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                       unsigned long vga_ram_offset, int vga_ram_size)
  {
-@@ -1769,6 +1899,8 @@
+@@ -1796,6 +1926,8 @@
+     s->get_resolution = vga_get_resolution;
+     graphic_console_init(s->ds, vga_update_display, vga_invalidate_display,
                           vga_screen_dump, s);
-     /* XXX: currently needed for display */
-     vga_state = s;
 +
 +    vga_bios_init(s);
  }
  
- 
+ /* used by both ISA and PCI */

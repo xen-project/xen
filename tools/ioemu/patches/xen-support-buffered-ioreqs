@@ -1,16 +1,16 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 15:09:21.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 15:09:48.000000000 +0100
-@@ -5923,6 +5923,7 @@
-     int usb_devices_index;
+--- ioemu.orig/vl.c	2007-05-10 15:34:19.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:34:24.000000000 +0100
+@@ -6823,6 +6823,7 @@
+     int fds[2];
      unsigned long ioreq_pfn;
      extern void *shared_page;
 +    extern void *buffered_io_page;
      unsigned long nr_pages;
  
      char qemu_dm_logfilename[64];
-@@ -6499,6 +6500,16 @@
+@@ -7490,6 +7491,16 @@
          exit(-1);
      }
  
@@ -29,8 +29,8 @@ Index: ioemu/vl.c
  #elif defined(__ia64__)
 Index: ioemu/target-i386-dm/helper2.c
 ===================================================================
---- ioemu.orig/target-i386-dm/helper2.c	2007-05-03 15:09:21.000000000 +0100
-+++ ioemu/target-i386-dm/helper2.c	2007-05-03 15:10:03.000000000 +0100
+--- ioemu.orig/target-i386-dm/helper2.c	2007-05-10 15:34:19.000000000 +0100
++++ ioemu/target-i386-dm/helper2.c	2007-05-10 15:34:24.000000000 +0100
 @@ -78,6 +78,10 @@
  
  shared_iopage_t *shared_page = NULL;
@@ -179,4 +179,4 @@ Index: ioemu/target-i386-dm/helper2.c
 +    handle_buffered_io(env);
      main_loop_wait(1); /* For the select() on events */
  
-     /* Stop the IDE thread */
+     /* Save the device state */

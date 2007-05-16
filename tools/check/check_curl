@@ -1,0 +1,38 @@
+#!/bin/sh
+# CHECK-BUILD CHECK-INSTALL
+
+if [ ! "$LIBXENAPI_BINDINGS" = "y" ]
+then
+    echo -n "unused, "
+    exit 0
+fi
+
+RC=0
+
+CURL_CONFIG="$(which curl-config)"
+tmpfile=$(mktemp)
+
+if test -z ${CURL_CONFIG}; then
+    RC=1
+else
+    ${CURL_CONFIG} --libs 2>&1 > /dev/null
+    RC=$?
+fi
+
+if test $RC -ne 0; then
+    echo "FAILED"
+	echo " *** curl-config is missing. "
+    echo " *** Please install curl-devel."
+elif ! ld $($CURL_CONFIG --libs) -o $tmpfile >/dev/null 2>&1; then
+    echo "FAILED"
+    echo " *** dependency libraries for curl are missing: "
+    RC=1
+    for i in $(ld $($CURL_CONFIG --libs) -o $tmpfile 2>&1 >/dev/null); do
+        case $i in
+        -l*) echo lib${i#-l}
+        esac
+    done
+fi
+rm -f $tmpfile
+
+exit $RC

@@ -171,7 +171,7 @@ uint32_t vlapic_get_ppr(struct vlapic *vlapic)
         ppr = isrv & 0xf0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_INTERRUPT,
-                "vlapic %p, ppr 0x%x, isr 0x%x, isrv 0x%x.",
+                "vlapic %p, ppr 0x%x, isr 0x%x, isrv 0x%x",
                 vlapic, ppr, isr, isrv);
 
     return ppr;
@@ -211,7 +211,7 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
     struct vlapic *target = vcpu_vlapic(v);
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest 0x%x, "
-                "dest_mode 0x%x, short_hand 0x%x\n",
+                "dest_mode 0x%x, short_hand 0x%x",
                 target, source, dest, dest_mode, short_hand);
 
     switch ( short_hand )
@@ -270,14 +270,14 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         if ( vlapic_test_and_set_irr(vector, vlapic) && trig_mode )
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                        "level trig mode repeatedly for vector %d\n", vector);
+                        "level trig mode repeatedly for vector %d", vector);
             break;
         }
 
         if ( trig_mode )
         {
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                        "level trig mode for vector %d\n", vector);
+                        "level trig mode for vector %d", vector);
             vlapic_set_vector(vector, &vlapic->regs->data[APIC_TMR]);
         }
 
@@ -399,7 +399,7 @@ static void vlapic_ipi(struct vlapic *vlapic)
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr_high 0x%x, icr_low 0x%x, "
                 "short_hand 0x%x, dest 0x%x, trig_mode 0x%x, level 0x%x, "
-                "dest_mode 0x%x, delivery_mode 0x%x, vector 0x%x.",
+                "dest_mode 0x%x, delivery_mode 0x%x, vector 0x%x",
                 icr_high, icr_low, short_hand, dest,
                 trig_mode, level, dest_mode, delivery_mode, vector);
 
@@ -437,7 +437,7 @@ static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
                 "timer initial count %d, timer current count %d, "
-                "offset %"PRId64".",
+                "offset %"PRId64,
                 tmict, tmcct, counter_passed);
 
     return tmcct;
@@ -454,7 +454,7 @@ static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
     vlapic->hw.timer_divisor = 1 << (val & 7);
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
-                "vlapic_set_tdcr timer_divisor: %d.", vlapic->hw.timer_divisor);
+                "timer_divisor: %d", vlapic->hw.timer_divisor);
 }
 
 static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
@@ -493,7 +493,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     /* some bugs on kernel cause read this with byte*/
     if ( len != 4 )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "read with len=0x%lx, should be 4 instead.\n",
+                    "read with len=0x%lx, should be 4 instead",
                     len);
 
     alignment = offset & 0x3;
@@ -522,7 +522,7 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     }
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset 0x%x with length 0x%lx, "
-                "and the result is 0x%lx.", offset, len, result);
+                "and the result is 0x%lx", offset, len, result);
 
     return result;
 
@@ -539,7 +539,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
     if ( offset != 0xb0 )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "offset 0x%x with length 0x%lx, and value is 0x%lx.",
+                    "offset 0x%x with length 0x%lx, and value is 0x%lx",
                     offset, len, val);
 
     /*
@@ -713,7 +713,7 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
     vlapic->hw.apic_base_msr = value;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                "apic base msr is 0x%016"PRIx64".", vlapic->hw.apic_base_msr);
+                "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
 }
 
 int vlapic_accept_pic_intr(struct vcpu *v)
@@ -913,7 +913,7 @@ int vlapic_init(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_init %d", v->vcpu_id);
+    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "%d", v->vcpu_id);
 
     vlapic->regs_page = alloc_domheap_page(NULL);
     if ( vlapic->regs_page == NULL )

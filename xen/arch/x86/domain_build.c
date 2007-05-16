@@ -33,7 +33,9 @@
 extern unsigned long initial_images_nrpages(void);
 extern void discard_initial_images(void);
 
-static long dom0_nrpages, dom0_min_nrpages, dom0_max_nrpages = LONG_MAX;
+static long __initdata dom0_nrpages;
+static long __initdata dom0_min_nrpages;
+static long __initdata dom0_max_nrpages = LONG_MAX;
 
 /*
  * dom0_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
@@ -55,12 +57,12 @@ static long dom0_nrpages, dom0_min_nrpages, dom0_max_nrpages = LONG_MAX;
  *  If +ve: The specified amount is an absolute value.
  *  If -ve: The specified amount is subtracted from total available memory.
  */
-static long parse_amt(const char *s, const char **ps)
+static long __init parse_amt(const char *s, const char **ps)
 {
     long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
     return (*s == '-') ? -pages : pages;
 }
-static void parse_dom0_mem(const char *s)
+static void __init parse_dom0_mem(const char *s)
 {
     do {
         if ( !strncmp(s, "min:", 4) )
@@ -103,7 +105,8 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-static struct page_info *alloc_chunk(struct domain *d, unsigned long max_pages)
+static struct page_info * __init alloc_chunk(
+    struct domain *d, unsigned long max_pages)
 {
     struct page_info *page;
     unsigned int order;
@@ -122,7 +125,7 @@ static struct page_info *alloc_chunk(struct domain *d, unsigned long max_pages)
     return page;
 }
 
-static unsigned long compute_dom0_nr_pages(void)
+static unsigned long __init compute_dom0_nr_pages(void)
 {
     unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
 
@@ -151,7 +154,7 @@ static unsigned long compute_dom0_nr_pages(void)
     return dom0_nrpages;
 }
 
-static void process_dom0_ioports_disable(void)
+static void __init process_dom0_ioports_disable(void)
 {
     unsigned long io_from, io_to;
     char *t, *s = opt_dom0_ioports_disable;
@@ -189,10 +192,11 @@ static void process_dom0_ioports_disable(void)
     }
 }
 
-int construct_dom0(struct domain *d,
-                   unsigned long _image_start, unsigned long image_len, 
-                   unsigned long _initrd_start, unsigned long initrd_len,
-                   char *cmdline)
+int __init construct_dom0(
+    struct domain *d,
+    unsigned long _image_start, unsigned long image_len, 
+    unsigned long _initrd_start, unsigned long initrd_len,
+    char *cmdline)
 {
     int i, rc, compatible, compat32, order, machine;
     struct cpu_user_regs *regs;
@@ -898,7 +902,6 @@ int construct_dom0(struct domain *d,
 #if defined(__i386__)
     /* Destroy low mappings - they were only for our convenience. */
     zap_low_mappings(l2start);
-    zap_low_mappings(idle_pg_table_l2);
 #endif
 
     update_domain_wallclock_time(d);

@@ -196,9 +196,19 @@ typedef struct TranslationBlock {
     struct TranslationBlock *jmp_first;
 } TranslationBlock;
 
+static inline unsigned int tb_jmp_cache_hash_page(target_ulong pc)
+{
+    target_ulong tmp;
+    tmp = pc ^ (pc >> (TARGET_PAGE_BITS - TB_JMP_PAGE_BITS));
+    return (tmp >> TB_JMP_PAGE_BITS) & TB_JMP_PAGE_MASK;
+}
+
 static inline unsigned int tb_jmp_cache_hash_func(target_ulong pc)
 {
-    return (pc ^ (pc >> TB_JMP_CACHE_BITS)) & (TB_JMP_CACHE_SIZE - 1);
+    target_ulong tmp;
+    tmp = pc ^ (pc >> (TARGET_PAGE_BITS - TB_JMP_PAGE_BITS));
+    return (((tmp >> TB_JMP_PAGE_BITS) & TB_JMP_PAGE_MASK) |
+	    (tmp & TB_JMP_ADDR_MASK));
 }
 
 static inline unsigned int tb_phys_hash_func(unsigned long pc)
@@ -462,13 +472,12 @@ static inline int testandset (int *p)
 }
 #endif
 
-#ifdef __ia64__
-#include "ia64_intrinsic.h"
+#ifdef __ia64
+#include <ia64intrin.h>
 
 static inline int testandset (int *p)
 {
-    uint32_t o = 0, n = 1;
-    return (int)cmpxchg_acq(p, o, n);
+    return __sync_lock_test_and_set (p, 1);
 }
 #endif
 

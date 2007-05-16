@@ -305,7 +305,7 @@ static void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
     SetIRQFunc *set_irq;
     void *pic;
     m48t59_t *nvram;
-    int PPC_io_memory, unin_memory;
+    int unin_memory;
     int linux_boot, i;
     unsigned long bios_offset, vga_bios_offset;
     uint32_t kernel_base, kernel_size, initrd_base, initrd_size;
@@ -417,16 +417,15 @@ static void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
         isa_mem_base = 0x80000000;
         
         /* Register 2 MB of ISA IO space */
-        PPC_io_memory = cpu_register_io_memory(0, PPC_io_read, PPC_io_write, NULL);
-        cpu_register_physical_memory(0xfe000000, 0x00200000, PPC_io_memory);
-        
+        isa_mmio_init(0xfe000000, 0x00200000);
+
         /* init basic PC hardware */
         pic = heathrow_pic_init(&heathrow_pic_mem_index);
         set_irq = heathrow_pic_set_irq;
         pci_bus = pci_grackle_init(0xfec00000, pic);
-        vga_initialize(pci_bus, ds, phys_ram_base + ram_size, 
-                       ram_size, vga_ram_size,
-                       vga_bios_offset, vga_bios_size);
+        pci_vga_init(pci_bus, ds, phys_ram_base + ram_size, 
+                     ram_size, vga_ram_size,
+                     vga_bios_offset, vga_bios_size);
 
         /* XXX: suppress that */
         isa_pic = pic_init(pic_irq_request, NULL);
@@ -437,7 +436,7 @@ static void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
         for(i = 0; i < nb_nics; i++) {
             if (!nd_table[i].model)
                 nd_table[i].model = "ne2k_pci";
-            pci_nic_init(pci_bus, &nd_table[i]);
+            pci_nic_init(pci_bus, &nd_table[i], -1);
         }
         
         pci_cmd646_ide_init(pci_bus, &bs_table[0], 0);
@@ -463,8 +462,7 @@ static void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
         isa_mem_base = 0x80000000;
         
         /* Register 8 MB of ISA IO space */
-        PPC_io_memory = cpu_register_io_memory(0, PPC_io_read, PPC_io_write, NULL);
-        cpu_register_physical_memory(0xF2000000, 0x00800000, PPC_io_memory);
+        isa_mmio_init(0xf2000000, 0x00800000);
         
         /* UniN init */
         unin_memory = cpu_register_io_memory(0, unin_read, unin_write, NULL);
@@ -474,9 +472,9 @@ static void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
         set_irq = openpic_set_irq;
         pci_bus = pci_pmac_init(pic);
         /* init basic PC hardware */
-        vga_initialize(pci_bus, ds, phys_ram_base + ram_size,
-                       ram_size, vga_ram_size,
-                       vga_bios_offset, vga_bios_size);
+        pci_vga_init(pci_bus, ds, phys_ram_base + ram_size,
+                     ram_size, vga_ram_size,
+                     vga_bios_offset, vga_bios_size);
 
         /* XXX: suppress that */
         isa_pic = pic_init(pic_irq_request, NULL);
@@ -485,7 +483,7 @@ static void ppc_chrp_init(int ram_size, int vga_ram_size, int boot_device,
         serial_init(&pic_set_irq_new, isa_pic, 0x3f8, 4, serial_hds[0]);
         
         for(i = 0; i < nb_nics; i++) {
-            pci_ne2000_init(pci_bus, &nd_table[i]);
+            pci_ne2000_init(pci_bus, &nd_table[i], -1);
         }
         
 #if 1

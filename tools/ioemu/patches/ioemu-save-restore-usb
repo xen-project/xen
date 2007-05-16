@@ -1,8 +1,8 @@
 Index: ioemu/hw/usb-hid.c
 ===================================================================
---- ioemu.orig/hw/usb-hid.c	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/hw/usb-hid.c	2007-05-03 10:07:54.000000000 +0100
-@@ -508,6 +508,49 @@
+--- ioemu.orig/hw/usb-hid.c	2007-05-09 14:10:50.000000000 +0100
++++ ioemu/hw/usb-hid.c	2007-05-09 14:11:27.000000000 +0100
+@@ -510,6 +510,51 @@
      qemu_free(s);
  }
  
@@ -41,18 +41,20 @@ Index: ioemu/hw/usb-hid.c
 +
 +    if ( s->kind == USB_TABLET) {
 +        fprintf(logfile, "usb_mouse_load:add usb_tablet_event.\n");
-+        qemu_add_mouse_event_handler(usb_tablet_event, s, 1);
++        qemu_add_mouse_event_handler(usb_tablet_event, s, 1, "QEMU USB Tablet");
 +    } else if ( s->kind == USB_MOUSE) {
 +        fprintf(logfile, "usb_mouse_load:add usb_mouse_event.\n");
-+        qemu_add_mouse_event_handler(usb_mouse_event, s, 0);
++        qemu_add_mouse_event_handler(usb_mouse_event, s, 0, "QEMU USB MOUSE");
 +    }
++
++    return 0;
 +}
 +
 +
  USBDevice *usb_tablet_init(void)
  {
      USBMouseState *s;
-@@ -526,6 +569,8 @@
+@@ -528,6 +573,8 @@
  
      pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Tablet");
  
@@ -61,7 +63,7 @@ Index: ioemu/hw/usb-hid.c
      return (USBDevice *)s;
  }
  
-@@ -547,5 +592,7 @@
+@@ -549,5 +596,7 @@
  
      pstrcpy(s->dev.devname, sizeof(s->dev.devname), "QEMU USB Mouse");
  
@@ -71,9 +73,9 @@ Index: ioemu/hw/usb-hid.c
  }
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:07:53.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:07:54.000000000 +0100
-@@ -3878,6 +3878,7 @@
+--- ioemu.orig/vl.c	2007-05-09 14:10:50.000000000 +0100
++++ ioemu/vl.c	2007-05-09 14:11:19.000000000 +0100
+@@ -4076,6 +4076,7 @@
      const char *p;
      USBDevice *dev;
      USBPort *port;
@@ -81,7 +83,7 @@ Index: ioemu/vl.c
  
      if (!free_usb_ports)
          return -1;
-@@ -3914,6 +3915,12 @@
+@@ -4112,6 +4113,12 @@
      free_usb_ports = port->next;
      port->next = used_usb_ports;
      used_usb_ports = port;
@@ -96,13 +98,12 @@ Index: ioemu/vl.c
  }
 Index: ioemu/hw/usb.c
 ===================================================================
---- ioemu.orig/hw/usb.c	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/hw/usb.c	2007-05-03 10:07:54.000000000 +0100
-@@ -191,3 +191,43 @@
-     }
-     return q - buf;
+--- ioemu.orig/hw/usb.c	2007-05-09 14:10:50.000000000 +0100
++++ ioemu/hw/usb.c	2007-05-09 14:11:01.000000000 +0100
+@@ -201,3 +201,42 @@
+     dev->handle_packet(dev, &p);
  }
-+
+ 
 +void generic_usb_save(QEMUFile* f, void *opaque)
 +{
 +    USBDevice *s = (USBDevice*)opaque;
@@ -144,21 +145,43 @@ Index: ioemu/hw/usb.c
 +}
 Index: ioemu/hw/usb-ohci.c
 ===================================================================
---- ioemu.orig/hw/usb-ohci.c	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/hw/usb-ohci.c	2007-05-03 10:07:54.000000000 +0100
-@@ -1186,5 +1186,7 @@
+--- ioemu.orig/hw/usb-ohci.c	2007-05-09 14:10:50.000000000 +0100
++++ ioemu/hw/usb-ohci.c	2007-05-09 14:11:01.000000000 +0100
+@@ -1215,6 +1215,20 @@
+     cpu_register_physical_memory(addr, size, ohci->mem);
+ }
+ 
++static void ohci_usb_save(QEMUFile *f, void *opaque)
++{
++    OHCIState *ohci = opaque;
++
++    pci_device_save(&ohci->pci_dev, f);
++}
++
++static int ohci_usb_load(QEMUFile *f, void *opaque, int version_id)
++{
++    OHCIState *ohci = opaque;
++
++    return pci_device_load(&ohci->pci_dev, f);
++}
++
+ void usb_ohci_init(struct PCIBus *bus, int num_ports, int devfn)
+ {
+     OHCIState *ohci;
+@@ -1265,6 +1279,8 @@
          qemu_register_usb_port(&ohci->rhport[i].port, ohci, i, ohci_attach);
      }
  
-+    register_savevm("OHCI USB", 0, 1, generic_pci_save, generic_pci_load, ohci);
++    register_savevm("OHCI USB", 0, 1, ohci_usb_save, ohci_usb_load, ohci);
 +
+     ohci->async_td = 0;
      ohci_reset(ohci);
  }
 Index: ioemu/hw/usb.h
 ===================================================================
---- ioemu.orig/hw/usb.h	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/hw/usb.h	2007-05-03 10:07:54.000000000 +0100
-@@ -176,3 +176,9 @@
+--- ioemu.orig/hw/usb.h	2007-05-09 14:10:50.000000000 +0100
++++ ioemu/hw/usb.h	2007-05-09 14:11:01.000000000 +0100
+@@ -218,3 +218,9 @@
  
  /* usb-msd.c */
  USBDevice *usb_msd_init(const char *filename);
@@ -170,9 +193,9 @@ Index: ioemu/hw/usb.h
 +
 Index: ioemu/hw/usb-uhci.c
 ===================================================================
---- ioemu.orig/hw/usb-uhci.c	2007-05-03 09:56:32.000000000 +0100
-+++ ioemu/hw/usb-uhci.c	2007-05-03 10:07:54.000000000 +0100
-@@ -638,6 +638,51 @@
+--- ioemu.orig/hw/usb-uhci.c	2007-05-09 14:10:50.000000000 +0100
++++ ioemu/hw/usb-uhci.c	2007-05-09 14:11:18.000000000 +0100
+@@ -760,6 +760,57 @@
      register_ioport_read(addr, 32, 1, uhci_ioport_readb, s);
  }
  
@@ -180,6 +203,8 @@ Index: ioemu/hw/usb-uhci.c
 +{
 +    int i;
 +    UHCIState *s = (UHCIState*)opaque;
++
++    pci_device_save(&s->dev, f);
 +
 +    qemu_put_be16s(f, &s->cmd);
 +    qemu_put_be16s(f, &s->status);
@@ -204,6 +229,10 @@ Index: ioemu/hw/usb-uhci.c
 +    if (version_id != 1)
 +        return -EINVAL;
 +
++    i = pci_device_load(&s->dev, f);
++    if (i < 0)
++	return i;
++
 +    qemu_get_be16s(f, &s->cmd);
 +    qemu_get_be16s(f, &s->status);
 +    qemu_get_be16s(f, &s->intr);
@@ -224,12 +253,10 @@ Index: ioemu/hw/usb-uhci.c
  void usb_uhci_init(PCIBus *bus, int devfn)
  {
      UHCIState *s;
-@@ -671,4 +716,8 @@
+@@ -793,4 +844,6 @@
         to rely on this.  */
      pci_register_io_region(&s->dev, 4, 0x20, 
                             PCI_ADDRESS_SPACE_IO, uhci_map);
-+
-+    register_savevm("UHCI_usb_pci", 0, 1, generic_pci_save, generic_pci_load, s);
 +
 +    register_savevm("UHCI usb controller", 0, 1, uhci_usb_save, uhci_usb_load, s);
  }

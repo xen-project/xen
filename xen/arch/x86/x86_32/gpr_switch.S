@@ -20,6 +20,7 @@ ENTRY(host_to_guest_gpr_switch)
         movl  UREGS_esi(%eax), %esi
         pushl %edi
         movl  UREGS_edi(%eax), %edi
+        pushl $guest_to_host_gpr_switch
         pushl %ecx
         movl  UREGS_ecx(%eax), %ecx
         movl  UREGS_eax(%eax), %eax

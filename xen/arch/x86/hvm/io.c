@@ -418,11 +418,10 @@ static inline void set_eflags_PF(int size, unsigned long result,
 static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                            struct hvm_io_op *pio_opp)
 {
-    unsigned long old_eax;
-    int sign = p->df ? -1 : 1;
-
     if ( p->data_is_ptr || (pio_opp->flags & OVERLAP) )
     {
+        int sign = p->df ? -1 : 1;
+
         if ( pio_opp->flags & REPZ )
             regs->ecx -= p->count;
 
@@ -459,14 +458,15 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     }
     else if ( p->dir == IOREQ_READ )
     {
-        old_eax = regs->eax;
+        unsigned long old_eax = regs->eax;
+
         switch ( p->size )
         {
         case 1:
-            regs->eax = (old_eax & 0xffffff00) | (p->data & 0xff);
+            regs->eax = (old_eax & ~0xff) | (p->data & 0xff);
             break;
         case 2:
-            regs->eax = (old_eax & 0xffff0000) | (p->data & 0xffff);
+            regs->eax = (old_eax & ~0xffff) | (p->data & 0xffff);
             break;
         case 4:
             regs->eax = (p->data & 0xffffffff);

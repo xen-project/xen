@@ -1,0 +1,190 @@
+# HG changeset patch
+# User Christian Limpach <Christian.Limpach@xensource.com>
+# Date 1178821985 -3600
+# Node ID dfbbb4d3b0dd2107cfee2b07fab6f33cefc4719c
+# Parent  23c4790512dbc889c4deed8ae1f8d54813c4b474
+[qemu] Fix keypad handling for VNC.
+
+Signed-off-by: Christian Limpach <Christian.Limpach@xensource.com>
+
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2007-05-10 19:34:49.000000000 +0100
++++ ioemu/vnc.c	2007-05-10 19:34:51.000000000 +0100
+@@ -909,6 +909,12 @@
+     }
+ }
+ 
++static void press_key(VncState *vs, int keysym)
++{
++    kbd_put_keycode(keysym2scancode(vs->kbd_layout, keysym) & 0x7f);
++    kbd_put_keycode(keysym2scancode(vs->kbd_layout, keysym) | 0x80);
++}
++
+ static void do_key_event(VncState *vs, int down, uint32_t sym)
+ {
+     int keycode;
+@@ -936,6 +942,28 @@
+             return;
+         }
+         break;
++    case 0x45:			/* NumLock */
++	if (!down)
++	    vs->modifiers_state[keycode] ^= 1;
++	break;
++    }
++
++    if (keycodeIsKeypad(vs->kbd_layout, keycode)) {
++        /* If the numlock state needs to change then simulate an additional
++           keypress before sending this one.  This will happen if the user
++           toggles numlock away from the VNC window.
++        */
++        if (keysymIsNumlock(vs->kbd_layout, sym & 0xFFFF)) {
++	    if (!vs->modifiers_state[0x45]) {
++		vs->modifiers_state[0x45] = 1;
++		press_key(vs, 0xff7f);
++	    }
++	} else {
++	    if (vs->modifiers_state[0x45]) {
++		vs->modifiers_state[0x45] = 0;
++		press_key(vs, 0xff7f);
++	    }
++        }
+     }
+ 
+     if (is_graphic_console()) {
+@@ -1427,6 +1455,7 @@
+     vs->kbd_layout = init_keyboard_layout(keyboard_layout);
+     if (!vs->kbd_layout)
+ 	exit(1);
++    vs->modifiers_state[0x45] = 1; /* NumLock on - on boot */
+ 
+     vs->ds->data = NULL;
+     vs->ds->dpy_update = vnc_dpy_update;
+Index: ioemu/keymaps.c
+===================================================================
+--- ioemu.orig/keymaps.c	2007-05-10 19:34:49.000000000 +0100
++++ ioemu/keymaps.c	2007-05-10 19:34:51.000000000 +0100
+@@ -32,6 +32,12 @@
+     return 0;
+ }
+ 
++struct key_range {
++    int start;
++    int end;
++    struct key_range *next;
++};
++
+ #define MAX_NORMAL_KEYCODE 512
+ #define MAX_EXTRA_COUNT 256
+ typedef struct {
+@@ -41,8 +47,34 @@
+ 	uint16_t keycode;
+     } keysym2keycode_extra[MAX_EXTRA_COUNT];
+     int extra_count;
++    struct key_range *keypad_range;
++    struct key_range *numlock_range;
+ } kbd_layout_t;
+ 
++static void add_to_key_range(struct key_range **krp, int code) {
++    struct key_range *kr;
++    for (kr = *krp; kr; kr = kr->next) {
++	if (code >= kr->start && code <= kr->end)
++	    break;
++	if (code == kr->start - 1) {
++	    kr->start--;
++	    break;
++	}
++	if (code == kr->end + 1) {
++	    kr->end++;
++	    break;
++	}
++    }
++    if (kr == NULL) {
++	kr = qemu_mallocz(sizeof(*kr));
++	if (kr) {
++	    kr->start = kr->end = code;
++	    kr->next = *krp;
++	    *krp = kr;
++	}
++    }
++}
++
+ static kbd_layout_t *parse_keyboard_layout(const char *language,
+ 					   kbd_layout_t * k)
+ {
+@@ -87,7 +119,15 @@
+                     //		    fprintf(stderr, "Warning: unknown keysym %s\n", line);
+ 		} else {
+ 		    const char *rest = end_of_keysym + 1;
+-		    int keycode = strtol(rest, NULL, 0);
++		    char *rest2;
++		    int keycode = strtol(rest, &rest2, 0);
++
++		    if (rest && strstr(rest, "numlock")) {
++			add_to_key_range(&k->keypad_range, keycode);
++			add_to_key_range(&k->numlock_range, keysym);
++			fprintf(stderr, "keypad keysym %04x keycode %d\n", keysym, keycode);
++		    }
++
+ 		    /* if(keycode&0x80)
+ 		       keycode=(keycode<<8)^0x80e0; */
+ 		    if (keysym < MAX_NORMAL_KEYCODE) {
+@@ -143,3 +183,25 @@
+     }
+     return 0;
+ }
++
++static int keycodeIsKeypad(void *kbd_layout, int keycode)
++{
++    kbd_layout_t *k = kbd_layout;
++    struct key_range *kr;
++
++    for (kr = k->keypad_range; kr; kr = kr->next)
++	if (keycode >= kr->start && keycode <= kr->end)
++	    return 1;
++    return 0;
++}
++
++static int keysymIsNumlock(void *kbd_layout, int keysym)
++{
++    kbd_layout_t *k = kbd_layout;
++    struct key_range *kr;
++
++    for (kr = k->numlock_range; kr; kr = kr->next)
++	if (keysym >= kr->start && keysym <= kr->end)
++	    return 1;
++    return 0;
++}
+Index: ioemu/vnc_keysym.h
+===================================================================
+--- ioemu.orig/vnc_keysym.h	2007-05-10 19:34:49.000000000 +0100
++++ ioemu/vnc_keysym.h	2007-05-10 19:34:51.000000000 +0100
+@@ -232,6 +232,19 @@
+ {"Home", 0xff50},      /* XK_Home */
+ {"End", 0xff57},       /* XK_End */
+ {"Scroll_Lock", 0xff14}, /* XK_Scroll_Lock */
++{"KP_Home", 0xff95},
++{"KP_Left", 0xff96},
++{"KP_Up", 0xff97},
++{"KP_Right", 0xff98},
++{"KP_Down", 0xff99},
++{"KP_Prior", 0xff9a},
++{"KP_Page_Up", 0xff9a},
++{"KP_Next", 0xff9b},
++{"KP_Page_Down", 0xff9b},
++{"KP_End", 0xff9c},
++{"KP_Begin", 0xff9d},
++{"KP_Insert", 0xff9e},
++{"KP_Delete", 0xff9f},
+ {"F1", 0xffbe},        /* XK_F1 */
+ {"F2", 0xffbf},        /* XK_F2 */
+ {"F3", 0xffc0},        /* XK_F3 */
+@@ -259,6 +272,7 @@
+ {"KP_8", 0xffb8},      /* XK_KP_8 */
+ {"KP_9", 0xffb9},      /* XK_KP_9 */
+ {"KP_Add", 0xffab},    /* XK_KP_Add */
++{"KP_Separator", 0xffac},/* XK_KP_Separator */
+ {"KP_Decimal", 0xffae},  /* XK_KP_Decimal */
+ {"KP_Divide", 0xffaf},   /* XK_KP_Divide */
+ {"KP_Enter", 0xff8d},    /* XK_KP_Enter */

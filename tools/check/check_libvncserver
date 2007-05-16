@@ -10,6 +10,7 @@ fi
 RC=0
 
 LIBVNCSERVER_CONFIG="$(which libvncserver-config)"
+tmpfile=$(mktemp)
 
 if test -z ${LIBVNCSERVER_CONFIG}; then 
     RC=1
@@ -22,6 +23,16 @@ if test $RC -ne 0; then
     echo "FAILED"
 	echo " *** libvncserver-config is missing. "
     echo " *** Please install libvncserver."
+elif ! ld $($LIBVNCSERVER_CONFIG --libs) -o $tmpfile >/dev/null 2>&1; then
+    echo "FAILED"
+    echo " *** dependency libraries for libvncserver are missing: "
+    RC=1
+    for i in $(ld $($LIBVNCSERVER_CONFIG --libs) -o $tmpfile 2>&1 >/dev/null); do
+        case $i in
+        -l*) echo lib${i#-l}
+        esac
+    done
 fi
+rm -f $tmpfile
 
 exit $RC

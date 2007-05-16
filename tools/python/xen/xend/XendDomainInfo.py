@@ -1472,8 +1472,7 @@ class XendDomainInfo:
         try:
             self.image = image.create(self, self.info)
 
-            localtime = self.info.get('platform_localtime', False)
-            if localtime:
+            if self.info['platform'].get('localtime', 0):
                 xc.domain_set_time_offset(self.domid)
 
             xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])

@@ -322,7 +322,7 @@ void cpu_ioreq_pio(CPUState *env, ioreq_t *req)
             do_outp(env, req->addr, req->size, req->data);
         } else {
             for (i = 0; i < req->count; i++) {
-                unsigned long tmp;
+                unsigned long tmp = 0;
 
                 read_physical((target_phys_addr_t) req->data
                   + (sign * i * req->size),
@@ -354,7 +354,7 @@ void cpu_ioreq_move(CPUState *env, ioreq_t *req)
             }
         }
     } else {
-        unsigned long tmp;
+        target_ulong tmp;
 
         if (req->dir == IOREQ_READ) {
             for (i = 0; i < req->count; i++) {
@@ -380,14 +380,14 @@ void cpu_ioreq_move(CPUState *env, ioreq_t *req)
 
 void cpu_ioreq_and(CPUState *env, ioreq_t *req)
 {
-    unsigned long tmp1, tmp2;
+    target_ulong tmp1, tmp2;
 
     if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 & (unsigned long) req->data;
+        tmp2 = tmp1 & (target_ulong) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
     req->data = tmp1;
@@ -395,14 +395,14 @@ void cpu_ioreq_and(CPUState *env, ioreq_t *req)
 
 void cpu_ioreq_add(CPUState *env, ioreq_t *req)
 {
-    unsigned long tmp1, tmp2;
+    target_ulong tmp1, tmp2;
 
     if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 + (unsigned long) req->data;
+        tmp2 = tmp1 + (target_ulong) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
     req->data = tmp1;
@@ -410,14 +410,14 @@ void cpu_ioreq_add(CPUState *env, ioreq_t *req)
 
 void cpu_ioreq_sub(CPUState *env, ioreq_t *req)
 {
-    unsigned long tmp1, tmp2;
+    target_ulong tmp1, tmp2;
 
     if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 - (unsigned long) req->data;
+        tmp2 = tmp1 - (target_ulong) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
     req->data = tmp1;
@@ -425,14 +425,14 @@ void cpu_ioreq_sub(CPUState *env, ioreq_t *req)
 
 void cpu_ioreq_or(CPUState *env, ioreq_t *req)
 {
-    unsigned long tmp1, tmp2;
+    target_ulong tmp1, tmp2;
 
     if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 | (unsigned long) req->data;
+        tmp2 = tmp1 | (target_ulong) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
     req->data = tmp1;
@@ -440,14 +440,14 @@ void cpu_ioreq_or(CPUState *env, ioreq_t *req)
 
 void cpu_ioreq_xor(CPUState *env, ioreq_t *req)
 {
-    unsigned long tmp1, tmp2;
+    target_ulong tmp1, tmp2;
 
     if (req->data_is_ptr != 0)
         hw_error("expected scalar value");
 
     read_physical(req->addr, req->size, &tmp1);
     if (req->dir == IOREQ_WRITE) {
-        tmp2 = tmp1 ^ (unsigned long) req->data;
+        tmp2 = tmp1 ^ (target_ulong) req->data;
         write_physical(req->addr, req->size, &tmp2);
     }
     req->data = tmp1;
@@ -495,8 +495,9 @@ void cpu_ioreq_xchg(CPUState *env, ioreq_t *req)
 
 void __handle_ioreq(CPUState *env, ioreq_t *req)
 {
-    if (!req->data_is_ptr && req->dir == IOREQ_WRITE && req->size != 4)
-	req->data &= (1UL << (8 * req->size)) - 1;
+    if (!req->data_is_ptr && (req->dir == IOREQ_WRITE) &&
+        (req->size < sizeof(target_ulong)))
+        req->data &= ((target_ulong)1 << (8 * req->size)) - 1;
 
     switch (req->type) {
     case IOREQ_TYPE_PIO:
@@ -615,7 +616,7 @@ int main_loop(void)
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
-    char qemu_file[20];
+    char qemu_file[32];
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
@@ -633,13 +634,9 @@ int main_loop(void)
     handle_buffered_io(env);
     main_loop_wait(1); /* For the select() on events */
 
-    /* Stop the IDE thread */
-    ide_stop_dma_thread();
-
     /* Save the device state */
     sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
-    if (qemu_savevm(qemu_file) < 0)
-        fprintf(stderr, "qemu save fail.\n");
+    do_savevm(qemu_file);
 
     return 0;
 }

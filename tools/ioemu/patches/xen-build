@@ -1,8 +1,8 @@
 Index: ioemu/Makefile
 ===================================================================
---- ioemu.orig/Makefile	2007-05-03 15:38:37.000000000 +0100
-+++ ioemu/Makefile	2007-05-03 15:38:39.000000000 +0100
-@@ -1,11 +1,14 @@
+--- ioemu.orig/Makefile	2007-05-09 13:42:55.000000000 +0100
++++ ioemu/Makefile	2007-05-09 13:42:58.000000000 +0100
+@@ -1,6 +1,9 @@
  # Makefile for QEMU.
  
 -include config-host.mak
@@ -13,14 +13,8 @@ Index: ioemu/Makefile
  
  .PHONY: all clean distclean dvi info install install-doc tar tarbin \
  	speed test test2 html dvi info
- 
--CFLAGS=-Wall -O2 -g -fno-strict-aliasing -I.
-+CFLAGS+=-Wall -O2 -g -fno-strict-aliasing -I.
- ifdef CONFIG_DARWIN
- CFLAGS+= -mdynamic-no-pic
+@@ -32,9 +35,11 @@
  endif
-@@ -25,9 +28,11 @@
- DOCS=
  endif
  
 +TOOLS=
@@ -32,7 +26,7 @@ Index: ioemu/Makefile
  	$(MAKE) -C $(subst subdir-,,$@) all
  
  recurse-all: $(patsubst %,subdir-%, $(TARGET_DIRS))
-@@ -44,7 +49,7 @@
+@@ -51,7 +56,7 @@
  	rm -f *.o *.a $(TOOLS) dyngen$(EXESUF) TAGS *.pod *~ */*~
  	$(MAKE) -C tests clean
  	for d in $(TARGET_DIRS); do \
@@ -41,12 +35,12 @@ Index: ioemu/Makefile
          done
  
  distclean: clean
-@@ -60,24 +65,24 @@
+@@ -67,25 +72,25 @@
  
  install-doc: $(DOCS)
  	mkdir -p "$(DESTDIR)$(docdir)"
 -	$(INSTALL) -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
-+	$(INSTALL_DATA) qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
++	$(INSTALL_DATA) -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)$(docdir)"
  ifndef CONFIG_WIN32
  	mkdir -p "$(DESTDIR)$(mandir)/man1"
 -	$(INSTALL) qemu.1 qemu-img.1 "$(DESTDIR)$(mandir)/man1"
@@ -58,24 +52,26 @@ Index: ioemu/Makefile
 -	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(bindir)"
 -	mkdir -p "$(DESTDIR)$(datadir)"
 -	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
--			video.x openbios-sparc32 linux_boot.bin; do \
+-		video.x openbios-sparc32 linux_boot.bin pxe-ne2k_pci.bin \
+-		pxe-rtl8139.bin pxe-pcnet.bin; do \
 -		$(INSTALL) -m 644 $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
 -	done
 +#	$(INSTALL) -m 755 -s $(TOOLS) "$(DESTDIR)$(bindir)"
 +#	mkdir -p "$(DESTDIR)$(datadir)"
 +#	for x in bios.bin vgabios.bin vgabios-cirrus.bin ppc_rom.bin \
-+#			video.x openbios-sparc32 linux_boot.bin; do \
-+#		$(INSTALL_DATA) $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
++#		video.x openbios-sparc32 linux_boot.bin pxe-ne2k_pci.bin \
++#		pxe-rtl8139.bin pxe-pcnet.bin; do \
++#		$(INSTALL) -m 644 $(SRC_PATH)/pc-bios/$$x "$(DESTDIR)$(datadir)"; \
 +#	done
  ifndef CONFIG_WIN32
  	mkdir -p "$(DESTDIR)$(datadir)/keymaps"
  	for x in $(KEYMAPS); do \
 -		$(INSTALL) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
-+		$(INSTALL_DATA) $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
++		$(INSTALL_DATA) -m 644 $(SRC_PATH)/keymaps/$$x "$(DESTDIR)$(datadir)/keymaps"; \
  	done
  endif
  	for d in $(TARGET_DIRS); do \
-@@ -89,7 +94,7 @@
+@@ -97,7 +102,7 @@
  	$(MAKE) -C tests $@
  
  TAGS: 
@@ -84,7 +80,7 @@ Index: ioemu/Makefile
  
  cscope:
  	rm -f ./cscope.*
-@@ -107,11 +112,11 @@
+@@ -115,11 +120,11 @@
  	texi2dvi $<
  
  qemu.1: qemu-doc.texi
@@ -100,8 +96,8 @@ Index: ioemu/Makefile
  info: qemu-doc.info qemu-tech.info
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-03 15:38:37.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-03 15:38:39.000000000 +0100
+--- ioemu.orig/Makefile.target	2007-05-09 13:42:55.000000000 +0100
++++ ioemu/Makefile.target	2007-05-09 13:42:58.000000000 +0100
 @@ -1,5 +1,8 @@
  include config.mak
  
@@ -111,37 +107,37 @@ Index: ioemu/Makefile.target
  TARGET_BASE_ARCH:=$(TARGET_ARCH)
  ifeq ($(TARGET_ARCH), x86_64)
  TARGET_BASE_ARCH:=i386
-@@ -10,14 +13,21 @@
+@@ -10,9 +13,11 @@
  ifeq ($(TARGET_ARCH), sparc64)
  TARGET_BASE_ARCH:=sparc
  endif
 -TARGET_PATH=$(SRC_PATH)/target-$(TARGET_BASE_ARCH)
 +TARGET_PATH=$(SRC_PATH)/target-$(TARGET_BASE_ARCH)$(TARGET_SUB)
  VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
- DEFINES=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH)
-+DEFINES+= -I$(XEN_ROOT)/tools/libxc
-+DEFINES+= -I$(XEN_ROOT)/tools/xenstore
- ifdef CONFIG_USER_ONLY
- VPATH+=:$(SRC_PATH)/linux-user
- DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
+ CPPFLAGS=-I. -I.. -I$(TARGET_PATH) -I$(SRC_PATH)
++CPPFLAGS+= -I$(XEN_ROOT)/tools/libxc
++CPPFLAGS+= -I$(XEN_ROOT)/tools/xenstore
+ ifdef CONFIG_DARWIN_USER
+ VPATH+=:$(SRC_PATH)/darwin-user
+ CPPFLAGS+=-I$(SRC_PATH)/darwin-user -I$(SRC_PATH)/darwin-user/$(TARGET_ARCH)
+@@ -23,6 +28,10 @@
  endif
--CFLAGS=-Wall -O2 -g -fno-strict-aliasing
-+CFLAGS+=-Wall -O2 -g -fno-strict-aliasing
+ BASE_CFLAGS=
+ BASE_LDFLAGS=
 +SSE2 := $(call cc-option,$(CC),-msse2,)
 +ifeq ($(SSE2),-msse2)
 +CFLAGS += -DUSE_SSE2=1 -msse2
 +endif
-+CFLAGS+= $(LOCAL_CFLAGS)
  #CFLAGS+=-Werror
- LDFLAGS=-g
  LIBS=
-@@ -165,8 +175,12 @@
+ HELPER_CFLAGS=$(CFLAGS)
+@@ -181,8 +190,12 @@
  
  #########################################################
  
--DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-+DEFINES+=-D_GNU_SOURCE
-+#-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
+-CPPFLAGS+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
++CPPFLAGS+=-D_GNU_SOURCE
++# -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
  LIBS+=-lm
 +LIBS+=-L../../libxc -lxenctrl -lxenguest
 +LIBS+=-L../../xenstore -lxenstore
@@ -149,16 +145,16 @@ Index: ioemu/Makefile.target
  ifndef CONFIG_USER_ONLY
  LIBS+=-lz
  endif
-@@ -281,7 +295,7 @@
+@@ -311,7 +324,7 @@
  all: $(PROGS)
  
  $(QEMU_USER): $(OBJS)
--	$(CC) $(LDFLAGS) -o $@ $^  $(LIBS)
-+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^  $(LIBS)
+-	$(CC) $(LDFLAGS) $(BASE_LDFLAGS) -o $@ $^  $(LIBS)
++	$(CC) $(CFLAGS) $(LDFLAGS) $(BASE_LDFLAGS) -o $@ $^  $(LIBS)
  ifeq ($(ARCH),alpha)
  # Mark as 32 bit binary, i. e. it will be mapped into the low 31 bit of
  # the address space (31 bit so sign extending doesn't matter)
-@@ -528,10 +542,16 @@
+@@ -574,10 +587,16 @@
  clean:
  	rm -f *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe/*.o slirp/*.o fpu/*.o
  
@@ -178,8 +174,8 @@ Index: ioemu/Makefile.target
  include .depend
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2007-05-03 15:38:37.000000000 +0100
-+++ ioemu/configure	2007-05-03 15:38:39.000000000 +0100
+--- ioemu.orig/configure	2007-05-09 13:42:55.000000000 +0100
++++ ioemu/configure	2007-05-09 13:42:58.000000000 +0100
 @@ -18,8 +18,8 @@
  
  # default parameters
@@ -189,8 +185,8 @@ Index: ioemu/configure
 +libdir="lib"
  cross_prefix=""
  cc="gcc"
- host_cc="gcc"
-@@ -65,6 +65,7 @@
+ gcc3_search="yes"
+@@ -67,6 +67,7 @@
    ;;
    x86_64|amd64)
      cpu="x86_64"
@@ -198,16 +194,16 @@ Index: ioemu/configure
    ;;
    *)
      cpu="unknown"
-@@ -91,7 +92,7 @@
- kernel_path=""
+@@ -92,7 +93,7 @@
+ profiler="no"
  cocoa="no"
  check_gfx="yes"
 -check_gcc="yes"
 +check_gcc="no"
  softmmu="yes"
- user="no"
- build_docs="no"
-@@ -380,6 +381,8 @@
+ linux_user="no"
+ darwin_user="no"
+@@ -433,6 +434,8 @@
      exit 1
  fi
  
@@ -216,7 +212,7 @@ Index: ioemu/configure
  if test -z "$cross_prefix" ; then
  
  # ---
-@@ -505,14 +508,16 @@
+@@ -569,14 +572,16 @@
  datadir="$prefix"
  docdir="$prefix"
  bindir="$prefix"
@@ -235,7 +231,7 @@ Index: ioemu/configure
  fi
  
  echo "Install prefix    $prefix"
-@@ -583,6 +588,8 @@
+@@ -647,6 +652,8 @@
  echo "mandir=$mandir" >> $config_mak
  echo "datadir=$datadir" >> $config_mak
  echo "docdir=$docdir" >> $config_mak
@@ -244,7 +240,7 @@ Index: ioemu/configure
  echo "#define CONFIG_QEMU_SHAREDIR \"$datadir\"" >> $config_h
  echo "MAKE=$make" >> $config_mak
  echo "INSTALL=$install" >> $config_mak
-@@ -770,7 +777,7 @@
+@@ -843,7 +850,7 @@
  # don't use ln -sf as not all "ln -sf" over write the file/link
  #
  rm -f $target_dir/Makefile
@@ -253,7 +249,7 @@ Index: ioemu/configure
  
  
  echo "# Automatically generated by configure - do not modify" > $config_mak
-@@ -784,6 +791,12 @@
+@@ -857,6 +864,12 @@
  interp_prefix1=`echo "$interp_prefix" | sed "s/%M/$target_cpu/g"`
  echo "#define CONFIG_QEMU_PREFIX \"$interp_prefix1\"" >> $config_h
  
@@ -266,14 +262,13 @@ Index: ioemu/configure
  if test "$target_cpu" = "i386" ; then
    echo "TARGET_ARCH=i386" >> $config_mak
    echo "#define TARGET_ARCH \"i386\"" >> $config_h
-@@ -850,6 +863,10 @@
-   echo "#define CONFIG_USER_ONLY 1" >> $config_h
+@@ -935,6 +948,9 @@
+   echo "CONFIG_DARWIN_USER=yes" >> $config_mak
+   echo "#define CONFIG_DARWIN_USER 1" >> $config_h
  fi
- 
 +if expr $target : '.*-dm' > /dev/null ; then
 +  echo "#define CONFIG_DM 1" >> $config_h
 +fi
-+
- if test "$target_cpu" = "arm" -o "$target_cpu" = "armeb" -o "$target_cpu" = "sparc" -o "$target_cpu" = "sparc64"; then
+ 
+ if test "$target_cpu" = "arm" -o "$target_cpu" = "armeb" -o "$target_cpu" = "sparc" -o "$target_cpu" = "sparc64" -o "$target_cpu" = "m68k"; then
    echo "CONFIG_SOFTFLOAT=yes" >> $config_mak
-   echo "#define CONFIG_SOFTFLOAT 1" >> $config_h

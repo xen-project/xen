@@ -93,14 +93,17 @@ struct hvm_function_table {
      * 1) determine whether paging is enabled,
      * 2) determine whether long mode is enabled,
      * 3) determine whether PAE paging is enabled,
-     * 4) determine whether interrupts are enabled or not,
-     * 5) determine the mode the guest is running in,
-     * 6) return the current guest control-register value
-     * 7) return the current guest segment descriptor base
+     * 4) determine whether NX is enabled,
+     * 5) determine whether interrupts are enabled or not,
+     * 6) determine the mode the guest is running in,
+     * 7) return the current guest control-register value
+     * 8) return the current guest segment descriptor base
+     * 9) return the current guest segment descriptor
      */
     int (*paging_enabled)(struct vcpu *v);
     int (*long_mode_enabled)(struct vcpu *v);
     int (*pae_enabled)(struct vcpu *v);
+    int (*nx_enabled)(struct vcpu *v);
     int (*interrupts_enabled)(struct vcpu *v);
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
@@ -196,6 +199,12 @@ static inline int
 hvm_interrupts_enabled(struct vcpu *v)
 {
     return hvm_funcs.interrupts_enabled(v);
+}
+
+static inline int
+hvm_nx_enabled(struct vcpu *v)
+{
+    return hvm_funcs.nx_enabled(v);
 }
 
 static inline int

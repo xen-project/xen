@@ -170,7 +170,7 @@ static int ns16550_getc(struct serial_port *port, char *pc)
     return 1;
 }
 
-static void ns16550_init_preirq(struct serial_port *port)
+static void __init ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     unsigned char lcr;
@@ -214,7 +214,7 @@ static void ns16550_init_preirq(struct serial_port *port)
         port->tx_fifo_size = 16;
 }
 
-static void ns16550_init_postirq(struct serial_port *port)
+static void __init ns16550_init_postirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     int rc, bits;
@@ -250,7 +250,7 @@ static void ns16550_init_postirq(struct serial_port *port)
 }
 
 #ifdef CONFIG_X86
-static void ns16550_endboot(struct serial_port *port)
+static void __init ns16550_endboot(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     if ( ioports_deny_access(dom0, uart->io_base, uart->io_base + 7) != 0 )
@@ -276,7 +276,7 @@ static struct uart_driver ns16550_driver = {
     .irq          = ns16550_irq
 };
 
-static int parse_parity_char(int c)
+static int __init parse_parity_char(int c)
 {
     switch ( c )
     {
@@ -300,7 +300,8 @@ static int parse_parity_char(int c)
         return;                              \
     } while ( 0 )
 
-static void ns16550_parse_port_config(struct ns16550 *uart, const char *conf)
+static void __init ns16550_parse_port_config(
+    struct ns16550 *uart, const char *conf)
 {
     int baud;
 
@@ -360,7 +361,7 @@ static void ns16550_parse_port_config(struct ns16550 *uart, const char *conf)
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);
 }
 
-void ns16550_init(int index, struct ns16550_defaults *defaults)
+void __init ns16550_init(int index, struct ns16550_defaults *defaults)
 {
     struct ns16550 *uart = &ns16550_com[index];
 

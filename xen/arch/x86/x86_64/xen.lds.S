@@ -16,7 +16,7 @@ PHDRS
 }
 SECTIONS
 {
-  . = 0xFFFF830000100000;
+  . = __XEN_VIRT_START + 0x100000;
   _start = .;
   _stext = .;			/* Text and read-only data */
   .text : {

@@ -1,5 +1,6 @@
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/perfc.h>
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
@@ -9,8 +10,8 @@ extern struct exception_table_entry __stop___ex_table[];
 extern struct exception_table_entry __start___pre_ex_table[];
 extern struct exception_table_entry __stop___pre_ex_table[];
 
-static void sort_exception_table(struct exception_table_entry *start,
-                                 struct exception_table_entry *end)
+static void __init sort_exception_table(struct exception_table_entry *start,
+                                        struct exception_table_entry *end)
 {
     struct exception_table_entry *p, *q, tmp;
 
@@ -28,7 +29,7 @@ static void sort_exception_table(struct exception_table_entry *start,
     }
 }
 
-void sort_exception_tables(void)
+void __init sort_exception_tables(void)
 {
     sort_exception_table(__start___ex_table, __stop___ex_table);
     sort_exception_table(__start___pre_ex_table, __stop___pre_ex_table);

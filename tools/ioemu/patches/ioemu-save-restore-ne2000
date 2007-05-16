@@ -1,8 +1,8 @@
 Index: ioemu/hw/ne2000.c
 ===================================================================
---- ioemu.orig/hw/ne2000.c	2007-05-02 16:09:35.000000000 +0100
-+++ ioemu/hw/ne2000.c	2007-05-02 16:10:03.000000000 +0100
-@@ -739,7 +739,7 @@
+--- ioemu.orig/hw/ne2000.c	2007-05-09 13:47:48.000000000 +0100
++++ ioemu/hw/ne2000.c	2007-05-09 13:55:24.000000000 +0100
+@@ -750,7 +750,7 @@
               s->macaddr[4],
               s->macaddr[5]);
               
@@ -11,24 +11,3 @@ Index: ioemu/hw/ne2000.c
  }
  
  /***********************************************************/
-@@ -775,6 +775,7 @@
-     PCINE2000State *d;
-     NE2000State *s;
-     uint8_t *pci_conf;
-+    int instance;
-     
-     d = (PCINE2000State *)pci_register_device(bus,
-                                               "NE2000", sizeof(PCINE2000State),
-@@ -809,8 +810,8 @@
-              s->macaddr[4],
-              s->macaddr[5]);
-              
--    /* XXX: instance number ? */
--    register_savevm("ne2000", 0, 2, ne2000_save, ne2000_load, s);
--    register_savevm("ne2000_pci", 0, 1, generic_pci_save, generic_pci_load, 
--                    &d->dev);
-+    instance = pci_bus_num(bus) << 8 | s->pci_dev->devfn;
-+    register_savevm("ne2000", instance, 2, ne2000_save, ne2000_load, s);
-+    register_savevm("ne2000_pci", instance, 1, generic_pci_save, 
-+                    generic_pci_load, &d->dev);
- }

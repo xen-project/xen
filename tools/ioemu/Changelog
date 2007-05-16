@@ -1,3 +1,21 @@
+version 0.9.0:
+
+  - Support for relative paths in backing files for disk images
+  - Async file I/O API
+  - New qcow2 disk image format
+  - Support of multiple VM snapshots
+  - Linux: specific host CDROM and floppy support
+  - SMM support
+  - Moved PCI init, MP table init and ACPI table init to Bochs BIOS
+  - Support for MIPS32 Release 2 instruction set (Thiemo Seufer)
+  - MIPS Malta system emulation (Aurelien Jarno, Stefan Weil)
+  - Darwin userspace emulation (Pierre d'Herbemont)
+  - m68k user support (Paul Brook)
+  - several x86 and x86_64 emulation fixes
+  - Mouse relative offset VNC extension (Anthony Liguori)
+  - PXE boot support (Anthony Liguori)
+  - '-daemonize' option (Anthony Liguori)
+
 version 0.8.2:
 
   - ACPI support

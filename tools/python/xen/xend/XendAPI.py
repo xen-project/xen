@@ -905,7 +905,7 @@ class XendAPI(object):
         XendNode.instance().set_name(new_name)
         return xen_api_success_void()
     def host_get_name_description(self, session, host_ref):
-        return xen_api_success(XendNode.instance().description)
+        return xen_api_success(XendNode.instance().get_description())
     def host_set_name_description(self, session, host_ref, new_desc):
         XendNode.instance().set_description(new_desc)
         return xen_api_success_void()

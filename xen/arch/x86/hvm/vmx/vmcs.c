@@ -285,11 +285,6 @@ static void construct_vmcs(struct vcpu *v)
 
     vmx_vmcs_enter(v);
 
-    v->arch.hvm_vmx.cpu_cr2 = 0;
-    v->arch.hvm_vmx.cpu_cr3 = 0;
-    memset(&v->arch.hvm_vmx.msr_state, 0, sizeof(v->arch.hvm_vmx.msr_state));
-    v->arch.hvm_vmx.vmxassist_enabled = 0;
-
     /* VMCS controls. */
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
     __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);

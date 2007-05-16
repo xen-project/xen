@@ -1,41 +1,41 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:07:47.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:07:52.000000000 +0100
-@@ -159,6 +159,8 @@
- int acpi_enabled = 1;
- int fd_bootchk = 1;
+--- ioemu.orig/vl.c	2007-05-03 19:09:15.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:09:18.000000000 +0100
+@@ -176,6 +176,8 @@
+ int semihosting_enabled = 0;
+ int autostart = 1;
  
 +extern int vcpus;
 +
  int xc_handle;
  
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
-@@ -5173,6 +5175,7 @@
+@@ -6065,6 +6067,7 @@
             "-m megs         set virtual RAM size to megs MB [default=%d]\n"
             "-smp n          set the number of CPUs to 'n' [default=1]\n"
             "-nographic      disable graphical output and redirect serial I/Os to console\n"
 +           "-vcpus          set CPU number of guest platform\n"
  #ifndef _WIN32
- 	   "-k language     use keyboard layout (for example \"fr\" for French)\n"
+            "-k language     use keyboard layout (for example \"fr\" for French)\n"
  #endif
-@@ -5343,6 +5346,7 @@
-     QEMU_OPTION_no_acpi,
- 
+@@ -6246,6 +6249,7 @@
+     QEMU_OPTION_semihosting
+     ,
      QEMU_OPTION_d,
 +    QEMU_OPTION_vcpus,
  };
  
  typedef struct QEMUOption {
-@@ -5424,6 +5428,7 @@
-     { "no-acpi", 0, QEMU_OPTION_no_acpi },
+@@ -6337,6 +6341,7 @@
+ #endif
      
      { "d", HAS_ARG, QEMU_OPTION_d },
 +    { "vcpus", 1, QEMU_OPTION_vcpus },
      { NULL },
  };
  
-@@ -6092,6 +6097,10 @@
+@@ -7028,6 +7033,10 @@
                  domid = atoi(optarg);
                  fprintf(logfile, "domid: %d\n", domid);
                  break;

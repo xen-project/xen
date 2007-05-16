@@ -10,6 +10,8 @@
 
 #include "cpu.h"
 
+int start_svm(struct cpuinfo_x86 *c);
+
 /*
  * amd_flush_filter={on,off}. Forcibly Enable or disable the TLB flush
  * filter on AMD 64-bit processors.
@@ -335,7 +337,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	if ((smp_processor_id() == 1) && c1_ramping_may_cause_clock_drift(c))
 		disable_c1_ramping();
 
-	start_svm();
+	start_svm(c);
 }
 
 static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)

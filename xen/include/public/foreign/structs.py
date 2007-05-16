@@ -1,5 +1,7 @@
 # configuration: what needs translation
 
+unions  = [ ];
+
 structs = [ "start_info",
             "trap_info",
             "pt_fpreg",

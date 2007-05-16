@@ -15,8 +15,8 @@ Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
 
 Index: ioemu/hw/rtl8139.c
 ===================================================================
---- ioemu.orig/hw/rtl8139.c	2006-12-08 18:21:36.000000000 +0000
-+++ ioemu/hw/rtl8139.c	2006-12-08 18:22:22.000000000 +0000
+--- ioemu.orig/hw/rtl8139.c	2007-05-03 20:36:50.000000000 +0100
++++ ioemu/hw/rtl8139.c	2007-05-03 20:39:45.000000000 +0100
 @@ -1999,12 +1999,12 @@
          DEBUG_PRINT(("RTL8139: +++ C+ mode transmission buffer allocated space %d\n", s->cplus_txbuffer_len));
      }

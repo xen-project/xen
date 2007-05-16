@@ -104,7 +104,10 @@ struct page_info
 #define PageSetSlab(page)   ((void)0)
 #define PageClearSlab(page) ((void)0)
 
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
+#define is_xen_heap_frame(pfn) ({                                       \
+    paddr_t maddr = page_to_maddr(pfn);                                 \
+    ((maddr >= xenheap_phys_start) && (maddr < xenheap_phys_end));      \
+})
 
 #if defined(__i386__)
 #define pickle_domptr(_d)   ((u32)(unsigned long)(_d))
@@ -143,7 +146,6 @@ void init_frametable(void);
 
 int alloc_page_type(struct page_info *page, unsigned long type);
 void free_page_type(struct page_info *page, unsigned long type);
-void invalidate_shadow_ldt(struct vcpu *d);
 int _shadow_mode_refcounts(struct domain *d);
 
 static inline void put_page(struct page_info *page)

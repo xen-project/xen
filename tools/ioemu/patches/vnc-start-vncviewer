@@ -1,10 +1,10 @@
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2007-05-03 10:24:06.000000000 +0100
-+++ ioemu/vnc.c	2007-05-03 10:24:06.000000000 +0100
-@@ -1189,3 +1189,31 @@
- 
-     vnc_dpy_resize(vs->ds, 640, 400);
+--- ioemu.orig/vnc.c	2007-05-03 19:49:43.000000000 +0100
++++ ioemu/vnc.c	2007-05-03 19:49:46.000000000 +0100
+@@ -1364,3 +1364,31 @@
+ 	exit(1);
+     }
  }
 +
 +int vnc_start_viewer(int port)
@@ -36,9 +36,9 @@ Index: ioemu/vnc.c
 +}
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:24:05.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:24:06.000000000 +0100
-@@ -121,6 +121,7 @@
+--- ioemu.orig/vl.c	2007-05-03 19:46:21.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:50:04.000000000 +0100
+@@ -131,6 +131,7 @@
  int bios_size;
  static DisplayState display_state;
  int nographic;
@@ -46,15 +46,15 @@ Index: ioemu/vl.c
  const char* keyboard_layout = NULL;
  int64_t ticks_per_sec;
  int boot_device = 'c';
-@@ -5415,6 +5416,7 @@
- #endif
+@@ -6309,6 +6310,7 @@
+            "-no-reboot      exit instead of rebooting\n"
             "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
  	   "-vnc display    start a VNC server on display\n"
 +           "-vncviewer      start a vncviewer process for this domain\n"
-            "-acpi           disable or enable ACPI of HVM domain \n"
-            "\n"
-            "During emulation, the following keys are useful:\n"
-@@ -5501,6 +5503,7 @@
+ #ifndef _WIN32
+ 	   "-daemonize      daemonize QEMU after initializing\n"
+ #endif
+@@ -6404,6 +6406,7 @@
      QEMU_OPTION_d,
      QEMU_OPTION_vcpus,
      QEMU_OPTION_acpi,
@@ -62,15 +62,15 @@ Index: ioemu/vl.c
  };
  
  typedef struct QEMUOption {
-@@ -5575,6 +5578,7 @@
+@@ -6482,6 +6485,7 @@
      { "usbdevice", HAS_ARG, QEMU_OPTION_usbdevice },
      { "smp", HAS_ARG, QEMU_OPTION_smp },
      { "vnc", HAS_ARG, QEMU_OPTION_vnc },
 +    { "vncviewer", 0, QEMU_OPTION_vncviewer },
-     
+ 
      /* temporary options */
      { "usb", 0, QEMU_OPTION_usb },
-@@ -5933,6 +5937,7 @@
+@@ -6848,6 +6852,7 @@
  #endif
      snapshot = 0;
      nographic = 0;
@@ -78,7 +78,7 @@ Index: ioemu/vl.c
      kernel_filename = NULL;
      kernel_cmdline = "";
  #ifdef TARGET_PPC
-@@ -6328,6 +6333,9 @@
+@@ -7264,6 +7269,9 @@
              case QEMU_OPTION_acpi:
                  acpi_enabled = 1;
                  break;
@@ -88,9 +88,9 @@ Index: ioemu/vl.c
              }
          }
      }
-@@ -6530,6 +6538,8 @@
+@@ -7547,6 +7555,8 @@
          dumb_display_init(ds);
-     } else if (vnc_display != -1) {
+     } else if (vnc_display != NULL) {
  	vnc_display_init(ds, vnc_display);
 +	if (vncviewer)
 +	    vnc_start_viewer(vnc_display);
@@ -99,13 +99,13 @@ Index: ioemu/vl.c
          sdl_display_init(ds, full_screen);
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 10:24:05.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 10:24:06.000000000 +0100
-@@ -786,6 +786,7 @@
- 
+--- ioemu.orig/vl.h	2007-05-03 19:46:21.000000000 +0100
++++ ioemu/vl.h	2007-05-03 19:50:15.000000000 +0100
+@@ -930,6 +930,7 @@
  /* vnc.c */
- void vnc_display_init(DisplayState *ds, int display);
+ void vnc_display_init(DisplayState *ds, const char *display);
+ void do_info_vnc(void);
 +int vnc_start_viewer(int port);
  
- /* ide.c */
- #define MAX_DISKS 4
+ /* x_keymap.c */
+ extern uint8_t _translate_keycode(const int key);

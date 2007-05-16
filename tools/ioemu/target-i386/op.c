@@ -678,6 +678,11 @@ void OPPROTO op_reset_inhibit_irq(void)
     env->hflags &= ~HF_INHIBIT_IRQ_MASK;
 }
 
+void OPPROTO op_rsm(void)
+{
+    helper_rsm();
+}
+
 #if 0
 /* vm86plus instructions */
 void OPPROTO op_cli_vm(void)
@@ -783,7 +788,7 @@ void OPPROTO op_movzwl_T0_T0(void)
 
 void OPPROTO op_movswl_EAX_AX(void)
 {
-    EAX = (int16_t)EAX;
+    EAX = (uint32_t)((int16_t)EAX);
 }
 
 #ifdef TARGET_X86_64
@@ -805,7 +810,7 @@ void OPPROTO op_movsbw_AX_AL(void)
 
 void OPPROTO op_movslq_EDX_EAX(void)
 {
-    EDX = (int32_t)EAX >> 31;
+    EDX = (uint32_t)((int32_t)EAX >> 31);
 }
 
 void OPPROTO op_movswl_DX_AX(void)

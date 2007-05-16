@@ -2023,7 +2023,7 @@ float32 float32_sqrt( float32 a STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float32_eq( float32 a, float32 b STATUS_PARAM )
+int float32_eq( float32 a, float32 b STATUS_PARAM )
 {
 
     if (    ( ( extractFloat32Exp( a ) == 0xFF ) && extractFloat32Frac( a ) )
@@ -2045,7 +2045,7 @@ flag float32_eq( float32 a, float32 b STATUS_PARAM )
 | Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float32_le( float32 a, float32 b STATUS_PARAM )
+int float32_le( float32 a, float32 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -2068,7 +2068,7 @@ flag float32_le( float32 a, float32 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float32_lt( float32 a, float32 b STATUS_PARAM )
+int float32_lt( float32 a, float32 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -2092,7 +2092,7 @@ flag float32_lt( float32 a, float32 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float32_eq_signaling( float32 a, float32 b STATUS_PARAM )
+int float32_eq_signaling( float32 a, float32 b STATUS_PARAM )
 {
 
     if (    ( ( extractFloat32Exp( a ) == 0xFF ) && extractFloat32Frac( a ) )
@@ -2112,7 +2112,7 @@ flag float32_eq_signaling( float32 a, float32 b STATUS_PARAM )
 | IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float32_le_quiet( float32 a, float32 b STATUS_PARAM )
+int float32_le_quiet( float32 a, float32 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -2138,7 +2138,7 @@ flag float32_le_quiet( float32 a, float32 b STATUS_PARAM )
 | Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float32_lt_quiet( float32 a, float32 b STATUS_PARAM )
+int float32_lt_quiet( float32 a, float32 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -2481,6 +2481,17 @@ float64 float64_round_to_int( float64 a STATUS_PARAM )
     if ( z != a ) STATUS(float_exception_flags) |= float_flag_inexact;
     return z;
 
+}
+
+float64 float64_trunc_to_int( float64 a STATUS_PARAM)
+{
+    int oldmode;
+    float64 res;
+    oldmode = STATUS(float_rounding_mode);
+    STATUS(float_rounding_mode) = float_round_to_zero;
+    res = float64_round_to_int(a STATUS_VAR);
+    STATUS(float_rounding_mode) = oldmode;
+    return res;
 }
 
 /*----------------------------------------------------------------------------
@@ -2941,7 +2952,7 @@ float64 float64_sqrt( float64 a STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float64_eq( float64 a, float64 b STATUS_PARAM )
+int float64_eq( float64 a, float64 b STATUS_PARAM )
 {
 
     if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
@@ -2963,7 +2974,7 @@ flag float64_eq( float64 a, float64 b STATUS_PARAM )
 | Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float64_le( float64 a, float64 b STATUS_PARAM )
+int float64_le( float64 a, float64 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -2986,7 +2997,7 @@ flag float64_le( float64 a, float64 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float64_lt( float64 a, float64 b STATUS_PARAM )
+int float64_lt( float64 a, float64 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -3010,7 +3021,7 @@ flag float64_lt( float64 a, float64 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float64_eq_signaling( float64 a, float64 b STATUS_PARAM )
+int float64_eq_signaling( float64 a, float64 b STATUS_PARAM )
 {
 
     if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
@@ -3030,7 +3041,7 @@ flag float64_eq_signaling( float64 a, float64 b STATUS_PARAM )
 | IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float64_le_quiet( float64 a, float64 b STATUS_PARAM )
+int float64_le_quiet( float64 a, float64 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -3056,7 +3067,7 @@ flag float64_le_quiet( float64 a, float64 b STATUS_PARAM )
 | Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float64_lt_quiet( float64 a, float64 b STATUS_PARAM )
+int float64_lt_quiet( float64 a, float64 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -3879,7 +3890,7 @@ floatx80 floatx80_sqrt( floatx80 a STATUS_PARAM )
 | Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag floatx80_eq( floatx80 a, floatx80 b STATUS_PARAM )
+int floatx80_eq( floatx80 a, floatx80 b STATUS_PARAM )
 {
 
     if (    (    ( extractFloatx80Exp( a ) == 0x7FFF )
@@ -3909,7 +3920,7 @@ flag floatx80_eq( floatx80 a, floatx80 b STATUS_PARAM )
 | Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag floatx80_le( floatx80 a, floatx80 b STATUS_PARAM )
+int floatx80_le( floatx80 a, floatx80 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -3942,7 +3953,7 @@ flag floatx80_le( floatx80 a, floatx80 b STATUS_PARAM )
 | Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag floatx80_lt( floatx80 a, floatx80 b STATUS_PARAM )
+int floatx80_lt( floatx80 a, floatx80 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -3975,7 +3986,7 @@ flag floatx80_lt( floatx80 a, floatx80 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag floatx80_eq_signaling( floatx80 a, floatx80 b STATUS_PARAM )
+int floatx80_eq_signaling( floatx80 a, floatx80 b STATUS_PARAM )
 {
 
     if (    (    ( extractFloatx80Exp( a ) == 0x7FFF )
@@ -4002,7 +4013,7 @@ flag floatx80_eq_signaling( floatx80 a, floatx80 b STATUS_PARAM )
 | to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag floatx80_le_quiet( floatx80 a, floatx80 b STATUS_PARAM )
+int floatx80_le_quiet( floatx80 a, floatx80 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -4038,7 +4049,7 @@ flag floatx80_le_quiet( floatx80 a, floatx80 b STATUS_PARAM )
 | IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag floatx80_lt_quiet( floatx80 a, floatx80 b STATUS_PARAM )
+int floatx80_lt_quiet( floatx80 a, floatx80 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -4999,7 +5010,7 @@ float128 float128_sqrt( float128 a STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float128_eq( float128 a, float128 b STATUS_PARAM )
+int float128_eq( float128 a, float128 b STATUS_PARAM )
 {
 
     if (    (    ( extractFloat128Exp( a ) == 0x7FFF )
@@ -5029,7 +5040,7 @@ flag float128_eq( float128 a, float128 b STATUS_PARAM )
 | Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float128_le( float128 a, float128 b STATUS_PARAM )
+int float128_le( float128 a, float128 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -5061,7 +5072,7 @@ flag float128_le( float128 a, float128 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float128_lt( float128 a, float128 b STATUS_PARAM )
+int float128_lt( float128 a, float128 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -5094,7 +5105,7 @@ flag float128_lt( float128 a, float128 b STATUS_PARAM )
 | according to the IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float128_eq_signaling( float128 a, float128 b STATUS_PARAM )
+int float128_eq_signaling( float128 a, float128 b STATUS_PARAM )
 {
 
     if (    (    ( extractFloat128Exp( a ) == 0x7FFF )
@@ -5121,7 +5132,7 @@ flag float128_eq_signaling( float128 a, float128 b STATUS_PARAM )
 | IEC/IEEE Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float128_le_quiet( float128 a, float128 b STATUS_PARAM )
+int float128_le_quiet( float128 a, float128 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -5157,7 +5168,7 @@ flag float128_le_quiet( float128 a, float128 b STATUS_PARAM )
 | Standard for Binary Floating-Point Arithmetic.
 *----------------------------------------------------------------------------*/
 
-flag float128_lt_quiet( float128 a, float128 b STATUS_PARAM )
+int float128_lt_quiet( float128 a, float128 b STATUS_PARAM )
 {
     flag aSign, bSign;
 
@@ -5272,7 +5283,7 @@ unsigned int float64_to_uint32_round_to_zero( float64 a STATUS_PARAM )
 }
 
 #define COMPARE(s, nan_exp)                                                  \
-INLINE char float ## s ## _compare_internal( float ## s a, float ## s b,     \
+INLINE int float ## s ## _compare_internal( float ## s a, float ## s b,      \
                                       int is_quiet STATUS_PARAM )            \
 {                                                                            \
     flag aSign, bSign;                                                       \
@@ -5306,12 +5317,12 @@ INLINE char float ## s ## _compare_internal( float ## s a, float ## s b,     \
     }                                                                        \
 }                                                                            \
                                                                              \
-char float ## s ## _compare( float ## s a, float ## s b STATUS_PARAM )       \
+int float ## s ## _compare( float ## s a, float ## s b STATUS_PARAM )        \
 {                                                                            \
     return float ## s ## _compare_internal(a, b, 0 STATUS_VAR);              \
 }                                                                            \
                                                                              \
-char float ## s ## _compare_quiet( float ## s a, float ## s b STATUS_PARAM ) \
+int float ## s ## _compare_quiet( float ## s a, float ## s b STATUS_PARAM )  \
 {                                                                            \
     return float ## s ## _compare_internal(a, b, 1 STATUS_VAR);              \
 }

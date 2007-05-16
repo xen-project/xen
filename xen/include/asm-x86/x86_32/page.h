@@ -3,6 +3,10 @@
 #define __X86_32_PAGE_H__
 
 #define __PAGE_OFFSET           (0xFF000000)
+#define __XEN_VIRT_START        __PAGE_OFFSET
+
+#define virt_to_maddr(va) ((unsigned long)(va)-DIRECTMAP_VIRT_START)
+#define maddr_to_virt(ma) ((void *)((unsigned long)(ma)+DIRECTMAP_VIRT_START))
 
 #define VADDR_BITS              32
 #define VADDR_MASK              (~0UL)

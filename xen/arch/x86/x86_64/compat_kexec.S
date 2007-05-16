@@ -8,7 +8,9 @@
 #include <asm/msr.h>
 #include <asm/page.h>
 
-.text
+#define SYM_PHYS(sym)       ((sym) - __XEN_VIRT_START)
+
+        .text
 
         .code64
 
@@ -29,21 +31,19 @@ ENTRY(compat_machine_kexec)
         test %r9,%r9
         jnz 1b
 
-        movq %rbx,%rdx
-        mov $__PAGE_OFFSET,%rbx
-        sub %rbx, %rdx
+        mov $SYM_PHYS(compat_page_list),%rdx
 
         /*
          * Setup an identity mapped region in PML4[0] of idle page
          * table.
          */
-        lea idle_pg_table_l3(%rip),%rax
+        lea l3_identmap(%rip),%rax
         sub %rbx,%rax
         or  $0x63,%rax
         mov %rax, idle_pg_table(%rip)
 
         /* Switch to idle page table. */
-        movq $(idle_pg_table - __PAGE_OFFSET), %rax
+        movq $SYM_PHYS(idle_pg_table), %rax
         movq %rax, %cr3
 
         /* Jump to low identity mapping in compatibility mode. */
@@ -51,7 +51,7 @@ ENTRY(compat_machine_kexec)
         ud2
 
 compatibility_mode_far:
-        .long compatibility_mode - __PAGE_OFFSET
+        .long SYM_PHYS(compatibility_mode)
         .long __HYPERVISOR_CS32
 
         .code32
@@ -78,7 +78,7 @@ compatibility_mode:
         movl %eax, %cr0
 
         /* Switch to 32 bit page table. */
-        movl  $compat_pg_table - __PAGE_OFFSET, %eax
+        movl  $SYM_PHYS(compat_pg_table), %eax
         movl  %eax, %cr3
 
         /* Clear MSR_EFER[LME], disabling long mode */
@@ -106,10 +106,10 @@ compat_page_list:
          * first 4G of the physical address space.
          */
 compat_pg_table:
-        .long compat_pg_table_l2 + 0*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
-        .long compat_pg_table_l2 + 1*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
-        .long compat_pg_table_l2 + 2*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
-        .long compat_pg_table_l2 + 3*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long SYM_PHYS(compat_pg_table_l2) + 0*PAGE_SIZE + 0x01, 0
+        .long SYM_PHYS(compat_pg_table_l2) + 1*PAGE_SIZE + 0x01, 0
+        .long SYM_PHYS(compat_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
+        .long SYM_PHYS(compat_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
 
         .align 4096,0
 

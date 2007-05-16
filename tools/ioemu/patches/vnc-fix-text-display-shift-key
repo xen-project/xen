@@ -1,0 +1,13 @@
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2007-05-10 15:11:44.000000000 +0100
++++ ioemu/vnc.c	2007-05-10 15:11:44.000000000 +0100
+@@ -993,7 +993,7 @@
+ 
+ static void key_event(VncState *vs, int down, uint32_t sym)
+ {
+-    if (sym >= 'A' && sym <= 'Z')
++    if (sym >= 'A' && sym <= 'Z' && is_graphic_console())
+ 	sym = sym - 'A' + 'a';
+     do_key_event(vs, down, sym);
+ }

@@ -112,7 +112,7 @@ struct page_info
  /* 29-bit count of references to this frame. */
 #define PGC_count_mask      ((1UL<<28)-1)
 
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
+#define is_xen_heap_frame(pfn) (page_to_maddr(pfn) < xenheap_phys_end)
 
 static inline struct domain *unpickle_domptr(u32 _domain)
 { return ((_domain == 0) || (_domain & 1)) ? NULL : __va(_domain); }

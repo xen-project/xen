@@ -282,7 +282,7 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
                              bit. */
 }
 
-void initialize_keytable(void)
+void __init initialize_keytable(void)
 {
     open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
 

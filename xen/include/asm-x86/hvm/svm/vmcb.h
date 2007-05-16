@@ -1,6 +1,6 @@
 /*
  * vmcb.h: VMCB related definitions
- * Copyright (c) 2005, AMD Corporation.
+ * Copyright (c) 2005-2007, Advanced Micro Devices, Inc
  * Copyright (c) 2004, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,6 @@
 #include <asm/config.h>
 #include <asm/hvm/hvm.h>
 
-int start_svm(void);
 
 /* general 1 intercepts */
 enum GenericIntercept1bits
@@ -444,11 +443,11 @@ struct vmcb_struct {
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
     u64                 vmcb_pa;
-    u32                 *msrpm;
-    u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
+    u64                 asid_generation; /* ASID tracking, moved here to
+                                            prevent cacheline misses. */
+    u32                *msrpm;
     int                 launch_core;
-    
-    unsigned long       flags;            /* VMCB flags */
+    bool_t              vmcb_in_sync;     /* VMCB sync'ed with VMSAVE? */
     unsigned long       cpu_shadow_cr0;   /* Guest value for CR0 */
     unsigned long       cpu_shadow_cr4;   /* Guest value for CR4 */
     unsigned long       cpu_shadow_efer;  /* Guest value for EFER */

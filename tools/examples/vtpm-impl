@@ -83,7 +83,7 @@ function vtpm_manager_cmd() {
  release_lock vtpm_mgr
 
  #return whether the command was successful
- if [ $resp_hex ne $TPM_SUCCESS ]; then
+ if [ $resp_hex -ne $TPM_SUCCESS ]; then
    vtpm_fatal_error=1
    false
   else

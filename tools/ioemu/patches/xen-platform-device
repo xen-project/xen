@@ -3,21 +3,21 @@ will come later.
 
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2007-05-03 15:16:41.000000000 +0100
-+++ ioemu/Makefile.target	2007-05-03 15:20:35.000000000 +0100
-@@ -360,6 +360,7 @@
- VL_OBJS+= usb-uhci.o
+--- ioemu.orig/Makefile.target	2007-05-10 15:19:05.000000000 +0100
++++ ioemu/Makefile.target	2007-05-10 15:19:28.000000000 +0100
+@@ -391,6 +391,7 @@
+ VL_OBJS+= usb-uhci.o smbus_eeprom.o
  VL_OBJS+= piix4acpi.o
  VL_OBJS+= xenstore.o
 +VL_OBJS+= xen_platform.o
- DEFINES += -DHAS_AUDIO
+ CPPFLAGS += -DHAS_AUDIO
  endif
  ifeq ($(TARGET_BASE_ARCH), ppc)
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2007-05-03 15:18:17.000000000 +0100
-+++ ioemu/hw/pc.c	2007-05-03 15:20:35.000000000 +0100
-@@ -823,6 +823,9 @@
+--- ioemu.orig/hw/pc.c	2007-05-10 15:19:11.000000000 +0100
++++ ioemu/hw/pc.c	2007-05-10 15:19:28.000000000 +0100
+@@ -676,6 +676,9 @@
      }
  #endif /* !CONFIG_DM */
  
@@ -30,8 +30,8 @@ Index: ioemu/hw/pc.c
 Index: ioemu/hw/xen_platform.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/hw/xen_platform.c	2007-05-03 15:18:17.000000000 +0100
-@@ -0,0 +1,133 @@
++++ ioemu/hw/xen_platform.c	2007-05-10 15:19:28.000000000 +0100
+@@ -0,0 +1,150 @@
 +/*
 + * XEN platform fake pci device, formerly known as the event channel device
 + * 
@@ -131,6 +131,23 @@ Index: ioemu/hw/xen_platform.c
 +    uint8_t  max_lat;
 +};
 +
++void xen_pci_save(QEMUFile *f, void *opaque)
++{
++    PCIDevice *d = opaque;
++
++    pci_device_save(d, f);
++}
++
++int xen_pci_load(QEMUFile *f, void *opaque, int version_id)
++{
++    PCIDevice *d = opaque;
++
++    if (version_id != 1)
++        return -EINVAL;
++
++    return pci_device_load(d, f);
++}
++
 +void pci_xen_platform_init(PCIBus *bus)
 +{
 +    PCIDevice *d;
@@ -162,14 +179,14 @@ Index: ioemu/hw/xen_platform.c
 +    pci_register_io_region(d, 1, 0x1000000, PCI_ADDRESS_SPACE_MEM_PREFETCH,
 +			   platform_mmio_map);
 +
-+    register_savevm("platform", 0, 1, generic_pci_save, generic_pci_load, d);
++    register_savevm("platform", 0, 1, xen_pci_save, xen_pci_load, d);
 +    printf("Done register platform.\n");
 +}
 Index: ioemu/vl.h
 ===================================================================
---- ioemu.orig/vl.h	2007-05-03 15:18:17.000000000 +0100
-+++ ioemu/vl.h	2007-05-03 15:20:39.000000000 +0100
-@@ -1220,6 +1220,10 @@
+--- ioemu.orig/vl.h	2007-05-10 15:19:11.000000000 +0100
++++ ioemu/vl.h	2007-05-10 15:19:28.000000000 +0100
+@@ -1437,6 +1437,10 @@
  extern long time_offset;
  void timeoffset_get(void);
  

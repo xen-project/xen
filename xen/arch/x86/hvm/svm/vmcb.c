@@ -1,6 +1,6 @@
 /*
  * vmcb.c: VMCB management
- * Copyright (c) 2005, AMD Corporation.
+ * Copyright (c) 2005-2007, Advanced Micro Devices, Inc.
  * Copyright (c) 2004, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/intr.h>
+#include <asm/hvm/svm/asid.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
@@ -109,11 +110,9 @@ static int construct_vmcb(struct vcpu *v)
     struct vmcb_struct *vmcb = arch_svm->vmcb;
     svm_segment_attributes_t attrib;
 
-    /* Always flush the TLB on VMRUN. All guests share a single ASID (1). */
-    vmcb->tlb_control = 1;
-    vmcb->guest_asid  = 1;
+    /* TLB control, and ASID assigment. */
+    svm_asid_init_vcpu (v);
 
-    /* SVM intercepts. */
     vmcb->general1_intercepts = 
         GENERAL1_INTERCEPT_INTR         | GENERAL1_INTERCEPT_NMI         |
         GENERAL1_INTERCEPT_SMI          | GENERAL1_INTERCEPT_INIT        |

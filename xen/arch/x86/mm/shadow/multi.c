@@ -181,11 +181,11 @@ guest_supports_superpages(struct vcpu *v)
 static inline int
 guest_supports_nx(struct vcpu *v)
 {
+    if ( GUEST_PAGING_LEVELS == 2 || !cpu_has_nx )
+        return 0;
     if ( !is_hvm_vcpu(v) )
-        return cpu_has_nx;
-
-    // XXX - fix this!
-    return 1;
+        return 1;
+    return hvm_nx_enabled(v);
 }
 
 

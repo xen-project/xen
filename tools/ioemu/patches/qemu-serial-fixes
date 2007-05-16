@@ -13,21 +13,21 @@ Signed-off-by: Keir Fraser <keir@xensource.com>
 
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:09:02.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:09:02.000000000 +0100
-@@ -1740,7 +1740,7 @@
+--- ioemu.orig/vl.c	2007-05-10 15:35:24.000000000 +0100
++++ ioemu/vl.c	2007-05-10 15:35:25.000000000 +0100
+@@ -1871,7 +1871,7 @@
  
      tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP
                            |INLCR|IGNCR|ICRNL|IXON);
 -    tty.c_oflag |= OPOST;
 +    tty.c_oflag &= ~OPOST; /* no output mangling of raw serial stream */
      tty.c_lflag &= ~(ECHO|ECHONL|ICANON|IEXTEN|ISIG);
-     tty.c_cflag &= ~(CSIZE|PARENB|PARODD|CRTSCTS);
+     tty.c_cflag &= ~(CSIZE|PARENB|PARODD|CRTSCTS|CSTOPB);
      switch(data_bits) {
 Index: ioemu/hw/serial.c
 ===================================================================
---- ioemu.orig/hw/serial.c	2007-05-03 10:09:02.000000000 +0100
-+++ ioemu/hw/serial.c	2007-05-03 10:09:02.000000000 +0100
+--- ioemu.orig/hw/serial.c	2007-05-10 15:35:24.000000000 +0100
++++ ioemu/hw/serial.c	2007-05-10 15:35:25.000000000 +0100
 @@ -73,6 +73,11 @@
  #define UART_LSR_OE	0x02	/* Overrun error indicator */
  #define UART_LSR_DR	0x01	/* Receiver data ready */
@@ -38,7 +38,7 @@ Index: ioemu/hw/serial.c
 +#define WRITE_MAX_TOTAL_RETRIES 10
 +
  struct SerialState {
-     uint8_t divider;
+     uint16_t divider;
      uint8_t rbr; /* receive register */
 @@ -93,6 +98,19 @@
      int last_break_enable;
@@ -115,19 +115,19 @@ Index: ioemu/hw/serial.c
          }
          break;
      case 1:
-@@ -424,6 +466,7 @@
+@@ -427,6 +469,7 @@
      s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
      s->iir = UART_IIR_NO_INT;
      s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
 +    s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
  
-     register_savevm("serial", base, 1, serial_save, serial_load, s);
+     register_savevm("serial", base, 2, serial_save, serial_load, s);
  
-@@ -511,6 +554,7 @@
+@@ -514,6 +557,7 @@
      s->msr = UART_MSR_DCD | UART_MSR_DSR | UART_MSR_CTS;
      s->base = base;
      s->it_shift = it_shift;
 +    s->write_retry_timer = qemu_new_timer(vm_clock, serial_chr_write, s);
  
-     register_savevm("serial", base, 1, serial_save, serial_load, s);
+     register_savevm("serial", base, 2, serial_save, serial_load, s);
  

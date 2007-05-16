@@ -1,8 +1,8 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2007-05-03 10:24:03.000000000 +0100
-+++ ioemu/vl.c	2007-05-03 10:24:04.000000000 +0100
-@@ -1537,26 +1537,108 @@
+--- ioemu.orig/vl.c	2007-05-03 19:12:00.000000000 +0100
++++ ioemu/vl.c	2007-05-03 19:14:57.000000000 +0100
+@@ -1671,26 +1671,108 @@
      return chr;
  }
  
@@ -92,7 +92,7 @@ Index: ioemu/vl.c
 +}
 +
  #if defined(__linux__)
- CharDriverState *qemu_chr_open_pty(void)
+ static CharDriverState *qemu_chr_open_pty(void)
  {
      struct termios tty;
 -    char slave_name[1024];
@@ -120,7 +120,7 @@ Index: ioemu/vl.c
      return qemu_chr_open_fd(master_fd, master_fd);
  }
  
-@@ -5881,7 +5963,9 @@
+@@ -6799,7 +6881,9 @@
                  break;
              case QEMU_OPTION_nographic:
                  pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
@@ -131,7 +131,7 @@ Index: ioemu/vl.c
                  nographic = 1;
                  break;
              case QEMU_OPTION_kernel:
-@@ -6348,16 +6432,23 @@
+@@ -7365,17 +7449,24 @@
          fprintf(stderr, "qemu: could not open monitor device '%s'\n", monitor_device);
          exit(1);
      }
@@ -139,12 +139,13 @@ Index: ioemu/vl.c
      monitor_init(monitor_hd, !nographic);
  
      for(i = 0; i < MAX_SERIAL_PORTS; i++) {
-         if (serial_devices[i][0] != '\0') {
+         const char *devname = serial_devices[i];
+         if (devname[0] != '\0' && strcmp(devname, "none")) {
 +            char buf[16];
-             serial_hds[i] = qemu_chr_open(serial_devices[i]);
+             serial_hds[i] = qemu_chr_open(devname);
              if (!serial_hds[i]) {
                  fprintf(stderr, "qemu: could not open serial device '%s'\n", 
-                         serial_devices[i]);
+                         devname);
                  exit(1);
              }
 +            snprintf(buf, sizeof(buf), "/serial/%d", i);
@@ -152,22 +153,22 @@ Index: ioemu/vl.c
 +            if (i == 0) /* serial 0 is also called the console */
 +                store_dev_info(serial_devices[i], domid,
 +                               serial_hds[i], "/console");
-             if (!strcmp(serial_devices[i], "vc"))
+             if (!strcmp(devname, "vc"))
                  qemu_chr_printf(serial_hds[i], "serial%d console\r\n", i);
          }
-@@ -6365,12 +6456,15 @@
- 
+@@ -7384,12 +7475,15 @@
      for(i = 0; i < MAX_PARALLEL_PORTS; i++) {
-         if (parallel_devices[i][0] != '\0') {
+         const char *devname = parallel_devices[i];
+         if (devname[0] != '\0' && strcmp(devname, "none")) {
 +            char buf[16];
-             parallel_hds[i] = qemu_chr_open(parallel_devices[i]);
+             parallel_hds[i] = qemu_chr_open(devname);
              if (!parallel_hds[i]) {
                  fprintf(stderr, "qemu: could not open parallel device '%s'\n", 
-                         parallel_devices[i]);
+                         devname);
                  exit(1);
              }
 +            snprintf(buf, sizeof(buf), "/parallel/%d", i);
 +            store_dev_info(parallel_devices[i], domid, parallel_hds[i], buf);
-             if (!strcmp(parallel_devices[i], "vc"))
+             if (!strcmp(devname, "vc"))
                  qemu_chr_printf(parallel_hds[i], "parallel%d console\r\n", i);
          }

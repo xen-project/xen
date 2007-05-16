@@ -61,7 +61,7 @@ void nonono(const char* file, int line, const char* msg) {
     exit(-5);
 }
 #undef assert
-#define assert(a) if (!(a)) nonono(__FILE__, __LINE__, #a)
+#define assert(a) do {if (!(a)) nonono(__FILE__, __LINE__, #a);}while(0)
 #endif
 
 #else
@@ -350,13 +350,6 @@ typedef struct BDRVVVFATState {
     int downcase_short_names;
 } BDRVVVFATState;
 
-
-static int vvfat_probe(const uint8_t *buf, int buf_size, const char *filename)
-{
-    if (strstart(filename, "fat:", NULL))
-	return 100;
-    return 0;
-}
 
 static void init_mbr(BDRVVVFATState* s)
 {
@@ -954,18 +947,22 @@ static int init_directories(BDRVVVFATState* s,
     return 0;
 }
 
+#ifdef DEBUG
 static BDRVVVFATState *vvv = NULL;
+#endif
 
 static int enable_write_target(BDRVVVFATState *s);
 static int is_consistent(BDRVVVFATState *s);
 
-static int vvfat_open(BlockDriverState *bs, const char* dirname)
+static int vvfat_open(BlockDriverState *bs, const char* dirname, int flags)
 {
     BDRVVVFATState *s = bs->opaque;
     int floppy = 0;
     int i;
 
+#ifdef DEBUG
     vvv = s;
+#endif
 
 DLOG(if (stderr == NULL) {
     stderr = fopen("vvfat.log", "a");
@@ -1040,7 +1037,6 @@ DLOG(if (stderr == NULL) {
 	bs->heads = bs->cyls = bs->secs = 0;
 
     //    assert(is_consistent(s));
-
     return 0;
 }
 
@@ -2178,7 +2174,7 @@ static int commit_one_file(BDRVVVFATState* s,
     for (i = s->cluster_size; i < offset; i += s->cluster_size)
 	c = modified_fat_get(s, c);
 
-    fd = open(mapping->path, O_RDWR | O_CREAT, 0666);
+    fd = open(mapping->path, O_RDWR | O_CREAT | O_BINARY, 0666);
     if (fd < 0) {
 	fprintf(stderr, "Could not open %s... (%s, %d)\n", mapping->path,
 		strerror(errno), errno);
@@ -2732,8 +2728,7 @@ static int enable_write_target(BDRVVVFATState *s)
     array_init(&(s->commits), sizeof(commit_t));
 
     s->qcow_filename = malloc(1024);
-    strcpy(s->qcow_filename, "/tmp/vl.XXXXXX");
-    get_tmp_filename(s->qcow_filename, strlen(s->qcow_filename) + 1);
+    get_tmp_filename(s->qcow_filename, 1024);
     if (bdrv_create(&bdrv_qcow,
 		s->qcow_filename, s->sector_count, "fat:", 0) < 0)
 	return -1;
@@ -2767,14 +2762,15 @@ static void vvfat_close(BlockDriverState *bs)
 BlockDriver bdrv_vvfat = {
     "vvfat",
     sizeof(BDRVVVFATState),
-    vvfat_probe,
+    NULL, /* no probe for protocols */
     vvfat_open,
     vvfat_read,
     vvfat_write,
     vvfat_close,
     NULL, /* ??? Not sure if we can do any meaningful flushing.  */
     NULL,
-    vvfat_is_allocated
+    vvfat_is_allocated,
+    .protocol_name = "fat",
 };
 
 #ifdef DEBUG

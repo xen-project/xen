@@ -1,7 +1,7 @@
 /*
- * create a COW disk image
+ * QEMU disk image utility
  * 
- * Copyright (c) 2003 Fabrice Bellard
+ * Copyright (c) 2003-2007 Fabrice Bellard
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -62,55 +62,17 @@ char *qemu_strdup(const char *str)
     return ptr;
 }
 
-void pstrcpy(char *buf, int buf_size, const char *str)
-{
-    int c;
-    char *q = buf;
-
-    if (buf_size <= 0)
-        return;
-
-    for(;;) {
-        c = *str++;
-        if (c == 0 || q >= buf + buf_size - 1)
-            break;
-        *q++ = c;
-    }
-    *q = '\0';
-}
-
-/* strcat and truncate. */
-char *pstrcat(char *buf, int buf_size, const char *s)
-{
-    int len;
-    len = strlen(buf);
-    if (len < buf_size) 
-        pstrcpy(buf + len, buf_size - len, s);
-    return buf;
-}
-
-int strstart(const char *str, const char *val, const char **ptr)
-{
-    const char *p, *q;
-    p = str;
-    q = val;
-    while (*q != '\0') {
-        if (*p != *q)
-            return 0;
-        p++;
-        q++;
-    }
-    if (ptr)
-        *ptr = p;
-    return 1;
-}
-
 void term_printf(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+}
+
+void term_print_filename(const char *filename)
+{
+    term_printf(filename);
 }
 
 void __attribute__((noreturn)) error(const char *fmt, ...) 
@@ -131,7 +93,7 @@ static void format_print(void *opaque, const char *name)
 
 void help(void)
 {
-    printf("qemu-img version " QEMU_VERSION ", Copyright (c) 2004-2005 Fabrice Bellard\n"
+    printf("qemu-img version " QEMU_VERSION ", Copyright (c) 2004-2007 Fabrice Bellard\n"
            "usage: qemu-img command [command options]\n"
            "QEMU disk image utility\n"
            "\n"
@@ -157,36 +119,6 @@ void help(void)
     bdrv_iterate_format(format_print, NULL);
     printf("\n");
     exit(1);
-}
-
-
-#define NB_SUFFIXES 4
-
-static void get_human_readable_size(char *buf, int buf_size, int64_t size)
-{
-    static const char suffixes[NB_SUFFIXES] = "KMGT";
-    int64_t base;
-    int i;
-
-    if (size <= 999) {
-        snprintf(buf, buf_size, "%" PRId64, size);
-    } else {
-        base = 1024;
-        for(i = 0; i < NB_SUFFIXES; i++) {
-            if (size < (10 * base)) {
-                snprintf(buf, buf_size, "%0.1f%c", 
-                         (double)size / base,
-                         suffixes[i]);
-                break;
-            } else if (size < (1000 * base) || i == (NB_SUFFIXES - 1)) {
-                snprintf(buf, buf_size, "%" PRId64 "%c", 
-                         ((size + (base >> 1)) / base),
-                         suffixes[i]);
-                break;
-            }
-            base = base * 1024;
-        }
-    }
 }
 
 #if defined(WIN32)
@@ -486,6 +418,7 @@ static int img_convert(int argc, char **argv)
     int64_t total_sectors, nb_sectors, sector_num;
     uint8_t buf[IO_BUF_SIZE];
     const uint8_t *buf1;
+    BlockDriverInfo bdi;
 
     fmt = NULL;
     out_fmt = "raw";
@@ -525,9 +458,9 @@ static int img_convert(int argc, char **argv)
     drv = bdrv_find_format(out_fmt);
     if (!drv)
         error("Unknown file format '%s'", fmt);
-    if (compress && drv != &bdrv_qcow)
+    if (compress && drv != &bdrv_qcow && drv != &bdrv_qcow2)
         error("Compression not supported for this file format");
-    if (encrypt && drv != &bdrv_qcow)
+    if (encrypt && drv != &bdrv_qcow && drv != &bdrv_qcow2)
         error("Encryption not supported for this file format");
     if (compress && encrypt)
         error("Compression and encryption not supported at the same time");
@@ -544,7 +477,9 @@ static int img_convert(int argc, char **argv)
     out_bs = bdrv_new_open(out_filename, out_fmt);
 
     if (compress) {
-        cluster_size = qcow_get_cluster_size(out_bs);
+        if (bdrv_get_info(out_bs, &bdi) < 0)
+            error("could not get block driver info");
+        cluster_size = bdi.cluster_size;
         if (cluster_size <= 0 || cluster_size > IO_BUF_SIZE)
             error("invalid cluster size");
         cluster_sectors = cluster_size >> 9;
@@ -562,12 +497,15 @@ static int img_convert(int argc, char **argv)
             if (n < cluster_sectors)
                 memset(buf + n * 512, 0, cluster_size - n * 512);
             if (is_not_zero(buf, cluster_size)) {
-                if (qcow_compress_cluster(out_bs, sector_num, buf) != 0)
+                if (bdrv_write_compressed(out_bs, sector_num, buf, 
+                                          cluster_sectors) != 0)
                     error("error while compressing sector %" PRId64,
                           sector_num);
             }
             sector_num += n;
         }
+        /* signal EOF to align */
+        bdrv_write_compressed(out_bs, 0, NULL, 0);
     } else {
         sector_num = 0;
         for(;;) {
@@ -630,6 +568,24 @@ static int64_t get_allocated_file_size(const char *filename)
 }
 #endif
 
+static void dump_snapshots(BlockDriverState *bs)
+{
+    QEMUSnapshotInfo *sn_tab, *sn;
+    int nb_sns, i;
+    char buf[256];
+
+    nb_sns = bdrv_snapshot_list(bs, &sn_tab);
+    if (nb_sns <= 0)
+        return;
+    printf("Snapshot list:\n");
+    printf("%s\n", bdrv_snapshot_dump(buf, sizeof(buf), NULL));
+    for(i = 0; i < nb_sns; i++) {
+        sn = &sn_tab[i];
+        printf("%s\n", bdrv_snapshot_dump(buf, sizeof(buf), sn));
+    }
+    qemu_free(sn_tab);
+}
+
 static int img_info(int argc, char **argv)
 {
     int c;
@@ -638,6 +594,9 @@ static int img_info(int argc, char **argv)
     BlockDriverState *bs;
     char fmt_name[128], size_buf[128], dsize_buf[128];
     int64_t total_sectors, allocated_size;
+    char backing_filename[1024];
+    char backing_filename2[1024];
+    BlockDriverInfo bdi;
 
     fmt = NULL;
     for(;;) {
@@ -688,6 +647,19 @@ static int img_info(int argc, char **argv)
            dsize_buf);
     if (bdrv_is_encrypted(bs))
         printf("encrypted: yes\n");
+    if (bdrv_get_info(bs, &bdi) >= 0) {
+        if (bdi.cluster_size != 0) 
+            printf("cluster_size: %d\n", bdi.cluster_size);
+    }
+    bdrv_get_backing_filename(bs, backing_filename, sizeof(backing_filename));
+    if (backing_filename[0] != '\0') {
+        path_combine(backing_filename2, sizeof(backing_filename2),
+                     filename, backing_filename);
+        printf("backing file: %s (actual path: %s)\n", 
+               backing_filename,
+               backing_filename2);
+    }
+    dump_snapshots(bs);
     bdrv_delete(bs);
     return 0;
 }

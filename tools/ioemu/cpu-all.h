@@ -727,6 +727,13 @@ void page_unprotect_range(target_ulong data, target_ulong data_size);
 #define cpu_gen_code cpu_ppc_gen_code
 #define cpu_signal_handler cpu_ppc_signal_handler
 
+#elif defined(TARGET_M68K)
+#define CPUState CPUM68KState
+#define cpu_init cpu_m68k_init
+#define cpu_exec cpu_m68k_exec
+#define cpu_gen_code cpu_m68k_gen_code
+#define cpu_signal_handler cpu_m68k_signal_handler
+
 #elif defined(TARGET_MIPS)
 #define CPUState CPUMIPSState
 #define cpu_init cpu_mips_init
@@ -770,6 +777,7 @@ extern int code_copy_enabled;
 #define CPU_INTERRUPT_TIMER  0x08 /* internal timer exception pending */
 #define CPU_INTERRUPT_FIQ    0x10 /* Fast interrupt pending.  */
 #define CPU_INTERRUPT_HALT   0x20 /* CPU halt wanted */
+#define CPU_INTERRUPT_SMI    0x40 /* (x86 only) SMI interrupt pending */
 
 void cpu_interrupt(CPUState *s, int mask);
 void cpu_reset_interrupt(CPUState *env, int mask);
@@ -820,48 +828,6 @@ int cpu_inw(CPUState *env, int addr);
 int cpu_inl(CPUState *env, int addr);
 #endif
 
-#if defined(__i386__) || defined(__x86_64__)
-static __inline__ void atomic_set_bit(long nr, volatile void *addr)
-{
-        __asm__ __volatile__(
-                "lock ; bts %1,%0"
-                :"=m" (*(volatile long *)addr)
-                :"dIr" (nr));
-}
-static __inline__ void atomic_clear_bit(long nr, volatile void *addr)
-{
-        __asm__ __volatile__(
-                "lock ; btr %1,%0"
-                :"=m" (*(volatile long *)addr)
-                :"dIr" (nr));
-}
-#elif defined(__ia64__)
-#include "ia64_intrinsic.h"
-#define atomic_set_bit(nr, addr) ({					\
-	typeof(*addr) bit, old, new;					\
-	volatile typeof(*addr) *m;					\
-									\
-	m = (volatile typeof(*addr)*)(addr + nr / (8*sizeof(*addr)));	\
-	bit = 1 << (nr % (8*sizeof(*addr)));				\
-	do {								\
-		old = *m;						\
-		new = old | bit;					\
-	} while (cmpxchg_acq(m, old, new) != old);			\
-})
-
-#define atomic_clear_bit(nr, addr) ({					\
-	typeof(*addr) bit, old, new;					\
-	volatile typeof(*addr) *m;					\
-									\
-	m = (volatile typeof(*addr)*)(addr + nr / (8*sizeof(*addr)));	\
-	bit = ~(1 << (nr % (8*sizeof(*addr))));				\
-	do {								\
-		old = *m;						\
-		new = old & bit;					\
-	} while (cmpxchg_acq(m, old, new) != old);			\
-})
-#endif
-
 /* memory API */
 
 extern uint64_t phys_ram_size;
@@ -889,6 +855,7 @@ typedef uint32_t CPUReadMemoryFunc(void *opaque, target_phys_addr_t addr);
 void cpu_register_physical_memory(target_phys_addr_t start_addr, 
                                   unsigned long size,
                                   unsigned long phys_offset);
+uint32_t cpu_get_physical_page_desc(target_phys_addr_t addr);
 int cpu_register_io_memory(int io_index,
                            CPUReadMemoryFunc **mem_read,
                            CPUWriteMemoryFunc **mem_write,
@@ -1041,6 +1008,15 @@ static inline int64_t cpu_get_real_ticks (void)
                 : "=r"(rval.i32.high), "=r"(rval.i32.low));
         return rval.i64;
 #endif
+}
+#else
+/* The host CPU doesn't have an easily accessible cycle counter.
+   Just return a monotonically increasing vlue.  This will be totally wrong,
+   but hopefully better than nothing.  */
+static inline int64_t cpu_get_real_ticks (void)
+{
+    static int64_t ticks = 0;
+    return ticks++;
 }
 #endif
 

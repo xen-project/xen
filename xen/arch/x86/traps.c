@@ -75,8 +75,11 @@ char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
-/* Master table, used by all CPUs on x86/64, and by CPU0 on x86/32.*/
+/* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];
+
+/* Pointer to the IDT of every CPU. */
+idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
 #define DECLARE_TRAP_HANDLER(_name)                     \
 asmlinkage void _name(void);                            \
@@ -594,6 +597,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     else if ( regs->eax == 0x80000001 )
     {
         /* Modify Feature Information. */
+        if ( is_pv_32bit_vcpu(current) )
+            clear_bit(X86_FEATURE_SYSCALL % 32, &d);
         clear_bit(X86_FEATURE_RDTSCP % 32, &d);
     }
     else
@@ -1413,20 +1418,30 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
      * GPR context. This is needed for some systems which (ab)use IN/OUT
      * to communicate with BIOS code in system-management mode.
      */
+#ifdef __x86_64__
+    /* movq $host_to_guest_gpr_switch,%rcx */
+    io_emul_stub[0] = 0x48;
+    io_emul_stub[1] = 0xb9;
+    *(void **)&io_emul_stub[2] = (void *)host_to_guest_gpr_switch;
+    /* callq *%rcx */
+    io_emul_stub[10] = 0xff;
+    io_emul_stub[11] = 0xd1;
+#else
     /* call host_to_guest_gpr_switch */
     io_emul_stub[0] = 0xe8;
     *(s32 *)&io_emul_stub[1] =
         (char *)host_to_guest_gpr_switch - &io_emul_stub[5];
+    /* 7 x nop */
+    memset(&io_emul_stub[5], 0x90, 7);
+#endif
     /* data16 or nop */
-    io_emul_stub[5] = (op_bytes != 2) ? 0x90 : 0x66;
+    io_emul_stub[12] = (op_bytes != 2) ? 0x90 : 0x66;
     /* <io-access opcode> */
-    io_emul_stub[6] = opcode;
+    io_emul_stub[13] = opcode;
     /* imm8 or nop */
-    io_emul_stub[7] = 0x90;
-    /* jmp guest_to_host_gpr_switch */
-    io_emul_stub[8] = 0xe9;
-    *(s32 *)&io_emul_stub[9] =
-        (char *)guest_to_host_gpr_switch - &io_emul_stub[13];
+    io_emul_stub[14] = 0x90;
+    /* ret (jumps to guest_to_host_gpr_switch) */
+    io_emul_stub[15] = 0xc3;
 
     /* Handy function-typed pointer to the stub. */
     io_emul = (void *)io_emul_stub;
@@ -1438,7 +1453,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         op_bytes = 1;
     case 0xe5: /* IN imm8,%eax */
         port = insn_fetch(u8, code_base, eip, code_limit);
-        io_emul_stub[7] = port; /* imm8 */
+        io_emul_stub[14] = port; /* imm8 */
     exec_in:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
@@ -1480,7 +1495,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         op_bytes = 1;
     case 0xe7: /* OUT %eax,imm8 */
         port = insn_fetch(u8, code_base, eip, code_limit);
-        io_emul_stub[7] = port; /* imm8 */
+        io_emul_stub[14] = port; /* imm8 */
     exec_out:
         if ( !guest_io_okay(port, op_bytes, v, regs) )
             goto fail;
@@ -2015,13 +2030,11 @@ asmlinkage int do_spurious_interrupt_bug(struct cpu_user_regs *regs)
 
 void set_intr_gate(unsigned int n, void *addr)
 {
-#ifdef __i386__
     int i;
     /* Keep secondary tables in sync with IRQ updates. */
     for ( i = 1; i < NR_CPUS; i++ )
         if ( idt_tables[i] != NULL )
             _set_gate(&idt_tables[i][n], 14, 0, addr);
-#endif
     _set_gate(&idt_table[n], 14, 0, addr);
 }
 
@@ -2083,6 +2096,9 @@ void __init trap_init(void)
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
+
+    /* CPU0 uses the master IDT. */
+    idt_tables[0] = idt_table;
 
     percpu_traps_init();
 

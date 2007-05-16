@@ -184,7 +184,7 @@ void __init init_frametable(void)
     memset(frame_table, 0, nr_pages << PAGE_SHIFT);
 }
 
-void arch_init_memory(void)
+void __init arch_init_memory(void)
 {
     extern void subarch_init_memory(void);
 
@@ -410,7 +410,7 @@ void update_cr3(struct vcpu *v)
 }
 
 
-void invalidate_shadow_ldt(struct vcpu *v)
+static void invalidate_shadow_ldt(struct vcpu *v)
 {
     int i;
     unsigned long pfn;
@@ -1017,7 +1017,7 @@ static void pae_flush_pgd(
             l3tab_ptr = &cache->table[cache->inuse_idx][idx];
             _ol3e = l3e_get_intpte(*l3tab_ptr);
             _nl3e = l3e_get_intpte(nl3e);
-            _pl3e = cmpxchg((intpte_t *)l3tab_ptr, _ol3e, _nl3e);
+            _pl3e = cmpxchg(&l3e_get_intpte(*l3tab_ptr), _ol3e, _nl3e);
             BUG_ON(_pl3e != _ol3e);
         }
 
@@ -1316,7 +1316,7 @@ static inline int update_intpte(intpte_t *p,
 /* Macro that wraps the appropriate type-changes around update_intpte().
  * Arguments are: type, ptr, old, new, mfn, vcpu */
 #define UPDATE_ENTRY(_t,_p,_o,_n,_m,_v)                             \
-    update_intpte((intpte_t *)(_p),                                 \
+    update_intpte(&_t ## e_get_intpte(*(_p)),                       \
                   _t ## e_get_intpte(_o), _t ## e_get_intpte(_n),   \
                   (_m), (_v))
 
@@ -2261,7 +2261,7 @@ int do_mmu_update(
     struct vcpu *v = current;
     struct domain *d = v->domain;
     unsigned long type_info;
-    struct domain_mmap_cache mapcache, sh_mapcache;
+    struct domain_mmap_cache mapcache;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2285,7 +2285,6 @@ int do_mmu_update(
     }
 
     domain_mmap_cache_init(&mapcache);
-    domain_mmap_cache_init(&sh_mapcache);
 
     LOCK_BIGLOCK(d);
 
@@ -2447,7 +2446,6 @@ int do_mmu_update(
     UNLOCK_BIGLOCK(d);
 
     domain_mmap_cache_destroy(&mapcache);
-    domain_mmap_cache_destroy(&sh_mapcache);
 
     perfc_add(num_page_updates, i);
 
@@ -2500,7 +2498,7 @@ static int create_grant_pte_mapping(
     }
 
     ol1e = *(l1_pgentry_t *)va;
-    if ( !UPDATE_ENTRY(l1, va, ol1e, nl1e, mfn, v) )
+    if ( !UPDATE_ENTRY(l1, (l1_pgentry_t *)va, ol1e, nl1e, mfn, v) )
     {
         put_page_type(page);
         rc = GNTST_general_error;
@@ -3037,7 +3035,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
         if ( mfn_valid(prev_mfn) )
         {
-            if ( IS_XEN_HEAP_FRAME(mfn_to_page(prev_mfn)) )
+            if ( is_xen_heap_frame(mfn_to_page(prev_mfn)) )
                 /* Xen heap frames are simply unhooked from this phys slot. */
                 guest_physmap_remove_page(d, xatp.gpfn, prev_mfn);
             else
@@ -3240,13 +3238,14 @@ static int ptwr_emulated_update(
 
     /* We are looking only for read-only mappings of p.t. pages. */
     ASSERT((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) == _PAGE_PRESENT);
+    ASSERT(mfn_valid(mfn));
     ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table);
     ASSERT((page->u.inuse.type_info & PGT_count_mask) != 0);
     ASSERT(page_get_owner(page) == d);
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
-    if ( unlikely(!get_page_from_l1e(gl1e_to_ml1e(d, nl1e), d)) )
+    if ( unlikely(!get_page_from_l1e(nl1e, d)) )
     {
         if ( (CONFIG_PAGING_LEVELS >= 3) && is_pv_32bit_domain(d) &&
              (bytes == 4) && (addr & 4) && !do_cmpxchg &&
@@ -3272,7 +3271,7 @@ static int ptwr_emulated_update(
     adjust_guest_l1e(nl1e, d);
 
     /* Checked successfully: do the update (write or cmpxchg). */
-    pl1e = map_domain_page(page_to_mfn(page));
+    pl1e = map_domain_page(mfn);
     pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
     if ( do_cmpxchg )
     {
@@ -3280,28 +3279,28 @@ static int ptwr_emulated_update(
         intpte_t t = old;
         ol1e = l1e_from_intpte(old);
 
-        okay = paging_cmpxchg_guest_entry(v, (intpte_t *) pl1e, 
+        okay = paging_cmpxchg_guest_entry(v, &l1e_get_intpte(*pl1e),
                                           &t, val, _mfn(mfn));
         okay = (okay && t == old);
 
         if ( !okay )
         {
             unmap_domain_page(pl1e);
-            put_page_from_l1e(gl1e_to_ml1e(d, nl1e), d);
+            put_page_from_l1e(nl1e, d);
             return X86EMUL_CMPXCHG_FAILED;
         }
     }
     else
     {
         ol1e = *pl1e;
-        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, page_to_mfn(page), v) )
+        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn, v) )
             BUG();
     }
 
     unmap_domain_page(pl1e);
 
     /* Finally, drop the old PTE. */
-    put_page_from_l1e(gl1e_to_ml1e(d, ol1e), d);
+    put_page_from_l1e(ol1e, d);
 
     return X86EMUL_OKAY;
 }
@@ -3367,17 +3366,13 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 
     LOCK_BIGLOCK(d);
 
-    /*
-     * Attempt to read the PTE that maps the VA being accessed. By checking for
-     * PDE validity in the L2 we avoid many expensive fixups in __get_user().
-     */
+    /* Attempt to read the PTE that maps the VA being accessed. */
     guest_get_eff_l1e(v, addr, &pte);
-    if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
-        goto bail;
     page = l1e_get_page(pte);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) ||
+         !mfn_valid(l1e_get_pfn(pte)) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
          ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
          (page_get_owner(page) != d) )
@@ -3400,6 +3395,18 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
  bail:
     UNLOCK_BIGLOCK(d);
     return 0;
+}
+
+void free_xen_pagetable(void *v)
+{
+    extern int early_boot;
+
+    BUG_ON(early_boot);
+    
+    if ( is_xen_heap_frame(virt_to_page(v)) )
+        free_xenheap_page(v);
+    else
+        free_domheap_page(virt_to_page(v));
 }
 
 int map_pages_to_xen(
@@ -3475,6 +3482,74 @@ int map_pages_to_xen(
     return 0;
 }
 
+void destroy_xen_mappings(unsigned long s, unsigned long e)
+{
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned int  i;
+    unsigned long v = s;
+
+    ASSERT((s & ~PAGE_MASK) == 0);
+    ASSERT((e & ~PAGE_MASK) == 0);
+
+    while ( v < e )
+    {
+        pl2e = virt_to_xen_l2e(v);
+
+        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+        {
+            v += 1UL << L2_PAGETABLE_SHIFT;
+            v &= ~((1UL << L2_PAGETABLE_SHIFT) - 1);
+            continue;
+        }
+
+        if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
+        {
+            if ( (l1_table_offset(v) == 0) &&
+                 ((e-v) >= (1UL << L2_PAGETABLE_SHIFT)) )
+            {
+                /* PSE: whole superpage is destroyed. */
+                l2e_write_atomic(pl2e, l2e_empty());
+                v += 1UL << L2_PAGETABLE_SHIFT;
+            }
+            else
+            {
+                /* PSE: shatter the superpage and try again. */
+                pl1e = alloc_xen_pagetable();
+                for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                    l1e_write(&pl1e[i],
+                              l1e_from_pfn(l2e_get_pfn(*pl2e) + i,
+                                           l2e_get_flags(*pl2e) & ~_PAGE_PSE));
+                l2e_write_atomic(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                                                    __PAGE_HYPERVISOR));
+            }
+        }
+        else
+        {
+            /* Ordinary 4kB mapping. */
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(v);
+            l1e_write_atomic(pl1e, l1e_empty());
+            v += PAGE_SIZE;
+
+            /* If we are done with the L2E, check if it is now empty. */
+            if ( (v != e) && (l1_table_offset(v) != 0) )
+                continue;
+            pl1e = l2e_to_l1e(*pl2e);
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+                if ( l1e_get_intpte(pl1e[i]) != 0 )
+                    break;
+            if ( i == L1_PAGETABLE_ENTRIES )
+            {
+                /* Empty: zap the L2E and free the L1 page. */
+                l2e_write_atomic(pl2e, l2e_empty());
+                free_xen_pagetable(pl1e);
+            }
+        }
+    }
+
+    flush_tlb_all_pge();
+}
+
 void __set_fixmap(
     enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
 {
@@ -3487,8 +3562,17 @@ void __set_fixmap(
 void memguard_init(void)
 {
     map_pages_to_xen(
-        PAGE_OFFSET, 0, xenheap_phys_end >> PAGE_SHIFT,
+        (unsigned long)__va(xen_phys_start),
+        xen_phys_start >> PAGE_SHIFT,
+        (xenheap_phys_end - xen_phys_start) >> PAGE_SHIFT,
         __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+#ifdef __x86_64__
+    map_pages_to_xen(
+        XEN_VIRT_START,
+        xen_phys_start >> PAGE_SHIFT,
+        (__pa(&_end) + PAGE_SIZE - 1 - xen_phys_start) >> PAGE_SHIFT,
+        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
+#endif
 }
 
 static void __memguard_change_range(void *p, unsigned long l, int guard)

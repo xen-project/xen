@@ -17,6 +17,7 @@
 #define ROOT_PAGETABLE_ENTRIES  L4_PAGETABLE_ENTRIES
 
 #define __PAGE_OFFSET           (0xFFFF830000000000)
+#define __XEN_VIRT_START        (0xFFFF828C80000000)
 
 /* These are architectural limits. Current CPUs support only 40-bit phys. */
 #define PADDR_BITS              52
@@ -30,6 +31,23 @@
 
 #include <xen/config.h>
 #include <asm/types.h>
+
+/* Physical address where Xen was relocated to. */
+extern unsigned long xen_phys_start;
+
+static inline unsigned long __virt_to_maddr(unsigned long va)
+{
+    ASSERT(va >= XEN_VIRT_START);
+    ASSERT(va < DIRECTMAP_VIRT_END);
+    ASSERT((va < XEN_VIRT_END) || (va >= DIRECTMAP_VIRT_START));
+    if ( va > DIRECTMAP_VIRT_START )
+        return va - DIRECTMAP_VIRT_START;
+    return va - XEN_VIRT_START + xen_phys_start;
+}
+#define virt_to_maddr(va)       \
+    (__virt_to_maddr((unsigned long)(va)))
+#define maddr_to_virt(ma)       \
+    ((void *)((unsigned long)(ma)+DIRECTMAP_VIRT_START))
 
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;

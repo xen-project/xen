@@ -9,8 +9,8 @@ Signed-off-by: Steven Smith <sos22@cam.ac.uk>
 
 Index: ioemu/vnc.c
 ===================================================================
---- ioemu.orig/vnc.c	2006-12-06 23:46:11.000000000 +0000
-+++ ioemu/vnc.c	2006-12-06 23:46:11.000000000 +0000
+--- ioemu.orig/vnc.c	2007-05-03 19:49:33.000000000 +0100
++++ ioemu/vnc.c	2007-05-03 19:49:43.000000000 +0100
 @@ -26,6 +26,7 @@
  
  #include "vl.h"
@@ -19,7 +19,7 @@ Index: ioemu/vnc.c
  
  #define VNC_REFRESH_INTERVAL (1000 / 30)
  
-@@ -679,8 +680,10 @@
+@@ -710,8 +711,10 @@
  	    memmove(vs->input.buffer, vs->input.buffer + len,
  		    vs->input.offset - len);
  	    vs->input.offset -= len;
@@ -31,7 +31,7 @@ Index: ioemu/vnc.c
      }
  }
  
-@@ -963,8 +966,12 @@
+@@ -1100,8 +1103,12 @@
  	if (len == 1)
  	    return 4;
  
@@ -46,7 +46,7 @@ Index: ioemu/vnc.c
  
  	limit = read_u16(data, 2);
  	for (i = 0; i < limit; i++) {
-@@ -998,8 +1005,12 @@
+@@ -1135,8 +1142,12 @@
  	if (len == 1)
  	    return 8;
  

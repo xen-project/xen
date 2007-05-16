@@ -26,6 +26,9 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #endif
+#ifdef HOST_SOLARIS
+#include <sys/modctl.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -470,13 +473,17 @@ static int do_syscall(CPUState *env,
     selector = (env->star >> 32) & 0xffff;
 #ifdef __x86_64__
     if (env->hflags & HF_LMA_MASK) {
+        int code64;
+
         env->regs[R_ECX] = kenv->next_eip;
         env->regs[11] = env->eflags;
+
+        code64 = env->hflags & HF_CS64_MASK;
 
         cpu_x86_set_cpl(env, 0);
         cpu_x86_load_seg_cache(env, R_CS, selector & 0xfffc, 
                                0, 0xffffffff, 
-                               DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
+                               DESC_G_MASK | DESC_P_MASK |
                                DESC_S_MASK |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK | DESC_L_MASK);
         cpu_x86_load_seg_cache(env, R_SS, (selector + 8) & 0xfffc, 
@@ -485,7 +492,7 @@ static int do_syscall(CPUState *env,
                                DESC_S_MASK |
                                DESC_W_MASK | DESC_A_MASK);
         env->eflags &= ~env->fmask;
-        if (env->hflags & HF_CS64_MASK)
+        if (code64)
             env->eip = env->lstar;
         else
             env->eip = env->cstar;
