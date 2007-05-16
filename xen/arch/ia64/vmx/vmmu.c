@@ -563,13 +563,16 @@ static void ptc_ga_remote_func (void *varg)
     struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
     VCPU *v = args->vcpu;
     vadr = args->vadr;
+    int cpu = v->processor;
 
     /* Try again if VCPU has migrated. */
-    if (v->processor != current->processor)
+    if (cpu != current->processor)
         return;
-    vcpu_schedule_lock_irqsave(v, flags);
-    if (v->processor != current->processor)
-        goto bail;
+    local_irq_save(flags);
+    if (!spin_trylock(&per_cpu(schedule_data, cpu).schedule_lock))
+        goto bail2;
+    if (v->processor != cpu)
+        goto bail1;
     oldrid = VMX(v, vrr[0]);
     VMX(v, vrr[0]) = args->rid;
     oldpsbits = VMX(v, psbits[0]);
@@ -587,8 +590,10 @@ static void ptc_ga_remote_func (void *varg)
     ia64_set_pta(mpta);
     ia64_dv_serialize_data();
     args->vcpu = NULL;
-bail:
-    vcpu_schedule_unlock_irqrestore(v, flags);
+bail1:
+    spin_unlock(&per_cpu(schedule_data, cpu).schedule_lock);
+bail2:
+    local_irq_restore(flags);
 }
 
 
@@ -598,7 +603,7 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
     struct domain *d = vcpu->domain;
     struct vcpu *v;
     struct ptc_ga_args args;
-    int proc;
+    int cpu;
 
     args.vadr = va;
     vcpu_get_rr(vcpu, va, &args.rid);
@@ -614,13 +619,15 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
 
         args.vcpu = v;
         do {
-            proc = v->processor;
-            if (proc != vcpu->processor)
+            cpu = v->processor;
+            if (cpu != current->processor) {
+                spin_unlock_wait(&per_cpu(schedule_data, cpu).schedule_lock);
                 /* Flush VHPT on remote processors. */
-                smp_call_function_single(proc, &ptc_ga_remote_func,
+                smp_call_function_single(cpu, &ptc_ga_remote_func,
                                          &args, 0, 1);
-            else
+            } else {
                 ptc_ga_remote_func(&args);
+            }
         } while (args.vcpu != NULL);
     }
     return IA64_NO_FAULT;
