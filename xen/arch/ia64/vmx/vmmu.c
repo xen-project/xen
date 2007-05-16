@@ -562,8 +562,9 @@ static void ptc_ga_remote_func (void *varg)
     u64 oldrid, moldrid, mpta, oldpsbits, vadr, flags;
     struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
     VCPU *v = args->vcpu;
-    vadr = args->vadr;
     int cpu = v->processor;
+
+    vadr = args->vadr;
 
     /* Try again if VCPU has migrated. */
     if (cpu != current->processor)
