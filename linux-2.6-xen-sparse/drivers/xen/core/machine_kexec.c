@@ -12,8 +12,8 @@ extern void machine_kexec_setup_load_arg(xen_kexec_image_t *xki,
 					 struct kimage *image);
 
 static int __initdata xen_max_nr_phys_cpus;
-static struct resource __initdata xen_hypervisor_res;
-static struct resource __initdata *xen_phys_cpus;
+static struct resource xen_hypervisor_res;
+static struct resource *xen_phys_cpus;
 
 void __init xen_machine_kexec_setup_resources(void)
 {
