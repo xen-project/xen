@@ -1,6 +1,7 @@
 # configuration: what needs translation
 
-unions  = [ ];
+unions  = [ "vcpu_cr_regs",
+            "vcpu_ar_regs" ];
 
 structs = [ "start_info",
             "trap_info",
@@ -8,7 +9,8 @@ structs = [ "start_info",
             "cpu_user_regs",
             "xen_ia64_boot_param",
             "ia64_tr_entry",
-            "vcpu_extra_regs",
+            "vcpu_tr_regs",
+            "vcpu_guest_context_regs",
             "vcpu_guest_context",
             "arch_vcpu_info",
             "vcpu_time_info",
