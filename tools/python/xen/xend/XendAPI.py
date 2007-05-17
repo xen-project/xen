@@ -1780,6 +1780,7 @@ class XendAPI(object):
                 return_cfg[k] = cfg[k]
 
         return_cfg['metrics'] = vbd_ref
+        return_cfg['runtime_properties'] = {} #todo
 
         return xen_api_success(return_cfg)
 
@@ -1849,7 +1850,7 @@ class XendAPI(object):
         try:
             devid = int(device['id'])
             device_sxps = dominfo.getDeviceSxprs('vbd')
-            device_dicts  = [dict(device_sxp[1][1:]) for device_sxp in device_sxps]
+            device_dicts  = [dict(device_sxp[1][0:]) for device_sxp in device_sxps]
             device_dict = [device_dict
                            for device_dict in device_dicts
                            if int(device_dict['virtual-device']) == devid][0]
