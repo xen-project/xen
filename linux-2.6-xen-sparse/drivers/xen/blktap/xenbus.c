@@ -161,7 +161,9 @@ int xentap_sysfs_addif(struct xenbus_device *dev)
 
 void xentap_sysfs_delif(struct xenbus_device *dev)
 {
+	struct backend_info *be = dev->dev.driver_data;
 	sysfs_remove_group(&dev->dev.kobj, &tapstat_group);
+	be->group_added = 0;
 }
 
 static int blktap_remove(struct xenbus_device *dev)
@@ -212,11 +214,13 @@ static void tap_update_blkif_status(blkif_t *blkif)
 		return;
 	}
 
-	err = xentap_sysfs_addif(blkif->be->dev);
-	if (err) {
-		xenbus_dev_fatal(blkif->be->dev, err, 
-				 "creating sysfs entries");
-		return;
+	if (!blkif->be->group_added) {
+		err = xentap_sysfs_addif(blkif->be->dev);
+		if (err) {
+			xenbus_dev_fatal(blkif->be->dev, err, 
+					 "creating sysfs entries");
+			return;
+		}
 	}
 
 	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif, name);
