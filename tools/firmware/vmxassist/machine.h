@@ -115,7 +115,7 @@ struct tss {
 #ifdef	ENABLE_VME
 	unsigned long	int_redir[8];
 #endif
-	unsigned char	iomap[8192];
+	unsigned char	iomap[8193];
 };
 
 static inline void
