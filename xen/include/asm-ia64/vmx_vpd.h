@@ -29,7 +29,7 @@
 #include <public/xen.h>
 #include <xen/spinlock.h>
 
-#define VPD_SHIFT	17	/* 128K requirement */
+#define VPD_SHIFT	16
 #define VPD_SIZE	(1 << VPD_SHIFT)
 
 typedef struct {
