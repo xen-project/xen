@@ -2,7 +2,9 @@
 #include "xenguest.h"
 #include "xc_private.h"
 #include "xc_elf.h"
+#include "xc_efi.h"
 #include <stdlib.h>
+#include <assert.h>
 #include <zlib.h>
 #include "xen/arch-ia64.h"
 #include <xen/hvm/ioreq.h>
@@ -554,12 +556,129 @@ add_pal_hob(void* hob_buf)
 #define GFW_PAGES (GFW_SIZE >> PAGE_SHIFT)
 #define VGA_START_PAGE (VGA_IO_START >> PAGE_SHIFT)
 #define VGA_END_PAGE ((VGA_IO_START + VGA_IO_SIZE) >> PAGE_SHIFT)
+
+static void
+xc_ia64_setup_md(efi_memory_desc_t *md,
+                 unsigned long start, unsigned long end)
+{
+    md->type = EFI_CONVENTIONAL_MEMORY;
+    md->pad = 0;
+    md->phys_addr = start;
+    md->virt_addr = 0;
+    md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
+    md->attribute = EFI_MEMORY_WB;
+}
+
+static inline unsigned long 
+min(unsigned long lhs, unsigned long rhs)
+{
+    return (lhs < rhs)? lhs: rhs;
+}
+
+static int
+xc_ia64_setup_memmap_info(int xc_handle, uint32_t dom,
+                          unsigned long dom_memsize, /* in bytes */
+                          unsigned long *pfns_special_pages, 
+                          unsigned long nr_special_pages,
+                          unsigned long memmap_info_pfn,
+                          unsigned long memmap_info_num_pages)
+{
+    xen_ia64_memmap_info_t* memmap_info;
+    efi_memory_desc_t *md;
+    uint64_t nr_mds;
+    
+    memmap_info = xc_map_foreign_range(xc_handle, dom,
+                                       PAGE_SIZE * memmap_info_num_pages,
+                                       PROT_READ | PROT_WRITE,
+                                       memmap_info_pfn);
+    if (memmap_info == NULL) {
+        PERROR("Could not map memmmap_info page.\n");
+        return -1;
+    }
+    memset(memmap_info, 0, PAGE_SIZE * memmap_info_num_pages);
+
+    /*
+     * [0, VGA_IO_START = 0xA0000)
+     * [VGA_IO_START + VGA_IO_SIZE = 0xC0000, MMIO_START = 3GB)
+     * [IO_PAGE_START (> 3GB), IO_PAGE_START + IO_PAGE_SIZE)
+     * [STORE_PAGE_START, STORE_PAGE_START + STORE_PAGE_SIZE)
+     * [BUFFER_IO_PAGE_START, BUFFER_IO_PAGE_START + BUFFER_IO_PAGE_SIZE)
+     * [BUFFER_PIO_PAGE_START, BUFFER_PIO_PAGE_START + BUFFER_PIO_PAGE_SIZE)
+     * [memmap_info_pfn << PAGE_SHIFT,
+     *                          (memmap_info_pfn << PAGE_SHIFT) + PAGE_SIZE)
+     * [GFW_START=4GB - GFW_SIZE, GFW_START + GFW_SIZE = 4GB)
+     * [4GB, ...)
+     */ 
+    md = (efi_memory_desc_t*)&memmap_info->memdesc;
+    xc_ia64_setup_md(md, 0, min(VGA_IO_START, dom_memsize));
+    md++;
+    if (dom_memsize > (VGA_IO_START + VGA_IO_SIZE)) {
+        xc_ia64_setup_md(md, VGA_IO_START + VGA_IO_SIZE,
+                         min(MMIO_START, dom_memsize));
+        md++;
+    }
+    xc_ia64_setup_md(md, IO_PAGE_START, IO_PAGE_START + IO_PAGE_SIZE);
+    md++;
+    xc_ia64_setup_md(md, STORE_PAGE_START, STORE_PAGE_START + STORE_PAGE_SIZE);
+    md++;
+    xc_ia64_setup_md(md, BUFFER_IO_PAGE_START,
+                     BUFFER_IO_PAGE_START + BUFFER_IO_PAGE_SIZE);
+    md++;
+    xc_ia64_setup_md(md, BUFFER_PIO_PAGE_START,
+                     BUFFER_PIO_PAGE_START + BUFFER_PIO_PAGE_SIZE);
+    md++;
+    xc_ia64_setup_md(md, memmap_info_pfn << PAGE_SHIFT,
+                     (memmap_info_pfn << PAGE_SHIFT) +
+                     PAGE_SIZE * memmap_info_num_pages);
+    md++;
+    xc_ia64_setup_md(md, GFW_START, GFW_START + GFW_SIZE);
+    md++;
+    if (dom_memsize > MMIO_START) {
+        xc_ia64_setup_md(md, 4 * MEM_G, dom_memsize + (1 * MEM_G));
+        md++;
+    }
+    nr_mds = md - (efi_memory_desc_t*)&memmap_info->memdesc;
+    
+    assert(nr_mds <=
+           (PAGE_SIZE * memmap_info_num_pages -
+            offsetof(*memmap_info, memdesc))/sizeof(*md));
+    memmap_info->efi_memmap_size = nr_mds * sizeof(*md);
+    memmap_info->efi_memdesc_size = sizeof(*md);
+    memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
+
+    munmap(memmap_info, PAGE_SIZE * memmap_info_num_pages);
+    return 0;
+}
+
+/* setup shared_info page */
+static int
+xc_ia64_setup_shared_info(int xc_handle, uint32_t dom,
+                          unsigned long shared_info_pfn,
+                          unsigned long memmap_info_pfn,
+                          unsigned long memmap_info_num_pages)
+{
+    shared_info_t *shared_info;
+
+    shared_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                       PROT_READ | PROT_WRITE,
+                                       shared_info_pfn);
+    if (shared_info == NULL) {
+        PERROR("Could not map shared_info");
+        return -1;
+    }
+    memset(shared_info, 0, sizeof(*shared_info));
+    shared_info->arch.memmap_info_num_pages = memmap_info_num_pages;
+    shared_info->arch.memmap_info_pfn = memmap_info_pfn;
+    munmap(shared_info, PAGE_SIZE);
+    return 0;
+}
+
 /*
  * In this function, we will allocate memory and build P2M/M2P table for VTI
  * guest.  Frist, a pfn list will be initialized discontiguous, normal memory
- * begins with 0, GFW memory and other three pages at their place defined in
+ * begins with 0, GFW memory and other five pages at their place defined in
  * xen/include/public/arch-ia64.h xc_domain_memory_populate_physmap() called
- * three times, to set parameter 'extent_order' to different value, this is
+ * five times, to set parameter 'extent_order' to different value, this is
  * convenient to allocate discontiguous memory with different size.
  */
 static int
@@ -573,6 +692,11 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     unsigned long dom_memsize = memsize << 20;
     unsigned long nr_pages = memsize << (20 - PAGE_SHIFT);
     unsigned long vcpus;
+
+    unsigned long nr_special_pages;
+    unsigned long memmap_info_pfn;
+    unsigned long memmap_info_num_pages;
+
     int rc;
     long i;
     DECLARE_DOMCTL;
@@ -614,7 +738,7 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
-    // We allocate additional pfn for GFW and other three pages, so
+    // We allocate additional pfn for GFW and other five pages, so
     // the pfn_list is not contiguous.  Due to this we must support
     // old interface xc_ia64_get_pfn_list().
     for (i = 0; i < GFW_PAGES; i++) 
@@ -627,12 +751,22 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
-    pfn_list[0] = IO_PAGE_START >> PAGE_SHIFT;
-    pfn_list[1] = STORE_PAGE_START >> PAGE_SHIFT;
-    pfn_list[2] = BUFFER_IO_PAGE_START >> PAGE_SHIFT;
-    pfn_list[3] = BUFFER_PIO_PAGE_START >> PAGE_SHIFT;
+    nr_special_pages = 0;
+    pfn_list[nr_special_pages] = IO_PAGE_START >> PAGE_SHIFT;
+    nr_special_pages++;
+    pfn_list[nr_special_pages] = STORE_PAGE_START >> PAGE_SHIFT;
+    nr_special_pages++;
+    pfn_list[nr_special_pages] = BUFFER_IO_PAGE_START >> PAGE_SHIFT;
+    nr_special_pages++;
+    pfn_list[nr_special_pages] = BUFFER_PIO_PAGE_START >> PAGE_SHIFT;
 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom, 4,
+    memmap_info_pfn = pfn_list[nr_special_pages] + 1;
+    memmap_info_num_pages = 1;
+    nr_special_pages++;
+    pfn_list[nr_special_pages] = memmap_info_pfn;
+    nr_special_pages++;
+
+    rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_special_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate IO page or store page or buffer io page.\n");
@@ -659,6 +793,19 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     domctl.domain = (domid_t)dom;
     if (xc_domctl(xc_handle, &domctl) < 0) {
         PERROR("Could not get info on domain");
+        goto error_out;
+    }
+
+    if (xc_ia64_setup_memmap_info(xc_handle, dom, dom_memsize,
+                                  pfn_list, nr_special_pages,
+                                  memmap_info_pfn, memmap_info_num_pages)) {
+        PERROR("Could not build memmap info\n");
+        goto error_out;
+    }
+    if (xc_ia64_setup_shared_info(xc_handle, dom,
+                                  domctl.u.getdomaininfo.shared_info_frame,
+                                  memmap_info_pfn, memmap_info_num_pages)) {
+        PERROR("Could not setup shared_info\n");
         goto error_out;
     }
 

@@ -471,8 +471,9 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
 
     def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 16
-        # ROM size for guest firmware, ioreq page, pio page and xenstore page
-        extra_pages = 1024 + 4
+        # ROM size for guest firmware, io page, xenstore page
+        # buffer io page, buffer pio page and memmap info page
+        extra_pages = 1024 + 5
         return mem_kb + extra_pages * page_kb
 
     def getRequiredInitialReservation(self):

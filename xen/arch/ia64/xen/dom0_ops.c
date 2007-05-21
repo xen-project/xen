@@ -117,19 +117,19 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 if (ds->xsi_va)
                     d->arch.shared_info_va = ds->xsi_va;
                 ret = dom_fw_setup(d, ds->bp, ds->maxmem);
-                {
-                    /*
-                     * XXX IA64_SHARED_INFO_PADDR
-                     * assign these pages into guest psudo physical address
-                     * space for dom0 to map this page by gmfn.
-                     * this is necessary for domain build, save, restore and 
-                     * dump-core.
-                     */
-                    unsigned long i;
-                    for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
-                        assign_domain_page(d, IA64_SHARED_INFO_PADDR + i,
-                                           virt_to_maddr(d->shared_info + i));
-                }
+            }
+            if (ret == 0) {
+                /*
+                 * XXX IA64_SHARED_INFO_PADDR
+                 * assign these pages into guest psudo physical address
+                 * space for dom0 to map this page by gmfn.
+                 * this is necessary for domain build, save, restore and 
+                 * dump-core.
+                 */
+                unsigned long i;
+                for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
+                    assign_domain_page(d, IA64_SHARED_INFO_PADDR + i,
+                                       virt_to_maddr(d->shared_info + i));
             }
         }
 
