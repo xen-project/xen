@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #include <xen/xen.h>
 #include <xen/foreign/ia64.h>
@@ -19,6 +20,9 @@
 #include "xg_private.h"
 #include "xc_dom.h"
 #include "xenctrl.h"
+
+#include <asm/dom_fw_common.h>
+#include "ia64/xc_dom_ia64_util.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -49,6 +53,13 @@ static int start_info_ia64(struct xc_dom_image *dom)
     start_info->console.domU.mfn = dom->console_pfn;
     start_info->console.domU.evtchn = dom->console_evtchn;
 
+    /*
+     * domain_start and domain_size are abused for arch_setup hypercall
+     * so that we need to clear them here.
+     */
+    XEN_IA64_MEMMAP_INFO_NUM_PAGES(bp) = 0;
+    XEN_IA64_MEMMAP_INFO_PFN(bp) = 0;
+
     if ( dom->ramdisk_blob )
     {
         start_info->mod_start = dom->ramdisk_seg.vstart;
@@ -77,7 +88,7 @@ static int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
     for (i = 0; i < MAX_VIRT_CPUS; i++)
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     shared_info->arch.start_info_pfn = dom->start_info_pfn;
-    shared_info->arch.memmap_info_num_pages = 1;
+    shared_info->arch.memmap_info_num_pages = 1; //XXX
     shared_info->arch.memmap_info_pfn = dom->start_info_pfn - 1;
     return 0;
 }
@@ -153,6 +164,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 static int ia64_setup_memmap(struct xc_dom_image *dom)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+    unsigned long memmap_info_num_pages;
     unsigned long memmap_info_pfn;
     xen_ia64_memmap_info_t* memmap_info;
     unsigned int num_mds;
@@ -162,11 +174,12 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
     struct xen_ia64_boot_param* bp;
 
     /* setup memmap page */
+    memmap_info_num_pages = 1;
     memmap_info_pfn = dom->start_info_pfn - 1;
-    xc_dom_printf("%s: memmap: mfn 0x%" PRIpfn "\n",
-		  __FUNCTION__, memmap_info_pfn);
+    xc_dom_printf("%s: memmap: mfn 0x%" PRIpfn " pages 0x%lx\n",
+                  __FUNCTION__, memmap_info_pfn, memmap_info_num_pages);
     memmap_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
-                                       page_size,
+                                       page_size * memmap_info_num_pages,
                                        PROT_READ | PROT_WRITE,
                                        memmap_info_pfn);
     if (NULL == memmap_info)
@@ -184,10 +197,17 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
     md[num_mds].attribute = EFI_MEMORY_WB;
     num_mds++;
     memmap_info->efi_memmap_size = num_mds * sizeof(md[0]);
-    munmap(memmap_info, page_size);
+    munmap(memmap_info, page_size * memmap_info_num_pages);
+    assert(nr_mds <=
+           (page_size * memmap_info_num_pages -
+            offsetof(*memmap_info, memdesc))/sizeof(*md));
 
-    /* kludge: we need to pass memmap_info page's pfn somehow.
-     * we use xen_ia64_boot_param::efi_memmap for this purpose */
+    /*
+     * kludge: we need to pass memmap_info page's pfn and other magic pages
+     * somehow.
+     * we use xen_ia64_boot_param::efi_memmap::{efi_memmap, efi_memmap_size}
+     * for this purpose
+     */
     start_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
 				      page_size,
 				      PROT_READ | PROT_WRITE,
@@ -196,9 +216,8 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
         return -1;
     bp = (struct xen_ia64_boot_param*)(start_info + sizeof(start_info_t));
     memset(bp, 0, sizeof(*bp));
-    bp->efi_memmap = memmap_info_pfn;
-    /* 4 = memmap info page, start info page, xenstore page and console page */
-    bp->efi_memmap_size = 4 * PAGE_SIZE;
+    XEN_IA64_MEMMAP_INFO_NUM_PAGES(bp) = memmap_info_num_pages;
+    XEN_IA64_MEMMAP_INFO_PFN(bp) = memmap_info_pfn;
     munmap(start_info, page_size);
     return 0;
 }
@@ -211,6 +230,20 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
     xc_dom_printf("%s: setup firmware\n", __FUNCTION__);
 
     rc = ia64_setup_memmap(dom);
+    if (rc)
+        return rc;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.cmd = XEN_DOMCTL_arch_setup;
+    domctl.domain = dom->guest_domid;
+    domctl.u.arch_setup.flags = XEN_DOMAINSETUP_query;
+    rc = do_domctl(dom->guest_xc, &domctl);
+    if (rc)
+        return rc;
+    rc = xen_ia64_dom_fw_setup(dom, domctl.u.arch_setup.hypercall_imm,
+                               (dom->start_info_pfn << PAGE_SHIFT) +
+                               sizeof(start_info_t),
+                               dom->total_pages << PAGE_SHIFT);
     if (rc)
         return rc;
 
