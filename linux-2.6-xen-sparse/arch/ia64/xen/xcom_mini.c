@@ -467,3 +467,19 @@ xencomm_mini_hypercall_sched_op(int cmd, void *arg)
 	return xencomm_arch_hypercall_sched_op(cmd, desc);
 }
 EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_sched_op);
+
+int
+xencomm_mini_hypercall_fpswa_revision(unsigned int *revision)
+{
+	int nbr_area = 2;
+	struct xencomm_mini xc_area[2];
+	struct xencomm_handle *desc;
+	int rc;
+
+	rc = xencomm_create_mini(xc_area, &nbr_area,
+				 revision, sizeof(*revision), &desc);
+	if (rc)
+		return rc;
+	return xencomm_arch_hypercall_fpswa_revision(desc);
+}
+EXPORT_SYMBOL_GPL(xencomm_mini_hypercall_fpswa_revision);

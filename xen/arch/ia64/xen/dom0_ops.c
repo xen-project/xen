@@ -352,6 +352,16 @@ dom0vp_ioremap(struct domain *d, unsigned long mpaddr, unsigned long size)
                                    ASSIGN_writable | ASSIGN_nocache);
 }
 
+static unsigned long
+dom0vp_fpswa_revision(XEN_GUEST_HANDLE(uint) revision)
+{
+    if (fpswa_interface == NULL)
+        return -ENOSYS;
+    if (copy_to_guest(revision, &fpswa_interface->revision, 1))
+        return -EFAULT;
+    return 0;
+}
+
 unsigned long
 do_dom0vp_op(unsigned long cmd,
              unsigned long arg0, unsigned long arg1, unsigned long arg2,
@@ -400,6 +410,12 @@ do_dom0vp_op(unsigned long cmd,
         XEN_GUEST_HANDLE(void) hnd;
         set_xen_guest_handle(hnd, (void*)arg1);
         ret = do_perfmon_op(arg0, hnd, arg2);
+        break;
+    }
+    case IA64_DOM0VP_fpswa_revision: {
+        XEN_GUEST_HANDLE(uint) hnd;
+        set_xen_guest_handle(hnd, (uint*)arg0);
+        ret = dom0vp_fpswa_revision(hnd);
         break;
     }
     default:

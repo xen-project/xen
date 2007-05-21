@@ -643,6 +643,38 @@ xencomm_privcmd_sched_op(privcmd_hypercall_t *hypercall)
 	return ret;
 }
 
+static int
+xencomm_privcmd_ia64_dom0vp_op(privcmd_hypercall_t *hypercall)
+{
+	int cmd = hypercall->arg[0];
+	int ret;
+	
+	switch (cmd) {
+	case IA64_DOM0VP_fpswa_revision: {
+		unsigned int revision;
+		unsigned int __user *revision_user =
+			(unsigned int* __user)hypercall->arg[1];
+		struct xencomm_handle *desc;
+		ret = xencomm_create(&revision, sizeof(revision),
+				     &desc, GFP_KERNEL);
+		if (ret)
+			break;
+		ret = xencomm_arch_hypercall_fpswa_revision(desc);
+		xencomm_free(desc);
+		if (ret)
+			break;
+		if (copy_to_user(revision_user, &revision, sizeof(revision)))
+			ret = -EFAULT;
+		break;
+	}
+	default:
+		printk("%s: unknown IA64 DOM0VP op %d\n", __func__, cmd);
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
 int
 privcmd_hypercall(privcmd_hypercall_t *hypercall)
 {
@@ -665,6 +697,8 @@ privcmd_hypercall(privcmd_hypercall_t *hypercall)
 		return xencomm_privcmd_hvm_op(hypercall);
 	case __HYPERVISOR_sched_op:
 		return xencomm_privcmd_sched_op(hypercall);
+	case __HYPERVISOR_ia64_dom0vp_op:
+		return xencomm_privcmd_ia64_dom0vp_op(hypercall);
 	default:
 		printk("%s: unknown hcall (%ld)\n", __func__, hypercall->op);
 		return -ENOSYS;

@@ -395,3 +395,10 @@ xencomm_hypercall_vcpu_op(int cmd, int cpu, void *arg)
 	return xencomm_arch_hypercall_vcpu_op(cmd, cpu,
 					      xencomm_create_inline(arg));
 }
+
+int
+xencomm_hypercall_fpswa_revision(unsigned int *revision)
+{
+	return xencomm_arch_hypercall_fpswa_revision(
+		xencomm_create_inline(revision));
+}
