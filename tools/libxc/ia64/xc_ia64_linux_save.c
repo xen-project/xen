@@ -361,11 +361,13 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             if (!write_exact(io_fd, &N, sizeof(N))) {
                 ERROR("write: max_pfn");
+                munmap(mem, PAGE_SIZE);
                 goto out;
             }
 
             if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
                 ERROR("Error when writing to state file (5)");
+                munmap(mem, PAGE_SIZE);
                 goto out;
             }
             munmap(mem, PAGE_SIZE);
@@ -470,6 +472,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
     if (write(io_fd, mem, PAGE_SIZE) != PAGE_SIZE) {
         ERROR("Error when writing privreg to state file (5)");
+        munmap(mem, PAGE_SIZE);
         goto out;
     }
     munmap(mem, PAGE_SIZE);    
