@@ -163,20 +163,23 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
-#ifdef notyet
     int ret = -1;
     xen_ia64_memmap_info_t *memmap_info;
+    unsigned long map_size;
     xc_core_memory_map_t *map;
     char *start;
     char *end;
     char *p;
     efi_memory_desc_t *md;
 
-    if  ( live_shinfo == NULL || live_shinfo->arch.memmap_info_pfn == 0 )
+    if  ( live_shinfo == NULL ||
+          live_shinfo->arch.memmap_info_num_pages == 0 ||
+          live_shinfo->arch.memmap_info_pfn == 0 )
         goto old;
 
+    map_size = PAGE_SIZE * live_shinfo->arch.memmap_info_num_pages;
     memmap_info = xc_map_foreign_range(xc_handle, info->domid,
-                                       PAGE_SIZE, PROT_READ,
+                                       map_size, PROT_READ,
                                        live_shinfo->arch.memmap_info_pfn);
     if ( memmap_info == NULL )
     {
@@ -185,7 +188,7 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
     }
     if ( memmap_info->efi_memdesc_size != sizeof(*md) ||
          (memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size) == 0 ||
-         memmap_info->efi_memmap_size > PAGE_SIZE - sizeof(memmap_info) ||
+         memmap_info->efi_memmap_size > map_size - sizeof(memmap_info) ||
          memmap_info->efi_memdesc_version != EFI_MEMORY_DESCRIPTOR_VERSION )
     {
         PERROR("unknown memmap header. defaulting to compat mode.");
@@ -219,12 +222,11 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
     }
     ret = 0;
 out:
-    munmap(memmap_info, PAGE_SIZE);
+    munmap(memmap_info, map_size);
     qsort(map, *nr_entries, sizeof(map[0]), &xc_memory_map_cmp);
     return ret;
     
 old:
-#endif
     return memory_map_get_old(xc_handle, info, live_shinfo, mapp, nr_entries);
 }
 
