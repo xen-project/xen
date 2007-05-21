@@ -59,7 +59,8 @@
  * rp=b0 indicates the return point.
  *
  * A single hypercall is used for all PAL calls.
- * The hypercall stub is pal_call_stub (xenasm.S).  Its size is 2 bundles.
+ * The hypercall stub is xen_ia64_pal_call_stub (dom_fw_asm.S). 
+ * Its size is 2 bundles.
  */
 
 #define FW_HYPERCALL_PAL_CALL_INDEX	0x80UL

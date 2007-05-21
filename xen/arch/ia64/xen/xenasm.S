@@ -356,26 +356,3 @@ stacked:
 	br.ret.sptk.few rp
 END(pal_emulator_static)
 
-//  These instructions are copied in the domains.
-//  This is the virtual PAL, which simply does a hypercall.
-//  The size is 2 bundles (32 Bytes).  It handles both static and stacked
-//    convention.
-//  If you modify this code, you have to modify dom_fw.h (for the size) and
-//   dom_fw_pal_hypercall_patch.
-GLOBAL_ENTRY(pal_call_stub)
-	{
-	 .mii
-	addl r2=0x1000,r0	//  Hypercall number (Value is patched).
-	mov r9=256
-	;; 
-	cmp.gtu p7,p8=r9,r28		/* r32 <= 255? */
-	}
-	{
-	 .mbb
-	break 0x1000		//  Hypercall vector (Value is patched).
-(p7)	br.cond.sptk.few rp
-(p8)	br.ret.sptk.few rp
-	}
-END(pal_call_stub)
-
-

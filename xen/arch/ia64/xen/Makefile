@@ -6,6 +6,7 @@ obj-y += acpi.o
 obj-y += dom0_ops.o
 obj-y += domain.o
 obj-y += dom_fw.o
+obj-y += dom_fw_asm.o
 obj-y += fw_emul.o
 obj-y += hpsimserial.o
 obj-y += hypercall.o

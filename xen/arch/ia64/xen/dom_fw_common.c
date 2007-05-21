@@ -110,17 +110,19 @@ build_hypercall_bundle(uint64_t *imva, uint64_t brkimm, uint64_t hypnum, uint64_
 static void
 build_pal_hypercall_bundles(uint64_t *imva, uint64_t brkimm, uint64_t hypnum)
 {
-	extern unsigned long pal_call_stub[];
+	extern unsigned long xen_ia64_pal_call_stub[];
 	IA64_BUNDLE bundle;
 	INST64_A5 slot_a5;
 	INST64_M37 slot_m37;
 
-	/* The source of the hypercall stub is the pal_call_stub function
-	   defined in xenasm.S.  */
+	/*
+	 * The source of the hypercall stub is
+	 * the xen_ia64_pal_call_stub function defined in dom_fw_asm.S. 
+	 */
 
 	/* Copy the first bundle and patch the hypercall number.  */
-	bundle.i64[0] = pal_call_stub[0];
-	bundle.i64[1] = pal_call_stub[1];
+	bundle.i64[0] = xen_ia64_pal_call_stub[0];
+	bundle.i64[1] = xen_ia64_pal_call_stub[1];
 	slot_a5.inst = bundle.slot0;
 	slot_a5.imm7b = hypnum;
 	slot_a5.imm9d = hypnum >> 7;
@@ -132,8 +134,8 @@ build_pal_hypercall_bundles(uint64_t *imva, uint64_t brkimm, uint64_t hypnum)
 	ia64_fc(imva + 1);
 	
 	/* Copy the second bundle and patch the hypercall vector.  */
-	bundle.i64[0] = pal_call_stub[2];
-	bundle.i64[1] = pal_call_stub[3];
+	bundle.i64[0] = xen_ia64_pal_call_stub[2];
+	bundle.i64[1] = xen_ia64_pal_call_stub[3];
 	slot_m37.inst = bundle.slot0;
 	slot_m37.imm20a = brkimm;
 	slot_m37.i = brkimm >> 20;
