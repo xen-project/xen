@@ -339,7 +339,12 @@ struct arch_shared_info {
     /* Interrupt vector for event channel.  */
     int evtchn_vector;
 
-    uint64_t pad[32];
+    /* PFN of memmap_info page */
+    unsigned int memmap_info_num_pages;/* currently only = 1 case is
+                                          supported. */
+    unsigned long memmap_info_pfn;
+
+    uint64_t pad[31];
 };
 typedef struct arch_shared_info arch_shared_info_t;
 

@@ -77,6 +77,8 @@ static int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
     for (i = 0; i < MAX_VIRT_CPUS; i++)
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     shared_info->arch.start_info_pfn = dom->start_info_pfn;
+    shared_info->arch.memmap_info_num_pages = 1;
+    shared_info->arch.memmap_info_pfn = dom->start_info_pfn - 1;
     return 0;
 }
 
@@ -129,6 +131,8 @@ static void __init register_arch_hooks(void)
     xc_dom_register_arch_hooks(&xc_dom_arch_ia64be);
 }
 
+#include "xc_efi.h"
+
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
     xen_pfn_t pfn;
@@ -146,12 +150,69 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     return rc;
 }
 
+static int ia64_setup_memmap(struct xc_dom_image *dom)
+{
+    unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
+    unsigned long memmap_info_pfn;
+    xen_ia64_memmap_info_t* memmap_info;
+    unsigned int num_mds;
+    efi_memory_desc_t *md;
+
+    char* start_info;
+    struct xen_ia64_boot_param* bp;
+
+    /* setup memmap page */
+    memmap_info_pfn = dom->start_info_pfn - 1;
+    xc_dom_printf("%s: memmap: mfn 0x%" PRIpfn "\n",
+		  __FUNCTION__, memmap_info_pfn);
+    memmap_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+                                       page_size,
+                                       PROT_READ | PROT_WRITE,
+                                       memmap_info_pfn);
+    if (NULL == memmap_info)
+        return -1;
+    /* [0, total_pages) */
+    memmap_info->efi_memdesc_size = sizeof(md[0]);
+    memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
+    num_mds = 0;
+    md = (efi_memory_desc_t*)&memmap_info->memdesc;
+    md[num_mds].type = EFI_CONVENTIONAL_MEMORY;
+    md[num_mds].pad = 0;
+    md[num_mds].phys_addr = 0;
+    md[num_mds].virt_addr = 0;
+    md[num_mds].num_pages = dom->total_pages << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+    md[num_mds].attribute = EFI_MEMORY_WB;
+    num_mds++;
+    memmap_info->efi_memmap_size = num_mds * sizeof(md[0]);
+    munmap(memmap_info, page_size);
+
+    /* kludge: we need to pass memmap_info page's pfn somehow.
+     * we use xen_ia64_boot_param::efi_memmap for this purpose */
+    start_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+				      page_size,
+				      PROT_READ | PROT_WRITE,
+				      dom->start_info_pfn);
+    if (NULL == start_info)
+        return -1;
+    bp = (struct xen_ia64_boot_param*)(start_info + sizeof(start_info_t));
+    memset(bp, 0, sizeof(*bp));
+    bp->efi_memmap = memmap_info_pfn;
+    /* 4 = memmap info page, start info page, xenstore page and console page */
+    bp->efi_memmap_size = 4 * PAGE_SIZE;
+    munmap(start_info, page_size);
+    return 0;
+}
+
 int arch_setup_bootearly(struct xc_dom_image *dom)
 {
     DECLARE_DOMCTL;
     int rc;
 
     xc_dom_printf("%s: setup firmware\n", __FUNCTION__);
+
+    rc = ia64_setup_memmap(dom);
+    if (rc)
+        return rc;
 
     memset(&domctl, 0, sizeof(domctl));
     domctl.cmd = XEN_DOMCTL_arch_setup;
@@ -160,8 +221,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
 
     domctl.u.arch_setup.bp = (dom->start_info_pfn << PAGE_SHIFT)
         + sizeof(start_info_t);
-    /* 3 = start info page, xenstore page and console page */
-    domctl.u.arch_setup.maxmem = (dom->total_pages - 3) << PAGE_SHIFT;
+    domctl.u.arch_setup.maxmem = dom->total_pages << PAGE_SHIFT;
     rc = do_domctl(dom->guest_xc, &domctl);
     return rc;
 }

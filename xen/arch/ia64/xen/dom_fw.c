@@ -508,6 +508,63 @@ struct fw_tables {
 #define FW_FIELD_MPA(field) \
    FW_TABLES_BASE_PADDR + offsetof(struct fw_tables, field)
 
+static void
+setup_dom0_memmap_info(struct domain *d, struct fw_tables *tables,
+		       int *num_mds)
+{
+	int i;
+	efi_memory_desc_t *md;
+	efi_memory_desc_t *last_mem_md = NULL;
+	xen_ia64_memmap_info_t* memmap_info;
+	unsigned long paddr_start;
+	unsigned long paddr_end;
+
+	for (i = *num_mds - 1; i >= 0; i--) {
+		md = &tables->efi_memmap[i];
+		if (md->attribute == EFI_MEMORY_WB &&
+		    md->type == EFI_CONVENTIONAL_MEMORY &&
+		    md->num_pages >
+		    2 * (1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT))) {
+			last_mem_md = md;
+			break;
+		}
+	}
+
+	if (last_mem_md == NULL) {
+		printk("%s: warning: "
+		       "no dom0 contiguous memory to hold memory map\n",
+		       __func__);
+		return;
+	}
+	paddr_end = last_mem_md->phys_addr +
+		(last_mem_md->num_pages << EFI_PAGE_SHIFT);
+	paddr_start = (paddr_end - PAGE_SIZE) & PAGE_MASK;
+	last_mem_md->num_pages -=
+		(paddr_end - paddr_start) / (1UL << EFI_PAGE_SHIFT);
+
+	md = &tables->efi_memmap[*num_mds];
+	(*num_mds)++;
+	md->type = EFI_RUNTIME_SERVICES_DATA;
+	md->phys_addr = paddr_start;
+	md->virt_addr = 0;
+	md->num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+	md->attribute = EFI_MEMORY_WB;
+
+	memmap_info = domain_mpa_to_imva(d, md->phys_addr);
+	BUG_ON(*num_mds > NUM_MEM_DESCS);
+
+	memmap_info->efi_memdesc_size = sizeof(md[0]);
+	memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
+	memmap_info->efi_memmap_size = *num_mds * sizeof(md[0]);
+	memcpy(&memmap_info->memdesc, &tables->efi_memmap[0],
+	       memmap_info->efi_memmap_size);
+	d->shared_info->arch.memmap_info_num_pages = 1;
+	d->shared_info->arch.memmap_info_pfn = md->phys_addr >> PAGE_SHIFT;
+
+	sort(tables->efi_memmap, *num_mds, sizeof(efi_memory_desc_t),
+	     efi_mdt_cmp, NULL);
+}
+
 /* Complete the dom0 memmap.  */
 static int
 complete_dom0_memmap(struct domain *d,
@@ -672,9 +729,152 @@ complete_dom0_memmap(struct domain *d,
 						PAGE_SIZE, flags);
 		}
 	}
+	setup_dom0_memmap_info(d, tables, &num_mds);
 	return num_mds;
 }
 	
+static int
+complete_domu_memmap(struct domain *d,
+                     struct fw_tables *tables,
+                     unsigned long maxmem,
+                     int num_mds,
+		     unsigned long memmap_info_pfn,
+		     unsigned long memmap_size)
+{
+	efi_memory_desc_t *md;
+	int i = num_mds; /* for MAKE_MD */
+	int create_memmap = 0;
+	xen_ia64_memmap_info_t* memmap_info;
+	unsigned long paddr_start;
+	unsigned long paddr_end;
+	void *p;
+	void *memmap_start;
+	void *memmap_end;
+
+	if (memmap_info_pfn == 0 || memmap_size == 0) {
+		/* old domain builder which doesn't setup
+		 * memory map. create it for compatibility */
+		memmap_info_pfn = (maxmem >> PAGE_SHIFT) - 1;
+		/* 4 = memmap info page, start info page, xenstore page and
+		   console page */
+		memmap_size = 4 << PAGE_SHIFT;
+		create_memmap = 1;
+	}
+	paddr_start = memmap_info_pfn << PAGE_SHIFT;
+	paddr_end = paddr_start + memmap_size;
+	memmap_info = domain_mpa_to_imva(d, paddr_start);
+	if (memmap_info->efi_memmap_size == 0) {
+		create_memmap = 1;
+	} else if (memmap_info->efi_memdesc_size != sizeof(md[0]) ||
+		   memmap_info->efi_memdesc_version !=
+		   EFI_MEMORY_DESCRIPTOR_VERSION) {
+		printk(XENLOG_WARNING
+		       "%s: Warning: unknown memory map "
+		       "memmap size %"PRIu64" "
+		       "memdesc size %"PRIu64" "
+		       "version %"PRIu32"\n",
+		       __func__,
+		       memmap_info->efi_memmap_size,
+		       memmap_info->efi_memdesc_size,
+		       memmap_info->efi_memdesc_version);
+		create_memmap = 1;
+	} else if (max(memmap_size, memmap_info->efi_memmap_size) >
+		   PAGE_SIZE - sizeof(*memmap_info)) {
+		/*
+		 * curently memmap spanning more than single page isn't
+		 * supported.
+		 */
+		printk(XENLOG_WARNING
+		       "%s: Warning: too large memmap_size %"PRIu64"\n",
+		       __func__, memmap_size);
+		return -ENOSYS;
+	}
+	
+	if (create_memmap) {
+		/* old domain builder which doesn't setup
+		 * memory map. create it for compatibility */
+		memmap_info->efi_memdesc_size = sizeof(md[0]);
+		memmap_info->efi_memdesc_version =
+			EFI_MEMORY_DESCRIPTOR_VERSION;
+		memmap_info->efi_memmap_size = 1 * sizeof(md[0]);
+		md = (efi_memory_desc_t*)&memmap_info->memdesc;
+		md[num_mds].type = EFI_CONVENTIONAL_MEMORY;
+		md[num_mds].pad = 0;
+		md[num_mds].phys_addr = 0;
+		md[num_mds].virt_addr = 0;
+		md[num_mds].num_pages = maxmem >> EFI_PAGE_SHIFT;
+		md[num_mds].attribute = EFI_MEMORY_WB;
+	}
+	/*
+	 * XXX kludge.
+	 * when XEN_DOMCTL_arch_setup is called, shared_info can't
+	 * be accessed by libxc so that memmap_info_pfn isn't initialized.
+	 * But dom_fw_set_convmem_end() requires it, so here we initialize it.
+	 */
+	d->shared_info->arch.memmap_info_num_pages = 1;
+	d->shared_info->arch.memmap_info_pfn = memmap_info_pfn;
+
+	memmap_start = &memmap_info->memdesc;
+	memmap_end = memmap_start + memmap_info->efi_memmap_size;
+	/* XXX Currently the table must be in a single page. */
+	if ((unsigned long)memmap_end > (unsigned long)memmap_info + PAGE_SIZE)
+		return -EINVAL;
+
+	/* sort it bofore use
+	 * XXX: this is created by user space domain builder so that
+	 * we should check its integrity */
+	sort(&memmap_info->memdesc,
+	     memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size,
+	     memmap_info->efi_memdesc_size,
+	     efi_mdt_cmp, NULL);
+
+	for (p = memmap_start; p < memmap_end; p += memmap_info->efi_memdesc_size) {
+		unsigned long start;
+		unsigned long end;
+		md = p;
+		start = md->phys_addr;
+		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
+		if (start < FW_END_PADDR)
+			start = FW_END_PADDR;
+		if (end <= start)
+			continue;
+
+		/* exclude [paddr_start, paddr_end) */
+		if (paddr_end <= start || end <= paddr_start) {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				start, end);
+		} else if (paddr_start <= start && paddr_end < end) {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				paddr_end, end);
+		} else if (start < paddr_start && end <= paddr_end) {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				start, paddr_start);
+		} else {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				start, paddr_start);
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				paddr_end, end);
+		}
+		d->arch.convmem_end = end;
+	}
+
+	/* memmap info page. */
+	MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB,
+		paddr_start, paddr_end);
+	if (d->arch.convmem_end < paddr_end)
+		d->arch.convmem_end = paddr_end;
+
+	/* Create an entry for IO ports.  */
+	MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
+		IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
+
+	num_mds = i;
+	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
+	     efi_mdt_cmp, NULL);
+	return num_mds;
+}
+
 static void
 dom_fw_init(struct domain *d,
             struct ia64_boot_param *bp,
@@ -842,18 +1042,17 @@ dom_fw_init(struct domain *d,
 	if (d != dom0 || running_on_sim) {
 		/* DomU (or hp-ski).
 		   Create a continuous memory area.  */
-		/* Memory.  */
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-		        FW_END_PADDR, maxmem);
-		d->arch.convmem_end = maxmem;
-		
-		/* Create an entry for IO ports.  */
-		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
-		        IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
-
-		num_mds = i;
-	}
-	else {
+		/* kludge: bp->efi_memmap is used to pass memmap_info
+		 * page's pfn and number of pages to reserve. 
+		 * Currently the following pages must be reserved.
+		 * memmap info page, start info page, xenstore page
+		 * and console page.
+		 * see ia64_setup_memmap() @ xc_dom_boot.c
+		 */
+		num_mds = complete_domu_memmap(d, tables, maxmem, i,
+					       bp->efi_memmap,
+					       bp->efi_memmap_size);
+	} else {
 		/* Dom0.
 		   We must preserve ACPI data from real machine,
 		   as well as IO areas.  */
