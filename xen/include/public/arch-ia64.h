@@ -78,6 +78,10 @@ typedef unsigned long xen_ulong_t;
 #define MEM_G   (1UL << 30)
 #define MEM_M   (1UL << 20)
 
+/* Guest physical address of IO ports space.  */
+#define IO_PORTS_PADDR          0x00000ffffc000000UL
+#define IO_PORTS_SIZE           0x0000000004000000UL
+
 #define MMIO_START       (3 * MEM_G)
 #define MMIO_SIZE        (512 * MEM_M)
 
