@@ -101,21 +101,22 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 if (!vmx_enabled) {
                     printk("No VMX hardware feature for vmx domain.\n");
                     ret = -EINVAL;
-                    break;
+                } else {
+                    d->arch.is_vti = 1;
+                    vmx_setup_platform(d);
                 }
-                d->arch.is_vti = 1;
-                vmx_setup_platform(d);
             }
             else {
-                dom_fw_setup(d, ds->bp, ds->maxmem);
-                if (ds->xsi_va)
-                    d->arch.shared_info_va = ds->xsi_va;
                 if (ds->hypercall_imm) {
+                    /* dom_fw_setup() reads d->arch.breakimm */
                     struct vcpu *v;
                     d->arch.breakimm = ds->hypercall_imm;
                     for_each_vcpu (d, v)
                         v->arch.breakimm = d->arch.breakimm;
                 }
+                if (ds->xsi_va)
+                    d->arch.shared_info_va = ds->xsi_va;
+                ret = dom_fw_setup(d, ds->bp, ds->maxmem);
                 {
                     /*
                      * XXX IA64_SHARED_INFO_PADDR

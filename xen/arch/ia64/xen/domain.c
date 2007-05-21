@@ -1353,7 +1353,9 @@ int construct_dom0(struct domain *d,
 	   Note: Linux kernel reserve memory used by start_info, so there is
 	   no need to remove it from MDT.  */
 	bp_mpa = pstart_info + sizeof(struct start_info);
-	dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
+	rc = dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
+	if (rc != 0)
+		return rc;
 
 	/* Fill boot param.  */
 	strlcpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
