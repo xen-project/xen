@@ -281,12 +281,12 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         /* Initially all the pages must be sent.  */
         memset(to_send, 0xff, bitmap_size);
 
-        if (mlock(to_send, bitmap_size)) {
-            ERROR("Unable to mlock to_send");
+        if (lock_pages(to_send, bitmap_size)) {
+            ERROR("Unable to lock_pages to_send");
             goto out;
         }
-        if (mlock(to_skip, bitmap_size)) {
-            ERROR("Unable to mlock to_skip");
+        if (lock_pages(to_skip, bitmap_size)) {
+            ERROR("Unable to lock_pages to_skip");
             goto out;
         }
         
@@ -492,7 +492,9 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     free(page_array);
+    unlock_pages(to_send, bitmap_size);
     free(to_send);
+    unlock_pages(to_skip, bitmap_size);
     free(to_skip);
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);

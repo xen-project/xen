@@ -39,11 +39,11 @@ xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
     arg.index = param;
     arg.value = value;
 
-    if (mlock(&arg, sizeof(arg)) != 0)
+    if (lock_pages(&arg, sizeof(arg)) != 0)
         return -1;
 
     rc = do_xen_hypercall(handle, &hypercall);
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
 
     return rc;
 }
@@ -62,11 +62,11 @@ xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
     arg.domid = dom;
     arg.index = param;
 
-    if (mlock(&arg, sizeof(arg)) != 0)
+    if (lock_pages(&arg, sizeof(arg)) != 0)
         return -1;
 
     rc = do_xen_hypercall(handle, &hypercall);
-    safe_munlock(&arg, sizeof(arg));
+    unlock_pages(&arg, sizeof(arg));
 
     *value = arg.value;
     return rc;
@@ -723,8 +723,8 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 
     image_size = (image_size + PAGE_SIZE - 1) & PAGE_MASK;
 
-    if (mlock(&st_ctxt, sizeof(st_ctxt))) {
-        PERROR("Unable to mlock ctxt");
+    if (lock_pages(&st_ctxt, sizeof(st_ctxt))) {
+        PERROR("Unable to lock_pages ctxt");
         return 1;
     }
 
@@ -748,10 +748,12 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
 
     launch_domctl.cmd = XEN_DOMCTL_setvcpucontext;
     rc = do_domctl(xc_handle, &launch_domctl);
+    unlock_pages(&st_ctxt, sizeof(st_ctxt));
     return rc;
 
 error_out:
     free(image);
+    unlock_pages(&st_ctxt, sizeof(st_ctxt));
     return -1;
 }
 

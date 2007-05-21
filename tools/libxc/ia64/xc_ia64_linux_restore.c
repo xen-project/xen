@@ -106,9 +106,9 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 	goto out;
     }
 
-    if (mlock(&ctxt, sizeof(ctxt))) {
+    if (lock_pages(&ctxt, sizeof(ctxt))) {
         /* needed for build domctl, but might as well do early */
-        ERROR("Unable to mlock ctxt");
+        ERROR("Unable to lock_pages ctxt");
         return 1;
     }
 
@@ -317,6 +317,8 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     if (page_array != NULL)
 	    free(page_array);
+
+    unlock_pages(&ctxt, sizeof(ctxt));
 
     DPRINTF("Restore exit with rc=%d\n", rc);
 
