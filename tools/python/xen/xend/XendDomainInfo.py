@@ -357,6 +357,8 @@ class XendDomainInfo:
         self.console_port = None
         self.console_mfn = None
 
+        self.native_protocol = None
+
         self.vmWatch = None
         self.shutdownWatch = None
         self.shutdownStartTime = None
@@ -1520,6 +1522,8 @@ class XendDomainInfo:
                 self.console_mfn = channel_details['console_mfn']
             if 'notes' in channel_details:
                 self.info.set_notes(channel_details['notes'])
+            if 'native_protocol' in channel_details:
+                self.native_protocol = channel_details['native_protocol'];
 
             self._introduceDomain()
 

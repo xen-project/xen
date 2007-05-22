@@ -117,7 +117,7 @@ class XendVMMetrics(XendBase):
         except Exception, err:
             # ignore missing domain
             log.trace("domain_getinfo(%d) failed, ignoring: %s", domid, str(err))
-        return ""
+        return []
 
     def get_VCPUs_params(self):
         domid = self.xend_domain_instance.getDomid()

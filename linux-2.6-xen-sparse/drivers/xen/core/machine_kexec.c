@@ -11,11 +11,11 @@
 extern void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, 
 					 struct kimage *image);
 
-int xen_max_nr_phys_cpus;
-struct resource xen_hypervisor_res;
-struct resource *xen_phys_cpus;
+static int __initdata xen_max_nr_phys_cpus;
+static struct resource xen_hypervisor_res;
+static struct resource *xen_phys_cpus;
 
-void xen_machine_kexec_setup_resources(void)
+void __init xen_machine_kexec_setup_resources(void)
 {
 	xen_kexec_range_t range;
 	struct resource *res;
@@ -104,7 +104,7 @@ void xen_machine_kexec_setup_resources(void)
 	return;
 }
 
-void xen_machine_kexec_register_resources(struct resource *res)
+void __init xen_machine_kexec_register_resources(struct resource *res)
 {
 	int k;
 

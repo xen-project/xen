@@ -407,6 +407,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
     unsigned long console_mfn = 0;
     PyObject* elfnote_dict;
     PyObject* elfnote = NULL;
+    PyObject* ret;
     int i;
 
     static char *kwd_list[] = { "domid", "store_evtchn", "memsize",
@@ -455,12 +456,22 @@ static PyObject *pyxc_linux_build(XcObject *self,
 	Py_DECREF(elfnote);
     }
 
+    ret = Py_BuildValue("{s:i,s:i,s:N}",
+			"store_mfn", store_mfn,
+			"console_mfn", console_mfn,
+			"notes", elfnote_dict);
+
+    if ( dom->arch_hooks->native_protocol )
+    {
+	PyObject *native_protocol =
+	    Py_BuildValue("s", dom->arch_hooks->native_protocol);
+	PyDict_SetItemString(ret, "native_protocol", native_protocol);
+	Py_DECREF(native_protocol);
+    }
+
     xc_dom_release(dom);
 
-    return Py_BuildValue("{s:i,s:i,s:N}", 
-                         "store_mfn", store_mfn,
-                         "console_mfn", console_mfn,
-			 "notes", elfnote_dict);
+    return ret;
 
   out:
     xc_dom_release(dom);

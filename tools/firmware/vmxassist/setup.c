@@ -127,6 +127,7 @@ setup_gdt(void)
 	tss.ss0 = DATA_SELECTOR;
 	tss.esp0 = (unsigned) stack_top;
 	tss.iomap_base = offsetof(struct tss, iomap);
+	tss.iomap[sizeof(tss.iomap)-1] = 0xff;
 
 	/* initialize gdt's tss selector */
 	gdt[TSS_SELECTOR / sizeof(gdt[0])] |=
