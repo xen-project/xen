@@ -1684,7 +1684,6 @@ class XendDomainInfo:
         try:
             if self.domid is not None:
                 xc.domain_destroy(self.domid)
-                self.domid = None
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0
                 self._stateSet(DOM_STATE_HALTED)
