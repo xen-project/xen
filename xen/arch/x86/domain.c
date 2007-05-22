@@ -49,6 +49,8 @@
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(__u64, efer);
 
+static void unmap_vcpu_info(struct vcpu *v);
+
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
 
@@ -728,8 +730,113 @@ int arch_set_info_guest(
 
 int arch_vcpu_reset(struct vcpu *v)
 {
+    unmap_vcpu_info(v);
     destroy_gdt(v);
     vcpu_destroy_pagetables(v);
+    return 0;
+}
+
+/*
+ * Copy from an old vcpu to a new one, being careful that events don't
+ * get lost.  The new vcpu_info is marked as having pending events;
+ * this may cause a spurious upcall into the guest, but that's better
+ * than losing events altogether.
+ *
+ * The caller should restore the event mask state once the new vcpu_info
+ * has been installed.
+ */
+static unsigned char
+transfer_vcpu_info(const vcpu_info_t *old, vcpu_info_t *new)
+{
+    unsigned char mask = old->evtchn_upcall_mask;
+
+    memcpy(new, old, sizeof(*new));
+
+    new->evtchn_upcall_mask = 1;
+    new->evtchn_upcall_pending = 1;
+    new->evtchn_pending_sel = ~0;
+
+    return mask;
+}
+
+/*
+ * Unmap a mapped guest page, if any, and use the standard shared_info
+ * vcpu_info location.
+ */
+static void
+unmap_vcpu_info(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned long mfn;
+    vcpu_info_t *sh_vcpu_info;
+    vcpu_info_t *old_vcpu_info;
+    unsigned char mask;
+
+    sh_vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
+
+    if (v->vcpu_info == sh_vcpu_info) {
+        ASSERT(v->vcpu_info_mfn == INVALID_MFN);
+        return;
+    }
+
+    mfn = v->vcpu_info_mfn;
+
+    ASSERT(mfn != INVALID_MFN);
+
+    mask = transfer_vcpu_info(v->vcpu_info, sh_vcpu_info);
+
+    old_vcpu_info = v->vcpu_info;
+
+    v->vcpu_info = sh_vcpu_info;
+    v->vcpu_info_mfn = INVALID_MFN;
+    wmb();                      /* update pointers before unmapping */
+
+    put_page_and_type(mfn_to_page(mfn));
+    unmap_domain_page_global(old_vcpu_info);
+
+    sh_vcpu_info->evtchn_upcall_mask = mask;
+
+    update_vcpu_system_time(v);
+}
+
+/* 
+ * Map a guest page in and point the vcpu_info pointer at it.  This
+ * makes sure that the vcpu_info is always pointing at a valid piece
+ * of memory, and it sets a pending event to make sure that a pending
+ * event doesn't get missed.
+ */
+static int
+map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
+{
+    struct domain *d = v->domain;
+    unsigned char mask;
+    void *mapping;
+    struct vcpu_info *new_info;
+
+    if (offset > (PAGE_SIZE - sizeof(vcpu_info_t)))
+        return -EINVAL;
+
+    mfn = gmfn_to_mfn(d, mfn);
+    if ( !mfn_valid(mfn) ||
+         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        return -EINVAL;
+
+    mapping = map_domain_page_global(mfn);
+    new_info = (vcpu_info_t *)(mapping + offset);
+
+    mask = transfer_vcpu_info(v->vcpu_info, new_info);
+    wmb();
+
+    unmap_vcpu_info(v);
+
+    v->vcpu_info = new_info;
+    v->vcpu_info_mfn = mfn;
+
+    wmb();
+    new_info->evtchn_upcall_mask = mask;
+
+    update_vcpu_system_time(v);
+
     return 0;
 }
 
@@ -765,6 +872,26 @@ arch_do_vcpu_op(
             vcpu_runstate_get(v, &runstate);
             __copy_to_guest(runstate_guest(v), &runstate, 1);
         }
+
+        break;
+    }
+
+    case VCPUOP_register_vcpu_info:
+    {
+        struct domain *d = v->domain;
+        struct vcpu_register_vcpu_info info;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&info, arg, 1) )
+            break;
+
+        LOCK_BIGLOCK(d);
+        if (info.mfn == INVALID_MFN) {
+            unmap_vcpu_info(v);
+            rc = 0;
+        } else
+            rc = map_vcpu_info(v, info.mfn, info.offset);
+        UNLOCK_BIGLOCK(d);
 
         break;
     }
