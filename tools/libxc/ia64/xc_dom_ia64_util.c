@@ -33,7 +33,7 @@ xen_ia64_version(struct xc_dom_image *dom)
 int
 xen_ia64_fpswa_revision(struct xc_dom_image *dom, unsigned int *revision)
 {
-    int ret = -1;
+    int ret;
     DECLARE_HYPERCALL;
     hypercall.op     = __HYPERVISOR_ia64_dom0vp_op;
     hypercall.arg[0] = IA64_DOM0VP_fpswa_revision;
@@ -41,13 +41,13 @@ xen_ia64_fpswa_revision(struct xc_dom_image *dom, unsigned int *revision)
 
     if (lock_pages(revision, sizeof(*revision)) != 0) {
         PERROR("Could not lock memory for xen fpswa hypercall");
-        goto out;
+        return -1;
     }
 
     ret = do_xen_hypercall(dom->guest_xc, &hypercall);
     
     unlock_pages(revision, sizeof(*revision));
-out:
+
     return ret;
 }
 
@@ -79,6 +79,7 @@ xen_ia64_dom_fw_map(struct xc_dom_image *dom, unsigned long mpaddr)
                                mpaddr / page_size);
     if (ret != NULL)
         ret = (void*)((unsigned long)ret | (mpaddr & (page_size - 1)));
+
     return ret;
 }
 
@@ -151,6 +152,7 @@ xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
     }
     rc = dom_fw_init(d, brkimm, bp, imva_tables_base,
                      (unsigned long)imva_hypercall_base, maxmem);
+
  out:
     if (imva_hypercall_base != NULL)
         xen_ia64_dom_fw_unmap(d, imva_hypercall_base);
@@ -160,6 +162,7 @@ xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
         xen_ia64_dom_fw_unmap(d, imva);
     if (bp != NULL)
         xen_ia64_dom_fw_unmap(d, bp);
+
     return rc;
 }
 

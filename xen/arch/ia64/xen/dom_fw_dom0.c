@@ -52,6 +52,7 @@ acpi_update_lsapic(acpi_table_entry_header *header, const unsigned long end)
         enable = 1;
     else
         enable = 0;
+
     if (lsapic->flags.enabled && enable) {
         printk("enable lsapic entry: 0x%lx\n", (u64)lsapic);
         lsapic->id = lsapic_nbr;
@@ -103,6 +104,7 @@ static void __init
 touch_acpi_table(void)
 {
     lsapic_nbr = 0;
+
     if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
         printk("Error parsing MADT - no LAPIC entries\n");
     if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC,
@@ -118,6 +120,7 @@ void __init
 efi_systable_init_dom0(struct fw_tables *tables)
 {
     int i = 1;
+
     /* Write messages to the console.  */
     touch_acpi_table();
 
@@ -352,7 +355,7 @@ complete_dom0_memmap(struct domain *d,
             md->type == EFI_CONVENTIONAL_MEMORY) {
             unsigned long start = md->phys_addr & PAGE_MASK;
             unsigned long end = md->phys_addr +
-                (md->num_pages << EFI_PAGE_SHIFT);
+                                (md->num_pages << EFI_PAGE_SHIFT);
 
             if (end == start) {
                 /* md->num_pages = 0 is allowed. */
@@ -371,8 +374,7 @@ complete_dom0_memmap(struct domain *d,
         if (efi_mmio(addr, PAGE_SIZE)) {
             unsigned long flags;
             flags = ASSIGN_writable | ASSIGN_nocache;
-            assign_domain_mmio_page(d, addr, addr,
-                        PAGE_SIZE, flags);
+            assign_domain_mmio_page(d, addr, addr, PAGE_SIZE, flags);
         }
     }
     setup_dom0_memmap_info(d, tables, &num_mds);

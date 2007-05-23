@@ -171,8 +171,9 @@ static void
 dom_efi_hypercall_patch(uint64_t brkimm, unsigned long paddr,
                         unsigned long hypercall, unsigned long imva)
 {
-	build_hypercall_bundle((uint64_t *)(imva + paddr - FW_HYPERCALL_BASE_PADDR),
-	                       brkimm, hypercall, 1);
+	build_hypercall_bundle((uint64_t *)(imva + paddr -
+			       FW_HYPERCALL_BASE_PADDR),
+			       brkimm, hypercall, 1);
 }
 
 // builds a hypercall bundle at domain physical address
@@ -181,8 +182,9 @@ dom_fw_hypercall_patch(uint64_t brkimm, unsigned long paddr,
 		       unsigned long hypercall,unsigned long ret,
                        unsigned long imva)
 {
-	build_hypercall_bundle((uint64_t *)(imva + paddr - FW_HYPERCALL_BASE_PADDR),
-	                       brkimm, hypercall, ret);
+	build_hypercall_bundle((uint64_t *)(imva + paddr -
+			       FW_HYPERCALL_BASE_PADDR),
+			       brkimm, hypercall, ret);
 }
 
 static void
@@ -397,7 +399,7 @@ efi_mdt_cmp(const void *a, const void *b)
 	if (x->phys_addr < y->phys_addr)
 		return -1;
 
-	// num_pages == 0 is allowed.
+	/* num_pages == 0 is allowed. */
 	if (x->num_pages > y->num_pages)
 		return 1;
 	if (x->num_pages < y->num_pages)

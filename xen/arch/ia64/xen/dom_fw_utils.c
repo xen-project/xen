@@ -41,6 +41,7 @@ xen_ia64_fpswa_revision(struct domain *d, unsigned int *revision)
 {
     if (fpswa_interface == NULL)
         return -ENOSYS;
+
     *revision = fpswa_interface->revision;
     return 0;
 }
@@ -90,6 +91,7 @@ dom_fw_set_convmem_end(struct domain *d)
         memmap_info->efi_memdesc_version !=
         EFI_MEMORY_DESCRIPTOR_VERSION)
         return -EINVAL;
+
     /* only 1page case is supported */
     if (d->shared_info->arch.memmap_info_num_pages != 1)
         return -ENOSYS;
@@ -111,10 +113,13 @@ dom_fw_set_convmem_end(struct domain *d)
 
     if (d->arch.convmem_end == 0)
         d->arch.convmem_end = d->max_pages << PAGE_SHIFT;
+
     for (p = memmap_start; p < memmap_end; p += memmap_info->efi_memdesc_size) {
         unsigned long end;
+
         md = p;
         end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
         if (md->attribute == EFI_MEMORY_WB &&
             md->type == EFI_CONVENTIONAL_MEMORY &&
             md->num_pages > 0 &&
@@ -130,8 +135,8 @@ dom_fw_set_convmem_end(struct domain *d)
 static inline void
 assign_new_domain_page_if_dom0(struct domain *d, unsigned long mpaddr)
 {
-        if (d == dom0)
-            assign_new_domain0_page(d, mpaddr);
+    if (d == dom0)
+        assign_new_domain0_page(d, mpaddr);
 }
 
 int

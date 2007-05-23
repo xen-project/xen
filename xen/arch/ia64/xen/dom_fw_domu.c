@@ -51,6 +51,7 @@ void
 efi_systable_init_domu(struct fw_tables *tables)
 {
     int i = 1;
+
     printk(XENLOG_GUEST XENLOG_INFO "DomainU EFI build up:");
 
     tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
@@ -96,6 +97,7 @@ complete_domu_memmap(domain_t *d,
     /* 3 = start info page, xenstore page and console page */
     paddr_end = paddr_start + memmap_info_size + 3 * PAGE_SIZE;
     memmap_info = xen_ia64_dom_fw_map(d, paddr_start);
+
     if (memmap_info->efi_memmap_size == 0) {
         create_memmap = 1;
     } else if (memmap_info->efi_memdesc_size != sizeof(md[0]) ||
@@ -136,9 +138,9 @@ complete_domu_memmap(domain_t *d,
          * memory map. create it for compatibility
          */
         memmap_info->efi_memdesc_size = sizeof(md[0]);
-        memmap_info->efi_memdesc_version =
-            EFI_MEMORY_DESCRIPTOR_VERSION;
+        memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
         memmap_info->efi_memmap_size = 1 * sizeof(md[0]);
+
         md = (efi_memory_desc_t*)&memmap_info->memdesc;
         md[num_mds].type = EFI_CONVENTIONAL_MEMORY;
         md[num_mds].pad = 0;
@@ -150,6 +152,7 @@ complete_domu_memmap(domain_t *d,
 
     memmap_start = &memmap_info->memdesc;
     memmap_end = memmap_start + memmap_info->efi_memmap_size;
+
     /* XXX Currently the table must be in a single page. */
     if ((unsigned long)memmap_end > (unsigned long)memmap_info + PAGE_SIZE) {
         xen_ia64_dom_fw_unmap(d, memmap_info);
@@ -167,6 +170,7 @@ complete_domu_memmap(domain_t *d,
     for (p = memmap_start; p < memmap_end; p += memmap_info->efi_memdesc_size) {
         unsigned long start;
         unsigned long end;
+
         md = p;
         start = md->phys_addr;
         end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
@@ -178,29 +182,23 @@ complete_domu_memmap(domain_t *d,
 
         /* exclude [paddr_start, paddr_end) */
         if (paddr_end <= start || end <= paddr_start) {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-                start, end);
+            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start, end);
         } else if (paddr_start <= start && paddr_end < end) {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-                paddr_end, end);
+            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, paddr_end, end);
         } else if (start < paddr_start && end <= paddr_end) {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-                start, paddr_start);
+            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start, paddr_start);
         } else {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-                start, paddr_start);
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-                paddr_end, end);
+            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start, paddr_start);
+            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, paddr_end, end);
         }
     }
 
     /* memmap info page. */
-    MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB,
-        paddr_start, paddr_end);
+    MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB, paddr_start, paddr_end);
 
     /* Create an entry for IO ports.  */
     MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
-        IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
+            IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
 
     num_mds = i;
     sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),

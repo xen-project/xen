@@ -28,7 +28,7 @@ typedef struct {
 /*
  * Generic EFI table header
  */
-typedef	struct {
+typedef struct {
 	uint64_t signature;
 	uint32_t revision;
 	uint32_t headersize;

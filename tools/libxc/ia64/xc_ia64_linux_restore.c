@@ -47,13 +47,13 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
     mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                PROT_READ|PROT_WRITE, pfn);
     if (mem == NULL) {
-            ERROR("cannot map page");
-            return -1;
+        ERROR("cannot map page");
+        return -1;
     }
     if (!read_exact(io_fd, mem, PAGE_SIZE)) {
-            ERROR("Error when reading from state file (5)");
-            munmap(mem, PAGE_SIZE);
-            return -1;
+        ERROR("Error when reading from state file (5)");
+        munmap(mem, PAGE_SIZE);
+        return -1;
     }
     munmap(mem, PAGE_SIZE);
     return 0;
@@ -99,12 +99,12 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     DPRINTF("xc_linux_restore start: p2m_size = %lx\n", p2m_size);
 
     if (!read_exact(io_fd, &ver, sizeof(unsigned long))) {
-	ERROR("Error when reading version");
-	goto out;
+        ERROR("Error when reading version");
+        goto out;
     }
     if (ver != 1) {
-	ERROR("version of save doesn't match");
-	goto out;
+        ERROR("version of save doesn't match");
+        goto out;
     }
 
     if (lock_pages(&ctxt, sizeof(ctxt))) {
@@ -164,11 +164,11 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             ERROR("Error when reading batch size");
             goto out;
         }
-	if (gmfn == INVALID_MFN)
-		break;
+        if (gmfn == INVALID_MFN)
+            break;
 
-	if (read_page(xc_handle, io_fd, dom, gmfn) < 0)
-		goto out;
+        if (read_page(xc_handle, io_fd, dom, gmfn) < 0)
+            goto out;
     }
 
     DPRINTF("Received all pages\n");
@@ -195,11 +195,11 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
 
-	DPRINTF ("Try to free %u pages\n", count);
+        DPRINTF ("Try to free %u pages\n", count);
 
         for (i = 0; i < count; i++) {
 
-	    volatile unsigned long pfn;
+            volatile unsigned long pfn;
 
             struct xen_memory_reservation reservation = {
                 .nr_extents   = 1,
@@ -207,9 +207,9 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 .domid        = dom
             };
             set_xen_guest_handle(reservation.extent_start,
-				 (unsigned long *)&pfn);
+                                 (unsigned long *)&pfn);
 
-	    pfn = pfntab[i];
+            pfn = pfntab[i];
             rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
                               &reservation);
             if (rc != 1) {
@@ -218,7 +218,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             }
         }
 
-	DPRINTF("Decreased reservation by %d pages\n", count);
+        DPRINTF("Decreased reservation by %d pages\n", count);
     }
 
 
@@ -235,8 +235,8 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     domctl.u.vcpucontext.vcpu   = 0;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
     if (xc_domctl(xc_handle, &domctl) != 0) {
-	    ERROR("Couldn't set vcpu context");
-	    goto out;
+        ERROR("Couldn't set vcpu context");
+        goto out;
     }
 
     /* Second to set registers...  */
@@ -246,20 +246,20 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     domctl.u.vcpucontext.vcpu   = 0;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
     if (xc_domctl(xc_handle, &domctl) != 0) {
-	    ERROR("Couldn't set vcpu context");
-	    goto out;
+        ERROR("Couldn't set vcpu context");
+        goto out;
     }
 
     /* Just a check.  */
     if (xc_vcpu_getcontext(xc_handle, dom, 0 /* XXX */, &ctxt)) {
         ERROR("Could not get vcpu context");
-	goto out;
+        goto out;
     }
 
     /* Then get privreg page.  */
     if (read_page(xc_handle, io_fd, dom, ctxt.privregs_pfn) < 0) {
-	    ERROR("Could not read vcpu privregs");
-	    goto out;
+        ERROR("Could not read vcpu privregs");
+        goto out;
     }
 
     /* Read shared info.  */
@@ -267,12 +267,12 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                                        PROT_READ|PROT_WRITE, shared_info_frame);
     if (shared_info == NULL) {
             ERROR("cannot map page");
-	    goto out;
+            goto out;
     }
     if (!read_exact(io_fd, shared_info, PAGE_SIZE)) {
             ERROR("Error when reading shared_info page");
             munmap(shared_info, PAGE_SIZE);
-	    goto out;
+            goto out;
     }
 
     /* clear any pending events and the selector */
@@ -322,7 +322,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         xc_domain_destroy(xc_handle, dom);
 
     if (page_array != NULL)
-	    free(page_array);
+        free(page_array);
 
     unlock_pages(&ctxt, sizeof(ctxt));
 
