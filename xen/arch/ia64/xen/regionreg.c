@@ -87,7 +87,7 @@ static int implemented_rid_bits = 0;
 static int mp_rid_shift;
 static struct domain *ridblock_owner[MAX_RID_BLOCKS] = { 0 };
 
-void init_rid_allocator (void)
+void __init init_rid_allocator (void)
 {
 	int log_blocks;
 	pal_vm_info_2_u_t vm_info_2;

@@ -252,7 +252,7 @@ void ia64_do_page_fault(unsigned long address, unsigned long isr,
 
 fpswa_interface_t *fpswa_interface = 0;
 
-void trap_init(void)
+void __init trap_init(void)
 {
 	if (ia64_boot_param->fpswa)
 		/* FPSWA fixup: make the interface pointer a virtual address */

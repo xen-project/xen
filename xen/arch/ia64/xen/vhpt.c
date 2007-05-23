@@ -117,7 +117,7 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 	}
 }
 
-void vhpt_init(void)
+void __init vhpt_init(void)
 {
 	unsigned long paddr;
 	struct page_info *page;

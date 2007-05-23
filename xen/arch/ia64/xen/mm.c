@@ -779,7 +779,7 @@ assign_new_domain_page(struct domain *d, unsigned long mpaddr)
     return __assign_new_domain_page(d, mpaddr, pte);
 }
 
-void
+void __init
 assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 {
     volatile pte_t *pte;
@@ -1360,7 +1360,7 @@ dom0vp_add_physmap_with_gmfn(struct domain* d, unsigned long gpfn,
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 static struct page_info* p2m_pte_zero_page = NULL;
 
-void
+void __init
 expose_p2m_init(void)
 {
     pte_t* pte;

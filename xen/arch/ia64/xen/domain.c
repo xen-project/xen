@@ -52,10 +52,10 @@
 #include <asm/perfmon.h>
 #include <public/vcpu.h>
 
-unsigned long dom0_size = 512*1024*1024;
+static unsigned long __initdata dom0_size = 512*1024*1024;
 
 /* dom0_max_vcpus: maximum number of VCPUs to create for dom0.  */
-static unsigned int dom0_max_vcpus = 1;
+static unsigned int __initdata dom0_max_vcpus = 1;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
 extern unsigned long running_on_sim;
@@ -1109,7 +1109,7 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 #define	privify_memory(x,y) do {} while(0)
 #endif
 
-static void loaddomainelfimage(struct domain *d, struct elf_binary *elf)
+static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf)
 {
 	const elf_phdr *phdr;
 	int phnum, h, filesz, memsz;
@@ -1163,7 +1163,7 @@ static void loaddomainelfimage(struct domain *d, struct elf_binary *elf)
 	}
 }
 
-void alloc_dom0(void)
+void __init alloc_dom0(void)
 {
 	/* Check dom0 size.  */
 	if (dom0_size < 4 * 1024 * 1024) {
@@ -1187,7 +1187,7 @@ void alloc_dom0(void)
  * handled with order > 0 request. Dom0 requires that bit set to
  * allocate memory for other domains.
  */
-static void physdev_init_dom0(struct domain *d)
+static void __init physdev_init_dom0(struct domain *d)
 {
 	if (iomem_permit_access(d, 0UL, ~0UL))
 		BUG();
@@ -1197,10 +1197,10 @@ static void physdev_init_dom0(struct domain *d)
 		BUG();
 }
 
-int construct_dom0(struct domain *d, 
-	               unsigned long image_start, unsigned long image_len, 
-	               unsigned long initrd_start, unsigned long initrd_len,
-	               char *cmdline)
+int __init construct_dom0(struct domain *d, 
+			  unsigned long image_start, unsigned long image_len, 
+			  unsigned long initrd_start, unsigned long initrd_len,
+			  char *cmdline)
 {
 	int i, rc;
 	start_info_t *si;
@@ -1464,7 +1464,7 @@ arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
 	return rc;
 }
 
-static void parse_dom0_mem(char *s)
+static void __init parse_dom0_mem(char *s)
 {
 	dom0_size = parse_size_and_unit(s, NULL);
 }

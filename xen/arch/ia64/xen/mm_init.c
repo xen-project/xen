@@ -115,7 +115,7 @@ ia64_mmu_init (void *my_cpu_data)
 #endif
 }
 
-void
+void __init
 mem_init (void)
 {
 #ifdef CONFIG_PCI

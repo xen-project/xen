@@ -46,7 +46,7 @@ unsigned long max_page;
  */
 volatile unsigned long *mpt_table __read_mostly;
 
-void
+void __init
 paging_init (void)
 {
 	unsigned int mpt_order;
@@ -81,7 +81,7 @@ paging_init (void)
 
 #ifdef CONFIG_VIRTUAL_FRAME_TABLE
 
-static unsigned long
+static unsigned long __init
 alloc_dir_page(void)
 {
 	unsigned long mfn = alloc_boot_pages(1, 1);
@@ -94,7 +94,7 @@ alloc_dir_page(void)
 	return dir;
 }
 
-static inline unsigned long
+static inline unsigned long __init
 alloc_table_page(unsigned long fill)
 {
 	unsigned long mfn = alloc_boot_pages(1, 1);
@@ -109,7 +109,7 @@ alloc_table_page(unsigned long fill)
 	return mfn;
 }
 
-static void
+static void __init
 create_page_table(unsigned long start_page, unsigned long end_page,
                   unsigned long fill)
 {
@@ -131,7 +131,7 @@ create_page_table(unsigned long start_page, unsigned long end_page,
 	}
 }
 
-static int
+static int __init
 create_frametable_page_table (u64 start, u64 end, void *arg)
 {
 	struct page_info *map_start, *map_end;
@@ -147,7 +147,7 @@ create_frametable_page_table (u64 start, u64 end, void *arg)
 	return 0;
 }
 
-static int
+static int __init
 create_mpttable_page_table (u64 start, u64 end, void *arg)
 {
 	unsigned long map_start, map_end;
@@ -163,7 +163,7 @@ create_mpttable_page_table (u64 start, u64 end, void *arg)
 	return 0;
 }
 
-void init_virtual_frametable(void)
+void __init init_virtual_frametable(void)
 {
 	/* Allocate virtual frame_table */
 	frame_table = (struct page_info *) VIRT_FRAME_TABLE_ADDR;

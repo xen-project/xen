@@ -21,6 +21,7 @@
 
 #include <xen/config.h>
 #include <xen/lib.h>
+#include <xen/init.h>
 #include <asm/xensystem.h>
 #include <asm/intrinsics.h>
 
@@ -96,7 +97,7 @@ extern unsigned long xen_pstart;
  * Add more patch points in seperate functions as appropriate
  */
 
-static void xen_patch_frametable_miss(u64 offset)
+static void __init xen_patch_frametable_miss(u64 offset)
 {
 	u64 addr, val;
 
@@ -106,7 +107,7 @@ static void xen_patch_frametable_miss(u64 offset)
 }
 
 
-void xen_patch_kernel(void)
+void __init xen_patch_kernel(void)
 {
 	unsigned long patch_offset;
 
