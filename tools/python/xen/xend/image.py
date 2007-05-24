@@ -469,6 +469,10 @@ class HVMImageHandler(ImageHandler):
 
 class IA64_HVM_ImageHandler(HVMImageHandler):
 
+    def buildDomain(self):
+        xc.nvram_init(self.vm.getName(), self.vm.getDomid())
+        return HVMImageHandler.buildDomain(self)
+
     def getRequiredAvailableMemory(self, mem_kb):
         page_kb = 16
         # ROM size for guest firmware, ioreq page, pio page and xenstore page
