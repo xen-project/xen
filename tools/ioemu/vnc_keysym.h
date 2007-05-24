@@ -291,10 +291,34 @@ static name2keysym_t name2keysym[]={
 {"BackApostrophe", 0xff21},
 {"Muhenkan", 0xff22},
 {"Katakana", 0xff25},
-{"Zenkaku_Hankaku", 0xff29},
+{"Hankaku", 0xff29},
+{"Zenkaku_Hankaku", 0xff2a},
 {"Henkan_Mode_Real", 0xff23},
 {"Henkan_Mode_Ultra", 0xff3e},
 {"backslash_ja", 0xffa5},
 
+    /* dead keys */
+{"dead_grave", 0xfe50},
+{"dead_acute", 0xfe51},
+{"dead_circumflex", 0xfe52},
+{"dead_tilde", 0xfe53},
+{"dead_macron", 0xfe54},
+{"dead_brev", 0xfe55},
+{"dead_abovedot", 0xfe56},
+{"dead_diaeresis", 0xfe57},
+{"dead_abovering", 0xfe58},
+{"dead_doubleacute", 0xfe59},
+{"dead_caron", 0xfe5a},
+{"dead_cedilla", 0xfe5b},
+{"dead_ogonek", 0xfe5c},
+{"dead_iota", 0xfe5d},
+{"dead_voiced_sound", 0xfe5e},
+{"dead_semivoiced_sound", 0xfe5f},
+{"dead_belowdot", 0xfe60},
+{"dead_hook", 0xfe61},
+{"dead_horn", 0xfe62},
+
+
 {0,0},
 };
+
