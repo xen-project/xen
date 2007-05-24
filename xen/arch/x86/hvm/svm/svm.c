@@ -2520,14 +2520,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void svm_load_cr2(void)
+asmlinkage void svm_trace_vmentry(void)
 {
     struct vcpu *v = current;
 
     /* This is the last C code before the VMRUN instruction. */
     HVMTRACE_0D(VMENTRY, v);
-
-    asm volatile ( "mov %0,%%cr2" : : "r" (v->arch.hvm_svm.cpu_cr2) );
 }
   
 /*

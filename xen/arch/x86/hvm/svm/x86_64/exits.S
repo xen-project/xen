@@ -38,16 +38,23 @@
 ENTRY(svm_asm_do_resume)
         GET_CURRENT(%rbx)
         CLGI
-        /* Run ASID stuff. */
-        call svm_asid_handle_vmrun
 
         movl VCPU_processor(%rbx),%eax
         shl  $IRQSTAT_shift,%rax
         leaq irq_stat(%rip),%rdx
         testl $~0,(%rdx,%rax,1)
         jnz  svm_process_softirqs
+
+        call svm_asid_handle_vmrun
         call svm_intr_assist
-        call svm_load_cr2
+
+        /* Check if the trace buffer is initialized. 
+         * Because the below condition is unlikely, we jump out of line
+         * instead of having a mostly taken branch over the unlikely code.
+         */
+        cmpb $0,tb_init_done(%rip)
+        jnz  svm_trace
+svm_trace_done:
 
         movq VCPU_svm_vmcb(%rbx),%rcx
         movq UREGS_rax(%rsp),%rax
@@ -106,3 +113,11 @@ svm_process_softirqs:
         STGI
         call do_softirq
         jmp  svm_asm_do_resume
+
+svm_trace:
+        /* Call out to C, as this is not speed critical path
+         * Note: svm_trace_vmentry will recheck the tb_init_done,
+         * but this is on the slow path, so who cares 
+         */
+        call svm_trace_vmentry
+        jmp  svm_trace_done
