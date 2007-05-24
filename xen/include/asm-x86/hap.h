@@ -48,18 +48,6 @@ hap_unmap_domain_page(void *p)
     unmap_domain_page(p);
 }
 
-static inline void *
-hap_map_domain_page_global(mfn_t mfn)
-{
-    return map_domain_page_global(mfn_x(mfn));
-}
-
-static inline void 
-hap_unmap_domain_page_global(void *p) 
-{
-    unmap_domain_page_global(p);
-}
-
 /************************************************/
 /*           locking for hap code               */
 /************************************************/

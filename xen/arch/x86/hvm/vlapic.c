@@ -918,16 +918,16 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs_page = alloc_domheap_page(NULL);
     if ( vlapic->regs_page == NULL )
     {
-        dprintk(XENLOG_ERR, "malloc vlapic regs_page error for vcpu %x\n",
-                v->vcpu_id);
+        dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",
+                v->domain->domain_id, v->vcpu_id);
         return -ENOMEM;
     }
 
     vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
     if ( vlapic->regs == NULL )
     {
-        dprintk(XENLOG_ERR, "malloc vlapic regs error for vcpu %x\n",
-                v->vcpu_id);
+        dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
+                v->domain->domain_id, v->vcpu_id);
 	return -ENOMEM;
     }
 
@@ -935,7 +935,8 @@ int vlapic_init(struct vcpu *v)
 
     vlapic_reset(vlapic);
 
-    vlapic->hw.apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+    vlapic->hw.apic_base_msr = (MSR_IA32_APICBASE_ENABLE |
+                                APIC_DEFAULT_PHYS_BASE);
     if ( v->vcpu_id == 0 )
         vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
