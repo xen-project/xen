@@ -690,8 +690,10 @@ int main(int argc, char *argv[])
 
 	/* Attach to blktap0 */
 	asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME);
-	if ((ret = xc_find_device_number("blktap0")) < 0)
+	if ((ret = xc_find_device_number("blktap0")) < 0) {
+		DPRINTF("couldn't find device number for 'blktap0'\n");
 		goto open_failed;
+	}
 	blktap_major = major(ret);
 	make_blktap_dev(devname,blktap_major,0);
 	ctlfd = open(devname, O_RDWR);
