@@ -136,6 +136,7 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
+    v->vcpu_info_mfn = INVALID_MFN;
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();

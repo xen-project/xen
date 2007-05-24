@@ -28,6 +28,7 @@
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/percpu.h>
+#include <xen/compat.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -48,6 +49,8 @@
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(__u64, efer);
+
+static void unmap_vcpu_info(struct vcpu *v);
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
@@ -728,8 +731,91 @@ int arch_set_info_guest(
 
 int arch_vcpu_reset(struct vcpu *v)
 {
+    unmap_vcpu_info(v);
     destroy_gdt(v);
     vcpu_destroy_pagetables(v);
+    return 0;
+}
+
+/* 
+ * Unmap the vcpu info page if the guest decided to place it somewhere
+ * else.  This is only used from arch_vcpu_reset, so there's no need
+ * to do anything clever.
+ */
+static void
+unmap_vcpu_info(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned long mfn;
+
+    if ( v->vcpu_info_mfn == INVALID_MFN )
+        return;
+
+    mfn = v->vcpu_info_mfn;
+    unmap_domain_page_global( v->vcpu_info );
+
+    v->vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
+    v->vcpu_info_mfn = INVALID_MFN;
+
+    put_page_and_type(mfn_to_page(mfn));
+}
+
+/* 
+ * Map a guest page in and point the vcpu_info pointer at it.  This
+ * makes sure that the vcpu_info is always pointing at a valid piece
+ * of memory, and it sets a pending event to make sure that a pending
+ * event doesn't get missed.
+ */
+static int
+map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
+{
+    struct domain *d = v->domain;
+    void *mapping;
+    vcpu_info_t *new_info;
+    int i;
+
+    if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
+        return -EINVAL;
+
+    if ( mfn == INVALID_MFN ||
+         v->vcpu_info_mfn != INVALID_MFN )
+        return -EINVAL;
+
+    mfn = gmfn_to_mfn(d, mfn);
+    if ( !mfn_valid(mfn) ||
+         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        return -EINVAL;
+
+    mapping = map_domain_page_global(mfn);
+    if ( mapping == NULL )
+    {
+        put_page_and_type(mfn_to_page(mfn));
+        return -ENOMEM;
+    }
+
+    new_info = (vcpu_info_t *)(mapping + offset);
+
+    memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+
+    v->vcpu_info = new_info;
+    v->vcpu_info_mfn = mfn;
+
+    /* make sure all the pointers are uptodate before setting pending */
+    wmb();
+
+    /* Mark everything as being pending just to make sure nothing gets
+       lost.  The domain will get a spurious event, but it can
+       cope. */
+    vcpu_info(v, evtchn_upcall_pending) = 1;
+    for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
+        set_bit(i, vcpu_info_addr(v, evtchn_pending_sel));
+
+    /* Only bother to update time for the current vcpu.  If we're
+     * operating on another vcpu, then it had better not be running at
+     * the time. */
+    if ( v == current )
+         update_vcpu_system_time(v);
+
     return 0;
 }
 
@@ -765,6 +851,22 @@ arch_do_vcpu_op(
             vcpu_runstate_get(v, &runstate);
             __copy_to_guest(runstate_guest(v), &runstate, 1);
         }
+
+        break;
+    }
+
+    case VCPUOP_register_vcpu_info:
+    {
+        struct domain *d = v->domain;
+        struct vcpu_register_vcpu_info info;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&info, arg, 1) )
+            break;
+
+        LOCK_BIGLOCK(d);
+        rc = map_vcpu_info(v, info.mfn, info.offset);
+        UNLOCK_BIGLOCK(d);
 
         break;
     }

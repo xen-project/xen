@@ -168,8 +168,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
  * The pointer need not be page aligned, but the structure must not
  * cross a page boundary.
  *
- * If the specified mfn is INVALID_MFN, then it reverts to using the
- * vcpu_info structure in the shared_info page.
+ * This may be called only once per vcpu.
  */
 #define VCPUOP_register_vcpu_info   10  /* arg == struct vcpu_info */
 struct vcpu_register_vcpu_info {
