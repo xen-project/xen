@@ -1517,14 +1517,14 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
         limit_field = GUEST_FS_LIMIT;
         break;
     case x86_seg_gs:
-        ar_field = GUEST_FS_AR_BYTES;
-        base_field = GUEST_FS_BASE;
-        limit_field = GUEST_FS_LIMIT;
-        break;
-    case x86_seg_ss:
         ar_field = GUEST_GS_AR_BYTES;
         base_field = GUEST_GS_BASE;
         limit_field = GUEST_GS_LIMIT;
+        break;
+    case x86_seg_ss:
+        ar_field = GUEST_SS_AR_BYTES;
+        base_field = GUEST_SS_BASE;
+        limit_field = GUEST_SS_LIMIT;
         break;
     default:
         BUG();
