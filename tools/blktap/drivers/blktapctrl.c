@@ -678,7 +678,10 @@ int main(int argc, char *argv[])
 	__init_blkif();
 	snprintf(buf, sizeof(buf), "BLKTAPCTRL[%d]", getpid());
 	openlog(buf, LOG_CONS|LOG_ODELAY, LOG_DAEMON);
-	daemon(0,0);
+	if (daemon(0,0)) {
+		DPRINTF("daemon failed (%d)\n", errno);
+		goto open_failed;
+	}
 
 	print_drivers();
 	init_driver_list();
