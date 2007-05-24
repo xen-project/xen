@@ -917,10 +917,10 @@ def domid_match(domid, info):
            domid == str(info['domid'])
 
 def xm_brief_list(doms):
-    print '%-40s %3s %5s %5s %10s %9s' % \
+    print '%-40s %5s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s " \
+    format = "%(name)-40s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -928,11 +928,11 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-32s %3s %5s %5s %5s %9s %-8s' % \
+    print '%-32s %5s %5s %5s %5s %9s %-8s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
+    format = '%(name)-32s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
 
     if serverType != SERVER_XEN_API:
@@ -1022,10 +1022,10 @@ def xm_vcpu_list(args):
             doms = server.xend.domains(False)
             dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
-    print '%-32s %3s %5s %5s %5s %9s %s' % \
+    print '%-32s %5s %5s %5s %5s %9s %s' % \
           ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
 
-    format = '%(name)-32s %(domid)3d %(number)5d %(c)5s %(s)5s ' \
+    format = '%(name)-32s %(domid)5d %(number)5d %(c)5s %(s)5s ' \
              ' %(cpu_time)8.1f %(cpumap)s'
 
     for dom in dominfo:
@@ -1423,7 +1423,7 @@ def xm_sched_sedf(args):
         info['period']  = ns_to_ms(info['period'])
         info['slice']   = ns_to_ms(info['slice'])
         info['latency'] = ns_to_ms(info['latency'])
-        print( ("%(name)-32s %(domid)3d %(period)9.1f %(slice)9.1f" +
+        print( ("%(name)-32s %(domid)5d %(period)9.1f %(slice)9.1f" +
                 " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
     check_sched_type('sedf')
@@ -1469,7 +1469,7 @@ def xm_sched_sedf(args):
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
-        print '%-33s %-2s %-4s %-4s %-7s %-5s %-6s' % \
+        print '%-33s %4s %-4s %-4s %-7s %-5s %-6s' % \
               ('Name','ID','Period(ms)', 'Slice(ms)', 'Lat(ms)',
                'Extra','Weight')
     
@@ -1533,7 +1533,7 @@ def xm_sched_credit(args):
             err("Domain '%s' does not exist." % domid)
             usage('sched-credit')
         # print header if we aren't setting any parameters
-        print '%-33s %-2s %-6s %-4s' % ('Name','ID','Weight','Cap')
+        print '%-33s %4s %6s %4s' % ('Name','ID','Weight','Cap')
         
         for d in doms:
             try:
@@ -1555,7 +1555,7 @@ def xm_sched_credit(args):
             
             info['name']  = d['name']
             info['domid'] = int(d['domid'])
-            print( ("%(name)-32s %(domid)3d %(weight)6d %(cap)4d") % info)
+            print( ("%(name)-32s %(domid)5d %(weight)6d %(cap)4d") % info)
     else:
         if domid is None:
             # place holder for system-wide scheduler parameters
@@ -1718,7 +1718,7 @@ def xm_uptime(args):
     doms = getDomains(params, 'running')
 
     if short_mode == 0:
-        print 'Name                              ID Uptime'
+        print '%-33s %4s %s ' % ('Name','ID','Uptime')
 
     for dom in doms:
         d = parse_doms_info(dom)
@@ -1752,7 +1752,7 @@ def xm_uptime(args):
             upstring += ", " + d['name'] + " (" + d['domid'] + ")"
         else:
             upstring += ':%(seconds)02d' % vars()
-            upstring = ("%(name)-32s %(domid)3s " % d) + upstring
+            upstring = ("%(name)-32s %(domid)5s " % d) + upstring
 
         print upstring
 
