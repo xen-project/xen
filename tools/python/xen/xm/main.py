@@ -231,6 +231,7 @@ SUBCOMMAND_OPTIONS = {
     ),
     'start': (
       ('-p', '--paused', 'Do not unpause domain after starting it'),
+      ('-c', '--console_autoconnect', 'Connect to the console after the domain is created'),
     ),
     'resume': (
       ('-p', '--paused', 'Do not unpause domain after resuming it'),
@@ -1125,29 +1126,67 @@ def xm_vcpu_list(args):
 
             print format % locals()
 
+def start_do_console(domain_name):
+    cpid = os.fork() 
+    if cpid != 0:
+        for i in range(10):
+            # Catch failure of the create process 
+            time.sleep(1)
+            (p, rv) = os.waitpid(cpid, os.WNOHANG)
+            if os.WIFEXITED(rv):
+                if os.WEXITSTATUS(rv) != 0:
+                    sys.exit(os.WEXITSTATUS(rv))
+            try:
+                # Acquire the console of the created dom
+                if serverType == SERVER_XEN_API:
+                    domid = server.xenapi.VM.get_domid(
+                               get_single_vm(domain_name))
+                else:
+                    dom = server.xend.domain(domain_name)
+                    domid = int(sxp.child_value(dom, 'domid', '-1'))
+                console.execConsole(domid)
+            except:
+                pass
+        print("Could not start console\n");
+        sys.exit(0)
+
 def xm_start(args):
-    arg_check(args, "start", 1, 2)
+
+    paused = False
+    console_autoconnect = False
 
     try:
-        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+        (options, params) = getopt.gnu_getopt(args, 'cp', ['console_autoconnect','paused'])
+        for (k, v) in options:
+            if k in ('-p', '--paused'):
+                paused = True
+            if k in ('-c', '--console_autoconnect'):
+                console_autoconnect = True
+
+        if len(params) != 1:
+            raise OptionError("Expects 1 argument")
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('start')
 
-    paused = False
-    for (k, v) in options:
-        if k in ['-p', '--paused']:
-            paused = True
-
-    if len(params) != 1:
-        err("Wrong number of parameters")
-        usage('start')
-
     dom = params[0]
-    if serverType == SERVER_XEN_API:
-        server.xenapi.VM.start(get_single_vm(dom), paused)
-    else:
-        server.xend.domain.start(dom, paused)
+
+    if console_autoconnect:
+        start_do_console(dom)
+
+    try:
+        if serverType == SERVER_XEN_API:
+            server.xenapi.VM.start(get_single_vm(dom), paused)
+            domid = int(server.xenapi.VM.get_domid(get_single_vm(dom)))
+        else:
+            server.xend.domain.start(dom, paused)
+            info = server.xend.domain(dom)
+            domid = int(sxp.child_value(info, 'domid', '-1'))
+    except:
+        raise
+        
+    if domid == -1:
+        raise xmlrpclib.Fault(0, "Domain '%s' is not started" % dom)
 
 def xm_delete(args):
     arg_check(args, "delete", 1)
