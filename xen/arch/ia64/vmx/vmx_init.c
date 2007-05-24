@@ -132,7 +132,7 @@ vmx_init_env(void)
 	if (!__vsa_base)
 		__vsa_base = tmp_base;
 	else
-		ASSERT(tmp_base != __vsa_base);
+		ASSERT(tmp_base == __vsa_base);
 
 }
 
