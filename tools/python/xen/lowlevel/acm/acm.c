@@ -53,7 +53,6 @@ void * __getssid(int domid, uint32_t *buflen)
         goto out2;
     }
     memset(buf, 0, SSID_BUFFER_SIZE);
-    getssid.interface_version = ACM_INTERFACE_VERSION;
     set_xen_guest_handle(getssid.ssidbuf, buf);
     getssid.ssidbuf_size = SSID_BUFFER_SIZE;
     getssid.get_ssid_by = ACM_GETBY_domainid;
@@ -163,7 +162,6 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
     (strcmp(arg2_name, "domid") && strcmp(arg2_name, "ssidref")))
         return NULL;
 
-    getdecision.interface_version = ACM_INTERFACE_VERSION;
     getdecision.hook = ACMHOOK_sharing;
     if (!strcmp(arg1_name, "domid")) {
         getdecision.get_decision_by1 = ACM_GETBY_domainid;

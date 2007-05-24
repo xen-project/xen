@@ -98,7 +98,7 @@ do_vcpu_op(
 
 extern long
 do_acm_op(
-    int cmd, XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE(xen_acmctl_t) arg);
 
 extern long
 do_nmi_op(
