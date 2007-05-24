@@ -370,6 +370,12 @@ mm_final_teardown(struct domain* d)
     mm_p2m_teardown(d);
 }
 
+unsigned long
+domain_get_maximum_gpfn(struct domain *d)
+{
+    return (d->arch.convmem_end + PAGE_SIZE - 1) >> PAGE_SHIFT;
+}
+
 // stolen from share_xen_page_with_guest() in xen/arch/x86/mm.c
 void
 share_xen_page_with_guest(struct page_info *page,

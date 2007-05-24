@@ -430,6 +430,21 @@ xencomm_privcmd_memory_op(privcmd_hypercall_t *hypercall)
 
 		return ret;
 	}
+	case XENMEM_maximum_gpfn:
+	{
+		domid_t kern_domid;
+		domid_t __user *user_domid;
+		struct xencomm_handle *desc;
+
+		user_domid = (domid_t __user *)hypercall->arg[1];
+		if (copy_from_user(&kern_domid, user_domid, sizeof(domid_t)))
+			return -EFAULT;
+		desc = xencomm_create_inline(&kern_domid);
+
+		ret = xencomm_arch_hypercall_memory_op(cmd, desc);
+
+		return ret;
+	}
 	case XENMEM_translate_gpfn_list:
 	{
 		xen_translate_gpfn_list_t kern_op;
