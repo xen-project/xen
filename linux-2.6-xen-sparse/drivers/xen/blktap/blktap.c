@@ -269,6 +269,16 @@ static inline int GET_NEXT_REQ(unsigned long *idx_map)
 	return INVALID_REQ;
 }
 
+static inline int OFFSET_TO_USR_IDX(int offset)
+{
+	return offset / BLKIF_MAX_SEGMENTS_PER_REQUEST;
+}
+
+static inline int OFFSET_TO_SEG(int offset)
+{
+	return offset % BLKIF_MAX_SEGMENTS_PER_REQUEST;
+}
+
 
 #define BLKTAP_INVALID_HANDLE(_g) \
     (((_g->kernel) == INVALID_GRANT_HANDLE) &&  \
@@ -295,8 +305,90 @@ static struct page *blktap_nopage(struct vm_area_struct *vma,
 	return NOPAGE_SIGBUS;
 }
 
+static pte_t blktap_clear_pte(struct vm_area_struct *vma,
+			      unsigned long uvaddr,
+			      pte_t *ptep, int is_fullmm)
+{
+	pte_t copy = *ptep;
+	tap_blkif_t *info;
+	int offset, seg, usr_idx, pending_idx, mmap_idx;
+	unsigned long uvstart = vma->vm_start + (RING_PAGES << PAGE_SHIFT);
+	unsigned long kvaddr;
+	struct page **map;
+	struct page *pg;
+	struct grant_handle_pair *khandle;
+	struct gnttab_unmap_grant_ref unmap[2];
+	int count = 0;
+	static int print_warning = 1;
+
+	/* Print a warning message once, if the hook gets called. */
+	if (print_warning) {
+		WPRINTK("Clear pte hook called!\n");
+		print_warning = 0;
+	}
+
+	/*
+	 * If the address is before the start of the grant mapped region or
+	 * if vm_file is NULL (meaning mmap failed and we have nothing to do)
+	 */
+	if (uvaddr < uvstart || vma->vm_file == NULL)
+		return copy;
+
+	info = vma->vm_file->private_data;
+	map = vma->vm_private_data;
+
+	/* TODO Should these be changed to if statements? */
+	BUG_ON(!info);
+	BUG_ON(!info->idx_map);
+	BUG_ON(!map);
+
+	offset = (int) ((uvaddr - uvstart) >> PAGE_SHIFT);
+	usr_idx = OFFSET_TO_USR_IDX(offset);
+	seg = OFFSET_TO_SEG(offset);
+
+	pending_idx = MASK_PEND_IDX(ID_TO_IDX(info->idx_map[usr_idx]));
+	mmap_idx = ID_TO_MIDX(info->idx_map[usr_idx]);
+
+	kvaddr = idx_to_kaddr(mmap_idx, pending_idx, seg);
+	pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+	ClearPageReserved(pg);
+	map[offset] = NULL;
+
+	khandle = &pending_handle(mmap_idx, pending_idx, seg);
+
+	if (khandle->kernel != INVALID_GRANT_HANDLE) {
+		gnttab_set_unmap_op(&unmap[count], kvaddr, 
+				    GNTMAP_host_map, khandle->kernel);
+		count++;
+
+		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT, 
+				    INVALID_P2M_ENTRY);
+	}
+
+	if (khandle->user != INVALID_GRANT_HANDLE) {
+		BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
+
+		gnttab_set_unmap_op(&unmap[count], virt_to_machine(ptep), 
+				    GNTMAP_host_map 
+				    | GNTMAP_application_map 
+				    | GNTMAP_contains_pte,
+				    khandle->user);
+		count++;
+	}
+
+	if (count) {
+		BLKTAP_INVALIDATE_HANDLE(khandle);
+		if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
+					      unmap, count))
+			BUG();
+	}
+
+	return copy;
+}
+
 struct vm_operations_struct blktap_vm_ops = {
 	nopage:   blktap_nopage,
+	zap_pte:  blktap_clear_pte,
 };
 
 /******************************************************************
@@ -477,6 +569,9 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	info->idx_map = kmalloc(sizeof(unsigned long) * MAX_PENDING_REQS, 
 				GFP_KERNEL);
 	
+	if (info->idx_map == NULL)
+		goto fail_nomem;
+
 	if (idx > 0) {
 		init_waitqueue_head(&info->wait);
 		for (i = 0; i < MAX_PENDING_REQS; i++) 
@@ -510,16 +605,25 @@ static int blktap_release(struct inode *inode, struct file *filp)
 		zap_page_range(
 			info->vma, info->vma->vm_start, 
 			info->vma->vm_end - info->vma->vm_start, NULL);
+
+		kfree(info->vma->vm_private_data);
+
 		info->vma = NULL;
 	}
-	
+
+	if (info->idx_map) {
+		kfree(info->idx_map);
+		info->idx_map = NULL;
+	}
+
 	if ( (info->status != CLEANSHUTDOWN) && (info->blkif != NULL) ) {
 		if (info->blkif->xenblkd != NULL) {
 			kthread_stop(info->blkif->xenblkd);
 			info->blkif->xenblkd = NULL;
 		}
 		info->status = CLEANSHUTDOWN;
-	}	
+	}
+
 	return 0;
 }
 
@@ -590,6 +694,11 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
     
 	vma->vm_private_data = map;
 	vma->vm_flags |= VM_FOREIGN;
+	vma->vm_flags |= VM_DONTCOPY;
+
+#ifdef CONFIG_X86
+	vma->vm_mm->context.has_foreign_mappings = 1;
+#endif
 
 	info->vma = vma;
 	info->ring_ok = 1;
@@ -885,6 +994,10 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 					    idx_to_kaddr(mmap_idx, k_idx, i),
 					    GNTMAP_host_map, khandle->kernel);
 			invcount++;
+
+			set_phys_to_machine(
+				__pa(idx_to_kaddr(mmap_idx, k_idx, i))
+				>> PAGE_SHIFT, INVALID_P2M_ENTRY);
 		}
 
 		if (khandle->user != INVALID_GRANT_HANDLE) {
