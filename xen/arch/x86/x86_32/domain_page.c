@@ -98,7 +98,7 @@ void *map_domain_page(unsigned long mfn)
         cache->tlbflush_timestamp = tlbflush_current_time();
 
         idx = find_first_zero_bit(cache->inuse, MAPCACHE_ENTRIES);
-        ASSERT(idx < MAPCACHE_ENTRIES);
+        BUG_ON(idx >= MAPCACHE_ENTRIES);
     }
 
     set_bit(idx, cache->inuse);
@@ -218,25 +218,21 @@ void *map_domain_page_global(unsigned long mfn)
 
         idx = find_first_zero_bit(inuse, GLOBALMAP_BITS);
         va = IOREMAP_VIRT_START + (idx << PAGE_SHIFT);
-        if ( va >= FIXADDR_START )
+        if ( unlikely(va >= FIXADDR_START) )
         {
-            va = 0;
-            goto fail;
+            spin_unlock(&globalmap_lock);
+            return NULL;
         }
     }
 
     set_bit(idx, inuse);
     inuse_cursor = idx + 1;
 
-  fail:
     spin_unlock(&globalmap_lock);
 
-    if ( likely(va != 0) )
-    {
-	pl2e = virt_to_xen_l2e(va);
-	pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
-	l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
-    }
+    pl2e = virt_to_xen_l2e(va);
+    pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
+    l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
     return (void *)va;
 }

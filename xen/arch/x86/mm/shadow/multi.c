@@ -3487,6 +3487,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
         /* PAGING_LEVELS==4 implies 64-bit, which means that
          * map_domain_page_global can't fail */
+        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL);
     }
     else
         v->arch.paging.shadow.guest_vtable = __linear_l4_table;
@@ -3519,7 +3520,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
         /* Does this really need map_domain_page_global?  Handle the
          * error properly if so. */
-        ASSERT( v->arch.paging.shadow.guest_vtable );
+        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
     }
     else
         v->arch.paging.shadow.guest_vtable = __linear_l2_table;
