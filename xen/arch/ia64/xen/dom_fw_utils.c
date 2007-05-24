@@ -139,6 +139,14 @@ assign_new_domain_page_if_dom0(struct domain *d, unsigned long mpaddr)
         assign_new_domain0_page(d, mpaddr);
 }
 
+static void
+dom_fw_setup_for_domain_restore(domain_t *d, unsigned long maxmem)
+{
+    assign_new_domain_page(d, FW_HYPERCALL_BASE_PADDR);
+    dom_fw_domain_init(d, domain_mpa_to_imva(d, FW_TABLES_BASE_PADDR));
+    d->arch.convmem_end = maxmem;
+}
+
 int
 dom_fw_setup(domain_t *d, unsigned long bp_mpa, unsigned long maxmem)
 {
@@ -148,6 +156,12 @@ dom_fw_setup(domain_t *d, unsigned long bp_mpa, unsigned long maxmem)
 
     BUILD_BUG_ON(sizeof(struct fw_tables) >
                  (FW_TABLES_END_PADDR - FW_TABLES_BASE_PADDR));
+
+    if (bp_mpa == 0) {
+        /* bp_mpa == 0 means this is domain restore case. */
+        dom_fw_setup_for_domain_restore(d, maxmem);
+        return 0;
+    }
 
     /* Create page for boot_param.  */
     assign_new_domain_page_if_dom0(d, bp_mpa);

@@ -89,7 +89,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 ds->flags |= XEN_DOMAINSETUP_hvm_guest;
             /* Set params.  */
             ds->bp = 0;		/* unknown.  */
-            ds->maxmem = 0; /* unknown.  */
+            ds->maxmem = d->arch.convmem_end;
             ds->xsi_va = d->arch.shared_info_va;
             ds->hypercall_imm = d->arch.breakimm;
             /* Copy back.  */

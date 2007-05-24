@@ -140,9 +140,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Build firmware (will be overwritten).  */
     domctl.domain = (domid_t)dom;
     domctl.u.arch_setup.flags &= ~XEN_DOMAINSETUP_query;
-    domctl.u.arch_setup.bp = ((p2m_size - 3) << PAGE_SHIFT)
-                           + sizeof (start_info_t);
-    domctl.u.arch_setup.maxmem = (p2m_size - 3) << PAGE_SHIFT;
+    domctl.u.arch_setup.bp = 0; /* indicate domain restore */
     
     domctl.cmd = XEN_DOMCTL_arch_setup;
     if (xc_domctl(xc_handle, &domctl))
@@ -330,3 +328,13 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     return rc;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

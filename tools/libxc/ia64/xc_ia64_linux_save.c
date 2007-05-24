@@ -22,8 +22,8 @@
 ** XXX SMH: should consider if want to be able to override MAX_MBIT_RATE too.
 **
 */
-#define DEF_MAX_ITERS    (4 - 1)	/* limit us to 4 times round loop  */
-#define DEF_MAX_FACTOR   3		/* never send more than 3x nr_pfns */
+#define DEF_MAX_ITERS    (4 - 1)        /* limit us to 4 times round loop  */
+#define DEF_MAX_FACTOR   3              /* never send more than 3x nr_pfns */
 
 /*
 ** During (live) save/migrate, we maintain a number of bitmaps to track
@@ -37,23 +37,20 @@
 
 #define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
 
-static inline int test_bit (int nr, volatile void * addr)
+static inline int test_bit(int nr, volatile void * addr)
 {
     return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
 }
 
-static inline void clear_bit (int nr, volatile void * addr)
+static inline void clear_bit(int nr, volatile void * addr)
 {
     BITMAP_ENTRY(nr, addr) &= ~(1UL << BITMAP_SHIFT(nr));
 }
 
-static inline void set_bit ( int nr, volatile void * addr)
+static inline void set_bit(int nr, volatile void * addr)
 {
     BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
 }
-
-/* total number of pages used by the current guest */
-static unsigned long max_pfn;
 
 static int xc_ia64_shadow_control(int xc_handle,
                                   uint32_t domid,
@@ -67,7 +64,7 @@ static int xc_ia64_shadow_control(int xc_handle,
         unsigned char *bmap = (unsigned char *)dirty_bitmap;
         unsigned long bmap_bytes =
             ((pages + BITS_PER_LONG - 1) & ~(BITS_PER_LONG - 1)) / 8;
-        unsigned int bmap_pages = (bmap_bytes + PAGE_SIZE - 1) / PAGE_SIZE; 
+        unsigned int bmap_pages = (bmap_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 
         /* Touch the page so that it is in the TC.
            FIXME: use a more reliable method.  */
@@ -168,6 +165,9 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Number of pages sent (live only).  */
     unsigned int total_sent;
 
+    /* total number of pages used by the current guest */
+    unsigned long p2m_size;
+
     /* Size of the shadow bitmap (live only).  */
     unsigned int bitmap_size = 0;
 
@@ -182,7 +182,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     char *mem;
 
     if (debug)
-        fprintf (stderr, "xc_linux_save (ia64): started dom=%d\n", dom);
+        fprintf(stderr, "xc_linux_save (ia64): started dom=%d\n", dom);
 
     /* If no explicit control parameters given, use defaults */
     if (!max_iters)
@@ -216,17 +216,17 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
-    max_pfn = info.max_memkb >> (PAGE_SHIFT - 10);
+    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom);
 
-    page_array = malloc(max_pfn * sizeof(unsigned long));
+    page_array = malloc(p2m_size * sizeof(unsigned long));
     if (page_array == NULL) {
         ERROR("Could not allocate memory");
         goto out;
     }
 
     /* This is expected by xm restore.  */
-    if (!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
-        ERROR("write: max_pfn");
+    if (!write_exact(io_fd, &p2m_size, sizeof(unsigned long))) {
+        ERROR("write: p2m_size");
         goto out;
     }
 
@@ -269,7 +269,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         last_iter = 0;
 
-        bitmap_size = ((max_pfn + BITS_PER_LONG-1) & ~(BITS_PER_LONG-1)) / 8;
+        bitmap_size = ((p2m_size + BITS_PER_LONG-1) & ~(BITS_PER_LONG-1)) / 8;
         to_send = malloc(bitmap_size);
         to_skip = malloc(bitmap_size);
 
@@ -289,7 +289,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             ERROR("Unable to lock_pages to_skip");
             goto out;
         }
-        
+
     } else {
 
         /* This is a non-live suspend. Issue the call back to get the
@@ -304,7 +304,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     }
 
-    sent_last_iter = max_pfn;
+    sent_last_iter = p2m_size;
     total_sent = 0;
 
     for (iter = 1; ; iter++) {
@@ -316,7 +316,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         /* Get the pfn list, as it may change.  */
         if (xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                                 0, max_pfn) != max_pfn) {
+                                 0, p2m_size) != p2m_size) {
             ERROR("Could not get the page frame list");
             goto out;
         }
@@ -327,14 +327,14 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         if (!last_iter) {
             if (xc_ia64_shadow_control(xc_handle, dom,
                                        XEN_DOMCTL_SHADOW_OP_PEEK,
-                                       to_skip, max_pfn, NULL) != max_pfn) {
+                                       to_skip, p2m_size, NULL) != p2m_size) {
                 ERROR("Error peeking shadow bitmap");
                 goto out;
             }
         }
 
         /* Start writing out the saved-domain record. */
-        for (N = 0; N < max_pfn; N++) {
+        for (N = 0; N < p2m_size; N++) {
             if (page_array[N] == INVALID_MFN)
                 continue;
             if (!last_iter) {
@@ -346,7 +346,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             if (debug)
                 fprintf(stderr, "xc_linux_save: page %lx (%lu/%lu)\n",
-                        page_array[N], N, max_pfn);
+                        page_array[N], N, p2m_size);
 
             mem = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE, N);
@@ -360,7 +360,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
 
             if (!write_exact(io_fd, &N, sizeof(N))) {
-                ERROR("write: max_pfn");
+                ERROR("write: p2m_size");
                 munmap(mem, PAGE_SIZE);
                 goto out;
             }
@@ -384,7 +384,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         if (live) {
             if ( /* ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) || */
                 (iter >= max_iters) || (sent_this_iter+skip_this_iter < 50) ||
-                (total_sent > max_pfn*max_factor)) {
+                (total_sent > p2m_size*max_factor)) {
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
@@ -397,7 +397,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             /* Pages to be sent are pages which were dirty.  */
             if (xc_ia64_shadow_control(xc_handle, dom,
                                        XEN_DOMCTL_SHADOW_OP_CLEAN,
-                                       to_send, max_pfn, NULL ) != max_pfn) {
+                                       to_send, p2m_size, NULL ) != p2m_size) {
                 ERROR("Error flushing shadow PT");
                 goto out;
             }
@@ -409,7 +409,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     }
 
-    fprintf (stderr, "All memory is saved\n");
+    fprintf(stderr, "All memory is saved\n");
 
     /* terminate */
     {
@@ -425,7 +425,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         unsigned int i,j;
         unsigned long pfntab[1024];
 
-        for (i = 0, j = 0; i < max_pfn; i++) {
+        for (i = 0, j = 0; i < p2m_size; i++) {
             if (page_array[i] == INVALID_MFN)
                 j++;
         }
@@ -435,13 +435,13 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             goto out;
         }
 
-        for (i = 0, j = 0; i < max_pfn; ) {
+        for (i = 0, j = 0; i < p2m_size; ) {
 
             if (page_array[i] == INVALID_MFN)
                 pfntab[j++] = i;
 
             i++;
-            if (j == 1024 || i == max_pfn) {
+            if (j == 1024 || i == p2m_size) {
                 if (!write_exact(io_fd, &pfntab, sizeof(unsigned long)*j)) {
                     ERROR("Error when writing to state file (6b)");
                     goto out;
@@ -475,7 +475,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         munmap(mem, PAGE_SIZE);
         goto out;
     }
-    munmap(mem, PAGE_SIZE);    
+    munmap(mem, PAGE_SIZE);
 
     if (!write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1)");
