@@ -489,7 +489,7 @@ void arch_domain_destroy(struct domain *d)
 {
     struct vcpu *v;
 
-    for_each_vcpu( d, v )
+    for_each_vcpu ( d, v )
         unmap_vcpu_info(v);
 
     if ( is_hvm_domain(d) )
@@ -754,7 +754,7 @@ unmap_vcpu_info(struct vcpu *v)
         return;
 
     mfn = v->vcpu_info_mfn;
-    unmap_domain_page_global( v->vcpu_info );
+    unmap_domain_page_global(v->vcpu_info);
 
     v->vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
     v->vcpu_info_mfn = INVALID_MFN;
@@ -779,8 +779,11 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
 
-    if ( mfn == INVALID_MFN ||
-         v->vcpu_info_mfn != INVALID_MFN )
+    if ( v->vcpu_info_mfn != INVALID_MFN )
+        return -EINVAL;
+
+    /* Run this command on yourself or on other offline VCPUS. */
+    if ( (v != current) && !test_bit(_VPF_down, &v->pause_flags) )
         return -EINVAL;
 
     mfn = gmfn_to_mfn(d, mfn);
@@ -802,19 +805,22 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     v->vcpu_info = new_info;
     v->vcpu_info_mfn = mfn;
 
-    /* make sure all the pointers are uptodate before setting pending */
+    /* Set new vcpu_info pointer /before/ setting pending flags. */
     wmb();
 
-    /* Mark everything as being pending just to make sure nothing gets
-       lost.  The domain will get a spurious event, but it can
-       cope. */
+    /*
+     * Mark everything as being pending just to make sure nothing gets
+     * lost.  The domain will get a spurious event, but it can cope.
+     */
     vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
         set_bit(i, vcpu_info_addr(v, evtchn_pending_sel));
 
-    /* Only bother to update time for the current vcpu.  If we're
+    /*
+     * Only bother to update time for the current vcpu.  If we're
      * operating on another vcpu, then it had better not be running at
-     * the time. */
+     * the time.
+     */
     if ( v == current )
          update_vcpu_system_time(v);
 
