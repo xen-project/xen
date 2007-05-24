@@ -546,20 +546,30 @@ class XendDomainInfo:
             self.getDeviceController(devclass).waitForDevices()
 
     def destroyDevice(self, deviceClass, devid, force = False):
+        found = True                    # Assume devid is an integer.
         try:
             devid = int(devid)
         except ValueError:
             # devid is not a number, let's search for it in xenstore.
             devicePath = '%s/device/%s' % (self.dompath, deviceClass)
+            found = False
             for entry in xstransact.List(devicePath):
+                log.debug("Attempting to find devid at %s/%s", devicePath, entry)
                 backend = xstransact.Read('%s/%s' % (devicePath, entry),
                                           "backend")
-                devName = xstransact.Read(backend, "dev")
-                if devName == devid:
-                    # We found the integer matching our devid, use it instead
-                    devid = entry
-                    break
-                
+                if backend != None:
+                    devName = '%s/%s' % (deviceClass, entry)
+                    log.debug("devName=%s", devName)
+                    if devName == devid:
+                        # We found the integer matching our devid, use it instead
+                        devid = int(entry)
+                        found = True
+                        break
+
+        if not found:
+            log.debug("Could not find the device %s", devid)
+            return None
+        log.debug("devid = %s", devid)
         return self.getDeviceController(deviceClass).destroyDevice(devid, force)
 
     def getDeviceSxprs(self, deviceClass):
@@ -1338,20 +1348,19 @@ class XendDomainInfo:
             self.image.destroy(suspend)
             return
 
-        while True:
-            t = xstransact("%s/device" % self.dompath)
-            for devclass in XendDevices.valid_devices():
-                for dev in t.list(devclass):
-                    try:
-                        t.remove(dev)
-                    except:
-                        # Log and swallow any exceptions in removal --
-                        # there's nothing more we can do.
-                        log.exception(
-                           "Device release failed: %s; %s; %s",
-                           self.info['name_label'], devclass, dev)
-            if t.commit():
-                break
+        t = xstransact("%s/device" % self.dompath)
+        for devclass in XendDevices.valid_devices():
+            for dev in t.list(devclass):
+                try:
+                    log.debug("Removing %s", dev);
+                    self.destroyDevice(devclass, dev, False);
+                except:
+                    # Log and swallow any exceptions in removal --
+                    # there's nothing more we can do.
+                        log.exception("Device release failed: %s; %s; %s",
+                                      self.info['name_label'], devclass, dev)
+
+            
 
     def getDeviceController(self, name):
         """Get the device controller for this domain, and if it
