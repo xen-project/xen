@@ -985,10 +985,16 @@ class XendDomain:
             dominfo.start(is_managed = True)
         finally:
             self.domains_lock.release()
-        dominfo.waitForDevices()
+
+        try:
+            dominfo.waitForDevices()
+        except Exception, ex:
+            log.warn("Failed to setup devices for " + str(dominfo) + ": " + str(ex))
+            dominfo.destroy()
+            raise
+
         if not start_paused:
             dominfo.unpause()
-        
 
     def domain_delete(self, domid):
         """Remove a managed domain from database
