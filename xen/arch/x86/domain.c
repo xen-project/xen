@@ -489,6 +489,9 @@ void arch_domain_destroy(struct domain *d)
 {
     struct vcpu *v;
 
+    for_each_vcpu( d, v )
+        unmap_vcpu_info(v);
+
     if ( is_hvm_domain(d) )
     {
         for_each_vcpu ( d, v )
@@ -731,7 +734,6 @@ int arch_set_info_guest(
 
 int arch_vcpu_reset(struct vcpu *v)
 {
-    unmap_vcpu_info(v);
     destroy_gdt(v);
     vcpu_destroy_pagetables(v);
     return 0;
@@ -739,8 +741,8 @@ int arch_vcpu_reset(struct vcpu *v)
 
 /* 
  * Unmap the vcpu info page if the guest decided to place it somewhere
- * else.  This is only used from arch_vcpu_reset, so there's no need
- * to do anything clever.
+ * else.  This is only used from arch_domain_destroy, so there's no
+ * need to do anything clever.
  */
 static void
 unmap_vcpu_info(struct vcpu *v)
