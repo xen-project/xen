@@ -579,7 +579,7 @@ diff -uprN tpm_emulator/tpmd.c vtpm/tpmd.c
 +        memset(&client_addr, 0, sizeof(client_addr));
 +        client_length = sizeof(client_addr);
 +
-+        vtpm_rx_fh = vtpm_tx_fh = accept(sockfd, &client_addr, &client_length);
++        vtpm_rx_fh = vtpm_tx_fh = accept(sockfd, (struct sockaddr *)&client_addr, &client_length);
 +      }
 +#endif
      }
