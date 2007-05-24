@@ -29,6 +29,7 @@
 #include <xen/softirq.h>
 #include <xen/rcupdate.h>
 #include <acm/acm_hooks.h>
+#include <asm/sn/simulator.h>
 
 unsigned long xenheap_phys_end, total_pages;
 
@@ -553,7 +554,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
   			0) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
-    if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
+    if (!running_on_sim && !IS_MEDUSA())  // slow on ski and pages are pre-initialized to zero
 	scrub_heap_pages();
 
     init_trace_bufs();
