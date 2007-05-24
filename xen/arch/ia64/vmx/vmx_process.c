@@ -311,6 +311,8 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){
         if(vec==2){
+            if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
+                return vmx_handle_lds(regs);
             if (v->domain != dom0
                 && __gpfn_is_io(v->domain, (vadr << 1) >> (PAGE_SHIFT + 1))) {
                 emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
@@ -324,9 +326,16 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 try_again:
     if((data=vtlb_lookup(v, vadr,type))!=0){
         if (v->domain != dom0 && type == DSIDE_TLB) {
+            if (misr.sp) { /* Refer to SDM Vol2 Table 4-10,4-12 */
+                if ((data->ma == VA_MATTR_UC) || (data->ma == VA_MATTR_UCE))
+                    return vmx_handle_lds(regs);
+            }
             gppa = (vadr & ((1UL << data->ps) - 1)) +
                    (data->ppn >> (data->ps - 12) << data->ps);
             if (__gpfn_is_io(v->domain, gppa >> PAGE_SHIFT)) {
+                if (misr.sp)
+                    panic_domain(NULL, "ld.s on I/O page not with UC attr."
+                                 " pte=0x%lx\n", data->page_flags);
                 if (data->pl >= ((regs->cr_ipsr >> IA64_PSR_CPL0_BIT) & 3))
                     emulate_io_inst(v, gppa, data->ma);
                 else {

@@ -507,6 +507,13 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
         *pte |= VTLB_PTE_IO;
         return -1;
     }
+    /* Ensure WB attribute if pte is related to a normal mem page,
+     * which is required by vga acceleration since qemu maps shared
+     * vram buffer with WB.
+     */
+    if (phy_pte.ma != VA_MATTR_NATPAGE)
+        phy_pte.ma = VA_MATTR_WB;
+
 //    rr.rrval = ia64_get_rr(va);
 //    ps = rr.ps;
     maddr = ((maddr & _PAGE_PPN_MASK) & PAGE_MASK) | (paddr & ~PAGE_MASK);
@@ -530,17 +537,8 @@ int thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa, int type)
     vcpu_get_rr(current, ifa, &vrr.rrval);
     mrr.rrval = ia64_get_rr(ifa);
     if(VMX_DOMAIN(v)){
-        
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
 
-        /* Ensure WB attribute if pte is related to a normal mem page,
-         * which is required by vga acceleration since qemu maps shared
-         * vram buffer with WB.
-         */
-        if (!(pte & VTLB_PTE_IO) && ((pte & _PAGE_MA_MASK) != _PAGE_MA_NAT)) {
-            pte &= ~_PAGE_MA_MASK;
-            phy_pte &= ~_PAGE_MA_MASK;
-        }
         if (pte & VTLB_PTE_IO)
             ret = 1;
         vtlb_purge(v, ifa, ps);
