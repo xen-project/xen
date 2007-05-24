@@ -587,30 +587,46 @@ class XendConfig(dict):
             else:
                 cfg['cpus'] = str(cfg['cpu'])
 
-        # convert 'cpus' string to list of ints
-        # 'cpus' supports a list of ranges (0-3), seperated by
-        # commas, and negation, (^1).  
-        # Precedence is settled by  order of the string:
-        #     "0-3,^1"   -> [0,2,3]
-        #     "0-3,^1,1" -> [0,1,2,3]
-        try:
-            if 'cpus' in cfg and type(cfg['cpus']) != list:
-                cpus = []
-                for c in cfg['cpus'].split(','):
-                    if c.find('-') != -1:             
-                        (x, y) = c.split('-')
-                        for i in range(int(x), int(y)+1):
-                            cpus.append(int(i))
-                    else:
-                        # remove this element from the list 
-                        if c[0] == '^':
-                            cpus = [x for x in cpus if x != int(c[1:])]
+        # Convert 'cpus' to list of ints
+        if 'cpus' in cfg:
+            cpus = []
+            if type(cfg['cpus']) == list:
+                # If sxp_cfg was created from config.sxp,
+                # the form of 'cpus' is list of string.
+                # Convert 'cpus' to list of ints.
+                #    ['1']         -> [1]
+                #    ['0','2','3'] -> [0,2,3]
+                try:
+                    for c in cfg['cpus']:
+                        cpus.append(int(c))
+                    
+                    cfg['cpus'] = cpus
+                except ValueError, e:
+                    raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+            else:
+                # Convert 'cpus' string to list of ints
+                # 'cpus' supports a list of ranges (0-3),
+                # seperated by commas, and negation, (^1).  
+                # Precedence is settled by order of the 
+                # string:
+                #    "0-3,^1"      -> [0,2,3]
+                #    "0-3,^1,1"    -> [0,1,2,3]
+                try:
+                    for c in cfg['cpus'].split(','):
+                        if c.find('-') != -1:             
+                            (x, y) = c.split('-')
+                            for i in range(int(x), int(y)+1):
+                                cpus.append(int(i))
                         else:
-                            cpus.append(int(c))
-
-                cfg['cpus'] = cpus
-        except ValueError, e:
-            raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+                            # remove this element from the list 
+                            if c[0] == '^':
+                                cpus = [x for x in cpus if x != int(c[1:])]
+                            else:
+                                cpus.append(int(c))
+                    
+                    cfg['cpus'] = cpus
+                except ValueError, e:
+                    raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
         if 'security' in cfg and isinstance(cfg['security'], str):
             cfg['security'] = sxp.from_string(cfg['security'])
@@ -842,6 +858,8 @@ class XendConfig(dict):
                 if name in self and self[name] not in (None, []):
                     if typ == dict:
                         s = self[name].items()
+                    elif typ == list:
+                        s = self[name]
                     else:
                         s = str(self[name])
                     sxpr.append([name, s])
