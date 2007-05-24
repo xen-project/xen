@@ -5,7 +5,6 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
-efi.h			-> linux/include/linux/efi.h
 gfp.h	 		-> linux/include/linux/gfp.h
 hardirq.h 		-> linux/include/linux/hardirq.h
 interrupt.h 		-> linux/include/linux/interrupt.h
@@ -17,3 +16,6 @@ oprofile.h		-> linux/include/linux/oprofile.h
 pci.h			-> linux/include/linux/pci.h
 kobject.h		-> linux/include/linux/kobject.h
 device.h		-> linux/include/linux/device.h
+
+# The files below are from Linux-2.6.21
+efi.h			-> linux/include/linux/efi.h

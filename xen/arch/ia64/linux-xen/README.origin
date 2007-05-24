@@ -6,7 +6,6 @@
 # easily updated to future versions of the corresponding Linux files.
 
 cmdline.c		-> linux/lib/cmdline.c
-efi.c			-> linux/arch/ia64/kernel/efi.c
 entry.h			-> linux/arch/ia64/kernel/entry.h
 entry.S			-> linux/arch/ia64/kernel/entry.S
 head.S			-> linux/arch/ia64/kernel/head.S
@@ -42,3 +41,6 @@ perfmon_generic.h	-> linux/arch/kernel/perfmon_generic.h
 perfmon_itanium.h	-> linux/arch/kernel/perfmon_itanium.h
 perfmon_mckinley.h	-> linux/arch/kernel/perfmon_mckinley.h
 perfmon_montecito.h	-> linux/arch/kernel/perfmon_montecito.h
+
+# The files below are from Linux-2.6.21
+efi.c			-> linux/arch/ia64/kernel/efi.c
