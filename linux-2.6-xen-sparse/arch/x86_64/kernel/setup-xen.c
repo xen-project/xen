@@ -792,6 +792,33 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XEN
 	{
 		int i, j, k, fpp;
+		unsigned long p2m_pages;
+
+		p2m_pages = end_pfn;
+		if (xen_start_info->nr_pages > end_pfn) {
+			/*
+			 * the end_pfn was shrunk (probably by mem= or highmem=
+			 * kernel parameter); shrink reservation with the HV
+			 */
+			struct xen_memory_reservation reservation = {
+				.address_bits = 0,
+				.extent_order = 0,
+				.domid = DOMID_SELF
+			};
+			unsigned int difference;
+			int ret;
+			
+			difference = xen_start_info->nr_pages - end_pfn;
+			
+			set_xen_guest_handle(reservation.extent_start,
+					     ((unsigned long *)xen_start_info->mfn_list) + end_pfn);
+			reservation.nr_extents = difference;
+			ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+						   &reservation);
+			BUG_ON (ret != difference);
+		}
+		else if (end_pfn > xen_start_info->nr_pages)
+			p2m_pages = xen_start_info->nr_pages;
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Make sure we have a large enough P->M table. */
@@ -801,7 +828,7 @@ void __init setup_arch(char **cmdline_p)
 			       end_pfn * sizeof(unsigned long));
 			memcpy(phys_to_machine_mapping,
 			       (unsigned long *)xen_start_info->mfn_list,
-			       xen_start_info->nr_pages * sizeof(unsigned long));
+			       p2m_pages * sizeof(unsigned long));
 			free_bootmem(
 				__pa(xen_start_info->mfn_list),
 				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
