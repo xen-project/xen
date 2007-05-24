@@ -3399,7 +3399,7 @@ static int tap_open(char *ifname, int ifname_size)
 static int tap_open(char *ifname, int ifname_size)
 {
     struct ifreq ifr;
-    int fd, ret;
+    int fd, ret, retries = 0;
     
     fd = open("/dev/net/tun", O_RDWR);
     if (fd < 0) {
@@ -3412,7 +3412,9 @@ static int tap_open(char *ifname, int ifname_size)
         pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
     else
         pstrcpy(ifr.ifr_name, IFNAMSIZ, "tap%d");
-    ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
+    do {
+        ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
+    } while ((ret != 0) && (retries++ < 3));
     if (ret != 0) {
         fprintf(stderr, "warning: could not configure /dev/net/tun: no virtual network emulation\n");
         close(fd);
