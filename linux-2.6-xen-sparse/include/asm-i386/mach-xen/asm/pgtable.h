@@ -209,15 +209,16 @@ extern unsigned long pg0[];
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
 
 /* To avoid harmful races, pmd_none(x) should check only the lower when PAE */
-#define pmd_none(x)	(!(unsigned long)pmd_val(x))
+#define pmd_none(x)	(!(unsigned long)__pmd_val(x))
 #if CONFIG_XEN_COMPAT <= 0x030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
-#define pmd_present(x)	(pmd_val(x))
+#define pmd_present(x)	(__pmd_val(x))
+#define pmd_bad(x)	((__pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 #else
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#define pmd_present(x)	(__pmd_val(x) & _PAGE_PRESENT)
+#define pmd_bad(x)	((__pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
 #endif
-#define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
@@ -346,7 +347,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 }
 
 #define pmd_large(pmd) \
-((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
+((__pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
 
 /*
  * the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]

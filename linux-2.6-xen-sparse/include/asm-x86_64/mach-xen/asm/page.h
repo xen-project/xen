@@ -96,14 +96,15 @@ typedef struct { unsigned long pgd; } pgd_t;
 
 typedef struct { unsigned long pgprot; } pgprot_t;
 
-#define pte_val(x)	(((x).pte & _PAGE_PRESENT) ? \
-			 pte_machine_to_phys((x).pte) : \
-			 (x).pte)
-#define pte_val_ma(x)	((x).pte)
+#define __pte_val(x) ((x).pte)
+#define pte_val(x) ((__pte_val(x) & _PAGE_PRESENT) ? \
+                    pte_machine_to_phys(__pte_val(x)) : \
+                    __pte_val(x))
 
+#define __pmd_val(x) ((x).pmd)
 static inline unsigned long pmd_val(pmd_t x)
 {
-	unsigned long ret = x.pmd;
+	unsigned long ret = __pmd_val(x);
 #if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret) ret = pte_machine_to_phys(ret) | _PAGE_PRESENT;
 #else
@@ -112,16 +113,18 @@ static inline unsigned long pmd_val(pmd_t x)
 	return ret;
 }
 
+#define __pud_val(x) ((x).pud)
 static inline unsigned long pud_val(pud_t x)
 {
-	unsigned long ret = x.pud;
+	unsigned long ret = __pud_val(x);
 	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
+#define __pgd_val(x) ((x).pgd)
 static inline unsigned long pgd_val(pgd_t x)
 {
-	unsigned long ret = x.pgd;
+	unsigned long ret = __pgd_val(x);
 	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
 	return ret;
 }

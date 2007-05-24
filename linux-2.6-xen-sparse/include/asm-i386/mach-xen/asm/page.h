@@ -89,19 +89,20 @@ typedef struct { unsigned long long pgprot; } pgprot_t;
     (pgd_t) {((_x) & _PAGE_PRESENT) ? pte_phys_to_machine(_x) : (_x)}; })
 #define __pmd(x) ({ unsigned long long _x = (x); \
     (pmd_t) {((_x) & _PAGE_PRESENT) ? pte_phys_to_machine(_x) : (_x)}; })
-static inline unsigned long long pte_val_ma(pte_t x)
+static inline unsigned long long __pte_val(pte_t x)
 {
 	return ((unsigned long long)x.pte_high << 32) | x.pte_low;
 }
 static inline unsigned long long pte_val(pte_t x)
 {
-	unsigned long long ret = pte_val_ma(x);
+	unsigned long long ret = __pte_val(x);
 	if (x.pte_low & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
 	return ret;
 }
+#define __pmd_val(x) ((x).pmd)
 static inline unsigned long long pmd_val(pmd_t x)
 {
-	unsigned long long ret = x.pmd;
+	unsigned long long ret = __pmd_val(x);
 #if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret) ret = pte_machine_to_phys(ret) | _PAGE_PRESENT;
 #else
@@ -109,9 +110,11 @@ static inline unsigned long long pmd_val(pmd_t x)
 #endif
 	return ret;
 }
+#define __pud_val(x) __pgd_val((x).pgd)
+#define __pgd_val(x) ((x).pgd)
 static inline unsigned long long pgd_val(pgd_t x)
 {
-	unsigned long long ret = x.pgd;
+	unsigned long long ret = __pgd_val(x);
 	if (ret & _PAGE_PRESENT) ret = pte_machine_to_phys(ret);
 	return ret;
 }
@@ -123,17 +126,20 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define pgprot_val(x)	((x).pgprot)
 #include <asm/maddr.h>
 #define boot_pte_t pte_t /* or would you rather have a typedef */
-#define pte_val(x)	(((x).pte_low & _PAGE_PRESENT) ? \
-			 machine_to_phys((x).pte_low) : \
-			 (x).pte_low)
-#define pte_val_ma(x)	((x).pte_low)
+#define __pte_val(x) ((x).pte_low)
+#define pte_val(x) (__pte_val(x) & _PAGE_PRESENT ? \
+                    machine_to_phys(__pte_val(x)) : \
+                    __pte_val(x))
 #define __pte(x) ({ unsigned long _x = (x); \
     (pte_t) {((_x) & _PAGE_PRESENT) ? phys_to_machine(_x) : (_x)}; })
+#define __pmd_val(x) __pud_val((x).pud)
+#define __pud_val(x) __pgd_val((x).pgd)
 #define __pgd(x) ({ unsigned long _x = (x); \
     (pgd_t) {((_x) & _PAGE_PRESENT) ? phys_to_machine(_x) : (_x)}; })
+#define __pgd_val(x) ((x).pgd)
 static inline unsigned long pgd_val(pgd_t x)
 {
-	unsigned long ret = x.pgd;
+	unsigned long ret = __pgd_val(x);
 #if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret) ret = machine_to_phys(ret) | _PAGE_PRESENT;
 #else

@@ -4,9 +4,11 @@
 #include <asm-generic/pgtable-nopmd.h>
 
 #define pte_ERROR(e) \
-	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, (e).pte_low)
+	printk("%s:%d: bad pte %08lx (pfn %05lx).\n", __FILE__, __LINE__, \
+	       __pte_val(e), pte_pfn(e))
 #define pgd_ERROR(e) \
-	printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pgd_val(e))
+	printk("%s:%d: bad pgd %08lx (pfn %05lx).\n", __FILE__, __LINE__, \
+	       __pgd_val(e), pgd_val(e) >> PAGE_SHIFT)
 
 /*
  * Certain architectures need to do special things when PTEs

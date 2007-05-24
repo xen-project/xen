@@ -43,22 +43,11 @@
 #include <linux/percpu.h>
 #include <asm/tlbflush.h>
 
-#ifdef CONFIG_X86_64
-#define pmd_val_ma(v) (v).pmd
-#else
-#ifdef CONFIG_X86_PAE
-# define pmd_val_ma(v) ((v).pmd)
-# define pud_val_ma(v) ((v).pgd.pgd)
-#else
-# define pmd_val_ma(v) ((v).pud.pgd.pgd)
-#endif
-#endif
-
 void xen_l1_entry_update(pte_t *ptr, pte_t val)
 {
 	mmu_update_t u;
 	u.ptr = virt_to_machine(ptr);
-	u.val = pte_val_ma(val);
+	u.val = __pte_val(val);
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -66,34 +55,26 @@ void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
 {
 	mmu_update_t u;
 	u.ptr = virt_to_machine(ptr);
-	u.val = pmd_val_ma(val);
+	u.val = __pmd_val(val);
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 
-#ifdef CONFIG_X86_PAE
+#if defined(CONFIG_X86_PAE) || defined(CONFIG_X86_64)
 void xen_l3_entry_update(pud_t *ptr, pud_t val)
 {
 	mmu_update_t u;
 	u.ptr = virt_to_machine(ptr);
-	u.val = pud_val_ma(val);
+	u.val = __pud_val(val);
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 #endif
 
 #ifdef CONFIG_X86_64
-void xen_l3_entry_update(pud_t *ptr, pud_t val)
-{
-	mmu_update_t u;
-	u.ptr = virt_to_machine(ptr);
-	u.val = val.pud;
-	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
-}
-
 void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 {
 	mmu_update_t u;
 	u.ptr = virt_to_machine(ptr);
-	u.val = val.pgd;
+	u.val = __pgd_val(val);
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 #endif /* CONFIG_X86_64 */
