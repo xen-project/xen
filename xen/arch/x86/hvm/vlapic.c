@@ -918,12 +918,19 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs_page = alloc_domheap_page(NULL);
     if ( vlapic->regs_page == NULL )
     {
-        dprintk(XENLOG_ERR, "malloc vlapic regs error for vcpu %x\n",
+        dprintk(XENLOG_ERR, "malloc vlapic regs_page error for vcpu %x\n",
                 v->vcpu_id);
         return -ENOMEM;
     }
 
     vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
+    if ( vlapic->regs == NULL )
+    {
+        dprintk(XENLOG_ERR, "malloc vlapic regs error for vcpu %x\n",
+                v->vcpu_id);
+	return -ENOMEM;
+    }
+
     memset(vlapic->regs, 0, PAGE_SIZE);
 
     vlapic_reset(vlapic);

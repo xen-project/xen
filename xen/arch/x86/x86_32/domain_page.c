@@ -218,17 +218,25 @@ void *map_domain_page_global(unsigned long mfn)
 
         idx = find_first_zero_bit(inuse, GLOBALMAP_BITS);
         va = IOREMAP_VIRT_START + (idx << PAGE_SHIFT);
-        ASSERT(va < FIXADDR_START);
+        if ( va >= FIXADDR_START )
+        {
+            va = 0;
+            goto fail;
+        }
     }
 
     set_bit(idx, inuse);
     inuse_cursor = idx + 1;
 
+  fail:
     spin_unlock(&globalmap_lock);
 
-    pl2e = virt_to_xen_l2e(va);
-    pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
-    l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    if ( likely(va != 0) )
+    {
+	pl2e = virt_to_xen_l2e(va);
+	pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
+	l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    }
 
     return (void *)va;
 }
