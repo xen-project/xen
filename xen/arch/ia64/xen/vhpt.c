@@ -137,8 +137,8 @@ void __init vhpt_init(void)
 		panic("vhpt_init: bad VHPT alignment!\n");
 	__get_cpu_var(vhpt_paddr) = paddr;
 	__get_cpu_var(vhpt_pend) = paddr + (1 << VHPT_SIZE_LOG2) - 1;
-	printk("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
-		paddr, __get_cpu_var(vhpt_pend));
+	printk(XENLOG_DEBUG "vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
+	       paddr, __get_cpu_var(vhpt_pend));
 	vhpt_erase(paddr);
 	// we don't enable VHPT here.
 	// context_switch() or schedule_tail() does it.
