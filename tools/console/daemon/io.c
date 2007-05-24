@@ -22,7 +22,6 @@
 
 #include "utils.h"
 #include "io.h"
-#include <xenctrl.h>
 #include <xs.h>
 #include <xen/io/console.h>
 #include <xenctrl.h>
