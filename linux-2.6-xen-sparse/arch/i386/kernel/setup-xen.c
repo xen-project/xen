@@ -1583,6 +1583,7 @@ void __init setup_arch(char **cmdline_p)
 	int i, j, k, fpp;
 	struct physdev_set_iopl set_iopl;
 	unsigned long max_low_pfn;
+	unsigned long p2m_pages;
 
 	/* Force a quick death if the kernel panics (not domain 0). */
 	extern int panic_timeout;
@@ -1725,6 +1726,32 @@ void __init setup_arch(char **cmdline_p)
 	find_smp_config();
 #endif
 
+	p2m_pages = max_pfn;
+	if (xen_start_info->nr_pages > max_pfn) {
+		/*
+		 * the max_pfn was shrunk (probably by mem= or highmem=
+		 * kernel parameter); shrink reservation with the HV
+		 */
+		struct xen_memory_reservation reservation = {
+			.address_bits = 0,
+			.extent_order = 0,
+			.domid = DOMID_SELF
+		};
+		unsigned int difference;
+		int ret;
+
+		difference = xen_start_info->nr_pages - max_pfn;
+
+		set_xen_guest_handle(reservation.extent_start,
+				     ((unsigned long *)xen_start_info->mfn_list) + max_pfn);
+		reservation.nr_extents = difference;
+		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					   &reservation);
+		BUG_ON (ret != difference);
+	}
+	else if (max_pfn > xen_start_info->nr_pages)
+		p2m_pages = xen_start_info->nr_pages;
+
 	/* Make sure we have a correctly sized P->M table. */
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
@@ -1733,7 +1760,7 @@ void __init setup_arch(char **cmdline_p)
 		       max_pfn * sizeof(unsigned long));
 		memcpy(phys_to_machine_mapping,
 		       (unsigned long *)xen_start_info->mfn_list,
-		       xen_start_info->nr_pages * sizeof(unsigned long));
+		       p2m_pages * sizeof(unsigned long));
 		free_bootmem(
 		     __pa(xen_start_info->mfn_list),
 		     PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
