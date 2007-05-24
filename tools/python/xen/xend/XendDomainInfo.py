@@ -1009,8 +1009,14 @@ class XendDomainInfo:
     def getCap(self):
         return self.info.get('cpu_cap', 0)
 
+    def setCap(self, cpu_cap):
+        self.info['cpu_cap'] = cpu_cap
+
     def getWeight(self):
         return self.info.get('cpu_weight', 256)
+
+    def setWeight(self, cpu_weight):
+        self.info['cpu_weight'] = cpu_weight
 
     def setResume(self, state):
         self._resume = state

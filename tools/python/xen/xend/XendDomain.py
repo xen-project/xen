@@ -1402,6 +1402,8 @@ class XendDomain:
         @type cap: int
         @rtype: 0
         """
+        set_weight = False
+        set_cap = False
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
@@ -1410,16 +1412,26 @@ class XendDomain:
                 weight = int(0)
             elif weight < 1 or weight > 65535:
                 raise XendError("weight is out of range")
+            else:
+                set_weight = True
 
             if cap is None:
                 cap = int(~0)
             elif cap < 0 or cap > dominfo.getVCpuCount() * 100:
                 raise XendError("cap is out of range")
+            else:
+                set_cap = True
 
             assert type(weight) == int
             assert type(cap) == int
 
-            return xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
+            rc = xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
+            if rc == 0:
+                if set_weight:
+                    dominfo.setWeight(weight)
+                if set_cap:
+                    dominfo.setCap(cap)
+            return rc
         except Exception, ex:
             log.exception(ex)
             raise XendError(str(ex))
