@@ -217,6 +217,27 @@ static inline void write_efer(__u64 val)
 #define MSR_IA32_MC0_ADDR		0x402
 #define MSR_IA32_MC0_MISC		0x403
 
+/* K8 Machine Check MSRs */
+#define MSR_K8_MC1_CTL			0x404
+#define MSR_K8_MC1_STATUS		0x405
+#define MSR_K8_MC1_ADDR			0x406
+#define MSR_K8_MC1_MISC			0x407
+
+#define MSR_K8_MC2_CTL			0x408
+#define MSR_K8_MC2_STATUS		0x409
+#define MSR_K8_MC2_ADDR			0x40A
+#define MSR_K8_MC2_MISC			0x40B
+
+#define MSR_K8_MC3_CTL			0x40C
+#define MSR_K8_MC3_STATUS		0x40D
+#define MSR_K8_MC3_ADDR			0x40E
+#define MSR_K8_MC3_MISC			0x40F
+
+#define MSR_K8_MC4_CTL			0x410
+#define MSR_K8_MC4_STATUS		0x411
+#define MSR_K8_MC4_ADDR			0x412
+#define MSR_K8_MC4_MISC			0x413
+
 /* Pentium IV performance counter MSRs */
 #define MSR_P4_BPU_PERFCTR0 		0x300
 #define MSR_P4_BPU_PERFCTR1 		0x301

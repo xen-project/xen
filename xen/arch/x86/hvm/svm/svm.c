@@ -179,6 +179,14 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
         break;
 
+    case MSR_K8_MC4_MISC: /* Threshold register */
+        /*
+         * MCA/MCE: Threshold register is reported to be locked, so we ignore
+         * all write accesses. This behaviour matches real HW, so guests should
+         * have no problem with this.
+         */
+        break;
+
     default:
         return 0;
     }
@@ -2060,6 +2068,14 @@ static inline void svm_do_msr_access(
             break;
         case MSR_EFER:
             msr_content = v->arch.hvm_svm.cpu_shadow_efer;
+            break;
+
+        case MSR_K8_MC4_MISC: /* Threshold register */
+            /*
+             * MCA/MCE: We report that the threshold register is unavailable
+             * for OS use (locked by the BIOS).
+             */
+            msr_content = 1ULL << 61; /* MC4_MISC.Locked */
             break;
 
         default:
