@@ -158,7 +158,7 @@ __contiguous_bitmap_init(unsigned long size)
 }
 
 void
-contiguous_bitmap_init(unsigned long end_pfn)
+xen_contiguous_bitmap_init(unsigned long end_pfn)
 {
 	unsigned long size = (end_pfn + 2 * BITS_PER_LONG) >> 3;
 #ifndef CONFIG_VIRTUAL_MEM_MAP

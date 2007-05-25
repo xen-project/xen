@@ -145,6 +145,7 @@ int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
 #define pfn_pte_ma(_x,_y)	__pte_ma(0)     /* unmodified use */
 
 #ifndef CONFIG_VMX_GUEST
+void xen_contiguous_bitmap_init(unsigned long end_pfn);
 int __xen_create_contiguous_region(unsigned long vstart, unsigned int order, unsigned int address_bits);
 static inline int
 xen_create_contiguous_region(unsigned long vstart,

@@ -610,7 +610,7 @@ setup_arch (char **cmdline_p)
 #endif
 	paging_init();
 #ifdef CONFIG_XEN
-	contiguous_bitmap_init(max_pfn);
+	xen_contiguous_bitmap_init(max_pfn);
 #endif
 }
 
