@@ -362,6 +362,7 @@ class XendDomainInfo:
         self.vmWatch = None
         self.shutdownWatch = None
         self.shutdownStartTime = None
+        self.unresponsive = False
         self._resume = resume
 
         self.state_updated = threading.Condition()
@@ -1128,21 +1129,25 @@ class XendDomainInfo:
                 # failed.  Ignore this domain.
                 pass
             else:
-                # Domain is alive.  If we are shutting it down, then check
-                # the timeout on that, and destroy it if necessary.
+                # Domain is alive.
                 if xeninfo['paused']:
                     self._stateSet(DOM_STATE_PAUSED)
                 else:
                     self._stateSet(DOM_STATE_RUNNING)
                     
-                if self.shutdownStartTime:
+                if self.shutdownStartTime and not self.unresponsive:
                     timeout = (SHUTDOWN_TIMEOUT - time.time() +
                                self.shutdownStartTime)
                     if timeout < 0:
+                        # The domain is not responding to shutdown requests.
+                        # Log a message, and rename the domain to indicate the
+                        # state; we keep the domain running, however, to
+                        # allow corrective action.
                         log.info(
                             "Domain shutdown timeout expired: name=%s id=%s",
                             self.info['name_label'], self.domid)
-                        self.destroy()
+                        self.setName('unresponsive-' + self.getName())
+                        self.unresponsive = True
         finally:
             self.refresh_shutdown_lock.release()
 
@@ -1431,6 +1436,7 @@ class XendDomainInfo:
         log.debug('XendDomainInfo.constructDomain')
 
         self.shutdownStartTime = None
+        self.unresponsive = False
 
         hvm = self.info.is_hvm()
         if hvm:
