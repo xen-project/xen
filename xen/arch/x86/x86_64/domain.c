@@ -22,8 +22,10 @@ arch_compat_vcpu_op(
         struct compat_vcpu_register_runstate_memory_area area;
         struct compat_vcpu_runstate_info info;
 
+        area.addr.p = 0;
+
         rc = -EFAULT;
-        if ( copy_from_guest(&area, arg, 1) )
+        if ( copy_from_guest(&area.addr.h, arg, 1) )
             break;
 
         if ( area.addr.h.c != area.addr.p ||

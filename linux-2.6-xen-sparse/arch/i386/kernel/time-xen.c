@@ -732,11 +732,13 @@ static void init_missing_ticks_accounting(int cpu)
 {
 	struct vcpu_register_runstate_memory_area area;
 	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
+	int rc;
 
 	memset(runstate, 0, sizeof(*runstate));
 
 	area.addr.v = runstate;
-	HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+	WARN_ON(rc && rc != -ENOSYS);
 
 	per_cpu(processed_blocked_time, cpu) =
 		runstate->time[RUNSTATE_blocked];
