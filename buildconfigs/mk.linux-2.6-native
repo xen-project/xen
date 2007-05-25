@@ -1,4 +1,4 @@
-EXTRAVERSION = native
+EXTRAVERSION = -native
 IMAGE_TARGET = bzImage
 INSTALL_BOOT_PATH = $(DESTDIR)/boot
 include buildconfigs/mk.linux-2.6-xen

@@ -1,0 +1,26 @@
+# Main repository to clone.
+XEN_LINUX_HGREPO ?= http://xenbits.xensource.com/linux-$(LINUX_VER)-xen.hg
+
+# Set this to pull additional changesets from a second source.
+
+# This can be useful if you use a local mirror for XEN_LINUX_HGREPO
+# (to reduce time spent cloning) but still want to pull the very
+# latest changesets from xenbits.
+XEN_LINUX_HGUPDATES ?=
+
+# Set this to update to a particlar revision.
+XEN_LINUX_HGREV  ?=
+
+LINUX_SRCDIR ?= linux-$(LINUX_VER)-xen.hg
+
+$(LINUX_SRCDIR)/.valid-src:
+	if [ ! -d $(LINUX_SRCDIR) ] ; then \
+	    hg clone $(XEN_LINUX_HGREPO) $(LINUX_SRCDIR) ; \
+	fi
+	if [ -n "$(XEN_LINUX_HGUPDATES)" ] ; then \
+	    hg pull -R $(LINUX_SRCDIR) $(XEN_LINUX_HGUPDATES) ; \
+	fi
+	if [ -n "$(XEN_LINUX_HGREV)" ] ; then \
+	    hg update -R $(LINUX_SRCDIR) $(XEN_LINUX_HGREV) ; \
+	fi
+	touch $@
