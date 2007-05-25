@@ -2086,7 +2086,7 @@ class XendDomainInfo:
             raise VmError('Invalid VM Name')
 
         dom =  XendDomain.instance().domain_lookup_nr(name)
-        if dom and dom.info['uuid'] != self.info['uuid']:
+        if dom and dom.domid != self.domid:
             raise VmError("VM name '%s' already exists%s" %
                           (name,
                            dom.domid is not None and
