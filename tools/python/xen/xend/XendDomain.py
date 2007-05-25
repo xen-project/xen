@@ -1088,6 +1088,9 @@ class XendDomain:
 
         try:
             return XendCheckpoint.restore(self, fd, paused=paused)
+        except XendError, e:
+            log.exception("Restore failed")
+            raise
         except:
             # I don't really want to log this exception here, but the error
             # handling in the relocation-socket handling code (relocate.py) is
