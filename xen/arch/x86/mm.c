@@ -1326,6 +1326,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 {
     l1_pgentry_t ol1e;
     struct domain *d = current->domain;
+    unsigned long mfn;
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return 0;
@@ -1336,8 +1337,11 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        nl1e = l1e_from_pfn(gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e)),
-                            l1e_get_flags(nl1e));
+        mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e));
+        if ( unlikely(mfn == INVALID_MFN) )
+            return 0;
+        ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
+        nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
 
         if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         {
