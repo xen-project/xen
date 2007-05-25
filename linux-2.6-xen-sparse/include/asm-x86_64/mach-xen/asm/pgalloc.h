@@ -146,8 +146,8 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	/*
 	 * Set level3_user_pgt for vsyscall area
 	 */
-	set_pgd(__user_pgd(pgd) + pgd_index(VSYSCALL_START), 
-		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
+	set_pgd(__user_pgd(pgd) + pgd_index(VSYSCALL_START),
+		__pgd(__pa_symbol(level3_user_pgt) | _PAGE_TABLE));
 	return pgd;
 }
 

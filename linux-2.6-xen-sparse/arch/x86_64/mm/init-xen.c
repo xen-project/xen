@@ -577,7 +577,7 @@ void __init xen_init_pt(void)
 
 	/* Construct mapping of initial pte page in our own directories. */
 	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
-		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt) | _PAGE_USER);
+		__pgd(__pa_symbol(level3_kernel_pgt) | _PAGE_TABLE);
 	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
 		__pud(__pa_symbol(level2_kernel_pgt) |
 		      _KERNPG_TABLE);
