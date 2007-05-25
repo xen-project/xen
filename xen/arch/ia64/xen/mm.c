@@ -498,9 +498,22 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 			   This can happen when domU tries to touch i/o
 			   port space.  Also prevents possible address
 			   aliasing issues.  */
-			if (!(mpaddr - IO_PORTS_PADDR < IO_PORTS_SIZE))
-				gdprintk(XENLOG_WARNING, "Warning: UC to WB "
-				         "for mpaddr=%lx\n", mpaddr);
+			if (!(mpaddr - IO_PORTS_PADDR < IO_PORTS_SIZE)) {
+				u64 ucwb;
+				
+				/*
+				 * If dom0 page has both UC & WB attributes
+				 * don't warn about attempted UC access.
+				 */
+				ucwb = efi_mem_attribute(mpaddr, PAGE_SIZE);
+				ucwb &= EFI_MEMORY_UC | EFI_MEMORY_WB;
+				ucwb ^= EFI_MEMORY_UC | EFI_MEMORY_WB;
+
+				if (d != dom0 || ucwb != 0)
+					gdprintk(XENLOG_WARNING, "Warning: UC"
+						 " to WB for mpaddr=%lx\n",
+						 mpaddr);
+			}
 			pteval = (pteval & ~_PAGE_MA_MASK) | _PAGE_MA_WB;
 		}
 		break;
