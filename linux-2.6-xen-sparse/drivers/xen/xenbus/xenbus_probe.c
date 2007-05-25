@@ -172,6 +172,7 @@ static struct xen_bus_type xenbus_frontend = {
 	.levels = 2, 		/* device/type/<id> */
 	.get_bus_id = frontend_bus_id,
 	.probe = xenbus_probe_frontend,
+	.error = -ENODEV,
 	.bus = {
 		.name     = "xen",
 		.match    = xenbus_match,

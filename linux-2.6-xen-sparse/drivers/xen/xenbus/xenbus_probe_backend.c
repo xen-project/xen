@@ -115,6 +115,7 @@ static struct xen_bus_type xenbus_backend = {
 	.levels = 3, 		/* backend/type/<frontend>/<id> */
 	.get_bus_id = backend_bus_id,
 	.probe = xenbus_probe_backend,
+	.error = -ENODEV,
 	.bus = {
 		.name     = "xen-backend",
 		.match    = xenbus_match,
