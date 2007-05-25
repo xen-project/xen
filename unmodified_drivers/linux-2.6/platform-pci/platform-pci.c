@@ -54,6 +54,7 @@
 #define DRV_VERSION "0.10"
 #define DRV_RELDATE "03/03/2005"
 
+static int max_hypercall_stub_pages, nr_hypercall_stub_pages;
 char *hypercall_stubs;
 EXPORT_SYMBOL(hypercall_stubs);
 
@@ -109,8 +110,8 @@ unsigned long alloc_xen_mmio(unsigned long len)
 }
 
 #ifndef __ia64__
-/* Lifted from hvmloader.c */
-static int get_hypercall_stubs(void)
+
+static int init_hypercall_stubs(void)
 {
 	uint32_t eax, ebx, ecx, edx, pages, msr, i;
 	char signature[13];
@@ -133,16 +134,27 @@ static int get_hypercall_stubs(void)
 
 	printk(KERN_INFO "Xen version %d.%d.\n", eax >> 16, eax & 0xffff);
 
+	/*
+	 * Find largest supported number of hypercall pages.
+	 * We'll create as many as possible up to this number.
+	 */
 	cpuid(0x40000002, &pages, &msr, &ecx, &edx);
 
-	printk(KERN_INFO "Hypercall area is %u pages.\n", pages);
+	/*
+	 * Use __vmalloc() because vmalloc_exec() is not an exported symbol.
+	 * PAGE_KERNEL_EXEC also is not exported, hence we use PAGE_KERNEL.
+	 * hypercall_stubs = vmalloc_exec(pages * PAGE_SIZE);
+	 */
+	while (pages > 0) {
+		hypercall_stubs = __vmalloc(
+			pages * PAGE_SIZE,
+			GFP_KERNEL | __GFP_HIGHMEM,
+			__pgprot(__PAGE_KERNEL & ~_PAGE_NX));
+		if (hypercall_stubs != NULL)
+			break;
+		pages--; /* vmalloc failed: try one fewer pages */
+	}
 
-	/* Use __vmalloc() because vmalloc_exec() is not an exported symbol. */
-	/* PAGE_KERNEL_EXEC also is not exported, hence we use PAGE_KERNEL. */
-	/* hypercall_stubs = vmalloc_exec(pages * PAGE_SIZE); */
-	hypercall_stubs = __vmalloc(pages * PAGE_SIZE,
-				    GFP_KERNEL | __GFP_HIGHMEM,
-				    __pgprot(__PAGE_KERNEL & ~_PAGE_NX));
 	if (hypercall_stubs == NULL)
 		return -ENOMEM;
 
@@ -152,10 +164,46 @@ static int get_hypercall_stubs(void)
 		wrmsrl(msr, ((u64)pfn << PAGE_SHIFT) + i);
 	}
 
+	nr_hypercall_stub_pages = pages;
+	max_hypercall_stub_pages = pages;
+
+	printk(KERN_INFO "Hypercall area is %u pages.\n", pages);
+
 	return 0;
 }
+
+static void resume_hypercall_stubs(void)
+{
+	uint32_t eax, ebx, ecx, edx, pages, msr, i;
+	char signature[13];
+
+	cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
+	*(uint32_t*)(signature + 0) = ebx;
+	*(uint32_t*)(signature + 4) = ecx;
+	*(uint32_t*)(signature + 8) = edx;
+	signature[12] = 0;
+
+	BUG_ON(strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002));
+
+	cpuid(0x40000002, &pages, &msr, &ecx, &edx);
+
+	if (pages > max_hypercall_stub_pages)
+		pages = max_hypercall_stub_pages;
+
+	for (i = 0; i < pages; i++) {
+		unsigned long pfn;
+		pfn = vmalloc_to_pfn((char *)hypercall_stubs + i*PAGE_SIZE);
+		wrmsrl(msr, ((u64)pfn << PAGE_SHIFT) + i);
+	}
+
+	nr_hypercall_stub_pages = pages;
+}
+
 #else /* __ia64__ */
-#define get_hypercall_stubs()	(0)
+
+#define init_hypercall_stubs()		(0)
+#define resume_hypercall_stubs()	((void)0)
+
 #endif
 
 static uint64_t get_callback_via(struct pci_dev *pdev)
@@ -247,7 +295,7 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	platform_mmio = mmio_addr;
 	platform_mmiolen = mmio_len;
 
-	ret = get_hypercall_stubs();
+	ret = init_hypercall_stubs();
 	if (ret < 0)
 		goto out;
 
@@ -302,10 +350,8 @@ void platform_pci_resume(void)
 {
 	struct xen_add_to_physmap xatp;
 
-	/* do 2 things for PV driver restore on HVM
-	 * 1: rebuild share info
-	 * 2: set callback irq again
-	 */
+	resume_hypercall_stubs();
+
 	xatp.domid = DOMID_SELF;
 	xatp.idx = 0;
 	xatp.space = XENMAPSPACE_shared_info;
