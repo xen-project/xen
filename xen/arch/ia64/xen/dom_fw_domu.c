@@ -47,173 +47,179 @@
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_domu.h>
 
-void
-efi_systable_init_domu(struct fw_tables *tables)
+void efi_systable_init_domu(struct fw_tables *tables)
 {
-    int i = 1;
+	int i = 1;
 
-    printk(XENLOG_GUEST XENLOG_INFO "DomainU EFI build up:");
+	printk(XENLOG_GUEST XENLOG_INFO "DomainU EFI build up:");
 
-    tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
-    tables->efi_tables[i].table = FW_ACPI_BASE_PADDR;
-    printk(" ACPI 2.0=0x%lx",tables->efi_tables[i].table);
-    i++;
-    printk("\n");
-    BUG_ON(i > NUM_EFI_SYS_TABLES);
+	tables->efi_tables[i].guid = ACPI_20_TABLE_GUID;
+	tables->efi_tables[i].table = FW_ACPI_BASE_PADDR;
+	printk(" ACPI 2.0=0x%lx", tables->efi_tables[i].table);
+	i++;
+	printk("\n");
+	BUG_ON(i > NUM_EFI_SYS_TABLES);
 }
 
 #define MAKE_MD(typ, attr, start, end) \
 	xen_ia64_efi_make_md((tables), &(i), (typ), (attr), (start), (end))
 
 int
-complete_domu_memmap(domain_t *d,
-                     struct fw_tables *tables,
-                     unsigned long maxmem,
-                     int num_mds,
-                     unsigned long memmap_info_pfn,
-                     unsigned long memmap_info_num_pages)
+complete_domu_memmap(domain_t * d,
+		     struct fw_tables *tables,
+		     unsigned long maxmem,
+		     int num_mds,
+		     unsigned long memmap_info_pfn,
+		     unsigned long memmap_info_num_pages)
 {
-    efi_memory_desc_t *md;
-    int i = num_mds; /* for MAKE_MD */
-    int create_memmap = 0;
-    xen_ia64_memmap_info_t* memmap_info;
-    unsigned long memmap_info_size;
-    unsigned long paddr_start;
-    unsigned long paddr_end;
-    void *p;
-    void *memmap_start;
-    void *memmap_end;
+	efi_memory_desc_t *md;
+	int i = num_mds;	/* for MAKE_MD */
+	int create_memmap = 0;
+	xen_ia64_memmap_info_t *memmap_info;
+	unsigned long memmap_info_size;
+	unsigned long paddr_start;
+	unsigned long paddr_end;
+	void *p;
+	void *memmap_start;
+	void *memmap_end;
 
-    if (memmap_info_pfn == 0 || memmap_info_num_pages == 0) {
-        /* old domain builder which doesn't setup
-         * memory map. create it for compatibility */
-        memmap_info_pfn = (maxmem >> PAGE_SHIFT) - 1;
-        memmap_info_num_pages = 1;
-        create_memmap = 1;
-    }
+	if (memmap_info_pfn == 0 || memmap_info_num_pages == 0) {
+		/* old domain builder which doesn't setup
+		 * memory map. create it for compatibility */
+		memmap_info_pfn = (maxmem >> PAGE_SHIFT) - 1;
+		memmap_info_num_pages = 1;
+		create_memmap = 1;
+	}
 
-    memmap_info_size = memmap_info_num_pages << PAGE_SHIFT;
-    paddr_start = memmap_info_pfn << PAGE_SHIFT;
-    /* 3 = start info page, xenstore page and console page */
-    paddr_end = paddr_start + memmap_info_size + 3 * PAGE_SIZE;
-    memmap_info = xen_ia64_dom_fw_map(d, paddr_start);
+	memmap_info_size = memmap_info_num_pages << PAGE_SHIFT;
+	paddr_start = memmap_info_pfn << PAGE_SHIFT;
+	/* 3 = start info page, xenstore page and console page */
+	paddr_end = paddr_start + memmap_info_size + 3 * PAGE_SIZE;
+	memmap_info = xen_ia64_dom_fw_map(d, paddr_start);
 
-    if (memmap_info->efi_memmap_size == 0) {
-        create_memmap = 1;
-    } else if (memmap_info->efi_memdesc_size != sizeof(md[0]) ||
-               memmap_info->efi_memdesc_version !=
-               EFI_MEMORY_DESCRIPTOR_VERSION) {
-        printk(XENLOG_WARNING
-               "%s: Warning: unknown memory map "
-               "memmap size %"PRIu64" "
-               "memdesc size %"PRIu64" "
-               "version %"PRIu32"\n",
-               __func__,
-               memmap_info->efi_memmap_size,
-               memmap_info->efi_memdesc_size,
-               memmap_info->efi_memdesc_version);
-        create_memmap = 1;
-    } else if (memmap_info_size < memmap_info->efi_memmap_size) {
-        printk(XENLOG_WARNING
-               "%s: Warning: too short memmap info size %"PRIu64"\n",
-               __func__, memmap_info_size);
-        xen_ia64_dom_fw_unmap(d, memmap_info);
-        return -EINVAL;
-    } else if (memmap_info->efi_memmap_size >
-           PAGE_SIZE - sizeof(*memmap_info)) {
-        /*
-         * curently memmap spanning more than single page isn't
-         * supported.
-         */
-        printk(XENLOG_WARNING
-               "%s: Warning: too large efi_memmap_size %"PRIu64"\n",
-               __func__, memmap_info->efi_memmap_size);
-        xen_ia64_dom_fw_unmap(d, memmap_info);
-        return -ENOSYS;
-    }
-    
-    if (create_memmap) {
-        /*
-         * old domain builder which doesn't setup
-         * memory map. create it for compatibility
-         */
-        memmap_info->efi_memdesc_size = sizeof(md[0]);
-        memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
-        memmap_info->efi_memmap_size = 1 * sizeof(md[0]);
+	if (memmap_info->efi_memmap_size == 0) {
+		create_memmap = 1;
+	} else if (memmap_info->efi_memdesc_size != sizeof(md[0]) ||
+		   memmap_info->efi_memdesc_version !=
+		   EFI_MEMORY_DESCRIPTOR_VERSION) {
+		printk(XENLOG_WARNING
+		       "%s: Warning: unknown memory map "
+		       "memmap size %" PRIu64 " "
+		       "memdesc size %" PRIu64 " "
+		       "version %" PRIu32 "\n",
+		       __func__,
+		       memmap_info->efi_memmap_size,
+		       memmap_info->efi_memdesc_size,
+		       memmap_info->efi_memdesc_version);
+		create_memmap = 1;
+	} else if (memmap_info_size < memmap_info->efi_memmap_size) {
+		printk(XENLOG_WARNING
+		       "%s: Warning: too short memmap info size %" PRIu64 "\n",
+		       __func__, memmap_info_size);
+		xen_ia64_dom_fw_unmap(d, memmap_info);
+		return -EINVAL;
+	} else if (memmap_info->efi_memmap_size >
+		   PAGE_SIZE - sizeof(*memmap_info)) {
+		/*
+		 * curently memmap spanning more than single page isn't
+		 * supported.
+		 */
+		printk(XENLOG_WARNING
+		       "%s: Warning: too large efi_memmap_size %" PRIu64 "\n",
+		       __func__, memmap_info->efi_memmap_size);
+		xen_ia64_dom_fw_unmap(d, memmap_info);
+		return -ENOSYS;
+	}
 
-        md = (efi_memory_desc_t*)&memmap_info->memdesc;
-        md[num_mds].type = EFI_CONVENTIONAL_MEMORY;
-        md[num_mds].pad = 0;
-        md[num_mds].phys_addr = 0;
-        md[num_mds].virt_addr = 0;
-        md[num_mds].num_pages = maxmem >> EFI_PAGE_SHIFT;
-        md[num_mds].attribute = EFI_MEMORY_WB;
-    }
+	if (create_memmap) {
+		/*
+		 * old domain builder which doesn't setup
+		 * memory map. create it for compatibility
+		 */
+		memmap_info->efi_memdesc_size = sizeof(md[0]);
+		memmap_info->efi_memdesc_version =
+		    EFI_MEMORY_DESCRIPTOR_VERSION;
+		memmap_info->efi_memmap_size = 1 * sizeof(md[0]);
 
-    memmap_start = &memmap_info->memdesc;
-    memmap_end = memmap_start + memmap_info->efi_memmap_size;
+		md = (efi_memory_desc_t *) & memmap_info->memdesc;
+		md[num_mds].type = EFI_CONVENTIONAL_MEMORY;
+		md[num_mds].pad = 0;
+		md[num_mds].phys_addr = 0;
+		md[num_mds].virt_addr = 0;
+		md[num_mds].num_pages = maxmem >> EFI_PAGE_SHIFT;
+		md[num_mds].attribute = EFI_MEMORY_WB;
+	}
 
-    /* XXX Currently the table must be in a single page. */
-    if ((unsigned long)memmap_end > (unsigned long)memmap_info + PAGE_SIZE) {
-        xen_ia64_dom_fw_unmap(d, memmap_info);
-        return -EINVAL;
-    }
+	memmap_start = &memmap_info->memdesc;
+	memmap_end = memmap_start + memmap_info->efi_memmap_size;
 
-    /* sort it bofore use
-     * XXX: this is created by user space domain builder so that
-     * we should check its integrity */
-    sort(&memmap_info->memdesc,
-         memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size,
-         memmap_info->efi_memdesc_size,
-         efi_mdt_cmp, NULL);
+	/* XXX Currently the table must be in a single page. */
+	if ((unsigned long)memmap_end > (unsigned long)memmap_info + PAGE_SIZE) {
+		xen_ia64_dom_fw_unmap(d, memmap_info);
+		return -EINVAL;
+	}
 
-    for (p = memmap_start; p < memmap_end; p += memmap_info->efi_memdesc_size) {
-        unsigned long start;
-        unsigned long end;
+	/* sort it bofore use
+	 * XXX: this is created by user space domain builder so that
+	 * we should check its integrity */
+	sort(&memmap_info->memdesc,
+	     memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size,
+	     memmap_info->efi_memdesc_size, efi_mdt_cmp, NULL);
 
-        md = p;
-        start = md->phys_addr;
-        end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+	for (p = memmap_start; p < memmap_end;
+	     p += memmap_info->efi_memdesc_size) {
+		unsigned long start;
+		unsigned long end;
 
-        if (start < FW_END_PADDR)
-            start = FW_END_PADDR;
-        if (end <= start)
-            continue;
+		md = p;
+		start = md->phys_addr;
+		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
 
-        /* exclude [paddr_start, paddr_end) */
-        if (paddr_end <= start || end <= paddr_start) {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start, end);
-        } else if (paddr_start <= start && paddr_end < end) {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, paddr_end, end);
-        } else if (start < paddr_start && end <= paddr_end) {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start, paddr_start);
-        } else {
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start, paddr_start);
-            MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, paddr_end, end);
-        }
-    }
+		if (start < FW_END_PADDR)
+			start = FW_END_PADDR;
+		if (end <= start)
+			continue;
 
-    /* memmap info page. */
-    MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB, paddr_start, paddr_end);
+		/* exclude [paddr_start, paddr_end) */
+		if (paddr_end <= start || end <= paddr_start) {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start,
+				end);
+		} else if (paddr_start <= start && paddr_end < end) {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				paddr_end, end);
+		} else if (start < paddr_start && end <= paddr_end) {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start,
+				paddr_start);
+		} else {
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start,
+				paddr_start);
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+				paddr_end, end);
+		}
+	}
 
-    /* Create an entry for IO ports.  */
-    MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
-            IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
+	/* memmap info page. */
+	MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB, paddr_start,
+		paddr_end);
 
-    num_mds = i;
-    sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
-         efi_mdt_cmp, NULL);
+	/* Create an entry for IO ports.  */
+	MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
+		IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
 
-    xen_ia64_dom_fw_unmap(d, memmap_info);
-    return num_mds;
+	num_mds = i;
+	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
+	     efi_mdt_cmp, NULL);
+
+	xen_ia64_dom_fw_unmap(d, memmap_info);
+	return num_mds;
 }
 
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
- * c-basic-offset: 4
- * tab-width: 4
- * indent-tabs-mode: nil
+ * c-set-style: "linux"
+ * c-basic-offset: 8
+ * tab-width: 8
+ * indent-tabs-mode: t
  * End:
  */
