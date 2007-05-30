@@ -58,6 +58,16 @@ union grant_combo {
     } shorts;
 };
 
+/* Used to share code between unmap_grant_ref and unmap_and_replace. */
+struct gnttab_unmap_common {
+    uint64_t host_addr;
+    uint64_t dev_bus_addr;
+    uint64_t new_addr;
+    grant_handle_t handle;
+
+    int16_t status;
+};
+
 #define PIN_FAIL(_lbl, _rc, _f, _a...)          \
     do {                                        \
         gdprintk(XENLOG_WARNING, _f, ## _a );   \
@@ -397,8 +407,8 @@ gnttab_map_grant_ref(
 }
 
 static void
-__gnttab_unmap_grant_ref(
-    struct gnttab_unmap_grant_ref *op)
+__gnttab_unmap_common(
+    struct gnttab_unmap_common *op)
 {
     domid_t          dom;
     grant_ref_t      ref;
@@ -477,8 +487,8 @@ __gnttab_unmap_grant_ref(
 
     if ( (op->host_addr != 0) && (flags & GNTMAP_host_map) )
     {
-        if ( (rc = destroy_grant_host_mapping(op->host_addr,
-                                              frame, flags)) < 0 )
+        if ( (rc = replace_grant_host_mapping(op->host_addr,
+                                              frame, op->new_addr, flags)) < 0 )
             goto unmap_out;
 
         ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
@@ -518,6 +528,20 @@ __gnttab_unmap_grant_ref(
     rcu_unlock_domain(rd);
 }
 
+static void
+__gnttab_unmap_grant_ref(
+    struct gnttab_unmap_grant_ref *op)
+{
+    struct gnttab_unmap_common common = {
+	.host_addr = op->host_addr,
+	.dev_bus_addr = op->dev_bus_addr,
+	.handle = op->handle,
+    };
+
+    __gnttab_unmap_common(&common);
+    op->status = common.status;
+}
+
 static long
 gnttab_unmap_grant_ref(
     XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) uop, unsigned int count)
@@ -530,6 +554,44 @@ gnttab_unmap_grant_ref(
         if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
             goto fault;
         __gnttab_unmap_grant_ref(&op);
+        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
+            goto fault;
+    }
+
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
+    return 0;
+
+fault:
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
+    return -EFAULT;    
+}
+
+static void
+__gnttab_unmap_and_replace(
+    struct gnttab_unmap_and_replace *op)
+{
+    struct gnttab_unmap_common common = {
+	.host_addr = op->host_addr,
+	.new_addr = op->new_addr,
+	.handle = op->handle,
+    };
+
+    __gnttab_unmap_common(&common);
+    op->status = common.status;
+}
+
+static long
+gnttab_unmap_and_replace(
+    XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t) uop, unsigned int count)
+{
+    int i;
+    struct gnttab_unmap_and_replace op;
+
+    for ( i = 0; i < count; i++ )
+    {
+        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
+            goto fault;
+        __gnttab_unmap_and_replace(&op);
         if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
             goto fault;
     }
@@ -1203,6 +1265,21 @@ do_grant_table_op(
         if ( unlikely(!grant_operation_permitted(d)) )
             goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
+        break;
+    }
+    case GNTTABOP_unmap_and_replace:
+    {
+        XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t) unmap =
+            guest_handle_cast(uop, gnttab_unmap_and_replace_t);
+        if ( unlikely(!guest_handle_okay(unmap, count)) )
+            goto out;
+        rc = -EPERM;
+        if ( unlikely(!grant_operation_permitted(d)) )
+            goto out;
+        rc = -ENOSYS;
+        if ( unlikely(!replace_grant_supported()) )
+            goto out;
+        rc = gnttab_unmap_and_replace(unmap, count);
         break;
     }
     case GNTTABOP_setup_table:

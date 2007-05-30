@@ -135,4 +135,19 @@ gnttab_set_unmap_op(struct gnttab_unmap_grant_ref *unmap, maddr_t addr,
 	unmap->dev_bus_addr = 0;
 }
 
+static inline void
+gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
+		      maddr_t new_addr, grant_handle_t handle)
+{
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		unmap->host_addr = __pa(addr);
+		unmap->new_addr = __pa(new_addr);
+	} else {
+		unmap->host_addr = addr;
+		unmap->new_addr = new_addr;
+	}
+
+	unmap->handle = handle;
+}
+
 #endif /* __ASM_GNTTAB_H__ */

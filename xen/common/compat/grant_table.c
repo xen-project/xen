@@ -17,6 +17,10 @@ CHECK_gnttab_map_grant_ref;
 CHECK_gnttab_unmap_grant_ref;
 #undef xen_gnttab_unmap_grant_ref
 
+#define xen_gnttab_unmap_and_replace gnttab_unmap_and_replace
+CHECK_gnttab_unmap_and_replace;
+#undef xen_gnttab_unmap_and_replace
+
 DEFINE_XEN_GUEST_HANDLE(gnttab_setup_table_compat_t);
 DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_compat_t);
 DEFINE_XEN_GUEST_HANDLE(gnttab_copy_compat_t);
@@ -48,6 +52,10 @@ int compat_grant_table_op(unsigned int cmd,
 
 #ifndef CHECK_gnttab_unmap_grant_ref
     CASE(unmap_grant_ref);
+#endif
+
+#ifndef CHECK_gnttab_unmap_and_replace
+    CASE(unmap_and_replace);
 #endif
 
 #ifndef CHECK_gnttab_setup_table

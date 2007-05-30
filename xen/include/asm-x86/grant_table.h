@@ -15,8 +15,8 @@
  */
 int create_grant_host_mapping(
     uint64_t addr, unsigned long frame, unsigned int flags);
-int destroy_grant_host_mapping(
-    uint64_t addr, unsigned long frame, unsigned int flags);
+int replace_grant_host_mapping(
+    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags);
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
@@ -47,5 +47,10 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
     do {                                                        \
         /* Done implicitly when page tables are destroyed. */   \
     } while (0)
+
+static inline int replace_grant_supported(void)
+{
+    return 1;
+}
 
 #endif /* __ASM_GRANT_TABLE_H__ */

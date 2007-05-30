@@ -2621,8 +2621,8 @@ static int create_grant_va_mapping(
     return GNTST_okay;
 }
 
-static int destroy_grant_va_mapping(
-    unsigned long addr, unsigned long frame, struct vcpu *v)
+static int replace_grant_va_mapping(
+    unsigned long addr, unsigned long frame, l1_pgentry_t nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
@@ -2646,7 +2646,7 @@ static int destroy_grant_va_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, v)) )
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v)) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         rc = GNTST_general_error;
@@ -2656,6 +2656,12 @@ static int destroy_grant_va_mapping(
  out:
     guest_unmap_l1e(v, pl1e);
     return rc;
+}
+
+static int destroy_grant_va_mapping(
+    unsigned long addr, unsigned long frame, struct vcpu *v)
+{
+    return replace_grant_va_mapping(addr, frame, l1e_empty(), v);
 }
 
 int create_grant_host_mapping(
@@ -2673,12 +2679,48 @@ int create_grant_host_mapping(
     return create_grant_va_mapping(addr, pte, current);
 }
 
-int destroy_grant_host_mapping(
-    uint64_t addr, unsigned long frame, unsigned int flags)
+int replace_grant_host_mapping(
+    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
 {
+    l1_pgentry_t *pl1e, ol1e;
+    unsigned long gl1mfn;
+    int rc;
+    
     if ( flags & GNTMAP_contains_pte )
-        return destroy_grant_pte_mapping(addr, frame, current->domain);
-    return destroy_grant_va_mapping(addr, frame, current);
+    {
+	if (!new_addr)
+	    return destroy_grant_pte_mapping(addr, frame, current->domain);
+
+	MEM_LOG("Unsupported grant table operation");
+	return GNTST_general_error;
+    }
+
+    if (!new_addr)
+	return destroy_grant_va_mapping(addr, frame, current);
+
+    pl1e = guest_map_l1e(current, new_addr, &gl1mfn);
+    if ( !pl1e )
+    {
+        MEM_LOG("Could not find L1 PTE for address %lx",
+                (unsigned long)new_addr);
+        return GNTST_general_error;
+    }
+    ol1e = *pl1e;
+
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, current)) )
+    {
+        MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
+        guest_unmap_l1e(current, pl1e);
+        return GNTST_general_error;
+    }
+
+    guest_unmap_l1e(current, pl1e);
+
+    rc = replace_grant_va_mapping(addr, frame, ol1e, current);
+    if ( rc && !paging_mode_refcounts(current->domain) )
+        put_page_from_l1e(ol1e, current->domain);
+
+    return rc;
 }
 
 int steal_page(
