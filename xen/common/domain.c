@@ -69,19 +69,6 @@ struct domain *alloc_domain(domid_t domid)
 
 void free_domain(struct domain *d)
 {
-    struct vcpu *v;
-    int i;
-
-    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
-    {
-        if ( (v = d->vcpu[i]) == NULL )
-            continue;
-        vcpu_destroy(v);
-        sched_destroy_vcpu(v);
-        free_vcpu_struct(v);
-    }
-
-    sched_destroy_domain(d);
     xfree(d);
 }
 
@@ -136,7 +123,6 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
-    v->vcpu_info_mfn = INVALID_MFN;
 
     v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
     v->runstate.state_entry_time = NOW();
@@ -472,6 +458,17 @@ void domain_pause_for_debugger(void)
 static void complete_domain_destroy(struct rcu_head *head)
 {
     struct domain *d = container_of(head, struct domain, rcu);
+    struct vcpu *v;
+    int i;
+
+    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
+    {
+        if ( (v = d->vcpu[i]) == NULL )
+            continue;
+        vcpu_destroy(v);
+        sched_destroy_vcpu(v);
+        free_vcpu_struct(v);
+    }
 
     acm_domain_destroy(d);
 
@@ -481,6 +478,8 @@ static void complete_domain_destroy(struct rcu_head *head)
     grant_table_destroy(d);
 
     arch_domain_destroy(d);
+
+    sched_destroy_domain(d);
 
     free_domain(d);
 

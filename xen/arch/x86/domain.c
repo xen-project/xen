@@ -343,6 +343,8 @@ int vcpu_initialise(struct vcpu *v)
     struct domain *d = v->domain;
     int rc;
 
+    v->arch.vcpu_info_mfn = INVALID_MFN;
+
     v->arch.flags = TF_kernel_mode;
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
@@ -384,6 +386,11 @@ void vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
+
+    unmap_vcpu_info(v);
+
+    if ( is_hvm_vcpu(v) )
+        hvm_vcpu_destroy(v);
 }
 
 int arch_domain_create(struct domain *d)
@@ -489,17 +496,8 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
-    struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-        unmap_vcpu_info(v);
-
     if ( is_hvm_domain(d) )
-    {
-        for_each_vcpu ( d, v )
-            hvm_vcpu_destroy(v);
         hvm_domain_destroy(d);
-    }
 
     paging_final_teardown(d);
 
@@ -752,14 +750,14 @@ unmap_vcpu_info(struct vcpu *v)
     struct domain *d = v->domain;
     unsigned long mfn;
 
-    if ( v->vcpu_info_mfn == INVALID_MFN )
+    if ( v->arch.vcpu_info_mfn == INVALID_MFN )
         return;
 
-    mfn = v->vcpu_info_mfn;
+    mfn = v->arch.vcpu_info_mfn;
     unmap_domain_page_global(v->vcpu_info);
 
     v->vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
-    v->vcpu_info_mfn = INVALID_MFN;
+    v->arch.vcpu_info_mfn = INVALID_MFN;
 
     put_page_and_type(mfn_to_page(mfn));
 }
@@ -781,7 +779,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
 
-    if ( v->vcpu_info_mfn != INVALID_MFN )
+    if ( v->arch.vcpu_info_mfn != INVALID_MFN )
         return -EINVAL;
 
     /* Run this command on yourself or on other offline VCPUS. */
@@ -805,7 +803,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
     memcpy(new_info, v->vcpu_info, sizeof(*new_info));
 
     v->vcpu_info = new_info;
-    v->vcpu_info_mfn = mfn;
+    v->arch.vcpu_info_mfn = mfn;
 
     /* Set new vcpu_info pointer /before/ setting pending flags. */
     wmb();

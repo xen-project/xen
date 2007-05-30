@@ -75,7 +75,6 @@ struct vcpu
     int              processor;
 
     vcpu_info_t     *vcpu_info;
-    unsigned long    vcpu_info_mfn;
 
     struct domain   *domain;
 

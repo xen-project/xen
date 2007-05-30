@@ -290,6 +290,9 @@ struct arch_vcpu
     unsigned long shadow_ldt_mapcnt;
 
     struct paging_vcpu paging;
+
+    /* Guest-specified relocation of vcpu_info. */
+    unsigned long vcpu_info_mfn;
 } __cacheline_aligned;
 
 /* shorthands to improve code legibility */
