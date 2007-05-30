@@ -31,10 +31,9 @@
 #include <asm/hpet.h>
 #include <io_ports.h>
 
-/* opt_hpet_force: If true, force HPET configuration via PCI space. */
-/* NB. This is a gross hack. Mainly useful for HPET testing. */
-static int opt_hpet_force = 0;
-boolean_param("hpet_force", opt_hpet_force);
+/* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
+static char opt_clocksource[10];
+string_param("clocksource", opt_clocksource);
 
 #define EPOCH MILLISECS(1000)
 
@@ -357,15 +356,6 @@ static int init_hpet(void)
     u32 hpet_id, hpet_period, cfg;
     int i;
 
-    if ( (hpet_address == 0) && opt_hpet_force )
-    {
-        outl(0x800038a0, 0xcf8);
-        outl(0xff000001, 0xcfc);
-        outl(0x800038a0, 0xcf8);
-        hpet_address = inl(0xcfc) & 0xfffffffe;
-        printk("WARNING: Forcibly enabled HPET at %#lx.\n", hpet_address);
-    }
-
     if ( hpet_address == 0 )
         return 0;
 
@@ -603,6 +593,27 @@ static void platform_time_calibration(void)
 
 static void init_platform_timer(void)
 {
+    if ( opt_clocksource[0] != '\0' )
+    {
+        int rc = -1;
+
+        if ( !strcmp(opt_clocksource, "pit") )
+            rc = (init_pit(), 1);
+        else if ( !strcmp(opt_clocksource, "hpet") )
+            rc = init_hpet();
+        else if ( !strcmp(opt_clocksource, "cyclone") )
+            rc = init_cyclone();
+        else if ( !strcmp(opt_clocksource, "acpi") )
+            rc = init_pmtimer();
+
+        if ( rc == 1 )
+            return;
+
+        printk("WARNING: %s clocksource '%s'.\n",
+               (rc == 0) ? "Could not initialise" : "Unrecognised",
+               opt_clocksource);
+    }
+
     if ( !init_cyclone() && !init_hpet() && !init_pmtimer() )
         init_pit();
 }
