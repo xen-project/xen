@@ -511,6 +511,60 @@ static int init_cyclone(void)
 }
 
 /************************************************************
+ * PLATFORM TIMER 4: ACPI PM TIMER
+ */
+
+u32 pmtmr_ioport;
+
+/* Protected by platform_timer_lock. */
+static u64 pmtimer_counter64;
+static u32 pmtimer_stamp;
+static struct timer pmtimer_overflow_timer;
+
+/* ACPI PM timer ticks at 3.579545 MHz. */
+#define ACPI_PM_FREQUENCY 3579545
+
+/* Deltas are 24-bit unsigned values, as counter may be only 24 bits wide. */
+#define pmtimer_delta(c) ((u32)(((c) - pmtimer_stamp) & ((1U<<24)-1)))
+
+static void pmtimer_overflow(void *unused)
+{
+    u32 counter;
+
+    spin_lock_irq(&platform_timer_lock);
+    counter = inl(pmtmr_ioport);
+    pmtimer_counter64 += pmtimer_delta(counter);
+    pmtimer_stamp = counter;
+    spin_unlock_irq(&platform_timer_lock);
+
+    /* Trigger overflow avoidance roughly when counter increments 2^23. */
+    set_timer(&pmtimer_overflow_timer, NOW() + MILLISECS(2000));
+}
+
+static u64 read_pmtimer_count(void)
+{
+    return pmtimer_counter64 + pmtimer_delta(inl(pmtmr_ioport));
+}
+
+static int init_pmtimer(void)
+{
+    if ( pmtmr_ioport == 0 )
+        return 0;
+
+    read_platform_count = read_pmtimer_count;
+
+    init_timer(&pmtimer_overflow_timer, pmtimer_overflow, NULL, 0);
+    pmtimer_overflow(NULL);
+    platform_timer_stamp = pmtimer_counter64;
+    set_time_scale(&platform_timer_scale, ACPI_PM_FREQUENCY);
+
+    printk("Platform timer is %s ACPI PM Timer\n",
+           freq_string(ACPI_PM_FREQUENCY));
+
+    return 1;
+}
+
+/************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
@@ -549,7 +603,7 @@ static void platform_time_calibration(void)
 
 static void init_platform_timer(void)
 {
-    if ( !init_cyclone() && !init_hpet() )
+    if ( !init_cyclone() && !init_hpet() && !init_pmtimer() )
         init_pit();
 }
 
