@@ -27,6 +27,15 @@ include buildconfigs/src.$(XEN_LINUX_SOURCE)
 # The real action starts here!
 .PHONY: build
 build: $(LINUX_DIR)/include/linux/autoconf.h
+ifneq ($(XEN_LINUX_ALLOW_INTERFACE_MISMATCH),y)
+	@if ! diff -urN -x '*.size' $(LINUX_SRCDIR)/include/xen/interface xen/include/public ; then \
+		echo "" 1>&2 ; \
+		echo " *** $(LINUX_SRCDIR)/include/xen/interface is out of date " 1>&2 ; \
+		echo " *** relative to $(XEN_ROOT)/xen/include/public." 1>&2 ; \
+		echo "" 1>&2 ; \
+		exit 1 ; \
+	fi
+endif
 	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \

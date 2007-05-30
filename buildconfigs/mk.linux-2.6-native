@@ -1,4 +1,7 @@
 EXTRAVERSION = -native
 IMAGE_TARGET = bzImage
 INSTALL_BOOT_PATH = $(DESTDIR)/boot
+
+XEN_LINUX_ALLOW_INTERFACE_MISMATCH := y
+
 include buildconfigs/mk.linux-2.6-xen
