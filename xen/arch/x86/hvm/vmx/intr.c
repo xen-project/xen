@@ -67,13 +67,17 @@ static inline int is_interruptibility_state(void)
     return __vmread(GUEST_INTERRUPTIBILITY_INFO);
 }
 
-#ifdef __x86_64__
 static void update_tpr_threshold(struct vlapic *vlapic)
 {
     int max_irr, tpr;
 
     if ( !cpu_has_vmx_tpr_shadow )
         return;
+
+#ifdef __i386__
+    if ( !vlapic->mmap_vtpr_enabled )
+        return;
+#endif
 
     if ( !vlapic_enabled(vlapic) || 
          ((max_irr = vlapic_find_highest_irr(vlapic)) == -1) )
@@ -85,9 +89,6 @@ static void update_tpr_threshold(struct vlapic *vlapic)
     tpr = vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xF0;
     __vmwrite(TPR_THRESHOLD, (max_irr > tpr) ? (tpr >> 4) : (max_irr >> 4));
 }
-#else
-#define update_tpr_threshold(v) ((void)0)
-#endif
 
 asmlinkage void vmx_intr_assist(void)
 {

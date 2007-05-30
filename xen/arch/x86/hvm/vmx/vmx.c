@@ -2483,6 +2483,114 @@ done:
     return 1;
 }
 
+struct page_info * change_guest_physmap_for_vtpr(struct domain *d,
+                                                 int enable_vtpr)
+{
+    struct page_info *pg;
+    unsigned long pfn, mfn;
+
+    spin_lock(&d->arch.hvm_domain.vapic_access_lock);
+
+    pg = d->arch.hvm_domain.apic_access_page;
+    pfn = paddr_to_pfn(APIC_DEFAULT_PHYS_BASE);
+
+    if ( enable_vtpr )
+    {
+        if ( d->arch.hvm_domain.physmap_changed_for_vlapic_access )
+            goto out;
+
+        if ( pg == NULL )
+            pg = alloc_domheap_page(d);
+        if ( pg == NULL )
+        {
+            gdprintk(XENLOG_ERR, "alloc_domheap_pages() failed!\n");
+            goto out;
+        }
+
+        mfn = page_to_mfn(pg);
+        d->arch.hvm_domain.apic_access_page = pg;
+
+        guest_physmap_add_page(d, pfn, mfn);
+
+        d->arch.hvm_domain.physmap_changed_for_vlapic_access = 1;
+
+        goto out;
+    }
+    else
+    {
+        if ( d->arch.hvm_domain.physmap_changed_for_vlapic_access )
+        {
+            mfn = page_to_mfn(pg);
+            guest_physmap_remove_page(d, pfn, mfn);
+            flush_tlb_mask(d->domain_dirty_cpumask);
+
+            d->arch.hvm_domain.physmap_changed_for_vlapic_access = 0;
+        }
+        pg = NULL;
+        goto out;
+    }
+
+out:
+    spin_unlock(&d->arch.hvm_domain.vapic_access_lock);
+    return pg;
+}
+
+static void check_vlapic_msr_for_vtpr(struct vcpu *v)
+{
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    int    mmap_vtpr_enabled = vcpu_vlapic(v)->mmap_vtpr_enabled;
+    uint32_t tmp;
+
+
+    if ( vlapic_hw_disabled(vlapic) && mmap_vtpr_enabled )
+    {
+        vcpu_vlapic(v)->mmap_vtpr_enabled = 0;    
+
+#ifdef __i386__
+        v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_TPR_SHADOW;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
+#elif defined(__x86_64__)
+        if ( !cpu_has_vmx_tpr_shadow )
+        {
+            v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_TPR_SHADOW;
+            __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                v->arch.hvm_vcpu.u.vmx.exec_control);
+        }
+#endif
+        tmp  = __vmread(SECONDARY_VM_EXEC_CONTROL);
+        tmp &= ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+        __vmwrite(SECONDARY_VM_EXEC_CONTROL, tmp);
+
+        change_guest_physmap_for_vtpr(v->domain, 0);
+    }
+    else if ( !vlapic_hw_disabled(vlapic) && !mmap_vtpr_enabled &&
+              cpu_has_vmx_mmap_vtpr_optimization )
+    {
+        vcpu_vlapic(v)->mmap_vtpr_enabled = 1;
+
+        v->arch.hvm_vcpu.u.vmx.exec_control |=
+            ( ACTIVATE_SECONDARY_CONTROLS | CPU_BASED_TPR_SHADOW );
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
+        tmp  = __vmread(SECONDARY_VM_EXEC_CONTROL);
+        tmp |= SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+        __vmwrite(SECONDARY_VM_EXEC_CONTROL, tmp);
+
+        change_guest_physmap_for_vtpr(v->domain, 1);
+    }
+
+    if ( vcpu_vlapic(v)->mmap_vtpr_enabled &&
+        !vlapic_hw_disabled(vlapic) &&
+        (vlapic_base_address(vlapic) != APIC_DEFAULT_PHYS_BASE) )
+    {
+        gdprintk(XENLOG_ERR,
+                 "Local APIC base address is set to 0x%016"PRIx64"!\n",
+                  vlapic_base_address(vlapic));
+        domain_crash_synchronous();
+    }
+}
+
 static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
 {
     u32 ecx = regs->ecx;
@@ -2511,6 +2619,7 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
         break;
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
+        check_vlapic_msr_for_vtpr(v);
         break;
     default:
         if ( !long_mode_do_msr_write(regs) )
@@ -2823,6 +2932,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
         break;
+    case EXIT_REASON_APIC_ACCESS:
+    {
+        unsigned long offset;
+
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
+        offset = exit_qualification & 0x0fffUL;        
+        handle_mmio(APIC_DEFAULT_PHYS_BASE | offset);
+        break;
+    }
 
     default:
     exit_and_crash:

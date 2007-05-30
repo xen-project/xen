@@ -106,6 +106,7 @@ void vmx_vmcs_exit(struct vcpu *v);
 #define CPU_BASED_ACTIVATE_MSR_BITMAP   0x10000000
 #define CPU_BASED_MONITOR_EXITING       0x20000000
 #define CPU_BASED_PAUSE_EXITING         0x40000000
+#define ACTIVATE_SECONDARY_CONTROLS     0x80000000
 extern u32 vmx_cpu_based_exec_control;
 
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
@@ -121,8 +122,16 @@ extern u32 vmx_vmexit_control;
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
 extern u32 vmx_vmentry_control;
 
+#define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
+extern u32 vmx_secondary_exec_control;
+
+#define cpu_has_vmx_virtualize_apic_accesses \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \
     (vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
+#define cpu_has_vmx_mmap_vtpr_optimization \
+    (cpu_has_vmx_virtualize_apic_accesses && cpu_has_vmx_tpr_shadow)
+
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
 extern char *vmx_msr_bitmap;
@@ -160,6 +169,8 @@ enum vmcs_field {
     TSC_OFFSET_HIGH                 = 0x00002011,
     VIRTUAL_APIC_PAGE_ADDR          = 0x00002012,
     VIRTUAL_APIC_PAGE_ADDR_HIGH     = 0x00002013,
+    APIC_ACCESS_ADDR                = 0x00002014,
+    APIC_ACCESS_ADDR_HIGH           = 0x00002015, 
     VMCS_LINK_POINTER               = 0x00002800,
     VMCS_LINK_POINTER_HIGH          = 0x00002801,
     GUEST_IA32_DEBUGCTL             = 0x00002802,

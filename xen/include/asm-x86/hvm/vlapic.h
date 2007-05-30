@@ -49,12 +49,17 @@
 #define vlapic_disabled(vlapic)    ((vlapic)->hw.disabled)
 #define vlapic_enabled(vlapic)     (!vlapic_disabled(vlapic))
 
+#define vlapic_base_address(vlapic)                             \
+    (vlapic->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
+
 struct vlapic {
     struct hvm_hw_lapic      hw;
     struct hvm_hw_lapic_regs *regs;
     struct periodic_time     pt;
     s_time_t                 timer_last_update;
     struct page_info         *regs_page;
+
+    int                      mmap_vtpr_enabled : 1;
 };
 
 static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)

@@ -40,6 +40,7 @@
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
+u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 
@@ -60,11 +61,15 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
     return ctl;
 }
 
+#define vmx_has_secondary_exec_ctls \
+    (_vmx_cpu_based_exec_control & ACTIVATE_SECONDARY_CONTROLS)
+
 void vmx_init_vmcs_config(void)
 {
     u32 vmx_msr_low, vmx_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
     u32 _vmx_cpu_based_exec_control;
+    u32 _vmx_secondary_exec_control = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
 
@@ -80,9 +85,8 @@ void vmx_init_vmcs_config(void)
            CPU_BASED_ACTIVATE_IO_BITMAP |
            CPU_BASED_USE_TSC_OFFSETING);
     opt = CPU_BASED_ACTIVATE_MSR_BITMAP;
-#ifdef __x86_64__
     opt |= CPU_BASED_TPR_SHADOW;
-#endif
+    opt |= ACTIVATE_SECONDARY_CONTROLS;
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
 #ifdef __x86_64__
@@ -92,7 +96,18 @@ void vmx_init_vmcs_config(void)
         _vmx_cpu_based_exec_control = adjust_vmx_controls(
             min, opt, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
     }
+#elif defined(__i386__)
+    if ( !vmx_has_secondary_exec_ctls )
+        _vmx_cpu_based_exec_control &= ~CPU_BASED_TPR_SHADOW;
 #endif
+
+    if ( vmx_has_secondary_exec_ctls )
+    {
+        min = 0;
+        opt = SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+        _vmx_secondary_exec_control = adjust_vmx_controls(
+            min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
+    }
 
     min = VM_EXIT_ACK_INTR_ON_EXIT;
     opt = 0;
@@ -113,6 +128,8 @@ void vmx_init_vmcs_config(void)
         vmcs_revision_id = vmx_msr_low;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
+        if ( vmx_has_secondary_exec_ctls )
+            vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
     }
@@ -121,6 +138,8 @@ void vmx_init_vmcs_config(void)
         BUG_ON(vmcs_revision_id != vmx_msr_low);
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
+        if ( vmx_has_secondary_exec_ctls )
+            BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
         BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
         BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
     }
@@ -291,6 +310,8 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
+    if ( vmx_cpu_based_exec_control & ACTIVATE_SECONDARY_CONTROLS )
+        __vmwrite(SECONDARY_VM_EXEC_CONTROL, vmx_secondary_exec_control);
 
     if ( cpu_has_vmx_msr_bitmap )
         __vmwrite(MSR_BITMAP, virt_to_maddr(vmx_msr_bitmap));
@@ -417,7 +438,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
 #ifdef __x86_64__ 
-    /* VLAPIC TPR optimisation. */
+    /* CR8 based VLAPIC TPR optimization. */
     if ( cpu_has_vmx_tpr_shadow )
     {
         __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
@@ -425,6 +446,16 @@ static void construct_vmcs(struct vcpu *v)
         __vmwrite(TPR_THRESHOLD, 0);
     }
 #endif
+
+    /* Memory-mapped based VLAPIC TPR optimization. */
+    if ( cpu_has_vmx_mmap_vtpr_optimization )
+    {
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
+                    page_to_maddr(vcpu_vlapic(v)->regs_page));
+        __vmwrite(TPR_THRESHOLD, 0);
+
+        vcpu_vlapic(v)->mmap_vtpr_enabled = 1;
+    }
 
     __vmwrite(GUEST_LDTR_SELECTOR, 0);
     __vmwrite(GUEST_LDTR_BASE, 0);
@@ -494,6 +525,18 @@ void vmx_do_resume(struct vcpu *v)
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);
         vmx_set_host_env(v);
+    }
+
+    if ( !v->arch.hvm_vmx.launched && vcpu_vlapic(v)->mmap_vtpr_enabled )
+    {
+        struct page_info *pg = change_guest_physmap_for_vtpr(v->domain, 1);
+
+        if ( pg == NULL )
+        {
+            gdprintk(XENLOG_ERR, "change_guest_physmap_for_vtpr failed!\n");
+            domain_crash_synchronous();
+        }
+        __vmwrite(APIC_ACCESS_ADDR, page_to_maddr(pg));
     }
 
     debug_state = v->domain->debugger_attached;

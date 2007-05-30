@@ -79,8 +79,6 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 #define vlapic_lvtt_period(vlapic)                              \
     (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_TIMER_PERIODIC)
 
-#define vlapic_base_address(vlapic)                             \
-    (vlapic->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
 
 /*
  * Generic APIC bitmap vector update & search routines.

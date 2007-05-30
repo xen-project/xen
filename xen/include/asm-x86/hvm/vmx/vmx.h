@@ -33,6 +33,9 @@ void vmx_intr_assist(void);
 void vmx_do_resume(struct vcpu *);
 void set_guest_time(struct vcpu *v, u64 gtime);
 
+extern struct page_info *change_guest_physmap_for_vtpr(struct domain *d,
+                                                       int enable_vtpr);
+
 /*
  * Exit Reasons
  */
@@ -81,6 +84,7 @@ void set_guest_time(struct vcpu *v, u64 gtime);
 #define EXIT_REASON_MACHINE_CHECK       41
 
 #define EXIT_REASON_TPR_BELOW_THRESHOLD 43
+#define EXIT_REASON_APIC_ACCESS         44
 
 /*
  * Interruption-information format

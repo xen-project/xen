@@ -41,6 +41,11 @@ struct hvm_domain {
     s64                    tsc_frequency;
     struct pl_time         pl_time;
 
+    /* For memory-mapped vLAPIC/vTPR access optimization */
+    spinlock_t             vapic_access_lock;
+    int                    physmap_changed_for_vlapic_access : 1;
+    struct page_info       *apic_access_page;
+
     struct hvm_io_handler  io_handler;
 
     /* Lock protects access to irq, vpic and vioapic. */
