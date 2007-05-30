@@ -17,6 +17,7 @@
 #ifndef COMPAT
 DEFINE_PER_CPU(struct mc_state, mc_state);
 typedef long ret_t;
+#define xlat_multicall_entry(mcs)
 #endif
 
 ret_t
@@ -62,6 +63,9 @@ do_multicall(
 
         if ( test_bit(_MCSF_call_preempted, &mcs->flags) )
         {
+            /* Translate sub-call continuation to guest layout */
+            xlat_multicall_entry(mcs);
+
             /* Copy the sub-call continuation. */
             (void)__copy_to_guest(call_list, &mcs->call, 1);
             goto preempted;

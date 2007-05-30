@@ -1456,13 +1456,12 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
                 id = NULL;
             }
             if ( (mask & 1) && mcs->call.args[i] == nval )
-                ++rc;
-            else
             {
-                cval = mcs->call.args[i];
-                BUG_ON(mcs->call.args[i] != cval);
+                mcs->call.args[i] = cval;
+                ++rc;
             }
-            mcs->compat_call.args[i] = cval;
+            else
+                BUG_ON(mcs->call.args[i] != (unsigned int)mcs->call.args[i]);
         }
     }
     else
