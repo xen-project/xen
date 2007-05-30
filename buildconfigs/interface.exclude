@@ -1,0 +1,7 @@
+*.size
+*.pyc
+checker
+checker.c
+ia64.h
+x86_32.h
+x86_64.h
