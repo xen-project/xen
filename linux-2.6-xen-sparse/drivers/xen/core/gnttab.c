@@ -490,6 +490,128 @@ static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 	return 0;
 }
 
+static void gnttab_page_free(struct page *page)
+{
+	if (page->mapping) {
+		put_page((struct page *)page->mapping);
+		page->mapping = NULL;
+	}
+
+	ClearPageForeign(page);
+	gnttab_reset_grant_page(page);
+	put_page(page);
+}
+
+/*
+ * Must not be called with IRQs off.  This should only be used on the
+ * slow path.
+ *
+ * Copy a foreign granted page to local memory.
+ */
+int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep)
+{
+	struct gnttab_unmap_and_replace unmap;
+	mmu_update_t mmu;
+	struct page *page;
+	struct page *new_page;
+	void *new_addr;
+	void *addr;
+	paddr_t pfn;
+	maddr_t mfn;
+	maddr_t new_mfn;
+	int err;
+
+	page = *pagep;
+	if (!get_page_unless_zero(page))
+		return -ENOENT;
+
+	err = -ENOMEM;
+	new_page = alloc_page(GFP_ATOMIC | __GFP_NOWARN);
+	if (!new_page)
+		goto out;
+
+	new_addr = page_address(new_page);
+	addr = page_address(page);
+	memcpy(new_addr, addr, PAGE_SIZE);
+
+	pfn = page_to_pfn(page);
+	mfn = pfn_to_mfn(pfn);
+	new_mfn = virt_to_mfn(new_addr);
+
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		set_phys_to_machine(pfn, new_mfn);
+		set_phys_to_machine(page_to_pfn(new_page), INVALID_P2M_ENTRY);
+
+		mmu.ptr = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+		mmu.val = pfn;
+		err = HYPERVISOR_mmu_update(&mmu, 1, NULL, DOMID_SELF);
+		BUG_ON(err);
+	}
+
+	gnttab_set_replace_op(&unmap, (unsigned long)addr,
+			      (unsigned long)new_addr, ref);
+
+	err = HYPERVISOR_grant_table_op(GNTTABOP_unmap_and_replace,
+					&unmap, 1);
+	BUG_ON(err);
+	BUG_ON(unmap.status);
+
+	new_page->mapping = page->mapping;
+	new_page->index = page->index;
+	set_bit(PG_foreign, &new_page->flags);
+	*pagep = new_page;
+
+	SetPageForeign(page, gnttab_page_free);
+	page->mapping = NULL;
+
+	/*
+	 * Ensure that there is a barrier between setting the p2m entry
+	 * and checking the map count.  See gnttab_dma_map_page.
+	 */
+	smp_mb();
+
+	/* Has the page been DMA-mapped? */
+	if (unlikely(page_mapped(page))) {
+		err = -EBUSY;
+		page->mapping = (void *)new_page;
+	}
+
+out:
+	put_page(page);
+	return err;
+
+}
+EXPORT_SYMBOL(gnttab_copy_grant_page);
+
+/*
+ * Keep track of foreign pages marked as PageForeign so that we don't
+ * return them to the remote domain prematurely.
+ *
+ * PageForeign pages are pinned down by increasing their mapcount.
+ *
+ * All other pages are simply returned as is.
+ */
+maddr_t gnttab_dma_map_page(struct page *page)
+{
+	maddr_t mfn = pfn_to_mfn(page_to_pfn(page)), mfn2;
+
+	if (!PageForeign(page))
+		return mfn << PAGE_SHIFT;
+
+	if (mfn_to_local_pfn(mfn) < max_mapnr)
+		return mfn << PAGE_SHIFT;
+
+	atomic_set(&page->_mapcount, 0);
+
+	/* This barrier corresponds to the one in gnttab_copy_grant_page. */
+	smp_mb();
+
+	/* Has this page been copied in the mean time? */
+	mfn2 = pfn_to_mfn(page_to_pfn(page));
+
+	return mfn2 << PAGE_SHIFT;
+}
+
 int gnttab_resume(void)
 {
 	if (max_nr_grant_frames() < nr_grant_frames)

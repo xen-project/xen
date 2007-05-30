@@ -39,6 +39,7 @@
 
 #include <asm/hypervisor.h>
 #include <asm/maddr.h> /* maddr_t */
+#include <linux/mm.h>
 #include <xen/interface/grant_table.h>
 #include <xen/features.h>
 
@@ -100,6 +101,19 @@ void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 
 void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
 				       unsigned long pfn);
+
+int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep);
+maddr_t gnttab_dma_map_page(struct page *page);
+
+static inline void gnttab_dma_unmap_page(maddr_t mfn)
+{
+}
+
+static inline void gnttab_reset_grant_page(struct page *page)
+{
+	init_page_count(page);
+	reset_page_mapcount(page);
+}
 
 int gnttab_suspend(void);
 int gnttab_resume(void);
