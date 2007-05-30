@@ -32,6 +32,7 @@
 #include "list.h"
 #include "xenstored_transaction.h"
 #include "xenstored_watch.h"
+#include "xenstored_domain.h"
 #include "xs_lib.h"
 #include "utils.h"
 #include "xenstored_test.h"
@@ -46,6 +47,18 @@ struct changed_node
 
 	/* And the children? (ie. rm) */
 	bool recurse;
+};
+
+struct changed_domain
+{
+	/* List of all changed domains in the context of this transaction. */
+	struct list_head list;
+
+	/* Identifier of the changed domain. */
+	unsigned int domid;
+
+	/* Amount by which this domain's nbentry field has changed. */
+	int nbentry;
 };
 
 struct transaction
@@ -65,6 +78,9 @@ struct transaction
 
 	/* List of changed nodes. */
 	struct list_head changes;
+
+	/* List of changed domains - to record the changed domain entry number */
+	struct list_head changed_domains;
 };
 
 extern int quota_max_transaction;
@@ -142,6 +158,7 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	/* Attach transaction to input for autofree until it's complete */
 	trans = talloc(in, struct transaction);
 	INIT_LIST_HEAD(&trans->changes);
+	INIT_LIST_HEAD(&trans->changed_domains);
 	trans->generation = generation;
 	trans->tdb_name = talloc_asprintf(trans, "%s.%p",
 					  xs_daemon_tdb(), trans);
@@ -172,6 +189,7 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 void do_transaction_end(struct connection *conn, const char *arg)
 {
 	struct changed_node *i;
+	struct changed_domain *d;
 	struct transaction *trans;
 
 	if (!arg || (!streq(arg, "T") && !streq(arg, "F"))) {
@@ -204,12 +222,48 @@ void do_transaction_end(struct connection *conn, const char *arg)
 		/* Don't close this: we won! */
 		trans->tdb = NULL;
 
+		/* fix domain entry for each changed domain */
+		list_for_each_entry(d, &trans->changed_domains, list)
+			domain_entry_fix(d->domid, d->nbentry);
+
 		/* Fire off the watches for everything that changed. */
 		list_for_each_entry(i, &trans->changes, list)
 			fire_watches(conn, i->node, i->recurse);
 		generation++;
 	}
 	send_ack(conn, XS_TRANSACTION_END);
+}
+
+void transaction_entry_inc(struct transaction *trans, unsigned int domid)
+{
+	struct changed_domain *d;
+
+	list_for_each_entry(d, &trans->changed_domains, list)
+		if (d->domid == domid) {
+			d->nbentry++;
+			return;
+		}
+
+	d = talloc(trans, struct changed_domain);
+	d->domid = domid;
+	d->nbentry = 1;
+	list_add_tail(&d->list, &trans->changed_domains);
+}
+
+void transaction_entry_dec(struct transaction *trans, unsigned int domid)
+{
+	struct changed_domain *d;
+
+	list_for_each_entry(d, &trans->changed_domains, list)
+		if (d->domid == domid) {
+			d->nbentry--;
+			return;
+		}
+
+	d = talloc(trans, struct changed_domain);
+	d->domid = domid;
+	d->nbentry = -1;
+	list_add_tail(&d->list, &trans->changed_domains);
 }
 
 void conn_delete_all_transactions(struct connection *conn)

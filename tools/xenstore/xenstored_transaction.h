@@ -27,6 +27,10 @@ void do_transaction_end(struct connection *conn, const char *arg);
 
 struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 
+/* inc/dec entry number local to trans while changing a node */
+void transaction_entry_inc(struct transaction *trans, unsigned int domid);
+void transaction_entry_dec(struct transaction *trans, unsigned int domid);
+
 /* This node was changed: can fail and longjmp. */
 void add_change_node(struct transaction *trans, const char *node,
                      bool recurse);
