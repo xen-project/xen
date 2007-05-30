@@ -114,6 +114,14 @@ typedef struct netif_st {
 #define netback_carrier_off(netif)	((netif)->carrier = 0)
 #define netback_carrier_ok(netif)	((netif)->carrier)
 
+enum {
+	NETBK_DONT_COPY_SKB,
+	NETBK_DELAYED_COPY_SKB,
+	NETBK_ALWAYS_COPY_SKB,
+};
+
+extern int netbk_copy_skb_mode;
+
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
 

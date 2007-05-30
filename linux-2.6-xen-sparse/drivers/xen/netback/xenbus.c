@@ -62,6 +62,7 @@ static int netback_probe(struct xenbus_device *dev,
 	const char *message;
 	struct xenbus_transaction xbt;
 	int err;
+	int sg;
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
 	if (!be) {
@@ -73,6 +74,10 @@ static int netback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	dev->dev.driver_data = be;
 
+	sg = 1;
+	if (netbk_copy_skb_mode == NETBK_ALWAYS_COPY_SKB)
+		sg = 0;
+
 	do {
 		err = xenbus_transaction_start(&xbt);
 		if (err) {
@@ -80,14 +85,14 @@ static int netback_probe(struct xenbus_device *dev,
 			goto fail;
 		}
 
-		err = xenbus_printf(xbt, dev->nodename, "feature-sg", "%d", 1);
+		err = xenbus_printf(xbt, dev->nodename, "feature-sg", "%d", sg);
 		if (err) {
 			message = "writing feature-sg";
 			goto abort_transaction;
 		}
 
 		err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4",
-				    "%d", 1);
+				    "%d", sg);
 		if (err) {
 			message = "writing feature-gso-tcpv4";
 			goto abort_transaction;
