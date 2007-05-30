@@ -1128,8 +1128,8 @@ class XendDomainInfo:
                 # failed.  Ignore this domain.
                 pass
             else:
-                # Domain is alive.  If we are shutting it down, then check
-                # the timeout on that, and destroy it if necessary.
+                # Domain is alive.  If we are shutting it down, log a message
+                # if it seems unresponsive.
                 if xeninfo['paused']:
                     self._stateSet(DOM_STATE_PAUSED)
                 else:
@@ -1138,11 +1138,11 @@ class XendDomainInfo:
                 if self.shutdownStartTime:
                     timeout = (SHUTDOWN_TIMEOUT - time.time() +
                                self.shutdownStartTime)
-                    if timeout < 0:
+                    if (timeout < 0 and not self.readDom('xend/unresponsive')):
                         log.info(
                             "Domain shutdown timeout expired: name=%s id=%s",
                             self.info['name_label'], self.domid)
-                        self.destroy()
+                        self.storeDom('xend/unresponsive', 'True')
         finally:
             self.refresh_shutdown_lock.release()
 
