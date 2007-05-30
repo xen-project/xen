@@ -109,12 +109,12 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_P6_PERFCTR1      0xc2
 
 /* MSRs & bits used for VMX enabling */
-#define MSR_IA32_VMX_BASIC_MSR                  0x480
-#define MSR_IA32_VMX_PINBASED_CTLS_MSR          0x481
-#define MSR_IA32_VMX_PROCBASED_CTLS_MSR         0x482
-#define MSR_IA32_VMX_EXIT_CTLS_MSR              0x483
-#define MSR_IA32_VMX_ENTRY_CTLS_MSR             0x484
-#define MSR_IA32_VMX_MISC_MSR                   0x485
+#define MSR_IA32_VMX_BASIC                      0x480
+#define MSR_IA32_VMX_PINBASED_CTLS              0x481
+#define MSR_IA32_VMX_PROCBASED_CTLS             0x482
+#define MSR_IA32_VMX_EXIT_CTLS                  0x483
+#define MSR_IA32_VMX_ENTRY_CTLS                 0x484
+#define MSR_IA32_VMX_MISC                       0x485
 #define MSR_IA32_VMX_CR0_FIXED0                 0x486
 #define MSR_IA32_VMX_CR0_FIXED1                 0x487
 #define MSR_IA32_VMX_CR4_FIXED0                 0x488

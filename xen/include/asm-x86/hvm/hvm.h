@@ -69,8 +69,10 @@ struct hvm_function_table {
     void (*disable)(void);
 
     /*
-     * Initialise/destroy HVM VCPU resources
+     * Initialise/destroy HVM domain/vcpu resources
      */
+    int  (*domain_initialise)(struct domain *d);
+    void (*domain_destroy)(struct domain *d);
     int  (*vcpu_initialise)(struct vcpu *v);
     void (*vcpu_destroy)(struct vcpu *v);
 

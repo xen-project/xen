@@ -61,9 +61,6 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
     return ctl;
 }
 
-#define vmx_has_secondary_exec_ctls \
-    (_vmx_cpu_based_exec_control & ACTIVATE_SECONDARY_CONTROLS)
-
 void vmx_init_vmcs_config(void)
 {
     u32 vmx_msr_low, vmx_msr_high, min, opt;
@@ -76,7 +73,7 @@ void vmx_init_vmcs_config(void)
     min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
     opt = 0;
     _vmx_pin_based_exec_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_PINBASED_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_PINBASED_CTLS);
 
     min = (CPU_BASED_HLT_EXITING |
            CPU_BASED_INVDPG_EXITING |
@@ -84,24 +81,21 @@ void vmx_init_vmcs_config(void)
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
            CPU_BASED_USE_TSC_OFFSETING);
-    opt = CPU_BASED_ACTIVATE_MSR_BITMAP;
+    opt  = CPU_BASED_ACTIVATE_MSR_BITMAP;
     opt |= CPU_BASED_TPR_SHADOW;
-    opt |= ACTIVATE_SECONDARY_CONTROLS;
+    opt |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
 #ifdef __x86_64__
     if ( !(_vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW) )
     {
         min |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
         _vmx_cpu_based_exec_control = adjust_vmx_controls(
-            min, opt, MSR_IA32_VMX_PROCBASED_CTLS_MSR);
+            min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
     }
-#elif defined(__i386__)
-    if ( !vmx_has_secondary_exec_ctls )
-        _vmx_cpu_based_exec_control &= ~CPU_BASED_TPR_SHADOW;
 #endif
 
-    if ( vmx_has_secondary_exec_ctls )
+    if ( _vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
     {
         min = 0;
         opt = SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
@@ -109,27 +103,33 @@ void vmx_init_vmcs_config(void)
             min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
     }
 
+#if defined(__i386__)
+    /* If we can't virtualise APIC accesses, the TPR shadow is pointless. */
+    if ( !(_vmx_secondary_exec_control &
+           SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES) )
+        _vmx_cpu_based_exec_control &= ~CPU_BASED_TPR_SHADOW;
+#endif
+
     min = VM_EXIT_ACK_INTR_ON_EXIT;
     opt = 0;
 #ifdef __x86_64__
     min |= VM_EXIT_IA32E_MODE;
 #endif
     _vmx_vmexit_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_EXIT_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_EXIT_CTLS);
 
     min = opt = 0;
     _vmx_vmentry_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_ENTRY_CTLS_MSR);
+        min, opt, MSR_IA32_VMX_ENTRY_CTLS);
 
-    rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
+    rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
 
     if ( smp_processor_id() == 0 )
     {
         vmcs_revision_id = vmx_msr_low;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
-        if ( vmx_has_secondary_exec_ctls )
-            vmx_secondary_exec_control = _vmx_secondary_exec_control;
+        vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
     }
@@ -138,8 +138,7 @@ void vmx_init_vmcs_config(void)
         BUG_ON(vmcs_revision_id != vmx_msr_low);
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
-        if ( vmx_has_secondary_exec_ctls )
-            BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
+        BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
         BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
         BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
     }
@@ -310,7 +309,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
     v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
-    if ( vmx_cpu_based_exec_control & ACTIVATE_SECONDARY_CONTROLS )
+    if ( vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL, vmx_secondary_exec_control);
 
     if ( cpu_has_vmx_msr_bitmap )
@@ -437,24 +436,14 @@ static void construct_vmcs(struct vcpu *v)
         cr4 & ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
     __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
-#ifdef __x86_64__ 
-    /* CR8 based VLAPIC TPR optimization. */
     if ( cpu_has_vmx_tpr_shadow )
     {
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
-                  page_to_maddr(vcpu_vlapic(v)->regs_page));
-        __vmwrite(TPR_THRESHOLD, 0);
-    }
+        uint64_t virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
+#if defined (__i386__)
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
 #endif
-
-    /* Memory-mapped based VLAPIC TPR optimization. */
-    if ( cpu_has_vmx_mmap_vtpr_optimization )
-    {
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
-                    page_to_maddr(vcpu_vlapic(v)->regs_page));
         __vmwrite(TPR_THRESHOLD, 0);
-
-        vcpu_vlapic(v)->mmap_vtpr_enabled = 1;
     }
 
     __vmwrite(GUEST_LDTR_SELECTOR, 0);
@@ -525,18 +514,6 @@ void vmx_do_resume(struct vcpu *v)
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);
         vmx_set_host_env(v);
-    }
-
-    if ( !v->arch.hvm_vmx.launched && vcpu_vlapic(v)->mmap_vtpr_enabled )
-    {
-        struct page_info *pg = change_guest_physmap_for_vtpr(v->domain, 1);
-
-        if ( pg == NULL )
-        {
-            gdprintk(XENLOG_ERR, "change_guest_physmap_for_vtpr failed!\n");
-            domain_crash_synchronous();
-        }
-        __vmwrite(APIC_ACCESS_ADDR, page_to_maddr(pg));
     }
 
     debug_state = v->domain->debugger_attached;

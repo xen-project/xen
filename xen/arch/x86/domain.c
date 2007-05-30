@@ -393,7 +393,7 @@ int arch_domain_create(struct domain *d)
     int i;
 #endif
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order;
+    int vcpuid, pdpt_order, paging_initialised = 0;
     int rc = -ENOMEM;
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
@@ -442,6 +442,7 @@ int arch_domain_create(struct domain *d)
 #endif
 
     paging_domain_init(d);
+    paging_initialised = 1;
 
     if ( !is_idle_domain(d) )
     {
@@ -469,12 +470,13 @@ int arch_domain_create(struct domain *d)
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
             (CONFIG_PAGING_LEVELS != 4);
     }
-        
 
     return 0;
 
  fail:
     free_xenheap_page(d->shared_info);
+    if ( paging_initialised )
+        paging_final_teardown(d);
 #ifdef __x86_64__
     if ( d->arch.mm_perdomain_l2 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));

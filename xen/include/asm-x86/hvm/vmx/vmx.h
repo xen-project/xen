@@ -33,9 +33,6 @@ void vmx_intr_assist(void);
 void vmx_do_resume(struct vcpu *);
 void set_guest_time(struct vcpu *v, u64 gtime);
 
-extern struct page_info *change_guest_physmap_for_vtpr(struct domain *d,
-                                                       int enable_vtpr);
-
 /*
  * Exit Reasons
  */

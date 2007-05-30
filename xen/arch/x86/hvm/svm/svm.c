@@ -876,6 +876,15 @@ static void svm_do_resume(struct vcpu *v)
     reset_stack_and_jump(svm_asm_do_resume);
 }
 
+static int svm_domain_initialise(struct domain *d)
+{
+    return 0;
+}
+
+static void svm_domain_destroy(struct domain *d)
+{
+}
+
 static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -920,6 +929,8 @@ static int svm_event_injection_faulted(struct vcpu *v)
 static struct hvm_function_table svm_function_table = {
     .name                 = "SVM",
     .disable              = stop_svm,
+    .domain_initialise    = svm_domain_initialise,
+    .domain_destroy       = svm_domain_destroy,
     .vcpu_initialise      = svm_vcpu_initialise,
     .vcpu_destroy         = svm_vcpu_destroy,
     .store_cpu_guest_regs = svm_store_cpu_guest_regs,

@@ -90,23 +90,23 @@ void vmx_destroy_vmcs(struct vcpu *v);
 void vmx_vmcs_enter(struct vcpu *v);
 void vmx_vmcs_exit(struct vcpu *v);
 
-#define CPU_BASED_VIRTUAL_INTR_PENDING  0x00000004
-#define CPU_BASED_USE_TSC_OFFSETING     0x00000008
-#define CPU_BASED_HLT_EXITING           0x00000080
-#define CPU_BASED_INVDPG_EXITING        0x00000200
-#define CPU_BASED_MWAIT_EXITING         0x00000400
-#define CPU_BASED_RDPMC_EXITING         0x00000800
-#define CPU_BASED_RDTSC_EXITING         0x00001000
-#define CPU_BASED_CR8_LOAD_EXITING      0x00080000
-#define CPU_BASED_CR8_STORE_EXITING     0x00100000
-#define CPU_BASED_TPR_SHADOW            0x00200000
-#define CPU_BASED_MOV_DR_EXITING        0x00800000
-#define CPU_BASED_UNCOND_IO_EXITING     0x01000000
-#define CPU_BASED_ACTIVATE_IO_BITMAP    0x02000000
-#define CPU_BASED_ACTIVATE_MSR_BITMAP   0x10000000
-#define CPU_BASED_MONITOR_EXITING       0x20000000
-#define CPU_BASED_PAUSE_EXITING         0x40000000
-#define ACTIVATE_SECONDARY_CONTROLS     0x80000000
+#define CPU_BASED_VIRTUAL_INTR_PENDING        0x00000004
+#define CPU_BASED_USE_TSC_OFFSETING           0x00000008
+#define CPU_BASED_HLT_EXITING                 0x00000080
+#define CPU_BASED_INVDPG_EXITING              0x00000200
+#define CPU_BASED_MWAIT_EXITING               0x00000400
+#define CPU_BASED_RDPMC_EXITING               0x00000800
+#define CPU_BASED_RDTSC_EXITING               0x00001000
+#define CPU_BASED_CR8_LOAD_EXITING            0x00080000
+#define CPU_BASED_CR8_STORE_EXITING           0x00100000
+#define CPU_BASED_TPR_SHADOW                  0x00200000
+#define CPU_BASED_MOV_DR_EXITING              0x00800000
+#define CPU_BASED_UNCOND_IO_EXITING           0x01000000
+#define CPU_BASED_ACTIVATE_IO_BITMAP          0x02000000
+#define CPU_BASED_ACTIVATE_MSR_BITMAP         0x10000000
+#define CPU_BASED_MONITOR_EXITING             0x20000000
+#define CPU_BASED_PAUSE_EXITING               0x40000000
+#define CPU_BASED_ACTIVATE_SECONDARY_CONTROLS 0x80000000
 extern u32 vmx_cpu_based_exec_control;
 
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
@@ -129,9 +129,6 @@ extern u32 vmx_secondary_exec_control;
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \
     (vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
-#define cpu_has_vmx_mmap_vtpr_optimization \
-    (cpu_has_vmx_virtualize_apic_accesses && cpu_has_vmx_tpr_shadow)
-
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
 extern char *vmx_msr_bitmap;

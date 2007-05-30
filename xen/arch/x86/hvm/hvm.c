@@ -226,7 +226,6 @@ int hvm_domain_initialise(struct domain *d)
 
     spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
-    spin_lock_init(&d->arch.hvm_domain.vapic_access_lock);
 
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
     if ( rc != 0 )
@@ -238,7 +237,7 @@ int hvm_domain_initialise(struct domain *d)
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    return 0;
+    return hvm_funcs.domain_initialise(d);
 }
 
 void hvm_domain_relinquish_resources(struct domain *d)
@@ -249,10 +248,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
-    pit_deinit(d);
-    rtc_deinit(d);
-    pmtimer_deinit(d);
-    hpet_deinit(d);
+    hvm_funcs.domain_destroy(d);
 }
 
 static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -409,27 +405,39 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
-    if ( v->vcpu_id != 0 )
-        return 0;
-
-    pit_init(v, cpu_khz);
-    rtc_init(v, RTC_PORT(0));
-    pmtimer_init(v);
-    hpet_init(v);
+    if ( v->vcpu_id == 0 )
+    {
+        /* NB. All these really belong in hvm_domain_initialise(). */
+        pit_init(v, cpu_khz);
+        rtc_init(v, RTC_PORT(0));
+        pmtimer_init(v);
+        hpet_init(v);
  
-    /* Init guest TSC to start from zero. */
-    hvm_set_guest_time(v, 0);
+        /* Init guest TSC to start from zero. */
+        hvm_set_guest_time(v, 0);
+    }
 
     return 0;
 }
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+    struct domain *d = v->domain;
+
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
+
+    if ( v->vcpu_id == 0 )
+    {
+        /* NB. All these really belong in hvm_domain_destroy(). */
+        pit_deinit(d);
+        rtc_deinit(d);
+        pmtimer_deinit(d);
+        hpet_deinit(d);
+    }
 }
 
 
