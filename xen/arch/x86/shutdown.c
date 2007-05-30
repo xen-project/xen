@@ -197,7 +197,7 @@ static void machine_real_restart(const unsigned char *code, unsigned length)
 
 #endif
 
-void machine_restart(char * __unused)
+void machine_restart(char *cmd)
 {
     int i;
 

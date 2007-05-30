@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <ctype.h>
 
 #define KSYM_NAME_LEN		127
@@ -103,7 +104,7 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		_sextratext = s->addr;
 	else if (strcmp(sym, "_eextratext") == 0)
 		_eextratext = s->addr;
-	else if (toupper(stype) == 'A')
+	else if (toupper((uint8_t)stype) == 'A')
 	{
 		/* Keep these useful absolute symbols */
 		if (strcmp(sym, "__kernel_syscall_via_break") &&
@@ -113,7 +114,7 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 			return -1;
 
 	}
-	else if (toupper(stype) == 'U' ||
+	else if (toupper((uint8_t)stype) == 'U' ||
 		 is_arm_mapping_symbol(sym))
 		return -1;
 	/* exclude also MIPS ELF local symbols ($L123 instead of .L123) */
