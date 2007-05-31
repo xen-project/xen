@@ -52,6 +52,14 @@ typedef union {
 #define	IA64_PTA_LFMT		(1UL << IA64_PTA_VF_BIT)
 #define	IA64_PTA_SZ(x)		(x##UL << IA64_PTA_SZ_BIT)
 
+#define IA64_PSR_NON_VIRT_BITS				\
+	(IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC |	\
+	 IA64_PSR_MFL| IA64_PSR_MFH| IA64_PSR_PK |	\
+	 IA64_PSR_DFL| IA64_PSR_SP | IA64_PSR_DB |	\
+	 IA64_PSR_LP | IA64_PSR_TB | IA64_PSR_ID |	\
+	 IA64_PSR_DA | IA64_PSR_DD | IA64_PSR_SS |	\
+	 IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
+
 unsigned long vcpu_verbose = 0;
 
 /**************************************************************************
@@ -455,12 +463,7 @@ IA64FAULT vcpu_set_psr(VCPU * vcpu, u64 val)
 	u64 enabling_interrupts = 0;
 
 	/* Copy non-virtualized bits.  */
-	newpsr.val = val & (IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC |
-			    IA64_PSR_MFL| IA64_PSR_MFH| IA64_PSR_PK |
-			    IA64_PSR_DFL| IA64_PSR_SP | IA64_PSR_DB |
-			    IA64_PSR_LP | IA64_PSR_TB | IA64_PSR_ID |
-			    IA64_PSR_DA | IA64_PSR_DD | IA64_PSR_SS |
-			    IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA);
+	newpsr.val = val & IA64_PSR_NON_VIRT_BITS;
 
 	/* Bits forced to 1 (psr.si, psr.is and psr.mc are forced to 0)  */
 	newpsr.val |= IA64_PSR_DI;
@@ -518,12 +521,7 @@ u64 vcpu_get_psr(VCPU * vcpu)
 	ipsr.i64 = regs->cr_ipsr;
 
 	/* Copy non-virtualized bits.  */
-	newpsr.i64 = ipsr.i64 & (IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC |
-				 IA64_PSR_MFL| IA64_PSR_MFH| IA64_PSR_PK |
-				 IA64_PSR_DFL| IA64_PSR_SP | IA64_PSR_DB |
-				 IA64_PSR_LP | IA64_PSR_TB | IA64_PSR_ID |
-				 IA64_PSR_DA | IA64_PSR_DD | IA64_PSR_SS |
-				 IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA);
+	newpsr.i64 = ipsr.i64 & IA64_PSR_NON_VIRT_BITS;
 
 	/* Bits forced to 1 (psr.si and psr.is are forced to 0)  */
 	newpsr.i64 |= IA64_PSR_DI;
