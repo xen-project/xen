@@ -32,6 +32,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <asm/hvm/vmx/vmx.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
@@ -710,6 +711,8 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 
     vlapic->hw.apic_base_msr = value;
 
+    vmx_vlapic_msr_changed(vlapic_vcpu(vlapic));
+
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                 "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
 }
@@ -877,6 +880,9 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     lapic_info(s);
+
+    vmx_vlapic_msr_changed(v);
+
     return 0;
 }
 

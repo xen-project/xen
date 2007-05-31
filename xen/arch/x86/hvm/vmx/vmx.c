@@ -2547,7 +2547,7 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static void vmx_check_vlapic_msr(struct vcpu *v)
+void vmx_vlapic_msr_changed(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t ctl;
@@ -2555,12 +2555,14 @@ static void vmx_check_vlapic_msr(struct vcpu *v)
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return;
 
+    vmx_vmcs_enter(v);
     ctl  = __vmread(SECONDARY_VM_EXEC_CONTROL);
     ctl &= ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
     if ( !vlapic_hw_disabled(vlapic) &&
          (vlapic_base_address(vlapic) == APIC_DEFAULT_PHYS_BASE) )
         ctl |= SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
     __vmwrite(SECONDARY_VM_EXEC_CONTROL, ctl);
+    vmx_vmcs_exit(v);
 }
 
 static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
@@ -2591,7 +2593,6 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
         break;
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
-        vmx_check_vlapic_msr(v);
         break;
     default:
         if ( !long_mode_do_msr_write(regs) )

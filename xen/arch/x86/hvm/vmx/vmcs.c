@@ -456,6 +456,8 @@ static void construct_vmcs(struct vcpu *v)
     vmx_vmcs_exit(v);
 
     paging_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
+
+    vmx_vlapic_msr_changed(v);
 }
 
 int vmx_create_vmcs(struct vcpu *v)
