@@ -126,48 +126,8 @@ ENTRY(itlb_miss)
 	;;
 	mov pr = r31, 0x1ffff
 	;;							
-#ifdef VHPT_GLOBAL
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
-#endif
-	/*
-	 * The ITLB handler accesses the L3 PTE via the virtually mapped linear
-	 * page table.  If a nested TLB miss occurs, we switch into physical
-	 * mode, walk the page table, and then re-execute the L3 PTE read
-	 * and go on normally after that.
-	 */
-	mov r16=cr.ifa				// get virtual address
-	mov r29=b0				// save b0
-	mov r31=pr				// save predicates
-.itlb_fault:
-	mov r17=cr.iha				// get virtual address of L3 PTE
-	movl r30=1f				// load nested fault 
-						//   continuation point
-	;;
-1:	ld8 r18=[r17]				// read L3 PTE
-	;;
-	mov b0=r29
-	tbit.z p6,p0=r18,_PAGE_P_BIT		// page present bit cleared?
-(p6)	br.cond.spnt page_fault
-	;;
-	itc.i r18
-	;;
-#ifdef CONFIG_SMP
-	/*
-	 * Tell the assemblers dependency-violation checker that the above
-	 * "itc" instructions cannot possibly affect the following loads:
-	 */
-	dv_serialize_data
-
-	ld8 r19=[r17]			// read L3 PTE again and see if same
-	mov r20=PAGE_SHIFT<<2		// setup page size for purge
-	;;
-	cmp.ne p7,p0=r18,r19
-	;;
-(p7)	ptc.l r16,r20
-#endif
-	mov pr=r31,-1
-	rfi
 END(itlb_miss)
 
 	.org ia64_ivt+0x0800
@@ -242,12 +202,8 @@ ENTRY(dtlb_miss)
 
 2:
 #endif	
-#ifdef VHPT_GLOBAL
-//	br.cond.sptk page_fault
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
-#endif
-	mov r29=b0				// save b0
 dtlb_fault:
 	mov r17=cr.iha				// get virtual address of L3 PTE
 	movl r30=1f				// load nested fault 

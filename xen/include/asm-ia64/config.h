@@ -1,8 +1,6 @@
 #ifndef	_IA64_CONFIG_H_
 #define _IA64_CONFIG_H_
 
-#define VHPT_GLOBAL
-
 #undef DEBUG_PFMON
 
 // manufactured from component pieces

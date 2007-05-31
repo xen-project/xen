@@ -2222,7 +2222,6 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 	ia64_itc(IorD, vaddr, pte, ps);	// FIXME: look for bigger mappings
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
-#ifdef VHPT_GLOBAL
 	if (vcpu->domain == dom0 && ((vaddr >> 61) == 7)) {
 		// FIXME: this is dangerous... vhpt_flush_address ensures these
 		// addresses never get flushed.  More work needed if this
@@ -2237,7 +2236,6 @@ vcpu_itc_no_srlz(VCPU * vcpu, u64 IorD, u64 vaddr, u64 pte,
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
 	else
 		vhpt_insert(vaddr, pte, PAGE_SHIFT << 2);
-#endif
 }
 
 IA64FAULT vcpu_itc_d(VCPU * vcpu, u64 pte, u64 itir, u64 ifa)

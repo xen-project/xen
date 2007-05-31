@@ -559,13 +559,8 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				   .hash_tag_id = 0x30,
 				   .max_dtr_entry = NDTRS - 1,
 				   .max_itr_entry = NITRS - 1,
-#ifdef VHPT_GLOBAL
 				   .max_unique_tcs = 3,
 				   .num_tc_levels = 2
-#else
-				   .max_unique_tcs = 2,
-				   .num_tc_levels = 1
-#endif
 				 }};
 			pal_vm_info_2_u_t v2;
 			v2.pvi2_val = 0;
@@ -583,7 +578,6 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			                          (pal_tc_info_u_t *)&r9, &r10);
 			break;
 		}
-#ifdef VHPT_GLOBAL
 		if (in1 == 0 && in2 == 2) {
 			/* Level 1: VHPT  */
 			const pal_tc_info_u_t v =
@@ -599,16 +593,8 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			r10 = PAGE_SIZE;
 			status = PAL_STATUS_SUCCESS;
 		}
-#endif
-	        else if (
-#ifdef VHPT_GLOBAL 
-	                in1 == 1 /* Level 2. */
-#else
-			in1 == 0 /* Level 1. */
-#endif
-			 && (in2 == 1 || in2 == 2))
-		{
-			/* itlb/dtlb, 1 entry.  */
+	        else if (in1 == 1 && (in2 == 1 || in2 == 2)) {
+			/* Level 2: itlb/dtlb, 1 entry.  */
 			const pal_tc_info_u_t v =
 				{ .pal_tc_info_s = {.num_sets = 1,
 						    .associativity = 1,
