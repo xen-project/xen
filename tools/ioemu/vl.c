@@ -3965,30 +3965,30 @@ static int net_client_init(const char *str)
         NICInfo *nd;
         uint8_t *macaddr;
 
-        if (nb_nics >= MAX_NICS) {
-            fprintf(stderr, "Too Many NICs\n");
-            return -1;
-        }
-        nd = &nd_table[nb_nics];
-        macaddr = nd->macaddr;
-        macaddr[0] = 0x52;
-        macaddr[1] = 0x54;
-        macaddr[2] = 0x00;
-        macaddr[3] = 0x12;
-        macaddr[4] = 0x34;
-        macaddr[5] = 0x56 + nb_nics;
+        if (nb_nics < MAX_NICS) {
+            nd = &nd_table[nb_nics];
+            macaddr = nd->macaddr;
+            macaddr[0] = 0x52;
+            macaddr[1] = 0x54;
+            macaddr[2] = 0x00;
+            macaddr[3] = 0x12;
+            macaddr[4] = 0x34;
+            macaddr[5] = 0x56 + nb_nics;
 
-        if (get_param_value(buf, sizeof(buf), "macaddr", p)) {
-            if (parse_macaddr(macaddr, buf) < 0) {
-                fprintf(stderr, "invalid syntax for ethernet address\n");
-                return -1;
+            if (get_param_value(buf, sizeof(buf), "macaddr", p)) {
+                if (parse_macaddr(macaddr, buf) < 0) {
+                    fprintf(stderr, "invalid syntax for ethernet address\n");
+                    return -1;
+                }
             }
-        }
-        if (get_param_value(buf, sizeof(buf), "model", p)) {
-            nd->model = strdup(buf);
-        }
-        nd->vlan = vlan;
-        nb_nics++;
+            if (get_param_value(buf, sizeof(buf), "model", p)) {
+                nd->model = strdup(buf);
+            }
+            nd->vlan = vlan;
+            nb_nics++;
+        } else {
+            fprintf(stderr, "Too Many NICs\n");
+	}
         ret = 0;
     } else
     if (!strcmp(device, "none")) {
