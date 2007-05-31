@@ -433,12 +433,12 @@ void __init start_kernel(void)
 
     alloc_dom0();
 
-    end_boot_allocator();
-
     init_xenheap_pages(__pa(xen_heap_start), xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",
 	(xenheap_phys_end-__pa(xen_heap_start)) >> 20,
 	(xenheap_phys_end-__pa(xen_heap_start)) >> 10);
+
+    end_boot_allocator();
 
     late_setup_arch(&cmdline);
 
