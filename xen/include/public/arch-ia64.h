@@ -464,8 +464,18 @@ struct vcpu_guest_context_regs {
 
         struct vcpu_tr_regs tr;
 
+#if 0
+	/*
+	 * The vcpu_guest_context structure is allocated on the stack in
+	 * a few places.  With this array for RBS storage, that structure
+	 * is a bit over 21k.  It looks like maybe we're blowing the stack
+	 * and causing rather random looking failures on a couple systems.
+	 * Remove since we're not actually using it for now.
+	 */
+
         /* Note: loadrs is 2**14 bytes == 2**11 slots.  */
         unsigned long rbs[2048];
+#endif
 };
 
 struct vcpu_guest_context {
