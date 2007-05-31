@@ -2540,7 +2540,7 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
     vmx_vmcs_enter(v);
     __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
     __vmwrite(APIC_ACCESS_ADDR, apic_page_ma);
-#if defined (__i386__)
+#if defined (CONFIG_X86_PAE)
     __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
     __vmwrite(APIC_ACCESS_ADDR_HIGH, apic_page_ma >> 32);
 #endif

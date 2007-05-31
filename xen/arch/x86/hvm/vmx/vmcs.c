@@ -438,9 +438,9 @@ static void construct_vmcs(struct vcpu *v)
 
     if ( cpu_has_vmx_tpr_shadow )
     {
-        uint64_t virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
+        paddr_t virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
         __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
-#if defined (__i386__)
+#if defined (CONFIG_X86_PAE)
         __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
 #endif
         __vmwrite(TPR_THRESHOLD, 0);
