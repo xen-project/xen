@@ -3,8 +3,6 @@ XEN_LINUX_TARBALL ?= linux-$(LINUX_VER)-xen.tar.bz2
 
 LINUX_SRCDIR ?= linux-$(LINUX_VER)
 
-# Setup Linux search path
-LINUX_SRC_PATH	?= .:..
 vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 
 # download a pristine Linux kernel tarball if there isn't one in LINUX_SRC_PATH

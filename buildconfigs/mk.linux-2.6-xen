@@ -3,6 +3,10 @@ LINUX_VER    ?= 2.6.18
 
 EXTRAVERSION ?= -xen
 
+# Linux search path, will be searched for tarballs and mercurial
+# repositories.
+LINUX_SRC_PATH ?= .:..
+
 XEN_LINUX_SOURCE ?= sparse
 
 # Let XEN_TARGET_ARCH override ARCH.

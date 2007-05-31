@@ -7,8 +7,6 @@ LINUX_SRCDIR ?= linux-$(LINUX_VER)-xen
 PRISTINE_SRC_PATH	?= .:..
 vpath pristine-% $(PRISTINE_SRC_PATH)
 
-# Setup Linux search path
-LINUX_SRC_PATH	?= .:..
 vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 vpath patch-%.bz2 $(LINUX_SRC_PATH)
 
