@@ -448,6 +448,67 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 	return IA64_NO_FAULT;
 }
 
+IA64FAULT vcpu_set_psr(VCPU * vcpu, u64 val)
+{
+	IA64_PSR newpsr, vpsr;
+	REGS *regs = vcpu_regs(vcpu);
+	u64 enabling_interrupts = 0;
+
+	/* Copy non-virtualized bits.  */
+	newpsr.val = val & (IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC |
+			    IA64_PSR_MFL| IA64_PSR_MFH| IA64_PSR_PK |
+			    IA64_PSR_DFL| IA64_PSR_SP | IA64_PSR_DB |
+			    IA64_PSR_LP | IA64_PSR_TB | IA64_PSR_ID |
+			    IA64_PSR_DA | IA64_PSR_DD | IA64_PSR_SS |
+			    IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA);
+
+	/* Bits forced to 1 (psr.si, psr.is and psr.mc are forced to 0)  */
+	newpsr.val |= IA64_PSR_DI;
+
+	newpsr.val |= IA64_PSR_I  | IA64_PSR_IC | IA64_PSR_DT | IA64_PSR_RT |
+		      IA64_PSR_IT | IA64_PSR_BN | IA64_PSR_DI | IA64_PSR_PP;
+
+	vpsr.val = val;
+
+	if (val & IA64_PSR_DFH) {
+		newpsr.dfh = 1;
+		PSCB(vcpu, vpsr_dfh) = 1;
+	} else {
+		newpsr.dfh = PSCB(vcpu, hpsr_dfh);
+		PSCB(vcpu, vpsr_dfh) = 0;
+	}
+
+	PSCB(vcpu, vpsr_pp) = vpsr.pp;
+
+	if (vpsr.i) {
+		if (vcpu->vcpu_info->evtchn_upcall_mask)
+			enabling_interrupts = 1;
+
+		vcpu->vcpu_info->evtchn_upcall_mask = 0;
+
+		if (enabling_interrupts &&
+		    vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+			PSCB(vcpu, pending_interruption) = 1;
+	} else
+		vcpu->vcpu_info->evtchn_upcall_mask = 1;
+
+	PSCB(vcpu, interrupt_collection_enabled) = vpsr.ic;
+	vcpu_set_metaphysical_mode(vcpu, !(vpsr.dt && vpsr.rt && vpsr.it));
+
+	newpsr.cpl |= vpsr.cpl | 2;
+
+	if (PSCB(vcpu, banknum)	!= vpsr.bn) {
+		if (vpsr.bn)
+			vcpu_bsw1(vcpu);
+		else
+			vcpu_bsw0(vcpu);
+	}
+
+	regs->cr_ipsr = newpsr.val;
+
+	return IA64_NO_FAULT;
+}
+
 u64 vcpu_get_psr(VCPU * vcpu)
 {
  	REGS *regs = vcpu_regs(vcpu);
@@ -473,12 +534,14 @@ u64 vcpu_get_psr(VCPU * vcpu)
 
 	if (!PSCB(vcpu, metaphysical_mode))
 		newpsr.i64 |= IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_IT;
+
 	newpsr.ia64_psr.dfh = PSCB(vcpu, vpsr_dfh);
 	newpsr.ia64_psr.pp = PSCB(vcpu, vpsr_pp);
 
 	/* Fool cpl.  */
 	if (ipsr.ia64_psr.cpl < 3)
 		newpsr.ia64_psr.cpl = 0;
+
 	newpsr.ia64_psr.bn = PSCB(vcpu, banknum);
 	
 	return newpsr.i64;
@@ -1347,44 +1410,17 @@ IA64FAULT vcpu_force_data_miss(VCPU * vcpu, u64 ifa)
 
 IA64FAULT vcpu_rfi(VCPU * vcpu)
 {
-	// TODO: Only allowed for current vcpu
-	PSR psr;
-	u64 int_enable, ifs;
+	u64 ifs;
 	REGS *regs = vcpu_regs(vcpu);
-
-	psr.i64 = PSCB(vcpu, ipsr);
-	if (psr.ia64_psr.cpl < 3)
-		psr.ia64_psr.cpl = 2;
-	int_enable = psr.ia64_psr.i;
-	if (psr.ia64_psr.dfh) {
-		PSCB(vcpu, vpsr_dfh) = 1;
-	} else {
-		psr.ia64_psr.dfh = PSCB(vcpu, hpsr_dfh);
-		PSCB(vcpu, vpsr_dfh) = 0;
-	}
-	if (psr.ia64_psr.ic)
-		PSCB(vcpu, interrupt_collection_enabled) = 1;
-	if (psr.ia64_psr.dt && psr.ia64_psr.rt && psr.ia64_psr.it)
-		vcpu_set_metaphysical_mode(vcpu, FALSE);
-	else
-		vcpu_set_metaphysical_mode(vcpu, TRUE);
-	psr.ia64_psr.ic = 1;
-	psr.ia64_psr.i = 1;
-	psr.ia64_psr.dt = 1;
-	psr.ia64_psr.rt = 1;
-	psr.ia64_psr.it = 1;
-	psr.ia64_psr.bn = 1;
-	//psr.pk = 1;  // checking pkeys shouldn't be a problem but seems broken
+	
+	vcpu_set_psr(vcpu, PSCB(vcpu, ipsr));
 
 	ifs = PSCB(vcpu, ifs);
 	if (ifs & 0x8000000000000000UL) 
 		regs->cr_ifs = ifs;
 
-	regs->cr_ipsr = psr.i64;
 	regs->cr_iip = PSCB(vcpu, iip);
-	PSCB(vcpu, interrupt_collection_enabled) = 1;
-	vcpu_bsw1(vcpu);
-	vcpu->vcpu_info->evtchn_upcall_mask = !int_enable;
+
 	return IA64_NO_FAULT;
 }
 
