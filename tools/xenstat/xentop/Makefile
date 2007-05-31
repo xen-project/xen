@@ -1,5 +1,5 @@
 # Copyright (C) International Business Machines Corp., 2005
-# Author: Josh Triplett <josht@us.ibm.com>
+# Author: Josh Triplett <josh@kernel.org>
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

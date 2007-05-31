@@ -1,8 +1,8 @@
 /* libxenstat: statistics-collection library for Xen
  * Copyright (C) International Business Machines Corp., 2005
- * Authors: Josh Triplett <josht@us.ibm.com>
- *          Judy Fischbach <jfisch@us.ibm.com>
- *          David Hendricks <dhendrix@us.ibm.com>
+ * Authors: Josh Triplett <josh@kernel.org>
+ *          Judy Fischbach <jfisch@cs.pdx.edu>
+ *          David Hendricks <cro_marmot@comcast.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
