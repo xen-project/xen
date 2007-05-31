@@ -448,43 +448,47 @@ IA64FAULT vcpu_set_psr_l(VCPU * vcpu, u64 val)
 	return IA64_NO_FAULT;
 }
 
-IA64FAULT vcpu_get_psr(VCPU * vcpu, u64 * pval)
+u64 vcpu_get_psr(VCPU * vcpu)
 {
-	REGS *regs = vcpu_regs(vcpu);
-	struct ia64_psr newpsr;
+ 	REGS *regs = vcpu_regs(vcpu);
+	PSR newpsr;
+	PSR ipsr;
 
-	newpsr = *(struct ia64_psr *)&regs->cr_ipsr;
-	if (!vcpu->vcpu_info->evtchn_upcall_mask)
-		newpsr.i = 1;
-	else
-		newpsr.i = 0;
-	if (PSCB(vcpu, interrupt_collection_enabled))
-		newpsr.ic = 1;
-	else
-		newpsr.ic = 0;
-	if (PSCB(vcpu, metaphysical_mode))
-		newpsr.dt = 0;
-	else
-		newpsr.dt = 1;
-	if (PSCB(vcpu, vpsr_pp))
-		newpsr.pp = 1;
-	else
-		newpsr.pp = 0;
-	newpsr.dfh = PSCB(vcpu, vpsr_dfh);
+	ipsr.i64 = regs->cr_ipsr;
 
-	*pval = *(unsigned long *)&newpsr;
-	*pval &= (MASK(0, 32) | MASK(35, 2));
+	/* Copy non-virtualized bits.  */
+	newpsr.i64 = ipsr.i64 & (IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC |
+				 IA64_PSR_MFL| IA64_PSR_MFH| IA64_PSR_PK |
+				 IA64_PSR_DFL| IA64_PSR_SP | IA64_PSR_DB |
+				 IA64_PSR_LP | IA64_PSR_TB | IA64_PSR_ID |
+				 IA64_PSR_DA | IA64_PSR_DD | IA64_PSR_SS |
+				 IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA);
+
+	/* Bits forced to 1 (psr.si and psr.is are forced to 0)  */
+	newpsr.i64 |= IA64_PSR_DI;
+
+	/* System mask.  */
+	newpsr.ia64_psr.ic = PSCB(vcpu, interrupt_collection_enabled);
+	newpsr.ia64_psr.i = !vcpu->vcpu_info->evtchn_upcall_mask;
+
+	if (!PSCB(vcpu, metaphysical_mode))
+		newpsr.i64 |= IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_IT;
+	newpsr.ia64_psr.dfh = PSCB(vcpu, vpsr_dfh);
+	newpsr.ia64_psr.pp = PSCB(vcpu, vpsr_pp);
+
+	/* Fool cpl.  */
+	if (ipsr.ia64_psr.cpl < 3)
+		newpsr.ia64_psr.cpl = 0;
+	newpsr.ia64_psr.bn = PSCB(vcpu, banknum);
+	
+	return newpsr.i64;
+}
+
+IA64FAULT vcpu_get_psr_masked(VCPU * vcpu, u64 * pval)
+{
+  	u64 psr = vcpu_get_psr(vcpu);
+	*pval = psr & (MASK(0, 32) | MASK(35, 2));
 	return IA64_NO_FAULT;
-}
-
-BOOLEAN vcpu_get_psr_ic(VCPU * vcpu)
-{
-	return !!PSCB(vcpu, interrupt_collection_enabled);
-}
-
-BOOLEAN vcpu_get_psr_i(VCPU * vcpu)
-{
-	return !vcpu->vcpu_info->evtchn_upcall_mask;
 }
 
 u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
@@ -509,6 +513,16 @@ u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
 	// psr.pk = 1;
 	//printk("returns 0x%016lx...\n",psr.i64);
 	return psr.i64;
+}
+
+BOOLEAN vcpu_get_psr_ic(VCPU * vcpu)
+{
+	return !!PSCB(vcpu, interrupt_collection_enabled);
+}
+
+BOOLEAN vcpu_get_psr_i(VCPU * vcpu)
+{
+	return !vcpu->vcpu_info->evtchn_upcall_mask;
 }
 
 /**************************************************************************

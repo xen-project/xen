@@ -524,7 +524,7 @@ static IA64FAULT priv_mov_from_psr(VCPU * vcpu, INST64 inst)
 	u64 val;
 	IA64FAULT fault;
 
-	fault = vcpu_get_psr(vcpu, &val);
+	fault = vcpu_get_psr_masked(vcpu, &val);
 	if (fault == IA64_NO_FAULT)
 		return vcpu_set_gr(vcpu, tgt, val, 0);
 	else
@@ -883,7 +883,7 @@ int ia64_hyperprivop(unsigned long iim, REGS * regs)
 		vcpu_reset_psr_sm(v, IA64_PSR_BE);
 		return 1;
 	case HYPERPRIVOP_GET_PSR:
-		vcpu_get_psr(v, &val);
+		vcpu_get_psr_masked(v, &val);
 		regs->r8 = val;
 		return 1;
 	}
