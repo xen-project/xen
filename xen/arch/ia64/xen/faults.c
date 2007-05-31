@@ -666,7 +666,10 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		vector = IA64_FP_TRAP_VECTOR;
 		break;
 	case 34:
-		printk("ia64_handle_reflection: handling lowerpriv trap\n");
+		if (isr & (1UL << 4))
+			printk("ia64_handle_reflection: handling "
+			       "unimplemented instruction address %s\n",
+			       (isr & (1UL<<32)) ? "fault" : "trap");
 		vector = IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR;
 		break;
 	case 35:
