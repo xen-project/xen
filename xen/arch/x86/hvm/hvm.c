@@ -662,20 +662,28 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     }
 }
 
+static long hvm_grant_table_op(
+    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
+{
+    if ( cmd != GNTTABOP_query_size )
+        return -ENOSYS; /* all other commands need auditing */
+    return do_grant_table_op(cmd, uop, count);
+}
+
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 
 #define HYPERCALL(x)                                        \
     [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
-#define HYPERCALL_COMPAT32(x)                               \
-    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x ## _compat32
 
 #if defined(__i386__)
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
@@ -726,15 +734,19 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 
 static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
 };
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
-    HYPERCALL_COMPAT32(memory_op),
+    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)do_memory_op_compat32,
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
@@ -767,9 +779,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
     if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
     {
-        if ( eax != __HYPERVISOR_grant_table_op )
-            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %u.\n",
-                     current->domain->domain_id, current->vcpu_id, eax);
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
     }
@@ -779,7 +788,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
      * For now we also need to flush when pages are added, as qemu-dm is not
      * yet capable of faulting pages into an existing valid mapcache bucket.
      */
-    flush = (eax == __HYPERVISOR_memory_op);
+    flush = ((eax == __HYPERVISOR_memory_op) ||
+             (eax == __HYPERVISOR_grant_table_op)); /* needed ? */
     this_cpu(hc_preempted) = 0;
 
 #ifdef __x86_64__
@@ -809,7 +819,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
                                                (uint32_t)regs->edi);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx", eax, (unsigned long)regs->eax);
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
+                eax, (unsigned long)regs->eax);
 
     return (this_cpu(hc_preempted) ? HVM_HCALL_preempted :
             flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);
