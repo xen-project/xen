@@ -1208,7 +1208,7 @@ xen_ia64_allocate_resource(unsigned long size)
 	struct resource* res;
 	int error;
 	
-	res = kmalloc(sizeof(*res), GFP_KERNEL);
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
 	if (res == NULL)
 		return ERR_PTR(-ENOMEM);
 
