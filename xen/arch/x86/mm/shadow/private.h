@@ -634,9 +634,10 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 struct sh_emulate_ctxt {
     struct x86_emulate_ctxt ctxt;
 
-    /* [HVM] Cache of up to 15 bytes of instruction. */
-    uint8_t insn_buf[15];
+    /* [HVM] Cache of up to 31 bytes of instruction. */
+    uint8_t insn_buf[31];
     uint8_t insn_buf_bytes;
+    unsigned long insn_buf_eip;
 
     /* [HVM] Cache of segment registers already gathered for this emulation. */
     unsigned int valid_seg_regs;
@@ -644,6 +645,8 @@ struct sh_emulate_ctxt {
 };
 
 struct x86_emulate_ops *shadow_init_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
+void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
 
 #endif /* _XEN_SHADOW_PRIVATE_H */

@@ -248,7 +248,7 @@ hvm_emulate_insn_fetch(enum x86_segment seg,
 {
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    unsigned int insn_off = offset - ctxt->regs->eip;
+    unsigned int insn_off = offset - sh_ctxt->insn_buf_eip;
 
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
@@ -450,6 +450,7 @@ struct x86_emulate_ops *shadow_init_emulation(
     }
 
     /* Attempt to prefetch whole instruction. */
+    sh_ctxt->insn_buf_eip = regs->eip;
     sh_ctxt->insn_buf_bytes =
         (!hvm_translate_linear_addr(
             x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
@@ -459,6 +460,35 @@ struct x86_emulate_ops *shadow_init_emulation(
         ? sizeof(sh_ctxt->insn_buf) : 0;
 
     return &hvm_shadow_emulator_ops;
+}
+
+/* Update an initialized emulation context to prepare for the next 
+ * instruction */
+void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt, 
+                               struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    unsigned long addr, diff;
+
+    /* We don't refetch the segment bases, because we don't emulate
+     * writes to segment registers */
+
+    if ( is_hvm_vcpu(v) )
+    {
+        diff = regs->eip - sh_ctxt->insn_buf_eip;
+        if ( diff > sh_ctxt->insn_buf_bytes )
+        {
+            /* Prefetch more bytes. */
+            sh_ctxt->insn_buf_bytes =
+                (!hvm_translate_linear_addr(
+                    x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+                    hvm_access_insn_fetch, sh_ctxt, &addr) &&
+                 !hvm_copy_from_guest_virt(
+                     sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
+                ? sizeof(sh_ctxt->insn_buf) : 0;
+            sh_ctxt->insn_buf_eip = regs->eip;
+        }
+    }
 }
 
 /**************************************************************************/

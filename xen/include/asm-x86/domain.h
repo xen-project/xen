@@ -171,6 +171,8 @@ struct paging_vcpu {
     struct paging_mode *mode;
     /* HVM guest: paging enabled (CR0.PG)?  */
     unsigned int translate_enabled:1;
+    /* HVM guest: last emulate was to a pagetable */
+    unsigned int last_write_was_pt:1;
 
     /* paging support extension */
     struct shadow_vcpu shadow;
