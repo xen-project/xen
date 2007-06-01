@@ -173,6 +173,9 @@ struct paging_vcpu {
     unsigned int translate_enabled:1;
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
+    /* Translated guest: virtual TLB */    
+    struct shadow_vtlb *vtlb;
+    spinlock_t          vtlb_lock; 
 
     /* paging support extension */
     struct shadow_vcpu shadow;

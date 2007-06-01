@@ -61,8 +61,9 @@ extern int shadow_audit_enable;
 #define SHOPT_PREFETCH            0x08  /* Shadow multiple entries per fault */
 #define SHOPT_LINUX_L3_TOPLEVEL   0x10  /* Pin l3es on early 64bit linux */
 #define SHOPT_SKIP_VERIFY         0x20  /* Skip PTE v'fy when safe to do so */
+#define SHOPT_VIRTUAL_TLB         0x40  /* Cache guest v->p translations */
 
-#define SHADOW_OPTIMIZATIONS      0x3f
+#define SHADOW_OPTIMIZATIONS      0x7f
 
 
 /******************************************************************************
@@ -648,6 +649,72 @@ struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
 void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
+
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+/**************************************************************************/
+/* Virtual TLB entries 
+ *
+ * We keep a cache of virtual-to-physical translations that we have seen 
+ * since the last TLB flush.  This is safe to use for frame translations, 
+ * but callers that use the rights need to re-check the actual guest tables
+ * before triggering a fault.
+ * 
+ * Lookups and updates are protected by a per-vTLB (and hence per-vcpu)
+ * lock.  This lock is held *only* while reading or writing the table,
+ * so it is safe to take in any non-interrupt context.  Most lookups
+ * happen with v==current, so we expect contention to be low.
+ */
+
+#define VTLB_ENTRIES 13
+
+struct shadow_vtlb {
+    unsigned long page_number;    /* Guest virtual address >> PAGE_SHIFT  */
+    unsigned long frame_number;   /* Guest physical address >> PAGE_SHIFT */
+    u32 flags;    /* Accumulated guest pte flags, or 0 for an empty slot. */
+};
+
+/* Call whenever the guest flushes hit actual TLB */
+static inline void vtlb_flush(struct vcpu *v) 
+{
+    spin_lock(&v->arch.paging.vtlb_lock);
+    memset(v->arch.paging.vtlb, 0, VTLB_ENTRIES * sizeof (struct shadow_vtlb));
+    spin_unlock(&v->arch.paging.vtlb_lock);
+}
+
+static inline int vtlb_hash(unsigned long page_number)
+{
+    return page_number % VTLB_ENTRIES;
+}
+
+/* Put a translation into the vTLB, potentially clobbering an old one */
+static inline void vtlb_insert(struct vcpu *v, struct shadow_vtlb entry)
+{
+    spin_lock(&v->arch.paging.vtlb_lock);
+    v->arch.paging.vtlb[vtlb_hash(entry.page_number)] = entry;
+    spin_unlock(&v->arch.paging.vtlb_lock);
+}
+
+/* Look a translation up in the vTLB.  Returns 0 if not found. */
+static inline int vtlb_lookup(struct vcpu *v, unsigned long va,
+                              struct shadow_vtlb *result) 
+{
+    unsigned long page_number = va >> PAGE_SHIFT;
+    int rv = 0;
+    int i = vtlb_hash(page_number);
+
+    spin_lock(&v->arch.paging.vtlb_lock);
+    if ( v->arch.paging.vtlb[i].flags != 0 
+         && v->arch.paging.vtlb[i].page_number == page_number )
+    {
+        rv = 1; 
+        result[0] = v->arch.paging.vtlb[i];
+    }
+    spin_unlock(&v->arch.paging.vtlb_lock);
+    return rv;
+}
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
 
 #endif /* _XEN_SHADOW_PRIVATE_H */
 

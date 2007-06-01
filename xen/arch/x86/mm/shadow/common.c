@@ -2206,6 +2206,24 @@ static void sh_update_paging_modes(struct vcpu *v)
 
     ASSERT(shadow_locked_by_me(d));
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) 
+    /* Make sure this vcpu has a virtual TLB array allocated */
+    if ( unlikely(!v->arch.paging.vtlb) )
+    {
+        v->arch.paging.vtlb = xmalloc_array(struct shadow_vtlb, VTLB_ENTRIES);
+        if ( unlikely(!v->arch.paging.vtlb) )
+        {
+            SHADOW_ERROR("Could not allocate vTLB space for dom %u vcpu %u\n",
+                         d->domain_id, v->vcpu_id);
+            domain_crash(v->domain);
+            return;
+        }
+        memset(v->arch.paging.vtlb, 0, 
+               VTLB_ENTRIES * sizeof (struct shadow_vtlb));
+        spin_lock_init(&v->arch.paging.vtlb_lock);
+    }
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
     // Valid transitions handled by this function:
     // - For PV guests:
     //     - after a shadow mode has been changed
@@ -2513,6 +2531,18 @@ void shadow_teardown(struct domain *d)
             }
         }
     }
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) 
+    /* Free the virtual-TLB array attached to each vcpu */
+    for_each_vcpu(d, v)
+    {
+        if ( v->arch.paging.vtlb )
+        {
+            xfree(v->arch.paging.vtlb);
+            v->arch.paging.vtlb = NULL;
+        }
+    }
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     list_for_each_safe(entry, n, &d->arch.paging.shadow.p2m_freelist)
     {

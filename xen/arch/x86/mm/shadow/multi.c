@@ -2997,6 +2997,11 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     
     perfc_incr(shadow_invlpg);
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* No longer safe to use cached gva->gfn translations */
+    vtlb_flush(v);
+#endif
+
     /* First check that we can safely read the shadow l2e.  SMP/PAE linux can
      * run as high as 6% of invlpg calls where we haven't shadowed the l2 
      * yet. */
@@ -3057,6 +3062,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     return 1;
 }
 
+
 static unsigned long
 sh_gva_to_gfn(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
@@ -3064,11 +3070,24 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va)
 {
     walk_t gw;
     gfn_t gfn;
+    
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    struct shadow_vtlb t = {0};
+    if ( vtlb_lookup(v, va, &t) )
+        return t.frame_number;
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     guest_walk_tables(v, va, &gw, 0);
     gfn = guest_walk_to_gfn(&gw);
-    unmap_walk(v, &gw);
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    t.page_number = va >> PAGE_SHIFT;
+    t.frame_number = gfn_x(gfn);
+    t.flags = accumulate_guest_flags(v, &gw); 
+    vtlb_insert(v, t);
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
+    unmap_walk(v, &gw);
     return gfn_x(gfn);
 }
 
@@ -3694,6 +3713,11 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     /* Fix up the linear pagetable mappings */
     sh_update_linear_entries(v);
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* No longer safe to use cached gva->gfn translations */
+    vtlb_flush(v);
+#endif
+
     /* Release the lock, if we took it (otherwise it's the caller's problem) */
     if ( do_locking ) shadow_unlock(v->domain);
 }
@@ -3918,13 +3942,41 @@ static inline void * emulate_map_dest(struct vcpu *v,
     if ( ring_3(sh_ctxt->ctxt.regs) ) 
         return NULL;
 
-    /* Walk the guest pagetables */
-    guest_walk_tables(v, vaddr, &gw, 1);
-    flags = accumulate_guest_flags(v, &gw);
-    gfn = guest_l1e_get_gfn(gw.eff_l1e);
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* Try the virtual TLB first */
+    {
+        struct shadow_vtlb t = {0};
+        if ( vtlb_lookup(v, vaddr, &t) 
+             && ((t.flags & (_PAGE_PRESENT|_PAGE_RW)) 
+                 == (_PAGE_PRESENT|_PAGE_RW)) )
+        {
+            flags = t.flags;
+            gfn = _gfn(t.frame_number);
+        }
+        else
+        {
+            /* Need to do the full lookup, just in case permissions
+             * have increased since we cached this entry */
+            
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
+            /* Walk the guest pagetables */
+            guest_walk_tables(v, vaddr, &gw, 1);
+            flags = accumulate_guest_flags(v, &gw);
+            gfn = guest_l1e_get_gfn(gw.eff_l1e);
+            sh_audit_gw(v, &gw);
+            unmap_walk(v, &gw);
+            
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+            /* Remember this translation for next time */
+            t.page_number = vaddr >> PAGE_SHIFT;
+            t.frame_number = gfn_x(gfn);
+            t.flags = flags;
+            vtlb_insert(v, t);
+        }
+    }
+#endif
     mfn = vcpu_gfn_to_mfn(v, gfn);
-    sh_audit_gw(v, &gw);
-    unmap_walk(v, &gw);
 
     errcode = PFEC_write_access;
     if ( !(flags & _PAGE_PRESENT) ) 
