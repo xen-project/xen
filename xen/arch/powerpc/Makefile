@@ -63,12 +63,19 @@ CFLAGS += $(PPC_C_WARNINGS)
 # objects into a single ELF segment and to not link in any additional
 # objects that gcc would normally like to
 #
-OMAGIC = -nodefaultlibs -nostartfiles
+OMAGIC = -nodefaultlibs -nostartfiles -Wl,--omagic
 
 firmware: of_handler/built_in.o $(TARGET_SUBARCH)/memcpy.o of-devtree.o
 	$(CC) $(CFLAGS) $(OMAGIC) -e __ofh_start -Wl,-Ttext,0x0 $^ -o $@
 
-firmware_image.bin: firmware
+#
+# Link firmware again but this time at the place we expect to load it.
+# This makes debugging _way_ easier.
+#
+firmware.dbg: of_handler/built_in.o $(TARGET_SUBARCH)/memcpy.o of-devtree.o
+	$(CC) $(CFLAGS) $(OMAGIC) -e __ofh_start -Wl,-Ttext,0x2000000 $^ -o $@
+
+firmware_image.bin: firmware firmware.dbg
 	$(CROSS_COMPILE)objcopy --output-target=binary $< $@
 
 #
@@ -139,5 +146,6 @@ dom0.bin: $(DOM0_IMAGE)
 
 clean::
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C of_handler clean
-	rm -f firmware firmware_image.bin dom0.bin .xen-syms xen-syms.S \
+	rm -f firmware firmware.dbg firmware_image.bin \
+		dom0.bin .xen-syms xen-syms.S \
 		xen.lds asm-offsets.s cmdline.dep
