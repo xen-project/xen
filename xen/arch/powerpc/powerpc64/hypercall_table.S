@@ -27,7 +27,7 @@ __hypercall_table:
         .quad do_grant_table_op     /* 20 */
         .quad do_vm_assist
         .quad 0 /* do_update_va_mapping_otherdomain */
-        .quad 0 /* do_switch_vm86 */
+        .quad do_rtas_proxy /* do_switch_vm86 */
         .quad do_vcpu_op
         .quad do_ni_hypercall       /* 25 */
         .quad 0 /* do_mmuext_op */
