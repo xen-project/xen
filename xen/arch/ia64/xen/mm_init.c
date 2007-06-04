@@ -22,17 +22,8 @@ void __devinit
 ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long psr, impl_va_bits;
-#if 0
-	unsigned long pta;
-#endif
 	extern void __devinit tlb_init (void);
 	int cpu;
-
-#ifdef CONFIG_DISABLE_VHPT
-#	define VHPT_ENABLE_BIT	0
-#else
-#	define VHPT_ENABLE_BIT	1
-#endif
 
 	/* Pin mapping for percpu area into TLB */
 	psr = ia64_clear_ic();
@@ -73,21 +64,6 @@ ia64_mmu_init (void *my_cpu_data)
 
 #ifdef XEN
 	vhpt_init();
-#endif
-#if 0
-	/* place the VMLPT at the end of each page-table mapped region: */
-	pta = POW2(61) - POW2(vmlpt_bits);
-
-	if (POW2(mapped_space_bits) >= pta)
-		panic("mm/init: overlap between virtually mapped linear page table and "
-		      "mapped kernel space!");
-	/*
-	 * Set the (virtually mapped linear) page table address.  Bit
-	 * 8 selects between the short and long format, bits 2-7 the
-	 * size of the table, and bit 0 whether the VHPT walker is
-	 * enabled.
-	 */
-	ia64_set_pta(pta | (0 << 8) | (vmlpt_bits << 2) | VHPT_ENABLE_BIT);
 #endif
 	ia64_tlb_init();
 

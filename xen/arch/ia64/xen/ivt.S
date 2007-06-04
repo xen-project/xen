@@ -204,35 +204,6 @@ ENTRY(dtlb_miss)
 #endif	
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
-dtlb_fault:
-	mov r17=cr.iha				// get virtual address of L3 PTE
-	movl r30=1f				// load nested fault 
-						//   continuation point
-	;;
-1:	ld8 r18=[r17]				// read L3 PTE
-	;;
-	mov b0=r29
-	tbit.z p6,p0=r18,_PAGE_P_BIT		// page present bit cleared?
-(p6)	br.cond.spnt page_fault
-	;;
-	itc.d r18
-	;;
-#ifdef CONFIG_SMP
-	/*
-	 * Tell the assemblers dependency-violation checker that the above
-	 * "itc" instructions cannot possibly affect the following loads:
-	 */
-	dv_serialize_data
-
-	ld8 r19=[r17]			// read L3 PTE again and see if same
-	mov r20=PAGE_SHIFT<<2		// setup page size for purge
-	;;
-	cmp.ne p7,p0=r18,r19
-	;;
-(p7)	ptc.l r16,r20
-#endif
-	mov pr=r31,-1
-	rfi
 END(dtlb_miss)
 
 	.org ia64_ivt+0x0c00
@@ -248,17 +219,6 @@ late_alt_itlb_miss:
 	movl r17=PAGE_KERNEL
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
-#ifdef CONFIG_DISABLE_VHPT
-	shr.u r22=r16,61		// get the region number into r21
-	;;
-	cmp.gt p8,p0=6,r22		// user mode
-	;;
-(p8)	thash r17=r16
-	;;
-(p8)	mov cr.iha=r17
-(p8)	mov r29=b0			// save b0
-(p8)	br.cond.dptk .itlb_fault
-#endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
 	shr.u r18=r16,55	// move address bit 59 to bit 4
@@ -290,17 +250,6 @@ late_alt_dtlb_miss:
 	mov r21=cr.ipsr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
-#ifdef CONFIG_DISABLE_VHPT
-	shr.u r22=r16,61			// get the region into r22
-	;;
-	cmp.gt p8,p0=6,r22			// access to region 0-5
-	;;
-(p8)	thash r17=r16
-	;;
-(p8)	mov cr.iha=r17
-(p8)	mov r29=b0				// save b0
-(p8)	br.cond.dptk dtlb_fault
-#endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
@@ -419,6 +368,38 @@ ENTRY(nested_dtlb_miss)
 	;;
 END(nested_dtlb_miss)
 
+GLOBAL_ENTRY(dispatch_reflection)
+	/*
+	 * Input:
+	 *	psr.ic:	off
+	 *	r19:	intr type (offset into ivt, see ia64_int.h)
+	 *	r31:	contains saved predicates (pr)
+	 */
+	SAVE_MIN_WITH_COVER_R19
+	alloc r14=ar.pfs,0,0,5,0
+	mov out4=r15
+	mov out0=cr.ifa
+	adds out1=16,sp
+	mov out2=cr.isr
+	mov out3=cr.iim
+//	mov out3=cr.itir		// TODO: why commented out?
+
+	ssm psr.ic | PSR_DEFAULT_BITS
+	;;
+	srlz.i				// guarantee that interruption 
+					//   collection is on
+	;;
+(p15)	ssm psr.i			// restore psr.i
+	adds r3=8,r2			// set up second base pointer
+	;;
+	SAVE_REST
+	movl r14=ia64_leave_kernel
+	;;
+	mov rp=r14
+//	br.sptk.many ia64_prepare_handle_reflection // TODO: why commented out?
+    	br.call.sptk.many b6=ia64_handle_reflection
+END(dispatch_reflection)
+
 	.org ia64_ivt+0x1800
 //////////////////////////////////////////////////////////////////////////
 // 0x1800 Entry 6 (size 64 bundles) Instruction Key Miss (24)
@@ -464,6 +445,16 @@ ENTRY(dkey_miss)
 	DBG_FAULT(7)
 	FAULT_OR_REFLECT(7)
 END(dkey_miss)
+
+	
+#define SAVE_MIN_COVER_DONE	DO_SAVE_MIN(,mov r30=cr.ifs,)
+
+// same as dispatch_break_fault except cover has already been done
+GLOBAL_ENTRY(dispatch_slow_hyperprivop)
+	SAVE_MIN_COVER_DONE
+	;;
+	br.sptk.many dispatch_break_fault_post_save
+END(dispatch_slow_hyperprivop)
 
 	.org ia64_ivt+0x2000
 //////////////////////////////////////////////////////////////////////////
@@ -600,7 +591,7 @@ ENTRY(break_fault)
 	// and it can have no memory accesses unless they are to pinned
 	// addresses!
 	mov r19= cr.ipsr
-	movl r20=HYPERPRIVOP_START
+	mov r20=HYPERPRIVOP_START
 	mov r21=HYPERPRIVOP_MAX
 	;;
 	sub r20=r17,r20
@@ -1244,11 +1235,7 @@ END(disabled_fp_reg)
 // 0x5600 Entry 26 (size 16 bundles) Nat Consumption (11,23,37,50)
 ENTRY(nat_consumption)
 	DBG_FAULT(26)
-#ifdef XEN
 	FAULT_OR_REFLECT(26)
-#else
-	FAULT(26)
-#endif
 END(nat_consumption)
 
 	.org ia64_ivt+0x5700
@@ -1529,43 +1516,3 @@ END(ia32_interrupt)
 	FAULT(67)
 
 	.org ia64_ivt+0x8000
-GLOBAL_ENTRY(dispatch_reflection)
-	/*
-	 * Input:
-	 *	psr.ic:	off
-	 *	r19:	intr type (offset into ivt, see ia64_int.h)
-	 *	r31:	contains saved predicates (pr)
-	 */
-	SAVE_MIN_WITH_COVER_R19
-	alloc r14=ar.pfs,0,0,5,0
-	mov out4=r15
-	mov out0=cr.ifa
-	adds out1=16,sp
-	mov out2=cr.isr
-	mov out3=cr.iim
-//	mov out3=cr.itir		// TODO: why commented out?
-
-	ssm psr.ic | PSR_DEFAULT_BITS
-	;;
-	srlz.i				// guarantee that interruption 
-					//   collection is on
-	;;
-(p15)	ssm psr.i			// restore psr.i
-	adds r3=8,r2			// set up second base pointer
-	;;
-	SAVE_REST
-	movl r14=ia64_leave_kernel
-	;;
-	mov rp=r14
-//	br.sptk.many ia64_prepare_handle_reflection // TODO: why commented out?
-    	br.call.sptk.many b6=ia64_handle_reflection
-END(dispatch_reflection)
-
-#define SAVE_MIN_COVER_DONE	DO_SAVE_MIN(,mov r30=cr.ifs,)
-
-// same as dispatch_break_fault except cover has already been done
-GLOBAL_ENTRY(dispatch_slow_hyperprivop)
-	SAVE_MIN_COVER_DONE
-	;;
-	br.sptk.many dispatch_break_fault_post_save
-END(dispatch_slow_hyperprivop)
