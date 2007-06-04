@@ -42,6 +42,8 @@
 
 #define CONFIG_DMA_BITSIZE 32
 
+#define PADDR_BITS	48
+
 /* If PERFC is used, include privop maps.  */
 #ifdef PERF_COUNTERS
 #define CONFIG_PRIVOP_ADDRS
