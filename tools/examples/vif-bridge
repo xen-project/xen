@@ -44,6 +44,32 @@ then
   then
      fatal "Could not find bridge, and none was specified"
   fi
+else
+  #
+  # Old style bridge setup with netloop, used to have a bridge name
+  # of xenbrX, enslaving pethX and vif0.X, and then configuring
+  # eth0.
+  #
+  # New style bridge setup does not use netloop, so the bridge name
+  # is ethX and the physical device is enslaved pethX
+  #
+  # So if...
+  #
+  #   - User asks for xenbrX
+  #   - AND xenbrX doesn't exist
+  #   - AND there is a ethX device which is a bridge
+  #
+  # ..then we translate xenbrX to ethX
+  #
+  # This lets old config files work without modification
+  #
+  if [ ! -e "/sys/class/net/$bridge" ] && [ -z "${bridge##xenbr*}" ]
+  then
+     if [ -e "/sys/class/net/eth${bridge#xenbr}/bridge" ]
+     then
+        bridge="eth${bridge#xenbr}"
+     fi
+  fi
 fi
 
 RET=0
@@ -68,7 +94,7 @@ esac
 handle_iptable
 
 log debug "Successful vif-bridge $command for $vif, bridge $bridge."
-if [ "$command" = "online" ]
+if [ "$command" == "online" ]
 then
   success
 fi

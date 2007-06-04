@@ -90,8 +90,6 @@ find_dhcpd_init_file()
 }
 
 # configure interfaces which act as pure bridge ports:
-#  - make quiet: no arp, no multicast (ipv6 autoconf)
-#  - set mac address to fe:ff:ff:ff:ff:ff
 setup_bridge_port() {
     local dev="$1"
 
@@ -99,9 +97,6 @@ setup_bridge_port() {
     ip link set ${dev} down
 
     # ... and configure it
-    ip link set ${dev} arp off
-    ip link set ${dev} multicast off
-    ip link set ${dev} addr fe:ff:ff:ff:ff:ff
     ip addr flush ${dev}
 }
 
@@ -114,15 +109,7 @@ create_bridge () {
 	brctl addbr ${bridge}
 	brctl stp ${bridge} off
 	brctl setfd ${bridge} 0
-        ip link set ${bridge} arp off
-        ip link set ${bridge} multicast off
     fi
-
-    # A small MTU disables IPv6 (and therefore IPv6 addrconf).
-    mtu=$(ip link show ${bridge} | sed -n 's/.* mtu \([0-9]\+\).*/\1/p')
-    ip link set ${bridge} mtu 68
-    ip link set ${bridge} up
-    ip link set ${bridge} mtu ${mtu:-1500}
 }
 
 # Usage: add_to_bridge bridge dev

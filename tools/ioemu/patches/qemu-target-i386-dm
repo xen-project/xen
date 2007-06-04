@@ -1405,8 +1405,8 @@ Index: ioemu/target-i386-dm/qemu-dm.debug
 Index: ioemu/target-i386-dm/qemu-ifup
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ ioemu/target-i386-dm/qemu-ifup	2007-05-11 10:01:09.000000000 +0100
-@@ -0,0 +1,9 @@
++++ ioemu/target-i386-dm/qemu-ifup	2007-06-03 11:50:25.000000000 +1000
+@@ -0,0 +1,37 @@
 +#!/bin/sh
 +
 +#. /etc/rc.d/init.d/functions
@@ -1414,5 +1414,33 @@ Index: ioemu/target-i386-dm/qemu-ifup
 +
 +echo 'config qemu network with xen bridge for ' $*
 +
++bridge=$2
++
++#
++# Old style bridge setup with netloop, used to have a bridge name
++# of xenbrX, enslaving pethX and vif0.X, and then configuring
++# eth0.
++#
++# New style bridge setup does not use netloop, so the bridge name
++# is ethX and the physical device is enslaved pethX
++#
++# So if...
++#
++#   - User asks for xenbrX
++#   - AND xenbrX doesn't exist
++#   - AND there is a ethX device which is a bridge
++#
++# ..then we translate xenbrX to ethX
++#
++# This lets old config files work without modification
++#
++if [ ! -e "/sys/class/net/$bridge" ] && [ -z "${bridge##xenbr*}" ]
++then
++   if [ -e "/sys/class/net/eth${bridge#xenbr}/bridge" ]
++   then
++      bridge="eth${bridge#xenbr}"
++   fi
++fi
++
 +ifconfig $1 0.0.0.0 up
-+brctl addif $2 $1
++brctl addif $bridge $1

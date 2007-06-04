@@ -5,9 +5,10 @@
 # The script name to use is defined in /etc/xen/xend-config.sxp
 # in the network-script field.
 #
-# This script creates a bridge (default xenbr${vifnum}), adds a device
-# (default eth${vifnum}) to it, copies the IP addresses from the device
-# to the bridge and adjusts the routes accordingly.
+# This script creates a bridge (default ${netdev}), adds a device
+# (defaults to the device on the default gateway route) to it, copies
+# the IP addresses from the device to the bridge and adjusts the routes
+# accordingly.
 #
 # If all goes well, this should ensure that networking stays up.
 # However, some configurations are upset by this, especially
@@ -20,31 +21,27 @@
 #
 # Vars:
 #
-# vifnum     Virtual device number to use (default 0). Numbers >=8
-#            require the netback driver to have nloopbacks set to a
-#            higher value than its default of 8.
-# bridge     The bridge to use (default xenbr${vifnum}).
-# netdev     The interface to add to the bridge (default eth${vifnum}).
+# bridge     The bridge to use (default ${netdev}).
+# netdev     The interface to add to the bridge (default gateway device).
 # antispoof  Whether to use iptables to prevent spoofing (default no).
 #
 # Internal Vars:
 # pdev="p${netdev}"
-# vdev="veth${vifnum}"
-# vif0="vif0.${vifnum}"
+# tdev=tmpbridge
 #
 # start:
-# Creates the bridge
-# Copies the IP and MAC addresses from netdev to vdev
+# Creates the bridge as tdev
+# Copies the IP and MAC addresses from pdev to bridge
 # Renames netdev to be pdev 
-# Renames vdev to be netdev 
-# Enslaves pdev, vdev to bridge
+# Renames tdev to bridge
+# Enslaves pdev to bridge
 #
 # stop:
-# Removes netdev from the bridge
-# Transfers addresses, routes from netdev to pdev
-# Renames netdev to vdev
+# Removes pdev from the bridge
+# Transfers addresses, routes from bridge to pdev
+# Renames bridge to tdev
 # Renames pdev to netdev 
-# Deletes bridge
+# Deletes tdev
 #
 # status:
 # Print addresses, interfaces, routes
@@ -59,15 +56,13 @@ dir=$(dirname "$0")
 findCommand "$@"
 evalVariables "$@"
 
-vifnum=${vifnum:-$(ip route list | awk '/^default / { print $NF }' | sed 's/^[^0-9]*//')}
-vifnum=${vifnum:-0}
-bridge=${bridge:-xenbr${vifnum}}
-netdev=${netdev:-eth${vifnum}}
+netdev=${netdev:-$(ip route list | awk '/^default / { print $NF }' |
+		   sed 's/.* dev //')}
+bridge=${bridge:-${netdev}}
 antispoof=${antispoof:-no}
 
 pdev="p${netdev}"
-vdev="veth${vifnum}"
-vif0="vif0.${vifnum}"
+tdev=tmpbridge
 
 get_ip_info() {
     addr_pfx=`ip addr show dev $1 | egrep '^ *inet' | sed -e 's/ *inet //' -e 's/ .*//'`
@@ -157,7 +152,6 @@ antispoofing () {
     iptables -P FORWARD DROP
     iptables -F FORWARD
     iptables -A FORWARD -m physdev --physdev-in ${pdev} -j ACCEPT
-    iptables -A FORWARD -m physdev --physdev-in ${vif0} -j ACCEPT
 }
 
 # Usage: show_status dev bridge
@@ -184,53 +178,27 @@ op_start () {
     fi
 
     if link_exists "$pdev"; then
-	# The device is already up.
-	return
-    fi
-    if link_exists veth0 && ! link_exists "$vdev"; then
-	echo "
-Link $vdev is missing.
-This may be because you have reached the limit of the number of interfaces
-that the loopback driver supports.  If the loopback driver is a module, you
-may raise this limit by passing it as a parameter (nloopbacks=<N>); if the
-driver is compiled statically into the kernel, then you may set the parameter
-using netloop.nloopbacks=<N> on the domain 0 kernel command line.
-" >&2
-	exit 1
+        # The device is already up.
+        return
     fi
 
-    create_bridge ${bridge}
+    create_bridge ${tdev}
 
-    if link_exists "$vdev"; then
-	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
-	preiftransfer ${netdev}
-	transfer_addrs ${netdev} ${vdev}
-	if ! ifdown ${netdev}; then
-	    # If ifdown fails, remember the IP details.
-	    get_ip_info ${netdev}
-	    ip link set ${netdev} down
-	    ip addr flush ${netdev}
-	fi
-	ip link set ${netdev} name ${pdev}
-	ip link set ${vdev} name ${netdev}
-
-	setup_bridge_port ${pdev}
-	setup_bridge_port ${vif0}
-	ip link set ${netdev} addr ${mac} arp on
-
-	ip link set ${bridge} up
-	add_to_bridge  ${bridge} ${vif0}
-	add_to_bridge2 ${bridge} ${pdev}
-	do_ifup ${netdev}
-    else
-	ip link set ${bridge} arp on
-	ip link set ${bridge} multicast on
-	# old style without ${vdev}
-	transfer_addrs  ${netdev} ${bridge}
-	transfer_routes ${netdev} ${bridge}
-	# Attach the real interface to the bridge.
-	add_to_bridge ${bridge} ${netdev}
+    preiftransfer ${netdev}
+    transfer_addrs ${netdev} ${tdev}
+    if ! ifdown ${netdev}; then
+	# If ifdown fails, remember the IP details.
+	get_ip_info ${netdev}
+	ip link set ${netdev} down
+	ip addr flush ${netdev}
     fi
+    ip link set ${netdev} name ${pdev}
+    ip link set ${tdev} name ${bridge}
+
+    setup_bridge_port ${pdev}
+
+    add_to_bridge2 ${bridge} ${pdev}
+    do_ifup ${bridge}
 
     if [ ${antispoof} = 'yes' ] ; then
 	antispoofing
@@ -245,31 +213,21 @@ op_stop () {
 	return
     fi
 
-    if link_exists "$pdev"; then
-	ip link set dev ${vif0} down
-	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
-	transfer_addrs ${netdev} ${pdev}
-	if ! ifdown ${netdev}; then
-	    get_ip_info ${netdev}
-	fi
-	ip link set ${netdev} down arp off
-	ip link set ${netdev} addr fe:ff:ff:ff:ff:ff
-	ip link set ${pdev} down
-	ip addr flush ${netdev}
-	ip link set ${pdev} addr ${mac} arp on
-
-	brctl delif ${bridge} ${pdev}
-	brctl delif ${bridge} ${vif0}
-	ip link set ${bridge} down
-
-	ip link set ${netdev} name ${vdev}
-	ip link set ${pdev} name ${netdev}
-	do_ifup ${netdev}
-    else
-	transfer_routes ${bridge} ${netdev}
-	ip link set ${bridge} down
+    transfer_addrs ${bridge} ${pdev}
+    if ! ifdown ${bridge}; then
+	get_ip_info ${bridge}
     fi
-    brctl delbr ${bridge}
+    ip link set ${pdev} down
+    ip addr flush ${bridge}
+
+    brctl delif ${bridge} ${pdev}
+    ip link set ${bridge} down
+
+    ip link set ${bridge} name ${tdev}
+    ip link set ${pdev} name ${netdev}
+    do_ifup ${netdev}
+
+    brctl delbr ${tdev}
 }
 
 # adds $dev to $bridge but waits for $dev to be in running state first
