@@ -38,9 +38,6 @@ BLK-OBJS  += aes.o
 
 all: $(IBIN) qcow-util
 
-LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
-
-
 blktapctrl: blktapctrl.c
 	$(CC) $(CFLAGS) -o blktapctrl $(LIBS) blktapctrl.c
 

@@ -1,8 +1,6 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-linuxsparsetree = $(XEN_ROOT)/linux-2.6-xen-sparse
-
 .PHONY: all
 all:
 
@@ -13,7 +11,7 @@ check:
 
 install-Linux:
 	mkdir -p $(DESTDIR)/usr/include/xen/linux
-	$(INSTALL_DATA) $(linuxsparsetree)/include/xen/public/*.h $(DESTDIR)/usr/include/xen/linux
+	$(INSTALL_DATA) $(XEN_ROOT)/tools/include/Linux/*.h $(DESTDIR)/usr/include/xen/linux
 
 install-SunOS:
 

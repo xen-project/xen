@@ -41,11 +41,11 @@ $(eval $(check-y))
 
 mk-symlinks-SunOS:
 
-mk-symlinks-Linux: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
+mk-symlinks-Linux: LINUX_ROOT=$(XEN_ROOT)/tools/include/Linux
 mk-symlinks-Linux:
 	mkdir -p xen/linux
 	( cd xen/linux && \
-	  ln -sf ../../$(LINUX_ROOT)/include/xen/public/*.h . )
+	  ln -sf ../../$(LINUX_ROOT)/*.h . )
 	( cd xen && rm -f sys && ln -sf linux sys )
 
 mk-symlinks-xen:
