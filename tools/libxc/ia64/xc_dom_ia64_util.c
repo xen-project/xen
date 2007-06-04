@@ -18,6 +18,7 @@
  *
  */
 
+#include <assert.h>
 #include "xg_private.h"
 #include "xc_dom.h"
 #include "asm/dom_fw.h"
@@ -114,12 +115,12 @@ xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
 {
     int rc = 0;
     void *imva_hypercall_base = NULL;
-    void *imva_tables_base = NULL;
+    struct fw_tables *fw_tables = NULL;
     struct fake_acpi_tables *imva = NULL;
     struct xen_ia64_boot_param *bp = NULL;
 
     BUILD_BUG_ON(sizeof(struct fw_tables) >
-                 (FW_TABLES_END_PADDR - FW_TABLES_BASE_PADDR));
+                 (FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR));
 
     /* Create page for hypercalls.  */
     imva_hypercall_base = xen_ia64_dom_fw_map(d, FW_HYPERCALL_BASE_PADDR);
@@ -129,11 +130,17 @@ xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
     }
 
     /* Create page for FW tables.  */
-    imva_tables_base = xen_ia64_dom_fw_map(d, FW_TABLES_BASE_PADDR);
-    if (imva_tables_base == NULL) {
+    fw_tables = (struct fw_tables*)xen_ia64_dom_fw_map(d, FW_TABLES_BASE_PADDR);
+    if (fw_tables == NULL) {
         rc = -errno;
         goto out;
     }
+    memset(fw_tables, 0, FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR);
+    BUILD_BUG_ON(FW_END_PADDR_MIN != FW_TABLES_END_PADDR_MIN);
+    fw_tables->fw_tables_size = FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR;
+    fw_tables->fw_end_paddr = FW_END_PADDR_MIN;
+    fw_tables->fw_tables_end_paddr = FW_TABLES_END_PADDR_MIN;
+    fw_tables->num_mds = 0;
         
     /* Create page for acpi tables.  */
     imva = (struct fake_acpi_tables *)
@@ -150,14 +157,22 @@ xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
         rc = -errno;
         goto out;
     }
-    rc = dom_fw_init(d, brkimm, bp, imva_tables_base,
+    rc = dom_fw_init(d, brkimm, bp, fw_tables,
                      (unsigned long)imva_hypercall_base, maxmem);
+    BUG_ON(fw_tables->fw_tables_size < sizeof(*fw_tables) +
+           sizeof(fw_tables->efi_memmap[0]) * fw_tables->num_mds);
 
+    /* clear domain builder internal use member */
+    fw_tables->fw_tables_size = 0;
+    fw_tables->fw_end_paddr = 0;
+    fw_tables->fw_tables_end_paddr = 0;
+    fw_tables->num_mds = 0;
+    
  out:
     if (imva_hypercall_base != NULL)
         xen_ia64_dom_fw_unmap(d, imva_hypercall_base);
-    if (imva_tables_base != NULL)
-        xen_ia64_dom_fw_unmap(d, imva_tables_base);
+    if (fw_tables != NULL)
+        xen_ia64_dom_fw_unmap(d, fw_tables);
     if (imva != NULL)
         xen_ia64_dom_fw_unmap(d, imva);
     if (bp != NULL)

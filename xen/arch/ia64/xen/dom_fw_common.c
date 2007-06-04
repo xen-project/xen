@@ -35,22 +35,17 @@
 #include <asm/dom_fw_domu.h>
 
 void
-xen_ia64_efi_make_md(struct fw_tables *tables, int *index,
+xen_ia64_efi_make_md(efi_memory_desc_t *md,
 		     uint32_t type, uint64_t attr, 
 		     uint64_t start, uint64_t end)
 {
-	efi_memory_desc_t *md = &tables->efi_memmap[*index];
 	md->type = type;
 	md->pad = 0;
 	md->phys_addr = start;
 	md->virt_addr = 0;
 	md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
 	md->attribute = attr;
-
-	(*index)++;
 }
-#define MAKE_MD(typ, attr, start, end) \
-	xen_ia64_efi_make_md((tables), &(i), (typ), (attr), (start), (end))
 
 #define EFI_HYPERCALL_PATCH(tgt, call)					\
 	do {								\
@@ -422,7 +417,7 @@ dom_fw_init(domain_t *d,
 	int num_mds, i;
 	int fpswa_supported = 0;
 
-	memset(tables, 0, sizeof(struct fw_tables));
+	/* Caller must zero-clear fw_tables */
 
 	/* EFI systab.  */
 	tables->efi_systab.hdr.signature = EFI_SYSTEM_TABLE_SIGNATURE;
@@ -514,17 +509,25 @@ dom_fw_init(domain_t *d,
 			(void *)FW_HYPERCALL_FPSWA_ENTRY_PADDR;
 	}
 
-	i = 0; /* Used by MAKE_MD */
-
+	tables->num_mds = 0;
 	/* hypercall patches live here, masquerade as reserved PAL memory */
-	MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,
-	        FW_HYPERCALL_BASE_PADDR, FW_HYPERCALL_END_PADDR);
+	xen_ia64_efi_make_md(&tables->efi_memmap[tables->num_mds],
+			     EFI_PAL_CODE, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
+			     FW_HYPERCALL_BASE_PADDR, FW_HYPERCALL_END_PADDR);
+	tables->num_mds++;
 
 	/* Create dom0/domu md entry for fw and cpi tables area.  */
-	MAKE_MD(EFI_ACPI_MEMORY_NVS, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
-	        FW_ACPI_BASE_PADDR, FW_ACPI_END_PADDR);
-	MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
-	        FW_TABLES_BASE_PADDR, FW_TABLES_END_PADDR);
+	xen_ia64_efi_make_md(&tables->efi_memmap[tables->num_mds],
+			     EFI_ACPI_MEMORY_NVS,
+			     EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
+			     FW_ACPI_BASE_PADDR, FW_ACPI_END_PADDR);
+	tables->num_mds++;
+	xen_ia64_efi_make_md(&tables->efi_memmap[tables->num_mds],
+			     EFI_RUNTIME_SERVICES_DATA,
+			     EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
+			     FW_TABLES_BASE_PADDR,
+			     tables->fw_tables_end_paddr);
+	tables->num_mds++;
 
 	if (!xen_ia64_is_dom0(d) || xen_ia64_is_running_on_sim(d)) {
 		/* DomU (or hp-ski).
@@ -536,26 +539,27 @@ dom_fw_init(domain_t *d,
 		 * and console page.
 		 * see ia64_setup_memmap() @ xc_dom_boot.c
 		 */
-		num_mds = complete_domu_memmap(d, tables, maxmem, i,
+		num_mds = complete_domu_memmap(d, tables, maxmem,
 					       XEN_IA64_MEMMAP_INFO_PFN(bp),
 					       XEN_IA64_MEMMAP_INFO_NUM_PAGES(bp));
 	} else {
 		/* Dom0.
 		   We must preserve ACPI data from real machine,
 		   as well as IO areas.  */
-		num_mds = complete_dom0_memmap(d, tables, maxmem, i);
+		num_mds = complete_dom0_memmap(d, tables);
 	}
 	if (num_mds < 0)
 		return num_mds;
+	BUG_ON(num_mds != tables->num_mds);
 
 	/* Display memmap.  */
-	for (i = 0 ; i < num_mds; i++)
+	for (i = 0 ; i < tables->num_mds; i++)
 		print_md(&tables->efi_memmap[i]);
 
 	/* Fill boot_param  */
 	bp->efi_systab = FW_FIELD_MPA(efi_systab);
 	bp->efi_memmap = FW_FIELD_MPA(efi_memmap);
-	bp->efi_memmap_size = num_mds * sizeof(efi_memory_desc_t);
+	bp->efi_memmap_size = tables->num_mds * sizeof(efi_memory_desc_t);
 	bp->efi_memdesc_size = sizeof(efi_memory_desc_t);
 	bp->efi_memdesc_version = EFI_MEMDESC_VERSION;
 	bp->command_line = 0;

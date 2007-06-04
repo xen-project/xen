@@ -29,9 +29,9 @@ int
 complete_domu_memmap(domain_t *d,
                      struct fw_tables *tables,
                      unsigned long maxmem,
-                     int num_mds,
                      unsigned long memmap_info_pfn,
                      unsigned long reserved_size);
+
 #endif /* __ASM_IA64_DOM_FW_DOMU_H__ */
 /*
  * Local variables:

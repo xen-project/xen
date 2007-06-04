@@ -8,7 +8,8 @@
 /* Portion of guest physical memory space reserved for PAL/SAL/EFI/ACPI
    data and code.  */
 #define FW_BASE_PADDR		0x0000UL
-#define FW_END_PADDR		0x3000UL
+/* It is assumed that FW_END_PADDR_MIN = FW_TABLES_END_PADDR_MIN */
+#define FW_END_PADDR_MIN	0x3000UL
 
 /* This is used to determined the portion of a domain's metaphysical memory
    space reserved for the hypercall patch table. */
@@ -29,7 +30,7 @@
 
 /* Base and end guest physical address of EFI and SAL (non-ACPI) tables.  */
 #define FW_TABLES_BASE_PADDR	0x2000UL
-#define FW_TABLES_END_PADDR	0x3000UL
+#define FW_TABLES_END_PADDR_MIN	0x3000UL
 
 
 /* Hypercalls number have a low part and a high part.

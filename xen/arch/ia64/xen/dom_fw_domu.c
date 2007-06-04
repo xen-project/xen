@@ -61,19 +61,14 @@ void efi_systable_init_domu(struct fw_tables *tables)
 	BUG_ON(i > NUM_EFI_SYS_TABLES);
 }
 
-#define MAKE_MD(typ, attr, start, end) \
-	xen_ia64_efi_make_md((tables), &(i), (typ), (attr), (start), (end))
-
 int
 complete_domu_memmap(domain_t * d,
 		     struct fw_tables *tables,
 		     unsigned long maxmem,
-		     int num_mds,
 		     unsigned long memmap_info_pfn,
 		     unsigned long memmap_info_num_pages)
 {
 	efi_memory_desc_t *md;
-	int i = num_mds;	/* for MAKE_MD */
 	int create_memmap = 0;
 	xen_ia64_memmap_info_t *memmap_info;
 	unsigned long memmap_info_size;
@@ -142,12 +137,12 @@ complete_domu_memmap(domain_t * d,
 		memmap_info->efi_memmap_size = 1 * sizeof(md[0]);
 
 		md = (efi_memory_desc_t *) & memmap_info->memdesc;
-		md[num_mds].type = EFI_CONVENTIONAL_MEMORY;
-		md[num_mds].pad = 0;
-		md[num_mds].phys_addr = 0;
-		md[num_mds].virt_addr = 0;
-		md[num_mds].num_pages = maxmem >> EFI_PAGE_SHIFT;
-		md[num_mds].attribute = EFI_MEMORY_WB;
+		md->type = EFI_CONVENTIONAL_MEMORY;
+		md->pad = 0;
+		md->phys_addr = 0;
+		md->virt_addr = 0;
+		md->num_pages = maxmem >> EFI_PAGE_SHIFT;
+		md->attribute = EFI_MEMORY_WB;
 	}
 
 	memmap_start = &memmap_info->memdesc;
@@ -175,43 +170,61 @@ complete_domu_memmap(domain_t * d,
 		start = md->phys_addr;
 		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
 
-		if (start < FW_END_PADDR)
-			start = FW_END_PADDR;
+		if (start < tables->fw_end_paddr)
+			start = tables->fw_end_paddr;
 		if (end <= start)
 			continue;
 
 		/* exclude [paddr_start, paddr_end) */
 		if (paddr_end <= start || end <= paddr_start) {
-			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start,
-				end);
+			xen_ia64_efi_make_md(&tables->
+					     efi_memmap[tables->num_mds],
+					     EFI_CONVENTIONAL_MEMORY,
+					     EFI_MEMORY_WB, start, end);
+			tables->num_mds++;
 		} else if (paddr_start <= start && paddr_end < end) {
-			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-				paddr_end, end);
+			xen_ia64_efi_make_md(&tables->
+					     efi_memmap[tables->num_mds],
+					     EFI_CONVENTIONAL_MEMORY,
+					     EFI_MEMORY_WB, paddr_end, end);
+			tables->num_mds++;
 		} else if (start < paddr_start && end <= paddr_end) {
-			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start,
-				paddr_start);
+			xen_ia64_efi_make_md(&tables->
+					     efi_memmap[tables->num_mds],
+					     EFI_CONVENTIONAL_MEMORY,
+					     EFI_MEMORY_WB, start, paddr_start);
+			tables->num_mds++;
 		} else {
-			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB, start,
-				paddr_start);
-			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-				paddr_end, end);
+			xen_ia64_efi_make_md(&tables->
+					     efi_memmap[tables->num_mds],
+					     EFI_CONVENTIONAL_MEMORY,
+					     EFI_MEMORY_WB, start, paddr_start);
+			tables->num_mds++;
+			xen_ia64_efi_make_md(&tables->
+					     efi_memmap[tables->num_mds],
+					     EFI_CONVENTIONAL_MEMORY,
+					     EFI_MEMORY_WB, paddr_end, end);
+			tables->num_mds++;
 		}
 	}
 
 	/* memmap info page. */
-	MAKE_MD(EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB, paddr_start,
-		paddr_end);
+	xen_ia64_efi_make_md(&tables->efi_memmap[tables->num_mds],
+			     EFI_RUNTIME_SERVICES_DATA, EFI_MEMORY_WB,
+			     paddr_start, paddr_end);
+	tables->num_mds++;
 
 	/* Create an entry for IO ports.  */
-	MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
-		IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
+	xen_ia64_efi_make_md(&tables->efi_memmap[tables->num_mds],
+			     EFI_MEMORY_MAPPED_IO_PORT_SPACE, EFI_MEMORY_UC,
+			     IO_PORTS_PADDR, IO_PORTS_PADDR + IO_PORTS_SIZE);
+	tables->num_mds++;
 
-	num_mds = i;
-	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
+	sort(tables->efi_memmap, tables->num_mds, sizeof(efi_memory_desc_t),
 	     efi_mdt_cmp, NULL);
 
 	xen_ia64_dom_fw_unmap(d, memmap_info);
-	return num_mds;
+	return tables->num_mds;
 }
 
 /*

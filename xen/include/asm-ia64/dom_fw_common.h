@@ -64,16 +64,26 @@ struct fw_tables {
     /* End of SAL descriptors.  Do not forget to update checkum bound.  */
 
     fpswa_interface_t                   fpswa_inf;
-    efi_memory_desc_t                   efi_memmap[NUM_MEM_DESCS];
     unsigned long                       func_ptrs[2*NFUNCPTRS];
     struct xen_sal_data                 sal_data;
     unsigned char                       fw_vendor[sizeof(FW_VENDOR)];
+
+    /*
+     * These four member for domain builder internal use at virtualized
+     * efi memmap creation. They should be zero-cleared after use.
+     */
+    unsigned long                       fw_tables_size;
+    unsigned long                       fw_end_paddr;   
+    unsigned long                       fw_tables_end_paddr;
+    unsigned long                       num_mds;
+
+    efi_memory_desc_t                   efi_memmap[0];
 };
 #define FW_FIELD_MPA(field)                                     \
     FW_TABLES_BASE_PADDR + offsetof(struct fw_tables, field)
 
 void
-xen_ia64_efi_make_md(struct fw_tables *tables, int *index,
+xen_ia64_efi_make_md(efi_memory_desc_t *md,
                      uint32_t type, uint64_t attr, 
                      uint64_t start, uint64_t end);
 uint8_t generate_acpi_checksum(void *tbl, unsigned long len);

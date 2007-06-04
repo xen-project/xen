@@ -25,11 +25,7 @@ struct fw_tables;
 struct domain;
 
 void efi_systable_init_dom0(struct fw_tables *tables);
-int
-complete_dom0_memmap(struct domain *d,
-                     struct fw_tables *tables,
-                     unsigned long maxmem,
-                     int num_mds);
+int complete_dom0_memmap(struct domain *d, struct fw_tables *tables);
 
 #endif /* __ASM_IA64_DOM_FW_DOM0_H__ */
 /*

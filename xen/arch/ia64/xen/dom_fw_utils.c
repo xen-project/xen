@@ -27,6 +27,7 @@
 #include <asm/fpswa.h>
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_common.h>
+#include <asm/dom_fw_utils.h>
 
 #include <linux/sort.h>
 
@@ -70,6 +71,8 @@ static void dom_fw_domain_init(struct domain *d, struct fw_tables *tables)
 
 static int dom_fw_set_convmem_end(struct domain *d)
 {
+	unsigned long gpaddr;
+	size_t size;
 	xen_ia64_memmap_info_t *memmap_info;
 	efi_memory_desc_t *md;
 	void *p;
@@ -79,26 +82,23 @@ static int dom_fw_set_convmem_end(struct domain *d)
 	if (d->shared_info->arch.memmap_info_pfn == 0)
 		return -EINVAL;
 
-	memmap_info =
-	    domain_mpa_to_imva(d,
-			       d->shared_info->arch.
-			       memmap_info_pfn << PAGE_SHIFT);
-	if (memmap_info->efi_memmap_size == 0
-	    || memmap_info->efi_memdesc_size != sizeof(*md)
-	    || memmap_info->efi_memdesc_version !=
-	    EFI_MEMORY_DESCRIPTOR_VERSION)
+	gpaddr = d->shared_info->arch.memmap_info_pfn << PAGE_SHIFT;
+	size = d->shared_info->arch.memmap_info_num_pages << PAGE_SHIFT;
+	memmap_info = _xmalloc(size, __alignof__(*memmap_info));
+	if (memmap_info == NULL)
+		return -ENOMEM;
+	dom_fw_copy_from(memmap_info, d, gpaddr, size);
+	if (memmap_info->efi_memmap_size == 0 ||
+	    memmap_info->efi_memdesc_size != sizeof(*md) ||
+	    memmap_info->efi_memdesc_version != EFI_MEMORY_DESCRIPTOR_VERSION ||
+	    sizeof(*memmap_info) + memmap_info->efi_memmap_size > size ||
+	    memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size == 0) {
+		xfree(memmap_info);
 		return -EINVAL;
-
-	/* only 1page case is supported */
-	if (d->shared_info->arch.memmap_info_num_pages != 1)
-		return -ENOSYS;
+	}
 
 	memmap_start = &memmap_info->memdesc;
 	memmap_end = memmap_start + memmap_info->efi_memmap_size;
-
-	/* XXX Currently the table must be in a single page. */
-	if ((unsigned long)memmap_end > (unsigned long)memmap_info + PAGE_SIZE)
-		return -EINVAL;
 
 	/* sort it bofore use
 	 * XXX: this is created by user space domain builder so that
@@ -122,6 +122,9 @@ static int dom_fw_set_convmem_end(struct domain *d)
 		    md->num_pages > 0 && d->arch.convmem_end < end)
 			d->arch.convmem_end = end;
 	}
+
+	dom_fw_copy_to(d, gpaddr, memmap_info, size);
+	xfree(memmap_info);
 	return 0;
 }
 
@@ -135,22 +138,62 @@ assign_new_domain_page_if_dom0(struct domain *d, unsigned long mpaddr)
 		assign_new_domain0_page(d, mpaddr);
 }
 
-static void
-dom_fw_setup_for_domain_restore(domain_t *d, unsigned long maxmem)
+static void dom_fw_setup_for_domain_restore(domain_t * d, unsigned long maxmem)
 {
 	assign_new_domain_page(d, FW_HYPERCALL_BASE_PADDR);
 	dom_fw_domain_init(d, domain_mpa_to_imva(d, FW_TABLES_BASE_PADDR));
 	d->arch.convmem_end = maxmem;
 }
 
+/* copy memory range to domain pseudo physical address space */
+void
+dom_fw_copy_to(struct domain *d, unsigned long dest_gpaddr,
+	       void *src, size_t size)
+{
+	while (size > 0) {
+		unsigned long page_offset = dest_gpaddr & ~PAGE_MASK;
+		size_t copy_size = size;
+		void *dest;
+
+		if (page_offset + copy_size > PAGE_SIZE)
+			copy_size = PAGE_SIZE - page_offset;
+		dest = domain_mpa_to_imva(d, dest_gpaddr);
+		memcpy(dest, src, copy_size);
+
+		src += copy_size;
+		dest_gpaddr += copy_size;
+		size -= copy_size;
+	}
+}
+
+/* copy memory range from domain pseudo physical address space */
+void
+dom_fw_copy_from(void *dest, struct domain *d, unsigned long src_gpaddr,
+		 size_t size)
+{
+	while (size > 0) {
+		unsigned long page_offset = src_gpaddr & ~PAGE_MASK;
+		size_t copy_size = size;
+		void *src;
+
+		if (page_offset + copy_size > PAGE_SIZE)
+			copy_size = PAGE_SIZE - page_offset;
+		src = domain_mpa_to_imva(d, src_gpaddr);
+		memcpy(dest, src, copy_size);
+
+		dest += copy_size;
+		src_gpaddr += copy_size;
+		size -= copy_size;
+	}
+}
+
 int dom_fw_setup(domain_t * d, unsigned long bp_mpa, unsigned long maxmem)
 {
 	int old_domu_builder = 0;
 	struct xen_ia64_boot_param *bp;
-	struct fw_tables *imva_tables_base;
 
 	BUILD_BUG_ON(sizeof(struct fw_tables) >
-		     (FW_TABLES_END_PADDR - FW_TABLES_BASE_PADDR));
+		     (FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR));
 
 	if (bp_mpa == 0) {
 		/* bp_mpa == 0 means this is domain restore case. */
@@ -190,10 +233,6 @@ int dom_fw_setup(domain_t * d, unsigned long bp_mpa, unsigned long maxmem)
 		}
 	}
 
-	/* Create page for FW tables.  */
-	assign_new_domain_page_if_dom0(d, FW_TABLES_BASE_PADDR);
-	imva_tables_base = (struct fw_tables *)domain_mpa_to_imva
-	    (d, FW_TABLES_BASE_PADDR);
 	/* Create page for acpi tables.  */
 	if (d != dom0 && old_domu_builder) {
 		struct fake_acpi_tables *imva;
@@ -203,20 +242,81 @@ int dom_fw_setup(domain_t * d, unsigned long bp_mpa, unsigned long maxmem)
 	if (d == dom0 || old_domu_builder) {
 		int ret;
 		unsigned long imva_hypercall_base;
+		size_t fw_tables_size;
+		struct fw_tables *fw_tables;
+		unsigned long gpaddr;
 
 		/* Create page for hypercalls.  */
 		assign_new_domain_page_if_dom0(d, FW_HYPERCALL_BASE_PADDR);
 		imva_hypercall_base = (unsigned long)domain_mpa_to_imva
 		    (d, FW_HYPERCALL_BASE_PADDR);
 
+		/* Estimate necessary efi memmap size and allocate memory */
+		fw_tables_size = sizeof(*fw_tables) +
+			(ia64_boot_param->efi_memmap_size /
+			 ia64_boot_param->efi_memdesc_size + NUM_MEM_DESCS) *
+			sizeof(fw_tables->efi_memmap[0]);
+		if (fw_tables_size <
+		    FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR)
+			fw_tables_size =
+			    FW_TABLES_END_PADDR_MIN - FW_TABLES_BASE_PADDR;
+		fw_tables_size = (fw_tables_size + ((1UL << EFI_PAGE_SHIFT) - 1))
+			& ~((1UL << EFI_PAGE_SHIFT) - 1);
+		fw_tables =
+		    (struct fw_tables *)_xmalloc(fw_tables_size,
+						 __alignof__(*fw_tables));
+		if (fw_tables == NULL) {
+			dprintk(XENLOG_INFO,
+				"can't allocate fw_tables memory size = %ld\n",
+				fw_tables_size);
+			return -ENOMEM;
+		}
+		memset(fw_tables, 0, fw_tables_size);
+		BUILD_BUG_ON(FW_END_PADDR_MIN != FW_TABLES_END_PADDR_MIN);
+		fw_tables->fw_tables_size = fw_tables_size;
+		fw_tables->fw_end_paddr = FW_TABLES_BASE_PADDR + fw_tables_size;
+		fw_tables->fw_tables_end_paddr =
+			FW_TABLES_BASE_PADDR + fw_tables_size;
+		fw_tables->num_mds = 0;
+
+		/* It is necessary to allocate pages before dom_fw_init()
+		 * dom_fw_init() uses up page to d->max_pages.
+		 */
+		for (gpaddr = FW_TABLES_BASE_PADDR;
+		     gpaddr < fw_tables->fw_end_paddr; gpaddr += PAGE_SIZE)
+			assign_new_domain_page_if_dom0(d, gpaddr);
+
 		ret = dom_fw_init(d, d->arch.breakimm, bp,
-				  imva_tables_base, imva_hypercall_base,
-				  maxmem);
-		if (ret < 0)
+				  fw_tables, imva_hypercall_base, maxmem);
+		if (ret < 0) {
+			xfree(fw_tables);
 			return ret;
+		}
+		if (sizeof(*fw_tables) +
+		    fw_tables->num_mds * sizeof(fw_tables->efi_memmap[0]) >
+		    fw_tables_size) {
+			panic("EFI memmap too large. Increase NUM_MEM_DESCS.\n"
+			      "fw_table_size %ld > %ld num_mds %ld "
+			      "NUM_MEM_DESCS %d.\n",
+			      fw_tables_size, fw_tables->fw_tables_size,
+			      fw_tables->num_mds, NUM_MEM_DESCS);
+		}
+		fw_tables_size = sizeof(*fw_tables) +
+			fw_tables->num_mds * sizeof(fw_tables->efi_memmap[0]);
+
+		/* clear domain builder internal use member */
+		fw_tables->fw_tables_size = 0;
+		fw_tables->fw_end_paddr = 0;
+		fw_tables->fw_tables_end_paddr = 0;
+		fw_tables->num_mds = 0;
+
+		/* copy fw_tables into domain pseudo physical address space */
+		dom_fw_copy_to(d, FW_TABLES_BASE_PADDR, fw_tables,
+			       fw_tables_size);
+		xfree(fw_tables);
 	}
 
-	dom_fw_domain_init(d, imva_tables_base);
+	dom_fw_domain_init(d, domain_mpa_to_imva(d, FW_TABLES_BASE_PADDR));
 	return dom_fw_set_convmem_end(d);
 }
 

@@ -14,6 +14,6 @@ int
 xen_ia64_dom_fw_setup(struct xc_dom_image *d, uint64_t brkimm,
                       unsigned long bp_mpa, unsigned long maxmem);
 #define efi_systable_init_dom0(tables)	assert(0)
-#define complete_dom0_memmap(d, tables, maxmem, num_mds) ({assert(0);0;})
+#define complete_dom0_memmap(d, tables) ({assert(0);0;})
 
 #endif /* XC_IA64_DOM_IA64_UTIL_H */

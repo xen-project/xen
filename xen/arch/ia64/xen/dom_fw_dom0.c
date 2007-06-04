@@ -32,6 +32,7 @@
 #include <asm/dom_fw.h>
 #include <asm/dom_fw_common.h>
 #include <asm/dom_fw_dom0.h>
+#include <asm/dom_fw_utils.h>
 
 #include <linux/sort.h>
 
@@ -158,21 +159,26 @@ void __init efi_systable_init_dom0(struct fw_tables *tables)
 }
 
 static void __init
-setup_dom0_memmap_info(struct domain *d, struct fw_tables *tables, int *num_mds)
+setup_dom0_memmap_info(struct domain *d, struct fw_tables *tables)
 {
 	int i;
+	size_t size;
+	unsigned int num_pages;
 	efi_memory_desc_t *md;
 	efi_memory_desc_t *last_mem_md = NULL;
 	xen_ia64_memmap_info_t *memmap_info;
 	unsigned long paddr_start;
 	unsigned long paddr_end;
 
-	for (i = *num_mds - 1; i >= 0; i--) {
+	size = sizeof(*memmap_info) +
+		(tables->num_mds + 1) * sizeof(tables->efi_memmap[0]);
+	num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	for (i = tables->num_mds - 1; i >= 0; i--) {
 		md = &tables->efi_memmap[i];
 		if (md->attribute == EFI_MEMORY_WB &&
 		    md->type == EFI_CONVENTIONAL_MEMORY &&
 		    md->num_pages >
-		    2 * (1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT))) {
+		    ((num_pages + 1) << (PAGE_SHIFT - EFI_PAGE_SHIFT))) {
 			last_mem_md = md;
 			break;
 		}
@@ -186,45 +192,71 @@ setup_dom0_memmap_info(struct domain *d, struct fw_tables *tables, int *num_mds)
 	}
 	paddr_end = last_mem_md->phys_addr +
 	    (last_mem_md->num_pages << EFI_PAGE_SHIFT);
-	paddr_start = (paddr_end - PAGE_SIZE) & PAGE_MASK;
-	last_mem_md->num_pages -=
-	    (paddr_end - paddr_start) / (1UL << EFI_PAGE_SHIFT);
+	paddr_start = (paddr_end - (num_pages << PAGE_SHIFT)) & PAGE_MASK;
+	last_mem_md->num_pages -= (paddr_end - paddr_start) >> EFI_PAGE_SHIFT;
 
-	md = &tables->efi_memmap[*num_mds];
-	(*num_mds)++;
+	md = &tables->efi_memmap[tables->num_mds];
+	tables->num_mds++;
 	md->type = EFI_RUNTIME_SERVICES_DATA;
 	md->phys_addr = paddr_start;
 	md->virt_addr = 0;
-	md->num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+	md->num_pages = num_pages << (PAGE_SHIFT - EFI_PAGE_SHIFT);
 	md->attribute = EFI_MEMORY_WB;
 
-	memmap_info = domain_mpa_to_imva(d, md->phys_addr);
-	BUG_ON(*num_mds > NUM_MEM_DESCS);
+	BUG_ON(tables->fw_tables_size <
+	       sizeof(*tables) +
+	       sizeof(tables->efi_memmap[0]) * tables->num_mds);
+	/* with this sort, md doesn't point memmap table */
+	sort(tables->efi_memmap, tables->num_mds,
+	     sizeof(efi_memory_desc_t), efi_mdt_cmp, NULL);
 
+	memmap_info = domain_mpa_to_imva(d, paddr_start);
 	memmap_info->efi_memdesc_size = sizeof(md[0]);
 	memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
-	memmap_info->efi_memmap_size = *num_mds * sizeof(md[0]);
-	memcpy(&memmap_info->memdesc, &tables->efi_memmap[0],
-	       memmap_info->efi_memmap_size);
-	d->shared_info->arch.memmap_info_num_pages = 1;
-	d->shared_info->arch.memmap_info_pfn = md->phys_addr >> PAGE_SHIFT;
+	memmap_info->efi_memmap_size = tables->num_mds * sizeof(md[0]);
+	dom_fw_copy_to(d,
+		       paddr_start + offsetof(xen_ia64_memmap_info_t, memdesc),
+		       &tables->efi_memmap[0], memmap_info->efi_memmap_size);
+	d->shared_info->arch.memmap_info_num_pages = num_pages;
+	d->shared_info->arch.memmap_info_pfn = paddr_start >> PAGE_SHIFT;
+}
 
-	sort(tables->efi_memmap, *num_mds, sizeof(efi_memory_desc_t),
-	     efi_mdt_cmp, NULL);
+/* setup_guest() @ libxc/xc_linux_build() arranges memory for domU.
+ * however no one arranges memory for dom0,
+ * instead we allocate pages manually.
+ */
+static void
+assign_new_domain0_range(struct domain *d, const efi_memory_desc_t * md)
+{
+	if (md->type == EFI_PAL_CODE ||
+	    md->type == EFI_RUNTIME_SERVICES_DATA ||
+	    md->type == EFI_CONVENTIONAL_MEMORY) {
+		unsigned long start = md->phys_addr & PAGE_MASK;
+		unsigned long end =
+			md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+		unsigned long addr;
+
+		if (end == start) {
+			/* md->num_pages = 0 is allowed. */
+			return;
+		}
+
+		for (addr = start; addr < end; addr += PAGE_SIZE)
+			assign_new_domain0_page(d, addr);
+	}
 }
 
 /* Complete the dom0 memmap.  */
 int __init
-complete_dom0_memmap(struct domain *d,
-		     struct fw_tables *tables,
-		     unsigned long maxmem, int num_mds)
+complete_dom0_memmap(struct domain *d, struct fw_tables *tables)
 {
-	efi_memory_desc_t *md;
 	u64 addr;
 	void *efi_map_start, *efi_map_end, *p;
 	u64 efi_desc_size;
 	int i;
-	unsigned long dom_mem = maxmem - (d->tot_pages << PAGE_SHIFT);
+
+	for (i = 0; i < tables->num_mds; i++)
+		assign_new_domain0_range(d, &tables->efi_memmap[i]);
 
 	/* Walk through all MDT entries.
 	   Copy all interesting entries.  */
@@ -234,7 +266,7 @@ complete_dom0_memmap(struct domain *d,
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		const efi_memory_desc_t *md = p;
-		efi_memory_desc_t *dom_md = &tables->efi_memmap[num_mds];
+		efi_memory_desc_t *dom_md = &tables->efi_memmap[tables->num_mds];
 		u64 start = md->phys_addr;
 		u64 size = md->num_pages << EFI_PAGE_SHIFT;
 		u64 end = start + size;
@@ -267,7 +299,7 @@ complete_dom0_memmap(struct domain *d,
 			/* Copy descriptor.  */
 			*dom_md = *md;
 			dom_md->virt_addr = 0;
-			num_mds++;
+			tables->num_mds++;
 			break;
 
 		case EFI_MEMORY_MAPPED_IO_PORT_SPACE:
@@ -288,31 +320,55 @@ complete_dom0_memmap(struct domain *d,
 			*dom_md = *md;
 			dom_md->phys_addr = mpaddr;
 			dom_md->virt_addr = 0;
-			num_mds++;
+			tables->num_mds++;
 			break;
 
 		case EFI_CONVENTIONAL_MEMORY:
 		case EFI_LOADER_CODE:
 		case EFI_LOADER_DATA:
 		case EFI_BOOT_SERVICES_CODE:
-		case EFI_BOOT_SERVICES_DATA:
+		case EFI_BOOT_SERVICES_DATA: {
+			u64 dom_md_start;
+			u64 dom_md_end;
+			unsigned long left_mem =
+				(unsigned long)(d->max_pages - d->tot_pages) <<
+				PAGE_SHIFT;
+
 			if (!(md->attribute & EFI_MEMORY_WB))
 				break;
 
-			start = max(FW_END_PADDR, start);
-			end = min(start + dom_mem, end);
-			if (end <= start)
-				break;
+			dom_md_start = max(tables->fw_end_paddr, start);
+			dom_md_end = dom_md_start;
+			do {
+				dom_md_end = min(dom_md_end + left_mem, end);
+				if (dom_md_end < dom_md_start + PAGE_SIZE)
+					break;
 
-			dom_md->type = EFI_CONVENTIONAL_MEMORY;
-			dom_md->phys_addr = start;
-			dom_md->virt_addr = 0;
-			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
-			dom_md->attribute = EFI_MEMORY_WB;
-			num_mds++;
+				dom_md->type = EFI_CONVENTIONAL_MEMORY;
+				dom_md->phys_addr = dom_md_start;
+				dom_md->virt_addr = 0;
+				dom_md->num_pages =
+					(dom_md_end - dom_md_start) >>
+					EFI_PAGE_SHIFT;
+				dom_md->attribute = EFI_MEMORY_WB;
 
-			dom_mem -= dom_md->num_pages << EFI_PAGE_SHIFT;
+				assign_new_domain0_range(d, dom_md);
+				/*
+				 * recalculate left_mem.
+				 * we might already allocated memory in
+				 * this region because of kernel loader.
+				 * So we might consumed less than
+				 * (dom_md_end - dom_md_start) above.
+				 */
+				left_mem = (unsigned long)
+					(d->max_pages - d->tot_pages) <<
+					PAGE_SHIFT;
+			} while (left_mem > 0 && dom_md_end < end);
+
+			if (!(dom_md_end < dom_md_start + PAGE_SIZE))
+				tables->num_mds++;
 			break;
+		}
 
 		case EFI_UNUSABLE_MEMORY:
 		case EFI_PAL_CODE:
@@ -326,7 +382,7 @@ complete_dom0_memmap(struct domain *d,
 			dom_md->virt_addr = 0;
 			dom_md->num_pages = (end - start) >> EFI_PAGE_SHIFT;
 			dom_md->attribute = EFI_MEMORY_WB;
-			num_mds++;
+			tables->num_mds++;
 			break;
 
 		default:
@@ -335,34 +391,13 @@ complete_dom0_memmap(struct domain *d,
 			       "unhandled MDT entry type %u\n", md->type);
 		}
 	}
-	BUG_ON(num_mds > NUM_MEM_DESCS);
+	BUG_ON(tables->fw_tables_size <
+	       sizeof(*tables) +
+	       sizeof(tables->efi_memmap[0]) * tables->num_mds);
 
-	sort(tables->efi_memmap, num_mds, sizeof(efi_memory_desc_t),
+	sort(tables->efi_memmap, tables->num_mds, sizeof(efi_memory_desc_t),
 	     efi_mdt_cmp, NULL);
 
-	/* setup_guest() @ libxc/xc_linux_build() arranges memory for domU.
-	 * however no one arranges memory for dom0,
-	 * instead we allocate pages manually.
-	 */
-	for (i = 0; i < num_mds; i++) {
-		md = &tables->efi_memmap[i];
-
-		if (md->type == EFI_LOADER_DATA ||
-		    md->type == EFI_PAL_CODE ||
-		    md->type == EFI_CONVENTIONAL_MEMORY) {
-			unsigned long start = md->phys_addr & PAGE_MASK;
-			unsigned long end = md->phys_addr +
-			    (md->num_pages << EFI_PAGE_SHIFT);
-
-			if (end == start) {
-				/* md->num_pages = 0 is allowed. */
-				continue;
-			}
-
-			for (addr = start; addr < end; addr += PAGE_SIZE)
-				assign_new_domain0_page(d, addr);
-		}
-	}
 	// Map low-memory holes & unmapped MMIO for legacy drivers
 	for (addr = 0; addr < ONE_MB; addr += PAGE_SIZE) {
 		if (domain_page_mapped(d, addr))
@@ -375,8 +410,8 @@ complete_dom0_memmap(struct domain *d,
 						flags);
 		}
 	}
-	setup_dom0_memmap_info(d, tables, &num_mds);
-	return num_mds;
+	setup_dom0_memmap_info(d, tables);
+	return tables->num_mds;
 }
 
 /*
