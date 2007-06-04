@@ -122,7 +122,7 @@ clean::
 
 .PHONY: delete
 delete: 
-	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 
+	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) $(LINUX_SRCDIR)
 
 .PHONY: mrproper
 mrproper:
