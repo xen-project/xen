@@ -467,7 +467,6 @@ static void complete_domain_destroy(struct rcu_head *head)
             continue;
         vcpu_destroy(v);
         sched_destroy_vcpu(v);
-        free_vcpu_struct(v);
     }
 
     acm_domain_destroy(d);
@@ -480,6 +479,10 @@ static void complete_domain_destroy(struct rcu_head *head)
     arch_domain_destroy(d);
 
     sched_destroy_domain(d);
+
+    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
+        if ( (v = d->vcpu[i]) != NULL )
+            free_vcpu_struct(v);
 
     free_domain(d);
 
