@@ -269,7 +269,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
         /* Other vcpu register state */
         vc = &v->arch.guest_context;
-        if ( vc->flags & VGCF_i387_valid )
+        if ( v->fpu_initialised )
             memcpy(ctxt.fpu_regs, &vc->fpu_ctxt, sizeof(ctxt.fpu_regs));
         else 
             memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
@@ -361,7 +361,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc->debugreg[6] = ctxt.dr6;
     vc->debugreg[7] = ctxt.dr7;
 
-    vc->flags = VGCF_i387_valid | VGCF_online;
+    vc->flags = VGCF_online;
     v->fpu_initialised = 1;
 
     /* Auxiliary processors should be woken immediately. */
