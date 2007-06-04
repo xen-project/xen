@@ -1087,23 +1087,16 @@ ENTRY(hyper_rfi)
 	ld4 r20=[r20];;
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.few slow_vcpu_rfi ;;
+#if 0
 	// if domain hasn't already done virtual bank switch
 	//  do it the slow way (FIXME later?)
-#if 0
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.eq p7,p0=r20,r0
 (p7)	br.spnt.few slow_vcpu_rfi ;;
 #endif
-	// validate vcr.iip, if in Xen range, do it the slow way
 	adds r20=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r22=[r20];;
-	movl r23=HYPERVISOR_VIRT_START
-	movl r24=HYPERVISOR_VIRT_END;;
-	cmp.ltu p0,p7=r22,r23 ;;	// if !(iip<low) &&
-(p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
-(p7)	br.spnt.few slow_vcpu_rfi ;;
-
 1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=FAST_HYPERPRIVOP_PERFC(HYPERPRIVOP_RFI);;
