@@ -4,7 +4,6 @@ include Config.mk
 export DESTDIR
 
 ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
-ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 
 %-install:
 	$(MAKE) -f buildconfigs/mk.$* build

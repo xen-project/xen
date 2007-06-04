@@ -114,8 +114,6 @@ performed with root privileges.]
    version for unstable.
 
 2. cd to xen-unstable (or whatever you sensibly rename it to).
-   The Linux, netbsd and freebsd kernel source trees are in
-   the $os-$version-xen-sparse directories.
 
 On Linux:
 
