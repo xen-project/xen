@@ -86,7 +86,7 @@ void daemonize(const char *pidfile)
 	if (chdir("/") < 0)
 		exit (1);
 
-	fd = open(pidfile, O_RDWR | O_CREAT);
+	fd = open(pidfile, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR);
 	if (fd == -1) {
 		exit(1);
 	}
