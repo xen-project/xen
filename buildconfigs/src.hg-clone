@@ -20,17 +20,24 @@ endif
 XEN_LINUX_HGREV  ?= tip
 
 $(LINUX_SRCDIR)/.valid-src: $(__XEN_LINUX_UPDATE)
-	set -e ; __repo=$(XEN_LINUX_HGREPO) ; \
-	if [ ! -d $(LINUX_SRCDIR) ] ; then \
-	    echo "Cloning $${__repo} to $(LINUX_SRCDIR)." ; \
-	    $(HG) clone $${__repo} $(LINUX_SRCDIR) ; \
+	set -e ; \
+	if [ ! -e $(LINUX_SRCDIR)/.hg ] ; then \
+	    __repo=$(XEN_LINUX_HGREPO) ; \
+	    if [ -d $${__repo} ] ; then \
+	        echo "Linking $${__repo} to $(LINUX_SRCDIR)." ; \
+	        ln -s $${__repo} $(LINUX_SRCDIR) ; \
+	    else \
+	        echo "Cloning $${__repo} to $(LINUX_SRCDIR)." ; \
+	        $(HG) clone $${__repo} $(LINUX_SRCDIR) ; \
+	    fi ; \
 	else \
-	    echo "Pulling changes from $${__repo} into $(LINUX_SRCDIR)." ; \
-	    $(HG) -R $(LINUX_SRCDIR) pull $${__repo} ; \
+	    __parent=$$($(HG) -R $(LINUX_SRCDIR) path default) ; \
+	    echo "Pulling changes from $${__parent} into $(LINUX_SRCDIR)." ; \
+	    $(HG) -R $(LINUX_SRCDIR) pull $${__parent} ; \
 	fi
 	if [ -n "$(XEN_LINUX_HGREV)" ] ; then \
 	    echo "Updating $(LINUX_SRCDIR) to revision $(XEN_LINUX_HGREV)." ; \
-	    $(HG) update -R $(LINUX_SRCDIR) $(XEN_LINUX_HGREV) ; \
+	    ( cd $(LINUX_SRCDIR) && $(HG) update $(XEN_LINUX_HGREV) ); \
 	fi
 	touch $@
 
