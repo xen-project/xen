@@ -7,7 +7,7 @@ EXTRAVERSION ?= -xen
 # repositories.
 LINUX_SRC_PATH ?= .:..
 
-XEN_LINUX_SOURCE ?= sparse
+XEN_LINUX_SOURCE ?= hg-clone
 
 # Let XEN_TARGET_ARCH override ARCH.
 ifeq ($(XEN_TARGET_ARCH),x86_32)
