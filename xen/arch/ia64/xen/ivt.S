@@ -587,9 +587,13 @@ ENTRY(break_fault)
 	;;
 	ld8 r18=[r18]    
 	;;
-	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
+#ifdef CONFIG_PRIVIFY
+	// pseudo-cover are replaced by break.b which (unfortunatly) always
+	// clear iim.
+	cmp.eq p7,p0=r0,r17
 (p7)	br.spnt.many dispatch_privop_fault
 	;;
+#endif
 	// if (ipsr.cpl == 2 && (iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX)
 	// this is a hyperprivop. A hyperprivop is hand-coded assembly with
 	// psr.ic off which means it can make no calls, cannot use r1-r15,

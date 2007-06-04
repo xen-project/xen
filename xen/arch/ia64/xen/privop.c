@@ -702,7 +702,7 @@ static IA64FAULT priv_handle_op(VCPU * vcpu, REGS * regs, int privlvl)
 			perfc_incr(bsw1);
 			return priv_bsw1(vcpu, inst);
 		}
-		if (inst.B8.x6 == 0x0) {
+		if (privify_en && inst.B8.x6 == 0x0) {
 			// break instr for privified cover
 			perfc_incr(cover);
 			return priv_cover(vcpu, inst);
