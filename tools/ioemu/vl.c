@@ -183,7 +183,7 @@ extern int vcpus;
 
 int xc_handle;
 
-char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
+char domain_name[64] = "Xen HVM Guest";
 extern int domid;
 
 char vncpasswd[64];
@@ -7058,7 +7058,7 @@ int main(int argc, char **argv)
     extern void *buffered_pio_page;
 #endif
 
-    char qemu_dm_logfilename[64];
+    char qemu_dm_logfilename[128];
 
     LIST_INIT (&vm_change_state_head);
 #ifndef _WIN32
@@ -7525,7 +7525,8 @@ int main(int argc, char **argv)
                 semihosting_enabled = 1;
                 break;
             case QEMU_OPTION_domainname:
-                strncpy(domain_name, optarg, sizeof(domain_name) - 1);
+                strncpy(domain_name, optarg, sizeof(domain_name));
+                domain_name[sizeof(domain_name)-1] = '\0';
                 break;
             case QEMU_OPTION_d:
                 domid = atoi(optarg);
