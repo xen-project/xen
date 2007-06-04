@@ -119,9 +119,8 @@ ENTRY(itlb_miss)
 	;;
 	/* If address belongs to VMM, go to alt tlb handler */
 	cmp.eq p6,p0=0x1e,r17
-(p6)	br.cond.spnt	late_alt_itlb_miss
 	;;
-	cmp.eq p6,p0=0x1d,r17
+	cmp.eq.or p6,p0=0x1d,r17
 (p6)	br.cond.spnt	late_alt_itlb_miss
 	;;
 	mov pr = r31, 0x1ffff
@@ -140,68 +139,11 @@ ENTRY(dtlb_miss)
 	;;
 	extr.u r17=r16,59,5
 	;;
-	cmp.eq p6,p0=0x1e,r17		// if the address belongs to VMM, go
-					//   to the alternate tlb handler
+	/* If address belongs to VMM, go to alt tlb handler */
+	cmp.eq p6,p0=0x1e,r17
+	;;
+	cmp.eq.or p6,p0=0x1d,r17
 (p6)	br.cond.spnt	late_alt_dtlb_miss
-	;;
-	cmp.eq p6,p0=0x1d,r17
-(p6)	br.cond.spnt	late_alt_dtlb_miss
-	;;
-#if VHPT_ENABLED
-	mov r30=cr.ipsr			// XXX TODO optimization
-	mov r28=cr.iip			
-	mov r17=cr.isr
-	;;
-
-	extr.u r18 = r30, IA64_PSR_CPL0_BIT, 2	// extract psr.cpl
-	;; 
-	cmp.ne p6, p0 = r0, r18			// cpl == 0?
-(p6)	br.cond.sptk 2f
-
-	tbit.nz p7,p0=r17,IA64_ISR_SP_BIT	// is speculation bit on?
-	;; 
-(p7)	br.cond.spnt 2f
-
-	// Is the faulted iip in the vmm area?
-	//    -- check [59:58] bit
-	//    -- if 00, 11: guest
-	//    -- if 01, 10: vmm
-	extr.u r19 = r28, 58, 2
-	;; 
-	cmp.eq p10, p0 = 0x0, r19
-(p10)	br.cond.sptk 2f
-	cmp.eq p11, p0 = 0x3, r19
-(p11)	br.cond.sptk 2f
-
-	// Is the faulted address is in the identity mapping area?
-	// must be either 0xf000... or 0xe8000...
-	extr.u r20 = r16, 59, 5
-	;; 
-	cmp.eq p12, p0 = 0x1e, r20 	// (0xf0 >> 3) = 0x1e
-(p12)	br.cond.spnt 1f
-	cmp.eq p0, p13 = 0x1d, r20 	// (0xe8 >> 3) = 0x1d
-(p13)	br.cond.sptk 2f
-
-1:
-	movl r24=PAGE_KERNEL 		// xen identity mapping area.
-	movl r25=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
-	;;
-	shr.u r26=r16,55	// move address bit 59 to bit 4
-	and r25=r25,r16		// clear ed, reserved bits, and PTE control bits
-	;;
-	and r26=0x10,r26	// bit 4=address-bit(59)
-	;; 
-	or r25=r25,r24		// insert PTE control bits into r25
-	;;
-	or r25=r25,r26		// set bit 4 (uncached) if the access was to
-				//   region 6
-	;;
-	itc.d r25		// insert the TLB entry
-	mov pr=r31,-1
-	rfi
-
-2:
-#endif	
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
 END(dtlb_miss)
