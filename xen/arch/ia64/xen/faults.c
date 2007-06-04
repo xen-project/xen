@@ -84,7 +84,7 @@ static void reflect_interruption(unsigned long isr, struct pt_regs *regs,
 		check_bad_nested_interruption(isr, regs, vector);
 	PSCB(v, unat) = regs->ar_unat;	// not sure if this is really needed?
 	PSCB(v, precover_ifs) = regs->cr_ifs;
-	PSCB(v, ipsr) = vcpu_get_ipsr_int_state(v, regs->cr_ipsr);
+	PSCB(v, ipsr) = vcpu_get_psr(v);
 	vcpu_bsw0(v);
 	PSCB(v, isr) = isr;
 	PSCB(v, iip) = regs->cr_iip;
@@ -129,7 +129,7 @@ void reflect_event(void)
 		       regs->cr_ipsr, regs->cr_iip, isr, PSCB(v, iip));
 	PSCB(v, unat) = regs->ar_unat;	// not sure if this is really needed?
 	PSCB(v, precover_ifs) = regs->cr_ifs;
-	PSCB(v, ipsr) = vcpu_get_ipsr_int_state(v, regs->cr_ipsr);
+	PSCB(v, ipsr) = vcpu_get_psr(v);
 	vcpu_bsw0(v);
 	PSCB(v, isr) = isr;
 	PSCB(v, iip) = regs->cr_iip;

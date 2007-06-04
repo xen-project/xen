@@ -539,6 +539,8 @@ u64 vcpu_get_psr(VCPU * vcpu)
 	/* Fool cpl.  */
 	if (ipsr.ia64_psr.cpl < 3)
 		newpsr.ia64_psr.cpl = 0;
+	else
+		newpsr.ia64_psr.cpl = 3;
 
 	newpsr.ia64_psr.bn = PSCB(vcpu, banknum);
 	
@@ -550,30 +552,6 @@ IA64FAULT vcpu_get_psr_masked(VCPU * vcpu, u64 * pval)
   	u64 psr = vcpu_get_psr(vcpu);
 	*pval = psr & (MASK(0, 32) | MASK(35, 2));
 	return IA64_NO_FAULT;
-}
-
-u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr)
-{
-	u64 dcr = PSCB(vcpu, dcr);
-	PSR psr;
-
-	//printk("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
-	psr.i64 = prevpsr;
-	psr.ia64_psr.pp = 0;
-	if (dcr & IA64_DCR_PP)
-		psr.ia64_psr.pp = 1;
-	psr.ia64_psr.ic = PSCB(vcpu, interrupt_collection_enabled);
-	psr.ia64_psr.i = !vcpu->vcpu_info->evtchn_upcall_mask;
-	psr.ia64_psr.bn = PSCB(vcpu, banknum);
-	psr.ia64_psr.dfh = PSCB(vcpu, vpsr_dfh);
-	psr.ia64_psr.dt = 1;
-	psr.ia64_psr.it = 1;
-	psr.ia64_psr.rt = 1;
-	if (psr.ia64_psr.cpl == 2)
-		psr.ia64_psr.cpl = 0;	// !!!! fool domain
-	// psr.pk = 1;
-	//printk("returns 0x%016lx...\n",psr.i64);
-	return psr.i64;
 }
 
 BOOLEAN vcpu_get_psr_ic(VCPU * vcpu)

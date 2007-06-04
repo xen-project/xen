@@ -41,7 +41,6 @@ extern IA64FAULT vcpu_set_ar(VCPU * vcpu, u64 reg, u64 val);
 extern IA64FAULT vcpu_get_ar(VCPU * vcpu, u64 reg, u64 * val);
 /* psr */
 extern BOOLEAN vcpu_get_psr_ic(VCPU * vcpu);
-extern u64 vcpu_get_ipsr_int_state(VCPU * vcpu, u64 prevpsr);
 extern u64 vcpu_get_psr(VCPU * vcpu);
 extern IA64FAULT vcpu_get_psr_masked(VCPU * vcpu, u64 * pval);
 extern IA64FAULT vcpu_reset_psr_sm(VCPU * vcpu, u64 imm);
