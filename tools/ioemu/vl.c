@@ -7146,9 +7146,7 @@ int main(int argc, char **argv)
     nb_nics = 0;
     /* default mac address of the first network interface */
     
-    /* init debug */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%ld.log", (long)getpid());
-    cpu_set_log_filename(qemu_dm_logfilename);
+    /* Init logs to stderr to start with */
     cpu_set_log(0);
     
     optind = 1;
@@ -7527,7 +7525,7 @@ int main(int argc, char **argv)
                 semihosting_enabled = 1;
                 break;
             case QEMU_OPTION_domainname:
-                strncat(domain_name, optarg, sizeof(domain_name) - 20);
+                strncpy(domain_name, optarg, sizeof(domain_name) - 1);
                 break;
             case QEMU_OPTION_d:
                 domid = atoi(optarg);
@@ -7549,6 +7547,10 @@ int main(int argc, char **argv)
             }
         }
     }
+
+    /* Now send logs to our named config */
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%s.log", domain_name);
+    cpu_set_log_filename(qemu_dm_logfilename);
 
 #ifndef _WIN32
     if (daemonize && !nographic && vnc_display == NULL && vncunused == 0) {

@@ -124,7 +124,6 @@ void *io_mem_opaque[IO_MEM_NB_ENTRIES];
 static int io_mem_nb = 1;
 
 /* log support */
-char *logfilename = "/tmp/qemu.log";
 FILE *logfile;
 int loglevel;
 
@@ -166,29 +165,28 @@ void cpu_exec_init(CPUState *env)
 void cpu_set_log(int log_flags)
 {
     loglevel = log_flags;
-    if (!logfile) {
-        logfile = fopen(logfilename, "w");
-        if (!logfile) {
-            perror(logfilename);
-            _exit(1);
-        }
-#if !defined(CONFIG_SOFTMMU)
-        /* must avoid mmap() usage of glibc by setting a buffer "by hand" */
-        {
-            static uint8_t logfile_buf[4096];
-            setvbuf(logfile, logfile_buf, _IOLBF, sizeof(logfile_buf));
-        }
-#else
-        setvbuf(logfile, NULL, _IOLBF, 0);
-#endif
-        stdout = logfile;
-        stderr = logfile;
-    }
+    if (!logfile)
+      logfile = stderr;
 }
 
 void cpu_set_log_filename(const char *filename)
 {
-    logfilename = strdup(filename);
+    logfile = fopen(filename, "w");
+    if (!logfile) {
+        perror(filename);
+	_exit(1);
+    }
+#if !defined(CONFIG_SOFTMMU)
+    /* must avoid mmap() usage of glibc by setting a buffer "by hand" */
+    {
+        static uint8_t logfile_buf[4096];
+	setvbuf(logfile, logfile_buf, _IOLBF, sizeof(logfile_buf));
+    }
+#else
+    setvbuf(logfile, NULL, _IOLBF, 0);
+#endif
+    stdout = logfile;
+    stderr = logfile;
 }
 
 /* mask must never be zero, except for A20 change call */
