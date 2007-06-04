@@ -56,7 +56,7 @@ typedef struct settings_st {
     uint32_t evt_mask;
     uint32_t cpu_mask;
     unsigned long tbuf_size;
-    int discard:1;
+    uint8_t discard:1;
 } settings_t;
 
 settings_t opts;
@@ -308,12 +308,9 @@ int monitor_tbufs(FILE *logfile)
     meta  = init_bufs_ptrs(tbufs_mapped, num, size);
     data  = init_rec_ptrs(meta, num);
 
-    if(opts.discard) {
-        for ( i = 0; (i < num) ; i++ )
-        {
-	    meta[i]->cons = meta[i]->prod;
-        }
-    }
+    if ( opts.discard )
+        for ( i = 0; i < num; i++ )
+            meta[i]->cons = meta[i]->prod;
 
     /* now, scan buffers for events */
     while ( !interrupted )
@@ -423,7 +420,7 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
 
     case 'D': /* Discard traces currently in the buffer before beginning */
     {
-        opts.discard=1;
+        opts.discard = 1;
     }
     break;
 
