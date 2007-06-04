@@ -31,6 +31,15 @@ Privileged operation emulation routines
 
 static IA64FAULT priv_rfi(VCPU * vcpu, INST64 inst)
 {
+	REGS *regs = vcpu_regs(vcpu);
+	if (PSCB(vcpu, ifs) > 0x8000000000000000UL
+	    && regs->cr_ifs > 0x8000000000000000UL) {
+		panic_domain(regs,
+			     "rfi emulation with double uncover is "
+			     "impossible - use hyperprivop\n"
+			     " ip=0x%lx vifs=0x%lx ifs=0x%lx\n",
+			     regs->cr_iip, PSCB(vcpu, ifs), regs->cr_ifs);
+	}
 	return vcpu_rfi(vcpu);
 }
 

@@ -1029,8 +1029,22 @@ ENTRY(slow_vcpu_rfi)
 	ld8 r22=[r22];;
 	tbit.z p6,p0=r22,63
 (p6)	br.spnt.few dispatch_break_fault ;;
-	// if vips is valid, discard current register frame
-	// don't need dorfirfi any more
+	// If vifs.v is set, we have two IFS to consider:
+	// * the guest IFS
+	// * the hypervisor IFS (validated by cover)
+	// Because IFS is copied to CFM and is used to adjust AR.BSP,
+	// virtualization of rfi is not easy.
+	// Previously there was a two steps method (a first rfi jumped to
+	// a stub which performed a new rfi).
+	// This new method discards the RS before executing the hypervisor
+	// cover.  After cover, IFS.IFM will be zero.  This IFS would simply
+	// clear CFM but not modifying AR.BSP.  Therefore the guest IFS can
+	// be used instead and there is no need of a second rfi.
+	// Discarding the RS with the following alloc instruction just clears
+	// CFM, which is safe because rfi will overwrite it.
+	// There is a drawback:	because the RS must be discarded before
+	// executing C code, emulation of rfi must go through an hyperprivop
+	// and not through normal instruction decoding.
 	alloc r22=ar.pfs,0,0,0,0
 	br.spnt.few dispatch_break_fault
 	;;
