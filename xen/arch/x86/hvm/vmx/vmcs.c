@@ -337,7 +337,7 @@ static void construct_vmcs(struct vcpu *v)
 #endif
 
     /* Host control registers. */
-    __vmwrite(HOST_CR0, read_cr0());
+    __vmwrite(HOST_CR0, read_cr0() | X86_CR0_TS);
     __vmwrite(HOST_CR4, read_cr4());
 
     /* Host CS:RIP. */
