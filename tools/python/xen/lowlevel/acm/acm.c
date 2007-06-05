@@ -1,10 +1,11 @@
 /****************************************************************
  * acm.c
  *
- * Copyright (C) 2006 IBM Corporation
+ * Copyright (C) 2006,2007 IBM Corporation
  *
  * Authors:
  * Reiner Sailer <sailer@watson.ibm.com>
+ * Stefan Berger <stefanb@us.ibm.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -197,13 +198,120 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
     return Py_BuildValue("s", decision);
 }
 
+/* error messages for exceptions */
+const char bad_arg[] = "Bad function argument.";
+const char ctrlif_op[] = "Could not open control interface.";
+const char hv_op_err[] = "Error from hypervisor operation.";
+
+
+static PyObject *chgpolicy(PyObject *self, PyObject *args)
+{
+    struct acm_change_policy chgpolicy;
+    int xc_handle, rc;
+    char *bin_pol = NULL, *del_arr = NULL, *chg_arr = NULL;
+    int bin_pol_len = 0, del_arr_len = 0, chg_arr_len = 0;
+    uint errarray_mbrs = 20 * 2;
+    uint32_t error_array[errarray_mbrs];
+    PyObject *result;
+    uint len;
+
+    memset(&chgpolicy, 0x0, sizeof(chgpolicy));
+
+    if (!PyArg_ParseTuple(args, "s#s#s#" ,&bin_pol, &bin_pol_len,
+                                          &del_arr, &del_arr_len,
+                                          &chg_arr, &chg_arr_len)) {
+        PyErr_SetString(PyExc_TypeError, bad_arg);
+        return NULL;
+    }
+
+    chgpolicy.policy_pushcache_size = bin_pol_len;
+    chgpolicy.delarray_size = del_arr_len;
+    chgpolicy.chgarray_size = chg_arr_len;
+    chgpolicy.errarray_size = sizeof(error_array);
+
+    set_xen_guest_handle(chgpolicy.policy_pushcache, bin_pol);
+    set_xen_guest_handle(chgpolicy.del_array, del_arr);
+    set_xen_guest_handle(chgpolicy.chg_array, chg_arr);
+    set_xen_guest_handle(chgpolicy.err_array, error_array);
+
+    if ((xc_handle = xc_interface_open()) <= 0) {
+        PyErr_SetString(PyExc_IOError, ctrlif_op);
+        return NULL;
+    }
+
+    rc = xc_acm_op(xc_handle, ACMOP_chgpolicy, &chgpolicy, sizeof(chgpolicy));
+
+    xc_interface_close(xc_handle);
+
+    /* only pass the filled error codes */
+    for (len = 0; (len + 1) < errarray_mbrs; len += 2) {
+        if (error_array[len] == 0) {
+            len *= sizeof(error_array[0]);
+            break;
+        }
+    }
+
+    result = Py_BuildValue("is#", rc, error_array, len);
+    return result;
+}
+
+
+static PyObject *relabel_domains(PyObject *self, PyObject *args)
+{
+    struct acm_relabel_doms reldoms;
+    int xc_handle, rc;
+    char *relabel_rules = NULL;
+    int rel_rules_len = 0;
+    uint errarray_mbrs = 20 * 2;
+    uint32_t error_array[errarray_mbrs];
+    PyObject *result;
+    uint len;
+
+    memset(&reldoms, 0x0, sizeof(reldoms));
+
+    if (!PyArg_ParseTuple(args, "s#" ,&relabel_rules, &rel_rules_len)) {
+        PyErr_SetString(PyExc_TypeError, bad_arg);
+        return NULL;
+    }
+
+    reldoms.relabel_map_size = rel_rules_len;
+    reldoms.errarray_size = sizeof(error_array);
+
+    set_xen_guest_handle(reldoms.relabel_map, relabel_rules);
+    set_xen_guest_handle(reldoms.err_array, error_array);
+
+    if ((xc_handle = xc_interface_open()) <= 0) {
+        PyErr_SetString(PyExc_IOError, ctrlif_op);
+        return NULL;
+    }
+
+    rc = xc_acm_op(xc_handle, ACMOP_relabeldoms, &reldoms, sizeof(reldoms));
+
+    xc_interface_close(xc_handle);
+
+
+    /* only pass the filled error codes */
+    for (len = 0; (len + 1) < errarray_mbrs; len += 2) {
+        if (error_array[len] == 0) {
+            len *= sizeof(error_array[0]);
+            break;
+        }
+    }
+
+    result = Py_BuildValue("is#", rc, error_array, len);
+    return result;
+}
+
+
 /*=================General Python Extension Declarations=================*/
 
 /* methods */
 static PyMethodDef acmMethods[] = {
-    {"policy", policy, METH_VARARGS, "Retrieve Active ACM Policy Reference Name"},
-    {"getssid", getssid, METH_VARARGS, "Retrieve label information and ssidref for a domain"},
+    {"policy",      policy,      METH_VARARGS, "Retrieve Active ACM Policy Reference Name"},
+    {"getssid",     getssid,     METH_VARARGS, "Retrieve label information and ssidref for a domain"},
     {"getdecision", getdecision, METH_VARARGS, "Retrieve ACM access control decision"},
+    {"chgpolicy",   chgpolicy,   METH_VARARGS, "Change the policy in one step"},
+    {"relabel_domains", relabel_domains, METH_VARARGS, "Relabel domains"},
     /* end of list (extend list above this line) */
     {NULL, NULL, 0, NULL}
 };
