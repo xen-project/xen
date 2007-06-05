@@ -45,5 +45,14 @@ if [ $? -ne 0 ] || [ X"$XEN" = "X" ] ; then
 fi
 
 echo "$ME: Found ${BASE}/${REPO}" 1>&2
-echo ${BASE}/${REPO}
+
+# If ${BASE}/${REPO} is a local directory then prepend file:// so that
+# the test in src.hg-clone will fail and we will clone instead of
+# linking this repository. We only want to link repositories which
+# were found via LINUX_SRC_PATH.
+if [ -d "${BASE}/${REPO}" ] ; then
+    echo "file://${BASE}/${REPO}"
+else
+    echo ${BASE}/${REPO}
+fi
 exit 0

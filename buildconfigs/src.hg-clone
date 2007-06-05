@@ -28,7 +28,7 @@ $(LINUX_SRCDIR)/.valid-src: $(__XEN_LINUX_UPDATE)
 	        ln -s $${__repo} $(LINUX_SRCDIR) ; \
 	    else \
 	        echo "Cloning $${__repo} to $(LINUX_SRCDIR)." ; \
-	        $(HG) clone $${__repo} $(LINUX_SRCDIR) ; \
+	        $(HG) clone $${__repo#file://} $(LINUX_SRCDIR) ; \
 	    fi ; \
 	else \
 	    __parent=$$($(HG) -R $(LINUX_SRCDIR) path default) ; \
