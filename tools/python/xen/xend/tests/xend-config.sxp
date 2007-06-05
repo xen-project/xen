@@ -62,9 +62,8 @@
 ##
 # To bridge network traffic, like this:
 #
-# dom0: fake eth0 -> vif0.0 -+
-#                            |
-#                          bridge -> real eth0 -> the network
+#
+# dom0: ----------------- bridge -> real eth0 -> the network
 #                            |
 # domU: fake eth0 -> vifN.0 -+
 #
