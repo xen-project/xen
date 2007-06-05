@@ -27,8 +27,6 @@
 #include "oftree.h"
 #include "rtas.h"
 
-#undef RTAS
-
 ofdn_t ofd_boot_cpu;
 
 #ifdef PAPR_VTERM
@@ -307,26 +305,6 @@ static ofdn_t ofd_chosen_props(void *m, const char *cmdline)
     return n;
 }
 
-#ifdef RTAS
-static ofdn_t ofd_rtas_props(void *m)
-{
-    static const char path[] = "/rtas";
-    static const char hypertas[] = "dummy";
-    ofdn_t p;
-    ofdn_t n;
-
-    /* just enough to make linux think its on LPAR */
-
-    p = ofd_node_find(m, "/");
-
-    n = ofd_node_add(m, p, path, sizeof(path));
-    ofd_prop_add(m, n, "name", &path[1], sizeof (path) - 1);
-    ofd_prop_add(m, n, "ibm,hypertas-functions", hypertas, sizeof (hypertas));
-
-    return n;
-}
-#endif
-
 static ofdn_t ofd_xen_props(void *m, struct domain *d, ulong shared_info)
 {
     ofdn_t n;
@@ -382,8 +360,8 @@ static ofdn_t ofd_xen_props(void *m, struct domain *d, ulong shared_info)
     return n;
 }
 
-int ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
-                   ulong shared_info)
+ulong ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
+                     ulong shared_info)
 {
     void *m;
     const ofdn_t n = OFD_ROOT;
@@ -423,11 +401,8 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
     printk("Remove original /rtas\n");
     ofd_prune_path(m, "/rtas");
 
-#ifdef RTAS
-    printk("Create a new RTAS with just enough stuff to convince "
-           "Linux that its on LPAR\n");
-    ofd_rtas_props(m);
-#endif
+    rtas_proxy_init(m);
+
 #ifdef FIX_COMPAT 
     const char compat[] = "Hypervisor,Maple";
     r = ofd_prop_add(m, n, "compatible", compat, sizeof (compat));
@@ -446,5 +421,5 @@ int ofd_dom0_fixup(struct domain *d, ulong mem, const char *cmdline,
 #ifdef DEBUG
     ofd_walk(m, __func__, OFD_ROOT, ofd_dump_props, OFD_DUMP_ALL);
 #endif
-    return 1;
+    return ofd_size(m);
 }
