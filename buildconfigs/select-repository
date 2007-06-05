@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 ME=$(basename $0)
 
@@ -39,9 +39,13 @@ if [ $? -ne 0 ] || [ X"$XEN" = "X" ] ; then
 fi
 
 BASE=$(dirname ${XEN})
-if [ $? -ne 0 ] || [ X"$XEN" = "X" ] ; then
-    echo "$ME: Unable to determine Xen repository parent." 1>&2
+if [ $? -ne 0 ] || [ X"$BASE" = "X" ] ; then
+    echo "$ME: Unable to determine Xen repository base." 1>&2
     exit 1;
+fi
+if [ -d "$XEN" ] && [ ! -d "$BASE/$REPO" ] ; then
+    echo "$ME: No such dir: $BASE/$REPO" 1>&2
+    exit 1
 fi
 
 echo "$ME: Found ${BASE}/${REPO}" 1>&2
