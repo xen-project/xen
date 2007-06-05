@@ -60,17 +60,20 @@ trampoline_protmode_entry:
 
 #if CONFIG_PAGING_LEVELS != 2
         /* Set up EFER (Extended Feature Enable Register). */
+        mov     SYM_TRAMP_PHYS(cpuid_ext_features),%edi
+        test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
+        jz      .Lskip_efer
         movl    $MSR_EFER,%ecx
         rdmsr
 #if CONFIG_PAGING_LEVELS == 4
         btsl    $_EFER_LME,%eax /* Long Mode      */
         btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
 #endif
-        mov     SYM_TRAMP_PHYS(cpuid_ext_features),%edi
-        btl     $20,%edi        /* CPUID 0x80000001, EDX[20] */
+        btl     $20,%edi        /* No Execute?    */
         jnc     1f
-        btsl    $_EFER_NX,%eax  /* No-Execute     */
+        btsl    $_EFER_NX,%eax  /* No Execute     */
 1:      wrmsr
+.Lskip_efer:
 #endif
 
         mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
