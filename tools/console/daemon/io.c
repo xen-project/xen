@@ -191,6 +191,7 @@ static int create_domain_log(struct domain *dom)
 		free(namepath);
 		return -1;
 	}
+	namepath = s;
 	strcat(namepath, "/name");
 	data = xs_read(xs, XBT_NULL, namepath, &len);
 	if (!data)
