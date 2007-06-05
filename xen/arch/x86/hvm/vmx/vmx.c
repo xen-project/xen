@@ -929,7 +929,8 @@ static unsigned long vmx_get_segment_base(struct vcpu *v, enum x86_segment seg)
     ASSERT(v == current);
 
 #ifdef __x86_64__
-    if ( vmx_long_mode_enabled(v) && (__vmread(GUEST_CS_AR_BYTES) & (1u<<13)) )
+    if ( vmx_long_mode_enabled(v) &&
+         (__vmread(GUEST_CS_AR_BYTES) & X86_SEG_AR_CS_LM_ACTIVE) )
         long_mode = 1;
 #endif
 
@@ -1097,9 +1098,10 @@ static int vmx_guest_x86_mode(struct vcpu *v)
     if ( unlikely(__vmread(GUEST_RFLAGS) & X86_EFLAGS_VM) )
         return 1;
     cs_ar_bytes = __vmread(GUEST_CS_AR_BYTES);
-    if ( vmx_long_mode_enabled(v) && likely(cs_ar_bytes & (1u<<13)) )
+    if ( vmx_long_mode_enabled(v) && likely(cs_ar_bytes &
+                                            X86_SEG_AR_CS_LM_ACTIVE) )
         return 8;
-    return (likely(cs_ar_bytes & (1u<<14)) ? 4 : 2);
+    return (likely(cs_ar_bytes & X86_SEG_AR_DEF_OP_SIZE) ? 4 : 2);
 }
 
 static int vmx_pae_enabled(struct vcpu *v)
@@ -1452,65 +1454,73 @@ static void vmx_do_invlpg(unsigned long va)
     paging_invlpg(v, va);
 }
 
+/*
+ * get segment for string pio according to guest instruction
+ */
+static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
+                                   int inst_len, enum x86_segment *seg)
+{
+    unsigned char inst[MAX_INST_LEN];
+    int i;
+    extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
 
-static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
-                                enum x86_segment seg, unsigned long *base,
-                                u32 *limit, u32 *ar_bytes)
+    if ( !long_mode )
+        eip += __vmread(GUEST_CS_BASE);
+
+    memset(inst, 0, MAX_INST_LEN);
+    if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
+    {
+        gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
+        domain_crash(current->domain);
+        return;
+    }
+
+    for ( i = 0; i < inst_len; i++ )
+    {
+        switch ( inst[i] )
+        {
+        case 0xf3: /* REPZ */
+        case 0xf2: /* REPNZ */
+        case 0xf0: /* LOCK */
+        case 0x66: /* data32 */
+        case 0x67: /* addr32 */
+#ifdef __x86_64__
+        case 0x40 ... 0x4f: /* REX */
+#endif
+            continue;
+        case 0x2e: /* CS */
+            *seg = x86_seg_cs;
+            continue;
+        case 0x36: /* SS */
+            *seg = x86_seg_ss;
+            continue;
+        case 0x26: /* ES */
+            *seg = x86_seg_es;
+            continue;
+        case 0x64: /* FS */
+            *seg = x86_seg_fs;
+            continue;
+        case 0x65: /* GS */
+            *seg = x86_seg_gs;
+            continue;
+        case 0x3e: /* DS */
+            *seg = x86_seg_ds;
+            continue;
+        }
+    }
+}
+
+static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
+                                        int inst_len, enum x86_segment seg,
+                                        unsigned long *base, u32 *limit,
+                                        u32 *ar_bytes)
 {
     enum vmcs_field ar_field, base_field, limit_field;
 
     *base = 0;
     *limit = 0;
     if ( seg != x86_seg_es )
-    {
-        unsigned char inst[MAX_INST_LEN];
-        int i;
-        extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
-
-        if ( !long_mode )
-            eip += __vmread(GUEST_CS_BASE);
-        memset(inst, 0, MAX_INST_LEN);
-        if ( inst_copy_from_guest(inst, eip, inst_len) != inst_len )
-        {
-            gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
-            domain_crash(current->domain);
-            return 0;
-        }
-
-        for ( i = 0; i < inst_len; i++ )
-        {
-            switch ( inst[i] )
-            {
-            case 0xf3: /* REPZ */
-            case 0xf2: /* REPNZ */
-            case 0xf0: /* LOCK */
-            case 0x66: /* data32 */
-            case 0x67: /* addr32 */
-#ifdef __x86_64__
-            case 0x40 ... 0x4f: /* REX */
-#endif
-                continue;
-            case 0x2e: /* CS */
-                seg = x86_seg_cs;
-                continue;
-            case 0x36: /* SS */
-                seg = x86_seg_ss;
-                continue;
-            case 0x26: /* ES */
-                seg = x86_seg_es;
-                continue;
-            case 0x64: /* FS */
-                seg = x86_seg_fs;
-                continue;
-            case 0x65: /* GS */
-                seg = x86_seg_gs;
-                continue;
-            case 0x3e: /* DS */
-                seg = x86_seg_ds;
-                continue;
-            }
-        }
-    }
+        vmx_str_pio_get_segment(long_mode, eip, inst_len, &seg);
 
     switch ( seg )
     {
@@ -1559,13 +1569,259 @@ static int vmx_check_descriptor(int long_mode, unsigned long eip, int inst_len,
     return !(*ar_bytes & 0x10000);
 }
 
+
+static inline void vmx_str_pio_check_limit(u32 limit, unsigned int size,
+                                           u32 ar_bytes, unsigned long addr,
+                                           unsigned long base, int df,
+                                           unsigned long *count)
+{
+    unsigned long ea = addr - base;
+
+    /* Offset must be within limits. */
+    ASSERT(ea == (u32)ea);
+    if ( (u32)(ea + size - 1) < (u32)ea ||
+         (ar_bytes & 0xc) != 0x4 ? ea + size - 1 > limit
+                                 : ea <= limit )
+    {
+        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+        return;
+    }
+
+    /* Check the limit for repeated instructions, as above we checked
+       only the first instance. Truncate the count if a limit violation
+       would occur. Note that the checking is not necessary for page
+       granular segments as transfers crossing page boundaries will be
+       broken up anyway. */
+    if ( !(ar_bytes & X86_SEG_AR_GRANULARITY) && *count > 1 )
+    {
+        if ( (ar_bytes & 0xc) != 0x4 )
+        {
+            /* expand-up */
+            if ( !df )
+            {
+                if ( ea + *count * size - 1 < ea ||
+                     ea + *count * size - 1 > limit )
+                    *count = (limit + 1UL - ea) / size;
+            }
+            else
+            {
+                if ( *count - 1 > ea / size )
+                    *count = ea / size + 1;
+            }
+        }
+        else
+        {
+            /* expand-down */
+            if ( !df )
+            {
+                if ( *count - 1 > -(s32)ea / size )
+                    *count = -(s32)ea / size + 1UL;
+            }
+            else
+            {
+                if ( ea < (*count - 1) * size ||
+                     ea - (*count - 1) * size <= limit )
+                    *count = (ea - limit - 1) / size + 1;
+            }
+        }
+        ASSERT(*count);
+    }
+}
+
+#ifdef __x86_64__
+static inline void vmx_str_pio_lm_check_limit(struct cpu_user_regs *regs,
+                                              unsigned int size,
+                                              unsigned long addr,
+                                              unsigned long *count)
+{
+    if ( !is_canonical_address(addr) ||
+         !is_canonical_address(addr + size - 1) )
+    {
+        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+        return;
+    }
+    if ( *count > (1UL << 48) / size )
+        *count = (1UL << 48) / size;
+    if ( !(regs->eflags & EF_DF) )
+    {
+        if ( addr + *count * size - 1 < addr ||
+             !is_canonical_address(addr + *count * size - 1) )
+            *count = (addr & ~((1UL << 48) - 1)) / size;
+    }
+    else
+    {
+        if ( (*count - 1) * size > addr ||
+             !is_canonical_address(addr + (*count - 1) * size) )
+            *count = (addr & ~((1UL << 48) - 1)) / size + 1;
+    }
+    ASSERT(*count);
+}
+#endif
+
+static inline void vmx_send_str_pio(struct cpu_user_regs *regs,
+                                    struct hvm_io_op *pio_opp,
+                                    unsigned long inst_len, unsigned int port,
+                                    int sign, unsigned int size, int dir,
+                                    int df, unsigned long addr,
+                                    unsigned long paddr, unsigned long count)
+{
+    /*
+     * Handle string pio instructions that cross pages or that
+     * are unaligned. See the comments in hvm_domain.c/handle_mmio()
+     */
+    if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
+        unsigned long value = 0;
+
+        pio_opp->flags |= OVERLAP;
+
+        if ( dir == IOREQ_WRITE )   /* OUTS */
+        {
+            if ( hvm_paging_enabled(current) )
+            {
+                int rv = hvm_copy_from_guest_virt(&value, addr, size);
+                if ( rv != 0 )
+                {
+                    /* Failed on the page-spanning copy.  Inject PF into
+                     * the guest for the address where we failed. */
+                    addr += size - rv;
+                    gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
+                             "of a page-spanning PIO: va=%#lx\n", addr);
+                    vmx_inject_exception(TRAP_page_fault, 0, addr);
+                    return;
+                }
+            }
+            else
+                (void) hvm_copy_from_guest_phys(&value, addr, size);
+        } else /* dir != IOREQ_WRITE */
+            /* Remember where to write the result, as a *VA*.
+             * Must be a VA so we can handle the page overlap
+             * correctly in hvm_pio_assist() */
+            pio_opp->addr = addr;
+
+        if ( count == 1 )
+            regs->eip += inst_len;
+
+        send_pio_req(port, 1, size, value, dir, df, 0);
+    } else {
+        unsigned long last_addr = sign > 0 ? addr + count * size - 1
+                                           : addr - (count - 1) * size;
+
+        if ( (addr & PAGE_MASK) != (last_addr & PAGE_MASK) )
+        {
+            if ( sign > 0 )
+                count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
+            else
+                count = (addr & ~PAGE_MASK) / size + 1;
+        } else
+            regs->eip += inst_len;
+
+        send_pio_req(port, count, size, paddr, dir, df, 1);
+    }
+}
+
+static void vmx_str_pio_handler(unsigned long exit_qualification,
+                                unsigned long inst_len,
+                                struct cpu_user_regs *regs,
+                                struct hvm_io_op *pio_opp)
+{
+    unsigned int port, size;
+    int dir, df, vm86;
+    unsigned long addr, count = 1, base;
+    paddr_t paddr;
+    unsigned long gfn;
+    u32 ar_bytes, limit;
+    int sign;
+    int long_mode = 0;
+
+    vm86 = regs->eflags & X86_EFLAGS_VM ? 1 : 0;
+    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
+
+    if ( test_bit(6, &exit_qualification) )
+        port = (exit_qualification >> 16) & 0xFFFF;
+    else
+        port = regs->edx & 0xffff;
+
+    size = (exit_qualification & 7) + 1;
+    dir = test_bit(3, &exit_qualification); /* direction */
+
+    if ( dir == IOREQ_READ )
+        HVMTRACE_2D(IO_READ,  current, port, size);
+    else
+        HVMTRACE_2D(IO_WRITE, current, port, size);
+
+    sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
+    ar_bytes = __vmread(GUEST_CS_AR_BYTES);
+#ifdef __x86_64__
+    if ( vmx_long_mode_enabled(current) &&
+         (ar_bytes & X86_SEG_AR_CS_LM_ACTIVE) )
+        long_mode = 1;
+#endif
+    addr = __vmread(GUEST_LINEAR_ADDRESS);
+
+    if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
+        pio_opp->flags |= REPZ;
+        count = regs->ecx;
+        if ( !long_mode &&
+            (vm86 || !(ar_bytes & X86_SEG_AR_DEF_OP_SIZE)) )
+            count &= 0xFFFF;
+    }
+
+    /*
+     * In protected mode, guest linear address is invalid if the
+     * selector is null.
+     */
+    if ( !vmx_str_pio_check_descriptor(long_mode, regs->eip, inst_len,
+                                       dir==IOREQ_WRITE ? x86_seg_ds :
+                                       x86_seg_es, &base, &limit,
+                                       &ar_bytes) ) {
+        if ( !long_mode ) {
+            vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+            return;
+        }
+        addr = dir == IOREQ_WRITE ? base + regs->esi : regs->edi;
+    }
+
+    if ( !long_mode )
+    {
+        /* Segment must be readable for outs and writeable for ins. */
+        if ( dir == IOREQ_WRITE ? (ar_bytes & 0xa) == 0x8
+                                : (ar_bytes & 0xa) != 0x2 ) {
+            vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+            return;
+        }
+
+        vmx_str_pio_check_limit(limit, size, ar_bytes, addr, base, df, &count);
+    }
+#ifdef __x86_64__
+    else
+    {
+        vmx_str_pio_lm_check_limit(regs, size, addr, &count);
+    }
+#endif
+
+    /* Translate the address to a physical address */
+    gfn = paging_gva_to_gfn(current, addr);
+    if ( gfn == INVALID_GFN )
+    {
+        /* The guest does not have the RAM address mapped.
+         * Need to send in a page fault */
+        int errcode = 0;
+        /* IO read --> memory write */
+        if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
+        vmx_inject_exception(TRAP_page_fault, errcode, addr);
+        return;
+    }
+    paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
+
+    vmx_send_str_pio(regs, pio_opp, inst_len, port, sign,
+                     size, dir, df, addr, paddr, count);
+}
+
 static void vmx_io_instruction(unsigned long exit_qualification,
                                unsigned long inst_len)
 {
     struct cpu_user_regs *regs;
     struct hvm_io_op *pio_opp;
-    unsigned int port, size;
-    int dir, df, vm86;
 
     pio_opp = &current->arch.hvm_vcpu.io_op;
     pio_opp->instr = INSTR_PIO;
@@ -1577,216 +1833,33 @@ static void vmx_io_instruction(unsigned long exit_qualification,
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
     hvm_store_cpu_guest_regs(current, regs, NULL);
 
-    vm86 = regs->eflags & X86_EFLAGS_VM ? 1 : 0;
-    df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
-
     HVM_DBG_LOG(DBG_LEVEL_IO, "vm86 %d, eip=%x:%lx, "
                 "exit_qualification = %lx",
-                vm86, regs->cs, (unsigned long)regs->eip, exit_qualification);
+                regs->eflags & X86_EFLAGS_VM ? 1 : 0,
+                regs->cs, (unsigned long)regs->eip, exit_qualification);
 
-    if ( test_bit(6, &exit_qualification) )
-        port = (exit_qualification >> 16) & 0xFFFF;
+    if ( test_bit(4, &exit_qualification) ) /* string instrucation */
+        vmx_str_pio_handler(exit_qualification, inst_len, regs, pio_opp);
     else
-        port = regs->edx & 0xffff;
+    {
+        unsigned int port, size;
+        int dir, df;
 
-    size = (exit_qualification & 7) + 1;
-    dir = test_bit(3, &exit_qualification); /* direction */
+        df = regs->eflags & X86_EFLAGS_DF ? 1 : 0;
 
-    if (dir==IOREQ_READ)
-        HVMTRACE_2D(IO_READ,  current, port, size);
-    else
-        HVMTRACE_2D(IO_WRITE, current, port, size);
-
-    if ( test_bit(4, &exit_qualification) ) { /* string instruction */
-        unsigned long addr, count = 1, base;
-        paddr_t paddr;
-        unsigned long gfn;
-        u32 ar_bytes, limit;
-        int sign = regs->eflags & X86_EFLAGS_DF ? -1 : 1;
-        int long_mode = 0;
-
-        ar_bytes = __vmread(GUEST_CS_AR_BYTES);
-#ifdef __x86_64__
-        if ( vmx_long_mode_enabled(current) && (ar_bytes & (1u<<13)) )
-            long_mode = 1;
-#endif
-        addr = __vmread(GUEST_LINEAR_ADDRESS);
-
-        if ( test_bit(5, &exit_qualification) ) { /* "rep" prefix */
-            pio_opp->flags |= REPZ;
-            count = regs->ecx;
-            if ( !long_mode && (vm86 || !(ar_bytes & (1u<<14))) )
-                count &= 0xFFFF;
-        }
-
-        /*
-         * In protected mode, guest linear address is invalid if the
-         * selector is null.
-         */
-        if ( !vmx_check_descriptor(long_mode, regs->eip, inst_len,
-                                   dir==IOREQ_WRITE ? x86_seg_ds : x86_seg_es,
-                                   &base, &limit, &ar_bytes) ) {
-            if ( !long_mode ) {
-                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-                return;
-            }
-            addr = dir == IOREQ_WRITE ? base + regs->esi : regs->edi;
-        }
-
-        if ( !long_mode ) {
-            unsigned long ea = addr - base;
-
-            /* Segment must be readable for outs and writeable for ins. */
-            if ( dir == IOREQ_WRITE ? (ar_bytes & 0xa) == 0x8
-                                    : (ar_bytes & 0xa) != 0x2 ) {
-                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-                return;
-            }
-
-            /* Offset must be within limits. */
-            ASSERT(ea == (u32)ea);
-            if ( (u32)(ea + size - 1) < (u32)ea ||
-                 (ar_bytes & 0xc) != 0x4 ? ea + size - 1 > limit
-                                         : ea <= limit )
-            {
-                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-                return;
-            }
-
-            /* Check the limit for repeated instructions, as above we checked
-               only the first instance. Truncate the count if a limit violation
-               would occur. Note that the checking is not necessary for page
-               granular segments as transfers crossing page boundaries will be
-               broken up anyway. */
-            if ( !(ar_bytes & (1u<<15)) && count > 1 )
-            {
-                if ( (ar_bytes & 0xc) != 0x4 )
-                {
-                    /* expand-up */
-                    if ( !df )
-                    {
-                        if ( ea + count * size - 1 < ea ||
-                             ea + count * size - 1 > limit )
-                            count = (limit + 1UL - ea) / size;
-                    }
-                    else
-                    {
-                        if ( count - 1 > ea / size )
-                            count = ea / size + 1;
-                    }
-                }
-                else
-                {
-                    /* expand-down */
-                    if ( !df )
-                    {
-                        if ( count - 1 > -(s32)ea / size )
-                            count = -(s32)ea / size + 1UL;
-                    }
-                    else
-                    {
-                        if ( ea < (count - 1) * size ||
-                             ea - (count - 1) * size <= limit )
-                            count = (ea - limit - 1) / size + 1;
-                    }
-                }
-                ASSERT(count);
-            }
-        }
-#ifdef __x86_64__
+        if ( test_bit(6, &exit_qualification) )
+            port = (exit_qualification >> 16) & 0xFFFF;
         else
-        {
-            if ( !is_canonical_address(addr) ||
-                 !is_canonical_address(addr + size - 1) )
-            {
-                vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-                return;
-            }
-            if ( count > (1UL << 48) / size )
-                count = (1UL << 48) / size;
-            if ( !(regs->eflags & EF_DF) )
-            {
-                if ( addr + count * size - 1 < addr ||
-                     !is_canonical_address(addr + count * size - 1) )
-                    count = (addr & ~((1UL << 48) - 1)) / size;
-            }
-            else
-            {
-                if ( (count - 1) * size > addr ||
-                     !is_canonical_address(addr + (count - 1) * size) )
-                    count = (addr & ~((1UL << 48) - 1)) / size + 1;
-            }
-            ASSERT(count);
-        }
-#endif
+            port = regs->edx & 0xffff;
 
-        /* Translate the address to a physical address */
-        gfn = paging_gva_to_gfn(current, addr);
-        if ( gfn == INVALID_GFN ) 
-        {
-            /* The guest does not have the RAM address mapped. 
-             * Need to send in a page fault */
-            int errcode = 0;
-            /* IO read --> memory write */
-            if ( dir == IOREQ_READ ) errcode |= PFEC_write_access;
-            vmx_inject_exception(TRAP_page_fault, errcode, addr);
-            return;
-        }
-        paddr = (paddr_t)gfn << PAGE_SHIFT | (addr & ~PAGE_MASK);
+        size = (exit_qualification & 7) + 1;
+        dir = test_bit(3, &exit_qualification); /* direction */
 
-        /*
-         * Handle string pio instructions that cross pages or that
-         * are unaligned. See the comments in hvm_domain.c/handle_mmio()
-         */
-        if ( (addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK) ) {
-            unsigned long value = 0;
+        if ( dir == IOREQ_READ )
+            HVMTRACE_2D(IO_READ,  current, port, size);
+        else
+            HVMTRACE_2D(IO_WRITE, current, port, size);
 
-            pio_opp->flags |= OVERLAP;
-
-            if ( dir == IOREQ_WRITE )   /* OUTS */
-            {
-                if ( hvm_paging_enabled(current) )
-                {
-                    int rv = hvm_copy_from_guest_virt(&value, addr, size);
-                    if ( rv != 0 ) 
-                    {
-                        /* Failed on the page-spanning copy.  Inject PF into
-                         * the guest for the address where we failed. */ 
-                        addr += size - rv;
-                        gdprintk(XENLOG_DEBUG, "Pagefault reading non-io side "
-                                 "of a page-spanning PIO: va=%#lx\n", addr);
-                        vmx_inject_exception(TRAP_page_fault, 0, addr);
-                        return;
-                    }
-                }
-                else
-                    (void) hvm_copy_from_guest_phys(&value, addr, size);
-            } else /* dir != IOREQ_WRITE */
-                /* Remember where to write the result, as a *VA*.
-                 * Must be a VA so we can handle the page overlap 
-                 * correctly in hvm_pio_assist() */
-                pio_opp->addr = addr;
-
-            if ( count == 1 )
-                regs->eip += inst_len;
-
-            send_pio_req(port, 1, size, value, dir, df, 0);
-        } else {
-            unsigned long last_addr = sign > 0 ? addr + count * size - 1
-                                               : addr - (count - 1) * size;
-
-            if ( (addr & PAGE_MASK) != (last_addr & PAGE_MASK) )
-            {
-                if ( sign > 0 )
-                    count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
-                else
-                    count = (addr & ~PAGE_MASK) / size + 1;
-            } else
-                regs->eip += inst_len;
-
-            send_pio_req(port, count, size, paddr, dir, df, 1);
-        }
-    } else {
         if ( port == 0xe9 && dir == IOREQ_WRITE && size == 1 )
             hvm_print_line(current, regs->eax); /* guest debug output */
 
