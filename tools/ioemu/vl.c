@@ -183,7 +183,7 @@ extern int vcpus;
 
 int xc_handle;
 
-char domain_name[64] = "Xen HVM Guest";
+char domain_name[64] = "Xen-HVM-no-name";
 extern int domid;
 
 char vncpasswd[64];
@@ -7525,8 +7525,8 @@ int main(int argc, char **argv)
                 semihosting_enabled = 1;
                 break;
             case QEMU_OPTION_domainname:
-                strncpy(domain_name, optarg, sizeof(domain_name));
-                domain_name[sizeof(domain_name)-1] = '\0';
+                snprintf(domain_name, sizeof(domain_name),
+                         "Xen-HVM-%s", optarg);
                 break;
             case QEMU_OPTION_d:
                 domid = atoi(optarg);
@@ -7550,7 +7550,7 @@ int main(int argc, char **argv)
     }
 
     /* Now send logs to our named config */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%s.log", domain_name);
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
     cpu_set_log_filename(qemu_dm_logfilename);
 
 #ifndef _WIN32
