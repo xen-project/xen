@@ -10,8 +10,17 @@ fi
 
 C=$PWD
 
-XEN=$C/../../xen
-XL=$C/../../../linux-2.6.18-xen.hg
+if [ -n "$XEN" -a -d "$XEN" ]; then
+  XEN=$(cd $XEN && pwd)
+else
+  XEN=$C/../../xen
+fi
+
+if [ -n "$XL" -a -d "$XL" ]; then
+  XL=$(cd $XL && pwd)
+else
+  XL=$C/../../linux-2.6.18-xen.hg
+fi
 
 for d in $(find ${XL}/drivers/xen/ -maxdepth 1 -type d | sed -e 1d); do
     if ! echo $d | egrep -q back; then
