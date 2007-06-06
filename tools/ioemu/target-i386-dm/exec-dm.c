@@ -437,6 +437,31 @@ int iomem_index(target_phys_addr_t addr)
 extern unsigned long *logdirty_bitmap;
 extern unsigned long logdirty_bitmap_size;
 
+/*
+ * Replace the standard byte memcpy with a word memcpy for appropriately sized
+ * memory copy operations.  Some users (USB-UHCI) can not tolerate the possible
+ * word tearing that can result from a guest concurrently writing a memory
+ * structure while the qemu device model is modifying the same location.
+ * Forcing a word-sized read/write prevents the guest from seeing a partially
+ * written word-sized atom.
+ */
+void memcpy_words(void *dst, void *src, size_t n)
+{
+    while (n >= sizeof(long)) {
+        *((long *)dst)++ = *((long *)src)++;
+        n -= sizeof(long);
+    }
+
+    if (n & 4)
+        *((uint32_t *)dst)++ = *((uint32_t *)src)++;
+
+    if (n & 2)
+        *((uint16_t *)dst)++ = *((uint16_t *)src)++;
+
+    if (n & 1)
+        *((uint8_t *)dst)++ = *((uint8_t *)src)++;
+}
+
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                             int len, int is_write)
 {
@@ -473,7 +498,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 }
             } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                 /* Writing to RAM */
-                memcpy(ptr, buf, l);
+                memcpy_words(ptr, buf, l);
                 if (logdirty_bitmap != NULL) {
                     /* Record that we have dirtied this frame */
                     unsigned long pfn = addr >> TARGET_PAGE_BITS;
@@ -509,7 +534,7 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 }
             } else if ((ptr = phys_ram_addr(addr)) != NULL) {
                 /* Reading from RAM */
-                memcpy(buf, ptr, l);
+                memcpy_words(buf, ptr, l);
             } else {
                 /* Neither RAM nor known MMIO space */
                 memset(buf, 0xff, len); 
