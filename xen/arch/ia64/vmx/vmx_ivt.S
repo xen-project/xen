@@ -315,9 +315,6 @@ ENTRY(vmx_alt_itlb_miss)
 vmx_alt_itlb_miss_1:
     mov r16=cr.ifa    // get address that caused the TLB miss
     ;;
-    tbit.z p6,p7=r16,63
-(p6)br.spnt vmx_fault_3
-    ;;
     movl r17=PAGE_KERNEL
     mov r24=cr.ipsr
     movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
@@ -328,8 +325,8 @@ vmx_alt_itlb_miss_1:
     and r18=0x10,r18    // bit 4=address-bit(61)
     or r19=r17,r19      // insert PTE control bits into r19
     ;;
-    movl r20=IA64_GRANULE_SHIFT<<2
-    or r19=r19,r18	// set bit 4 (uncached) if the access was to region 6
+    mov r20=IA64_GRANULE_SHIFT<<2
+    or r19=r19,r18	// set bit 4 (uncached) if the access was to UC region
     ;;
     mov cr.itir=r20
     ;;
@@ -359,9 +356,6 @@ vmx_alt_dtlb_miss_1:
     cmp.eq p8,p0=((VIRT_FRAME_TABLE_ADDR>>56)&0xff)-0x100,r22
 (p8)br.cond.sptk frametable_miss ;;
 #endif
-    tbit.z p6,p7=r16,63
-(p6)br.spnt vmx_fault_4
-    ;;
     movl r17=PAGE_KERNEL
     mov r20=cr.isr
     movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
@@ -378,9 +372,9 @@ vmx_alt_dtlb_miss_1:
     dep r24=-1,r24,IA64_PSR_ED_BIT,1
     or r19=r19,r17				// insert PTE control bits into r19
     ;;
-    or r19=r19,r18				// set bit 4 (uncached) if the access was to region 6
+    or r19=r19,r18				// set bit 4 (uncached) if the access was to UC region
 (p6)mov cr.ipsr=r24
-    movl r20=IA64_GRANULE_SHIFT<<2
+    mov r20=IA64_GRANULE_SHIFT<<2
     ;;
     mov cr.itir=r20
     ;;
