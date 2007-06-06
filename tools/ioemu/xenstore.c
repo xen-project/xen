@@ -367,7 +367,7 @@ void xenstore_write_vncport(int display)
     if (pasprintf(&buf, "%s/console/vnc-port", path) == -1)
         goto out;
 
-    if (pasprintf(&portstr, "%d", 5900 + display) == -1)
+    if (pasprintf(&portstr, "%d", display) == -1)
         goto out;
 
     if (xs_write(xsh, XBT_NULL, buf, portstr, strlen(portstr)) == 0)
