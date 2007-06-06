@@ -11,7 +11,7 @@ fi
 C=$PWD
 
 XEN=$C/../../xen
-XL=$C/../../linux-2.6-xen-sparse
+XL=$C/../../../linux-2.6.18-xen.hg
 
 for d in $(find ${XL}/drivers/xen/ -maxdepth 1 -type d | sed -e 1d); do
     if ! echo $d | egrep -q back; then
@@ -42,7 +42,7 @@ in
     ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/hypercall.h include/asm
     ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/synch_bitops.h include/asm
     ln -sf ${XL}/include/asm-x86_64/mach-xen/asm/maddr.h include/asm
-    mkdir include/asm-i386
+    mkdir -p include/asm-i386
     lndir -silent ${XL}/include/asm-i386 include/asm-i386
   ;;
 i[34567]86)
@@ -56,7 +56,7 @@ i[34567]86)
     ln -sf ${XL}/include/asm-ia64/hypercall.h include/asm
     ln -sf ${XL}/include/asm-ia64/synch_bitops.h include/asm
     ln -sf ${XL}/include/asm-ia64/maddr.h include/asm
-    mkdir include/asm/xen
+    mkdir -p include/asm/xen
     ln -sf ${XL}/include/asm-ia64/xen/xcom_hcall.h include/asm/xen
     ln -sf ${XL}/include/asm-ia64/xen/xencomm.h include/asm/xen
     ln -sf ${XL}/arch/ia64/xen/xcom_mini.c platform-pci
