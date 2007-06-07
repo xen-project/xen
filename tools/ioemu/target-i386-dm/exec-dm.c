@@ -448,18 +448,29 @@ extern unsigned long logdirty_bitmap_size;
 void memcpy_words(void *dst, void *src, size_t n)
 {
     while (n >= sizeof(long)) {
-        *((long *)dst)++ = *((long *)src)++;
+        *((long *)dst) = *((long *)src);
+        dst = ((long *)dst) + 1;
+        src = ((long *)src) + 1;
         n -= sizeof(long);
     }
 
-    if (n & 4)
-        *((uint32_t *)dst)++ = *((uint32_t *)src)++;
+    if (n & 4) {
+        *((uint32_t *)dst) = *((uint32_t *)src);
+        dst = ((uint32_t *)dst) + 1;
+        src = ((uint32_t *)src) + 1;
+   }
 
-    if (n & 2)
-        *((uint16_t *)dst)++ = *((uint16_t *)src)++;
+    if (n & 2) {
+        *((uint16_t *)dst) = *((uint16_t *)src);
+        dst = ((uint16_t *)dst) + 1;
+        src = ((uint16_t *)src) + 1;
+    }
 
-    if (n & 1)
-        *((uint8_t *)dst)++ = *((uint8_t *)src)++;
+    if (n & 1) {
+        *((uint8_t *)dst) = *((uint8_t *)src);
+        dst = ((uint8_t *)dst) + 1;
+        src = ((uint8_t *)src) + 1;
+    }
 }
 
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 

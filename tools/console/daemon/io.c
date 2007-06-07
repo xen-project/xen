@@ -183,7 +183,8 @@ static int create_domain_log(struct domain *dom)
 {
 	char logfile[PATH_MAX];
 	char *namepath, *data, *s;
-	int fd, len;
+	int fd;
+	unsigned int len;
 
 	namepath = xs_get_domain_path(xs, dom->domid);
 	s = realloc(namepath, strlen(namepath) + 6);
