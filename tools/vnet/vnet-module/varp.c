@@ -1365,7 +1365,7 @@ int varp_handle_message(struct sk_buff *skb){
             goto exit;
         }
     }
-    varph = (void*)skb_pull(skb, sizeof(struct udphdr));
+    varph = (void*)skb_pull_vn(skb, sizeof(struct udphdr));
     if(skb->len < sizeof(struct VnetMsgHdr)){
         wprintf("> Varp msg too short: %d < %d\n", skb->len, sizeof(struct VnetMsgHdr));
         goto exit;
@@ -1378,11 +1378,11 @@ int varp_handle_message(struct sk_buff *skb){
         }
         break;
     case VUDP_ID: // Etherip-in-udp packet.
-        skb_pull(skb, sizeof(struct VnetMsgHdr));
+        skb_pull_vn(skb, sizeof(struct VnetMsgHdr));
         err = etherip_protocol_recv(skb);
         goto exit;
     case VFWD_ID: // Forwarded.
-        skb_pull(skb, sizeof(struct VnetMsgHdr));
+        skb_pull_vn(skb, sizeof(struct VnetMsgHdr));
         err = vnet_forward_recv(skb);
         goto exit;
     default:

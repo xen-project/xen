@@ -186,7 +186,7 @@ static int VnetPeer_forward(VnetPeer *peer, struct sk_buff *fwdskb){
     printk("\nWrapped packet:\n");
     print_iphdr(__FUNCTION__, skb);
     print_udphdr(__FUNCTION__, skb);
-    skb_print_bits(__FUNCTION__, skb, 0, 0 * skb->len);
+    skb_print_bits(__FUNCTION__, skb, 0, skb->len);
 #endif
 
     err = _skb_xmit(skb, saddr);
@@ -304,7 +304,7 @@ int vnet_forward_recv(struct sk_buff *skb){
     peer->rx_packets++;
     skb->mac.raw = NULL;
     skb->nh.raw = skb->data;
-    skb->h.raw = (void*)(skb->nh.iph + 1);
+    skb->h.raw = skb->data + sizeof(struct iphdr);
     if(!skb->nh.iph->saddr){
         skb->nh.iph->saddr = addr.u.ip4.s_addr;
     }
@@ -328,12 +328,17 @@ int vnet_forward_recv(struct sk_buff *skb){
 
     // Handle (a copy of) it ourselves, because
     // if it is looped-back by xmit it will be ignored.
-    //recvskb = skb_clone(skb, GFP_ATOMIC);
-    recvskb = pskb_copy(skb, GFP_ATOMIC);
+    recvskb = alloc_skb(skb->len, GFP_ATOMIC);
     if(recvskb){
+        recvskb->protocol = htons(ETH_P_IP);
+
+        recvskb->nh.raw = skb_put(recvskb, skb->len);
+        recvskb->h.raw = recvskb->data + sizeof(struct iphdr); 
+        skb_copy_bits(skb, 0, recvskb->data, skb->len);
+        
         // Data points at the unwrapped iphdr, but varp_handle_message()
         // expects it to point at the udphdr, so pull.
-        skb_pull(recvskb, sizeof(struct iphdr));
+        skb_pull_vn(recvskb, sizeof(struct iphdr));
         if(varp_handle_message(recvskb) <= 0){
             kfree_skb(recvskb);
         }

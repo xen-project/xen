@@ -270,6 +270,7 @@ int etherip_protocol_recv(struct sk_buff *skb){
     u32 saddr, daddr;
     char vnetbuf[VNET_ID_BUF];
     struct ethhdr *eth;
+    struct sk_buff *newskb;
 
     dprintf(">\n");
     saddr = skb->nh.iph->saddr;
@@ -293,7 +294,7 @@ int etherip_protocol_recv(struct sk_buff *skb){
             err = -EINVAL;
             goto exit;
         }
-        skb_pull(skb, pull_n);
+        skb_pull_vn(skb, pull_n);
     }
     // Assume skb->data points at etherip header.
     etheriph = (void*)skb->data;
@@ -318,7 +319,18 @@ int etherip_protocol_recv(struct sk_buff *skb){
         goto exit;
     }
     // Point at the headers in the contained ethernet frame.
-    skb->mac.raw = skb_pull(skb, etherip_n);
+    skb->mac.raw = skb_pull_vn(skb, etherip_n);
+
+    newskb = alloc_skb(skb->len, GFP_ATOMIC);
+    if (!newskb) {
+        wprintf("> alloc new sk_buff failed \n");
+        goto exit;
+    }
+    newskb->mac.raw = skb_put(newskb, skb->len);
+    skb_copy_bits(skb, 0, newskb->data, skb->len);
+    kfree_skb(skb);
+    skb = newskb;
+
     eth = eth_hdr(skb);
 
     // Simulate the logic from eth_type_trans()
@@ -340,27 +352,12 @@ int etherip_protocol_recv(struct sk_buff *skb){
     
     // Assuming a standard Ethernet frame.
     // Should check for protocol? Support ETH_P_8021Q too.
-    skb->nh.raw = skb_pull(skb, ETH_HLEN);
+    skb->nh.raw = skb_pull_vn(skb, ETH_HLEN);
+    skb->h.raw = newskb->nh.raw + sizeof(struct iphdr);
 
-#ifdef __KERNEL__
-    // Fix IP options, checksum, skb dst, netfilter state.
-    memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-    if (skb->ip_summed == CHECKSUM_HW){
-        skb->ip_summed = CHECKSUM_NONE;
-    }
-    dst_release(skb->dst);
-    skb->dst = NULL;
-    nf_reset(skb);
-#ifdef CONFIG_BRIDGE_NETFILTER
-    if(skb->nf_bridge){
-        // Stop the eth header being clobbered by nf_bridge_maybe_copy_header().
-        _nf_bridge_save_header(skb);
-    }
-#endif
-#endif // __KERNEL__
-
-    dprintf("> Unpacked srcaddr=" IPFMT " vnet=%s srcmac=" MACFMT " dstmac=" MACFMT "\n",
+    dprintf("> Unpacked srcaddr=" IPFMT " dstaddr=" IPFMT " vnet=%s srcmac=" MACFMT " dstmac=" MACFMT "\n",
             NIPQUAD(skb->nh.iph->saddr),
+            NIPQUAD(skb->nh.iph->daddr),
             VnetId_ntoa(&vnet, vnetbuf),
             MAC6TUPLE(eth->h_source),
             MAC6TUPLE(eth->h_dest));

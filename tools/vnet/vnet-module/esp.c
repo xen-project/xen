@@ -341,12 +341,12 @@ static int esp_sa_send(SAState *sa, struct sk_buff *skb, Tunnel *tunnel){
         dprintf("> ETH header pull...\n");
         memmove(skb->data, skb->mac.raw, ETH_HLEN);
         skb->mac.raw = skb->data; 
-        __skb_pull(skb, ETH_HLEN);
+        skb_pull_vn(skb, ETH_HLEN);
     }
     dprintf("> IP header pull...\n");
     memmove(skb->data, skb->nh.raw, ip_n);
     skb->nh.raw = skb->data;
-    __skb_pull(skb, ip_n);
+    skb_pull_vn(skb, ip_n);
     esph = (void*)skb->data;
     // Add spi and sequence number.
     esph->spi = sa->ident.spi;
@@ -457,7 +457,7 @@ static int esp_sa_recv(SAState *sa, struct sk_buff *skb){
     // Move skb->data back to ethernet header.
     // Do in 2 moves to ensure offsets are +ve,
     // since args to skb_pull/skb_push are unsigned.
-    __skb_pull(skb, head_n);
+    skb_pull_vn(skb, head_n);
     __skb_push(skb, skb->data - skb->mac.raw);
     // After this esph is invalid.
     esph = NULL;
@@ -763,7 +763,7 @@ static int esp_protocol_recv(struct sk_buff *skb){
     dprintf(">\n");
 #ifdef DEBUG
     dprintf("> recv skb=\n"); 
-    skb_print_bits(skb, 0, skb->len);
+    skb_print_bits("", skb, 0, skb->len);
 #endif
     ip_n = (skb->nh.iph->ihl << 2);
     if(skb->data == skb->mac.raw){
@@ -773,7 +773,7 @@ static int esp_protocol_recv(struct sk_buff *skb){
             err = -EINVAL;
             goto exit;
         }
-        skb_pull(skb, eth_n + ip_n);
+        skb_pull_vn(skb, eth_n + ip_n);
     }
     addr = skb->nh.iph->daddr;
     err = esp_skb_header(skb, &esph);
