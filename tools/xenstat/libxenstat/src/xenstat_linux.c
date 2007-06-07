@@ -204,17 +204,23 @@ int xenstat_collect_vbds(xenstat_node * node)
 		int ret;
 		char buf[256];
 
+		ret = sscanf(dp->d_name, "%3s-%u-%u", buf, &domid, &vbd.dev);
+		if (ret != 3)
+			continue;
 
-		ret = sscanf(dp->d_name, "vbd-%u-%u", &domid, &vbd.dev);
-		if (ret != 2)
+		if (strcmp(buf,"vbd") == 0)
+			vbd.back_type = 1;
+		else if (strcmp(buf,"tap") == 0)
+			vbd.back_type = 2;
+		else
 			continue;
 
 		domain = xenstat_node_domain(node, domid);
 		if (domain == NULL) {
 			fprintf(stderr,
-				"Found interface vbd-%u-%u but domain %u"
+				"Found interface %s-%u-%u but domain %u"
 				" does not exist.\n",
-				domid, vbd.dev, domid);
+				buf, domid, vbd.dev, domid);
 			continue;
 		}
 

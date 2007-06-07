@@ -87,10 +87,11 @@ struct xenstat_network {
 };
 
 struct xenstat_vbd {
-       unsigned int dev;
-       unsigned long long oo_reqs;
-       unsigned long long rd_reqs;
-       unsigned long long wr_reqs;
+	unsigned int back_type;
+	unsigned int dev;
+	unsigned long long oo_reqs;
+	unsigned long long rd_reqs;
+	unsigned long long wr_reqs;
 };
 
 extern int xenstat_collect_networks(xenstat_node * node);

@@ -625,6 +625,12 @@ static void xenstat_free_vbds(xenstat_node * node)
 		free(node->domains[i].vbds);
 }
 
+/* Get the back driver type  for Virtual Block Device */
+unsigned int xenstat_vbd_type(xenstat_vbd * vbd)
+{
+	return vbd->back_type;
+}
+
 /* Get the major number of VBD device */
 unsigned int xenstat_vbd_dev(xenstat_vbd * vbd)
 {
