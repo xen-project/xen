@@ -43,8 +43,8 @@
 
 static unsigned long reset_value[NUM_COUNTERS];
 
-extern void xenoprof_log_event(struct vcpu *v, unsigned long eip,
-			       int mode, int event);
+extern void xenoprof_log_event(struct vcpu *v, struct cpu_user_regs * regs, 
+			       unsigned long eip, int mode, int event);
 extern int xenoprofile_get_mode(struct vcpu *v,
 				struct cpu_user_regs * const regs);
 
@@ -130,7 +130,7 @@ static int athlon_check_ctrs(unsigned int const cpu,
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {
-			xenoprof_log_event(current, eip, mode, i);
+			xenoprof_log_event(current, regs, eip, mode, i);
 			CTR_WRITE(reset_value[i], msrs, i);
 			ovf = 1;
 		}

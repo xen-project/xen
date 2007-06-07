@@ -167,7 +167,7 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     printk("\n");
 }
 
-#ifdef NDEBUG
+#if !defined(CONFIG_FRAME_POINTER)
 
 static void show_trace(struct cpu_user_regs *regs)
 {

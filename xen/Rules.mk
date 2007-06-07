@@ -3,10 +3,11 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-verbose     ?= n
-perfc       ?= n
-perfc_arrays?= n
-crash_debug ?= n
+verbose       ?= n
+perfc         ?= n
+perfc_arrays  ?= n
+crash_debug   ?= n
+frame_pointer ?= n
 
 XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
@@ -14,10 +15,14 @@ include $(XEN_ROOT)/Config.mk
 # Hardcoded configuration implications and dependencies.
 # Do this is a neater way if it becomes unwieldy.
 ifeq ($(debug),y)
-verbose := y
+verbose       := y
+frame_pointer := y
 endif
 ifeq ($(perfc_arrays),y)
 perfc := y
+endif
+ifeq ($(frame_pointer),y)
+CFLAGS := $(shell echo $(CFLAGS) | sed -e 's/-f[^ ]*omit-frame-pointer//g')
 endif
 
 # Set ARCH/SUBARCH appropriately.
@@ -50,18 +55,19 @@ ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
 ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 
-CFLAGS-y               += -g -D__XEN__
-CFLAGS-$(ACM_SECURITY) += -DACM_SECURITY
-CFLAGS-$(verbose)      += -DVERBOSE
-CFLAGS-$(crash_debug)  += -DCRASH_DEBUG
-CFLAGS-$(perfc)        += -DPERF_COUNTERS
-CFLAGS-$(perfc_arrays) += -DPERF_ARRAYS
+CFLAGS-y                += -g -D__XEN__
+CFLAGS-$(ACM_SECURITY)  += -DACM_SECURITY
+CFLAGS-$(verbose)       += -DVERBOSE
+CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
+CFLAGS-$(perfc)         += -DPERF_COUNTERS
+CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
+CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 
 ifneq ($(max_phys_cpus),)
-CFLAGS-y               += -DMAX_PHYS_CPUS=$(max_phys_cpus)
+CFLAGS-y                += -DMAX_PHYS_CPUS=$(max_phys_cpus)
 endif
 
-AFLAGS-y               += -D__ASSEMBLY__
+AFLAGS-y                += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
 
