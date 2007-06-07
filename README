@@ -1,11 +1,11 @@
-################################
- __  __            _____  ___
- \ \/ /___ _ __   |___ / / _ \
-  \  // _ \ '_ \    |_ \| | | |
-  /  \  __/ | | |  ___) | |_| |
- /_/\_\___|_| |_| |____(_)___/
+#############################
+ __  __            _____  _ 
+ \ \/ /___ _ __   |___ / / |
+  \  // _ \ '_ \    |_ \ | |
+  /  \  __/ | | |  ___) || |
+ /_/\_\___|_| |_| |____(_)_|
 
-################################
+#############################
 
 http://www.xensource.com/xen/about.html
 
@@ -21,7 +21,7 @@ development community, spearheaded by XenSource Inc, a company created
 by the original Xen development team to build enterprise products
 around Xen.
 
-The 3.0 release offers excellent performance, hardware support and
+The 3.1 release offers excellent performance, hardware support and
 enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
 live relocation of VMs. This install tree contains source for a Linux
 2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris are
@@ -55,8 +55,8 @@ performed with root privileges.]
    /boot/grub/menu.lst: edit this file to include an entry like the
    following:
 
-    title Xen 3.0 / XenLinux 2.6
-       kernel /boot/xen-3.0.gz console=vga
+    title Xen 3.1 / XenLinux 2.6
+       kernel /boot/xen-3.1.gz console=vga
        module /boot/vmlinuz-2.6-xen root=<root-dev> ro console=tty0
        module /boot/initrd-2.6-xen.img
 
@@ -75,7 +75,7 @@ performed with root privileges.]
    32MB memory for internal use, which is not available for allocation
    to virtual machines.
 
-3. Reboot your system and select the "Xen 3.0 / XenLinux 2.6" menu
+3. Reboot your system and select the "Xen 3.1 / XenLinux 2.6" menu
    option. After booting Xen, Linux will start and your initialisation
    scripts should execute in the usual way.
 
@@ -103,8 +103,8 @@ performed with root privileges.]
 
 1. Download and untar the source tarball file. This will be a
    file named xen-unstable-src.tgz, or xen-$version-src.tgz.
-   You can also pull the current version from the SCMS
-   that is being used (Bitkeeper, scheduled to change shortly).
+   You can also pull the current version from the mercurial
+   repository at http://xenbits.xensource.com/
 
     # tar xzf xen-unstable-src.tgz
 
@@ -173,8 +173,13 @@ On Linux:
 
    Depending on your config, you may need to use 'mkinitrd' to create
    an initial ram disk, just like a native system e.g.
-    # depmod 2.6.16-xen
-    # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.16-xen.img 2.6.16-xen
+    # depmod 2.6.18-xen
+    # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.18-xen.img 2.6.18-xen
+
+   Other systems may requires the use of 'mkinitramfs' to create the
+   ram disk.
+    # depmod 2.6.18-xen
+    # mkinitramfs -o initrd-2.6.18-xen.img 2.6.18-xen
 
 
 Python Runtime Libraries
