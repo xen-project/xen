@@ -162,8 +162,6 @@ static void __init do_initcalls(void)
     for ( ; ; ) __asm__ __volatile__ ( "hlt" ); \
 } while (0)
 
-static struct e820entry __initdata e820_raw[E820MAX];
-
 static unsigned long __initdata initial_images_start, initial_images_end;
 
 unsigned long __init initial_images_nrpages(void)
@@ -338,6 +336,7 @@ void init_done(void)
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
+    char *memmap_type = NULL;
     char __cmdline[] = "", *cmdline = __cmdline;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
@@ -345,7 +344,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long _policy_len = 0;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
-    int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
+    int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -395,23 +394,24 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( opt_xenheap_megabytes > 2048 )
         opt_xenheap_megabytes = 2048;
 
-    if ( bootsym(e820nr) != 0 )
+    if ( e820_raw_nr != 0 )
     {
-        e820_raw_nr = bootsym(e820nr);
-        memcpy(e820_raw, bootsym(e820map), e820_raw_nr * sizeof(e820_raw[0]));
+        memmap_type = "Xen-e820";
     }
-    else if ( lowmem_kb )
+    else if ( bootsym(lowmem_kb) )
     {
+        memmap_type = "Xen-e801";
         e820_raw[0].addr = 0;
-        e820_raw[0].size = lowmem_kb << 10;
+        e820_raw[0].size = bootsym(lowmem_kb) << 10;
         e820_raw[0].type = E820_RAM;
         e820_raw[1].addr = 0x100000;
-        e820_raw[1].size = highmem_kb << 10;
+        e820_raw[1].size = bootsym(highmem_kb) << 10;
         e820_raw[1].type = E820_RAM;
         e820_raw_nr = 2;
     }
     else if ( mbi->flags & MBI_MEMMAP )
     {
+        memmap_type = "Multiboot-e820";
         while ( bytes < mbi->mmap_length )
         {
             memory_map_t *map = __va(mbi->mmap_addr + bytes);
@@ -449,6 +449,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
     else if ( mbi->flags & MBI_MEMLIMITS )
     {
+        memmap_type = "Multiboot-e801";
         e820_raw[0].addr = 0;
         e820_raw[0].size = mbi->mem_lower << 10;
         e820_raw[0].type = E820_RAM;
@@ -480,7 +481,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
 
     /* Sanitise the raw E820 map to produce a final clean version. */
-    max_page = init_e820(e820_raw, &e820_raw_nr);
+    max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
 
     /*
      * Create a temporary copy of the E820 map. Truncate it to above 16MB

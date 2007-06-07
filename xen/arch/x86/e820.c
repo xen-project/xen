@@ -412,10 +412,11 @@ static void __init machine_specific_memory_setup(
     clip_mem();
 }
 
-unsigned long __init init_e820(struct e820entry *raw, int *raw_nr)
+unsigned long __init init_e820(
+    const char *str, struct e820entry *raw, int *raw_nr)
 {
     machine_specific_memory_setup(raw, raw_nr);
-    printk(KERN_INFO "Physical RAM map:\n");
+    printk(KERN_INFO "%s RAM map:\n", str);
     print_e820_memory_map(e820.map, e820.nr_map);
     return find_max_pfn();
 }

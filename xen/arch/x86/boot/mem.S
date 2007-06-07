@@ -71,7 +71,7 @@ get_memory_map:
 e820map:
         .fill   E820MAX*20,1,0
 e820nr:
-        .byte   0
+        .long   0
 lowmem_kb:
         .long   0
 highmem_kb:
