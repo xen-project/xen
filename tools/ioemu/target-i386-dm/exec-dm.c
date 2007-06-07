@@ -458,7 +458,7 @@ void memcpy_words(void *dst, void *src, size_t n)
         *((uint32_t *)dst) = *((uint32_t *)src);
         dst = ((uint32_t *)dst) + 1;
         src = ((uint32_t *)src) + 1;
-   }
+    }
 
     if (n & 2) {
         *((uint16_t *)dst) = *((uint16_t *)src);
