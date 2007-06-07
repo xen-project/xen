@@ -13,4 +13,9 @@ struct e820map {
 extern unsigned long init_e820(struct e820entry *, int *);
 extern struct e820map e820;
 
+/* These symbols live in the boot trampoline. */
+extern struct e820entry e820map[];
+extern unsigned char e820nr;
+extern unsigned int lowmem_kb, highmem_kb;
+
 #endif /*__E820_HEADER*/

@@ -71,7 +71,7 @@ gdt_descr:
         .word   0
 nopaging_gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-        .long   SYM_PHYS(gdt_table) - FIRST_RESERVED_GDT_BYTE
+        .long   sym_phys(gdt_table) - FIRST_RESERVED_GDT_BYTE
 
         .align PAGE_SIZE, 0
 /* NB. Rings != 0 get access up to MACH2PHYS_VIRT_END. This allows access to */
@@ -93,8 +93,8 @@ ENTRY(gdt_table)
 #ifdef CONFIG_X86_PAE
         .align 32
 ENTRY(idle_pg_table)
-        .long SYM_PHYS(idle_pg_table_l2) + 0*PAGE_SIZE + 0x01, 0
-        .long SYM_PHYS(idle_pg_table_l2) + 1*PAGE_SIZE + 0x01, 0
-        .long SYM_PHYS(idle_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
-        .long SYM_PHYS(idle_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 0*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 1*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
+        .long sym_phys(idle_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
 #endif

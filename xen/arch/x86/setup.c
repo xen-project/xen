@@ -395,7 +395,22 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( opt_xenheap_megabytes > 2048 )
         opt_xenheap_megabytes = 2048;
 
-    if ( mbi->flags & MBI_MEMMAP )
+    if ( bootsym(e820nr) != 0 )
+    {
+        e820_raw_nr = bootsym(e820nr);
+        memcpy(e820_raw, bootsym(e820map), e820_raw_nr * sizeof(e820_raw[0]));
+    }
+    else if ( lowmem_kb )
+    {
+        e820_raw[0].addr = 0;
+        e820_raw[0].size = lowmem_kb << 10;
+        e820_raw[0].type = E820_RAM;
+        e820_raw[1].addr = 0x100000;
+        e820_raw[1].size = highmem_kb << 10;
+        e820_raw[1].type = E820_RAM;
+        e820_raw_nr = 2;
+    }
+    else if ( mbi->flags & MBI_MEMMAP )
     {
         while ( bytes < mbi->mmap_length )
         {
@@ -412,7 +427,12 @@ void __init __start_xen(multiboot_info_t *mbi)
              */
             if ( (map->base_addr_high == 0) && (map->length_high != 0) )
             {
-                e820_warn = 1;
+                if ( !e820_warn )
+                {
+                    printk("WARNING: Buggy e820 map detected and fixed "
+                           "(truncated length fields).\n");
+                    e820_warn = 1;
+                }
                 map->length_high = 0;
             }
 
@@ -442,14 +462,11 @@ void __init __start_xen(multiboot_info_t *mbi)
         EARLY_FAIL("Bootloader provided no memory information.\n");
     }
 
-    if ( e820_warn )
-        printk("WARNING: Buggy e820 map detected and fixed "
-               "(truncated length fields).\n");
-
     /* Ensure that all E820 RAM regions are page-aligned and -sized. */
     for ( i = 0; i < e820_raw_nr; i++ )
     {
         uint64_t s, e;
+
         if ( e820_raw[i].type != E820_RAM )
             continue;
         s = PFN_UP(e820_raw[i].addr);
@@ -530,7 +547,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             /* Select relocation address. */
             e = (e - (opt_xenheap_megabytes << 20)) & ~mask;
             xen_phys_start = e;
-            boot_trampoline_va(trampoline_xen_phys_start) = e;
+            bootsym(trampoline_xen_phys_start) = e;
 
             /*
              * Perform relocation to new physical address.

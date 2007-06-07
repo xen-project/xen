@@ -55,7 +55,7 @@
 #include <smpboot_hooks.h>
 
 #define set_kernel_exec(x, y) (0)
-#define setup_trampoline()    (boot_trampoline_pa(trampoline_realmode_entry))
+#define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
 /* Set if we find a B stepping CPU */
 static int __devinitdata smp_b_stepping;
@@ -905,7 +905,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		} else {
 			boot_error = 1;
 			mb();
-			if (boot_trampoline_va(trampoline_cpu_started) == 0xA5)
+			if (bootsym(trampoline_cpu_started) == 0xA5)
 				/* trampoline started but...? */
 				printk("Stuck ??\n");
 			else
@@ -927,7 +927,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	}
 
 	/* mark "stuck" area as not stuck */
-	boot_trampoline_va(trampoline_cpu_started) = 0;
+	bootsym(trampoline_cpu_started) = 0;
 	mb();
 
 	return boot_error;
