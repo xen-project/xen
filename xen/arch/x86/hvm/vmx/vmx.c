@@ -2039,8 +2039,8 @@ enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
 static int vmx_assist(struct vcpu *v, int mode)
 {
     struct vmx_assist_context c;
-    u32 magic;
-    u32 cp;
+    struct hvm_hw_vpic *vpic = v->domain->arch.hvm_domain.vpic;
+    u32 magic, cp;
 
     /* make sure vmxassist exists (this is not an error) */
     if (hvm_copy_from_guest_phys(&magic, VMXASSIST_MAGIC_OFFSET,
@@ -2074,20 +2074,11 @@ static int vmx_assist(struct vcpu *v, int mode)
                 goto error;
             if ( vmx_world_restore(v, &c) != 0 )
                 goto error;
+            v->arch.hvm_vmx.pm_irqbase[0] = vpic[0].irq_base;
+            v->arch.hvm_vmx.pm_irqbase[1] = vpic[1].irq_base;
+            vpic[0].irq_base = NR_EXCEPTION_HANDLER;
+            vpic[1].irq_base = NR_EXCEPTION_HANDLER + 8;
             v->arch.hvm_vmx.vmxassist_enabled = 1;
-            /*
-             * The 32-bit vmxassist vm86.c support code is hard-coded to
-             * expect vPIC interrupts to arrive at interrupt traps 0x20-0x27
-             * and 0x28-0x2f.  It bounces these to 16-bit boot code traps
-             * 0x08-0x0f and 0x70-0x77.  But when the guest transitions
-             * to true native 32-bit mode, vmxassist steps out of the
-             * way and no such bouncing occurs; so we need to rewrite
-             * the vPIC irq base to point directly to 0x08/0x70 (see
-             * code just below).  So on re-entering 16-bit mode, we need
-             * to reset the vPICs to go back to the 0x20/0x28 bounce traps.
-             */
-            v->domain->arch.hvm_domain.vpic[0].irq_base = 0x20;
-            v->domain->arch.hvm_domain.vpic[1].irq_base = 0x28;
             return 1;
         }
         break;
@@ -2105,13 +2096,14 @@ static int vmx_assist(struct vcpu *v, int mode)
                 goto error;
             if ( vmx_world_restore(v, &c) != 0 )
                 goto error;
+            if ( v->arch.hvm_vmx.irqbase_mode ) {
+                vpic[0].irq_base = c.rm_irqbase[0] & 0xf8;
+                vpic[1].irq_base = c.rm_irqbase[1] & 0xf8;
+            } else {
+                vpic[0].irq_base = v->arch.hvm_vmx.pm_irqbase[0];
+                vpic[1].irq_base = v->arch.hvm_vmx.pm_irqbase[1];
+            }
             v->arch.hvm_vmx.vmxassist_enabled = 0;
-            /*
-             * See comment above about vmxassist 16/32-bit vPIC behaviour.
-             * The irq_base values are hard-coded into vmxassist vm86.c.
-             */
-            v->domain->arch.hvm_domain.vpic[0].irq_base = 0x08;
-            v->domain->arch.hvm_domain.vpic[1].irq_base = 0x70;
             return 1;
         }
         break;

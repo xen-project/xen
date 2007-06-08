@@ -26,10 +26,6 @@
 
 #include <xen/hvm/vmx_assist.h>
 
-#define	NR_EXCEPTION_HANDLER	32
-#define	NR_INTERRUPT_HANDLERS	16
-#define	NR_TRAPS		(NR_EXCEPTION_HANDLER+NR_INTERRUPT_HANDLERS)
-
 #ifndef __ASSEMBLY__
 
 struct regs {

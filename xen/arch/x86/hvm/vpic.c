@@ -174,7 +174,8 @@ static int vpic_intack(struct hvm_hw_vpic *vpic)
     return irq;
 }
 
-static void vpic_ioport_write(struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t val)
+static void vpic_ioport_write(
+    struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t val)
 {
     int priority, cmd, irq;
     uint8_t mask;
@@ -265,6 +266,11 @@ static void vpic_ioport_write(struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t 
             vpic->imr = val;
             break;
         case 1:
+#if 1 /* Delete me when vmxassist is retired. */
+            /* Which mode is irqbase programmed in? */
+            current->arch.hvm_vmx.irqbase_mode =
+                current->arch.hvm_vmx.vmxassist_enabled;
+#endif
             /* ICW2 */
             vpic->irq_base = val & 0xf8;
             vpic->init_state++;

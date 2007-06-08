@@ -79,7 +79,11 @@ struct arch_vmx_struct {
     unsigned long        cstar;
 #endif
     unsigned long        efer;
+
+    /* Following fields are all specific to vmxassist. */
     unsigned long        vmxassist_enabled:1;
+    unsigned long        irqbase_mode:1;
+    unsigned char        pm_irqbase[2];
 };
 
 struct vmcs_struct *vmx_alloc_host_vmcs(void);

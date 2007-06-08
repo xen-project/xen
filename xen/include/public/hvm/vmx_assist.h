@@ -35,6 +35,10 @@
 
 #ifndef __ASSEMBLY__
 
+#define NR_EXCEPTION_HANDLER    32
+#define NR_INTERRUPT_HANDLERS   16
+#define NR_TRAPS        (NR_EXCEPTION_HANDLER+NR_INTERRUPT_HANDLERS)
+
 union vmcs_arbytes {
     struct arbyte_fields {
         unsigned int seg_type : 4,
@@ -98,6 +102,8 @@ struct vmx_assist_context {
     uint32_t  ldtr_limit;
     uint32_t  ldtr_base;
     union vmcs_arbytes ldtr_arbytes;
+
+    unsigned char rm_irqbase[2];
 };
 typedef struct vmx_assist_context vmx_assist_context_t;
 
