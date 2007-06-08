@@ -111,7 +111,8 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         # put qemu device model state
         if hvm:
             write_exact(fd, QEMU_SIGNATURE, "could not write qemu signature")
-            qemu_fd = os.open("/tmp/xen.qemu-dm.%d" % dominfo.getDomid(), os.O_RDONLY)
+            qemu_fd = os.open("/var/lib/xen/qemu-save.%d" % dominfo.getDomid(),
+                              os.O_RDONLY)
             while True:
                 buf = os.read(qemu_fd, dm_batch)
                 if len(buf):
@@ -119,7 +120,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
                 else:
                     break
             os.close(qemu_fd)
-            os.remove("/tmp/xen.qemu-dm.%d" % dominfo.getDomid())
+            os.remove("/var/lib/xen/qemu-save.%d" % dominfo.getDomid())
 
         if checkpoint:
             dominfo.resumeDomain()
@@ -238,7 +239,7 @@ def restore(xd, fd, dominfo = None, paused = False):
             if qemu_signature != QEMU_SIGNATURE:
                 raise XendError("not a valid device model state: found '%s'" %
                                 qemu_signature)
-            qemu_fd = os.open("/tmp/xen.qemu-dm.%d" % dominfo.getDomid(),
+            qemu_fd = os.open("/var/lib/xen/qemu-save.%d" % dominfo.getDomid(),
                               os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
             while True:
                 buf = os.read(fd, dm_batch)

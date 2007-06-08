@@ -635,7 +635,7 @@ int main_loop(void)
     main_loop_wait(1); /* For the select() on events */
 
     /* Save the device state */
-    sprintf(qemu_file, "/tmp/xen.qemu-dm.%d", domid);
+    sprintf(qemu_file, "/var/lib/xen/qemu-save.%d", domid);
     do_savevm(qemu_file);
 
     return 0;
