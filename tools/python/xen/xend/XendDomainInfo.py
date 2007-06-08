@@ -612,7 +612,7 @@ class XendDomainInfo:
             raise XendError('Invalid memory size')
 
         MiB = 1024 * 1024
-        self.info['memory_static_max'] = limit * MiB
+        self._safe_set_memory('memory_static_max', limit * MiB)
 
         if self.domid >= 0:
             maxmem = int(limit) * 1024
