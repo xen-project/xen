@@ -616,7 +616,7 @@ int main_loop(void)
     extern int suspend_requested;
     CPUState *env = cpu_single_env;
     int evtchn_fd = xc_evtchn_fd(xce_handle);
-    char qemu_file[32];
+    char qemu_file[PATH_MAX];
 
     buffered_io_timer = qemu_new_timer(rt_clock, handle_buffered_io,
 				       cpu_single_env);
@@ -635,7 +635,7 @@ int main_loop(void)
     main_loop_wait(1); /* For the select() on events */
 
     /* Save the device state */
-    sprintf(qemu_file, "/var/lib/xen/qemu-save.%d", domid);
+    snprintf(qemu_file, sizeof(qemu_file), "/var/lib/xen/qemu-save.%d", domid);
     do_savevm(qemu_file);
 
     return 0;
