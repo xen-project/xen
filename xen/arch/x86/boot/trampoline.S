@@ -6,7 +6,6 @@
 
         .globl trampoline_realmode_entry
 trampoline_realmode_entry:
-        nop                               # We use this byte as a progress flag
         movb    $0xA5,bootsym(trampoline_cpu_started)
         cld
         cli
@@ -117,6 +116,9 @@ high_start:
 
         .code32
 trampoline_boot_cpu_entry:
+        cmpb    $0,bootsym_phys(skip_realmode)
+        jnz     .Lskip_realmode
+
         /* Load pseudo-real-mode segments. */
         mov     $BOOT_PSEUDORM_DS,%eax
         mov     %eax,%ds
@@ -148,8 +150,10 @@ trampoline_boot_cpu_entry:
         /*
          * Do real-mode work:
          *  1. Get memory map.
+         *  2. Set video mode.
          */
         call    get_memory_map
+        call    video
 
         /* Disable irqs before returning to protected mode. */
         cli
@@ -170,12 +174,17 @@ trampoline_boot_cpu_entry:
         mov     %eax,%gs
         mov     %eax,%ss
 
+.Lskip_realmode:
         /* EBX == 0 indicates we are the BP (Boot Processor). */
         xor     %ebx,%ebx
 
         /* Jump to the common bootstrap entry point. */
         jmp     trampoline_protmode_entry
 
+skip_realmode:
+        .byte   0
+
 rm_idt: .word   256*4-1, 0, 0
 
 #include "mem.S"
+#include "video.S"

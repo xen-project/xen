@@ -12,6 +12,7 @@
 #include <xen/config.h>
 
 #ifdef CONFIG_VGA
+extern struct xen_vga_console_info vga_console_info;
 void vga_init(void);
 void vga_endboot(void);
 void vga_putchar(int c);

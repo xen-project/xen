@@ -18,6 +18,7 @@
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
 #include <xen/rcupdate.h>
+#include <xen/vga.h>
 #include <public/version.h>
 #ifdef CONFIG_COMPAT
 #include <compat/platform.h>
@@ -316,6 +317,69 @@ static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
     }
 }
 
+struct boot_video_info {
+    u8  orig_x;             /* 0x00 */
+    u8  orig_y;             /* 0x01 */
+    u8  orig_video_mode;    /* 0x02 */
+    u8  orig_video_cols;    /* 0x03 */
+    u8  orig_video_lines;   /* 0x04 */
+    u8  orig_video_isVGA;   /* 0x05 */
+    u16 orig_video_points;  /* 0x06 */
+
+    /* VESA graphic mode -- linear frame buffer */
+    u32 capabilities;       /* 0x08 */
+    u16 lfb_linelength;     /* 0x0c */
+    u16 lfb_width;          /* 0x0e */
+    u16 lfb_height;         /* 0x10 */
+    u16 lfb_depth;          /* 0x12 */
+    u32 lfb_base;           /* 0x14 */
+    u32 lfb_size;           /* 0x18 */
+    u8  red_size;           /* 0x1c */
+    u8  red_pos;            /* 0x1d */
+    u8  green_size;         /* 0x1e */
+    u8  green_pos;          /* 0x1f */
+    u8  blue_size;          /* 0x20 */
+    u8  blue_pos;           /* 0x21 */
+    u8  rsvd_size;          /* 0x22 */
+    u8  rsvd_pos;           /* 0x23 */
+    u16 vesapm_seg;         /* 0x24 */
+    u16 vesapm_off;         /* 0x26 */
+};
+
+static void __init parse_video_info(void)
+{
+    extern struct boot_video_info boot_vid_info;
+    struct boot_video_info *bvi = &bootsym(boot_vid_info);
+
+    if ( (bvi->orig_video_isVGA == 1) && (bvi->orig_video_mode == 3) )
+    {
+        vga_console_info.video_type = XEN_VGATYPE_TEXT_MODE_3;
+        vga_console_info.u.text_mode_3.font_height = bvi->orig_video_points;
+        vga_console_info.u.text_mode_3.cursor_x = bvi->orig_x;
+        vga_console_info.u.text_mode_3.cursor_y = bvi->orig_y;
+        vga_console_info.u.text_mode_3.rows = bvi->orig_video_lines;
+        vga_console_info.u.text_mode_3.columns = bvi->orig_video_cols;
+    }
+    else if ( bvi->orig_video_isVGA == 0x23 )
+    {
+        vga_console_info.video_type = XEN_VGATYPE_VESA_LFB;
+        vga_console_info.u.vesa_lfb.width = bvi->lfb_width;
+        vga_console_info.u.vesa_lfb.height = bvi->lfb_height;
+        vga_console_info.u.vesa_lfb.bytes_per_line = bvi->lfb_linelength;
+        vga_console_info.u.vesa_lfb.bits_per_pixel = bvi->lfb_depth;
+        vga_console_info.u.vesa_lfb.lfb_base = bvi->lfb_base;
+        vga_console_info.u.vesa_lfb.lfb_size = bvi->lfb_size;
+        vga_console_info.u.vesa_lfb.red_pos = bvi->red_pos;
+        vga_console_info.u.vesa_lfb.red_size = bvi->red_size;
+        vga_console_info.u.vesa_lfb.green_pos = bvi->green_pos;
+        vga_console_info.u.vesa_lfb.green_size = bvi->green_size;
+        vga_console_info.u.vesa_lfb.blue_pos = bvi->blue_pos;
+        vga_console_info.u.vesa_lfb.blue_size = bvi->blue_size;
+        vga_console_info.u.vesa_lfb.rsvd_pos = bvi->rsvd_pos;
+        vga_console_info.u.vesa_lfb.rsvd_size = bvi->rsvd_size;
+    }
+}
+
 void init_done(void)
 {
     extern char __init_begin[], __init_end[];
@@ -359,6 +423,8 @@ void __init __start_xen(multiboot_info_t *mbi)
         cmdline = __va(mbi->cmdline);
     cmdline_parse(cmdline);
 
+    parse_video_info();
+
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
     set_processor_id(0); /* needed early, for smp_processor_id() */
@@ -377,6 +443,22 @@ void __init __start_xen(multiboot_info_t *mbi)
     init_console();
 
     printk("Command line: %s\n", cmdline);
+
+    switch ( vga_console_info.video_type )
+    {
+    case XEN_VGATYPE_TEXT_MODE_3:
+        printk("VGA is text mode %dx%d, font 8x%d\n",
+               vga_console_info.u.text_mode_3.columns,
+               vga_console_info.u.text_mode_3.rows,
+               vga_console_info.u.text_mode_3.font_height);
+        break;
+    case XEN_VGATYPE_VESA_LFB:
+        printk("VGA is graphics mode %dx%d, %d bpp\n",
+               vga_console_info.u.vesa_lfb.width,
+               vga_console_info.u.vesa_lfb.height,
+               vga_console_info.u.vesa_lfb.bits_per_pixel);
+        break;
+    }
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )

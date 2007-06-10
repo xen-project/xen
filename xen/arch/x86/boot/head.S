@@ -73,6 +73,7 @@ __start:
         mov     $BOOT_DS,%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
+        mov     %ecx,%ss
 
         /* Check for Multiboot bootloader */
         cmp     $0x2BADB002,%eax
@@ -166,8 +167,13 @@ __start:
         mov     $trampoline_end - trampoline_start,%ecx
         rep     movsb
 
+        mov     $0x98000,%esp
+        call    cmdline_parse_early
+
         /* Jump into the relocated trampoline. */
         jmp     $BOOT_CS32,$bootsym_phys(trampoline_boot_cpu_entry)
+
+#include "cmdline.S"
 
         .globl trampoline_start, trampoline_end
 trampoline_start:
