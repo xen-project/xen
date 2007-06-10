@@ -3,11 +3,16 @@
 
 #include <asm/percpu.h>
 
-#ifndef NDEBUG
+#ifdef CONFIG_FRAME_POINTER
 /* Indicate special exception stack frame by inverting the frame pointer. */
 #define SETUP_EXCEPTION_FRAME_POINTER           \
         movq  %rsp,%rbp;                        \
         notq  %rbp
+#else
+#define SETUP_EXCEPTION_FRAME_POINTER
+#endif
+
+#ifndef NDEBUG
 #define ASSERT_INTERRUPT_STATUS(x)              \
         pushf;                                  \
         testb $X86_EFLAGS_IF>>8,1(%rsp);        \
@@ -15,7 +20,6 @@
         ud2a;                                   \
 1:      addq  $8,%rsp;
 #else
-#define SETUP_EXCEPTION_FRAME_POINTER
 #define ASSERT_INTERRUPT_STATUS(x)
 #endif
 
