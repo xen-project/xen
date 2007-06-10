@@ -416,7 +416,7 @@ unsigned long __init init_e820(
     const char *str, struct e820entry *raw, int *raw_nr)
 {
     machine_specific_memory_setup(raw, raw_nr);
-    printk(KERN_INFO "%s RAM map:\n", str);
+    printk("%s RAM map:\n", str);
     print_e820_memory_map(e820.map, e820.nr_map);
     return find_max_pfn();
 }
