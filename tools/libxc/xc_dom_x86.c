@@ -18,7 +18,6 @@
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/hvm_info_table.h>
-#include <xen/hvm/e820.h>
 #include <xen/io/protocols.h>
 
 #include "xg_private.h"

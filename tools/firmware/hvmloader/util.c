@@ -20,6 +20,7 @@
 
 #include "util.h"
 #include "config.h"
+#include "e820.h"
 #include <stdint.h>
 #include <xenctrl.h>
 #include <xen/hvm/hvm_info_table.h>
@@ -286,16 +287,16 @@ uuid_to_string(char *dest, uint8_t *uuid)
 static void e820_collapse(void)
 {
     int i = 0;
-    struct e820entry *ent = (struct e820entry *)E820_MAP;
+    struct e820entry *ent = (struct e820entry *)HVM_E820;
 
-    while ( i < (*E820_MAP_NR-1) )
+    while ( i < (*HVM_E820_NR-1) )
     {
         if ( (ent[i].type == ent[i+1].type) &&
              ((ent[i].addr + ent[i].size) == ent[i+1].addr) )
         {
             ent[i].size += ent[i+1].size;
-            memcpy(&ent[i+1], &ent[i+2], (*E820_MAP_NR-i-2) * sizeof(*ent));
-            (*E820_MAP_NR)--;
+            memcpy(&ent[i+1], &ent[i+2], (*HVM_E820_NR-i-2) * sizeof(*ent));
+            (*HVM_E820_NR)--;
         }
         else
         {
@@ -308,12 +309,12 @@ uint32_t e820_malloc(uint32_t size)
 {
     uint32_t addr;
     int i;
-    struct e820entry *ent = (struct e820entry *)E820_MAP;
+    struct e820entry *ent = (struct e820entry *)HVM_E820;
 
     /* Align allocation request to a reasonable boundary (1kB). */
     size = (size + 1023) & ~1023;
 
-    for ( i = *E820_MAP_NR - 1; i >= 0; i-- )
+    for ( i = *HVM_E820_NR - 1; i >= 0; i-- )
     {
         addr = ent[i].addr;
         if ( (ent[i].type != E820_RAM) || /* not ram? */
@@ -324,8 +325,8 @@ uint32_t e820_malloc(uint32_t size)
 
         if ( ent[i].size != size )
         {
-            memmove(&ent[i+1], &ent[i], (*E820_MAP_NR-i) * sizeof(*ent));
-            (*E820_MAP_NR)++;
+            memmove(&ent[i+1], &ent[i], (*HVM_E820_NR-i) * sizeof(*ent));
+            (*HVM_E820_NR)++;
             ent[i].size -= size;
             addr += ent[i].size;
             i++;

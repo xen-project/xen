@@ -15,7 +15,7 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
-#include <xen/hvm/e820.h>
+#include "xc_e820.h"
 
 #include <xen/libelf.h>
 
@@ -32,7 +32,7 @@ typedef union
 static void build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =
-        (struct e820entry *)(((unsigned char *)e820_page) + E820_MAP_OFFSET);
+        (struct e820entry *)(((unsigned char *)e820_page) + HVM_E820_OFFSET);
     unsigned long long extra_mem_size = 0;
     unsigned char nr_map = 0;
 
@@ -105,7 +105,7 @@ static void build_e820map(void *e820_page, unsigned long long mem_size)
         nr_map++;
     }
 
-    *(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map;
+    *(((unsigned char *)e820_page) + HVM_E820_NR_OFFSET) = nr_map;
 }
 
 static int loadelfimage(
@@ -226,7 +226,7 @@ static int setup_guest(int xc_handle,
 
     if ( (e820_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              E820_MAP_PAGE >> PAGE_SHIFT)) == NULL )
+              HVM_E820_PAGE >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     build_e820map(e820_page, v_end);

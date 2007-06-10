@@ -32,8 +32,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-#include <xen/hvm/e820.h>
-
 #include "cpu.h"
 #include "exec-all.h"
 #include "vl.h"

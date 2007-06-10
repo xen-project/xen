@@ -24,7 +24,6 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
-#include <public/hvm/e820.h>
 
 long arch_do_domctl(
     struct xen_domctl *domctl,

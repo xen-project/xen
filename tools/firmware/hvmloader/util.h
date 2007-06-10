@@ -84,11 +84,6 @@ int vprintf(const char *fmt, va_list ap);
 /* Reserve a RAM region in the e820 table. */
 uint32_t e820_malloc(uint32_t size);
 
-/* General e820 access. */
-#include <xen/hvm/e820.h>
-#define E820_MAP_NR ((unsigned char *)E820_MAP_PAGE + E820_MAP_NR_OFFSET)
-#define E820_MAP    ((struct e820entry *)(E820_MAP_PAGE + E820_MAP_OFFSET))
-
 /* Prepare the 32bit BIOS */
 void highbios_setup(void);
 
