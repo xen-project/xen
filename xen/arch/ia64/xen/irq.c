@@ -281,6 +281,30 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	return res;
 }
 
+void free_irq(unsigned int irq)
+{
+	unsigned int vec;
+	unsigned long flags;
+	irq_desc_t *desc;
+
+	/* Get vector for IRQ.  */
+	if (acpi_gsi_to_irq(irq, &vec) < 0)
+		return;
+
+	desc = irq_descp(vec);
+
+	spin_lock_irqsave(&desc->lock, flags);
+	clear_bit(vec, ia64_xen_vector);
+	desc->action = NULL;
+	desc->depth = 1;
+	desc->status |= IRQ_DISABLED;
+	desc->handler->shutdown(vec);
+	spin_unlock_irqrestore(&desc->lock, flags);
+
+	while (desc->status & IRQ_INPROGRESS)
+		cpu_relax();
+}
+
 /*
  * HANDLING OF GUEST-BOUND PHYSICAL IRQS
  */
