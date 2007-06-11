@@ -935,7 +935,7 @@ static void timer_save(QEMUFile *f, void *opaque)
 
 static int timer_load(QEMUFile *f, void *opaque, int version_id)
 {
-    if (version_id != 1)
+    if (version_id != 1 && version_id != 2)
         return -EINVAL;
     if (cpu_ticks_enabled) {
         return -EINVAL;
