@@ -102,6 +102,7 @@ def free(need_mem):
         retries = 0
         sleep_time = SLEEP_TIME_GROWTH
         last_new_alloc = None
+        last_free = None
         rlimit = RETRY_LIMIT
         while retries < rlimit:
             physinfo = xc.physinfo()
@@ -140,7 +141,9 @@ def free(need_mem):
             time.sleep(sleep_time)
             if retries < 2 * RETRY_LIMIT:
                 sleep_time += SLEEP_TIME_GROWTH
-            retries += 1
+            if last_free != None and last_free >= free_mem + scrub_mem:
+                retries += 1
+            last_free = free_mem + scrub_mem
 
         # Not enough memory; diagnose the problem.
         if dom0_min_mem == 0:
