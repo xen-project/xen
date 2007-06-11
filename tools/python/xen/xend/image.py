@@ -428,7 +428,7 @@ class HVMImageHandler(ImageHandler):
                              (self.getRequiredInitialReservation() / 1024) ])
         args = args + self.dmargs
         if restore:
-            args = args + ([ "-loadvm", "/var/lib/xen/xen.qemu-dm.%d" %
+            args = args + ([ "-loadvm", "/var/lib/xen/qemu-save.%d" %
                              self.vm.getDomid() ])
         env = dict(os.environ)
         if self.display:
