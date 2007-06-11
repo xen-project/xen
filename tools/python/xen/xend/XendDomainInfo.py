@@ -557,7 +557,23 @@ class XendDomainInfo:
                 return None
 
         log.debug("dev = %s", dev)
-        return self.getDeviceController(deviceClass).destroyDevice(dev, force)
+
+        dev_control = self.getDeviceController(deviceClass)
+        dev_uuid = dev_control.readBackend(dev, 'uuid')
+
+        ret = None
+
+        try:
+            ret = dev_control.destroyDevice(dev, force)
+        except EnvironmentError:
+            # We failed to detach the device
+            raise VmError("Failed to detach device %d" % dev)
+
+        # update XendConfig
+        if dev_uuid:
+            self.info.device_remove(dev_uuid)
+
+        return ret
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
@@ -570,7 +586,6 @@ class XendDomainInfo:
                     sxprs.append([dev_num, dev_info])
                     dev_num += 1
             return sxprs
-
 
     def setMemoryTarget(self, target):
         """Set the memory target of this domain.
