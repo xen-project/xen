@@ -22,6 +22,7 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#include <linux/bitops.h>
 #include <linux/dma-mapping.h>
 #include <linux/mm.h>
 #include <asm/scatterlist.h>
@@ -40,18 +41,18 @@ do {								\
  * when merged with upstream Linux.
  */
 static inline int
-address_needs_mapping(struct device *hwdev, dma_addr_t addr)
+address_needs_mapping(struct device *dev, dma_addr_t addr)
 {
 	dma_addr_t mask = 0xffffffff;
 
 	/* If the device has a mask, use it, otherwise default to 32 bits */
-	if (hwdev && hwdev->dma_mask)
-		mask = *hwdev->dma_mask;
+	if (dev && dev->dma_mask)
+		mask = *dev->dma_mask;
 	return (addr & ~mask) != 0;
 }
 
 int
-xen_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
+xen_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	   int direction)
 {
 	int i;
@@ -60,7 +61,7 @@ xen_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 		sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
 		sg[i].dma_length  = sg[i].length;
 
-		IOMMU_BUG_ON(address_needs_mapping(hwdev, sg[i].dma_address));
+		IOMMU_BUG_ON(address_needs_mapping(dev, sg[i].dma_address));
 	}
 
 	return nents;
@@ -68,7 +69,7 @@ xen_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 EXPORT_SYMBOL(xen_map_sg);
 
 void
-xen_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
+xen_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 	     int direction)
 {
 }
@@ -101,7 +102,7 @@ xen_alloc_coherent(struct device *dev, size_t size,
 		return NULL;
 
 	if (xen_create_contiguous_region(vaddr, order,
-					 dev->coherent_dma_mask)) {
+					 fls64(dev->coherent_dma_mask))) {
 		free_pages(vaddr, order);
 		return NULL;
 	}
