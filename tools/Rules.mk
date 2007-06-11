@@ -37,18 +37,12 @@ $(eval $(check-y))
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(XEN_OS)
+.PHONY: mk-symlinks
 
-mk-symlinks-SunOS:
-
-mk-symlinks-Linux: LINUX_ROOT=$(XEN_ROOT)/tools/include/Linux
-mk-symlinks-Linux:
-	mkdir -p xen/linux
-	( cd xen/linux && \
-	  ln -sf ../../$(LINUX_ROOT)/*.h . )
-	( cd xen && rm -f sys && ln -sf linux sys )
-
-mk-symlinks-xen:
+mk-symlinks:
+	mkdir -p xen/sys
+	( cd xen/sys && \
+	  ln -sf ../../$(XEN_ROOT)/tools/include/$(XEN_OS)/*.h . )
 	mkdir -p xen
 	( cd xen && ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
 	mkdir -p xen/hvm
@@ -62,5 +56,3 @@ mk-symlinks-xen:
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/reference.size . )
 	( cd xen/foreign && ln -sf ../../$(XEN_ROOT)/xen/include/public/foreign/*.py . )
 	$(MAKE) -C xen/foreign
-
-mk-symlinks: mk-symlinks-xen mk-symlinks-$(XEN_OS)
