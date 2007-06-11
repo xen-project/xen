@@ -63,6 +63,9 @@
 #define paging_mode_translate(_d) ((_d)->arch.paging.mode & PG_translate)
 #define paging_mode_external(_d)  ((_d)->arch.paging.mode & PG_external)
 
+/* flags used for paging debug */
+#define PAGING_DEBUG_LOGDIRTY 0
+
 /******************************************************************************
  * The equivalent for a particular vcpu of a shadowed domain. */
 
@@ -136,6 +139,29 @@ struct paging_mode {
     struct shadow_paging_mode shadow;
 };
 
+/*****************************************************************************
+ * Log dirty code */
+
+/* allocate log dirty bitmap resource for recording dirty pages */
+int paging_alloc_log_dirty_bitmap(struct domain *d);
+
+/* free log dirty bitmap resource */
+void paging_free_log_dirty_bitmap(struct domain *d);
+
+/* enable log dirty */
+int paging_log_dirty_enable(struct domain *d);
+
+/* disable log dirty */
+int paging_log_dirty_disable(struct domain *d);
+
+/* log dirty initialization */
+void paging_log_dirty_init(struct domain *d,
+                           int  (*enable_log_dirty)(struct domain *d),
+                           int  (*disable_log_dirty)(struct domain *d),
+                           void (*clean_dirty_bitmap)(struct domain *d));
+
+/* mark a page as dirty */
+void paging_mark_dirty(struct domain *d, unsigned long guest_mfn);
 
 /*****************************************************************************
  * Entry points into the paging-assistance code */

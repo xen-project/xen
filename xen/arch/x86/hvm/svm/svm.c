@@ -1027,8 +1027,8 @@ static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
         return 1;
     }
 
-    /* We should not reach here. Otherwise, P2M table is not correct.*/
-    return 0;
+    paging_mark_dirty(current->domain, get_mfn_from_gpfn(gpa >> PAGE_SHIFT));
+    return p2m_set_flags(current->domain, gpa, __PAGE_HYPERVISOR|_PAGE_USER);
 }
 
 static void svm_do_no_device_fault(struct vmcb_struct *vmcb)

@@ -496,13 +496,13 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 {
     unsigned long pfn;
     ASSERT(shadow_mode_log_dirty(d));
-    ASSERT(d->arch.paging.shadow.dirty_bitmap != NULL);
+    ASSERT(d->arch.paging.log_dirty.bitmap != NULL);
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
     if ( likely(VALID_M2P(pfn))
-         && likely(pfn < d->arch.paging.shadow.dirty_bitmap_size) 
-         && test_bit(pfn, d->arch.paging.shadow.dirty_bitmap) )
+         && likely(pfn < d->arch.paging.log_dirty.bitmap_size) 
+         && test_bit(pfn, d->arch.paging.log_dirty.bitmap) )
         return 1;
 
     return 0;

@@ -1556,7 +1556,7 @@ int alloc_page_type(struct page_info *page, unsigned long type)
 
     /* A page table is dirtied when its type count becomes non-zero. */
     if ( likely(owner != NULL) )
-        mark_dirty(owner, page_to_mfn(page));
+        paging_mark_dirty(owner, page_to_mfn(page));
 
     switch ( type & PGT_type_mask )
     {
@@ -1602,7 +1602,7 @@ void free_page_type(struct page_info *page, unsigned long type)
         if ( unlikely(paging_mode_enabled(owner)) )
         {
             /* A page table is dirtied when its type count becomes zero. */
-            mark_dirty(owner, page_to_mfn(page));
+            paging_mark_dirty(owner, page_to_mfn(page));
 
             if ( shadow_mode_refcounts(owner) )
                 return;
@@ -2057,7 +2057,7 @@ int do_mmuext_op(
             }
 
             /* A page is dirtied when its pin status is set. */
-            mark_dirty(d, mfn);
+            paging_mark_dirty(d, mfn);
            
             /* We can race domain destruction (domain_relinquish_resources). */
             if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) )
@@ -2089,7 +2089,7 @@ int do_mmuext_op(
                 put_page_and_type(page);
                 put_page(page);
                 /* A page is dirtied when its pin status is cleared. */
-                mark_dirty(d, mfn);
+                paging_mark_dirty(d, mfn);
             }
             else
             {
@@ -2424,7 +2424,7 @@ int do_mmu_update(
             set_gpfn_from_mfn(mfn, gpfn);
             okay = 1;
 
-            mark_dirty(FOREIGNDOM, mfn);
+            paging_mark_dirty(FOREIGNDOM, mfn);
 
             put_page(mfn_to_page(mfn));
             break;
@@ -3005,7 +3005,7 @@ long do_update_descriptor(u64 pa, u64 desc)
         break;
     }
 
-    mark_dirty(dom, mfn);
+    paging_mark_dirty(dom, mfn);
 
     /* All is good so make the update. */
     gdt_pent = map_domain_page(mfn);

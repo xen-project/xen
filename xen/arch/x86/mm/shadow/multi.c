@@ -457,7 +457,7 @@ static u32 guest_set_ad_bits(struct vcpu *v,
     }
 
     /* Set the bit(s) */
-    sh_mark_dirty(v->domain, gmfn);
+    paging_mark_dirty(v->domain, mfn_x(gmfn));
     SHADOW_DEBUG(A_AND_D, "gfn = %" SH_PRI_gfn ", "
                  "old flags = %#x, new flags = %#x\n", 
                  gfn_x(guest_l1e_get_gfn(*ep)), guest_l1e_get_flags(*ep), 
@@ -717,7 +717,7 @@ _sh_propagate(struct vcpu *v,
     if ( unlikely((level == 1) && shadow_mode_log_dirty(d)) )
     {
         if ( ft & FETCH_TYPE_WRITE ) 
-            sh_mark_dirty(d, target_mfn);
+            paging_mark_dirty(d, mfn_x(target_mfn));
         else if ( !sh_mfn_is_dirty(d, target_mfn) )
             sflags &= ~_PAGE_RW;
     }
@@ -2856,7 +2856,7 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     perfc_incr(shadow_fault_fixed);
-    d->arch.paging.shadow.fault_count++;
+    d->arch.paging.log_dirty.fault_count++;
     reset_early_unshadow(v);
 
  done:
@@ -4058,7 +4058,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     else
         reset_early_unshadow(v);
     
-    sh_mark_dirty(v->domain, mfn);
+    paging_mark_dirty(v->domain, mfn_x(mfn));
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4114,7 +4114,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     else
         reset_early_unshadow(v);
 
-    sh_mark_dirty(v->domain, mfn);
+    paging_mark_dirty(v->domain, mfn_x(mfn));
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4158,7 +4158,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     else
         reset_early_unshadow(v);
 
-    sh_mark_dirty(v->domain, mfn);
+    paging_mark_dirty(v->domain, mfn_x(mfn));
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);

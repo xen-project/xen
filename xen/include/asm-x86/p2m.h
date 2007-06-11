@@ -129,6 +129,11 @@ void guest_physmap_add_page(struct domain *d, unsigned long gfn,
 void guest_physmap_remove_page(struct domain *d, unsigned long gfn,
                                unsigned long mfn);
 
+/* set P2M table l1e flags */
+void p2m_set_flags_global(struct domain *d, u32 l1e_flags);
+
+/* set P2M table l1e flags for a gpa */
+int p2m_set_flags(struct domain *d, paddr_t gpa, u32 l1e_flags);
 
 #endif /* _XEN_P2M_H */
 
