@@ -49,6 +49,10 @@ void shadow_domain_init(struct domain *d)
         INIT_LIST_HEAD(&d->arch.paging.shadow.freelists[i]);
     INIT_LIST_HEAD(&d->arch.paging.shadow.p2m_freelist);
     INIT_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
+
+    /* Use shadow pagetables for log-dirty support */
+    paging_log_dirty_init(d, shadow_enable_log_dirty, 
+                          shadow_disable_log_dirty, shadow_clean_dirty_bitmap);
 }
 
 /* Setup the shadow-specfic parts of a vcpu struct. Note: The most important
@@ -2452,10 +2456,6 @@ int shadow_enable(struct domain *d, u32 mode)
             goto out_unlocked;
         }        
     }
-
-    /* initialize log dirty here */
-    paging_log_dirty_init(d, shadow_enable_log_dirty, 
-                          shadow_disable_log_dirty, shadow_clean_dirty_bitmap);
 
     /* Init the P2M table.  Must be done before we take the shadow lock 
      * to avoid possible deadlock. */

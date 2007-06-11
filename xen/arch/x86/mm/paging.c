@@ -53,6 +53,21 @@ boolean_param("hap", opt_hap_enabled);
 #undef page_to_mfn
 #define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
 
+/* The log-dirty lock.  This protects the log-dirty bitmap from
+ * concurrent accesses (and teardowns, etc). 
+ * 
+ * Locking discipline: always acquire shadow or HAP lock before this one.
+ * 
+ * Because mark_dirty is called from a lot of places, the log-dirty lock
+ * may be acquired with the shadow or HAP locks already held.  When the
+ * log-dirty code makes callbacks into HAP or shadow code to reset
+ * various traps that will trigger the mark_dirty calls, it must *not*
+ * have the log-dirty lock held, or it risks deadlock.  Because the only
+ * purpose of those calls is to make sure that *guest* actions will
+ * cause mark_dirty to be called (hypervisor actions explictly call it
+ * anyway), it is safe to release the log-dirty lock before the callback
+ * as long as the domain is paused for the entire operation. */
+
 #define log_dirty_lock_init(_d)                                   \
     do {                                                          \
         spin_lock_init(&(_d)->arch.paging.log_dirty.lock);        \
@@ -85,7 +100,9 @@ boolean_param("hap", opt_hap_enabled);
 /* allocate bitmap resources for log dirty */
 int paging_alloc_log_dirty_bitmap(struct domain *d)
 {
-    ASSERT(d->arch.paging.log_dirty.bitmap == NULL);
+    if ( d->arch.paging.log_dirty.bitmap != NULL )
+        return 0;
+
     d->arch.paging.log_dirty.bitmap_size =
         (domain_get_maximum_gpfn(d) + BITS_PER_LONG) & ~(BITS_PER_LONG - 1);
     d->arch.paging.log_dirty.bitmap = 
@@ -133,9 +150,16 @@ int paging_log_dirty_enable(struct domain *d)
         goto out;
     }
 
-    ret = d->arch.paging.log_dirty.enable_log_dirty(d);
-    if ( ret != 0 )
-        paging_free_log_dirty_bitmap(d);
+    log_dirty_unlock(d);
+
+    /* Safe because the domain is paused. */    
+    ret = d->arch.paging.log_dirty.enable_log_dirty(d);    
+
+    /* Possibility of leaving the bitmap allocated here but it'll be
+     * tidied on domain teardown. */
+
+    domain_unpause(d);
+    return ret;
 
  out:
     log_dirty_unlock(d);
@@ -148,8 +172,9 @@ int paging_log_dirty_disable(struct domain *d)
     int ret;
 
     domain_pause(d);
-    log_dirty_lock(d);
+    /* Safe because the domain is paused. */
     ret = d->arch.paging.log_dirty.disable_log_dirty(d);
+    log_dirty_lock(d);
     if ( !paging_mode_log_dirty(d) )
         paging_free_log_dirty_bitmap(d);
     log_dirty_unlock(d);
@@ -182,7 +207,10 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
      * Nothing to do here...
      */
     if ( unlikely(!VALID_M2P(pfn)) )
+    {
+        log_dirty_unlock(d);
         return;
+    }
 
     if ( likely(pfn < d->arch.paging.log_dirty.bitmap_size) ) 
     { 
@@ -237,11 +265,6 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
     {
         d->arch.paging.log_dirty.fault_count = 0;
         d->arch.paging.log_dirty.dirty_count = 0;
-
-        /* We need to further call clean_dirty_bitmap() functions of specific
-         * paging modes (shadow or hap).
-         */
-        d->arch.paging.log_dirty.clean_dirty_bitmap(d);
     }
 
     if ( guest_handle_is_null(sc->dirty_bitmap) )
@@ -280,6 +303,17 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
     }
 #undef CHUNK
 
+    log_dirty_unlock(d);
+
+    if ( clean )
+    {
+        /* We need to further call clean_dirty_bitmap() functions of specific
+         * paging modes (shadow or hap).  Safe because the domain is paused. */
+        d->arch.paging.log_dirty.clean_dirty_bitmap(d);
+    }
+    domain_unpause(d);
+    return rv;
+
  out:
     log_dirty_unlock(d);
     domain_unpause(d);
@@ -291,6 +325,8 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
  * these functions for log dirty code to call. This function usually is 
  * invoked when paging is enabled. Check shadow_enable() and hap_enable() for 
  * reference.
+ *
+ * These function pointers must not be followed with the log-dirty lock held. 
  */
 void paging_log_dirty_init(struct domain *d,
                            int    (*enable_log_dirty)(struct domain *d),
@@ -319,8 +355,13 @@ void paging_log_dirty_teardown(struct domain*d)
 void paging_domain_init(struct domain *d)
 {
     p2m_init(d);
+
+    /* The order of the *_init calls below is important, as the later
+     * ones may rewrite some common fields.  Shadow pagetables are the
+     * default... */
     shadow_domain_init(d);
 
+    /* ... but we will use hardware assistance if it's available. */
     if ( opt_hap_enabled && is_hvm_domain(d) )
         hap_domain_init(d);
 }
@@ -397,13 +438,13 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 /* Call when destroying a domain */
 void paging_teardown(struct domain *d)
 {
-    /* clean up log dirty resources. */
-    paging_log_dirty_teardown(d);
-    
     if ( opt_hap_enabled && is_hvm_domain(d) )
         hap_teardown(d);
     else
         shadow_teardown(d);
+
+    /* clean up log dirty resources. */
+    paging_log_dirty_teardown(d);
 }
 
 /* Call once all of the references to the domain have gone away */

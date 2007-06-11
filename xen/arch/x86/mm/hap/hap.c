@@ -425,6 +425,10 @@ void hap_domain_init(struct domain *d)
 {
     hap_lock_init(d);
     INIT_LIST_HEAD(&d->arch.paging.hap.freelists);
+
+    /* This domain will use HAP for log-dirty mode */
+    paging_log_dirty_init(d, hap_enable_log_dirty, hap_disable_log_dirty,
+                          hap_clean_dirty_bitmap);
 }
 
 /* return 0 for success, -errno for failure */
@@ -454,10 +458,6 @@ int hap_enable(struct domain *d, u32 mode)
             goto out;
         }
     }
-
-    /* initialize log dirty here */
-    paging_log_dirty_init(d, hap_enable_log_dirty, hap_disable_log_dirty,
-                          hap_clean_dirty_bitmap);
 
     /* allocate P2m table */
     if ( mode & PG_translate ) {
