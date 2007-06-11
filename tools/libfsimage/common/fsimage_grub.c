@@ -145,7 +145,7 @@ fsig_log2 (unsigned long word)
 #else
 # define ia64_popcnt(x)                                     \
   ({                                                        \
-    __u64 ia64_intri_res;                                   \
+    uint64_t ia64_intri_res;                                \
     asm ("popcnt %0=%1" : "=r" (ia64_intri_res) : "r" (x)); \
     ia64_intri_res;                                         \
   })
