@@ -27,7 +27,6 @@ from xen.xend.XendConstants import REVERSE_DOMAIN_SHUTDOWN_REASONS
 from xen.xend.XendError import VmError, XendError, HVMRequired
 from xen.xend.XendLogging import log
 from xen.xend.XendOptions import instance as xenopts
-from xen.xend.server.netif import randomMAC
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend import arch
 
@@ -351,7 +350,7 @@ class HVMImageHandler(ImageHandler):
             nics += 1
             mac = devinfo.get('mac')
             if mac is None:
-                mac = randomMAC()
+                raise VmError("MAC address not specified or generated.")
             bridge = devinfo.get('bridge', 'xenbr0')
             model = devinfo.get('model', 'rtl8139')
             ret.append("-net")

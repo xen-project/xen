@@ -27,6 +27,7 @@ from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
+from xen.xend.server.netif import randomMAC
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -993,6 +994,10 @@ class XendConfig(dict):
                 else:
                     dev_info['driver'] = 'paravirtualised'
 
+            if dev_type == 'vif':
+                if not dev_info.get('mac'):
+                    dev_info['mac'] = randomMAC()
+
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', None)
             if not dev_uuid:
@@ -1051,8 +1056,9 @@ class XendConfig(dict):
             dev_info = {}
             dev_uuid = ''
             if dev_type == 'vif':
-                if cfg_xenapi.get('MAC'): # don't add if blank
-                    dev_info['mac'] = cfg_xenapi.get('MAC')
+                dev_info['mac'] = cfg_xenapi.get('MAC')
+                if not dev_info['mac']:
+                    dev_info['mac'] = randomMAC()
                 # vifname is the name on the guest, not dom0
                 # TODO: we don't have the ability to find that out or
                 #       change it from dom0

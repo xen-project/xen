@@ -112,7 +112,7 @@ class NetifController(DevController):
             typ = xoptions.netback_type
 
         if not mac:
-            mac = randomMAC()
+            raise VmError("MAC address not specified or generated.")
 
         devid = self.allocateDeviceID()
 
