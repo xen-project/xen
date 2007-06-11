@@ -546,31 +546,18 @@ class XendDomainInfo:
             self.getDeviceController(devclass).waitForDevices()
 
     def destroyDevice(self, deviceClass, devid, force = False):
-        found = True                    # Assume devid is an integer.
         try:
-            devid = int(devid)
+            dev = int(devid)
         except ValueError:
-            # devid is not a number, let's search for it in xenstore.
-            devicePath = '%s/device/%s' % (self.dompath, deviceClass)
-            found = False
-            for entry in xstransact.List(devicePath):
-                log.debug("Attempting to find devid at %s/%s", devicePath, entry)
-                backend = xstransact.Read('%s/%s' % (devicePath, entry),
-                                          "backend")
-                if backend != None:
-                    devName = '%s/%s' % (deviceClass, entry)
-                    log.debug("devName=%s", devName)
-                    if devName == devid:
-                        # We found the integer matching our devid, use it instead
-                        devid = int(entry)
-                        found = True
-                        break
+            # devid is not a number but a string containing either device
+            # name (e.g. xvda) or device_type/device_id (e.g. vbd/51728)
+            dev = type(devid) is str and devid.split('/')[-1] or None
+            if dev == None:
+                log.debug("Could not find the device %s", devid)
+                return None
 
-        if not found:
-            log.debug("Could not find the device %s", devid)
-            return None
-        log.debug("devid = %s", devid)
-        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
+        log.debug("dev = %s", dev)
+        return self.getDeviceController(deviceClass).destroyDevice(dev, force)
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
