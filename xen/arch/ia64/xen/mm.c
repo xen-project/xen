@@ -1333,7 +1333,7 @@ __dom0vp_add_physmap(struct domain* d, unsigned long gpfn,
             break;
         default:
             gdprintk(XENLOG_INFO, "d 0x%p domid %d "
-                    "pgfn 0x%lx mfn_or_gmfn 0x%lx flags 0x%lx domid %d\n",
+                    "gpfn 0x%lx mfn_or_gmfn 0x%lx flags 0x%lx domid %d\n",
                     d, d->domain_id, gpfn, mfn_or_gmfn, flags, domid);
             return -ESRCH;
         }
