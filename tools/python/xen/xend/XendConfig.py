@@ -27,6 +27,7 @@ from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
+from xen.xend.server.netif import randomMAC
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -587,30 +588,46 @@ class XendConfig(dict):
             else:
                 cfg['cpus'] = str(cfg['cpu'])
 
-        # convert 'cpus' string to list of ints
-        # 'cpus' supports a list of ranges (0-3), seperated by
-        # commas, and negation, (^1).  
-        # Precedence is settled by  order of the string:
-        #     "0-3,^1"   -> [0,2,3]
-        #     "0-3,^1,1" -> [0,1,2,3]
-        try:
-            if 'cpus' in cfg and type(cfg['cpus']) != list:
-                cpus = []
-                for c in cfg['cpus'].split(','):
-                    if c.find('-') != -1:             
-                        (x, y) = c.split('-')
-                        for i in range(int(x), int(y)+1):
-                            cpus.append(int(i))
-                    else:
-                        # remove this element from the list 
-                        if c[0] == '^':
-                            cpus = [x for x in cpus if x != int(c[1:])]
+        # Convert 'cpus' to list of ints
+        if 'cpus' in cfg:
+            cpus = []
+            if type(cfg['cpus']) == list:
+                # If sxp_cfg was created from config.sxp,
+                # the form of 'cpus' is list of string.
+                # Convert 'cpus' to list of ints.
+                #    ['1']         -> [1]
+                #    ['0','2','3'] -> [0,2,3]
+                try:
+                    for c in cfg['cpus']:
+                        cpus.append(int(c))
+                    
+                    cfg['cpus'] = cpus
+                except ValueError, e:
+                    raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+            else:
+                # Convert 'cpus' string to list of ints
+                # 'cpus' supports a list of ranges (0-3),
+                # seperated by commas, and negation, (^1).  
+                # Precedence is settled by order of the 
+                # string:
+                #    "0-3,^1"      -> [0,2,3]
+                #    "0-3,^1,1"    -> [0,1,2,3]
+                try:
+                    for c in cfg['cpus'].split(','):
+                        if c.find('-') != -1:             
+                            (x, y) = c.split('-')
+                            for i in range(int(x), int(y)+1):
+                                cpus.append(int(i))
                         else:
-                            cpus.append(int(c))
-
-                cfg['cpus'] = cpus
-        except ValueError, e:
-            raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
+                            # remove this element from the list 
+                            if c[0] == '^':
+                                cpus = [x for x in cpus if x != int(c[1:])]
+                            else:
+                                cpus.append(int(c))
+                    
+                    cfg['cpus'] = cpus
+                except ValueError, e:
+                    raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
         if 'security' in cfg and isinstance(cfg['security'], str):
             cfg['security'] = sxp.from_string(cfg['security'])
@@ -842,6 +859,8 @@ class XendConfig(dict):
                 if name in self and self[name] not in (None, []):
                     if typ == dict:
                         s = self[name].items()
+                    elif typ == list:
+                        s = self[name]
                     else:
                         s = str(self[name])
                     sxpr.append([name, s])
@@ -975,6 +994,10 @@ class XendConfig(dict):
                 else:
                     dev_info['driver'] = 'paravirtualised'
 
+            if dev_type == 'vif':
+                if not dev_info.get('mac'):
+                    dev_info['mac'] = randomMAC()
+
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', None)
             if not dev_uuid:
@@ -1033,8 +1056,9 @@ class XendConfig(dict):
             dev_info = {}
             dev_uuid = ''
             if dev_type == 'vif':
-                if cfg_xenapi.get('MAC'): # don't add if blank
-                    dev_info['mac'] = cfg_xenapi.get('MAC')
+                dev_info['mac'] = cfg_xenapi.get('MAC')
+                if not dev_info['mac']:
+                    dev_info['mac'] = randomMAC()
                 # vifname is the name on the guest, not dom0
                 # TODO: we don't have the ability to find that out or
                 #       change it from dom0
@@ -1250,6 +1274,21 @@ class XendConfig(dict):
 
         return False
 
+    def device_remove(self, dev_uuid):
+        """Remove an existing device referred by dev_uuid.
+        """
+
+        if dev_uuid in self['devices']:
+            dev_config = self['devices'].get(dev_uuid)
+            dev_type = dev_config[0]
+
+            del self['devices'][dev_uuid]
+            # Remove dev references for certain device types (see device_add)
+            if dev_type in ('vif', 'vbd', 'vtpm'):
+                param = '%s_refs' % dev_type
+                if param in self:
+                    if dev_uuid in self[param]:
+                        self[param].remove(dev_uuid)
 
     def device_sxpr(self, dev_uuid = None, dev_type = None, dev_info = None):
         """Get Device SXPR by either giving the device UUID or (type, config).

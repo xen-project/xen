@@ -167,7 +167,7 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     printk("\n");
 }
 
-#ifdef NDEBUG
+#if !defined(CONFIG_FRAME_POINTER)
 
 static void show_trace(struct cpu_user_regs *regs)
 {
@@ -345,16 +345,26 @@ char *trapstr(int trapnr)
  */
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
-    watchdog_disable();
-    console_start_sync();
+    static DEFINE_PER_CPU(char, depth);
 
-    show_execution_state(regs);
-
-    if ( trapnr == TRAP_page_fault )
+    /*
+     * In some cases, we can end up in a vicious cycle of fatal_trap()s
+     * within fatal_trap()s. We give the problem a couple of iterations to
+     * bottom out, and then we just panic.
+     */
+    if ( ++this_cpu(depth) < 3 )
     {
-        unsigned long cr2 = read_cr2();
-        printk("Faulting linear address: %p\n", _p(cr2));
-        show_page_walk(cr2);
+        watchdog_disable();
+        console_start_sync();
+
+        show_execution_state(regs);
+
+        if ( trapnr == TRAP_page_fault )
+        {
+            unsigned long cr2 = read_cr2();
+            printk("Faulting linear address: %p\n", _p(cr2));
+            show_page_walk(cr2);
+        }
     }
 
     panic("FATAL TRAP: vector = %d (%s)\n"

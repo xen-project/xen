@@ -37,7 +37,17 @@ void xenoprof_arch_release_counters(void);
 struct vcpu;
 struct cpu_user_regs;
 int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
-
+static inline int xenoprof_backtrace_supported(void)
+{
+    return 0;
+}
+static inline void xenoprof_backtrace(
+    struct domain *d, struct vcpu *vcpu, 
+    struct pt_regs *const regs, unsigned long depth, int mode)
+{
+    /* To be implemented */
+    return;
+}
 #define xenoprof_shared_gmfn(d, gmaddr, maddr)  \
     assign_domain_page((d), (gmaddr), (maddr));
 

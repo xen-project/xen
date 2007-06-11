@@ -75,16 +75,14 @@ void shadow_teardown(struct domain *d);
 /* Call once all of the references to the domain have gone away */
 void shadow_final_teardown(struct domain *d);
 
-/* Mark a page as dirty in the log-dirty bitmap: called when Xen 
- * makes changes to guest memory on its behalf. */
-void sh_mark_dirty(struct domain *d, mfn_t gmfn);
-/* Cleaner version so we don't pepper shadow_mode tests all over the place */
-static inline void mark_dirty(struct domain *d, unsigned long gmfn)
-{
-    if ( unlikely(shadow_mode_log_dirty(d)) )
-        /* See the comment about locking in sh_mark_dirty */
-        sh_mark_dirty(d, _mfn(gmfn));
-}
+/* shadow code to call when log dirty is enabled */
+int shadow_enable_log_dirty(struct domain *d);
+
+/* shadow code to call when log dirty is disabled */
+int shadow_disable_log_dirty(struct domain *d);
+
+/* shadow code to call when bitmap is being cleaned */
+void shadow_clean_dirty_bitmap(struct domain *d);
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
  * Called to initialize paging structures if the paging mode

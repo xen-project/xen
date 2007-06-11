@@ -87,7 +87,7 @@ class XendAuthSessions:
         pam_auth.start("login")
         pam_auth.set_item(PAM.PAM_USER, username)
 
-        def _pam_conv(auth, query_list, user_data):
+        def _pam_conv(auth, query_list, user_data = None):
             resp = []
             for i in range(len(query_list)):
                 query, qtype = query_list[i]

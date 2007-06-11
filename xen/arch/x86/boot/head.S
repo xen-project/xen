@@ -9,12 +9,15 @@
         .text
         .code32
 
-#define SYM_PHYS(sym)       ((sym) - __XEN_VIRT_START)
-#define SYM_TRAMP_PHYS(sym) ((sym) - trampoline_start + BOOT_TRAMPOLINE)
+#undef bootsym_phys
+#define sym_phys(sym)     ((sym) - __XEN_VIRT_START)
+#define bootsym_phys(sym) ((sym) - trampoline_start + BOOT_TRAMPOLINE)
 
-#define TRAMP_CS32 0x0008
-#define TRAMP_CS64 0x0010
-#define TRAMP_DS   0x0018
+#define BOOT_CS32        0x0008
+#define BOOT_CS64        0x0010
+#define BOOT_DS          0x0018
+#define BOOT_PSEUDORM_CS 0x0020
+#define BOOT_PSEUDORM_DS 0x0028
 
 ENTRY(start)
         jmp     __start
@@ -30,14 +33,16 @@ ENTRY(start)
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 
+        .section .init.text
+
 .Lbad_cpu_msg: .asciz "ERR: Not a 64-bit CPU!"
 .Lbad_ldr_msg: .asciz "ERR: Not a Multiboot bootloader!"
 
 bad_cpu:
-        mov     $(SYM_PHYS(.Lbad_cpu_msg)),%esi # Error message
+        mov     $(sym_phys(.Lbad_cpu_msg)),%esi # Error message
         jmp     print_err
 not_multiboot:
-        mov     $(SYM_PHYS(.Lbad_ldr_msg)),%esi # Error message
+        mov     $(sym_phys(.Lbad_ldr_msg)),%esi # Error message
 print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
@@ -56,29 +61,30 @@ print_err:
         jmp     1b
 
 gdt_boot_descr:
-        .word   4*8-1
-        .long   SYM_PHYS(trampoline_gdt)
+        .word   6*8-1
+        .long   sym_phys(trampoline_gdt)
 
 __start:
         cld
         cli
 
         /* Initialise GDT and basic data segments. */
-        lgdt    %cs:SYM_PHYS(gdt_boot_descr)
-        mov     $TRAMP_DS,%ecx
+        lgdt    %cs:sym_phys(gdt_boot_descr)
+        mov     $BOOT_DS,%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
+        mov     %ecx,%ss
 
         /* Check for Multiboot bootloader */
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
 
         /* Save the Multiboot info structure for later use. */
-        mov     %ebx,SYM_PHYS(multiboot_ptr)
+        mov     %ebx,sym_phys(multiboot_ptr)
 
         /* Initialize BSS (no nasty surprises!) */
-        mov     $SYM_PHYS(__bss_start),%edi
-        mov     $SYM_PHYS(_end),%ecx
+        mov     $sym_phys(__bss_start),%edi
+        mov     $sym_phys(_end),%ecx
         sub     %edi,%ecx
         xor     %eax,%eax
         rep     stosb
@@ -91,15 +97,15 @@ __start:
         jbe     1f
         mov     $0x80000001,%eax
         cpuid
-1:      mov     %edx,SYM_PHYS(cpuid_ext_features)
+1:      mov     %edx,sym_phys(cpuid_ext_features)
 
 #if defined(__x86_64__)
         /* Check for availability of long mode. */
         bt      $29,%edx
         jnc     bad_cpu
         /* Initialise L2 identity-map and xen page table entries (16MB). */
-        mov     $SYM_PHYS(l2_identmap),%edi
-        mov     $SYM_PHYS(l2_xenmap),%esi
+        mov     $sym_phys(l2_identmap),%edi
+        mov     $sym_phys(l2_xenmap),%esi
         mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+2MB+GLOBAL */
         mov     $8,%ecx
 1:      mov     %eax,(%edi)
@@ -109,25 +115,25 @@ __start:
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         loop    1b
         /* Initialise L3 identity-map page directory entries. */
-        mov     $SYM_PHYS(l3_identmap),%edi
-        mov     $(SYM_PHYS(l2_identmap)+7),%eax
+        mov     $sym_phys(l3_identmap),%edi
+        mov     $(sym_phys(l2_identmap)+7),%eax
         mov     $4,%ecx
 1:      mov     %eax,(%edi)
         add     $8,%edi
         add     $PAGE_SIZE,%eax
         loop    1b
         /* Initialise L3 xen-map page directory entry. */
-        mov     $(SYM_PHYS(l2_xenmap)+7),%eax
-        mov     %eax,SYM_PHYS(l3_xenmap) + (50*8)
+        mov     $(sym_phys(l2_xenmap)+7),%eax
+        mov     %eax,sym_phys(l3_xenmap) + (50*8)
         /* Hook indentity-map and xen-map L3 tables into PML4. */
-        mov     $(SYM_PHYS(l3_identmap)+7),%eax
-        mov     %eax,SYM_PHYS(idle_pg_table) + (  0*8) /* PML4[  0]: 1:1 map */
-        mov     %eax,SYM_PHYS(idle_pg_table) + (262*8) /* PML4[262]: 1:1 map */
-        mov     $(SYM_PHYS(l3_xenmap)+7),%eax
-        mov     %eax,SYM_PHYS(idle_pg_table) + (261*8) /* PML4[261]: xen map */
+        mov     $(sym_phys(l3_identmap)+7),%eax
+        mov     %eax,sym_phys(idle_pg_table) + (  0*8) /* PML4[  0]: 1:1 map */
+        mov     %eax,sym_phys(idle_pg_table) + (262*8) /* PML4[262]: 1:1 map */
+        mov     $(sym_phys(l3_xenmap)+7),%eax
+        mov     %eax,sym_phys(idle_pg_table) + (261*8) /* PML4[261]: xen map */
 #elif defined(CONFIG_X86_PAE)
         /* Initialize low and high mappings of memory with 2MB pages */
-        mov     $SYM_PHYS(idle_pg_table_l2),%edi
+        mov     $sym_phys(idle_pg_table_l2),%edi
         mov     $0xe3,%eax                   /* PRESENT+RW+A+D+2MB */
 1:      mov     %eax,__PAGE_OFFSET>>18(%edi) /* high mapping */
         stosl                                /* low mapping */
@@ -142,7 +148,7 @@ __start:
         jne     1b
 #else
         /* Initialize low and high mappings of memory with 4MB pages */
-        mov     $SYM_PHYS(idle_pg_table),%edi
+        mov     $sym_phys(idle_pg_table),%edi
         mov     $0xe3,%eax                   /* PRESENT+RW+A+D+4MB */
 1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
         stosl                                /* low mapping */
@@ -156,22 +162,25 @@ __start:
 #endif
 
         /* Copy bootstrap trampoline to low memory, below 1MB. */
-        mov     $SYM_PHYS(trampoline_start),%esi
-        mov     $SYM_TRAMP_PHYS(trampoline_start),%edi
+        mov     $sym_phys(trampoline_start),%esi
+        mov     $bootsym_phys(trampoline_start),%edi
         mov     $trampoline_end - trampoline_start,%ecx
         rep     movsb
 
-        /* EBX == 0 indicates we are the BP (Boot Processor). */
-        xor     %ebx,%ebx
+        mov     $0x98000,%esp
+        call    cmdline_parse_early
 
         /* Jump into the relocated trampoline. */
-        jmp     $TRAMP_CS32,$SYM_TRAMP_PHYS(trampoline_protmode_entry)
+        jmp     $BOOT_CS32,$bootsym_phys(trampoline_boot_cpu_entry)
+
+#include "cmdline.S"
 
         .globl trampoline_start, trampoline_end
 trampoline_start:
 #include "trampoline.S"
 trampoline_end:
 
+        .text
 __high_start:
 #ifdef __x86_64__
 #include "x86_64.S"

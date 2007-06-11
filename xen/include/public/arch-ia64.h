@@ -77,6 +77,7 @@ typedef unsigned long xen_ulong_t;
 
 #define MEM_G   (1UL << 30)
 #define MEM_M   (1UL << 20)
+#define MEM_K   (1UL << 10)
 
 /* Guest physical address of IO ports space.  */
 #define IO_PORTS_PADDR          0x00000ffffc000000UL
@@ -111,6 +112,10 @@ typedef unsigned long xen_ulong_t;
 
 #define GFW_START        (4*MEM_G -16*MEM_M)
 #define GFW_SIZE         (16*MEM_M)
+
+/* Nvram belongs to GFW memory space  */
+#define NVRAM_SIZE       (MEM_K * 64)
+#define NVRAM_START      (GFW_START + 10 * MEM_M)
 
 struct pt_fpreg {
     union {

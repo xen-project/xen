@@ -24,7 +24,6 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
-#include <public/hvm/e820.h>
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
@@ -317,7 +316,9 @@ long arch_do_domctl(
         if ( copy_from_guest(c.data, domctl->u.hvmcontext.buffer, c.size) != 0)
             goto sethvmcontext_out;
 
+        domain_pause(d);
         ret = hvm_load(d, &c);
+        domain_unpause(d);
 
     sethvmcontext_out:
         if ( c.data != NULL )
@@ -362,7 +363,9 @@ long arch_do_domctl(
         if ( (c.data = xmalloc_bytes(c.size)) == NULL )
             goto gethvmcontext_out;
 
+        domain_pause(d);
         ret = hvm_save(d, &c);
+        domain_unpause(d);
 
         domctl->u.hvmcontext.size = c.cur;
         if ( copy_to_guest(domctl->u.hvmcontext.buffer, c.data, c.size) != 0 )

@@ -25,6 +25,7 @@
 #include "smbios_types.h"
 #include "util.h"
 #include "hypercall.h"
+#include "e820.h"
 
 static int
 write_smbios_tables(void *start,
@@ -131,8 +132,8 @@ write_smbios_tables(void *start,
 static uint64_t
 get_memsize(void)
 {
-    struct e820entry *map = E820_MAP;
-    uint8_t num_entries = *E820_MAP_NR;
+    struct e820entry *map = HVM_E820;
+    uint8_t num_entries = *HVM_E820_NR;
     uint64_t memsize = 0;
     int i;
 

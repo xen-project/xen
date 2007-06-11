@@ -1326,6 +1326,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 {
     l1_pgentry_t ol1e;
     struct domain *d = current->domain;
+    unsigned long mfn;
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return 0;
@@ -1336,8 +1337,11 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        nl1e = l1e_from_pfn(gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e)),
-                            l1e_get_flags(nl1e));
+        mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e));
+        if ( unlikely(mfn == INVALID_MFN) )
+            return 0;
+        ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
+        nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
 
         if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         {
@@ -1552,7 +1556,7 @@ int alloc_page_type(struct page_info *page, unsigned long type)
 
     /* A page table is dirtied when its type count becomes non-zero. */
     if ( likely(owner != NULL) )
-        mark_dirty(owner, page_to_mfn(page));
+        paging_mark_dirty(owner, page_to_mfn(page));
 
     switch ( type & PGT_type_mask )
     {
@@ -1598,7 +1602,7 @@ void free_page_type(struct page_info *page, unsigned long type)
         if ( unlikely(paging_mode_enabled(owner)) )
         {
             /* A page table is dirtied when its type count becomes zero. */
-            mark_dirty(owner, page_to_mfn(page));
+            paging_mark_dirty(owner, page_to_mfn(page));
 
             if ( shadow_mode_refcounts(owner) )
                 return;
@@ -2053,7 +2057,7 @@ int do_mmuext_op(
             }
 
             /* A page is dirtied when its pin status is set. */
-            mark_dirty(d, mfn);
+            paging_mark_dirty(d, mfn);
            
             /* We can race domain destruction (domain_relinquish_resources). */
             if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) )
@@ -2085,7 +2089,7 @@ int do_mmuext_op(
                 put_page_and_type(page);
                 put_page(page);
                 /* A page is dirtied when its pin status is cleared. */
-                mark_dirty(d, mfn);
+                paging_mark_dirty(d, mfn);
             }
             else
             {
@@ -2420,7 +2424,7 @@ int do_mmu_update(
             set_gpfn_from_mfn(mfn, gpfn);
             okay = 1;
 
-            mark_dirty(FOREIGNDOM, mfn);
+            paging_mark_dirty(FOREIGNDOM, mfn);
 
             put_page(mfn_to_page(mfn));
             break;
@@ -2617,8 +2621,8 @@ static int create_grant_va_mapping(
     return GNTST_okay;
 }
 
-static int destroy_grant_va_mapping(
-    unsigned long addr, unsigned long frame, struct vcpu *v)
+static int replace_grant_va_mapping(
+    unsigned long addr, unsigned long frame, l1_pgentry_t nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
     unsigned long gl1mfn;
@@ -2642,7 +2646,7 @@ static int destroy_grant_va_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, v)) )
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, v)) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         rc = GNTST_general_error;
@@ -2652,6 +2656,12 @@ static int destroy_grant_va_mapping(
  out:
     guest_unmap_l1e(v, pl1e);
     return rc;
+}
+
+static int destroy_grant_va_mapping(
+    unsigned long addr, unsigned long frame, struct vcpu *v)
+{
+    return replace_grant_va_mapping(addr, frame, l1e_empty(), v);
 }
 
 int create_grant_host_mapping(
@@ -2669,12 +2679,48 @@ int create_grant_host_mapping(
     return create_grant_va_mapping(addr, pte, current);
 }
 
-int destroy_grant_host_mapping(
-    uint64_t addr, unsigned long frame, unsigned int flags)
+int replace_grant_host_mapping(
+    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
 {
+    l1_pgentry_t *pl1e, ol1e;
+    unsigned long gl1mfn;
+    int rc;
+    
     if ( flags & GNTMAP_contains_pte )
-        return destroy_grant_pte_mapping(addr, frame, current->domain);
-    return destroy_grant_va_mapping(addr, frame, current);
+    {
+	if (!new_addr)
+	    return destroy_grant_pte_mapping(addr, frame, current->domain);
+
+	MEM_LOG("Unsupported grant table operation");
+	return GNTST_general_error;
+    }
+
+    if (!new_addr)
+	return destroy_grant_va_mapping(addr, frame, current);
+
+    pl1e = guest_map_l1e(current, new_addr, &gl1mfn);
+    if ( !pl1e )
+    {
+        MEM_LOG("Could not find L1 PTE for address %lx",
+                (unsigned long)new_addr);
+        return GNTST_general_error;
+    }
+    ol1e = *pl1e;
+
+    if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, current)) )
+    {
+        MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
+        guest_unmap_l1e(current, pl1e);
+        return GNTST_general_error;
+    }
+
+    guest_unmap_l1e(current, pl1e);
+
+    rc = replace_grant_va_mapping(addr, frame, ol1e, current);
+    if ( rc && !paging_mode_refcounts(current->domain) )
+        put_page_from_l1e(ol1e, current->domain);
+
+    return rc;
 }
 
 int steal_page(
@@ -2959,7 +3005,7 @@ long do_update_descriptor(u64 pa, u64 desc)
         break;
     }
 
-    mark_dirty(dom, mfn);
+    paging_mark_dirty(dom, mfn);
 
     /* All is good so make the update. */
     gdt_pent = map_domain_page(mfn);

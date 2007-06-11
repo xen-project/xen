@@ -30,12 +30,13 @@ import sys
 
 for p in ['python%s' % sys.version[:3], 'python']:
     for l in ['/usr/lib64', '/usr/lib']:
-        d = os.path.join(l, p)
-        if os.path.exists(os.path.join(d, AUXBIN)):
-            sys.path.append(d)
-            import xen.util.auxbin
-            print os.path.join(xen.util.auxbin.libpath(), p)
-            sys.exit(0)
+        for k in ['', 'site-packages/']:
+            d = os.path.join(l, p, k)
+            if os.path.exists(os.path.join(d, AUXBIN)):
+                sys.path.append(d)
+                import xen.util.auxbin
+                print os.path.join(xen.util.auxbin.libpath(), p)
+                sys.exit(0)
 
 print >>sys.stderr, "Cannot find Xen Python modules."
 sys.exit(1)

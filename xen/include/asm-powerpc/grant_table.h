@@ -35,8 +35,9 @@ extern long pte_remove(ulong flags, ulong ptex, ulong avpn,
 
 int create_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned int flags);
-int destroy_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags);
+int replace_grant_host_mapping(
+    unsigned long addr, unsigned long frame, unsigned long new_addr,
+    unsigned int flags);
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
@@ -82,4 +83,8 @@ static inline uint cpu_foreign_map_order(void)
 #define gnttab_release_put_page_and_type(page)  do { } while (0)
 #endif
 
+static inline int replace_grant_supported(void)
+{
+    return 0;
+}
 #endif  /* __ASM_PPC_GRANT_TABLE_H__ */

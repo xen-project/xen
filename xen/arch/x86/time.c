@@ -31,10 +31,9 @@
 #include <asm/hpet.h>
 #include <io_ports.h>
 
-/* opt_hpet_force: If true, force HPET configuration via PCI space. */
-/* NB. This is a gross hack. Mainly useful for HPET testing. */
-static int opt_hpet_force = 0;
-boolean_param("hpet_force", opt_hpet_force);
+/* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
+static char opt_clocksource[10];
+string_param("clocksource", opt_clocksource);
 
 #define EPOCH MILLISECS(1000)
 
@@ -58,25 +57,29 @@ struct cpu_time {
     struct timer calibration_timer;
 };
 
+struct platform_timesource {
+    char *name;
+    u64 frequency;
+    u32 (*read_counter)(void);
+    int counter_bits;
+};
+
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 
 /*
  * Protected by platform_timer_lock, which must be acquired with interrupts
- * disabled because pit_overflow() is called from PIT ch0 interrupt context.
+ * disabled because plt_overflow() is called from PIT ch0 interrupt context.
  */
 static s_time_t stime_platform_stamp;
 static u64 platform_timer_stamp;
-static struct time_scale platform_timer_scale;
 static DEFINE_SPINLOCK(platform_timer_lock);
-static u64 (*read_platform_count)(void);
 
 /*
- * Folding 16-bit PIT into 64-bit software counter is a really critical
- * operation! We therefore do it directly in PIT ch0 interrupt handler,
- * based on this flag.
+ * Folding platform timer into 64-bit software counter is a really critical
+ * operation! We therefore do it directly in PIT ch0 interrupt handler.
  */
-static int using_pit;
-static void pit_overflow(void);
+static u32 plt_overflow_jiffies;
+static void plt_overflow(void);
 
 /*
  * 32-bit division of integer dividend and integer divisor yielding
@@ -154,8 +157,8 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     if ( !cpu_has_apic )
         raise_softirq(TIMER_SOFTIRQ);
 
-    if ( using_pit )
-        pit_overflow();
+    if ( --plt_overflow_jiffies == 0 )
+        plt_overflow();
 }
 
 static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
@@ -168,10 +171,17 @@ static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
 #define CALIBRATE_FRAC  20      /* calibrate over 50ms */
 #define CALIBRATE_LATCH ((CLOCK_TICK_RATE+(CALIBRATE_FRAC/2))/CALIBRATE_FRAC)
 
-static u64 calibrate_boot_tsc(void)
+static u64 init_pit_and_calibrate_tsc(void)
 {
     u64 start, end;
     unsigned long count;
+
+    /* Set PIT channel 0 to HZ Hz. */
+#define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */
+#define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
+    outb_p(0x34, PIT_MODE);        /* binary, mode 2, LSB/MSB, ch 0 */
+    outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
+    outb(LATCH >> 8, PIT_CH0);     /* MSB */
 
     /* Set the Gate high, disable speaker */
     outb((inb(0x61) & ~0x02) | 0x01, 0x61);
@@ -282,89 +292,38 @@ static char *freq_string(u64 freq)
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
 
-/* Protected by platform_timer_lock. */
-static u64 pit_counter64;
-static u16 pit_stamp;
-
-static u16 pit_read_counter(void)
+static u32 read_pit_count(void)
 {
     u16 count;
     ASSERT(spin_is_locked(&platform_timer_lock));
     outb(0x80, PIT_MODE);
     count  = inb(PIT_CH2);
     count |= inb(PIT_CH2) << 8;
-    return count;
+    return ~count;
 }
 
-static void pit_overflow(void)
+static void init_pit(struct platform_timesource *pts)
 {
-    u16 counter;
-
-    spin_lock_irq(&platform_timer_lock);
-    counter = pit_read_counter();
-    pit_counter64 += (u16)(pit_stamp - counter);
-    pit_stamp = counter;
-    spin_unlock_irq(&platform_timer_lock);
-}
-
-static u64 read_pit_count(void)
-{
-    return pit_counter64 + (u16)(pit_stamp - pit_read_counter());
-}
-
-static void init_pit(void)
-{
-    read_platform_count = read_pit_count;
-
-    pit_overflow();
-    platform_timer_stamp = pit_counter64;
-    set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
-
-    printk("Platform timer is %s PIT\n", freq_string(CLOCK_TICK_RATE));
-    using_pit = 1;
+    pts->name = "PIT";
+    pts->frequency = CLOCK_TICK_RATE;
+    pts->read_counter = read_pit_count;
+    pts->counter_bits = 16;
 }
 
 /************************************************************
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
  */
 
-/* Protected by platform_timer_lock. */
-static u64 hpet_counter64, hpet_overflow_period;
-static u32 hpet_stamp;
-static struct timer hpet_overflow_timer;
-
-static void hpet_overflow(void *unused)
+static u32 read_hpet_count(void)
 {
-    u32 counter;
-
-    spin_lock_irq(&platform_timer_lock);
-    counter = hpet_read32(HPET_COUNTER);
-    hpet_counter64 += (u32)(counter - hpet_stamp);
-    hpet_stamp = counter;
-    spin_unlock_irq(&platform_timer_lock);
-
-    set_timer(&hpet_overflow_timer, NOW() + hpet_overflow_period);
+    return hpet_read32(HPET_COUNTER);
 }
 
-static u64 read_hpet_count(void)
-{
-    return hpet_counter64 + (u32)(hpet_read32(HPET_COUNTER) - hpet_stamp);
-}
-
-static int init_hpet(void)
+static int init_hpet(struct platform_timesource *pts)
 {
     u64 hpet_rate;
     u32 hpet_id, hpet_period, cfg;
     int i;
-
-    if ( (hpet_address == 0) && opt_hpet_force )
-    {
-        outl(0x800038a0, 0xcf8);
-        outl(0xff000001, 0xcfc);
-        outl(0x800038a0, 0xcf8);
-        hpet_address = inl(0xcfc) & 0xfffffffe;
-        printk("WARNING: Forcibly enabled HPET at %#lx.\n", hpet_address);
-    }
 
     if ( hpet_address == 0 )
         return 0;
@@ -401,29 +360,13 @@ static int init_hpet(void)
     cfg |= HPET_CFG_ENABLE;
     hpet_write32(cfg, HPET_CFG);
 
-    read_platform_count = read_hpet_count;
-
     hpet_rate = 1000000000000000ULL; /* 10^15 */
     (void)do_div(hpet_rate, hpet_period);
-    set_time_scale(&platform_timer_scale, hpet_rate);
 
-    /* Trigger overflow avoidance roughly when counter increments 2^31. */
-    if ( (hpet_rate >> 31) != 0 )
-    {
-        hpet_overflow_period = MILLISECS(1000);
-        (void)do_div(hpet_overflow_period, (u32)(hpet_rate >> 31) + 1);
-    }
-    else
-    {
-        hpet_overflow_period = MILLISECS(1000) << 31;
-        (void)do_div(hpet_overflow_period, (u32)hpet_rate);
-    }
-
-    init_timer(&hpet_overflow_timer, hpet_overflow, NULL, 0);
-    hpet_overflow(NULL);
-    platform_timer_stamp = hpet_counter64;
-
-    printk("Platform timer is %s HPET\n", freq_string(hpet_rate));
+    pts->name = "HPET";
+    pts->frequency = hpet_rate;
+    pts->read_counter = read_hpet_count;
+    pts->counter_bits = 32;
 
     return 1;
 }
@@ -445,28 +388,12 @@ int use_cyclone;
 #define CYCLONE_MPCS_OFFSET 0x51A8
 #define CYCLONE_TIMER_FREQ  100000000
 
-/* Protected by platform_timer_lock. */
-static u64 cyclone_counter64;
-static u32 cyclone_stamp;
-static struct timer cyclone_overflow_timer;
-static volatile u32 *cyclone_timer; /* Cyclone MPMC0 register */
+/* Cyclone MPMC0 register. */
+static volatile u32 *cyclone_timer;
 
-static void cyclone_overflow(void *unused)
+static u32 read_cyclone_count(void)
 {
-    u32 counter;
-
-    spin_lock_irq(&platform_timer_lock);
-    counter = *cyclone_timer;
-    cyclone_counter64 += (u32)(counter - cyclone_stamp);
-    cyclone_stamp = counter;
-    spin_unlock_irq(&platform_timer_lock);
-
-    set_timer(&cyclone_overflow_timer, NOW() + MILLISECS(20000));
-}
-
-static u64 read_cyclone_count(void)
-{
-    return cyclone_counter64 + (u32)(*cyclone_timer - cyclone_stamp);
+    return *cyclone_timer;
 }
 
 static volatile u32 *map_cyclone_reg(unsigned long regaddr)
@@ -477,7 +404,7 @@ static volatile u32 *map_cyclone_reg(unsigned long regaddr)
     return (volatile u32 *)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 }
 
-static int init_cyclone(void)
+static int init_cyclone(struct platform_timesource *pts)
 {
     u32 base;
     
@@ -497,15 +424,37 @@ static int init_cyclone(void)
     *(map_cyclone_reg(base + CYCLONE_MPCS_OFFSET)) = 1;
     cyclone_timer = map_cyclone_reg(base + CYCLONE_MPMC_OFFSET);
 
-    read_platform_count = read_cyclone_count;
+    pts->name = "IBM Cyclone";
+    pts->frequency = CYCLONE_TIMER_FREQ;
+    pts->read_counter = read_cyclone_count;
+    pts->counter_bits = 32;
 
-    init_timer(&cyclone_overflow_timer, cyclone_overflow, NULL, 0);
-    cyclone_overflow(NULL);
-    platform_timer_stamp = cyclone_counter64;
-    set_time_scale(&platform_timer_scale, CYCLONE_TIMER_FREQ);
+    return 1;
+}
 
-    printk("Platform timer is %s IBM Cyclone\n",
-           freq_string(CYCLONE_TIMER_FREQ));
+/************************************************************
+ * PLATFORM TIMER 4: ACPI PM TIMER
+ */
+
+u32 pmtmr_ioport;
+
+/* ACPI PM timer ticks at 3.579545 MHz. */
+#define ACPI_PM_FREQUENCY 3579545
+
+static u32 read_pmtimer_count(void)
+{
+    return inl(pmtmr_ioport);
+}
+
+static int init_pmtimer(struct platform_timesource *pts)
+{
+    if ( pmtmr_ioport == 0 )
+        return 0;
+
+    pts->name = "ACPI PM Timer";
+    pts->frequency = ACPI_PM_FREQUENCY;
+    pts->read_counter = read_pmtimer_count;
+    pts->counter_bits = 24;
 
     return 1;
 }
@@ -514,43 +463,113 @@ static int init_cyclone(void)
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
 
+static struct platform_timesource plt_src; /* details of chosen timesource  */
+static u32 plt_mask;             /* hardware-width mask                     */
+static u32 plt_overflow_period;  /* jiffies between calls to plt_overflow() */
+static struct time_scale plt_scale; /* scale: platform counter -> nanosecs  */
+
+/* Protected by platform_timer_lock. */
+static u64 plt_count64;          /* 64-bit platform counter stamp           */
+static u32 plt_count;            /* hardware-width platform counter stamp   */
+
+static void plt_overflow(void)
+{
+    u32 count;
+    unsigned long flags;
+
+    spin_lock_irqsave(&platform_timer_lock, flags);
+    count = plt_src.read_counter();
+    plt_count64 += (count - plt_count) & plt_mask;
+    plt_count = count;
+    plt_overflow_jiffies = plt_overflow_period;
+    spin_unlock_irqrestore(&platform_timer_lock, flags);
+}
+
 static s_time_t __read_platform_stime(u64 platform_time)
 {
     u64 diff = platform_time - platform_timer_stamp;
     ASSERT(spin_is_locked(&platform_timer_lock));
-    return (stime_platform_stamp + scale_delta(diff, &platform_timer_scale));
+    return (stime_platform_stamp + scale_delta(diff, &plt_scale));
 }
 
 static s_time_t read_platform_stime(void)
 {
-    u64 counter;
+    u64 count;
     s_time_t stime;
+    unsigned long flags;
 
-    spin_lock_irq(&platform_timer_lock);
-    counter = read_platform_count();
-    stime   = __read_platform_stime(counter);
-    spin_unlock_irq(&platform_timer_lock);
+    spin_lock_irqsave(&platform_timer_lock, flags);
+    count = plt_count64 + ((plt_src.read_counter() - plt_count) & plt_mask);
+    stime = __read_platform_stime(count);
+    spin_unlock_irqrestore(&platform_timer_lock, flags);
 
     return stime;
 }
 
 static void platform_time_calibration(void)
 {
-    u64 counter;
+    u64 count;
     s_time_t stamp;
+    unsigned long flags;
 
-    spin_lock_irq(&platform_timer_lock);
-    counter = read_platform_count();
-    stamp   = __read_platform_stime(counter);
+    spin_lock_irqsave(&platform_timer_lock, flags);
+    count = plt_count64 + ((plt_src.read_counter() - plt_count) & plt_mask);
+    stamp = __read_platform_stime(count);
     stime_platform_stamp = stamp;
-    platform_timer_stamp = counter;
-    spin_unlock_irq(&platform_timer_lock);
+    platform_timer_stamp = count;
+    spin_unlock_irqrestore(&platform_timer_lock, flags);
+}
+
+static void resume_platform_timer(void)
+{
+    /* No change in platform_stime across suspend/resume. */
+    platform_timer_stamp = plt_count64;
+    plt_count = plt_src.read_counter();
 }
 
 static void init_platform_timer(void)
 {
-    if ( !init_cyclone() && !init_hpet() )
-        init_pit();
+    struct platform_timesource *pts = &plt_src;
+    u64 overflow_period;
+    int rc = -1;
+
+    if ( opt_clocksource[0] != '\0' )
+    {
+        if ( !strcmp(opt_clocksource, "pit") )
+            rc = (init_pit(pts), 1);
+        else if ( !strcmp(opt_clocksource, "hpet") )
+            rc = init_hpet(pts);
+        else if ( !strcmp(opt_clocksource, "cyclone") )
+            rc = init_cyclone(pts);
+        else if ( !strcmp(opt_clocksource, "acpi") )
+            rc = init_pmtimer(pts);
+
+        if ( rc <= 0 )
+            printk("WARNING: %s clocksource '%s'.\n",
+                   (rc == 0) ? "Could not initialise" : "Unrecognised",
+                   opt_clocksource);
+    }
+
+    if ( (rc <= 0) &&
+         !init_cyclone(pts) &&
+         !init_hpet(pts) &&
+         !init_pmtimer(pts) )
+        init_pit(pts);
+
+    plt_mask = (u32)~0u >> (32 - pts->counter_bits);
+
+    set_time_scale(&plt_scale, pts->frequency);
+
+    overflow_period = scale_delta(1ull << (pts->counter_bits-1), &plt_scale);
+    do_div(overflow_period, MILLISECS(1000/HZ));
+    plt_overflow_period = overflow_period;
+    plt_overflow();
+    printk("Platform timer overflows in %d jiffies.\n", plt_overflow_period);
+
+    platform_timer_stamp = plt_count64;
+
+    printk("Platform timer is %s %s\n",
+           freq_string(pts->frequency), pts->name);
 }
 
 
@@ -872,7 +891,7 @@ void init_percpu_time(void)
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = (smp_processor_id() == 0) ? 0 : read_platform_stime();
+    now = !plt_src.read_counter ? 0 : read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
@@ -904,9 +923,9 @@ int __init init_xen_time(void)
 /* Early init function. */
 void __init early_time_init(void)
 {
-    u64 tmp = calibrate_boot_tsc();
+    u64 tmp = init_pit_and_calibrate_tsc();
 
-    set_time_scale(&per_cpu(cpu_time, 0).tsc_scale, tmp);
+    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
@@ -926,6 +945,33 @@ unsigned long get_localtime(struct domain *d)
 {
     return wc_sec + (wc_nsec + NOW()) / 1000000000ULL 
         + d->time_offset_seconds;
+}
+
+int time_suspend(void)
+{
+    /* Better to cancel calibration timer for accuracy. */
+    kill_timer(&this_cpu(cpu_time).calibration_timer);
+
+    return 0;
+}
+
+int time_resume(void)
+{
+    u64 now_sec, tmp = init_pit_and_calibrate_tsc();
+
+    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+
+    resume_platform_timer();
+    now_sec = read_platform_stime();
+    do_div(now_sec, SECONDS(1));
+    wc_sec = get_cmos_time() - now_sec;
+
+    init_percpu_time();
+
+    if ( !is_idle_vcpu(current) )
+        update_vcpu_system_time(current);
+
+    return 0;
 }
 
 /*

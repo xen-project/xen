@@ -49,6 +49,10 @@ void shadow_domain_init(struct domain *d)
         INIT_LIST_HEAD(&d->arch.paging.shadow.freelists[i]);
     INIT_LIST_HEAD(&d->arch.paging.shadow.p2m_freelist);
     INIT_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
+
+    /* Use shadow pagetables for log-dirty support */
+    paging_log_dirty_init(d, shadow_enable_log_dirty, 
+                          shadow_disable_log_dirty, shadow_clean_dirty_bitmap);
 }
 
 /* Setup the shadow-specfic parts of a vcpu struct. Note: The most important
@@ -86,8 +90,6 @@ static int __init shadow_audit_key_init(void)
 }
 __initcall(shadow_audit_key_init);
 #endif /* SHADOW_AUDIT */
-
-static void sh_free_log_dirty_bitmap(struct domain *d);
 
 int _shadow_mode_refcounts(struct domain *d)
 {
@@ -248,7 +250,7 @@ hvm_emulate_insn_fetch(enum x86_segment seg,
 {
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
-    unsigned int insn_off = offset - ctxt->regs->eip;
+    unsigned int insn_off = offset - sh_ctxt->insn_buf_eip;
 
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > sh_ctxt->insn_buf_bytes) )
@@ -450,6 +452,7 @@ struct x86_emulate_ops *shadow_init_emulation(
     }
 
     /* Attempt to prefetch whole instruction. */
+    sh_ctxt->insn_buf_eip = regs->eip;
     sh_ctxt->insn_buf_bytes =
         (!hvm_translate_linear_addr(
             x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
@@ -459,6 +462,35 @@ struct x86_emulate_ops *shadow_init_emulation(
         ? sizeof(sh_ctxt->insn_buf) : 0;
 
     return &hvm_shadow_emulator_ops;
+}
+
+/* Update an initialized emulation context to prepare for the next 
+ * instruction */
+void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt, 
+                               struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    unsigned long addr, diff;
+
+    /* We don't refetch the segment bases, because we don't emulate
+     * writes to segment registers */
+
+    if ( is_hvm_vcpu(v) )
+    {
+        diff = regs->eip - sh_ctxt->insn_buf_eip;
+        if ( diff > sh_ctxt->insn_buf_bytes )
+        {
+            /* Prefetch more bytes. */
+            sh_ctxt->insn_buf_bytes =
+                (!hvm_translate_linear_addr(
+                    x86_seg_cs, regs->eip, sizeof(sh_ctxt->insn_buf),
+                    hvm_access_insn_fetch, sh_ctxt, &addr) &&
+                 !hvm_copy_from_guest_virt(
+                     sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf)))
+                ? sizeof(sh_ctxt->insn_buf) : 0;
+            sh_ctxt->insn_buf_eip = regs->eip;
+        }
+    }
 }
 
 /**************************************************************************/
@@ -511,7 +543,7 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
     int result = 0;
     struct page_info *page = mfn_to_page(gmfn);
 
-    sh_mark_dirty(v->domain, gmfn);
+    paging_mark_dirty(v->domain, mfn_x(gmfn));
     
     // Determine which types of shadows are affected, and update each.
     //
@@ -2176,6 +2208,24 @@ static void sh_update_paging_modes(struct vcpu *v)
 
     ASSERT(shadow_locked_by_me(d));
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) 
+    /* Make sure this vcpu has a virtual TLB array allocated */
+    if ( unlikely(!v->arch.paging.vtlb) )
+    {
+        v->arch.paging.vtlb = xmalloc_array(struct shadow_vtlb, VTLB_ENTRIES);
+        if ( unlikely(!v->arch.paging.vtlb) )
+        {
+            SHADOW_ERROR("Could not allocate vTLB space for dom %u vcpu %u\n",
+                         d->domain_id, v->vcpu_id);
+            domain_crash(v->domain);
+            return;
+        }
+        memset(v->arch.paging.vtlb, 0, 
+               VTLB_ENTRIES * sizeof (struct shadow_vtlb));
+        spin_lock_init(&v->arch.paging.vtlb_lock);
+    }
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
     // Valid transitions handled by this function:
     // - For PV guests:
     //     - after a shadow mode has been changed
@@ -2416,6 +2466,7 @@ int shadow_enable(struct domain *d, u32 mode)
             goto out_unlocked;
     }
 
+
     shadow_lock(d);
 
     /* Sanity check again with the lock held */
@@ -2484,6 +2535,18 @@ void shadow_teardown(struct domain *d)
         }
     }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) 
+    /* Free the virtual-TLB array attached to each vcpu */
+    for_each_vcpu(d, v)
+    {
+        if ( v->arch.paging.vtlb )
+        {
+            xfree(v->arch.paging.vtlb);
+            v->arch.paging.vtlb = NULL;
+        }
+    }
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
     list_for_each_safe(entry, n, &d->arch.paging.shadow.p2m_freelist)
     {
         list_del(entry);
@@ -2504,8 +2567,6 @@ void shadow_teardown(struct domain *d)
         /* Release the hash table back to xenheap */
         if (d->arch.paging.shadow.hash_table) 
             shadow_hash_teardown(d);
-        /* Release the log-dirty bitmap of dirtied pages */
-        sh_free_log_dirty_bitmap(d);
         /* Should not have any more memory held */
         SHADOW_PRINTK("teardown done."
                        "  Shadow pages total = %u, free = %u, p2m=%u\n",
@@ -2664,98 +2725,6 @@ static int shadow_test_disable(struct domain *d)
     return ret;
 }
 
-static int
-sh_alloc_log_dirty_bitmap(struct domain *d)
-{
-    ASSERT(d->arch.paging.shadow.dirty_bitmap == NULL);
-    d->arch.paging.shadow.dirty_bitmap_size =
-        (domain_get_maximum_gpfn(d) + BITS_PER_LONG) & ~(BITS_PER_LONG - 1);
-    d->arch.paging.shadow.dirty_bitmap =
-        xmalloc_array(unsigned long,
-                      d->arch.paging.shadow.dirty_bitmap_size / BITS_PER_LONG);
-    if ( d->arch.paging.shadow.dirty_bitmap == NULL )
-    {
-        d->arch.paging.shadow.dirty_bitmap_size = 0;
-        return -ENOMEM;
-    }
-    memset(d->arch.paging.shadow.dirty_bitmap, 0,
-           d->arch.paging.shadow.dirty_bitmap_size/8);
-
-    return 0;
-}
-
-static void
-sh_free_log_dirty_bitmap(struct domain *d)
-{
-    d->arch.paging.shadow.dirty_bitmap_size = 0;
-    if ( d->arch.paging.shadow.dirty_bitmap )
-    {
-        xfree(d->arch.paging.shadow.dirty_bitmap);
-        d->arch.paging.shadow.dirty_bitmap = NULL;
-    }
-}
-
-static int shadow_log_dirty_enable(struct domain *d)
-{
-    int ret;
-
-    domain_pause(d);
-    shadow_lock(d);
-
-    if ( shadow_mode_log_dirty(d) )
-    {
-        ret = -EINVAL;
-        goto out;
-    }
-
-    if ( shadow_mode_enabled(d) )
-    {
-        /* This domain already has some shadows: need to clear them out 
-         * of the way to make sure that all references to guest memory are 
-         * properly write-protected */
-        shadow_blow_tables(d);
-    }
-
-#if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL)
-    /* 32bit PV guests on 64bit xen behave like older 64bit linux: they
-     * change an l4e instead of cr3 to switch tables.  Give them the
-     * same optimization */
-    if ( is_pv_32on64_domain(d) )
-        d->arch.paging.shadow.opt_flags = SHOPT_LINUX_L3_TOPLEVEL;
-#endif
-
-    ret = sh_alloc_log_dirty_bitmap(d);
-    if ( ret != 0 )
-    {
-        sh_free_log_dirty_bitmap(d);
-        goto out;
-    }
-
-    ret = shadow_one_bit_enable(d, PG_log_dirty);
-    if ( ret != 0 )
-        sh_free_log_dirty_bitmap(d);
-
- out:
-    shadow_unlock(d);
-    domain_unpause(d);
-    return ret;
-}
-
-static int shadow_log_dirty_disable(struct domain *d)
-{
-    int ret;
-
-    domain_pause(d);
-    shadow_lock(d);
-    ret = shadow_one_bit_disable(d, PG_log_dirty);
-    if ( !shadow_mode_log_dirty(d) )
-        sh_free_log_dirty_bitmap(d);
-    shadow_unlock(d);
-    domain_unpause(d);
-
-    return ret;
-}
-
 /**************************************************************************/
 /* P2M map manipulations */
 
@@ -2832,150 +2801,62 @@ void shadow_convert_to_log_dirty(struct vcpu *v, mfn_t smfn)
     BUG();
 }
 
-
-/* Read a domain's log-dirty bitmap and stats.  
- * If the operation is a CLEAN, clear the bitmap and stats as well. */
-static int shadow_log_dirty_op(
-    struct domain *d, struct xen_domctl_shadow_op *sc)
+/* Shadow specific code which is called in paging_log_dirty_enable().
+ * Return 0 if no problem found.
+ */
+int shadow_enable_log_dirty(struct domain *d)
 {
-    int i, rv = 0, clean = 0, peek = 1;
+    int ret;
 
-    domain_pause(d);
+    /* shadow lock is required here */
     shadow_lock(d);
-
-    clean = (sc->op == XEN_DOMCTL_SHADOW_OP_CLEAN);
-
-    SHADOW_DEBUG(LOGDIRTY, "log-dirty %s: dom %u faults=%u dirty=%u\n", 
-                  (clean) ? "clean" : "peek",
-                  d->domain_id,
-                  d->arch.paging.shadow.fault_count, 
-                  d->arch.paging.shadow.dirty_count);
-
-    sc->stats.fault_count = d->arch.paging.shadow.fault_count;
-    sc->stats.dirty_count = d->arch.paging.shadow.dirty_count;
-
-    if ( clean )
+    if ( shadow_mode_enabled(d) )
     {
-        /* Need to revoke write access to the domain's pages again.
-         * In future, we'll have a less heavy-handed approach to this,
-         * but for now, we just unshadow everything except Xen. */
+        /* This domain already has some shadows: need to clear them out 
+         * of the way to make sure that all references to guest memory are 
+         * properly write-protected */
         shadow_blow_tables(d);
-
-        d->arch.paging.shadow.fault_count = 0;
-        d->arch.paging.shadow.dirty_count = 0;
     }
 
-    if ( guest_handle_is_null(sc->dirty_bitmap) )
-        /* caller may have wanted just to clean the state or access stats. */
-        peek = 0;
-
-    if ( (peek || clean) && (d->arch.paging.shadow.dirty_bitmap == NULL) )
-    {
-        rv = -EINVAL; /* perhaps should be ENOMEM? */
-        goto out;
-    }
- 
-    if ( sc->pages > d->arch.paging.shadow.dirty_bitmap_size )
-        sc->pages = d->arch.paging.shadow.dirty_bitmap_size;
-
-#define CHUNK (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
-    for ( i = 0; i < sc->pages; i += CHUNK )
-    {
-        int bytes = ((((sc->pages - i) > CHUNK)
-                      ? CHUNK
-                      : (sc->pages - i)) + 7) / 8;
-
-        if ( likely(peek) )
-        {
-            if ( copy_to_guest_offset(
-                sc->dirty_bitmap, i/8,
-                (uint8_t *)d->arch.paging.shadow.dirty_bitmap + (i/8), bytes) )
-            {
-                rv = -EFAULT;
-                goto out;
-            }
-        }
-
-        if ( clean )
-            memset((uint8_t *)d->arch.paging.shadow.dirty_bitmap + (i/8), 0, bytes);
-    }
-#undef CHUNK
-
- out:
+#if (SHADOW_OPTIMIZATIONS & SHOPT_LINUX_L3_TOPLEVEL)
+    /* 32bit PV guests on 64bit xen behave like older 64bit linux: they
+     * change an l4e instead of cr3 to switch tables.  Give them the
+     * same optimization */
+    if ( is_pv_32on64_domain(d) )
+        d->arch.paging.shadow.opt_flags = SHOPT_LINUX_L3_TOPLEVEL;
+#endif
+    
+    ret = shadow_one_bit_enable(d, PG_log_dirty);
     shadow_unlock(d);
-    domain_unpause(d);
-    return rv;
+
+    return ret;
 }
 
-
-/* Mark a page as dirty */
-void sh_mark_dirty(struct domain *d, mfn_t gmfn)
+/* shadow specfic code which is called in paging_log_dirty_disable() */
+int shadow_disable_log_dirty(struct domain *d)
 {
-    unsigned long pfn;
-    int do_locking;
+    int ret;
 
-    if ( !shadow_mode_log_dirty(d) || !mfn_valid(gmfn) )
-        return;
-
-    /* Although this is an externally visible function, we do not know
-     * whether the shadow lock will be held when it is called (since it
-     * can be called from __hvm_copy during emulation).
-     * If the lock isn't held, take it for the duration of the call. */
-    do_locking = !shadow_locked_by_me(d);
-    if ( do_locking ) 
-    { 
-        shadow_lock(d);
-        /* Check the mode again with the lock held */ 
-        if ( unlikely(!shadow_mode_log_dirty(d)) )
-        {
-            shadow_unlock(d);
-            return;
-        }
-    }
-
-    ASSERT(d->arch.paging.shadow.dirty_bitmap != NULL);
-
-    /* We /really/ mean PFN here, even for non-translated guests. */
-    pfn = get_gpfn_from_mfn(mfn_x(gmfn));
-
-    /*
-     * Values with the MSB set denote MFNs that aren't really part of the 
-     * domain's pseudo-physical memory map (e.g., the shared info frame).
-     * Nothing to do here...
-     */
-    if ( unlikely(!VALID_M2P(pfn)) )
-        return;
-
-    /* N.B. Can use non-atomic TAS because protected by shadow_lock. */
-    if ( likely(pfn < d->arch.paging.shadow.dirty_bitmap_size) ) 
-    { 
-        if ( !__test_and_set_bit(pfn, d->arch.paging.shadow.dirty_bitmap) )
-        {
-            SHADOW_DEBUG(LOGDIRTY, 
-                          "marked mfn %" PRI_mfn " (pfn=%lx), dom %d\n",
-                          mfn_x(gmfn), pfn, d->domain_id);
-            d->arch.paging.shadow.dirty_count++;
-        }
-    }
-    else
-    {
-        SHADOW_PRINTK("mark_dirty OOR! "
-                       "mfn=%" PRI_mfn " pfn=%lx max=%x (dom %d)\n"
-                       "owner=%d c=%08x t=%" PRtype_info "\n",
-                       mfn_x(gmfn), 
-                       pfn, 
-                       d->arch.paging.shadow.dirty_bitmap_size,
-                       d->domain_id,
-                       (page_get_owner(mfn_to_page(gmfn))
-                        ? page_get_owner(mfn_to_page(gmfn))->domain_id
-                        : -1),
-                       mfn_to_page(gmfn)->count_info, 
-                       mfn_to_page(gmfn)->u.inuse.type_info);
-    }
-
-    if ( do_locking ) shadow_unlock(d);
+    /* shadow lock is required here */    
+    shadow_lock(d);
+    ret = shadow_one_bit_disable(d, PG_log_dirty);
+    shadow_unlock(d);
+    
+    return ret;
 }
 
+/* This function is called when we CLEAN log dirty bitmap. See 
+ * paging_log_dirty_op() for details. 
+ */
+void shadow_clean_dirty_bitmap(struct domain *d)
+{
+    shadow_lock(d);
+    /* Need to revoke write access to the domain's pages again.
+     * In future, we'll have a less heavy-handed approach to this,
+     * but for now, we just unshadow everything except Xen. */
+    shadow_blow_tables(d);
+    shadow_unlock(d);
+}
 /**************************************************************************/
 /* Shadow-control XEN_DOMCTL dispatcher */
 
@@ -2985,33 +2866,9 @@ int shadow_domctl(struct domain *d,
 {
     int rc, preempted = 0;
 
-    if ( unlikely(d == current->domain) )
-    {
-        gdprintk(XENLOG_INFO, "Dom %u tried to do a shadow op on itself.\n",
-                 d->domain_id);
-        return -EINVAL;
-    }
-
-    if ( unlikely(d->is_dying) )
-    {
-        gdprintk(XENLOG_INFO, "Ignoring shadow op on dying domain %u\n",
-                 d->domain_id);
-        return 0;
-    }
-
-    if ( unlikely(d->vcpu[0] == NULL) )
-    {
-        SHADOW_ERROR("Shadow op on a domain (%u) with no vcpus\n",
-                     d->domain_id);
-        return -EINVAL;
-    }
-
     switch ( sc->op )
     {
     case XEN_DOMCTL_SHADOW_OP_OFF:
-        if ( shadow_mode_log_dirty(d) )
-            if ( (rc = shadow_log_dirty_disable(d)) != 0 ) 
-                return rc;
         if ( d->arch.paging.mode == PG_SH_enable )
             if ( (rc = shadow_test_disable(d)) != 0 ) 
                 return rc;
@@ -3020,19 +2877,10 @@ int shadow_domctl(struct domain *d,
     case XEN_DOMCTL_SHADOW_OP_ENABLE_TEST:
         return shadow_test_enable(d);
 
-    case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
-        return shadow_log_dirty_enable(d);
-
     case XEN_DOMCTL_SHADOW_OP_ENABLE_TRANSLATE:
         return shadow_enable(d, PG_refcounts|PG_translate);
 
-    case XEN_DOMCTL_SHADOW_OP_CLEAN:
-    case XEN_DOMCTL_SHADOW_OP_PEEK:
-        return shadow_log_dirty_op(d, sc);
-
     case XEN_DOMCTL_SHADOW_OP_ENABLE:
-        if ( sc->mode & XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY )
-            return shadow_log_dirty_enable(d);
         return shadow_enable(d, sc->mode << PG_mode_shift);
 
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:

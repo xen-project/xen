@@ -67,6 +67,21 @@ static inline struct ethhdr *eth_hdr(const struct sk_buff *skb)
 
 #endif
 
+/*
+ * It's a copy from {kernel}/include/linux/skbuff.h func '__skb_pull' and 'skb_pull'
+ * to aviodthe BUG_ON when pulling into the data (getting forwarded ip-frames)
+ */
+static inline unsigned char *__skb_pull_vn(struct sk_buff *skb, unsigned int len)
+{
+        skb->len -= len;
+        //BUG_ON(skb->len < skb->data_len);
+        return skb->data += len;
+}
+static inline unsigned char *skb_pull_vn(struct sk_buff *skb, unsigned int len)
+{
+        return unlikely(len > skb->len) ? NULL : __skb_pull_vn(skb, len);
+}
+
 
 #ifdef __KERNEL__
 

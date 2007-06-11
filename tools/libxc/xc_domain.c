@@ -372,7 +372,7 @@ int xc_domain_setmaxmem(int xc_handle,
 }
 
 #if defined(__i386__) || defined(__x86_64__)
-#include <xen/hvm/e820.h>
+#include "xc_e820.h"
 int xc_domain_set_memmap_limit(int xc_handle,
                                uint32_t domid,
                                unsigned long map_limitkb)

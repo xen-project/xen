@@ -92,11 +92,6 @@ kdelete:
 kclean:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-clean ; done
 
-# Make patches from kernel sparse trees
-.PHONY: mkpatches
-mkpatches:
-	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch; done
-
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
 # and place them in the install directory. 'make install' should then
 # copy them to the normal system directories
@@ -121,7 +116,6 @@ distclean:
 	$(MAKE) -C docs distclean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
-	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 	rm -rf patches/*/.makedep
 
 # Linux name for GNU distclean
@@ -157,8 +151,6 @@ help:
 	@echo ''
 	@echo 'Miscellaneous targets:'
 	@echo '  prep-kernels     - prepares kernel directories, does not build'
-	@echo '  mkpatches        - make patches against vanilla kernels from'
-	@echo '                     sparse trees'
 	@echo '  uninstall        - attempt to remove installed Xen tools'
 	@echo '                     (use with extreme care!)'
 	@echo

@@ -568,6 +568,8 @@ typedef struct dom0_vga_console_info {
         } vesa_lfb;
     } u;
 } dom0_vga_console_info_t;
+#define xen_vga_console_info dom0_vga_console_info
+#define xen_vga_console_info_t dom0_vga_console_info_t
 
 typedef uint8_t xen_domain_handle_t[16];
 

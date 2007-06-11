@@ -1,8 +1,8 @@
 /*
  *  Copyright (C) International Business Machines  Corp., 2005
- *  Author(s): Judy Fischbach <jfisch@us.ibm.com>
- *             David Hendricks <dhendrix@us.ibm.com>
- *             Josh Triplett <josht@us.ibm.com>
+ *  Author(s): Judy Fischbach <jfisch@cs.pdx.edu>
+ *             David Hendricks <cro_marmot@comcast.net>
+ *             Josh Triplett <josh@kernel.org>
  *    based on code from Anthony Liguori <aliguori@us.ibm.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -38,7 +38,7 @@
 "Copyright (C) 2005  International Business Machines  Corp\n"\
 "This is free software; see the source for copying conditions.There is NO\n"\
 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"
-#define XENTOP_BUGSTO "Report bugs to <dsteklof@us.ibm.com>.\n"
+#define XENTOP_BUGSTO "Report bugs to <xen-tools@lists.xensource.com>.\n"
 
 #define _GNU_SOURCE
 #include <getopt.h>
@@ -913,6 +913,12 @@ void do_vbd(xenstat_domain *domain)
 	xenstat_vbd *vbd;
 	unsigned num_vbds = 0;
 
+	const char *vbd_type[] = {
+		"Unidentified",           /* number 0 */
+		"BlkBack",           /* number 1 */
+		"BlkTap",            /* number 2 */
+	};
+	
 	num_vbds = xenstat_domain_num_vbds(domain);
 
 	for (i=0 ; i< num_vbds; i++) {
@@ -927,7 +933,8 @@ void do_vbd(xenstat_domain *domain)
 		         MINOR(xenstat_vbd_dev(vbd)));
 #endif
 
-		print("VBD %4d %s OO: %8llu   RD: %8llu   WR: %8llu\n",
+		print("VBD %s %4d %s OO: %8llu   RD: %8llu   WR: %8llu\n",
+		      vbd_type[xenstat_vbd_type(vbd)],
 		      xenstat_vbd_dev(vbd), details,
 		      xenstat_vbd_oo_reqs(vbd),
 		      xenstat_vbd_rd_reqs(vbd),

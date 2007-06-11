@@ -22,6 +22,7 @@
 #define CONFIG_X86_LOCAL_APIC 1
 #define CONFIG_X86_GOOD_APIC 1
 #define CONFIG_X86_IO_APIC 1
+#define CONFIG_X86_PM_TIMER 1
 #define CONFIG_HPET_TIMER 1
 #define CONFIG_X86_MCE_P4THERMAL 1
 #define CONFIG_ACPI_NUMA 1
@@ -85,10 +86,10 @@
 #define CONFIG_DMA_BITSIZE 32
 
 #define BOOT_TRAMPOLINE 0x90000
-#define boot_trampoline_pa(sym)                                 \
+#define bootsym_phys(sym)                                 \
     (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+BOOT_TRAMPOLINE)
-#define boot_trampoline_va(sym)                                 \
-    (*RELOC_HIDE((typeof(&(sym)))__va(__pa(&(sym))),            \
+#define bootsym(sym)                                      \
+    (*RELOC_HIDE((typeof(&(sym)))__va(__pa(&(sym))),      \
                  BOOT_TRAMPOLINE-__pa(trampoline_start)))
 #ifndef __ASSEMBLY__
 extern char trampoline_start[], trampoline_end[];

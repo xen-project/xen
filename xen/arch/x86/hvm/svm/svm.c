@@ -179,6 +179,14 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
         break;
 
+    case MSR_K8_MC4_MISC: /* Threshold register */
+        /*
+         * MCA/MCE: Threshold register is reported to be locked, so we ignore
+         * all write accesses. This behaviour matches real HW, so guests should
+         * have no problem with this.
+         */
+        break;
+
     default:
         return 0;
     }
@@ -868,6 +876,15 @@ static void svm_do_resume(struct vcpu *v)
     reset_stack_and_jump(svm_asm_do_resume);
 }
 
+static int svm_domain_initialise(struct domain *d)
+{
+    return 0;
+}
+
+static void svm_domain_destroy(struct domain *d)
+{
+}
+
 static int svm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -912,6 +929,8 @@ static int svm_event_injection_faulted(struct vcpu *v)
 static struct hvm_function_table svm_function_table = {
     .name                 = "SVM",
     .disable              = stop_svm,
+    .domain_initialise    = svm_domain_initialise,
+    .domain_destroy       = svm_domain_destroy,
     .vcpu_initialise      = svm_vcpu_initialise,
     .vcpu_destroy         = svm_vcpu_destroy,
     .store_cpu_guest_regs = svm_store_cpu_guest_regs,
@@ -1008,8 +1027,8 @@ static int svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
         return 1;
     }
 
-    /* We should not reach here. Otherwise, P2M table is not correct.*/
-    return 0;
+    paging_mark_dirty(current->domain, get_mfn_from_gpfn(gpa >> PAGE_SHIFT));
+    return p2m_set_flags(current->domain, gpa, __PAGE_HYPERVISOR|_PAGE_USER);
 }
 
 static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
@@ -2062,6 +2081,14 @@ static inline void svm_do_msr_access(
             msr_content = v->arch.hvm_svm.cpu_shadow_efer;
             break;
 
+        case MSR_K8_MC4_MISC: /* Threshold register */
+            /*
+             * MCA/MCE: We report that the threshold register is unavailable
+             * for OS use (locked by the BIOS).
+             */
+            msr_content = 1ULL << 61; /* MC4_MISC.Locked */
+            break;
+
         default:
             if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
                  rdmsr_safe(ecx, eax, edx) == 0 )
@@ -2504,14 +2531,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void svm_load_cr2(void)
+asmlinkage void svm_trace_vmentry(void)
 {
     struct vcpu *v = current;
 
     /* This is the last C code before the VMRUN instruction. */
     HVMTRACE_0D(VMENTRY, v);
-
-    asm volatile ( "mov %0,%%cr2" : : "r" (v->arch.hvm_svm.cpu_cr2) );
 }
   
 /*

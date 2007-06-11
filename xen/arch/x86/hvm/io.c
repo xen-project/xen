@@ -865,7 +865,7 @@ void hvm_io_assist(void)
     if ( (p->dir == IOREQ_READ) && p->data_is_ptr )
     {
         gmfn = get_mfn_from_gpfn(paging_gva_to_gfn(v, p->data));
-        mark_dirty(d, gmfn);
+        paging_mark_dirty(d, gmfn);
     }
 
  out:

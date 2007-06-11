@@ -22,7 +22,6 @@
 
 #include "utils.h"
 #include "io.h"
-#include <xenctrl.h>
 #include <xs.h>
 #include <xen/io/console.h>
 #include <xenctrl.h>
@@ -44,6 +43,14 @@
 /* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
 
+extern int log_reload;
+extern int log_guest;
+extern int log_hv;
+extern char *log_dir;
+
+static int log_hv_fd = -1;
+static int xc_handle = -1;
+
 struct buffer
 {
 	char *data;
@@ -57,6 +64,7 @@ struct domain
 {
 	int domid;
 	int tty_fd;
+	int log_fd;
 	bool is_dead;
 	struct buffer buffer;
 	struct domain *next;
@@ -103,6 +111,19 @@ static void buffer_append(struct domain *dom)
 	intf->out_cons = cons;
 	xc_evtchn_notify(dom->xce_handle, dom->local_port);
 
+	/* Get the data to the logfile as early as possible because if
+	 * no one is listening on the console pty then it will fill up
+	 * and handle_tty_write will stop being called.
+	 */
+	if (dom->log_fd != -1) {
+		int len = write(dom->log_fd,
+				buffer->data + buffer->size - size,
+				size);
+		if (len < 0)
+			dolog(LOG_ERR, "Write to log failed on domain %d: %d (%s)\n",
+			      dom->domid, errno, strerror(errno));
+	}
+
 	if (buffer->max_capacity &&
 	    buffer->size > buffer->max_capacity) {
 		/* Discard the middle of the data. */
@@ -143,6 +164,55 @@ static bool domain_is_valid(int domid)
 		
 	return ret;
 }
+
+static int create_hv_log(void)
+{
+	char logfile[PATH_MAX];
+	int fd;
+	snprintf(logfile, PATH_MAX-1, "%s/hypervisor.log", log_dir);
+	logfile[PATH_MAX-1] = '\0';
+
+	fd = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0644);
+	if (fd == -1)
+		dolog(LOG_ERR, "Failed to open log %s: %d (%s)",
+		      logfile, errno, strerror(errno));
+	return fd;
+}
+
+static int create_domain_log(struct domain *dom)
+{
+	char logfile[PATH_MAX];
+	char *namepath, *data, *s;
+	int fd;
+	unsigned int len;
+
+	namepath = xs_get_domain_path(xs, dom->domid);
+	s = realloc(namepath, strlen(namepath) + 6);
+	if (s == NULL) {
+		free(namepath);
+		return -1;
+	}
+	namepath = s;
+	strcat(namepath, "/name");
+	data = xs_read(xs, XBT_NULL, namepath, &len);
+	if (!data)
+		return -1;
+	if (!len) {
+		free(data);
+		return -1;
+	}
+
+	snprintf(logfile, PATH_MAX-1, "%s/guest-%s.log", log_dir, data);
+	free(data);
+	logfile[PATH_MAX-1] = '\0';
+
+	fd = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0644);
+	if (fd == -1)
+		dolog(LOG_ERR, "Failed to open log %s: %d (%s)",
+		      logfile, errno, strerror(errno));
+	return fd;
+}
+
 
 static int domain_create_tty(struct domain *dom)
 {
@@ -325,6 +395,9 @@ static int domain_create_ring(struct domain *dom)
 		}
 	}
 
+	if (log_guest)
+		dom->log_fd = create_domain_log(dom);
+
  out:
 	return err;
 }
@@ -351,6 +424,7 @@ static bool watch_domain(struct domain *dom, bool watch)
 
 	return success;
 }
+
 
 static struct domain *create_domain(int domid)
 {
@@ -383,6 +457,8 @@ static struct domain *create_domain(int domid)
 	strcat(dom->conspath, "/console");
 
 	dom->tty_fd = -1;
+	dom->log_fd = -1;
+
 	dom->is_dead = false;
 	dom->buffer.data = 0;
 	dom->buffer.consumed = 0;
@@ -443,6 +519,10 @@ static void cleanup_domain(struct domain *d)
 	if (d->tty_fd != -1) {
 		close(d->tty_fd);
 		d->tty_fd = -1;
+	}
+	if (d->log_fd != -1) {
+		close(d->log_fd);
+		d->log_fd = -1;
 	}
 
 	free(d->buffer.data);
@@ -605,13 +685,54 @@ static void handle_xs(void)
 	free(vec);
 }
 
+static void handle_hv_logs(void)
+{
+	char buffer[1024*16];
+	char *bufptr = buffer;
+	unsigned int size = sizeof(buffer);
+	if (xc_readconsolering(xc_handle, &bufptr, &size, 1) == 0) {
+		int len = write(log_hv_fd, buffer, size);
+		if (len < 0)
+			dolog(LOG_ERR, "Failed to write hypervisor log: %d (%s)",
+			      errno, strerror(errno));
+	}
+}
+
+static void handle_log_reload(void)
+{
+	if (log_guest) {
+		struct domain *d;
+		for (d = dom_head; d; d = d->next) {
+			if (d->log_fd != -1)
+				close(d->log_fd);
+			d->log_fd = create_domain_log(d);
+		}
+	}
+
+	if (log_hv) {
+		if (log_hv_fd != -1)
+			close(log_hv_fd);
+		log_hv_fd = create_hv_log();
+	}
+}
+
 void handle_io(void)
 {
 	fd_set readfds, writefds;
 	int ret;
 
-	do {
+	if (log_hv) {
+		xc_handle = xc_interface_open();
+		if (xc_handle == -1)
+			dolog(LOG_ERR, "Failed to open xc handle: %d (%s)",
+			      errno, strerror(errno));
+		else
+			log_hv_fd = create_hv_log();
+	}
+
+	for (;;) {
 		struct domain *d, *n;
+		struct timeval timeout = { 1, 0 }; /* Read HV logs every 1 second */
 		int max_fd = -1;
 
 		FD_ZERO(&readfds);
@@ -637,7 +758,30 @@ void handle_io(void)
 			}
 		}
 
-		ret = select(max_fd + 1, &readfds, &writefds, 0, NULL);
+		/* XXX I wish we didn't have to busy wait for hypervisor logs
+		 * but there's no obvious way to get event channel notifications
+		 * for new HV log data as we can with guest */
+		ret = select(max_fd + 1, &readfds, &writefds, 0, log_hv_fd != -1 ? &timeout : NULL);
+
+		if (ret == -1) {
+			if (errno == EINTR) {
+				if (log_reload) {
+					handle_log_reload();
+					log_reload = 0;
+				}
+				continue;
+			}
+			dolog(LOG_ERR, "Failure in select: %d (%s)",
+			      errno, strerror(errno));
+			break;
+		}
+
+		/* Check for timeout */
+		if (ret == 0) {
+			if (log_hv_fd != -1)
+				handle_hv_logs();
+			continue;
+		}
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
 			handle_xs();
@@ -657,7 +801,12 @@ void handle_io(void)
 			if (d->is_dead)
 				cleanup_domain(d);
 		}
-	} while (ret > -1);
+	}
+
+	if (log_hv_fd != -1)
+		close(log_hv_fd);
+	if (xc_handle != -1)
+		xc_interface_close(xc_handle);
 }
 
 /*

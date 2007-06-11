@@ -576,12 +576,21 @@ void domain_entry_inc(struct connection *conn, struct node *node)
 		return;
 
 	if (node->perms && node->perms[0].id != conn->id) {
-		d = find_domain_by_domid(node->perms[0].id);
-		if (d)
-			d->nbentry++;
-	}
-	else if (conn->domain) {
-		conn->domain->nbentry++;
+		if (conn->transaction) {
+			transaction_entry_inc(conn->transaction,
+				node->perms[0].id);
+		} else {
+			d = find_domain_by_domid(node->perms[0].id);
+			if (d)
+				d->nbentry++;
+		}
+	} else if (conn->domain) {
+		if (conn->transaction) {
+			transaction_entry_inc(conn->transaction,
+				conn->domain->domid);
+ 		} else {
+ 			conn->domain->nbentry++;
+		}
 	}
 }
 
@@ -593,11 +602,36 @@ void domain_entry_dec(struct connection *conn, struct node *node)
 		return;
 
 	if (node->perms && node->perms[0].id != conn->id) {
-		d = find_domain_by_domid(node->perms[0].id);
-		if (d && d->nbentry)
-			d->nbentry--;
-	} else if (conn->domain && conn->domain->nbentry)
-		conn->domain->nbentry--;
+		if (conn->transaction) {
+			transaction_entry_dec(conn->transaction,
+				node->perms[0].id);
+		} else {
+			d = find_domain_by_domid(node->perms[0].id);
+			if (d && d->nbentry)
+				d->nbentry--;
+		}
+	} else if (conn->domain && conn->domain->nbentry) {
+		if (conn->transaction) {
+			transaction_entry_dec(conn->transaction,
+				conn->domain->domid);
+		} else {
+			conn->domain->nbentry--;
+		}
+	}
+}
+
+void domain_entry_fix(unsigned int domid, int num)
+{
+	struct domain *d;
+
+	d = find_domain_by_domid(domid);
+	if (d) {
+		if ((d->nbentry += num) < 0) {
+			eprintf("invalid domain entry number %d",
+				d->nbentry);
+			d->nbentry = 0;
+		}
+	}
 }
 
 int domain_entry(struct connection *conn)

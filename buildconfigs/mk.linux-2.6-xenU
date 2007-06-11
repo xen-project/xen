@@ -1,2 +1,2 @@
-EXTRAVERSION = xenU
+EXTRAVERSION = -xenU
 include buildconfigs/mk.linux-2.6-xen

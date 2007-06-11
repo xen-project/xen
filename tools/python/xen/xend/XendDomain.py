@@ -985,10 +985,16 @@ class XendDomain:
             dominfo.start(is_managed = True)
         finally:
             self.domains_lock.release()
-        dominfo.waitForDevices()
+
+        try:
+            dominfo.waitForDevices()
+        except Exception, ex:
+            log.warn("Failed to setup devices for " + str(dominfo) + ": " + str(ex))
+            dominfo.destroy()
+            raise
+
         if not start_paused:
             dominfo.unpause()
-        
 
     def domain_delete(self, domid):
         """Remove a managed domain from database
@@ -1082,6 +1088,9 @@ class XendDomain:
 
         try:
             return XendCheckpoint.restore(self, fd, paused=paused)
+        except XendError, e:
+            log.exception("Restore failed")
+            raise
         except:
             # I don't really want to log this exception here, but the error
             # handling in the relocation-socket handling code (relocate.py) is
@@ -1402,6 +1411,8 @@ class XendDomain:
         @type cap: int
         @rtype: 0
         """
+        set_weight = False
+        set_cap = False
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
@@ -1410,16 +1421,26 @@ class XendDomain:
                 weight = int(0)
             elif weight < 1 or weight > 65535:
                 raise XendError("weight is out of range")
+            else:
+                set_weight = True
 
             if cap is None:
                 cap = int(~0)
             elif cap < 0 or cap > dominfo.getVCpuCount() * 100:
                 raise XendError("cap is out of range")
+            else:
+                set_cap = True
 
             assert type(weight) == int
             assert type(cap) == int
 
-            return xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
+            rc = xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
+            if rc == 0:
+                if set_weight:
+                    dominfo.setWeight(weight)
+                if set_cap:
+                    dominfo.setCap(cap)
+            return rc
         except Exception, ex:
             log.exception(ex)
             raise XendError(str(ex))

@@ -66,6 +66,8 @@ struct domain;
 void free_xenoprof_pages(struct domain *d);
 
 int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
+int xenoprof_add_trace(struct domain *d, struct vcpu *v, 
+                       unsigned long eip, int mode);
 
 extern struct domain *xenoprof_primary_profiler;
 

@@ -38,69 +38,54 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
 int acm_authorize_acm_ops(struct domain *d)
 {
+    /* currently, policy management functions are restricted to privileged domains */
     return (IS_PRIV(d) ? 0 : -EPERM);
 }
 
-long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+
+long do_acm_op(XEN_GUEST_HANDLE(xen_acmctl_t) u_acmctl)
 {
     long rc = -EFAULT;
+    struct xen_acmctl curop, *op = &curop;
 
-    if ( acm_authorize_acm_ops(current->domain) )
+    if (acm_authorize_acm_ops(current->domain))
         return -EPERM;
 
-    switch ( cmd )
+    if ( copy_from_guest(op, u_acmctl, 1) )
+        return -EFAULT;
+
+    if (op->interface_version != ACM_INTERFACE_VERSION)
+        return -EACCES;
+
+    switch ( op->cmd )
     {
 
     case ACMOP_setpolicy: {
-        struct acm_setpolicy setpolicy;
-        if (copy_from_guest(&setpolicy, arg, 1) != 0)
-            return -EFAULT;
-        if (setpolicy.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        rc = acm_set_policy(setpolicy.pushcache,
-                            setpolicy.pushcache_size);
+        rc = acm_set_policy(op->u.setpolicy.pushcache,
+                            op->u.setpolicy.pushcache_size);
         break;
     }
 
     case ACMOP_getpolicy: {
-        struct acm_getpolicy getpolicy;
-        if (copy_from_guest(&getpolicy, arg, 1) != 0)
-            return -EFAULT;
-        if (getpolicy.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        rc = acm_get_policy(getpolicy.pullcache,
-                            getpolicy.pullcache_size);
+        rc = acm_get_policy(op->u.getpolicy.pullcache,
+                            op->u.getpolicy.pullcache_size);
         break;
     }
 
     case ACMOP_dumpstats: {
-        struct acm_dumpstats dumpstats;
-        if (copy_from_guest(&dumpstats, arg, 1) != 0)
-            return -EFAULT;
-        if (dumpstats.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        rc = acm_dump_statistics(dumpstats.pullcache,
-                                 dumpstats.pullcache_size);
+        rc = acm_dump_statistics(op->u.dumpstats.pullcache,
+                                 op->u.dumpstats.pullcache_size);
         break;
     }
 
     case ACMOP_getssid: {
-        struct acm_getssid getssid;
         ssidref_t ssidref;
 
-        if (copy_from_guest(&getssid, arg, 1) != 0)
-            return -EFAULT;
-        if (getssid.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        if (getssid.get_ssid_by == ACM_GETBY_ssidref)
-            ssidref = getssid.id.ssidref;
-        else if (getssid.get_ssid_by == ACM_GETBY_domainid)
+        if (op->u.getssid.get_ssid_by == ACM_GETBY_ssidref)
+            ssidref = op->u.getssid.id.ssidref;
+        else if (op->u.getssid.get_ssid_by == ACM_GETBY_domainid)
         {
-            struct domain *subj = rcu_lock_domain_by_id(getssid.id.domainid);
+            struct domain *subj = rcu_lock_domain_by_id(op->u.getssid.id.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -120,24 +105,19 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             rc = -ESRCH;
             break;
         }
-        rc = acm_get_ssid(ssidref, getssid.ssidbuf, getssid.ssidbuf_size);
+        rc = acm_get_ssid(ssidref, op->u.getssid.ssidbuf,
+                          op->u.getssid.ssidbuf_size);
         break;
     }
 
     case ACMOP_getdecision: {
-        struct acm_getdecision getdecision;
         ssidref_t ssidref1, ssidref2;
 
-        if (copy_from_guest(&getdecision, arg, 1) != 0)
-            return -EFAULT;
-        if (getdecision.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        if (getdecision.get_decision_by1 == ACM_GETBY_ssidref)
-            ssidref1 = getdecision.id1.ssidref;
-        else if (getdecision.get_decision_by1 == ACM_GETBY_domainid)
+        if (op->u.getdecision.get_decision_by1 == ACM_GETBY_ssidref)
+            ssidref1 = op->u.getdecision.id1.ssidref;
+        else if (op->u.getdecision.get_decision_by1 == ACM_GETBY_domainid)
         {
-            struct domain *subj = rcu_lock_domain_by_id(getdecision.id1.domainid);
+            struct domain *subj = rcu_lock_domain_by_id(op->u.getdecision.id1.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -157,11 +137,11 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             rc = -ESRCH;
             break;
         }
-        if (getdecision.get_decision_by2 == ACM_GETBY_ssidref)
-            ssidref2 = getdecision.id2.ssidref;
-        else if (getdecision.get_decision_by2 == ACM_GETBY_domainid)
+        if (op->u.getdecision.get_decision_by2 == ACM_GETBY_ssidref)
+            ssidref2 = op->u.getdecision.id2.ssidref;
+        else if (op->u.getdecision.get_decision_by2 == ACM_GETBY_domainid)
         {
-            struct domain *subj = rcu_lock_domain_by_id(getdecision.id2.domainid);
+            struct domain *subj = rcu_lock_domain_by_id(op->u.getdecision.id2.domainid);
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
@@ -181,55 +161,33 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             rc = -ESRCH;
             break;
         }
-        rc = acm_get_decision(ssidref1, ssidref2, getdecision.hook);
+        rc = acm_get_decision(ssidref1, ssidref2, op->u.getdecision.hook);
 
         if (rc == ACM_ACCESS_PERMITTED)
         {
-            getdecision.acm_decision = ACM_ACCESS_PERMITTED;
+            op->u.getdecision.acm_decision = ACM_ACCESS_PERMITTED;
             rc = 0;
         }
         else if  (rc == ACM_ACCESS_DENIED)
         {
-            getdecision.acm_decision = ACM_ACCESS_DENIED;
+            op->u.getdecision.acm_decision = ACM_ACCESS_DENIED;
             rc = 0;
         }
         else
             rc = -ESRCH;
 
-        if ( (rc == 0) && (copy_to_guest(arg, &getdecision, 1) != 0) )
+        if ( (rc == 0) && (copy_to_guest(u_acmctl, op, 1) != 0) )
             rc = -EFAULT;
         break;
     }
 
     case ACMOP_chgpolicy: {
-        struct acm_change_policy chgpolicy;
-
-        if (copy_from_guest(&chgpolicy, arg, 1) != 0)
-            return -EFAULT;
-        if (chgpolicy.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        rc = acm_change_policy(&chgpolicy);
-
-        if (rc == 0)
-            if (copy_to_guest(arg, &chgpolicy, 1) != 0)
-                rc = -EFAULT;
+        rc = acm_change_policy(&op->u.change_policy);
         break;
     }
 
     case ACMOP_relabeldoms: {
-        struct acm_relabel_doms relabeldoms;
-
-        if (copy_from_guest(&relabeldoms, arg, 1) != 0)
-            return -EFAULT;
-        if (relabeldoms.interface_version != ACM_INTERFACE_VERSION)
-            return -EACCES;
-
-        rc = acm_relabel_domains(&relabeldoms);
-
-        if (rc == 0)
-            if (copy_to_guest(arg, &relabeldoms, 1) != 0)
-                rc = -EFAULT;
+        rc = acm_relabel_domains(&op->u.relabel_doms);
         break;
     }
 
@@ -241,7 +199,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
-#endif /* defined(ACM_SECURITY) */
+#endif
 
 /*
  * Local variables:

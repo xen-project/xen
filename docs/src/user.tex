@@ -3163,7 +3163,7 @@ editing \path{grub.conf}.
   console I/O.  This is a comma-separated list of, for example:
   \begin{description}
   \item[ vga ] Use VGA console (until domain 0 boots, unless {\bf
-  vga=keep } is specified).
+  vga=...keep } is specified).
   \item[ com1 ] Use serial port com1.
   \item[ com2H ] Use serial port com2. Transmitted chars will have the
     MSB set. Received chars must have MSB set.
@@ -3174,12 +3174,20 @@ editing \path{grub.conf}.
   subsystems (e.g.\ console and debugger). Sharing is controlled by
   MSB of each transmitted/received character.  [NB. Default for this
   option is `com1,vga']
-\item [ vga=$<$options$>$ ] This is a comma-separated list of options:
+\item [ vga=$<$mode$>$(,keep) ] The mode is one of the following options:
   \begin{description}
+  \item[ ask ] Display a vga menu allowing manual selection of video
+  mode.
   \item[ text-$<$mode$>$ ] Select text-mode resolution, where mode is
   one of 80x25, 80x28, 80x30, 80x34, 80x43, 80x50, 80x60.
-  \item[ keep ] Keep the VGA console even after domain 0 boots.
+  \item[ gfx-$<$mode$>$ ] Select VESA graphics mode
+  $<$width$>$x$<$height$>$x$<$depth$>$ (e.g., `vga=gfx-1024x768x32').
+  \item[ mode-$<$mode$>$ ] Specify a mode number as discovered by `vga
+  ask'. Note that the numbers are displayed in hex and hence must be
+  prefixed by `0x' here (e.g., `vga=mode-0x0335').
   \end{description}
+The mode may optionally be followed by `{\bf,keep}' to cause Xen to keep
+writing to the VGA console after domain 0 starts booting (e.g., `vga=text-80x50,keep').
 \item [ console\_to\_ring ] Place guest console output into the
   hypervisor console ring buffer. This is disabled by default.
   When enabled, both hypervisor output and guest console output

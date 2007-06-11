@@ -124,6 +124,7 @@ typedef enum {
     HOB_TYPE_PAL_VM_INFO,
     HOB_TYPE_PAL_VM_PAGE_SIZE,
     HOB_TYPE_NR_VCPU,
+	HOB_TYPE_NVRAM,
     HOB_TYPE_MAX
 } hob_type_t;
 
@@ -131,14 +132,17 @@ static int hob_init(void  *buffer ,unsigned long buf_size);
 static int add_pal_hob(void* hob_buf);
 static int add_mem_hob(void* hob_buf, unsigned long dom_mem_size);
 static int add_vcpus_hob(void* hob_buf, unsigned long nr_vcpu);
+static int add_nvram_hob(void* hob_buf, unsigned long nvram_addr);
 static int build_hob(void* hob_buf, unsigned long hob_buf_size,
-                     unsigned long dom_mem_size, unsigned long vcpus);
+                     unsigned long dom_mem_size, unsigned long vcpus,
+					 unsigned long nvram_addr);
 static int load_hob(int xc_handle,uint32_t dom, void *hob_buf,
                     unsigned long dom_mem_size);
 
 static int
 xc_ia64_build_hob(int xc_handle, uint32_t dom,
-                  unsigned long memsize, unsigned long vcpus)
+                  unsigned long memsize, unsigned long vcpus,
+				  unsigned long nvram_addr)
 {
     char   *hob_buf;
 
@@ -148,7 +152,7 @@ xc_ia64_build_hob(int xc_handle, uint32_t dom,
         return -1;
     }
 
-    if (build_hob(hob_buf, GFW_HOB_SIZE, memsize, vcpus) < 0) {
+    if (build_hob(hob_buf, GFW_HOB_SIZE, memsize, vcpus, nvram_addr) < 0) {
         free(hob_buf);
         PERROR("Could not build hob");
         return -1;
@@ -246,7 +250,8 @@ get_hob_size(void* hob_buf)
 
 static int
 build_hob(void* hob_buf, unsigned long hob_buf_size,
-          unsigned long dom_mem_size, unsigned long vcpus)
+          unsigned long dom_mem_size, unsigned long vcpus,
+		  unsigned long nvram_addr)
 {
     //Init HOB List
     if (hob_init(hob_buf, hob_buf_size) < 0) {
@@ -268,6 +273,11 @@ build_hob(void* hob_buf, unsigned long hob_buf_size,
         PERROR("Add PAL hob failed, buffer too small");
         goto err_out;
     }
+
+	if (add_nvram_hob( hob_buf, nvram_addr ) < 0) {
+		PERROR("Add nvram hob failed, buffer too small");
+		goto err_out;
+	}
 
     return 0;
 
@@ -327,6 +337,12 @@ static int
 add_vcpus_hob(void* hob_buf, unsigned long vcpus)
 {
     return hob_add(hob_buf, HOB_TYPE_NR_VCPU, &vcpus, sizeof(vcpus));
+}
+
+static int
+add_nvram_hob(void *hob_buf, unsigned long nvram_addr)
+{
+	return hob_add(hob_buf, HOB_TYPE_NVRAM, &nvram_addr, sizeof(nvram_addr));
 }
 
 static const unsigned char config_pal_bus_get_features_data[24] = {
@@ -553,6 +569,184 @@ add_pal_hob(void* hob_buf)
     return 0;
 }
 
+// The most significant bit of nvram file descriptor:
+// 1: valid; 0: invalid
+#define VALIDATE_NVRAM_FD(x) ((1UL<<(sizeof(x)*8 - 1)) | x)
+#define IS_VALID_NVRAM_FD(x) ((uint64_t)x >> (sizeof(x)*8 - 1))
+static uint64_t 
+nvram_init(const char *nvram_path)
+{
+	uint64_t fd = 0;
+	fd = open(nvram_path, O_CREAT|O_RDWR, 0666);
+
+	if ( fd < 0 )
+	{
+		PERROR("Nvram open failed at %s. Guest will boot without"
+				" nvram support!\n", nvram_path);	
+		return -1;
+	}
+
+	return VALIDATE_NVRAM_FD(fd);
+}
+
+static int 
+copy_from_nvram_to_GFW(int xc_handle, uint32_t dom, int nvram_fd)
+{
+	unsigned int nr_pages = NVRAM_SIZE >> PAGE_SHIFT;
+	struct stat file_stat;
+	char buf[NVRAM_SIZE] = {0};
+	
+	if ( fstat(nvram_fd, &file_stat) < 0 )
+	{
+		PERROR("Cannot get Nvram file info! Guest will boot without "
+			   "nvram support!\n");
+		return -1;
+	}
+
+	if ( 0 == file_stat.st_size )
+	{
+		DPRINTF("Nvram file create successful!\n");
+		return 0;
+	}
+
+	if ( read(nvram_fd, buf, NVRAM_SIZE) != NVRAM_SIZE )
+	{
+		PERROR("Load nvram fail. guest will boot without"
+			   " nvram support!\n");
+		return -1;
+	}
+
+	return  xc_ia64_copy_to_domain_pages(xc_handle, dom, buf,
+											NVRAM_START >> PAGE_SHIFT,
+											nr_pages);
+}
+
+
+/*
+ * GFW use 4k page. when doing foreign map, we should 16k align
+ * the address and map one more page to guarantee all 64k nvram data 
+ * can be got.
+ */
+static int
+copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
+{
+	xen_pfn_t *pfn_list = NULL;
+	char *tmp_ptr = NULL;
+	unsigned int nr_pages = 0;
+	uint64_t addr_from_GFW_4k_align = 0;
+	uint32_t offset = 0;
+	uint64_t nvram_base_addr = 0;
+	char buf[NVRAM_SIZE] = {0};
+	int i;
+
+	
+	// map one more page 
+	nr_pages = (NVRAM_SIZE + PAGE_SIZE) >> PAGE_SHIFT;
+	pfn_list = (xen_pfn_t *)malloc(sizeof(xen_pfn_t) * nr_pages);
+	if ( NULL == pfn_list )
+	{
+		PERROR("Cannot allocate memory for nvram save!\n");
+		close(nvram_fd);
+		return -1;
+	}
+
+	/* 
+	 * GFW allocate memory dynamicly to save nvram data
+	 * and save address of the dynamic memory at NVRAM_START. 
+	 * To save nvram data to file, we must get the dynamic
+	 * memory address first.
+	 */
+	pfn_list[0] = NVRAM_START >> PAGE_SHIFT;
+	tmp_ptr = (char *)xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+			PROT_READ | PROT_WRITE, pfn_list[0]);
+
+	if ( NULL == tmp_ptr )
+	{
+		PERROR("Cannot get nvram data from GFW!\n");
+		free(pfn_list);
+		close(nvram_fd);
+		return -1;
+	}
+
+	addr_from_GFW_4k_align = *((uint64_t *)tmp_ptr);
+	munmap(tmp_ptr, PAGE_SIZE);
+
+	// align address to 16k
+	offset = addr_from_GFW_4k_align % ( 16 * MEM_K );
+	addr_from_GFW_4k_align = addr_from_GFW_4k_align - offset;
+	for ( i=0; i<nr_pages; i++ )
+		pfn_list[i] = (addr_from_GFW_4k_align >> PAGE_SHIFT) + i;
+
+	tmp_ptr = (char *)xc_map_foreign_batch(xc_handle, dom,
+						PROT_READ | PROT_WRITE, pfn_list, nr_pages);
+	if ( NULL == tmp_ptr )
+	{
+		PERROR("Cannot get nvram data from GFW!\n");
+		free(pfn_list);
+		close(nvram_fd);
+		return -1;
+	}
+
+	// calculate nvram data base addrees
+	nvram_base_addr = (uint64_t)(tmp_ptr + offset);
+
+	memcpy(buf, (void *)nvram_base_addr, NVRAM_SIZE);
+	free(pfn_list);
+	munmap(tmp_ptr, NVRAM_SIZE + PAGE_SIZE);
+
+	lseek(nvram_fd, 0, SEEK_SET);
+	if ( write(nvram_fd, buf, NVRAM_SIZE) != NVRAM_SIZE )
+	{
+		PERROR("Save to nvram fail!\n");
+		return -1;
+	}
+
+	close(nvram_fd);
+
+	DPRINTF("Nvram save successful!\n");
+
+	return 0;
+}
+
+int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom) 
+{
+	uint64_t nvram_fd = 0;
+	xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
+
+	if ( !IS_VALID_NVRAM_FD(nvram_fd) )
+	{
+		PERROR("Nvram not be initialized. Nvram save fail!\n");
+		return -1;
+	}
+	return copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
+}
+
+#define NVRAM_FILE_PATH	"/usr/lib/xen/boot/nvram_"
+int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
+{
+	int file_path_len = strlen(NVRAM_FILE_PATH);
+	uint64_t nvram_fd = 0;
+	char nvram_path[100] = {0};
+
+	strncpy(nvram_path, NVRAM_FILE_PATH, file_path_len);
+	if ( file_path_len + strlen(dom_name) + 1 > sizeof(nvram_path) )
+	{
+		PERROR("Nvram file path is too long!\n");
+		return -1;
+	}
+	strcpy(nvram_path + file_path_len, dom_name);
+
+	nvram_fd = nvram_init(nvram_path);
+	if ( nvram_fd == (uint64_t)(-1) )
+	{
+		xc_set_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, 0);
+		return -1;
+	}
+
+	xc_set_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, nvram_fd);
+	return 0; 
+}
+
 #define GFW_PAGES (GFW_SIZE >> PAGE_SHIFT)
 #define VGA_START_PAGE (VGA_IO_START >> PAGE_SHIFT)
 #define VGA_END_PAGE ((VGA_IO_START + VGA_IO_SIZE) >> PAGE_SHIFT)
@@ -692,11 +886,10 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     unsigned long dom_memsize = memsize << 20;
     unsigned long nr_pages = memsize << (20 - PAGE_SHIFT);
     unsigned long vcpus;
-
     unsigned long nr_special_pages;
     unsigned long memmap_info_pfn;
     unsigned long memmap_info_num_pages;
-
+    unsigned long nvram_start = NVRAM_START, nvram_fd = 0; 
     int rc;
     long i;
     DECLARE_DOMCTL;
@@ -809,10 +1002,16 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         goto error_out;
     }
 
+    xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
+    if ( !IS_VALID_NVRAM_FD(nvram_fd) )
+        nvram_start = 0;
+    else if ( copy_from_nvram_to_GFW(xc_handle, dom, (int)nvram_fd ) == -1 )
+        nvram_start = 0;
+
     vcpus = domctl.u.getdomaininfo.max_vcpu_id + 1;
 
     // Hand-off state passed to guest firmware 
-    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus) < 0) {
+    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus, nvram_start) < 0) {
         PERROR("Could not build hob\n");
         goto error_out;
     }

@@ -1,0 +1,13 @@
+XEN_LINUX_SOURCE ?= tarball
+XEN_LINUX_MIRROR ?= http://xenbits.xensource.com/ext/paravirt_ops/
+LINUX_VER ?= 2.6-paravirt
+
+# This target currently only supports x86_32.
+XEN_TARGET_ARCH = x86_32
+IMAGE_TARGET ?= vmlinux bzImage
+
+XEN_LINUX_ALLOW_INTERFACE_MISMATCH := y
+
+EXTRAVERSION ?=
+
+include buildconfigs/mk.linux-2.6-xen

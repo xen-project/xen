@@ -169,9 +169,13 @@ extern int timer_uses_ioapic_pin_0;
 #endif /*CONFIG_ACPI_BOOT*/
 
 extern int (*ioapic_renumber_irq)(int ioapic, int irq);
+extern int ioapic_suspend(void);
+extern int ioapic_resume(void);
 
 #else  /* !CONFIG_X86_IO_APIC */
 #define io_apic_assign_pci_irqs 0
+static inline int ioapic_suspend(void) {return 0};
+static inline int ioapic_resume(void) {return 0};
 #endif
 
 extern int assign_irq_vector(int irq);

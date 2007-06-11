@@ -27,33 +27,38 @@ void xprintf(const char *fmt, ...)
 void barf(const char *fmt, ...)
 {
 	char *str;
+	int bytes;
 	va_list arglist;
 
 	xprintf("FATAL: ");
 
 	va_start(arglist, fmt);
-	vasprintf(&str, fmt, arglist);
+	bytes = vasprintf(&str, fmt, arglist);
 	va_end(arglist);
 
-	xprintf("%s\n", str);
-	free(str);
+ 	if (bytes >= 0) {
+		xprintf("%s\n", str);
+		free(str);
+	}
 	exit(1);
 }
 
 void barf_perror(const char *fmt, ...)
 {
 	char *str;
-	int err = errno;
+	int bytes, err = errno;
 	va_list arglist;
 
 	xprintf("FATAL: ");
 
 	va_start(arglist, fmt);
-	vasprintf(&str, fmt, arglist);
+	bytes = vasprintf(&str, fmt, arglist);
 	va_end(arglist);
 
-	xprintf("%s: %s\n", str, strerror(err));
-	free(str);
+ 	if (bytes >= 0) {
+		xprintf("%s: %s\n", str, strerror(err));
+		free(str);
+	}
 	exit(1);
 }
 

@@ -457,7 +457,7 @@ static u32 guest_set_ad_bits(struct vcpu *v,
     }
 
     /* Set the bit(s) */
-    sh_mark_dirty(v->domain, gmfn);
+    paging_mark_dirty(v->domain, mfn_x(gmfn));
     SHADOW_DEBUG(A_AND_D, "gfn = %" SH_PRI_gfn ", "
                  "old flags = %#x, new flags = %#x\n", 
                  gfn_x(guest_l1e_get_gfn(*ep)), guest_l1e_get_flags(*ep), 
@@ -717,7 +717,7 @@ _sh_propagate(struct vcpu *v,
     if ( unlikely((level == 1) && shadow_mode_log_dirty(d)) )
     {
         if ( ft & FETCH_TYPE_WRITE ) 
-            sh_mark_dirty(d, target_mfn);
+            paging_mark_dirty(d, mfn_x(target_mfn));
         else if ( !sh_mfn_is_dirty(d, target_mfn) )
             sflags &= ~_PAGE_RW;
     }
@@ -2856,7 +2856,7 @@ static int sh_page_fault(struct vcpu *v,
     }
 
     perfc_incr(shadow_fault_fixed);
-    d->arch.paging.shadow.fault_count++;
+    d->arch.paging.log_dirty.fault_count++;
     reset_early_unshadow(v);
 
  done:
@@ -2870,6 +2870,20 @@ static int sh_page_fault(struct vcpu *v,
  emulate:
     if ( !shadow_mode_refcounts(d) || !guest_mode(regs) )
         goto not_a_shadow_fault;
+
+    /*
+     * We do not emulate user writes. Instead we use them as a hint that the
+     * page is no longer a page table. This behaviour differs from native, but
+     * it seems very unlikely that any OS grants user access to page tables.
+     */
+    if ( (regs->error_code & PFEC_user_mode) )
+    {
+        SHADOW_PRINTK("user-mode fault to PT, unshadowing mfn %#lx\n", 
+                      mfn_x(gmfn));
+        perfc_incr(shadow_fault_emulate_failed);
+        sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
+        goto done;
+    }
 
     if ( is_hvm_domain(d) )
     {
@@ -2897,14 +2911,7 @@ static int sh_page_fault(struct vcpu *v,
 
     emul_ops = shadow_init_emulation(&emul_ctxt, regs);
 
-    /*
-     * We do not emulate user writes. Instead we use them as a hint that the
-     * page is no longer a page table. This behaviour differs from native, but
-     * it seems very unlikely that any OS grants user access to page tables.
-     */
-    r = X86EMUL_UNHANDLEABLE;
-    if ( !(regs->error_code & PFEC_user_mode) )
-        r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
+    r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
     /*
      * NB. We do not unshadow on X86EMUL_EXCEPTION. It's not clear that it
@@ -2921,6 +2928,35 @@ static int sh_page_fault(struct vcpu *v,
          * though, this is a hint that this page should not be shadowed. */
         sh_remove_shadows(v, gmfn, 0 /* thorough */, 1 /* must succeed */);
     }
+
+#if GUEST_PAGING_LEVELS == 3 /* PAE guest */
+    if ( r == X86EMUL_OKAY ) {
+        int i;
+        /* Emulate up to four extra instructions in the hope of catching 
+         * the "second half" of a 64-bit pagetable write. */
+        for ( i = 0 ; i < 4 ; i++ )
+        {
+            shadow_continue_emulation(&emul_ctxt, regs);
+            v->arch.paging.last_write_was_pt = 0;
+            r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
+            if ( r == X86EMUL_OKAY )
+            {
+                if ( v->arch.paging.last_write_was_pt )
+                {
+                    perfc_incr(shadow_em_ex_pt);
+                    break; /* Don't emulate past the other half of the write */
+                }
+                else 
+                    perfc_incr(shadow_em_ex_non_pt);
+            }
+            else
+            {
+                perfc_incr(shadow_em_ex_fail);
+                break; /* Don't emulate again if we failed! */
+            }
+        }
+    }
+#endif /* PAE guest */
 
     /* Emulator has changed the user registers: write back */
     if ( is_hvm_domain(d) )
@@ -2960,6 +2996,11 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     shadow_l2e_t sl2e;
     
     perfc_incr(shadow_invlpg);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* No longer safe to use cached gva->gfn translations */
+    vtlb_flush(v);
+#endif
 
     /* First check that we can safely read the shadow l2e.  SMP/PAE linux can
      * run as high as 6% of invlpg calls where we haven't shadowed the l2 
@@ -3021,6 +3062,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
     return 1;
 }
 
+
 static unsigned long
 sh_gva_to_gfn(struct vcpu *v, unsigned long va)
 /* Called to translate a guest virtual address to what the *guest*
@@ -3028,11 +3070,24 @@ sh_gva_to_gfn(struct vcpu *v, unsigned long va)
 {
     walk_t gw;
     gfn_t gfn;
+    
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    struct shadow_vtlb t = {0};
+    if ( vtlb_lookup(v, va, &t) )
+        return t.frame_number;
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
 
     guest_walk_tables(v, va, &gw, 0);
     gfn = guest_walk_to_gfn(&gw);
-    unmap_walk(v, &gw);
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    t.page_number = va >> PAGE_SHIFT;
+    t.frame_number = gfn_x(gfn);
+    t.flags = accumulate_guest_flags(v, &gw); 
+    vtlb_insert(v, t);
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
+    unmap_walk(v, &gw);
     return gfn_x(gfn);
 }
 
@@ -3485,6 +3540,9 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         if ( v->arch.paging.shadow.guest_vtable )
             sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
         v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
+        /* PAGING_LEVELS==4 implies 64-bit, which means that
+         * map_domain_page_global can't fail */
+        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL);
     }
     else
         v->arch.paging.shadow.guest_vtable = __linear_l4_table;
@@ -3515,6 +3573,9 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         if ( v->arch.paging.shadow.guest_vtable )
             sh_unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
         v->arch.paging.shadow.guest_vtable = sh_map_domain_page_global(gmfn);
+        /* Does this really need map_domain_page_global?  Handle the
+         * error properly if so. */
+        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
     }
     else
         v->arch.paging.shadow.guest_vtable = __linear_l2_table;
@@ -3651,6 +3712,11 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 
     /* Fix up the linear pagetable mappings */
     sh_update_linear_entries(v);
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* No longer safe to use cached gva->gfn translations */
+    vtlb_flush(v);
+#endif
 
     /* Release the lock, if we took it (otherwise it's the caller's problem) */
     if ( do_locking ) shadow_unlock(v->domain);
@@ -3872,34 +3938,64 @@ static inline void * emulate_map_dest(struct vcpu *v,
     gfn_t gfn;
     mfn_t mfn;
 
-    guest_walk_tables(v, vaddr, &gw, 1);
-    flags = accumulate_guest_flags(v, &gw);
-    gfn = guest_l1e_get_gfn(gw.eff_l1e);
-    mfn = vcpu_gfn_to_mfn(v, gfn);
-    sh_audit_gw(v, &gw);
-    unmap_walk(v, &gw);
-
-    if ( !(flags & _PAGE_PRESENT) )
-    {
-        errcode = 0;
-        goto page_fault;
-    }
-
-    if ( !(flags & _PAGE_RW) ||
-         (!(flags & _PAGE_USER) && ring_3(sh_ctxt->ctxt.regs)) )
-    {
-        errcode = PFEC_page_present;
-        goto page_fault;
-    }
-
-    if ( !mfn_valid(mfn) )
+    /* We don't emulate user-mode writes to page tables */
+    if ( ring_3(sh_ctxt->ctxt.regs) ) 
         return NULL;
 
-    *mfnp = mfn;
-    return sh_map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+    /* Try the virtual TLB first */
+    {
+        struct shadow_vtlb t = {0};
+        if ( vtlb_lookup(v, vaddr, &t) 
+             && ((t.flags & (_PAGE_PRESENT|_PAGE_RW)) 
+                 == (_PAGE_PRESENT|_PAGE_RW)) )
+        {
+            flags = t.flags;
+            gfn = _gfn(t.frame_number);
+        }
+        else
+        {
+            /* Need to do the full lookup, just in case permissions
+             * have increased since we cached this entry */
+            
+#endif /* (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB) */
+
+            /* Walk the guest pagetables */
+            guest_walk_tables(v, vaddr, &gw, 1);
+            flags = accumulate_guest_flags(v, &gw);
+            gfn = guest_l1e_get_gfn(gw.eff_l1e);
+            sh_audit_gw(v, &gw);
+            unmap_walk(v, &gw);
+            
+#if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
+            /* Remember this translation for next time */
+            t.page_number = vaddr >> PAGE_SHIFT;
+            t.frame_number = gfn_x(gfn);
+            t.flags = flags;
+            vtlb_insert(v, t);
+        }
+    }
+#endif
+    mfn = vcpu_gfn_to_mfn(v, gfn);
+
+    errcode = PFEC_write_access;
+    if ( !(flags & _PAGE_PRESENT) ) 
+        goto page_fault;
+
+    errcode |= PFEC_page_present;
+    if ( !(flags & _PAGE_RW) ) 
+        goto page_fault;
+
+    if ( mfn_valid(mfn) )
+    {
+        *mfnp = mfn;
+        v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
+        return sh_map_domain_page(mfn) + (vaddr & ~PAGE_MASK);
+    }
+    else 
+        return NULL;
 
  page_fault:
-    errcode |= PFEC_write_access;
     if ( is_hvm_vcpu(v) )
         hvm_inject_exception(TRAP_page_fault, errcode, vaddr);
     else
@@ -3962,7 +4058,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
     else
         reset_early_unshadow(v);
     
-    sh_mark_dirty(v->domain, mfn);
+    paging_mark_dirty(v->domain, mfn_x(mfn));
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4018,7 +4114,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     else
         reset_early_unshadow(v);
 
-    sh_mark_dirty(v->domain, mfn);
+    paging_mark_dirty(v->domain, mfn_x(mfn));
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);
@@ -4062,7 +4158,7 @@ sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr,
     else
         reset_early_unshadow(v);
 
-    sh_mark_dirty(v->domain, mfn);
+    paging_mark_dirty(v->domain, mfn_x(mfn));
 
     sh_unmap_domain_page(addr);
     shadow_audit_tables(v);

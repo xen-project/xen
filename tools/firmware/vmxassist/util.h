@@ -23,13 +23,11 @@
 #include <stdarg.h>
 #include <vm86.h>
 
-#include <xen/hvm/e820.h>
-#define E820_MAP_NR ((unsigned char *)E820_MAP_PAGE + E820_MAP_NR_OFFSET)
-#define E820_MAP    ((struct e820entry *)(E820_MAP_PAGE + E820_MAP_OFFSET))
-
 #define	offsetof(type, member)	((unsigned) &((type *)0)->member)
 
 struct vmx_assist_context;
+
+#include "../hvmloader/e820.h"
 
 extern void cpuid_addr_value(uint64_t addr, uint64_t *value);
 extern void hexdump(unsigned char *, int);

@@ -283,8 +283,9 @@ static uint64_t get_cluster_offset(struct tdvmdk_state *prv,
         	if (!allocate)
             		return 0;
         	cluster_offset = lseek(prv->fd, 0, SEEK_END);
-        	ftruncate(prv->fd, cluster_offset + 
-			  (prv->cluster_sectors << 9));
+        	if (ftruncate(prv->fd, cluster_offset + 
+			      (prv->cluster_sectors << 9)))
+			return 0;
         	cluster_offset >>= 9;
         	/* update L2 table */
         	tmp = cpu_to_le32(cluster_offset);

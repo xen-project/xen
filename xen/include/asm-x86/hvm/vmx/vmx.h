@@ -32,6 +32,7 @@ void vmx_asm_do_vmentry(void);
 void vmx_intr_assist(void);
 void vmx_do_resume(struct vcpu *);
 void set_guest_time(struct vcpu *v, u64 gtime);
+void vmx_vlapic_msr_changed(struct vcpu *v);
 
 /*
  * Exit Reasons
@@ -81,6 +82,7 @@ void set_guest_time(struct vcpu *v, u64 gtime);
 #define EXIT_REASON_MACHINE_CHECK       41
 
 #define EXIT_REASON_TPR_BELOW_THRESHOLD 43
+#define EXIT_REASON_APIC_ACCESS         44
 
 /*
  * Interruption-information format
@@ -127,6 +129,19 @@ void set_guest_time(struct vcpu *v, u64 gtime);
 #define TYPE_MOV_TO_DR                  (0 << 4)
 #define TYPE_MOV_FROM_DR                (1 << 4)
 #define DEBUG_REG_ACCESS_REG            0xf00   /* 11:8, general purpose register */
+
+/*
+ * Access Rights
+ */
+#define X86_SEG_AR_SEG_TYPE     0xf        /* 3:0, segment type */
+#define X86_SEG_AR_DESC_TYPE    (1u << 4)  /* 4, descriptor type */
+#define X86_SEG_AR_DPL          0x60       /* 6:5, descriptor privilege level */
+#define X86_SEG_AR_SEG_PRESENT  (1u << 7)  /* 7, segment present */
+#define X86_SEG_AR_AVL          (1u << 12) /* 12, available for system software */
+#define X86_SEG_AR_CS_LM_ACTIVE (1u << 13) /* 13, long mode active (CS only) */
+#define X86_SEG_AR_DEF_OP_SIZE  (1u << 14) /* 14, default operation size */
+#define X86_SEG_AR_GRANULARITY  (1u << 15) /* 15, granularity */
+#define X86_SEG_AR_SEG_UNUSABLE (1u << 16) /* 16, segment unusable */
 
 /* These bits in the CR4 are owned by the host */
 #if CONFIG_PAGING_LEVELS >= 3

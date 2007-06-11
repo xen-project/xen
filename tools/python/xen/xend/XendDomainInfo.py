@@ -357,6 +357,8 @@ class XendDomainInfo:
         self.console_port = None
         self.console_mfn = None
 
+        self.native_protocol = None
+
         self.vmWatch = None
         self.shutdownWatch = None
         self.shutdownStartTime = None
@@ -545,20 +547,33 @@ class XendDomainInfo:
 
     def destroyDevice(self, deviceClass, devid, force = False):
         try:
-            devid = int(devid)
+            dev = int(devid)
         except ValueError:
-            # devid is not a number, let's search for it in xenstore.
-            devicePath = '%s/device/%s' % (self.dompath, deviceClass)
-            for entry in xstransact.List(devicePath):
-                backend = xstransact.Read('%s/%s' % (devicePath, entry),
-                                          "backend")
-                devName = xstransact.Read(backend, "dev")
-                if devName == devid:
-                    # We found the integer matching our devid, use it instead
-                    devid = entry
-                    break
-                
-        return self.getDeviceController(deviceClass).destroyDevice(devid, force)
+            # devid is not a number but a string containing either device
+            # name (e.g. xvda) or device_type/device_id (e.g. vbd/51728)
+            dev = type(devid) is str and devid.split('/')[-1] or None
+            if dev == None:
+                log.debug("Could not find the device %s", devid)
+                return None
+
+        log.debug("dev = %s", dev)
+
+        dev_control = self.getDeviceController(deviceClass)
+        dev_uuid = dev_control.readBackend(dev, 'uuid')
+
+        ret = None
+
+        try:
+            ret = dev_control.destroyDevice(dev, force)
+        except EnvironmentError:
+            # We failed to detach the device
+            raise VmError("Failed to detach device %d" % dev)
+
+        # update XendConfig
+        if dev_uuid:
+            self.info.device_remove(dev_uuid)
+
+        return ret
 
     def getDeviceSxprs(self, deviceClass):
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
@@ -571,7 +586,6 @@ class XendDomainInfo:
                     sxprs.append([dev_num, dev_info])
                     dev_num += 1
             return sxprs
-
 
     def setMemoryTarget(self, target):
         """Set the memory target of this domain.
@@ -600,7 +614,7 @@ class XendDomainInfo:
             raise XendError('Invalid memory size')
 
         MiB = 1024 * 1024
-        self.info['memory_static_max'] = limit * MiB
+        self._safe_set_memory('memory_static_max', limit * MiB)
 
         if self.domid >= 0:
             maxmem = int(limit) * 1024
@@ -1007,8 +1021,14 @@ class XendDomainInfo:
     def getCap(self):
         return self.info.get('cpu_cap', 0)
 
+    def setCap(self, cpu_cap):
+        self.info['cpu_cap'] = cpu_cap
+
     def getWeight(self):
         return self.info.get('cpu_weight', 256)
+
+    def setWeight(self, cpu_weight):
+        self.info['cpu_weight'] = cpu_weight
 
     def setResume(self, state):
         self._resume = state
@@ -1110,8 +1130,8 @@ class XendDomainInfo:
                 # failed.  Ignore this domain.
                 pass
             else:
-                # Domain is alive.  If we are shutting it down, then check
-                # the timeout on that, and destroy it if necessary.
+                # Domain is alive.  If we are shutting it down, log a message
+                # if it seems unresponsive.
                 if xeninfo['paused']:
                     self._stateSet(DOM_STATE_PAUSED)
                 else:
@@ -1120,11 +1140,11 @@ class XendDomainInfo:
                 if self.shutdownStartTime:
                     timeout = (SHUTDOWN_TIMEOUT - time.time() +
                                self.shutdownStartTime)
-                    if timeout < 0:
+                    if (timeout < 0 and not self.readDom('xend/unresponsive')):
                         log.info(
                             "Domain shutdown timeout expired: name=%s id=%s",
                             self.info['name_label'], self.domid)
-                        self.destroy()
+                        self.storeDom('xend/unresponsive', 'True')
         finally:
             self.refresh_shutdown_lock.release()
 
@@ -1330,20 +1350,19 @@ class XendDomainInfo:
             self.image.destroy(suspend)
             return
 
-        while True:
-            t = xstransact("%s/device" % self.dompath)
-            for devclass in XendDevices.valid_devices():
-                for dev in t.list(devclass):
-                    try:
-                        t.remove(dev)
-                    except:
-                        # Log and swallow any exceptions in removal --
-                        # there's nothing more we can do.
-                        log.exception(
-                           "Device release failed: %s; %s; %s",
-                           self.info['name_label'], devclass, dev)
-            if t.commit():
-                break
+        t = xstransact("%s/device" % self.dompath)
+        for devclass in XendDevices.valid_devices():
+            for dev in t.list(devclass):
+                try:
+                    log.debug("Removing %s", dev);
+                    self.destroyDevice(devclass, dev, False);
+                except:
+                    # Log and swallow any exceptions in removal --
+                    # there's nothing more we can do.
+                        log.exception("Device release failed: %s; %s; %s",
+                                      self.info['name_label'], devclass, dev)
+
+            
 
     def getDeviceController(self, name):
         """Get the device controller for this domain, and if it
@@ -1520,6 +1539,8 @@ class XendDomainInfo:
                 self.console_mfn = channel_details['console_mfn']
             if 'notes' in channel_details:
                 self.info.set_notes(channel_details['notes'])
+            if 'native_protocol' in channel_details:
+                self.native_protocol = channel_details['native_protocol'];
 
             self._introduceDomain()
 
@@ -1662,6 +1683,7 @@ class XendDomainInfo:
 
         self._cleanupVm()
         if self.dompath is not None:
+            xc.domain_destroy_hook(self.domid)
             self.destroyDomain()
 
         self._cleanup_phantom_devs(paths)
@@ -1680,7 +1702,6 @@ class XendDomainInfo:
         try:
             if self.domid is not None:
                 xc.domain_destroy(self.domid)
-                self.domid = None
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0
                 self._stateSet(DOM_STATE_HALTED)
@@ -2061,7 +2082,7 @@ class XendDomainInfo:
             raise VmError('Invalid VM Name')
 
         dom =  XendDomain.instance().domain_lookup_nr(name)
-        if dom and dom.info['uuid'] != self.info['uuid']:
+        if dom and dom.domid != self.domid:
             raise VmError("VM name '%s' already exists%s" %
                           (name,
                            dom.domid is not None and

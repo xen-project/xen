@@ -55,6 +55,8 @@ struct hvm_domain {
     spinlock_t             pbuf_lock;
 
     uint64_t               params[HVM_NR_PARAMS];
+
+    unsigned long          vmx_apic_access_mfn;
 };
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */

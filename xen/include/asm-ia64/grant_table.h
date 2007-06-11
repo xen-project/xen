@@ -9,7 +9,7 @@
 
 // for grant map/unmap
 int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);
-int destroy_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);
+int replace_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned long new_gpaddr, unsigned int flags);
 
 // for grant transfer
 void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
@@ -66,5 +66,10 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 
 #define gnttab_release_put_page(page)           put_page((page))
 #define gnttab_release_put_page_and_type(page)  put_page_and_type((page))
+
+static inline int replace_grant_supported(void)
+{
+    return 0;
+}
 
 #endif /* __ASM_GRANT_TABLE_H__ */

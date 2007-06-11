@@ -90,5 +90,8 @@ PERFCOUNTER(shadow_guest_walk,     "shadow walks guest tables")
 PERFCOUNTER(shadow_invlpg,         "shadow emulates invlpg")
 PERFCOUNTER(shadow_invlpg_fault,   "shadow invlpg faults")
 
+PERFCOUNTER(shadow_em_ex_pt,       "shadow extra pt write")
+PERFCOUNTER(shadow_em_ex_non_pt,   "shadow extra non-pt-write op")
+PERFCOUNTER(shadow_em_ex_fail,     "shadow extra emulation failed")
 
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */

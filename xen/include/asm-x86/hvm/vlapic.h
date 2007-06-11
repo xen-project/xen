@@ -33,7 +33,7 @@
 #define vlapic_domain(vpic) (vlapic_vcpu(vlapic)->domain)
 
 #define VLAPIC_ID(vlapic)   \
-    (GET_APIC_ID(vlapic_get_reg(vlapic, APIC_ID)))
+    (GET_APIC_ID(vlapic_get_reg((vlapic), APIC_ID)))
 
 /*
  * APIC can be disabled in two ways:
@@ -48,6 +48,9 @@
 #define vlapic_hw_disabled(vlapic) ((vlapic)->hw.disabled & VLAPIC_HW_DISABLED)
 #define vlapic_disabled(vlapic)    ((vlapic)->hw.disabled)
 #define vlapic_enabled(vlapic)     (!vlapic_disabled(vlapic))
+
+#define vlapic_base_address(vlapic)                             \
+    ((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
 
 struct vlapic {
     struct hvm_hw_lapic      hw;

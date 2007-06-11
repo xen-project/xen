@@ -189,9 +189,15 @@ static void aio_signal_handler(int signum)
 void qemu_aio_init(void)
 {
     struct sigaction act;
+    sigset_t set;
 
     aio_initialized = 1;
     
+    /* Ensure aio_sig_num is not blocked */ 
+    sigemptyset(&set);
+    sigaddset(&set, aio_sig_num);
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+
     sigfillset(&act.sa_mask);
     act.sa_flags = 0; /* do not restart syscalls to interrupt select() */
     act.sa_handler = aio_signal_handler;

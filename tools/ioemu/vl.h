@@ -39,7 +39,6 @@
 #include <sys/stat.h>
 #include "xenctrl.h"
 #include "xs.h"
-#include <xen/hvm/e820.h>
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0

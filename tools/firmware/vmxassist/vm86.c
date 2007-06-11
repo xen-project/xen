@@ -927,6 +927,7 @@ load_or_clear_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs
 		load_seg(0, base, limit, arbytes);
 }
 
+static unsigned char rm_irqbase[2];
 
 /*
  * Transition to protected mode
@@ -935,6 +936,9 @@ static void
 protected_mode(struct regs *regs)
 {
 	extern char stack_top[];
+
+	oldctx.rm_irqbase[0] = rm_irqbase[0];
+	oldctx.rm_irqbase[1] = rm_irqbase[1];
 
 	regs->eflags &= ~(EFLAGS_TF|EFLAGS_VM);
 
@@ -1187,6 +1191,7 @@ outbyte(struct regs *regs, unsigned prefix, unsigned opc)
 			icw2[0] = 0;
 			printf("Remapping master: ICW2 0x%x -> 0x%x\n",
 				al, NR_EXCEPTION_HANDLER);
+			rm_irqbase[0] = al;
 			al = NR_EXCEPTION_HANDLER;
 		}
 		break;
@@ -1200,6 +1205,7 @@ outbyte(struct regs *regs, unsigned prefix, unsigned opc)
 			icw2[1] = 0;
 			printf("Remapping slave: ICW2 0x%x -> 0x%x\n",
 				al, NR_EXCEPTION_HANDLER+8);
+			rm_irqbase[1] = al;
 			al = NR_EXCEPTION_HANDLER+8;
 		}
 		break;

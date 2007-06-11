@@ -92,14 +92,6 @@ struct shadow_domain {
 
     /* Fast MMIO path heuristic */
     int has_fast_mmio_entries;
-
-    /* Shadow log-dirty bitmap */
-    unsigned long *dirty_bitmap;
-    unsigned int dirty_bitmap_size;  /* in pages, bit per page */
-
-    /* Shadow log-dirty mode stats */
-    unsigned int fault_count;
-    unsigned int dirty_count;
 };
 
 struct shadow_vcpu {
@@ -134,7 +126,6 @@ struct hap_domain {
 /************************************************/
 /*       p2m handling                           */
 /************************************************/
-
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
     spinlock_t         lock;
@@ -156,21 +147,46 @@ struct p2m_domain {
 /************************************************/
 /*       common paging data structure           */
 /************************************************/
-struct paging_domain {
-    u32               mode;  /* flags to control paging operation */
+struct log_dirty_domain {
+    /* log-dirty lock */
+    spinlock_t     lock;
+    int            locker; /* processor that holds the lock */
+    const char    *locker_function; /* func that took it */
 
-    /* extension for shadow paging support */
-    struct shadow_domain shadow;
+    /* log-dirty bitmap to record dirty pages */
+    unsigned long *bitmap;
+    unsigned int   bitmap_size;  /* in pages, bit per page */
 
-    /* Other paging assistance code will have structs here */
-    struct hap_domain    hap;
+    /* log-dirty mode stats */
+    unsigned int   fault_count;
+    unsigned int   dirty_count;
+
+    /* functions which are paging mode specific */
+    int            (*enable_log_dirty   )(struct domain *d);
+    int            (*disable_log_dirty  )(struct domain *d);
+    void           (*clean_dirty_bitmap )(struct domain *d);
 };
 
+struct paging_domain {
+    /* flags to control paging operation */
+    u32                     mode;
+    /* extension for shadow paging support */
+    struct shadow_domain    shadow;
+    /* extension for hardware-assited paging */
+    struct hap_domain       hap;
+    /* log dirty support */
+    struct log_dirty_domain log_dirty;
+};
 struct paging_vcpu {
     /* Pointers to mode-specific entry points. */
     struct paging_mode *mode;
     /* HVM guest: paging enabled (CR0.PG)?  */
     unsigned int translate_enabled:1;
+    /* HVM guest: last emulate was to a pagetable */
+    unsigned int last_write_was_pt:1;
+    /* Translated guest: virtual TLB */    
+    struct shadow_vtlb *vtlb;
+    spinlock_t          vtlb_lock; 
 
     /* paging support extension */
     struct shadow_vcpu shadow;
@@ -290,6 +306,9 @@ struct arch_vcpu
     unsigned long shadow_ldt_mapcnt;
 
     struct paging_vcpu paging;
+
+    /* Guest-specified relocation of vcpu_info. */
+    unsigned long vcpu_info_mfn;
 } __cacheline_aligned;
 
 /* shorthands to improve code legibility */

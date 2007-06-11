@@ -169,7 +169,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
 
 // Returns 0 on error (out of memory)
 static int
-set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, u32 l1e_flags)
 {
     // XXX -- this might be able to be faster iff current->domain == d
     mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
@@ -213,7 +213,7 @@ set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         d->arch.p2m.max_mapped_pfn = gfn;
 
     if ( mfn_valid(mfn) )
-        entry_content = l1e_from_pfn(mfn_x(mfn), __PAGE_HYPERVISOR|_PAGE_USER);
+        entry_content = l1e_from_pfn(mfn_x(mfn), l1e_flags);
     else
         entry_content = l1e_empty();
 
@@ -278,7 +278,7 @@ int p2m_alloc_table(struct domain *d,
         p2m_unlock(d);
         return -ENOMEM;
     }
-list_add_tail(&p2m_top->list, &d->arch.p2m.pages);
+    list_add_tail(&p2m_top->list, &d->arch.p2m.pages);
 
     p2m_top->count_info = 1;
     p2m_top->u.inuse.type_info = 
@@ -297,8 +297,8 @@ list_add_tail(&p2m_top->list, &d->arch.p2m.pages);
  
     /* Initialise physmap tables for slot zero. Other code assumes this. */
     gfn = 0;
-mfn = _mfn(INVALID_MFN);
-    if ( !set_p2m_entry(d, gfn, mfn) )
+    mfn = _mfn(INVALID_MFN);
+    if ( !set_p2m_entry(d, gfn, mfn, __PAGE_HYPERVISOR|_PAGE_USER) )
         goto error;
 
     for ( entry = d->page_list.next;
@@ -316,7 +316,7 @@ mfn = _mfn(INVALID_MFN);
             (gfn != 0x55555555L)
 #endif
              && gfn != INVALID_M2P_ENTRY
-             && !set_p2m_entry(d, gfn, mfn) )
+             && !set_p2m_entry(d, gfn, mfn, __PAGE_HYPERVISOR|_PAGE_USER) )
             goto error;
     }
 
@@ -497,7 +497,7 @@ static void audit_p2m(struct domain *d)
             /* This m2p entry is stale: the domain has another frame in
              * this physical slot.  No great disaster, but for neatness,
              * blow away the m2p entry. */ 
-            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+            set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY, __PAGE_HYPERVISOR|_PAGE_USER);
         }
 
         if ( test_linear && (gfn <= d->arch.p2m.max_mapped_pfn) )
@@ -626,7 +626,7 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     ASSERT(mfn_x(gfn_to_mfn(d, gfn)) == mfn);
     //ASSERT(mfn_to_gfn(d, mfn) == gfn);
 
-    set_p2m_entry(d, gfn, _mfn(INVALID_MFN));
+    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), __PAGE_HYPERVISOR|_PAGE_USER);
     set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
 }
 
@@ -659,7 +659,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
     omfn = gfn_to_mfn(d, gfn);
     if ( mfn_valid(omfn) )
     {
-        set_p2m_entry(d, gfn, _mfn(INVALID_MFN));
+        set_p2m_entry(d, gfn, _mfn(INVALID_MFN), __PAGE_HYPERVISOR|_PAGE_USER);
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
     }
 
@@ -685,13 +685,129 @@ guest_physmap_add_page(struct domain *d, unsigned long gfn,
         }
     }
 
-    set_p2m_entry(d, gfn, _mfn(mfn));
+    set_p2m_entry(d, gfn, _mfn(mfn), __PAGE_HYPERVISOR|_PAGE_USER);
     set_gpfn_from_mfn(mfn, gfn);
 
     audit_p2m(d);
     p2m_unlock(d);
 }
 
+/* This function goes through P2M table and modify l1e flags of all pages. Note
+ * that physical base address of l1e is intact. This function can be used for
+ * special purpose, such as marking physical memory as NOT WRITABLE for
+ * tracking dirty pages during live migration.
+ */
+void p2m_set_flags_global(struct domain *d, u32 l1e_flags)
+{
+    unsigned long mfn, gfn;
+    l1_pgentry_t l1e_content;
+    l1_pgentry_t *l1e;
+    l2_pgentry_t *l2e;
+    int i1, i2;
+#if CONFIG_PAGING_LEVELS >= 3
+    l3_pgentry_t *l3e;
+    int i3;
+#if CONFIG_PAGING_LEVELS == 4
+    l4_pgentry_t *l4e;
+    int i4;
+#endif /* CONFIG_PAGING_LEVELS == 4 */
+#endif /* CONFIG_PAGING_LEVELS >= 3 */
+    
+    if ( !paging_mode_translate(d) )
+        return;
+ 
+    if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
+        return;
+
+    p2m_lock(d);
+        
+#if CONFIG_PAGING_LEVELS == 4
+    l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+#elif CONFIG_PAGING_LEVELS == 3
+    l3e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+#else /* CONFIG_PAGING_LEVELS == 2 */
+    l2e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+#endif
+
+#if CONFIG_PAGING_LEVELS >= 3
+#if CONFIG_PAGING_LEVELS >= 4
+    for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ ) 
+    {
+	if ( !(l4e_get_flags(l4e[i4]) & _PAGE_PRESENT) )
+	{
+	    continue;
+	}
+	l3e = map_domain_page(mfn_x(_mfn(l4e_get_pfn(l4e[i4]))));
+#endif /* now at levels 3 or 4... */
+	for ( i3 = 0; 
+	      i3 < ((CONFIG_PAGING_LEVELS==4) ? L3_PAGETABLE_ENTRIES : 8); 
+	      i3++ )
+	{
+	    if ( !(l3e_get_flags(l3e[i3]) & _PAGE_PRESENT) )
+	    {
+		continue;
+	    }
+	    l2e = map_domain_page(mfn_x(_mfn(l3e_get_pfn(l3e[i3]))));
+#endif /* all levels... */
+	    for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
+	    {
+		if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
+		{
+		    continue;
+		}
+		l1e = map_domain_page(mfn_x(_mfn(l2e_get_pfn(l2e[i2]))));
+		
+		for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++, gfn++ )
+		{
+		    if ( !(l1e_get_flags(l1e[i1]) & _PAGE_PRESENT) )
+			continue;
+		    mfn = l1e_get_pfn(l1e[i1]);
+		    gfn = get_gpfn_from_mfn(mfn);
+		    /* create a new 1le entry using l1e_flags */
+		    l1e_content = l1e_from_pfn(mfn, l1e_flags);
+		    paging_write_p2m_entry(d, gfn, &l1e[i1], l1e_content, 1);
+		}
+		unmap_domain_page(l1e);
+	    }
+#if CONFIG_PAGING_LEVELS >= 3
+	    unmap_domain_page(l2e);
+	}
+#if CONFIG_PAGING_LEVELS >= 4
+	unmap_domain_page(l3e);
+    }
+#endif
+#endif
+
+#if CONFIG_PAGING_LEVELS == 4
+    unmap_domain_page(l4e);
+#elif CONFIG_PAGING_LEVELS == 3
+    unmap_domain_page(l3e);
+#else /* CONFIG_PAGING_LEVELS == 2 */
+    unmap_domain_page(l2e);
+#endif
+
+    p2m_unlock(d);
+}
+
+/* This function traces through P2M table and modifies l1e flags of a specific
+ * gpa.
+ */
+int p2m_set_flags(struct domain *d, paddr_t gpa, u32 l1e_flags)
+{
+    unsigned long gfn;
+    mfn_t mfn;
+
+    p2m_lock(d);
+
+    gfn = gpa >> PAGE_SHIFT;
+    mfn = gfn_to_mfn(d, gfn);
+    if ( mfn_valid(mfn) )
+        set_p2m_entry(d, gfn, mfn, l1e_flags);
+    
+    p2m_unlock(d);
+
+    return 1;
+}
 
 /*
  * Local variables:

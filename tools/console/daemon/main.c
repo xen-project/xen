@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
+#include <signal.h>
 #include <sys/types.h>
 
 #include "xenctrl.h"
@@ -30,9 +32,19 @@
 #include "utils.h"
 #include "io.h"
 
+int log_reload = 0;
+int log_guest = 0;
+int log_hv = 0;
+char *log_dir = NULL;
+
+static void handle_hup(int sig)
+{
+        log_reload = 1;
+}
+
 static void usage(char *name)
 {
-	printf("Usage: %s [-h] [-V] [-v] [-i]\n", name);
+	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH]\n", name);
 }
 
 static void version(char *name)
@@ -48,6 +60,9 @@ int main(int argc, char **argv)
 		{ "version", 0, 0, 'V' },
 		{ "verbose", 0, 0, 'v' },
 		{ "interactive", 0, 0, 'i' },
+		{ "log", 1, 0, 'l' },
+		{ "log-dir", 1, 0, 'r' },
+		{ "pid-file", 1, 0, 'p' },
 		{ 0 },
 	};
 	bool is_interactive = false;
@@ -55,6 +70,7 @@ int main(int argc, char **argv)
 	int syslog_option = LOG_CONS;
 	int syslog_mask = LOG_WARNING;
 	int opt_ind = 0;
+	char *pidfile = NULL;
 
 	while ((ch = getopt_long(argc, argv, sopts, lopts, &opt_ind)) != -1) {
 		switch (ch) {
@@ -71,6 +87,22 @@ int main(int argc, char **argv)
 		case 'i':
 			is_interactive = true;
 			break;
+		case 'l':
+		        if (!strcmp(optarg, "all")) {
+			      log_hv = 1;
+			      log_guest = 1;
+			} else if (!strcmp(optarg, "hv")) {
+			      log_hv = 1;
+			} else if (!strcmp(optarg, "guest")) {
+			      log_guest = 1;
+			}
+			break;
+		case 'r':
+		        log_dir = strdup(optarg);
+			break;
+		case 'p':
+		        pidfile = strdup(optarg);
+			break;
 		case '?':
 			fprintf(stderr,
 				"Try `%s --help' for more information\n",
@@ -79,16 +111,22 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (!log_dir) {
+		log_dir = strdup("/var/log/xen/console");
+	}
+
 	if (geteuid() != 0) {
 		fprintf(stderr, "%s requires root to run.\n", argv[0]);
 		exit(EPERM);
 	}
 
+	signal(SIGHUP, handle_hup);
+
 	openlog("xenconsoled", syslog_option, LOG_DAEMON);
 	setlogmask(syslog_mask);
 
 	if (!is_interactive) {
-		daemonize("/var/run/xenconsoled.pid");
+		daemonize(pidfile ? pidfile : "/var/run/xenconsoled.pid");
 	}
 
 	if (!xen_setup())
@@ -99,6 +137,18 @@ int main(int argc, char **argv)
 	handle_io();
 
 	closelog();
+	free(log_dir);
+	free(pidfile);
 
 	return 0;
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

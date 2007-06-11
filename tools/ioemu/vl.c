@@ -183,7 +183,7 @@ extern int vcpus;
 
 int xc_handle;
 
-char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
+char domain_name[64] = "Xen-HVM-no-name";
 extern int domid;
 
 char vncpasswd[64];
@@ -935,7 +935,7 @@ static void timer_save(QEMUFile *f, void *opaque)
 
 static int timer_load(QEMUFile *f, void *opaque, int version_id)
 {
-    if (version_id != 1)
+    if (version_id != 1 && version_id != 2)
         return -EINVAL;
     if (cpu_ticks_enabled) {
         return -EINVAL;
@@ -3399,7 +3399,7 @@ static int tap_open(char *ifname, int ifname_size)
 static int tap_open(char *ifname, int ifname_size)
 {
     struct ifreq ifr;
-    int fd, ret;
+    int fd, ret, retries = 0;
     
     fd = open("/dev/net/tun", O_RDWR);
     if (fd < 0) {
@@ -3412,7 +3412,9 @@ static int tap_open(char *ifname, int ifname_size)
         pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
     else
         pstrcpy(ifr.ifr_name, IFNAMSIZ, "tap%d");
-    ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
+    do {
+        ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
+    } while ((ret != 0) && (retries++ < 3));
     if (ret != 0) {
         fprintf(stderr, "warning: could not configure /dev/net/tun: no virtual network emulation\n");
         close(fd);
@@ -3963,30 +3965,30 @@ static int net_client_init(const char *str)
         NICInfo *nd;
         uint8_t *macaddr;
 
-        if (nb_nics >= MAX_NICS) {
-            fprintf(stderr, "Too Many NICs\n");
-            return -1;
-        }
-        nd = &nd_table[nb_nics];
-        macaddr = nd->macaddr;
-        macaddr[0] = 0x52;
-        macaddr[1] = 0x54;
-        macaddr[2] = 0x00;
-        macaddr[3] = 0x12;
-        macaddr[4] = 0x34;
-        macaddr[5] = 0x56 + nb_nics;
+        if (nb_nics < MAX_NICS) {
+            nd = &nd_table[nb_nics];
+            macaddr = nd->macaddr;
+            macaddr[0] = 0x52;
+            macaddr[1] = 0x54;
+            macaddr[2] = 0x00;
+            macaddr[3] = 0x12;
+            macaddr[4] = 0x34;
+            macaddr[5] = 0x56 + nb_nics;
 
-        if (get_param_value(buf, sizeof(buf), "macaddr", p)) {
-            if (parse_macaddr(macaddr, buf) < 0) {
-                fprintf(stderr, "invalid syntax for ethernet address\n");
-                return -1;
+            if (get_param_value(buf, sizeof(buf), "macaddr", p)) {
+                if (parse_macaddr(macaddr, buf) < 0) {
+                    fprintf(stderr, "invalid syntax for ethernet address\n");
+                    return -1;
+                }
             }
-        }
-        if (get_param_value(buf, sizeof(buf), "model", p)) {
-            nd->model = strdup(buf);
-        }
-        nd->vlan = vlan;
-        nb_nics++;
+            if (get_param_value(buf, sizeof(buf), "model", p)) {
+                nd->model = strdup(buf);
+            }
+            nd->vlan = vlan;
+            nb_nics++;
+        } else {
+            fprintf(stderr, "Too Many NICs\n");
+	}
         ret = 0;
     } else
     if (!strcmp(device, "none")) {
@@ -7056,7 +7058,7 @@ int main(int argc, char **argv)
     extern void *buffered_pio_page;
 #endif
 
-    char qemu_dm_logfilename[64];
+    char qemu_dm_logfilename[128];
 
     LIST_INIT (&vm_change_state_head);
 #ifndef _WIN32
@@ -7144,9 +7146,7 @@ int main(int argc, char **argv)
     nb_nics = 0;
     /* default mac address of the first network interface */
     
-    /* init debug */
-    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm.%ld.log", (long)getpid());
-    cpu_set_log_filename(qemu_dm_logfilename);
+    /* Init logs to stderr to start with */
     cpu_set_log(0);
     
     optind = 1;
@@ -7525,7 +7525,8 @@ int main(int argc, char **argv)
                 semihosting_enabled = 1;
                 break;
             case QEMU_OPTION_domainname:
-                strncat(domain_name, optarg, sizeof(domain_name) - 20);
+                snprintf(domain_name, sizeof(domain_name),
+                         "Xen-HVM-%s", optarg);
                 break;
             case QEMU_OPTION_d:
                 domid = atoi(optarg);
@@ -7547,6 +7548,10 @@ int main(int argc, char **argv)
             }
         }
     }
+
+    /* Now send logs to our named config */
+    sprintf(qemu_dm_logfilename, "/var/log/xen/qemu-dm-%d.log", domid);
+    cpu_set_log_filename(qemu_dm_logfilename);
 
 #ifndef _WIN32
     if (daemonize && !nographic && vnc_display == NULL && vncunused == 0) {

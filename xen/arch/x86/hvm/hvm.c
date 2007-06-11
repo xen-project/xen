@@ -237,7 +237,7 @@ int hvm_domain_initialise(struct domain *d)
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_init_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 
-    return 0;
+    return hvm_funcs.domain_initialise(d);
 }
 
 void hvm_domain_relinquish_resources(struct domain *d)
@@ -248,10 +248,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
-    pit_deinit(d);
-    rtc_deinit(d);
-    pmtimer_deinit(d);
-    hpet_deinit(d);
+    hvm_funcs.domain_destroy(d);
 }
 
 static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -272,7 +269,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
         /* Other vcpu register state */
         vc = &v->arch.guest_context;
-        if ( vc->flags & VGCF_i387_valid )
+        if ( v->fpu_initialised )
             memcpy(ctxt.fpu_regs, &vc->fpu_ctxt, sizeof(ctxt.fpu_regs));
         else 
             memset(ctxt.fpu_regs, 0, sizeof(ctxt.fpu_regs));
@@ -364,7 +361,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc->debugreg[6] = ctxt.dr6;
     vc->debugreg[7] = ctxt.dr7;
 
-    vc->flags = VGCF_i387_valid | VGCF_online;
+    vc->flags = VGCF_online;
     v->fpu_initialised = 1;
 
     /* Auxiliary processors should be woken immediately. */
@@ -408,27 +405,39 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
-    if ( v->vcpu_id != 0 )
-        return 0;
-
-    pit_init(v, cpu_khz);
-    rtc_init(v, RTC_PORT(0));
-    pmtimer_init(v);
-    hpet_init(v);
+    if ( v->vcpu_id == 0 )
+    {
+        /* NB. All these really belong in hvm_domain_initialise(). */
+        pit_init(v, cpu_khz);
+        rtc_init(v, RTC_PORT(0));
+        pmtimer_init(v);
+        hpet_init(v);
  
-    /* Init guest TSC to start from zero. */
-    hvm_set_guest_time(v, 0);
+        /* Init guest TSC to start from zero. */
+        hvm_set_guest_time(v, 0);
+    }
 
     return 0;
 }
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+    struct domain *d = v->domain;
+
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
+
+    if ( v->vcpu_id == 0 )
+    {
+        /* NB. All these really belong in hvm_domain_destroy(). */
+        pit_deinit(d);
+        rtc_deinit(d);
+        pmtimer_deinit(d);
+        hpet_deinit(d);
+    }
 }
 
 
@@ -559,7 +568,7 @@ static int __hvm_copy(void *buf, paddr_t addr, int size, int dir, int virt)
         if ( dir )
         {
             memcpy(p, buf, count); /* dir == TRUE:  *to* guest */
-            mark_dirty(current->domain, mfn);
+            paging_mark_dirty(current->domain, mfn);
         }
         else
             memcpy(buf, p, count); /* dir == FALSE: *from guest */
@@ -653,20 +662,28 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     }
 }
 
+static long hvm_grant_table_op(
+    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
+{
+    if ( cmd != GNTTABOP_query_size )
+        return -ENOSYS; /* all other commands need auditing */
+    return do_grant_table_op(cmd, uop, count);
+}
+
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 
 #define HYPERCALL(x)                                        \
     [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
-#define HYPERCALL_COMPAT32(x)                               \
-    [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x ## _compat32
 
 #if defined(__i386__)
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(multicall),
     HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
@@ -717,15 +734,19 @@ static long do_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 
 static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(memory_op),
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
 };
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
-    HYPERCALL_COMPAT32(memory_op),
+    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)do_memory_op_compat32,
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     HYPERCALL(xen_version),
+    HYPERCALL(grant_table_op),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(hvm_op)
@@ -758,9 +779,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
     if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
     {
-        if ( eax != __HYPERVISOR_grant_table_op )
-            gdprintk(XENLOG_WARNING, "HVM vcpu %d:%d bad hypercall %u.\n",
-                     current->domain->domain_id, current->vcpu_id, eax);
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
     }
@@ -770,7 +788,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
      * For now we also need to flush when pages are added, as qemu-dm is not
      * yet capable of faulting pages into an existing valid mapcache bucket.
      */
-    flush = (eax == __HYPERVISOR_memory_op);
+    flush = ((eax == __HYPERVISOR_memory_op) ||
+             (eax == __HYPERVISOR_grant_table_op)); /* needed ? */
     this_cpu(hc_preempted) = 0;
 
 #ifdef __x86_64__
@@ -800,7 +819,8 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
                                                (uint32_t)regs->edi);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx", eax, (unsigned long)regs->eax);
+    HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u -> %lx",
+                eax, (unsigned long)regs->eax);
 
     return (this_cpu(hc_preempted) ? HVM_HCALL_preempted :
             flush ? HVM_HCALL_invalidate : HVM_HCALL_completed);

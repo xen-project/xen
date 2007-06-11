@@ -882,7 +882,8 @@ class XendAPI(object):
     
     host_attr_rw = ['name_label',
                     'name_description',
-                    'other_config']
+                    'other_config',
+                    'logging']
 
     host_methods = [('disable', None),
                     ('enable', None),
@@ -957,7 +958,11 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().get_vcpus_policy())
     def host_get_cpu_configuration(self, _, host_ref):
         return xen_api_success(XendNode.instance().get_cpu_configuration())
-    
+    def host_set_logging(self, _, host_ref, logging):
+        return xen_api_todo()
+    def host_get_logging(self, _, host_ref):
+        return xen_api_todo()
+
     # object methods
     def host_disable(self, session, host_ref):
         XendDomain.instance().set_allow_new_domains(False)
@@ -1010,7 +1015,10 @@ class XendAPI(object):
                   'metrics': node.host_metrics_uuid,
                   'capabilities': node.get_capabilities(),
                   'supported_bootloaders': ['pygrub'],
-                  'sched_policy': node.get_vcpus_policy()}
+                  'sched_policy': node.get_vcpus_policy(),
+                  'logging': {},
+                  'PIFs': XendPIF.get_all(),
+                  'PBDs': XendPBD.get_all()}
         return xen_api_success(record)
 
     # class methods
@@ -1133,7 +1141,8 @@ class XendAPI(object):
                   'tools_version',
                   'domid',
                   'is_control_domain',
-                  'metrics'
+                  'metrics',
+                  'crash_dumps',
                   ]
                   
     VM_attr_rw = ['name_label',
@@ -1572,6 +1581,9 @@ class XendAPI(object):
         else:
             return xen_api_success_void()
 
+    def VM_get_crash_dumps(self, _, vm_ref):
+        return xen_api_todo()
+
     # class methods
     def VM_get_all(self, session):
         refs = [d.get_uuid() for d in XendDomain.instance().list('all')]
@@ -1636,7 +1648,8 @@ class XendAPI(object):
             'other_config': xeninfo.info.get('other_config', {}),
             'domid': domid is None and -1 or domid,
             'is_control_domain': xeninfo.info['is_control_domain'],
-            'metrics': xeninfo.get_metrics()
+            'metrics': xeninfo.get_metrics(),
+            'crash_dumps': []
         }
         return xen_api_success(record)
 
@@ -1767,6 +1780,7 @@ class XendAPI(object):
                 return_cfg[k] = cfg[k]
 
         return_cfg['metrics'] = vbd_ref
+        return_cfg['runtime_properties'] = {} #todo
 
         return xen_api_success(return_cfg)
 
@@ -1836,7 +1850,7 @@ class XendAPI(object):
         try:
             devid = int(device['id'])
             device_sxps = dominfo.getDeviceSxprs('vbd')
-            device_dicts  = [dict(device_sxp[1][1:]) for device_sxp in device_sxps]
+            device_dicts  = [dict(device_sxp[1][0:]) for device_sxp in device_sxps]
             device_dict = [device_dict
                            for device_dict in device_dicts
                            if int(device_dict['virtual-device']) == devid][0]

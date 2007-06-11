@@ -1793,6 +1793,80 @@ void __init setup_IO_APIC(void)
     register_keyhandler('z', print_IO_APIC_keyhandler, "print ioapic info");
 }
 
+struct IO_APIC_route_entry *ioapic_pm_state=NULL;
+
+void ioapic_pm_state_alloc(void)
+{
+    int i, nr_entry = 0;
+
+    if (ioapic_pm_state != NULL)
+        return;
+
+    for (i = 0; i < nr_ioapics; i++)
+        nr_entry += nr_ioapic_registers[i];
+
+    ioapic_pm_state = _xmalloc(sizeof(struct IO_APIC_route_entry)*nr_entry,
+                               sizeof(struct IO_APIC_route_entry));
+}
+
+int ioapic_suspend(void)
+{
+    struct IO_APIC_route_entry *entry;
+    unsigned long flags;
+    int apic,i;
+
+    ioapic_pm_state_alloc();
+
+    if (ioapic_pm_state == NULL) {
+        printk("Cannot suspend ioapic due to lack of memory\n");
+        return 1;
+    }
+
+    entry = ioapic_pm_state;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    for (apic = 0; apic < nr_ioapics; apic++) {
+        for (i = 0; i < nr_ioapic_registers[apic]; i ++, entry ++ ) {
+            *(((int *)entry) + 1) = io_apic_read(apic, 0x11 + 2 * i);
+            *(((int *)entry) + 0) = io_apic_read(apic, 0x10 + 2 * i);
+        }
+    }
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    return 0;
+}
+
+int ioapic_resume(void)
+{
+    struct IO_APIC_route_entry *entry;
+    unsigned long flags;
+    union IO_APIC_reg_00 reg_00;
+    int i,apic;
+    
+    if (ioapic_pm_state == NULL){
+        printk("Cannot resume ioapic due to lack of memory\n");
+        return 1;
+    }
+    
+    entry = ioapic_pm_state;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    for (apic = 0; apic < nr_ioapics; apic++){
+        reg_00.raw = io_apic_read(apic, 0);
+        if (reg_00.bits.ID != mp_ioapics[apic].mpc_apicid) {
+            reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
+            io_apic_write(apic, 0, reg_00.raw);
+        }
+        for (i = 0; i < nr_ioapic_registers[apic]; i++, entry++) {
+            io_apic_write(apic, 0x11+2*i, *(((int *)entry)+1));
+            io_apic_write(apic, 0x10+2*i, *(((int *)entry)+0));
+        }
+    }
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    return 0;
+}
+
 /* --------------------------------------------------------------------------
                           ACPI-based IOAPIC Configuration
    -------------------------------------------------------------------------- */

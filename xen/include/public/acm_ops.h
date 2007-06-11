@@ -34,7 +34,7 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0009
+#define ACM_INTERFACE_VERSION   0xAAAA000A
 
 /************************************************************************/
 
@@ -49,7 +49,6 @@
 #define ACMOP_setpolicy         1
 struct acm_setpolicy {
     /* IN */
-    uint32_t interface_version;
     XEN_GUEST_HANDLE_64(void) pushcache;
     uint32_t pushcache_size;
 };
@@ -58,7 +57,6 @@ struct acm_setpolicy {
 #define ACMOP_getpolicy         2
 struct acm_getpolicy {
     /* IN */
-    uint32_t interface_version;
     XEN_GUEST_HANDLE_64(void) pullcache;
     uint32_t pullcache_size;
 };
@@ -67,7 +65,6 @@ struct acm_getpolicy {
 #define ACMOP_dumpstats         3
 struct acm_dumpstats {
     /* IN */
-    uint32_t interface_version;
     XEN_GUEST_HANDLE_64(void) pullcache;
     uint32_t pullcache_size;
 };
@@ -78,7 +75,6 @@ struct acm_dumpstats {
 #define ACM_GETBY_domainid 2
 struct acm_getssid {
     /* IN */
-    uint32_t interface_version;
     uint32_t get_ssid_by; /* ACM_GETBY_* */
     union {
         domaintype_t domainid;
@@ -91,7 +87,6 @@ struct acm_getssid {
 #define ACMOP_getdecision      5
 struct acm_getdecision {
     /* IN */
-    uint32_t interface_version;
     uint32_t get_decision_by1; /* ACM_GETBY_* */
     uint32_t get_decision_by2; /* ACM_GETBY_* */
     union {
@@ -111,7 +106,6 @@ struct acm_getdecision {
 #define ACMOP_chgpolicy        6
 struct acm_change_policy {
     /* IN */
-    uint32_t interface_version;
     XEN_GUEST_HANDLE_64(void) policy_pushcache;
     uint32_t policy_pushcache_size;
     XEN_GUEST_HANDLE_64(void) del_array;
@@ -127,7 +121,6 @@ struct acm_change_policy {
 #define ACMOP_relabeldoms       7
 struct acm_relabel_doms {
     /* IN */
-    uint32_t interface_version;
     XEN_GUEST_HANDLE_64(void) relabel_map;
     uint32_t relabel_map_size;
     /* OUT */

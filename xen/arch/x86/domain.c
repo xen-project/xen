@@ -28,6 +28,7 @@
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/percpu.h>
+#include <xen/compat.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -48,6 +49,8 @@
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(__u64, efer);
+
+static void unmap_vcpu_info(struct vcpu *v);
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
@@ -340,6 +343,8 @@ int vcpu_initialise(struct vcpu *v)
     struct domain *d = v->domain;
     int rc;
 
+    v->arch.vcpu_info_mfn = INVALID_MFN;
+
     v->arch.flags = TF_kernel_mode;
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
@@ -381,6 +386,11 @@ void vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32on64_vcpu(v) )
         release_compat_l4(v);
+
+    unmap_vcpu_info(v);
+
+    if ( is_hvm_vcpu(v) )
+        hvm_vcpu_destroy(v);
 }
 
 int arch_domain_create(struct domain *d)
@@ -390,7 +400,7 @@ int arch_domain_create(struct domain *d)
     int i;
 #endif
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order;
+    int vcpuid, pdpt_order, paging_initialised = 0;
     int rc = -ENOMEM;
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
@@ -439,6 +449,7 @@ int arch_domain_create(struct domain *d)
 #endif
 
     paging_domain_init(d);
+    paging_initialised = 1;
 
     if ( !is_idle_domain(d) )
     {
@@ -466,12 +477,13 @@ int arch_domain_create(struct domain *d)
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
             (CONFIG_PAGING_LEVELS != 4);
     }
-        
 
     return 0;
 
  fail:
     free_xenheap_page(d->shared_info);
+    if ( paging_initialised )
+        paging_final_teardown(d);
 #ifdef __x86_64__
     if ( d->arch.mm_perdomain_l2 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
@@ -484,14 +496,8 @@ int arch_domain_create(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
-    struct vcpu *v;
-
     if ( is_hvm_domain(d) )
-    {
-        for_each_vcpu ( d, v )
-            hvm_vcpu_destroy(v);
         hvm_domain_destroy(d);
-    }
 
     paging_final_teardown(d);
 
@@ -733,6 +739,94 @@ int arch_vcpu_reset(struct vcpu *v)
     return 0;
 }
 
+/* 
+ * Unmap the vcpu info page if the guest decided to place it somewhere
+ * else.  This is only used from arch_domain_destroy, so there's no
+ * need to do anything clever.
+ */
+static void
+unmap_vcpu_info(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned long mfn;
+
+    if ( v->arch.vcpu_info_mfn == INVALID_MFN )
+        return;
+
+    mfn = v->arch.vcpu_info_mfn;
+    unmap_domain_page_global(v->vcpu_info);
+
+    v->vcpu_info = shared_info_addr(d, vcpu_info[v->vcpu_id]);
+    v->arch.vcpu_info_mfn = INVALID_MFN;
+
+    put_page_and_type(mfn_to_page(mfn));
+}
+
+/* 
+ * Map a guest page in and point the vcpu_info pointer at it.  This
+ * makes sure that the vcpu_info is always pointing at a valid piece
+ * of memory, and it sets a pending event to make sure that a pending
+ * event doesn't get missed.
+ */
+static int
+map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
+{
+    struct domain *d = v->domain;
+    void *mapping;
+    vcpu_info_t *new_info;
+    int i;
+
+    if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
+        return -EINVAL;
+
+    if ( v->arch.vcpu_info_mfn != INVALID_MFN )
+        return -EINVAL;
+
+    /* Run this command on yourself or on other offline VCPUS. */
+    if ( (v != current) && !test_bit(_VPF_down, &v->pause_flags) )
+        return -EINVAL;
+
+    mfn = gmfn_to_mfn(d, mfn);
+    if ( !mfn_valid(mfn) ||
+         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        return -EINVAL;
+
+    mapping = map_domain_page_global(mfn);
+    if ( mapping == NULL )
+    {
+        put_page_and_type(mfn_to_page(mfn));
+        return -ENOMEM;
+    }
+
+    new_info = (vcpu_info_t *)(mapping + offset);
+
+    memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+
+    v->vcpu_info = new_info;
+    v->arch.vcpu_info_mfn = mfn;
+
+    /* Set new vcpu_info pointer /before/ setting pending flags. */
+    wmb();
+
+    /*
+     * Mark everything as being pending just to make sure nothing gets
+     * lost.  The domain will get a spurious event, but it can cope.
+     */
+    vcpu_info(v, evtchn_upcall_pending) = 1;
+    for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
+        set_bit(i, vcpu_info_addr(v, evtchn_pending_sel));
+
+    /*
+     * Only bother to update time for the current vcpu.  If we're
+     * operating on another vcpu, then it had better not be running at
+     * the time.
+     */
+    if ( v == current )
+         update_vcpu_system_time(v);
+
+    return 0;
+}
+
 long
 arch_do_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
@@ -765,6 +859,22 @@ arch_do_vcpu_op(
             vcpu_runstate_get(v, &runstate);
             __copy_to_guest(runstate_guest(v), &runstate, 1);
         }
+
+        break;
+    }
+
+    case VCPUOP_register_vcpu_info:
+    {
+        struct domain *d = v->domain;
+        struct vcpu_register_vcpu_info info;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&info, arg, 1) )
+            break;
+
+        LOCK_BIGLOCK(d);
+        rc = map_vcpu_info(v, info.mfn, info.offset);
+        UNLOCK_BIGLOCK(d);
 
         break;
     }
@@ -1346,13 +1456,12 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
                 id = NULL;
             }
             if ( (mask & 1) && mcs->call.args[i] == nval )
-                ++rc;
-            else
             {
-                cval = mcs->call.args[i];
-                BUG_ON(mcs->call.args[i] != cval);
+                mcs->call.args[i] = cval;
+                ++rc;
             }
-            mcs->compat_call.args[i] = cval;
+            else
+                BUG_ON(mcs->call.args[i] != (unsigned int)mcs->call.args[i]);
         }
     }
     else

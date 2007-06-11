@@ -42,10 +42,10 @@ libblktap: libblktap.a
 install: all
 	$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) $(LIB) $(DESTDIR)/usr/$(LIBDIR)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libblktap.so
-	$(INSTALL_PROG) blktaplib.h $(DESTDIR)/usr/include
+	$(INSTALL_DATA) blktaplib.h $(DESTDIR)/usr/include
 
 clean:
 	rm -rf *.a *.so* *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS

@@ -231,6 +231,7 @@ SUBCOMMAND_OPTIONS = {
     ),
     'start': (
       ('-p', '--paused', 'Do not unpause domain after starting it'),
+      ('-c', '--console_autoconnect', 'Connect to the console after the domain is created'),
     ),
     'resume': (
       ('-p', '--paused', 'Do not unpause domain after resuming it'),
@@ -731,10 +732,13 @@ def xm_restore(args):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    if serverType == SERVER_XEN_API:
-        server.xenapi.VM.restore(savefile, paused)
-    else:
-        server.xend.domain.restore(savefile, paused)
+    try:
+        if serverType == SERVER_XEN_API:
+            server.xenapi.VM.restore(savefile, paused)
+        else:
+            server.xend.domain.restore(savefile, paused)
+    except Exception, ex:
+        err("%s" % ex.faultString)
 
 
 def datetime_to_secs(v):
@@ -916,10 +920,10 @@ def domid_match(domid, info):
            domid == str(info['domid'])
 
 def xm_brief_list(doms):
-    print '%-40s %3s %5s %5s %10s %9s' % \
+    print '%-40s %5s %5s %5s %10s %9s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)')
     
-    format = "%(name)-40s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s " \
+    format = "%(name)-40s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s " \
              "%(cpu_time)8.1f"
     
     for dom in doms:
@@ -927,11 +931,11 @@ def xm_brief_list(doms):
         print format % d
 
 def xm_label_list(doms):
-    print '%-32s %3s %5s %5s %5s %9s %-8s' % \
+    print '%-32s %5s %5s %5s %5s %9s %-8s' % \
           ('Name', 'ID', 'Mem', 'VCPUs', 'State', 'Time(s)', 'Label')
     
     output = []
-    format = '%(name)-32s %(domid)3s %(mem)5d %(vcpus)5d %(state)10s ' \
+    format = '%(name)-32s %(domid)5s %(mem)5d %(vcpus)5d %(state)10s ' \
              '%(cpu_time)8.1f %(seclabel)9s'
 
     if serverType != SERVER_XEN_API:
@@ -1021,10 +1025,10 @@ def xm_vcpu_list(args):
             doms = server.xend.domains(False)
             dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
-    print '%-32s %3s %5s %5s %5s %9s %s' % \
+    print '%-32s %5s %5s %5s %5s %9s %s' % \
           ('Name', 'ID', 'VCPU', 'CPU', 'State', 'Time(s)', 'CPU Affinity')
 
-    format = '%(name)-32s %(domid)3d %(number)5d %(c)5s %(s)5s ' \
+    format = '%(name)-32s %(domid)5d %(number)5d %(c)5s %(s)5s ' \
              ' %(cpu_time)8.1f %(cpumap)s'
 
     for dom in dominfo:
@@ -1125,29 +1129,67 @@ def xm_vcpu_list(args):
 
             print format % locals()
 
+def start_do_console(domain_name):
+    cpid = os.fork() 
+    if cpid != 0:
+        for i in range(10):
+            # Catch failure of the create process 
+            time.sleep(1)
+            (p, rv) = os.waitpid(cpid, os.WNOHANG)
+            if os.WIFEXITED(rv):
+                if os.WEXITSTATUS(rv) != 0:
+                    sys.exit(os.WEXITSTATUS(rv))
+            try:
+                # Acquire the console of the created dom
+                if serverType == SERVER_XEN_API:
+                    domid = server.xenapi.VM.get_domid(
+                               get_single_vm(domain_name))
+                else:
+                    dom = server.xend.domain(domain_name)
+                    domid = int(sxp.child_value(dom, 'domid', '-1'))
+                console.execConsole(domid)
+            except:
+                pass
+        print("Could not start console\n");
+        sys.exit(0)
+
 def xm_start(args):
-    arg_check(args, "start", 1, 2)
+
+    paused = False
+    console_autoconnect = False
 
     try:
-        (options, params) = getopt.gnu_getopt(args, 'p', ['paused'])
+        (options, params) = getopt.gnu_getopt(args, 'cp', ['console_autoconnect','paused'])
+        for (k, v) in options:
+            if k in ('-p', '--paused'):
+                paused = True
+            if k in ('-c', '--console_autoconnect'):
+                console_autoconnect = True
+
+        if len(params) != 1:
+            raise OptionError("Expects 1 argument")
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('start')
 
-    paused = False
-    for (k, v) in options:
-        if k in ['-p', '--paused']:
-            paused = True
-
-    if len(params) != 1:
-        err("Wrong number of parameters")
-        usage('start')
-
     dom = params[0]
-    if serverType == SERVER_XEN_API:
-        server.xenapi.VM.start(get_single_vm(dom), paused)
-    else:
-        server.xend.domain.start(dom, paused)
+
+    if console_autoconnect:
+        start_do_console(dom)
+
+    try:
+        if serverType == SERVER_XEN_API:
+            server.xenapi.VM.start(get_single_vm(dom), paused)
+            domid = int(server.xenapi.VM.get_domid(get_single_vm(dom)))
+        else:
+            server.xend.domain.start(dom, paused)
+            info = server.xend.domain(dom)
+            domid = int(sxp.child_value(info, 'domid', '-1'))
+    except:
+        raise
+        
+    if domid == -1:
+        raise xmlrpclib.Fault(0, "Domain '%s' is not started" % dom)
 
 def xm_delete(args):
     arg_check(args, "delete", 1)
@@ -1384,7 +1426,7 @@ def xm_sched_sedf(args):
         info['period']  = ns_to_ms(info['period'])
         info['slice']   = ns_to_ms(info['slice'])
         info['latency'] = ns_to_ms(info['latency'])
-        print( ("%(name)-32s %(domid)3d %(period)9.1f %(slice)9.1f" +
+        print( ("%(name)-32s %(domid)5d %(period)9.1f %(slice)9.1f" +
                 " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
     check_sched_type('sedf')
@@ -1430,7 +1472,7 @@ def xm_sched_sedf(args):
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
-        print '%-33s %-2s %-4s %-4s %-7s %-5s %-6s' % \
+        print '%-33s %4s %-4s %-4s %-7s %-5s %-6s' % \
               ('Name','ID','Period(ms)', 'Slice(ms)', 'Lat(ms)',
                'Extra','Weight')
     
@@ -1494,7 +1536,7 @@ def xm_sched_credit(args):
             err("Domain '%s' does not exist." % domid)
             usage('sched-credit')
         # print header if we aren't setting any parameters
-        print '%-33s %-2s %-6s %-4s' % ('Name','ID','Weight','Cap')
+        print '%-33s %4s %6s %4s' % ('Name','ID','Weight','Cap')
         
         for d in doms:
             try:
@@ -1516,7 +1558,7 @@ def xm_sched_credit(args):
             
             info['name']  = d['name']
             info['domid'] = int(d['domid'])
-            print( ("%(name)-32s %(domid)3d %(weight)6d %(cap)4d") % info)
+            print( ("%(name)-32s %(domid)5d %(weight)6d %(cap)4d") % info)
     else:
         if domid is None:
             # place holder for system-wide scheduler parameters
@@ -1679,7 +1721,7 @@ def xm_uptime(args):
     doms = getDomains(params, 'running')
 
     if short_mode == 0:
-        print 'Name                              ID Uptime'
+        print '%-33s %4s %s ' % ('Name','ID','Uptime')
 
     for dom in doms:
         d = parse_doms_info(dom)
@@ -1713,7 +1755,7 @@ def xm_uptime(args):
             upstring += ", " + d['name'] + " (" + d['domid'] + ")"
         else:
             upstring += ':%(seconds)02d' % vars()
-            upstring = ("%(name)-32s %(domid)3s " % d) + upstring
+            upstring = ("%(name)-32s %(domid)5s " % d) + upstring
 
         print upstring
 

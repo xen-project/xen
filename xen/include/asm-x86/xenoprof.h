@@ -46,7 +46,18 @@ int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg);
 
 struct vcpu;
 struct cpu_user_regs;
+
 int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
+
+static inline int xenoprof_backtrace_supported(void)
+{
+    return 1;
+}
+
+void xenoprof_backtrace(
+    struct domain *d, struct vcpu *vcpu, 
+    struct cpu_user_regs *const regs, unsigned long depth, int mode);
+
 #define xenoprof_shared_gmfn(d, gmaddr, maddr)                      \
     do {                                                            \
         (void)(maddr);                                              \

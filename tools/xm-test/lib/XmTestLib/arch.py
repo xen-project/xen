@@ -46,6 +46,9 @@ def ia_checkBuffer(buffer):
 def ia_minSafeMem():
     return 32
 
+def ia64_minSafeMem():
+    return 128
+
 def ia_getDeviceModel():
     """Get the path to the device model based on
     the architecture reported in uname"""
@@ -139,6 +142,17 @@ if _arch == "x86" or _arch == "x86_64" or _arch == "ia64":
         configDefaults = ia_HVMDefaults
     else:
         configDefaults = ia_ParavirtDefaults
+
+    # note: xm-test generates an uncompressed image, and this code
+    # expects one.  This will fail with a gzip-ed image. 
+    if configDefaults['ramdisk']:
+        rd_size = os.stat(configDefaults['ramdisk']).st_size
+        configDefaults['extra'] = 'ramdisk_size=' + str((rd_size / 1024)+1)
+
+    if _arch == "ia64":
+        minSafeMem = ia64_minSafeMem
+        configDefaults['memory'] = ia64_minSafeMem()
+
 elif _arch == "powerpc":
     minSafeMem = ppc_minSafeMem
     getDefaultKernel = ppc_getDefaultKernel

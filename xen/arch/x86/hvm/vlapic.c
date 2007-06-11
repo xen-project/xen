@@ -32,6 +32,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <asm/hvm/vmx/vmx.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
@@ -79,8 +80,6 @@ static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 #define vlapic_lvtt_period(vlapic)                              \
     (vlapic_get_reg(vlapic, APIC_LVTT) & APIC_LVT_TIMER_PERIODIC)
 
-#define vlapic_base_address(vlapic)                             \
-    (vlapic->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
 
 /*
  * Generic APIC bitmap vector update & search routines.
@@ -712,6 +711,8 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 
     vlapic->hw.apic_base_msr = value;
 
+    vmx_vlapic_msr_changed(vlapic_vcpu(vlapic));
+
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                 "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
 }
@@ -879,6 +880,9 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     lapic_info(s);
+
+    vmx_vlapic_msr_changed(v);
+
     return 0;
 }
 
@@ -918,17 +922,25 @@ int vlapic_init(struct vcpu *v)
     vlapic->regs_page = alloc_domheap_page(NULL);
     if ( vlapic->regs_page == NULL )
     {
-        dprintk(XENLOG_ERR, "malloc vlapic regs error for vcpu %x\n",
-                v->vcpu_id);
+        dprintk(XENLOG_ERR, "alloc vlapic regs error: %d/%d\n",
+                v->domain->domain_id, v->vcpu_id);
         return -ENOMEM;
     }
 
     vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
+    if ( vlapic->regs == NULL )
+    {
+        dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",
+                v->domain->domain_id, v->vcpu_id);
+	return -ENOMEM;
+    }
+
     memset(vlapic->regs, 0, PAGE_SIZE);
 
     vlapic_reset(vlapic);
 
-    vlapic->hw.apic_base_msr = MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+    vlapic->hw.apic_base_msr = (MSR_IA32_APICBASE_ENABLE |
+                                APIC_DEFAULT_PHYS_BASE);
     if ( v->vcpu_id == 0 )
         vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
 

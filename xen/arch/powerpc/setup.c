@@ -356,6 +356,8 @@ static void __init __start_xen(multiboot_info_t *mbi)
 
     start_of_day();
 
+    acm_init(NULL, 0);
+
     mpic_setup_this_cpu();
 
     /* Deal with secondary processors.  */

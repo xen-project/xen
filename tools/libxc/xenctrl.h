@@ -847,4 +847,11 @@ int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value);
 int xc_alloc_real_mode_area(int xc_handle,
                             uint32_t domid,
                             unsigned int log);
-#endif
+
+/* IA64 specific, nvram save */
+int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom);
+
+/* IA64 specific, nvram init */
+int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom);
+
+#endif /* XENCTRL_H */

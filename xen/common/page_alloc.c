@@ -320,21 +320,39 @@ unsigned long __init alloc_boot_pages(
 #define pfn_dom_zone_type(_pfn) (fls(_pfn) - 1)
 
 typedef struct list_head heap_by_zone_and_order_t[NR_ZONES][MAX_ORDER+1];
-static heap_by_zone_and_order_t _heap0;
 static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
 #define heap(node, zone, order) ((*_heap[node])[zone][order])
 
-static unsigned long avail0[NR_ZONES];
 static unsigned long *avail[MAX_NUMNODES];
 
 static DEFINE_SPINLOCK(heap_lock);
 
-static void init_heap_block(heap_by_zone_and_order_t *heap_block)
+static void init_node_heap(int node)
 {
+    /* First node to be discovered has its heap metadata statically alloced. */
+    static heap_by_zone_and_order_t _heap_static;
+    static unsigned long avail_static[NR_ZONES];
+    static unsigned long first_node_initialised;
+
     int i, j;
+
+    if ( !test_and_set_bit(0, &first_node_initialised) )
+    {
+        _heap[node] = &_heap_static;
+        avail[node] = avail_static;
+    }
+    else
+    {
+        _heap[node] = xmalloc(heap_by_zone_and_order_t);
+        avail[node] = xmalloc_array(unsigned long, NR_ZONES);
+        BUG_ON(!_heap[node] || !avail[node]);
+    }
+
+    memset(avail[node], 0, NR_ZONES * sizeof(long));
+
     for ( i = 0; i < NR_ZONES; i++ )
         for ( j = 0; j <= MAX_ORDER; j++ )
-            INIT_LIST_HEAD(&(*heap_block)[i][j]);
+            INIT_LIST_HEAD(&(*_heap[node])[i][j]);
 }
 
 /* Allocate 2^@order contiguous pages. */
@@ -524,14 +542,6 @@ void init_heap_pages(
 
     ASSERT(zone < NR_ZONES);
 
-    if ( unlikely(avail[0] == NULL) )
-    {
-        /* Start-of-day memory node 0 initialisation. */
-        init_heap_block(&_heap0);
-        _heap[0] = &_heap0;
-        avail[0] = avail0;
-    }
-
     if ( likely(page_to_mfn(pg) != 0) )
         nid_prev = phys_to_nid(page_to_maddr(pg-1));
     else
@@ -541,13 +551,8 @@ void init_heap_pages(
     {
         nid_curr = phys_to_nid(page_to_maddr(pg+i));
 
-        if ( !avail[nid_curr] )
-        {
-            avail[nid_curr] = xmalloc_array(unsigned long, NR_ZONES);
-            memset(avail[nid_curr], 0, NR_ZONES * sizeof(long));
-            _heap[nid_curr] = xmalloc(heap_by_zone_and_order_t);
-            init_heap_block(_heap[nid_curr]);
-        }
+        if ( unlikely(!avail[nid_curr]) )
+            init_node_heap(nid_curr);
 
         /*
          * free pages of the same node, or if they differ, but are on a

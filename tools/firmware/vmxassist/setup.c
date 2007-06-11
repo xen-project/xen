@@ -91,13 +91,13 @@ banner(void)
 	e820map[6].addr = memory_size;
 	e820map[7].addr += memory_size;
 
-	*E820_MAP_NR = sizeof(e820map)/sizeof(e820map[0]);
-	memcpy(E820_MAP, e820map, sizeof(e820map));
+	*HVM_E820_NR = sizeof(e820map)/sizeof(e820map[0]);
+	memcpy(HVM_E820, e820map, sizeof(e820map));
 #endif
 
 	printf("Memory size %ld MB\n", memory_size >> 20);
 	printf("E820 map:\n");
-	print_e820_map(E820_MAP, *E820_MAP_NR);
+	print_e820_map(HVM_E820, *HVM_E820_NR);
 	printf("\n");
 }
 
@@ -127,6 +127,7 @@ setup_gdt(void)
 	tss.ss0 = DATA_SELECTOR;
 	tss.esp0 = (unsigned) stack_top;
 	tss.iomap_base = offsetof(struct tss, iomap);
+	tss.iomap[sizeof(tss.iomap)-1] = 0xff;
 
 	/* initialize gdt's tss selector */
 	gdt[TSS_SELECTOR / sizeof(gdt[0])] |=

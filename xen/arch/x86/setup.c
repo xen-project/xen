@@ -18,6 +18,7 @@
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
 #include <xen/rcupdate.h>
+#include <xen/vga.h>
 #include <public/version.h>
 #ifdef CONFIG_COMPAT
 #include <compat/platform.h>
@@ -161,8 +162,6 @@ static void __init do_initcalls(void)
     printk( f , ## a );                         \
     for ( ; ; ) __asm__ __volatile__ ( "hlt" ); \
 } while (0)
-
-static struct e820entry __initdata e820_raw[E820MAX];
 
 static unsigned long __initdata initial_images_start, initial_images_end;
 
@@ -318,6 +317,69 @@ static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
     }
 }
 
+struct boot_video_info {
+    u8  orig_x;             /* 0x00 */
+    u8  orig_y;             /* 0x01 */
+    u8  orig_video_mode;    /* 0x02 */
+    u8  orig_video_cols;    /* 0x03 */
+    u8  orig_video_lines;   /* 0x04 */
+    u8  orig_video_isVGA;   /* 0x05 */
+    u16 orig_video_points;  /* 0x06 */
+
+    /* VESA graphic mode -- linear frame buffer */
+    u32 capabilities;       /* 0x08 */
+    u16 lfb_linelength;     /* 0x0c */
+    u16 lfb_width;          /* 0x0e */
+    u16 lfb_height;         /* 0x10 */
+    u16 lfb_depth;          /* 0x12 */
+    u32 lfb_base;           /* 0x14 */
+    u32 lfb_size;           /* 0x18 */
+    u8  red_size;           /* 0x1c */
+    u8  red_pos;            /* 0x1d */
+    u8  green_size;         /* 0x1e */
+    u8  green_pos;          /* 0x1f */
+    u8  blue_size;          /* 0x20 */
+    u8  blue_pos;           /* 0x21 */
+    u8  rsvd_size;          /* 0x22 */
+    u8  rsvd_pos;           /* 0x23 */
+    u16 vesapm_seg;         /* 0x24 */
+    u16 vesapm_off;         /* 0x26 */
+};
+
+static void __init parse_video_info(void)
+{
+    extern struct boot_video_info boot_vid_info;
+    struct boot_video_info *bvi = &bootsym(boot_vid_info);
+
+    if ( (bvi->orig_video_isVGA == 1) && (bvi->orig_video_mode == 3) )
+    {
+        vga_console_info.video_type = XEN_VGATYPE_TEXT_MODE_3;
+        vga_console_info.u.text_mode_3.font_height = bvi->orig_video_points;
+        vga_console_info.u.text_mode_3.cursor_x = bvi->orig_x;
+        vga_console_info.u.text_mode_3.cursor_y = bvi->orig_y;
+        vga_console_info.u.text_mode_3.rows = bvi->orig_video_lines;
+        vga_console_info.u.text_mode_3.columns = bvi->orig_video_cols;
+    }
+    else if ( bvi->orig_video_isVGA == 0x23 )
+    {
+        vga_console_info.video_type = XEN_VGATYPE_VESA_LFB;
+        vga_console_info.u.vesa_lfb.width = bvi->lfb_width;
+        vga_console_info.u.vesa_lfb.height = bvi->lfb_height;
+        vga_console_info.u.vesa_lfb.bytes_per_line = bvi->lfb_linelength;
+        vga_console_info.u.vesa_lfb.bits_per_pixel = bvi->lfb_depth;
+        vga_console_info.u.vesa_lfb.lfb_base = bvi->lfb_base;
+        vga_console_info.u.vesa_lfb.lfb_size = bvi->lfb_size;
+        vga_console_info.u.vesa_lfb.red_pos = bvi->red_pos;
+        vga_console_info.u.vesa_lfb.red_size = bvi->red_size;
+        vga_console_info.u.vesa_lfb.green_pos = bvi->green_pos;
+        vga_console_info.u.vesa_lfb.green_size = bvi->green_size;
+        vga_console_info.u.vesa_lfb.blue_pos = bvi->blue_pos;
+        vga_console_info.u.vesa_lfb.blue_size = bvi->blue_size;
+        vga_console_info.u.vesa_lfb.rsvd_pos = bvi->rsvd_pos;
+        vga_console_info.u.vesa_lfb.rsvd_size = bvi->rsvd_size;
+    }
+}
+
 void init_done(void)
 {
     extern char __init_begin[], __init_end[];
@@ -338,6 +400,7 @@ void init_done(void)
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
+    char *memmap_type = NULL;
     char __cmdline[] = "", *cmdline = __cmdline;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
@@ -345,7 +408,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long _policy_len = 0;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
-    int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
+    int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -359,6 +422,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
         cmdline = __va(mbi->cmdline);
     cmdline_parse(cmdline);
+
+    parse_video_info();
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
@@ -379,6 +444,22 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     printk("Command line: %s\n", cmdline);
 
+    switch ( vga_console_info.video_type )
+    {
+    case XEN_VGATYPE_TEXT_MODE_3:
+        printk("VGA is text mode %dx%d, font 8x%d\n",
+               vga_console_info.u.text_mode_3.columns,
+               vga_console_info.u.text_mode_3.rows,
+               vga_console_info.u.text_mode_3.font_height);
+        break;
+    case XEN_VGATYPE_VESA_LFB:
+        printk("VGA is graphics mode %dx%d, %d bpp\n",
+               vga_console_info.u.vesa_lfb.width,
+               vga_console_info.u.vesa_lfb.height,
+               vga_console_info.u.vesa_lfb.bits_per_pixel);
+        break;
+    }
+
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
         EARLY_FAIL("dom0 kernel not specified. "
@@ -395,8 +476,24 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( opt_xenheap_megabytes > 2048 )
         opt_xenheap_megabytes = 2048;
 
-    if ( mbi->flags & MBI_MEMMAP )
+    if ( e820_raw_nr != 0 )
     {
+        memmap_type = "Xen-e820";
+    }
+    else if ( bootsym(lowmem_kb) )
+    {
+        memmap_type = "Xen-e801";
+        e820_raw[0].addr = 0;
+        e820_raw[0].size = bootsym(lowmem_kb) << 10;
+        e820_raw[0].type = E820_RAM;
+        e820_raw[1].addr = 0x100000;
+        e820_raw[1].size = bootsym(highmem_kb) << 10;
+        e820_raw[1].type = E820_RAM;
+        e820_raw_nr = 2;
+    }
+    else if ( mbi->flags & MBI_MEMMAP )
+    {
+        memmap_type = "Multiboot-e820";
         while ( bytes < mbi->mmap_length )
         {
             memory_map_t *map = __va(mbi->mmap_addr + bytes);
@@ -412,7 +509,12 @@ void __init __start_xen(multiboot_info_t *mbi)
              */
             if ( (map->base_addr_high == 0) && (map->length_high != 0) )
             {
-                e820_warn = 1;
+                if ( !e820_warn )
+                {
+                    printk("WARNING: Buggy e820 map detected and fixed "
+                           "(truncated length fields).\n");
+                    e820_warn = 1;
+                }
                 map->length_high = 0;
             }
 
@@ -429,6 +531,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
     else if ( mbi->flags & MBI_MEMLIMITS )
     {
+        memmap_type = "Multiboot-e801";
         e820_raw[0].addr = 0;
         e820_raw[0].size = mbi->mem_lower << 10;
         e820_raw[0].type = E820_RAM;
@@ -442,14 +545,11 @@ void __init __start_xen(multiboot_info_t *mbi)
         EARLY_FAIL("Bootloader provided no memory information.\n");
     }
 
-    if ( e820_warn )
-        printk("WARNING: Buggy e820 map detected and fixed "
-               "(truncated length fields).\n");
-
     /* Ensure that all E820 RAM regions are page-aligned and -sized. */
     for ( i = 0; i < e820_raw_nr; i++ )
     {
         uint64_t s, e;
+
         if ( e820_raw[i].type != E820_RAM )
             continue;
         s = PFN_UP(e820_raw[i].addr);
@@ -463,7 +563,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     }
 
     /* Sanitise the raw E820 map to produce a final clean version. */
-    max_page = init_e820(e820_raw, &e820_raw_nr);
+    max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
 
     /*
      * Create a temporary copy of the E820 map. Truncate it to above 16MB
@@ -530,7 +630,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             /* Select relocation address. */
             e = (e - (opt_xenheap_megabytes << 20)) & ~mask;
             xen_phys_start = e;
-            boot_trampoline_va(trampoline_xen_phys_start) = e;
+            bootsym(trampoline_xen_phys_start) = e;
 
             /*
              * Perform relocation to new physical address.

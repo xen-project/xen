@@ -63,7 +63,7 @@
  *     assign_domain_page_replace()
  *   - cmpxchg p2m entry
  *     assign_domain_page_cmpxchg_rel()
- *     destroy_grant_host_mapping()
+ *     replace_grant_host_mapping()
  *     steal_page()
  *     zap_domain_page_one()
  *   - read p2m entry
@@ -133,7 +133,7 @@
  * - races between p2m entry update and tlb insert
  *   This is a race between reading/writing the p2m entry.
  *   reader: vcpu_itc_i(), vcpu_itc_d(), ia64_do_page_fault(), vcpu_fc()
- *   writer: assign_domain_page_cmpxchg_rel(), destroy_grant_host_mapping(), 
+ *   writer: assign_domain_page_cmpxchg_rel(), replace_grant_host_mapping(), 
  *           steal_page(), zap_domain_page_one()
  * 
  *   For example, vcpu_itc_i() is about to insert tlb by calling
@@ -151,7 +151,7 @@
  *   This is a race between reading/writing the p2m entry.
  *   reader: vcpu_get_domain_bundle(), vmx_get_domain_bundle(),
  *           efi_emulate_get_time()
- *   writer: assign_domain_page_cmpxchg_rel(), destroy_grant_host_mapping(), 
+ *   writer: assign_domain_page_cmpxchg_rel(), replace_grant_host_mapping(), 
  *           steal_page(), zap_domain_page_one()
  * 
  *   A page which assigned to a domain can be de-assigned by another vcpu.
@@ -1539,8 +1539,8 @@ create_grant_host_mapping(unsigned long gpaddr,
 
 // grant table host unmapping
 int
-destroy_grant_host_mapping(unsigned long gpaddr,
-               unsigned long mfn, unsigned int flags)
+replace_grant_host_mapping(unsigned long gpaddr,
+	       unsigned long mfn, unsigned long new_gpaddr, unsigned int flags)
 {
     struct domain* d = current->domain;
     unsigned long gpfn = gpaddr >> PAGE_SHIFT;
@@ -1550,6 +1550,11 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     pte_t new_pte;
     pte_t old_pte;
     struct page_info* page = mfn_to_page(mfn);
+
+    if (new_gpaddr) {
+        gdprintk(XENLOG_INFO, "%s: new_gpaddr 0x%lx\n", __func__, new_gpaddr);
+    	return GNTST_general_error;
+    }
 
     if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
         gdprintk(XENLOG_INFO, "%s: flags 0x%x\n", __func__, flags);
@@ -1598,7 +1603,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     BUG_ON(pte_pgc_allocated(old_pte));
     domain_page_flush_and_put(d, gpaddr, pte, old_pte, page);
 
-    perfc_incr(destroy_grant_host_mapping);
+    perfc_incr(replace_grant_host_mapping);
     return GNTST_okay;
 }
 

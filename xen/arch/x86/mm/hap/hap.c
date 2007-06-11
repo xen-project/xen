@@ -50,6 +50,40 @@
 #define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
 
 /************************************************/
+/*            HAP LOG DIRTY SUPPORT             */
+/************************************************/
+/* hap code to call when log_dirty is enable. return 0 if no problem found. */
+int hap_enable_log_dirty(struct domain *d)
+{
+    hap_lock(d);
+    /* turn on PG_log_dirty bit in paging mode */
+    d->arch.paging.mode |= PG_log_dirty;
+    /* set l1e entries of P2M table to NOT_WRITABLE. */
+    p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
+    flush_tlb_all_pge();
+    hap_unlock(d);
+
+    return 0;
+}
+
+int hap_disable_log_dirty(struct domain *d)
+{
+    hap_lock(d);
+    d->arch.paging.mode &= ~PG_log_dirty;
+    /* set l1e entries of P2M table with normal mode */
+    p2m_set_flags_global(d, __PAGE_HYPERVISOR|_PAGE_USER);
+    hap_unlock(d);
+    
+    return 1;
+}
+
+void hap_clean_dirty_bitmap(struct domain *d)
+{
+    /* mark physical memory as NOT_WRITEABLE and flush the TLB */
+    p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
+    flush_tlb_all_pge();
+}
+/************************************************/
 /*             HAP SUPPORT FUNCTIONS            */
 /************************************************/
 mfn_t hap_alloc(struct domain *d)
@@ -391,6 +425,10 @@ void hap_domain_init(struct domain *d)
 {
     hap_lock_init(d);
     INIT_LIST_HEAD(&d->arch.paging.hap.freelists);
+
+    /* This domain will use HAP for log-dirty mode */
+    paging_log_dirty_init(d, hap_enable_log_dirty, hap_disable_log_dirty,
+                          hap_clean_dirty_bitmap);
 }
 
 /* return 0 for success, -errno for failure */
@@ -498,11 +536,6 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 
     HERE_I_AM;
 
-    if ( unlikely(d == current->domain) ) {
-        gdprintk(XENLOG_INFO, "Don't try to do a hap op on yourself!\n");
-        return -EINVAL;
-    }
-    
     switch ( sc->op ) {
     case XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION:
         hap_lock(d);
@@ -669,7 +702,16 @@ void
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     l1_pgentry_t new, unsigned int level)
 {
-    hap_lock(v->domain);
+    int do_locking;
+
+    /* This function can be called from two directions (P2M and log dirty). We
+     *  need to make sure this lock has been held or not.
+     */
+    do_locking = !hap_locked_by_me(v->domain);
+
+    if ( do_locking )
+        hap_lock(v->domain);
+
     safe_write_pte(p, new);
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */
@@ -680,7 +722,9 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
 	
     }
 #endif
-    hap_unlock(v->domain);
+    
+    if ( do_locking )
+        hap_unlock(v->domain);
 }
 
 /* Entry points into this mode of the hap code. */

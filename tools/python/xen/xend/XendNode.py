@@ -195,7 +195,7 @@ class XendNode:
                         network_uuid, 'network')
                     if network.get_name_label() == bridge_name:
                         XendPIF.create_phy(network_uuid, name,
-                                           mtu, mac)
+                                           mac, mtu)
                         break
                 else:
                     log.debug("Cannot find network for bridge %s "
@@ -233,8 +233,9 @@ class XendNode:
   ##      self.save_networks()
 
 
-##    def get_PIF_refs(self):
-##       return self.pifs[:]
+    def get_PIF_refs(self):
+        log.debug(XendPIF.get_all())
+        return XendPIF.get_all()
 
 ##   def _PIF_create(self, name, mtu, vlan, mac, network, persist = True,
 ##                     pif_uuid = None, metrics_uuid = None):

@@ -79,7 +79,11 @@ struct arch_vmx_struct {
     unsigned long        cstar;
 #endif
     unsigned long        efer;
+
+    /* Following fields are all specific to vmxassist. */
     unsigned long        vmxassist_enabled:1;
+    unsigned long        irqbase_mode:1;
+    unsigned char        pm_irqbase[2];
 };
 
 struct vmcs_struct *vmx_alloc_host_vmcs(void);
@@ -90,22 +94,23 @@ void vmx_destroy_vmcs(struct vcpu *v);
 void vmx_vmcs_enter(struct vcpu *v);
 void vmx_vmcs_exit(struct vcpu *v);
 
-#define CPU_BASED_VIRTUAL_INTR_PENDING  0x00000004
-#define CPU_BASED_USE_TSC_OFFSETING     0x00000008
-#define CPU_BASED_HLT_EXITING           0x00000080
-#define CPU_BASED_INVDPG_EXITING        0x00000200
-#define CPU_BASED_MWAIT_EXITING         0x00000400
-#define CPU_BASED_RDPMC_EXITING         0x00000800
-#define CPU_BASED_RDTSC_EXITING         0x00001000
-#define CPU_BASED_CR8_LOAD_EXITING      0x00080000
-#define CPU_BASED_CR8_STORE_EXITING     0x00100000
-#define CPU_BASED_TPR_SHADOW            0x00200000
-#define CPU_BASED_MOV_DR_EXITING        0x00800000
-#define CPU_BASED_UNCOND_IO_EXITING     0x01000000
-#define CPU_BASED_ACTIVATE_IO_BITMAP    0x02000000
-#define CPU_BASED_ACTIVATE_MSR_BITMAP   0x10000000
-#define CPU_BASED_MONITOR_EXITING       0x20000000
-#define CPU_BASED_PAUSE_EXITING         0x40000000
+#define CPU_BASED_VIRTUAL_INTR_PENDING        0x00000004
+#define CPU_BASED_USE_TSC_OFFSETING           0x00000008
+#define CPU_BASED_HLT_EXITING                 0x00000080
+#define CPU_BASED_INVDPG_EXITING              0x00000200
+#define CPU_BASED_MWAIT_EXITING               0x00000400
+#define CPU_BASED_RDPMC_EXITING               0x00000800
+#define CPU_BASED_RDTSC_EXITING               0x00001000
+#define CPU_BASED_CR8_LOAD_EXITING            0x00080000
+#define CPU_BASED_CR8_STORE_EXITING           0x00100000
+#define CPU_BASED_TPR_SHADOW                  0x00200000
+#define CPU_BASED_MOV_DR_EXITING              0x00800000
+#define CPU_BASED_UNCOND_IO_EXITING           0x01000000
+#define CPU_BASED_ACTIVATE_IO_BITMAP          0x02000000
+#define CPU_BASED_ACTIVATE_MSR_BITMAP         0x10000000
+#define CPU_BASED_MONITOR_EXITING             0x20000000
+#define CPU_BASED_PAUSE_EXITING               0x40000000
+#define CPU_BASED_ACTIVATE_SECONDARY_CONTROLS 0x80000000
 extern u32 vmx_cpu_based_exec_control;
 
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
@@ -121,6 +126,11 @@ extern u32 vmx_vmexit_control;
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
 extern u32 vmx_vmentry_control;
 
+#define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
+extern u32 vmx_secondary_exec_control;
+
+#define cpu_has_vmx_virtualize_apic_accesses \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \
     (vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
 #define cpu_has_vmx_msr_bitmap \
@@ -160,6 +170,8 @@ enum vmcs_field {
     TSC_OFFSET_HIGH                 = 0x00002011,
     VIRTUAL_APIC_PAGE_ADDR          = 0x00002012,
     VIRTUAL_APIC_PAGE_ADDR_HIGH     = 0x00002013,
+    APIC_ACCESS_ADDR                = 0x00002014,
+    APIC_ACCESS_ADDR_HIGH           = 0x00002015, 
     VMCS_LINK_POINTER               = 0x00002800,
     VMCS_LINK_POINTER_HIGH          = 0x00002801,
     GUEST_IA32_DEBUGCTL             = 0x00002802,

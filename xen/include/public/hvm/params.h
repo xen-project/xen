@@ -50,6 +50,11 @@
 
 #define HVM_PARAM_BUFIOREQ_PFN 6
 
+#ifdef __ia64__
+#define HVM_PARAM_NVRAM_FD     7
+#define HVM_NR_PARAMS          8
+#else
 #define HVM_NR_PARAMS          7
+#endif
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

@@ -745,7 +745,10 @@ found:
 		}
 		memcpy(tmp_ptr2, l2_ptr, 4096);
 		lseek(s->fd, l2_offset + (l2_sector << 12), SEEK_SET);
-		write(s->fd, tmp_ptr2, 4096);
+		if (write(s->fd, tmp_ptr2, 4096) != 4096) {
+			free(tmp_ptr2);
+			return -1;
+		}
 		free(tmp_ptr2);
 	}
 	return cluster_offset;
@@ -1252,8 +1255,8 @@ int qcow_create(const char *filename, uint64_t total_size,
 				strncpy(backing_filename, backing_file,
 					sizeof(backing_filename));
 			} else {
-				realpath(backing_file, backing_filename);
-				if (stat(backing_filename, &st) != 0) {
+				if (realpath(backing_file, backing_filename) == NULL ||
+				    stat(backing_filename, &st) != 0) {
 					return -1;
 				}
 			}

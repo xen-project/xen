@@ -109,16 +109,17 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_P6_PERFCTR1      0xc2
 
 /* MSRs & bits used for VMX enabling */
-#define MSR_IA32_VMX_BASIC_MSR                  0x480
-#define MSR_IA32_VMX_PINBASED_CTLS_MSR          0x481
-#define MSR_IA32_VMX_PROCBASED_CTLS_MSR         0x482
-#define MSR_IA32_VMX_EXIT_CTLS_MSR              0x483
-#define MSR_IA32_VMX_ENTRY_CTLS_MSR             0x484
-#define MSR_IA32_VMX_MISC_MSR                   0x485
+#define MSR_IA32_VMX_BASIC                      0x480
+#define MSR_IA32_VMX_PINBASED_CTLS              0x481
+#define MSR_IA32_VMX_PROCBASED_CTLS             0x482
+#define MSR_IA32_VMX_EXIT_CTLS                  0x483
+#define MSR_IA32_VMX_ENTRY_CTLS                 0x484
+#define MSR_IA32_VMX_MISC                       0x485
 #define MSR_IA32_VMX_CR0_FIXED0                 0x486
 #define MSR_IA32_VMX_CR0_FIXED1                 0x487
 #define MSR_IA32_VMX_CR4_FIXED0                 0x488
 #define MSR_IA32_VMX_CR4_FIXED1                 0x489
+#define MSR_IA32_VMX_PROCBASED_CTLS2            0x48b
 #define IA32_FEATURE_CONTROL_MSR                0x3a
 #define IA32_FEATURE_CONTROL_MSR_LOCK           0x1
 #define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON   0x4
@@ -216,6 +217,27 @@ static inline void write_efer(__u64 val)
 #define MSR_IA32_MC0_STATUS		0x401
 #define MSR_IA32_MC0_ADDR		0x402
 #define MSR_IA32_MC0_MISC		0x403
+
+/* K8 Machine Check MSRs */
+#define MSR_K8_MC1_CTL			0x404
+#define MSR_K8_MC1_STATUS		0x405
+#define MSR_K8_MC1_ADDR			0x406
+#define MSR_K8_MC1_MISC			0x407
+
+#define MSR_K8_MC2_CTL			0x408
+#define MSR_K8_MC2_STATUS		0x409
+#define MSR_K8_MC2_ADDR			0x40A
+#define MSR_K8_MC2_MISC			0x40B
+
+#define MSR_K8_MC3_CTL			0x40C
+#define MSR_K8_MC3_STATUS		0x40D
+#define MSR_K8_MC3_ADDR			0x40E
+#define MSR_K8_MC3_MISC			0x40F
+
+#define MSR_K8_MC4_CTL			0x410
+#define MSR_K8_MC4_STATUS		0x411
+#define MSR_K8_MC4_ADDR			0x412
+#define MSR_K8_MC4_MISC			0x413
 
 /* Pentium IV performance counter MSRs */
 #define MSR_P4_BPU_PERFCTR0 		0x300

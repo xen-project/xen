@@ -1,8 +1,8 @@
 /* libxenstat: statistics-collection library for Xen
  * Copyright (C) International Business Machines Corp., 2005
- * Authors: Josh Triplett <josht@us.ibm.com>
- *          Judy Fischbach <jfisch@us.ibm.com>
- *          David Hendricks <dhendrix@us.ibm.com>
+ * Authors: Josh Triplett <josh@kernel.org>
+ *          Judy Fischbach <jfisch@cs.pdx.edu>
+ *          David Hendricks <cro_marmot@comcast.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -172,6 +172,10 @@ unsigned long long xenstat_network_tdrop(xenstat_network * network);
 /*
  * VBD functions - extract information from a xen_vbd
  */
+
+/* Get the back driver type  for Virtual Block Device */
+unsigned int xenstat_vbd_type(xenstat_vbd * vbd);
+
 /* Get the device number for Virtual Block Device */
 unsigned int xenstat_vbd_dev(xenstat_vbd * vbd);
 

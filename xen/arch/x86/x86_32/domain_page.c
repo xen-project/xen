@@ -98,7 +98,7 @@ void *map_domain_page(unsigned long mfn)
         cache->tlbflush_timestamp = tlbflush_current_time();
 
         idx = find_first_zero_bit(cache->inuse, MAPCACHE_ENTRIES);
-        ASSERT(idx < MAPCACHE_ENTRIES);
+        BUG_ON(idx >= MAPCACHE_ENTRIES);
     }
 
     set_bit(idx, cache->inuse);
@@ -218,7 +218,11 @@ void *map_domain_page_global(unsigned long mfn)
 
         idx = find_first_zero_bit(inuse, GLOBALMAP_BITS);
         va = IOREMAP_VIRT_START + (idx << PAGE_SHIFT);
-        ASSERT(va < FIXADDR_START);
+        if ( unlikely(va >= FIXADDR_START) )
+        {
+            spin_unlock(&globalmap_lock);
+            return NULL;
+        }
     }
 
     set_bit(idx, inuse);

@@ -18,7 +18,7 @@
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/hvm_info_table.h>
-#include <xen/hvm/e820.h>
+#include <xen/io/protocols.h>
 
 #include "xg_private.h"
 #include "xc_dom.h"
@@ -589,6 +589,7 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
 
 static struct xc_dom_arch xc_dom_32 = {
     .guest_type = "xen-3.0-x86_32",
+    .native_protocol = XEN_IO_PROTO_ABI_X86_32,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
     .alloc_magic_pages = alloc_magic_pages,
@@ -600,6 +601,7 @@ static struct xc_dom_arch xc_dom_32 = {
 };
 static struct xc_dom_arch xc_dom_32_pae = {
     .guest_type = "xen-3.0-x86_32p",
+    .native_protocol = XEN_IO_PROTO_ABI_X86_32,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
     .alloc_magic_pages = alloc_magic_pages,
@@ -612,6 +614,7 @@ static struct xc_dom_arch xc_dom_32_pae = {
 
 static struct xc_dom_arch xc_dom_64 = {
     .guest_type = "xen-3.0-x86_64",
+    .native_protocol = XEN_IO_PROTO_ABI_X86_64,
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 8,
     .alloc_magic_pages = alloc_magic_pages,

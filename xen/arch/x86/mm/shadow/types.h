@@ -553,6 +553,9 @@ accumulate_guest_flags(struct vcpu *v, walk_t *gw)
 {
     u32 accumulated_flags;
 
+    if ( unlikely(!(guest_l1e_get_flags(gw->eff_l1e) & _PAGE_PRESENT)) )
+        return 0;
+        
     // We accumulate the permission flags with bitwise ANDing.
     // This works for the PRESENT bit, RW bit, and USER bit.
     // For the NX bit, however, the polarity is wrong, so we accumulate the

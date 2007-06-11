@@ -37,7 +37,7 @@
 #include <asm/ptrace.h>
 
 // XXX move them to an appropriate header file
-extern void xenoprof_log_event(struct vcpu *vcpu,
+extern void xenoprof_log_event(struct vcpu *vcpu, struct pt_regs * regs,
                                unsigned long eip, int mode, int event);
 extern int is_active(struct domain *d);
 
@@ -55,7 +55,10 @@ xenoprof_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg,
     if (!allow_virq || !allow_ints)
         return 0;
 
-    xenoprof_log_event(current, ip, xenoprofile_get_mode(task, regs), event);
+    // Note that log event actually expect cpu_user_regs, cast back 
+    // appropriately when doing the backtrace implementation in ia64
+    xenoprof_log_event(current, regs, ip, xenoprofile_get_mode(task, regs), 
+					   event);
     
     // send VIRQ_XENOPROF
     if (is_active(current->domain) && !ring_0(regs))

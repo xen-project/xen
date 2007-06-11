@@ -55,7 +55,7 @@
 #include <smpboot_hooks.h>
 
 #define set_kernel_exec(x, y) (0)
-#define setup_trampoline()    (boot_trampoline_pa(trampoline_realmode_entry))
+#define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
 /* Set if we find a B stepping CPU */
 static int __devinitdata smp_b_stepping;
@@ -543,40 +543,6 @@ extern struct {
 	unsigned short ss;
 } stack_start;
 
-#ifdef CONFIG_NUMA
-
-/* which logical CPUs are on which nodes */
-cpumask_t node_2_cpu_mask[MAX_NUMNODES] __read_mostly =
-				{ [0 ... MAX_NUMNODES-1] = CPU_MASK_NONE };
-/* which node each logical CPU is on */
-int cpu_2_node[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = 0 };
-EXPORT_SYMBOL(cpu_2_node);
-
-/* set up a mapping between cpu and node. */
-static inline void map_cpu_to_node(int cpu, int node)
-{
-	printk("Mapping cpu %d to node %d\n", cpu, node);
-	cpu_set(cpu, node_2_cpu_mask[node]);
-	cpu_2_node[cpu] = node;
-}
-
-/* undo a mapping between cpu and node. */
-static inline void unmap_cpu_to_node(int cpu)
-{
-	int node;
-
-	printk("Unmapping cpu %d from all nodes\n", cpu);
-	for (node = 0; node < MAX_NUMNODES; node ++)
-		cpu_clear(cpu, node_2_cpu_mask[node]);
-	cpu_2_node[cpu] = 0;
-}
-#else /* !CONFIG_NUMA */
-
-#define map_cpu_to_node(cpu, node)	({})
-#define unmap_cpu_to_node(cpu)	({})
-
-#endif /* CONFIG_NUMA */
-
 u8 cpu_2_logical_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 static void map_cpu_to_logical_apicid(void)
@@ -585,13 +551,11 @@ static void map_cpu_to_logical_apicid(void)
 	int apicid = hard_smp_processor_id();
 
 	cpu_2_logical_apicid[cpu] = apicid;
-	map_cpu_to_node(cpu, apicid_to_node(apicid));
 }
 
 static void unmap_cpu_to_logical_apicid(int cpu)
 {
 	cpu_2_logical_apicid[cpu] = BAD_APICID;
-	unmap_cpu_to_node(cpu);
 }
 
 #if APIC_DEBUG
@@ -905,7 +869,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		} else {
 			boot_error = 1;
 			mb();
-			if (boot_trampoline_va(trampoline_cpu_started) == 0xA5)
+			if (bootsym(trampoline_cpu_started) == 0xA5)
 				/* trampoline started but...? */
 				printk("Stuck ??\n");
 			else
@@ -927,7 +891,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	}
 
 	/* mark "stuck" area as not stuck */
-	boot_trampoline_va(trampoline_cpu_started) = 0;
+	bootsym(trampoline_cpu_started) = 0;
 	mb();
 
 	return boot_error;

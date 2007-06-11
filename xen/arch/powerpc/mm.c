@@ -183,9 +183,16 @@ int create_grant_host_mapping(
     return create_grant_va_mapping(addr, frame, current);
 }
 
-int destroy_grant_host_mapping(
-    unsigned long addr, unsigned long frame, unsigned int flags)
+int replace_grant_host_mapping(
+    unsigned long addr, unsigned long frame, unsigned long new_addr,
+    unsigned int flags)
 {
+    if (new_addr)
+        printk("%s: new_addr not supported\n", __func__);
+        BUG();
+        return GNTST_general_error;
+    }
+
     if (flags & GNTMAP_contains_pte) {
         printk("%s: GNTMAP_contains_pte not supported\n", __func__);
         BUG();

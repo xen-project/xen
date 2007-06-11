@@ -54,9 +54,9 @@ static PyObject *pyxc_error_to_exception(void)
         return PyErr_SetFromErrno(xc_error_obj);
 
     if ( err->message[0] != '\0' )
-	pyerr = Py_BuildValue("(iss)", err->code, desc, err->message);
+        pyerr = Py_BuildValue("(iss)", err->code, desc, err->message);
     else
-	pyerr = Py_BuildValue("(is)", err->code, desc);
+        pyerr = Py_BuildValue("(is)", err->code, desc);
 
     xc_clear_last_error();
 
@@ -161,6 +161,16 @@ static PyObject *pyxc_domain_pause(XcObject *self, PyObject *args)
 static PyObject *pyxc_domain_unpause(XcObject *self, PyObject *args)
 {
     return dom_op(self, args, xc_domain_unpause);
+}
+
+static PyObject *pyxc_domain_destroy_hook(XcObject *self, PyObject *args)
+{
+#ifdef __ia64__
+    dom_op(self, args, xc_ia64_save_to_nvram);
+#endif
+
+    Py_INCREF(zero);
+    return zero;
 }
 
 static PyObject *pyxc_domain_destroy(XcObject *self, PyObject *args)
@@ -407,6 +417,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
     unsigned long console_mfn = 0;
     PyObject* elfnote_dict;
     PyObject* elfnote = NULL;
+    PyObject* ret;
     int i;
 
     static char *kwd_list[] = { "domid", "store_evtchn", "memsize",
@@ -425,7 +436,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
 
     xc_dom_loginit();
     if (!(dom = xc_dom_allocate(cmdline, features)))
-	return pyxc_error_to_exception();
+        return pyxc_error_to_exception();
 
     if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
 			    ramdisk, flags, store_evtchn, &store_mfn,
@@ -455,12 +466,22 @@ static PyObject *pyxc_linux_build(XcObject *self,
 	Py_DECREF(elfnote);
     }
 
+    ret = Py_BuildValue("{s:i,s:i,s:N}",
+			"store_mfn", store_mfn,
+			"console_mfn", console_mfn,
+			"notes", elfnote_dict);
+
+    if ( dom->arch_hooks->native_protocol )
+    {
+	PyObject *native_protocol =
+	    Py_BuildValue("s", dom->arch_hooks->native_protocol);
+	PyDict_SetItemString(ret, "native_protocol", native_protocol);
+	Py_DECREF(native_protocol);
+    }
+
     xc_dom_release(dom);
 
-    return Py_BuildValue("{s:i,s:i,s:N}", 
-                         "store_mfn", store_mfn,
-                         "console_mfn", console_mfn,
-			 "notes", elfnote_dict);
+    return ret;
 
   out:
     xc_dom_release(dom);
@@ -486,6 +507,23 @@ static PyObject *pyxc_get_hvm_param(XcObject *self,
     return Py_BuildValue("i", value);
 
 }
+
+#ifdef __ia64__
+static PyObject *pyxc_nvram_init(XcObject *self,
+                                 PyObject *args)
+{
+    char *dom_name;
+    uint32_t dom;
+
+    if ( !PyArg_ParseTuple(args, "si", &dom_name, &dom) )
+        return NULL;
+
+    xc_ia64_nvram_init(self->xc_handle, dom_name, dom);
+
+    Py_INCREF(zero);
+    return zero;
+}
+#endif /* __ia64__ */
 
 static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *args,
@@ -1145,6 +1183,13 @@ static PyMethodDef pyxc_methods[] = {
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
+    { "domain_destroy_hook", 
+      (PyCFunction)pyxc_domain_destroy_hook, 
+      METH_VARARGS, "\n"
+      "Add a hook for arch stuff before destroy a domain.\n"
+      " dom [int]:    Identifier of domain to be destroyed.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
     { "domain_resume", 
       (PyCFunction)pyxc_domain_resume,
       METH_VARARGS, "\n"
@@ -1386,7 +1431,13 @@ static PyMethodDef pyxc_methods[] = {
       " dom [int]: Identifier of domain.\n"
       " mem_kb [long]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
-
+#ifdef __ia64__
+    { "nvram_init",
+      (PyCFunction)pyxc_nvram_init,
+      METH_VARARGS, "\n"
+      "Init nvram in IA64 platform\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+#endif /* __ia64__ */
     { "domain_ioport_permission",
       (PyCFunction)pyxc_domain_ioport_permission,
       METH_VARARGS | METH_KEYWORDS, "\n"

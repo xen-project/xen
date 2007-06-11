@@ -27,6 +27,7 @@
 #include "config.h"
 #include "apic_regs.h"
 #include "pci_regs.h"
+#include "e820.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
 
@@ -311,8 +312,8 @@ static int must_load_nic(void)
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
 static void cmos_write_memory_size(void)
 {
-    struct e820entry *map = E820_MAP;
-    int i, nr = *E820_MAP_NR;
+    struct e820entry *map = HVM_E820;
+    int i, nr = *HVM_E820_NR;
     uint32_t base_mem = 640, ext_mem = 0, alt_mem = 0;
 
     for ( i = 0; i < nr; i++ )
