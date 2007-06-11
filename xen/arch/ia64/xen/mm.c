@@ -187,6 +187,13 @@ extern unsigned long ia64_iobase;
 
 static struct domain *dom_xen, *dom_io;
 
+/*
+ * This number is bigger than DOMID_SELF, DOMID_XEN and DOMID_IO.
+ * If more reserved domain ids are introduced, this might be increased.
+ */
+#define DOMID_P2M       (0x7FF8U)
+static struct domain *dom_p2m;
+
 // followings are stolen from arch_init_memory() @ xen/arch/x86/mm.c
 void
 alloc_dom_xen_and_dom_io(void)
@@ -227,11 +234,8 @@ mm_teardown_pte(struct domain* d, volatile pte_t* pte, unsigned long offset)
     if (!mfn_valid(mfn))
         return;
     page = mfn_to_page(mfn);
-    // page might be pte page for p2m exposing. check it.
-    if (page_get_owner(page) == NULL) {
-        BUG_ON(page->count_info != 0);
-        return;
-    }
+    BUG_ON(page_get_owner(page) == NULL);
+
     // struct page_info corresponding to mfn may exist or not depending
     // on CONFIG_VIRTUAL_FRAME_TABLE.
     // The above check is too easy.
@@ -1379,10 +1383,19 @@ dom0vp_add_physmap_with_gmfn(struct domain* d, unsigned long gpfn,
 #ifdef CONFIG_XEN_IA64_EXPOSE_P2M
 static struct page_info* p2m_pte_zero_page = NULL;
 
+/* This must called before dom0 p2m table allocation */
 void __init
 expose_p2m_init(void)
 {
     pte_t* pte;
+
+    /*
+     * Initialise our DOMID_P2M domain.
+     * This domain owns m2p table pages.
+     */
+    dom_p2m = alloc_domain(DOMID_P2M);
+    BUG_ON(dom_p2m == NULL);
+    dom_p2m->max_pages = ~0U;
 
     pte = pte_alloc_one_kernel(NULL, 0);
     BUG_ON(pte == NULL);
@@ -1393,13 +1406,8 @@ expose_p2m_init(void)
 static int
 expose_p2m_page(struct domain* d, unsigned long mpaddr, struct page_info* page)
 {
-    // we can't get_page(page) here.
-    // pte page is allocated form xen heap.(see pte_alloc_one_kernel().)
-    // so that the page has NULL page owner and it's reference count
-    // is useless.
-    // see also mm_teardown_pte()'s page_get_owner() == NULL check.
-    BUG_ON(page_get_owner(page) != NULL);
-
+    int ret = get_page(page, dom_p2m);
+    BUG_ON(ret != 1);
     return __assign_domain_page(d, mpaddr, page_to_maddr(page),
                                 ASSIGN_readonly);
 }
@@ -1918,8 +1926,10 @@ boolean_param("p2m_xenheap", opt_p2m_xenheap);
 void *pgtable_quicklist_alloc(void)
 {
     void *p;
+
+    BUG_ON(dom_p2m == NULL);
     if (!opt_p2m_xenheap) {
-        struct page_info *page = alloc_domheap_page(NULL);
+        struct page_info *page = alloc_domheap_page(dom_p2m);
         if (page == NULL)
             return NULL;
         p = page_to_virt(page);
@@ -1927,16 +1937,26 @@ void *pgtable_quicklist_alloc(void)
         return p;
     }
     p = alloc_xenheap_pages(0);
-    if (p)
+    if (p) {
         clear_page(p);
+        /*
+         * This page should be read only.  At this moment, the third
+         * argument doesn't make sense.  It should be 1 when supported.
+         */
+        share_xen_page_with_guest(virt_to_page(p), dom_p2m, 0);
+    }
     return p;
 }
 
 void pgtable_quicklist_free(void *pgtable_entry)
 {
-    if (!opt_p2m_xenheap)
-        free_domheap_page(virt_to_page(pgtable_entry));
-    else
+    struct page_info* page = virt_to_page(pgtable_entry);
+
+    BUG_ON(page_get_owner(page) != dom_p2m);
+    BUG_ON(page->count_info != (1 | PGC_allocated));
+
+    put_page(page);
+    if (opt_p2m_xenheap)
         free_xenheap_page(pgtable_entry);
 }
 
