@@ -579,6 +579,95 @@ void __devinit setup_local_APIC(void)
     apic_pm_activate();
 }
 
+static struct {
+    int active;
+    /* r/w apic fields */
+    unsigned int apic_id;
+    unsigned int apic_taskpri;
+    unsigned int apic_ldr;
+    unsigned int apic_dfr;
+    unsigned int apic_spiv;
+    unsigned int apic_lvtt;
+    unsigned int apic_lvtpc;
+    unsigned int apic_lvt0;
+    unsigned int apic_lvt1;
+    unsigned int apic_lvterr;
+    unsigned int apic_tmict;
+    unsigned int apic_tdcr;
+    unsigned int apic_thmr;
+} apic_pm_state;
+
+int lapic_suspend(void)
+{
+    unsigned long flags;
+
+    if (!apic_pm_state.active)
+        return 0;
+
+    apic_pm_state.apic_id = apic_read(APIC_ID);
+    apic_pm_state.apic_taskpri = apic_read(APIC_TASKPRI);
+    apic_pm_state.apic_ldr = apic_read(APIC_LDR);
+    apic_pm_state.apic_dfr = apic_read(APIC_DFR);
+    apic_pm_state.apic_spiv = apic_read(APIC_SPIV);
+    apic_pm_state.apic_lvtt = apic_read(APIC_LVTT);
+    apic_pm_state.apic_lvtpc = apic_read(APIC_LVTPC);
+    apic_pm_state.apic_lvt0 = apic_read(APIC_LVT0);
+    apic_pm_state.apic_lvt1 = apic_read(APIC_LVT1);
+    apic_pm_state.apic_lvterr = apic_read(APIC_LVTERR);
+    apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
+    apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
+    apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
+    
+    local_irq_save(flags);
+    disable_local_APIC();
+    local_irq_restore(flags);
+    return 0;
+}
+
+int lapic_resume(void)
+{
+    unsigned int l, h;
+    unsigned long flags;
+
+    if (!apic_pm_state.active)
+        return 0;
+
+    local_irq_save(flags);
+
+    /*
+     * Make sure the APICBASE points to the right address
+     *
+     * FIXME! This will be wrong if we ever support suspend on
+     * SMP! We'll need to do this as part of the CPU restore!
+     */
+    rdmsr(MSR_IA32_APICBASE, l, h);
+    l &= ~MSR_IA32_APICBASE_BASE;
+    l |= MSR_IA32_APICBASE_ENABLE | mp_lapic_addr;
+    wrmsr(MSR_IA32_APICBASE, l, h);
+
+    apic_write(APIC_LVTERR, ERROR_APIC_VECTOR | APIC_LVT_MASKED);
+    apic_write(APIC_ID, apic_pm_state.apic_id);
+    apic_write(APIC_DFR, apic_pm_state.apic_dfr);
+    apic_write(APIC_LDR, apic_pm_state.apic_ldr);
+    apic_write(APIC_TASKPRI, apic_pm_state.apic_taskpri);
+    apic_write(APIC_SPIV, apic_pm_state.apic_spiv);
+    apic_write(APIC_LVT0, apic_pm_state.apic_lvt0);
+    apic_write(APIC_LVT1, apic_pm_state.apic_lvt1);
+    apic_write(APIC_LVTTHMR, apic_pm_state.apic_thmr);
+    apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
+    apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
+    apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);
+    apic_write(APIC_TMICT, apic_pm_state.apic_tmict);
+    apic_write(APIC_ESR, 0);
+    apic_read(APIC_ESR);
+    apic_write(APIC_LVTERR, apic_pm_state.apic_lvterr);
+    apic_write(APIC_ESR, 0);
+    apic_read(APIC_ESR);
+    local_irq_restore(flags);
+    return 0;
+}
+
+
 /*
  * If Linux enabled the LAPIC against the BIOS default
  * disable it down before re-entering the BIOS on shutdown.
@@ -602,7 +691,10 @@ void lapic_shutdown(void)
     local_irq_restore(flags);
 }
 
-static void apic_pm_activate(void) { }
+static void apic_pm_activate(void)
+{
+    apic_pm_state.active = 1;
+}
 
 /*
  * Detect and enable local APICs on non-SMP boards.

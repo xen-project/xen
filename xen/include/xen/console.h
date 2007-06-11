@@ -38,4 +38,7 @@ int console_steal(int handle, void (*fn)(const char *));
 /* Give back stolen console. Takes the identifier returned by console_steal. */
 void console_giveback(int id);
 
+int console_suspend(void);
+int console_resume(void);
+
 #endif /* __CONSOLE_H__ */

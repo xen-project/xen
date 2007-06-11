@@ -306,6 +306,36 @@ static void mask_and_ack_8259A_vector(unsigned int vector)
     }
 }
 
+static char irq_trigger[2];
+/**
+ * ELCR registers (0x4d0, 0x4d1) control edge/level of IRQ
+ */
+static void restore_ELCR(char *trigger)
+{
+    outb(trigger[0], 0x4d0);
+    outb(trigger[1], 0x4d1);
+}
+
+static void save_ELCR(char *trigger)
+{
+    /* IRQ 0,1,2,8,13 are marked as reserved */
+    trigger[0] = inb(0x4d0) & 0xF8;
+    trigger[1] = inb(0x4d1) & 0xDE;
+}
+
+int i8259A_resume(void)
+{
+    init_8259A(0);
+    restore_ELCR(irq_trigger);
+    return 0;
+}
+
+int i8259A_suspend(void)
+{
+    save_ELCR(irq_trigger);
+    return 0;
+}
+
 void __init init_8259A(int auto_eoi)
 {
     unsigned long flags;

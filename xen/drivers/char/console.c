@@ -848,7 +848,6 @@ __initcall(debugtrace_init);
 #endif /* !NDEBUG */
 
 
-
 /*
  * **************************************************************
  * *************** Debugging/tracing/error-report ***************
@@ -912,6 +911,30 @@ void __warn(char *file, int line)
 {
     printk("Xen WARN at %s:%d\n", file, line);
     dump_execution_state();
+}
+
+
+/*
+ * **************************************************************
+ * ****************** Console suspend/resume ********************
+ * **************************************************************
+ */
+
+static void suspend_steal_fn(const char *str) { }
+static int suspend_steal_id;
+
+int console_suspend(void)
+{
+    suspend_steal_id = console_steal(sercon_handle, suspend_steal_fn);
+    serial_suspend();
+    return 0;
+}
+
+int console_resume(void)
+{
+    serial_resume();
+    console_giveback(suspend_steal_id);
+    return 0;
 }
 
 /*

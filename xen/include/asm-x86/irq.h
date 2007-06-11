@@ -35,6 +35,8 @@ void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);
 void init_8259A(int aeoi);
+int i8259A_suspend(void);
+int i8259A_resume(void);
 
 void setup_IO_APIC(void);
 void disable_IO_APIC(void);

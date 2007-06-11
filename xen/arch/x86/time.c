@@ -171,10 +171,17 @@ static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
 #define CALIBRATE_FRAC  20      /* calibrate over 50ms */
 #define CALIBRATE_LATCH ((CLOCK_TICK_RATE+(CALIBRATE_FRAC/2))/CALIBRATE_FRAC)
 
-static u64 calibrate_boot_tsc(void)
+static u64 init_pit_and_calibrate_tsc(void)
 {
     u64 start, end;
     unsigned long count;
+
+    /* Set PIT channel 0 to HZ Hz. */
+#define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */
+#define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
+    outb_p(0x34, PIT_MODE);        /* binary, mode 2, LSB/MSB, ch 0 */
+    outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
+    outb(LATCH >> 8, PIT_CH0);     /* MSB */
 
     /* Set the Gate high, disable speaker */
     outb((inb(0x61) & ~0x02) | 0x01, 0x61);
@@ -489,11 +496,12 @@ static s_time_t read_platform_stime(void)
 {
     u64 count;
     s_time_t stime;
+    unsigned long flags;
 
-    spin_lock_irq(&platform_timer_lock);
+    spin_lock_irqsave(&platform_timer_lock, flags);
     count = plt_count64 + ((plt_src.read_counter() - plt_count) & plt_mask);
     stime = __read_platform_stime(count);
-    spin_unlock_irq(&platform_timer_lock);
+    spin_unlock_irqrestore(&platform_timer_lock, flags);
 
     return stime;
 }
@@ -502,13 +510,21 @@ static void platform_time_calibration(void)
 {
     u64 count;
     s_time_t stamp;
+    unsigned long flags;
 
-    spin_lock_irq(&platform_timer_lock);
+    spin_lock_irqsave(&platform_timer_lock, flags);
     count = plt_count64 + ((plt_src.read_counter() - plt_count) & plt_mask);
     stamp = __read_platform_stime(count);
     stime_platform_stamp = stamp;
     platform_timer_stamp = count;
-    spin_unlock_irq(&platform_timer_lock);
+    spin_unlock_irqrestore(&platform_timer_lock, flags);
+}
+
+static void resume_platform_timer(void)
+{
+    /* No change in platform_stime across suspend/resume. */
+    platform_timer_stamp = plt_count64;
+    plt_count = plt_src.read_counter();
 }
 
 static void init_platform_timer(void)
@@ -875,7 +891,7 @@ void init_percpu_time(void)
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = (smp_processor_id() == 0) ? 0 : read_platform_stime();
+    now = !plt_src.read_counter ? 0 : read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
@@ -907,9 +923,9 @@ int __init init_xen_time(void)
 /* Early init function. */
 void __init early_time_init(void)
 {
-    u64 tmp = calibrate_boot_tsc();
+    u64 tmp = init_pit_and_calibrate_tsc();
 
-    set_time_scale(&per_cpu(cpu_time, 0).tsc_scale, tmp);
+    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
@@ -929,6 +945,33 @@ unsigned long get_localtime(struct domain *d)
 {
     return wc_sec + (wc_nsec + NOW()) / 1000000000ULL 
         + d->time_offset_seconds;
+}
+
+int time_suspend(void)
+{
+    /* Better to cancel calibration timer for accuracy. */
+    kill_timer(&this_cpu(cpu_time).calibration_timer);
+
+    return 0;
+}
+
+int time_resume(void)
+{
+    u64 now_sec, tmp = init_pit_and_calibrate_tsc();
+
+    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+
+    resume_platform_timer();
+    now_sec = read_platform_stime();
+    do_div(now_sec, SECONDS(1));
+    wc_sec = get_cmos_time() - now_sec;
+
+    init_percpu_time();
+
+    if ( !is_idle_vcpu(current) )
+        update_vcpu_system_time(current);
+
+    return 0;
 }
 
 /*

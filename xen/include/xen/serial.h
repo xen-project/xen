@@ -104,6 +104,10 @@ int serial_tx_space(int handle);
 /* Return irq number for specified serial port (identified by index). */
 int serial_irq(int idx);
 
+/* Serial suspend/resume. */
+void serial_suspend(void);
+void serial_resume(void);
+
 /*
  * Initialisation and helper functions for uart drivers.
  */

@@ -381,6 +381,20 @@ int serial_irq(int idx)
     return -1;
 }
 
+void serial_suspend(void)
+{
+    int i, irq;
+    for ( i = 0; i < ARRAY_SIZE(com); i++ )
+        if ( (irq = serial_irq(i)) >= 0 )
+            free_irq(irq);
+}
+
+void serial_resume(void)
+{
+    serial_init_preirq();
+    serial_init_postirq();
+}
+
 void serial_register_uart(int idx, struct uart_driver *driver, void *uart)
 {
     /* Store UART-specific info. */

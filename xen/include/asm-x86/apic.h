@@ -108,6 +108,8 @@ extern void nmi_watchdog_tick (struct cpu_user_regs *regs);
 extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);
+extern int lapic_suspend(void);
+extern int lapic_resume(void);
 
 extern int check_nmi_watchdog (void);
 extern void enable_NMI_through_LVT0 (void * dummy);
@@ -123,6 +125,8 @@ extern unsigned int nmi_watchdog;
 
 #else /* !CONFIG_X86_LOCAL_APIC */
 static inline void lapic_shutdown(void) { }
+static inline int lapic_suspend(void) {return 0;}
+static inline int lapic_resume(void) {return 0;}
 
 #endif /* !CONFIG_X86_LOCAL_APIC */
 

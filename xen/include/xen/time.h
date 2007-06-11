@@ -31,7 +31,6 @@
 #include <asm/time.h>
 
 extern int init_xen_time(void);
-extern void init_percpu_time(void);
 
 extern unsigned long cpu_khz;
 

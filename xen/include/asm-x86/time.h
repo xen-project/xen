@@ -21,4 +21,9 @@ mktime (unsigned int year, unsigned int mon,
         unsigned int day, unsigned int hour,
         unsigned int min, unsigned int sec);
 
+extern int time_suspend(void);
+extern int time_resume(void);
+
+extern void init_percpu_time(void);
+
 #endif /* __X86_TIME_H__ */
