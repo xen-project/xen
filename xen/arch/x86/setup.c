@@ -34,6 +34,7 @@
 #include <asm/e820.h>
 #include <acm/acm_hooks.h>
 #include <xen/kexec.h>
+#include <asm/edd.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32)
@@ -489,6 +490,12 @@ void __init __start_xen(multiboot_info_t *mbi)
                 printk("of reasons unknown\n");
         }
     }
+
+    printk("Disc information:\n");
+    printk(" Found %d MBR signatures\n",
+           bootsym(boot_edd_signature_nr));
+    printk(" Found %d EDD information structures\n",
+           bootsym(boot_edd_info_nr));
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )

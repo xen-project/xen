@@ -142,17 +142,19 @@ trampoline_boot_cpu_entry:
         mov     %ax,%es
         mov     %ax,%ss
 
-        /* Stack grows down from 0x9200. Initialise IDT and enable irqs. */
-        mov     $0x2000,%sp
+        /* Stack grows down from 0x93000. Initialise IDT and enable irqs. */
+        mov     $0x3000,%sp
         lidt    bootsym(rm_idt)
         sti
 
         /*
          * Do real-mode work:
          *  1. Get memory map.
-         *  2. Set video mode.
+         *  2. Get Enhanced Disk Drive (EDD) information.
+         *  3. Set video mode.
          */
         call    get_memory_map
+        call    get_edd
         call    video
 
         /* Disable irqs before returning to protected mode. */
@@ -187,4 +189,5 @@ skip_realmode:
 rm_idt: .word   256*4-1, 0, 0
 
 #include "mem.S"
+#include "edd.S"
 #include "video.S"

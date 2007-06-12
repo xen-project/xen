@@ -169,6 +169,24 @@ cmdline_parse_early:
         test    %eax,%eax
         setnz   bootsym_phys(skip_realmode)
 
+.Lparse_edd:
+        /* Check for 'edd=' command-line option. */
+        movl    $sym_phys(.Ledd_opt),4(%esp)
+        call    .Lfind_option
+        test    %eax,%eax
+        jz      .Lparse_edid
+        cmpb    $'=',3(%eax)
+        jne     .Lparse_edid
+        add     $4,%eax
+        movb    $2,bootsym_phys(opt_edd)  /* opt_edd=2: edd=off */
+        cmpw    $0x666f,(%eax)            /* 0x666f == "of" */
+        je      .Lparse_edid
+        decb    bootsym_phys(opt_edd)     /* opt_edd=1: edd=skipmbr */
+        cmpw    $0x6b73,(%eax)            /* 0x6b73 == "sk" */
+        je      .Lparse_edid
+        decb    bootsym_phys(opt_edid)    /* opt_edd=0: edd=on (default) */
+
+.Lparse_edid:
         /* Check for 'edid=' command-line option. */
         movl    $sym_phys(.Ledid_opt),4(%esp)
         call    .Lfind_option
@@ -318,3 +336,5 @@ cmdline_parse_early:
         .asciz  "force"
 .Ledid_no:
         .asciz  "no"
+.Ledd_opt:
+        .asciz  "edd"

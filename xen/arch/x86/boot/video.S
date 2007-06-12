@@ -15,7 +15,7 @@
 
 #include "video.h"
 
-#define modelist (0x2000)
+#define modelist (0x3000)
 
 /* Retrieve Extended Display Identification Data. */
 #define CONFIG_FIRMWARE_EDID
