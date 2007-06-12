@@ -16,6 +16,7 @@
 
 #include <xen/xen.h>
 #include <xen/foreign/ia64.h>
+#include <xen/io/protocols.h>
 
 #include "xg_private.h"
 #include "xc_dom.h"
@@ -120,6 +121,7 @@ static int vcpu_ia64(struct xc_dom_image *dom, void *ptr)
 
 static struct xc_dom_arch xc_dom_arch = {
     .guest_type = "xen-3.0-ia64",
+    .native_protocol = XEN_IO_PROTO_ABI_IA64,
     .page_shift = PAGE_SHIFT_IA64,
     .alloc_magic_pages = alloc_magic_pages,
     .start_info = start_info_ia64,
@@ -129,6 +131,7 @@ static struct xc_dom_arch xc_dom_arch = {
 
 static struct xc_dom_arch xc_dom_arch_ia64be = {
     .guest_type = "xen-3.0-ia64be",
+    .native_protocol = XEN_IO_PROTO_ABI_IA64,
     .page_shift = PAGE_SHIFT_IA64,
     .alloc_magic_pages = alloc_magic_pages,
     .start_info = start_info_ia64,
