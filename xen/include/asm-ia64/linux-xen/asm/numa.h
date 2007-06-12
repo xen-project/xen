@@ -75,6 +75,8 @@ extern int paddr_to_nid(unsigned long paddr);
 
 #ifdef XEN
 #define phys_to_nid(paddr) paddr_to_nid(paddr)
+extern int pxm_to_node(int pxm);
+extern int node_to_pxm(int node);
 #endif
 
 #endif /* _ASM_IA64_NUMA_H */

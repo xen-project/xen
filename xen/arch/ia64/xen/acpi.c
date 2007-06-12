@@ -388,6 +388,24 @@ int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
 int __initdata nid_to_pxm_map[MAX_NUMNODES];
 static struct acpi_table_slit __initdata *slit_table;
 
+#define NID_INVAL			-1
+#define PXM_INVAL			-1
+
+int __init pxm_to_node(int pxm)
+{
+	if (pxm < 0)
+		return NID_INVAL;
+	return pxm_to_nid_map[pxm];
+}
+
+int __init node_to_pxm(int node)
+{
+	if (node < 0)
+		return PXM_INVAL;
+	return nid_to_pxm_map[node];
+}
+
+
 /*
  * ACPI 2.0 SLIT (System Locality Information Table)
  * http://devresource.hp.com/devresource/Docs/TechPapers/IA64/slit.pdf
@@ -473,8 +491,8 @@ acpi_numa_arch_fixup (void)
 	/* calculate total number of nodes in system from PXM bitmap */
 	numnodes = 0;		/* init total nodes in system */
 
-	memset(pxm_to_nid_map, -1, sizeof(pxm_to_nid_map));
-	memset(nid_to_pxm_map, -1, sizeof(nid_to_pxm_map));
+	memset(pxm_to_nid_map, PXM_INVAL, sizeof(pxm_to_nid_map));
+	memset(nid_to_pxm_map, NID_INVAL, sizeof(nid_to_pxm_map));
 	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
 		if (pxm_bit_test(i)) {
 			pxm_to_nid_map[i] = numnodes;

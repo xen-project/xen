@@ -72,11 +72,6 @@
 #include <asm/sn/klconfig.h>
 #ifdef XEN
 #include <asm/sn/shubio.h>
-
-/* Xen has no clue about NUMA ....  grrrr */
-#define pxm_to_node(foo)		0
-#define node_to_pxm(foo)		0
-#define numa_node_id()			0
 #endif
 
 
