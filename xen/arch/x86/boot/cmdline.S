@@ -157,10 +157,10 @@ cmdline_parse_early:
         mov     sym_phys(multiboot_ptr),%ebx
         mov     MB_flags(%ebx),%eax
         test    $4,%al
-        jz      1f
+        jz      .Lcmdline_exit
         mov     MB_cmdline(%ebx),%eax
         test    %eax,%eax
-        jz      1f
+        jz      .Lcmdline_exit
 
         /* Check for 'no-real-mode' command-line option. */
         pushl   $sym_phys(.Lno_rm_opt)
@@ -169,14 +169,40 @@ cmdline_parse_early:
         test    %eax,%eax
         setnz   bootsym_phys(skip_realmode)
 
+        /* Check for 'edid=' command-line option. */
+        movl    $sym_phys(.Ledid_opt),4(%esp)
+        call    .Lfind_option
+        test    %eax,%eax
+        jz      .Lparse_vga
+        cmpb    $'=',4(%eax)
+        jne     .Lparse_vga
+        add     $5,%eax
+        mov     %eax,%ebx
+        push    %ebx
+        pushl   $sym_phys(.Ledid_force)
+        call    .Lstr_prefix
+        add     $8,%esp
+        movb    $2,bootsym_phys(opt_edid) /* opt_edid=2: edid=force */
+        test    %eax,%eax
+        jz      .Lparse_vga
+        push    %ebx
+        pushl   $sym_phys(.Ledid_no)
+        call    .Lstr_prefix
+        add     $8,%esp
+        decb    bootsym_phys(opt_edid)    /* opt_edid=1: edid=no */
+        test    %eax,%eax
+        jz      .Lparse_vga
+        decb    bootsym_phys(opt_edid)    /* opt_edid=0: default */
+
+.Lparse_vga:
         /* Check for 'vga=' command-line option. */
         movl    $sym_phys(.Lvga_opt),4(%esp)
         call    .Lfind_option
         add     $8,%esp
         test    %eax,%eax
-        jz      1f
+        jz      .Lcmdline_exit
         cmpb    $'=',3(%eax)
-        jne     1f
+        jne     .Lcmdline_exit
         add     $4,%eax
 
         /* Found the 'vga=' option. Default option is to display vga menu. */
@@ -189,7 +215,7 @@ cmdline_parse_early:
         call    .Lstr_prefix
         add     $8,%esp
         test    %eax,%eax
-        jnz     3f
+        jnz     .Lparse_vga_gfx
 
         /* We have 'vga=text-80x<rows>'. */
         add     $8,%ebx
@@ -198,22 +224,23 @@ cmdline_parse_early:
         add     $4,%esp
         mov     %ax,%bx
         lea     sym_phys(.Lvga_text_modes),%esi
-2:      lodsw
+1:      lodsw
         test    %ax,%ax
-        jz      1f
+        jz      .Lcmdline_exit
         cmp     %ax,%bx
         lodsw
-        jne     2b
+        jne     1b
         mov     %ax,bootsym_phys(boot_vid_mode)
-        jmp     1f
+        jmp     .Lcmdline_exit
 
+.Lparse_vga_gfx:
         /* Check for 'vga=gfx-<width>x<height>x<depth>'. */
-3:      push    %ebx
+        push    %ebx
         pushl   $sym_phys(.Lvga_gfx)
         call    .Lstr_prefix
         add     $8,%esp
         test    %eax,%eax
-        jnz     3f
+        jnz     .Lparse_vga_mode
 
         /* We have 'vga=gfx-<width>x<height>x<depth>'. */
         /* skip 'gfx-' */
@@ -226,7 +253,7 @@ cmdline_parse_early:
         /* skip 'x' */
         lodsb
         cmpb    $'x',%al
-        jne     1f
+        jne     .Lcmdline_exit
         /* parse <height> */
         push    %esi
         call    .Latoi
@@ -235,7 +262,7 @@ cmdline_parse_early:
         /* skip 'x' */
         lodsb
         cmpb    $'x',%al
-        jne     1f
+        jne     .Lcmdline_exit
         /* parse <depth> */
         push    %esi
         call    .Latoi
@@ -243,15 +270,16 @@ cmdline_parse_early:
         mov     %ax,bootsym_phys(vesa_size)+4
         /* commit to vesa mode */
         movw    $VIDEO_VESA_BY_SIZE,bootsym_phys(boot_vid_mode)
-        jmp     1f
+        jmp     .Lcmdline_exit
 
+.Lparse_vga_mode:
         /* Check for 'vga=mode-<mode>'. */
-3:      push    %ebx
+        push    %ebx
         pushl   $sym_phys(.Lvga_mode)
         call    .Lstr_prefix
         add     $8,%esp
         test    %eax,%eax
-        jnz     1f
+        jnz     .Lcmdline_exit
 
         /* We have 'vga=mode-<mode>'. */
         add     $5,%ebx
@@ -260,7 +288,8 @@ cmdline_parse_early:
         add     $4,%esp
         mov     %ax,bootsym_phys(boot_vid_mode)
 
-1:      popa
+.Lcmdline_exit:
+        popa
         ret
 
 .Lvga_text_modes: /* rows, mode_number */
@@ -283,3 +312,9 @@ cmdline_parse_early:
         .asciz  "mode-"
 .Lno_rm_opt:
         .asciz  "no-real-mode"
+.Ledid_opt:
+        .asciz  "edid"
+.Ledid_force:
+        .asciz  "force"
+.Ledid_no:
+        .asciz  "no"

@@ -3188,6 +3188,13 @@ editing \path{grub.conf}.
   \end{description}
 The mode may optionally be followed by `{\bf,keep}' to cause Xen to keep
 writing to the VGA console after domain 0 starts booting (e.g., `vga=text-80x50,keep').
+\item [ no-real-mode ] (x86 only) Do not execute real-mode bootstrap
+  code when booting Xen. This option should not be used except for
+  debugging. It will effectively disable the {\bf vga} option, which
+  relies on real mode to set the video mode.
+\item [ edid=no,force ] (x86 only) Either force retrieval of monitor
+  EDID information via VESA DDC, or disable it (edid=no). This option
+  should not normally be required except for debugging purposes.
 \item [ console\_to\_ring ] Place guest console output into the
   hypervisor console ring buffer. This is disabled by default.
   When enabled, both hypervisor output and guest console output
