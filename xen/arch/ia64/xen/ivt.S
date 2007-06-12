@@ -119,12 +119,7 @@ ENTRY(itlb_miss)
 	;;
 	/* If address belongs to VMM, go to alt tlb handler */
 	cmp.eq p6,p0=0x1e,r17
-	;;
-	cmp.eq.or p6,p0=0x1d,r17
 (p6)	br.cond.spnt	late_alt_itlb_miss
-	;;
-	mov pr = r31, 0x1ffff
-	;;							
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
 END(itlb_miss)
@@ -141,8 +136,6 @@ ENTRY(dtlb_miss)
 	;;
 	/* If address belongs to VMM, go to alt tlb handler */
 	cmp.eq p6,p0=0x1e,r17
-	;;
-	cmp.eq.or p6,p0=0x1d,r17
 (p6)	br.cond.spnt	late_alt_dtlb_miss
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
@@ -162,15 +155,13 @@ late_alt_itlb_miss:
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
-	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
-	shr.u r18=r16,55	// move address bit 59 to bit 4
+	and r19=r19,r16		// clear ed, reserved bits, and PTE ctrl bits
+	extr.u r18=r16,XEN_VIRT_UC_BIT,1	// extract UC bit
 	;;
-	and r18=0x10,r18	// bit 4=address-bit(59)
 	cmp.ne p8,p0=r0,r23	// psr.cpl != 0?
 	or r19=r17,r19		// insert PTE control bits into r19
 	;;
-	or r19=r19,r18		// set bit 4 (uncached) if the access was to
-				//   region 6
+	dep r19=r18,r19,4,1	// set bit 4 (uncached) if access to UC area.
 (p8)	br.cond.spnt page_fault
 	;;
 	itc.i r19		// insert the TLB entry
@@ -195,12 +186,11 @@ late_alt_dtlb_miss:
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
-	shr.u r18=r16,55			// move address bit 59 to bit 4
+	extr.u r18=r16,XEN_VIRT_UC_BIT,1	// extract UC bit
 	and r19=r19,r16				// clear ed, reserved bits, and
 						//   PTE control bits
 	tbit.nz p9,p0=r20,IA64_ISR_NA_BIT	// is non-access bit on?
 	;;
-	and r18=0x10,r18	// bit 4=address-bit(59)
 	cmp.ne p8,p0=r0,r23
 (p9)	cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
 (p8)	br.cond.spnt page_fault
@@ -212,22 +202,15 @@ late_alt_dtlb_miss:
 (p8)	br.cond.sptk frametable_miss ;;
 #endif
 	// If it is not a Xen address, handle it via page_fault.
-	// Note that 0xf000 (cached) and 0xe800 (uncached) addresses
-	// should be OK.
 	extr.u r22=r16,59,5
 	;;
-	cmp.eq p8,p0=0x1e,r22
-(p8)	br.cond.spnt 1f
-	;;
-	cmp.ne p8,p0=0x1d,r22
+	cmp.ne p8,p0=0x1e,r22
 (p8)	br.cond.sptk page_fault
 	;;
-1:
 	dep r21=-1,r21,IA64_PSR_ED_BIT,1
 	or r19=r19,r17		// insert PTE control bits into r19
 	;;
-	or r19=r19,r18		// set bit 4 (uncached) if the access was to
-				//   region 6
+	dep r19=r18,r19,4,1	// set bit 4 (uncached) if access to UC area
 (p6)	mov cr.ipsr=r21
 	;;
 (p7)	itc.d r19		// insert the TLB entry
