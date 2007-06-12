@@ -834,7 +834,7 @@ xc_ia64_setup_memmap_info(int xc_handle, uint32_t dom,
     
     assert(nr_mds <=
            (PAGE_SIZE * memmap_info_num_pages -
-            offsetof(*memmap_info, memdesc))/sizeof(*md));
+            offsetof(typeof(*memmap_info), memdesc))/sizeof(*md));
     memmap_info->efi_memmap_size = nr_mds * sizeof(*md);
     memmap_info->efi_memdesc_size = sizeof(*md);
     memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;

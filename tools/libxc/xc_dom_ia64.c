@@ -203,9 +203,9 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
     num_mds++;
     memmap_info->efi_memmap_size = num_mds * sizeof(md[0]);
     munmap(memmap_info, page_size * memmap_info_num_pages);
-    assert(nr_mds <=
+    assert(num_mds <=
            (page_size * memmap_info_num_pages -
-            offsetof(*memmap_info, memdesc))/sizeof(*md));
+            offsetof(typeof(*memmap_info), memdesc))/sizeof(*md));
 
     /*
      * kludge: we need to pass memmap_info page's pfn and other magic pages
