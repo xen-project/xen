@@ -712,11 +712,15 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom)
 	xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
 
 	if ( !IS_VALID_NVRAM_FD(nvram_fd) )
-	{
 		PERROR("Nvram not be initialized. Nvram save fail!\n");
-		return -1;
-	}
-	return copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
+	else
+		copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
+	
+	// although save to nvram maybe fail, we don't return any error number
+	// to Xend. This is quite logical because damage of NVRAM on native would 
+	// not block OS's executive path. Return error number will cause an exception 
+	// of Xend and block XenU when it destroy.
+	return 0;
 }
 
 #define NVRAM_FILE_PATH	"/usr/lib/xen/boot/nvram_"
@@ -862,7 +866,10 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
 		nvram_start = 0;
 	else
 		if ( copy_from_nvram_to_GFW(xc_handle, dom, (int)nvram_fd ) == -1 )
+		{
 			nvram_start = 0;
+			close(nvram_fd);
+		}
 
     vcpus = domctl.u.getdomaininfo.max_vcpu_id + 1;
 
