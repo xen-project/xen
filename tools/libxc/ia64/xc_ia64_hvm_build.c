@@ -1,3 +1,4 @@
+#include <asm/kregs.h>
 #include "xg_private.h"
 #include "xenguest.h"
 #include "xc_private.h"
@@ -1083,6 +1084,11 @@ xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
     free(image);
 
     ctxt->regs.ip = 0x80000000ffffffb0UL;
+    ctxt->regs.ar.fpsr = xc_ia64_fpsr_default();
+    ctxt->regs.cr.isr = 1UL << 63;
+    ctxt->regs.psr = IA64_PSR_AC | IA64_PSR_BN;
+    ctxt->regs.cr.dcr = 0;
+    ctxt->regs.cr.pta = 15 << 2;
 
     memset(&launch_domctl, 0, sizeof(launch_domctl));
 

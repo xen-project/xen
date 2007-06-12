@@ -622,12 +622,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	c.nat->regs.r[10] = uregs->r10;
 	c.nat->regs.r[11] = uregs->r11;
 
-	if (is_hvm) {
-		c.nat->regs.psr = vmx_vcpu_get_psr (v);
-	} else {
-		/* FIXME: get the vpsr.  */
-		c.nat->regs.psr = uregs->cr_ipsr;
-	}
+	if (is_hvm)
+		c.nat->regs.psr = vmx_vcpu_get_psr(v);
+	else
+		c.nat->regs.psr = vcpu_get_psr(v);
 
 	c.nat->regs.ip = uregs->cr_iip;
 	c.nat->regs.cfm = uregs->cr_ifs;
@@ -717,6 +715,26 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	struct domain *d = v->domain;
 	int rc;
 
+	/* Finish vcpu initialization.  */
+	if (!v->is_initialised) {
+		if (d->arch.is_vti)
+			rc = vmx_final_setup_guest(v);
+		else
+			rc = vcpu_late_initialise(v);
+		if (rc != 0)
+			return rc;
+
+		vcpu_init_regs(v);
+
+		v->is_initialised = 1;
+		/* Auto-online VCPU0 when it is initialised. */
+		if (v->vcpu_id == 0)
+			clear_bit(_VPF_down, &v->pause_flags);
+	}
+
+	if (c.nat == NULL)
+		return 0;
+
 	uregs->b6 = c.nat->regs.b[6];
 	uregs->b7 = c.nat->regs.b[7];
 	
@@ -727,8 +745,11 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	uregs->r9 = c.nat->regs.r[9];
 	uregs->r10 = c.nat->regs.r[10];
 	uregs->r11 = c.nat->regs.r[11];
-	
-	uregs->cr_ipsr = c.nat->regs.psr;
+
+ 	if (!d->arch.is_vti)
+		vcpu_set_psr(v, c.nat->regs.psr);
+	else
+		vmx_vcpu_set_psr(v, c.nat->regs.psr);
 	uregs->cr_iip = c.nat->regs.ip;
 	uregs->cr_ifs = c.nat->regs.cfm;
 	
@@ -811,32 +832,6 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		}
 		v->arch.event_callback_ip = c.nat->event_callback_ip;
 		v->arch.iva = c.nat->regs.cr.iva;
-	}
-
-	if (v->is_initialised)
-		return 0;
-
-	if (d->arch.is_vti) {
-		rc = vmx_final_setup_guest(v);
-		if (rc != 0)
-			return rc;
-	} else {
-		rc = vcpu_late_initialise(v);
-		if (rc != 0)
-			return rc;
-		VCPU(v, interrupt_mask_addr) = 
-			(unsigned char *) d->arch.shared_info_va +
-			INT_ENABLE_OFFSET(v);
-	}
-
-	/* This overrides some registers. */
-	vcpu_init_regs(v);
-
-	if (!v->is_initialised) {
-		v->is_initialised = 1;
-		/* Auto-online VCPU0 when it is initialised. */
-		if (v->vcpu_id == 0)
-			clear_bit(_VPF_down, &v->pause_flags);
 	}
 
 	return 0;

@@ -182,8 +182,6 @@ void vcpu_init_regs(struct vcpu *v)
 		    INT_ENABLE_OFFSET(v);
 		VCPU(v, itv) = (1 << 16);	/* timer vector masked */
 
-		/* SAL specification 3.2.4 */
-		VCPU(v, vpsr) = IA64_PSR_AC | IA64_PSR_IC | IA64_PSR_BN;
 		v->vcpu_info->evtchn_upcall_pending = 0;
 		v->vcpu_info->evtchn_upcall_mask = -1;
 	}

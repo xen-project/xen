@@ -86,11 +86,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 
 		/* First start: initialize vpcu.  */
 		if (!targ->is_initialised) {
-			struct vcpu_guest_context c;
-		
-			memset (&c, 0, sizeof (c));
-
-			if (arch_set_info_guest (targ, &c) != 0) {
+			if (arch_set_info_guest (targ, NULL) != 0) {
 				printk ("arch_boot_vcpu: failure\n");
 				return;
 			}

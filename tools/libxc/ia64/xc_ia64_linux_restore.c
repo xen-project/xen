@@ -227,17 +227,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     fprintf(stderr, "ip=%016lx, b0=%016lx\n", ctxt.regs.ip, ctxt.regs.b[0]);
 
-    /* First to initialize.  */
-    domctl.cmd = XEN_DOMCTL_setvcpucontext;
-    domctl.domain = (domid_t)dom;
-    domctl.u.vcpucontext.vcpu   = 0;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt);
-    if (xc_domctl(xc_handle, &domctl) != 0) {
-        ERROR("Couldn't set vcpu context");
-        goto out;
-    }
-
-    /* Second to set registers...  */
+    /* Initialize and set registers.  */
     ctxt.flags = VGCF_EXTRA_REGS;
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = (domid_t)dom;

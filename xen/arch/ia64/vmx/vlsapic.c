@@ -696,11 +696,8 @@ static void vlsapic_write_ipi(VCPU *vcpu, uint64_t addr, uint64_t value)
         test_bit(_VPF_down, &targ->pause_flags)) {
 
         struct pt_regs *targ_regs = vcpu_regs(targ);
-        struct vcpu_guest_context c;
 
-        memset (&c, 0, sizeof(c));
-
-        if (arch_set_info_guest(targ, &c) != 0) {
+        if (arch_set_info_guest(targ, NULL) != 0) {
             printk("arch_boot_vcpu: failure\n");
             return;
         }

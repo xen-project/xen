@@ -13,6 +13,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <asm/kregs.h>
 
 #include <xen/xen.h>
 #include <xen/foreign/ia64.h>
@@ -106,9 +107,10 @@ static int vcpu_ia64(struct xc_dom_image *dom, void *ptr)
     memset(ctxt, 0, sizeof(*ctxt));
 
     ctxt->flags = 0;
-    ctxt->regs.psr = 0;	/* all necessary bits filled by hypervisor */
+    /* PSR is set according to SAL 3.2.4: AC, IC and BN are set. */
+    ctxt->regs.psr = IA64_PSR_AC | IA64_PSR_IC | IA64_PSR_BN;
     ctxt->regs.ip = dom->parms.virt_entry;
-    ctxt->regs.cfm = (uint64_t) 1 << 63;
+    ctxt->regs.cfm = 1UL << 63;
 #ifdef __ia64__			/* FIXME */
     ctxt->regs.ar.fpsr = xc_ia64_fpsr_default();
 #endif
