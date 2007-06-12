@@ -6,11 +6,13 @@
 
         .globl trampoline_realmode_entry
 trampoline_realmode_entry:
+        mov     %cs,%ax
+        mov     %ax,%ds
         movb    $0xA5,bootsym(trampoline_cpu_started)
         cld
         cli
-        lidt    %cs:bootsym(idt_48)
-        lgdt    %cs:bootsym(gdt_48)
+        lidt    bootsym(idt_48)
+        lgdt    bootsym(gdt_48)
         xor     %ax, %ax
         inc     %ax
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
