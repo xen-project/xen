@@ -1547,13 +1547,55 @@ replace_grant_host_mapping(unsigned long gpaddr,
     volatile pte_t* pte;
     unsigned long cur_arflags;
     pte_t cur_pte;
-    pte_t new_pte;
+    pte_t new_pte = __pte(0);
     pte_t old_pte;
     struct page_info* page = mfn_to_page(mfn);
+    struct page_info* new_page = NULL;
+    volatile pte_t* new_page_pte = NULL;
 
     if (new_gpaddr) {
-        gdprintk(XENLOG_INFO, "%s: new_gpaddr 0x%lx\n", __func__, new_gpaddr);
-    	return GNTST_general_error;
+        new_page_pte = lookup_noalloc_domain_pte_none(d, new_gpaddr);
+        if (likely(new_page_pte != NULL)) {
+            new_pte = ptep_get_and_clear(&d->arch.mm,
+                                         new_gpaddr, new_page_pte);
+            if (likely(pte_present(new_pte))) {
+                unsigned long new_page_mfn;
+                struct domain* page_owner;
+
+                new_page_mfn = pte_pfn(new_pte);
+                new_page = mfn_to_page(new_page_mfn);
+                page_owner = page_get_owner(new_page);
+                if (unlikely(page_owner == NULL)) {
+                    gdprintk(XENLOG_INFO,
+                             "%s: page_owner == NULL "
+                             "gpaddr 0x%lx mfn 0x%lx "
+                             "new_gpaddr 0x%lx mfn 0x%lx\n",
+                             __func__, gpaddr, mfn, new_gpaddr, new_page_mfn);
+                    new_page = NULL; /* prevent domain_put_page() */
+                    goto out;
+                }
+
+                /*
+		 * domain_put_page(clear_PGC_allcoated = 0)
+                 * doesn't decrement refcount of page with
+                 * pte_ptc_allocated() = 1. Be carefull.
+		 */
+                if (unlikely(!pte_pgc_allocated(new_pte))) {
+                    /* domain_put_page() decrements page refcount. adjust it. */
+                    if (get_page(new_page, page_owner)) {
+                        gdprintk(XENLOG_INFO,
+                                 "%s: get_page() failed. "
+                                 "gpaddr 0x%lx mfn 0x%lx "
+                                 "new_gpaddr 0x%lx mfn 0x%lx\n",
+                                 __func__, gpaddr, mfn,
+                                 new_gpaddr, new_page_mfn);
+                        goto out;
+                    }
+                }
+                domain_put_page(d, new_gpaddr, new_page_pte, new_pte, 0);
+            } else
+                new_pte = __pte(0);
+        }
     }
 
     if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
@@ -1565,7 +1607,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
     if (pte == NULL) {
         gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx\n",
                 __func__, gpaddr, mfn);
-        return GNTST_general_error;
+        goto out;
     }
 
  again:
@@ -1575,16 +1617,15 @@ replace_grant_host_mapping(unsigned long gpaddr,
         (page_get_owner(page) == d && get_gpfn_from_mfn(mfn) == gpfn)) {
         gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte));
-        return GNTST_general_error;
+        goto out;
     }
-    new_pte = __pte(0);
 
     old_pte = ptep_cmpxchg_rel(&d->arch.mm, gpaddr, pte, cur_pte, new_pte);
     if (unlikely(!pte_present(old_pte))) {
         gdprintk(XENLOG_INFO, "%s: gpaddr 0x%lx mfn 0x%lx"
                          " cur_pte 0x%lx old_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
-        return GNTST_general_error;
+        goto out;
     }
     if (unlikely(pte_val(cur_pte) != pte_val(old_pte))) {
         if (pte_pfn(old_pte) == mfn) {
@@ -1593,7 +1634,7 @@ replace_grant_host_mapping(unsigned long gpaddr,
         gdprintk(XENLOG_INFO, "%s gpaddr 0x%lx mfn 0x%lx cur_pte "
                 "0x%lx old_pte 0x%lx\n",
                 __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
-        return GNTST_general_error;
+        goto out;
     }
     BUG_ON(pte_pfn(old_pte) != mfn);
 
@@ -1605,6 +1646,11 @@ replace_grant_host_mapping(unsigned long gpaddr,
 
     perfc_incr(replace_grant_host_mapping);
     return GNTST_okay;
+
+ out:
+    if (new_page)
+        domain_put_page(d, new_gpaddr, new_page_pte, new_pte, 1);
+    return GNTST_general_error;
 }
 
 // heavily depends on the struct page layout.

@@ -69,7 +69,7 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 
 static inline int replace_grant_supported(void)
 {
-    return 0;
+    return 1;
 }
 
 #endif /* __ASM_GRANT_TABLE_H__ */
