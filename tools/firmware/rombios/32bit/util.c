@@ -290,7 +290,7 @@ static char *printnum(char *p, unsigned long num, int base)
     return p;
 }
 
-static void _doprint(void (*put)(char), char const *fmt, va_list ap)
+static void _doprint(void (*put)(char), const char *fmt, va_list ap)
 {
     register char *str, c;
     int lflag, zflag, nflag;
