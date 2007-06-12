@@ -890,81 +890,144 @@ assign_domain_page(struct domain *d,
 }
 
 int
-ioports_permit_access(struct domain *d, unsigned long fp, unsigned long lp)
+ioports_permit_access(struct domain *d, unsigned int fp, unsigned int lp)
 {
+    struct io_space *space;
+    unsigned long mmio_start, mmio_end, mach_start;
     int ret;
-    unsigned long off;
-    unsigned long fp_offset;
-    unsigned long lp_offset;
 
+    if (IO_SPACE_NR(fp) >= num_io_spaces) {
+        dprintk(XENLOG_WARNING, "Unknown I/O Port range 0x%x - 0x%x\n", fp, lp);
+        return -EFAULT;
+    }
+
+    /*
+     * The ioport_cap rangeset tracks the I/O port address including
+     * the port space ID.  This means port space IDs need to match
+     * between Xen and dom0.  This is also a requirement because
+     * the hypercall to pass these port ranges only uses a u32.
+     *
+     * NB - non-dom0 driver domains may only have a subset of the
+     * I/O port spaces and thus will number port spaces differently.
+     * This is ok, they don't make use of this interface.
+     */
     ret = rangeset_add_range(d->arch.ioport_caps, fp, lp);
     if (ret != 0)
         return ret;
 
-    /* Domain 0 doesn't virtualize IO ports space. */
-    if (d == dom0)
+    space = &io_space[IO_SPACE_NR(fp)];
+
+    /* Legacy I/O on dom0 is already setup */
+    if (d == dom0 && space == &io_space[0])
         return 0;
 
-    fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
-    lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
+    fp = IO_SPACE_PORT(fp);
+    lp = IO_SPACE_PORT(lp);
 
-    for (off = fp_offset; off <= lp_offset; off += PAGE_SIZE)
-        (void)__assign_domain_page(d, IO_PORTS_PADDR + off,
-                                   __pa(ia64_iobase) + off, ASSIGN_nocache);
+    if (space->sparse) {
+        mmio_start = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
+        mmio_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
+    } else {
+        mmio_start = fp & ~PAGE_MASK;
+        mmio_end = PAGE_ALIGN(lp);
+    }
+
+    /*
+     * The "machine first port" is not necessarily identity mapped
+     * to the guest first port.  At least for the legacy range.
+     */
+    mach_start = mmio_start | __pa(space->mmio_base);
+
+    if (space == &io_space[0]) {
+        mmio_start |= IO_PORTS_PADDR;
+        mmio_end |= IO_PORTS_PADDR;
+    } else {
+        mmio_start |= __pa(space->mmio_base);
+        mmio_end |= __pa(space->mmio_base);
+    }
+
+    while (mmio_start <= mmio_end) {
+        (void)__assign_domain_page(d, mmio_start, mach_start, ASSIGN_nocache); 
+        mmio_start += PAGE_SIZE;
+        mach_start += PAGE_SIZE;
+    }
 
     return 0;
 }
 
 static int
-ioports_has_allowed(struct domain *d, unsigned long fp, unsigned long lp)
+ioports_has_allowed(struct domain *d, unsigned int fp, unsigned int lp)
 {
-    unsigned long i;
-    for (i = fp; i < lp; i++)
-        if (rangeset_contains_singleton(d->arch.ioport_caps, i))
+    for (; fp < lp; fp++)
+        if (rangeset_contains_singleton(d->arch.ioport_caps, fp))
             return 1;
+
     return 0;
 }
 
 int
-ioports_deny_access(struct domain *d, unsigned long fp, unsigned long lp)
+ioports_deny_access(struct domain *d, unsigned int fp, unsigned int lp)
 {
     int ret;
     struct mm_struct *mm = &d->arch.mm;
-    unsigned long off;
-    unsigned long io_ports_base;
-    unsigned long fp_offset;
-    unsigned long lp_offset;
+    unsigned long mmio_start, mmio_end, mmio_base;
+    unsigned int fp_base, lp_base;
+    struct io_space *space;
+
+    if (IO_SPACE_NR(fp) >= num_io_spaces) {
+        dprintk(XENLOG_WARNING, "Unknown I/O Port range 0x%x - 0x%x\n", fp, lp);
+        return -EFAULT;
+    }
 
     ret = rangeset_remove_range(d->arch.ioport_caps, fp, lp);
     if (ret != 0)
         return ret;
-    if (d == dom0)
-        io_ports_base = __pa(ia64_iobase);
+
+    space = &io_space[IO_SPACE_NR(fp)];
+    fp_base = IO_SPACE_PORT(fp);
+    lp_base = IO_SPACE_PORT(lp);
+
+    if (space->sparse) {
+        mmio_start = IO_SPACE_SPARSE_ENCODING(fp_base) & ~PAGE_MASK;
+        mmio_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp_base));
+    } else {
+        mmio_start = fp_base & ~PAGE_MASK;
+        mmio_end = PAGE_ALIGN(lp_base);
+    }
+
+    if (space == &io_space[0] && d != dom0)
+        mmio_base = IO_PORTS_PADDR;
     else
-        io_ports_base = IO_PORTS_PADDR;
+        mmio_base = __pa(space->mmio_base);
 
-    fp_offset = IO_SPACE_SPARSE_ENCODING(fp) & PAGE_MASK;
-    lp_offset = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
-
-    for (off = fp_offset; off < lp_offset; off += PAGE_SIZE) {
-        unsigned long mpaddr = io_ports_base + off;
-        unsigned long port;
+    for (; mmio_start < mmio_end; mmio_start += PAGE_SIZE) {
+        unsigned int port, range;
+        unsigned long mpaddr;
         volatile pte_t *pte;
         pte_t old_pte;
 
-        port = IO_SPACE_SPARSE_DECODING (off);
-        if (port < fp || port + IO_SPACE_SPARSE_PORTS_PER_PAGE - 1 > lp) {
+        if (space->sparse) {
+            port = IO_SPACE_SPARSE_DECODING(mmio_start);
+            range = IO_SPACE_SPARSE_PORTS_PER_PAGE - 1;
+        } else {
+            port = mmio_start;
+            range = PAGE_SIZE - 1;
+        }
+
+        port |= IO_SPACE_BASE(IO_SPACE_NR(fp));
+
+        if (port < fp || port + range > lp) {
             /* Maybe this covers an allowed port.  */
-            if (ioports_has_allowed(d, port,
-                                    port + IO_SPACE_SPARSE_PORTS_PER_PAGE - 1))
+            if (ioports_has_allowed(d, port, port + range))
                 continue;
         }
 
+        mpaddr = mmio_start | mmio_base;
         pte = lookup_noalloc_domain_pte_none(d, mpaddr);
         BUG_ON(pte == NULL);
         BUG_ON(pte_none(*pte));
 
-        // clear pte
+        /* clear pte */
         old_pte = ptep_get_and_clear(mm, mpaddr, pte);
     }
     domain_flush_vtlb_all(d);

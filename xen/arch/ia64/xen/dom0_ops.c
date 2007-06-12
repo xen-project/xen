@@ -363,6 +363,40 @@ dom0vp_fpswa_revision(XEN_GUEST_HANDLE(uint) revision)
     return 0;
 }
 
+static unsigned long
+dom0vp_add_io_space(struct domain *d, unsigned long phys_base,
+                    unsigned long sparse, unsigned long space_number)
+{
+    unsigned int fp, lp;
+
+    /*
+     * Registering new io_space roughly based on linux
+     * arch/ia64/pci/pci.c:new_space()
+     */
+
+    /* Skip legacy I/O port space, we already know about it */
+    if (phys_base == 0)
+        return 0;
+
+    /*
+     * Dom0 Linux initializes io spaces sequentially, if that changes,
+     * we'll need to add thread protection and the ability to handle
+     * a sparsely populated io_space array.
+     */
+    if (space_number > MAX_IO_SPACES || space_number != num_io_spaces)
+        return -EINVAL;
+
+    io_space[space_number].mmio_base = phys_base;
+    io_space[space_number].sparse = sparse;
+
+    num_io_spaces++;
+
+    fp = space_number << IO_SPACE_BITS;
+    lp = fp | 0xffff;
+
+    return ioports_permit_access(d, fp, lp);
+}
+
 unsigned long
 do_dom0vp_op(unsigned long cmd,
              unsigned long arg0, unsigned long arg1, unsigned long arg2,
@@ -419,6 +453,9 @@ do_dom0vp_op(unsigned long cmd,
         ret = dom0vp_fpswa_revision(hnd);
         break;
     }
+    case IA64_DOM0VP_add_io_space:
+        ret = dom0vp_add_io_space(d, arg0, arg1, arg2);
+        break;
     default:
         ret = -1;
 		printk("unknown dom0_vp_op 0x%lx\n", cmd);
