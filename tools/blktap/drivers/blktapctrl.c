@@ -143,7 +143,8 @@ static int get_new_dev(int *major, int *minor, blkif_t *blkif)
 		return -1;
 	}
 
-	asprintf(&devname,"%s/%s%d",BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, *minor);
+	if (asprintf(&devname,"%s/%s%d",BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, *minor) == -1)
+		return -1;
 	make_blktap_dev(devname,*major,*minor);	
 	DPRINTF("Received device id %d and major %d, "
 		"sent domid %d and be_id %d\n",
@@ -495,20 +496,27 @@ int blktapctrl_new_blkif(blkif_t *blkif)
 
 		if (!exist) {
 			DPRINTF("Process does not exist:\n");
-			asprintf(&rdctldev, 
-				 "%s/tapctrlread%d", BLKTAP_CTRL_DIR, minor);
+			if (asprintf(&rdctldev,
+				     "%s/tapctrlread%d", BLKTAP_CTRL_DIR, minor) == -1)
+				return -1;
+			if (asprintf(&wrctldev,
+				     "%s/tapctrlwrite%d", BLKTAP_CTRL_DIR, minor) == -1) {
+				free(rdctldev);
+				return -1;
+			}
+			if (asprintf(&cmd, "tapdisk %s %s", wrctldev, rdctldev) == -1) {
+				free(rdctldev);
+				free(wrctldev);
+				return -1;
+			}
+
 			blkif->fds[READ] = open_ctrl_socket(rdctldev);
-
-
-			asprintf(&wrctldev, 
-				 "%s/tapctrlwrite%d", BLKTAP_CTRL_DIR, minor);
 			blkif->fds[WRITE] = open_ctrl_socket(wrctldev);
 			
 			if (blkif->fds[READ] == -1 || blkif->fds[WRITE] == -1) 
 				goto fail;
 
 			/*launch the new process*/
-			asprintf(&cmd, "tapdisk %s %s", wrctldev, rdctldev);
 			DPRINTF("Launching process, CMDLINE [%s]\n",cmd);
 			if (system(cmd) == -1) {
 				DPRINTF("Unable to fork, cmdline: [%s]\n",cmd);
@@ -692,7 +700,8 @@ int main(int argc, char *argv[])
 	register_new_unmap_hook(unmap_blktapctrl);
 
 	/* Attach to blktap0 */
-	asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME);
+	if (asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME) == -1)
+                goto open_failed;
 	if ((ret = xc_find_device_number("blktap0")) < 0) {
 		DPRINTF("couldn't find device number for 'blktap0'\n");
 		goto open_failed;

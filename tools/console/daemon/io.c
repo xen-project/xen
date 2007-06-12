@@ -303,7 +303,10 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 		void *result = va_arg(ap, void *);
 		char *p;
 
-		asprintf(&path, "%s/%s", dir, name);
+		if (asprintf(&path, "%s/%s", dir, name) == -1) {
+			ret = ENOMEM;
+			break;
+		}
 		p = xs_read(xs, XBT_NULL, path, NULL);
 		free(path);
 		if (p == NULL) {

@@ -871,7 +871,10 @@ int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	}
 
 	s->fd = fd;
-	asprintf(&s->name,"%s", name);
+	if (asprintf(&s->name,"%s", name) == -1) {
+		close(fd);
+		return -1;
+	}
 
 	ASSERT(sizeof(QCowHeader) + sizeof(QCowHeader_ext) < 512);
 
@@ -1165,7 +1168,7 @@ int tdqcow_close(struct disk_driver *dd)
 		offset = sizeof(QCowHeader) + sizeof(uint32_t);
 		lseek(fd, offset, SEEK_SET);
 		out = cpu_to_be32(cksum);
-		write(fd, &out, sizeof(uint32_t));
+		if (write(fd, &out, sizeof(uint32_t))) ;
 		close(fd);
 	}
 
