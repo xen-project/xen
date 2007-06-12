@@ -60,7 +60,7 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 || ln -sf $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
 
 # I'm sure a Makefile wizard would know a better way to do this
-xen.lds.s: xen/xen.lds.S
+xen.lds.s: xen/xen.lds.S $(HDRS)
 	$(CC) -E $(CPPFLAGS) -P -DXEN $(AFLAGS) \
 		-o xen.lds.s xen/xen.lds.S
 
