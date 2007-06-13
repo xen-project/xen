@@ -1483,6 +1483,12 @@ class XendAPI(object):
         else:
             return xen_api_success_void()
     
+    def VM_set_VCPUs_at_startup(self, session, vm_ref, num):
+        return self.VM_set('VCPUs_at_startup', session, vm_ref, num)
+
+    def VM_set_VCPUs_max(self, session, vm_ref, num):
+        return self.VM_set('VCPUs_max', session, vm_ref, num)
+
     def VM_set_actions_after_shutdown(self, session, vm_ref, action):
         if action not in XEN_API_ON_NORMAL_EXIT:
             return xen_api_error(['VM_ON_NORMAL_EXIT_INVALID', vm_ref])
