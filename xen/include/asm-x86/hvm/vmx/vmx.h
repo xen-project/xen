@@ -46,8 +46,8 @@ void vmx_vlapic_msr_changed(struct vcpu *v);
 #define EXIT_REASON_SIPI                4
 #define EXIT_REASON_IO_SMI              5
 #define EXIT_REASON_OTHER_SMI           6
-#define EXIT_REASON_PENDING_INTERRUPT   7
-
+#define EXIT_REASON_PENDING_VIRT_INTR   7
+#define EXIT_REASON_PENDING_VIRT_NMI    8
 #define EXIT_REASON_TASK_SWITCH         9
 #define EXIT_REASON_CPUID               10
 #define EXIT_REASON_HLT                 12
@@ -295,7 +295,14 @@ static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
 {
     unsigned long intr_fields;
 
-    /* Reflect it back into the guest */
+    /*
+     * NB. Callers do not need to worry about clearing STI/MOV-SS blocking:
+     *  "If the VM entry is injecting, there is no blocking by STI or by
+     *   MOV SS following the VM entry, regardless of the contents of the
+     *   interruptibility-state field [in the guest-state area before the
+     *   VM entry]", PRM Vol. 3, 22.6.1 (Interruptibility State).
+     */
+
     intr_fields = (INTR_INFO_VALID_MASK | type | trap);
     if ( error_code != VMX_DELIVER_NO_ERROR_CODE ) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
@@ -332,7 +339,6 @@ static inline void vmx_inject_sw_exception(
 static inline void vmx_inject_extint(struct vcpu *v, int trap, int error_code)
 {
     __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code, 0);
-    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 }
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */
