@@ -1887,6 +1887,17 @@ class XendAPI(object):
         xd.managed_config_save(vm)
         return xen_api_success_void()
 
+    def VBD_set_mode(self, session, vbd_ref, mode):
+        if mode == 'RW':
+            mode = 'w'
+        else:
+            mode = 'r'
+        xd = XendDomain.instance()
+        vm = xd.get_vm_with_dev_uuid('vbd', vbd_ref)
+        vm.set_dev_property('vbd', vbd_ref, 'mode', mode)
+        xd.managed_config_save(vm)
+        return xen_api_success_void()
+
     def VBD_get_all(self, session):
         xendom = XendDomain.instance()
         vbds = [d.get_vbds() for d in XendDomain.instance().list('all')]
