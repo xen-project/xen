@@ -463,7 +463,7 @@ xen_vbd_set_mode(xen_session *session, xen_vbd vbd, enum xen_vbd_mode mode)
             { .type = &abstract_type_string,
               .u.string_val = vbd },
             { .type = &xen_vbd_mode_abstract_type_,
-              .u.string_val = xen_vbd_mode_to_string(mode) }
+              .u.enum_val = mode }
         };
 
     xen_call_(session, "VBD.set_mode", param_values, 2, NULL, NULL);
@@ -479,7 +479,7 @@ xen_vbd_set_type(xen_session *session, xen_vbd vbd, enum xen_vbd_type type)
             { .type = &abstract_type_string,
               .u.string_val = vbd },
             { .type = &xen_vbd_type_abstract_type_,
-              .u.string_val = xen_vbd_type_to_string(type) }
+              .u.enum_val = type }
         };
 
     xen_call_(session, "VBD.set_type", param_values, 2, NULL, NULL);

@@ -1142,7 +1142,7 @@ xen_vm_set_actions_after_shutdown(xen_session *session, xen_vm vm, enum xen_on_n
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &xen_on_normal_exit_abstract_type_,
-              .u.string_val = xen_on_normal_exit_to_string(after_shutdown) }
+              .u.enum_val = after_shutdown }
         };
 
     xen_call_(session, "VM.set_actions_after_shutdown", param_values, 2, NULL, NULL);
@@ -1158,7 +1158,7 @@ xen_vm_set_actions_after_reboot(xen_session *session, xen_vm vm, enum xen_on_nor
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &xen_on_normal_exit_abstract_type_,
-              .u.string_val = xen_on_normal_exit_to_string(after_reboot) }
+              .u.enum_val = after_reboot }
         };
 
     xen_call_(session, "VM.set_actions_after_reboot", param_values, 2, NULL, NULL);
@@ -1174,7 +1174,7 @@ xen_vm_set_actions_after_crash(xen_session *session, xen_vm vm, enum xen_on_cras
             { .type = &abstract_type_string,
               .u.string_val = vm },
             { .type = &xen_on_crash_behaviour_abstract_type_,
-              .u.string_val = xen_on_crash_behaviour_to_string(after_crash) }
+              .u.enum_val = after_crash }
         };
 
     xen_call_(session, "VM.set_actions_after_crash", param_values, 2, NULL, NULL);
