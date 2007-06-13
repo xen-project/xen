@@ -290,12 +290,24 @@ static void print(const char *fmt, ...)
 	}
 }
 
+static void xentop_attron(int attr)
+{
+	if (!batch)
+		attron(attr);
+}
+
+static void xentop_attroff(int attr)
+{
+	if (!batch)
+		attroff(attr);
+}
+
 /* Print a string with the given attributes set. */
 static void attr_addstr(int attr, const char *str)
 {
-	attron(attr);
+	xentop_attron(attr);
 	addstr((curses_str_t)str);
-	attroff(attr);
+	xentop_attroff(attr);
 }
 
 /* Handle setting the delay from the user-supplied value in prompt_val */
@@ -780,18 +792,18 @@ void do_header(void)
 	field_id i;
 
 	/* Turn on REVERSE highlight attribute for headings */
-	attron(A_REVERSE);
+	xentop_attron(A_REVERSE);
 	for(i = 0; i < NUM_FIELDS; i++) {
-		if(i != 0)
+		if (i != 0)
 			print(" ");
 		/* The BOLD attribute is turned on for the sort column */
-		if(i == sort_field)
-			attron(A_BOLD);
+		if (i == sort_field)
+			xentop_attron(A_BOLD);
 		print("%*s", fields[i].default_width, fields[i].header);
-		if(i == sort_field)
-			attroff(A_BOLD);
+		if (i == sort_field)
+			xentop_attroff(A_BOLD);
 	}
-	attroff(A_REVERSE);
+	xentop_attroff(A_REVERSE);
 	print("\n");
 }
 
@@ -838,14 +850,14 @@ void do_bottom_line(void)
 void do_domain(xenstat_domain *domain)
 {
 	unsigned int i;
-	for(i = 0; i < NUM_FIELDS; i++) {
-		if(i != 0)
+	for (i = 0; i < NUM_FIELDS; i++) {
+		if (i != 0)
 			print(" ");
-		if(i == sort_field)
-			attron(A_BOLD);
+		if (i == sort_field)
+			xentop_attron(A_BOLD);
 		fields[i].print(domain);
-		if(i == sort_field)
-			attroff(A_BOLD);
+		if (i == sort_field)
+			xentop_attroff(A_BOLD);
 	}
 	print("\n");
 }
@@ -956,7 +968,8 @@ static void top(void)
 		fail("Failed to retrieve statistics from libxenstat\n");
 
 	/* dump summary top information */
-	do_summary();
+	if (!batch)
+		do_summary();
 
 	/* Count the number of domains for which to report data */
 	num_domains = xenstat_node_num_domains(cur_node);
@@ -976,7 +989,7 @@ static void top(void)
 		first_domain_index = num_domains-1;
 
 	for (i = first_domain_index; i < num_domains; i++) {
-		if(current_row() == lines()-1)
+		if(!batch && current_row() == lines()-1)
 			break;
 		if (i == first_domain_index || repeat_header)
 			do_header();
@@ -989,8 +1002,8 @@ static void top(void)
 			do_vbd(domains[i]);
 	}
 
-	if(!batch)
-	do_bottom_line();
+	if (!batch)
+		do_bottom_line();
 
 	free(domains);
 }
