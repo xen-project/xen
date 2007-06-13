@@ -49,7 +49,7 @@ xc_core_arch_memory_map_get(int xc_handle, xc_dominfo_t *info,
     }
 
     map->addr = 0;
-    map->size = p2m_size << PAGE_SHIFT;
+    map->size = ((uint64_t)p2m_size) << PAGE_SHIFT;
 
     *mapp = map;
     *nr_entries = 1;

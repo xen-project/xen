@@ -220,7 +220,8 @@ static int map_new_dev(struct td_state *s, int minor)
 	fd_list_entry_t *ptr;
 	int page_size;
 
-	asprintf(&devname,"%s/%s%d", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, minor);
+	if (asprintf(&devname,"%s/%s%d", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, minor) == -1)
+		return -1;
 	tap_fd = open(devname, O_RDWR);
 	if (tap_fd == -1) 
 	{

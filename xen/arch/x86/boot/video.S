@@ -15,7 +15,7 @@
 
 #include "video.h"
 
-#define modelist (0x2000)
+#define modelist (0x3000)
 
 /* Retrieve Extended Display Identification Data. */
 #define CONFIG_FIRMWARE_EDID
@@ -882,27 +882,18 @@ gettime:
 
 store_edid:
 #ifdef CONFIG_FIRMWARE_EDID
-        pushw   %es                     # just save all registers
         pushw   %ax
         pushw   %bx
         pushw   %cx
         pushw   %dx
         pushw   %di
 
-        pushw   %fs
-        popw    %es
-
-        movl    $0x13131313, %eax       # memset block with 0x13
-        movw    $32, %cx
-        movw    $0x140, %di
-        cld
-        rep
-        stosl
+        cmpb    $1, bootsym(opt_edid)   # EDID disabled on cmdline (edid=no)?
+        je      .Lno_edid
 
         cmpw    $0x0200, bootsym(vbe_version)  # only do EDID on >= VBE2.0
-        jl      no_edid
+        jl      .Lno_edid
 
-        pushw   %es                     # save ES
         xorw    %di, %di                # Report Capability
         pushw   %di
         popw    %es                     # ES:DI must be 0:0
@@ -910,31 +901,40 @@ store_edid:
         xorw    %bx, %bx
         xorw    %cx, %cx
         int     $0x10
-        popw    %es                     # restore ES
+        cmpw    $0x004f, %ax            # Call failed?
+        jne     .Lno_edid
 
-        cmpb    $0x00, %ah              # call successful
-        jne     no_edid
+        movw    %bx, bootsym(boot_edid_caps)
 
-        cmpb    $0x4f, %al              # function supported
-        jne     no_edid
+        cmpb    $2, bootsym(opt_edid)   # EDID forced on cmdline (edid=force)?
+        je      .Lforce_edid
 
+        /* EDID not forced on cmdline, so perform further sanity checks. */
+        testb   $3,%bl                  # No DDC capabilities?
+        jz      .Lno_edid
+        cmpb    $5,%bh                  # Longer than 5s to read EDID?
+        ja      .Lno_edid
+
+.Lforce_edid:
         movw    $0x4f15, %ax            # do VBE/DDC
         movw    $0x01, %bx
         movw    $0x00, %cx
         movw    $0x00, %dx
-        movw    $0x140, %di
+        pushw   %ds
+        popw    %es
+        movw    $bootsym(boot_edid_info), %di
         int     $0x10
 
-no_edid:
+.Lno_edid:
         popw    %di                     # restore all registers
         popw    %dx
         popw    %cx
         popw    %bx
         popw    %ax
-        popw    %es
 #endif
         ret
 
+opt_edid:       .byte   0       # EDID parsing option (force/no/default)
 mt_end:         .word   0       # End of video mode table if built
 edit_buf:       .space  6       # Line editor buffer
 card_name:      .word   0       # Pointer to adapter name
@@ -983,7 +983,7 @@ force_size:     .word   0       # Use this size instead of the one in BIOS vars
 
 vesa_size:      .word   0,0,0   # width x depth x height
 
-                .globl  boot_vid_info
+                .globl  boot_vid_info, boot_edid_info, boot_edid_caps
 /* If we don't run at all, assume basic video mode 3 at 80x25. */
 boot_vid_mode:  .word   VIDEO_80x25
 boot_vid_info:  .byte   0, 0    /* orig_x, orig_y */
@@ -992,3 +992,5 @@ boot_vid_info:  .byte   0, 0    /* orig_x, orig_y */
                 .byte   1       /* isVGA          */
                 .word   16      /* 8x16 font      */
                 .fill   0x28,1,0
+boot_edid_info: .fill   128,1,0x13
+boot_edid_caps: .word   0x1313

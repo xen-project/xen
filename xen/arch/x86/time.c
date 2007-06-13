@@ -957,14 +957,12 @@ int time_suspend(void)
 
 int time_resume(void)
 {
-    u64 now_sec, tmp = init_pit_and_calibrate_tsc();
+    u64 tmp = init_pit_and_calibrate_tsc();
 
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
 
     resume_platform_timer();
-    now_sec = read_platform_stime();
-    do_div(now_sec, SECONDS(1));
-    wc_sec = get_cmos_time() - now_sec;
+    do_settime(get_cmos_time(), 0, read_platform_stime());
 
     init_percpu_time();
 

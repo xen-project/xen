@@ -126,10 +126,12 @@ int xs_printf(struct xs_handle *h, const char *dir, const char *node,
 	ret = vasprintf(&buf, fmt, ap);
 	va_end(ap);
 	
-	asprintf(&path, "%s/%s", dir, node);
-	
-	if ((path == NULL) || (buf == NULL))
-		return 0;
+	if (ret == -1)
+		return ENOMEM;
+	if (asprintf(&path, "%s/%s", dir, node) == -1) {
+		free(buf);
+		return ENOMEM;
+	}
 
 	ret = xs_write(h, XBT_NULL, path, buf, strlen(buf)+1);
 	
@@ -180,10 +182,11 @@ char *get_dom_domid(struct xs_handle *h)
 	
 	e = xs_directory(h, xth, "/local/domain", &num);
 	if (e == NULL)
-		return NULL;
+		goto done;
 
 	for (i = 0; (i < num) && (domid == NULL); i++) {
-		asprintf(&path, "/local/domain/%s/name", e[i]);
+		if (asprintf(&path, "/local/domain/%s/name", e[i]) == -1)
+			break;
 		val = xs_read(h, xth, path, &len);
 		free(path);
 		if (val == NULL)
@@ -191,29 +194,31 @@ char *get_dom_domid(struct xs_handle *h)
 		
 		if (strcmp(val, DOMNAME) == 0) {
 			/* match! */
-			asprintf(&path, "/local/domain/%s/domid", e[i]);
+			if (asprintf(&path, "/local/domain/%s/domid", e[i]) == -1) {
+				free(val);
+				break;
+			}
 			domid = xs_read(h, xth, path, &len);
 			free(path);
 		}
 		free(val);
 	}
+done:
 	xs_transaction_end(h, xth, 0);
-	
-	free(e);
+	if (e)
+		free(e);
 	return domid;
 }
 
 int convert_dev_name_to_num(char *name) {
-	char *p_sd, *p_hd, *p_xvd, *p_plx, *p, *alpha,*ptr;
+	char *p, *ptr;
 	int majors[10] = {3,22,33,34,56,57,88,89,90,91};
 	int maj,i,ret = 0;
-
-	asprintf(&p_sd,"/dev/sd");
-	asprintf(&p_hd,"/dev/hd");
-	asprintf(&p_xvd,"/dev/xvd");
-	asprintf(&p_plx,"plx");
-	asprintf(&alpha,"abcdefghijklmnop");
-	
+	char *p_sd = "/dev/sd";
+	char *p_hd = "/dev/hd";
+	char *p_xvd = "/dev/xvd";
+	char *p_plx = "plx";
+	char *alpha = "abcdefghijklmnop";
 
 	if (strstr(name, p_sd) != NULL) {
 		p = name + strlen(p_sd);
@@ -250,12 +255,6 @@ int convert_dev_name_to_num(char *name) {
 		DPRINTF("Unknown device type, setting to default.\n");
 		ret = BASE_DEV_VAL;
 	}
-
-	free(p_sd);
-	free(p_hd);
-	free(p_xvd);
-	free(p_plx);
-	free(alpha);
 
 	return ret;
 }

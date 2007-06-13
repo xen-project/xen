@@ -823,12 +823,12 @@ const xc_error *xc_get_last_error(void);
  */
 void xc_clear_last_error(void);
 
-typedef void (*xc_error_handler)(const xc_error * const err);
+typedef void (*xc_error_handler)(const xc_error *err);
 
 /*
  * The default error handler which prints to stderr
  */
-void xc_default_error_handler(const xc_error * const err);
+void xc_default_error_handler(const xc_error *err);
 
 /*
  * Convert an error code into a text description

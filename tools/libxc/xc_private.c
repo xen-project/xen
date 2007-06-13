@@ -17,7 +17,7 @@ static xc_error_handler error_handler = xc_default_error_handler;
 static xc_error_handler error_handler = NULL;
 #endif
 
-void xc_default_error_handler(const xc_error const *err)
+void xc_default_error_handler(const xc_error *err)
 {
     const char *desc = xc_error_code_to_desc(err->code);
     fprintf(stderr, "ERROR %s: %s\n", desc, err->message);

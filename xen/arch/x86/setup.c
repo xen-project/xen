@@ -34,6 +34,7 @@
 #include <asm/e820.h>
 #include <acm/acm_hooks.h>
 #include <xen/kexec.h>
+#include <asm/edd.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32)
@@ -46,6 +47,10 @@
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
 extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
+
+extern u16 boot_edid_caps;
+extern u8 boot_edid_info[128];
+extern struct boot_video_info boot_vid_info;
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
@@ -348,7 +353,6 @@ struct boot_video_info {
 
 static void __init parse_video_info(void)
 {
-    extern struct boot_video_info boot_vid_info;
     struct boot_video_info *bvi = &bootsym(boot_vid_info);
 
     if ( (bvi->orig_video_isVGA == 1) && (bvi->orig_video_mode == 3) )
@@ -444,21 +448,54 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     printk("Command line: %s\n", cmdline);
 
+    printk("Video information:\n");
+
+    /* Print VGA display mode information. */
     switch ( vga_console_info.video_type )
     {
     case XEN_VGATYPE_TEXT_MODE_3:
-        printk("VGA is text mode %dx%d, font 8x%d\n",
+        printk(" VGA is text mode %dx%d, font 8x%d\n",
                vga_console_info.u.text_mode_3.columns,
                vga_console_info.u.text_mode_3.rows,
                vga_console_info.u.text_mode_3.font_height);
         break;
     case XEN_VGATYPE_VESA_LFB:
-        printk("VGA is graphics mode %dx%d, %d bpp\n",
+        printk(" VGA is graphics mode %dx%d, %d bpp\n",
                vga_console_info.u.vesa_lfb.width,
                vga_console_info.u.vesa_lfb.height,
                vga_console_info.u.vesa_lfb.bits_per_pixel);
         break;
+    default:
+        printk(" No VGA detected\n");
+        break;
     }
+
+    /* Print VBE/DDC EDID information. */
+    if ( bootsym(boot_edid_caps) != 0x1313 )
+    {
+        u16 caps = bootsym(boot_edid_caps);
+        printk(" VBE/DDC methods:%s%s%s; ",
+               (caps & 1) ? " V1" : "",
+               (caps & 2) ? " V2" : "",
+               !(caps & 3) ? " none" : "");
+        printk("EDID transfer time: %d seconds\n", caps >> 8);
+        if ( *(u32 *)bootsym(boot_edid_info) == 0x13131313 )
+        {
+            printk(" EDID info not retrieved because ");
+            if ( !(caps & 3) )
+                printk("no DDC retrieval method detected\n");
+            else if ( (caps >> 8) > 5 )
+                printk("takes longer than 5 seconds\n");
+            else
+                printk("of reasons unknown\n");
+        }
+    }
+
+    printk("Disc information:\n");
+    printk(" Found %d MBR signatures\n",
+           bootsym(boot_edd_signature_nr));
+    printk(" Found %d EDD information structures\n",
+           bootsym(boot_edd_info_nr));
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )

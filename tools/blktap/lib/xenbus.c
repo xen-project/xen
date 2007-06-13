@@ -360,8 +360,7 @@ int add_blockdevice_probe_watch(struct xs_handle *h, const char *domid)
 	char *path;
 	struct xenbus_watch *vbd_watch;
 	
-	asprintf(&path, "/local/domain/%s/backend/tap", domid);
-	if (path == NULL) 
+	if (asprintf(&path, "/local/domain/%s/backend/tap", domid) == -1)
 		return -ENOMEM;
 	
 	vbd_watch = (struct xenbus_watch *)malloc(sizeof(struct xenbus_watch));
@@ -399,8 +398,7 @@ int watch_for_domid(struct xs_handle *h)
 	struct xenbus_watch *domid_watch;
 	char *path = NULL;
 
-	asprintf(&path, "/local/domain");
-	if (path == NULL) 
+	if (asprintf(&path, "/local/domain") == -1)
 		return -ENOMEM;
 
 	domid_watch = malloc(sizeof(struct xenbus_watch));

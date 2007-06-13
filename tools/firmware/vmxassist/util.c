@@ -27,7 +27,7 @@
 
 static void putchar(int);
 static char *printnum(char *, unsigned long, int);
-static void _doprint(void (*)(int), char const *, va_list);
+static void _doprint(void (*)(int), const char *, va_list);
 
 void
 cpuid_addr_value(uint64_t addr, uint64_t *value)
@@ -321,7 +321,7 @@ putchar(int ch)
  * but still powerful enough for most tasks.
  */
 static void
-_doprint(void (*put)(int), char const *fmt, va_list ap)
+_doprint(void (*put)(int), const char *fmt, va_list ap)
 {
 	register char *str, c;
 	int lflag, zflag, nflag;
