@@ -709,11 +709,22 @@ copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
 
 int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom) 
 {
+    xc_dominfo_t info;
     uint64_t nvram_fd = 0;
+
+    if ( xc_domain_getinfo(xc_handle, dom, 1, &info) != 1 )
+    {
+        PERROR("Could not get info for domain");
+        return -1;
+    }
+
+    if ( !info.hvm )
+        return 0;
+
     xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
 
     if ( !IS_VALID_NVRAM_FD(nvram_fd) )
-        PERROR("Nvram not be initialized. Nvram save fail!\n");
+        PERROR("Nvram not initialized. Nvram save failed!\n");
     else
         copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
 	
