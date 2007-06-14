@@ -944,8 +944,6 @@ int vlapic_init(struct vcpu *v)
     if ( v->vcpu_id == 0 )
         vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
-    init_timer(&vlapic->pt.timer, pt_timer_fn, &vlapic->pt, v->processor);
-
     return 0;
 }
 
@@ -953,7 +951,7 @@ void vlapic_destroy(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    kill_timer(&vlapic->pt.timer);
+    destroy_periodic_time(&vlapic->pt);
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);
 }

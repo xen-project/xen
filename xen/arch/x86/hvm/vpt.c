@@ -22,31 +22,31 @@
 #include <asm/hvm/vpt.h>
 #include <asm/event.h>
 
-static __inline__ void missed_ticks(struct periodic_time *pt)
+static void missed_ticks(struct periodic_time *pt)
 {
     s_time_t missed_ticks;
 
     missed_ticks = NOW() - pt->scheduled;
-    if ( missed_ticks > 0 ) 
+    if ( missed_ticks <= 0 )
+        return;
+
+    missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
+    if ( missed_ticks > 1000 )
     {
-        missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
-        if ( missed_ticks > 1000 )
-        {
-            /* TODO: Adjust guest time together */
-            pt->pending_intr_nr++;
-        }
-        else
-        {
-            pt->pending_intr_nr += missed_ticks;
-        }
-        pt->scheduled += missed_ticks * pt->period;
+        /* TODO: Adjust guest time together */
+        pt->pending_intr_nr++;
     }
+    else
+    {
+        pt->pending_intr_nr += missed_ticks;
+    }
+
+    pt->scheduled += missed_ticks * pt->period;
 }
 
 void pt_freeze_time(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct list_head *list;
     struct periodic_time *pt;
 
     if ( test_bit(_VPF_blocked, &v->pause_flags) )
@@ -54,17 +54,13 @@ void pt_freeze_time(struct vcpu *v)
 
     v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
 
-    list_for_each( list, head )
-    {
-        pt = list_entry(list, struct periodic_time, list);
+    list_for_each_entry ( pt, head, list )
         stop_timer(&pt->timer);
-    }
 }
 
 void pt_thaw_time(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct list_head *list;
     struct periodic_time *pt;
 
     if ( v->arch.hvm_vcpu.guest_time )
@@ -72,17 +68,15 @@ void pt_thaw_time(struct vcpu *v)
         hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
         v->arch.hvm_vcpu.guest_time = 0;
 
-        list_for_each( list, head )
+        list_for_each_entry ( pt, head, list )
         {
-            pt = list_entry(list, struct periodic_time, list);
             missed_ticks(pt);
             set_timer(&pt->timer, pt->scheduled);
         }
     }
 }
 
-/* Hook function for the platform periodic time */
-void pt_timer_fn(void *data)
+static void pt_timer_fn(void *data)
 {
     struct periodic_time *pt = data;
 
@@ -100,14 +94,12 @@ void pt_timer_fn(void *data)
 void pt_update_irq(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct list_head *list;
     struct periodic_time *pt;
     uint64_t max_lag = -1ULL;
     int irq = -1;
 
-    list_for_each( list, head )
+    list_for_each_entry ( pt, head, list )
     {
-        pt = list_entry(list, struct periodic_time, list);
         if ( !is_isa_irq_masked(v, pt->irq) && pt->pending_intr_nr &&
              ((pt->last_plt_gtime + pt->period_cycles) < max_lag) )
         {
@@ -130,14 +122,12 @@ void pt_update_irq(struct vcpu *v)
 struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct list_head *list;
     struct periodic_time *pt;
     struct RTCState *rtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
     int vec;
 
-    list_for_each( list, head )
+    list_for_each_entry ( pt, head, list )
     {
-        pt = list_entry(list, struct periodic_time, list);
         if ( !pt->pending_intr_nr )
             continue;
 
@@ -177,17 +167,14 @@ void pt_intr_post(struct vcpu *v, int vector, int type)
         pt->cb(pt->vcpu, pt->priv);
 }
 
-/* If pt is enabled, discard pending intr */
 void pt_reset(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct list_head *list;
     struct periodic_time *pt;
 
-    list_for_each( list, head )
+    list_for_each_entry ( pt, head, list )
     {
-	pt = list_entry(list, struct periodic_time, list);
-	if ( pt->enabled )
+        if ( pt->enabled )
         {
             pt->pending_intr_nr = 0;
             pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
@@ -197,11 +184,25 @@ void pt_reset(struct vcpu *v)
     }
 }
 
-void create_periodic_time(struct vcpu *v, struct periodic_time *pt, uint64_t period,
-                          uint8_t irq, char one_shot, time_cb *cb, void *data)
+void pt_migrate(struct vcpu *v)
+{
+    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
+    struct periodic_time *pt;
+
+    list_for_each_entry ( pt, head, list )
+    {
+        if ( pt->enabled )
+            migrate_timer(&pt->timer, v->processor);
+    }
+}
+
+void create_periodic_time(
+    struct vcpu *v, struct periodic_time *pt, uint64_t period,
+    uint8_t irq, char one_shot, time_cb *cb, void *data)
 {
     destroy_periodic_time(pt);
 
+    init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
     pt->enabled = 1;
     if ( period < 900000 ) /* < 0.9 ms */
     {
@@ -226,11 +227,11 @@ void create_periodic_time(struct vcpu *v, struct periodic_time *pt, uint64_t per
 
 void destroy_periodic_time(struct periodic_time *pt)
 {
-    if ( pt->enabled )
-    {
-        pt->enabled = 0;
-        pt->pending_intr_nr = 0;
-        list_del(&pt->list);
-        stop_timer(&pt->timer);
-    }
+    if ( !pt->enabled )
+        return;
+
+    pt->enabled = 0;
+    pt->pending_intr_nr = 0;
+    list_del(&pt->list);
+    kill_timer(&pt->timer);
 }

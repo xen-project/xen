@@ -115,19 +115,19 @@ struct pl_time {    /* platform time */
 
 void pt_freeze_time(struct vcpu *v);
 void pt_thaw_time(struct vcpu *v);
-void pt_timer_fn(void *data);
 void pt_update_irq(struct vcpu *v);
 struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type);
 void pt_intr_post(struct vcpu *v, int vector, int type);
 void pt_reset(struct vcpu *v);
-void create_periodic_time(struct vcpu *v, struct periodic_time *pt, uint64_t period,
-                          uint8_t irq, char one_shot, time_cb *cb, void *data);
+void pt_migrate(struct vcpu *v);
+void create_periodic_time(
+    struct vcpu *v, struct periodic_time *pt, uint64_t period,
+    uint8_t irq, char one_shot, time_cb *cb, void *data);
 void destroy_periodic_time(struct periodic_time *pt);
 
 int pv_pit_handler(int port, int data, int write);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void pit_stop_channel0_irq(PITState * pit);
-void pit_migrate_timers(struct vcpu *v);
 void pit_deinit(struct domain *d);
 void rtc_init(struct vcpu *v, int base);
 void rtc_migrate_timers(struct vcpu *v);

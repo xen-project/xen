@@ -28,8 +28,6 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 
-/* #define DEBUG_RTC */
-
 void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
@@ -56,16 +54,16 @@ static void rtc_timer_update(RTCState *s, struct vcpu *v)
     {
         if ( period_code <= 2 )
             period_code += 7;
-        
+
         period = 1 << (period_code - 1); /* period in 32 Khz cycles */
         period = DIV_ROUND((period * 1000000000ULL), 32768); /* period in ns */
-#ifdef DEBUG_RTC
-        printk("HVM_RTC: period = %uns\n", period);
-#endif
-        create_periodic_time(v, &s->pt, period, RTC_IRQ, 0, rtc_periodic_cb, s);
-    } 
+        create_periodic_time(v, &s->pt, period, RTC_IRQ,
+                             0, rtc_periodic_cb, s);
+    }
     else
+    {
         destroy_periodic_time(&s->pt);
+    }
 }
 
 static void rtc_set_time(RTCState *s);
@@ -80,13 +78,8 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         return (s->hw.cmos_index < RTC_CMOS_SIZE);
     }
 
-    if (s->hw.cmos_index >= RTC_CMOS_SIZE)
+    if ( s->hw.cmos_index >= RTC_CMOS_SIZE )
         return 0;
-
-#ifdef DEBUG_RTC
-    printk("HVM_RTC: write index=0x%02x val=0x%02x\n",
-           s->hw.cmos_index, data);
-#endif
 
     switch ( s->hw.cmos_index )
     {
@@ -182,7 +175,8 @@ static void rtc_copy_date(RTCState *s)
 {
     const struct tm *tm = &s->current_tm;
 
-    if (s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds) {
+    if ( s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds )
+    {
         s->current_tm = gmtime(get_localtime(s->pt.vcpu->domain));
         s->time_offset_seconds = s->pt.vcpu->domain->time_offset_seconds;
     }
@@ -229,33 +223,41 @@ static void rtc_next_second(RTCState *s)
     struct tm *tm = &s->current_tm;
     int days_in_month;
 
-    if (s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds) {
+    if ( s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds )
+    {
         s->current_tm = gmtime(get_localtime(s->pt.vcpu->domain));
         s->time_offset_seconds = s->pt.vcpu->domain->time_offset_seconds;
     }
 
     tm->tm_sec++;
-    if ((unsigned)tm->tm_sec >= 60) {
+    if ( (unsigned)tm->tm_sec >= 60 )
+    {
         tm->tm_sec = 0;
         tm->tm_min++;
-        if ((unsigned)tm->tm_min >= 60) {
+        if ( (unsigned)tm->tm_min >= 60 )
+        {
             tm->tm_min = 0;
             tm->tm_hour++;
-            if ((unsigned)tm->tm_hour >= 24) {
+            if ( (unsigned)tm->tm_hour >= 24 )
+            {
                 tm->tm_hour = 0;
                 /* next day */
                 tm->tm_wday++;
-                if ((unsigned)tm->tm_wday >= 7)
+                if ( (unsigned)tm->tm_wday >= 7 )
                     tm->tm_wday = 0;
                 days_in_month = get_days_in_month(tm->tm_mon, 
                                                   tm->tm_year + 1900);
                 tm->tm_mday++;
-                if (tm->tm_mday < 1) {
+                if ( tm->tm_mday < 1 )
+                {
                     tm->tm_mday = 1;
-                } else if (tm->tm_mday > days_in_month) {
+                }
+                else if ( tm->tm_mday > days_in_month )
+                {
                     tm->tm_mday = 1;
                     tm->tm_mon++;
-                    if (tm->tm_mon >= 12) {
+                    if ( tm->tm_mon >= 12 )
+                    {
                         tm->tm_mon = 0;
                         tm->tm_year++;
                     }
@@ -360,11 +362,6 @@ static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
         break;
     }
 
-#ifdef DEBUG_RTC
-    printk("HVM_RTC: read index=0x%02x val=0x%02x\n",
-           s->hw.cmos_index, ret);
-#endif
-
     return ret;
 }
 
@@ -375,16 +372,16 @@ static int handle_rtc_io(ioreq_t *p)
 
     if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
     {
-        printk("HVM_RTC: wrong RTC IO!\n");
+        gdprintk(XENLOG_WARNING, "HVM_RTC bas access\n");
         return 1;
     }
     
-    if ( p->dir == 0 ) /* write */
+    if ( p->dir == IOREQ_WRITE )
     {
         if ( rtc_ioport_write(vrtc, p->addr, p->data & 0xFF) )
             return 1;
     }
-    else if ( (p->dir == 1) && (vrtc->hw.cmos_index < RTC_CMOS_SIZE) ) /* read */
+    else if ( vrtc->hw.cmos_index < RTC_CMOS_SIZE )
     {
         p->data = rtc_ioport_read(vrtc, p->addr);
         return 1;
@@ -393,15 +390,12 @@ static int handle_rtc_io(ioreq_t *p)
     return 0;
 }
 
-/* Move the RTC timers on to this vcpu's current cpu */
 void rtc_migrate_timers(struct vcpu *v)
 {
     RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
 
-    if ( s->pt.vcpu == v )
+    if ( v->vcpu_id == 0 )
     {
-        if ( s->pt.enabled )
-            migrate_timer(&s->pt.timer, v->processor);
         migrate_timer(&s->second_timer, v->processor);
         migrate_timer(&s->second_timer2, v->processor);
     }
@@ -452,7 +446,6 @@ void rtc_init(struct vcpu *v, int base)
     s->current_tm = gmtime(get_localtime(v->domain));
     rtc_copy_date(s);
 
-    init_timer(&s->pt.timer, pt_timer_fn, &s->pt, v->processor);
     init_timer(&s->second_timer, rtc_update_second, s, v->processor);
     init_timer(&s->second_timer2, rtc_update_second2, s, v->processor);
 
@@ -466,7 +459,7 @@ void rtc_deinit(struct domain *d)
 {
     RTCState *s = &d->arch.hvm_domain.pl_time.vrtc;
 
-    kill_timer(&s->pt.timer);
+    destroy_periodic_time(&s->pt);
     kill_timer(&s->second_timer);
     kill_timer(&s->second_timer2);
 }

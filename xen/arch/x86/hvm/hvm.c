@@ -109,11 +109,8 @@ u64 hvm_get_guest_time(struct vcpu *v)
 
 void hvm_migrate_timers(struct vcpu *v)
 {
-    pit_migrate_timers(v);
     rtc_migrate_timers(v);
-    hpet_migrate_timers(v);
-    if ( vcpu_vlapic(v)->pt.enabled )
-        migrate_timer(&vcpu_vlapic(v)->pt.timer, v->processor);
+    pt_migrate(v);
 }
 
 void hvm_do_resume(struct vcpu *v)
