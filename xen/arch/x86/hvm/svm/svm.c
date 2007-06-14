@@ -2089,6 +2089,15 @@ static inline void svm_do_msr_access(
             msr_content = 1ULL << 61; /* MC4_MISC.Locked */
             break;
 
+        case MSR_IA32_EBC_FREQUENCY_ID:
+            /*
+             * This Intel-only register may be accessed if this HVM guest
+             * has been migrated from an Intel host. The value zero is not
+             * particularly meaningful, but at least avoids the guest crashing!
+             */
+            msr_content = 0;
+            break;
+
         default:
             if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
                  rdmsr_safe(ecx, eax, edx) == 0 )
