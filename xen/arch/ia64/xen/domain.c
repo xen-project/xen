@@ -1104,7 +1104,8 @@ int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc)
 #define	privify_memory(x,y) do {} while(0)
 #endif
 
-static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf)
+static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf,
+				      unsigned long phys_load_offset)
 {
 	const elf_phdr *phdr;
 	int phnum, h, filesz, memsz;
@@ -1121,6 +1122,7 @@ static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf)
 		memsz = elf_uval(elf, phdr, p_memsz);
 		elfaddr = (unsigned long) elf->image + elf_uval(elf, phdr, p_offset);
 		dom_mpaddr = elf_uval(elf, phdr, p_paddr);
+		dom_mpaddr += phys_load_offset;
 
 		while (memsz > 0) {
 			p = assign_new_domain_page(d,dom_mpaddr);
@@ -1211,6 +1213,7 @@ int __init construct_dom0(struct domain *d,
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
 	unsigned long pstart_info;
+	unsigned long phys_load_offset;
 	struct page_info *start_info_page;
 	unsigned long bp_mpa;
 	struct ia64_boot_param *bp;
@@ -1237,6 +1240,19 @@ int __init construct_dom0(struct domain *d,
 	elf_parse_binary(&elf);
 	if (0 != (elf_xen_parse(&elf, &parms)))
 		return rc;
+
+	/*
+	 * We cannot rely on the load address in the ELF headers to
+	 * determine the meta physical address at which the image
+	 * is loaded.  Patch the address to match the real one, based
+	 * on xen_pstart
+	 */
+	phys_load_offset = xen_pstart - elf.pstart;
+	elf.pstart += phys_load_offset;
+	elf.pend += phys_load_offset;
+	parms.virt_kstart += phys_load_offset;
+	parms.virt_kend += phys_load_offset;
+	parms.virt_entry += phys_load_offset;
 
 	printk(" Dom0 kernel: %s, %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
 	       elf_64bit(&elf) ? "64-bit" : "32-bit",
@@ -1268,8 +1284,10 @@ int __init construct_dom0(struct domain *d,
 	    /* The next page aligned boundary after the start info.
 	       Note: EFI_PAGE_SHIFT = 12 <= PAGE_SHIFT */
 	    pinitrd_start = pstart_info + PAGE_SIZE;
-	    if (pinitrd_start + initrd_len >= dom0_size)
+
+	    if ((pinitrd_start + initrd_len - phys_load_offset) >= dom0_size)
 		    panic("%s: not enough memory assigned to dom0", __func__);
+
 	    for (offset = 0; offset < initrd_len; offset += PAGE_SIZE) {
 		struct page_info *p;
 		p = assign_new_domain_page(d, pinitrd_start + offset);
@@ -1322,7 +1340,7 @@ int __init construct_dom0(struct domain *d,
 		panic("Cannot allocate dom0 vcpu %d\n", i);
 
 	/* Copy the OS image. */
-	loaddomainelfimage(d,&elf);
+	loaddomainelfimage(d, &elf, phys_load_offset);
 
 	BUILD_BUG_ON(sizeof(start_info_t) + sizeof(dom0_vga_console_info_t) +
 	             sizeof(struct ia64_boot_param) > PAGE_SIZE);
