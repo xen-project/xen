@@ -26,7 +26,7 @@ $(DOMFW_ASM_HDRS): ia64/asm
 	ln -sf ../../$(XEN_ROOT)/xen/include/asm-ia64/$(@F) $@
 build: $(DOMFW_ASM_HDR)
 
-.PHONY: mk-symlinks-acpi ia64-clean
+.PHONY: mk-symlinks-acpi mk-symlinks-misc ia64-clean
 
 IA64_HDR_DIRS := ia64/asm ia64/xen ia64/acpi ia64/acpi/platform
 $(IA64_HDR_DIRS):
@@ -41,7 +41,9 @@ mk-symlinks-acpi: $(IA64_HDR_DIRS) $(IA64_EMPTY_FILES) $(DOMFW_ASM_HDRS)
 	( cd ia64/acpi/platform && ln -sf ../../../$(XEN_ROOT)/xen/include/acpi/platform/*.h .)
 	( cd ia64/acpi/platform/ && ln -sf ../../aclinux.h .)
 	( cd ia64/xen && ln -sf ../../$(XEN_ROOT)/xen/include/xen/acpi.h .)
-build: mk-symlinks-acpi
+mk-symlinks-misc:
+	( cd ia64/asm && ln -sf ../../$(XEN_ROOT)/xen/include/asm-ia64/linux-xen/asm/kregs.h .)
+build: mk-symlinks-acpi mk-symlinks-misc
 
 clean: ia64-clean
 ia64-clean:
