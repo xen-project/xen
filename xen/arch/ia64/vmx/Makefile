@@ -18,3 +18,4 @@ obj-y += vmx_virt.o
 obj-y += vmx_vsa.o
 obj-y += vtlb.o
 obj-y += optvfault.o
+obj-y += vacpi.o

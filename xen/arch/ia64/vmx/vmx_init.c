@@ -347,6 +347,8 @@ vmx_relinquish_guest_resources(struct domain *d)
 
 	for_each_vcpu(d, v)
 		vmx_release_assist_channel(v);
+
+	vacpi_relinquish_resources(d);
 }
 
 void
@@ -415,6 +417,8 @@ void vmx_setup_platform(struct domain *d)
 
 	/* Initialize iosapic model within hypervisor */
 	viosapic_init(d);
+
+	vacpi_init(d);
 }
 
 void vmx_do_launch(struct vcpu *v)

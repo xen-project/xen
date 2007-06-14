@@ -37,6 +37,7 @@
 #include <xen/domain.h>
 #include <asm/viosapic.h>
 #include <asm/vlsapic.h>
+#include <asm/hvm/vacpi.h>
 
 #define HVM_BUFFERED_IO_RANGE_NR 1
 
@@ -233,6 +234,9 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     if (vmx_ide_pio_intercept(p, val))
         return;
+
+    if (IS_ACPI_ADDR(p->addr) && vacpi_intercept(p, val))
+	return;
 
     vmx_send_assist_req(v);
     if(dir==IOREQ_READ){ //read

@@ -22,6 +22,7 @@
 #include <public/xen.h>
 #include <public/hvm/params.h>
 #include <asm/viosapic.h>
+#include <asm/hvm/vacpi.h>
 
 
 /* Value of guest os type */
@@ -54,6 +55,7 @@ typedef struct virtual_platform_def {
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */
     struct viosapic     viosapic;
+    struct vacpi        vacpi;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)
