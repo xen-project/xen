@@ -28,6 +28,12 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 
+#define domain_vrtc(d)   (&(d)->arch.hvm_domain.pl_time.vrtc)
+#define vcpu_vrtc(vcpu)  (domain_vrtc((vcpu)->domain))
+#define vrtc_domain(rtc) (container_of((rtc), struct domain, \
+                                       arch.hvm_domain.pl_time.vrtc))
+#define vrtc_vcpu(rtc)   (vrtc_domain(rtc)->vcpu[0])
+
 void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
@@ -39,15 +45,15 @@ int is_rtc_periodic_irq(void *opaque)
     RTCState *s = opaque;
 
     return !(s->hw.cmos_data[RTC_REG_C] & RTC_AF || 
-           s->hw.cmos_data[RTC_REG_C] & RTC_UF);
+             s->hw.cmos_data[RTC_REG_C] & RTC_UF);
 }
 
 /* Enable/configure/disable the periodic timer based on the RTC_PIE and
  * RTC_RATE_SELECT settings */
-static void rtc_timer_update(RTCState *s, struct vcpu *v)
+static void rtc_timer_update(RTCState *s)
 {
-    int period_code; 
-    int period;
+    int period_code, period;
+    struct vcpu *v = vrtc_vcpu(s);
 
     period_code = s->hw.cmos_data[RTC_REG_A] & RTC_RATE_SELECT;
     if ( (period_code != 0) && (s->hw.cmos_data[RTC_REG_B] & RTC_PIE) )
@@ -104,7 +110,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         /* UIP bit is read only */
         s->hw.cmos_data[RTC_REG_A] = (data & ~RTC_UIP) |
             (s->hw.cmos_data[RTC_REG_A] & RTC_UIP);
-        rtc_timer_update(s, current);
+        rtc_timer_update(s);
         break;
     case RTC_REG_B:
         if ( data & RTC_SET )
@@ -120,7 +126,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
                 rtc_set_time(s);
         }
         s->hw.cmos_data[RTC_REG_B] = data;
-        rtc_timer_update(s, current);
+        rtc_timer_update(s);
         break;
     case RTC_REG_C:
     case RTC_REG_D:
@@ -174,11 +180,12 @@ static void rtc_set_time(RTCState *s)
 static void rtc_copy_date(RTCState *s)
 {
     const struct tm *tm = &s->current_tm;
+    struct domain *d = vrtc_domain(s);
 
-    if ( s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds )
+    if ( s->time_offset_seconds != d->time_offset_seconds )
     {
-        s->current_tm = gmtime(get_localtime(s->pt.vcpu->domain));
-        s->time_offset_seconds = s->pt.vcpu->domain->time_offset_seconds;
+        s->current_tm = gmtime(get_localtime(d));
+        s->time_offset_seconds = d->time_offset_seconds;
     }
 
     s->hw.cmos_data[RTC_SECONDS] = to_bcd(s, tm->tm_sec);
@@ -222,11 +229,12 @@ static void rtc_next_second(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
     int days_in_month;
+    struct domain *d = vrtc_domain(s);
 
-    if ( s->time_offset_seconds != s->pt.vcpu->domain->time_offset_seconds )
+    if ( s->time_offset_seconds != d->time_offset_seconds )
     {
-        s->current_tm = gmtime(get_localtime(s->pt.vcpu->domain));
-        s->time_offset_seconds = s->pt.vcpu->domain->time_offset_seconds;
+        s->current_tm = gmtime(get_localtime(d));
+        s->time_offset_seconds = d->time_offset_seconds;
     }
 
     tm->tm_sec++;
@@ -292,6 +300,7 @@ static void rtc_update_second(void *opaque)
 static void rtc_update_second2(void *opaque)
 {
     RTCState *s = opaque;
+    struct domain *d = vrtc_domain(s);
 
     if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
         rtc_copy_date(s);
@@ -310,8 +319,8 @@ static void rtc_update_second2(void *opaque)
               s->current_tm.tm_hour) )
         {
             s->hw.cmos_data[RTC_REG_C] |= 0xa0; 
-            hvm_isa_irq_deassert(s->pt.vcpu->domain, RTC_IRQ);
-            hvm_isa_irq_assert(s->pt.vcpu->domain, RTC_IRQ);
+            hvm_isa_irq_deassert(d, RTC_IRQ);
+            hvm_isa_irq_assert(d, RTC_IRQ);
         }
     }
 
@@ -319,8 +328,8 @@ static void rtc_update_second2(void *opaque)
     if ( s->hw.cmos_data[RTC_REG_B] & RTC_UIE )
     {
         s->hw.cmos_data[RTC_REG_C] |= 0x90; 
-        hvm_isa_irq_deassert(s->pt.vcpu->domain, RTC_IRQ);
-        hvm_isa_irq_assert(s->pt.vcpu->domain, RTC_IRQ);
+        hvm_isa_irq_deassert(d, RTC_IRQ);
+        hvm_isa_irq_assert(d, RTC_IRQ);
     }
 
     /* clear update in progress bit */
@@ -354,8 +363,8 @@ static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
         break;
     case RTC_REG_C:
         ret = s->hw.cmos_data[s->hw.cmos_index];
-        hvm_isa_irq_deassert(s->pt.vcpu->domain, RTC_IRQ);
-        s->hw.cmos_data[RTC_REG_C] = 0x00; 
+        hvm_isa_irq_deassert(vrtc_domain(s), RTC_IRQ);
+        s->hw.cmos_data[RTC_REG_C] = 0x00;
         break;
     default:
         ret = s->hw.cmos_data[s->hw.cmos_index];
@@ -367,8 +376,7 @@ static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
 
 static int handle_rtc_io(ioreq_t *p)
 {
-    struct vcpu *v = current;
-    struct RTCState *vrtc = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    struct RTCState *vrtc = vcpu_vrtc(current);
 
     if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
     {
@@ -392,7 +400,7 @@ static int handle_rtc_io(ioreq_t *p)
 
 void rtc_migrate_timers(struct vcpu *v)
 {
-    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    RTCState *s = vcpu_vrtc(v);
 
     if ( v->vcpu_id == 0 )
     {
@@ -404,13 +412,14 @@ void rtc_migrate_timers(struct vcpu *v)
 /* Save RTC hardware state */
 static int rtc_save(struct domain *d, hvm_domain_context_t *h)
 {
-    return hvm_save_entry(RTC, 0, h, &d->arch.hvm_domain.pl_time.vrtc.hw);
+    RTCState *s = domain_vrtc(d);
+    return hvm_save_entry(RTC, 0, h, &s->hw);
 }
 
 /* Reload the hardware state from a saved domain */
 static int rtc_load(struct domain *d, hvm_domain_context_t *h)
 {
-    RTCState *s = &d->arch.hvm_domain.pl_time.vrtc;    
+    RTCState *s = domain_vrtc(d);
 
     /* Restore the registers */
     if ( hvm_load_entry(RTC, h, &s->hw) != 0 )
@@ -425,7 +434,7 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
     set_timer(&s->second_timer2, s->next_second_time);
 
     /* Reset the periodic interrupt timer based on the registers */
-    rtc_timer_update(s, d->vcpu[0]);
+    rtc_timer_update(s);
 
     return 0;
 }
@@ -435,9 +444,8 @@ HVM_REGISTER_SAVE_RESTORE(RTC, rtc_save, rtc_load, 1, HVMSR_PER_DOM);
 
 void rtc_init(struct vcpu *v, int base)
 {
-    RTCState *s = &v->domain->arch.hvm_domain.pl_time.vrtc;
+    RTCState *s = vcpu_vrtc(v);
 
-    s->pt.vcpu = v;
     s->hw.cmos_data[RTC_REG_A] = RTC_REF_CLCK_32KHZ | 6; /* ~1kHz */
     s->hw.cmos_data[RTC_REG_B] = RTC_24H;
     s->hw.cmos_data[RTC_REG_C] = 0;
@@ -457,7 +465,7 @@ void rtc_init(struct vcpu *v, int base)
 
 void rtc_deinit(struct domain *d)
 {
-    RTCState *s = &d->arch.hvm_domain.pl_time.vrtc;
+    RTCState *s = domain_vrtc(d);
 
     destroy_periodic_time(&s->pt);
     kill_timer(&s->second_timer);

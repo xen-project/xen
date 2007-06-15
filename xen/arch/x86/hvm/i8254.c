@@ -37,6 +37,12 @@
 #include <asm/hvm/vpt.h>
 #include <asm/current.h>
 
+#define domain_vpit(d)   (&(d)->arch.hvm_domain.pl_time.vpit)
+#define vcpu_vpit(vcpu)  (domain_vpit((vcpu)->domain))
+#define vpit_domain(pit) (container_of((pit), struct domain, \
+                                       arch.hvm_domain.pl_time.vpit))
+#define vpit_vcpu(pit)   (vpit_domain(pit)->vcpu[0])
+
 #define RW_STATE_LSB 1
 #define RW_STATE_MSB 2
 #define RW_STATE_WORD0 3
@@ -45,8 +51,8 @@
 static int handle_pit_io(ioreq_t *p);
 static int handle_speaker_io(ioreq_t *p);
 
-/* compute with 96 bit intermediate result: (a*b)/c */
-uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
+/* Compute with 96 bit intermediate result: (a*b)/c */
+static uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
 {
     union {
         uint64_t ll;
@@ -69,15 +75,16 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
     return res.ll;
 }
 
-static int pit_get_count(PITState *s, int channel)
+static int pit_get_count(PITState *pit, int channel)
 {
     uint64_t d;
     int  counter;
-    struct hvm_hw_pit_channel *c = &s->hw.channels[channel];
-    struct periodic_time *pt = &s->pt[channel];
+    struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
+    struct vcpu *v = vpit_vcpu(pit);
 
-    d = muldiv64(hvm_get_guest_time(pt->vcpu) - s->count_load_time[channel],
-                 PIT_FREQ, ticks_per_sec(pt->vcpu));
+    d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel],
+                 PIT_FREQ, ticks_per_sec(v));
+
     switch ( c->mode )
     {
     case 0:
@@ -97,15 +104,15 @@ static int pit_get_count(PITState *s, int channel)
     return counter;
 }
 
-int pit_get_out(PITState *pit, int channel)
+static int pit_get_out(PITState *pit, int channel)
 {
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
-    uint64_t d, current_time;
+    uint64_t d;
     int out;
+    struct vcpu *v = vpit_vcpu(pit);
 
-    current_time = hvm_get_guest_time(pit->pt[channel].vcpu);
-    d = muldiv64(current_time - pit->count_load_time[channel], 
-                 PIT_FREQ, ticks_per_sec(pit->pt[channel].vcpu));
+    d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel], 
+                 PIT_FREQ, ticks_per_sec(v));
 
     switch ( s->mode )
     {
@@ -131,11 +138,10 @@ int pit_get_out(PITState *pit, int channel)
     return out;
 }
 
-/* val must be 0 or 1 */
-void pit_set_gate(PITState *pit, int channel, int val)
+static void pit_set_gate(PITState *pit, int channel, int val)
 {
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
-    struct periodic_time *pt = &pit->pt[channel];
+    struct vcpu *v = vpit_vcpu(pit);
 
     switch ( s->mode )
     {
@@ -150,7 +156,7 @@ void pit_set_gate(PITState *pit, int channel, int val)
     case 3:
         /* Restart counting on rising edge. */
         if ( s->gate < val )
-            pit->count_load_time[channel] = hvm_get_guest_time(pt->vcpu);
+            pit->count_load_time[channel] = hvm_get_guest_time(v);
         break;
     }
 
@@ -162,7 +168,7 @@ int pit_get_gate(PITState *pit, int channel)
     return pit->hw.channels[channel].gate;
 }
 
-void pit_time_fired(struct vcpu *v, void *priv)
+static void pit_time_fired(struct vcpu *v, void *priv)
 {
     uint64_t *count_load_time = priv;
     *count_load_time = hvm_get_guest_time(v);
@@ -173,9 +179,7 @@ static void pit_load_count(PITState *pit, int channel, int val)
     u32 period;
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
     struct periodic_time *pt = &pit->pt[channel];
-    struct domain *d = container_of(pit, struct domain,
-                                    arch.hvm_domain.pl_time.vpit);
-    struct vcpu *v;
+    struct vcpu *v = vpit_vcpu(pit);
 
     if ( val == 0 )
         val = 0x10000;
@@ -184,14 +188,8 @@ static void pit_load_count(PITState *pit, int channel, int val)
     s->count = val;
     period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
 
-    if ( !is_hvm_domain(d) || (channel != 0) )
+    if ( (v == NULL) || !is_hvm_vcpu(v) || (channel != 0) )
         return;
-
-    /* Choose a vcpu to set the timer on: current if appropriate else vcpu 0 */
-    if ( pit == &current->domain->arch.hvm_domain.pl_time.vpit )
-        v = current;
-    else 
-        v = d->vcpu[0];
 
     switch ( s->mode )
     {
@@ -235,9 +233,8 @@ static void pit_latch_status(PITState *s, int channel)
     }
 }
 
-static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
+static void pit_ioport_write(struct PITState *pit, uint32_t addr, uint32_t val)
 {
-    PITState *pit = opaque;
     int channel, access;
     struct hvm_hw_pit_channel *s;
 
@@ -309,9 +306,8 @@ static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     }
 }
 
-static uint32_t pit_ioport_read(void *opaque, uint32_t addr)
+static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
 {
-    PITState *pit = opaque;
     int ret, count;
     struct hvm_hw_pit_channel *s;
     
@@ -371,7 +367,7 @@ static uint32_t pit_ioport_read(void *opaque, uint32_t addr)
     return ret;
 }
 
-void pit_stop_channel0_irq(PITState * pit)
+void pit_stop_channel0_irq(PITState *pit)
 {
     destroy_periodic_time(&pit->pt[0]);
 }
@@ -425,7 +421,7 @@ static void pit_info(PITState *pit)
 
 static int pit_save(struct domain *d, hvm_domain_context_t *h)
 {
-    PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
+    PITState *pit = domain_vpit(d);
     
     pit_info(pit);
 
@@ -435,7 +431,7 @@ static int pit_save(struct domain *d, hvm_domain_context_t *h)
 
 static int pit_load(struct domain *d, hvm_domain_context_t *h)
 {
-    PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
+    PITState *pit = domain_vpit(d);
     int i;
 
     /* Restore the PIT hardware state */
@@ -457,26 +453,12 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
 
-static void pit_reset(void *opaque)
-{
-    PITState *pit = opaque;
-    struct hvm_hw_pit_channel *s;
-    int i;
-
-    for ( i = 0; i < 3; i++ )
-    {
-        s = &pit->hw.channels[i];
-        destroy_periodic_time(&pit->pt[i]);
-        s->mode = 0xff; /* the init mode */
-        s->gate = (i != 2);
-        pit_load_count(pit, i, 0);
-    }
-}
-
 void pit_init(struct vcpu *v, unsigned long cpu_khz)
 {
-    PITState *pit = &v->domain->arch.hvm_domain.pl_time.vpit;
+    PITState *pit = vcpu_vpit(v);
     struct periodic_time *pt;
+    struct hvm_hw_pit_channel *s;
+    int i;
 
     pt = &pit->pt[0];  
     pt[0].vcpu = v;
@@ -487,20 +469,26 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     /* register the speaker port */
     register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
     ticks_per_sec(v) = cpu_khz * (int64_t)1000;
-    pit_reset(pit);
+
+    for ( i = 0; i < 3; i++ )
+    {
+        s = &pit->hw.channels[i];
+        s->mode = 0xff; /* the init mode */
+        s->gate = (i != 2);
+        pit_load_count(pit, i, 0);
+    }
 }
 
 void pit_deinit(struct domain *d)
 {
-    PITState *pit = &d->arch.hvm_domain.pl_time.vpit;
+    PITState *pit = domain_vpit(d);
     destroy_periodic_time(&pit->pt[0]);
 }
 
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */  
 static int handle_pit_io(ioreq_t *p)
 {
-    struct vcpu *v = current;
-    struct PITState *vpit = &(v->domain->arch.hvm_domain.pl_time.vpit);
+    struct PITState *vpit = vcpu_vpit(current);
 
     if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
     {
@@ -523,16 +511,16 @@ static int handle_pit_io(ioreq_t *p)
     return 1;
 }
 
-static void speaker_ioport_write(void *opaque, uint32_t addr, uint32_t val)
+static void speaker_ioport_write(
+    struct PITState *pit, uint32_t addr, uint32_t val)
 {
-    PITState *pit = opaque;
     pit->hw.speaker_data_on = (val >> 1) & 1;
     pit_set_gate(pit, 2, val & 1);
 }
 
-static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
+static uint32_t speaker_ioport_read(
+    struct PITState *pit, uint32_t addr)
 {
-    PITState *pit = opaque;
     /* Refresh clock toggles at about 15us. We approximate as 2^14ns. */
     unsigned int refresh_clock = ((unsigned int)NOW() >> 14) & 1;
     return ((pit->hw.speaker_data_on << 1) | pit_get_gate(pit, 2) |
@@ -541,8 +529,7 @@ static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
 
 static int handle_speaker_io(ioreq_t *p)
 {
-    struct vcpu *v = current;
-    struct PITState *vpit = &(v->domain->arch.hvm_domain.pl_time.vpit);
+    struct PITState *vpit = vcpu_vpit(current);
 
     if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
     {
