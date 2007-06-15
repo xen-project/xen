@@ -19,6 +19,7 @@
 #include <asm/atomic.h>
 #include <xen/spinlock.h>
 #include <xen/version.h>
+#include <xen/console.h>
 #include <public/elfnote.h>
 
 #ifndef COMPAT
@@ -109,6 +110,8 @@ void kexec_crash(void)
     pos = (test_bit(KEXEC_FLAG_CRASH_POS, &kexec_flags) != 0);
     if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
         return;
+
+    console_start_sync();
 
     one_cpu_only();
     kexec_crash_save_cpu();
