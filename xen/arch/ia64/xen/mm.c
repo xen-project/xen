@@ -1551,7 +1551,7 @@ dom0vp_expose_p2m(struct domain* d,
     }
 
     // expose p2m_pte_zero_page 
-    for (i = 0; i < expose_num_pfn / PTRS_PER_PTE + 1; i++) {
+    for (i = 0; i < (expose_num_pfn + PTRS_PER_PTE - 1) / PTRS_PER_PTE; i++) {
         assign_pte = lookup_noalloc_domain_pte(d, (assign_start_gpfn + i) <<
                                                PAGE_SHIFT);
         if (assign_pte == NULL || pte_present(*assign_pte))
