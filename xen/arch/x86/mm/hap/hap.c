@@ -55,14 +55,14 @@
 /* hap code to call when log_dirty is enable. return 0 if no problem found. */
 int hap_enable_log_dirty(struct domain *d)
 {
-    hap_lock(d);
     /* turn on PG_log_dirty bit in paging mode */
+    hap_lock(d);
     d->arch.paging.mode |= PG_log_dirty;
-    /* set l1e entries of P2M table to NOT_WRITABLE. */
-    p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
-    flush_tlb_all_pge();
     hap_unlock(d);
 
+    /* set l1e entries of P2M table to NOT_WRITABLE. */
+    p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
+    flush_tlb_mask(d->domain_dirty_cpumask);
     return 0;
 }
 
@@ -70,19 +70,20 @@ int hap_disable_log_dirty(struct domain *d)
 {
     hap_lock(d);
     d->arch.paging.mode &= ~PG_log_dirty;
-    /* set l1e entries of P2M table with normal mode */
-    p2m_set_flags_global(d, __PAGE_HYPERVISOR|_PAGE_USER);
     hap_unlock(d);
-    
-    return 1;
+
+    /* set l1e entries of P2M table with normal mode */
+    p2m_set_flags_global(d, __PAGE_HYPERVISOR|_PAGE_USER);    
+    return 0;
 }
 
 void hap_clean_dirty_bitmap(struct domain *d)
 {
     /* mark physical memory as NOT_WRITEABLE and flush the TLB */
     p2m_set_flags_global(d, (_PAGE_PRESENT|_PAGE_USER));
-    flush_tlb_all_pge();
+    flush_tlb_mask(d->domain_dirty_cpumask);
 }
+
 /************************************************/
 /*             HAP SUPPORT FUNCTIONS            */
 /************************************************/
@@ -268,6 +269,7 @@ void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
 {
     struct domain *d = v->domain;
     l2_pgentry_t *sl2e;
+    l3_pgentry_t *p2m;
 
     int i;
 
@@ -290,23 +292,18 @@ void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
         sl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
             l2e_empty();
 
-    if ( paging_mode_translate(d) )
+    /* Install the domain-specific p2m table */
+    ASSERT(pagetable_get_pfn(d->arch.phys_table) != 0);
+    p2m = hap_map_domain_page(pagetable_get_mfn(d->arch.phys_table));
+    for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
     {
-        /* Install the domain-specific p2m table */
-        l3_pgentry_t *p2m;
-        ASSERT(pagetable_get_pfn(d->arch.phys_table) != 0);
-        p2m = hap_map_domain_page(pagetable_get_mfn(d->arch.phys_table));
-        for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
-        {
-            sl2e[l2_table_offset(RO_MPT_VIRT_START) + i] =
-                (l3e_get_flags(p2m[i]) & _PAGE_PRESENT)
-                ? l2e_from_pfn(mfn_x(_mfn(l3e_get_pfn(p2m[i]))),
-                                      __PAGE_HYPERVISOR)
-                : l2e_empty();
-        }
-        hap_unmap_domain_page(p2m);
+        sl2e[l2_table_offset(RO_MPT_VIRT_START) + i] =
+            (l3e_get_flags(p2m[i]) & _PAGE_PRESENT)
+            ? l2e_from_pfn(mfn_x(_mfn(l3e_get_pfn(p2m[i]))),
+                           __PAGE_HYPERVISOR)
+            : l2e_empty();
     }
-
+    hap_unmap_domain_page(p2m);
     hap_unmap_domain_page(sl2e);
 }
 #endif
@@ -565,61 +562,37 @@ void hap_vcpu_init(struct vcpu *v)
 /************************************************/
 /*          HAP PAGING MODE FUNCTIONS           */
 /************************************************/
-/* In theory, hap should not intercept guest page fault. This function can 
- * be recycled to handle host/nested page fault, if needed.
+/* 
+ * HAP guests can handle page faults (in the guest page tables) without
+ * needing any action from Xen, so we should not be intercepting them.
  */
 int hap_page_fault(struct vcpu *v, unsigned long va, 
                    struct cpu_user_regs *regs)
 {
-    HERE_I_AM;
+    HAP_ERROR("Intercepted a guest #PF (%u:%u) with HAP enabled.\n",
+              v->domain->domain_id, v->vcpu_id);
     domain_crash(v->domain);
     return 0;
 }
 
-/* called when guest issues a invlpg request. 
- * Return 1 if need to issue page invalidation on CPU; Return 0 if does not
- * need to do so.
+/* 
+ * HAP guests can handle invlpg without needing any action from Xen, so
+ * should not be intercepting it. 
  */
 int hap_invlpg(struct vcpu *v, unsigned long va)
 {
-    HERE_I_AM;
+    HAP_ERROR("Intercepted a guest INVLPG (%u:%u) with HAP enabled.\n",
+              v->domain->domain_id, v->vcpu_id);
+    domain_crash(v->domain);
     return 0;
 }
 
+/*
+ * HAP guests do not need to take any action on CR3 writes (they are still
+ * intercepted, so that Xen's copy of the guest's CR3 can be kept in sync.)
+ */
 void hap_update_cr3(struct vcpu *v, int do_locking)
 {
-    struct domain *d = v->domain;
-    mfn_t gmfn;
-
-    HERE_I_AM;
-    /* Don't do anything on an uninitialised vcpu */
-    if ( !is_hvm_domain(d) && !v->is_initialised )
-    {
-        ASSERT(v->arch.cr3 == 0);
-        return;
-    }
-
-    if ( do_locking )
-        hap_lock(v->domain);
-    
-    ASSERT(hap_locked_by_me(v->domain));
-    ASSERT(v->arch.paging.mode);
-    
-    gmfn = pagetable_get_mfn(v->arch.guest_table);
-
-    make_cr3(v, pagetable_get_pfn(v->arch.monitor_table));
-    
-    hvm_update_guest_cr3(v, pagetable_get_paddr(v->arch.monitor_table));
-
-    HAP_PRINTK("d=%u v=%u guest_table=%05lx, monitor_table = %05lx\n", 
-               d->domain_id, v->vcpu_id, 
-               (unsigned long)pagetable_get_pfn(v->arch.guest_table),
-               (unsigned long)pagetable_get_pfn(v->arch.monitor_table));
-
-    flush_tlb_mask(d->domain_dirty_cpumask);
-
-    if ( do_locking )
-        hap_unlock(v->domain);
 }
 
 void hap_update_paging_modes(struct vcpu *v)
@@ -647,7 +620,7 @@ void hap_update_paging_modes(struct vcpu *v)
         v->arch.paging.mode = &hap_paging_real_mode;
     }
 
-    v->arch.paging.translate_enabled = !!hvm_paging_enabled(v);    
+    v->arch.paging.translate_enabled = !!hvm_paging_enabled(v);
 
     if ( pagetable_is_null(v->arch.monitor_table) ) {
         mfn_t mmfn = hap_make_monitor_table(v);
@@ -655,7 +628,6 @@ void hap_update_paging_modes(struct vcpu *v)
         make_cr3(v, mfn_x(mmfn));
     }
 
-    flush_tlb_mask(d->domain_dirty_cpumask);
     hap_unlock(d);
 }
 
@@ -702,29 +674,18 @@ void
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     l1_pgentry_t new, unsigned int level)
 {
-    int do_locking;
-
-    /* This function can be called from two directions (P2M and log dirty). We
-     *  need to make sure this lock has been held or not.
-     */
-    do_locking = !hap_locked_by_me(v->domain);
-
-    if ( do_locking )
-        hap_lock(v->domain);
+    hap_lock(v->domain);
 
     safe_write_pte(p, new);
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */
-    if ( level == 3 ) {
+    if ( level == 3 ) 
 	/* We have written to the p2m l3: need to sync the per-vcpu
          * copies of it in the monitor tables */
 	p2m_install_entry_in_monitors(v->domain, (l3_pgentry_t *)p);
-	
-    }
 #endif
     
-    if ( do_locking )
-        hap_unlock(v->domain);
+    hap_unlock(v->domain);
 }
 
 /* Entry points into this mode of the hap code. */

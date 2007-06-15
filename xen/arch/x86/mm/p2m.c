@@ -32,9 +32,13 @@
 #define P2M_AUDIT     0
 #define P2M_DEBUGGING 1
 
-/* The P2M lock.  This protects all updates to the p2m table.
+/*
+ * The P2M lock.  This protects all updates to the p2m table.
  * Updates are expected to be safe against concurrent reads, 
- * which do *not* require the lock */
+ * which do *not* require the lock.
+ *
+ * Locking discipline: always acquire this lock before the shadow or HAP one
+ */
 
 #define p2m_lock_init(_d)                            \
     do {                                             \
