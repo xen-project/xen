@@ -299,12 +299,12 @@ es7000_stop_cpu(int cpu)
 void __init
 es7000_sw_apic()
 {
-	if (es7000_plat) {
+	if (es7000_plat && (es7000_plat != ES7000_ZORRO)) {
 		int mip_status;
 		struct mip_reg es7000_mip_reg;
 
 		printk("ES7000: Enabling APIC mode.\n");
-        	memset(&es7000_mip_reg, 0, sizeof(struct mip_reg));
+		memset(&es7000_mip_reg, 0, sizeof(struct mip_reg));
         	es7000_mip_reg.off_0 = MIP_SW_APIC;
         	es7000_mip_reg.off_38 = (MIP_VALID);
         	while ((mip_status = es7000_mip_write(&es7000_mip_reg)) != 0)
