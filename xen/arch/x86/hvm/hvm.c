@@ -110,6 +110,7 @@ u64 hvm_get_guest_time(struct vcpu *v)
 void hvm_migrate_timers(struct vcpu *v)
 {
     rtc_migrate_timers(v);
+    hpet_migrate_timers(v);
     pt_migrate(v);
 }
 

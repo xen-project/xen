@@ -381,6 +381,9 @@ void hpet_migrate_timers(struct vcpu *v)
     struct HPETState *h = &v->domain->arch.hvm_domain.pl_time.vhpet;
     int i;
 
+    if ( v != h->vcpu )
+        return;
+
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
         migrate_timer(&h->timers[i], v->processor);
 }
