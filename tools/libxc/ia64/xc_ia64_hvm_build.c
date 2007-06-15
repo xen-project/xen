@@ -735,6 +735,7 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom)
     return 0;
 }
 
+#define NVRAM_DIR       "/usr/lib/xen/boot/"
 #define NVRAM_FILE_PATH	"/usr/lib/xen/boot/nvram_"
 int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
 {
@@ -749,6 +750,7 @@ int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
         return -1;
     }
     strcpy(nvram_path + file_path_len, dom_name);
+    mkdir(NVRAM_DIR, 0765);
 
     nvram_fd = nvram_init(nvram_path);
     if ( nvram_fd == (uint64_t)(-1) )
