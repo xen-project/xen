@@ -10,7 +10,6 @@
 #include <xen/io/protocols.h>
 #include <sys/select.h>
 #include <stdbool.h>
-#include <xen/linux/evtchn.h>
 #include <xen/event_channel.h>
 #include <sys/mman.h>
 #include <errno.h>
