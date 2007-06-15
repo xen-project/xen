@@ -49,7 +49,7 @@ endif
 	mkdir -p $(INSTALL_BOOT_PATH)
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(INSTALL_BOOT_PATH) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: CONFIG_FILE=$(PWD)/$(LINUX_DIR)/.config
+$(LINUX_DIR)/include/linux/autoconf.h: CONFIG_FILE=$(CURDIR)/$(LINUX_DIR)/.config
 $(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
 	rm -rf $(LINUX_DIR)
 	mkdir -p $(LINUX_DIR)
@@ -90,8 +90,8 @@ endif
 	      echo "VERSION = 2"; \
 	      echo "PATCHLEVEL = 6"; \
 	      echo ""; \
-	      echo "KERNELSRC    := $(PWD)/$(LINUX_SRCDIR)"; \
-	      echo "KERNELOUTPUT := $(PWD)/$(LINUX_DIR)"; \
+	      echo "KERNELSRC    := $(CURDIR)/$(LINUX_SRCDIR)"; \
+	      echo "KERNELOUTPUT := $(CURDIR)/$(LINUX_DIR)"; \
 	      echo ""; \
 	      echo "MAKEFLAGS += --no-print-directory"; \
 	      echo ""; \

@@ -213,7 +213,7 @@ class DevController:
         devid = int(devid)
 
         frontpath = self.frontendPath(devid)
-	if frontpath:
+        if frontpath:
             backpath = xstransact.Read(frontpath, "backend")
 
         # Modify online status /before/ updating state (latter is watched by
@@ -224,22 +224,22 @@ class DevController:
         if force:
             if backpath:
                 xstransact.Remove(backpath)
-	    if frontpath:
+            if frontpath:
                 xstransact.Remove(frontpath)
-	    return
+            return
 
-	# Wait till both frontpath and backpath are removed from
-	# xenstore, or timed out
-	if frontpath:
-	    status = self.waitUntilDestroyed(frontpath)
-	    if status == Timeout:
-	        # Exception will be caught by destroyDevice in XendDomainInfo.py
-	        raise EnvironmentError
-	if backpath:
-	    status = self.waitUntilDestroyed(backpath)
-	    if status == Timeout:
-	        # Exception will be caught by destroyDevice in XendDomainInfo.py
-	        raise EnvironmentError
+        # Wait till both frontpath and backpath are removed from
+        # xenstore, or timed out
+        if frontpath:
+            status = self.waitUntilDestroyed(frontpath)
+            if status == Timeout:
+                # Exception will be caught by destroyDevice in XendDomainInfo.py
+                raise EnvironmentError
+        if backpath:
+            status = self.waitUntilDestroyed(backpath)
+            if status == Timeout:
+                # Exception will be caught by destroyDevice in XendDomainInfo.py
+                raise EnvironmentError
 
         self.vm._removeVm("device/%s/%d" % (self.deviceClass, devid))
 

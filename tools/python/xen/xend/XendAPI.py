@@ -1483,6 +1483,12 @@ class XendAPI(object):
         else:
             return xen_api_success_void()
     
+    def VM_set_VCPUs_at_startup(self, session, vm_ref, num):
+        return self.VM_set('VCPUs_at_startup', session, vm_ref, num)
+
+    def VM_set_VCPUs_max(self, session, vm_ref, num):
+        return self.VM_set('VCPUs_max', session, vm_ref, num)
+
     def VM_set_actions_after_shutdown(self, session, vm_ref, action):
         if action not in XEN_API_ON_NORMAL_EXIT:
             return xen_api_error(['VM_ON_NORMAL_EXIT_INVALID', vm_ref])
@@ -1884,6 +1890,17 @@ class XendAPI(object):
         xd = XendDomain.instance()
         vm = xd.get_vm_with_dev_uuid('vbd', vbd_ref)
         vm.set_dev_property('vbd', vbd_ref, 'bootable', bootable)
+        xd.managed_config_save(vm)
+        return xen_api_success_void()
+
+    def VBD_set_mode(self, session, vbd_ref, mode):
+        if mode == 'RW':
+            mode = 'w'
+        else:
+            mode = 'r'
+        xd = XendDomain.instance()
+        vm = xd.get_vm_with_dev_uuid('vbd', vbd_ref)
+        vm.set_dev_property('vbd', vbd_ref, 'mode', mode)
         xd.managed_config_save(vm)
         return xen_api_success_void()
 

@@ -65,11 +65,11 @@ def _solaris_balloon_stat(label):
     import fcntl
     import array
     DEV_XEN_BALLOON = '/dev/xen/balloon'
-    BLN_IOCTL_CURRENT = 0x4201
-    BLN_IOCTL_TARGET = 0x4202
-    BLN_IOCTL_LOW = 0x4203
-    BLN_IOCTL_HIGH = 0x4204
-    BLN_IOCTL_LIMIT = 0x4205
+    BLN_IOCTL_CURRENT = 0x42410001
+    BLN_IOCTL_TARGET = 0x42410002
+    BLN_IOCTL_LOW = 0x42410003
+    BLN_IOCTL_HIGH = 0x42410004
+    BLN_IOCTL_LIMIT = 0x42410005
     label_to_ioctl = {	'Current allocation'	: BLN_IOCTL_CURRENT,
 			'Requested target'	: BLN_IOCTL_TARGET,
 			'Low-mem balloon'	: BLN_IOCTL_LOW,

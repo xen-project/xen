@@ -104,6 +104,7 @@ void vmx_vmcs_exit(struct vcpu *v);
 #define CPU_BASED_CR8_LOAD_EXITING            0x00080000
 #define CPU_BASED_CR8_STORE_EXITING           0x00100000
 #define CPU_BASED_TPR_SHADOW                  0x00200000
+#define CPU_BASED_VIRTUAL_NMI_PENDING         0x00400000
 #define CPU_BASED_MOV_DR_EXITING              0x00800000
 #define CPU_BASED_UNCOND_IO_EXITING           0x01000000
 #define CPU_BASED_ACTIVATE_IO_BITMAP          0x02000000
@@ -115,6 +116,7 @@ extern u32 vmx_cpu_based_exec_control;
 
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
 #define PIN_BASED_NMI_EXITING           0x00000008
+#define PIN_BASED_VIRTUAL_NMIS          0x00000020
 extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_IA32E_MODE              0x00000200
@@ -137,7 +139,13 @@ extern u32 vmx_secondary_exec_control;
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
 extern char *vmx_msr_bitmap;
 
-/* VMCS Encordings */
+/* GUEST_INTERRUPTIBILITY_INFO flags. */
+#define VMX_INTR_SHADOW_STI             0x00000001
+#define VMX_INTR_SHADOW_MOV_SS          0x00000002
+#define VMX_INTR_SHADOW_SMI             0x00000004
+#define VMX_INTR_SHADOW_NMI             0x00000008
+
+/* VMCS field encodings. */
 enum vmcs_field {
     GUEST_ES_SELECTOR               = 0x00000800,
     GUEST_CS_SELECTOR               = 0x00000802,

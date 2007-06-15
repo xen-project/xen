@@ -3195,6 +3195,8 @@ writing to the VGA console after domain 0 starts booting (e.g., `vga=text-80x50,
 \item [ edid=no,force ] (x86 only) Either force retrieval of monitor
   EDID information via VESA DDC, or disable it (edid=no). This option
   should not normally be required except for debugging purposes.
+\item [ edd=off,on,skipmbr ] (x86 only) Control retrieval of Extended
+  Disc Data (EDD) from the BIOS during boot.
 \item [ console\_to\_ring ] Place guest console output into the
   hypervisor console ring buffer. This is disabled by default.
   When enabled, both hypervisor output and guest console output

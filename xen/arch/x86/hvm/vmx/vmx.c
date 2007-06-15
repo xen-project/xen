@@ -1300,11 +1300,17 @@ static int __get_instruction_length(void)
 
 static void inline __update_guest_eip(unsigned long inst_len)
 {
-    unsigned long current_eip;
+    unsigned long current_eip, intr_shadow;
 
     current_eip = __vmread(GUEST_RIP);
     __vmwrite(GUEST_RIP, current_eip + inst_len);
-    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
+
+    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    if ( intr_shadow & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
+    {
+        intr_shadow &= ~(VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS);
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+    }
 }
 
 static void vmx_do_no_device_fault(void)
@@ -2902,9 +2908,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_TRIPLE_FAULT:
         hvm_triple_fault();
         break;
-    case EXIT_REASON_PENDING_INTERRUPT:
+    case EXIT_REASON_PENDING_VIRT_INTR:
         /* Disable the interrupt window. */
         v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
+        break;
+    case EXIT_REASON_PENDING_VIRT_NMI:
+        /* Disable the NMI window. */
+        v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_NMI_PENDING;
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                   v->arch.hvm_vcpu.u.vmx.exec_control);
         break;

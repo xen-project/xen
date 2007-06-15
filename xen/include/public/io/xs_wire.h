@@ -60,7 +60,11 @@ struct xsd_errors
     const char *errstring;
 };
 #define XSD_ERROR(x) { x, #x }
-static struct xsd_errors xsd_errors[] __attribute__((unused)) = {
+static struct xsd_errors xsd_errors[]
+#if defined(__GNUC__)
+__attribute__((unused))
+#endif
+    = {
     XSD_ERROR(EINVAL),
     XSD_ERROR(EACCES),
     XSD_ERROR(EEXIST),

@@ -2114,6 +2114,15 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return 0;
     }
 
+    /* Special delivery modes (SMI,NMI,INIT,ExtInt) should have no vector.  */
+    if ( (old_rte.delivery_mode > dest_LowestPrio) && (old_rte.vector != 0) )
+    {
+        WARN_BOGUS_WRITE("Special delivery mode %d with non-zero vector "
+                         "%02x\n", old_rte.delivery_mode, old_rte.vector);
+        /* Nobble the vector here as it does not relate to a valid irq. */
+        old_rte.vector = 0;
+    }
+
     if ( old_rte.vector >= FIRST_DYNAMIC_VECTOR )
         old_irq = vector_irq[old_rte.vector];
     if ( new_rte.vector >= FIRST_DYNAMIC_VECTOR )

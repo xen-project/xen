@@ -96,6 +96,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_IA32_TIME_STAMP_COUNTER     0x10
 #define MSR_IA32_PLATFORM_ID		0x17
 #define MSR_IA32_EBL_CR_POWERON		0x2a
+#define MSR_IA32_EBC_FREQUENCY_ID	0x2c
 
 #define MSR_IA32_APICBASE		0x1b
 #define MSR_IA32_APICBASE_BSP		(1<<8)

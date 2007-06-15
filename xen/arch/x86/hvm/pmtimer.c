@@ -50,7 +50,6 @@
 #define TMR_VAL_MASK  (0xffffffff)
 #define TMR_VAL_MSB   (0x80000000)
 
-
 /* Dispatch SCIs based on the PM1a_STS and PM1a_EN registers */
 static void pmt_update_sci(PMTState *s)
 {
@@ -89,19 +88,19 @@ static void pmt_timer_callback(void *opaque)
     PMTState *s = opaque;
     uint32_t pmt_cycles_until_flip;
     uint64_t time_until_flip;
-    
+
     /* Recalculate the timer and make sure we get an SCI if we need one */
     pmt_update_time(s);
-    
+
     /* How close are we to the next MSB flip? */
     pmt_cycles_until_flip = TMR_VAL_MSB - (s->pm.tmr_val & (TMR_VAL_MSB - 1));
-    
+
     /* Overall time between MSB flips */
-    time_until_flip = (1000000000ULL << 31) / FREQUENCE_PMTIMER;
-    
+    time_until_flip = (1000000000ULL << 23) / FREQUENCE_PMTIMER;
+
     /* Reduced appropriately */
-    time_until_flip = (time_until_flip * pmt_cycles_until_flip) / (1ULL<<31);
-    
+    time_until_flip = (time_until_flip * pmt_cycles_until_flip) >> 23;
+
     /* Wake up again near the next bit-flip */
     set_timer(&s->timer, NOW() + time_until_flip + MILLISECS(1));
 }

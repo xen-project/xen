@@ -1,6 +1,7 @@
 /*
- * io.c: handling I/O, interrupts related VMX entry/exit
+ * intr.c: handling I/O, interrupts related VMX entry/exit
  * Copyright (c) 2004, Intel Corporation.
+ * Copyright (c) 2004-2007, XenSource Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -14,7 +15,6 @@
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
- *
  */
 
 #include <xen/config.h>
@@ -24,7 +24,6 @@
 #include <xen/errno.h>
 #include <xen/trace.h>
 #include <xen/event.h>
-
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -39,32 +38,48 @@
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/trace.h>
 
+/*
+ * A few notes on virtual NMI and INTR delivery, and interactions with
+ * interruptibility states:
+ * 
+ * We can only inject an ExtInt if EFLAGS.IF = 1 and no blocking by
+ * STI nor MOV SS. Otherwise the VM entry fails. The 'virtual interrupt
+ * pending' control causes a VM exit when all these checks succeed. It will
+ * exit immediately after VM entry if the checks succeed at that point.
+ * 
+ * We can only inject an NMI if no blocking by MOV SS (also, depending on
+ * implementation, if no blocking by STI). If pin-based 'virtual NMIs'
+ * control is specified then the NMI-blocking interruptibility flag is
+ * also checked. The 'virtual NMI pending' control (available only in
+ * conjunction with 'virtual NMIs') causes a VM exit when all these checks
+ * succeed. It will exit immediately after VM entry if the checks succeed
+ * at that point.
+ * 
+ * Because a processor may or may not check blocking-by-STI when injecting
+ * a virtual NMI, it will be necessary to convert that to block-by-MOV-SS
+ * before specifying the 'virtual NMI pending' control. Otherwise we could
+ * enter an infinite loop where we check blocking-by-STI in software and
+ * thus delay delivery of a virtual NMI, but the processor causes immediate
+ * VM exit because it does not check blocking-by-STI.
+ * 
+ * Injecting a virtual NMI sets the NMI-blocking interruptibility flag only
+ * if the 'virtual NMIs' control is set. Injecting *any* kind of event clears
+ * the STI- and MOV-SS-blocking interruptibility-state flags.
+ * 
+ * If MOV/POP SS is executed while MOV-SS-blocking is in effect, the effect
+ * is cleared. If STI is executed while MOV-SS- or STI-blocking is in effect,
+ * the effect is cleared. (i.e., MOV-SS-blocking 'dominates' STI-blocking).
+ */
 
-static inline void
-enable_irq_window(struct vcpu *v)
+static void enable_irq_window(struct vcpu *v)
 {
     u32  *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
     
-    if (!(*cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING)) {
+    if ( !(*cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING) )
+    {
         *cpu_exec_control |= CPU_BASED_VIRTUAL_INTR_PENDING;
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
     }
-}
-
-static inline void
-disable_irq_window(struct vcpu *v)
-{
-    u32  *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
-    
-    if ( *cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING ) {
-        *cpu_exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
-    }
-}
-
-static inline int is_interruptibility_state(void)
-{
-    return __vmread(GUEST_INTERRUPTIBILITY_INFO);
 }
 
 static void update_tpr_threshold(struct vlapic *vlapic)
@@ -87,13 +102,11 @@ static void update_tpr_threshold(struct vlapic *vlapic)
 
 asmlinkage void vmx_intr_assist(void)
 {
-    int intr_type = 0;
-    int intr_vector;
-    unsigned long eflags;
+    int has_ext_irq, intr_vector, intr_type = 0;
+    unsigned long eflags, intr_shadow;
     struct vcpu *v = current;
     unsigned int idtv_info_field;
     unsigned long inst_len;
-    int    has_ext_irq;
 
     pt_update_irq(v);
 
@@ -125,10 +138,10 @@ asmlinkage void vmx_intr_assist(void)
         inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
-        if (unlikely(idtv_info_field & 0x800)) /* valid error code */
+        if ( unlikely(idtv_info_field & 0x800) ) /* valid error code */
             __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
                       __vmread(IDT_VECTORING_ERROR_CODE));
-        if (unlikely(has_ext_irq))
+        if ( unlikely(has_ext_irq) )
             enable_irq_window(v);
 
         HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
@@ -138,9 +151,9 @@ asmlinkage void vmx_intr_assist(void)
     if ( likely(!has_ext_irq) )
         return;
 
-    if ( unlikely(is_interruptibility_state()) )
+    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    if ( unlikely(intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS)) )
     {
-        /* pre-cleared for emulated instruction */
         enable_irq_window(v);
         HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
         return;

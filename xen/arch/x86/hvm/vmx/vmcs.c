@@ -70,8 +70,9 @@ void vmx_init_vmcs_config(void)
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
 
-    min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
-    opt = 0;
+    min = (PIN_BASED_EXT_INTR_MASK |
+           PIN_BASED_NMI_EXITING);
+    opt = 0; /*PIN_BASED_VIRTUAL_NMIS*/
     _vmx_pin_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PINBASED_CTLS);
 
