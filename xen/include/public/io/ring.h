@@ -133,7 +133,7 @@ typedef struct __name##_back_ring __name##_back_ring_t
 #define SHARED_RING_INIT(_s) do {                                       \
     (_s)->req_prod  = (_s)->rsp_prod  = 0;                              \
     (_s)->req_event = (_s)->rsp_event = 1;                              \
-    memset((_s)->pad, 0, sizeof((_s)->pad));                            \
+    (void)memset((_s)->pad, 0, sizeof((_s)->pad));                      \
 } while(0)
 
 #define FRONT_RING_INIT(_r, _s, __size) do {                            \
