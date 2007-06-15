@@ -82,6 +82,8 @@ static int pit_get_count(PITState *pit, int channel)
     struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
     struct vcpu *v = vpit_vcpu(pit);
 
+    ASSERT(spin_is_locked(&pit->lock));
+
     d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel],
                  PIT_FREQ, ticks_per_sec(v));
 
@@ -110,6 +112,8 @@ static int pit_get_out(PITState *pit, int channel)
     uint64_t d;
     int out;
     struct vcpu *v = vpit_vcpu(pit);
+
+    ASSERT(spin_is_locked(&pit->lock));
 
     d = muldiv64(hvm_get_guest_time(v) - pit->count_load_time[channel], 
                  PIT_FREQ, ticks_per_sec(v));
@@ -143,6 +147,8 @@ static void pit_set_gate(PITState *pit, int channel, int val)
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
     struct vcpu *v = vpit_vcpu(pit);
 
+    ASSERT(spin_is_locked(&pit->lock));
+
     switch ( s->mode )
     {
     default:
@@ -165,6 +171,7 @@ static void pit_set_gate(PITState *pit, int channel, int val)
 
 int pit_get_gate(PITState *pit, int channel)
 {
+    ASSERT(spin_is_locked(&pit->lock));
     return pit->hw.channels[channel].gate;
 }
 
@@ -181,10 +188,15 @@ static void pit_load_count(PITState *pit, int channel, int val)
     struct periodic_time *pt = &pit->pt[channel];
     struct vcpu *v = vpit_vcpu(pit);
 
+    ASSERT(spin_is_locked(&pit->lock));
+
     if ( val == 0 )
         val = 0x10000;
 
-    pit->count_load_time[channel] = hvm_get_guest_time(pt->vcpu);
+    if ( v == NULL )
+        rdtscll(pit->count_load_time[channel]);
+    else
+        pit->count_load_time[channel] = hvm_get_guest_time(v);
     s->count = val;
     period = DIV_ROUND((val * 1000000000ULL), PIT_FREQ);
 
@@ -209,23 +221,29 @@ static void pit_load_count(PITState *pit, int channel, int val)
     }
 }
 
-static void pit_latch_count(PITState *s, int channel)
+static void pit_latch_count(PITState *pit, int channel)
 {
-    struct hvm_hw_pit_channel *c = &s->hw.channels[channel];
+    struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
+
+    ASSERT(spin_is_locked(&pit->lock));
+
     if ( !c->count_latched )
     {
-        c->latched_count = pit_get_count(s, channel);
+        c->latched_count = pit_get_count(pit, channel);
         c->count_latched = c->rw_mode;
     }
 }
 
-static void pit_latch_status(PITState *s, int channel)
+static void pit_latch_status(PITState *pit, int channel)
 {
-    struct hvm_hw_pit_channel *c = &s->hw.channels[channel];
+    struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
+
+    ASSERT(spin_is_locked(&pit->lock));
+
     if ( !c->status_latched )
     {
         /* TODO: Return NULL COUNT (bit 6). */
-        c->status = ((pit_get_out(s, channel) << 7) |
+        c->status = ((pit_get_out(pit, channel) << 7) |
                      (c->rw_mode << 4) |
                      (c->mode << 1) |
                      c->bcd);
@@ -240,6 +258,8 @@ static void pit_ioport_write(struct PITState *pit, uint32_t addr, uint32_t val)
 
     val  &= 0xff;
     addr &= 3;
+
+    spin_lock(&pit->lock);
 
     if ( addr == 3 )
     {
@@ -304,6 +324,8 @@ static void pit_ioport_write(struct PITState *pit, uint32_t addr, uint32_t val)
             break;
         }
     }
+
+    spin_unlock(&pit->lock);
 }
 
 static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
@@ -313,6 +335,8 @@ static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
     
     addr &= 3;
     s = &pit->hw.channels[addr];
+
+    spin_lock(&pit->lock);
 
     if ( s->status_latched )
     {
@@ -364,12 +388,16 @@ static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
         }
     }
 
+    spin_unlock(&pit->lock);
+
     return ret;
 }
 
 void pit_stop_channel0_irq(PITState *pit)
 {
+    spin_lock(&pit->lock);
     destroy_periodic_time(&pit->pt[0]);
+    spin_unlock(&pit->lock);
 }
 
 #ifdef HVM_DEBUG_SUSPEND
@@ -422,11 +450,18 @@ static void pit_info(PITState *pit)
 static int pit_save(struct domain *d, hvm_domain_context_t *h)
 {
     PITState *pit = domain_vpit(d);
+    int rc;
+
+    spin_lock(&pit->lock);
     
     pit_info(pit);
 
     /* Save the PIT hardware state */
-    return hvm_save_entry(PIT, 0, h, &pit->hw);
+    rc = hvm_save_entry(PIT, 0, h, &pit->hw);
+
+    spin_unlock(&pit->lock);
+
+    return rc;
 }
 
 static int pit_load(struct domain *d, hvm_domain_context_t *h)
@@ -434,9 +469,14 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
     PITState *pit = domain_vpit(d);
     int i;
 
+    spin_lock(&pit->lock);
+
     /* Restore the PIT hardware state */
     if ( hvm_load_entry(PIT, h, &pit->hw) )
+    {
+        spin_unlock(&pit->lock);
         return 1;
+    }
     
     /* Recreate platform timers from hardware state.  There will be some 
      * time jitter here, but the wall-clock will have jumped massively, so 
@@ -448,6 +488,9 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
     }
 
     pit_info(pit);
+
+    spin_unlock(&pit->lock);
+
     return 0;
 }
 
@@ -456,17 +499,15 @@ HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
 void pit_init(struct vcpu *v, unsigned long cpu_khz)
 {
     PITState *pit = vcpu_vpit(v);
-    struct periodic_time *pt;
     struct hvm_hw_pit_channel *s;
     int i;
 
-    pt = &pit->pt[0];  
-    pt[0].vcpu = v;
-    pt[1].vcpu = v;
-    pt[2].vcpu = v;
+    spin_lock_init(&pit->lock);
+
+    /* Some sub-functions assert that they are called with the lock held. */
+    spin_lock(&pit->lock);
 
     register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
-    /* register the speaker port */
     register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
     ticks_per_sec(v) = cpu_khz * (int64_t)1000;
 
@@ -477,6 +518,8 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
         s->gate = (i != 2);
         pit_load_count(pit, i, 0);
     }
+
+    spin_unlock(&pit->lock);
 }
 
 void pit_deinit(struct domain *d)
@@ -492,10 +535,10 @@ static int handle_pit_io(ioreq_t *p)
 
     if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
     {
-        gdprintk(XENLOG_WARNING, "HVM_PIT bad access\n");
+        gdprintk(XENLOG_WARNING, "PIT bad access\n");
         return 1;
     }
-    
+
     if ( p->dir == IOREQ_WRITE )
     {
         pit_ioport_write(vpit, p->addr, p->data);
@@ -505,7 +548,7 @@ static int handle_pit_io(ioreq_t *p)
         if ( (p->addr & 3) != 3 )
             p->data = pit_ioport_read(vpit, p->addr);
         else
-            gdprintk(XENLOG_WARNING, "HVM_PIT: read A1:A0=3!\n");
+            gdprintk(XENLOG_WARNING, "PIT: read A1:A0=3!\n");
     }
 
     return 1;
@@ -533,14 +576,18 @@ static int handle_speaker_io(ioreq_t *p)
 
     if ( (p->size != 1) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
     {
-        gdprintk(XENLOG_WARNING, "HVM_SPEAKER bad access\n");
+        gdprintk(XENLOG_WARNING, "PIT_SPEAKER bad access\n");
         return 1;
     }
+
+    spin_lock(&vpit->lock);
 
     if ( p->dir == IOREQ_WRITE )
         speaker_ioport_write(vpit, p->addr, p->data);
     else
         p->data = speaker_ioport_read(vpit, p->addr);
+
+    spin_unlock(&vpit->lock);
 
     return 1;
 }

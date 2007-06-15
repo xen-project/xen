@@ -31,7 +31,6 @@
 #include <asm/hvm/vpic.h>
 #include <public/hvm/save.h>
 
-
 struct HPETState;
 struct HPET_timer_fn_info {
     struct HPETState       *hs;
@@ -45,6 +44,7 @@ typedef struct HPETState {
     uint64_t mc_offset;
     struct timer timers[HPET_TIMER_NUM];
     struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 
+    spinlock_t lock;
 } HPETState;
 
 
@@ -80,6 +80,7 @@ typedef struct PITState {
     int64_t count_load_time[3];
     /* irq handling */
     struct periodic_time pt[3];
+    spinlock_t lock;
 } PITState;
 
 typedef struct RTCState {
@@ -93,6 +94,7 @@ typedef struct RTCState {
     struct timer second_timer2;
     struct periodic_time pt;
     int32_t time_offset_seconds;
+    spinlock_t lock;
 } RTCState;
 
 #define FREQUENCE_PMTIMER  3579545  /* Timer should run at 3.579545 MHz */
@@ -102,6 +104,7 @@ typedef struct PMTState {
     uint64_t last_gtime;        /* Last (guest) time we updated the timer */
     uint64_t scale;             /* Multiplier to get from tsc to timer ticks */
     struct timer timer;         /* To make sure we send SCIs */
+    spinlock_t lock;
 } PMTState;
 
 struct pl_time {    /* platform time */
@@ -116,7 +119,6 @@ struct pl_time {    /* platform time */
 void pt_freeze_time(struct vcpu *v);
 void pt_thaw_time(struct vcpu *v);
 void pt_update_irq(struct vcpu *v);
-struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type);
 void pt_intr_post(struct vcpu *v, int vector, int type);
 void pt_reset(struct vcpu *v);
 void pt_migrate(struct vcpu *v);

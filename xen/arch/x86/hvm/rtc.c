@@ -34,10 +34,12 @@
                                        arch.hvm_domain.pl_time.vrtc))
 #define vrtc_vcpu(rtc)   (vrtc_domain(rtc)->vcpu[0])
 
-void rtc_periodic_cb(struct vcpu *v, void *opaque)
+static void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
+    spin_lock(&s->lock);
     s->hw.cmos_data[RTC_REG_C] |= 0xc0;
+    spin_unlock(&s->lock);
 }
 
 int is_rtc_periodic_irq(void *opaque)
@@ -54,6 +56,8 @@ static void rtc_timer_update(RTCState *s)
 {
     int period_code, period;
     struct vcpu *v = vrtc_vcpu(s);
+
+    ASSERT(spin_is_locked(&s->lock));
 
     period_code = s->hw.cmos_data[RTC_REG_A] & RTC_RATE_SELECT;
     if ( (period_code != 0) && (s->hw.cmos_data[RTC_REG_B] & RTC_PIE) )
@@ -78,14 +82,21 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
 {
     RTCState *s = opaque;
 
+    spin_lock(&s->lock);
+
     if ( (addr & 1) == 0 )
     {
-        s->hw.cmos_index = data & 0x7f;
-        return (s->hw.cmos_index < RTC_CMOS_SIZE);
+        data &= 0x7f;
+        s->hw.cmos_index = data;
+        spin_unlock(&s->lock);
+        return (data < RTC_CMOS_SIZE);
     }
 
     if ( s->hw.cmos_index >= RTC_CMOS_SIZE )
+    {
+        spin_unlock(&s->lock);
         return 0;
+    }
 
     switch ( s->hw.cmos_index )
     {
@@ -134,6 +145,8 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         break;
     }
 
+    spin_unlock(&s->lock);
+
     return 1;
 }
 
@@ -158,6 +171,8 @@ static void rtc_set_time(RTCState *s)
     struct tm *tm = &s->current_tm;
     unsigned long before, after; /* XXX s_time_t */
       
+    ASSERT(spin_is_locked(&s->lock));
+
     before = mktime(tm->tm_year, tm->tm_mon, tm->tm_mday,
 		    tm->tm_hour, tm->tm_min, tm->tm_sec);
     
@@ -181,6 +196,8 @@ static void rtc_copy_date(RTCState *s)
 {
     const struct tm *tm = &s->current_tm;
     struct domain *d = vrtc_domain(s);
+
+    ASSERT(spin_is_locked(&s->lock));
 
     if ( s->time_offset_seconds != d->time_offset_seconds )
     {
@@ -231,6 +248,8 @@ static void rtc_next_second(RTCState *s)
     int days_in_month;
     struct domain *d = vrtc_domain(s);
 
+    ASSERT(spin_is_locked(&s->lock));
+
     if ( s->time_offset_seconds != d->time_offset_seconds )
     {
         s->current_tm = gmtime(get_localtime(d));
@@ -279,6 +298,8 @@ static void rtc_update_second(void *opaque)
 {
     RTCState *s = opaque;
 
+    spin_lock(&s->lock);
+
     /* if the oscillator is not in normal operation, we do not update */
     if ( (s->hw.cmos_data[RTC_REG_A] & RTC_DIV_CTL) != RTC_REF_CLCK_32KHZ )
     {
@@ -295,12 +316,16 @@ static void rtc_update_second(void *opaque)
         /* Delay time before update cycle */
         set_timer(&s->second_timer2, s->next_second_time + 244000);
     }
+
+    spin_unlock(&s->lock);
 }
 
 static void rtc_update_second2(void *opaque)
 {
     RTCState *s = opaque;
     struct domain *d = vrtc_domain(s);
+
+    spin_lock(&s->lock);
 
     if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
         rtc_copy_date(s);
@@ -337,15 +362,18 @@ static void rtc_update_second2(void *opaque)
 
     s->next_second_time += 1000000000ULL;
     set_timer(&s->second_timer, s->next_second_time);
+
+    spin_unlock(&s->lock);
 }
 
-static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
+static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
 {
-    RTCState *s = opaque;
     int ret;
 
     if ( (addr & 1) == 0 )
         return 0xff;
+
+    spin_lock(&s->lock);
 
     switch ( s->hw.cmos_index )
     {
@@ -370,6 +398,8 @@ static uint32_t rtc_ioport_read(void *opaque, uint32_t addr)
         ret = s->hw.cmos_data[s->hw.cmos_index];
         break;
     }
+
+    spin_unlock(&s->lock);
 
     return ret;
 }
@@ -413,7 +443,11 @@ void rtc_migrate_timers(struct vcpu *v)
 static int rtc_save(struct domain *d, hvm_domain_context_t *h)
 {
     RTCState *s = domain_vrtc(d);
-    return hvm_save_entry(RTC, 0, h, &s->hw);
+    int rc;
+    spin_lock(&s->lock);
+    rc = hvm_save_entry(RTC, 0, h, &s->hw);
+    spin_unlock(&s->lock);
+    return rc;
 }
 
 /* Reload the hardware state from a saved domain */
@@ -421,9 +455,14 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
 {
     RTCState *s = domain_vrtc(d);
 
+    spin_lock(&s->lock);
+
     /* Restore the registers */
     if ( hvm_load_entry(RTC, h, &s->hw) != 0 )
+    {
+        spin_unlock(&s->lock);
         return -EINVAL;
+    }
 
     /* Reset the wall-clock time.  In normal running, this runs with host 
      * time, so let's keep doing that. */
@@ -436,6 +475,8 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
     /* Reset the periodic interrupt timer based on the registers */
     rtc_timer_update(s);
 
+    spin_unlock(&s->lock);
+
     return 0;
 }
 
@@ -446,13 +487,18 @@ void rtc_init(struct vcpu *v, int base)
 {
     RTCState *s = vcpu_vrtc(v);
 
+    spin_lock_init(&s->lock);
+
     s->hw.cmos_data[RTC_REG_A] = RTC_REF_CLCK_32KHZ | 6; /* ~1kHz */
     s->hw.cmos_data[RTC_REG_B] = RTC_24H;
     s->hw.cmos_data[RTC_REG_C] = 0;
     s->hw.cmos_data[RTC_REG_D] = RTC_VRT;
 
     s->current_tm = gmtime(get_localtime(v->domain));
+
+    spin_lock(&s->lock);
     rtc_copy_date(s);
+    spin_unlock(&s->lock);
 
     init_timer(&s->second_timer, rtc_update_second, s, v->processor);
     init_timer(&s->second_timer2, rtc_update_second2, s, v->processor);
