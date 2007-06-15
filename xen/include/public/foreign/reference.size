@@ -8,8 +8,8 @@ cpu_user_regs             |      68     200     496
 xen_ia64_boot_param       |       -       -      96
 ia64_tr_entry             |       -       -      32
 vcpu_tr_regs              |       -       -     512
-vcpu_guest_context_regs   |       -       -    5488
-vcpu_guest_context        |    2800    5168    5520
+vcpu_guest_context_regs   |       -       -   21872
+vcpu_guest_context        |    2800    5168   21904
 arch_vcpu_info            |      24      16       0
 vcpu_time_info            |      32      32      32
 vcpu_info                 |      64      64      48

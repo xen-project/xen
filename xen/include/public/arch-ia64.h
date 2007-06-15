@@ -451,7 +451,8 @@ struct vcpu_guest_context_regs {
         unsigned long psr;
         unsigned long cfm;
         unsigned long pr;
-        unsigned long nats; /* NaT bits for r1-r31.  */
+        unsigned int nats; /* NaT bits for r1-r31.  */
+        unsigned int bnats; /* Nat bits for banked registers.  */
         union vcpu_ar_regs ar;
         union vcpu_cr_regs cr;
         struct pt_fpreg f[128];
@@ -469,18 +470,17 @@ struct vcpu_guest_context_regs {
 
         struct vcpu_tr_regs tr;
 
-#if 0
-	/*
-	 * The vcpu_guest_context structure is allocated on the stack in
-	 * a few places.  With this array for RBS storage, that structure
-	 * is a bit over 21k.  It looks like maybe we're blowing the stack
-	 * and causing rather random looking failures on a couple systems.
-	 * Remove since we're not actually using it for now.
-	 */
-
+        /*
+         * The rbs is intended to be the image of the stacked registers still
+         * in the cpu (not yet stored in memory).  It is laid out as if it
+         * were written in memory at an 512 (64*8) * aligned address + offset.
+         * The offset is IA64_RBS_OFFSET % 512.
+         * rbs_nat contains NaT bits for the remaining rbs registers.
+         */
         /* Note: loadrs is 2**14 bytes == 2**11 slots.  */
+#define IA64_GUEST_CONTEXT_RBS_OFFSET 448
         unsigned long rbs[2048];
-#endif
+        unsigned long rbs_nat;
 };
 
 struct vcpu_guest_context {

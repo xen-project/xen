@@ -361,6 +361,10 @@ void startup_cpu_idle_loop(void)
 # error "XMAPPEDREGS_SHIFT doesn't match sizeof(mapped_regs_t)."
 #endif
 
+#if (IA64_RBS_OFFSET % 512) != IA64_GUEST_CONTEXT_RBS_OFFSET
+# error "arch-ia64.h: IA64_GUEST_CONTEXT_RBS_OFFSET must be adjusted."
+#endif
+
 void hlt_timer_fn(void *data)
 {
 	struct vcpu *v = data;
@@ -610,6 +614,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	struct vcpu_tr_regs *tr = &c.nat->regs.tr;
 	struct cpu_user_regs *uregs = vcpu_regs(v);
 	int is_hvm = VMX_DOMAIN(v);
+	unsigned int rbs_size;
 
 	c.nat->regs.b[6] = uregs->b6;
 	c.nat->regs.b[7] = uregs->b7;
@@ -638,7 +643,8 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 	c.nat->regs.pr = uregs->pr;
 	c.nat->regs.b[0] = uregs->b0;
-	c.nat->regs.ar.bsp = uregs->ar_bspstore + (uregs->loadrs >> 16);
+	rbs_size = uregs->loadrs >> 16;
+	c.nat->regs.ar.bsp = uregs->ar_bspstore + rbs_size;
 
 	c.nat->regs.r[1] = uregs->r1;
 	c.nat->regs.r[12] = uregs->r12;
@@ -683,6 +689,9 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	/* FIXME: to be reordered.  */
 	c.nat->regs.nats = uregs->eml_unat;
 
+	if (rbs_size < sizeof (c.nat->regs.rbs))
+		memcpy (c.nat->regs.rbs, (char *)v + IA64_RBS_OFFSET, rbs_size);
+
  	c.nat->privregs_pfn = get_gpfn_from_mfn
 		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
 
@@ -713,10 +722,12 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	struct cpu_user_regs *uregs = vcpu_regs(v);
 	struct domain *d = v->domain;
+	int was_initialised = v->is_initialised;
+	unsigned int rbs_size;
 	int rc;
 
 	/* Finish vcpu initialization.  */
-	if (!v->is_initialised) {
+	if (!was_initialised) {
 		if (d->arch.is_vti)
 			rc = vmx_final_setup_guest(v);
 		else
@@ -761,7 +772,12 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
 	uregs->pr = c.nat->regs.pr;
 	uregs->b0 = c.nat->regs.b[0];
-	uregs->loadrs = (c.nat->regs.ar.bsp - c.nat->regs.ar.bspstore) << 16;
+	rbs_size = c.nat->regs.ar.bsp - c.nat->regs.ar.bspstore;
+	/* Protection against crazy user code.  */
+	if (!was_initialised)
+		uregs->loadrs = (rbs_size) << 16;
+	if (rbs_size == (uregs->loadrs >> 16))
+		memcpy ((char *)v + IA64_RBS_OFFSET, c.nat->regs.rbs, rbs_size);
 
 	uregs->r1 = c.nat->regs.r[1];
 	uregs->r12 = c.nat->regs.r[12];
