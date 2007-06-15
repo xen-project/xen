@@ -578,7 +578,7 @@ static uint64_t
 nvram_init(const char *nvram_path)
 {
     uint64_t fd = 0;
-    fd = open(nvram_path, O_CREAT|O_RDWR, 0666);
+    fd = open(nvram_path, O_CREAT|O_RDWR, 0644);
 
     if ( fd < 0 )
     {
@@ -736,12 +736,34 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom)
 }
 
 #define NVRAM_DIR       "/usr/lib/xen/boot/"
-#define NVRAM_FILE_PATH	"/usr/lib/xen/boot/nvram_"
+#define NVRAM_FILE_PATH "/usr/lib/xen/boot/nvram_"
+
 int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
 {
     int file_path_len = strlen(NVRAM_FILE_PATH);
     uint64_t nvram_fd = 0;
     char nvram_path[100] = {0};
+    struct stat stat_buf;
+
+    if ( stat(NVRAM_DIR, &stat_buf) == -1 ) {
+        if ( errno != ENOENT )
+        {
+            PERROR("Error stat'ing NVRAM dir %s.", NVRAM_DIR);
+            return -1;
+        }
+        if ( mkdir(NVRAM_DIR, 0755) == -1 )
+        {
+            PERROR("Unable to create NVRAM store directory %s.", NVRAM_DIR);
+            return -1;
+        }
+    }
+
+    if ( !(stat_buf.st_mode & S_IRUSR) || !(stat_buf.st_mode & S_IWUSR) )
+    {
+        errno = EACCES;
+        PERROR("No R/W permission to NVRAM store directory %s.", NVRAM_DIR);
+        return -1;
+    }
 
     strncpy(nvram_path, NVRAM_FILE_PATH, file_path_len);
     if ( file_path_len + strlen(dom_name) + 1 > sizeof(nvram_path) )
@@ -750,7 +772,6 @@ int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
         return -1;
     }
     strcpy(nvram_path + file_path_len, dom_name);
-    mkdir(NVRAM_DIR, 0765);
 
     nvram_fd = nvram_init(nvram_path);
     if ( nvram_fd == (uint64_t)(-1) )
