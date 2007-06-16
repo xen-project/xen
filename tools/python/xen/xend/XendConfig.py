@@ -1274,21 +1274,6 @@ class XendConfig(dict):
 
         return False
 
-    def device_remove(self, dev_uuid):
-        """Remove an existing device referred by dev_uuid.
-        """
-
-        if dev_uuid in self['devices']:
-            dev_config = self['devices'].get(dev_uuid)
-            dev_type = dev_config[0]
-
-            del self['devices'][dev_uuid]
-            # Remove dev references for certain device types (see device_add)
-            if dev_type in ('vif', 'vbd', 'vtpm'):
-                param = '%s_refs' % dev_type
-                if param in self:
-                    if dev_uuid in self[param]:
-                        self[param].remove(dev_uuid)
 
     def device_sxpr(self, dev_uuid = None, dev_type = None, dev_info = None):
         """Get Device SXPR by either giving the device UUID or (type, config).

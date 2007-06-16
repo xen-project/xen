@@ -29,7 +29,6 @@ from xen.xend.xenstore.xswatch import xswatch
 import os
 
 DEVICE_CREATE_TIMEOUT = 100
-DEVICE_DESTROY_TIMEOUT = 10
 HOTPLUG_STATUS_NODE = "hotplug-status"
 HOTPLUG_ERROR_NODE  = "hotplug-error"
 HOTPLUG_STATUS_ERROR = "error"
@@ -212,34 +211,17 @@ class DevController:
 
         devid = int(devid)
 
-        frontpath = self.frontendPath(devid)
-        if frontpath:
-            backpath = xstransact.Read(frontpath, "backend")
-
         # Modify online status /before/ updating state (latter is watched by
         # drivers, so this ordering avoids a race).
         self.writeBackend(devid, 'online', "0")
         self.writeBackend(devid, 'state', str(xenbusState['Closing']))
 
         if force:
+            frontpath = self.frontendPath(devid)
+            backpath = xstransact.Read(frontpath, "backend")
             if backpath:
                 xstransact.Remove(backpath)
-            if frontpath:
-                xstransact.Remove(frontpath)
-            return
-
-        # Wait till both frontpath and backpath are removed from
-        # xenstore, or timed out
-        if frontpath:
-            status = self.waitUntilDestroyed(frontpath)
-            if status == Timeout:
-                # Exception will be caught by destroyDevice in XendDomainInfo.py
-                raise EnvironmentError
-        if backpath:
-            status = self.waitUntilDestroyed(backpath)
-            if status == Timeout:
-                # Exception will be caught by destroyDevice in XendDomainInfo.py
-                raise EnvironmentError
+            xstransact.Remove(frontpath)
 
         self.vm._removeVm("device/%s/%d" % (self.deviceClass, devid))
 
@@ -526,16 +508,6 @@ class DevController:
             return (Missing, None)
 
 
-    def waitUntilDestroyed(self, path):
-       ev = Event()
-       result = { 'path': path, 'status': Timeout }
-
-       xswatch(path, destroyCallback, ev, result)
-
-       ev.wait(DEVICE_DESTROY_TIMEOUT)
-       return result['status']
-
-
     def backendPath(self, backdom, devid):
         """Construct backend path given the backend domain and device id.
 
@@ -564,18 +536,6 @@ class DevController:
         return "%s/device-misc/%s" % (self.vm.getDomainPath(),
                                       self.deviceClass)
 
-
-def destroyCallback(devPath, ev, result):
-    log.debug("destroyCallback %s.", devPath)
-
-    list = xstransact.List(result['path'])
-    if list:
-        return 1
-
-    result['status'] = Missing
-    ev.set()
-    log.debug("destroyCallback %s is destroyed", result['path'])
-    return 0
 
 def hotplugStatusCallback(statusPath, ev, result):
     log.debug("hotplugStatusCallback %s.", statusPath)
