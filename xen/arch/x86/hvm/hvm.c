@@ -401,6 +401,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
     spin_unlock(&v->domain->arch.hvm_domain.ioreq.lock);
 
+    spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
     if ( v->vcpu_id == 0 )

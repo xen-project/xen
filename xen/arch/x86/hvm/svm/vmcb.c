@@ -236,6 +236,16 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
         vmcb->cr4 = arch_svm->cpu_shadow_cr4 = 0;
+
+        /* No point in intercepting CR0/3/4 reads, because the hardware 
+         * will return the guest versions anyway. */
+        vmcb->cr_intercepts &= ~(CR_INTERCEPT_CR0_READ
+                                 |CR_INTERCEPT_CR3_READ
+                                 |CR_INTERCEPT_CR4_READ);
+
+        /* No point in intercepting INVLPG if we don't have shadow pagetables 
+         * that need to be fixed up. */
+        vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_INVLPG;
     }
     else
     {

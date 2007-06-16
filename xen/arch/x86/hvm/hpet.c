@@ -113,6 +113,8 @@ static inline int hpet_check_access_length(
 
 static inline uint64_t hpet_read_maincounter(HPETState *h)
 {
+    ASSERT(spin_is_locked(&h->lock));
+
     if ( hpet_enabled(h) )
         return guest_time_hpet(h->vcpu) + h->mc_offset;
     else 
@@ -131,6 +133,8 @@ static unsigned long hpet_read(
     if ( hpet_check_access_length(addr, length) != 0 )
         return ~0UL;
 
+    spin_lock(&h->lock);
+
     val = hpet_read64(h, addr & ~7);
     if ( (addr & ~7) == HPET_COUNTER )
         val = hpet_read_maincounter(h);
@@ -139,12 +143,15 @@ static unsigned long hpet_read(
     if ( length != 8 )
         result = (val >> ((addr & 7) * 8)) & ((1UL << (length * 8)) - 1);
 
+    spin_unlock(&h->lock);
+
     return result;
 }
 
 static void hpet_stop_timer(HPETState *h, unsigned int tn)
 {
     ASSERT(tn < HPET_TIMER_NUM);
+    ASSERT(spin_is_locked(&h->lock));
     stop_timer(&h->timers[tn]);
 }
 
@@ -157,7 +164,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
     uint64_t tn_cmp, cur_tick, diff;
 
     ASSERT(tn < HPET_TIMER_NUM);
-    
+    ASSERT(spin_is_locked(&h->lock));
+
     if ( !hpet_enabled(h) || !timer_enabled(h, tn) )
         return;
 
@@ -212,6 +220,8 @@ static void hpet_write(
 
     if ( hpet_check_access_length(addr, length) != 0 )
         return;
+
+    spin_lock(&h->lock);
 
     old_val = hpet_read64(h, addr & ~7);
     if ( (addr & ~7) == HPET_COUNTER )
@@ -302,6 +312,8 @@ static void hpet_write(
         /* Ignore writes to unsupported and reserved registers. */
         break;
     }
+
+    spin_unlock(&h->lock);
 }
 
 static int hpet_range(struct vcpu *v, unsigned long addr)
@@ -320,6 +332,8 @@ static void hpet_route_interrupt(HPETState *h, unsigned int tn)
 {
     unsigned int tn_int_route = timer_int_route(h, tn);
     struct domain *d = h->vcpu->domain;
+
+    ASSERT(spin_is_locked(&h->lock));
 
     if ( (tn <= 1) && (h->hpet.config & HPET_CFG_LEGACY) )
     {
@@ -352,8 +366,13 @@ static void hpet_timer_fn(void *opaque)
     HPETState *h = htfi->hs;
     unsigned int tn = htfi->tn;
 
+    spin_lock(&h->lock);
+
     if ( !hpet_enabled(h) || !timer_enabled(h, tn) )
+    {
+        spin_unlock(&h->lock);
         return;
+    }
 
     hpet_route_interrupt(h, tn);
 
@@ -374,6 +393,8 @@ static void hpet_timer_fn(void *opaque)
         set_timer(&h->timers[tn], 
                   NOW() + hpet_tick_to_ns(h, h->hpet.period[tn]));
     }
+
+    spin_unlock(&h->lock);
 }
 
 void hpet_migrate_timers(struct vcpu *v)
@@ -391,12 +412,19 @@ void hpet_migrate_timers(struct vcpu *v)
 static int hpet_save(struct domain *d, hvm_domain_context_t *h)
 {
     HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
+    int rc;
+
+    spin_lock(&hp->lock);
 
     /* Write the proper value into the main counter */
     hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp->vcpu);
 
     /* Save the HPET registers */
-    return hvm_save_entry(HPET, 0, h, &hp->hpet);
+    rc = hvm_save_entry(HPET, 0, h, &hp->hpet);
+
+    spin_unlock(&hp->lock);
+
+    return rc;
 }
 
 static int hpet_load(struct domain *d, hvm_domain_context_t *h)
@@ -404,9 +432,14 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
     int i;
 
+    spin_lock(&hp->lock);
+
     /* Reload the HPET registers */
     if ( hvm_load_entry(HPET, h, &hp->hpet) )
+    {
+        spin_unlock(&hp->lock);
         return -EINVAL;
+    }
     
     /* Recalculate the offset between the main counter and guest time */
     hp->mc_offset = hp->hpet.mc64 - guest_time_hpet(hp->vcpu);
@@ -414,6 +447,8 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     /* Restart the timers */
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
         hpet_set_timer(hp, i);
+
+    spin_unlock(&hp->lock);
 
     return 0;
 }
@@ -426,6 +461,8 @@ void hpet_init(struct vcpu *v)
     int i;
 
     memset(h, 0, sizeof(HPETState));
+
+    spin_lock_init(&h->lock);
 
     h->vcpu = v;
     h->tsc_freq = ticks_per_sec(v);

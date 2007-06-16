@@ -183,7 +183,7 @@ static inline void timer_lock(struct timer *timer)
 
 static inline void timer_unlock(struct timer *timer)
 {
-        spin_unlock(&per_cpu(timers, timer->cpu).lock);
+    spin_unlock(&per_cpu(timers, timer->cpu).lock);
 }
 
 #define timer_unlock_irq(t) \

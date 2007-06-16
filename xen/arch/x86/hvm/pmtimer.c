@@ -53,6 +53,8 @@
 /* Dispatch SCIs based on the PM1a_STS and PM1a_EN registers */
 static void pmt_update_sci(PMTState *s)
 {
+    ASSERT(spin_is_locked(&s->lock));
+
     if ( s->pm.pm1a_en & s->pm.pm1a_sts & SCI_MASK )
         hvm_isa_irq_assert(s->vcpu->domain, SCI_IRQ);
     else
@@ -66,6 +68,8 @@ static void pmt_update_time(PMTState *s)
     uint64_t curr_gtime;
     uint32_t msb = s->pm.tmr_val & TMR_VAL_MSB;
     
+    ASSERT(spin_is_locked(&s->lock));
+
     /* Update the timer */
     curr_gtime = hvm_get_guest_time(s->vcpu);
     s->pm.tmr_val += ((curr_gtime - s->last_gtime) * s->scale) >> 32;
@@ -89,6 +93,8 @@ static void pmt_timer_callback(void *opaque)
     uint32_t pmt_cycles_until_flip;
     uint64_t time_until_flip;
 
+    spin_lock(&s->lock);
+
     /* Recalculate the timer and make sure we get an SCI if we need one */
     pmt_update_time(s);
 
@@ -103,8 +109,9 @@ static void pmt_timer_callback(void *opaque)
 
     /* Wake up again near the next bit-flip */
     set_timer(&s->timer, NOW() + time_until_flip + MILLISECS(1));
-}
 
+    spin_unlock(&s->lock);
+}
 
 /* Handle port I/O to the PM1a_STS and PM1a_EN registers */
 static int handle_evt_io(ioreq_t *p)
@@ -114,7 +121,9 @@ static int handle_evt_io(ioreq_t *p)
     uint32_t addr, data, byte;
     int i;
 
-    if ( p->dir == 0 ) /* Write */
+    spin_lock(&s->lock);
+
+    if ( p->dir == IOREQ_WRITE )
     {
         /* Handle this I/O one byte at a time */
         for ( i = p->size, addr = p->addr, data = p->data;
@@ -122,7 +131,7 @@ static int handle_evt_io(ioreq_t *p)
               i--, addr++, data >>= 8 )
         {
             byte = data & 0xff;
-            switch(addr) 
+            switch ( addr )
             {
                 /* PM1a_STS register bits are write-to-clear */
             case PM1a_STS_ADDR:
@@ -149,7 +158,7 @@ static int handle_evt_io(ioreq_t *p)
         /* Fix up the SCI state to match the new register state */
         pmt_update_sci(s);
     }
-    else /* Read */
+    else /* p->dir == IOREQ_READ */
     {
         data = s->pm.pm1a_sts | (((uint32_t) s->pm.pm1a_en) << 16);
         data >>= 8 * (p->addr - PM1a_STS_ADDR);
@@ -157,6 +166,9 @@ static int handle_evt_io(ioreq_t *p)
         else if ( p->size == 2 ) data &= 0xffff;
         p->data = data;
     }
+
+    spin_unlock(&s->lock);
+
     return 1;
 }
 
@@ -167,29 +179,31 @@ static int handle_pmt_io(ioreq_t *p)
     struct vcpu *v = current;
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
 
-    if (p->size != 4 ||
-        p->data_is_ptr ||
-        p->type != IOREQ_TYPE_PIO){
-        printk("HVM_PMT: wrong PM timer IO\n");
+    if ( (p->size != 4) || p->data_is_ptr || (p->type != IOREQ_TYPE_PIO) )
+    {
+        gdprintk(XENLOG_WARNING, "HVM_PMT bad access\n");
         return 1;
     }
     
-    if (p->dir == 0) { /* write */
-        /* PM_TMR_BLK is read-only */
-        return 1;
-    } else if (p->dir == 1) { /* read */
+    if ( p->dir == IOREQ_READ )
+    {
+        spin_lock(&s->lock);
         pmt_update_time(s);
         p->data = s->pm.tmr_val;
+        spin_unlock(&s->lock);
         return 1;
     }
+
     return 0;
 }
 
 static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
-    uint32_t msb = s->pm.tmr_val & TMR_VAL_MSB;
-    uint32_t x;
+    uint32_t x, msb = s->pm.tmr_val & TMR_VAL_MSB;
+    int rc;
+
+    spin_lock(&s->lock);
 
     /* Update the counter to the guest's current time.  We always save
      * with the domain paused, so the saved time should be after the
@@ -202,22 +216,33 @@ static int pmtimer_save(struct domain *d, hvm_domain_context_t *h)
     /* No point in setting the SCI here because we'll already have saved the 
      * IRQ and *PIC state; we'll fix it up when we restore the domain */
 
-    return hvm_save_entry(PMTIMER, 0, h, &s->pm);
+    rc = hvm_save_entry(PMTIMER, 0, h, &s->pm);
+
+    spin_unlock(&s->lock);
+
+    return rc;
 }
 
 static int pmtimer_load(struct domain *d, hvm_domain_context_t *h)
 {
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
 
+    spin_lock(&s->lock);
+
     /* Reload the registers */
     if ( hvm_load_entry(PMTIMER, h, &s->pm) )
+    {
+        spin_unlock(&s->lock);
         return -EINVAL;
+    }
 
     /* Calculate future counter values from now. */
     s->last_gtime = hvm_get_guest_time(s->vcpu);
 
     /* Set the SCI state from the registers */ 
     pmt_update_sci(s);
+
+    spin_unlock(&s->lock);
     
     return 0;
 }
@@ -225,14 +250,11 @@ static int pmtimer_load(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(PMTIMER, pmtimer_save, pmtimer_load, 
                           1, HVMSR_PER_DOM);
 
-
 void pmtimer_init(struct vcpu *v)
 {
     PMTState *s = &v->domain->arch.hvm_domain.pl_time.vpmt;
 
-    s->pm.tmr_val = 0;
-    s->pm.pm1a_sts = 0;
-    s->pm.pm1a_en = 0;
+    spin_lock_init(&s->lock);
 
     s->scale = ((uint64_t)FREQUENCE_PMTIMER << 32) / ticks_per_sec(v);
     s->vcpu = v;
