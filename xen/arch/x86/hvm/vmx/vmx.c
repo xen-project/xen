@@ -2549,7 +2549,8 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", ecx);
 
-    switch (ecx) {
+    switch ( ecx )
+    {
     case MSR_IA32_TIME_STAMP_COUNTER:
         msr_content = hvm_get_guest_time(v);
         break;
@@ -2565,6 +2566,8 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+        goto gp_fault;
     default:
         if ( long_mode_do_msr_read(regs) )
             goto done;
@@ -2576,8 +2579,8 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
             regs->edx = edx;
             goto done;
         }
-        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-        return 0;
+
+        goto gp_fault;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;
@@ -2589,6 +2592,10 @@ done:
                 ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
     return 1;
+
+gp_fault:
+    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    return 0;
 }
 
 static int vmx_alloc_vlapic_mapping(struct domain *d)
@@ -2667,7 +2674,8 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     HVMTRACE_2D(MSR_WRITE, v, ecx, msr_content);
 
-    switch (ecx) {
+    switch ( ecx )
+    {
     case MSR_IA32_TIME_STAMP_COUNTER:
         hvm_set_guest_time(v, msr_content);
         pt_reset(v);
@@ -2684,6 +2692,8 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+        goto gp_fault;
     default:
         if ( !long_mode_do_msr_write(regs) )
             wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
@@ -2691,6 +2701,10 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     }
 
     return 1;
+
+gp_fault:
+    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    return 0;
 }
 
 static void vmx_do_hlt(void)
