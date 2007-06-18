@@ -544,6 +544,14 @@ ia64_handle_privop(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
 		// Note: if a path results in a vector to reflect that requires
 		// iha/itir (e.g. vcpu_force_data_miss), they must be set there
+		/*
+		 * IA64_GENEX_VECTOR may contain in the lowest byte an ISR.code
+		 * see IA64_ILLOP_FAULT, ...
+		 */
+		if ((vector & ~0xffUL) == IA64_GENEX_VECTOR) {
+			isr = vector & 0xffUL;
+			vector = IA64_GENEX_VECTOR;
+		}
 		reflect_interruption(isr, regs, vector);
 	}
 }
