@@ -402,7 +402,7 @@ void init_done(void)
     startup_cpu_idle_loop();
 }
 
-void __init __start_xen(multiboot_info_t *mbi)
+void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char __cmdline[] = "", *cmdline = __cmdline;
@@ -410,6 +410,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned int initrdidx = 1;
     char *_policy_start = NULL;
     unsigned long _policy_len = 0;
+    multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
     int i, e820_warn = 0, bytes = 0;
@@ -677,6 +678,9 @@ void __init __start_xen(multiboot_info_t *mbi)
              */
             barrier();
             move_memory(e, 0, __pa(&_end) - xen_phys_start);
+
+            /* Poison low 1MB to detect stray pointers to physical 0-1MB. */
+            memset(maddr_to_bootstrap_virt(e), 0x55, 1U<<20);
 
             /* Walk initial pagetables, relocating page directory entries. */
             pl4e = __va(__pa(idle_pg_table));

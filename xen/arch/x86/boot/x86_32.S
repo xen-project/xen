@@ -30,9 +30,7 @@
         loop    1b
                 
         /* Pass off the Multiboot info structure to C land. */
-        mov     multiboot_ptr,%eax
-        add     $__PAGE_OFFSET,%eax
-        push    %eax
+        pushl   multiboot_ptr
         call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
 

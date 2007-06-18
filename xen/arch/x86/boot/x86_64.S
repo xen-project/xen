@@ -51,8 +51,6 @@
 
         /* Pass off the Multiboot info structure to C land. */
         mov     multiboot_ptr(%rip),%edi
-        lea     start-0x100000(%rip),%rax
-        add     %rax,%rdi
         call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
 
