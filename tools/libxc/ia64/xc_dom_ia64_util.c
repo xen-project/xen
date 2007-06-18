@@ -104,7 +104,7 @@ xen_ia64_is_vcpu_allocated(struct xc_dom_image *dom, uint32_t vcpu)
     if (rc == 0)
         return 1;
 
-    if (rc != -ESRCH)
+    if (errno != ESRCH)
         PERROR("Could not get vcpu info");
     return 0;
 }
