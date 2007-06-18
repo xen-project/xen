@@ -10,6 +10,7 @@ obj-y += dom_fw_common.o
 obj-y += dom_fw_dom0.o
 obj-y += dom_fw_domu.o
 obj-y += dom_fw_utils.o
+obj-y += dom_fw_sn2.o
 obj-y += fw_emul.o
 obj-y += hpsimserial.o
 obj-y += hypercall.o

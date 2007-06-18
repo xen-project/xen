@@ -191,6 +191,15 @@ machvec_noop_pci_legacy_write (struct pci_bus *bus, u16 port, u32 val, u8 size)
 	panic("%s() called", __FUNCTION__);
 	return 0;
 }
+
+typedef int ia64_mv_fw_init_t (void *d, void *bp, void *tables);
+
+static inline int
+machvec_noop_platform_fw_init (void *d, void *bp, void *tables)
+{
+	return 0;
+}
+
 #endif
 
 extern void machvec_setup (char **);
@@ -254,6 +263,9 @@ extern void machvec_tlb_migrate_finish (struct mm_struct *);
 #  define platform_readw_relaxed        ia64_mv.readw_relaxed
 #  define platform_readl_relaxed        ia64_mv.readl_relaxed
 #  define platform_readq_relaxed        ia64_mv.readq_relaxed
+#ifdef XEN
+#  define platform_fw_init      ia64_mv.fw_init
+#endif
 # endif
 
 /* __attribute__((__aligned__(16))) is required to make size of the
@@ -302,8 +314,57 @@ struct ia64_machine_vector {
 	ia64_mv_readw_relaxed_t *readw_relaxed;
 	ia64_mv_readl_relaxed_t *readl_relaxed;
 	ia64_mv_readq_relaxed_t *readq_relaxed;
+#ifdef XEN
+	ia64_mv_fw_init_t *fw_init;
+#endif
 } __attribute__((__aligned__(16))); /* align attrib? see above comment */
 
+#ifdef XEN
+#define MACHVEC_INIT(name)			\
+{						\
+	#name,					\
+	platform_setup,				\
+	platform_cpu_init,			\
+	platform_irq_init,			\
+	platform_send_ipi,			\
+	platform_timer_interrupt,		\
+	platform_global_tlb_purge,		\
+	platform_tlb_migrate_finish,		\
+	platform_dma_init,			\
+	platform_dma_alloc_coherent,		\
+	platform_dma_free_coherent,		\
+	platform_dma_map_single,		\
+	platform_dma_unmap_single,		\
+	platform_dma_map_sg,			\
+	platform_dma_unmap_sg,			\
+	platform_dma_sync_single_for_cpu,	\
+	platform_dma_sync_sg_for_cpu,		\
+	platform_dma_sync_single_for_device,	\
+	platform_dma_sync_sg_for_device,	\
+	platform_dma_mapping_error,			\
+	platform_dma_supported,			\
+	platform_local_vector_to_irq,		\
+	platform_pci_get_legacy_mem,		\
+	platform_pci_legacy_read,		\
+	platform_pci_legacy_write,		\
+	platform_inb,				\
+	platform_inw,				\
+	platform_inl,				\
+	platform_outb,				\
+	platform_outw,				\
+	platform_outl,				\
+	platform_mmiowb,			\
+	platform_readb,				\
+	platform_readw,				\
+	platform_readl,				\
+	platform_readq,				\
+	platform_readb_relaxed,			\
+	platform_readw_relaxed,			\
+	platform_readl_relaxed,			\
+	platform_readq_relaxed,			\
+	platform_fw_init,			\
+}
+#else
 #define MACHVEC_INIT(name)			\
 {						\
 	#name,					\
@@ -347,6 +408,7 @@ struct ia64_machine_vector {
 	platform_readl_relaxed,			\
 	platform_readq_relaxed,			\
 }
+#endif
 
 extern struct ia64_machine_vector ia64_mv;
 extern void machvec_init (const char *name);
@@ -493,6 +555,11 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
 #endif
 #ifndef platform_readq_relaxed
 # define platform_readq_relaxed	__ia64_readq_relaxed
+#endif
+#ifdef XEN
+#ifndef platform_fw_init
+# define platform_fw_init	machvec_noop_platform_fw_init
+#endif
 #endif
 
 #endif /* _ASM_IA64_MACHVEC_H */

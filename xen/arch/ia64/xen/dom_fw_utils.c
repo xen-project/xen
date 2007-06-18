@@ -292,6 +292,13 @@ int dom_fw_setup(domain_t * d, unsigned long bp_mpa, unsigned long maxmem)
 			xfree(fw_tables);
 			return ret;
 		}
+
+		ret = platform_fw_init(d, bp, fw_tables);
+		if (ret < 0) {
+			xfree(fw_tables);
+			return ret;
+		}
+
 		if (sizeof(*fw_tables) +
 		    fw_tables->num_mds * sizeof(fw_tables->efi_memmap[0]) >
 		    fw_tables_size) {
