@@ -462,7 +462,17 @@ int rdmsr_hypervisor_regs(
     if ( idx > 0 )
         return 0;
 
-    *eax = *edx = 0;
+    switch ( idx )
+    {
+    case 0:
+    {
+        *eax = *edx = 0;
+        break;
+    }
+    default:
+        BUG();
+    }
+
     return 1;
 }
 
