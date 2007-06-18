@@ -19,9 +19,8 @@ install:
 	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)/ps
 	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)/pdf
 
-	cp xenapi.ps $(DESTDIR)$(pkgdocdir)/ps
-	cp xenapi.pdf $(DESTDIR)$(pkgdocdir)/pdf
-
+	[ -e xenapi.ps ] && cp xenapi.ps $(DESTDIR)$(pkgdocdir)/ps || true
+	[ -e xenapi.pdf ] && cp xenapi.pdf $(DESTDIR)$(pkgdocdir)/pdf || true
 
 xenapi.dvi: $(TEX) $(EPS) $(EPSDOT)
 	$(LATEX) xenapi.tex
