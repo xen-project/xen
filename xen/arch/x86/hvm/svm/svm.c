@@ -957,7 +957,7 @@ static struct hvm_function_table svm_function_table = {
     .event_injection_faulted = svm_event_injection_faulted
 };
 
-void svm_npt_detect(void)
+static void svm_npt_detect(void)
 {
     u32 eax, ebx, ecx, edx;
 
@@ -1017,6 +1017,9 @@ int start_svm(struct cpuinfo_x86 *c)
 
     hvm_enable(&svm_function_table);
 
+    if ( opt_hap_enabled )
+        printk("SVM: Nested paging enabled.\n");
+        
     return 1;
 }
 
