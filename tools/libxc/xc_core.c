@@ -156,7 +156,7 @@ struct xc_core_section_headers {
     Elf64_Shdr  *shdrs;
 };
 #define SHDR_INIT       16
-#define SHDR_INC        4
+#define SHDR_INC        4U
 
 static struct xc_core_section_headers*
 xc_core_shdr_init(void)
