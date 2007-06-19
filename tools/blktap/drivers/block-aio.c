@@ -43,14 +43,7 @@
 #include <sys/ioctl.h>
 #include <linux/fs.h>
 #include "tapdisk.h"
-
-
-/**
- * We used a kernel patch to return an fd associated with the AIO context
- * so that we can concurrently poll on synchronous and async descriptors.
- * This is signalled by passing 1 as the io context to io_setup.
- */
-#define REQUEST_ASYNC_FD 1
+#include "tapaio.h"
 
 #define MAX_AIO_REQS (MAX_REQUESTS * MAX_SEGMENTS_PER_REQ)
 
@@ -65,14 +58,13 @@ struct tdaio_state {
 	int fd;
 	
 	/* libaio state */
-	io_context_t       aio_ctx;
+	tap_aio_context_t  aio_ctx;
 	struct iocb        iocb_list  [MAX_AIO_REQS];
 	struct iocb       *iocb_free  [MAX_AIO_REQS];
 	struct pending_aio pending_aio[MAX_AIO_REQS];
 	int                iocb_free_count;
 	struct iocb       *iocb_queue[MAX_AIO_REQS];
 	int                iocb_queued;
-	int                poll_fd; /* NB: we require aio_poll support */
 	struct io_event    aio_events[MAX_AIO_REQS];
 };
 
@@ -148,7 +140,7 @@ static inline void init_fds(struct disk_driver *dd)
 	for(i = 0; i < MAX_IOFD; i++) 
 		dd->io_fd[i] = 0;
 
-	dd->io_fd[0] = prv->poll_fd;
+	dd->io_fd[0] = prv->aio_ctx.pollfd;
 }
 
 /* Open the disk file and initialize aio state. */
@@ -162,12 +154,9 @@ int tdaio_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 	/* Initialize AIO */
 	prv->iocb_free_count = MAX_AIO_REQS;
 	prv->iocb_queued     = 0;
-	
-	prv->aio_ctx = (io_context_t) REQUEST_ASYNC_FD;
-	prv->poll_fd = io_setup(MAX_AIO_REQS, &prv->aio_ctx);
 
-	if (prv->poll_fd < 0) {
-		ret = prv->poll_fd;
+	ret = tap_aio_setup(&prv->aio_ctx, prv->aio_events, MAX_AIO_REQS);
+	if (ret < 0) {
                 if (ret == -EAGAIN) {
                         DPRINTF("Couldn't setup AIO context.  If you are "
                                 "trying to concurrently use a large number "
@@ -176,9 +165,7 @@ int tdaio_open (struct disk_driver *dd, const char *name, td_flag_t flags)
                                 "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
                                 "aio-max-nr')\n");
                 } else {
-                        DPRINTF("Couldn't get fd for AIO poll support.  This "
-                                "is probably because your kernel does not "
-                                "have the aio-poll patch applied.\n");
+                        DPRINTF("Couldn't setup AIO context.\n");
                 }
 		goto done;
 	}
@@ -286,7 +273,7 @@ int tdaio_submit(struct disk_driver *dd)
 	if (!prv->iocb_queued)
 		return 0;
 
-	ret = io_submit(prv->aio_ctx, prv->iocb_queued, prv->iocb_queue);
+	ret = io_submit(prv->aio_ctx.aio_ctx, prv->iocb_queued, prv->iocb_queue);
 	
 	/* XXX: TODO: Handle error conditions here. */
 	
@@ -300,7 +287,7 @@ int tdaio_close(struct disk_driver *dd)
 {
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 	
-	io_destroy(prv->aio_ctx);
+	io_destroy(prv->aio_ctx.aio_ctx);
 	close(prv->fd);
 
 	return 0;
@@ -308,15 +295,13 @@ int tdaio_close(struct disk_driver *dd)
 
 int tdaio_do_callbacks(struct disk_driver *dd, int sid)
 {
-	int ret, i, rsp = 0;
+	int i, nr_events, rsp = 0;
 	struct io_event *ep;
 	struct tdaio_state *prv = (struct tdaio_state *)dd->private;
 
-	/* Non-blocking test for completed io. */
-	ret = io_getevents(prv->aio_ctx, 0, MAX_AIO_REQS, prv->aio_events,
-			   NULL);
-			
-	for (ep=prv->aio_events,i=ret; i-->0; ep++) {
+	nr_events = tap_aio_get_events(&prv->aio_ctx);
+repeat:
+	for (ep = prv->aio_events, i = nr_events; i-- > 0; ep++) {
 		struct iocb        *io  = ep->obj;
 		struct pending_aio *pio;
 		
@@ -327,6 +312,14 @@ int tdaio_do_callbacks(struct disk_driver *dd, int sid)
 
 		prv->iocb_free[prv->iocb_free_count++] = io;
 	}
+
+	if (nr_events) {
+		nr_events = tap_aio_more_events(&prv->aio_ctx);
+		goto repeat;
+	}
+
+	tap_aio_continue(&prv->aio_ctx);
+
 	return rsp;
 }
 
