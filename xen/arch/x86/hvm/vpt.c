@@ -227,13 +227,10 @@ void pt_reset(struct vcpu *v)
 
     list_for_each_entry ( pt, head, list )
     {
-        if ( pt->enabled )
-        {
-            pt->pending_intr_nr = 0;
-            pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
-            pt->scheduled = NOW() + pt->period;
-            set_timer(&pt->timer, pt->scheduled);
-        }
+        pt->pending_intr_nr = 0;
+        pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
+        pt->scheduled = NOW() + pt->period;
+        set_timer(&pt->timer, pt->scheduled);
     }
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
@@ -247,10 +244,7 @@ void pt_migrate(struct vcpu *v)
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
     list_for_each_entry ( pt, head, list )
-    {
-        if ( pt->enabled )
-            migrate_timer(&pt->timer, v->processor);
-    }
+        migrate_timer(&pt->timer, v->processor);
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 }
@@ -263,8 +257,9 @@ void create_periodic_time(
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
     pt->enabled = 1;
+    pt->pending_intr_nr = 0;
+
     if ( period < 900000 ) /* < 0.9 ms */
     {
         gdprintk(XENLOG_WARNING,
@@ -283,6 +278,8 @@ void create_periodic_time(
     pt->priv = data;
 
     list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
+
+    init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
     set_timer(&pt->timer, pt->scheduled);
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
@@ -295,8 +292,12 @@ void destroy_periodic_time(struct periodic_time *pt)
 
     pt_lock(pt);
     pt->enabled = 0;
-    pt->pending_intr_nr = 0;
     list_del(&pt->list);
-    kill_timer(&pt->timer);
     pt_unlock(pt);
+
+    /*
+     * pt_timer_fn() can run until this kill_timer() returns. We must do this
+     * outside pt_lock() otherwise we can deadlock with pt_timer_fn().
+     */
+    kill_timer(&pt->timer);
 }
