@@ -27,6 +27,7 @@
 #include <asm/sn/sn_sal.h>
 
 #ifdef XEN
+#define pci_dev_get(dev)	do {} while(0)
 #define move_native_irq(foo)	do {} while(0)
 #endif
 
@@ -264,7 +265,6 @@ void sn_irq_init(void)
 	}
 }
 
-#ifndef XEN
 static void register_intr_pda(struct sn_irq_info *sn_irq_info)
 {
 	int irq = sn_irq_info->irq_irq;
@@ -278,6 +278,7 @@ static void register_intr_pda(struct sn_irq_info *sn_irq_info)
 		pdacpu(cpu)->sn_first_irq = irq;
 }
 
+#ifndef XEN
 static void unregister_intr_pda(struct sn_irq_info *sn_irq_info)
 {
 	int irq = sn_irq_info->irq_irq;
@@ -339,9 +340,7 @@ static void unregister_intr_pda(struct sn_irq_info *sn_irq_info)
 	spin_unlock(&sn_irq_info_lock);
 #endif
 }
-#endif /* XEN */
 
-#ifndef XEN
 static void sn_irq_info_free(struct rcu_head *head)
 {
 	struct sn_irq_info *sn_irq_info;
@@ -351,7 +350,6 @@ static void sn_irq_info_free(struct rcu_head *head)
 }
 #endif
 
-#ifndef XEN
 void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 {
 	nasid_t nasid = sn_irq_info->irq_nasid;
@@ -360,7 +358,9 @@ void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 
 	pci_dev_get(pci_dev);
 	sn_irq_info->irq_cpuid = cpu;
+#ifndef XEN
 	sn_irq_info->irq_pciioinfo = SN_PCIDEV_INFO(pci_dev);
+#endif
 
 	/* link it into the sn_irq[irq] list */
 	spin_lock(&sn_irq_info_lock);
@@ -379,6 +379,7 @@ void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 
 void sn_irq_unfixup(struct pci_dev *pci_dev)
 {
+#ifndef XEN
 	struct sn_irq_info *sn_irq_info;
 
 	/* Only cleanup IRQ stuff if this device has a host bus context */
@@ -408,8 +409,8 @@ void sn_irq_unfixup(struct pci_dev *pci_dev)
 #endif
 	pci_dev_put(pci_dev);
 
-}
 #endif
+}
 
 static inline void
 sn_call_force_intr_provider(struct sn_irq_info *sn_irq_info)
