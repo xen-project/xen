@@ -297,7 +297,7 @@ cmdline_parse_early:
         call    .Lstr_prefix
         add     $8,%esp
         test    %eax,%eax
-        jnz     .Lcmdline_exit
+        jnz     .Lparse_vga_current
 
         /* We have 'vga=mode-<mode>'. */
         add     $5,%ebx
@@ -305,6 +305,19 @@ cmdline_parse_early:
         call    .Latoi
         add     $4,%esp
         mov     %ax,bootsym_phys(boot_vid_mode)
+        jmp     .Lcmdline_exit
+
+.Lparse_vga_current:
+        /* Check for 'vga=current'. */
+        push    %ebx
+        pushl   $sym_phys(.Lvga_current)
+        call    .Lstr_prefix
+        add     $8,%esp
+        test    %eax,%eax
+        jnz     .Lcmdline_exit
+
+        /* We have 'vga=current'. */
+        movw    $VIDEO_CURRENT_MODE,bootsym_phys(boot_vid_mode)
 
 .Lcmdline_exit:
         popa
@@ -328,6 +341,8 @@ cmdline_parse_early:
         .asciz  "gfx-"
 .Lvga_mode:
         .asciz  "mode-"
+.Lvga_current:
+        .asciz  "current"
 .Lno_rm_opt:
         .asciz  "no-real-mode"
 .Ledid_opt:

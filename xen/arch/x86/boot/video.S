@@ -530,6 +530,7 @@ spec_inits:
         .word   bootsym(set_8pixel)
         .word   bootsym(set_80x43)
         .word   bootsym(set_80x28)
+        .word   bootsym(set_current)
         .word   bootsym(set_80x30)
         .word   bootsym(set_80x34)
         .word   bootsym(set_80x60)
@@ -575,6 +576,7 @@ set14:  movw    $0x1111, %ax            # Use 9x14 font
         movb    $0x01, %ah              # Define cursor scan lines 11-12
         movw    $0x0b0c, %cx
         int     $0x10
+set_current:
         stc
         ret
 

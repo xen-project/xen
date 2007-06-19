@@ -16,10 +16,11 @@
 #define VIDEO_80x50         0x0f01
 #define VIDEO_80x43         0x0f02
 #define VIDEO_80x28         0x0f03
-#define VIDEO_80x30         0x0f04
-#define VIDEO_80x34         0x0f05
-#define VIDEO_80x60         0x0f06
-#define VIDEO_LAST_SPECIAL  0x0f07
+#define VIDEO_CURRENT_MODE  0x0f04
+#define VIDEO_80x30         0x0f05
+#define VIDEO_80x34         0x0f06
+#define VIDEO_80x60         0x0f07
+#define VIDEO_LAST_SPECIAL  0x0f08
 
 #define ASK_VGA             0xfffd
 #define VIDEO_VESA_BY_SIZE  0xffff
