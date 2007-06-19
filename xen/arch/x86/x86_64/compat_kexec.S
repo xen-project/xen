@@ -73,6 +73,10 @@ ENTRY(compat_machine_kexec)
         RELOCATE_SYM(idle_pg_table,%rax)
         movq %rax, %cr3
 
+        /* Switch to identity mapped compatibility stack. */
+        RELOCATE_SYM(compat_stack,%rax)
+        movq %rax, %rsp
+
         /* Save xen_phys_start for 32 bit code. */
         movq xen_phys_start(%rip), %rbx
 
@@ -83,6 +87,14 @@ ENTRY(compat_machine_kexec)
 compatibility_mode_far:
         .long SYM_PHYS(compatibility_mode)
         .long __HYPERVISOR_CS32
+
+        /*
+         * We use 5 words of stack for the arguments passed to the kernel. The
+         * kernel only uses 1 word before switching to its own stack. Allocate
+         * 16 words to give "plenty" of room.
+         */
+        .fill 16,4,0
+compat_stack:
 
         .code32
 
