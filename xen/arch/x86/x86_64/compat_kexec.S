@@ -2,13 +2,32 @@
  * Compatibility kexec handler.
  */
 
+/*
+ * NOTE: We rely on Xen not relocating itself above the 4G boundary. This is
+ * currently true but if it ever changes then compat_pg_table will
+ * need to be moved back below 4G at run time.
+ */
+
 #include <xen/config.h>
 
 #include <asm/asm_defns.h>
 #include <asm/msr.h>
 #include <asm/page.h>
 
-#define SYM_PHYS(sym)       ((sym) - __XEN_VIRT_START)
+/* The unrelocated physical address of a symbol. */
+#define SYM_PHYS(sym)          ((sym) - __XEN_VIRT_START)
+
+/* Load physical address of symbol into register and relocate it. */
+#define RELOCATE_SYM(sym,reg)  mov $SYM_PHYS(sym), reg ; \
+                               add xen_phys_start(%rip), reg
+
+/*
+ * Relocate a physical address in memory. Size of temporary register
+ * determines size of the value to relocate.
+ */
+#define RELOCATE_MEM(addr,reg) mov addr(%rip), reg ; \
+                               add xen_phys_start(%rip), reg ; \
+                               mov reg, addr(%rip)
 
         .text
 
@@ -31,20 +50,31 @@ ENTRY(compat_machine_kexec)
         test %r9,%r9
         jnz 1b
 
-        mov $SYM_PHYS(compat_page_list),%rdx
+        RELOCATE_SYM(compat_page_list,%rdx)
+
+        /* Relocate compatibility mode entry point address. */
+        RELOCATE_MEM(compatibility_mode_far,%eax)
+
+        /* Relocate compat_pg_table. */
+        RELOCATE_MEM(compat_pg_table,     %rax)
+        RELOCATE_MEM(compat_pg_table+0x8, %rax)
+        RELOCATE_MEM(compat_pg_table+0x10,%rax)
+        RELOCATE_MEM(compat_pg_table+0x18,%rax)
 
         /*
          * Setup an identity mapped region in PML4[0] of idle page
          * table.
          */
-        lea l3_identmap(%rip),%rax
-        sub %rbx,%rax
+        RELOCATE_SYM(l3_identmap,%rax)
         or  $0x63,%rax
         mov %rax, idle_pg_table(%rip)
 
         /* Switch to idle page table. */
-        movq $SYM_PHYS(idle_pg_table), %rax
+        RELOCATE_SYM(idle_pg_table,%rax)
         movq %rax, %cr3
+
+        /* Save xen_phys_start for 32 bit code. */
+        movq xen_phys_start(%rip), %rbx
 
         /* Jump to low identity mapping in compatibility mode. */
         ljmp *compatibility_mode_far(%rip)
@@ -55,6 +85,17 @@ compatibility_mode_far:
         .long __HYPERVISOR_CS32
 
         .code32
+
+#undef RELOCATE_SYM
+#undef RELOCATE_MEM
+
+/*
+ * Load physical address of symbol into register and relocate it. %rbx
+ * contains xen_phys_start(%rip) saved before jump to compatibility
+ * mode.
+ */
+#define RELOCATE_SYM(sym,reg) mov $SYM_PHYS(sym), reg ; \
+                              add %ebx, reg
 
 compatibility_mode:
         /* Setup some sane segments. */
@@ -78,7 +119,7 @@ compatibility_mode:
         movl %eax, %cr0
 
         /* Switch to 32 bit page table. */
-        movl  $SYM_PHYS(compat_pg_table), %eax
+        RELOCATE_SYM(compat_pg_table, %eax)
         movl  %eax, %cr3
 
         /* Clear MSR_EFER[LME], disabling long mode */
