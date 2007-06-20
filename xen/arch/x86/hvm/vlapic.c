@@ -294,7 +294,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     case APIC_DM_NMI:
-        gdprintk(XENLOG_WARNING, "Ignoring guest NMI\n");
+        if ( !test_and_set_bool(v->arch.hvm_vcpu.nmi_pending) )
+            vcpu_kick(v);
         break;
 
     case APIC_DM_INIT:
@@ -747,7 +748,7 @@ int vlapic_has_interrupt(struct vcpu *v)
     return highest_irr;
 }
 
-int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
+int cpu_get_apic_interrupt(struct vcpu *v)
 {
     int vector = vlapic_has_interrupt(v);
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -757,8 +758,6 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
  
     vlapic_set_vector(vector, &vlapic->regs->data[APIC_ISR]);
     vlapic_clear_irr(vector, vlapic);
-
-    *mode = APIC_DM_FIXED;
     return vector;
 }
 

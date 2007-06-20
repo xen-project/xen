@@ -24,10 +24,10 @@
 
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <asm/hvm/hvm.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/save.h>
-
 
 struct hvm_irq {
     /*
@@ -58,7 +58,6 @@ struct hvm_irq {
             HVMIRQ_callback_gsi,
             HVMIRQ_callback_pci_intx
         } callback_via_type;
-        uint32_t pad; /* So the next field will be aligned */
     };
     union {
         uint32_t gsi;
@@ -115,9 +114,12 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 void hvm_set_callback_irq_level(void);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
 
-int cpu_get_interrupt(struct vcpu *v, int *type);
-int cpu_has_pending_irq(struct vcpu *v);
-int get_isa_irq_vector(struct vcpu *vcpu, int irq, int type);
+/* Check/Acknowledge next pending interrupt. */
+enum hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v);
+int hvm_vcpu_ack_pending_irq(
+    struct vcpu *v, enum hvm_intack type, int *vector);
+
+int get_isa_irq_vector(struct vcpu *vcpu, int irq, enum hvm_intack src);
 int is_isa_irq_masked(struct vcpu *v, int isa_irq);
 
 #endif /* __ASM_X86_HVM_IRQ_H__ */

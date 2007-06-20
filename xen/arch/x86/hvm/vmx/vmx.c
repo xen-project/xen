@@ -1115,16 +1115,26 @@ static int vmx_nx_enabled(struct vcpu *v)
     return v->arch.hvm_vmx.efer & EFER_NX;
 }
 
-static int vmx_interrupts_enabled(struct vcpu *v) 
+static int vmx_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
-    unsigned long eflags = __vmread(GUEST_RFLAGS); 
-    return !irq_masked(eflags); 
-}
+    unsigned long intr_shadow, eflags;
 
+    ASSERT(v == current);
+
+    intr_shadow  = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    intr_shadow &= VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS;
+
+    if ( type == hvm_intack_nmi )
+        return !intr_shadow;
+
+    ASSERT((type == hvm_intack_pic) || (type == hvm_intack_lapic));
+    eflags = __vmread(GUEST_RFLAGS);
+    return !irq_masked(eflags) && !intr_shadow;
+}
 
 static void vmx_update_host_cr3(struct vcpu *v)
 {
-    ASSERT( (v == current) || !vcpu_runnable(v) );
+    ASSERT((v == current) || !vcpu_runnable(v));
     vmx_vmcs_enter(v);
     __vmwrite(HOST_CR3, v->arch.cr3);
     vmx_vmcs_exit(v);
@@ -1132,7 +1142,7 @@ static void vmx_update_host_cr3(struct vcpu *v)
 
 static void vmx_update_guest_cr3(struct vcpu *v)
 {
-    ASSERT( (v == current) || !vcpu_runnable(v) );
+    ASSERT((v == current) || !vcpu_runnable(v));
     vmx_vmcs_enter(v);
     __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     vmx_vmcs_exit(v);

@@ -102,8 +102,8 @@ static void update_tpr_threshold(struct vlapic *vlapic)
 
 asmlinkage void vmx_intr_assist(void)
 {
-    int has_ext_irq, intr_vector, intr_type = 0;
-    unsigned long eflags, intr_shadow;
+    int intr_vector;
+    enum hvm_intack intr_source;
     struct vcpu *v = current;
     unsigned int idtv_info_field;
     unsigned long inst_len;
@@ -114,65 +114,67 @@ asmlinkage void vmx_intr_assist(void)
 
     update_tpr_threshold(vcpu_vlapic(v));
 
-    has_ext_irq = cpu_has_pending_irq(v);
+    do {
+        intr_source = hvm_vcpu_has_pending_irq(v);
 
-    if ( unlikely(v->arch.hvm_vmx.vector_injected) )
-    {
-        v->arch.hvm_vmx.vector_injected = 0;
-        if ( unlikely(has_ext_irq) )
-            enable_irq_window(v);
-        return;
-    }
+        if ( unlikely(v->arch.hvm_vmx.vector_injected) )
+        {
+            v->arch.hvm_vmx.vector_injected = 0;
+            if ( unlikely(intr_source != hvm_intack_none) )
+                enable_irq_window(v);
+            return;
+        }
 
-    /* This could be moved earlier in the VMX resume sequence. */
-    idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
-    if ( unlikely(idtv_info_field & INTR_INFO_VALID_MASK) )
-    {
-        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
+        /* This could be moved earlier in the VMX resume sequence. */
+        idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
+        if ( unlikely(idtv_info_field & INTR_INFO_VALID_MASK) )
+        {
+            __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
+
+            /*
+             * Safe: the length will only be interpreted for software
+             * exceptions and interrupts. If we get here then delivery of some
+             * event caused a fault, and this always results in defined
+             * VM_EXIT_INSTRUCTION_LEN.
+             */
+            inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
+            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
+
+            if ( unlikely(idtv_info_field & 0x800) ) /* valid error code */
+                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
+                          __vmread(IDT_VECTORING_ERROR_CODE));
+            if ( unlikely(intr_source != hvm_intack_none) )
+                enable_irq_window(v);
+
+            HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
+            return;
+        }
+
+        if ( likely(intr_source == hvm_intack_none) )
+            return;
 
         /*
-         * Safe: the length will only be interpreted for software exceptions
-         * and interrupts. If we get here then delivery of some event caused a
-         * fault, and this always results in defined VM_EXIT_INSTRUCTION_LEN.
+         * TODO: Better NMI handling. Shouldn't wait for EFLAGS.IF==1, but
+         * should wait for exit from 'NMI blocking' window (NMI injection to
+         * next IRET). This requires us to use the new 'virtual NMI' support.
          */
-        inst_len = __vmread(VM_EXIT_INSTRUCTION_LEN); /* Safe */
-        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
-
-        if ( unlikely(idtv_info_field & 0x800) ) /* valid error code */
-            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
-                      __vmread(IDT_VECTORING_ERROR_CODE));
-        if ( unlikely(has_ext_irq) )
+        if ( !hvm_interrupts_enabled(v, intr_source) )
+        {
             enable_irq_window(v);
+            return;
+        }
+    } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );
 
-        HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
-        return;
-    }
-
-    if ( likely(!has_ext_irq) )
-        return;
-
-    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-    if ( unlikely(intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS)) )
+    if ( intr_source == hvm_intack_nmi )
     {
-        enable_irq_window(v);
-        HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
-        return;
+        vmx_inject_nmi(v);
     }
-
-    eflags = __vmread(GUEST_RFLAGS);
-    if ( irq_masked(eflags) )
+    else
     {
-        enable_irq_window(v);
-        return;
+        HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
+        vmx_inject_extint(v, intr_vector);
+        pt_intr_post(v, intr_vector, intr_source);
     }
-
-    intr_vector = cpu_get_interrupt(v, &intr_type);
-    BUG_ON(intr_vector < 0);
-
-    HVMTRACE_2D(INJ_VIRQ, v, intr_vector, /*fake=*/ 0);
-    vmx_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
-
-    pt_intr_post(v, intr_vector, intr_type);
 }
 
 /*

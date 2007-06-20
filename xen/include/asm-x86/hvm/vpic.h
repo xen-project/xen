@@ -32,7 +32,7 @@
 void vpic_irq_positive_edge(struct domain *d, int irq);
 void vpic_irq_negative_edge(struct domain *d, int irq);
 void vpic_init(struct domain *d);
-int cpu_get_pic_interrupt(struct vcpu *v, int *type);
+int cpu_get_pic_interrupt(struct vcpu *v);
 int is_periodic_irq(struct vcpu *v, int irq, int type);
 
 #endif  /* __ASM_X86_HVM_VPIC_H__ */  

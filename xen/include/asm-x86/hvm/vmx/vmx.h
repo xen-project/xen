@@ -336,9 +336,16 @@ static inline void vmx_inject_sw_exception(
                            instruction_len);
 }
 
-static inline void vmx_inject_extint(struct vcpu *v, int trap, int error_code)
+static inline void vmx_inject_extint(struct vcpu *v, int trap)
 {
-    __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code, 0);
+    __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR,
+                           VMX_DELIVER_NO_ERROR_CODE, 0);
+}
+
+static inline void vmx_inject_nmi(struct vcpu *v)
+{
+    __vmx_inject_exception(v, 2, INTR_TYPE_NMI,
+                           VMX_DELIVER_NO_ERROR_CODE, 0);
 }
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

@@ -285,43 +285,49 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
     }
 }
 
-int cpu_has_pending_irq(struct vcpu *v)
+enum hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
 {
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
 
-    /* APIC */
+    if ( unlikely(v->arch.hvm_vcpu.nmi_pending) )
+        return hvm_intack_nmi;
+
     if ( vlapic_has_interrupt(v) != -1 )
-        return 1;
+        return hvm_intack_lapic;
 
-    /* PIC */
     if ( !vlapic_accept_pic_intr(v) )
-        return 0;
+        return hvm_intack_none;
 
-    return plat->vpic[0].int_output;
+    return plat->vpic[0].int_output ? hvm_intack_pic : hvm_intack_none;
 }
 
-int cpu_get_interrupt(struct vcpu *v, int *type)
+int hvm_vcpu_ack_pending_irq(struct vcpu *v, enum hvm_intack type, int *vector)
 {
-    int vector;
+    switch ( type )
+    {
+    case hvm_intack_nmi:
+        return test_and_clear_bool(v->arch.hvm_vcpu.nmi_pending);
+    case hvm_intack_lapic:
+        return ((*vector = cpu_get_apic_interrupt(v)) != -1);
+    case hvm_intack_pic:
+        ASSERT(v->vcpu_id == 0);
+        return ((*vector = cpu_get_pic_interrupt(v)) != -1);
+    default:
+        break;
+    }
 
-    if ( (vector = cpu_get_apic_interrupt(v, type)) != -1 )
-        return vector;
-
-    if ( (v->vcpu_id == 0) &&
-         ((vector = cpu_get_pic_interrupt(v, type)) != -1) )
-        return vector;
-
-    return -1;
+    return 0;
 }
 
-int get_isa_irq_vector(struct vcpu *v, int isa_irq, int type)
+int get_isa_irq_vector(struct vcpu *v, int isa_irq, enum hvm_intack src)
 {
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
-    if ( type == APIC_DM_EXTINT )
+    if ( src == hvm_intack_pic )
         return (v->domain->arch.hvm_domain.vpic[isa_irq >> 3].irq_base
                 + (isa_irq & 7));
 
+    ASSERT(src == hvm_intack_lapic);
     return domain_vioapic(v->domain)->redirtbl[gsi].fields.vector;
 }
 
@@ -337,19 +343,20 @@ int is_isa_irq_masked(struct vcpu *v, int isa_irq)
             domain_vioapic(v->domain)->redirtbl[gsi].fields.mask);
 }
 
-/*
- * TODO: 1. Should not need special treatment of event-channel events.
- *       2. Should take notice of interrupt shadows (or clear them).
- */
 int hvm_local_events_need_delivery(struct vcpu *v)
 {
-    int pending;
+    enum hvm_intack type;
 
-    pending = (vcpu_info(v, evtchn_upcall_pending) || cpu_has_pending_irq(v));
-    if ( unlikely(pending) )
-        pending = hvm_interrupts_enabled(v); 
+    /* TODO: Get rid of event-channel special case. */
+    if ( vcpu_info(v, evtchn_upcall_pending) )
+        type = hvm_intack_pic;
+    else
+        type = hvm_vcpu_has_pending_irq(v);
 
-    return pending;
+    if ( likely(type == hvm_intack_none) )
+        return 0;
+
+    return hvm_interrupts_enabled(v, type);
 }
 
 #if 0 /* Keep for debugging */

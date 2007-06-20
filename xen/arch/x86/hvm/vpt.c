@@ -155,7 +155,8 @@ void pt_update_irq(struct vcpu *v)
     }
 }
 
-static struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type)
+static struct periodic_time *is_pt_irq(
+    struct vcpu *v, int vector, enum hvm_intack src)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt;
@@ -174,7 +175,7 @@ static struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type)
             return pt;
         }
 
-        vec = get_isa_irq_vector(v, pt->irq, type);
+        vec = get_isa_irq_vector(v, pt->irq, src);
 
         /* RTC irq need special care */
         if ( (vector != vec) || (pt->irq == 8 && !is_rtc_periodic_irq(rtc)) )
@@ -186,7 +187,7 @@ static struct periodic_time *is_pt_irq(struct vcpu *v, int vector, int type)
     return NULL;
 }
 
-void pt_intr_post(struct vcpu *v, int vector, int type)
+void pt_intr_post(struct vcpu *v, int vector, enum hvm_intack src)
 {
     struct periodic_time *pt;
     time_cb *cb;
@@ -194,7 +195,7 @@ void pt_intr_post(struct vcpu *v, int vector, int type)
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    pt = is_pt_irq(v, vector, type);
+    pt = is_pt_irq(v, vector, src);
     if ( pt == NULL )
     {
         spin_unlock(&v->arch.hvm_vcpu.tm_lock);
