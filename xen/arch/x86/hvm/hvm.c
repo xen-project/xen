@@ -831,11 +831,24 @@ void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3)
     hvm_funcs.update_guest_cr3(v);
 }
 
+static void hvm_latch_shinfo_size(struct domain *d)
+{
+    /*
+     * Called from operations which are among the very first executed by
+     * PV drivers on initialisation or after save/restore. These are sensible
+     * points at which to sample the execution mode of the guest and latch
+     * 32- or 64-bit format for shared state.
+     */
+    if ( current->domain == d )
+        d->arch.has_32bit_shinfo = (hvm_guest_x86_mode(current) != 8);
+}
+
 /* Initialise a hypercall transfer page for a VMX domain using
    paravirtualised drivers. */
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page)
 {
+    hvm_latch_shinfo_size(d);
     hvm_funcs.init_hypercall_page(d, hypercall_page);
 }
 
@@ -1065,13 +1078,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 break;
             case HVM_PARAM_CALLBACK_IRQ:
                 hvm_set_callback_via(d, a.value);
-                /*
-                 * Since this operation is one of the very first executed
-                 * by PV drivers on initialisation or after save/restore, it
-                 * is a sensible point at which to sample the execution mode of
-                 * the guest and latch 32- or 64-bit format for shared state.
-                 */
-                d->arch.has_32bit_shinfo = (hvm_guest_x86_mode(current) != 8);
+                hvm_latch_shinfo_size(d);
                 break;
             }
             d->arch.hvm_domain.params[a.index] = a.value;
