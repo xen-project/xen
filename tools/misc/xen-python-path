@@ -28,8 +28,13 @@ import os
 import os.path
 import sys
 
-for p in ['python%s' % sys.version[:3], 'python']:
-    for l in ['/usr/lib64', '/usr/lib']:
+usr   = os.path.dirname(os.path.dirname(sys.argv[0]))
+list  = [ os.path.join(usr,'lib64') ]
+list += [ os.path.join(usr,'lib') ]
+list += ['/usr/lib64', '/usr/lib']
+
+for l in list:
+    for p in ['python%s' % sys.version[:3], 'python']:
         for k in ['', 'site-packages/']:
             d = os.path.join(l, p, k)
             if os.path.exists(os.path.join(d, AUXBIN)):
