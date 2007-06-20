@@ -1854,7 +1854,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-    hvm_store_cpu_guest_regs(current, regs, NULL);
+    vmx_store_cpu_guest_regs(current, regs, NULL);
 
     HVM_DBG_LOG(DBG_LEVEL_IO, "vm86 %d, eip=%x:%lx, "
                 "exit_qualification = %lx",

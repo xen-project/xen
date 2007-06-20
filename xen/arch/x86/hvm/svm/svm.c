@@ -1476,7 +1476,7 @@ static void svm_io_instruction(struct vcpu *v)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-    hvm_store_cpu_guest_regs(v, regs, NULL);
+    svm_store_cpu_guest_regs(v, regs, NULL);
 
     info.bytes = vmcb->exitinfo1;
 
@@ -2153,7 +2153,7 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 
     /* Check for interrupt not handled or new interrupt. */
     if ( vmcb->eventinj.fields.v ||
-         ((type != hvm_intack_none) && hvm_interrupts_enabled(current, type)) )
+         ((type != hvm_intack_none) && svm_interrupts_enabled(current, type)) )
     {
         HVMTRACE_1D(HLT, current, /*int pending=*/ 1);
         return;
