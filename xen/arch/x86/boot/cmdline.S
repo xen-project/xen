@@ -119,30 +119,31 @@
         ret
 
 .Lfind_option:
+        mov     4(%esp),%eax
+        dec     %eax
         push    %ebx
-        push    4+8(%esp)
-        push    4+8(%esp)
+1:      pushl   4+8(%esp)
+        inc     %eax
+        push    %eax
         call    .Lstrstr
         add     $8,%esp
         test    %eax,%eax
         jz      3f
         cmp     %eax,4+4(%esp)
-        je      1f
+        je      2f
         cmpb    $' ',-1(%eax)
-        jne     2f
-1:      mov     %eax,%ebx
-        push    4+8(%esp)
+        jne     1b
+2:      mov     %eax,%ebx
+        pushl   4+8(%esp)
         call    .Lstrlen
         add     $4,%esp
-        xchg    %eax,%ebx
-        add     %eax,%ebx
+        xadd    %eax,%ebx
         cmpb    $'\0',(%ebx)
         je      3f
         cmpb    $' ',(%ebx)
         je      3f
         cmpb    $'=',(%ebx)
-        je      3f
-2:      xor     %eax,%eax
+        jne     1b
 3:      pop     %ebx
         ret
 
