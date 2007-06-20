@@ -295,14 +295,14 @@ static struct e820map __initdata boot_e820;
 /* Reserve area (@s,@e) in the temporary bootstrap e820 map. */
 static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
 {
-    unsigned long rs, re;
+    uint64_t rs, re;
     int i;
 
     for ( i = 0; i < boot_e820.nr_map; i++ )
     {
         /* Have we found the e820 region that includes the specified range? */
         rs = boot_e820.map[i].addr;
-        re = boot_e820.map[i].addr + boot_e820.map[i].size;
+        re = rs + boot_e820.map[i].size;
         if ( (s < rs) || (e > re) )
             continue;
 
