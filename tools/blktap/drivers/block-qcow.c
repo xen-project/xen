@@ -38,6 +38,7 @@
 #include "bswap.h"
 #include "aes.h"
 #include "tapdisk.h"
+#include "tapaio.h"
 
 #if 1
 #define ASSERT(_p) \
@@ -52,9 +53,6 @@
     (uint64_t)( \
         (l + (s - 1)) - ((l + (s - 1)) % s)); \
 })
-
-/******AIO DEFINES******/
-#define REQUEST_ASYNC_FD 1
 
 struct pending_aio {
         td_callback_t cb;
@@ -145,7 +143,7 @@ struct tdqcow_state {
 	AES_KEY aes_encrypt_key;       /*AES key*/
 	AES_KEY aes_decrypt_key;       /*AES key*/
         /* libaio state */
-        io_context_t        aio_ctx;
+        tap_aio_context_t   aio_ctx;
         int                 max_aio_reqs;
         struct iocb        *iocb_list;
         struct iocb       **iocb_free;
@@ -153,7 +151,6 @@ struct tdqcow_state {
         int                 iocb_free_count;
         struct iocb       **iocb_queue;
         int                 iocb_queued;
-        int                 poll_fd;      /* NB: we require aio_poll support */
         struct io_event    *aio_events;
 };
 
@@ -179,7 +176,7 @@ static void free_aio_state(struct disk_driver *dd)
 
 static int init_aio_state(struct disk_driver *dd)
 {
-        int i;
+	int i, ret;
 	struct td_state     *bs = dd->td_state;
 	struct tdqcow_state  *s = (struct tdqcow_state *)dd->private;
         long     ioidx;
@@ -216,12 +213,9 @@ static int init_aio_state(struct disk_driver *dd)
                 goto fail;
         }
 
-        /*Signal kernel to create Poll FD for Asyc completion events*/
-        s->aio_ctx = (io_context_t) REQUEST_ASYNC_FD;   
-        s->poll_fd = io_setup(s->max_aio_reqs, &s->aio_ctx);
-
-	if (s->poll_fd < 0) {
-                if (s->poll_fd == -EAGAIN) {
+	ret = tap_aio_setup(&s->aio_ctx, s->aio_events, s->max_aio_reqs);
+	if (ret < 0) {
+                if (ret == -EAGAIN) {
                         DPRINTF("Couldn't setup AIO context.  If you are "
                                 "trying to concurrently use a large number "
                                 "of blktap-based disks, you may need to "
@@ -229,9 +223,7 @@ static int init_aio_state(struct disk_driver *dd)
                                 "(e.g. 'echo echo 1048576 > /proc/sys/fs/"
                                 "aio-max-nr')\n");
                 } else {
-                        DPRINTF("Couldn't get fd for AIO poll support.  This "
-                                "is probably because your kernel does not "
-                                "have the aio-poll patch applied.\n");
+                        DPRINTF("Couldn't setup AIO context.\n");
                 }
 		goto fail;
 	}
@@ -845,7 +837,7 @@ static inline void init_fds(struct disk_driver *dd)
 	for(i = 0; i < MAX_IOFD; i++) 
 		dd->io_fd[i] = 0;
 
-	dd->io_fd[0] = s->poll_fd;
+	dd->io_fd[0] = s->aio_ctx.pollfd;
 }
 
 /* Open the disk file and initialize qcow state. */
@@ -1144,7 +1136,7 @@ int tdqcow_submit(struct disk_driver *dd)
 	if (!prv->iocb_queued)
 		return 0;
 
-	ret = io_submit(prv->aio_ctx, prv->iocb_queued, prv->iocb_queue);
+	ret = io_submit(prv->aio_ctx.aio_ctx, prv->iocb_queued, prv->iocb_queue);
 
         /* XXX: TODO: Handle error conditions here. */
 
@@ -1172,7 +1164,7 @@ int tdqcow_close(struct disk_driver *dd)
 		close(fd);
 	}
 
-	io_destroy(s->aio_ctx);
+	io_destroy(s->aio_ctx.aio_ctx);
 	free(s->name);
 	free(s->l1_table);
 	free(s->l2_cache);
@@ -1184,17 +1176,15 @@ int tdqcow_close(struct disk_driver *dd)
 
 int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
 {
-        int ret, i, rsp = 0,*ptr;
+        int ret, i, nr_events, rsp = 0,*ptr;
         struct io_event *ep;
         struct tdqcow_state *prv = (struct tdqcow_state *)dd->private;
 
         if (sid > MAX_IOFD) return 1;
-	
-	/* Non-blocking test for completed io. */
-        ret = io_getevents(prv->aio_ctx, 0, prv->max_aio_reqs, prv->aio_events,
-                           NULL);
 
-        for (ep = prv->aio_events, i = ret; i-- > 0; ep++) {
+        nr_events = tap_aio_get_events(&prv->aio_ctx);
+repeat:
+        for (ep = prv->aio_events, i = nr_events; i-- > 0; ep++) {
                 struct iocb        *io  = ep->obj;
                 struct pending_aio *pio;
 
@@ -1215,6 +1205,14 @@ int tdqcow_do_callbacks(struct disk_driver *dd, int sid)
 
                 prv->iocb_free[prv->iocb_free_count++] = io;
         }
+
+        if (nr_events) {
+                nr_events = tap_aio_more_events(&prv->aio_ctx);
+                goto repeat;
+        }
+
+        tap_aio_continue(&prv->aio_ctx);
+
         return rsp;
 }
 

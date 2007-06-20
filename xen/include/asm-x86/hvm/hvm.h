@@ -55,6 +55,14 @@ typedef struct segment_register {
     u64        base;
 } __attribute__ ((packed)) segment_register_t;
 
+/* Interrupt acknowledgement sources. */
+enum hvm_intack {
+    hvm_intack_none,
+    hvm_intack_pic,
+    hvm_intack_lapic,
+    hvm_intack_nmi
+};
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -106,7 +114,7 @@ struct hvm_function_table {
     int (*long_mode_enabled)(struct vcpu *v);
     int (*pae_enabled)(struct vcpu *v);
     int (*nx_enabled)(struct vcpu *v);
-    int (*interrupts_enabled)(struct vcpu *v);
+    int (*interrupts_enabled)(struct vcpu *v, enum hvm_intack);
     int (*guest_x86_mode)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
     unsigned long (*get_segment_base)(struct vcpu *v, enum x86_segment seg);
@@ -122,6 +130,13 @@ struct hvm_function_table {
      * Called to inform HVM layer that a guest cr3 has changed
      */
     void (*update_guest_cr3)(struct vcpu *v);
+
+    /*
+     * Called to ensure than all guest-specific mappings in a tagged TLB
+     * are flushed; does *not* flush Xen's TLB entries, and on
+     * processors without a tagged TLB it will be a noop.
+     */
+    void (*flush_guest_tlbs)(void);
 
     /*
      * Reflect the virtual APIC's value in the guest's V_TPR register
@@ -148,6 +163,7 @@ struct hvm_function_table {
 };
 
 extern struct hvm_function_table hvm_funcs;
+extern int hvm_enabled;
 
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_relinquish_resources(struct domain *d);
@@ -191,16 +207,16 @@ hvm_long_mode_enabled(struct vcpu *v)
 #define hvm_long_mode_enabled(v) (v,0)
 #endif
 
- static inline int
+static inline int
 hvm_pae_enabled(struct vcpu *v)
 {
     return hvm_funcs.pae_enabled(v);
 }
 
 static inline int
-hvm_interrupts_enabled(struct vcpu *v)
+hvm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
-    return hvm_funcs.interrupts_enabled(v);
+    return hvm_funcs.interrupts_enabled(v, type);
 }
 
 static inline int
@@ -230,6 +246,13 @@ hvm_update_vtpr(struct vcpu *v, unsigned long value)
 }
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);
+
+static inline void 
+hvm_flush_guest_tlbs(void)
+{
+    if ( hvm_enabled )
+        hvm_funcs.flush_guest_tlbs();
+}
 
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);

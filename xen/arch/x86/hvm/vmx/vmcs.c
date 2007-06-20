@@ -158,7 +158,7 @@ static struct vmcs_struct *vmx_alloc_vmcs(void)
         return NULL;
     }
 
-    memset(vmcs, 0, PAGE_SIZE);
+    clear_page(vmcs);
     vmcs->vmcs_revision_id = vmcs_revision_id;
 
     return vmcs;

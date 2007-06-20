@@ -56,7 +56,7 @@ struct vmcb_struct *alloc_vmcb(void)
         return NULL;
     }
 
-    memset(vmcb, 0, PAGE_SIZE);
+    clear_page(vmcb);
     return vmcb;
 }
 
@@ -72,11 +72,11 @@ struct host_save_area *alloc_host_save_area(void)
     hsa = alloc_xenheap_page();
     if ( hsa == NULL )
     {
-        printk(XENLOG_WARNING "Warning: failed to allocate vmcb.\n");
+        printk(XENLOG_WARNING "Warning: failed to allocate hsa.\n");
         return NULL;
     }
 
-    memset(hsa, 0, PAGE_SIZE);
+    clear_page(hsa);
     return hsa;
 }
 

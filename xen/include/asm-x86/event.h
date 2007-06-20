@@ -10,7 +10,6 @@
 #define __ASM_EVENT_H__
 
 #include <xen/shared.h>
-#include <asm/hvm/irq.h> /* cpu_has_pending_irq() */
 
 static inline void vcpu_kick(struct vcpu *v)
 {

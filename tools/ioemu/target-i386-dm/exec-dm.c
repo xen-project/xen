@@ -443,19 +443,40 @@ extern unsigned long logdirty_bitmap_size;
  * Forcing a word-sized read/write prevents the guest from seeing a partially
  * written word-sized atom.
  */
-void memcpy_words(void *dst, void *src, size_t n)
+#if defined(__x86_64__) || defined(__i386__)
+static void memcpy_words(void *dst, void *src, size_t n)
 {
-    while (n >= sizeof(long)) {
-        *((long *)dst) = *((long *)src);
-        dst = ((long *)dst) + 1;
-        src = ((long *)src) + 1;
-        n -= sizeof(long);
-    }
-
-    if (n & 4) {
+    asm (
+        "   movl %%edx,%%ecx \n"
+#ifdef __x86_64
+        "   shrl $3,%%ecx    \n"
+        "   andl $7,%%edx    \n"
+        "   rep  movsq       \n"
+        "   test $4,%%edx    \n"
+        "   jz   1f          \n"
+        "   movsl            \n"
+#else /* __i386__ */
+        "   shrl $2,%%ecx    \n"
+        "   andl $3,%%edx    \n"
+        "   rep  movsl       \n"
+#endif
+        "1: test $2,%%edx    \n"
+        "   jz   1f          \n"
+        "   movsw            \n"
+        "1: test $1,%%edx    \n"
+        "   jz   1f          \n"
+        "   movsb            \n"
+        "1:                  \n"
+        : : "S" (src), "D" (dst), "d" (n) : "ecx" );
+}
+#else
+static void memcpy_words(void *dst, void *src, size_t n)
+{
+    while (n >= sizeof(uint32_t)) {
         *((uint32_t *)dst) = *((uint32_t *)src);
         dst = ((uint32_t *)dst) + 1;
         src = ((uint32_t *)src) + 1;
+        n -= sizeof(uint32_t);
     }
 
     if (n & 2) {
@@ -470,6 +491,7 @@ void memcpy_words(void *dst, void *src, size_t n)
         src = ((uint8_t *)src) + 1;
     }
 }
+#endif
 
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                             int len, int is_write)

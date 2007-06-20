@@ -462,7 +462,17 @@ int rdmsr_hypervisor_regs(
     if ( idx > 0 )
         return 0;
 
-    *eax = *edx = 0;
+    switch ( idx )
+    {
+    case 0:
+    {
+        *eax = *edx = 0;
+        break;
+    }
+    default:
+        BUG();
+    }
+
     return 1;
 }
 
@@ -1130,7 +1140,7 @@ static inline int guest_io_okay(
          * read as 0xff (no access allowed).
          */
         TOGGLE_MODE();
-        switch ( __copy_from_guest_offset(&x.bytes[0], v->arch.iobmp,
+        switch ( __copy_from_guest_offset(x.bytes, v->arch.iobmp,
                                           port>>3, 2) )
         {
         default: x.bytes[0] = ~0;

@@ -254,17 +254,11 @@ static void ioapic_inj_irq(
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "irq %d trig %d deliv %d",
                 vector, trig_mode, delivery_mode);
 
-    switch ( delivery_mode )
-    {
-    case dest_Fixed:
-    case dest_LowestPrio:
-        if ( vlapic_set_irq(target, vector, trig_mode) )
-            vcpu_kick(vlapic_vcpu(target));
-        break;
-    default:
-        gdprintk(XENLOG_WARNING, "error delivery mode %d\n", delivery_mode);
-        break;
-    }
+    ASSERT((delivery_mode == dest_Fixed) ||
+           (delivery_mode == dest_LowestPrio));
+
+    if ( vlapic_set_irq(target, vector, trig_mode) )
+        vcpu_kick(vlapic_vcpu(target));
 }
 
 static uint32_t ioapic_get_delivery_bitmask(
@@ -368,7 +362,6 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
     }
 
     case dest_Fixed:
-    case dest_ExtINT:
     {
         uint8_t bit;
         for ( bit = 0; deliver_bitmask != 0; bit++ )
@@ -393,10 +386,21 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
         break;
     }
 
-    case dest_SMI:
     case dest_NMI:
-    case dest_INIT:
-    case dest__reserved_2:
+    {
+        uint8_t bit;
+        for ( bit = 0; deliver_bitmask != 0; bit++ )
+        {
+            if ( !(deliver_bitmask & (1 << bit)) )
+                continue;
+            deliver_bitmask &= ~(1 << bit);
+            if ( ((v = vioapic_domain(vioapic)->vcpu[bit]) != NULL) &&
+                 !test_and_set_bool(v->arch.hvm_vcpu.nmi_pending) )
+                vcpu_kick(v);
+        }
+        break;
+    }
+
     default:
         gdprintk(XENLOG_WARNING, "Unsupported delivery mode %d\n",
                  delivery_mode);

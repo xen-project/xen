@@ -30,6 +30,7 @@
 void svm_asid_init(struct cpuinfo_x86 *c);
 void svm_asid_init_vcpu(struct vcpu *v);
 void svm_asid_inv_asid(struct vcpu *v);
+void svm_asid_inc_generation(void);
 
 /*
  * ASID related, guest triggered events.

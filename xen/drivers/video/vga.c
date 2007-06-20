@@ -33,6 +33,9 @@ static unsigned char *video;
  *   'vga=ask':
  *      display a vga menu of available modes
  * 
+ *   'vga=current':
+ *      use the current vga mode without modification
+ * 
  *   'vga=text-80x<rows>':
  *      text mode, where <rows> is one of {25,28,30,34,43,50,60}
  * 

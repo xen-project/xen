@@ -312,26 +312,8 @@ int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->sysenter_esp = vmcb->sysenter_esp;
     c->sysenter_eip = vmcb->sysenter_eip;
 
-    /* Save any event/interrupt that was being injected when we last
-     * exited.  Although there are three(!) VMCB fields that can contain
-     * active events, we only need to save at most one: because the
-     * intr_assist logic never delivers an IRQ when any other event is
-     * active, we know that the only possible collision is if we inject
-     * a fault while exitintinfo contains a valid event (the delivery of
-     * which caused the last exit).  In that case replaying just the
-     * first event should cause the same behaviour when we restore. */
-    if ( vmcb->vintr.fields.irq 
-         && /* Check it's not a fake interrupt (see svm_intr_assist()) */
-         !(vmcb->general1_intercepts & GENERAL1_INTERCEPT_VINTR) )
-    {
-        c->pending_vector = vmcb->vintr.fields.vector;
-        c->pending_type = 0; /* External interrupt */
-        c->pending_error_valid = 0;
-        c->pending_reserved = 0;
-        c->pending_valid = 1;
-        c->error_code = 0;
-    }
-    else if ( vmcb->exitintinfo.fields.v )
+    /* Save any event/interrupt that was being injected when we last exited. */
+    if ( vmcb->exitintinfo.fields.v )
     {
         c->pending_event = vmcb->exitintinfo.bytes & 0xffffffff;
         c->error_code = vmcb->exitintinfo.fields.errorcode;
@@ -569,10 +551,15 @@ static inline void svm_restore_dr(struct vcpu *v)
         __restore_debug_registers(v);
 }
 
-static int svm_interrupts_enabled(struct vcpu *v)
+static int svm_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
-    unsigned long eflags = v->arch.hvm_svm.vmcb->rflags;
-    return !irq_masked(eflags); 
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( type == hvm_intack_nmi )
+        return !vmcb->interrupt_shadow;
+
+    ASSERT((type == hvm_intack_pic) || (type == hvm_intack_lapic));
+    return !irq_masked(vmcb->rflags) && !vmcb->interrupt_shadow; 
 }
 
 static int svm_guest_x86_mode(struct vcpu *v)
@@ -596,6 +583,14 @@ static void svm_update_host_cr3(struct vcpu *v)
 static void svm_update_guest_cr3(struct vcpu *v)
 {
     v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
+}
+
+static void svm_flush_guest_tlbs(void)
+{
+    /* Roll over the CPU's ASID generation, so it gets a clean TLB when we
+     * next VMRUN.  (If ASIDs are disabled, the whole TLB is flushed on
+     * VMRUN anyway). */
+    svm_asid_inc_generation();
 }
 
 static void svm_update_vtpr(struct vcpu *v, unsigned long value)
@@ -770,8 +765,6 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
     int i;
-
-    memset(hypercall_page, 0, PAGE_SIZE);
 
     for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
@@ -948,6 +941,7 @@ static struct hvm_function_table svm_function_table = {
     .get_segment_register = svm_get_segment_register,
     .update_host_cr3      = svm_update_host_cr3,
     .update_guest_cr3     = svm_update_guest_cr3,
+    .flush_guest_tlbs     = svm_flush_guest_tlbs,
     .update_vtpr          = svm_update_vtpr,
     .stts                 = svm_stts,
     .set_tsc_offset       = svm_set_tsc_offset,
@@ -957,7 +951,7 @@ static struct hvm_function_table svm_function_table = {
     .event_injection_faulted = svm_event_injection_faulted
 };
 
-void svm_npt_detect(void)
+static void svm_npt_detect(void)
 {
     u32 eax, ebx, ecx, edx;
 
@@ -1017,6 +1011,9 @@ int start_svm(struct cpuinfo_x86 *c)
 
     hvm_enable(&svm_function_table);
 
+    if ( opt_hap_enabled )
+        printk("SVM: Nested paging enabled.\n");
+        
     return 1;
 }
 
@@ -1477,7 +1474,7 @@ static void svm_io_instruction(struct vcpu *v)
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-    hvm_store_cpu_guest_regs(v, regs, NULL);
+    svm_store_cpu_guest_regs(v, regs, NULL);
 
     info.bytes = vmcb->exitinfo1;
 
@@ -2148,11 +2145,14 @@ static inline void svm_do_msr_access(
 
 static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 {
+    enum hvm_intack type = hvm_vcpu_has_pending_irq(current);
+
     __update_guest_eip(vmcb, 1);
 
     /* Check for interrupt not handled or new interrupt. */
-    if ( (vmcb->rflags & X86_EFLAGS_IF) &&
-         (vmcb->vintr.fields.irq || cpu_has_pending_irq(current)) ) {
+    if ( vmcb->eventinj.fields.v ||
+         ((type != hvm_intack_none) && svm_interrupts_enabled(current, type)) )
+    {
         HVMTRACE_1D(HLT, current, /*int pending=*/ 1);
         return;
     }

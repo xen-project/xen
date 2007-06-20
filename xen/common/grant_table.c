@@ -148,7 +148,7 @@ get_maptrack_handle(
                 return -1;
             }
 
-            memset(new_mt, 0, PAGE_SIZE);
+            clear_page(new_mt);
 
             new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
 
@@ -624,7 +624,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     {
         if ( (gt->active[i] = alloc_xenheap_page()) == NULL )
             goto active_alloc_failed;
-        memset(gt->active[i], 0, PAGE_SIZE);
+        clear_page(gt->active[i]);
     }
 
     /* Shared */
@@ -632,7 +632,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     {
         if ( (gt->shared[i] = alloc_xenheap_page()) == NULL )
             goto shared_alloc_failed;
-        memset(gt->shared[i], 0, PAGE_SIZE);
+        clear_page(gt->shared[i]);
     }
 
     /* Share the new shared frames with the recipient domain */
@@ -1365,7 +1365,7 @@ grant_table_create(
     {
         if ( (t->active[i] = alloc_xenheap_page()) == NULL )
             goto no_mem_2;
-        memset(t->active[i], 0, PAGE_SIZE);
+        clear_page(t->active[i]);
     }
 
     /* Tracking of mapped foreign frames table */
@@ -1375,7 +1375,7 @@ grant_table_create(
     memset(t->maptrack, 0, max_nr_maptrack_frames() * sizeof(t->maptrack[0]));
     if ( (t->maptrack[0] = alloc_xenheap_page()) == NULL )
         goto no_mem_3;
-    memset(t->maptrack[0], 0, PAGE_SIZE);
+    clear_page(t->maptrack[0]);
     t->maptrack_limit = PAGE_SIZE / sizeof(struct grant_mapping);
     for ( i = 0; i < t->maptrack_limit; i++ )
         t->maptrack[0][i].ref = i+1;
@@ -1389,7 +1389,7 @@ grant_table_create(
     {
         if ( (t->shared[i] = alloc_xenheap_page()) == NULL )
             goto no_mem_4;
-        memset(t->shared[i], 0, PAGE_SIZE);
+        clear_page(t->shared[i]);
     }
 
     for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )

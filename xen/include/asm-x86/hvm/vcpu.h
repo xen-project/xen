@@ -30,11 +30,13 @@
 
 struct hvm_vcpu {
     unsigned long       hw_cr3;     /* value we give to HW to use */
-    unsigned long       ioflags;
     struct hvm_io_op    io_op;
     struct vlapic       vlapic;
     s64                 cache_tsc_offset;
     u64                 guest_time;
+
+    /* Is an NMI pending for delivery to this VCPU core? */
+    bool_t              nmi_pending; /* NB. integrate flag with save/restore */
 
     /* Lock and list for virtual platform timers. */
     spinlock_t          tm_lock;

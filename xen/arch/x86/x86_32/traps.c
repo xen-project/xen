@@ -513,6 +513,7 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
 
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
+    memset(hypercall_page, 0xCC, PAGE_SIZE);
     if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else if ( supervisor_mode_kernel )

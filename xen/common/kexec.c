@@ -169,7 +169,11 @@ static int kexec_get(reserve)(xen_kexec_range_t *range)
 
 static int kexec_get(xen)(xen_kexec_range_t *range)
 {
+#ifdef CONFIG_X86_64
+    range->start = xenheap_phys_start;
+#else
     range->start = virt_to_maddr(_start);
+#endif
     range->size = (unsigned long)xenheap_phys_end - (unsigned long)range->start;
     return 0;
 }

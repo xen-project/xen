@@ -44,9 +44,10 @@
  * specifying an offset into the guest array.
  */
 #define copy_to_compat_offset(hnd, off, ptr, nr) ({                  \
-    const typeof(ptr) _x = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
-    const typeof(*(ptr)) *const _y = (ptr);                          \
-    copy_to_user(_x + (off), _y, sizeof(*_x) * (nr));                \
+    const typeof(*(ptr)) *_s = (ptr);                                \
+    char (*_d)[sizeof(*_s)] = (void *)(full_ptr_t)(hnd).c;           \
+    ((void)((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c == (ptr)));     \
+    copy_to_user(_d + (off), _s, sizeof(*_s) * (nr));                \
 })
 
 /*
@@ -54,9 +55,9 @@
  * specifying an offset into the guest array.
  */
 #define copy_from_compat_offset(ptr, hnd, off, nr) ({                \
-    const typeof(ptr) _x = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
-    const typeof(ptr) _y = (ptr);                                    \
-    copy_from_user(_y, _x + (off), sizeof(*_x) * (nr));              \
+    const typeof(*(ptr)) *_s = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
+    typeof(*(ptr)) *_d = (ptr);                                      \
+    copy_from_user(_d, _s + (off), sizeof(*_d) * (nr));              \
 })
 
 #define copy_to_compat(hnd, ptr, nr)                                 \
@@ -67,16 +68,19 @@
 
 /* Copy sub-field of a structure to guest context via a compat handle. */
 #define copy_field_to_compat(hnd, ptr, field) ({                     \
-    typeof((ptr)->field) *const _x = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field; \
-    const typeof((ptr)->field) *const _y = &(ptr)->field;            \
-    copy_to_user(_x, _y, sizeof(*_x));                               \
+    const typeof(&(ptr)->field) _s = &(ptr)->field;                  \
+    void *_d = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;   \
+    ((void)(&((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field ==    \
+            &(ptr)->field));                                         \
+    copy_to_user(_d, _s, sizeof(*_s));                               \
 })
 
 /* Copy sub-field of a structure from guest context via a compat handle. */
 #define copy_field_from_compat(ptr, hnd, field) ({                   \
-    typeof((ptr)->field) *const _x = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field; \
-    typeof((ptr)->field) *const _y = &(ptr)->field;                  \
-    copy_from_user(_y, _x, sizeof(*_x));                             \
+    const typeof(&(ptr)->field) _s =                                 \
+        &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;          \
+    typeof(&(ptr)->field) _d = &(ptr)->field;                        \
+    copy_from_user(_d, _s, sizeof(*_d));                             \
 })
 
 /*
@@ -84,18 +88,20 @@
  * Allows use of faster __copy_* functions.
  */
 #define compat_handle_okay(hnd, nr)                                  \
-    compat_array_access_ok((void *)(full_ptr_t)(hnd).c, (nr), sizeof(**(hnd)._))
+    compat_array_access_ok((void *)(full_ptr_t)(hnd).c, (nr),        \
+                           sizeof(**(hnd)._))
 
 #define __copy_to_compat_offset(hnd, off, ptr, nr) ({                \
-    const typeof(ptr) _x = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
-    const typeof(*(ptr)) *const _y = (ptr);                          \
-    __copy_to_user(_x + (off), _y, sizeof(*_x) * (nr));              \
+    const typeof(*(ptr)) *_s = (ptr);                                \
+    char (*_d)[sizeof(*_s)] = (void *)(full_ptr_t)(hnd).c;           \
+    ((void)((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c == (ptr)));     \
+    __copy_to_user(_d + (off), _s, sizeof(*_s) * (nr));              \
 })
 
 #define __copy_from_compat_offset(ptr, hnd, off, nr) ({              \
-    const typeof(ptr) _x = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
-    const typeof(ptr) _y = (ptr);                                    \
-    __copy_from_user(_y, _x + (off), sizeof(*_x) * (nr));            \
+    const typeof(*(ptr)) *_s = (typeof(**(hnd)._) *)(full_ptr_t)(hnd).c; \
+    typeof(*(ptr)) *_d = (ptr);                                      \
+    __copy_from_user(_d, _s + (off), sizeof(*_d) * (nr));            \
 })
 
 #define __copy_to_compat(hnd, ptr, nr)                               \
@@ -105,15 +111,18 @@
     __copy_from_compat_offset(ptr, hnd, 0, nr)
 
 #define __copy_field_to_compat(hnd, ptr, field) ({                   \
-    typeof((ptr)->field) *const _x = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field; \
-    const typeof((ptr)->field) *const _y = &(ptr)->field;            \
-    __copy_to_user(_x, _y, sizeof(*_x));                             \
+    const typeof(&(ptr)->field) _s = &(ptr)->field;                  \
+    void *_d = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;   \
+    ((void)(&((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field ==    \
+            &(ptr)->field));                                         \
+    __copy_to_user(_d, _s, sizeof(*_s));                             \
 })
 
 #define __copy_field_from_compat(ptr, hnd, field) ({                 \
-    typeof((ptr)->field) *const _x = &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field; \
-    typeof((ptr)->field) *const _y = &(ptr)->field;                  \
-    __copy_from_user(_y, _x, sizeof(*_x));                           \
+    const typeof(&(ptr)->field) _s =                                 \
+        &((typeof(**(hnd)._) *)(full_ptr_t)(hnd).c)->field;          \
+    typeof(&(ptr)->field) _d = &(ptr)->field;                        \
+    __copy_from_user(_d, _s, sizeof(*_d));                           \
 })
 
 
@@ -169,7 +178,8 @@ void xlat_vcpu_runstate_info(struct vcpu_runstate_info *);
 int switch_compat(struct domain *);
 int switch_native(struct domain *);
 
-#define BITS_PER_GUEST_LONG(d) (!IS_COMPAT(d) ? BITS_PER_LONG : COMPAT_BITS_PER_LONG)
+#define BITS_PER_GUEST_LONG(d) \
+    (!IS_COMPAT(d) ? BITS_PER_LONG : COMPAT_BITS_PER_LONG)
 
 #else
 

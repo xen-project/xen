@@ -499,7 +499,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
         vpic_update_int_output(vpic);
 }
 
-int cpu_get_pic_interrupt(struct vcpu *v, int *type)
+int cpu_get_pic_interrupt(struct vcpu *v)
 {
     int irq, vector;
     struct hvm_hw_vpic *vpic = &v->domain->arch.hvm_domain.vpic[0];
@@ -512,6 +512,5 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
         return -1;
 
     vector = vpic[irq >> 3].irq_base + (irq & 7);
-    *type = APIC_DM_EXTINT;
     return vector;
 }

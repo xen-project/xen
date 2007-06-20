@@ -35,6 +35,7 @@ BLK-OBJS  += block-vmdk.o
 BLK-OBJS  += block-ram.o
 BLK-OBJS  += block-qcow.o
 BLK-OBJS  += aes.o
+BLK-OBJS  += tapaio.o
 
 all: $(IBIN) qcow-util
 

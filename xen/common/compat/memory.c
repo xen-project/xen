@@ -258,7 +258,8 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
                     compat_pfn_t pfn = nat.rsrv->extent_start.p[start_extent];
 
                     BUG_ON(pfn != nat.rsrv->extent_start.p[start_extent]);
-                    if ( __copy_to_compat_offset(cmp.rsrv.extent_start, start_extent, &pfn, 1) )
+                    if ( __copy_to_compat_offset(cmp.rsrv.extent_start,
+                                                 start_extent, &pfn, 1) )
                     {
                         if ( split >= 0 )
                         {
@@ -275,6 +276,10 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
                         break;
                     }
                 }
+
+                /* Bail if there was an error. */
+                if ( (split >= 0) && (end_extent != nat.rsrv->nr_extents) )
+                    split = 0;
             }
             else
                 start_extent = end_extent;

@@ -1070,8 +1070,6 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
     char *p;
     int i;
 
-    memset(hypercall_page, 0, PAGE_SIZE);
-
     for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
         p = (char *)(hypercall_page + (i * 32));
@@ -1115,16 +1113,26 @@ static int vmx_nx_enabled(struct vcpu *v)
     return v->arch.hvm_vmx.efer & EFER_NX;
 }
 
-static int vmx_interrupts_enabled(struct vcpu *v) 
+static int vmx_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 {
-    unsigned long eflags = __vmread(GUEST_RFLAGS); 
-    return !irq_masked(eflags); 
-}
+    unsigned long intr_shadow, eflags;
 
+    ASSERT(v == current);
+
+    intr_shadow  = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    intr_shadow &= VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS;
+
+    if ( type == hvm_intack_nmi )
+        return !intr_shadow;
+
+    ASSERT((type == hvm_intack_pic) || (type == hvm_intack_lapic));
+    eflags = __vmread(GUEST_RFLAGS);
+    return !irq_masked(eflags) && !intr_shadow;
+}
 
 static void vmx_update_host_cr3(struct vcpu *v)
 {
-    ASSERT( (v == current) || !vcpu_runnable(v) );
+    ASSERT((v == current) || !vcpu_runnable(v));
     vmx_vmcs_enter(v);
     __vmwrite(HOST_CR3, v->arch.cr3);
     vmx_vmcs_exit(v);
@@ -1132,12 +1140,18 @@ static void vmx_update_host_cr3(struct vcpu *v)
 
 static void vmx_update_guest_cr3(struct vcpu *v)
 {
-    ASSERT( (v == current) || !vcpu_runnable(v) );
+    ASSERT((v == current) || !vcpu_runnable(v));
     vmx_vmcs_enter(v);
     __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr3);
     vmx_vmcs_exit(v);
 }
 
+static void vmx_flush_guest_tlbs(void)
+{
+    /* No tagged TLB support on VMX yet.  The fact that we're in Xen 
+     * at all means any guest will have a clean TLB when it's next run,
+     * because VMRESUME will flush it for us. */
+}
 
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
@@ -1205,6 +1219,7 @@ static struct hvm_function_table vmx_function_table = {
     .get_segment_register = vmx_get_segment_register,
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr3     = vmx_update_guest_cr3,
+    .flush_guest_tlbs     = vmx_flush_guest_tlbs,
     .update_vtpr          = vmx_update_vtpr,
     .stts                 = vmx_stts,
     .set_tsc_offset       = vmx_set_tsc_offset,
@@ -1837,7 +1852,7 @@ static void vmx_io_instruction(unsigned long exit_qualification,
 
     /* Copy current guest state into io instruction state structure. */
     memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
-    hvm_store_cpu_guest_regs(current, regs, NULL);
+    vmx_store_cpu_guest_regs(current, regs, NULL);
 
     HVM_DBG_LOG(DBG_LEVEL_IO, "vm86 %d, eip=%x:%lx, "
                 "exit_qualification = %lx",
@@ -2549,7 +2564,8 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", ecx);
 
-    switch (ecx) {
+    switch ( ecx )
+    {
     case MSR_IA32_TIME_STAMP_COUNTER:
         msr_content = hvm_get_guest_time(v);
         break;
@@ -2565,6 +2581,8 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+        goto gp_fault;
     default:
         if ( long_mode_do_msr_read(regs) )
             goto done;
@@ -2576,8 +2594,8 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
             regs->edx = edx;
             goto done;
         }
-        vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-        return 0;
+
+        goto gp_fault;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;
@@ -2589,6 +2607,10 @@ done:
                 ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
     return 1;
+
+gp_fault:
+    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    return 0;
 }
 
 static int vmx_alloc_vlapic_mapping(struct domain *d)
@@ -2667,7 +2689,8 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     HVMTRACE_2D(MSR_WRITE, v, ecx, msr_content);
 
-    switch (ecx) {
+    switch ( ecx )
+    {
     case MSR_IA32_TIME_STAMP_COUNTER:
         hvm_set_guest_time(v, msr_content);
         pt_reset(v);
@@ -2684,6 +2707,8 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+        goto gp_fault;
     default:
         if ( !long_mode_do_msr_write(regs) )
             wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
@@ -2691,6 +2716,10 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     }
 
     return 1;
+
+gp_fault:
+    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    return 0;
 }
 
 static void vmx_do_hlt(void)

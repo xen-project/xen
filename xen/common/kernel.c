@@ -142,7 +142,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     {
         xen_extraversion_t extraversion;
         safe_strcpy(extraversion, xen_extra_version());
-        if ( copy_to_guest(arg, (char *)extraversion, sizeof(extraversion)) )
+        if ( copy_to_guest(arg, extraversion, ARRAY_SIZE(extraversion)) )
             return -EFAULT;
         return 0;
     }
@@ -167,7 +167,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
         memset(info, 0, sizeof(info));
         arch_get_xen_caps(&info);
 
-        if ( copy_to_guest(arg, (char *)info, sizeof(info)) )
+        if ( copy_to_guest(arg, info, ARRAY_SIZE(info)) )
             return -EFAULT;
         return 0;
     }
@@ -187,7 +187,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     {
         xen_changeset_info_t chgset;
         safe_strcpy(chgset, xen_changeset());
-        if ( copy_to_guest(arg, (char *)chgset, sizeof(chgset)) )
+        if ( copy_to_guest(arg, chgset, ARRAY_SIZE(chgset)) )
             return -EFAULT;
         return 0;
     }
@@ -229,8 +229,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     case XENVER_guest_handle:
     {
-        if ( copy_to_guest(arg, (char *)current->domain->handle,
-                           sizeof(current->domain->handle)) )
+        if ( copy_to_guest(arg, current->domain->handle,
+                           ARRAY_SIZE(current->domain->handle)) )
             return -EFAULT;
         return 0;
     }    

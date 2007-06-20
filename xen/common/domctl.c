@@ -43,7 +43,7 @@ void cpumask_to_xenctl_cpumap(
 
     bitmap_long_to_byte(bytemap, cpus_addr(*cpumask), NR_CPUS);
 
-    copy_to_guest(xenctl_cpumap->bitmap, &bytemap[0], copy_bytes);
+    copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes);
 
     for ( i = copy_bytes; i < guest_bytes; i++ )
         copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1);
@@ -63,7 +63,7 @@ void xenctl_cpumap_to_cpumask(
     if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
         return;
 
-    copy_from_guest(&bytemap[0], xenctl_cpumap->bitmap, copy_bytes);
+    copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes);
 
     bitmap_byte_to_long(cpus_addr(*cpumask), bytemap, NR_CPUS);
 }

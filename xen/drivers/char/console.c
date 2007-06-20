@@ -326,7 +326,7 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
                 CONSOLEIO_write, count, buffer);
 
         kcount = min_t(int, count, sizeof(kbuf)-1);
-        if ( copy_from_guest((char *)kbuf, buffer, kcount) )
+        if ( copy_from_guest(kbuf, buffer, kcount) )
             return -EFAULT;
         kbuf[kcount] = '\0';
 

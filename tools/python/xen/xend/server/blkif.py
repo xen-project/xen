@@ -98,6 +98,11 @@ class BlkifController(DevController):
 
         if (dev_type == 'cdrom' and new_front['device-type'] == 'cdrom' and
             dev == new_back['dev'] and mode == 'r'):
+            # dummy device
+            self.writeBackend(devid,
+                              'type', new_back['type'],
+                              'params', '')
+            # new backend-device
             self.writeBackend(devid,
                               'type', new_back['type'],
                               'params', new_back['params'])

@@ -60,7 +60,7 @@ struct svm_asid_data {
    u64 core_asid_generation;
    u32 next_asid;
    u32 max_asid;
-   u32 erratum170;
+   u32 erratum170:1;
 };
 
 static DEFINE_PER_CPU(struct svm_asid_data, svm_asid_data);
@@ -140,25 +140,21 @@ void svm_asid_init_vcpu(struct vcpu *v)
 }
 
 /*
- * Increase the Generation to make free ASIDs.  Flush physical TLB and give
- * ASID.
+ * Increase the Generation to make free ASIDs, and indirectly cause a 
+ * TLB flush of all ASIDs on the next vmrun.
  */
-static void svm_asid_handle_inc_generation(struct vcpu *v)
+void svm_asid_inc_generation(void)
 {
     struct svm_asid_data *data = svm_asid_core_data();
 
-    if ( likely(data->core_asid_generation <  SVM_ASID_LAST_GENERATION) )
+    if ( likely(data->core_asid_generation < SVM_ASID_LAST_GENERATION) )
     {
-        /* Handle ASID overflow. */
+        /* Move to the next generation.  We can't flush the TLB now
+         * because you need to vmrun to do that, and current might not
+         * be a HVM vcpu, but the first HVM vcpu that runs after this 
+         * will pick up ASID 1 and flush the TLBs. */
         data->core_asid_generation++;
-        data->next_asid = SVM_ASID_FIRST_GUEST_ASID + 1;
-
-        /* Handle VCPU. */
-        v->arch.hvm_svm.vmcb->guest_asid = SVM_ASID_FIRST_GUEST_ASID;
-        v->arch.hvm_svm.asid_generation  = data->core_asid_generation;
-
-        /* Trigger flush of physical TLB. */
-        v->arch.hvm_svm.vmcb->tlb_control = 1;
+        data->next_asid = SVM_ASID_FIRST_GUEST_ASID;
         return;
     }
 
@@ -168,11 +164,12 @@ static void svm_asid_handle_inc_generation(struct vcpu *v)
      * this core (flushing TLB always). So correctness is established; it
      * only runs a bit slower.
      */
-    printk("AMD SVM: ASID generation overrun. Disabling ASIDs.\n");
-    data->erratum170 = 1;
-    data->core_asid_generation = SVM_ASID_INVALID_GENERATION;
-
-    svm_asid_init_vcpu(v);
+    if ( !data->erratum170 )
+    {
+        printk("AMD SVM: ASID generation overrun. Disabling ASIDs.\n");
+        data->erratum170 = 1;
+        data->core_asid_generation = SVM_ASID_INVALID_GENERATION;
+    }
 }
 
 /*
@@ -202,18 +199,21 @@ asmlinkage void svm_asid_handle_vmrun(void)
         return;
     }
 
-    /* Different ASID generations trigger fetching of a fresh ASID. */
-    if ( likely(data->next_asid <= data->max_asid) )
-    {
-        /* There is a free ASID. */
-        v->arch.hvm_svm.vmcb->guest_asid = data->next_asid++;
-        v->arch.hvm_svm.asid_generation  = data->core_asid_generation;
-        v->arch.hvm_svm.vmcb->tlb_control = 0;
-        return;
-    }
+    /* If there are no free ASIDs, need to go to a new generation */
+    if ( unlikely(data->next_asid > data->max_asid) )
+        svm_asid_inc_generation();
 
-    /* Slow path, may cause TLB flush. */
-    svm_asid_handle_inc_generation(v);
+    /* Now guaranteed to be a free ASID. */
+    v->arch.hvm_svm.vmcb->guest_asid = data->next_asid++;
+    v->arch.hvm_svm.asid_generation  = data->core_asid_generation;
+
+    /* When we assign ASID 1, flush all TLB entries.  We need to do it 
+     * here because svm_asid_inc_generation() can be called at any time, 
+     * but the TLB flush can only happen on vmrun. */
+    if ( v->arch.hvm_svm.vmcb->guest_asid == SVM_ASID_FIRST_GUEST_ASID )
+        v->arch.hvm_svm.vmcb->tlb_control = 1;
+    else
+        v->arch.hvm_svm.vmcb->tlb_control = 0;
 }
 
 void svm_asid_inv_asid(struct vcpu *v)

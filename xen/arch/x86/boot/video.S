@@ -15,7 +15,10 @@
 
 #include "video.h"
 
-#define modelist (0x3000)
+/* Scratch space layout. */
+#define modelist       (0x3000)
+#define vesa_glob_info (modelist + 1024)
+#define vesa_mode_info (vesa_glob_info + 1024)
 
 /* Retrieve Extended Display Identification Data. */
 #define CONFIG_FIRMWARE_EDID
@@ -109,7 +112,7 @@ mopar2: movb    %al, _param(PARAM_VIDEO_LINES)
 
 # Fetching of VESA frame buffer parameters
 mopar_gr:
-        leaw    modelist+1024, %di
+        leaw    vesa_mode_info, %di
         movb    $0x23, _param(PARAM_HAVE_VGA)
         movw    16(%di), %ax
         movw    %ax, _param(PARAM_LFB_LINELENGTH)
@@ -128,9 +131,7 @@ mopar_gr:
         movl    %eax, _param(PARAM_LFB_COLORS+4)
 
 # get video mem size
-        leaw    modelist+1024, %di
-        movw    $0x4f00, %ax
-        int     $0x10
+        leaw    vesa_glob_info, %di
         xorl    %eax, %eax
         movw    18(%di), %ax
         movl    %eax, _param(PARAM_LFB_SIZE)
@@ -183,7 +184,10 @@ dac_done:
 
         movw    %es, _param(PARAM_VESAPM_SEG)
         movw    %di, _param(PARAM_VESAPM_OFF)
-no_pm:  ret
+
+no_pm:  pushw   %ds
+        popw    %es
+        ret
 
 # The video mode menu
 mode_menu:
@@ -428,17 +432,13 @@ setmenu:
         jmp     mode_set
 
 check_vesa:
-#ifdef CONFIG_FIRMWARE_EDID
-        leaw    modelist+1024, %di
+        leaw    vesa_glob_info, %di
         movw    $0x4f00, %ax
         int     $0x10
         cmpw    $0x004f, %ax
         jnz     setbad
 
-        movw    4(%di), %ax
-        movw    %ax, bootsym(vbe_version)
-#endif
-        leaw    modelist+1024, %di
+        leaw    vesa_mode_info, %di
         subb    $VIDEO_FIRST_VESA>>8, %bh
         movw    %bx, %cx                # Get mode information structure
         movw    $0x4f01, %ax
@@ -447,7 +447,7 @@ check_vesa:
         cmpw    $0x004f, %ax
         jnz     setbad
 
-        movb    (%di), %al              # Check capabilities.
+        movb    (%di), %al              # Check mode attributes.
         andb    $0x99, %al
         cmpb    $0x99, %al
         jnz     _setbad                 # Doh! No linear frame buffer.
@@ -530,6 +530,7 @@ spec_inits:
         .word   bootsym(set_8pixel)
         .word   bootsym(set_80x43)
         .word   bootsym(set_80x28)
+        .word   bootsym(set_current)
         .word   bootsym(set_80x30)
         .word   bootsym(set_80x34)
         .word   bootsym(set_80x60)
@@ -575,6 +576,7 @@ set14:  movw    $0x1111, %ax            # Use 9x14 font
         movb    $0x01, %ah              # Define cursor scan lines 11-12
         movw    $0x0b0c, %cx
         int     $0x10
+set_current:
         stc
         ret
 
@@ -695,33 +697,34 @@ vga_modes_end:
 # Detect VESA modes.
 vesa_modes:
         movw    %di, %bp                # BP=original mode table end
-        addw    $0x200, %di             # Buffer space
+        leaw    vesa_glob_info, %di
         movw    $0x4f00, %ax            # VESA Get card info call
         int     $0x10
+        movw    %di, %si
         movw    %bp, %di
         cmpw    $0x004f, %ax            # Successful?
         jnz     ret0
         
-        cmpw    $0x4556, 0x200(%di)     # 'VE'
+        cmpw    $0x4556, (%si)          # 'VE'
         jnz     ret0
         
-        cmpw    $0x4153, 0x202(%di)     # 'SA'
+        cmpw    $0x4153, 2(%si)         # 'SA'
         jnz     ret0
         
         movw    $bootsym(vesa_name), bootsym(card_name) # Set name to "VESA VGA"
         pushw   %gs
-        lgsw    0x20e(%di), %si         # GS:SI=mode list
+        lgsw    0xe(%si), %si           # GS:SI=mode list
         movw    $128, %cx               # Iteration limit
 vesa1:
         gs;     lodsw
-        cmpw    $0xffff, %ax                        # End of the table?
+        cmpw    $0xffff, %ax            # End of the table?
         jz      vesar
         
-        cmpw    $0x0080, %ax                        # Check validity of mode ID
+        cmpw    $0x0080, %ax            # Check validity of mode ID
         jc      vesa2
         
-        orb     %ah, %ah        # Valid IDs: 0x0000-0x007f/0x0100-0x07ff
-        jz      vesan                # Certain BIOSes report 0x80-0xff!
+        orb     %ah, %ah                # Valid IDs 0x0000-0x007f/0x0100-0x07ff
+        jz      vesan                   # Certain BIOSes report 0x80-0xff!
 
         cmpw    $0x0800, %ax
         jnc     vesae
@@ -891,8 +894,13 @@ store_edid:
         cmpb    $1, bootsym(opt_edid)   # EDID disabled on cmdline (edid=no)?
         je      .Lno_edid
 
-        cmpw    $0x0200, bootsym(vbe_version)  # only do EDID on >= VBE2.0
-        jl      .Lno_edid
+        leaw    vesa_glob_info, %di
+        movw    $0x4f00, %ax
+        int     $0x10
+        cmpw    $0x004f, %ax
+        jne     .Lno_edid
+        cmpw    $0x0200, 4(%di)         # only do EDID on >= VBE2.0
+        jb      .Lno_edid
 
         xorw    %di, %di                # Report Capability
         pushw   %di
@@ -901,6 +909,8 @@ store_edid:
         xorw    %bx, %bx
         xorw    %cx, %cx
         int     $0x10
+        pushw   %ds
+        popw    %es
         cmpw    $0x004f, %ax            # Call failed?
         jne     .Lno_edid
 
@@ -920,8 +930,6 @@ store_edid:
         movw    $0x01, %bx
         movw    $0x00, %cx
         movw    $0x00, %dx
-        pushw   %ds
-        popw    %es
         movw    $bootsym(boot_edid_info), %di
         int     $0x10
 
@@ -940,7 +948,6 @@ edit_buf:       .space  6       # Line editor buffer
 card_name:      .word   0       # Pointer to adapter name
 graphic_mode:   .byte   0       # Graphic mode with a linear frame buffer
 dac_size:       .byte   6       # DAC bit depth
-vbe_version:    .word   0       # VBE bios version
 
 # Status messages
 keymsg:         .ascii  "Press <RETURN> to see video modes available,"

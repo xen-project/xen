@@ -13,12 +13,11 @@ trampoline_realmode_entry:
         cli
         lidt    bootsym(idt_48)
         lgdt    bootsym(gdt_48)
+        mov     $1,%bl                    # EBX != 0 indicates we are an AP
         xor     %ax, %ax
         inc     %ax
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
-        mov     $1,%bl                    # EBX != 0 indicates we are an AP
-        jmp     1f
-1:      ljmpl   $BOOT_CS32,$bootsym_phys(trampoline_protmode_entry)
+        ljmpl   $BOOT_CS32,$bootsym_phys(trampoline_protmode_entry)
 
 idt_48: .word   0, 0, 0 # base = limit = 0
 gdt_48: .word   6*8-1
@@ -135,10 +134,9 @@ trampoline_boot_cpu_entry:
         ljmp    $BOOT_PSEUDORM_CS,$bootsym(1f)
         .code16
 1:      mov     %eax,%cr0                 # CR0.PE = 0 (leave protected mode)
-        jmp     1f
 
         /* Load proper real-mode values into %cs, %ds, %es and %ss. */
-1:      ljmp    $(BOOT_TRAMPOLINE>>4),$bootsym(1f)
+        ljmp    $(BOOT_TRAMPOLINE>>4),$bootsym(1f)
 1:      mov     $(BOOT_TRAMPOLINE>>4),%ax
         mov     %ax,%ds
         mov     %ax,%es
@@ -166,10 +164,9 @@ trampoline_boot_cpu_entry:
         xor     %ax,%ax
         inc     %ax
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
-        jmp     1f
 
         /* Load proper protected-mode values into all segment registers. */
-1:      ljmpl   $BOOT_CS32,$bootsym_phys(1f)
+        ljmpl   $BOOT_CS32,$bootsym_phys(1f)
         .code32
 1:      mov     $BOOT_DS,%eax
         mov     %eax,%ds

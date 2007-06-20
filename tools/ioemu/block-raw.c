@@ -166,7 +166,7 @@ typedef struct RawAIOCB {
     struct RawAIOCB *next;
 } RawAIOCB;
 
-static int aio_sig_num = SIGUSR2;
+const int aio_sig_num = SIGUSR2;
 static RawAIOCB *first_aio; /* AIO issued */
 static int aio_initialized = 0;
 

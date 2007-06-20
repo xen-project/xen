@@ -119,30 +119,31 @@
         ret
 
 .Lfind_option:
+        mov     4(%esp),%eax
+        dec     %eax
         push    %ebx
-        push    4+8(%esp)
-        push    4+8(%esp)
+1:      pushl   4+8(%esp)
+        inc     %eax
+        push    %eax
         call    .Lstrstr
         add     $8,%esp
         test    %eax,%eax
         jz      3f
         cmp     %eax,4+4(%esp)
-        je      1f
+        je      2f
         cmpb    $' ',-1(%eax)
-        jne     2f
-1:      mov     %eax,%ebx
-        push    4+8(%esp)
+        jne     1b
+2:      mov     %eax,%ebx
+        pushl   4+8(%esp)
         call    .Lstrlen
         add     $4,%esp
-        xchg    %eax,%ebx
-        add     %eax,%ebx
+        xadd    %eax,%ebx
         cmpb    $'\0',(%ebx)
         je      3f
         cmpb    $' ',(%ebx)
         je      3f
         cmpb    $'=',(%ebx)
-        je      3f
-2:      xor     %eax,%eax
+        jne     1b
 3:      pop     %ebx
         ret
 
@@ -297,7 +298,7 @@ cmdline_parse_early:
         call    .Lstr_prefix
         add     $8,%esp
         test    %eax,%eax
-        jnz     .Lcmdline_exit
+        jnz     .Lparse_vga_current
 
         /* We have 'vga=mode-<mode>'. */
         add     $5,%ebx
@@ -305,6 +306,19 @@ cmdline_parse_early:
         call    .Latoi
         add     $4,%esp
         mov     %ax,bootsym_phys(boot_vid_mode)
+        jmp     .Lcmdline_exit
+
+.Lparse_vga_current:
+        /* Check for 'vga=current'. */
+        push    %ebx
+        pushl   $sym_phys(.Lvga_current)
+        call    .Lstr_prefix
+        add     $8,%esp
+        test    %eax,%eax
+        jnz     .Lcmdline_exit
+
+        /* We have 'vga=current'. */
+        movw    $VIDEO_CURRENT_MODE,bootsym_phys(boot_vid_mode)
 
 .Lcmdline_exit:
         popa
@@ -328,6 +342,8 @@ cmdline_parse_early:
         .asciz  "gfx-"
 .Lvga_mode:
         .asciz  "mode-"
+.Lvga_current:
+        .asciz  "current"
 .Lno_rm_opt:
         .asciz  "no-real-mode"
 .Ledid_opt:
