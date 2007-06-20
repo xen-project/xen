@@ -7059,6 +7059,18 @@ int main(int argc, char **argv)
 #endif
 
     char qemu_dm_logfilename[128];
+    
+    /* Ensure that SIGUSR2 is blocked by default when a new thread is created,
+       then only the threads that use the signal unblock it -- this fixes a
+       race condition in Qcow support where the AIO signal is misdelivered.  */
+    {
+        extern const int aio_sig_num;
+        sigset_t set;
+
+        sigemptyset(&set);
+        sigaddset(&set, aio_sig_num);
+        sigprocmask(SIG_BLOCK, &set, NULL);
+    }
 
     LIST_INIT (&vm_change_state_head);
 #ifndef _WIN32
