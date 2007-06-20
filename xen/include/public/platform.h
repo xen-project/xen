@@ -114,6 +114,37 @@ struct xenpf_platform_quirk {
 typedef struct xenpf_platform_quirk xenpf_platform_quirk_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 
+#define XENPF_firmware_info       50
+#define XEN_FW_DISK_INFO          1
+#define XEN_FW_DISK_MBR_SIGNATURE 2
+struct xenpf_firmware_info {
+    /* IN variables. */
+    uint32_t type;
+    uint32_t index;
+    /* OUT variables. */
+    union {
+        struct {
+            /* Int13, Fn48: Check Extensions Present. */
+            uint8_t device;                   /* %dl: bios device number */
+            uint8_t version;                  /* %ah: major version      */
+            uint16_t interface_support;       /* %cx: support bitmap     */
+            /* Int13, Fn08: Legacy Get Device Parameters. */
+            uint16_t legacy_max_cylinder;     /* %cl[7:6]:%ch: max cyl # */
+            uint8_t legacy_max_head;          /* %dh: max head #         */
+            uint8_t legacy_sectors_per_track; /* %cl[5:0]: max sector #  */
+            /* Int13, Fn41: Get Device Parameters (as filled into %ds:%esi). */
+            /* NB. First uint16_t of buffer must be set to buffer size.      */
+            XEN_GUEST_HANDLE(void) edd_params;
+        } disk_info; /* XEN_FW_DISK_INFO */
+        struct {
+            uint8_t device;                   /* bios device number  */
+            uint32_t mbr_signature;           /* offset 0x1b8 in mbr */
+        } disk_mbr_signature; /* XEN_FW_DISK_MBR_SIGNATURE */
+    } u;
+};
+typedef struct xenpf_firmware_info xenpf_firmware_info_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_firmware_info_t);
+
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
@@ -124,6 +155,7 @@ struct xen_platform_op {
         struct xenpf_read_memtype      read_memtype;
         struct xenpf_microcode_update  microcode;
         struct xenpf_platform_quirk    platform_quirk;
+        struct xenpf_firmware_info     firmware_info;
         uint8_t                        pad[128];
     } u;
 };

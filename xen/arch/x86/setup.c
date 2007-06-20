@@ -505,7 +505,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     printk("Disc information:\n");
     printk(" Found %d MBR signatures\n",
-           bootsym(boot_edd_signature_nr));
+           bootsym(boot_mbr_signature_nr));
     printk(" Found %d EDD information structures\n",
            bootsym(boot_edd_info_nr));
 

@@ -20,12 +20,17 @@
 #include <xen/guest_access.h>
 #include <asm/current.h>
 #include <public/platform.h>
+#include <asm/edd.h>
 #include <asm/mtrr.h>
 #include "cpu/mtrr/mtrr.h"
 
 #ifndef COMPAT
 typedef long ret_t;
 DEFINE_SPINLOCK(xenpf_lock);
+# undef copy_from_compat
+# define copy_from_compat copy_from_guest
+# undef copy_to_compat
+# define copy_to_compat copy_to_guest
 #else
 extern spinlock_t xenpf_lock;
 #endif
@@ -150,6 +155,73 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         }
     }
     break;
+
+    case XENPF_firmware_info:
+        switch ( op->u.firmware_info.type )
+        {
+        case XEN_FW_DISK_INFO: {
+            const struct edd_info *info;
+            u16 length;
+
+            ret = -ESRCH;
+            if ( op->u.firmware_info.index >= bootsym(boot_edd_info_nr) )
+                break;
+
+            info = bootsym(boot_edd_info) + op->u.firmware_info.index;
+
+            /* Transfer the EDD info block. */
+            ret = -EFAULT;
+            if ( copy_from_compat(&length, op->u.firmware_info.u.
+                                  disk_info.edd_params, 1) )
+                break;
+            if ( length > info->edd_device_params.length )
+                length = info->edd_device_params.length;
+            if ( copy_to_compat(op->u.firmware_info.u.disk_info.edd_params,
+                                (u8 *)&info->edd_device_params,
+                                length) )
+                break;
+            if ( copy_to_compat(op->u.firmware_info.u.disk_info.edd_params,
+                                &length, 1) )
+                break;
+
+            /* Transfer miscellaneous other information values. */
+#define C(x) op->u.firmware_info.u.disk_info.x = info->x;
+            C(device);
+            C(version);
+            C(interface_support);
+            C(legacy_max_cylinder);
+            C(legacy_max_head);
+            C(legacy_sectors_per_track);
+#undef C
+
+            ret = (copy_field_to_guest(u_xenpf_op, op,
+                                      u.firmware_info.u.disk_info)
+                   ? -EFAULT : 0);
+            break;
+        }
+        case XEN_FW_DISK_MBR_SIGNATURE: {
+            const struct mbr_signature *sig;
+
+            ret = -ESRCH;
+            if ( op->u.firmware_info.index >= bootsym(boot_mbr_signature_nr) )
+                break;
+
+            sig = bootsym(boot_mbr_signature) + op->u.firmware_info.index;
+
+            op->u.firmware_info.u.disk_mbr_signature.device = sig->device;
+            op->u.firmware_info.u.disk_mbr_signature.mbr_signature =
+                sig->signature;
+
+            ret = (copy_field_to_guest(u_xenpf_op, op,
+                                      u.firmware_info.u.disk_mbr_signature)
+                   ? -EFAULT : 0);
+            break;
+        }
+        default:
+            ret = -EINVAL;
+            break;
+        }
+        break;
 
     default:
         ret = -ENOSYS;
