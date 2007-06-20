@@ -227,7 +227,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
     }
     BUG_ON(v != perfc_nbr_vals);
 
-    if ( copy_to_guest(desc, (xen_sysctl_perfc_desc_t *)perfc_d, NR_PERFCTRS) )
+    if ( copy_to_guest(desc, perfc_d, NR_PERFCTRS) )
         return -EFAULT;
     if ( copy_to_guest(val, perfc_vals, perfc_nbr_vals) )
         return -EFAULT;

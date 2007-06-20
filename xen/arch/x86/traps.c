@@ -1140,7 +1140,7 @@ static inline int guest_io_okay(
          * read as 0xff (no access allowed).
          */
         TOGGLE_MODE();
-        switch ( __copy_from_guest_offset(&x.bytes[0], v->arch.iobmp,
+        switch ( __copy_from_guest_offset(x.bytes, v->arch.iobmp,
                                           port>>3, 2) )
         {
         default: x.bytes[0] = ~0;

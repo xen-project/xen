@@ -2942,7 +2942,7 @@ long do_set_gdt(XEN_GUEST_HANDLE(ulong) frame_list, unsigned int entries)
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
     
-    if ( copy_from_guest((unsigned long *)frames, frame_list, nr_pages) )
+    if ( copy_from_guest(frames, frame_list, nr_pages) )
         return -EFAULT;
 
     LOCK_BIGLOCK(current->domain);
@@ -3123,7 +3123,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         else if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
             return -ESRCH;
 
-        rc = copy_from_guest(&d->arch.e820[0], fmap.map.buffer,
+        rc = copy_from_guest(d->arch.e820, fmap.map.buffer,
                              fmap.map.nr_entries) ? -EFAULT : 0;
         d->arch.nr_e820 = fmap.map.nr_entries;
 
@@ -3144,7 +3144,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         map.nr_entries = min(map.nr_entries, d->arch.nr_e820);
-        if ( copy_to_guest(map.buffer, &d->arch.e820[0], map.nr_entries) ||
+        if ( copy_to_guest(map.buffer, d->arch.e820, map.nr_entries) ||
              copy_to_guest(arg, &map, 1) )
             return -EFAULT;
 
@@ -3168,7 +3168,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         buffer = guest_handle_cast(memmap.buffer, e820entry_t);
 
         count = min((unsigned int)e820.nr_map, memmap.nr_entries);
-        if ( copy_to_guest(buffer, &e820.map[0], count) < 0 )
+        if ( copy_to_guest(buffer, e820.map, count) < 0 )
             return -EFAULT;
 
         memmap.nr_entries = count;
@@ -3181,7 +3181,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     case XENMEM_machphys_mapping:
     {
-        struct xen_machphys_mapping mapping = {
+        static const struct xen_machphys_mapping mapping = {
             .v_start = MACH2PHYS_VIRT_START,
             .v_end   = MACH2PHYS_VIRT_END,
             .max_mfn = MACH2PHYS_NR_ENTRIES - 1

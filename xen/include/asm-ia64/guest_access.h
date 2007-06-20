@@ -76,28 +76,31 @@ extern int xencomm_handle_is_null(void *ptr);
     __copy_field_from_guest(ptr, hnd, field)
 
 #define __copy_to_guest_offset(hnd, idx, ptr, nr) ({                    \
-    const typeof(ptr) _d = (hnd).p;                                     \
-    const typeof(ptr) _s = (ptr);                                       \
+    const typeof(*(ptr)) *_s = (ptr);                                   \
+    void *_d = (hnd).p;                                                 \
+    ((void)((hnd).p == (ptr)));                                         \
     xencomm_copy_to_guest(_d, _s, sizeof(*_s)*(nr), sizeof(*_s)*(idx)); \
 })
 
 #define __copy_field_to_guest(hnd, ptr, field) ({                   \
-    const int _off = offsetof(typeof(*ptr), field);                 \
-    const typeof(ptr) _d = (hnd).p;                                 \
+    unsigned int _off = offsetof(typeof(*(hnd).p), field);          \
     const typeof(&(ptr)->field) _s = &(ptr)->field;                 \
+    void *_d = (hnd).p;                                             \
+    ((void)(&(hnd).p->field == &(ptr)->field));                     \
     xencomm_copy_to_guest(_d, _s, sizeof(*_s), _off);               \
 })
 
-#define __copy_from_guest_offset(ptr, hnd, idx, nr) ({                     \
-    const typeof(ptr) _s = (hnd).p;                                        \
-    const typeof(ptr) _d = (ptr);                                          \
-    xencomm_copy_from_guest(_d, _s, sizeof(*_s)*(nr), sizeof(*_s)*(idx));  \
+#define __copy_from_guest_offset(ptr, hnd, idx, nr) ({                    \
+    const typeof(*(ptr)) *_s = (hnd).p;                                   \
+    typeof(*(ptr)) *_d = (ptr);                                           \
+    xencomm_copy_from_guest(_d, _s, sizeof(*_d)*(nr), sizeof(*_d)*(idx)); \
 })
 
 #define __copy_field_from_guest(ptr, hnd, field) ({                 \
-    const int _off = offsetof(typeof(*ptr), field);                 \
-    const typeof(ptr) _s = (hnd).p;                                 \
-    const typeof(&(ptr)->field) _d = &(ptr)->field;                 \
+    unsigned int _off = offsetof(typeof(*(hnd).p), field);          \
+    const void *_s = (hnd).p;                                       \
+    typeof(&(ptr)->field) _d = &(ptr)->field;                       \
+    ((void)(&(hnd).p->field == &(ptr)->field));                     \
     xencomm_copy_from_guest(_d, _s, sizeof(*_d), _off);             \
 })
 
