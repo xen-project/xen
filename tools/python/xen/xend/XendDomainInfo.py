@@ -983,7 +983,7 @@ class XendDomainInfo:
                 self.info['VCPUs_live'] = vcpus
                 self._writeDom(self._vcpuDomDetails())
         else:
-            self.info['VCPUs_live'] = vcpus
+            self.info['VCPUs_max'] = vcpus
             xen.xend.XendDomain.instance().managed_config_save(self)
         log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
                  vcpus)
