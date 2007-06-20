@@ -160,21 +160,97 @@ void sn_tlb_migrate_finish(struct mm_struct *mm)
 // static cpumask_t mask_all = CPU_MASK_ALL;
 #endif
 
+#ifdef XEN
+static DEFINE_SPINLOCK(sn2_ptcg_lock);
+
+struct sn_flush_struct {
+	unsigned long start;
+	unsigned long end;
+	unsigned long nbits;
+};
+
+static void sn_flush_ptcga_cpu(void *ptr)
+{
+	struct sn_flush_struct *sn_flush = ptr;
+	unsigned long start, end, nbits;
+
+	start = sn_flush->start;
+	end = sn_flush->end;
+	nbits = sn_flush->nbits;
+
+	/*
+	 * Contention me harder!!!
+	 */
+	/* HW requires global serialization of ptc.ga.  */
+	spin_lock(&sn2_ptcg_lock);
+	{
+		do {
+			/*
+			 * Flush ALAT entries also.
+			 */
+			ia64_ptcga(start, (nbits<<2));
+			ia64_srlz_i();
+			start += (1UL << nbits);
+		} while (start < end);
+	}
+	spin_unlock(&sn2_ptcg_lock);
+}
+
 void
-#ifndef XEN
-sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
-#else
 sn2_global_tlb_purge(unsigned long start,
-#endif
+		     unsigned long end, unsigned long nbits)
+{
+	nodemask_t nodes_flushed;
+	cpumask_t selected_cpus;
+	int cpu, cnode, i;
+	static DEFINE_SPINLOCK(sn2_ptcg_lock2);
+
+	nodes_clear(nodes_flushed);
+	cpus_clear(selected_cpus);
+
+	spin_lock(&sn2_ptcg_lock2);
+	node_set(cpu_to_node(smp_processor_id()), nodes_flushed);
+	i = 0;
+	for_each_cpu(cpu) {
+		cnode = cpu_to_node(cpu);
+		if (!node_isset(cnode, nodes_flushed)) {
+			cpu_set(cpu, selected_cpus);
+			i++;
+		}
+		node_set(cnode, nodes_flushed);
+	}
+
+	/* HW requires global serialization of ptc.ga.  */
+	spin_lock(&sn2_ptcg_lock);
+	{
+		do {
+			/*
+			 * Flush ALAT entries also.
+			 */
+			ia64_ptcga(start, (nbits<<2));
+			ia64_srlz_i();
+			start += (1UL << nbits);
+		} while (start < end);
+	}
+	spin_unlock(&sn2_ptcg_lock);
+
+	if (i) {
+		struct sn_flush_struct flush_data;
+		flush_data.start = start;
+		flush_data.end = end;
+		flush_data.nbits = nbits;
+		on_selected_cpus(selected_cpus, sn_flush_ptcga_cpu,
+				 &flush_data, 1, 1);
+	}
+	spin_unlock(&sn2_ptcg_lock2);
+}
+#else
+void
+sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
 		     unsigned long end, unsigned long nbits)
 {
 	int i, ibegin, shub1, cnode, mynasid, cpu, lcpu = 0, nasid;
-#ifndef XEN
 	int mymm = (mm == current->active_mm && mm == current->mm);
-#else
-	// struct mm_struct *mm;
-	int mymm = 0;
-#endif
 	int use_cpu_ptcga;
 	volatile unsigned long *ptc0, *ptc1;
 	unsigned long itc, itc2, flags, data0 = 0, data1 = 0, rr_value, old_rr = 0;
@@ -206,6 +282,7 @@ sn2_global_tlb_purge(unsigned long start,
 
 	preempt_disable();
 
+#ifndef XEN
 	if (likely(i == 1 && lcpu == smp_processor_id() && mymm)) {
 		do {
 			ia64_ptcl(start, nbits << 2);
@@ -217,13 +294,8 @@ sn2_global_tlb_purge(unsigned long start,
 		return;
 	}
 
-#ifndef XEN
 	if (atomic_read(&mm->mm_users) == 1 && mymm) {
-#ifndef XEN  /* I hate Xen! */
 		flush_tlb_mm(mm);
-#else
-		flush_tlb_mask(mask_all);
-#endif
 		__get_cpu_var(ptcstats).change_rid++;
 		preempt_enable();
 		return;
@@ -335,6 +407,7 @@ sn2_global_tlb_purge(unsigned long start,
 
 	preempt_enable();
 }
+#endif
 
 /*
  * sn2_ptc_deadlock_recovery
