@@ -90,7 +90,7 @@ alloc_dir_page(void)
 		panic("Not enough memory for virtual frame table!\n");
 	++table_size;
 	dir = mfn << PAGE_SHIFT;
-	memset(__va(dir), 0, PAGE_SIZE);
+	clear_page(__va(dir));
 	return dir;
 }
 

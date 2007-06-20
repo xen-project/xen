@@ -1070,8 +1070,6 @@ static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
     char *p;
     int i;
 
-    memset(hypercall_page, 0, PAGE_SIZE);
-
     for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
         p = (char *)(hypercall_page + (i * 32));

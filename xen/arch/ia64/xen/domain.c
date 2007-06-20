@@ -1146,9 +1146,8 @@ static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf,
 			dom_imva = __va_ul(page_to_maddr(p));
 			if (filesz > 0) {
 				if (filesz >= PAGE_SIZE)
-					memcpy((void *) dom_imva,
-					       (void *) elfaddr,
-					       PAGE_SIZE);
+					copy_page((void *) dom_imva,
+					          (void *) elfaddr);
 				else {
 					// copy partial page
 					memcpy((void *) dom_imva,
@@ -1166,7 +1165,7 @@ static void __init loaddomainelfimage(struct domain *d, struct elf_binary *elf,
 			}
 			else if (memsz > 0) {
                                 /* always zero out entire page */
-				memset((void *) dom_imva, 0, PAGE_SIZE);
+				clear_page((void *) dom_imva);
 			}
 			memsz -= PAGE_SIZE;
 			filesz -= PAGE_SIZE;
@@ -1367,7 +1366,7 @@ int __init construct_dom0(struct domain *d,
 	if (start_info_page == NULL)
 		panic("can't allocate start info page");
 	si = page_to_virt(start_info_page);
-	memset(si, 0, PAGE_SIZE);
+	clear_page(si);
 	snprintf(si->magic, sizeof(si->magic), "xen-%i.%i-ia64",
 		xen_major_version(), xen_minor_version());
 	si->nr_pages     = max_pages;

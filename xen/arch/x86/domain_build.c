@@ -505,7 +505,7 @@ int __init construct_dom0(
     v->arch.guest_table = pagetable_from_paddr((unsigned long)l3start);
 #else
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
-    memcpy(l2tab, idle_pg_table, PAGE_SIZE);
+    copy_page(l2tab, idle_pg_table);
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         l2e_from_paddr((unsigned long)l2start, __PAGE_HYPERVISOR);
     v->arch.guest_table = pagetable_from_paddr((unsigned long)l2start);
@@ -645,7 +645,7 @@ int __init construct_dom0(
             panic("Not enough RAM for domain 0 PML4.\n");
         l4start = l4tab = page_to_virt(page);
     }
-    memcpy(l4tab, idle_pg_table, PAGE_SIZE);
+    copy_page(l4tab, idle_pg_table);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
@@ -823,7 +823,7 @@ int __init construct_dom0(
 
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
-    memset(si, 0, PAGE_SIZE);
+    clear_page(si);
     si->nr_pages = nr_pages;
 
     si->shared_info = virt_to_maddr(d->shared_info);

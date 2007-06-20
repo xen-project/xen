@@ -476,7 +476,7 @@ int arch_domain_create(struct domain *d)
         if ( (d->shared_info = alloc_xenheap_page()) == NULL )
             goto fail;
 
-        memset(d->shared_info, 0, PAGE_SIZE);
+        clear_page(d->shared_info);
         share_xen_page_with_guest(
             virt_to_page(d->shared_info), d, XENSHARE_writable);
     }

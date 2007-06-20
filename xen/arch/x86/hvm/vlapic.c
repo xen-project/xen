@@ -934,7 +934,7 @@ int vlapic_init(struct vcpu *v)
 	return -ENOMEM;
     }
 
-    memset(vlapic->regs, 0, PAGE_SIZE);
+    clear_page(vlapic->regs);
 
     vlapic_reset(vlapic);
 
