@@ -185,7 +185,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 break;
 
             /* Transfer miscellaneous other information values. */
-#define C(x) op->u.firmware_info.u.disk_info.x = info->x;
+#define C(x) op->u.firmware_info.u.disk_info.x = info->x
             C(device);
             C(version);
             C(interface_support);
