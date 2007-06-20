@@ -1138,6 +1138,12 @@ static void vmx_update_guest_cr3(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
+static void vmx_flush_guest_tlbs(void)
+{
+    /* No tagged TLB support on VMX yet.  The fact that we're in Xen 
+     * at all means any guest will have a clean TLB when it's next run,
+     * because VMRESUME will flush it for us. */
+}
 
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
@@ -1205,6 +1211,7 @@ static struct hvm_function_table vmx_function_table = {
     .get_segment_register = vmx_get_segment_register,
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr3     = vmx_update_guest_cr3,
+    .flush_guest_tlbs     = vmx_flush_guest_tlbs,
     .update_vtpr          = vmx_update_vtpr,
     .stts                 = vmx_stts,
     .set_tsc_offset       = vmx_set_tsc_offset,

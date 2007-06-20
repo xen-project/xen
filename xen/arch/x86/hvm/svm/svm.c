@@ -598,6 +598,14 @@ static void svm_update_guest_cr3(struct vcpu *v)
     v->arch.hvm_svm.vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
 }
 
+static void svm_flush_guest_tlbs(void)
+{
+    /* Roll over the CPU's ASID generation, so it gets a clean TLB when we
+     * next VMRUN.  (If ASIDs are disabled, the whole TLB is flushed on
+     * VMRUN anyway). */
+    svm_asid_inc_generation();
+}
+
 static void svm_update_vtpr(struct vcpu *v, unsigned long value)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -948,6 +956,7 @@ static struct hvm_function_table svm_function_table = {
     .get_segment_register = svm_get_segment_register,
     .update_host_cr3      = svm_update_host_cr3,
     .update_guest_cr3     = svm_update_guest_cr3,
+    .flush_guest_tlbs     = svm_flush_guest_tlbs,
     .update_vtpr          = svm_update_vtpr,
     .stts                 = svm_stts,
     .set_tsc_offset       = svm_set_tsc_offset,

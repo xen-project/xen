@@ -124,6 +124,13 @@ struct hvm_function_table {
     void (*update_guest_cr3)(struct vcpu *v);
 
     /*
+     * Called to ensure than all guest-specific mappings in a tagged TLB
+     * are flushed; does *not* flush Xen's TLB entries, and on
+     * processors without a tagged TLB it will be a noop.
+     */
+    void (*flush_guest_tlbs)(void);
+
+    /*
      * Reflect the virtual APIC's value in the guest's V_TPR register
      */
     void (*update_vtpr)(struct vcpu *v, unsigned long value);
@@ -148,6 +155,7 @@ struct hvm_function_table {
 };
 
 extern struct hvm_function_table hvm_funcs;
+extern int hvm_enabled;
 
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_relinquish_resources(struct domain *d);
@@ -230,6 +238,13 @@ hvm_update_vtpr(struct vcpu *v, unsigned long value)
 }
 
 void hvm_update_guest_cr3(struct vcpu *v, unsigned long guest_cr3);
+
+static inline void 
+hvm_flush_guest_tlbs(void)
+{
+    if ( hvm_enabled )
+        hvm_funcs.flush_guest_tlbs();
+}
 
 void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page);

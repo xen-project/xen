@@ -80,6 +80,8 @@ void write_cr3(unsigned long cr3)
 
     t = pre_flush();
 
+    hvm_flush_guest_tlbs();
+
 #ifdef USER_MAPPINGS_ARE_GLOBAL
     __pge_off();
     __asm__ __volatile__ ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
@@ -102,6 +104,8 @@ void local_flush_tlb(void)
     local_irq_save(flags);
 
     t = pre_flush();
+
+    hvm_flush_guest_tlbs();
 
 #ifdef USER_MAPPINGS_ARE_GLOBAL
     __pge_off();
