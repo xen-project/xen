@@ -239,6 +239,7 @@ static int setup_compat_l4(struct vcpu *v)
     pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated;
 
     l4tab = copy_page(page_to_virt(pg), idle_pg_table);
+    l4tab[0] = l4e_empty();
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_page(pg, __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
