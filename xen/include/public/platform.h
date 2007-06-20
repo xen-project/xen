@@ -115,8 +115,9 @@ typedef struct xenpf_platform_quirk xenpf_platform_quirk_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 
 #define XENPF_firmware_info       50
-#define XEN_FW_DISK_INFO          1
-#define XEN_FW_DISK_MBR_SIGNATURE 2
+#define XEN_FW_DISK_INFO          1 /* from int 13 AH=08/41/48 */
+#define XEN_FW_DISK_MBR_SIGNATURE 2 /* from MBR offset 0x1b8 */
+#define XEN_FW_VBEDDC_INFO        3 /* from int 10 AX=4f15 */
 struct xenpf_firmware_info {
     /* IN variables. */
     uint32_t type;
@@ -140,6 +141,13 @@ struct xenpf_firmware_info {
             uint8_t device;                   /* bios device number  */
             uint32_t mbr_signature;           /* offset 0x1b8 in mbr */
         } disk_mbr_signature; /* XEN_FW_DISK_MBR_SIGNATURE */
+        struct {
+            /* Int10, AX=4F15: Get EDID info. */
+            uint8_t capabilities;
+            uint8_t edid_transfer_time;
+            /* must refer to 128-byte buffer */
+            XEN_GUEST_HANDLE(uint8_t) edid;
+        } ddc_info; /* XEN_FW_VBEDDC_INFO */
     } u;
 };
 typedef struct xenpf_firmware_info xenpf_firmware_info_t;

@@ -24,6 +24,9 @@
 #include <asm/mtrr.h>
 #include "cpu/mtrr/mtrr.h"
 
+extern uint16_t boot_edid_caps;
+extern uint8_t boot_edid_info[];
+
 #ifndef COMPAT
 typedef long ret_t;
 DEFINE_SPINLOCK(xenpf_lock);
@@ -217,6 +220,27 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                    ? -EFAULT : 0);
             break;
         }
+        case XEN_FW_VBEDDC_INFO:
+            ret = -ESRCH;
+            if ( op->u.firmware_info.index != 0 )
+                break;
+            if ( *(u32 *)bootsym(boot_edid_info) == 0x13131313 )
+                break;
+
+            op->u.firmware_info.u.ddc_info.capabilities =
+                bootsym(boot_edid_caps);
+            op->u.firmware_info.u.ddc_info.edid_transfer_time =
+                bootsym(boot_edid_caps) >> 8;
+
+            ret = 0;
+            if ( copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
+                                     u.ddc_info.capabilities) ||
+                 copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
+                                     u.ddc_info.edid_transfer_time) ||
+                 copy_to_compat(op->u.firmware_info.u.ddc_info.edid,
+                                bootsym(boot_edid_info), 128) )
+                ret = -EFAULT;
+            break;
         default:
             ret = -EINVAL;
             break;
