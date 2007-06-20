@@ -147,7 +147,7 @@ struct xenpf_firmware_info {
             uint8_t edid_transfer_time;
             /* must refer to 128-byte buffer */
             XEN_GUEST_HANDLE(uint8_t) edid;
-        } ddc_info; /* XEN_FW_VBEDDC_INFO */
+        } vbeddc_info; /* XEN_FW_VBEDDC_INFO */
     } u;
 };
 typedef struct xenpf_firmware_info xenpf_firmware_info_t;

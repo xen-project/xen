@@ -227,17 +227,17 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             if ( *(u32 *)bootsym(boot_edid_info) == 0x13131313 )
                 break;
 
-            op->u.firmware_info.u.ddc_info.capabilities =
+            op->u.firmware_info.u.vbeddc_info.capabilities =
                 bootsym(boot_edid_caps);
-            op->u.firmware_info.u.ddc_info.edid_transfer_time =
+            op->u.firmware_info.u.vbeddc_info.edid_transfer_time =
                 bootsym(boot_edid_caps) >> 8;
 
             ret = 0;
             if ( copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
-                                     u.ddc_info.capabilities) ||
+                                     u.vbeddc_info.capabilities) ||
                  copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
-                                     u.ddc_info.edid_transfer_time) ||
-                 copy_to_compat(op->u.firmware_info.u.ddc_info.edid,
+                                     u.vbeddc_info.edid_transfer_time) ||
+                 copy_to_compat(op->u.firmware_info.u.vbeddc_info.edid,
                                 bootsym(boot_edid_info), 128) )
                 ret = -EFAULT;
             break;
