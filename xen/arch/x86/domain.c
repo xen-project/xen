@@ -232,7 +232,7 @@ static int setup_compat_l4(struct vcpu *v)
     l4_pgentry_t *l4tab;
     int rc;
 
-    if ( !pg )
+    if ( pg == NULL )
         return -ENOMEM;
 
     /* This page needs to look like a pagetable so that it can be shadowed */
@@ -244,14 +244,15 @@ static int setup_compat_l4(struct vcpu *v)
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(v->domain->arch.mm_perdomain_l3),
                        __PAGE_HYPERVISOR);
-    v->arch.guest_table = pagetable_from_page(pg);
-    v->arch.guest_table_user = v->arch.guest_table;
 
     if ( (rc = setup_arg_xlat_area(v, l4tab)) < 0 )
     {
         free_domheap_page(pg);
         return rc;
     }
+
+    v->arch.guest_table = pagetable_from_page(pg);
+    v->arch.guest_table_user = v->arch.guest_table;
 
     return 0;
 }
@@ -318,11 +319,11 @@ int switch_compat(struct domain *d)
     gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table), PAGE_HYPERVISOR);
     for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
     {
+        if ( (d->vcpu[vcpuid] != NULL) &&
+             (setup_compat_l4(d->vcpu[vcpuid]) != 0) )
+            goto undo_and_fail;
         d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
                                  FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
-        if (d->vcpu[vcpuid]
-            && setup_compat_l4(d->vcpu[vcpuid]) != 0)
-            return -ENOMEM;
     }
 
     d->arch.physaddr_bitsize =
@@ -330,6 +331,19 @@ int switch_compat(struct domain *d)
         + (PAGE_SIZE - 2);
 
     return 0;
+
+ undo_and_fail:
+    d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+    release_arg_xlat_area(d);
+    gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+    while ( vcpuid-- != 0 )
+    {
+        if ( d->vcpu[vcpuid] != NULL )
+            release_compat_l4(d->vcpu[vcpuid]);
+        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
+                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
+    }
+    return -ENOMEM;
 }
 
 #else
