@@ -36,15 +36,29 @@
 
 /* This is the default interrupt handler. */
 int_msg:
-        .asciz "Unknown interrupt\n"
+        .asciz "Unknown interrupt (cr2=%08x)\n"
+hex_msg:
+        .asciz "  %08x"
         ALIGN
 ignore_int:
+        pusha
         cld
         mov     $(__HYPERVISOR_DS),%eax
         mov     %eax,%ds
         mov     %eax,%es
+        mov     %cr2,%eax
+        push    %eax
         pushl   $int_msg
         call    printk
+        add     $8,%esp
+        mov     %esp,%ebp
+0:      pushl   (%ebp)
+        add     $4,%ebp
+        pushl   $hex_msg
+        call    printk
+        add     $8,%esp
+        test    $0xffc,%ebp
+        jnz     0b
 1:      jmp     1b
 
 ENTRY(stack_start)
