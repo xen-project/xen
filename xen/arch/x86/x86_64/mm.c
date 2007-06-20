@@ -106,7 +106,8 @@ void __init paging_init(void)
     /* Create user-accessible L2 directory to map the MPT for guests. */
     if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
         goto nomem;
-    l3_ro_mpt = clear_page(page_to_virt(l2_pg));
+    l3_ro_mpt = page_to_virt(l2_pg);
+    clear_page(l3_ro_mpt);
     l4e_write(&idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)],
               l4e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
 
@@ -132,7 +133,8 @@ void __init paging_init(void)
             if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
                 goto nomem;
             va = RO_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
-            l2_ro_mpt = clear_page(page_to_virt(l2_pg));
+            l2_ro_mpt = page_to_virt(l2_pg);
+            clear_page(l2_ro_mpt);
             l3e_write(&l3_ro_mpt[l3_table_offset(va)],
                       l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
             l2_ro_mpt += l2_table_offset(va);
@@ -152,7 +154,8 @@ void __init paging_init(void)
         l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(HIRO_COMPAT_MPT_VIRT_START)]);
         if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
             goto nomem;
-        compat_idle_pg_table_l2 = l2_ro_mpt = clear_page(page_to_virt(l2_pg));
+        compat_idle_pg_table_l2 = l2_ro_mpt = page_to_virt(l2_pg);
+        clear_page(l2_ro_mpt);
         l3e_write(&l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
                   l3e_from_page(l2_pg, __PAGE_HYPERVISOR));
         l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
