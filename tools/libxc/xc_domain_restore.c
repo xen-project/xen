@@ -465,7 +465,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         if ( j == 0 )
             break;  /* our work here is done */
 
-        if ( j > MAX_BATCH_SIZE )
+        if ( (j > MAX_BATCH_SIZE) || (j < 0) )
         {
             ERROR("Max batch size exceeded. Giving up.");
             goto out;
