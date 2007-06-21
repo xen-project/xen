@@ -534,10 +534,6 @@ ENTRY(page_fault)
         movw  $TRAP_page_fault,2(%esp)
         jmp   handle_exception
 
-ENTRY(machine_check)
-        pushl $TRAP_machine_check<<16
-        jmp   handle_exception
-
 ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
         jmp   handle_exception
@@ -550,18 +546,20 @@ ENTRY(early_page_fault)
         addl  $4,%esp
         jmp   restore_all_xen
 
-ENTRY(nmi)
+handle_nmi_mce:
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
-        # NMI entry protocol is incompatible with guest kernel in ring 0.
+        # NMI/MCE entry protocol is incompatible with guest kernel in ring 0.
+        addl  $4,%esp
         iret
 #else
         # Save state but do not trash the segment registers!
-        pushl $TRAP_nmi<<16
-        SAVE_ALL(.Lnmi_xen,.Lnmi_common)
-.Lnmi_common:
-        movl  %esp,%eax
-        pushl %eax
-        call  do_nmi
+        SAVE_ALL(.Lnmi_mce_xen,.Lnmi_mce_common)
+.Lnmi_mce_common:
+        xorl  %eax,%eax
+        movw  UREGS_entry_vector(%esp),%ax
+        movl  %esp,%edx
+        pushl %edx
+        call  *exception_table(,%eax,4)
         addl  $4,%esp
         /* 
          * NB. We may return to Xen context with polluted %ds/%es. But in such
@@ -569,13 +567,13 @@ ENTRY(nmi)
          * be detected by SAVE_ALL(), or we have rolled back restore_guest.
          */
         jmp   ret_from_intr
-.Lnmi_xen:
+.Lnmi_mce_xen:
         /* Check the outer (guest) context for %ds/%es state validity. */
         GET_GUEST_REGS(%ebx)
         testl $X86_EFLAGS_VM,%ss:UREGS_eflags(%ebx)
         mov   %ds,%eax
         mov   %es,%edx
-        jnz   .Lnmi_vm86
+        jnz   .Lnmi_mce_vm86
         /* We may have interrupted Xen while messing with %ds/%es... */
         cmpw  %ax,%cx
         mov   %ecx,%ds             /* Ensure %ds is valid */
@@ -587,18 +585,26 @@ ENTRY(nmi)
         movl  $.Lrestore_sregs_guest,%ecx
         movl  %edx,UREGS_es(%ebx)  /* Ensure guest frame contains guest ES */
         cmpl  %ecx,UREGS_eip(%esp)
-        jbe   .Lnmi_common
+        jbe   .Lnmi_mce_common
         cmpl  $.Lrestore_iret_guest,UREGS_eip(%esp)
-        ja    .Lnmi_common
+        ja    .Lnmi_mce_common
         /* Roll outer context restore_guest back to restoring %ds/%es. */
         movl  %ecx,UREGS_eip(%esp)
-        jmp   .Lnmi_common
-.Lnmi_vm86:
+        jmp   .Lnmi_mce_common
+.Lnmi_mce_vm86:
         /* vm86 is easy: the CPU saved %ds/%es so we can safely stomp them. */
         mov   %ecx,%ds
         mov   %ecx,%es
-        jmp   .Lnmi_common
+        jmp   .Lnmi_mce_common
 #endif /* !CONFIG_X86_SUPERVISOR_MODE_KERNEL */
+
+ENTRY(nmi)
+        pushl $TRAP_nmi<<16
+        jmp   handle_nmi_mce
+
+ENTRY(machine_check)
+        pushl $TRAP_machine_check<<16
+        jmp   handle_nmi_mce
 
 ENTRY(setup_vm86_frame)
         mov %ecx,%ds
@@ -620,7 +626,7 @@ ENTRY(setup_vm86_frame)
 ENTRY(exception_table)
         .long do_divide_error
         .long do_debug
-        .long 0 # nmi
+        .long do_nmi
         .long do_int3
         .long do_overflow
         .long do_bounds

@@ -88,6 +88,7 @@
 #define TRC_HVM_VMMCALL         (TRC_HVM_HANDLER + 0x12)
 #define TRC_HVM_HLT             (TRC_HVM_HANDLER + 0x13)
 #define TRC_HVM_INVLPG          (TRC_HVM_HANDLER + 0x14)
+#define TRC_HVM_MCE             (TRC_HVM_HANDLER + 0x15)
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {

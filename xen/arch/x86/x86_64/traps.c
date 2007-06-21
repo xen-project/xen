@@ -294,8 +294,9 @@ void __init percpu_traps_init(void)
     {
         /* Specify dedicated interrupt stacks for NMIs and double faults. */
         set_intr_gate(TRAP_double_fault, &double_fault);
-        idt_table[TRAP_double_fault].a |= 1UL << 32; /* IST1 */
-        idt_table[TRAP_nmi].a          |= 2UL << 32; /* IST2 */
+        idt_table[TRAP_double_fault].a  |= 1UL << 32; /* IST1 */
+        idt_table[TRAP_nmi].a           |= 2UL << 32; /* IST2 */
+        idt_table[TRAP_machine_check].a |= 3UL << 32; /* IST3 */
 
         /*
          * The 32-on-64 hypercall entry vector is only accessible from ring 1.
@@ -310,7 +311,10 @@ void __init percpu_traps_init(void)
     stack_bottom = (char *)get_stack_bottom();
     stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
 
-    /* Double-fault handler has its own per-CPU 2kB stack. */
+    /* Machine Check handler has its own per-CPU 1kB stack. */
+    init_tss[cpu].ist[2] = (unsigned long)&stack[1024];
+
+    /* Double-fault handler has its own per-CPU 1kB stack. */
     init_tss[cpu].ist[0] = (unsigned long)&stack[2048];
 
     /* NMI handler has its own per-CPU 1kB stack. */

@@ -224,7 +224,7 @@ static int construct_vmcb(struct vcpu *v)
     /* Guest CR4. */
     arch_svm->cpu_shadow_cr4 =
         read_cr4() & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
-    vmcb->cr4 = arch_svm->cpu_shadow_cr4 | SVM_CR4_HOST_MASK;
+    vmcb->cr4 = arch_svm->cpu_shadow_cr4 | HVM_CR4_HOST_MASK;
 
     paging_update_paging_modes(v);
     vmcb->cr3 = v->arch.hvm_vcpu.hw_cr3; 
@@ -235,7 +235,9 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-        vmcb->cr4 = arch_svm->cpu_shadow_cr4 = 0;
+        vmcb->cr4 = arch_svm->cpu_shadow_cr4 =
+                    (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
+        vmcb->exception_intercepts = HVM_TRAP_MASK;
 
         /* No point in intercepting CR0/3/4 reads, because the hardware 
          * will return the guest versions anyway. */
@@ -249,7 +251,7 @@ static int construct_vmcb(struct vcpu *v)
     }
     else
     {
-        vmcb->exception_intercepts = 1U << TRAP_page_fault;
+        vmcb->exception_intercepts = HVM_TRAP_MASK | (1U << TRAP_page_fault);
     }
 
     return 0;

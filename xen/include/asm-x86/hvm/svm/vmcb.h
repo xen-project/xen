@@ -464,14 +464,6 @@ void svm_destroy_vmcb(struct vcpu *v);
 
 void setup_vmcb_dump(void);
 
-/* These bits in the CR4 are owned by the host */
-#if CONFIG_PAGING_LEVELS >= 3
-#define SVM_CR4_HOST_MASK (X86_CR4_PAE)
-#else
-#define SVM_CR4_HOST_MASK 0
-#endif
-
-
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 
 /*

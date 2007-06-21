@@ -143,13 +143,6 @@ void vmx_vlapic_msr_changed(struct vcpu *v);
 #define X86_SEG_AR_GRANULARITY  (1u << 15) /* 15, granularity */
 #define X86_SEG_AR_SEG_UNUSABLE (1u << 16) /* 16, segment unusable */
 
-/* These bits in the CR4 are owned by the host */
-#if CONFIG_PAGING_LEVELS >= 3
-#define VMX_CR4_HOST_MASK (X86_CR4_VMXE | X86_CR4_PAE)
-#else
-#define VMX_CR4_HOST_MASK (X86_CR4_VMXE)
-#endif
-
 #define VMCALL_OPCODE   ".byte 0x0f,0x01,0xc1\n"
 #define VMCLEAR_OPCODE  ".byte 0x66,0x0f,0xc7\n"        /* reg/opcode: /6 */
 #define VMLAUNCH_OPCODE ".byte 0x0f,0x01,0xc2\n"

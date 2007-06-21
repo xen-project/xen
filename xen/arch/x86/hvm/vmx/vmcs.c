@@ -421,7 +421,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
 #endif
 
-    __vmwrite(EXCEPTION_BITMAP, 1U << TRAP_page_fault);
+    __vmwrite(EXCEPTION_BITMAP, HVM_TRAP_MASK | (1U << TRAP_page_fault));
 
     /* Guest CR0. */
     cr0 = read_cr0();

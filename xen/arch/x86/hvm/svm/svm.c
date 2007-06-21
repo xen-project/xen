@@ -391,7 +391,7 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
  skip_cr3:
-    vmcb->cr4 = c->cr4 | SVM_CR4_HOST_MASK;
+    vmcb->cr4 = c->cr4 | HVM_CR4_HOST_MASK;
     v->arch.hvm_svm.cpu_shadow_cr4 = c->cr4;
     
     vmcb->idtr.limit = c->idtr_limit;
@@ -448,7 +448,8 @@ int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     /* update VMCB for nested paging restore */
     if ( paging_mode_hap(v->domain) ) {
         vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
-        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 |
+                    (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
         vmcb->cr3 = c->cr3;
         vmcb->np_enable = 1;
         vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
@@ -805,8 +806,10 @@ static void svm_ctxt_switch_from(struct vcpu *v)
         : : "a" (__pa(root_vmcb[cpu])) );
 
 #ifdef __x86_64__
-    /* Resume use of IST2 for NMIs now that the host TR is reinstated. */
-    idt_tables[cpu][TRAP_nmi].a |= 2UL << 32;
+    /* Resume use of ISTs now that the host TR is reinstated. */
+    idt_tables[cpu][TRAP_double_fault].a  |= 1UL << 32; /* IST1 */
+    idt_tables[cpu][TRAP_nmi].a           |= 2UL << 32; /* IST2 */
+    idt_tables[cpu][TRAP_machine_check].a |= 3UL << 32; /* IST3 */
 #endif
 }
 
@@ -826,10 +829,12 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     set_segment_register(ss, 0);
 
     /*
-     * Cannot use IST2 for NMIs while we are running with the guest TR. But
-     * this doesn't matter: the IST is only needed to handle SYSCALL/SYSRET.
+     * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
+     * But this doesn't matter: the IST is only req'd to handle SYSCALL/SYSRET.
      */
-    idt_tables[cpu][TRAP_nmi].a &= ~(2UL << 32);
+    idt_tables[cpu][TRAP_double_fault].a  &= ~(3UL << 32);
+    idt_tables[cpu][TRAP_nmi].a           &= ~(3UL << 32);
+    idt_tables[cpu][TRAP_machine_check].a &= ~(3UL << 32);
 #endif
 
     svm_restore_dr(v);
@@ -1823,9 +1828,19 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         break;
 
     case 4: /* CR4 */
+        if ( value & ~mmu_cr4_features )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to enable unsupported "
+                        "CR4 features %lx (host %lx)",
+                        value, mmu_cr4_features);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            break;
+        }
+
         if ( paging_mode_hap(v->domain) )
         {
-            vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 = value;
+            v->arch.hvm_svm.cpu_shadow_cr4 = value;
+            vmcb->cr4 = value | (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
             paging_update_paging_modes(v);
             /* signal paging update to ASID handler */
             svm_asid_g_update_paging (v);
@@ -1875,7 +1890,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         }
 
         v->arch.hvm_svm.cpu_shadow_cr4 = value;
-        vmcb->cr4 = value | SVM_CR4_HOST_MASK;
+        vmcb->cr4 = value | HVM_CR4_HOST_MASK;
   
         /*
          * Writing to CR4 to modify the PSE, PGE, or PAE flag invalidates
@@ -2265,12 +2280,13 @@ static int svm_reset_to_realmode(struct vcpu *v,
     vmcb->cr2 = 0;
     vmcb->efer = EFER_SVME;
 
-    vmcb->cr4 = SVM_CR4_HOST_MASK;
+    vmcb->cr4 = HVM_CR4_HOST_MASK;
     v->arch.hvm_svm.cpu_shadow_cr4 = 0;
 
     if ( paging_mode_hap(v->domain) ) {
         vmcb->cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
-        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+        vmcb->cr4 = v->arch.hvm_svm.cpu_shadow_cr4 |
+                    (HVM_CR4_HOST_MASK & ~X86_CR4_PAE);
     }
 
     /* This will jump to ROMBIOS */
@@ -2410,6 +2426,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_inject_exception(v, TRAP_page_fault, 1, regs->error_code);
         break;
     }
+
+    case VMEXIT_EXCEPTION_MC:
+        HVMTRACE_0D(MCE, v);
+        svm_store_cpu_guest_regs(v, regs, NULL);
+        do_machine_check(regs);
+        break;
 
     case VMEXIT_VINTR:
         vmcb->vintr.fields.irq = 0;

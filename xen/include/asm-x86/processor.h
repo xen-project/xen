@@ -566,7 +566,8 @@ void compat_show_guest_stack(struct cpu_user_regs *, int lines);
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
-extern void mcheck_init(struct cpuinfo_x86 *c);
+void mcheck_init(struct cpuinfo_x86 *c);
+asmlinkage void do_machine_check(struct cpu_user_regs *regs);
 
 int cpuid_hypervisor_leaves(
     uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

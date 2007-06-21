@@ -615,7 +615,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 #endif
 
-    __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
+    __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
     v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
     __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
@@ -2001,7 +2001,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     else
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
 
-    __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
+    __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
     v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
     __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
@@ -2400,6 +2400,14 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     case 4: /* CR4 */
         old_cr = v->arch.hvm_vmx.cpu_shadow_cr4;
 
+        if ( value & ~mmu_cr4_features )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to enable unsupported "
+                        "CR4 features %lx (host %lx)",
+                        value, mmu_cr4_features);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            break;
+        }
         if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
         {
             if ( vmx_pgbit_test(v) )
@@ -2440,7 +2448,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             }
         }
 
-        __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
+        __vmwrite(GUEST_CR4, value | HVM_CR4_HOST_MASK);
         v->arch.hvm_vmx.cpu_shadow_cr4 = value;
         __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
@@ -2826,7 +2834,8 @@ static void vmx_reflect_exception(struct vcpu *v)
     }
 }
 
-static void vmx_failed_vmentry(unsigned int exit_reason)
+static void vmx_failed_vmentry(unsigned int exit_reason,
+                               struct cpu_user_regs *regs)
 {
     unsigned int failed_vmentry_reason = (uint16_t)exit_reason;
     unsigned long exit_qualification;
@@ -2843,6 +2852,9 @@ static void vmx_failed_vmentry(unsigned int exit_reason)
         break;
     case EXIT_REASON_MACHINE_CHECK:
         printk("caused by machine check.\n");
+        HVMTRACE_0D(MCE, current);
+        vmx_store_cpu_guest_regs(current, regs, NULL);
+        do_machine_check(regs);
         break;
     default:
         printk("reason not known yet!");
@@ -2872,7 +2884,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         local_irq_enable();
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
-        return vmx_failed_vmentry(exit_reason);
+        return vmx_failed_vmentry(exit_reason, regs);
 
     switch ( exit_reason )
     {
@@ -2923,11 +2935,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
             break;
         case TRAP_nmi:
-            HVMTRACE_0D(NMI, v);
             if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
+            {
+                HVMTRACE_0D(NMI, v);
+                vmx_store_cpu_guest_regs(v, regs, NULL);
                 do_nmi(regs); /* Real NMI, vector 2: normal processing. */
+            }
             else
                 vmx_reflect_exception(v);
+            break;
+        case TRAP_machine_check:
+            HVMTRACE_0D(MCE, v);
+            vmx_store_cpu_guest_regs(v, regs, NULL);
+            do_machine_check(regs);
             break;
         default:
             goto exit_and_crash;

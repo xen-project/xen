@@ -505,11 +505,6 @@ ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
         jmp   handle_exception
 
-ENTRY(machine_check)
-        pushq $0
-        movl  $TRAP_machine_check,4(%rsp)
-        jmp   handle_exception
-
 ENTRY(spurious_interrupt_bug)
         pushq $0
         movl  $TRAP_spurious_int,4(%rsp)
@@ -527,31 +522,38 @@ ENTRY(early_page_fault)
         call  do_early_page_fault
         jmp   restore_all_xen
 
-ENTRY(nmi)
-        pushq $0
+handle_ist_exception:
         SAVE_ALL
         testb $3,UREGS_cs(%rsp)
-        jz    nmi_in_hypervisor_mode
+        jz    1f
         /* Interrupted guest context. Copy the context to stack bottom. */
-        GET_GUEST_REGS(%rbx)
+        GET_GUEST_REGS(%rdi)
+        movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
-1:      popq  %rax
-        movq  %rax,(%rbx)
-        addq  $8,%rbx
-        loop  1b
-        subq  $UREGS_kernel_sizeof,%rbx
-        movq  %rbx,%rsp
-nmi_in_hypervisor_mode:
-        movq  %rsp,%rdi
-        call  do_nmi
+        movq  %rdi,%rsp
+        rep   movsq
+1:      movq  %rsp,%rdi
+        movl  UREGS_entry_vector(%rsp),%eax
+        leaq  exception_table(%rip),%rdx
+        callq *(%rdx,%rax,8)
         jmp   ret_from_intr
+
+ENTRY(nmi)
+        pushq $0
+        movl  $TRAP_nmi,4(%rsp)
+        jmp   handle_ist_exception
+
+ENTRY(machine_check)
+        pushq $0
+        movl  $TRAP_machine_check,4(%rsp)
+        jmp   handle_ist_exception
 
 .data
 
 ENTRY(exception_table)
         .quad do_divide_error
         .quad do_debug
-        .quad 0 # nmi
+        .quad do_nmi
         .quad do_int3
         .quad do_overflow
         .quad do_bounds
