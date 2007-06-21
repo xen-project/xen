@@ -232,15 +232,6 @@ unsigned long do_iret(void)
     return 0;
 }
 
-#include <asm/asm_defns.h>
-BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
-fastcall void smp_deferred_nmi(struct cpu_user_regs *regs)
-{
-    asmlinkage void do_nmi(struct cpu_user_regs *);
-    ack_APIC_irq();
-    do_nmi(regs);
-}
-
 void __init percpu_traps_init(void)
 {
     struct tss_struct *tss = &doublefault_tss;
@@ -251,8 +242,6 @@ void __init percpu_traps_init(void)
 
     /* The hypercall entry vector is only accessible from ring 1. */
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
-
-    set_intr_gate(TRAP_deferred_nmi, &deferred_nmi);
 
     /*
      * Make a separate task for double faults. This will get us debug output if

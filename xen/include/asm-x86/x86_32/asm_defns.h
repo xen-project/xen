@@ -26,7 +26,16 @@
 #define ASSERT_INTERRUPTS_ENABLED  ASSERT_INTERRUPT_STATUS(nz)
 #define ASSERT_INTERRUPTS_DISABLED ASSERT_INTERRUPT_STATUS(z)
 
-#define __SAVE_ALL_PRE                                  \
+/*
+ * Saves all register state into an exception/interrupt stack frame.
+ * Returns to the caller at <xen_lbl> if the interrupted context is within
+ * Xen; at <vm86_lbl> if the interrupted context is vm86; or falls through
+ * if the interrupted context is an ordinary guest protected-mode context.
+ * In all cases %ecx contains __HYPERVISOR_DS. %ds/%es are guaranteed to
+ * contain __HYPERVISOR_DS unless control passes to <xen_lbl>, in which case
+ * the caller is reponsible for validity of %ds/%es.
+ */
+#define SAVE_ALL(xen_lbl, vm86_lbl)                     \
         cld;                                            \
         pushl %eax;                                     \
         pushl %ebp;                                     \
@@ -37,30 +46,34 @@
         pushl %ecx;                                     \
         pushl %ebx;                                     \
         testl $(X86_EFLAGS_VM),UREGS_eflags(%esp);      \
-        jz 2f;                                          \
-        call setup_vm86_frame;                          \
-        jmp 3f;                                         \
-        2:testb $3,UREGS_cs(%esp);                      \
-        jz 1f;                                          \
-        mov %ds,UREGS_ds(%esp);                         \
-        mov %es,UREGS_es(%esp);                         \
-        mov %fs,UREGS_fs(%esp);                         \
-        mov %gs,UREGS_gs(%esp);                         \
-        3:
-
-#define SAVE_ALL_NOSEGREGS(_reg)                \
-        __SAVE_ALL_PRE                          \
-        1:
-
-#define SET_XEN_SEGMENTS(_reg)                          \
-        movl $(__HYPERVISOR_DS),%e ## _reg ## x;        \
-        mov %e ## _reg ## x,%ds;                        \
-        mov %e ## _reg ## x,%es;
-
-#define SAVE_ALL(_reg)                          \
-        __SAVE_ALL_PRE                          \
-        SET_XEN_SEGMENTS(_reg)                  \
-        1:
+        mov   %ds,%edi;                                 \
+        mov   %es,%esi;                                 \
+        mov   $(__HYPERVISOR_DS),%ecx;                  \
+        jnz   86f;                                      \
+        .text 1;                                        \
+        86:   call setup_vm86_frame;                    \
+        jmp   vm86_lbl;                                 \
+        .previous;                                      \
+        testb $3,UREGS_cs(%esp);                        \
+        jz    xen_lbl;                                  \
+        /*                                              \
+         * We are the outermost Xen context, but our    \
+         * life is complicated by NMIs and MCEs. These  \
+         * could occur in our critical section and      \
+         * pollute %ds and %es. We have to detect that  \
+         * this has occurred and avoid saving Xen DS/ES \
+         * values to the guest stack frame.             \
+         */                                             \
+        cmpw  %cx,%di;                                  \
+        mov   %ecx,%ds;                                 \
+        mov   %fs,UREGS_fs(%esp);                       \
+        cmove UREGS_ds(%esp),%edi;                      \
+        cmpw  %cx,%si;                                  \
+        mov   %edi,UREGS_ds(%esp);                      \
+        cmove UREGS_es(%esp),%esi;                      \
+        mov   %ecx,%es;                                 \
+        mov   %gs,UREGS_gs(%esp);                       \
+        mov   %esi,UREGS_es(%esp)
 
 #ifdef PERF_COUNTERS
 #define PERFC_INCR(_name,_idx,_cur)                     \
@@ -97,8 +110,8 @@ __asm__(                                        \
     STR(x) ":\n\t"                              \
     "pushl $"#v"<<16\n\t"                       \
     STR(FIXUP_RING0_GUEST_STACK)                \
-    STR(SAVE_ALL(a))                            \
-    "movl %esp,%eax\n\t"                        \
+    STR(SAVE_ALL(1f,1f)) "\n\t"                 \
+    "1:movl %esp,%eax\n\t"                      \
     "pushl %eax\n\t"                            \
     "call "STR(smp_##x)"\n\t"                   \
     "addl $4,%esp\n\t"                          \
@@ -109,8 +122,8 @@ __asm__(                                        \
     "\n" __ALIGN_STR"\n"                        \
     "common_interrupt:\n\t"                     \
     STR(FIXUP_RING0_GUEST_STACK)                \
-    STR(SAVE_ALL(a))                            \
-    "movl %esp,%eax\n\t"                        \
+    STR(SAVE_ALL(1f,1f)) "\n\t"                 \
+    "1:movl %esp,%eax\n\t"                      \
     "pushl %eax\n\t"                            \
     "call " STR(do_IRQ) "\n\t"                  \
     "addl $4,%esp\n\t"                          \

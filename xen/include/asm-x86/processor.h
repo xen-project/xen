@@ -104,7 +104,6 @@
 #define TRAP_alignment_check  17
 #define TRAP_machine_check    18
 #define TRAP_simd_error       19
-#define TRAP_deferred_nmi     31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
 /* NB. Same as VGCF_in_syscall. No bits in common with any other TRAP_ defn. */
