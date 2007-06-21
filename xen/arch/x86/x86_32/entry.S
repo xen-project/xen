@@ -99,17 +99,9 @@ restore_all_guest:
 .Lrestore_iret_guest:
 .Lft5:  iret
 .section .fixup,"ax"
-.Lfx1:  subl  $28,%esp
-        pushl 28(%esp)                 # error_code/entry_vector
-        movl  %eax,UREGS_eax+4(%esp)
-        movl  %ebp,UREGS_ebp+4(%esp)
-        movl  %edi,UREGS_edi+4(%esp)
-        movl  %esi,UREGS_esi+4(%esp)
-        movl  %edx,UREGS_edx+4(%esp)
-        movl  %ecx,UREGS_ecx+4(%esp)
-        movl  %ebx,UREGS_ebx+4(%esp)
-        sti
-        popl  %esi
+.Lfx1:  sti
+        SAVE_ALL_GPRS
+        mov   UREGS_error_code(%esp),%esi
         pushfl                         # EFLAGS
         movl  $__HYPERVISOR_CS,%eax
         pushl %eax                     # CS

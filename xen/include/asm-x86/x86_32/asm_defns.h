@@ -26,6 +26,17 @@
 #define ASSERT_INTERRUPTS_ENABLED  ASSERT_INTERRUPT_STATUS(nz)
 #define ASSERT_INTERRUPTS_DISABLED ASSERT_INTERRUPT_STATUS(z)
 
+#define SAVE_ALL_GPRS                                   \
+        cld;                                            \
+        pushl %eax;                                     \
+        pushl %ebp;                                     \
+        SETUP_EXCEPTION_FRAME_POINTER;                  \
+        pushl %edi;                                     \
+        pushl %esi;                                     \
+        pushl %edx;                                     \
+        pushl %ecx;                                     \
+        pushl %ebx
+
 /*
  * Saves all register state into an exception/interrupt stack frame.
  * Returns to the caller at <xen_lbl> if the interrupted context is within
@@ -36,15 +47,7 @@
  * the caller is reponsible for validity of %ds/%es.
  */
 #define SAVE_ALL(xen_lbl, vm86_lbl)                     \
-        cld;                                            \
-        pushl %eax;                                     \
-        pushl %ebp;                                     \
-        SETUP_EXCEPTION_FRAME_POINTER;                  \
-        pushl %edi;                                     \
-        pushl %esi;                                     \
-        pushl %edx;                                     \
-        pushl %ecx;                                     \
-        pushl %ebx;                                     \
+        SAVE_ALL_GPRS;                                  \
         testl $(X86_EFLAGS_VM),UREGS_eflags(%esp);      \
         mov   %ds,%edi;                                 \
         mov   %es,%esi;                                 \
