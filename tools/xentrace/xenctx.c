@@ -47,6 +47,13 @@ int stack_trace = 0;
 #elif defined (__ia64__)
 /* On ia64, we can't translate virtual address to physical address.  */
 #define NO_TRANSLATION
+
+/* Which registers should be displayed.  */
+int disp_cr_regs;
+int disp_ar_regs;
+int disp_br_regs;
+int disp_bank_regs;
+int disp_tlb;
 #endif
 
 struct symbol {
@@ -287,12 +294,12 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 #define ITIR_PS_MAX               28
 #define RR_RID_SHIFT               8
 #define RR_RID_MASK         0xffffff
+#define PSR_BN           (1UL << 44)
+#define CFM_SOF_MASK            0x3f
 
-void print_ctx(vcpu_guest_context_t *ctx1)
+static void print_tr(int i, const struct ia64_tr_entry *tr)
 {
-    struct vcpu_guest_context_regs *regs = &ctx1->regs;
-    struct vcpu_tr_regs *tr = &ctx1->regs.tr;
-    int i, ps_val, ma_val;
+    int ps_val, ma_val;
     unsigned long pa;
 
     static const char ps[][5] = {"  4K", "  8K", " 16K", "    ",
@@ -303,104 +310,201 @@ void print_ctx(vcpu_guest_context_t *ctx1)
     static const char ma[][4] = {"WB ", "   ", "   ", "   ",
                                  "UC ", "UCE", "WC ", "Nat"};
 
-    printf(" ip:                %016lx  ", regs->ip);
+    ps_val =  tr->itir >> ITIR_PS_SHIFT & ITIR_PS_MASK;
+    ma_val =  tr->pte  >> PTE_MA_SHIFT  & PTE_MA_MASK;
+    pa     = (tr->pte  >> PTE_PPN_SHIFT & PTE_PPN_MASK) << PTE_PPN_SHIFT;
+    pa     = (pa >> ps_val) << ps_val;
+    printf(" [%d]  %ld %06lx %016lx %013lx %02x %s %ld  %ld  %ld  %ld "
+           "%ld %d %s %06lx\n", i,
+           tr->pte  >> PTE_P_SHIFT    & PTE_P_MASK,
+           tr->rid  >> RR_RID_SHIFT   & RR_RID_MASK,
+           tr->vadr, pa, ps_val,
+           ((ps_val >= ITIR_PS_MIN && ps_val <= ITIR_PS_MAX) ?
+            ps[ps_val - ITIR_PS_MIN] : "    "),
+           tr->pte  >> PTE_ED_SHIFT   & PTE_ED_MASK,
+           tr->pte  >> PTE_PL_SHIFT   & PTE_PL_MASK,
+           tr->pte  >> PTE_AR_SHIFT   & PTE_AR_MASK,
+           tr->pte  >> PTE_A_SHIFT    & PTE_A_MASK,
+           tr->pte  >> PTE_D_SHIFT    & PTE_D_MASK,
+           ma_val, ma[ma_val],
+           tr->itir >> ITIR_KEY_SHIFT & ITIR_KEY_MASK);
+}
+
+void print_ctx(vcpu_guest_context_t *ctx)
+{
+    struct vcpu_guest_context_regs *regs = &ctx->regs;
+    struct vcpu_tr_regs *tr = &ctx->regs.tr;
+    int i;
+    unsigned int rbs_size;
+
+    printf(" ip:  %016lx  ", regs->ip);
     print_symbol(regs->ip);
     printf("\n");
-    printf(" psr:               %016lx  ", regs->psr);
-    printf(" b0:                %016lx\n", regs->b[0]);
-    printf(" b6:                %016lx  ", regs->b[6]);
-    printf(" b7:                %016lx\n", regs->b[7]);
-    printf(" cfm:               %016lx  ", regs->cfm);
-    printf(" ar.unat:           %016lx\n", regs->ar.unat);
-    printf(" ar.pfs:            %016lx  ", regs->ar.pfs);
-    printf(" ar.rsc:            %016lx\n", regs->ar.rsc);
-    printf(" ar.rnat:           %016lx  ", regs->ar.rnat);
-    printf(" ar.bspstore:       %016lx\n", regs->ar.bspstore);
-    printf(" ar.fpsr:           %016lx  ", regs->ar.fpsr);
-    printf(" event_callback_ip: %016lx\n", ctx1->event_callback_ip);
-    printf(" pr:                %016lx  ", regs->pr);
-    /*    printf(" loadrs:            %016lx\n", regs->loadrs); */
-    printf(" iva:               %016lx\n", regs->cr.iva);
-    printf(" dcr:               %016lx\n", regs->cr.dcr);
+    printf(" psr:  %016lx  ", regs->psr);
+    printf(" cfm:  %016lx  ", regs->cfm);
+    printf(" pr:   %016lx\n", regs->pr);
 
+    if (disp_br_regs) {
+        printf(" b0:   %016lx  ", regs->b[0]);
+        printf(" b1:   %016lx  ", regs->b[1]);
+        printf(" b2:   %016lx\n", regs->b[2]);
+        printf(" b3:   %016lx  ", regs->b[3]);
+        printf(" b4:   %016lx  ", regs->b[4]);
+        printf(" b5:   %016lx\n", regs->b[5]);
+        printf(" b6:   %016lx  ", regs->b[6]);
+        printf(" b7:   %016lx\n", regs->b[7]);
+    } else {
+        printf(" b0:   %016lx\n", regs->b[0]);
+    }
+
+    if (disp_cr_regs) {
+        printf ("\n"
+                "                                CR:\n");
+        printf(" dcr:  %016lx  ", regs->cr.dcr);
+        printf(" itm:  %016lx  ", regs->cr.itm);
+        printf(" iva:  %016lx\n", regs->cr.iva);
+        printf(" pta:  %016lx  ", regs->cr.pta);
+        printf(" ipsr: %016lx  ", regs->cr.ipsr);
+        printf(" isr:  %016lx\n", regs->cr.isr);
+        printf(" iip:  %016lx  ", regs->cr.iip);
+        printf(" ifa:  %016lx  ", regs->cr.ifa);
+        printf(" itir: %016lx\n", regs->cr.itir);
+        printf(" iipa: %016lx  ", regs->cr.iipa);
+        printf(" ifs:  %016lx  ", regs->cr.ifs);
+        printf(" iim:  %016lx\n", regs->cr.iim);
+        printf(" iha:  %016lx  ", regs->cr.iha);
+        printf(" lid:  %016lx  ", regs->cr.lid);
+        printf(" ivr:  %016lx\n", regs->cr.ivr);
+        printf(" tpr:  %016lx  ", regs->cr.tpr);
+        printf(" eoi:  %016lx  ", regs->cr.eoi);
+        printf(" irr0: %016lx\n", regs->cr.irr[0]);
+        printf(" irr1: %016lx  ", regs->cr.irr[1]);
+        printf(" irr2: %016lx  ", regs->cr.irr[2]);
+        printf(" irr3: %016lx\n", regs->cr.irr[3]);
+        printf(" itv:  %016lx  ", regs->cr.itv);
+        printf(" pmv:  %016lx  ", regs->cr.pmv);
+        printf(" cmcv: %016lx\n", regs->cr.cmcv);
+        printf(" lrr0: %016lx  ", regs->cr.lrr0);
+        printf(" lrr1: %016lx  ", regs->cr.lrr1);
+        printf(" ev_cb:%016lx\n", ctx->event_callback_ip);
+
+    }
+    if (disp_ar_regs) {
+        printf ("\n"
+                "                                AR:\n");
+        printf(" kr0:  %016lx  ", regs->ar.kr[0]);
+        printf(" kr1:  %016lx  ", regs->ar.kr[1]);
+        printf(" kr2:  %016lx\n", regs->ar.kr[2]);
+        printf(" kr3:  %016lx  ", regs->ar.kr[3]);
+        printf(" kr4:  %016lx  ", regs->ar.kr[4]);
+        printf(" kr5:  %016lx\n", regs->ar.kr[5]);
+        printf(" kr6:  %016lx  ", regs->ar.kr[6]);
+        printf(" kr7:  %016lx  ", regs->ar.kr[7]);
+        printf(" rsc:  %016lx\n", regs->ar.rsc);
+        printf(" bsp:  %016lx  ", regs->ar.bsp);
+        printf(" bsps: %016lx  ", regs->ar.bspstore);
+        printf(" rnat: %016lx\n", regs->ar.rnat);
+        printf(" csd:  %016lx  ", regs->ar.csd);
+        printf(" ccv:  %016lx  ", regs->ar.ccv);
+        printf(" unat: %016lx\n", regs->ar.unat);
+        printf(" fpsr: %016lx  ", regs->ar.fpsr);
+        printf(" itc:  %016lx\n", regs->ar.itc);
+        printf(" pfs:  %016lx  ", regs->ar.pfs);
+        printf(" lc:   %016lx  ", regs->ar.lc);
+        printf(" ec:   %016lx\n", regs->ar.ec);
+    }
     printf("\n");
-    printf(" r1:  %016lx\n", regs->r[1]);
+    printf(" r1:  %016lx  ", regs->r[1]);
     printf(" r2:  %016lx  ", regs->r[2]);
     printf(" r3:  %016lx\n", regs->r[3]);
     printf(" r4:  %016lx  ", regs->r[4]);
-    printf(" r5:  %016lx\n", regs->r[5]);
-    printf(" r6:  %016lx  ", regs->r[6]);
-    printf(" r7:  %016lx\n", regs->r[7]);
+    printf(" r5:  %016lx  ", regs->r[5]);
+    printf(" r6:  %016lx\n", regs->r[6]);
+    printf(" r7:  %016lx  ", regs->r[7]);
     printf(" r8:  %016lx  ", regs->r[8]);
     printf(" r9:  %016lx\n", regs->r[9]);
     printf(" r10: %016lx  ", regs->r[10]);
-    printf(" r11: %016lx\n", regs->r[11]);
-    printf(" sp:  %016lx  ", regs->r[12]);
-    printf(" tp:  %016lx\n", regs->r[13]);
+    printf(" r11: %016lx  ", regs->r[11]);
+    printf(" sp:  %016lx\n", regs->r[12]);
+    printf(" tp:  %016lx  ", regs->r[13]);
     printf(" r14: %016lx  ", regs->r[14]);
     printf(" r15: %016lx\n", regs->r[15]);
-    printf(" r16: %016lx  ", regs->r[16]);
-    printf(" r17: %016lx\n", regs->r[17]);
-    printf(" r18: %016lx  ", regs->r[18]);
-    printf(" r19: %016lx\n", regs->r[19]);
-    printf(" r20: %016lx  ", regs->r[20]);
-    printf(" r21: %016lx\n", regs->r[21]);
-    printf(" r22: %016lx  ", regs->r[22]);
-    printf(" r23: %016lx\n", regs->r[23]);
-    printf(" r24: %016lx  ", regs->r[24]);
-    printf(" r25: %016lx\n", regs->r[25]);
-    printf(" r26: %016lx  ", regs->r[26]);
-    printf(" r27: %016lx\n", regs->r[27]);
-    printf(" r28: %016lx  ", regs->r[28]);
-    printf(" r29: %016lx\n", regs->r[29]);
-    printf(" r30: %016lx  ", regs->r[30]);
-    printf(" r31: %016lx\n", regs->r[31]);
-    
-    printf("\n itr: P rid    va               pa            ps      ed pl "
-           "ar a d ma    key\n");
-    for (i = 0; i < 8; i++) {
-        ps_val =  tr->itrs[i].itir >> ITIR_PS_SHIFT & ITIR_PS_MASK;
-        ma_val =  tr->itrs[i].pte  >> PTE_MA_SHIFT  & PTE_MA_MASK;
-        pa     = (tr->itrs[i].pte  >> PTE_PPN_SHIFT & PTE_PPN_MASK) <<
-                 PTE_PPN_SHIFT;
-        pa     = (pa >> ps_val) << ps_val;
-        printf(" [%d]  %ld %06lx %016lx %013lx %02x %s %ld  %ld  %ld  %ld "
-               "%ld %d %s %06lx\n", i,
-               tr->itrs[i].pte  >> PTE_P_SHIFT    & PTE_P_MASK,
-               tr->itrs[i].rid  >> RR_RID_SHIFT   & RR_RID_MASK,
-               tr->itrs[i].vadr, pa, ps_val,
-               ((ps_val >= ITIR_PS_MIN && ps_val <= ITIR_PS_MAX) ?
-                ps[ps_val - ITIR_PS_MIN] : "    "),
-               tr->itrs[i].pte  >> PTE_ED_SHIFT   & PTE_ED_MASK,
-               tr->itrs[i].pte  >> PTE_PL_SHIFT   & PTE_PL_MASK,
-               tr->itrs[i].pte  >> PTE_AR_SHIFT   & PTE_AR_MASK,
-               tr->itrs[i].pte  >> PTE_A_SHIFT    & PTE_A_MASK,
-               tr->itrs[i].pte  >> PTE_D_SHIFT    & PTE_D_MASK,
-               ma_val, ma[ma_val],
-               tr->itrs[i].itir >> ITIR_KEY_SHIFT & ITIR_KEY_MASK);
+    if (disp_bank_regs) {
+        printf("      Bank %d (current)                         Bank %d\n",
+               (regs->psr & PSR_BN) ? 1 : 0, (regs->psr & PSR_BN) ? 0 : 1);
+        printf ("16:%016lx ", regs->r[16]);
+        printf ("17:%016lx ", regs->r[17]);
+        printf ("16:%016lx ", regs->bank[0]);
+        printf ("17:%016lx\n", regs->bank[1]);
+        printf ("18:%016lx ", regs->r[18]);
+        printf ("19:%016lx ", regs->r[19]);
+        printf ("18:%016lx ", regs->bank[2]);
+        printf ("19:%016lx\n", regs->bank[3]);
+        printf ("20:%016lx ", regs->r[20]);
+        printf ("21:%016lx ", regs->r[21]);
+        printf ("20:%016lx ", regs->bank[4]);
+        printf ("21:%016lx\n", regs->bank[5]);
+        printf ("22:%016lx ", regs->r[22]);
+        printf ("23:%016lx ", regs->r[23]);
+        printf ("22:%016lx ", regs->bank[6]);
+        printf ("23:%016lx\n", regs->bank[7]);
+        printf ("24:%016lx ", regs->r[24]);
+        printf ("25:%016lx ", regs->r[25]);
+        printf ("24:%016lx ", regs->bank[8]);
+        printf ("25:%016lx\n", regs->bank[9]);
+        printf ("26:%016lx ", regs->r[26]);
+        printf ("27:%016lx ", regs->r[27]);
+        printf ("26:%016lx ", regs->bank[10]);
+        printf ("27:%016lx\n", regs->bank[11]);
+        printf ("28:%016lx ", regs->r[28]);
+        printf ("29:%016lx ", regs->r[29]);
+        printf ("28:%016lx ", regs->bank[12]);
+        printf ("29:%016lx\n", regs->bank[13]);
+        printf ("30:%016lx ", regs->r[30]);
+        printf ("31:%016lx ", regs->r[31]);
+        printf ("30:%016lx ", regs->bank[14]);
+        printf ("31:%016lx\n", regs->bank[15]);
+    } else {
+        printf(" r16: %016lx  ", regs->r[16]);
+        printf(" r17: %016lx  ", regs->r[17]);
+        printf(" r18: %016lx\n", regs->r[18]);
+        printf(" r19: %016lx  ", regs->r[19]);
+        printf(" r20: %016lx  ", regs->r[20]);
+        printf(" r21: %016lx\n", regs->r[21]);
+        printf(" r22: %016lx  ", regs->r[22]);
+        printf(" r23: %016lx  ", regs->r[23]);
+        printf(" r24: %016lx\n", regs->r[24]);
+        printf(" r25: %016lx  ", regs->r[25]);
+        printf(" r26: %016lx  ", regs->r[26]);
+        printf(" r27: %016lx\n", regs->r[27]);
+        printf(" r28: %016lx  ", regs->r[28]);
+        printf(" r29: %016lx  ", regs->r[29]);
+        printf(" r30: %016lx\n", regs->r[30]);
+        printf(" r31: %016lx\n", regs->r[31]);
     }
-    printf("\n dtr: P rid    va               pa            ps      ed pl "
-           "ar a d ma    key\n");
-    for (i = 0; i < 8; i++) {
-        ps_val =  tr->dtrs[i].itir >> ITIR_PS_SHIFT & ITIR_PS_MASK;
-        ma_val =  tr->dtrs[i].pte  >> PTE_MA_SHIFT  & PTE_MA_MASK;
-        pa     = (tr->dtrs[i].pte  >> PTE_PPN_SHIFT & PTE_PPN_MASK) <<
-                 PTE_PPN_SHIFT;
-        pa     = (pa >> ps_val) << ps_val;
-        printf(" [%d]  %ld %06lx %016lx %013lx %02x %s %ld  %ld  %ld  %ld "
-               "%ld %d %s %06lx\n", i,
-               tr->dtrs[i].pte  >> PTE_P_SHIFT    & PTE_P_MASK,
-               tr->dtrs[i].rid  >> RR_RID_SHIFT   & RR_RID_MASK,
-               tr->dtrs[i].vadr, pa, ps_val,
-               ((ps_val >= ITIR_PS_MIN && ps_val <= ITIR_PS_MAX) ?
-                ps[ps_val - ITIR_PS_MIN] : "    "),
-               tr->dtrs[i].pte  >> PTE_ED_SHIFT   & PTE_ED_MASK,
-               tr->dtrs[i].pte  >> PTE_PL_SHIFT   & PTE_PL_MASK,
-               tr->dtrs[i].pte  >> PTE_AR_SHIFT   & PTE_AR_MASK,
-               tr->dtrs[i].pte  >> PTE_A_SHIFT    & PTE_A_MASK,
-               tr->dtrs[i].pte  >> PTE_D_SHIFT    & PTE_D_MASK,
-               ma_val, ma[ma_val],
-               tr->dtrs[i].itir >> ITIR_KEY_SHIFT & ITIR_KEY_MASK);
+
+    printf("\n");
+    rbs_size = (regs->ar.bsp - regs->ar.bspstore) / 8;
+    for (i = 0; i < (regs->cfm & CFM_SOF_MASK); i++) {
+        unsigned int rbs_off = (((64 - (rbs_size % 64) - i)) / 64) + i;
+        if (rbs_off > rbs_size)
+            break;
+        printf(" r%02d: %016lx%s", 32 + i,
+               regs->rbs[rbs_size - rbs_off],
+               (i % 3) != 2 ? "  " : "\n");
+    }
+    if (i && (i % 3) != 2)
+        printf ("\n");
+
+    if (disp_tlb) {
+        printf("\n itr: P rid    va               pa            ps      ed pl "
+               "ar a d ma    key\n");
+        for (i = 0; i < 8; i++)
+            print_tr(i, &tr->itrs[i]);
+        printf("\n dtr: P rid    va               pa            ps      ed pl "
+               "ar a d ma    key\n");
+        for (i = 0; i < 8; i++)
+            print_tr(i, &tr->dtrs[i]);
     }
 }
 #endif
@@ -526,9 +630,16 @@ void dump_ctx(int vcpu)
 {
     int ret;
     vcpu_guest_context_t ctx;
+    xc_dominfo_t dominfo;
 
     xc_handle = xc_interface_open(); /* for accessing control interface */
 
+    ret = xc_domain_getinfo(xc_handle, domid, 1, &dominfo);
+    if (ret < 0) {
+        perror("xc_domain_getinfo");
+        exit(-1);
+    }
+    
     ret = xc_domain_pause(xc_handle, domid);
     if (ret < 0) {
         perror("xc_domain_pause");
@@ -537,7 +648,8 @@ void dump_ctx(int vcpu)
 
     ret = xc_vcpu_getcontext(xc_handle, domid, vcpu, &ctx);
     if (ret < 0) {
-        xc_domain_unpause(xc_handle, domid);
+        if (!dominfo.paused)
+            xc_domain_unpause(xc_handle, domid);
         perror("xc_vcpu_getcontext");
         exit(-1);
     }
@@ -548,10 +660,12 @@ void dump_ctx(int vcpu)
         print_stack(&ctx, vcpu);
 #endif
 
-    ret = xc_domain_unpause(xc_handle, domid);
-    if (ret < 0) {
-        perror("xc_domain_unpause");
-        exit(-1);
+    if (!dominfo.paused) {
+        ret = xc_domain_unpause(xc_handle, domid);
+        if (ret < 0) {
+            perror("xc_domain_unpause");
+            exit(-1);
+        }
     }
 
     xc_interface_close(xc_handle);
@@ -574,16 +688,28 @@ void usage(void)
     printf("  -s SYMTAB, --symbol-table=SYMTAB\n");
     printf("                    read symbol table from SYMTAB.\n");
     printf("  --stack-trace     print a complete stack trace.\n");
+#ifdef __ia64__
+    printf("  -r LIST, --regs=LIST  display more registers.\n");
+    printf("  -a --all          same as --regs=tlb,cr,ar,br,bk\n");
+#endif
 }
 
 int main(int argc, char **argv)
 {
     int ch;
-    const char *sopts = "fs:h";
-    const struct option lopts[] = {
+    static const char *sopts = "fs:h"
+#ifdef __ia64__
+        "ar:"
+#endif
+        ;
+    static const struct option lopts[] = {
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
         {"frame-pointers", 0, NULL, 'f'},
+#ifdef __ia64__
+        {"regs", 1, NULL, 'r'},
+        {"all", 0, NULL, 'a'},
+#endif
         {"help", 0, NULL, 'h'},
         {0, 0, 0, 0}
     };
@@ -602,6 +728,39 @@ int main(int argc, char **argv)
         case 'S':
             stack_trace = 1;
             break;
+#ifdef __ia64__
+        case 'r':
+            {
+                char *r;
+
+                r = strtok(optarg, ",");
+                while (r) {
+                    if (strcmp (r, "cr") == 0)
+                        disp_cr_regs = 1;
+                    else if (strcmp (r, "ar") == 0)
+                        disp_ar_regs = 1;
+                    else if (strcmp (r, "br") == 0)
+                        disp_br_regs = 1;
+                    else if (strcmp (r, "bk") == 0)
+                        disp_bank_regs = 1;
+                    else if (strcmp (r, "tlb") == 0)
+                        disp_tlb = 1;
+                    else {
+                        fprintf(stderr,"unknown register set %s\n", r);
+                        exit(-1);
+                    }
+                    r = strtok(NULL, "'");
+                }
+            }
+            break;
+        case 'a':
+            disp_cr_regs = 1;
+            disp_ar_regs = 1;
+            disp_br_regs = 1;
+            disp_bank_regs = 1;
+            disp_tlb = 1;
+            break;
+#endif
         case 'h':
             usage();
             exit(-1);
