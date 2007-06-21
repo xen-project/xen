@@ -57,23 +57,23 @@ restore_all_guest:
 /* No special register assumptions. */
 iret_exit_to_guest:
         addq  $8,%rsp
-.Lft1:  iretq
+.Lft0:  iretq
 
 .section .fixup,"ax"
-.Lfx1:  popq  -15*8-8(%rsp)            # error_code/entry_vector
-        SAVE_ALL                       # 15*8 bytes pushed
-        movq  -8(%rsp),%rsi            # error_code/entry_vector
-        sti                            # after stack abuse (-1024(%rsp))
+.Lfx0:  sti
+        SAVE_ALL
+        movq  UREGS_error_code(%rsp),%rsi
+        movq  %rsp,%rax
+        andq  $~0xf,%rsp
         pushq $__HYPERVISOR_DS         # SS
-        leaq  8(%rsp),%rax
         pushq %rax                     # RSP
-        pushf                          # RFLAGS
+        pushfq                         # RFLAGS
         pushq $__HYPERVISOR_CS         # CS
-        leaq  .Ldf1(%rip),%rax
+        leaq  .Ldf0(%rip),%rax
         pushq %rax                     # RIP
         pushq %rsi                     # error_code/entry_vector
         jmp   handle_exception
-.Ldf1:  GET_CURRENT(%rbx)
+.Ldf0:  GET_CURRENT(%rbx)
         jmp   test_all_events
 failsafe_callback:
         GET_CURRENT(%rbx)
@@ -88,10 +88,10 @@ failsafe_callback:
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
-        .quad .Lft1,.Lfx1
+        .quad .Lft0,.Lfx0
 .previous
 .section __ex_table,"a"
-        .quad .Ldf1,failsafe_callback
+        .quad .Ldf0,failsafe_callback
 .previous
 
         ALIGN
