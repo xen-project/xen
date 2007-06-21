@@ -631,6 +631,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->ecx = c;
     regs->edx = d;
     regs->eip = eip;
+    regs->eflags &= ~X86_EFLAGS_RF;
 
     return EXCRET_fault_fixed;
 }
@@ -1787,6 +1788,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  done:
     regs->eip = eip;
+    regs->eflags &= ~X86_EFLAGS_RF;
     return EXCRET_fault_fixed;
 
  fail:

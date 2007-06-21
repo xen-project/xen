@@ -858,6 +858,7 @@ void hvm_io_assist(void)
     }
 
     /* Copy register changes back into current guest state. */
+    regs->eflags &= ~X86_EFLAGS_RF;
     hvm_load_cpu_guest_regs(v, regs);
     memcpy(guest_cpu_user_regs(), regs, HVM_CONTEXT_STACK_BYTES);
 

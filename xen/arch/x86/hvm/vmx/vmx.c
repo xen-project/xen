@@ -1315,16 +1315,20 @@ static int __get_instruction_length(void)
 
 static void inline __update_guest_eip(unsigned long inst_len)
 {
-    unsigned long current_eip, intr_shadow;
+    unsigned long x;
 
-    current_eip = __vmread(GUEST_RIP);
-    __vmwrite(GUEST_RIP, current_eip + inst_len);
+    x = __vmread(GUEST_RIP);
+    __vmwrite(GUEST_RIP, x + inst_len);
 
-    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-    if ( intr_shadow & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
+    x = __vmread(GUEST_RFLAGS);
+    if ( x & X86_EFLAGS_RF )
+        __vmwrite(GUEST_RFLAGS, x & ~X86_EFLAGS_RF);
+
+    x = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    if ( x & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
     {
-        intr_shadow &= ~(VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS);
-        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+        x &= ~(VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS);
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, x);
     }
 }
 
@@ -1896,7 +1900,7 @@ static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
     c->eip += __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
 
     c->esp = __vmread(GUEST_RSP);
-    c->eflags = __vmread(GUEST_RFLAGS);
+    c->eflags = __vmread(GUEST_RFLAGS) & ~X86_EFLAGS_RF;
 
     c->cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     c->cr3 = v->arch.hvm_vmx.cpu_cr3;
@@ -2272,7 +2276,6 @@ static int vmx_set_cr0(unsigned long value)
                     "Enabling CR0.PE at %%eip 0x%lx", eip);
         if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
         {
-            eip = __vmread(GUEST_RIP);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Restoring to %%eip 0x%lx", eip);
             return 0; /* do not update eip! */
