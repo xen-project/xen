@@ -2086,9 +2086,11 @@ static inline void svm_do_msr_access(
         case MSR_IA32_TIME_STAMP_COUNTER:
             msr_content = hvm_get_guest_time(v);
             break;
+
         case MSR_IA32_APICBASE:
             msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
             break;
+
         case MSR_EFER:
             msr_content = v->arch.hvm_svm.cpu_shadow_efer;
             break;
@@ -2108,6 +2110,10 @@ static inline void svm_do_msr_access(
              * particularly meaningful, but at least avoids the guest crashing!
              */
             msr_content = 0;
+            break;
+
+        case MSR_K8_VM_HSAVE_PA:
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             break;
 
         default:
@@ -2143,9 +2149,15 @@ static inline void svm_do_msr_access(
             hvm_set_guest_time(v, msr_content);
             pt_reset(v);
             break;
+
         case MSR_IA32_APICBASE:
             vlapic_msr_set(vcpu_vlapic(v), msr_content);
             break;
+
+        case MSR_K8_VM_HSAVE_PA:
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
+            break;
+
         default:
             if ( !long_mode_do_msr_write(regs) )
                 wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
