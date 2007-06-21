@@ -903,13 +903,14 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
-        unsigned int count;
+        unsigned int count = 0;
         unsigned long *pfntab;
         int nr_frees, rc;
 
-        if ( !read_exact(io_fd, &count, sizeof(count)) )
+        if ( !read_exact(io_fd, &count, sizeof(count)) ||
+             (count > (1U << 28)) ) /* up to 1TB of address space */
         {
-            ERROR("Error when reading pfn count");
+            ERROR("Error when reading pfn count (= %u)", count);
             goto out;
         }
 
