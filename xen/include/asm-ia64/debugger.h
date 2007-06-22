@@ -56,13 +56,6 @@ show_execution_state(struct cpu_user_regs *regs)
 #ifdef CRASH_DEBUG
 // crash_debug=y
 
-/* The main trap handlers use these helper macros which include early bail. */
-static inline int debugger_trap_entry(
-    unsigned int vector, struct cpu_user_regs *regs)
-{
-    return 0;
-}
-
 extern int __trap_to_cdb(struct cpu_user_regs *r);
 static inline int debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
@@ -80,31 +73,7 @@ static inline int debugger_trap_fatal(
 #define smp_send_stop()	/* nothing */
 #endif
 
-#elif defined DOMU_DEBUG
-// domu_debug=y
-#warning "domu_debug is not implemented yet."
-/* The main trap handlers use these helper macros which include early bail. */
-static inline int debugger_trap_entry(
-    unsigned int vector, struct cpu_user_regs *regs)
-{
-    return 0;
-}
-
-static inline int debugger_trap_fatal(
-    unsigned int vector, struct cpu_user_regs *regs)
-{
-    return 0;
-}
-
-#define debugger_trap_immediate()		((void)0)
 #else
-/* The main trap handlers use these helper macros which include early bail. */
-static inline int debugger_trap_entry(
-    unsigned int vector, struct cpu_user_regs *regs)
-{
-    return 0;
-}
-
 static inline int debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
@@ -113,6 +82,20 @@ static inline int debugger_trap_fatal(
 
 #define debugger_trap_immediate()		((void)0)
 #endif
+
+static inline int debugger_trap_entry(
+    unsigned int vector, struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+
+    if (guest_kernel_mode(regs) && v->domain->debugger_attached) {
+        domain_pause_for_debugger();
+        return 1;
+    }
+
+    return 0;
+}
+
 #endif // __ASSEMBLLY__
 
 #endif /* __ASM_DEBUGGER_H__ */

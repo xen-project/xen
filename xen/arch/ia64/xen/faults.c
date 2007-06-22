@@ -647,6 +647,11 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		PSCB(current, iim) = iim;
 		vector = IA64_SPECULATION_VECTOR;
 		break;
+	case 29:
+		vector = IA64_DEBUG_VECTOR;
+		if (debugger_trap_entry(vector,regs))
+			return;
+		break;
 	case 30:
 		// FIXME: Should we handle unaligned refs in Xen??
 		vector = IA64_UNALIGNED_REF_VECTOR;
@@ -681,19 +686,19 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		vector = IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR;
 		break;
 	case 35:
-		printk("ia64_handle_reflection: handling taken branch trap\n");
 		vector = IA64_TAKEN_BRANCH_TRAP_VECTOR;
+		if (debugger_trap_entry(vector,regs))
+			return;
 		break;
 	case 36:
-		printk("ia64_handle_reflection: handling single step trap\n");
 		vector = IA64_SINGLE_STEP_TRAP_VECTOR;
+		if (debugger_trap_entry(vector,regs))
+			return;
 		break;
 
 	default:
-		printk("ia64_handle_reflection: unhandled vector=0x%lx\n",
-		       vector);
-		while (vector)
-			/* spin */;
+		panic_domain(regs, "ia64_handle_reflection: "
+			     "unhandled vector=0x%lx\n", vector);
 		return;
 	}
 	if (check_lazy_cover && (isr & IA64_ISR_IR) &&
