@@ -448,7 +448,7 @@ static void memcpy_words(void *dst, void *src, size_t n)
 {
     asm (
         "   movl %%edx,%%ecx \n"
-#ifdef __x86_64
+#ifdef __x86_64__
         "   shrl $3,%%ecx    \n"
         "   andl $7,%%edx    \n"
         "   rep  movsq       \n"
