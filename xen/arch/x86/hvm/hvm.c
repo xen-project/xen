@@ -423,12 +423,6 @@ void hvm_vcpu_destroy(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
-    vlapic_destroy(v);
-    hvm_funcs.vcpu_destroy(v);
-
-    /* Event channel is already freed by evtchn_destroy(). */
-    /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
-
     if ( v->vcpu_id == 0 )
     {
         /* NB. All these really belong in hvm_domain_destroy(). */
@@ -437,6 +431,12 @@ void hvm_vcpu_destroy(struct vcpu *v)
         pmtimer_deinit(d);
         hpet_deinit(d);
     }
+
+    vlapic_destroy(v);
+    hvm_funcs.vcpu_destroy(v);
+
+    /* Event channel is already freed by evtchn_destroy(). */
+    /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
 }
 
 
