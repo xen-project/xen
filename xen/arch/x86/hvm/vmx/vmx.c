@@ -560,6 +560,9 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     __vmwrite(GUEST_RSP, c->rsp);
     __vmwrite(GUEST_RFLAGS, c->rflags);
 
+    v->arch.hvm_vmx.cpu_cr0 = (c->cr0 | X86_CR0_PE | X86_CR0_PG 
+                               | X86_CR0_NE | X86_CR0_WP | X86_CR0_ET);
+    __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
     v->arch.hvm_vmx.cpu_shadow_cr0 = c->cr0;
     __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
 
@@ -577,33 +580,17 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         goto skip_cr3;
     }
 
-    if (c->cr3 == v->arch.hvm_vmx.cpu_cr3) {
-        /*
-         * This is simple TLB flush, implying the guest has
-         * removed some translation or changed page attributes.
-         * We simply invalidate the shadow.
-         */
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
-            goto bad_cr3;
-        }
-    } else {
-        /*
-         * If different, make a shadow. Check if the PDBR is valid
-         * first.
-         */
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
-        /* current!=vcpu as not called by arch_vmx_do_launch */
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
-            goto bad_cr3;
-        }
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if (old_base_mfn)
-             put_page(mfn_to_page(old_base_mfn));
-        v->arch.hvm_vmx.cpu_cr3 = c->cr3;
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
+    /* current!=vcpu as not called by arch_vmx_do_launch */
+    mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+    if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
+        goto bad_cr3;
     }
+    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+    v->arch.guest_table = pagetable_from_pfn(mfn);
+    if (old_base_mfn)
+        put_page(mfn_to_page(old_base_mfn));
+    v->arch.hvm_vmx.cpu_cr3 = c->cr3;
 
  skip_cr3:
 #if defined(__x86_64__)
