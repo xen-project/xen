@@ -433,6 +433,18 @@ int xc_domain_send_trigger(int xc_handle,
                            uint32_t trigger,
                            uint32_t vcpu);
 
+/**
+ * This function enables or disable debugging of a domain.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain id to send trigger
+ * @parm enable true to enable debugging
+ * return 0 on success, -1 on failure
+ */
+int xc_domain_setdebugging(int xc_handle,
+                           uint32_t domid,
+                           unsigned int enable);
+
 /*
  * EVENT CHANNEL FUNCTIONS
  */

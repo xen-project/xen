@@ -696,6 +696,18 @@ int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
     return rc;
 }
 
+int xc_domain_setdebugging(int xc_handle,
+                           uint32_t domid,
+                           unsigned int enable)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_setdebugging;
+    domctl.domain = domid;
+    domctl.u.setdebugging.enable = enable;
+    return do_domctl(xc_handle, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C
