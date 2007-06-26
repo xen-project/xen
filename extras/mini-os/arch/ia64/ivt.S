@@ -587,13 +587,11 @@ END(save_special_regs)
 
 
 ENTRY(hypervisor_callback)
-		// Calculate the stack address for storing.
-		// Use the kernel stack here because it's mapped wired!
-		// -> no nested tlb faults!
-	movl	r18=kstack+KSTACK_PAGES * PAGE_SIZE - 16 - TF_SIZE
-
-	//add	r18=-TF_SIZE,sp
-	add	r30=0xabab,r0
+	/*
+	 * Use the thread stack here for storing the trap frame.
+	 * It's not wired mapped, so nested data tlb faults may occur!
+	 */
+	add	r18=-TF_SIZE,sp
 	;;
 {	.mib
 	nop	0x02
@@ -602,7 +600,7 @@ ENTRY(hypervisor_callback)
 	;;
 }
 	add	sp=-16,r18		// the new stack
-	alloc	r15=ar.pfs,0,0,1,0	// 1 out for do_trap_error
+	alloc	r15=ar.pfs,0,0,1,0	// 1 out for do_hypervisor_callback
 	;;
 	mov	out0=r18		// the trap frame
 	movl	r22=XSI_PSR_IC
@@ -617,13 +615,8 @@ ENTRY(hypervisor_callback)
 	movl	r22=XSI_PSR_IC
 	;;
 	st4	[r22]=r0		// rsm psr.ic
-
-	add	r16=16,sp		// load EF-pointer again
+	add	r18=16,sp		// load EF-pointer again
 	;;
-	//mov	r18=sp
-	movl	r18=kstack+KSTACK_PAGES * PAGE_SIZE - 16 - TF_SIZE
-	;;
-
 			// must have r18-efp, calls rfi at the end.
 	br.sptk	restore_tf_rse_switch
 	;;
@@ -654,9 +647,7 @@ ENTRY(trap_error)
 	mov	out0=r18		// the trap frame
 	add	sp=-16,r18		// C-call abi
 	;;
-
-	//bsw.1
-	movl r30=XSI_BANKNUM
+	movl r30=XSI_BANKNUM		// bsw.1
 	mov r31=1;;
 #if defined(BIG_ENDIAN)			// swap because mini-os is in BE
 	mux1	r31=r31,@rev;;
@@ -752,6 +743,7 @@ IVT_ERR(Alternate_Instruction_TLB, 3, 0x0c00)
 
 IVT_ENTRY(Alternate_Data_TLB, 0x1000)
 	mov	r30=4			// trap number
+adt_common:
 	mov	r16=cr.ifa		// where did it happen
 	mov	r31=pr			// save predicates
 	;;
@@ -765,7 +757,7 @@ IVT_ENTRY(Alternate_Data_TLB, 0x1000)
 //		// No return
 //
 //adt_regf_addr:
-//	extr.u	r17=r16,60,4	// get region number
+//	extr.u	r17=r16,60,4		// get region number
 //	;;
 //	cmp.eq	p14,p15=0xf,r17
 //	;;
@@ -799,8 +791,23 @@ adt_reg7_addr:
 
 IVT_END(Alternate_Data_TLB)
 
+/*
+ * Handling of nested data tlb is needed, because in hypervisor_callback()
+ * the stack is used to store the register trap frame. This stack is allocated
+ * dynamically (as identity mapped address) and therewidth no tr mapped page!
+ */
+IVT_ENTRY(Data_Nested_TLB, 0x1400)
 
-IVT_ERR(Data_Nested_TLB, 5, 0x1400)
+	mov	r30=5			// trap number
+	add	r28=-TF_SIZE,sp		// r28 is never used in trap handling
+	;;
+	mov	cr.ifa=r28
+	;;
+	br.sptk	adt_common
+IVT_END(Data_Nested_TLB)
+
+
+
 IVT_ERR(Instruction_Key_Miss, 6, 0x1800)
 IVT_ERR(Data_Key_Miss, 7, 0x1c00)
 IVT_ERR(Dirty_Bit, 8, 0x2000)
