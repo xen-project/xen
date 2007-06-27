@@ -72,12 +72,8 @@ static inline void vcpu_runstate_change(
     ASSERT(v->runstate.state != new_state);
     ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
 
-    if(unlikely((v->runstate.state_entry_time - new_entry_time) > TIME_SLOP))
-        /* Local time on this CPU has been warped */
-        v->runstate.time[v->runstate.state] = new_entry_time; 
-    else 
-        v->runstate.time[v->runstate.state] +=
-            new_entry_time - v->runstate.state_entry_time;
+    v->runstate.time[v->runstate.state] +=
+        new_entry_time - v->runstate.state_entry_time;
     v->runstate.state_entry_time = new_entry_time;
     v->runstate.state = new_state;
 }

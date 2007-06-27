@@ -140,19 +140,20 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
         uint32_t i, nr_cpus;
         uint64_t idletime;
+        struct vcpu *v;
 
-        nr_cpus = (op->u.cpuinfo.max_cpus > NR_CPUS) ? NR_CPUS :
-            op->u.cpuinfo.max_cpus;
+        nr_cpus = min_t(uint32_t, op->u.cpuinfo.max_cpus, NR_CPUS);
 
         for ( i = 0; i < nr_cpus; i++ )
         {
-            if(!idle_vcpu[i])
-                /* XXX: assumes no further CPUs after first missing one */
+            /* Assume no holes in idle-vcpu map. */
+            if ( (v = idle_vcpu[i]) == NULL )
                 break;
 
-            /* somewhat imprecise but should suffice */
-            idletime = idle_vcpu[i]->runstate.time[RUNSTATE_running] +
-                (NOW() - idle_vcpu[i]->runstate.state_entry_time);
+            idletime = v->runstate.time[RUNSTATE_running];
+            if ( v->is_running )
+                idletime += NOW() - v->runstate.state_entry_time;
+
             if ( copy_to_guest_offset(op->u.cpuinfo.buffer, i, &idletime, 1) )
             {
                 ret = -EFAULT;
@@ -163,7 +164,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         op->u.cpuinfo.nr_cpus = i;
         ret = 0;
 
-        if( copy_to_guest (u_sysctl, op, 1) )
+        if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
     }
     break;

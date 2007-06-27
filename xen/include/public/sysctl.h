@@ -158,7 +158,7 @@ struct xen_sysctl_cpuinfo {
     /* IN variables. */
     uint32_t                      max_cpus;
     XEN_GUEST_HANDLE_64(uint64_t) buffer;
-    /* IN/OUT variables. */
+    /* OUT variables. */
     uint32_t                      nr_cpus;
 }; 
 typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
