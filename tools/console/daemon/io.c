@@ -764,27 +764,31 @@ void handle_io(void)
 		/* XXX I wish we didn't have to busy wait for hypervisor logs
 		 * but there's no obvious way to get event channel notifications
 		 * for new HV log data as we can with guest */
-		ret = select(max_fd + 1, &readfds, &writefds, 0, log_hv_fd != -1 ? &timeout : NULL);
+		ret = select(max_fd + 1, &readfds, &writefds, 0,
+			     log_hv_fd != -1 ? &timeout : NULL);
 
+		if (log_reload) {
+			handle_log_reload();
+			log_reload = 0;
+		}
+
+		/* Abort if select failed, except for EINTR cases
+		   which indicate a possible log reload */
 		if (ret == -1) {
-			if (errno == EINTR) {
-				if (log_reload) {
-					handle_log_reload();
-					log_reload = 0;
-				}
+			if (errno == EINTR)
 				continue;
-			}
 			dolog(LOG_ERR, "Failure in select: %d (%s)",
 			      errno, strerror(errno));
 			break;
 		}
 
-		/* Check for timeout */
-		if (ret == 0) {
-			if (log_hv_fd != -1)
-				handle_hv_logs();
+		/* Always process HV logs even if not a timeout */
+		if (log_hv_fd != -1)
+			handle_hv_logs();
+
+		/* Must not check returned FDSET if it was a timeout */
+		if (ret == 0)
 			continue;
-		}
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
 			handle_xs();
@@ -806,10 +810,14 @@ void handle_io(void)
 		}
 	}
 
-	if (log_hv_fd != -1)
+	if (log_hv_fd != -1) {
 		close(log_hv_fd);
-	if (xc_handle != -1)
+		log_hv_fd = -1;
+	}
+	if (xc_handle != -1) {
 		xc_interface_close(xc_handle);
+		xc_handle = -1;
+	}
 }
 
 /*
