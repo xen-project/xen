@@ -80,11 +80,6 @@ gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
         .long   gdt_table - FIRST_RESERVED_GDT_BYTE
 
-        .word   0
-nopaging_gdt_descr:
-        .word   LAST_RESERVED_GDT_BYTE
-        .long   sym_phys(gdt_table) - FIRST_RESERVED_GDT_BYTE
-
         .align PAGE_SIZE, 0
 /* NB. Rings != 0 get access up to MACH2PHYS_VIRT_END. This allows access to */
 /*     the machine->physical mapping table. Ring 0 can access all memory.    */
