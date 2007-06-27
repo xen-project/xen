@@ -371,7 +371,7 @@ static int pin_2_irq(int idx, int apic, int pin);
  * so mask in all cases should simply be TARGET_CPUS
  */
 #ifdef CONFIG_SMP
-void __init setup_ioapic_dest(void)
+void /*__init*/ setup_ioapic_dest(void)
 {
     int pin, ioapic, irq, irq_entry;
 
@@ -849,7 +849,7 @@ static inline void UNEXPECTED_IO_APIC(void)
 {
 }
 
-void __init __print_IO_APIC(void)
+void /*__init*/ __print_IO_APIC(void)
 {
     int apic, i;
     union IO_APIC_reg_00 reg_00;
