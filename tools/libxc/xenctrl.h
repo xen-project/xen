@@ -479,6 +479,8 @@ int xc_physinfo(int xc_handle,
 int xc_sched_id(int xc_handle,
                 int *sched_id);
 
+int xc_cpuinfo(int xc_handle, int max_cpus, uint64_t *info, int *nr_cpus); 
+
 int xc_domain_setmaxmem(int xc_handle,
                         uint32_t domid,
                         unsigned int max_memkb);

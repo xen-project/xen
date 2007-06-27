@@ -136,6 +136,38 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
+    case XEN_SYSCTL_cpuinfo:
+    {
+        uint32_t i, nr_cpus;
+        uint64_t idletime;
+
+        nr_cpus = (op->u.cpuinfo.max_cpus > NR_CPUS) ? NR_CPUS :
+            op->u.cpuinfo.max_cpus;
+
+        for ( i = 0; i < nr_cpus; i++ )
+        {
+            if(!idle_vcpu[i])
+                /* XXX: assumes no further CPUs after first missing one */
+                break;
+
+            /* somewhat imprecise but should suffice */
+            idletime = idle_vcpu[i]->runstate.time[RUNSTATE_running] +
+                (NOW() - idle_vcpu[i]->runstate.state_entry_time);
+            if ( copy_to_guest_offset(op->u.cpuinfo.buffer, i, &idletime, 1) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
+
+        op->u.cpuinfo.nr_cpus = i;
+        ret = 0;
+
+        if( copy_to_guest (u_sysctl, op, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         break;

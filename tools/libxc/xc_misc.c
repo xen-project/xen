@@ -109,6 +109,25 @@ int xc_perfc_control(int xc_handle,
     return rc;
 }
 
+int xc_cpuinfo(int xc_handle, int max_cpus, uint64_t *info, int *nr_cpus)
+{
+    int ret;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_cpuinfo;
+    sysctl.u.cpuinfo.max_cpus = max_cpus; 
+    set_xen_guest_handle(sysctl.u.cpuinfo.buffer, info); 
+
+    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
+        return ret;
+
+    if(nr_cpus) 
+        *nr_cpus = sysctl.u.cpuinfo.nr_cpus; 
+
+    return 0;
+}
+
+
 int xc_hvm_set_pci_intx_level(
     int xc_handle, domid_t dom,
     uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
