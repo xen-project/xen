@@ -81,6 +81,12 @@
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
 #define X86_CR4_VMXE		0x2000  /* enable VMX */
 
+#define X86_CR4_RESERVED_BITS   \
+    ~(X86_CR4_VME | X86_CR4_PVI | X86_CR4_TSD | \
+      X86_CR4_DE  | X86_CR4_PSE | X86_CR4_PAE | \
+      X86_CR4_MCE | X86_CR4_PGE | X86_CR4_PCE | \
+      X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT | X86_CR4_VMXE)
+
 /*
  * Trap/fault mnemonics.
  */

@@ -2387,14 +2387,15 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     case 4: /* CR4 */
         old_cr = v->arch.hvm_vmx.cpu_shadow_cr4;
 
-        if ( value & ~mmu_cr4_features )
+        if ( value & X86_CR4_RESERVED_BITS )
         {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to enable unsupported "
-                        "CR4 features %lx (host %lx)",
-                        value, mmu_cr4_features);
+            HVM_DBG_LOG(DBG_LEVEL_1,
+                        "Guest attempts to set reserved bit in CR4: %lx",
+                        value);
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             break;
         }
+
         if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
         {
             if ( vmx_pgbit_test(v) )
