@@ -1828,11 +1828,11 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         break;
 
     case 4: /* CR4 */
-        if ( value & ~mmu_cr4_features )
+        if ( value & HVM_CR4_GUEST_RESERVED_BITS )
         {
-            HVM_DBG_LOG(DBG_LEVEL_1, "Guest attempts to enable unsupported "
-                        "CR4 features %lx (host %lx)",
-                        value, mmu_cr4_features);
+            HVM_DBG_LOG(DBG_LEVEL_1,
+                        "Guest attempts to set reserved bit in CR4: %lx",
+                        value);
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             break;
         }

@@ -2387,7 +2387,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     case 4: /* CR4 */
         old_cr = v->arch.hvm_vmx.cpu_shadow_cr4;
 
-        if ( value & X86_CR4_RESERVED_BITS )
+        if ( value & HVM_CR4_GUEST_RESERVED_BITS )
         {
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Guest attempts to set reserved bit in CR4: %lx",
