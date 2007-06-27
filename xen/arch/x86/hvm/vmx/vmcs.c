@@ -43,6 +43,7 @@ u32 vmx_cpu_based_exec_control __read_mostly;
 u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
+bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
 static u32 vmcs_revision_id __read_mostly;
 
@@ -133,6 +134,7 @@ void vmx_init_vmcs_config(void)
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
+        cpu_has_vmx_ins_outs_instr_info = !!(vmx_msr_high & (1U<<22));
     }
     else
     {
@@ -142,6 +144,7 @@ void vmx_init_vmcs_config(void)
         BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
         BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
         BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
+        BUG_ON(cpu_has_vmx_ins_outs_instr_info != !!(vmx_msr_high & (1U<<22)));
     }
 
     /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */

@@ -1466,15 +1466,33 @@ static void vmx_do_invlpg(unsigned long va)
     paging_invlpg(v, va);
 }
 
-/*
- * get segment for string pio according to guest instruction
- */
-static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
-                                   int inst_len, enum x86_segment *seg)
+/* Get segment for OUTS according to guest instruction. */
+static enum x86_segment vmx_outs_get_segment(
+    int long_mode, unsigned long eip, int inst_len)
 {
     unsigned char inst[MAX_INST_LEN];
+    enum x86_segment seg = x86_seg_ds;
     int i;
     extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
+
+    if ( likely(cpu_has_vmx_ins_outs_instr_info) )
+    {
+        unsigned int instr_info = __vmread(VMX_INSTRUCTION_INFO);
+
+        /* Get segment register according to bits 17:15. */
+        switch ( (instr_info >> 15) & 7 )
+        {
+        case 0: seg = x86_seg_es; break;
+        case 1: seg = x86_seg_cs; break;
+        case 2: seg = x86_seg_ss; break;
+        case 3: seg = x86_seg_ds; break;
+        case 4: seg = x86_seg_fs; break;
+        case 5: seg = x86_seg_gs; break;
+        default: BUG();
+        }
+
+        goto out;
+    }
 
     if ( !long_mode )
         eip += __vmread(GUEST_CS_BASE);
@@ -1484,7 +1502,7 @@ static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
     {
         gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
         domain_crash(current->domain);
-        return;
+        goto out;
     }
 
     for ( i = 0; i < inst_len; i++ )
@@ -1501,25 +1519,28 @@ static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
 #endif
             continue;
         case 0x2e: /* CS */
-            *seg = x86_seg_cs;
+            seg = x86_seg_cs;
             continue;
         case 0x36: /* SS */
-            *seg = x86_seg_ss;
+            seg = x86_seg_ss;
             continue;
         case 0x26: /* ES */
-            *seg = x86_seg_es;
+            seg = x86_seg_es;
             continue;
         case 0x64: /* FS */
-            *seg = x86_seg_fs;
+            seg = x86_seg_fs;
             continue;
         case 0x65: /* GS */
-            *seg = x86_seg_gs;
+            seg = x86_seg_gs;
             continue;
         case 0x3e: /* DS */
-            *seg = x86_seg_ds;
+            seg = x86_seg_ds;
             continue;
         }
     }
+
+ out:
+    return seg;
 }
 
 static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
@@ -1532,7 +1553,7 @@ static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
     *base = 0;
     *limit = 0;
     if ( seg != x86_seg_es )
-        vmx_str_pio_get_segment(long_mode, eip, inst_len, &seg);
+        seg = vmx_outs_get_segment(long_mode, eip, inst_len);
 
     switch ( seg )
     {
@@ -1578,7 +1599,7 @@ static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
     }
     *ar_bytes = __vmread(ar_field);
 
-    return !(*ar_bytes & 0x10000);
+    return !(*ar_bytes & X86_SEG_AR_SEG_UNUSABLE);
 }
 
 
