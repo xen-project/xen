@@ -136,13 +136,13 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
-    case XEN_SYSCTL_cpuinfo:
+    case XEN_SYSCTL_getcpuinfo:
     {
         uint32_t i, nr_cpus;
-        uint64_t idletime;
+        struct xen_sysctl_cpuinfo cpuinfo;
         struct vcpu *v;
 
-        nr_cpus = min_t(uint32_t, op->u.cpuinfo.max_cpus, NR_CPUS);
+        nr_cpus = min_t(uint32_t, op->u.getcpuinfo.max_cpus, NR_CPUS);
 
         for ( i = 0; i < nr_cpus; i++ )
         {
@@ -150,18 +150,18 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             if ( (v = idle_vcpu[i]) == NULL )
                 break;
 
-            idletime = v->runstate.time[RUNSTATE_running];
+            cpuinfo.idletime = v->runstate.time[RUNSTATE_running];
             if ( v->is_running )
-                idletime += NOW() - v->runstate.state_entry_time;
+                cpuinfo.idletime += NOW() - v->runstate.state_entry_time;
 
-            if ( copy_to_guest_offset(op->u.cpuinfo.buffer, i, &idletime, 1) )
+            if ( copy_to_guest_offset(op->u.getcpuinfo.info, i, &cpuinfo, 1) )
             {
                 ret = -EFAULT;
                 break;
             }
         }
 
-        op->u.cpuinfo.nr_cpus = i;
+        op->u.getcpuinfo.nr_cpus = i;
         ret = 0;
 
         if ( copy_to_guest(u_sysctl, op, 1) )

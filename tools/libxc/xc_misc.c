@@ -101,30 +101,35 @@ int xc_perfc_control(int xc_handle,
 
     rc = do_sysctl(xc_handle, &sysctl);
 
-    if (nbr_desc)
+    if ( nbr_desc )
         *nbr_desc = sysctl.u.perfc_op.nr_counters;
-    if (nbr_val)
+    if ( nbr_val )
         *nbr_val = sysctl.u.perfc_op.nr_vals;
 
     return rc;
 }
 
-int xc_cpuinfo(int xc_handle, int max_cpus, uint64_t *info, int *nr_cpus)
+int xc_getcpuinfo(int xc_handle, int max_cpus,
+                  xc_cpuinfo_t *info, int *nr_cpus)
 {
-    int ret;
+    int rc;
     DECLARE_SYSCTL;
 
-    sysctl.cmd = XEN_SYSCTL_cpuinfo;
-    sysctl.u.cpuinfo.max_cpus = max_cpus; 
-    set_xen_guest_handle(sysctl.u.cpuinfo.buffer, info); 
+    sysctl.cmd = XEN_SYSCTL_getcpuinfo;
+    sysctl.u.getcpuinfo.max_cpus = max_cpus; 
+    set_xen_guest_handle(sysctl.u.getcpuinfo.info, info); 
 
-    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
-        return ret;
+    if ( (rc = lock_pages(info, max_cpus*sizeof(*info))) != 0 )
+        return rc;
 
-    if(nr_cpus) 
-        *nr_cpus = sysctl.u.cpuinfo.nr_cpus; 
+    rc = do_sysctl(xc_handle, &sysctl);
 
-    return 0;
+    unlock_pages(info, max_cpus*sizeof(*info));
+
+    if ( nr_cpus )
+        *nr_cpus = sysctl.u.getcpuinfo.nr_cpus; 
+
+    return rc;
 }
 
 
