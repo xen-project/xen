@@ -2601,7 +2601,7 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
         if ( long_mode_do_msr_read(regs) )
@@ -2727,7 +2727,7 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
         if ( !long_mode_do_msr_write(regs) )
