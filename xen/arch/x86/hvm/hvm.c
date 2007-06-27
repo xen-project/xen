@@ -242,6 +242,11 @@ void hvm_domain_relinquish_resources(struct domain *d)
 {
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
+
+    pit_deinit(d);
+    rtc_deinit(d);
+    pmtimer_deinit(d);
+    hpet_deinit(d);
 }
 
 void hvm_domain_destroy(struct domain *d)
@@ -421,17 +426,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    struct domain *d = v->domain;
-
-    if ( v->vcpu_id == 0 )
-    {
-        /* NB. All these really belong in hvm_domain_destroy(). */
-        pit_deinit(d);
-        rtc_deinit(d);
-        pmtimer_deinit(d);
-        hpet_deinit(d);
-    }
-
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
 
