@@ -61,7 +61,7 @@ class IRQController(DevController):
        
         pirq = get_param('irq')
 
-        rc = xc.domain_irq_permission(dom          = self.getDomid(),
+        rc = xc.domain_irq_permission(domid        = self.getDomid(),
                                       pirq         = pirq,
                                       allow_access = True)
 
