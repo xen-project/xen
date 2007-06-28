@@ -3240,6 +3240,7 @@ static int ptwr_emulated_update(
     struct ptwr_emulate_ctxt *ptwr_ctxt)
 {
     unsigned long mfn;
+    unsigned long unaligned_addr = addr;
     struct page_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct vcpu *v = current;
@@ -3294,7 +3295,7 @@ static int ptwr_emulated_update(
     if ( unlikely(!get_page_from_l1e(nl1e, d)) )
     {
         if ( (CONFIG_PAGING_LEVELS >= 3) && is_pv_32bit_domain(d) &&
-             (bytes == 4) && (addr & 4) && !do_cmpxchg &&
+             (bytes == 4) && (unaligned_addr & 4) && !do_cmpxchg &&
              (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
         {
             /*
