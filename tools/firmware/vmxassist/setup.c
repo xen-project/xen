@@ -198,9 +198,10 @@ enter_real_mode(struct regs *regs)
 	}
 
 	/* go from protected to real mode */
-	regs->eflags |= EFLAGS_VM;
 	set_mode(regs, VM86_PROTECTED_TO_REAL);
 	emulate(regs);
+	if (mode != VM86_REAL)
+		panic("failed to emulate between clear PE and long jump.\n");
 }
 
 /*
