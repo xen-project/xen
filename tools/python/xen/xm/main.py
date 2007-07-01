@@ -2213,7 +2213,7 @@ def xm_block_detach(args):
 
 def xm_network_detach(args):
     if serverType == SERVER_XEN_API:
-        arg_check(args, "xm_block_detach", 2, 3)
+        arg_check(args, "xm_network_detach", 2, 3)
         dom = args[0]
         devid = args[1]
         vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
