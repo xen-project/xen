@@ -148,6 +148,8 @@ def save(fd, dominfo, network, live, dst, checkpoint=False):
         except:
             log.exception("Failed to reset the migrating domain's name")
 
+        raise exn
+
 
 def restore(xd, fd, dominfo = None, paused = False):
     signature = read_exact(fd, len(SIGNATURE),
