@@ -56,13 +56,6 @@
 #define	LPGSIZE		(1 << LOG_PDSIZE)	/* large page size */
 #define	LPGMASK		(~(LPGSIZE - 1))	/* large page mask */
 
-#ifdef TEST
-#define	PTE_P		(1 << 0)	/* Present */
-#define	PTE_RW		(1 << 1)	/* Read/Write */
-#define	PTE_US		(1 << 2)	/* User/Supervisor */
-#define	PTE_PS		(1 << 7)	/* Page Size */
-#endif
-
 /* Programmable Interrupt Contoller (PIC) defines */
 #define	PIC_MASTER	0x20
 #define	PIC_SLAVE	0xA0
@@ -194,14 +187,6 @@ set_cr4(unsigned value)
 {
 	__asm__ __volatile__("movl %0, %%cr4" : /* no outputs */ : "r"(value));
 }
-
-#ifdef TEST
-static inline void
-breakpoint(void)
-{
-	outw(0x8A00, 0x8AE0);
-}
-#endif /* TEST */
 
 #endif /* __ASSEMBLY__ */
 

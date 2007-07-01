@@ -25,80 +25,12 @@
  * switch happens to the environment below. The magic indicates
  * that this is a valid context.
  */
-#ifdef TEST
-	.byte 0x55, 0xaa
-	.byte 0x80
-	.code16
-	jmp	_start16
-#else
 	jmp	_start
-#endif
 
 	.align	8
 	.long	VMXASSIST_MAGIC
 	.long	newctx			/* new context */
 	.long	oldctx			/* old context */
-
-#ifdef TEST
-/*
- * We are running in 16-bit. Get into the protected mode as soon as
- * possible. We use our own (minimal) GDT to get started.
- *
- * ROM is a misnomer as this code isn't really rommable (although it
- * only requires a few changes) but it does live in a BIOS ROM segment.
- * This code allows me to debug vmxassists under (a modified version of)
- * Bochs and load it as a "optromimage1".
- */
-	.code16
-	.globl	_start16
-_start16:
-        cli
-
-        /* load our own global descriptor table */
-        data32 addr32 lgdt %cs:(rom_gdtr - TEXTADDR)
-
-        /* go to protected mode */
-        movl    %cr0, %eax
-        orl     $(CR0_PE), %eax
-        movl    %eax, %cr0
-        data32  ljmp $0x08, $1f
-
-        .align  32
-        .globl  rom_gdt
-rom_gdt:
-        .word   0, 0            /* 0x00: reserved */
-        .byte   0, 0, 0, 0
-
-        .word   0xFFFF, 0       /* 0x08: CS 32-bit */
-        .byte   0, 0x9A, 0xCF, 0
-
-        .word   0xFFFF, 0       /* 0x10: CS 32-bit */
-        .byte   0, 0x92, 0xCF, 0
-rom_gdt_end:
-
-        .align  4
-        .globl  rom_gdtr
-rom_gdtr:
-        .word   rom_gdt_end - rom_gdt - 1
-        .long   rom_gdt
-
-        .code32
-1:
-        /* welcome to the 32-bit world */
-        movw    $0x10, %ax
-        movw    %ax, %ds
-        movw    %ax, %es
-        movw    %ax, %ss
-        movw    %ax, %fs
-        movw    %ax, %gs
-
-        /* enable Bochs debug facilities */
-        movw    $0x8A00, %dx
-        movw    $0x8A00, %ax
-        outw    %ax, (%dx)
-
-	jmp	_start
-#endif /* TEST */
 
 /*
  * This is the real start. Control was transfered to this point
@@ -111,9 +43,6 @@ _start:
 	cli
 
 	/* save register parameters to C land */
-#ifdef TEST
-	xorl	%edx, %edx
-#endif
 
 	/* clear bss */
 	cld
@@ -145,11 +74,6 @@ _start:
 halt:
 	push	$halt_msg
 	call	printf
-#ifdef TEST
-        movw    $0x8A00, %dx
-        movw    $0x8AE0, %ax
-        outw    %ax, (%dx)
-#endif
 	cli
 	jmp	.
 

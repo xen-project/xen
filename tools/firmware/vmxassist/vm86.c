@@ -561,11 +561,7 @@ lmsw(struct regs *regs, unsigned prefix, unsigned modrm)
 	unsigned cr0 = (oldctx.cr0 & 0xFFFFFFF0) | ax;
 
 	TRACE((regs, regs->eip - eip, "lmsw 0x%x", ax));
-#ifndef TEST
 	oldctx.cr0 = cr0 | CR0_PE | CR0_NE;
-#else
-	oldctx.cr0 = cr0 | CR0_PE | CR0_NE | CR0_PG;
-#endif
 	if (cr0 & CR0_PE)
 		set_mode(regs, VM86_REAL_TO_PROTECTED);
 
@@ -656,13 +652,8 @@ movcr(struct regs *regs, unsigned prefix, unsigned opc)
 		TRACE((regs, regs->eip - eip, "movl %%cr%d, %%eax", cr));
 		switch (cr) {
 		case 0:
-#ifndef TEST
 			setreg32(regs, modrm,
 				oldctx.cr0 & ~(CR0_PE | CR0_NE));
-#else
-			setreg32(regs, modrm,
-				oldctx.cr0 & ~(CR0_PE | CR0_NE | CR0_PG));
-#endif
 			break;
 		case 2:
 			setreg32(regs, modrm, get_cr2());
@@ -680,9 +671,6 @@ movcr(struct regs *regs, unsigned prefix, unsigned opc)
 		switch (cr) {
 		case 0:
 			oldctx.cr0 = getreg32(regs, modrm) | (CR0_PE | CR0_NE);
-#ifdef TEST
-			oldctx.cr0 |= CR0_PG;
-#endif
 			if (getreg32(regs, modrm) & CR0_PE)
 				set_mode(regs, VM86_REAL_TO_PROTECTED);
 			else
@@ -1086,7 +1074,7 @@ jmpl(struct regs *regs, int prefix)
 
 	if (mode == VM86_REAL_TO_PROTECTED)		/* jump to protected mode */
 		set_mode(regs, VM86_PROTECTED);
-	else if (mode == VM86_PROTECTED_TO_REAL)/* jump to real mode */
+	else if (mode == VM86_PROTECTED_TO_REAL)	/* jump to real mode */
 		set_mode(regs, VM86_REAL);
 	else
 		panic("jmpl");
