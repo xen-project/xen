@@ -185,3 +185,6 @@ class PciController(DevController):
 
     def waitForBackend(self,devid):
         return (0, "ok - no hotplug")
+
+    def migrate(self, config, network, dst, step, domName):
+        raise XendError('Migration not permitted with assigned PCI device.')
