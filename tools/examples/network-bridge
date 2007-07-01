@@ -172,9 +172,21 @@ show_status () {
     echo '============================================================'
 }
 
+is_network_root () {
+    local rootfs=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $3; }}' /etc/mtab)
+    local rootopts=$(awk '{ if ($1 !~ /^[ \t]*#/ && $2 == "/") { print $4; }}' /etc/mtab)
+
+    [[ "$rootfs" =~ "^nfs" ]] || [[ "$rootopts" =~ "_netdev" ]] && return 0 || return 1
+}
+
 op_start () {
     if [ "${bridge}" = "null" ] ; then
 	return
+    fi
+
+    if is_network_root ; then
+        [ -x /usr/bin/logger ] && /usr/bin/logger "network-bridge: bridging not supported on network root; not starting"
+        return
     fi
 
     if link_exists "$pdev"; then
