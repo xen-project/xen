@@ -140,6 +140,7 @@ void cpu_reset(CPUX86State *env)
     if (xcHandle < 0)
         fprintf(logfile, "Cannot acquire xenctrl handle\n");
     else {
+        xc_domain_shutdown_hook(xcHandle, domid);
         sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_reboot);
         if (sts != 0)
             fprintf(logfile,

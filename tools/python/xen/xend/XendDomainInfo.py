@@ -459,6 +459,7 @@ class XendDomainInfo:
             hvm_pvdrv = xc.hvm_get_param(self.domid, HVM_PARAM_CALLBACK_IRQ)
             if not hvm_pvdrv:
                 code = REVERSE_DOMAIN_SHUTDOWN_REASONS[reason]
+                xc.domain_destroy_hook(self.domid)
                 log.info("HVM save:remote shutdown dom %d!", self.domid)
                 xc.domain_shutdown(self.domid, code)
 
