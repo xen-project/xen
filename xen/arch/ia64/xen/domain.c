@@ -361,10 +361,6 @@ void startup_cpu_idle_loop(void)
 # error "XMAPPEDREGS_SHIFT doesn't match sizeof(mapped_regs_t)."
 #endif
 
-#if (IA64_RBS_OFFSET % 512) != IA64_GUEST_CONTEXT_RBS_OFFSET
-# error "arch-ia64.h: IA64_GUEST_CONTEXT_RBS_OFFSET must be adjusted."
-#endif
-
 void hlt_timer_fn(void *data)
 {
 	struct vcpu *v = data;
@@ -689,8 +685,9 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	/* FIXME: to be reordered.  */
 	c.nat->regs.nats = uregs->eml_unat;
 
+	c.nat->regs.rbs_voff = (IA64_RBS_OFFSET / 8) % 64;
 	if (rbs_size < sizeof (c.nat->regs.rbs))
-		memcpy (c.nat->regs.rbs, (char *)v + IA64_RBS_OFFSET, rbs_size);
+		memcpy(c.nat->regs.rbs, (char *)v + IA64_RBS_OFFSET, rbs_size);
 
  	c.nat->privregs_pfn = get_gpfn_from_mfn
 		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
@@ -777,7 +774,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	if (!was_initialised)
 		uregs->loadrs = (rbs_size) << 16;
 	if (rbs_size == (uregs->loadrs >> 16))
-		memcpy ((char *)v + IA64_RBS_OFFSET, c.nat->regs.rbs, rbs_size);
+		memcpy((char *)v + IA64_RBS_OFFSET, c.nat->regs.rbs, rbs_size);
 
 	uregs->r1 = c.nat->regs.r[1];
 	uregs->r12 = c.nat->regs.r[12];

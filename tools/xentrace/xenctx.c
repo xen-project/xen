@@ -335,7 +335,7 @@ void print_ctx(vcpu_guest_context_t *ctx)
     struct vcpu_guest_context_regs *regs = &ctx->regs;
     struct vcpu_tr_regs *tr = &ctx->regs.tr;
     int i;
-    unsigned int rbs_size;
+    unsigned int rbs_size, cfm_sof;
 
     printf(" ip:  %016lx  ", regs->ip);
     print_symbol(regs->ip);
@@ -485,15 +485,18 @@ void print_ctx(vcpu_guest_context_t *ctx)
 
     printf("\n");
     rbs_size = (regs->ar.bsp - regs->ar.bspstore) / 8;
-    for (i = 0; i < (regs->cfm & CFM_SOF_MASK); i++) {
-        unsigned int rbs_off = (((64 - (rbs_size % 64) - i)) / 64) + i;
+    cfm_sof = (regs->cfm & CFM_SOF_MASK);
+    for (i = 0; i < cfm_sof; i++) {
+        int off = cfm_sof - i;
+        unsigned int rbs_off =
+            (((62 - ((rbs_size + regs->rbs_voff) % 64) + off)) / 63) + off;
         if (rbs_off > rbs_size)
             break;
         printf(" r%02d: %016lx%s", 32 + i,
                regs->rbs[rbs_size - rbs_off],
                (i % 3) != 2 ? "  " : "\n");
     }
-    if (i && (i % 3) != 2)
+    if ((i % 3) != 0)
         printf ("\n");
 
     if (disp_tlb) {

@@ -470,17 +470,24 @@ struct vcpu_guest_context_regs {
 
         struct vcpu_tr_regs tr;
 
+        /* Physical registers in case of debug event.  */
+        unsigned long excp_iipa;
+        unsigned long excp_isr;
+        unsigned int excp_vector;
+
         /*
          * The rbs is intended to be the image of the stacked registers still
          * in the cpu (not yet stored in memory).  It is laid out as if it
-         * were written in memory at an 512 (64*8) * aligned address + offset.
-         * The offset is IA64_RBS_OFFSET % 512.
-         * rbs_nat contains NaT bits for the remaining rbs registers.
+         * were written in memory at a 512 (64*8) aligned address + offset.
+         * rbs_voff is (offset / 8).  rbs_nat contains NaT bits for the
+         * remaining rbs registers.  rbs_rnat contains NaT bits for in memory
+         * rbs registers.
+         * Note: loadrs is 2**14 bytes == 2**11 slots.
          */
-        /* Note: loadrs is 2**14 bytes == 2**11 slots.  */
-#define IA64_GUEST_CONTEXT_RBS_OFFSET 448
+        unsigned int rbs_voff;
         unsigned long rbs[2048];
         unsigned long rbs_nat;
+        unsigned long rbs_rnat;
 };
 
 struct vcpu_guest_context {
