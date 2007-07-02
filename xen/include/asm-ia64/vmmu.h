@@ -32,6 +32,7 @@
 #define     VCPU_VHPT_ORDER     (VCPU_VHPT_SHIFT - PAGE_SHIFT)
 #define     VTLB(v,_x)          (v->arch.vtlb._x)
 #define     VHPT(v,_x)          (v->arch.vhpt._x)
+#define     _PAGE_PL_PRIV       (CONFIG_CPL0_EMUL << 7)
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>

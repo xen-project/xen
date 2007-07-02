@@ -546,7 +546,7 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	/* Ignore non-addr bits of pteval2 and force PL0->2
 	   (PL3 is unaffected) */
 	return (pteval & ~_PAGE_PPN_MASK) |
-	       (pteval2 & _PAGE_PPN_MASK) | _PAGE_PL_2;
+	       (pteval2 & _PAGE_PPN_MASK) | _PAGE_PL_PRIV;
 }
 
 // given a current domain metaphysical address, return the physical address
@@ -711,7 +711,8 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
         p2m_entry_set(entry, NULL, __pte(0));
     //XXX This is a work around until the emulation memory access to a region
     //    where memory or device are attached is implemented.
-    return pte_val(pfn_pte(0, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+    return pte_val(pfn_pte(0, __pgprot(__DIRTY_BITS | _PAGE_PL_PRIV |
+                                       _PAGE_AR_RWX)));
 }
 
 // FIXME: ONLY USE FOR DOMAIN PAGE_SIZE == PAGE_SIZE
@@ -785,7 +786,7 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr,
     set_pte_rel(pte,
                 pfn_pte(maddr >> PAGE_SHIFT,
                         __pgprot(_PAGE_PGC_ALLOCATED | __DIRTY_BITS |
-                                 _PAGE_PL_2 | _PAGE_AR_RWX)));
+                                 _PAGE_PL_PRIV | _PAGE_AR_RWX)));
 
     smp_mb();
     return p;
@@ -820,7 +821,7 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 static unsigned long
 flags_to_prot (unsigned long flags)
 {
-    unsigned long res = _PAGE_PL_2 | __DIRTY_BITS;
+    unsigned long res = _PAGE_PL_PRIV | __DIRTY_BITS;
 
     res |= flags & ASSIGN_readonly ? _PAGE_AR_R: _PAGE_AR_RWX;
     res |= flags & ASSIGN_nocache ? _PAGE_MA_UC: _PAGE_MA_WB;

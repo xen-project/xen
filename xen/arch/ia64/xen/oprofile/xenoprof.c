@@ -28,20 +28,26 @@
 int
 xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
 {
-    int mode = 0;
+    int mode;
 
     // mode
     // 0: user, 1: kernel, 2: xen
-    // Xen/IA64 uses ring2 for kernel, and doesn't use ring1.
-    if (ring_2(regs))
-        mode = 1;
-    else if (ring_0(regs))
-        mode = 2;
-    else if (ring_1(regs)) {
-        gdprintk(XENLOG_ERR, "%s:%d ring1 is used!\n", __func__, __LINE__);
-        mode = 1;// fall back to kernel mode.
+    switch (ring(regs))
+    {
+        case 3:
+                mode = 0;
+                break;
+        case CONFIG_CPL0_EMUL:
+                mode = 1;
+                break;
+        case 0:
+                mode = 2;
+                break;
+        default:
+                gdprintk(XENLOG_ERR, "%s:%d ring%d is used!\n", __func__,
+                         __LINE__, 3 - CONFIG_CPL0_EMUL);
+                mode = 1; /* fall back to kernel mode. */
     }
-
     return mode;
 }
 

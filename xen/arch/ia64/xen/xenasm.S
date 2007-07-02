@@ -11,6 +11,7 @@
 #include <asm/pgtable.h>
 #include <asm/vhpt.h>
 #include <asm/asm-xsi-offsets.h>
+#include <asm/vmmu.h>
 #include <public/xen.h>
 	
 // Change rr7 to the passed value while ensuring
@@ -148,7 +149,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 
 	//  Shared info
 	mov r24=XSI_SHIFT<<2
-	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
+	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_PRIV | _PAGE_AR_RW)
 	;;
 	ptr.d	in3,r24
 	or r23=in1,r25			// construct PA | page properties

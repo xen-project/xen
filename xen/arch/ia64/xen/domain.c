@@ -838,8 +838,9 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
  	if (!d->arch.is_vti) {
  		/* domain runs at PL2/3 */
- 		uregs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
- 		uregs->ar_rsc |= (2 << 2); /* force PL2/3 */
+ 		uregs->cr_ipsr = vcpu_pl_adjust(uregs->cr_ipsr,
+		                                IA64_PSR_CPL0_BIT);
+ 		uregs->ar_rsc = vcpu_pl_adjust(uregs->ar_rsc, 2);
  	}
 
 	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {

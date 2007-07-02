@@ -55,6 +55,9 @@
 
 #define NR_hypercalls 64
 
+/* PV domains use this value for priv. level 0 emulation */
+#define CONFIG_CPL0_EMUL	1
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?

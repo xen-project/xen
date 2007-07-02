@@ -267,7 +267,7 @@ struct switch_stack {
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)
 #ifdef XEN
 # define guest_mode(regs)		(ia64_psr(regs)->cpl != 0)
-# define guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == 2)
+# define guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL)
 #else
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
 #endif

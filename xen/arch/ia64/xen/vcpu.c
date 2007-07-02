@@ -158,7 +158,7 @@ void vcpu_init_regs(struct vcpu *v)
 		regs->cr_ipsr &= ~(IA64_PSR_BITS_TO_CLEAR
 				   | IA64_PSR_RI | IA64_PSR_IS);
 		// domain runs at PL2
-		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
+		regs->cr_ipsr = vcpu_pl_adjust(regs->cr_ipsr,IA64_PSR_CPL0_BIT);
 		// lazy fp 
 		PSCB(v, hpsr_dfh) = 1;
 		PSCB(v, hpsr_mfh) = 0;
@@ -174,7 +174,7 @@ void vcpu_init_regs(struct vcpu *v)
 		VCPU(v, dcr) = 0;
 	} else {
 		init_all_rr(v);
-		regs->ar_rsc |= (2 << 2);	/* force PL2/3 */
+		regs->ar_rsc = vcpu_pl_adjust(regs->ar_rsc, 2);
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
 		VCPU(v, interrupt_mask_addr) =
@@ -496,7 +496,7 @@ IA64FAULT vcpu_set_psr(VCPU * vcpu, u64 val)
 	PSCB(vcpu, interrupt_collection_enabled) = vpsr.ic;
 	vcpu_set_metaphysical_mode(vcpu, !(vpsr.dt && vpsr.rt && vpsr.it));
 
-	newpsr.cpl |= vpsr.cpl | 2;
+	newpsr.cpl |= max(vpsr.cpl, (u64)CONFIG_CPL0_EMUL);
 
 	if (PSCB(vcpu, banknum)	!= vpsr.bn) {
 		if (vpsr.bn)
@@ -535,10 +535,10 @@ u64 vcpu_get_psr(VCPU * vcpu)
 	newpsr.ia64_psr.pp = PSCB(vcpu, vpsr_pp);
 
 	/* Fool cpl.  */
-	if (ipsr.ia64_psr.cpl < 3)
+	if (ipsr.ia64_psr.cpl <= CONFIG_CPL0_EMUL)
 		newpsr.ia64_psr.cpl = 0;
 	else
-		newpsr.ia64_psr.cpl = 3;
+		newpsr.ia64_psr.cpl = ipsr.ia64_psr.cpl;
 
 	newpsr.ia64_psr.bn = PSCB(vcpu, banknum);
 	
@@ -1646,7 +1646,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 
 		} else {
 			*pteval = (address & _PAGE_PPN_MASK) |
-				__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
+				__DIRTY_BITS | _PAGE_PL_PRIV | _PAGE_AR_RWX;
 			*itir = PAGE_SHIFT << 2;
 			perfc_incr(phys_translate);
 			return IA64_NO_FAULT;
@@ -1711,7 +1711,7 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 		REGS *regs = vcpu_regs(vcpu);
 		// NOTE: This is specific code for linux kernel
 		// We assume region 7 is identity mapped
-		if (region == 7 && ia64_psr(regs)->cpl == 2) {
+		if (region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL) {
 			pte.val = address & _PAGE_PPN_MASK;
 			pte.val = pte.val | pgprot_val(PAGE_KERNEL);
 			goto out;
@@ -2090,8 +2090,8 @@ vcpu_set_tr_entry_rid(TR_ENTRY * trp, u64 pte,
 	trp->rid = rid;
 	ps = trp->ps;
 	new_pte.val = pte;
-	if (new_pte.pl < 2)
-		new_pte.pl = 2;
+	if (new_pte.pl < CONFIG_CPL0_EMUL)
+		new_pte.pl = CONFIG_CPL0_EMUL;
 	trp->vadr = ifa & ~0xfff;
 	if (ps > 12) {		// "ignore" relevant low-order bits
 		new_pte.ppn &= ~((1UL << (ps - 12)) - 1);

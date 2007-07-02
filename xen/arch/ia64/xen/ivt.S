@@ -510,7 +510,8 @@ ENTRY(break_fault)
 (p7)	br.spnt.many dispatch_privop_fault
 	;;
 #endif
-	// if (ipsr.cpl == 2 && (iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX)
+	// if (ipsr.cpl == CONFIG_CPL0_EMUL &&
+	//    (iim - HYPERPRIVOP_START) < HYPERPRIVOP_MAX)
 	// this is a hyperprivop. A hyperprivop is hand-coded assembly with
 	// psr.ic off which means it can make no calls, cannot use r1-r15,
 	// and it can have no memory accesses unless they are to pinned
@@ -524,7 +525,7 @@ ENTRY(break_fault)
 	;;
 	cmp.gtu p7,p0=r21,r20
 	;;
-	cmp.eq.and p7,p0=2,r19			// ipsr.cpl==2
+	cmp.eq.and p7,p0=CONFIG_CPL0_EMUL,r19	// ipsr.cpl==CONFIG_CPL0_EMUL
 (p7)	br.sptk.many fast_hyperprivop
 	;;
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET
@@ -535,7 +536,7 @@ ENTRY(break_fault)
 	;;
 	ld4 r23=[r23];;
 	cmp4.eq p6,p0=r23,r17;;			// Xen-reserved breakimm?
-	cmp.eq.and p6,p0=2,r19        
+	cmp.eq.and p6,p0=CONFIG_CPL0_EMUL,r19        
 (p6)	br.spnt.many fast_hypercall
 	;;
 	br.sptk.many fast_break_reflect
