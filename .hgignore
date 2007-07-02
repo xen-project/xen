@@ -127,6 +127,8 @@
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
 ^tools/libxc/xen/.*$
+^tools/libxc/ia64/asm/acpi\.h$
+^tools/libxc/ia64/xen/list\.h$
 ^tools/libxen/libxenapi-
 ^tools/libxen/test/test_bindings$
 ^tools/libxen/test/test_event_handling$
@@ -208,6 +210,7 @@
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
 ^tools/xm-test/tests/.*\.test$
 ^xen/BLOG$
+^xen/System.map$
 ^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$
 ^xen/arch/x86/boot/mkelf32$
@@ -215,6 +218,7 @@
 ^xen/ddb/.*$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
+^xen/include/asm-ia64/asm-xsi-offsets\.h$
 ^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
 ^xen/include/public/foreign/.*\.(c|h|size)$
@@ -230,6 +234,10 @@
 ^xen/xen$
 ^xen/xen-syms$
 ^xen/xen\..*$
+^xen/arch/ia64/asm-offsets\.s$
+^xen/arch/ia64/asm-xsi-offsets\.s$
+^xen/arch/ia64/map\.out$
+^xen/arch/ia64/xen\.lds\.s$
 ^xen/arch/powerpc/dom0\.bin$
 ^xen/arch/powerpc/asm-offsets\.s$
 ^xen/arch/powerpc/firmware$
