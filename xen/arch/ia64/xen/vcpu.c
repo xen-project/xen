@@ -1780,8 +1780,10 @@ IA64FAULT vcpu_set_dbr(VCPU * vcpu, u64 reg, u64 val)
 		if (val >= HYPERVISOR_VIRT_START && val <= HYPERVISOR_VIRT_END)
 			return IA64_ILLOP_FAULT;
 	} else {
-		/* Mask PL0.  */
-		val &= ~(1UL << 56);
+		if (!VMX_DOMAIN(vcpu)) {
+			/* Mask PL0. */
+			val &= ~(1UL << 56);
+		}
 	}
 	if (val != 0)
 		vcpu->arch.dbg_used |= (1 << reg);
@@ -1802,8 +1804,10 @@ IA64FAULT vcpu_set_ibr(VCPU * vcpu, u64 reg, u64 val)
 		if (val >= HYPERVISOR_VIRT_START && val <= HYPERVISOR_VIRT_END)
 			return IA64_ILLOP_FAULT;
 	} else {
-		/* Mask PL0.  */
-		val &= ~(1UL << 56);
+		if (!VMX_DOMAIN(vcpu)) {
+			/* Mask PL0. */
+			val &= ~(1UL << 56);
+		}
 	}
 	if (val != 0)
 		vcpu->arch.dbg_used |= (1 << (reg + IA64_NUM_DBG_REGS));

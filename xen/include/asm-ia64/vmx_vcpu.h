@@ -313,30 +313,22 @@ static inline u64 vmx_vcpu_get_cpuid(VCPU * vcpu, u64 reg)
 
 static inline IA64FAULT vmx_vcpu_set_dbr(VCPU * vcpu, u64 reg, u64 val)
 {
-	// TODO: unimplemented DBRs return a reserved register fault
-	// TODO: Should set Logical CPU state, not just physical
-	ia64_set_dbr(reg, val);
-	return IA64_NO_FAULT;
+        return vcpu_set_dbr(vcpu, reg, val);
 }
 
 static inline IA64FAULT vmx_vcpu_set_ibr(VCPU * vcpu, u64 reg, u64 val)
 {
-	// TODO: unimplemented IBRs return a reserved register fault
-	// TODO: Should set Logical CPU state, not just physical
-	ia64_set_ibr(reg, val);
-	return IA64_NO_FAULT;
+        return vcpu_set_ibr(vcpu, reg, val);
 }
 
-static inline u64 vmx_vcpu_get_dbr(VCPU * vcpu, u64 reg)
+static inline IA64FAULT vmx_vcpu_get_dbr(VCPU * vcpu, u64 reg, u64 *pval)
 {
-	// TODO: unimplemented DBRs return a reserved register fault
-	return ((u64)ia64_get_dbr(reg));
+        return vcpu_get_dbr(vcpu, reg, pval);
 }
 
-static inline u64 vmx_vcpu_get_ibr(VCPU * vcpu, u64 reg)
+static inline IA64FAULT vmx_vcpu_get_ibr(VCPU * vcpu, u64 reg, u64 *pval)
 {
-	// TODO: unimplemented IBRs return a reserved register fault
-	return ((u64)ia64_get_ibr(reg));
+        return vcpu_get_ibr(vcpu, reg, pval);
 }
 
 /**************************************************************************

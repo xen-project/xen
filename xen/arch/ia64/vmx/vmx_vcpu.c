@@ -96,8 +96,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
      */
     VCPU(vcpu,vpsr) = value &
             (~ (IA64_PSR_ID |IA64_PSR_DA | IA64_PSR_DD |
-                IA64_PSR_SS | IA64_PSR_ED | IA64_PSR_IA
-            ));
+                IA64_PSR_ED | IA64_PSR_IA));
 
     if ( !old_psr.i && (value & IA64_PSR_I) ) {
         // vpsr.i 0->1

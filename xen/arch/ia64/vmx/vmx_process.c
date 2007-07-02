@@ -86,19 +86,20 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
     u64 vpsr = VCPU(vcpu, vpsr);
     
     vector = vec2off[vec];
-    if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
-        panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
-    }
 
     switch (vec) {
-
+    case 5:  // IA64_DATA_NESTED_TLB_VECTOR
+        break;
     case 22:	// IA64_INST_ACCESS_RIGHTS_VECTOR
+        if (!(vpsr & IA64_PSR_IC))
+            goto nested_fault;
         if (vhpt_access_rights_fixup(vcpu, ifa, 0))
             return;
         break;
 
     case 25:	// IA64_DISABLED_FPREG_VECTOR
-
+        if (!(vpsr & IA64_PSR_IC))
+            goto nested_fault;
         if (FP_PSR(vcpu) & IA64_PSR_DFH) {
             FP_PSR(vcpu) = IA64_PSR_MFH;
             if (__ia64_per_cpu_var(fp_owner) != vcpu)
@@ -110,8 +111,10 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         }
 
         break;       
-        
+
     case 32:	// IA64_FP_FAULT_VECTOR
+        if (!(vpsr & IA64_PSR_IC))
+            goto nested_fault;
         // handle fpswa emulation
         // fp fault
         status = handle_fpu_swa(1, regs, isr);
@@ -123,6 +126,8 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         break;
 
     case 33:	// IA64_FP_TRAP_VECTOR
+        if (!(vpsr & IA64_PSR_IC))
+            goto nested_fault;
         //fp trap
         status = handle_fpu_swa(0, regs, isr);
         if (!status)
@@ -132,7 +137,23 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
             return;
         }
         break;
-    
+
+    case 29: // IA64_DEBUG_VECTOR
+    case 35: // IA64_TAKEN_BRANCH_TRAP_VECTOR
+    case 36: // IA64_SINGLE_STEP_TRAP_VECTOR
+        if (vmx_guest_kernel_mode(regs)
+            && current->domain->debugger_attached) {
+            domain_pause_for_debugger();
+            return;
+        }
+        if (!(vpsr & IA64_PSR_IC))
+            goto nested_fault;
+        break;
+
+    default:
+        if (!(vpsr & IA64_PSR_IC))
+            goto nested_fault;
+        break;
     } 
     VCPU(vcpu,isr)=isr;
     VCPU(vcpu,iipa) = regs->cr_iip;
@@ -142,6 +163,10 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         set_ifa_itir_iha(vcpu,ifa,1,1,1);
     }
     inject_guest_interruption(vcpu, vector);
+    return;
+
+ nested_fault:
+    panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
 }
 
 

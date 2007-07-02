@@ -26,7 +26,7 @@
 #include <asm/processor.h>
 #include <asm/vmx_mm_def.h>
 
-
+#ifdef CHECK_FAULT
 /*
  * Return:
  *  0:  Not reserved indirect registers
@@ -71,6 +71,7 @@ is_reserved_indirect_register (
     return 0;
 
 }
+#endif
 
 /*
  * Return:
@@ -207,7 +208,7 @@ check_psr_rsv_fields (u64 value)
 }
 
 
-
+#ifdef CHECK_FAULT
 /*
  * Return:
  *  1: CR reserved fields are not zero
@@ -310,9 +311,9 @@ check_cr_rsv_fields (int index, u64 value)
     panic ("Unsupported CR");
     return 0;
 }
+#endif
 
-
-
+#if 0
 /*
  * Return:
  *  0:  Indirect Reg reserved fields are not zero
@@ -361,7 +362,7 @@ check_indirect_reg_rsv_fields ( int type, int index, u64 value )
 
     return 1;
 }
-
+#endif
 
 
 

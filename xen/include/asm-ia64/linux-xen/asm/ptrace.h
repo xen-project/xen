@@ -278,6 +278,7 @@ struct switch_stack {
 #ifdef XEN
 # define guest_mode(regs)		(ia64_psr(regs)->cpl != 0)
 # define guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL)
+# define vmx_guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == 0)
 #else
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
 #endif

@@ -178,8 +178,8 @@ static IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
 {
     u64 val;
 
-    if(vcpu_get_gr_nat(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
-	panic_domain(vcpu_regs(vcpu),"get_psr nat bit fault\n");
+    if (vcpu_get_gr_nat(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
+        panic_domain(vcpu_regs(vcpu),"get_psr nat bit fault\n");
 
     return vmx_vcpu_set_psr_l(vcpu, val);
 }
@@ -914,7 +914,6 @@ static IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 static IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r2;
-    return IA64_NO_FAULT;
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -932,7 +931,7 @@ static IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
 #endif  //CHECK_FAULT
     }
-    return (vmx_vcpu_set_ibr(vcpu,r3,r2));
+    return vmx_vcpu_set_ibr(vcpu,r3,r2);
 }
 
 static IA64FAULT vmx_emul_mov_to_pmc(VCPU *vcpu, INST64 inst)
@@ -1062,6 +1061,7 @@ static IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
 static IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
+    IA64FAULT res;
 #ifdef  CHECK_FAULT
     if(check_target_register(vcpu, inst.M43.r1)){
         set_illegal_op_isr(vcpu);
@@ -1092,13 +1092,16 @@ static IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif  //CHECK_FAULT
-    r1 = vmx_vcpu_get_dbr(vcpu, r3);
+    res = vmx_vcpu_get_ibr(vcpu, r3, &r1);
+    if (res != IA64_NO_FAULT)
+        return res;
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 static IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
 {
     u64 r3,r1;
+    IA64FAULT res;
 #ifdef  CHECK_FAULT
     if(check_target_register(vcpu, inst.M43.r1)){
         set_illegal_op_isr(vcpu);
@@ -1129,7 +1132,9 @@ static IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif  //CHECK_FAULT
-    r1 = vmx_vcpu_get_ibr(vcpu, r3);
+    res = vmx_vcpu_get_dbr(vcpu, r3, &r1);
+    if (res != IA64_NO_FAULT)
+        return res;
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
@@ -1562,21 +1567,37 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
         break;
     case EVENT_VMSW:
         printk ("Unimplemented instruction %ld\n", cause);
-	status=IA64_FAULT;
+        status=IA64_FAULT;
         break;
     default:
-        panic_domain(regs,"unknown cause %ld, iip: %lx, ipsr: %lx\n", cause,regs->cr_iip,regs->cr_ipsr);
+        panic_domain(regs,"unknown cause %ld, iip: %lx, ipsr: %lx\n",
+                     cause,regs->cr_iip,regs->cr_ipsr);
         break;
     };
 
 #if 0
-    if (status == IA64_FAULT)
+    if (status != IA64_NO_FAULT)
 	panic("Emulation failed with cause %d:\n", cause);
 #endif
 
-    if ( status == IA64_NO_FAULT && cause !=EVENT_RFI ) {
-        vcpu_increment_iip(vcpu);
+    switch (status) {
+    case IA64_RSVDREG_FAULT:
+        set_rsv_reg_field_isr(vcpu);
+        rsv_reg_field(vcpu);
+        break;
+    case IA64_ILLOP_FAULT:
+        set_illegal_op_isr(vcpu);
+        illegal_op(vcpu);
+        break;
+    case IA64_FAULT:
+        /* Registers aleady set.  */
+        break;
+    case IA64_NO_FAULT:
+        if ( cause != EVENT_RFI )
+            vcpu_increment_iip(vcpu);
+        break;
     }
+
 
     recover_if_physical_mode(vcpu);
     return;
