@@ -117,6 +117,12 @@ typedef unsigned long xen_ulong_t;
 #define NVRAM_SIZE       (MEM_K * 64)
 #define NVRAM_START      (GFW_START + 10 * MEM_M)
 
+#define NVRAM_VALID_SIG 0x4650494e45584948 		// "HIXENIPF"
+struct nvram_save_addr {
+    unsigned long addr;
+    unsigned long signature;
+};
+
 struct pt_fpreg {
     union {
         unsigned long bits[2];
