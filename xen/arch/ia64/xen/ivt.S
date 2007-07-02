@@ -371,16 +371,6 @@ ENTRY(dkey_miss)
 	FAULT_OR_REFLECT(7)
 END(dkey_miss)
 
-	
-#define SAVE_MIN_COVER_DONE	DO_SAVE_MIN(,mov r30=cr.ifs,)
-
-// same as dispatch_break_fault except cover has already been done
-GLOBAL_ENTRY(dispatch_slow_hyperprivop)
-	SAVE_MIN_COVER_DONE
-	;;
-	br.sptk.many dispatch_break_fault_post_save
-END(dispatch_slow_hyperprivop)
-
 	.org ia64_ivt+0x2000
 //////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
@@ -737,7 +727,6 @@ END(break_fault)
 ENTRY(interrupt)
 	DBG_FAULT(12)
 	mov r31=pr		// prepare to save predicates
-	;;
 	mov r30=cr.ivr		// pass cr.ivr as first arg
 	// FIXME: this is a hack... use cpuinfo.ksoftirqd because its
 	// not used anywhere else and we need a place to stash ivr and
@@ -745,7 +734,6 @@ ENTRY(interrupt)
 	movl r29=THIS_CPU(cpu_info)+IA64_CPUINFO_KSOFTIRQD_OFFSET
 	;;
 	st8 [r29]=r30
-	;;
 	movl r28=slow_interrupt
 	;;
 	mov r29=rp
@@ -806,7 +794,6 @@ dispatch_break_fault_post_save:
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
-//	br.sptk.many ia64_prepare_handle_break	// TODO: why commented out?
     	br.call.sptk.many b6=ia64_handle_break
 END(dispatch_break_fault)
 
@@ -998,7 +985,6 @@ ENTRY(dispatch_privop_fault)
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
-//	br.sptk.many ia64_prepare_handle_privop  // TODO: why commented out?
      	br.call.sptk.many b6=ia64_handle_privop
 END(dispatch_privop_fault)
 
@@ -1126,27 +1112,7 @@ END(general_exception)
 // 0x5500 Entry 25 (size 16 bundles) Disabled FP-Register (35)
 ENTRY(disabled_fp_reg)
 	DBG_FAULT(25)
-#if 0				// TODO: can this be removed?
-	mov r20=pr
-	movl r16=0x2000000000000000
-	movl r17=0x2000000000176b60
-	mov r18=cr.iip
-	mov r19=rr[r16]
-	movl r22=0xe95d0439
-	;;
-	mov pr=r0,-1
-	;;
-	cmp.eq p6,p7=r22,r19
-	;;
-	(p6) cmp.eq p8,p9=r17,r18
-	(p8) br.sptk.few floating_panic
-	;;
-	mov pr=r20,-1
-	;;
-#endif
 	FAULT_OR_REFLECT(25)
-//floating_panic:		// TODO: can this be removed?
-//	br.sptk.many floating_panic
 	;;
 	rsm psr.dfh		// ensure we can access fph
 	;;
