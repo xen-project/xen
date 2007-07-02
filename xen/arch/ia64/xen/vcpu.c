@@ -496,7 +496,7 @@ IA64FAULT vcpu_set_psr(VCPU * vcpu, u64 val)
 	PSCB(vcpu, interrupt_collection_enabled) = vpsr.ic;
 	vcpu_set_metaphysical_mode(vcpu, !(vpsr.dt && vpsr.rt && vpsr.it));
 
-	newpsr.cpl |= max(vpsr.cpl, (u64)CONFIG_CPL0_EMUL);
+	newpsr.cpl |= max((u64)vpsr.cpl, (u64)CONFIG_CPL0_EMUL);
 
 	if (PSCB(vcpu, banknum)	!= vpsr.bn) {
 		if (vpsr.bn)
