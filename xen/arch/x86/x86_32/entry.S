@@ -72,48 +72,36 @@
         andl $~3,reg;            \
         movl (reg),reg;
 
-
         ALIGN
 restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
         testl $X86_EFLAGS_VM,UREGS_eflags(%esp)
-        jnz  restore_all_vm86
+        popl  %ebx
+        popl  %ecx
+        popl  %edx
+        popl  %esi
+        popl  %edi
+        popl  %ebp
+        popl  %eax
+        leal  4(%esp),%esp
+        jnz   .Lrestore_iret_guest
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
-        testl $2,UREGS_cs(%esp)
-        jnz   1f
+        testb $2,UREGS_cs-UREGS_eip(%esp)
+        jnz   .Lrestore_sregs_guest
         call  restore_ring0_guest
-        jmp   restore_all_vm86
-1:
+        jmp   .Lrestore_iret_guest
 #endif
-.Lft1:  mov  UREGS_ds(%esp),%ds
-.Lft2:  mov  UREGS_es(%esp),%es
-.Lft3:  mov  UREGS_fs(%esp),%fs
-.Lft4:  mov  UREGS_gs(%esp),%gs
-restore_all_vm86:
-        popl %ebx
-        popl %ecx
-        popl %edx
-        popl %esi
-        popl %edi
-        popl %ebp
-        popl %eax
-        addl $4,%esp
+.Lrestore_sregs_guest:
+.Lft1:  mov  UREGS_ds-UREGS_eip(%esp),%ds
+.Lft2:  mov  UREGS_es-UREGS_eip(%esp),%es
+.Lft3:  mov  UREGS_fs-UREGS_eip(%esp),%fs
+.Lft4:  mov  UREGS_gs-UREGS_eip(%esp),%gs
+.Lrestore_iret_guest:
 .Lft5:  iret
 .section .fixup,"ax"
-.Lfx5:  subl  $28,%esp
-        pushl 28(%esp)                 # error_code/entry_vector
-        movl  %eax,UREGS_eax+4(%esp)
-        movl  %ebp,UREGS_ebp+4(%esp)
-        movl  %edi,UREGS_edi+4(%esp)
-        movl  %esi,UREGS_esi+4(%esp)
-        movl  %edx,UREGS_edx+4(%esp)
-        movl  %ecx,UREGS_ecx+4(%esp)
-        movl  %ebx,UREGS_ebx+4(%esp)
-.Lfx1:  SET_XEN_SEGMENTS(a)
-        movl  %eax,%fs
-        movl  %eax,%gs
-        sti
-        popl  %esi
+.Lfx1:  sti
+        SAVE_ALL_GPRS
+        mov   UREGS_error_code(%esp),%esi
         pushfl                         # EFLAGS
         movl  $__HYPERVISOR_CS,%eax
         pushl %eax                     # CS
@@ -147,7 +135,7 @@ failsafe_callback:
         .long .Lft2,.Lfx1
         .long .Lft3,.Lfx1
         .long .Lft4,.Lfx1
-        .long .Lft5,.Lfx5
+        .long .Lft5,.Lfx1
 .previous
 .section __ex_table,"a"
         .long .Ldf1,failsafe_callback
@@ -169,8 +157,8 @@ restore_all_xen:
 ENTRY(hypercall)
         subl $4,%esp
         FIXUP_RING0_GUEST_STACK
-        SAVE_ALL(b)
-        sti
+        SAVE_ALL(1f,1f)
+1:      sti
         GET_CURRENT(%ebx)
         cmpl  $NR_hypercalls,%eax
         jae   bad_hypercall
@@ -420,9 +408,14 @@ ENTRY(divide_error)
         ALIGN
 handle_exception:
         FIXUP_RING0_GUEST_STACK
-        SAVE_ALL_NOSEGREGS(a)
-        SET_XEN_SEGMENTS(a)
-        testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%esp)
+        SAVE_ALL(1f,2f)
+        .text 1
+        /* Exception within Xen: make sure we have valid %ds,%es. */
+1:      mov   %ecx,%ds
+        mov   %ecx,%es
+        jmp   2f
+        .previous
+2:      testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%esp)
         jz    exception_with_ints_disabled
         sti                             # re-enable interrupts
 1:      xorl  %eax,%eax
@@ -533,71 +526,81 @@ ENTRY(page_fault)
         movw  $TRAP_page_fault,2(%esp)
         jmp   handle_exception
 
-ENTRY(machine_check)
-        pushl $TRAP_machine_check<<16
-        jmp   handle_exception
-
 ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
         jmp   handle_exception
 
 ENTRY(early_page_fault)
-        SAVE_ALL_NOSEGREGS(a)
-        movl  %esp,%edx
-        pushl %edx
+        SAVE_ALL(1f,1f)
+1:      movl  %esp,%eax
+        pushl %eax
         call  do_early_page_fault
         addl  $4,%esp
         jmp   restore_all_xen
 
-ENTRY(nmi)
+handle_nmi_mce:
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
-        # NMI entry protocol is incompatible with guest kernel in ring 0.
+        # NMI/MCE entry protocol is incompatible with guest kernel in ring 0.
+        addl  $4,%esp
         iret
 #else
         # Save state but do not trash the segment registers!
-        # We may otherwise be unable to reload them or copy them to ring 1. 
-        pushl %eax
-        SAVE_ALL_NOSEGREGS(a)
-
-        # We can only process the NMI if:
-        #  A. We are the outermost Xen activation (in which case we have
-        #     the selectors safely saved on our stack)
-        #  B. DS and ES contain sane Xen values.
-        # In all other cases we bail without touching DS-GS, as we have
-        # interrupted an enclosing Xen activation in tricky prologue or
-        # epilogue code.
-        movl  UREGS_eflags(%esp),%eax
-        movb  UREGS_cs(%esp),%al
-        testl $(3|X86_EFLAGS_VM),%eax
-        jnz   continue_nmi
-        movl  %ds,%eax
-        cmpw  $(__HYPERVISOR_DS),%ax
-        jne   defer_nmi
-        movl  %es,%eax
-        cmpw  $(__HYPERVISOR_DS),%ax
-        jne   defer_nmi
-
-continue_nmi:
-        SET_XEN_SEGMENTS(d)
+        SAVE_ALL(.Lnmi_mce_xen,.Lnmi_mce_common)
+.Lnmi_mce_common:
+        xorl  %eax,%eax
+        movw  UREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
         pushl %edx
-        call  do_nmi
+        call  *exception_table(,%eax,4)
         addl  $4,%esp
+        /* 
+         * NB. We may return to Xen context with polluted %ds/%es. But in such
+         * cases we have put guest DS/ES on the guest stack frame, which will
+         * be detected by SAVE_ALL(), or we have rolled back restore_guest.
+         */
         jmp   ret_from_intr
-
-defer_nmi:
-        movl  $FIXMAP_apic_base,%eax
-        # apic_wait_icr_idle()
-1:      movl  %ss:APIC_ICR(%eax),%ebx
-        testl $APIC_ICR_BUSY,%ebx
-        jnz   1b
-        # __send_IPI_shortcut(APIC_DEST_SELF, TRAP_deferred_nmi)
-        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_PHYSICAL | \
-                TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
-        jmp   restore_all_xen
+.Lnmi_mce_xen:
+        /* Check the outer (guest) context for %ds/%es state validity. */
+        GET_GUEST_REGS(%ebx)
+        testl $X86_EFLAGS_VM,%ss:UREGS_eflags(%ebx)
+        mov   %ds,%eax
+        mov   %es,%edx
+        jnz   .Lnmi_mce_vm86
+        /* We may have interrupted Xen while messing with %ds/%es... */
+        cmpw  %ax,%cx
+        mov   %ecx,%ds             /* Ensure %ds is valid */
+        cmove UREGS_ds(%ebx),%eax  /* Grab guest DS if it wasn't in %ds */
+        cmpw  %dx,%cx
+        movl  %eax,UREGS_ds(%ebx)  /* Ensure guest frame contains guest DS */
+        cmove UREGS_es(%ebx),%edx  /* Grab guest ES if it wasn't in %es */
+        mov   %ecx,%es             /* Ensure %es is valid */
+        movl  $.Lrestore_sregs_guest,%ecx
+        movl  %edx,UREGS_es(%ebx)  /* Ensure guest frame contains guest ES */
+        cmpl  %ecx,UREGS_eip(%esp)
+        jbe   .Lnmi_mce_common
+        cmpl  $.Lrestore_iret_guest,UREGS_eip(%esp)
+        ja    .Lnmi_mce_common
+        /* Roll outer context restore_guest back to restoring %ds/%es. */
+        movl  %ecx,UREGS_eip(%esp)
+        jmp   .Lnmi_mce_common
+.Lnmi_mce_vm86:
+        /* vm86 is easy: the CPU saved %ds/%es so we can safely stomp them. */
+        mov   %ecx,%ds
+        mov   %ecx,%es
+        jmp   .Lnmi_mce_common
 #endif /* !CONFIG_X86_SUPERVISOR_MODE_KERNEL */
 
+ENTRY(nmi)
+        pushl $TRAP_nmi<<16
+        jmp   handle_nmi_mce
+
+ENTRY(machine_check)
+        pushl $TRAP_machine_check<<16
+        jmp   handle_nmi_mce
+
 ENTRY(setup_vm86_frame)
+        mov %ecx,%ds
+        mov %ecx,%es
         # Copies the entire stack frame forwards by 16 bytes.
         .macro copy_vm86_words count=18
         .if \count
@@ -615,7 +618,7 @@ ENTRY(setup_vm86_frame)
 ENTRY(exception_table)
         .long do_divide_error
         .long do_debug
-        .long 0 # nmi
+        .long do_nmi
         .long do_int3
         .long do_overflow
         .long do_bounds

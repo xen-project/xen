@@ -140,9 +140,7 @@ struct xen_sysctl_getdomaininfolist {
 typedef struct xen_sysctl_getdomaininfolist xen_sysctl_getdomaininfolist_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getdomaininfolist_t);
 
-/*
- * Inject debug keys into Xen.
- */
+/* Inject debug keys into Xen. */
 #define XEN_SYSCTL_debug_keys        7
 struct xen_sysctl_debug_keys {
     /* IN variables. */
@@ -151,6 +149,23 @@ struct xen_sysctl_debug_keys {
 };
 typedef struct xen_sysctl_debug_keys xen_sysctl_debug_keys_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
+
+/* Get physical CPU information. */
+#define XEN_SYSCTL_getcpuinfo        8
+struct xen_sysctl_cpuinfo {
+    uint64_t idletime;
+};
+typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t); 
+struct xen_sysctl_getcpuinfo {
+    /* IN variables. */
+    uint32_t max_cpus;
+    XEN_GUEST_HANDLE_64(xen_sysctl_cpuinfo_t) info;
+    /* OUT variables. */
+    uint32_t nr_cpus;
+}; 
+typedef struct xen_sysctl_getcpuinfo xen_sysctl_getcpuinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t); 
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -163,6 +178,7 @@ struct xen_sysctl {
         struct xen_sysctl_perfc_op          perfc_op;
         struct xen_sysctl_getdomaininfolist getdomaininfolist;
         struct xen_sysctl_debug_keys        debug_keys;
+        struct xen_sysctl_getcpuinfo        getcpuinfo;
         uint8_t                             pad[128];
     } u;
 };

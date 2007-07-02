@@ -21,6 +21,7 @@
 #define DO_TRC_HVM_CPUID       1
 #define DO_TRC_HVM_INTR        1
 #define DO_TRC_HVM_NMI         1
+#define DO_TRC_HVM_MCE         1
 #define DO_TRC_HVM_SMI         1
 #define DO_TRC_HVM_VMMCALL     1
 #define DO_TRC_HVM_HLT         1

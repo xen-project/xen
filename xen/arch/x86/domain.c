@@ -151,7 +151,8 @@ int setup_arg_xlat_area(struct vcpu *v, l4_pgentry_t *l4tab)
         pg = alloc_domheap_page(NULL);
         if ( !pg )
             return -ENOMEM;
-        d->arch.mm_arg_xlat_l3 = clear_page(page_to_virt(pg));
+        d->arch.mm_arg_xlat_l3 = page_to_virt(pg);
+        clear_page(d->arch.mm_arg_xlat_l3);
     }
 
     l4tab[l4_table_offset(COMPAT_ARG_XLAT_VIRT_BASE)] =
@@ -444,7 +445,8 @@ int arch_domain_create(struct domain *d)
 
     if ( (pg = alloc_domheap_page(NULL)) == NULL )
         goto fail;
-    d->arch.mm_perdomain_l2 = clear_page(page_to_virt(pg));
+    d->arch.mm_perdomain_l2 = page_to_virt(pg);
+    clear_page(d->arch.mm_perdomain_l2);
     for ( i = 0; i < (1 << pdpt_order); i++ )
         d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+i] =
             l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt)+i,
@@ -452,7 +454,8 @@ int arch_domain_create(struct domain *d)
 
     if ( (pg = alloc_domheap_page(NULL)) == NULL )
         goto fail;
-    d->arch.mm_perdomain_l3 = clear_page(page_to_virt(pg));
+    d->arch.mm_perdomain_l3 = page_to_virt(pg);
+    clear_page(d->arch.mm_perdomain_l3);
     d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
         l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);

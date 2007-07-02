@@ -491,6 +491,10 @@ int xc_physinfo(int xc_handle,
 int xc_sched_id(int xc_handle,
                 int *sched_id);
 
+typedef xen_sysctl_cpuinfo_t xc_cpuinfo_t;
+int xc_getcpuinfo(int xc_handle, int max_cpus,
+                  xc_cpuinfo_t *info, int *nr_cpus); 
+
 int xc_domain_setmaxmem(int xc_handle,
                         uint32_t domid,
                         unsigned int max_memkb);

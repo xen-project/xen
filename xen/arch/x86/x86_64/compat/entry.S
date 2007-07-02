@@ -143,12 +143,12 @@ compat_restore_all_guest:
 .Lft0:  iretq
 
 .section .fixup,"ax"
-.Lfx0:  popq  -15*8-8(%rsp)            # error_code/entry_vector
-        SAVE_ALL                       # 15*8 bytes pushed
-        movq  -8(%rsp),%rsi            # error_code/entry_vector
-        sti                            # after stack abuse (-1024(%rsp))
+.Lfx0:  sti
+        SAVE_ALL
+        movq  UREGS_error_code(%rsp),%rsi
+        movq  %rsp,%rax
+        andq  $~0xf,%rsp
         pushq $__HYPERVISOR_DS         # SS
-        leaq  8(%rsp),%rax
         pushq %rax                     # RSP
         pushfq                         # RFLAGS
         pushq $__HYPERVISOR_CS         # CS

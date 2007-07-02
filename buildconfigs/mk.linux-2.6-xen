@@ -28,6 +28,11 @@ _build: build
 
 include buildconfigs/src.$(XEN_LINUX_SOURCE)
 
+# Default to allowing interface mismatch
+ifndef XEN_LINUX_ALLOW_INTERFACE_MISMATCH
+XEN_LINUX_ALLOW_INTERFACE_MISMATCH := y
+endif
+
 # The real action starts here!
 .PHONY: build
 build: $(LINUX_DIR)/include/linux/autoconf.h

@@ -131,6 +131,8 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
 extern u32 vmx_secondary_exec_control;
 
+extern bool_t cpu_has_vmx_ins_outs_instr_info;
+
 #define cpu_has_vmx_virtualize_apic_accesses \
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \

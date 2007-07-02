@@ -89,7 +89,7 @@ static void __init set_dom0_ssidref(const char *val)
         if (hi < ACM_MAX_NUM_TYPES && hi >= 1)
             dom0_ste_ssidref = hi;
         for (i = 0; i < sizeof(polname); i++) {
-            polname[i] = c[7+i];
+            polname[i] = c[5+i];
             if (polname[i] == '\0' || polname[i] == '\t' ||
                 polname[i] == '\n' || polname[i] == ' '  ||
                 polname[i] == ':') {

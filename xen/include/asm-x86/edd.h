@@ -32,12 +32,22 @@ struct edd_info {
     u16 legacy_max_cylinder;     /* %cl[7:6]:%ch: maximum cylinder number */
     u8 legacy_max_head;          /* %dh: maximum head number */
     u8 legacy_sectors_per_track; /* %cl[5:0]: maximum sector number */
-    /* Int13, Fn41: Get Device Parameters */
-    u8 edd_device_params[74];    /* as filled into %ds:%si */
+    /* Int13, Fn41: Get Device Parameters (as filled into %ds:%esi). */
+    struct {
+        u16 length;
+        u8 data[72];
+    } edd_device_params;
 } __attribute__ ((packed));
 
-extern u32 boot_edd_signature[];
-extern u8 boot_edd_signature_nr;
+struct mbr_signature {
+    u8 device;
+    u8 pad[3];
+    u32 signature;
+} __attribute__ ((packed));
+
+/* These all reside in the boot trampoline. Access via bootsym(). */
+extern struct mbr_signature boot_mbr_signature[];
+extern u8 boot_mbr_signature_nr;
 extern struct edd_info boot_edd_info[];
 extern u8 boot_edd_info_nr;
 

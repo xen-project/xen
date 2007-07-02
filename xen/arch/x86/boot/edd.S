@@ -24,7 +24,7 @@
 /* Maximum number of EDD information structures at boot_edd_info. */
 #define EDD_INFO_MAX            6
 
-/* Maximum number of MBR signatures at boot_edd_signature. */
+/* Maximum number of MBR signatures at boot_mbr_signature. */
 #define EDD_MBR_SIG_MAX         16
 
 /* Size of components of EDD information structure. */
@@ -40,10 +40,8 @@ get_edd:
 # Read the first sector of each BIOS disk device and store the 4-byte signature
 edd_mbr_sig_start:
         movb    $0x80, %dl                      # from device 80
-        movw    $bootsym(boot_edd_signature),%bx # store buffer ptr in bx
+        movw    $bootsym(boot_mbr_signature),%bx # store buffer ptr in bx
 edd_mbr_sig_read:
-        movl    $0xFFFFFFFF, %eax
-        movl    %eax, (%bx)                     # assume failure
         pushw   %bx
         movb    $0x02, %ah                      # 0x02 Read Sectors
         movb    $1, %al                         # read 1 sector
@@ -64,11 +62,12 @@ edd_mbr_sig_read:
         cmpb    $0, %ah                         # some BIOSes do not set CF
         jne     edd_mbr_sig_done                # on failure, we're done.
         movl    bootsym(boot_edd_info)+EDD_MBR_SIG_OFFSET,%eax
-        movl    %eax, (%bx)                     # store signature from MBR
-        incb    bootsym(boot_edd_signature_nr)  # note that we stored something
+        movb    %dl, (%bx)                      # store BIOS drive number
+        movl    %eax, 4(%bx)                    # store signature from MBR
+        incb    bootsym(boot_mbr_signature_nr)  # note that we stored something
         incb    %dl                             # increment to next device
-        addw    $4, %bx                         # increment sig buffer ptr
-        cmpb    $EDD_MBR_SIG_MAX,bootsym(boot_edd_signature_nr)
+        addw    $8, %bx                         # increment sig buffer ptr
+        cmpb    $EDD_MBR_SIG_MAX,bootsym(boot_mbr_signature_nr)
         jb      edd_mbr_sig_read
 edd_mbr_sig_done:
 
@@ -150,12 +149,13 @@ edd_done:
 opt_edd:
         .byte   0                               # edd=on/off/skipmbr
 
-.globl  boot_edd_info_nr, boot_edd_signature_nr
+.globl  boot_edd_info, boot_edd_info_nr
+.globl  boot_mbr_signature, boot_mbr_signature_nr
 boot_edd_info_nr:
         .byte   0
-boot_edd_signature_nr:
+boot_mbr_signature_nr:
         .byte   0
-boot_edd_signature:
-        .fill   EDD_MBR_SIG_MAX*4,1,0
+boot_mbr_signature:
+        .fill   EDD_MBR_SIG_MAX*8,1,0
 boot_edd_info:
         .fill   512,1,0                         # big enough for a disc sector

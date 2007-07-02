@@ -405,7 +405,7 @@ void init_done(void)
 void __init __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
-    char __cmdline[] = "", *cmdline = __cmdline;
+    char __cmdline[] = "", *cmdline = __cmdline, *kextra;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     char *_policy_start = NULL;
@@ -426,6 +426,17 @@ void __init __start_xen(unsigned long mbi_p)
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
         cmdline = __va(mbi->cmdline);
+    if ( (kextra = strstr(cmdline, " -- ")) != NULL )
+    {
+        /*
+         * Options after ' -- ' separator belong to dom0.
+         *  1. Orphan dom0's options from Xen's command line.
+         *  2. Skip all but final leading space from dom0's options.
+         */
+        *kextra = '\0';
+        kextra += 3;
+        while ( kextra[1] == ' ' ) kextra++;
+    }
     cmdline_parse(cmdline);
 
     parse_video_info();
@@ -494,7 +505,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     printk("Disc information:\n");
     printk(" Found %d MBR signatures\n",
-           bootsym(boot_edd_signature_nr));
+           bootsym(boot_mbr_signature_nr));
     printk(" Found %d EDD information structures\n",
            bootsym(boot_edd_info_nr));
 
@@ -1009,17 +1020,26 @@ void __init __start_xen(unsigned long mbi_p)
 
     /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
-    if ( cmdline != NULL )
+    if ( (cmdline != NULL) || (kextra != NULL) )
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
 
-        /* Skip past the image name and copy to a local buffer. */
-        while ( *cmdline == ' ' ) cmdline++;
-        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
+        dom0_cmdline[0] = '\0';
+
+        if ( cmdline != NULL )
         {
+            /* Skip past the image name and copy to a local buffer. */
             while ( *cmdline == ' ' ) cmdline++;
-            safe_strcpy(dom0_cmdline, cmdline);
+            if ( (cmdline = strchr(cmdline, ' ')) != NULL )
+            {
+                while ( *cmdline == ' ' ) cmdline++;
+                safe_strcpy(dom0_cmdline, cmdline);
+            }
         }
+
+        if ( kextra != NULL )
+            /* kextra always includes exactly one leading space. */
+            safe_strcat(dom0_cmdline, kextra);
 
         /* Append any extra parameters. */
         if ( skip_ioapic_setup && !strstr(dom0_cmdline, "noapic") )

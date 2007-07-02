@@ -20,40 +20,45 @@
 #include <asm/asm_defns.h>
 #include <public/xen.h>
 
+#define guestreg(field) ((field)-UREGS_eip+36)
+
         # Upon entry the stack should be the Xen stack and contain:
-        #   %ss, %esp, EFLAGS, %cs|1, %eip, ERROR, SAVE_ALL, RETURN
+        #   %ss, %esp, EFLAGS, %cs|1, %eip, RETURN
         # On exit the stack should be %ss:%esp (i.e. the guest stack)
         # and contain:
-        #   EFLAGS, %cs, %eip, ERROR, SAVE_ALL, RETURN
+        #   EFLAGS, %cs, %eip, RETURN
         ALIGN
 ENTRY(restore_ring0_guest)
-        # Point %gs:%esi to guest stack.
-RRG0:   movw UREGS_ss+4(%esp),%gs
-        movl UREGS_esp+4(%esp),%esi
+        pusha
 
-        # Copy EFLAGS...EBX, RETURN from Xen stack to guest stack.
-        movl $(UREGS_kernel_sizeof>>2)+1,%ecx
+        # Point %gs:%esi to guest stack.
+RRG0:   movw guestreg(UREGS_ss)(%esp),%gs
+        movl guestreg(UREGS_esp)(%esp),%esi
+
+        # Copy EFLAGS, %cs, %eip, RETURN, PUSHA from Xen stack to guest stack.
+        movl $12,%ecx /* 12 32-bit values */
 
 1:      subl $4,%esi
         movl -4(%esp,%ecx,4),%eax
 RRG1:   movl %eax,%gs:(%esi)
         loop 1b
 
-RRG2:   andl $~3,%gs:UREGS_cs+4(%esi)
+RRG2:   andl $~3,%gs:guestreg(UREGS_cs)(%esi)
 
         movl %gs,%eax
 
         # We need to do this because these registers are not present
         # on the guest stack so they cannot be restored by the code in
         # restore_all_guest.
-RRG3:   mov  UREGS_ds+4(%esp),%ds
-RRG4:   mov  UREGS_es+4(%esp),%es
-RRG5:   mov  UREGS_fs+4(%esp),%fs
-RRG6:   mov  UREGS_gs+4(%esp),%gs
+RRG3:   mov  guestreg(UREGS_ds)(%esp),%ds
+RRG4:   mov  guestreg(UREGS_es)(%esp),%es
+RRG5:   mov  guestreg(UREGS_fs)(%esp),%fs
+RRG6:   mov  guestreg(UREGS_gs)(%esp),%gs
 
 RRG7:   movl %eax,%ss
         movl %esi,%esp
 
+        popa
         ret
 .section __ex_table,"a"
         .long RRG0,domain_crash_synchronous

@@ -28,6 +28,7 @@ from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 from xen.xend.server.netif import randomMAC
+from xen.util.blkif import blkdev_name_to_number
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -934,6 +935,62 @@ class XendConfig(dict):
 
         return sxpr    
     
+    def _blkdev_name_to_number(self, dev):
+        if 'ioemu:' in dev:
+            _, dev = dev.split(':', 1)
+        try:
+            dev, _ = dev.split(':', 1)
+        except ValueError:
+            pass
+        
+        try:
+            devid = int(dev)
+        except ValueError:
+            # devid is not a number but a string containing either device
+            # name (e.g. xvda) or device_type/device_id (e.g. vbd/51728)
+            dev2 = type(dev) is str and dev.split('/')[-1] or None
+            if dev2 == None:
+                log.debug("Could not check the device %s", dev)
+                return None
+            try:
+                devid = int(dev2)
+            except ValueError:
+                devid = blkdev_name_to_number(dev2)
+                if devid == None:
+                    log.debug("The device %s is not device name", dev2)
+                    return None
+        return devid
+    
+    def device_duplicate_check(self, dev_type, dev_info, defined_config):
+        defined_devices_sxpr = self.all_devices_sxpr(target = defined_config)
+        
+        if dev_type == 'vbd':
+            dev_uname = dev_info.get('uname')
+            blkdev_name = dev_info.get('dev')
+            devid = self._blkdev_name_to_number(blkdev_name)
+            if devid == None:
+                return
+            
+            for o_dev_type, o_dev_info in defined_devices_sxpr:
+                if dev_type == o_dev_type:
+                    if dev_uname == sxp.child_value(o_dev_info, 'uname'):
+                        raise XendConfigError('The uname "%s" is already defined' %
+                                              dev_uname)
+                    o_blkdev_name = sxp.child_value(o_dev_info, 'dev')
+                    o_devid = self._blkdev_name_to_number(o_blkdev_name)
+                    if o_devid != None and devid == o_devid:
+                        raise XendConfigError('The device "%s" is already defined' %
+                                              blkdev_name)
+                    
+        elif dev_type == 'vif':
+            dev_mac = dev_info.get('mac')
+            
+            for o_dev_type, o_dev_info in defined_devices_sxpr:
+                if dev_type == o_dev_type:
+                    if dev_mac == sxp.child_value(o_dev_info, 'mac'):
+                        raise XendConfigError('The mac "%s" is already defined' %
+                                              dev_mac)
+    
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None,
                    target = None):
         """Add a device configuration in SXP format or XenAPI struct format.
@@ -997,6 +1054,8 @@ class XendConfig(dict):
             if dev_type == 'vif':
                 if not dev_info.get('mac'):
                     dev_info['mac'] = randomMAC()
+
+            self.device_duplicate_check(dev_type, dev_info, target)
 
             # create uuid if it doesn't exist
             dev_uuid = dev_info.get('uuid', None)
@@ -1275,15 +1334,19 @@ class XendConfig(dict):
         return False
 
 
-    def device_sxpr(self, dev_uuid = None, dev_type = None, dev_info = None):
+    def device_sxpr(self, dev_uuid = None, dev_type = None, dev_info = None, target = None):
         """Get Device SXPR by either giving the device UUID or (type, config).
 
         @rtype: list of lists
         @return: device config sxpr
         """
         sxpr = []
-        if dev_uuid != None and dev_uuid in self['devices']:
-            dev_type, dev_info = self['devices'][dev_uuid]
+
+        if target == None:
+            target = self
+
+        if dev_uuid != None and dev_uuid in target['devices']:
+            dev_type, dev_info = target['devices'][dev_uuid]
 
         if dev_type == None or dev_info == None:
             raise XendConfigError("Required either UUID or device type and "
@@ -1300,8 +1363,12 @@ class XendConfig(dict):
 
         return sxpr
 
-    def ordered_device_refs(self):
+    def ordered_device_refs(self, target = None):
         result = []
+
+        if target == None:
+            target = self
+
         # vkbd devices *must* be before vfb devices, otherwise
         # there is a race condition when setting up devices
         # where the daemon spawned for the vfb may write stuff
@@ -1309,27 +1376,30 @@ class XendConfig(dict):
         # setup permissions on the vkbd backend path. This race
         # results in domain creation failing with 'device already
         # connected' messages
-        result.extend([u for u in self['devices'].keys() if self['devices'][u][0] == 'vkbd'])
+        result.extend([u for u in target['devices'].keys() if target['devices'][u][0] == 'vkbd'])
 
-        result.extend(self['console_refs'] +
-                      self['vbd_refs'] +
-                      self['vif_refs'] +
-                      self['vtpm_refs'])
+        result.extend(target.get('console_refs', []) +
+                      target.get('vbd_refs', []) +
+                      target.get('vif_refs', []) +
+                      target.get('vtpm_refs', []))
 
-        result.extend([u for u in self['devices'].keys() if u not in result])
+        result.extend([u for u in target['devices'].keys() if u not in result])
         return result
 
-    def all_devices_sxpr(self):
+    def all_devices_sxpr(self, target = None):
         """Returns the SXPR for all devices in the current configuration."""
         sxprs = []
         pci_devs = []
 
-        if 'devices' not in self:
+        if target == None:
+            target = self
+
+        if 'devices' not in target:
             return sxprs
         
-        ordered_refs = self.ordered_device_refs()
+        ordered_refs = self.ordered_device_refs(target = target)
         for dev_uuid in ordered_refs:
-            dev_type, dev_info = self['devices'][dev_uuid]
+            dev_type, dev_info = target['devices'][dev_uuid]
             if dev_type == 'pci': # special case for pci devices
                 sxpr = [['uuid', dev_info['uuid']]]
                 for pci_dev_info in dev_info['devs']:
@@ -1340,7 +1410,8 @@ class XendConfig(dict):
                 sxprs.append((dev_type, sxpr))
             else:
                 sxpr = self.device_sxpr(dev_type = dev_type,
-                                        dev_info = dev_info)
+                                        dev_info = dev_info,
+                                        target   = target)
                 sxprs.append((dev_type, sxpr))
 
         return sxprs

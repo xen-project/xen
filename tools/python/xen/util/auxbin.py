@@ -27,6 +27,7 @@ LIB_64_ARCHS = [ 'x86_64', 's390x', 'sparc64']
 
 import os
 import os.path
+import sys
 
 
 def execute(exe, args = None):
@@ -47,6 +48,14 @@ def path():
 
 def libpath():
     machine = os.uname()[4]
+    if sys.argv[0] != '-c':
+        prefix = os.path.dirname(os.path.dirname(sys.argv[0]))
+        path = os.path.join(prefix, os.path.basename(LIB_64))
+        if machine in LIB_64_ARCHS and os.path.exists(path):
+            return path
+        path = os.path.join(prefix, os.path.basename(LIB_32))
+        if os.path.exists(path):
+            return path
     if machine in LIB_64_ARCHS and os.path.exists(LIB_64):
         return LIB_64
     else:

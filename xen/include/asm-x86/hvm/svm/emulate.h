@@ -138,6 +138,7 @@ static void inline __update_guest_eip(
 {
     ASSERT(inst_len > 0);
     vmcb->rip += inst_len;
+    vmcb->rflags &= ~X86_EFLAGS_RF;
 }
 
 #endif /* __ASM_X86_HVM_SVM_EMULATE_H__ */

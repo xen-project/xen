@@ -86,6 +86,7 @@ asmlinkage void _name(void);                            \
 asmlinkage int do_ ## _name(struct cpu_user_regs *regs)
 
 asmlinkage void nmi(void);
+asmlinkage void machine_check(void);
 DECLARE_TRAP_HANDLER(divide_error);
 DECLARE_TRAP_HANDLER(debug);
 DECLARE_TRAP_HANDLER(int3);
@@ -103,7 +104,6 @@ DECLARE_TRAP_HANDLER(coprocessor_error);
 DECLARE_TRAP_HANDLER(simd_coprocessor_error);
 DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
-DECLARE_TRAP_HANDLER(machine_check);
 
 long do_set_debugreg(int reg, unsigned long value);
 unsigned long do_get_debugreg(int reg);
@@ -631,6 +631,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     regs->ecx = c;
     regs->edx = d;
     regs->eip = eip;
+    regs->eflags &= ~X86_EFLAGS_RF;
 
     return EXCRET_fault_fixed;
 }
@@ -730,10 +731,11 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
     return do_guest_trap(TRAP_int3, regs, 0);
 }
 
-asmlinkage int do_machine_check(struct cpu_user_regs *regs)
+asmlinkage void do_machine_check(struct cpu_user_regs *regs)
 {
-    fatal_trap(TRAP_machine_check, regs);
-    return 0;
+    extern fastcall void (*machine_check_vector)(
+        struct cpu_user_regs *, long error_code);
+    machine_check_vector(regs, regs->error_code);
 }
 
 void propagate_page_fault(unsigned long addr, u16 error_code)
@@ -1787,6 +1789,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  done:
     regs->eip = eip;
+    regs->eflags &= ~X86_EFLAGS_RF;
     return EXCRET_fault_fixed;
 
  fail:

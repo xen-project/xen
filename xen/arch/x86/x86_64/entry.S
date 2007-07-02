@@ -57,23 +57,23 @@ restore_all_guest:
 /* No special register assumptions. */
 iret_exit_to_guest:
         addq  $8,%rsp
-.Lft1:  iretq
+.Lft0:  iretq
 
 .section .fixup,"ax"
-.Lfx1:  popq  -15*8-8(%rsp)            # error_code/entry_vector
-        SAVE_ALL                       # 15*8 bytes pushed
-        movq  -8(%rsp),%rsi            # error_code/entry_vector
-        sti                            # after stack abuse (-1024(%rsp))
+.Lfx0:  sti
+        SAVE_ALL
+        movq  UREGS_error_code(%rsp),%rsi
+        movq  %rsp,%rax
+        andq  $~0xf,%rsp
         pushq $__HYPERVISOR_DS         # SS
-        leaq  8(%rsp),%rax
         pushq %rax                     # RSP
-        pushf                          # RFLAGS
+        pushfq                         # RFLAGS
         pushq $__HYPERVISOR_CS         # CS
-        leaq  .Ldf1(%rip),%rax
+        leaq  .Ldf0(%rip),%rax
         pushq %rax                     # RIP
         pushq %rsi                     # error_code/entry_vector
         jmp   handle_exception
-.Ldf1:  GET_CURRENT(%rbx)
+.Ldf0:  GET_CURRENT(%rbx)
         jmp   test_all_events
 failsafe_callback:
         GET_CURRENT(%rbx)
@@ -88,10 +88,10 @@ failsafe_callback:
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
-        .quad .Lft1,.Lfx1
+        .quad .Lft0,.Lfx0
 .previous
 .section __ex_table,"a"
-        .quad .Ldf1,failsafe_callback
+        .quad .Ldf0,failsafe_callback
 .previous
 
         ALIGN
@@ -505,11 +505,6 @@ ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
         jmp   handle_exception
 
-ENTRY(machine_check)
-        pushq $0
-        movl  $TRAP_machine_check,4(%rsp)
-        jmp   handle_exception
-
 ENTRY(spurious_interrupt_bug)
         pushq $0
         movl  $TRAP_spurious_int,4(%rsp)
@@ -527,31 +522,38 @@ ENTRY(early_page_fault)
         call  do_early_page_fault
         jmp   restore_all_xen
 
-ENTRY(nmi)
-        pushq $0
+handle_ist_exception:
         SAVE_ALL
         testb $3,UREGS_cs(%rsp)
-        jz    nmi_in_hypervisor_mode
+        jz    1f
         /* Interrupted guest context. Copy the context to stack bottom. */
-        GET_GUEST_REGS(%rbx)
+        GET_GUEST_REGS(%rdi)
+        movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
-1:      popq  %rax
-        movq  %rax,(%rbx)
-        addq  $8,%rbx
-        loop  1b
-        subq  $UREGS_kernel_sizeof,%rbx
-        movq  %rbx,%rsp
-nmi_in_hypervisor_mode:
-        movq  %rsp,%rdi
-        call  do_nmi
+        movq  %rdi,%rsp
+        rep   movsq
+1:      movq  %rsp,%rdi
+        movl  UREGS_entry_vector(%rsp),%eax
+        leaq  exception_table(%rip),%rdx
+        callq *(%rdx,%rax,8)
         jmp   ret_from_intr
+
+ENTRY(nmi)
+        pushq $0
+        movl  $TRAP_nmi,4(%rsp)
+        jmp   handle_ist_exception
+
+ENTRY(machine_check)
+        pushq $0
+        movl  $TRAP_machine_check,4(%rsp)
+        jmp   handle_ist_exception
 
 .data
 
 ENTRY(exception_table)
         .quad do_divide_error
         .quad do_debug
-        .quad 0 # nmi
+        .quad do_nmi
         .quad do_int3
         .quad do_overflow
         .quad do_bounds

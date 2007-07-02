@@ -1630,6 +1630,7 @@ x86_emulate(
     }
 
     /* Commit shadow register state. */
+    _regs.eflags &= ~EF_RF;
     *ctxt->regs = _regs;
 
  done:

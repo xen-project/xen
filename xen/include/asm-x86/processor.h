@@ -104,7 +104,6 @@
 #define TRAP_alignment_check  17
 #define TRAP_machine_check    18
 #define TRAP_simd_error       19
-#define TRAP_deferred_nmi     31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
 /* NB. Same as VGCF_in_syscall. No bits in common with any other TRAP_ defn. */
@@ -567,7 +566,8 @@ void compat_show_guest_stack(struct cpu_user_regs *, int lines);
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
-extern void mcheck_init(struct cpuinfo_x86 *c);
+void mcheck_init(struct cpuinfo_x86 *c);
+asmlinkage void do_machine_check(struct cpu_user_regs *regs);
 
 int cpuid_hypervisor_leaves(
     uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

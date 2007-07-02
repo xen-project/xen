@@ -1262,8 +1262,10 @@ class XendDomain:
             try:
                 XendCheckpoint.save(fd, dominfo, False, False, dst,
                                     checkpoint=checkpoint)
-            finally:
+            except Exception, e:
                 os.close(fd)
+                raise e
+            os.close(fd)
         except OSError, ex:
             raise XendError("can't write guest state file %s: %s" %
                             (dst, ex[1]))

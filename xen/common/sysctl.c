@@ -136,6 +136,39 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
+    case XEN_SYSCTL_getcpuinfo:
+    {
+        uint32_t i, nr_cpus;
+        struct xen_sysctl_cpuinfo cpuinfo;
+        struct vcpu *v;
+
+        nr_cpus = min_t(uint32_t, op->u.getcpuinfo.max_cpus, NR_CPUS);
+
+        for ( i = 0; i < nr_cpus; i++ )
+        {
+            /* Assume no holes in idle-vcpu map. */
+            if ( (v = idle_vcpu[i]) == NULL )
+                break;
+
+            cpuinfo.idletime = v->runstate.time[RUNSTATE_running];
+            if ( v->is_running )
+                cpuinfo.idletime += NOW() - v->runstate.state_entry_time;
+
+            if ( copy_to_guest_offset(op->u.getcpuinfo.info, i, &cpuinfo, 1) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
+
+        op->u.getcpuinfo.nr_cpus = i;
+        ret = 0;
+
+        if ( copy_to_guest(u_sysctl, op, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         break;

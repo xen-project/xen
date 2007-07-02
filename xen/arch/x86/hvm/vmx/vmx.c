@@ -560,6 +560,9 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     __vmwrite(GUEST_RSP, c->rsp);
     __vmwrite(GUEST_RFLAGS, c->rflags);
 
+    v->arch.hvm_vmx.cpu_cr0 = (c->cr0 | X86_CR0_PE | X86_CR0_PG 
+                               | X86_CR0_NE | X86_CR0_WP | X86_CR0_ET);
+    __vmwrite(GUEST_CR0, v->arch.hvm_vmx.cpu_cr0);
     v->arch.hvm_vmx.cpu_shadow_cr0 = c->cr0;
     __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr0);
 
@@ -577,33 +580,17 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         goto skip_cr3;
     }
 
-    if (c->cr3 == v->arch.hvm_vmx.cpu_cr3) {
-        /*
-         * This is simple TLB flush, implying the guest has
-         * removed some translation or changed page attributes.
-         * We simply invalidate the shadow.
-         */
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
-            goto bad_cr3;
-        }
-    } else {
-        /*
-         * If different, make a shadow. Check if the PDBR is valid
-         * first.
-         */
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
-        /* current!=vcpu as not called by arch_vmx_do_launch */
-        mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
-        if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
-            goto bad_cr3;
-        }
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if (old_base_mfn)
-             put_page(mfn_to_page(old_base_mfn));
-        v->arch.hvm_vmx.cpu_cr3 = c->cr3;
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %"PRIx64, c->cr3);
+    /* current!=vcpu as not called by arch_vmx_do_launch */
+    mfn = gmfn_to_mfn(v->domain, c->cr3 >> PAGE_SHIFT);
+    if( !mfn_valid(mfn) || !get_page(mfn_to_page(mfn), v->domain)) {
+        goto bad_cr3;
     }
+    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+    v->arch.guest_table = pagetable_from_pfn(mfn);
+    if (old_base_mfn)
+        put_page(mfn_to_page(old_base_mfn));
+    v->arch.hvm_vmx.cpu_cr3 = c->cr3;
 
  skip_cr3:
 #if defined(__x86_64__)
@@ -615,7 +602,7 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 #endif
 
-    __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
+    __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
     v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
     __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
@@ -1315,16 +1302,20 @@ static int __get_instruction_length(void)
 
 static void inline __update_guest_eip(unsigned long inst_len)
 {
-    unsigned long current_eip, intr_shadow;
+    unsigned long x;
 
-    current_eip = __vmread(GUEST_RIP);
-    __vmwrite(GUEST_RIP, current_eip + inst_len);
+    x = __vmread(GUEST_RIP);
+    __vmwrite(GUEST_RIP, x + inst_len);
 
-    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-    if ( intr_shadow & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
+    x = __vmread(GUEST_RFLAGS);
+    if ( x & X86_EFLAGS_RF )
+        __vmwrite(GUEST_RFLAGS, x & ~X86_EFLAGS_RF);
+
+    x = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    if ( x & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
     {
-        intr_shadow &= ~(VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS);
-        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+        x &= ~(VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS);
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, x);
     }
 }
 
@@ -1475,15 +1466,33 @@ static void vmx_do_invlpg(unsigned long va)
     paging_invlpg(v, va);
 }
 
-/*
- * get segment for string pio according to guest instruction
- */
-static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
-                                   int inst_len, enum x86_segment *seg)
+/* Get segment for OUTS according to guest instruction. */
+static enum x86_segment vmx_outs_get_segment(
+    int long_mode, unsigned long eip, int inst_len)
 {
     unsigned char inst[MAX_INST_LEN];
+    enum x86_segment seg = x86_seg_ds;
     int i;
     extern int inst_copy_from_guest(unsigned char *, unsigned long, int);
+
+    if ( likely(cpu_has_vmx_ins_outs_instr_info) )
+    {
+        unsigned int instr_info = __vmread(VMX_INSTRUCTION_INFO);
+
+        /* Get segment register according to bits 17:15. */
+        switch ( (instr_info >> 15) & 7 )
+        {
+        case 0: seg = x86_seg_es; break;
+        case 1: seg = x86_seg_cs; break;
+        case 2: seg = x86_seg_ss; break;
+        case 3: seg = x86_seg_ds; break;
+        case 4: seg = x86_seg_fs; break;
+        case 5: seg = x86_seg_gs; break;
+        default: BUG();
+        }
+
+        goto out;
+    }
 
     if ( !long_mode )
         eip += __vmread(GUEST_CS_BASE);
@@ -1493,7 +1502,7 @@ static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
     {
         gdprintk(XENLOG_ERR, "Get guest instruction failed\n");
         domain_crash(current->domain);
-        return;
+        goto out;
     }
 
     for ( i = 0; i < inst_len; i++ )
@@ -1510,25 +1519,28 @@ static void vmx_str_pio_get_segment(int long_mode, unsigned long eip,
 #endif
             continue;
         case 0x2e: /* CS */
-            *seg = x86_seg_cs;
+            seg = x86_seg_cs;
             continue;
         case 0x36: /* SS */
-            *seg = x86_seg_ss;
+            seg = x86_seg_ss;
             continue;
         case 0x26: /* ES */
-            *seg = x86_seg_es;
+            seg = x86_seg_es;
             continue;
         case 0x64: /* FS */
-            *seg = x86_seg_fs;
+            seg = x86_seg_fs;
             continue;
         case 0x65: /* GS */
-            *seg = x86_seg_gs;
+            seg = x86_seg_gs;
             continue;
         case 0x3e: /* DS */
-            *seg = x86_seg_ds;
+            seg = x86_seg_ds;
             continue;
         }
     }
+
+ out:
+    return seg;
 }
 
 static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
@@ -1541,7 +1553,7 @@ static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
     *base = 0;
     *limit = 0;
     if ( seg != x86_seg_es )
-        vmx_str_pio_get_segment(long_mode, eip, inst_len, &seg);
+        seg = vmx_outs_get_segment(long_mode, eip, inst_len);
 
     switch ( seg )
     {
@@ -1587,7 +1599,7 @@ static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
     }
     *ar_bytes = __vmread(ar_field);
 
-    return !(*ar_bytes & 0x10000);
+    return !(*ar_bytes & X86_SEG_AR_SEG_UNUSABLE);
 }
 
 
@@ -1896,7 +1908,7 @@ static void vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
     c->eip += __get_instruction_length(); /* Safe: MOV Cn, LMSW, CLTS */
 
     c->esp = __vmread(GUEST_RSP);
-    c->eflags = __vmread(GUEST_RFLAGS);
+    c->eflags = __vmread(GUEST_RFLAGS) & ~X86_EFLAGS_RF;
 
     c->cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
     c->cr3 = v->arch.hvm_vmx.cpu_cr3;
@@ -1997,7 +2009,7 @@ static int vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
     else
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
 
-    __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
+    __vmwrite(GUEST_CR4, (c->cr4 | HVM_CR4_HOST_MASK));
     v->arch.hvm_vmx.cpu_shadow_cr4 = c->cr4;
     __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
@@ -2272,7 +2284,6 @@ static int vmx_set_cr0(unsigned long value)
                     "Enabling CR0.PE at %%eip 0x%lx", eip);
         if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
         {
-            eip = __vmread(GUEST_RIP);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Restoring to %%eip 0x%lx", eip);
             return 0; /* do not update eip! */
@@ -2397,6 +2408,15 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     case 4: /* CR4 */
         old_cr = v->arch.hvm_vmx.cpu_shadow_cr4;
 
+        if ( value & HVM_CR4_GUEST_RESERVED_BITS )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1,
+                        "Guest attempts to set reserved bit in CR4: %lx",
+                        value);
+            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            break;
+        }
+
         if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
         {
             if ( vmx_pgbit_test(v) )
@@ -2437,7 +2457,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             }
         }
 
-        __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
+        __vmwrite(GUEST_CR4, value | HVM_CR4_HOST_MASK);
         v->arch.hvm_vmx.cpu_shadow_cr4 = value;
         __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vmx.cpu_shadow_cr4);
 
@@ -2581,7 +2601,7 @@ static inline int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
         if ( long_mode_do_msr_read(regs) )
@@ -2707,7 +2727,7 @@ static inline int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_APICBASE:
         vlapic_msr_set(vcpu_vlapic(v), msr_content);
         break;
-    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_CR4_FIXED1:
+    case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
         if ( !long_mode_do_msr_write(regs) )
@@ -2823,7 +2843,8 @@ static void vmx_reflect_exception(struct vcpu *v)
     }
 }
 
-static void vmx_failed_vmentry(unsigned int exit_reason)
+static void vmx_failed_vmentry(unsigned int exit_reason,
+                               struct cpu_user_regs *regs)
 {
     unsigned int failed_vmentry_reason = (uint16_t)exit_reason;
     unsigned long exit_qualification;
@@ -2840,6 +2861,9 @@ static void vmx_failed_vmentry(unsigned int exit_reason)
         break;
     case EXIT_REASON_MACHINE_CHECK:
         printk("caused by machine check.\n");
+        HVMTRACE_0D(MCE, current);
+        vmx_store_cpu_guest_regs(current, regs, NULL);
+        do_machine_check(regs);
         break;
     default:
         printk("reason not known yet!");
@@ -2869,7 +2893,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         local_irq_enable();
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
-        return vmx_failed_vmentry(exit_reason);
+        return vmx_failed_vmentry(exit_reason, regs);
 
     switch ( exit_reason )
     {
@@ -2920,11 +2944,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
             break;
         case TRAP_nmi:
-            HVMTRACE_0D(NMI, v);
             if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
+            {
+                HVMTRACE_0D(NMI, v);
+                vmx_store_cpu_guest_regs(v, regs, NULL);
                 do_nmi(regs); /* Real NMI, vector 2: normal processing. */
+            }
             else
                 vmx_reflect_exception(v);
+            break;
+        case TRAP_machine_check:
+            HVMTRACE_0D(MCE, v);
+            vmx_store_cpu_guest_regs(v, regs, NULL);
+            do_machine_check(regs);
             break;
         default:
             goto exit_and_crash;

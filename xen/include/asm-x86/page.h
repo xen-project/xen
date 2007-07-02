@@ -192,8 +192,9 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #define pgentry_ptr_to_slot(_p)    \
     (((unsigned long)(_p) & ~PAGE_MASK) / sizeof(*(_p)))
 
-/* Page-table type. */
 #ifndef __ASSEMBLY__
+
+/* Page-table type. */
 #if CONFIG_PAGING_LEVELS == 2
 /* x86_32 default */
 typedef struct { u32 pfn; } pagetable_t;
@@ -214,9 +215,11 @@ typedef struct { u64 pfn; } pagetable_t;
 #define pagetable_from_page(pg) pagetable_from_pfn(page_to_mfn(pg))
 #define pagetable_from_paddr(p) pagetable_from_pfn((p)>>PAGE_SHIFT)
 #define pagetable_null()        pagetable_from_pfn(0)
-#endif
 
-#define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)
+void clear_page_sse2(void *);
+#define clear_page(_p)      (cpu_has_xmm2 ?                             \
+                             clear_page_sse2((void *)(_p)) :            \
+                             (void)memset((void *)(_p), 0, PAGE_SIZE))
 #define copy_page(_t,_f)    memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
 
 #define mfn_valid(mfn)      ((mfn) < max_page)
@@ -244,6 +247,8 @@ typedef struct { u64 pfn; } pagetable_t;
 /* Convert between frame number and address formats.  */
 #define pfn_to_paddr(pfn)   ((paddr_t)(pfn) << PAGE_SHIFT)
 #define paddr_to_pfn(pa)    ((unsigned long)((pa) >> PAGE_SHIFT))
+
+#endif /* !defined(__ASSEMBLY__) */
 
 /* High table entries are reserved by the hypervisor. */
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)

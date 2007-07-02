@@ -2168,9 +2168,7 @@ def xm_network_attach(args):
         server.xend.domain.device_create(dom, vif)
 
 
-def detach(args, command, deviceClass):
-    arg_check(args, command, 2, 3)
-
+def detach(args, deviceClass):
     dom = args[0]
     dev = args[1]
     try:
@@ -2204,16 +2202,17 @@ def xm_block_detach(args):
             raise OptionError("Cannot find device '%s' in domain '%s'"
                               % (dev,dom))
     else:
+        arg_check(args, 'block-detach', 2, 3)
         try:
-            detach(args, 'block-detach', 'vbd')
+            detach(args, 'vbd')
             return
         except:
             pass
-        detach(args, 'block-detach', 'tap')
+        detach(args, 'tap')
 
 def xm_network_detach(args):
     if serverType == SERVER_XEN_API:
-        arg_check(args, "xm_block_detach", 2, 3)
+        arg_check(args, "xm_network_detach", 2, 3)
         dom = args[0]
         devid = args[1]
         vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
@@ -2227,7 +2226,8 @@ def xm_network_detach(args):
         else:
             print "Cannot find device '%s' in domain '%s'" % (devid,dom)
     else:
-        detach(args, 'network-detach', 'vif')
+        arg_check(args, 'network-detach', 2, 3)
+        detach(args, 'vif')
 
 
 def xm_vnet_list(args):

@@ -561,11 +561,7 @@ lmsw(struct regs *regs, unsigned prefix, unsigned modrm)
 	unsigned cr0 = (oldctx.cr0 & 0xFFFFFFF0) | ax;
 
 	TRACE((regs, regs->eip - eip, "lmsw 0x%x", ax));
-#ifndef TEST
 	oldctx.cr0 = cr0 | CR0_PE | CR0_NE;
-#else
-	oldctx.cr0 = cr0 | CR0_PE | CR0_NE | CR0_PG;
-#endif
 	if (cr0 & CR0_PE)
 		set_mode(regs, VM86_REAL_TO_PROTECTED);
 
@@ -584,8 +580,13 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 	unsigned addr = operand(prefix, regs, modrm);
 	unsigned val, r = (modrm >> 3) & 7;
 
-	if ((modrm & 0xC0) == 0xC0) /* no registers */
-		return 0;
+	if ((modrm & 0xC0) == 0xC0) {
+		/*
+		 * Emulate all guest instructions in protected to real mode.
+		 */
+		if (mode != VM86_PROTECTED_TO_REAL)
+			return 0;
+	}
 
 	switch (opc) {
 	case 0x88: /* addr32 mov r8, r/m8 */
@@ -656,13 +657,8 @@ movcr(struct regs *regs, unsigned prefix, unsigned opc)
 		TRACE((regs, regs->eip - eip, "movl %%cr%d, %%eax", cr));
 		switch (cr) {
 		case 0:
-#ifndef TEST
 			setreg32(regs, modrm,
 				oldctx.cr0 & ~(CR0_PE | CR0_NE));
-#else
-			setreg32(regs, modrm,
-				oldctx.cr0 & ~(CR0_PE | CR0_NE | CR0_PG));
-#endif
 			break;
 		case 2:
 			setreg32(regs, modrm, get_cr2());
@@ -680,9 +676,6 @@ movcr(struct regs *regs, unsigned prefix, unsigned opc)
 		switch (cr) {
 		case 0:
 			oldctx.cr0 = getreg32(regs, modrm) | (CR0_PE | CR0_NE);
-#ifdef TEST
-			oldctx.cr0 |= CR0_PG;
-#endif
 			if (getreg32(regs, modrm) & CR0_PE)
 				set_mode(regs, VM86_REAL_TO_PROTECTED);
 			else
@@ -818,8 +811,13 @@ mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	unsigned modrm = fetch8(regs);
 
-	/* Only need to emulate segment loads in real->protected mode. */
-	if (mode != VM86_REAL_TO_PROTECTED)
+	/*
+	 * Emulate segment loads in:
+	 * 1) real->protected mode.
+	 * 2) protected->real mode.
+	 */
+	if ((mode != VM86_REAL_TO_PROTECTED) &&
+	    (mode != VM86_PROTECTED_TO_REAL))
 		return 0;
 
 	/* Register source only. */
@@ -829,6 +827,8 @@ mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
 	switch ((modrm & 0x38) >> 3) {
 	case 0: /* es */
 		regs->ves = getreg16(regs, modrm);
+		if (mode == VM86_PROTECTED_TO_REAL)
+			return 1;
 		saved_rm_regs.ves = 0;
 		oldctx.es_sel = regs->ves;
 		return 1;
@@ -837,21 +837,29 @@ mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
 
 	case 2: /* ss */
 		regs->uss = getreg16(regs, modrm);
+		if (mode == VM86_PROTECTED_TO_REAL)
+			return 1;
 		saved_rm_regs.uss = 0;
 		oldctx.ss_sel = regs->uss;
 		return 1;
 	case 3: /* ds */
 		regs->vds = getreg16(regs, modrm);
+		if (mode == VM86_PROTECTED_TO_REAL)
+			return 1;
 		saved_rm_regs.vds = 0;
 		oldctx.ds_sel = regs->vds;
 		return 1;
 	case 4: /* fs */
 		regs->vfs = getreg16(regs, modrm);
+		if (mode == VM86_PROTECTED_TO_REAL)
+			return 1;
 		saved_rm_regs.vfs = 0;
 		oldctx.fs_sel = regs->vfs;
 		return 1;
 	case 5: /* gs */
 		regs->vgs = getreg16(regs, modrm);
+		if (mode == VM86_PROTECTED_TO_REAL)
+			return 1;
 		saved_rm_regs.vgs = 0;
 		oldctx.gs_sel = regs->vgs;
 		return 1;
@@ -1067,7 +1075,8 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 	}
 
 	mode = newmode;
-	TRACE((regs, 0, states[mode]));
+	if (mode != VM86_PROTECTED)
+		TRACE((regs, 0, states[mode]));
 }
 
 static void
@@ -1086,7 +1095,7 @@ jmpl(struct regs *regs, int prefix)
 
 	if (mode == VM86_REAL_TO_PROTECTED)		/* jump to protected mode */
 		set_mode(regs, VM86_PROTECTED);
-	else if (mode == VM86_PROTECTED_TO_REAL)/* jump to real mode */
+	else if (mode == VM86_PROTECTED_TO_REAL)	/* jump to real mode */
 		set_mode(regs, VM86_REAL);
 	else
 		panic("jmpl");
@@ -1281,6 +1290,12 @@ opcode(struct regs *regs)
 	unsigned opc, modrm, disp;
 	unsigned prefix = 0;
 
+	if (mode == VM86_PROTECTED_TO_REAL &&
+		oldctx.cs_arbytes.fields.default_ops_size) {
+		prefix |= DATA32;
+		prefix |= ADDR32;
+	}
+
 	for (;;) {
 		switch ((opc = fetch8(regs))) {
 		case 0x07: /* pop %es */
@@ -1391,17 +1406,29 @@ opcode(struct regs *regs)
 			continue;
 
 		case 0x66:
-			TRACE((regs, regs->eip - eip, "data32"));
-			prefix |= DATA32;
+			if (mode == VM86_PROTECTED_TO_REAL &&
+				oldctx.cs_arbytes.fields.default_ops_size) {
+				TRACE((regs, regs->eip - eip, "data16"));
+				prefix &= ~DATA32;
+			} else {
+				TRACE((regs, regs->eip - eip, "data32"));
+				prefix |= DATA32;
+			}
 			continue;
 
 		case 0x67:
-			TRACE((regs, regs->eip - eip, "addr32"));
-			prefix |= ADDR32;
+			if (mode == VM86_PROTECTED_TO_REAL &&
+				oldctx.cs_arbytes.fields.default_ops_size) {
+				TRACE((regs, regs->eip - eip, "addr16"));
+				prefix &= ~ADDR32;
+			} else {
+				TRACE((regs, regs->eip - eip, "addr32"));
+				prefix |= ADDR32;
+			}
 			continue;
 
-		case 0x88: /* addr32 mov r8, r/m8 */
-		case 0x8A: /* addr32 mov r/m8, r8 */
+		case 0x88: /* mov r8, r/m8 */
+		case 0x8A: /* mov r/m8, r8 */
 			if (mode != VM86_REAL && mode != VM86_REAL_TO_PROTECTED)
 				goto invalid;
 			if ((prefix & ADDR32) == 0)

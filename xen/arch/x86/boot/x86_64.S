@@ -56,12 +56,23 @@
 
 /* This is the default interrupt handler. */
 int_msg:
-        .asciz "Unknown interrupt\n"
+        .asciz "Unknown interrupt (cr2=%016lx)\n"
+hex_msg:
+        .asciz "    %016lx"
 ignore_int:
-        cld
+        SAVE_ALL
+        movq    %cr2,%rsi
         leaq    int_msg(%rip),%rdi
         xorl    %eax,%eax
         call    printk
+        movq    %rsp,%rbp
+0:      movq    (%rbp),%rsi
+        addq    $8,%rbp
+        leaq    hex_msg(%rip),%rdi
+        xorl    %eax,%eax
+        call    printk
+        testq   $0xff8,%rbp
+        jnz     0b
 1:      jmp     1b
 
 
