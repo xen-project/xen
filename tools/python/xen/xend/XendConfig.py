@@ -936,6 +936,13 @@ class XendConfig(dict):
         return sxpr    
     
     def _blkdev_name_to_number(self, dev):
+        if 'ioemu:' in dev:
+            _, dev = dev.split(':', 1)
+        try:
+            dev, _ = dev.split(':', 1)
+        except ValueError:
+            pass
+        
         try:
             devid = int(dev)
         except ValueError:
