@@ -90,25 +90,26 @@ ia64_patch_imm64 (u64 insn_addr, u64 val)
 	ia64_patch(insn_addr + 1, 0x1ffffffffffUL, val >> 22);
 }
 
-extern char frametable_miss;
-extern unsigned long xen_pstart;
-
 /*
  * Add more patch points in seperate functions as appropriate
  */
 
 static void __init xen_patch_frametable_miss(u64 offset)
 {
+#ifdef CONFIG_VIRTUAL_FRAME_TABLE
+	extern char frametable_miss;
 	u64 addr, val;
 
 	addr = (u64)&frametable_miss;
 	val = get_imm64(addr) + offset;
 	ia64_patch_imm64(addr, val);
+#endif
 }
 
 
 void __init xen_patch_kernel(void)
 {
+	extern unsigned long xen_pstart;
 	unsigned long patch_offset;
 
 	patch_offset = xen_pstart - (KERNEL_START - PAGE_OFFSET);
