@@ -58,8 +58,6 @@ static unsigned long __initdata dom0_size = 512*1024*1024;
 static unsigned int __initdata dom0_max_vcpus = 1;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
-extern unsigned long running_on_sim;
-
 extern char dom0_command_line[];
 
 /* forward declaration */

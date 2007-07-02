@@ -39,8 +39,6 @@
 
 static DEFINE_SPINLOCK(efi_time_services_lock);
 
-extern unsigned long running_on_sim;
-
 struct sal_mc_params {
 	u64 param_type;
 	u64 i_or_m;
@@ -142,7 +140,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	status = 0;
 	switch (index) {
 	    case SAL_FREQ_BASE:
-		if (!running_on_sim)
+		if (likely(!running_on_sim))
 			status = ia64_sal_freq_base(in1,&r9,&r10);
 		else switch (in1) {
 		      case SAL_FREQ_BASE_PLATFORM:
@@ -594,7 +592,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	unsigned long flags;
 	int processor;
 
-	if (running_on_sim)
+	if (unlikely(running_on_sim))
 		return pal_emulator_static(index);
 
 	// pal code must be mapped by a TR when pal is called, however
@@ -1375,7 +1373,10 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 		break;
 	    case SSC_OPEN:
 		arg1 = vcpu_get_gr(current,33);	// access rights
-if (!running_on_sim) { printk("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); arg0 = 0; }
+		if (!running_on_sim) { 
+		    printk("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); 
+		    arg0 = 0; 
+		}
 		if (arg0) {	// metaphysical address
 			arg0 = translate_domain_mpaddr(arg0, NULL);
 			retval = ia64_ssc(arg0,arg1,0,0,ssc);
@@ -1436,7 +1437,10 @@ if (!running_on_sim) { printk("SSC_OPEN, not implemented on hardware.  (ignoring
 		arg1 = vcpu_get_gr(current,33);
 		arg2 = vcpu_get_gr(current,34);
 		arg3 = vcpu_get_gr(current,35);
-		if (!running_on_sim) { printk("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); break; }
+		if (!running_on_sim) { 
+		    printk("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); 
+		    break; 
+		}
 		(void)ia64_ssc(arg0,arg1,arg2,arg3,ssc);
 		break;
 	    case SSC_NETDEV_PROBE:

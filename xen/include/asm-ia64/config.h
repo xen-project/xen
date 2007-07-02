@@ -84,8 +84,11 @@ typedef unsigned long paddr_t;
 #define LOCK_PREFIX
 
 extern unsigned long xenheap_phys_end;
+extern unsigned long total_pages;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;
+
+extern int running_on_sim;
 
 // from linux/include/linux/mm.h
 extern struct page_info *mem_map;

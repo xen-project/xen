@@ -491,8 +491,6 @@ ia64_fault(unsigned long vector, unsigned long isr, unsigned long ifa,
 	panic("Fault in Xen.\n");
 }
 
-unsigned long running_on_sim = 0;
-
 /* Also read in hyperprivop.S  */
 int first_break = 0;
 

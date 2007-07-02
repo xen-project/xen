@@ -52,7 +52,6 @@ int xen_ia64_is_vcpu_allocated(struct domain *d, uint32_t vcpu)
 
 int xen_ia64_is_running_on_sim(struct domain *unused)
 {
-	extern unsigned long running_on_sim;
 	return running_on_sim;
 }
 
