@@ -13,7 +13,8 @@
 #include <linux/acpi.h>
 struct vcpu;
 typedef struct vcpu VCPU;
-typedef cpu_user_regs_t REGS;
+typedef struct cpu_user_regs REGS;
+
 extern u64 cycle_to_ns(u64 cycle);
 
 /* Note: PSCB stands for Privilegied State Communication Block.  */

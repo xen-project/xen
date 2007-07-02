@@ -612,6 +612,8 @@ int arch_vcpu_reset(struct vcpu *v)
 	return 0;
 }
 
+#define COPY_FPREG(dst, src) memcpy(dst, src, sizeof(struct ia64_fpreg))
+
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
@@ -678,12 +680,12 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
 	c.nat->regs.ar.ccv = uregs->ar_ccv;
 
-	c.nat->regs.f[6] = uregs->f6;
-	c.nat->regs.f[7] = uregs->f7;
-	c.nat->regs.f[8] = uregs->f8;
-	c.nat->regs.f[9] = uregs->f9;
-	c.nat->regs.f[10] = uregs->f10;
-	c.nat->regs.f[11] = uregs->f11;
+	COPY_FPREG(&c.nat->regs.f[6], &uregs->f6);
+	COPY_FPREG(&c.nat->regs.f[7], &uregs->f7);
+	COPY_FPREG(&c.nat->regs.f[8], &uregs->f8);
+	COPY_FPREG(&c.nat->regs.f[9], &uregs->f9);
+	COPY_FPREG(&c.nat->regs.f[10], &uregs->f10);
+	COPY_FPREG(&c.nat->regs.f[11], &uregs->f11);
 
 	c.nat->regs.r[4] = uregs->r4;
 	c.nat->regs.r[5] = uregs->r5;
@@ -820,12 +822,12 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	
 	uregs->ar_ccv = c.nat->regs.ar.ccv;
 	
-	uregs->f6 = c.nat->regs.f[6];
-	uregs->f7 = c.nat->regs.f[7];
-	uregs->f8 = c.nat->regs.f[8];
-	uregs->f9 = c.nat->regs.f[9];
-	uregs->f10 = c.nat->regs.f[10];
-	uregs->f11 = c.nat->regs.f[11];
+	COPY_FPREG(&uregs->f6, &c.nat->regs.f[6]);
+	COPY_FPREG(&uregs->f7, &c.nat->regs.f[7]);
+	COPY_FPREG(&uregs->f8, &c.nat->regs.f[8]);
+	COPY_FPREG(&uregs->f9, &c.nat->regs.f[9]);
+	COPY_FPREG(&uregs->f10, &c.nat->regs.f[10]);
+	COPY_FPREG(&uregs->f11, &c.nat->regs.f[11]);
 	
 	uregs->r4 = c.nat->regs.r[4];
 	uregs->r5 = c.nat->regs.r[5];

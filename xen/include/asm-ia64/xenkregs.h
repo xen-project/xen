@@ -21,6 +21,9 @@
 #define IA64_IFS_V_BIT		63
 #define IA64_IFS_V	(__IA64_UL(1) << IA64_IFS_V_BIT)
 
+/* Interruption Status Register.  */
+#define IA64_ISR_NI_BIT	39	/* Nested interrupt.  */
+
 /* Page Table Address */
 #define IA64_PTA_VE_BIT 0
 #define IA64_PTA_SIZE_BIT 2
