@@ -237,6 +237,14 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     ia64_disable_vhpt_walker();
     lazy_fp_switch(prev, current);
 
+    if (prev->arch.dbg_used || next->arch.dbg_used) {
+        /*
+         * Load debug registers either because they are valid or to clear
+         * the previous one.
+         */
+        ia64_load_debug_regs(next->arch.dbr);
+    }
+    
     prev = ia64_switch_to(next);
 
     /* Note: ia64_switch_to does not return here at vcpu initialization.  */
@@ -692,6 +700,14 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
  	c.nat->privregs_pfn = get_gpfn_from_mfn
 		(virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT);
 
+	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
+		vcpu_get_dbr(v, i, &c.nat->regs.dbr[i]);
+		vcpu_get_ibr(v, i, &c.nat->regs.ibr[i]);
+	}
+
+	for (i = 0; i < 7; i++)
+		vcpu_get_rr(v, (unsigned long)i << 61, &c.nat->regs.rr[i]);
+
 	/* Fill extra regs.  */
 	for (i = 0; i < 8; i++) {
 		tr->itrs[i].pte = v->arch.itrs[i].pte.val;
@@ -721,7 +737,7 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	struct domain *d = v->domain;
 	int was_initialised = v->is_initialised;
 	unsigned int rbs_size;
-	int rc;
+	int rc, i;
 
 	/* Finish vcpu initialization.  */
 	if (!was_initialised) {
@@ -826,8 +842,12 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
  		uregs->ar_rsc |= (2 << 2); /* force PL2/3 */
  	}
 
+	for (i = 0; i < IA64_NUM_DBG_REGS; i++) {
+		vcpu_set_dbr(v, i, c.nat->regs.dbr[i]);
+		vcpu_set_ibr(v, i, c.nat->regs.ibr[i]);
+	}
+
 	if (c.nat->flags & VGCF_EXTRA_REGS) {
-		int i;
 		struct vcpu_tr_regs *tr = &c.nat->regs.tr;
 
 		for (i = 0; i < 8; i++) {

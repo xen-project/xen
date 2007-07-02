@@ -292,11 +292,14 @@ struct thread_struct {
 #else
 # define INIT_THREAD_PM
 #endif
+#ifndef XEN
 	__u64 dbr[IA64_NUM_DBG_REGS];
 	__u64 ibr[IA64_NUM_DBG_REGS];
+#endif
 	struct ia64_fpreg fph[96];	/* saved/loaded on demand */
 };
 
+#ifndef XEN
 #define INIT_THREAD {						\
 	.flags =	0,					\
 	.on_ustack =	0,					\
@@ -333,6 +336,7 @@ struct thread_struct {
 		regs->r1 = 0; regs->r9  = 0; regs->r11 = 0; regs->r13 = 0; regs->r15 = 0;	\
 	}											\
 } while (0)
+#endif
 
 /* Forward declarations, a strange C thing... */
 struct mm_struct;

@@ -1773,33 +1773,61 @@ IA64FAULT vcpu_tak(VCPU * vcpu, u64 vadr, u64 * key)
 
 IA64FAULT vcpu_set_dbr(VCPU * vcpu, u64 reg, u64 val)
 {
-	// TODO: unimplemented DBRs return a reserved register fault
-	// TODO: Should set Logical CPU state, not just physical
-	ia64_set_dbr(reg, val);
+	if (reg >= IA64_NUM_DBG_REGS)
+		return IA64_RSVDREG_FAULT;
+	if ((reg & 1) == 0) {
+		/* Validate address. */
+		if (val >= HYPERVISOR_VIRT_START && val <= HYPERVISOR_VIRT_END)
+			return IA64_ILLOP_FAULT;
+	} else {
+		/* Mask PL0.  */
+		val &= ~(1UL << 56);
+	}
+	if (val != 0)
+		vcpu->arch.dbg_used |= (1 << reg);
+	else
+		vcpu->arch.dbg_used &= ~(1 << reg);
+	vcpu->arch.dbr[reg] = val;
+	if (vcpu == current)
+		ia64_set_dbr(reg, val);
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_ibr(VCPU * vcpu, u64 reg, u64 val)
 {
-	// TODO: unimplemented IBRs return a reserved register fault
-	// TODO: Should set Logical CPU state, not just physical
-	ia64_set_ibr(reg, val);
+	if (reg >= IA64_NUM_DBG_REGS)
+		return IA64_RSVDREG_FAULT;
+	if ((reg & 1) == 0) {
+		/* Validate address. */
+		if (val >= HYPERVISOR_VIRT_START && val <= HYPERVISOR_VIRT_END)
+			return IA64_ILLOP_FAULT;
+	} else {
+		/* Mask PL0.  */
+		val &= ~(1UL << 56);
+	}
+	if (val != 0)
+		vcpu->arch.dbg_used |= (1 << (reg + IA64_NUM_DBG_REGS));
+	else
+		vcpu->arch.dbg_used &= ~(1 << (reg + IA64_NUM_DBG_REGS));
+	vcpu->arch.ibr[reg] = val;
+	if (vcpu == current)
+		ia64_set_ibr(reg, val);
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_get_dbr(VCPU * vcpu, u64 reg, u64 * pval)
 {
-	// TODO: unimplemented DBRs return a reserved register fault
-	u64 val = ia64_get_dbr(reg);
-	*pval = val;
+	if (reg >= IA64_NUM_DBG_REGS)
+		return IA64_RSVDREG_FAULT;
+	*pval = vcpu->arch.dbr[reg];
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_get_ibr(VCPU * vcpu, u64 reg, u64 * pval)
 {
-	// TODO: unimplemented IBRs return a reserved register fault
-	u64 val = ia64_get_ibr(reg);
-	*pval = val;
+	if (reg >= IA64_NUM_DBG_REGS)
+		return IA64_RSVDREG_FAULT;
+	*pval = vcpu->arch.ibr[reg];
 	return IA64_NO_FAULT;
 }
 
@@ -2002,8 +2030,8 @@ unsigned long vcpu_get_rr_ve(VCPU * vcpu, u64 vadr)
 IA64FAULT vcpu_set_rr(VCPU * vcpu, u64 reg, u64 val)
 {
 	PSCB(vcpu, rrs)[reg >> 61] = val;
-	// warning: set_one_rr() does it "live"
-	set_one_rr(reg, val);
+	if (vcpu == current)
+		set_one_rr(reg, val);
 	return IA64_NO_FAULT;
 }
 

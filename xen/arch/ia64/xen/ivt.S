@@ -1183,11 +1183,7 @@ END(speculation_vector)
 // 0x5900 Entry 29 (size 16 bundles) Debug (16,28,56)
 ENTRY(debug_vector)
 	DBG_FAULT(29)
-#ifdef XEN
 	FAULT_OR_REFLECT(29)
-#else
-	FAULT(29)
-#endif
 END(debug_vector)
 
 	.org ia64_ivt+0x5a00

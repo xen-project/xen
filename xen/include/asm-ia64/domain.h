@@ -180,6 +180,11 @@ struct arch_vcpu {
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
 
+    /* Bitset for debug register use.  */
+    unsigned int dbg_used;
+    u64 dbr[IA64_NUM_DBG_REGS];
+    u64 ibr[IA64_NUM_DBG_REGS];
+
     struct thread_struct _thread;	// this must be last
 
     thash_cb_t vtlb;
