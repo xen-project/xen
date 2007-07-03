@@ -211,23 +211,37 @@ void __init arch_init_memory(void)
         share_xen_page_with_guest(mfn_to_page(i), dom_io, XENSHARE_writable);
  
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
-    for ( i = 0, pfn = 0; i < e820.nr_map; i++ )
+    pfn = i = 0;
+    while ( pfn < max_page )
     {
-        if ( e820.map[i].type != E820_RAM )
-            continue;
-        /* Every page from cursor to start of next RAM region is I/O. */
-        rstart_pfn = PFN_UP(e820.map[i].addr);
-        rend_pfn   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
+        while ( (i < e820.nr_map) && (e820.map[i].type != E820_RAM) )
+            i++;
+
+        if ( i == e820.nr_map )
+        {
+            /* No more RAM regions: mark as I/O right to end of memory map. */
+            rstart_pfn = rend_pfn = max_page;
+        }
+        else
+        {
+            /* Mark as I/O just up as far as next RAM region. */
+            rstart_pfn = min_t(unsigned long, max_page,
+                               PFN_UP(e820.map[i].addr));
+            rend_pfn   = max_t(unsigned long, rstart_pfn,
+                               PFN_DOWN(e820.map[i].addr + e820.map[i].size));
+        }
+
+        /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
         {
             BUG_ON(!mfn_valid(pfn));
             share_xen_page_with_guest(
                 mfn_to_page(pfn), dom_io, XENSHARE_writable);
         }
+
         /* Skip the RAM region. */
         pfn = rend_pfn;
     }
-    BUG_ON(pfn != max_page);
 
     subarch_init_memory();
 }
