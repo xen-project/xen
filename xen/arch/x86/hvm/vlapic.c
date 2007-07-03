@@ -660,7 +660,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
         create_periodic_time(current, &vlapic->pt, period, vlapic->pt.irq,
-                             vlapic_lvtt_period(vlapic), NULL, vlapic);
+                             !vlapic_lvtt_period(vlapic), NULL, vlapic);
 
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                     "bus cycle is %uns, "
@@ -819,7 +819,7 @@ static void lapic_rearm(struct vlapic *s)
 
         s->pt.irq = lvtt & APIC_VECTOR_MASK;
         create_periodic_time(vlapic_vcpu(s), &s->pt, period, s->pt.irq,
-                             vlapic_lvtt_period(s), NULL, s);
+                             !vlapic_lvtt_period(s), NULL, s);
 
         printk("lapic_load to rearm the actimer:"
                     "bus cycle is %uns, "
