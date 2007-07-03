@@ -23,14 +23,12 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-//#define DEBUG
 #include "utils.h"
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
 #include "xenstored_transaction.h"
 #include "xenstored_watch.h"
-#include "xenstored_test.h"
 
 #include <xenctrl.h>
 
@@ -217,10 +215,8 @@ void handle_event(void)
 	if (port == virq_port)
 		domain_cleanup();
 
-#ifndef TESTING
 	if (xc_evtchn_unmask(xce_handle, port) == -1)
 		barf_perror("Failed to write to event fd");
-#endif
 }
 
 bool domain_can_read(struct connection *conn)

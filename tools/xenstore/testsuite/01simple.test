@@ -1,4 +1,0 @@
-# Create an entry, read it.
-write /test contents
-expect contents
-read /test

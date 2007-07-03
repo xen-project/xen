@@ -39,7 +39,6 @@
 #include <assert.h>
 #include <setjmp.h>
 
-//#define DEBUG
 #include "utils.h"
 #include "list.h"
 #include "talloc.h"
@@ -52,7 +51,6 @@
 #include "tdb.h"
 
 #include "hashtable.h"
-
 
 extern int xce_handle; /* in xenstored_domain.c */
 
@@ -81,50 +79,6 @@ int quota_nb_entry_per_domain = 1000;
 int quota_nb_watch_per_domain = 128;
 int quota_max_entry_size = 2048; /* 2K */
 int quota_max_transaction = 10;
-
-#ifdef TESTING
-static bool failtest = false;
-
-/* We override talloc's malloc. */
-void *test_malloc(size_t size)
-{
-	/* 1 in 20 means only about 50% of connections establish. */
-	if (failtest && (random() % 32) == 0)
-		return NULL;
-	return malloc(size);
-}
-
-static void stop_failtest(int signum __attribute__((unused)))
-{
-	failtest = false;
-}
-
-/* Need these before we #define away write_all/mkdir in testing.h */
-bool test_write_all(int fd, void *contents, unsigned int len);
-bool test_write_all(int fd, void *contents, unsigned int len)
-{
-	if (failtest && (random() % 8) == 0) {
-		if (len)
-			len = random() % len;
-		write(fd, contents, len);
-		errno = ENOSPC;
-		return false;
-	}
-	return xs_write_all(fd, contents, len);
-}
-
-int test_mkdir(const char *dir, int perms);
-int test_mkdir(const char *dir, int perms)
-{
-	if (failtest && (random() % 8) == 0) {
-		errno = ENOSPC;
-		return -1;
-	}
-	return mkdir(dir, perms);
-}
-#endif /* TESTING */
-
-#include "xenstored_test.h"
 
 TDB_CONTEXT *tdb_context(struct connection *conn)
 {
@@ -1163,12 +1117,10 @@ static void do_debug(struct connection *conn, struct buffered_data *in)
 {
 	int num;
 
-#ifndef TESTING
 	if (conn->id != 0) {
 		send_error(conn, EACCES);
 		return;
 	}
-#endif
 
 	num = xs_count_strings(in->buffer, in->used);
 
@@ -1179,18 +1131,10 @@ static void do_debug(struct connection *conn, struct buffered_data *in)
 		}
 		xprintf("debug: %s", in->buffer + get_string(in, 0));
 	}
+
 	if (streq(in->buffer, "check"))
 		check_store();
-#ifdef TESTING
-	/* For testing, we allow them to set id. */
-	if (streq(in->buffer, "setid")) {
-		conn->id = atoi(in->buffer + get_string(in, 0));
-	} else if (streq(in->buffer, "failtest")) {
-		if (get_string(in, 0) < in->used)
-			srandom(atoi(in->buffer + get_string(in, 0)));
-		failtest = true;
-	}
-#endif /* TESTING */
+
 	send_ack(conn, XS_DEBUG);
 }
 
@@ -1319,10 +1263,8 @@ static void handle_input(struct connection *conn)
 			return;
 
 		if (in->hdr.msg.len > PATH_MAX) {
-#ifndef TESTING
 			syslog(LOG_ERR, "Client tried to feed us %i",
 			       in->hdr.msg.len);
-#endif
 			goto bad_client;
 		}
 
@@ -1414,39 +1356,7 @@ static void accept_connection(int sock, bool canwrite)
 		close(fd);
 }
 
-#ifdef TESTING
-/* Valgrind can check our writes better if we don't use mmap */
-#define TDB_FLAGS TDB_NOMMAP
-/* Useful for running under debugger. */
-void dump_connection(void)
-{
-	struct connection *i;
-
-	list_for_each_entry(i, &connections, list) {
-		printf("Connection %p:\n", i);
-		printf("    state = %s\n",
-		       list_empty(&i->out_list) ? "OK" : "BUSY");
-		if (i->id)
-			printf("    id = %i\n", i->id);
-		if (!i->in->inhdr || i->in->used)
-			printf("    got %i bytes of %s\n",
-			       i->in->used, i->in->inhdr ? "header" : "data");
-#if 0
-		if (i->out)
-			printf("    sending message %s (%s) out\n",
-			       sockmsg_string(i->out->hdr.msg.type),
-			       i->out->buffer);
-		if (i->transaction)
-			dump_transaction(i);
-		if (i->domain)
-			dump_domain(i);
-#endif
-		dump_watches(i);
-	}
-}
-#else
 #define TDB_FLAGS 0
-#endif
 
 /* We create initial nodes manually. */
 static void manual_node(const char *name, const char *child)
@@ -1693,10 +1603,6 @@ static void corrupt(struct connection *conn, const char *fmt, ...)
 	log("corruption detected by connection %i: err %s: %s",
 	    conn ? (int)conn->id : -1, strerror(saved_errno), str);
 
-#ifdef TESTING
-	/* Allow them to attach debugger. */
-	sleep(30);
-#endif
 	check_store();
 }
 
@@ -1740,11 +1646,10 @@ static void daemonize(void)
 	if (pid != 0)
 		exit(0);
 
-#ifndef TESTING	/* Relative paths for socket names */
 	/* Move off any mount points we might be in. */
 	if (chdir("/") == -1)
 		barf_perror("Failed to chdir");
-#endif
+
 	/* Discard our parent's old-fashioned umask prejudices. */
 	umask(0);
 }
@@ -1940,10 +1845,6 @@ int main(int argc, char *argv[])
 	}
 
 	signal(SIGHUP, trigger_reopen_log);
-
-#ifdef TESTING
-	signal(SIGUSR1, stop_failtest);
-#endif
 
 	if (xce_handle != -1)
 		evtchn_fd = xc_evtchn_fd(xce_handle);
