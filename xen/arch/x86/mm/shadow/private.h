@@ -392,8 +392,8 @@ void shadow_free_p2m_page(struct domain *d, struct page_info *pg);
 
 /* Functions that atomically write PT/P2M entries and update state */
 void shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
-                            l1_pgentry_t *p, l1_pgentry_t new, 
-                            unsigned int level);
+                            l1_pgentry_t *p, mfn_t table_mfn,
+                            l1_pgentry_t new, unsigned int level);
 int shadow_write_guest_entry(struct vcpu *v, intpte_t *p,
                              intpte_t new, mfn_t gmfn);
 int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,

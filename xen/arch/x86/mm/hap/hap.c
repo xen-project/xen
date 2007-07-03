@@ -672,7 +672,7 @@ static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
 
 void 
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
-                    l1_pgentry_t new, unsigned int level)
+                    mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
 {
     hap_lock(v->domain);
 

@@ -2733,11 +2733,11 @@ static int shadow_test_disable(struct domain *d)
  * shadow processing jobs.
  */
 void
-shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p, 
+shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
+                       l1_pgentry_t *p, mfn_t table_mfn, 
                        l1_pgentry_t new, unsigned int level)
 {
     struct domain *d = v->domain;
-    mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
     mfn_t mfn;
     
     shadow_lock(d);
