@@ -45,6 +45,8 @@ u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
+static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
+
 static u32 vmcs_revision_id __read_mostly;
 
 static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
@@ -180,6 +182,9 @@ static void __vmx_clear_vmcs(void *info)
 
     v->arch.hvm_vmx.active_cpu = -1;
     v->arch.hvm_vmx.launched   = 0;
+
+    if ( v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs) )
+        this_cpu(current_vmcs) = NULL;
 }
 
 static void vmx_clear_vmcs(struct vcpu *v)
@@ -199,6 +204,7 @@ static void vmx_load_vmcs(struct vcpu *v)
 {
     __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
     v->arch.hvm_vmx.active_cpu = smp_processor_id();
+    this_cpu(current_vmcs) = v->arch.hvm_vmx.vmcs;
 }
 
 void vmx_vmcs_enter(struct vcpu *v)
@@ -512,7 +518,8 @@ void vmx_do_resume(struct vcpu *v)
 
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
     {
-        vmx_load_vmcs(v);
+        if ( v->arch.hvm_vmx.vmcs != this_cpu(current_vmcs) )
+            vmx_load_vmcs(v);
     }
     else
     {
