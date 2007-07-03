@@ -180,6 +180,8 @@ struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
     struct domain *d, **pd;
+    enum { INIT_evtchn = 1, INIT_gnttab = 2, INIT_acm = 4, INIT_arch = 8 }; 
+    int init_status = 0;
 
     if ( (d = alloc_domain(domid)) == NULL )
         return NULL;
@@ -195,25 +197,29 @@ struct domain *domain_create(
         atomic_inc(&d->pause_count);
 
         if ( evtchn_init(d) != 0 )
-            goto fail1;
+            goto fail;
+        init_status |= INIT_evtchn;
 
         if ( grant_table_create(d) != 0 )
-            goto fail2;
+            goto fail;
+        init_status |= INIT_gnttab;
 
         if ( acm_domain_create(d, ssidref) != 0 )
-            goto fail3;
+            goto fail;
+        init_status |= INIT_acm;
     }
 
     if ( arch_domain_create(d) != 0 )
-        goto fail4;
+        goto fail;
+    init_status |= INIT_arch;
 
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
-        goto fail5;
+        goto fail;
 
     if ( sched_init_domain(d) != 0 )
-        goto fail5;
+        goto fail;
 
     if ( !is_idle_domain(d) )
     {
@@ -224,10 +230,6 @@ struct domain *domain_create(
                 break;
         d->next_in_list = *pd;
         d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
-        /* Two rcu assignments are not atomic 
-         * Readers may see inconsistent domlist and hash table
-         * That is OK as long as each RCU reader-side critical section uses
-         * only one or them  */
         rcu_assign_pointer(*pd, d);
         rcu_assign_pointer(domain_hash[DOMAIN_HASH(domid)], d);
         spin_unlock(&domlist_update_lock);
@@ -235,18 +237,17 @@ struct domain *domain_create(
 
     return d;
 
- fail5:
-    arch_domain_destroy(d);
- fail4:
-    if ( !is_idle_domain(d) )
+ fail:
+    d->is_dying = 1;
+    atomic_set(&d->refcnt, DOMAIN_DESTROYED);
+    if ( init_status & INIT_arch )
+        arch_domain_destroy(d);
+    if ( init_status & INIT_acm )
         acm_domain_destroy(d);
- fail3:
-    if ( !is_idle_domain(d) )
+    if ( init_status & INIT_gnttab )
         grant_table_destroy(d);
- fail2:
-    if ( !is_idle_domain(d) )
+    if ( init_status & INIT_evtchn )
         evtchn_destroy(d);
- fail1:
     rangeset_domain_destroy(d);
     free_domain(d);
     return NULL;
@@ -308,6 +309,7 @@ void domain_kill(struct domain *d)
         return;
     }
 
+    evtchn_destroy(d);
     gnttab_release_mappings(d);
     domain_relinquish_resources(d);
     put_domain(d);
@@ -473,7 +475,6 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     rangeset_domain_destroy(d);
 
-    evtchn_destroy(d);
     grant_table_destroy(d);
 
     arch_domain_destroy(d);
