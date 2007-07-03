@@ -3655,8 +3655,9 @@ void memguard_unguard_range(void *p, unsigned long l)
 
 void memguard_guard_stack(void *p)
 {
-    BUILD_BUG_ON((DEBUG_STACK_SIZE + PAGE_SIZE) > STACK_SIZE);
-    p = (void *)((unsigned long)p + STACK_SIZE - DEBUG_STACK_SIZE - PAGE_SIZE);
+    BUILD_BUG_ON((PRIMARY_STACK_SIZE + PAGE_SIZE) > STACK_SIZE);
+    p = (void *)((unsigned long)p + STACK_SIZE -
+                 PRIMARY_STACK_SIZE - PAGE_SIZE);
     memguard_guard_range(p, PAGE_SIZE);
 }
 

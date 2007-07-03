@@ -77,11 +77,15 @@
 #define MEMORY_GUARD
 #endif
 
+#ifdef __i386__
 #define STACK_ORDER 2
+#else
+#define STACK_ORDER 3
+#endif
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
-/* Debug stack is restricted to 8kB by guard pages. */
-#define DEBUG_STACK_SIZE 8192
+/* Primary stack is restricted to 8kB by guard pages. */
+#define PRIMARY_STACK_SIZE 8192
 
 #define CONFIG_DMA_BITSIZE 32
 

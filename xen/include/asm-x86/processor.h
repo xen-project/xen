@@ -448,6 +448,13 @@ struct tss_struct {
     u8 __cacheline_filler[24];
 } __cacheline_aligned __attribute__((packed));
 
+#ifdef __x86_64__
+# define IST_DF  1UL
+# define IST_NMI 2UL
+# define IST_MCE 3UL
+# define IST_MAX 3UL
+#endif
+
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];

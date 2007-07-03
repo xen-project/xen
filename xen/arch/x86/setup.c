@@ -109,7 +109,7 @@ extern void early_cpu_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
 
-char __attribute__ ((__section__(".bss.page_aligned"))) cpu0_stack[STACK_SIZE];
+char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 

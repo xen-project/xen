@@ -807,9 +807,9 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
 #ifdef __x86_64__
     /* Resume use of ISTs now that the host TR is reinstated. */
-    idt_tables[cpu][TRAP_double_fault].a  |= 1UL << 32; /* IST1 */
-    idt_tables[cpu][TRAP_nmi].a           |= 2UL << 32; /* IST2 */
-    idt_tables[cpu][TRAP_machine_check].a |= 3UL << 32; /* IST3 */
+    idt_tables[cpu][TRAP_double_fault].a  |= IST_DF << 32;
+    idt_tables[cpu][TRAP_nmi].a           |= IST_NMI << 32;
+    idt_tables[cpu][TRAP_machine_check].a |= IST_MCE << 32;
 #endif
 }
 
@@ -832,9 +832,9 @@ static void svm_ctxt_switch_to(struct vcpu *v)
      * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
      * But this doesn't matter: the IST is only req'd to handle SYSCALL/SYSRET.
      */
-    idt_tables[cpu][TRAP_double_fault].a  &= ~(3UL << 32);
-    idt_tables[cpu][TRAP_nmi].a           &= ~(3UL << 32);
-    idt_tables[cpu][TRAP_machine_check].a &= ~(3UL << 32);
+    idt_tables[cpu][TRAP_double_fault].a  &= ~(7UL << 32);
+    idt_tables[cpu][TRAP_nmi].a           &= ~(7UL << 32);
+    idt_tables[cpu][TRAP_machine_check].a &= ~(7UL << 32);
 #endif
 
     svm_restore_dr(v);
