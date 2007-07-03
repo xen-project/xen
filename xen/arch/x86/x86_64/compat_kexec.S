@@ -144,6 +144,8 @@ compatibility_mode:
         movl %cr0, %eax
         orl $X86_CR0_PG, %eax
         movl %eax, %cr0
+        jmp 1f
+1:
 
         popl %eax
         call *%eax
