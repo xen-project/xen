@@ -211,13 +211,12 @@ void __init arch_init_memory(void)
         share_xen_page_with_guest(mfn_to_page(i), dom_io, XENSHARE_writable);
  
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
-    pfn = i = 0;
-    while ( pfn < max_page )
+    for ( i = 0, pfn = 0; pfn < max_page; i++ )
     {
         while ( (i < e820.nr_map) && (e820.map[i].type != E820_RAM) )
             i++;
 
-        if ( i == e820.nr_map )
+        if ( i >= e820.nr_map )
         {
             /* No more RAM regions: mark as I/O right to end of memory map. */
             rstart_pfn = rend_pfn = max_page;
