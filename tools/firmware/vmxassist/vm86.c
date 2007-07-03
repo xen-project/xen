@@ -594,16 +594,24 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 		TRACE((regs, regs->eip - eip,
 			"movb %%e%s, *0x%x", rnames[r], addr));
 		write8(addr, val);
-		break;
+		return 1;
 
 	case 0x8A: /* addr32 mov r/m8, r8 */
 		TRACE((regs, regs->eip - eip,
 			"movb *0x%x, %%%s", addr, rnames[r]));
 		setreg8(regs, r, read8(addr));
-		break;
+		return 1;
 
 	case 0x89: /* addr32 mov r16, r/m16 */
 		val = getreg32(regs, r);
+		if ((modrm & 0xC0) == 0xC0) {
+			if (prefix & DATA32)
+				setreg32(regs, modrm & 7, val);
+			else
+				setreg16(regs, modrm & 7, MASK16(val));
+			return 1;
+		}
+
 		if (prefix & DATA32) {
 			TRACE((regs, regs->eip - eip,
 				"movl %%e%s, *0x%x", rnames[r], addr));
@@ -613,9 +621,17 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 				"movw %%%s, *0x%x", rnames[r], addr));
 			write16(addr, MASK16(val));
 		}
-		break;
+		return 1;
 
-	case 0x8B: /* addr32 mov r/m16, r16 */
+	case 0x8B: /* mov r/m16, r16 */
+		if ((modrm & 0xC0) == 0xC0) {
+			if (prefix & DATA32)
+				setreg32(regs, r, addr);
+			else
+				setreg16(regs, r, MASK16(addr));
+			return 1;
+		}
+
 		if (prefix & DATA32) {
 			TRACE((regs, regs->eip - eip,
 				"movl *0x%x, %%e%s", addr, rnames[r]));
@@ -625,7 +641,7 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 				"movw *0x%x, %%%s", addr, rnames[r]));
 			setreg16(regs, r, read16(addr));
 		}
-		break;
+		return 1;
 
 	case 0xC6: /* addr32 movb $imm, r/m8 */
 		if ((modrm >> 3) & 7)
@@ -634,9 +650,9 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 		write8(addr, val);
 		TRACE((regs, regs->eip - eip, "movb $0x%x, *0x%x",
 							val, addr));
-		break;
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 /*
@@ -816,8 +832,8 @@ mov_to_seg(struct regs *regs, unsigned prefix, unsigned opc)
 	 * 1) real->protected mode.
 	 * 2) protected->real mode.
 	 */
-	if ((mode != VM86_REAL_TO_PROTECTED) &&
-	    (mode != VM86_PROTECTED_TO_REAL))
+	if (mode != VM86_REAL_TO_PROTECTED &&
+	    mode != VM86_PROTECTED_TO_REAL)
 		return 0;
 
 	/* Register source only. */
@@ -1037,8 +1053,8 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 {
 	switch (newmode) {
 	case VM86_REAL:
-		if ((mode == VM86_PROTECTED_TO_REAL) ||
-		    (mode == VM86_REAL_TO_PROTECTED)) {
+		if (mode == VM86_PROTECTED_TO_REAL ||
+		    mode == VM86_REAL_TO_PROTECTED) {
 			regs->eflags &= ~EFLAGS_TF;
 			real_mode(regs);
 		} else if (mode != VM86_REAL)
@@ -1121,7 +1137,7 @@ jmpl_indirect(struct regs *regs, int prefix, unsigned modrm)
 
 	if (mode == VM86_REAL_TO_PROTECTED)		/* jump to protected mode */
 		set_mode(regs, VM86_PROTECTED);
-	else if (mode == VM86_PROTECTED_TO_REAL)/* jump to real mode */
+	else if (mode == VM86_PROTECTED_TO_REAL)	/* jump to real mode */
 		set_mode(regs, VM86_REAL);
 	else
 		panic("jmpl");
@@ -1147,7 +1163,7 @@ retl(struct regs *regs, int prefix)
 
 	if (mode == VM86_REAL_TO_PROTECTED)		/* jump to protected mode */
 		set_mode(regs, VM86_PROTECTED);
-	else if (mode == VM86_PROTECTED_TO_REAL)/* jump to real mode */
+	else if (mode == VM86_PROTECTED_TO_REAL)	/* jump to real mode */
 		set_mode(regs, VM86_REAL);
 	else
 		panic("retl");
@@ -1382,9 +1398,7 @@ opcode(struct regs *regs)
 
 		case 0x39: /* addr32 cmp r16, r/m16 */
 		case 0x3B: /* addr32 cmp r/m16, r16 */
-			if (mode != VM86_REAL && mode != VM86_REAL_TO_PROTECTED)
-				goto invalid;
-			if ((prefix & ADDR32) == 0)
+			if (mode == VM86_PROTECTED_TO_REAL || !(prefix & ADDR32))
 				goto invalid;
 			if (!cmp(regs, prefix, opc))
 				goto invalid;
@@ -1427,37 +1441,17 @@ opcode(struct regs *regs)
 			}
 			continue;
 
-		case 0x88: /* mov r8, r/m8 */
-		case 0x8A: /* mov r/m8, r8 */
-			if (mode != VM86_REAL && mode != VM86_REAL_TO_PROTECTED)
-				goto invalid;
-			if ((prefix & ADDR32) == 0)
+		case 0x88: /* addr32 mov r8, r/m8 */
+		case 0x8A: /* addr32 mov r/m8, r8 */
+			if (mode == VM86_PROTECTED_TO_REAL || !(prefix & ADDR32))
 				goto invalid;
 			if (!movr(regs, prefix, opc))
 				goto invalid;
 			return OPC_EMULATED;
 
-		case 0x89: /* addr32 mov r16, r/m16 */
-			if (mode == VM86_PROTECTED_TO_REAL) {
-				unsigned modrm = fetch8(regs);
-				unsigned addr = operand(prefix, regs, modrm);
-				unsigned val, r = (modrm >> 3) & 7;
-
-				if (prefix & DATA32) {
-					val = getreg16(regs, r);
-					write32(addr, val);
-				} else {
-					val = getreg32(regs, r);
-					write16(addr, MASK16(val));
-				}
-				TRACE((regs, regs->eip - eip,
-					"mov %%%s, *0x%x", rnames[r], addr));
-				return OPC_EMULATED;
-			}
-		case 0x8B: /* addr32 mov r/m16, r16 */
-			if (mode != VM86_REAL && mode != VM86_REAL_TO_PROTECTED)
-				goto invalid;
-			if ((prefix & ADDR32) == 0)
+		case 0x89: /* mov r16, r/m16 */
+		case 0x8B: /* mov r/m16, r16 */
+			if (mode != VM86_PROTECTED_TO_REAL && !(prefix & ADDR32))
 				goto invalid;
 			if (!movr(regs, prefix, opc))
 				goto invalid;
@@ -1469,7 +1463,7 @@ opcode(struct regs *regs)
 			return OPC_EMULATED;
 
 		case 0x8F: /* addr32 pop r/m16 */
-			if ((prefix & ADDR32) == 0)
+			if (!(prefix & ADDR32))
 				goto invalid;
 			if (!pop(regs, prefix, opc))
 				goto invalid;
@@ -1498,48 +1492,48 @@ opcode(struct regs *regs)
 			return OPC_EMULATED;
 
 		case 0xA1: /* mov ax, r/m16 */
-			{
-				int addr, data;
-				int seg = segment(prefix, regs, regs->vds);
-				int offset = prefix & ADDR32? fetch32(regs) : fetch16(regs);
+		{
+			int addr, data;
+			int seg = segment(prefix, regs, regs->vds);
+			int offset = prefix & ADDR32 ? fetch32(regs) : fetch16(regs);
 
-				if (prefix & DATA32) {
-					addr = address(regs, seg, offset);
-					data = read32(addr);
-					setreg32(regs, 0, data);
-				} else {
-					addr = address(regs, seg, offset);
-					data = read16(addr);
-					setreg16(regs, 0, data);
-				}
-				TRACE((regs, regs->eip - eip, "mov *0x%x, %%ax", addr));
+			if (prefix & DATA32) {
+				addr = address(regs, seg, offset);
+				data = read32(addr);
+				setreg32(regs, 0, data);
+			} else {
+				addr = address(regs, seg, offset);
+				data = read16(addr);
+				setreg16(regs, 0, data);
 			}
+			TRACE((regs, regs->eip - eip, "mov *0x%x, %%ax", addr));
 			return OPC_EMULATED;
+		}
 
 		case 0xBB: /* mov bx, imm16 */
-			{
-				int data;
-				if (prefix & DATA32) {
-					data = fetch32(regs);
-					setreg32(regs, 3, data);
-				} else {
-					data = fetch16(regs);
-					setreg16(regs, 3, data);
-				}
-				TRACE((regs, regs->eip - eip, "mov $0x%x, %%bx", data));
+		{
+			int data;
+			if (prefix & DATA32) {
+				data = fetch32(regs);
+				setreg32(regs, 3, data);
+			} else {
+				data = fetch16(regs);
+				setreg16(regs, 3, data);
 			}
+			TRACE((regs, regs->eip - eip, "mov $0x%x, %%bx", data));
 			return OPC_EMULATED;
+		}
 
 		case 0xC6: /* addr32 movb $imm, r/m8 */
-			if ((prefix & ADDR32) == 0)
+			if (!(prefix & ADDR32))
 				goto invalid;
 			if (!movr(regs, prefix, opc))
 				goto invalid;
 			return OPC_EMULATED;
 
 		case 0xCB: /* retl */
-			if ((mode == VM86_REAL_TO_PROTECTED) ||
-				(mode == VM86_PROTECTED_TO_REAL)) {
+			if (mode == VM86_REAL_TO_PROTECTED ||
+				mode == VM86_PROTECTED_TO_REAL) {
 				retl(regs, prefix);
 				return OPC_INVALID;
 			}
@@ -1576,37 +1570,37 @@ opcode(struct regs *regs)
 			return OPC_EMULATED;
 
 		case 0xEA: /* jmpl */
-			if ((mode == VM86_REAL_TO_PROTECTED) ||
-				(mode == VM86_PROTECTED_TO_REAL)) {
+			if (mode == VM86_REAL_TO_PROTECTED ||
+				mode == VM86_PROTECTED_TO_REAL) {
 				jmpl(regs, prefix);
 				return OPC_INVALID;
 			}
 			goto invalid;
 
-		case 0xFF: /* jmpl (indirect) */
-			{
-				unsigned modrm = fetch8(regs);
-				switch((modrm >> 3) & 7) {
-				case 5: /* jmpl (indirect) */
-					if ((mode == VM86_REAL_TO_PROTECTED) ||
-						(mode == VM86_PROTECTED_TO_REAL)) {
-						jmpl_indirect(regs, prefix, modrm);
-						return OPC_INVALID;
-					}
-					goto invalid;
-
-				case 6: /* push r/m16 */
-					pushrm(regs, prefix, modrm);
-					return OPC_EMULATED;
-
-				default:
-					goto invalid;
+		case 0xFF:
+		{
+			unsigned modrm = fetch8(regs);
+			switch((modrm >> 3) & 7) {
+			case 5: /* jmpl (indirect) */
+				if (mode == VM86_REAL_TO_PROTECTED ||
+					mode == VM86_PROTECTED_TO_REAL) {
+					jmpl_indirect(regs, prefix, modrm);
+					return OPC_INVALID;
 				}
+				goto invalid;
+
+			case 6: /* push r/m16 */
+				pushrm(regs, prefix, modrm);
+				return OPC_EMULATED;
+
+			default:
+				goto invalid;
 			}
+		}
 
 		case 0xEB: /* short jump */
-			if ((mode == VM86_REAL_TO_PROTECTED) ||
-				(mode == VM86_PROTECTED_TO_REAL)) {
+			if (mode == VM86_REAL_TO_PROTECTED ||
+				mode == VM86_PROTECTED_TO_REAL) {
 				disp = (char) fetch8(regs);
 				TRACE((regs, 2, "jmp 0x%x", regs->eip + disp));
 				regs->eip += disp;
@@ -1629,7 +1623,7 @@ opcode(struct regs *regs)
 			continue;
 
 		case 0xF6: /* addr32 testb $imm, r/m8 */
-			if ((prefix & ADDR32) == 0)
+			if (!(prefix & ADDR32))
 				goto invalid;
 			if (!test(regs, prefix, opc))
 				goto invalid;
