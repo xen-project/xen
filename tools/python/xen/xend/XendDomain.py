@@ -1442,6 +1442,7 @@ class XendDomain:
                     dominfo.setWeight(weight)
                 if set_cap:
                     dominfo.setCap(cap)
+                self.managed_config_save(dominfo)
             return rc
         except Exception, ex:
             log.exception(ex)
