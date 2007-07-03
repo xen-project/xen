@@ -71,13 +71,38 @@
  * the effect is cleared. (i.e., MOV-SS-blocking 'dominates' STI-blocking).
  */
 
-static void enable_irq_window(struct vcpu *v)
+static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
 {
-    u32  *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
-    
-    if ( !(*cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING) )
+    u32 *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
+    u32 ctl = CPU_BASED_VIRTUAL_INTR_PENDING;
+
+    if ( unlikely(intr_source == hvm_intack_none) )
+        return;
+
+    if ( unlikely(intr_source == hvm_intack_nmi) && cpu_has_vmx_vnmi )
     {
-        *cpu_exec_control |= CPU_BASED_VIRTUAL_INTR_PENDING;
+        /*
+         * We set MOV-SS blocking in lieu of STI blocking when delivering an
+         * NMI. This is because it is processor-specific whether STI-blocking
+         * blocks NMIs. Hence we *must* check for STI-blocking on NMI delivery
+         * (otherwise vmentry will fail on processors that check for STI-
+         * blocking) but if the processor does not check for STI-blocking then
+         * we may immediately vmexit and hance make no progress!
+         * (see SDM 3B 21.3, "Other Causes of VM Exits").
+         */
+        u32 intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+        if ( intr_shadow & VMX_INTR_SHADOW_STI )
+        {
+            /* Having both STI-blocking and MOV-SS-blocking fails vmentry. */
+            intr_shadow &= ~VMX_INTR_SHADOW_STI;
+            intr_shadow |= VMX_INTR_SHADOW_MOV_SS;
+        }
+        ctl = CPU_BASED_VIRTUAL_NMI_PENDING;
+    }
+
+    if ( !(*cpu_exec_control & ctl) )
+    {
+        *cpu_exec_control |= ctl;
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
     }
 }
@@ -120,8 +145,7 @@ asmlinkage void vmx_intr_assist(void)
         if ( unlikely(v->arch.hvm_vmx.vector_injected) )
         {
             v->arch.hvm_vmx.vector_injected = 0;
-            if ( unlikely(intr_source != hvm_intack_none) )
-                enable_irq_window(v);
+            enable_intr_window(v, intr_source);
             return;
         }
 
@@ -129,7 +153,9 @@ asmlinkage void vmx_intr_assist(void)
         idtv_info_field = __vmread(IDT_VECTORING_INFO_FIELD);
         if ( unlikely(idtv_info_field & INTR_INFO_VALID_MASK) )
         {
-            __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
+            /* See SDM 3B 25.7.1.1 and .2 for info about masking resvd bits. */
+            __vmwrite(VM_ENTRY_INTR_INFO_FIELD,
+                      idtv_info_field & ~INTR_INFO_RESVD_BITS_MASK);
 
             /*
              * Safe: the length will only be interpreted for software
@@ -143,8 +169,16 @@ asmlinkage void vmx_intr_assist(void)
             if ( unlikely(idtv_info_field & 0x800) ) /* valid error code */
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
                           __vmread(IDT_VECTORING_ERROR_CODE));
-            if ( unlikely(intr_source != hvm_intack_none) )
-                enable_irq_window(v);
+            enable_intr_window(v, intr_source);
+
+            /*
+             * Clear NMI-blocking interruptibility info if an NMI delivery
+             * faulted. Re-delivery will re-set it (see SDM 3B 25.7.1.2).
+             */
+            if ( (idtv_info_field&INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI )
+                __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
+                          __vmread(GUEST_INTERRUPTIBILITY_INFO) &
+                          ~VMX_INTR_SHADOW_NMI);
 
             HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
             return;
@@ -153,14 +187,9 @@ asmlinkage void vmx_intr_assist(void)
         if ( likely(intr_source == hvm_intack_none) )
             return;
 
-        /*
-         * TODO: Better NMI handling. Shouldn't wait for EFLAGS.IF==1, but
-         * should wait for exit from 'NMI blocking' window (NMI injection to
-         * next IRET). This requires us to use the new 'virtual NMI' support.
-         */
         if ( !hvm_interrupts_enabled(v, intr_source) )
         {
-            enable_irq_window(v);
+            enable_intr_window(v, intr_source);
             return;
         }
     } while ( !hvm_vcpu_ack_pending_irq(v, intr_source, &intr_vector) );

@@ -1106,15 +1106,17 @@ static int vmx_interrupts_enabled(struct vcpu *v, enum hvm_intack type)
 
     ASSERT(v == current);
 
-    intr_shadow  = __vmread(GUEST_INTERRUPTIBILITY_INFO);
-    intr_shadow &= VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS;
+    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
 
     if ( type == hvm_intack_nmi )
-        return !intr_shadow;
+        return !(intr_shadow & (VMX_INTR_SHADOW_STI|
+                                VMX_INTR_SHADOW_MOV_SS|
+                                VMX_INTR_SHADOW_NMI));
 
     ASSERT((type == hvm_intack_pic) || (type == hvm_intack_lapic));
     eflags = __vmread(GUEST_RFLAGS);
-    return !irq_masked(eflags) && !intr_shadow;
+    return (!irq_masked(eflags) &&
+            !(intr_shadow & (VMX_INTR_SHADOW_STI|VMX_INTR_SHADOW_MOV_SS)));
 }
 
 static void vmx_update_host_cr3(struct vcpu *v)
@@ -2910,6 +2912,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         BUG_ON(!(intr_info & INTR_INFO_VALID_MASK));
 
         vector = intr_info & INTR_INFO_VECTOR_MASK;
+
+        /*
+         * Re-set the NMI shadow if vmexit caused by a guest IRET fault (see 3B
+         * 25.7.1.2, "Resuming Guest Software after Handling an Exception").
+         * (NB. If we emulate this IRET for any reason, we should re-clear!)
+         */
+        if ( unlikely(intr_info & INTR_INFO_NMI_UNBLOCKED_BY_IRET) &&
+             !(__vmread(IDT_VECTORING_INFO_FIELD) & INTR_INFO_VALID_MASK) &&
+             (vector != TRAP_double_fault) )
+            __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
+                    __vmread(GUEST_INTERRUPTIBILITY_INFO)|VMX_INTR_SHADOW_NMI);
 
         perfc_incra(cause_vector, vector);
 

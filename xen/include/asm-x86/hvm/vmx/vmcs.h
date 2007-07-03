@@ -137,6 +137,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \
     (vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
+#define cpu_has_vmx_vnmi \
+    (vmx_pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS)
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
 extern char *vmx_msr_bitmap;

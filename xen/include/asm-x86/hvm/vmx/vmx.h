@@ -90,7 +90,9 @@ void vmx_vlapic_msr_changed(struct vcpu *v);
 #define INTR_INFO_VECTOR_MASK           0xff            /* 7:0 */
 #define INTR_INFO_INTR_TYPE_MASK        0x700           /* 10:8 */
 #define INTR_INFO_DELIVER_CODE_MASK     0x800           /* 11 */
+#define INTR_INFO_NMI_UNBLOCKED_BY_IRET 0x1000          /* 12 */
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
+#define INTR_INFO_RESVD_BITS_MASK       0x7ffff000
 
 #define INTR_TYPE_EXT_INTR              (0 << 8)    /* external interrupt */
 #define INTR_TYPE_NMI                   (2 << 8)    /* NMI                */
