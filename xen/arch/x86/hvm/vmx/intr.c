@@ -96,6 +96,7 @@ static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
             /* Having both STI-blocking and MOV-SS-blocking fails vmentry. */
             intr_shadow &= ~VMX_INTR_SHADOW_STI;
             intr_shadow |= VMX_INTR_SHADOW_MOV_SS;
+            __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
         }
         ctl = CPU_BASED_VIRTUAL_NMI_PENDING;
     }
@@ -169,7 +170,6 @@ asmlinkage void vmx_intr_assist(void)
             if ( unlikely(idtv_info_field & 0x800) ) /* valid error code */
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
                           __vmread(IDT_VECTORING_ERROR_CODE));
-            enable_intr_window(v, intr_source);
 
             /*
              * Clear NMI-blocking interruptibility info if an NMI delivery
@@ -179,6 +179,8 @@ asmlinkage void vmx_intr_assist(void)
                 __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
                           __vmread(GUEST_INTERRUPTIBILITY_INFO) &
                           ~VMX_INTR_SHADOW_NMI);
+
+            enable_intr_window(v, intr_source);
 
             HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
             return;
