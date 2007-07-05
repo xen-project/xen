@@ -1,6 +1,6 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
- * vmx_process.c: handling VMX architecture-related VM exits
+ * vmx_fault.c: handling VMX architecture-related VM exits
  * Copyright (c) 2005, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -314,7 +314,7 @@ static int vmx_handle_lds(REGS* regs)
 
 /* We came here because the H/W VHPT walker failed to find an entry */
 IA64FAULT
-vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
+vmx_hpw_miss(u64 vadr, u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
     int type;
@@ -334,13 +334,15 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     else
         panic_domain(regs, "wrong vec:%lx\n", vec);
 
-    if(is_physical_mode(v)&&(!(vadr<<1>>62))){
-        if(vec==2){
+    /* Physical mode and region is 0 or 4.  */
+    if (is_physical_mode(v) && (!((vadr<<1)>>62))) {
+        if (vec == 2) {
+            /* DTLB miss.  */
             if (misr.sp) /* Refer to SDM Vol2 Table 4-11,4-12 */
                 return vmx_handle_lds(regs);
             if (v->domain != dom0
                 && __gpfn_is_io(v->domain, (vadr << 1) >> (PAGE_SHIFT + 1))) {
-                emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
+                emulate_io_inst(v, ((vadr<<1)>>1),4);   //  UC
                 return IA64_FAULT;
             }
         }
@@ -349,7 +351,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     }
     
 try_again:
-    if((data=vtlb_lookup(v, vadr,type))!=0){
+    if ((data=vtlb_lookup(v, vadr,type)) != 0) {
         if (v->domain != dom0 && type == DSIDE_TLB) {
             if (misr.sp) { /* Refer to SDM Vol2 Table 4-10,4-12 */
                 if ((data->ma == VA_MATTR_UC) || (data->ma == VA_MATTR_UCE))
@@ -372,7 +374,7 @@ try_again:
         }
         thash_vhpt_insert(v, data->page_flags, data->itir, vadr, type);
 
-    }else if(type == DSIDE_TLB){
+    } else if (type == DSIDE_TLB) {
     
         if (misr.sp)
             return vmx_handle_lds(regs);
@@ -380,11 +382,11 @@ try_again:
         vcpu_get_rr(v, vadr, &rr);
         itir = rr & (RR_RID_MASK | RR_PS_MASK);
 
-        if(!vhpt_enabled(v, vadr, misr.rs?RSE_REF:DATA_REF)){
+        if (!vhpt_enabled(v, vadr, misr.rs ? RSE_REF : DATA_REF)) {
             if (GOS_WINDOWS(v)) {
                 /* windows use region 4 and 5 for identity mapping */
                 if (REGION_NUMBER(vadr) == 4 && !(regs->cr_ipsr & IA64_PSR_CPL)
-                    && (REGION_OFFSET(vadr)<= _PAGE_PPN_MASK)) {
+                    && (REGION_OFFSET(vadr) <= _PAGE_PPN_MASK)) {
 
                     pteval = PAGEALIGN(REGION_OFFSET(vadr), itir_ps(itir)) |
                              (_PAGE_P | _PAGE_A | _PAGE_D |
@@ -397,7 +399,7 @@ try_again:
                 }
 
                 if (REGION_NUMBER(vadr) == 5 && !(regs->cr_ipsr & IA64_PSR_CPL)
-                    && (REGION_OFFSET(vadr)<= _PAGE_PPN_MASK)) {
+                    && (REGION_OFFSET(vadr) <= _PAGE_PPN_MASK)) {
 
                     pteval = PAGEALIGN(REGION_OFFSET(vadr),itir_ps(itir)) |
                              (_PAGE_P | _PAGE_A | _PAGE_D |
@@ -410,11 +412,11 @@ try_again:
                 }
             }
 
-            if(vpsr.ic){
+            if (vpsr.ic) {
                 vcpu_set_isr(v, misr.val);
                 alt_dtlb(v, vadr);
                 return IA64_FAULT;
-            } else{
+            } else {
                 nested_dtlb(v);
                 return IA64_FAULT;
             }
@@ -466,7 +468,7 @@ try_again:
                 vcpu_set_isr(v, misr.val);
                 dtlb_fault(v, vadr);
                 return IA64_FAULT;
-            }else{
+            } else {
                 nested_dtlb(v);
                 return IA64_FAULT;
             }
@@ -481,7 +483,7 @@ try_again:
                 return IA64_FAULT;
             }
         }
-    }else if(type == ISIDE_TLB){
+    } else if (type == ISIDE_TLB) {
     
         if (!vpsr.ic)
             misr.ni = 1;
