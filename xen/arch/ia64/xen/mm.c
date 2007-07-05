@@ -2021,20 +2021,6 @@ static int alloc_page_type(struct page_info *page, u32 type)
 	return 1;
 }
 
-unsigned long __get_free_pages(unsigned int mask, unsigned int order)
-{
-	void *p = alloc_xenheap_pages(order);
-
-	memset(p,0,PAGE_SIZE<<order);
-	return (unsigned long)p;
-}
-
-void __free_pages(struct page_info *page, unsigned int order)
-{
-	if (order) BUG();
-	free_xenheap_page(page);
-}
-
 static int opt_p2m_xenheap;
 boolean_param("p2m_xenheap", opt_p2m_xenheap);
 
