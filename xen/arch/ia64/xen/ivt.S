@@ -1087,11 +1087,10 @@ END(iaccess_rights)
 ENTRY(daccess_rights)
 	DBG_FAULT(23)
 	mov r31=pr
-	;;
 	mov r16=cr.isr
 	mov r17=cr.ifa
 	mov r19=23
-	movl r20=0x5300
+	mov r20=0x5300
 	br.sptk.many fast_access_reflect
 	;;
 END(daccess_rights)
@@ -1108,9 +1107,6 @@ ENTRY(general_exception)
 (p6)	br.sptk.many dispatch_privop_fault
 	;;
 	FAULT_OR_REFLECT(24)
-	;;
-	mov r19=24		// fault number
-	br.sptk.many dispatch_to_fault_handler
 END(general_exception)
 
 	.org ia64_ivt+0x5500
@@ -1119,13 +1115,6 @@ END(general_exception)
 ENTRY(disabled_fp_reg)
 	DBG_FAULT(25)
 	FAULT_OR_REFLECT(25)
-	;;
-	rsm psr.dfh		// ensure we can access fph
-	;;
-	srlz.d
-	mov r31=pr
-	mov r19=25
-	br.sptk.many dispatch_to_fault_handler
 END(disabled_fp_reg)
 
 	.org ia64_ivt+0x5600
