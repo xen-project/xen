@@ -35,4 +35,16 @@
 #define IA64_PTA_VF     (__IA64_UL(1) << IA64_PTA_VF_BIT)
 #define IA64_PTA_BASE   (__IA64_UL(0) - ((__IA64_UL(1) << IA64_PTA_BASE_BIT)))
 
+/* Some cr.itir declarations. */
+#define	IA64_ITIR_PS		2
+#define	IA64_ITIR_PS_LEN	6
+#define IA64_ITIR_PS_MASK	(((__IA64_UL(1) << IA64_ITIR_PS_LEN) - 1) \
+							<< IA64_ITIR_PS)
+#define	IA64_ITIR_KEY		8
+#define	IA64_ITIR_KEY_LEN	24
+#define	IA64_ITIR_KEY_MASK	(((__IA64_UL(1) << IA64_ITIR_KEY_LEN) - 1) \
+							<< IA64_ITIR_KEY)
+#define IA64_ITIR_PS_KEY(_ps, _key)	(((_ps) << IA64_ITIR_PS) | \
+					(((_key) << IA64_ITIR_KEY)))
+
 #endif /* _ASM_IA64_XENKREGS_H */

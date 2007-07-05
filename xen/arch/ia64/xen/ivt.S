@@ -154,14 +154,17 @@ late_alt_itlb_miss:
 	movl r17=PAGE_KERNEL
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
+	mov r20=cr.itir
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r19=r19,r16		// clear ed, reserved bits, and PTE ctrl bits
 	extr.u r18=r16,XEN_VIRT_UC_BIT,1	// extract UC bit
 	;;
 	cmp.ne p8,p0=r0,r23	// psr.cpl != 0?
 	or r19=r17,r19		// insert PTE control bits into r19
+	dep r20=0,r20,IA64_ITIR_KEY,IA64_ITIR_KEY_LEN	// clear the key 
 	;;
 	dep r19=r18,r19,4,1	// set bit 4 (uncached) if access to UC area.
+	mov cr.itir=r20		// set itir with cleared key
 (p8)	br.cond.spnt page_fault
 	;;
 	itc.i r19		// insert the TLB entry
@@ -195,6 +198,7 @@ late_alt_dtlb_miss:
 (p9)	cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
 (p8)	br.cond.spnt page_fault
 	;;
+	mov r20=cr.itir
 #ifdef CONFIG_VIRTUAL_FRAME_TABLE
 	shr r22=r16,56	 	// Test for the address of virtual frame_table
 	;;
@@ -204,11 +208,13 @@ late_alt_dtlb_miss:
 	// If it is not a Xen address, handle it via page_fault.
 	extr.u r22=r16,59,5
 	;;
+	dep r20=0,r20,IA64_ITIR_KEY,IA64_ITIR_KEY_LEN	// clear the key
 	cmp.ne p8,p0=0x1e,r22
 (p8)	br.cond.sptk page_fault
 	;;
 	dep r21=-1,r21,IA64_PSR_ED_BIT,1
 	or r19=r19,r17		// insert PTE control bits into r19
+	mov cr.itir=r20		// set itir with cleared key
 	;;
 	dep r19=r18,r19,4,1	// set bit 4 (uncached) if access to UC area
 (p6)	mov cr.ipsr=r21
@@ -242,7 +248,7 @@ GLOBAL_ENTRY(frametable_miss)
 	shladd r24=r19,3,r24	// r24=&pte[pte_offset(addr)]
 	;;
 (p7)	ld8 r24=[r24]		// r24=pte[pte_offset(addr)]
-	mov r25=0x700|(PAGE_SHIFT<<2) // key=7
+	mov r25=(PAGE_SHIFT<<IA64_ITIR_PS)
 (p6)	br.spnt.few frametable_fault
 	;;
 	mov cr.itir=r25
