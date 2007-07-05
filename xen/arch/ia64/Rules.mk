@@ -69,3 +69,5 @@ HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/asm-generic/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/asm/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/byteorder/*.h)
 HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/hvm/*.h)
+
+HDRS := $(filter-out %/include/asm-ia64/asm-xsi-offsets.h,$(HDRS))
