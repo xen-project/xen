@@ -126,9 +126,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 
 
 	new_itm = local_cpu_data->itm_next;
-	while (time_after(ia64_get_itc(), new_itm)) {
-		new_itm += local_cpu_data->itm_delta;
-
+	while (1) {
 		if (smp_processor_id() == TIME_KEEPER_ID) {
 			/*
 			 * Here we are in the timer irq handler. We have irqs locally
@@ -150,6 +148,10 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 
 		local_cpu_data->itm_next = new_itm;
 
+		if (time_after(new_itm, ia64_get_itc())) 
+			break;
+
+		new_itm += local_cpu_data->itm_delta;
 	}
 
 	if (!is_idle_domain(current->domain) && !VMX_DOMAIN(current)) {
