@@ -36,7 +36,7 @@ ofh_vty_init(ofdn_t chosen, ulong b)
 
     /* find the vty */
     n = ofd_node_find(mem,
-                        DRELA((const char *)"/vdevice/vty", b));
+                      DRELA((const char *)"/vdevice/vty", b));
     if (n > 0) {
         /* PAPR VTERM */
         ret = ofd_getprop(mem, n, DRELA((const char *)"reg", b),

@@ -1,25 +1,28 @@
 /*
- * Copyright (C) 2005 Jimi Xenidis <jimix@watson.ibm.com>, IBM Corporation
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ * Copyright (C) IBM Corp. 2005, 2007
+ *
+ * Authors: Jimi Xenidis <jimix@watson.ibm.com>
  */
+
 /*
  * Glue code for open-firmware client interface implementation.
  */
 
-#define OF_STACK_SIZE (32*1024)
+#define OF_STACK_SIZE (64*1024)
 
 #include <asm/config.h>
 #include <asm/processor.h>
@@ -62,11 +65,6 @@ _ofh_lastarg:
 	.long 0x0	
 	.long 0x0	
 	
-	. = 0x30
-_ofh_cih_stack_end:
-	.space	OF_STACK_SIZE
-_ofh_cih_stack:
-   
 _ofh_cih_continue:
 	mflr	r12				# r12 = &_ofh_work_space
 	mr	r11, r1				# r11 = orig stk ptr
@@ -150,3 +148,9 @@ _GLOBAL(get_base)
 	subf	r3,r4,r5
 	mtlr	r0
 	blr
+
+	.data
+	.p2align 3
+_ofh_cih_stack_end:
+	.space	OF_STACK_SIZE
+_ofh_cih_stack:

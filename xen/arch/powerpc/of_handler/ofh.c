@@ -234,6 +234,7 @@ ofh_init(ulong b)
 
     ofh_service_init(b);
     ofh_chosen_init(b);
+	ofh_rtas_init(b);
     ofh_options_init(b);
 }
 
