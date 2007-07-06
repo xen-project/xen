@@ -240,8 +240,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
 #ifdef IA64_NUMA_PHYSINFO
         int i;
-        node_data_t *chunks;
-        u64 *map, cpu_to_node_map[MAX_NUMNODES];
+        uint32_t *map, cpu_to_node_map[NR_CPUS];
 #endif
 
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
@@ -250,11 +249,9 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
-        pi->sockets_per_node = 
-            num_online_cpus() / cpus_weight(cpu_core_map[0]);
-#ifndef IA64_NUMA_PHYSINFO
-        pi->nr_nodes         = 1; 
-#endif
+        pi->nr_nodes         = num_online_nodes();
+        pi->sockets_per_node = num_online_cpus() / 
+            (pi->nr_nodes * pi->cores_per_socket * pi->threads_per_core);
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();
@@ -264,41 +261,6 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         ret = 0;
 
 #ifdef IA64_NUMA_PHYSINFO
-        /* fetch memory_chunk pointer from guest */
-        get_xen_guest_handle(chunks, pi->memory_chunks);
-
-        printk("chunks=%p, num_node_memblks=%u\n", chunks, num_node_memblks);
-        /* if it is set, fill out memory chunk array */
-        if (chunks != NULL) {
-            if (num_node_memblks == 0) {
-                /* Non-NUMA machine.  Put pseudo-values.  */
-                node_data_t data;
-                data.node_start_pfn = 0;
-                data.node_spanned_pages = total_pages;
-                data.node_id = 0;
-                /* copy memory chunk structs to guest */
-                if (copy_to_guest_offset(pi->memory_chunks, 0, &data, 1)) {
-                    ret = -EFAULT;
-                    break;
-                }
-            } else {
-                for (i = 0; i < num_node_memblks && i < PUBLIC_MAXCHUNKS; i++) {
-                    node_data_t data;
-                    data.node_start_pfn = node_memblk[i].start_paddr >>
-                                          PAGE_SHIFT;
-                    data.node_spanned_pages = node_memblk[i].size >> PAGE_SHIFT;
-                    data.node_id = node_memblk[i].nid;
-                    /* copy memory chunk structs to guest */
-                    if (copy_to_guest_offset(pi->memory_chunks, i, &data, 1)) {
-                        ret = -EFAULT;
-                        break;
-                    }
-                }
-            }
-        }
-        /* set number of notes */
-        pi->nr_nodes = num_online_nodes();
-
         /* fetch cpu_to_node pointer from guest */
         get_xen_guest_handle(map, pi->cpu_to_node);
 

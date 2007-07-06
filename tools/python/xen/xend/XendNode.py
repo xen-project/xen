@@ -533,6 +533,54 @@ class XendNode:
                 ['version', ver],
                 ['machine', mch]]
 
+    def list_to_rangepairs(self,cmap):
+            cmap.sort()
+            pairs = []
+            x = y = 0
+            for i in range(0,len(cmap)):
+                try:
+                    if ((cmap[y+1] - cmap[i]) > 1):
+                        pairs.append((cmap[x],cmap[y]))
+                        x = y = i+1
+                    else:
+                        y = y + 1
+                # if we go off the end, then just add x to y
+                except IndexError:
+                    pairs.append((cmap[x],cmap[y]))
+
+            return pairs
+
+    def format_pairs(self,pairs):
+            if not pairs:
+                return "no cpus"
+            out = ""
+            for f,s in pairs:
+                if (f==s):
+                    out += '%d'%f
+                else:
+                    out += '%d-%d'%(f,s)
+                out += ','
+            # trim trailing ','
+            return out[:-1]
+
+    def list_to_strrange(self,list):
+        return self.format_pairs(self.list_to_rangepairs(list))
+
+    def format_node_to_cpu(self, pinfo):
+        str=''
+        whitespace=''
+        try:
+            node_to_cpu=pinfo['node_to_cpu']
+            for i in range(0, pinfo['nr_nodes']):
+                str+='%snode%d:%s\n' % (whitespace,
+                                        i, 
+                                      self.list_to_strrange(node_to_cpu[i]))
+                whitespace='%25s' % ''        
+        except:
+            str='none\n'
+        return str[:-1];
+
+
     def physinfo(self):
         info = self.xc.physinfo()
 
@@ -545,6 +593,7 @@ class XendNode:
         # physinfo is in KiB, need it in MiB
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
+        info['node_to_cpu']  = self.format_node_to_cpu(info)
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
@@ -555,6 +604,7 @@ class XendNode:
                       'hw_caps',
                       'total_memory',
                       'free_memory',
+                      'node_to_cpu'
                       ]
 
         return [[k, info[k]] for k in ITEM_ORDER]

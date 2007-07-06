@@ -473,6 +473,7 @@ int xc_readconsolering(int xc_handle,
 int xc_send_debug_keys(int xc_handle, char *keys);
 
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
+typedef uint32_t xc_cpu_to_node_t;
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
 
