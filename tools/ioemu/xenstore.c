@@ -173,10 +173,12 @@ void xenstore_parse_domain_config(int domid)
         }
         /* open device now if media present */
         if (params[0]) {
+            char *p = strchr(params, ':');
+            p = p ? p+1 : params; /* skip colon separator if present */
             if (bdrv_open(bs_table[hd_index + (is_scsi ? MAX_DISKS : 0)],
-                          params, 0 /* snapshot */) < 0)
+                          p, 0 /* snapshot */) < 0)
                 fprintf(stderr, "qemu: could not open hard disk image '%s'\n",
-                        params);
+                        p);
         }
     }
 
