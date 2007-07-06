@@ -85,6 +85,9 @@ struct xen_domctl_getdomaininfo {
  /* Domain is currently running.            */
 #define _XEN_DOMINF_running   5
 #define XEN_DOMINF_running    (1U<<_XEN_DOMINF_running)
+ /* Being debugged.  */
+#define _XEN_DOMINF_debugged  6
+#define XEN_DOMINF_debugged   (1U<<_XEN_DOMINF_debugged)
  /* CPU to which this domain is bound.      */
 #define XEN_DOMINF_cpumask      255
 #define XEN_DOMINF_cpushift       8

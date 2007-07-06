@@ -153,7 +153,7 @@ typedef struct xc_dominfo {
     uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1,
                   paused:1, blocked:1, running:1,
-                  hvm:1;
+                  hvm:1, debugged:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;
