@@ -22,6 +22,7 @@ import types
 
 from xen.xend import sxp
 from xen.xend import uuid
+from xen.xend import XendOptions
 from xen.xend import XendAPIStore
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
@@ -392,6 +393,9 @@ class XendConfig(dict):
 
     def _platform_sanity_check(self):
         if self.is_hvm():
+            if 'keymap' not in self['platform'] and XendOptions.instance().get_keymap():
+                self['platform']['keymap'] = XendOptions.instance().get_keymap()
+
             if 'device_model' not in self['platform']:
                 self['platform']['device_model'] = DEFAULT_DM
 
