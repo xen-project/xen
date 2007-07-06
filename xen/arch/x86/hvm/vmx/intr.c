@@ -73,7 +73,7 @@
 
 static void enable_intr_window(struct vcpu *v, enum hvm_intack intr_source)
 {
-    u32 *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
+    u32 *cpu_exec_control = &v->arch.hvm_vmx.exec_control;
     u32 ctl = CPU_BASED_VIRTUAL_INTR_PENDING;
 
     if ( unlikely(intr_source == hvm_intack_none) )
