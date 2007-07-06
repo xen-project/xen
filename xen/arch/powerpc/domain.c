@@ -88,7 +88,7 @@ int arch_domain_create(struct domain *d)
     d->arch.large_page_sizes = cpu_large_page_orders(
         d->arch.large_page_order, ARRAY_SIZE(d->arch.large_page_order));
 
-    d->arch.foreign_mfn_count = 1024;
+    d->arch.foreign_mfn_count = 2048;
     d->arch.foreign_mfns = xmalloc_array(uint, d->arch.foreign_mfn_count);
     BUG_ON(d->arch.foreign_mfns == NULL);
 
