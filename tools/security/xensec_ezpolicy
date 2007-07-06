@@ -1102,8 +1102,10 @@ def org2dict():
     for i in iterchildren(app.win.orgs.GetRootItem()):
         d = []
         for j in iterchildren(i):
-            d.append(str(app.win.orgspanel.orgs.GetItemText(j)))
-        o.append([str(app.win.orgspanel.orgs.GetItemText(i)) , d])
+            d.append(
+                  str(app.win.orgspanel.orgs.GetItemText(j).encode("utf-8")))
+        o.append([str(app.win.orgspanel.orgs.GetItemText(i).encode("utf-8")),
+                 d])
     dic['orgs'] = o
     c=[]
     for i in app.win.conspanel.conflictsets:
@@ -1175,12 +1177,14 @@ def printPolicy(fd, types, cons):
                 continue
             #name is optional but must be set
             if i[0]:
-                rer_name = str(i[0])
+                rer_name = i[0]
             else:
-                rer_name = str("RER")
-            fd.write("""            <Conflict name=\"%s\">\n""" % rer_name)
+                rer_name = "RER"
+            fd.write("""            <Conflict name=\"""" +
+                     rer_name.encode("utf-8") + """\">\n""")
             for j in i[1]:
-                fd.write("""                <Type>%s</Type>\n""" % str(j))
+                typ = j.encode("utf-8")
+                fd.write("""                <Type>%s</Type>\n""" % typ)
             fd.write("""            </Conflict>\n""")
         fd.write("""       </ConflictSets>\n""")
 
