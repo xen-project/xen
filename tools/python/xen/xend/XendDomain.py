@@ -1399,10 +1399,15 @@ class XendDomain:
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
-        try:
-            return xc.sched_credit_domain_get(dominfo.getDomid())
-        except Exception, ex:
-            raise XendError(str(ex))
+        
+        if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            try:
+                return xc.sched_credit_domain_get(dominfo.getDomid())
+            except Exception, ex:
+                raise XendError(str(ex))
+        else:
+            return {'weight' : dominfo.getWeight(),
+                    'cap'    : dominfo.getCap()} 
     
     def domain_sched_credit_set(self, domid, weight = None, cap = None):
         """Set credit scheduler parameters for a domain.
@@ -1436,7 +1441,9 @@ class XendDomain:
             assert type(weight) == int
             assert type(cap) == int
 
-            rc = xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
+            rc = 0
+            if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+                rc = xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
             if rc == 0:
                 if set_weight:
                     dominfo.setWeight(weight)
