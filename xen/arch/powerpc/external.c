@@ -43,8 +43,6 @@ int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
 unsigned long io_apic_irqs;
 int ioapic_ack_new = 1;
 
-static struct hw_interrupt_type *hc_irq;
-
 /* deliver_ee: called with interrupts off when resuming every vcpu */
 void deliver_ee(struct cpu_user_regs *regs)
 {
@@ -81,6 +79,7 @@ void do_external(struct cpu_user_regs *regs)
     BUG_ON(mfmsr() & MSR_EE);
 
     vec = xen_mpic_get_irq(regs);
+    DBG(">HV: vec=%d, pc=0x%lx, msr=0x%lx\n", vec, regs->pc, regs->msr);
 
     if (irq_desc[vec].status & IRQ_PER_CPU) {
         /* x86 do_IRQ does not respect the per cpu flag.  */
@@ -90,7 +89,6 @@ void do_external(struct cpu_user_regs *regs)
         desc->action->handler(vector_to_irq(vec), desc->action->dev_id, regs);
         desc->handler->end(vec);
     } else if (vec != -1) {
-        DBG("EE:0x%lx isrc: %d\n", regs->msr, vec);
         regs->entry_vector = vec;
         do_IRQ(regs);
 
@@ -106,87 +104,9 @@ void do_external(struct cpu_user_regs *regs)
     }
 }
 
-static int xen_local_irq(unsigned int irq)
-{
-    irq_desc_t *desc;
-    unsigned int vector;
-
-    vector = irq_to_vector(irq);
-    desc = &irq_desc[vector];
-
-    return !(desc->status & IRQ_GUEST);
-}
-
-static unsigned int xen_startup_irq(unsigned int irq)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        return hc_irq->startup(irq);
-    }
-    return 0;
-}
-
-static void xen_shutdown_irq(unsigned int irq)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        hc_irq->shutdown(irq);
-    }
-}
-
-static void xen_enable_irq(unsigned int irq)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        hc_irq->enable(irq);
-    }
-}
-
-static void xen_disable_irq(unsigned int irq)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        hc_irq->disable(irq);
-    }
-}
-    
-static void xen_ack_irq(unsigned int irq)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        if (hc_irq->ack) hc_irq->ack(irq);
-    }
-}
-
-static void xen_end_irq(unsigned int irq)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        hc_irq->end(irq);
-    }
-}
-
-static void xen_set_affinity(unsigned int irq, cpumask_t mask)
-{
-    DBG("%s(%d)\n", __func__, irq);
-    if (xen_local_irq(irq)) {
-        if (hc_irq->set_affinity) hc_irq->set_affinity(irq, mask);
-    }
-}
-
-static struct hw_interrupt_type xen_irq = {
-    .startup = xen_startup_irq,
-    .enable = xen_enable_irq,
-    .disable = xen_disable_irq,
-    .shutdown = xen_shutdown_irq,
-    .ack = xen_ack_irq,
-    .end = xen_end_irq,
-    .set_affinity = xen_set_affinity,
-};
-
 void init_IRQ(void)
 {
-    hc_irq = xen_mpic_init(&xen_irq);
+    xen_mpic_init();
 }
 
 void ack_APIC_irq(void)
@@ -251,7 +171,6 @@ next:
 int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 {
     BUG_ON(pval != pval);
-
     return 0;
 }
 

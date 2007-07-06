@@ -21,9 +21,7 @@
 #ifndef _MPIC_INIT_H
 #define _MPIC_INIT_H
 
-extern struct hw_interrupt_type *xen_mpic_init(
-    struct hw_interrupt_type *xen_irq);
-
+extern void xen_mpic_init(void);
 extern int xen_mpic_get_irq(struct cpu_user_regs *regs);
 
 #endif  /* #ifndef _MPIC_INIT_H */
