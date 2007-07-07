@@ -263,28 +263,6 @@ static inline int __vmxon (u64 addr)
     return rc;
 }
 
-static inline int vmx_paging_enabled(struct vcpu *v)
-{
-    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
-    return ((cr0 & (X86_CR0_PE|X86_CR0_PG)) == (X86_CR0_PE|X86_CR0_PG));
-}
-
-static inline int vmx_long_mode_enabled(struct vcpu *v)
-{
-    return v->arch.hvm_vmx.efer & EFER_LMA;
-}
-
-static inline int vmx_lme_is_set(struct vcpu *v)
-{
-    return v->arch.hvm_vmx.efer & EFER_LME;
-}
-
-static inline int vmx_pgbit_test(struct vcpu *v)
-{
-    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
-    return (cr0 & X86_CR0_PG);
-}
-
 static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,
                                          int error_code, int ilen)
 {
