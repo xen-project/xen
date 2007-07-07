@@ -502,9 +502,18 @@ class XendDomainInfo:
         dev_uuid = self.info.device_add(dev_type, cfg_sxp = dev_config)
         dev_config_dict = self.info['devices'][dev_uuid][1]
         log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config_dict))
-        dev_config_dict['devid'] = devid = \
-             self._createDevice(dev_type, dev_config_dict)
-        self._waitForDevice(dev_type, devid)
+
+        if self.domid is not None:
+            try:
+                dev_config_dict['devid'] = devid = \
+                    self._createDevice(dev_type, dev_config_dict)
+                self._waitForDevice(dev_type, devid)
+            except VmError, ex:
+                raise ex
+        else:
+            devid = None
+
+        xen.xend.XendDomain.instance().managed_config_save(self)
         return self.getDeviceController(dev_type).sxpr(devid)
 
     def device_configure(self, dev_sxp, devid = None):

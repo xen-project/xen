@@ -4,7 +4,7 @@ xm - Xen management user interface
 
 =head1 SYNOPSIS
 
-xm <subcommand> [args]
+B<xm> I<subcommand> [I<args>]
 
 =head1 DESCRIPTION
 
@@ -13,46 +13,50 @@ domains. The program can be used to create, pause, and shutdown
 domains. It can also be used to list current domains, enable or pin
 VCPUs, and attach or detach virtual block devices.
 
-The basic structure of every xm command is almost always:
+The basic structure of every B<xm> command is almost always:
 
-  xm <subcommand> <domain-id> [OPTIONS]
+=over 2
 
-Where I<subcommand> is one of the sub commands listed below, I<domain-id>
+B<xm> I<subcommand> I<domain-id> [I<OPTIONS>]
+
+=back
+
+Where I<subcommand> is one of the subcommands listed below, I<domain-id>
 is the numeric domain id, or the domain name (which will be internally
-translated to domain id), and I<OPTIONS> are sub command specific
+translated to domain id), and I<OPTIONS> are subcommand specific
 options.  There are a few exceptions to this rule in the cases where
-the sub command in question acts on all domains, the entire machine,
-or directly on the xen hypervisor.  Those exceptions will be clear for
-each of those sub commands.
+the subcommand in question acts on all domains, the entire machine,
+or directly on the Xen hypervisor.  Those exceptions will be clear for
+each of those subcommands.
 
 =head1 NOTES
 
 All B<xm> operations rely upon the Xen control daemon, aka B<xend>.
-For any xm commands to run xend must also be running.  For this reason
-you should start xend as a service when your system first boots using
-xen.
+For any B<xm> commands to run, xend must also be running.  For this
+reason you should start xend as a service when your system first boots
+using Xen.
 
 Most B<xm> commands require root privileges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
 
 Most B<xm> commands act asynchronously, so just because the B<xm>
-command returned, doesn't mean the action is complete.  This is
+command returned doesn't mean the action is complete.  This is
 important, as many operations on domains, like create and shutdown,
 can take considerable time (30 seconds or more) to bring the machine
 into a fully compliant state.  If you want to know when one of these
-actions has finished you must poll through xm list periodically.
+actions has finished you must poll through B<xm list> periodically.
 
 =head1 DOMAIN SUBCOMMANDS
 
-The following sub commands manipulate domains directly, as stated
-previously most commands take domain-id as the first parameter.
+The following subcommands manipulate domains directly.  As stated
+previously, most commands take I<domain-id> as the first parameter.
 
 =over 4
 
 =item B<console> I<domain-id>
 
-Attach to domain domain-id's console.  If you've set up your Domains to
+Attach to domain I<domain-id>'s console.  If you've set up your domains to
 have a traditional log in console this will look much like a normal
 text log in screen.
 
@@ -63,15 +67,15 @@ The attached console will perform much like a standard serial console,
 so running curses based interfaces over the console B<is not
 advised>.  Vi tends to get very odd when using it over this interface.
 
-=item B<create> I<[-c]> I<configfile> I<[name=value]>..
+=item B<create> [B<-c>] I<configfile> [I<name>=I<value>]..
 
-The create sub command requires a configfile and can optional take a
+The create sub command requires a config file and can optionally take a
 series of name value pairs that add to or override variables defined
 in the config file.  See L<xmdomain.cfg> for full details of that file
 format, and possible options used in either the configfile or
-Name=Value combinations.
+I<name>=I<value> combinations.
 
-Configfile can either be an absolute path to a file, or a relative
+I<configfile> can either be an absolute path to a file, or a relative
 path to a file located in /etc/xen.
 
 Create will return B<as soon> as the domain is started.  This B<does
@@ -116,10 +120,10 @@ virtual networking.  (This example comes from the xm-test test suite.)
 
 =item B<destroy> I<domain-id>
 
-Immediately terminate the domain domain-id.  This doesn't give the domain
-OS any chance to react, and it the equivalent of ripping the power
-cord out on a physical machine.  In most cases you will want to use
-the B<shutdown> command instead.
+Immediately terminate the domain I<domain-id>.  This doesn't give the
+domain OS any chance to react, and is the equivalent of ripping the
+power cord out on a physical machine.  In most cases you will want to
+use the B<shutdown> command instead.
 
 =item B<domid> I<domain-name>
 
@@ -129,14 +133,14 @@ Converts a domain name to a domain id using xend's internal mapping.
 
 Converts a domain id to a domain name using xend's internal mapping.
 
-=item B<help> I<[--long]>
+=item B<help> [B<--long>]
 
 Displays the short help message (i.e. common commands).
 
-The I<--long> option prints out the complete set of B<xm> subcommands,
+The B<--long> option prints out the complete set of B<xm> subcommands,
 grouped by function.
 
-=item B<list> I<[--long | --label]> I<[domain-id, ...]>
+=item B<list> [B<--long> | B<--label>] [I<domain-id> ...]
 
 Prints information about one or more domains.  If no domains are
 specified it prints out information about all domains.
@@ -151,21 +155,23 @@ An example format for the list is as follows:
     Mandrake10.2                167      128     1 ------     2.5
     Suse9.2                     168      100     1 ------     1.8
 
-Name is the name of the domain.  ID the domain numeric id.  Mem is the
-size of the memory allocated to the domain.  VCPUS is the number of
-VCPUS allocated to domain.  State is the run state (see below).  Time
-is the total run time of the domain as accounted for by Xen.
+Name is the name of the domain.  ID the numeric domain id.  Mem is the
+desired amount of memory to allocate to the domain (although it may
+not be the currently allocated amount).  VCPUs is the number of
+virtual CPUs allocated to the domain.  State is the run state (see
+below).  Time is the total run time of the domain as accounted for by
+Xen.
 
 B<STATES>
 
 =over 4
 
-The State field lists 6 states for a Xen Domain, and which ones the
-current Domain is in.
+The State field lists 6 states for a Xen domain, and which ones the
+current domain is in.
 
 =item B<r - running>
 
-The domain is currently running on a CPU
+The domain is currently running on a CPU.
 
 =item B<b - blocked>
 
@@ -203,12 +209,12 @@ B<LONG OUTPUT>
 
 =over 4
 
-If I<--long> is specified, the output for xm list is not the table
+If B<--long> is specified, the output for B<xm list> is not the table
 view shown above, but instead is an S-Expression representing all
 information known about all domains asked for.  This is mostly only
 useful for external programs to parse the data.
 
-B<Note:> there is no stable guarantees on the format of this data.
+B<Note:> There is no stable guarantees on the format of this data.
 Use at your own risk.
 
 =back
@@ -217,10 +223,10 @@ B<LABEL OUTPUT>
 
 =over 4
 
-If I<--label> is specified, the security labels are added to the
-output of xm list and the lines are sorted by the labels (ignoring
-case). The I<--long> option prints the labels by default and cannot be
-combined with I<--label>. See the ACCESS CONTROL SUBCOMMAND section of
+If B<--label> is specified, the security labels are added to the
+output of B<xm list> and the lines are sorted by the labels (ignoring
+case). The B<--long> option prints the labels by default and cannot be
+combined with B<--label>. See the ACCESS CONTROL SUBCOMMAND section of
 this man page for more information about labels.
 
 ==back
@@ -230,7 +236,7 @@ B<NOTES>
 =over 4
 
 The Time column is deceptive.  Virtual IO (network and block devices)
-used by Domains requires coordination by Domain0, which means that
+used by domains requires coordination by Domain0, which means that
 Domain0 is actually charged for much of the time that a DomainU is
 doing IO.  Use of this time value to determine relative utilizations
 by domains is thus very suspect, as a high IO workload may show as
@@ -240,11 +246,11 @@ less utilized than a high CPU workload.  Consider yourself warned.
 
 =item B<mem-max> I<domain-id> I<mem>
 
-Specify the maximum amount of memory the Domain is able to use.  Mem
+Specify the maximum amount of memory the domain is able to use.  I<mem>
 is specified in megabytes. 
 
 The mem-max value may not correspond to the actual memory used in the
-Domain, as it may balloon down it's memory to give more back to the OS.
+domain, as it may balloon down its memory to give more back to the OS.
 
 =item B<mem-set> I<domain-id> I<mem>
 
@@ -252,20 +258,20 @@ Set the domain's used memory using the balloon driver.  Because this
 operation requires cooperation from the domain operating system, there
 is no guarantee that it will succeed.
 
-B<Warning:> there is no good way to know in advance how small of a
+B<Warning:> There is no good way to know in advance how small of a
 mem-set will make a domain unstable and cause it to crash.  Be very
 careful when using this command on running domains.
 
-=item B<migrate> I<domain-id> I<host> I<[options]>
+=item B<migrate> I<domain-id> I<host> [I<OPTIONS>]
 
-Migrate a domain to another Host machine. B<Xend> must be running on
-other host machine, it must be running the same version of xen, it
+Migrate a domain to another host machine. Xend must be running on
+other host machine, it must be running the same version of Xen, it
 must have the migration TCP port open and accepting connections from
 the source host, and there must be sufficient resources for the domain
 to run (memory, disk, etc).
 
-Migration is pretty complicated, and has many security implications,
-please read the Xen Users Guide to ensure you understand the
+Migration is pretty complicated, and has many security implications.
+Please read the Xen User's Guide to ensure you understand the
 ramifications and limitations on migration before attempting it in
 production.
 
@@ -273,13 +279,13 @@ B<OPTIONS>
 
 =over 4
 
-=item B<-l, --live>
+=item B<-l>, B<--live>
 
 Use live migration.  This will migrate the domain between hosts
-without shutting down the domain.  See the Xen Users Guide for more
+without shutting down the domain.  See the Xen User's Guide for more
 information.
 
-=item B<-r, --resource> I<Mbs>
+=item B<-r>, B<--resource> I<Mbs>
 
 Set maximum Mbs allowed for migrating the domain.  This ensures that
 the network link is not saturated with migration traffic while
@@ -293,7 +299,7 @@ Pause a domain.  When in a paused state the domain will still consume
 allocated resources such as memory, but will not be eligible for
 scheduling by the Xen hypervisor.
 
-=item B<reboot> I<[options]> I<domain-id>
+=item B<reboot> [I<OPTIONS>] I<domain-id>
 
 Reboot a domain.  This acts just as if the domain had the B<reboot>
 command run from the console.  The command returns as soon as it has
@@ -301,18 +307,18 @@ executed the reboot action, which may be significantly before the
 domain actually reboots.
 
 The behavior of what happens to a domain when it reboots is set by the
-I<on_reboot> parameter of the xmdomain.cfg file when the domain was
+B<on_reboot> parameter of the xmdomain.cfg file when the domain was
 created.
 
 B<OPTIONS>
 
 =over 4
 
-=item B<-a, --all>
+=item B<-a>, B<--all>
 
-Reboot all domains
+Reboot all domains.
 
-=item B<-w, --wait>
+=item B<-w>, B<--wait>
 
 Wait for reboot to complete before returning.  This may take a while,
 as all services in the domain will have to be shut down cleanly.
@@ -321,7 +327,7 @@ as all services in the domain will have to be shut down cleanly.
 
 =item B<restore> I<state-file>
 
-Build a domain from an B<xm save> state file.  See I<save> for more info.
+Build a domain from an B<xm save> state file.  See B<save> for more info.
 
 =item B<save> I<domain-id> I<state-file>
 
@@ -334,16 +340,16 @@ This is roughly equivalent to doing a hibernate on a running computer,
 with all the same limitations.  Open network connections may be
 severed upon restore, as TCP timeouts may have expired.
 
-=item B<shutdown> I<[options]> I<domain-id>
+=item B<shutdown> [I<OPTIONS>] I<domain-id>
 
 Gracefully shuts down a domain.  This coordinates with the domain OS
 to perform graceful shutdown, so there is no guarantee that it will
 succeed, and may take a variable length of time depending on what
 services must be shutdown in the domain.  The command returns
-immediately after signally the domain unless that I<-w> flag is used.
+immediately after signally the domain unless that B<-w> flag is used.
 
 The behavior of what happens to a domain when it reboots is set by the
-I<on_shutdown> parameter of the xmdomain.cfg file when the domain was
+B<on_shutdown> parameter of the xmdomain.cfg file when the domain was
 created.
 
 B<OPTIONS>
@@ -386,7 +392,7 @@ Attempting to set the VCPUs to a number larger than the initially
 configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
 quietly ignored.
 
-=item B<vcpu-list> I<[domain-id]>
+=item B<vcpu-list> [I<domain-id>]
 
 Lists VCPU information for a specific domain.  If no domain is
 specified, VCPU information for all domains will be provided.
@@ -394,7 +400,7 @@ specified, VCPU information for all domains will be provided.
 =item B<vcpu-pin> I<domain-id> I<vcpu> I<cpus>
 
 Pins the the VCPU to only run on the specific CPUs.  The keyword
-I<all> can be used to apply the I<cpus> list to all VCPUs in the
+B<all> can be used to apply the I<cpus> list to all VCPUs in the
 domain.
 
 Normally VCPUs can float between available CPUs whenever Xen deems a
@@ -408,7 +414,7 @@ CPUs.
 
 =over 4
 
-=item B<dmesg> I<[-c]>
+=item B<dmesg> [B<-c>]
 
 Reads the Xen message buffer, similar to dmesg on a Linux system.  The
 buffer contains informational, warning, and error messages created
@@ -419,7 +425,7 @@ B<OPTIONS>
 
 =over 4
 
-=item B<-c, --clear>
+=item B<-c>, B<--clear>
 
 Clears Xen's message buffer.
 
@@ -431,8 +437,8 @@ Print information about the Xen host in I<name : value> format.  When
 reporting a Xen bug, please provide this information as part of the
 bug report.
 
-Sample xen domain info looks as follows (lines wrapped manually to
-make the man page more readable):
+Sample output looks as follows (lines wrapped manually to make the man
+page more readable):
 
  host                   : talon
  release                : 2.6.12.6-xen0
@@ -470,36 +476,36 @@ B<FIELDS>
 Not all fields will be explained here, but some of the less obvious
 ones deserve explanation:
 
-=item I<hw_caps>
+=item B<hw_caps>
 
 A vector showing what hardware capabilities are supported by your
 processor.  This is equivalent to, though more cryptic, the flags
 field in /proc/cpuinfo on a normal Linux machine.
 
-=item I<free_memory>
+=item B<free_memory>
 
-Available memory (in MB) not allocated to Xen, or any other Domains.
+Available memory (in MB) not allocated to Xen, or any other domains.
 
-=item I<xen_caps>
+=item B<xen_caps>
 
-The xen version, architecture.  Architecture values can be one of:
+The Xen version and architecture.  Architecture values can be one of:
 x86_32, x86_32p (i.e. PAE enabled), x86_64, ia64.
 
-=item I<xen_changeset>
+=item B<xen_changeset>
 
-The xen mercurial changeset id.  Very useful for determining exactly
+The Xen mercurial changeset id.  Very useful for determining exactly
 what version of code your Xen system was built from.
 
 =back
 
 =item B<log>
 
-Print out the B<xend> log.  This log file can be found in
+Print out the xend log.  This log file can be found in
 /var/log/xend.log.
 
 =item B<top>
 
-Executes the xentop command, which provides real time monitoring of
+Executes the B<xentop> command, which provides real time monitoring of
 domains.  Xentop is a curses interface, and reasonably self
 explanatory.
 
@@ -508,12 +514,40 @@ explanatory.
 =head1 SCHEDULER SUBCOMMANDS
 
 Xen ships with a number of domain schedulers, which can be set at boot
-time with the I<sched=> parameter on the Xen command line.  By
-default I<sedf> is used for scheduling.
+time with the B<sched=> parameter on the Xen command line.  By
+default B<credit> is used for scheduling.
 
 FIXME: we really need a scheduler expert to write up this section.
 
 =over 4
+
+=item B<sched-credit> [ B<-d> I<domain-id> [ B<-w>[B<=>I<WEIGHT>] | B<-c>[B<=>I<CAP>] ] ]
+
+Set credit scheduler parameters.  The credit scheduler is a
+proportional fair share CPU scheduler built from the ground up to be
+work conserving on SMP hosts.
+
+Each domain (including Domain0) is assigned a weight and a cap.
+
+B<PARAMETERS>
+
+=over 4
+
+=item I<WEIGHT>
+
+A domain with a weight of 512 will get twice as much CPU as a domain
+with a weight of 256 on a contended host. Legal weights range from 1
+to 65535 and the default is 256.
+
+=item I<CAP>
+
+The cap optionally fixes the maximum amount of CPU a domain will be
+able to consume, even if the host system has idle CPU cycles. The cap
+is expressed in percentage of one physical CPU: 100 is 1 physical CPU,
+50 is half a CPU, 400 is 4 CPUs, etc. The default, 0, means there is
+no upper cap.
+
+=back
 
 =item B<sched-sedf> I<period> I<slice> I<latency-hint> I<extratime> I<weight>
 
@@ -546,7 +580,7 @@ Flag for allowing domain to run in extra time.
 
 =item I<weight>
 
-Another way of setting cpu slice.
+Another way of setting CPU slice.
 
 =back
 
@@ -591,7 +625,7 @@ event.
 
 =over 4
 
-=item B<block-attach> I<domain-id> I<be-dev> I<fe-dev> I<mode> I<[bedomain-id]>
+=item B<block-attach> I<domain-id> I<be-dev> I<fe-dev> I<mode> [I<bedomain-id>]
 
 Create a new virtual block device.  This will trigger a hotplug event
 for the guest.
@@ -619,7 +653,7 @@ devices, or by device id, such as 0x1400 (/dev/hdc device id in hex).
 =item I<mode>
 
 The access mode for the device from the guest domain.  Supported modes
-are I<w> (read/write) or I<r> (read-only).
+are B<w> (read/write) or B<r> (read-only).
 
 =item I<bedomain-id>
 
@@ -635,62 +669,65 @@ B<EXAMPLES>
 
 xm block-attach guestdomain file://path/to/dsl-2.0RC2.iso /dev/hdc ro
 
-This will mount the dsl iso as /dev/hdc in the guestdomain as a read
-only device.  This will probably not be detected as a cdrom by the
+This will mount the dsl ISO as /dev/hdc in the guestdomain as a read
+only device.  This will probably not be detected as a CD-ROM by the
 guest, but mounting /dev/hdc manually will work.
 
 =back
 
-=item B<block-detach> I<domain-id> I<devid>
+=item B<block-detach> I<domain-id> I<devid> [B<--force>]
 
-Destroy a domain's virtual block device. devid B<must> be the device
-id given to the device by domain 0.  You will need to run I<xm
-block-list> to determine that number.
+Detach a domain's virtual block device. I<devid> may be the symbolic
+name or the numeric device id given to the device by domain 0.  You
+will need to run B<xm block-list> to determine that number.
 
-FIXME: this is currently B<broken>.  Even though a block device is
-removed from domU, it appears to still be allocated in the domain 0.
+Detaching the device requires the cooperation of the domain.  If the
+domain fails to release the device (perhaps because the domain is hung
+or is still using the device), the detach will fail.  The B<--force>
+parameter will forcefully detach the device, but may cause IO errors
+in the domain.
 
-=item B<block-list> I<[-l|--long]> I<domain-id>
+=item B<block-list> [B<-l>|B<--long>] I<domain-id>
 
 List virtual block devices for a domain.  The returned output is
-formatted as a list or as an S-Expression if the '--long' option was given.
+formatted as a list or as an S-Expression if the B<--long> option was given.
 
 =head2 NETWORK DEVICES
 
-=item B<network-attach> I<domain-id> I<[script=scriptname]> I<[ip=ipaddr]>
-I<[mac=macaddr]> I<[bridge=bridge-name]> I<[backend=bedomain-id]>
+=item B<network-attach> I<domain-id> [B<script=>I<scriptname>] [B<ip=>I<ipaddr>]
+[B<mac=>I<macaddr>] [B<bridge=>I<bridge-name>] [B<backend=>I<bedomain-id>]
 
-Creates a new network device in the domain specified by domain-id.  It
+Creates a new network device in the domain specified by I<domain-id>.  It
 takes the following optional options:
 
 B<OPTIONS>
 
 =over 4
 
-=item I<script=scriptname>
+=item B<script=>I<scriptname>
 
 Use the specified script name to bring up the network.  Defaults to
-the default setting in xend-config.sxp for I<vif-script>.
+the default setting in xend-config.sxp for B<vif-script>.
 
-=item I<ip=ipaddr>
+=item B<ip=>I<ipaddr>
 
 Passes the specified IP Address to the adapter on creation.  
 
 FIXME: this currently appears to be B<broken>.  I'm not sure under what
 circumstances this should actually work.
 
-=item I<mac=macaddr>
+=item B<mac=>I<macaddr>
 
 The MAC address that the domain will see on its Ethernet device.  If
 the device is not specified it will be randomly generated with the
 00:16:3e vendor id prefix.
 
-=item I<bridge=bridge-name>
+=item B<bridge=>I<bridge-name>
 
 The name of the bridge to attach the vif to, in case you have more
-than one.  This defaults to 
+than one.  This defaults to xenbr0.
 
-=item I<backend=bedomain-id>
+=item B<backend=>I<bedomain-id>
 
 The backend domain id.  By default this is domain 0.
 
@@ -705,17 +742,17 @@ I<devid> is the virtual interface device number within the domain
 FIXME: this is currently B<broken>.  Network devices aren't completely
 removed from domain 0.
 
-=item B<network-list> I<[-l|--long]> I<domain-id>
+=item B<network-list> [B<-l>|B<--long>]> I<domain-id>
 
 List virtual network interfaces for a domain.  The returned output is
-formatted as a list or as an S-Expression if the '--long' option was given.
+formatted as a list or as an S-Expression if the B<--long> option was given.
 
 =head2 VIRTUAL TPM DEVICES
 
-=item B<vtpm-list> I<[-l|--long]> I<domain-id>
+=item B<vtpm-list> [B<-l>|B<--long>] I<domain-id>
 
 Show the virtual TPM device for a domain.  The returned output is
-formatted as a list or as an S-Expression if the '--long' option was given.
+formatted as a list or as an S-Expression if the B<--long> option was given.
 
 =back
 
@@ -728,7 +765,7 @@ out entirely.
 
 =over 4
 
-=item B<vnet-list> I<[-l|--long]>
+=item B<vnet-list> [B<-l>|B<--long>]
 
 List vnets.
 
@@ -762,7 +799,7 @@ subcommands described below. Currently, the ACP specifies two ways to
 interpret labels:
 
 (1) Simple Type Enforcement: Labels are interpreted to decide access
-of domains to comunication means and virtual or physical
+of domains to communication means and virtual or physical
 resources. Communication between domains as well as access to
 resources are forbidden by default and can only take place if they are
 explicitly allowed by the security policy. The proper assignment of
@@ -796,8 +833,8 @@ time with the B<cfgbootpolicy> subcommand.
 =over 4
 
 I<policy> is a dot-separated list of names. The last part is the file
-name pre-fix for the policy xml file. The preceding name parts are
-translated into the local path pointing to the policy xml file
+name pre-fix for the policy XML file. The preceding name parts are
+translated into the local path pointing to the policy XML file
 relative to the global policy root directory
 (/etc/xen/acm-security/policies). For example,
 example.chwall_ste.client_v1 denotes the policy file
@@ -823,16 +860,16 @@ I<boot title> parameter to specify a unique part of the proper title.
 
 Prints the current security policy state information of Xen.
 
-=item B<labels> [I<policy>] [I<type>=dom|res|any]
+=item B<labels> [I<policy>] [B<type=dom>|B<res>|B<any>]
 
 Lists all labels of a I<type> (domain, resource, or both) that are
 defined in the I<policy>. Unless specified, the default I<policy> is
 the currently enforced access control policy. The default for I<type>
 is 'dom'. The labels are arranged in alphabetical order.
 
-=item B<addlabel> I<label> dom I<configfile> [I<policy>]
+=item B<addlabel> I<label> B<dom> I<configfile> [I<policy>]
 
-=item B<addlabel> I<label> res I<resource> [I<policy>]
+=item B<addlabel> I<label> B<res> I<resource> [I<policy>]
 
 Adds the security label with name I<label> to a domain
 I<configfile> (dom) or to the global resource label file for the
@@ -841,17 +878,17 @@ currently enforced access control policy. This subcommand also
 verifies that the I<policy> definition supports the specified I<label>
 name.
 
-=item B<rmlabel> dom I<configfile>
+=item B<rmlabel> B<dom> I<configfile>
 
-=item B<rmlabel> res I<resource>
+=item B<rmlabel> B<res> I<resource>
 
-Works the same as the I<addlabel> command (above), except that this
+Works the same as the B<addlabel> command (above), except that this
 command will remove the label from the domain I<configfile> (dom) or
 the global resource label file (res).
 
-=item B<getlabel> dom I<configfile>
+=item B<getlabel> B<dom> I<configfile>
 
-=item B<getlabel> res I<resource>
+=item B<getlabel> B<res> I<resource>
 
 Shows the label for the given I<configfile> or I<resource>
 
@@ -881,7 +918,7 @@ Then recompile and install xen and the security tools and then reboot:
 
     cd xen_source_dir/xen; make clean; make; cp xen.gz /boot;
     cd xen_source_dir/tools/security; make install;
-    reboot into xen
+    reboot into Xen
 
 =back
 
@@ -944,10 +981,10 @@ B<ATTACHING A SECURITY LABEL TO A DOMAIN>
 
 =over 4
 
-The I<addlabel> subcommand can attach a security label to a domain
+The B<addlabel> subcommand can attach a security label to a domain
 configuration file, here a HomeBanking label. The example policy
 ensures that this domain does not share information with other
-non-hombanking user domains (i.e., domains labeled as dom_Fun or
+non-homebanking user domains (i.e., domains labeled as dom_Fun or
 dom_Boinc) and that it will not run simultaneously with domains
 labeled as dom_Fun.
 
@@ -958,7 +995,7 @@ probably just a browser environment for online-banking.
     xm addlabel dom_HomeBanking dom myconfig.xm
 
 The very simple configuration file might now look as printed
-below. The I<addlabel> subcommand added the B<access_control> entry at
+below. The B<addlabel> subcommand added the B<access_control> entry at
 the end of the file, consisting of a label name and the policy that
 specifies this label name:
 
@@ -986,7 +1023,7 @@ B<ATTACHING A SECURITY LABEL TO A RESOURCE>
 
 =over 4
 
-The I<addlabel> subcommand can also be used to attach a security
+The B<addlabel> subcommand can also be used to attach a security
 label to a resource. Following the home banking example from above,
 we can label a disk resource (e.g., a physical partition or a file)
 to make it accessible to the home banking domain. The example policy
@@ -1002,7 +1039,7 @@ attaches this disk to the domain at boot time.
     disk = [ 'phy:hda6,sda2,w' ]
 
 Alternatively, the resource can be attached after booting the domain
-by using the I<block-attach> subcommand.
+by using the B<block-attach> subcommand.
 
     xm block-attach homebanking phy:hda6 sda2 w
 
@@ -1010,7 +1047,7 @@ Note that labeled resources cannot be used when security is turned
 off.  Any attempt to use labeled resources with security turned off
 will result in a failure with a corresponding error message.  The
 solution is to enable security or, if security is no longer desired,
-to remove the resource label using the I<rmlabel> subcommand.
+to remove the resource label using the B<rmlabel> subcommand.
 
 =back
 
@@ -1048,7 +1085,7 @@ B<POLICY REPRESENTATIONS>
 =over 4
 
 We distinguish three representations of the Xen access control policy:
-the I<source XML> version, its I<binary> counterpart, and a I<mapping>
+the source XML version, its binary counterpart, and a mapping
 representation that enables the tools to deterministically translate
 back and forth between label names of the XML policy and label
 identifiers of the binary policy. All three versions must be kept
@@ -1074,8 +1111,6 @@ tools to translate between label names used as input to the tools and
 their binary identifiers (ssidrefs) used inside Xen.
 
 =back
-
-=head1 EXAMPLES
 
 =head1 SEE ALSO
 

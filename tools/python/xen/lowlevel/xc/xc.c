@@ -680,33 +680,62 @@ static PyObject *pyxc_pages_to_kib(XcObject *self, PyObject *args)
 
 static PyObject *pyxc_physinfo(XcObject *self)
 {
+#define MAX_CPU_ID 255
     xc_physinfo_t info;
     char cpu_cap[128], *p=cpu_cap, *q=cpu_cap;
-    int i;
-    
+    int i, j, max_cpu_id;
+    PyObject *ret_obj, *node_to_cpu_obj;
+    xc_cpu_to_node_t map[MAX_CPU_ID];
+
+    set_xen_guest_handle(info.cpu_to_node, map);
+    info.max_cpu_id = MAX_CPU_ID;
+
     if ( xc_physinfo(self->xc_handle, &info) != 0 )
         return pyxc_error_to_exception();
 
-    *q=0;
-    for(i=0;i<sizeof(info.hw_cap)/4;i++)
+    *q = 0;
+    for ( i = 0; i < sizeof(info.hw_cap)/4; i++ )
     {
-        p+=sprintf(p,"%08x:",info.hw_cap[i]);
-        if(info.hw_cap[i])
-            q=p;
+        p += sprintf(p, "%08x:", info.hw_cap[i]);
+        if ( info.hw_cap[i] )
+            q = p;
     }
-    if(q>cpu_cap)
-        *(q-1)=0;
+    if ( q > cpu_cap )
+        *(q-1) = 0;
 
-    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s}",
-                         "threads_per_core", info.threads_per_core,
-                         "cores_per_socket", info.cores_per_socket,
-                         "sockets_per_node", info.sockets_per_node,
-                         "nr_nodes",         info.nr_nodes,
-                         "total_memory",     pages_to_kib(info.total_pages),
-                         "free_memory",      pages_to_kib(info.free_pages),
-                         "scrub_memory",     pages_to_kib(info.scrub_pages),
-                         "cpu_khz",          info.cpu_khz,
-                         "hw_caps",          cpu_cap);
+    ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s}",
+                            "nr_nodes",         info.nr_nodes,
+                            "max_cpu_id",       info.max_cpu_id,
+                            "threads_per_core", info.threads_per_core,
+                            "cores_per_socket", info.cores_per_socket,
+                            "sockets_per_node", info.sockets_per_node,
+                            "total_memory",     pages_to_kib(info.total_pages),
+                            "free_memory",      pages_to_kib(info.free_pages),
+                            "scrub_memory",     pages_to_kib(info.scrub_pages),
+                            "cpu_khz",          info.cpu_khz,
+                            "hw_caps",          cpu_cap);
+
+    max_cpu_id = info.max_cpu_id;
+    if ( max_cpu_id > MAX_CPU_ID )
+        max_cpu_id = MAX_CPU_ID;
+
+    /* Construct node-to-cpu lists. */
+    node_to_cpu_obj = PyList_New(0);
+
+    /* Make a list for each node. */
+    for ( i = 0; i < info.nr_nodes; i++ )
+    {
+        PyObject *cpus = PyList_New(0);
+        for ( j = 0; j <= max_cpu_id; j++ )
+            if ( i == map[j])
+                PyList_Append(cpus, PyInt_FromLong(j));
+        PyList_Append(node_to_cpu_obj, cpus); 
+    }
+
+    PyDict_SetItemString(ret_obj, "node_to_cpu", node_to_cpu_obj);
+ 
+    return ret_obj;
+#undef MAX_CPU_ID
 }
 
 static PyObject *pyxc_xeninfo(XcObject *self)

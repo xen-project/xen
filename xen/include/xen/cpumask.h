@@ -222,6 +222,15 @@ static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
 }
 
+#define last_cpu(src) __last_cpu(&(src), NR_CPUS)
+static inline int __last_cpu(const cpumask_t *srcp, int nbits)
+{
+	int cpu, pcpu = NR_CPUS;
+	for (cpu = first_cpu(*srcp); cpu < NR_CPUS; cpu = next_cpu(cpu, *srcp))
+		pcpu = cpu;
+	return pcpu;
+}
+
 #define cpumask_of_cpu(cpu)						\
 ({									\
 	typeof(_unused_cpumask_arg_) m;					\

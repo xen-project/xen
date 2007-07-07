@@ -187,7 +187,7 @@ int replace_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned long new_addr,
     unsigned int flags)
 {
-    if (new_addr)
+    if (new_addr) {
         printk("%s: new_addr not supported\n", __func__);
         BUG();
         return GNTST_general_error;

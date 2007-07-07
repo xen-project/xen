@@ -76,6 +76,11 @@ class VfbifController(DevController):
             args += [ "--listen", vnclisten ]
             if config.has_key("keymap"):
                 args += ["-k", "%s" % config["keymap"]]
+            else:
+                xoptions = xen.xend.XendOptions.instance()
+                if xoptions.get_keymap():
+                    args += ["-k", "%s" % xoptions.get_keymap()]
+
             spawn_detached(args[0], args + std_args, os.environ)
         elif t == "sdl":
             args = [xen.util.auxbin.pathTo("xen-sdlfb")]

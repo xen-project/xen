@@ -181,6 +181,7 @@ int xc_domain_getinfo(int xc_handle,
         info->blocked  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_blocked);
         info->running  = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_running);
         info->hvm      = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
+        info->debugged = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_debugged);
 
         info->shutdown_reason =
             (domctl.u.getdomaininfo.flags>>XEN_DOMINF_shutdownshift) &

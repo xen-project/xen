@@ -80,7 +80,7 @@ void vmx_init_vmcs_config(void)
         min, opt, MSR_IA32_VMX_PINBASED_CTLS);
 
     min = (CPU_BASED_HLT_EXITING |
-           CPU_BASED_INVDPG_EXITING |
+           CPU_BASED_INVLPG_EXITING |
            CPU_BASED_MWAIT_EXITING |
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
@@ -318,7 +318,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
-    v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
+    v->arch.hvm_vmx.exec_control = vmx_cpu_based_exec_control;
     if ( vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL, vmx_secondary_exec_control);
 

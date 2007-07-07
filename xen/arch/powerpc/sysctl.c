@@ -45,10 +45,10 @@ long arch_do_sysctl(struct xen_sysctl *sysctl,
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
-        pi->sockets_per_node = 
-            num_online_cpus() / cpus_weight(cpu_core_map[0]);
+        pi->sockets_per_node = num_online_cpus() / 
+            (num_online_nodes() * pi->cores_per_socket * pi->threads_per_core);
 
-        pi->nr_nodes         = 1;
+        pi->nr_nodes         = num_online_nodes();
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = cpu_khz;

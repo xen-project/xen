@@ -278,6 +278,9 @@ class XendOptions:
         return self.get_config_string('vncpasswd',
                                      self.vncpasswd_default)
 
+    def get_keymap(self):
+        return self.get_config_value('keymap', None)
+
 class XendOptionsFile(XendOptions):
 
     """Default path to the config file."""

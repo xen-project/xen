@@ -191,3 +191,9 @@
 # The default password for VNC console on HVM domain.
 # Empty string is no authentication.
 (vncpasswd '')
+
+# The default keymap to use for the VM's virtual keyboard
+# when not specififed in VM's configuration
+#(keymap 'en-us')
+
+

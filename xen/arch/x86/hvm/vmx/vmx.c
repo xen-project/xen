@@ -433,8 +433,8 @@ static inline void vmx_save_dr(struct vcpu *v)
 
     /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
     v->arch.hvm_vcpu.flag_dr_dirty = 0;
-    v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
-    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vcpu.u.vmx.exec_control);
+    v->arch.hvm_vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
 
     savedebug(&v->arch.guest_context, 0);
     savedebug(&v->arch.guest_context, 1);
@@ -1440,9 +1440,9 @@ static void vmx_dr_access(unsigned long exit_qualification,
     __restore_debug_registers(v);
 
     /* Allow guest direct access to DR registers */
-    v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_MOV_DR_EXITING;
+    v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MOV_DR_EXITING;
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-              v->arch.hvm_vcpu.u.vmx.exec_control);
+              v->arch.hvm_vmx.exec_control);
 }
 
 /*
@@ -2984,15 +2984,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case EXIT_REASON_PENDING_VIRT_INTR:
         /* Disable the interrupt window. */
-        v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
+        v->arch.hvm_vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  v->arch.hvm_vcpu.u.vmx.exec_control);
+                  v->arch.hvm_vmx.exec_control);
         break;
     case EXIT_REASON_PENDING_VIRT_NMI:
         /* Disable the NMI window. */
-        v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_NMI_PENDING;
+        v->arch.hvm_vmx.exec_control &= ~CPU_BASED_VIRTUAL_NMI_PENDING;
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  v->arch.hvm_vcpu.u.vmx.exec_control);
+                  v->arch.hvm_vmx.exec_control);
         break;
     case EXIT_REASON_TASK_SWITCH:
         goto exit_and_crash;

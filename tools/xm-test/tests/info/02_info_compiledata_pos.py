@@ -18,9 +18,7 @@ map = {}
 for line in lines:
     pieces = line.split(" : ", 1)
 
-    if len(pieces) < 2:
-        FAIL("Found invalid line: [%s]" % line)
-    else:
+    if len(pieces) > 1:
         map[pieces[0]] = pieces[1]
 
 for field in ["cores_per_socket", "threads_per_core", "cpu_mhz",

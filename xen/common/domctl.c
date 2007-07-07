@@ -117,6 +117,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
         (d->is_dying                ? XEN_DOMINF_dying    : 0) |
         (d->is_shut_down            ? XEN_DOMINF_shutdown : 0) |
         (d->is_paused_by_controller ? XEN_DOMINF_paused   : 0) |
+        (d->debugger_attached       ? XEN_DOMINF_debugged : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 
     if ( is_hvm_domain(d) )
