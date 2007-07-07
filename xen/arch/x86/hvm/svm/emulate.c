@@ -201,7 +201,7 @@ unsigned long get_effective_addr_modrm64(struct cpu_user_regs *regs,
 
 #if __x86_64__
         /* 64-bit mode */
-        if (vmcb->cs.attr.fields.l && svm_long_mode_enabled(v))
+        if (vmcb->cs.attr.fields.l && hvm_long_mode_enabled(v))
             return vmcb->rip + inst_len + *size + disp;
 #endif
         return disp;
@@ -327,7 +327,7 @@ unsigned long svm_rip2pointer(struct vcpu *v)
      */
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     unsigned long p = vmcb->cs.base + vmcb->rip;
-    if (!(vmcb->cs.attr.fields.l && svm_long_mode_enabled(v)))
+    if (!(vmcb->cs.attr.fields.l && hvm_long_mode_enabled(v)))
         return (u32)p; /* mask to 32 bits */
     /* NB. Should mask to 16 bits if in real mode or 16-bit protected mode. */
     return p;
