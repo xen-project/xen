@@ -57,7 +57,6 @@ GUEST_SRCS-$(CONFIG_POWERPC) += xc_dom_powerpc.c
 -include $(XEN_TARGET_ARCH)/Makefile
 
 CFLAGS   += -Werror -Wmissing-prototypes
-CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I. -I../xenstore
 
 # Needed for posix_fadvise64() in xc_linux.c
