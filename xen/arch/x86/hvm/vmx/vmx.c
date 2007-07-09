@@ -1336,8 +1336,13 @@ int start_vmx(void)
         vmx_msr_bitmap = alloc_xenheap_page();
         BUG_ON(vmx_msr_bitmap == NULL);
         memset(vmx_msr_bitmap, ~0, PAGE_SIZE);
+
         disable_intercept_for_msr(MSR_FS_BASE);
         disable_intercept_for_msr(MSR_GS_BASE);
+
+        disable_intercept_for_msr(MSR_IA32_SYSENTER_CS);
+        disable_intercept_for_msr(MSR_IA32_SYSENTER_ESP);
+        disable_intercept_for_msr(MSR_IA32_SYSENTER_EIP);
     }
 
     return 1;
