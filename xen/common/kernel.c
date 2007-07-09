@@ -26,10 +26,11 @@ int tainted;
 
 void cmdline_parse(char *cmdline)
 {
-    char opt[100], *optval, *q;
+    char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
     struct kernel_param *param;
-    
+    int invbool;
+
     if ( p == NULL )
         return;
 
@@ -48,7 +49,7 @@ void cmdline_parse(char *cmdline)
             break;
 
         /* Grab the next whitespace-delimited option. */
-        q = opt;
+        q = optkey = opt;
         while ( (*p != ' ') && (*p != '\0') )
         {
             if ( (q-opt) < (sizeof(opt)-1) ) /* avoid overflow */
@@ -64,9 +65,14 @@ void cmdline_parse(char *cmdline)
         else
             optval = q;       /* default option value is empty string */
 
+        /* Boolean parameters can be inverted with 'no-' prefix. */
+        invbool = !strncmp("no-", optkey, 3);
+        if ( invbool )
+            optkey += 3;
+
         for ( param = &__setup_start; param <= &__setup_end; param++ )
         {
-            if ( strcmp(param->name, opt ) != 0 )
+            if ( strcmp(param->name, optkey) )
                 continue;
 
             switch ( param->type )
@@ -79,7 +85,10 @@ void cmdline_parse(char *cmdline)
                     simple_strtol(optval, (const char **)&optval, 0);
                 break;
             case OPT_BOOL:
-                *(int *)param->var = 1;
+                *(int *)param->var = !invbool;
+                break;
+            case OPT_INVBOOL:
+                *(int *)param->var = invbool;
                 break;
             case OPT_CUSTOM:
                 ((void (*)(const char *))param->var)(optval);
