@@ -45,9 +45,6 @@ CHECK_TYPE(domain_handle);
 
 #include "../kernel.c"
 
-int compat_disabled = 0;
-boolean_param("no-pv-compat", compat_disabled);
-
 /*
  * Local variables:
  * mode: C

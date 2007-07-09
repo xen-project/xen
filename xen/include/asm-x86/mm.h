@@ -315,8 +315,7 @@ TYPE_SAFE(unsigned long,mfn);
 #ifdef CONFIG_COMPAT
 #define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
 #define set_gpfn_from_mfn(mfn, pfn) \
-    ((void)(compat_disabled || \
-            (mfn) >= (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 || \
+    ((void)((mfn) >= (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 || \
             (compat_machine_to_phys_mapping[(mfn)] = (unsigned int)(pfn))), \
      machine_to_phys_mapping[(mfn)] = (pfn))
 #else

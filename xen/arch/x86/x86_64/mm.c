@@ -145,47 +145,42 @@ void __init paging_init(void)
         l2_ro_mpt++;
     }
 
-#ifdef CONFIG_COMPAT
-    if ( !compat_disabled )
+    /* Create user-accessible L2 directory to map the MPT for compat guests. */
+    BUILD_BUG_ON(l4_table_offset(RDWR_MPT_VIRT_START) !=
+                 l4_table_offset(HIRO_COMPAT_MPT_VIRT_START));
+    l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(
+        HIRO_COMPAT_MPT_VIRT_START)]);
+    if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
+        goto nomem;
+    compat_idle_pg_table_l2 = l2_ro_mpt = page_to_virt(l2_pg);
+    clear_page(l2_ro_mpt);
+    l3e_write(&l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+              l3e_from_page(l2_pg, __PAGE_HYPERVISOR));
+    l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
+    /* Allocate and map the compatibility mode machine-to-phys table. */
+    mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
+    if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )
+        mpt_size = RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START;
+    mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+    if ( m2p_compat_vstart + mpt_size < MACH2PHYS_COMPAT_VIRT_END )
+        m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
+    for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
-        /* Create user-accessible L2 directory to map the MPT for compatibility guests. */
-        BUILD_BUG_ON(l4_table_offset(RDWR_MPT_VIRT_START) !=
-                     l4_table_offset(HIRO_COMPAT_MPT_VIRT_START));
-        l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(HIRO_COMPAT_MPT_VIRT_START)]);
-        if ( (l2_pg = alloc_domheap_page(NULL)) == NULL )
+        if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
             goto nomem;
-        compat_idle_pg_table_l2 = l2_ro_mpt = page_to_virt(l2_pg);
-        clear_page(l2_ro_mpt);
-        l3e_write(&l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-                  l3e_from_page(l2_pg, __PAGE_HYPERVISOR));
-        l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
-        /*
-         * Allocate and map the compatibility mode machine-to-phys table.
-        */
-        mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));
-        if ( mpt_size > RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START )
-            mpt_size = RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START;
-        mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
-        if ( m2p_compat_vstart + mpt_size < MACH2PHYS_COMPAT_VIRT_END )
-            m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
-        for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
-        {
-            if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
-                goto nomem;
-            map_pages_to_xen(
-                RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
-                page_to_mfn(l1_pg),
-                1UL << PAGETABLE_ORDER,
-                PAGE_HYPERVISOR);
-            memset((void *)(RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
-                   0x55,
-                   1UL << L2_PAGETABLE_SHIFT);
-            /* NB. Cannot be GLOBAL as the pt entries get copied into per-VM space. */
-            l2e_write(l2_ro_mpt, l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
-            l2_ro_mpt++;
-        }
+        map_pages_to_xen(
+            RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
+            page_to_mfn(l1_pg),
+            1UL << PAGETABLE_ORDER,
+            PAGE_HYPERVISOR);
+        memset((void *)(RDWR_COMPAT_MPT_VIRT_START +
+                        (i << L2_PAGETABLE_SHIFT)),
+               0x55,
+               1UL << L2_PAGETABLE_SHIFT);
+        /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
+        l2e_write(l2_ro_mpt, l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
+        l2_ro_mpt++;
     }
-#endif
 
     /* Set up linear page table mapping. */
     l4e_write(&idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)],
@@ -255,30 +250,26 @@ void __init subarch_init_memory(void)
             share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
         }
     }
-#ifdef CONFIG_COMPAT
-    if ( !compat_disabled )
-    {
-        for ( v  = RDWR_COMPAT_MPT_VIRT_START;
-              v != RDWR_COMPAT_MPT_VIRT_END;
-              v += 1 << L2_PAGETABLE_SHIFT )
-        {
-            l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
-                l3_table_offset(v)];
-            if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-                continue;
-            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
-            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-                continue;
-            m2p_start_mfn = l2e_get_pfn(l2e);
 
-            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-            {
-                struct page_info *page = mfn_to_page(m2p_start_mfn + i);
-                share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
-            }
+    for ( v  = RDWR_COMPAT_MPT_VIRT_START;
+          v != RDWR_COMPAT_MPT_VIRT_END;
+          v += 1 << L2_PAGETABLE_SHIFT )
+    {
+        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
+            l3_table_offset(v)];
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+            continue;
+        l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+            continue;
+        m2p_start_mfn = l2e_get_pfn(l2e);
+
+        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+        {
+            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
+            share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
         }
     }
-#endif
 }
 
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
