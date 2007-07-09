@@ -311,3 +311,4 @@ def XSPolicyAdminInstance(maxpolicies=1):
     global poladmin
     if poladmin == None:
         poladmin = XSPolicyAdmin(maxpolicies)
+    return poladmin
