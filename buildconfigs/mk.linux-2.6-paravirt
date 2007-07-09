@@ -8,6 +8,8 @@ IMAGE_TARGET ?= vmlinux bzImage
 
 XEN_LINUX_ALLOW_INTERFACE_MISMATCH := y
 
-EXTRAVERSION ?=
+XEN_LINUX_CONFIG_UPDATE := buildconfigs/enable-xen-config
+
+EXTRAVERSION ?= -paravirt
 
 include buildconfigs/mk.linux-2.6-xen

@@ -74,6 +74,10 @@ $(LINUX_DIR)/include/linux/autoconf.h: $(LINUX_SRCDIR)/.valid-src
 	else \
           echo "No configuration method found for this kernel" ; \
 	fi
+ifneq ($(XEN_LINUX_CONFIG_UPDATE),)
+	echo "Updating $(CONFIG_FILE) using $(XEN_LINUX_CONFIG_UPDATE)"
+	sh $(XEN_LINUX_CONFIG_UPDATE) $(CONFIG_FILE)
+endif
 ifeq ($(XEN_TARGET_ARCH),x86_32)
 ifeq ($(pae),y)
 	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)
