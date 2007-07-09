@@ -53,6 +53,8 @@
 #define set_segment_register(name, value)  \
     asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
+enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
+
 int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                          int inst_len);
 asmlinkage void do_IRQ(struct cpu_user_regs *);
@@ -173,7 +175,7 @@ static void svm_store_cpu_guest_regs(
     }
 }
 
-static int long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     u32 ecx = regs->ecx;
@@ -237,14 +239,14 @@ static int long_mode_do_msr_write(struct cpu_user_regs *regs)
         break;
 
     default:
-        return 0;
+        return HNDL_unhandled;
     }
 
-    return 1;
+    return HNDL_done;
 
  gp_fault:
     svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-    return 0;
+    return HNDL_exception_raised;
 }
 
 
@@ -1716,8 +1718,8 @@ static int svm_set_cr0(unsigned long value)
             if ( old_base_mfn )
                 put_page(mfn_to_page(old_base_mfn));
 
-            HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                        (unsigned long) (mfn << PAGE_SHIFT));
+            HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
+                        v->arch.hvm_vmx.cpu_cr3, mfn);
         }
     }
     else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
@@ -1744,8 +1746,7 @@ static int svm_set_cr0(unsigned long value)
     if ( (value ^ old_value) & X86_CR0_PG )
     {
         paging_update_paging_modes(v);
-        /* signal paging update to ASID handler */
-        svm_asid_g_update_paging (v);
+        svm_asid_g_update_paging(v);
     }
 
     return 1;
@@ -1894,8 +1895,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         {
             if ( svm_pgbit_test(v) )
             {
-                /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 3
+                /* The guest is a 32-bit PAE guest. */
                 unsigned long mfn, old_base_mfn;
                 mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
                 if ( !mfn_valid(mfn) || 
@@ -1905,7 +1906,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 /*
                  * Now arch.guest_table points to machine physical.
                  */
-
                 old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
                 v->arch.guest_table = pagetable_from_pfn(mfn);
                 if ( old_base_mfn )
@@ -1913,9 +1913,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 paging_update_paging_modes(v);
                 /* signal paging update to ASID handler */
                 svm_asid_g_update_paging (v);
-
-                HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
-                            (unsigned long) (mfn << PAGE_SHIFT));
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
@@ -2201,8 +2198,16 @@ static void svm_do_msr_access(
             break;
 
         default:
-            if ( !long_mode_do_msr_write(regs) )
+            switch ( long_mode_do_msr_write(regs) )
+            {
+            case HNDL_unhandled:
                 wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+                break;
+            case HNDL_exception_raised:
+                return;
+            case HNDL_done:
+                break;
+            }
             break;
         }
 

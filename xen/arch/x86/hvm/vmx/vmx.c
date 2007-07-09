@@ -51,6 +51,8 @@
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
 
+enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
+
 char *vmx_msr_bitmap;
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
@@ -178,14 +180,15 @@ static void vmx_save_host_msrs(void)
         set_bit(VMX_INDEX_MSR_ ## address, &host_msr_state->flags);     \
         break
 
-static int long_mode_do_msr_read(struct cpu_user_regs *regs)
+static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     u32 ecx = regs->ecx;
     struct vcpu *v = current;
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
 
-    switch ( ecx ) {
+    switch ( ecx )
+    {
     case MSR_EFER:
         msr_content = v->arch.hvm_vmx.efer;
         break;
@@ -204,7 +207,7 @@ static int long_mode_do_msr_read(struct cpu_user_regs *regs)
         if ( !(vmx_long_mode_enabled(v)) )
         {
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
+            return HNDL_exception_raised;
         }
         break;
 
@@ -225,7 +228,7 @@ static int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     default:
-        return 0;
+        return HNDL_unhandled;
     }
 
     HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, ecx, msr_content);
@@ -233,10 +236,10 @@ static int long_mode_do_msr_read(struct cpu_user_regs *regs)
     regs->eax = (u32)(msr_content >>  0);
     regs->edx = (u32)(msr_content >> 32);
 
-    return 1;
+    return HNDL_done;
 }
 
-static int long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     u32 ecx = regs->ecx;
@@ -326,16 +329,16 @@ static int long_mode_do_msr_write(struct cpu_user_regs *regs)
         WRITE_MSR(SYSCALL_MASK);
 
     default:
-        return 0;
+        return HNDL_unhandled;
     }
 
-    return 1;
+    return HNDL_done;
 
  uncanonical_address:
     HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", ecx);
  gp_fault:
     vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-    return 0;
+    return HNDL_exception_raised;
 }
 
 /*
@@ -434,7 +437,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     }
 }
 
-static int long_mode_do_msr_read(struct cpu_user_regs *regs)
+static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     struct vcpu *v = current;
@@ -445,16 +448,16 @@ static int long_mode_do_msr_read(struct cpu_user_regs *regs)
         break;
 
     default:
-        return 0;
+        return HNDL_unhandled;
     }
 
     regs->eax = msr_content >>  0;
     regs->edx = msr_content >> 32;
 
-    return 1;
+    return HNDL_done;
 }
 
-static int long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = regs->eax | ((u64)regs->edx << 32);
     struct vcpu *v = current;
@@ -469,7 +472,7 @@ static int long_mode_do_msr_write(struct cpu_user_regs *regs)
             gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                      "EFER: %"PRIx64"\n", msr_content);
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            return 0;
+            return HNDL_exception_raised;
         }
 
         if ( (msr_content ^ v->arch.hvm_vmx.efer) & EFER_NX )
@@ -479,10 +482,10 @@ static int long_mode_do_msr_write(struct cpu_user_regs *regs)
         break;
 
     default:
-        return 0;
+        return HNDL_unhandled;
     }
 
-    return 1;
+    return HNDL_done;
 }
 
 #endif /* __i386__ */
@@ -683,9 +686,9 @@ int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     if ( old_base_mfn )
         put_page(mfn_to_page(old_base_mfn));
 
+ skip_cr3:
     v->arch.hvm_vmx.cpu_cr3 = c->cr3;
 
- skip_cr3:
     if ( vmx_long_mode_enabled(v) )
         vmx_enable_long_mode(v);
 
@@ -1663,10 +1666,10 @@ static int vmx_str_pio_check_descriptor(int long_mode, unsigned long eip,
 }
 
 
-static void vmx_str_pio_check_limit(u32 limit, unsigned int size,
-                                    u32 ar_bytes, unsigned long addr,
-                                    unsigned long base, int df,
-                                    unsigned long *count)
+static int vmx_str_pio_check_limit(u32 limit, unsigned int size,
+                                   u32 ar_bytes, unsigned long addr,
+                                   unsigned long base, int df,
+                                   unsigned long *count)
 {
     unsigned long ea = addr - base;
 
@@ -1675,10 +1678,7 @@ static void vmx_str_pio_check_limit(u32 limit, unsigned int size,
     if ( (u32)(ea + size - 1) < (u32)ea ||
          (ar_bytes & 0xc) != 0x4 ? ea + size - 1 > limit
                                  : ea <= limit )
-    {
-        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-        return;
-    }
+        return 0;
 
     /* Check the limit for repeated instructions, as above we checked
        only the first instance. Truncate the count if a limit violation
@@ -1719,22 +1719,23 @@ static void vmx_str_pio_check_limit(u32 limit, unsigned int size,
         }
         ASSERT(*count);
     }
+
+    return 1;
 }
 
 #ifdef __x86_64__
-static void vmx_str_pio_lm_check_limit(struct cpu_user_regs *regs,
-                                       unsigned int size,
-                                       unsigned long addr,
-                                       unsigned long *count)
+static int vmx_str_pio_lm_check_limit(struct cpu_user_regs *regs,
+                                      unsigned int size,
+                                      unsigned long addr,
+                                      unsigned long *count)
 {
     if ( !is_canonical_address(addr) ||
          !is_canonical_address(addr + size - 1) )
-    {
-        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
-        return;
-    }
+        return 0;
+
     if ( *count > (1UL << 48) / size )
         *count = (1UL << 48) / size;
+
     if ( !(regs->eflags & EF_DF) )
     {
         if ( addr + *count * size - 1 < addr ||
@@ -1747,7 +1748,10 @@ static void vmx_str_pio_lm_check_limit(struct cpu_user_regs *regs,
              !is_canonical_address(addr + (*count - 1) * size) )
             *count = (addr & ~((1UL << 48) - 1)) / size + 1;
     }
+
     ASSERT(*count);
+
+    return 1;
 }
 #endif
 
@@ -1875,18 +1879,21 @@ static void vmx_do_str_pio(unsigned long exit_qualification,
     if ( !long_mode )
     {
         /* Segment must be readable for outs and writeable for ins. */
-        if ( dir == IOREQ_WRITE ? (ar_bytes & 0xa) == 0x8
-                                : (ar_bytes & 0xa) != 0x2 ) {
+        if ( ((dir == IOREQ_WRITE)
+              ? ((ar_bytes & 0xa) == 0x8)
+              : ((ar_bytes & 0xa) != 0x2)) ||
+             !vmx_str_pio_check_limit(limit, size, ar_bytes,
+                                      addr, base, df, &count) )
+        {
             vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
             return;
         }
-
-        vmx_str_pio_check_limit(limit, size, ar_bytes, addr, base, df, &count);
     }
 #ifdef __x86_64__
-    else
+    else if ( !vmx_str_pio_lm_check_limit(regs, size, addr, &count) )
     {
-        vmx_str_pio_lm_check_limit(regs, size, addr, &count);
+        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+        return;
     }
 #endif
 
@@ -2133,12 +2140,20 @@ static int vmx_assist(struct vcpu *v, int mode)
     struct hvm_hw_vpic *vpic = v->domain->arch.hvm_domain.vpic;
     u32 magic, cp;
 
-    /* make sure vmxassist exists (this is not an error) */
     if ( hvm_copy_from_guest_phys(&magic, VMXASSIST_MAGIC_OFFSET,
                                   sizeof(magic)) )
+    {
+        gdprintk(XENLOG_ERR, "No vmxassist: can't execute real mode code\n");
+        domain_crash(v->domain);
         return 0;
+    }
+
     if ( magic != VMXASSIST_MAGIC )
+    {
+        gdprintk(XENLOG_ERR, "vmxassist magic number not match\n");
+        domain_crash(v->domain);
         return 0;
+    }
 
     switch ( mode ) {
         /*
@@ -2280,28 +2295,26 @@ static int vmx_set_cr0(unsigned long value)
         if ( old_base_mfn )
             put_page(mfn_to_page(old_base_mfn));
 
-        paging_update_paging_modes(v);
-
-        HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
-                    (unsigned long) (mfn << PAGE_SHIFT));
-
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
                     v->arch.hvm_vmx.cpu_cr3, mfn);
+
+        paging_update_paging_modes(v);
     }
 
     /* Trying to disable paging. */
     if ( ((value & (X86_CR0_PE | X86_CR0_PG)) != (X86_CR0_PE | X86_CR0_PG)) &&
          paging_enabled )
     {
+        /* When CR0.PG is cleared, LMA is cleared immediately. */
+        if ( vmx_long_mode_enabled(v) )
+            vmx_disable_long_mode(v);
+
         if ( v->arch.hvm_vmx.cpu_cr3 )
         {
             put_page(mfn_to_page(get_mfn_from_gpfn(
                       v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)));
             v->arch.guest_table = pagetable_null();
         }
-
-        if ( vmx_long_mode_enabled(v) )
-            vmx_disable_long_mode(v);
     }
 
     /*
@@ -2461,8 +2474,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         {
             if ( vmx_pgbit_test(v) )
             {
-                /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 3
+                /* The guest is a 32-bit PAE guest. */
                 unsigned long mfn, old_base_mfn;
                 mfn = get_mfn_from_gpfn(v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT);
                 if ( !mfn_valid(mfn) ||
@@ -2476,9 +2489,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 v->arch.guest_table = pagetable_from_pfn(mfn);
                 if ( old_base_mfn )
                     put_page(mfn_to_page(old_base_mfn));
-
-                HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
-                            (unsigned long) (mfn << PAGE_SHIFT));
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU,
                             "Update CR3 value = %lx, mfn = %lx",
@@ -2645,8 +2655,15 @@ static int vmx_do_msr_read(struct cpu_user_regs *regs)
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
-        if ( long_mode_do_msr_read(regs) )
-            goto done;
+        switch ( long_mode_do_msr_read(regs) )
+        {
+            case HNDL_unhandled:
+                break;
+            case HNDL_exception_raised:
+                return 0;
+            case HNDL_done:
+                goto done;
+        }
 
         if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
              rdmsr_safe(ecx, eax, edx) == 0 )
@@ -2771,8 +2788,16 @@ static int vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_PROCBASED_CTLS2:
         goto gp_fault;
     default:
-        if ( !long_mode_do_msr_write(regs) )
-            wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+        switch ( long_mode_do_msr_write(regs) )
+        {
+            case HNDL_unhandled:
+                wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+                break;
+            case HNDL_exception_raised:
+                return 0;
+            case HNDL_done:
+                break;
+        }
         break;
     }
 
@@ -2812,7 +2837,8 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     vector &= INTR_INFO_VECTOR_MASK;
     HVMTRACE_1D(INTR, current, vector);
 
-    switch(vector) {
+    switch ( vector )
+    {
     case LOCAL_TIMER_VECTOR:
         smp_apic_timer_interrupt(regs);
         break;
