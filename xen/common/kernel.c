@@ -29,7 +29,7 @@ void cmdline_parse(char *cmdline)
     char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
     struct kernel_param *param;
-    int invbool;
+    int bool_assert;
 
     if ( p == NULL )
         return;
@@ -66,8 +66,8 @@ void cmdline_parse(char *cmdline)
             optval = q;       /* default option value is empty string */
 
         /* Boolean parameters can be inverted with 'no-' prefix. */
-        invbool = !strncmp("no-", optkey, 3);
-        if ( invbool )
+        bool_assert = !!strncmp("no-", optkey, 3);
+        if ( !bool_assert )
             optkey += 3;
 
         for ( param = &__setup_start; param <= &__setup_end; param++ )
@@ -85,10 +85,12 @@ void cmdline_parse(char *cmdline)
                     simple_strtol(optval, (const char **)&optval, 0);
                 break;
             case OPT_BOOL:
-                *(int *)param->var = !invbool;
-                break;
             case OPT_INVBOOL:
-                *(int *)param->var = invbool;
+                if ( !strcmp("no", optval) || !strcmp("off", optval) )
+                    bool_assert = !bool_assert;
+                if ( param->type == OPT_INVBOOL )
+                    bool_assert = !bool_assert;
+                *(int *)param->var = bool_assert;
                 break;
             case OPT_CUSTOM:
                 ((void (*)(const char *))param->var)(optval);

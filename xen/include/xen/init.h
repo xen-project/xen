@@ -93,7 +93,7 @@ extern struct kernel_param __setup_start, __setup_end;
     static char __setup_str_##_var[] __initdata = _name; \
     static struct kernel_param __setup_##_var __attribute_used__ \
         __initsetup = { __setup_str_##_var, OPT_BOOL, &_var, sizeof(_var) }
-#define invboolean_param(_name, _var) \
+#define invbool_param(_name, _var) \
     static char __setup_str_##_var[] __initdata = _name; \
     static struct kernel_param __setup_##_var __attribute_used__ \
         __initsetup = { __setup_str_##_var, OPT_INVBOOL, &_var, sizeof(_var) }
