@@ -1515,3 +1515,48 @@ static void __init parse_dom0_mem(char *s)
 	dom0_size = parse_size_and_unit(s, NULL);
 }
 custom_param("dom0_mem", parse_dom0_mem);
+
+/*
+ * Helper function for the optimization stuff handling the identity mapping
+ * feature.
+ */
+static inline void
+optf_set_identity_mapping(unsigned long* mask, struct identity_mapping* im,
+			  struct xen_ia64_opt_feature* f)
+{
+	if (f->on) {
+		*mask |= f->cmd;
+		im->pgprot = f->pgprot;
+		im->key = f->key;
+	} else {
+		*mask &= ~(f->cmd);
+		im->pgprot = 0;
+		im->key = 0;
+	}
+}
+
+/* Switch a optimization feature on/off. */
+int
+domain_opt_feature(struct xen_ia64_opt_feature* f)
+{
+	struct opt_feature* optf = &(current->domain->arch.opt_feature);
+	long rc = 0;
+
+	switch (f->cmd) {
+	case XEN_IA64_OPTF_IDENT_MAP_REG4:
+		optf_set_identity_mapping(&optf->mask, &optf->im_reg4, f);
+		break;
+	case XEN_IA64_OPTF_IDENT_MAP_REG5:
+		optf_set_identity_mapping(&optf->mask, &optf->im_reg5, f);
+		break;
+	case XEN_IA64_OPTF_IDENT_MAP_REG7:
+		optf_set_identity_mapping(&optf->mask, &optf->im_reg7, f);
+		break;
+	default:
+		printk("%s: unknown opt_feature: %ld\n", __func__, f->cmd);
+		rc = -ENOSYS;
+		break;
+	}
+	return rc;
+}
+

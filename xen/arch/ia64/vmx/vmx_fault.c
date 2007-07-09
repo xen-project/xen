@@ -375,7 +375,8 @@ try_again:
         thash_vhpt_insert(v, data->page_flags, data->itir, vadr, type);
 
     } else if (type == DSIDE_TLB) {
-    
+        struct opt_feature* optf = &(v->domain->arch.opt_feature);
+
         if (misr.sp)
             return vmx_handle_lds(regs);
 
@@ -383,35 +384,27 @@ try_again:
         itir = rr & (RR_RID_MASK | RR_PS_MASK);
 
         if (!vhpt_enabled(v, vadr, misr.rs ? RSE_REF : DATA_REF)) {
-            if (GOS_WINDOWS(v)) {
-                /* windows use region 4 and 5 for identity mapping */
-                if (REGION_NUMBER(vadr) == 4 && !(regs->cr_ipsr & IA64_PSR_CPL)
-                    && (REGION_OFFSET(vadr) <= _PAGE_PPN_MASK)) {
+            /* windows use region 4 and 5 for identity mapping */
+            if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4 &&
+                REGION_NUMBER(vadr) == 4 && !(regs->cr_ipsr & IA64_PSR_CPL) &&
+                REGION_OFFSET(vadr) <= _PAGE_PPN_MASK) {
 
-                    pteval = PAGEALIGN(REGION_OFFSET(vadr), itir_ps(itir)) |
-                             (_PAGE_P | _PAGE_A | _PAGE_D |
-                               _PAGE_MA_WB | _PAGE_AR_RW);
-
-                    if (thash_purge_and_insert(v, pteval, itir, vadr, type))
-                        goto try_again;
-
-                    return IA64_NO_FAULT;
-                }
-
-                if (REGION_NUMBER(vadr) == 5 && !(regs->cr_ipsr & IA64_PSR_CPL)
-                    && (REGION_OFFSET(vadr) <= _PAGE_PPN_MASK)) {
-
-                    pteval = PAGEALIGN(REGION_OFFSET(vadr),itir_ps(itir)) |
-                             (_PAGE_P | _PAGE_A | _PAGE_D |
-                              _PAGE_MA_UC | _PAGE_AR_RW);
-
-                    if (thash_purge_and_insert(v, pteval, itir, vadr, type))
-                        goto try_again;
-
-                    return IA64_NO_FAULT;
-                }
+                pteval = PAGEALIGN(REGION_OFFSET(vadr), itir_ps(itir)) |
+                         optf->im_reg4.pgprot;
+                if (thash_purge_and_insert(v, pteval, itir, vadr, type))
+                    goto try_again;
+                return IA64_NO_FAULT;
             }
+            if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5 &&
+                REGION_NUMBER(vadr) == 5 && !(regs->cr_ipsr & IA64_PSR_CPL) &&
+                REGION_OFFSET(vadr) <= _PAGE_PPN_MASK) {
 
+                pteval = PAGEALIGN(REGION_OFFSET(vadr), itir_ps(itir)) |
+                         optf->im_reg5.pgprot;
+                if (thash_purge_and_insert(v, pteval, itir, vadr, type))
+                    goto try_again;
+                return IA64_NO_FAULT;
+            }
             if (vpsr.ic) {
                 vcpu_set_isr(v, misr.val);
                 alt_dtlb(v, vadr);
@@ -436,7 +429,8 @@ try_again:
         }
 
         /* avoid recursively walking (short format) VHPT */
-        if (!GOS_WINDOWS(v) &&
+        if (!(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG4) &&
+            !(optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG5) &&
             (((vadr ^ vpta.val) << 3) >> (vpta.size + 3)) == 0) {
 
             if (vpsr.ic) {

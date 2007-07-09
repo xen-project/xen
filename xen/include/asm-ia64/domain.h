@@ -66,6 +66,44 @@ struct xen_sal_data {
     int efi_virt_mode;		/* phys : 0 , virt : 1 */
 };
 
+/*
+ * Optimization features
+ * are used by the hypervisor to do some optimizations for guests.
+ * By default the optimizations are switched off and the guest has to activate
+ * the feature. On PV the guest must do this via the hypercall
+ * __HYPERVISOR_opt_feature, on HVM it's done within xen in set_os_type().
+ */
+
+/*
+ * Helper struct for the different identity mapping optimizations.
+ * The hypervisor does the insertion of address translations in the tlb
+ * for identity mapped areas without reflecting the page fault
+ * to the guest.
+ */
+struct identity_mapping {
+        unsigned long pgprot;	/* The page protection bit mask of the pte.*/
+        unsigned long key;	/* A protection key. */
+};
+
+/* Central structure for optimzation features used by the hypervisor.  */
+struct opt_feature {
+    unsigned long mask;			/* For every feature one bit. */
+    struct identity_mapping im_reg4;	/* Region 4 identity mapping */
+    struct identity_mapping im_reg5;	/* Region 5 identity mapping */
+    struct identity_mapping im_reg7;	/* Region 7 identity mapping */
+};
+
+/*
+ * The base XEN_IA64_OPTF_IDENT_MAP_REG7 is defined in public/arch-ia64.h.
+ * Identity mapping of region 4 addresses in HVM.
+ */
+#define XEN_IA64_OPTF_IDENT_MAP_REG4	(XEN_IA64_OPTF_IDENT_MAP_REG7 + 1)
+/* Identity mapping of region 5 addresses in HVM. */
+#define XEN_IA64_OPTF_IDENT_MAP_REG5	(XEN_IA64_OPTF_IDENT_MAP_REG4 + 1)
+
+/* Set an optimization feature in the struct arch_domain. */
+extern int domain_opt_feature(struct xen_ia64_opt_feature*);
+
 struct arch_domain {
     struct mm_struct mm;
 
@@ -128,6 +166,8 @@ struct arch_domain {
     atomic64_t shadow_fault_count;
 
     struct last_vcpu last_vcpu[NR_CPUS];
+
+    struct opt_feature opt_feature;
 
 #ifdef CONFIG_XEN_IA64_TLB_TRACK
     struct tlb_track*   tlb_track;

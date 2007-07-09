@@ -1709,11 +1709,13 @@ IA64FAULT vcpu_translate(VCPU * vcpu, u64 address, BOOLEAN is_data,
 	vcpu_thash(vcpu, address, iha);
 	if (!(rr & RR_VE_MASK) || !(pta & IA64_PTA_VE)) {
 		REGS *regs = vcpu_regs(vcpu);
-		// NOTE: This is specific code for linux kernel
-		// We assume region 7 is identity mapped
-		if (region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL) {
+		struct opt_feature* optf = &(vcpu->domain->arch.opt_feature);
+
+		/* Optimization for identity mapped region 7 OS (linux) */
+		if (optf->mask & XEN_IA64_OPTF_IDENT_MAP_REG7 &&
+		    region == 7 && ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL) {
 			pte.val = address & _PAGE_PPN_MASK;
-			pte.val = pte.val | pgprot_val(PAGE_KERNEL);
+			pte.val = pte.val | optf->im_reg7.pgprot;
 			goto out;
 		}
 		return is_data ? IA64_ALT_DATA_TLB_VECTOR :

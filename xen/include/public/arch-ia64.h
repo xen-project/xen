@@ -558,6 +558,41 @@ struct xen_ia64_boot_param {
 #define XENCOMM_INLINE_ADDR(addr) \
   ((unsigned long)(addr) & ~XENCOMM_INLINE_MASK)
 
+#ifndef __ASSEMBLY__
+
+/*
+ * Optimization features.
+ * The hypervisor may do some special optimizations for guests. This hypercall
+ * can be used to switch on/of these special optimizations.
+ */
+#define __HYPERVISOR_opt_feature	0x700UL
+
+#define XEN_IA64_OPTF_OFF	0x0
+#define XEN_IA64_OPTF_ON	0x1
+
+/*
+ * If this feature is switched on, the hypervisor inserts the
+ * tlb entries without calling the guests traphandler.
+ * This is useful in guests using region 7 for identity mapping
+ * like the linux kernel does.
+ */
+#define XEN_IA64_OPTF_IDENT_MAP_REG7	0x1UL
+
+struct xen_ia64_opt_feature {
+	unsigned long cmd;		/* Which feature */
+	unsigned char on;		/* Switch feature on/off */
+	union {
+		struct {
+				/* The page protection bit mask of the pte.
+			 	 * This will be or'ed with the pte. */
+			unsigned long pgprot;
+			unsigned long key;	/* A protection key for itir. */
+		};
+	};
+};
+
+#endif /* __ASSEMBLY__ */
+
 /* xen perfmon */
 #ifdef XEN
 #ifndef __ASSEMBLY__

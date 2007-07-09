@@ -200,6 +200,21 @@ static inline void set_os_type(VCPU *v, u64 type)
     if (type > OS_BASE && type < OS_END) {
         v->domain->arch.vmx_platform.gos_type = type;
         gdprintk(XENLOG_INFO, "Guest OS : %s\n", guest_os_name[type - OS_BASE]);
+
+        if (GOS_WINDOWS(v)) {
+            struct xen_ia64_opt_feature optf;
+
+	    /* Windows identity maps regions 4 & 5 */
+            optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG4;
+            optf.on = XEN_IA64_OPTF_ON;
+            optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_WB|_PAGE_AR_RW);
+            optf.key = 0;
+            domain_opt_feature(&optf);
+
+            optf.cmd = XEN_IA64_OPTF_IDENT_MAP_REG5;
+            optf.pgprot = (_PAGE_P|_PAGE_A|_PAGE_D|_PAGE_MA_UC|_PAGE_AR_RW);
+            domain_opt_feature(&optf);
+        }
     }
 }
 
