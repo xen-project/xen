@@ -700,13 +700,7 @@ def xm_save(args):
     if serverType == SERVER_XEN_API:       
         server.xenapi.VM.save(get_single_vm(dom), savefile, checkpoint)
     else:
-        try:
-            dominfo = parse_doms_info(server.xend.domain(dom))
-        except xmlrpclib.Fault, ex:
-            raise ex
-    
-        domid = dominfo['domid']
-        server.xend.domain.save(domid, savefile, checkpoint)
+        server.xend.domain.save(dom, savefile, checkpoint)
     
 def xm_restore(args):
     arg_check(args, "restore", 1, 2)

@@ -1253,7 +1253,11 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
 
             if dominfo.getDomid() == DOM0_ID:
-                raise XendError("Cannot save privileged domain %i" % domid)
+                raise XendError("Cannot save privileged domain %s" % str(domid))
+            if dominfo._stateGet() != DOM_STATE_RUNNING:
+                raise VMBadState("Domain is not running",
+                                 POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
 
             oflags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
             if hasattr(os, "O_LARGEFILE"):
