@@ -107,6 +107,7 @@ class NetifController(DevController):
         uuid    = config.get('uuid')
         ipaddr  = config.get('ip')
         model   = config.get('model')
+        accel   = config.get('accel')
 
         if not typ:
             typ = xoptions.netback_type
@@ -131,6 +132,8 @@ class NetifController(DevController):
             back['uuid'] = uuid
         if model:
             back['model'] = model
+        if accel:
+            back['accel'] = accel
 
         config_path = "device/%s/%d/" % (self.deviceClass, devid)
         for x in back:
@@ -157,10 +160,10 @@ class NetifController(DevController):
         config_path = "device/%s/%d/" % (self.deviceClass, devid)
         devinfo = ()
         for x in ( 'script', 'ip', 'bridge', 'mac',
-                   'type', 'vifname', 'rate', 'uuid', 'model' ):
+                   'type', 'vifname', 'rate', 'uuid', 'model', 'accel'):
             y = self.vm._readVm(config_path + x)
             devinfo += (y,)
-        (script, ip, bridge, mac, typ, vifname, rate, uuid, model) = devinfo
+        (script, ip, bridge, mac, typ, vifname, rate, uuid, model, accel) = devinfo
 
         if script:
             result['script'] = script
@@ -180,5 +183,7 @@ class NetifController(DevController):
             result['uuid'] = uuid
         if model:
             result['model'] = model
+        if accel:
+            result['accel'] = accel
             
         return result

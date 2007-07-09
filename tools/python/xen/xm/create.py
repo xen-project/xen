@@ -710,7 +710,7 @@ def configure_vifs(config_devs, vals):
 
         def f(k):
             if k not in ['backend', 'bridge', 'ip', 'mac', 'script', 'type',
-                         'vifname', 'rate', 'model']:
+                         'vifname', 'rate', 'model', 'accel']:
                 err('Invalid vif option: ' + k)
 
             config_vif.append([k, d[k]])
