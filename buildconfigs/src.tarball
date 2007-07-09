@@ -6,7 +6,7 @@ XEN_LINUX_TARBALL_KETCHUP ?= n
 
 LINUX_SRCDIR ?= linux-$(LINUX_VER)
 
-KETCHUP ?= buildconfigs/ketchup
+KETCHUP ?= python buildconfigs/ketchup
 
 vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 

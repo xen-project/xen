@@ -67,6 +67,9 @@
 ^linux-[^/]*-xen0/.*$
 ^linux-[^/]*-xenU/.*$
 ^linux-[^/]*-paravirt/.*$
+^linux-[^/]*-mm/.*$
+^linux-[^/]*-rc/.*$
+^linux-[^/]*-tip/.*$
 ^linux-[^/]*\.patch$
 ^mkddbxen$
 ^netbsd-[^/]*-tools/.*$
