@@ -488,6 +488,9 @@ class XendDomainInfo:
 
     def send_sysrq(self, key):
         """ Send a Sysrq equivalent key via xenstored."""
+        if self._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            raise XendError("Domain '%s' is not started" % self.info['name_label'])
+
         asserts.isCharConvertible(key)
         self.storeDom("control/sysrq", '%c' % key)
 
