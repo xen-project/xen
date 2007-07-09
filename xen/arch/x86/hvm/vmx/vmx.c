@@ -2153,7 +2153,7 @@ static int vmx_assist(struct vcpu *v, int mode)
             goto error;
         if ( cp != 0 ) {
             vmx_world_save(v, &c);
-            if ( hvm_copy_to_guest_phys(cp, &c, sizeof(c)))
+            if ( hvm_copy_to_guest_phys(cp, &c, sizeof(c)) )
                 goto error;
         }
 
@@ -2220,7 +2220,7 @@ static int vmx_set_cr0(unsigned long value)
     /* ET is reserved and should be always be 1. */
     value |= X86_CR0_ET;
 
-    if ( (value & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG )
+    if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
     {
         vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
         return 0;
@@ -2253,12 +2253,11 @@ static int vmx_set_cr0(unsigned long value)
                 HVM_DBG_LOG(DBG_LEVEL_1, "Guest enabled paging "
                             "with EFER.LME set but not CR4.PAE");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+                return 0;
             }
-            else
-            {
-                HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
-                vmx_enable_long_mode(v);
-            }
+
+            HVM_DBG_LOG(DBG_LEVEL_1, "Enabling long mode");
+            vmx_enable_long_mode(v);
         }
 
         /*
@@ -2312,8 +2311,8 @@ static int vmx_set_cr0(unsigned long value)
      */
     if ( (value & X86_CR0_PE) == 0 )
     {
-        if ( value & X86_CR0_PG ) {
-            /* inject GP here */
+        if ( value & X86_CR0_PG )
+        {
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
             return 0;
         }
@@ -2408,7 +2407,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         /*
          * If paging is not enabled yet, simply copy the value to CR3.
          */
-        if ( !vmx_paging_enabled(v) ) {
+        if ( !vmx_paging_enabled(v) )
+        {
             v->arch.hvm_vmx.cpu_cr3 = value;
             break;
         }
@@ -2454,7 +2454,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                         "Guest attempts to set reserved bit in CR4: %lx",
                         value);
             vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
-            break;
+            return 0;
         }
 
         if ( (value & X86_CR4_PAE) && !(old_cr & X86_CR4_PAE) )
@@ -2472,7 +2472,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 /*
                  * Now arch.guest_table points to machine physical.
                  */
-
                 old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
                 v->arch.guest_table = pagetable_from_pfn(mfn);
                 if ( old_base_mfn )
@@ -2494,6 +2493,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 HVM_DBG_LOG(DBG_LEVEL_1, "Guest cleared CR4.PAE while "
                             "EFER.LMA is set");
                 vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+                return 0;
             }
         }
 
