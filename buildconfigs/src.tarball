@@ -19,5 +19,4 @@ linux-%.tar.bz2:
 	-@rm -f tmp-linux-$*/pax_global_header
 	mv tmp-linux-$*/* $(@D)
 	@rm -rf tmp-linux-$*
-	touch $(@D)/.hgskip
 	touch $@ # update timestamp to avoid rebuild
