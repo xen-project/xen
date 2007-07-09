@@ -174,6 +174,23 @@ class NetworkError(XendAPIError):
 
     def __str__(self):
         return 'NETWORK_ERROR: %s %s' % (self.error, self.network)
+
+from xen.util.xsconstants import xserr2string
+
+class SecurityError(XendAPIError):
+    def __init__(self, error, message=None):
+        XendAPIError.__init__(self)
+        self.error = error
+        if not message:
+            self.message = xserr2string(-error)
+        else:
+            self.message = message
+
+    def get_api_error(self):
+        return ['SECURITY_ERROR', self.error, self.message]
+
+    def __str__(self):
+        return 'SECURITY_ERROR: %s:%s' % (self.error, self.message)
     
 XEND_ERROR_AUTHENTICATION_FAILED = ('ELUSER', 'Authentication Failed')
 XEND_ERROR_SESSION_INVALID       = ('EPERMDENIED', 'Session Invalid')
@@ -188,4 +205,5 @@ XEND_ERROR_VIF_INVALID           = ('EVIFINVALID', 'VIF Invalid')
 XEND_ERROR_VTPM_INVALID          = ('EVTPMINVALID', 'VTPM Invalid')
 XEND_ERROR_VDI_INVALID           = ('EVDIINVALID', 'VDI Invalid')
 XEND_ERROR_SR_INVALID           = ('ESRINVALID', 'SR Invalid')
+XEND_ERROR_XSPOLICY_INVALID      = ('EXSPOLICYINVALID', 'XS Invalid')
 XEND_ERROR_TODO                  = ('ETODO', 'Lazy Programmer Error')

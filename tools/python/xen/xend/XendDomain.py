@@ -49,7 +49,7 @@ from xen.xend.XendAPIConstants import *
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
-from xen.util import mkdir, security
+from xen.util import mkdir
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
@@ -486,7 +486,6 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
-            security.refresh_ssidref(config)
             dominfo = XendDomainInfo.restore(config)
             return dominfo
         finally:

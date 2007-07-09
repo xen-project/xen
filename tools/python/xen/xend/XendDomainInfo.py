@@ -830,6 +830,9 @@ class XendDomainInfo:
             else:
                 f('image/%s' % n, v)
 
+        if self.info.has_key('security_label'):
+            f('security_label', self.info['security_label'])
+
         to_store.update(self._vcpuDomDetails())
 
         log.debug("Storing domain details: %s", scrub_password(to_store))
@@ -999,9 +1002,6 @@ class XendDomainInfo:
             xen.xend.XendDomain.instance().managed_config_save(self)
         log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
                  vcpus)
-
-    def getLabel(self):
-        return security.get_security_info(self.info, 'label')
 
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
@@ -1446,11 +1446,20 @@ class XendDomainInfo:
         # allocation of 1MB. We free up 2MB here to be on the safe side.
         balloon.free(2*1024) # 2MB should be plenty
 
-        self.domid = xc.domain_create(
-            domid = 0,
-            ssidref = security.get_security_info(self.info, 'ssidref'),
-            handle = uuid.fromString(self.info['uuid']),
-            hvm = int(hvm))
+        ssidref = security.calc_dom_ssidref_from_info(self.info)
+        if ssidref == 0 and security.on():
+            raise VmError('VM is not properly labeled.')
+
+        try:
+            self.domid = xc.domain_create(
+                domid = 0,
+                ssidref = ssidref,
+                handle = uuid.fromString(self.info['uuid']),
+                hvm = int(hvm))
+        except Exception, e:
+            # may get here if due to ACM the operation is not permitted
+            if security.on():
+                raise VmError('Domain in conflict set with running domain?')
 
         if self.domid < 0:
             raise VmError('Creating domain failed: name=%s' %
@@ -1966,24 +1975,6 @@ class XendDomainInfo:
         if image_sxpr:
             to_store['image'] = sxp.to_string(image_sxpr)
 
-        if self._infoIsSet('security'):
-            secinfo = self.info['security']
-            to_store['security'] = sxp.to_string(secinfo)
-            for idx in range(0, len(secinfo)):
-                if secinfo[idx][0] == 'access_control':
-                    to_store['security/access_control'] = sxp.to_string(
-                        [secinfo[idx][1], secinfo[idx][2]])
-                    for aidx in range(1, len(secinfo[idx])):
-                        if secinfo[idx][aidx][0] == 'label':
-                            to_store['security/access_control/label'] = \
-                                secinfo[idx][aidx][1]
-                        if secinfo[idx][aidx][0] == 'policy':
-                            to_store['security/access_control/policy'] = \
-                                secinfo[idx][aidx][1]
-                if secinfo[idx][0] == 'ssidref':
-                    to_store['security/ssidref'] = str(secinfo[idx][1])
-
-
         if not self._readVm('xend/restart_count'):
             to_store['xend/restart_count'] = str(0)
 
@@ -2101,15 +2092,6 @@ class XendDomainInfo:
             info["maxmem_kb"] = XendNode.instance() \
                                 .physinfo_dict()['total_memory'] * 1024
 
-        #manually update ssidref / security fields
-        if security.on() and info.has_key('ssidref'):
-            if (info['ssidref'] != 0) and self.info.has_key('security'):
-                security_field = self.info['security']
-                if not security_field:
-                    #create new security element
-                    self.info.update({'security':
-                                      [['ssidref', str(info['ssidref'])]]})
-                    
         #ssidref field not used any longer
         if 'ssidref' in info:
             info.pop('ssidref')
@@ -2193,7 +2175,133 @@ class XendDomainInfo:
         return self.info.get('tools_version', {})
     def get_metrics(self):
         return self.metrics.get_uuid();
-    
+
+
+    def get_security_label(self):
+        domid = self.getDomid()
+
+        from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+        xspol = XSPolicyAdminInstance().get_loaded_policy()
+
+        if domid == 0:
+            if xspol:
+                label = xspol.policy_get_domain_label_formatted(domid)
+            else:
+                label = ""
+        else:
+            label = self.info.get('security_label', '')
+        return label
+
+    def set_security_label(self, seclab, old_seclab, xspol=None):
+        """
+           Set the security label of a domain from its old to
+           a new value.
+           @param seclab  New security label formatted in the form
+                          <policy type>:<policy name>:<vm label>
+           @param old_seclab  The current security label that the
+                          VM must have.
+           @param xspol   An optional policy under which this
+                          update should be done. If not given,
+                          then the current active policy is used.
+           @return Returns return code, a string with errors from
+                   the hypervisor's operation, old label of the
+                   domain
+        """
+        rc = 0
+        errors = ""
+        old_label = ""
+        new_ssidref = 0
+        domid = self.getDomid()
+        res_labels = None
+
+        from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+        from xen.util import xsconstants
+
+        state = self._stateGet()
+        # Relabel only HALTED or RUNNING or PAUSED domains
+        if domid != 0 and \
+           state not in \
+              [ DOM_STATE_HALTED, DOM_STATE_RUNNING, DOM_STATE_PAUSED, \
+                DOM_STATE_SUSPENDED ]:
+            log.warn("Relabeling domain not possible in state '%s'" %
+                     DOM_STATES[state])
+            return (-xsconstants.XSERR_VM_WRONG_STATE, "", "", 0)
+
+        # Remove security label. Works only for halted domains
+        if not seclab or seclab == "":
+            if state not in [ DOM_STATE_HALTED ]:
+                return (-xsconstants.XSERR_VM_WRONG_STATE, "", "", 0)
+
+            if self.info.has_key('security_label'):
+                old_label = self.info['security_label']
+                # Check label against expected one.
+                if old_label != old_seclab:
+                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+                del self.info['security_label']
+                xen.xend.XendDomain.instance().managed_config_save(self)
+                return (xsconstants.XSERR_SUCCESS, "", "", 0)
+
+        tmp = seclab.split(":")
+        if len(tmp) != 3:
+            return (-xsconstants.XSERR_BAD_LABEL_FORMAT, "", "", 0)
+        typ, policy, label = tmp
+
+        poladmin = XSPolicyAdminInstance()
+        if not xspol:
+            xspol = poladmin.get_policy_by_name(policy)
+
+        if state in [ DOM_STATE_RUNNING, DOM_STATE_PAUSED ]:
+            #if domain is running or paused try to relabel in hypervisor
+            if not xspol:
+                return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
+
+            if typ != xspol.get_type_name() or \
+               policy != xspol.get_name():
+                return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+            if typ == xsconstants.ACM_POLICY_ID:
+                new_ssidref = xspol.vmlabel_to_ssidref(label)
+                if new_ssidref == xsconstants.INVALID_SSIDREF:
+                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                # Check that all used resources are accessible under the
+                # new label
+                if not security.resources_compatible_with_vmlabel(xspol,
+                          self, label):
+                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                #Check label against expected one.
+                old_label = self.get_security_label()
+                if old_label != old_seclab:
+                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                # relabel domain in the hypervisor
+                rc, errors = security.relabel_domains([[domid, new_ssidref]])
+                log.info("rc from relabeling in HV: %d" % rc)
+            else:
+                return (-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED, "", "", 0)
+
+        if rc == 0:
+            # HALTED, RUNNING or PAUSED
+            if domid == 0:
+                if xspol:
+                    ssidref = poladmin.set_domain0_bootlabel(xspol, label)
+                else:
+                    return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
+            else:
+                if self.info.has_key('security_label'):
+                    old_label = self.info['security_label']
+                    # Check label against expected one, unless wildcard
+                    if old_label != old_seclab:
+                        return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                self.info['security_label'] = seclab
+                try:
+                    xen.xend.XendDomain.instance().managed_config_save(self)
+                except:
+                    pass
+        return (rc, errors, old_label, new_ssidref)
+
     def get_on_shutdown(self):
         after_shutdown = self.info.get('actions_after_shutdown')
         if not after_shutdown or after_shutdown not in XEN_API_ON_NORMAL_EXIT:

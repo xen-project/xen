@@ -30,6 +30,8 @@ from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendConstants import DOM_STATE_HALTED
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number
+from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
+from xen.util import xsconstants
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -160,6 +162,7 @@ XENAPI_CFG_TYPES = {
     'platform': dict,
     'tools_version': dict,
     'other_config': dict,
+    'security_label': str,
 }
 
 # List of legacy configuration keys that have no equivalent in the
@@ -168,7 +171,6 @@ XENAPI_CFG_TYPES = {
 LEGACY_UNSUPPORTED_BY_XENAPI_CFG = [
     # roundtripped (dynamic, unmodified)
     'shadow_memory',
-    'security',
     'vcpu_avail',
     'cpu_weight',
     'cpu_cap',
@@ -319,7 +321,6 @@ class XendConfig(dict):
             'memory_static_max': 0,
             'memory_dynamic_max': 0,
             'devices': {},
-            'security': None,
             'on_xend_start': 'ignore',
             'on_xend_stop': 'ignore',
             'cpus': [],
@@ -425,9 +426,10 @@ class XendConfig(dict):
             self._memory_sanity_check()
 
         self['cpu_time'] = dominfo['cpu_time']/1e9
-        # TODO: i don't know what the security stuff expects here
         if dominfo.get('ssidref'):
-            self['security'] = [['ssidref', dominfo['ssidref']]]
+            ssidref = int(dominfo.get('ssidref'))
+            self['security_label'] = XSPolicyAdminInstance().ssidref_to_vmlabel(ssidref)
+
         self['shutdown_reason'] = dominfo['shutdown_reason']
 
         # parse state into Xen API states
@@ -634,8 +636,26 @@ class XendConfig(dict):
                 except ValueError, e:
                     raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
-        if 'security' in cfg and isinstance(cfg['security'], str):
-            cfg['security'] = sxp.from_string(cfg['security'])
+        if 'security' in cfg and not cfg.get('security_label'):
+            secinfo = cfg['security']
+            if isinstance(secinfo, list):
+                # The xm command sends a list formatted like this:
+                # [['access_control', ['policy', 'xm-test'],['label', 'red']],
+                #                     ['ssidref', 196611]]
+                policy = ""
+                label = ""
+                policytype = xsconstants.ACM_POLICY_ID
+                for idx in range(0, len(secinfo)):
+                    if secinfo[idx][0] == "access_control":
+                        for aidx in range(1, len(secinfo[idx])):
+                            if secinfo[idx][aidx][0] == "policy":
+                                policy = secinfo[idx][aidx][1]
+                            if secinfo[idx][aidx][0] == "label":
+                                label  = secinfo[idx][aidx][1]
+                if label != "" and policy != "":
+                    cfg['security_label'] = "%s:%s:%s" % \
+                            (policytype, policy, label)
+                    del cfg['security']
 
         old_state = sxp.child_value(sxp_cfg, 'state')
         if old_state:
@@ -778,7 +798,6 @@ class XendConfig(dict):
                     self[sxp_arg] = val
 
         _set_cfg_if_exists('shadow_memory')
-        _set_cfg_if_exists('security')
         _set_cfg_if_exists('features')
         _set_cfg_if_exists('on_xend_stop')
         _set_cfg_if_exists('on_xend_start')
@@ -890,6 +909,9 @@ class XendConfig(dict):
                 continue
             if self.has_key(legacy) and self[legacy] not in (None, []):
                 sxpr.append([legacy, self[legacy]])
+
+        if self.has_key('security_label'):
+            sxpr.append(['security_label', self['security_label']])
 
         sxpr.append(['image', self.image_sxpr()])
         sxpr.append(['status', domain._stateGet()])

@@ -23,6 +23,7 @@ import os
 
 from xen.util.xmlrpclib2 import stringify
 from xmlrpclib import dumps, loads
+from xen.util import security, xsconstants
 
 KB = 1024
 MB = 1024 * 1024
@@ -160,6 +161,17 @@ class XendVDI(AutoSaveObject):
 
     def get_location(self):
         raise NotImplementedError()
+
+    def set_security_label(self, sec_lab, old_lab):
+        image = self.get_location()
+        rc = security.set_resource_label_xapi(image, sec_lab, old_lab)
+        if rc != xsconstants.XSERR_SUCCESS:
+            raise SecurityError(rc)
+        return rc
+
+    def get_security_label(self):
+        image = self.get_location()
+        return security.get_resource_label_xapi(image)
                 
 
 class XendQCoWVDI(XendVDI):
