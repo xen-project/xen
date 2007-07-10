@@ -158,7 +158,7 @@ void vmx_init_vmcs_config(void)
 #endif
 
     /* Require Write-Back (WB) memory type for VMCS accesses. */
-    BUG_ON(((vmx_msr_high >> 18) & 15) == 6);
+    BUG_ON(((vmx_msr_high >> 18) & 15) != 6);
 }
 
 static struct vmcs_struct *vmx_alloc_vmcs(void)
