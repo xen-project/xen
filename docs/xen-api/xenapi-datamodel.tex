@@ -225,6 +225,249 @@ The following enumeration types are used:
 \end{longtable}
 
 \vspace{1cm}
+\newpage
+\section{Error Handling}
+When a low-level transport error occurs, or a request is malformed at the HTTP
+or XML-RPC level, the server may send an XML-RPC Fault response, or the client
+may simulate the same.  The client must be prepared to handle these errors,
+though they may be treated as fatal.  On the wire, these are transmitted in a
+form similar to this:
+
+\begin{verbatim}
+    <methodResponse>
+      <fault>
+        <value>
+          <struct>
+            <member>
+                <name>faultCode</name>
+                <value><int>-1</int></value>
+              </member>
+              <member>
+                <name>faultString</name>
+                <value><string>Malformed request</string></value>
+            </member>
+          </struct>
+        </value>
+      </fault>
+    </methodResponse>
+\end{verbatim}
+
+All other failures are reported with a more structured error response, to
+allow better automatic response to failures, proper internationalisation of
+any error message, and easier debugging.  On the wire, these are transmitted
+like this:
+
+\begin{verbatim}
+    <struct>
+      <member>
+        <name>Status</name>
+        <value>Failure</value>
+      </member>
+      <member>
+        <name>ErrorDescription</name>
+        <value>
+          <array>
+            <data>
+              <value>MAP_DUPLICATE_KEY</value>
+              <value>Customer</value>
+              <value>eSpeil Inc.</value>
+              <value>eSpeil Incorporated</value>
+            </data>
+          </array>
+        </value>
+      </member>
+    </struct>
+\end{verbatim}
+
+Note that {\tt ErrorDescription} value is an array of string values. The
+first element of the array is an error code; the remainder of the array are
+strings representing error parameters relating to that code.  In this case,
+the client has attempted to add the mapping {\tt Customer $\rightarrow$
+eSpiel Incorporated} to a Map, but it already contains the mapping
+{\tt Customer $\rightarrow$ eSpiel Inc.}, and so the request has failed.
+
+The reference below lists each possible error returned by each method.
+As well as the errors explicitly listed, any method may return low-level
+errors as described above, or any of the following generic errors:
+
+\begin{itemize}
+\item HANDLE\_INVALID
+\item INTERNAL\_ERROR
+\item MAP\_DUPLICATE\_KEY
+\item MESSAGE\_METHOD\_UNKNOWN
+\item MESSAGE\_PARAMETER\_COUNT\_MISMATCH
+\item OPERATION\_NOT\_ALLOWED
+\item PERMISSION\_DENIED
+\item SESSION\_INVALID
+\end{itemize}
+
+Each possible error code is documented in the following section.
+
+\subsection{Error Codes}
+
+\subsubsection{HANDLE\_INVALID}
+
+You gave an invalid handle.  The object may have recently been deleted. 
+The class parameter gives the type of reference given, and the handle
+parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}HANDLE_INVALID(class, handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{INTERNAL\_ERROR}
+
+The server failed to handle your request, due to an internal error.  The
+given message may give details useful for debugging the problem.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MAP\_DUPLICATE\_KEY}
+
+You tried to add a key-value pair to a map, but that key is already there. 
+The key, current value, and the new value that you tried to set are all
+echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MESSAGE\_METHOD\_UNKNOWN}
+
+You tried to call a method that does not exist.  The method name that you
+used is echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
+
+You tried to call a method with the incorrect number of parameters.  The
+fully-qualified method name that you used, and the number of received and
+expected parameters are returned.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{NETWORK\_ALREADY\_CONNECTED}
+
+You tried to create a PIF, but the network you tried to attach it to is
+already attached to some other PIF, and so the creation failed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{OPERATION\_NOT\_ALLOWED}
+
+You attempted an operation that was not allowed.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{PERMISSION\_DENIED}
+
+You do not have the required permissions to perform the operation.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{PIF\_IS\_PHYSICAL}
+
+You tried to destroy a PIF, but it represents an aspect of the physical
+host configuration, and so cannot be destroyed.  The parameter echoes the
+PIF handle you gave.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_AUTHENTICATION\_FAILED}
+
+The credentials given by the user are incorrect, so access has been denied,
+and you have not been issued a session handle.
+
+\vspace{0.3cm}
+No parameters.
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_INVALID}
+
+You gave an invalid session handle.  It may have been invalidated by a
+server restart, or timed out.  You should get a new session handle, using
+one of the session.login\_ calls.  This error does not invalidate the
+current connection.  The handle parameter echoes the bad value given.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{SESSION\_NOT\_REGISTERED}
+
+This session is not registered to receive events.  You must call
+event.register before event.next.  The session handle you are using is
+echoed.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}SESSION_NOT_REGISTERED(handle)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VALUE\_NOT\_SUPPORTED}
+
+You attempted to set a value that is not supported by this implementation. 
+The fully-qualified field name and the value that you tried to set are
+returned.  Also returned is a developer-only diagnostic reason.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VLAN\_TAG\_INVALID}
+
+You tried to create a VLAN, but the tag you gave was invalid -- it mmust be
+between 0 and 4095.  The parameter echoes the VLAN tag you gave.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VLAN_TAG_INVALID(VLAN)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_BAD\_POWER\_STATE}
+
+You attempted an operation on a VM that was not in an appropriate power
+state at the time; for example, you attempted to start a VM that was
+already running.  The parameters returned are the VM's handle, and the
+expected and actual VM state at the time of the call.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{VM\_HVM\_REQUIRED}
+
+HVM is required for this operation
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
 
 \newpage
 \section{Class: session}
@@ -275,6 +518,11 @@ session ref
 
 
 ID of newly created session
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt SESSION\_AUTHENTICATION\_FAILED}
+
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
@@ -7100,7 +7348,9 @@ value of the field
 \subsubsection{RPC name:~get\_flags}
 
 {\bf Overview:} 
-Get the flags field of the given host\_cpu.
+Get the flags field of the given host\_cpu.  As of this version of the
+API, the semantics of the returned string are explicitly unspecified,
+and may change in the future.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_flags (session_id s, host_cpu ref self)\end{verbatim}
@@ -7132,7 +7382,9 @@ value of the field
 \subsubsection{RPC name:~get\_features}
 
 {\bf Overview:} 
-Get the features field of the given host\_cpu.
+Get the features field of the given host\_cpu. As of this version of the
+API, the semantics of the returned string are explicitly unspecified,
+and may change in the future.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} string get_features (session_id s, host_cpu ref self)\end{verbatim}
@@ -14192,224 +14444,3 @@ all fields from the object
 \vspace{0.3cm}
 \vspace{0.3cm}
 
-\vspace{1cm}
-\newpage
-\section{Error Handling}
-When a low-level transport error occurs, or a request is malformed at the HTTP
-or XML-RPC level, the server may send an XML-RPC Fault response, or the client
-may simulate the same.  The client must be prepared to handle these errors,
-though they may be treated as fatal.  On the wire, these are transmitted in a
-form similar to this:
-
-\begin{verbatim}
-    <methodResponse>
-      <fault>
-        <value>
-          <struct>
-            <member>
-                <name>faultCode</name>
-                <value><int>-1</int></value>
-              </member>
-              <member>
-                <name>faultString</name>
-                <value><string>Malformed request</string></value>
-            </member>
-          </struct>
-        </value>
-      </fault>
-    </methodResponse>
-\end{verbatim}
-
-All other failures are reported with a more structured error response, to
-allow better automatic response to failures, proper internationalisation of
-any error message, and easier debugging.  On the wire, these are transmitted
-like this:
-
-\begin{verbatim}
-    <struct>
-      <member>
-        <name>Status</name>
-        <value>Failure</value>
-      </member>
-      <member>
-        <name>ErrorDescription</name>
-        <value>
-          <array>
-            <data>
-              <value>MAP_DUPLICATE_KEY</value>
-              <value>Customer</value>
-              <value>eSpeil Inc.</value>
-              <value>eSpeil Incorporated</value>
-            </data>
-          </array>
-        </value>
-      </member>
-    </struct>
-\end{verbatim}
-
-Note that {\tt ErrorDescription} value is an array of string values. The
-first element of the array is an error code; the remainder of the array are
-strings representing error parameters relating to that code.  In this case,
-the client has attempted to add the mapping {\tt Customer $\rightarrow$
-eSpiel Incorporated} to a Map, but it already contains the mapping
-{\tt Customer $\rightarrow$ eSpiel Inc.}, and so the request has failed.
-
-Each possible error code is documented in the following section.
-
-\subsection{Error Codes}
-
-\subsubsection{HANDLE\_INVALID}
-
-You gave an invalid handle.  The object may have recently been deleted. 
-The class parameter gives the type of reference given, and the handle
-parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}HANDLE_INVALID(class, handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{INTERNAL\_ERROR}
-
-The server failed to handle your request, due to an internal error.  The
-given message may give details useful for debugging the problem.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}INTERNAL_ERROR(message)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{MAP\_DUPLICATE\_KEY}
-
-You tried to add a key-value pair to a map, but that key is already there. 
-The key, current value, and the new value that you tried to set are all
-echoed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}MAP_DUPLICATE_KEY(key, current value, new value)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{MESSAGE\_METHOD\_UNKNOWN}
-
-You tried to call a method that does not exist.  The method name that you
-used is echoed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}MESSAGE_METHOD_UNKNOWN(method)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{MESSAGE\_PARAMETER\_COUNT\_MISMATCH}
-
-You tried to call a method with the incorrect number of parameters.  The
-fully-qualified method name that you used, and the number of received and
-expected parameters are returned.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}MESSAGE_PARAMETER_COUNT_MISMATCH(method, expected, received)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{NETWORK\_ALREADY\_CONNECTED}
-
-You tried to create a PIF, but the network you tried to attach it to is
-already attached to some other PIF, and so the creation failed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}NETWORK_ALREADY_CONNECTED(network, connected PIF)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{OPERATION\_NOT\_ALLOWED}
-
-You attempted an operation that was not allowed.
-
-\vspace{0.3cm}
-No parameters.
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{PIF\_IS\_PHYSICAL}
-
-You tried to destroy a PIF, but it represents an aspect of the physical
-host configuration, and so cannot be destroyed.  The parameter echoes the
-PIF handle you gave.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}PIF_IS_PHYSICAL(PIF)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{SESSION\_AUTHENTICATION\_FAILED}
-
-The credentials given by the user are incorrect, so access has been denied,
-and you have not been issued a session handle.
-
-\vspace{0.3cm}
-No parameters.
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{SESSION\_INVALID}
-
-You gave an invalid session handle.  It may have been invalidated by a
-server restart, or timed out.  You should get a new session handle, using
-one of the session.login\_ calls.  This error does not invalidate the
-current connection.  The handle parameter echoes the bad value given.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}SESSION_INVALID(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{SESSION\_NOT\_REGISTERED}
-
-This session is not registered to receive events.  You must call
-event.register before event.next.  The session handle you are using is
-echoed.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}SESSION_NOT_REGISTERED(handle)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VALUE\_NOT\_SUPPORTED}
-
-You attempted to set a value that is not supported by this implementation. 
-The fully-qualified field name and the value that you tried to set are
-returned.  Also returned is a developer-only diagnostic reason.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VALUE_NOT_SUPPORTED(field, value, reason)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VLAN\_TAG\_INVALID}
-
-You tried to create a VLAN, but the tag you gave was invalid -- it mmust be
-between 0 and 4095.  The parameter echoes the VLAN tag you gave.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VLAN_TAG_INVALID(VLAN)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_BAD\_POWER\_STATE}
-
-You attempted an operation on a VM that was not in an appropriate power
-state at the time; for example, you attempted to start a VM that was
-already running.  The parameters returned are the VM's handle, and the
-expected and actual VM state at the time of the call.
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_BAD_POWER_STATE(vm, expected, actual)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
-
-\subsubsection{VM\_HVM\_REQUIRED}
-
-HVM is required for this operation
-
-\vspace{0.3cm}
-{\bf Signature:}
-\begin{verbatim}VM_HVM_REQUIRED(vm)\end{verbatim}
-\begin{center}\rule{10em}{0.1pt}\end{center}
