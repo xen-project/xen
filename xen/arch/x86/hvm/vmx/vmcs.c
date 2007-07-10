@@ -247,55 +247,27 @@ void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
     vmx_free_vmcs(vmcs);
 }
 
-#define GUEST_SEGMENT_LIMIT     0xffffffff
-
-struct host_execution_env {
-    /* selectors */
-    unsigned short ldtr_selector;
-    unsigned short tr_selector;
-    unsigned short ds_selector;
-    unsigned short cs_selector;
-    /* limits */
-    unsigned short gdtr_limit;
-    unsigned short ldtr_limit;
-    unsigned short idtr_limit;
-    unsigned short tr_limit;
-    /* base */
-    unsigned long gdtr_base;
-    unsigned long ldtr_base;
-    unsigned long idtr_base;
-    unsigned long tr_base;
-    unsigned long ds_base;
-    unsigned long cs_base;
-#ifdef __x86_64__
-    unsigned long fs_base;
-    unsigned long gs_base;
-#endif
+struct xgt_desc {
+    unsigned short size;
+    unsigned long address __attribute__((packed));
 };
 
 static void vmx_set_host_env(struct vcpu *v)
 {
     unsigned int tr, cpu;
-    struct host_execution_env host_env;
-    struct Xgt_desc_struct desc;
+    struct xgt_desc desc;
 
     cpu = smp_processor_id();
-    __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
-    host_env.idtr_limit = desc.size;
-    host_env.idtr_base = desc.address;
-    __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
 
-    __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
-    host_env.gdtr_limit = desc.size;
-    host_env.gdtr_base = desc.address;
-    __vmwrite(HOST_GDTR_BASE, host_env.gdtr_base);
+    __asm__ __volatile__ ( "sidt (%0) \n" : : "a" (&desc) : "memory" );
+    __vmwrite(HOST_IDTR_BASE, desc.address);
 
-    __asm__ __volatile__ ("str  (%0) \n" :: "a"(&tr) : "memory");
-    host_env.tr_selector = tr;
-    host_env.tr_limit = sizeof(struct tss_struct);
-    host_env.tr_base = (unsigned long) &init_tss[cpu];
-    __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
-    __vmwrite(HOST_TR_BASE, host_env.tr_base);
+    __asm__ __volatile__ ( "sgdt (%0) \n" : : "a" (&desc) : "memory" );
+    __vmwrite(HOST_GDTR_BASE, desc.address);
+
+    __asm__ __volatile__ ( "str (%0) \n" : : "a" (&tr) : "memory" );
+    __vmwrite(HOST_TR_SELECTOR, tr);
+    __vmwrite(HOST_TR_BASE, (unsigned long)&init_tss[cpu]);
 
     /*
      * Skip end of cpu_user_regs when entering the hypervisor because the
@@ -305,6 +277,8 @@ static void vmx_set_host_env(struct vcpu *v)
     __vmwrite(HOST_RSP,
               (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
+
+#define GUEST_SEGMENT_LIMIT     0xffffffff
 
 static void construct_vmcs(struct vcpu *v)
 {
