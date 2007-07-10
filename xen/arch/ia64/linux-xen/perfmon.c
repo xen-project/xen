@@ -7729,7 +7729,7 @@ do_perfmon_op(unsigned long cmd,
 {
 	unsigned long error = 0;
 
-	if (!NONPRIV_OP(cmd) && current->domain != xenoprof_primary_profiler) {
+	if (!NONPRIV_OP(cmd) && current->domain->domain_id !=0) {
 		gdprintk(XENLOG_INFO, "xen perfmon: "
 			 "dom %d denied privileged operation %ld\n",
 			 current->domain->domain_id, cmd);

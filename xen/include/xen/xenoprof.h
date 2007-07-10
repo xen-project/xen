@@ -69,6 +69,4 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
 int xenoprof_add_trace(struct domain *d, struct vcpu *v, 
                        unsigned long eip, int mode);
 
-extern struct domain *xenoprof_primary_profiler;
-
 #endif  /* __XEN__XENOPROF_H__ */
