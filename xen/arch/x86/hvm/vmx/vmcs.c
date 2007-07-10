@@ -151,6 +151,14 @@ void vmx_init_vmcs_config(void)
 
     /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
     BUG_ON((vmx_msr_high & 0x1fff) > PAGE_SIZE);
+
+#ifdef __x86_64__
+    /* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
+    BUG_ON(vmx_msr_high & (1u<<16));
+#endif
+
+    /* Require Write-Back (WB) memory type for VMCS accesses. */
+    BUG_ON(((vmx_msr_high >> 18) & 15) == 6);
 }
 
 static struct vmcs_struct *vmx_alloc_vmcs(void)
@@ -422,11 +430,8 @@ static void construct_vmcs(struct vcpu *v)
 
     if ( cpu_has_vmx_tpr_shadow )
     {
-        paddr_t virt_page_ma = page_to_maddr(vcpu_vlapic(v)->regs_page);
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
-#if defined (CONFIG_X86_PAE)
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
-#endif
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR,
+                  page_to_maddr(vcpu_vlapic(v)->regs_page));
         __vmwrite(TPR_THRESHOLD, 0);
     }
 

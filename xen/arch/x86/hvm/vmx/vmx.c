@@ -2718,7 +2718,7 @@ static void vmx_free_vlapic_mapping(struct domain *d)
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
 {
-    paddr_t virt_page_ma, apic_page_ma;
+    unsigned long virt_page_ma, apic_page_ma;
 
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return;
@@ -2730,10 +2730,6 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
     vmx_vmcs_enter(v);
     __vmwrite(VIRTUAL_APIC_PAGE_ADDR, virt_page_ma);
     __vmwrite(APIC_ACCESS_ADDR, apic_page_ma);
-#if defined (CONFIG_X86_PAE)
-    __vmwrite(VIRTUAL_APIC_PAGE_ADDR_HIGH, virt_page_ma >> 32);
-    __vmwrite(APIC_ACCESS_ADDR_HIGH, apic_page_ma >> 32);
-#endif
     vmx_vmcs_exit(v);
 }
 
