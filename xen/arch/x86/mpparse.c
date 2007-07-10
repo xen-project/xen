@@ -1001,12 +1001,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 	mp_bus_id_to_type[MP_ISA_BUS] = MP_BUS_ISA;
 	Dprintk("Bus #%d is ISA\n", MP_ISA_BUS);
 
-	/*
-	 * Older generations of ES7000 have no legacy identity mappings
-	 */
-	if (es7000_plat == 1)
-		return;
-
 	/* 
 	 * Locate the IOAPIC that manages the ISA IRQs (0-15). 
 	 */

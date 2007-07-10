@@ -15,11 +15,10 @@
 #define clustered_apic_check (genapic->clustered_apic_check) 
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
 
-extern void es7000_sw_apic(void);
 static inline void enable_apic_mode(void)
 {
-	es7000_sw_apic();
-	return;
+	/* Not needed for modern ES7000 which boot in Virtual Wire mode. */
+	/*es7000_sw_apic();*/
 }
 
 #define apicid_to_node(apicid) ((int)apicid_to_node[(u8)apicid])
