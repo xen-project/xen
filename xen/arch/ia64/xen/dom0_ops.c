@@ -224,12 +224,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     return ret;
 }
 
-/*
- * Temporarily disable the NUMA PHYSINFO code until the rest of the
- * changes are upstream.
- */
-#undef IA64_NUMA_PHYSINFO
-
 long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
@@ -238,46 +232,47 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
     case XEN_SYSCTL_physinfo:
     {
-#ifdef IA64_NUMA_PHYSINFO
-        int i;
-        uint32_t *map, cpu_to_node_map[NR_CPUS];
-#endif
+        int i, node_cpus = 0;
+        uint32_t max_array_ent;
 
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
-        pi->threads_per_core =
-            cpus_weight(cpu_sibling_map[0]);
+        pi->threads_per_core = cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
         pi->nr_nodes         = num_online_nodes();
-        pi->sockets_per_node = num_online_cpus() / 
-            (pi->nr_nodes * pi->cores_per_socket * pi->threads_per_core);
+
+        /*
+         * Guess at a sockets_per_node value.  Use the maximum number of
+         * CPUs per node to avoid deconfigured CPUs breaking the average.
+         */
+        for_each_online_node(i)
+            node_cpus = max(node_cpus, cpus_weight(node_to_cpumask(i)));
+
+        pi->sockets_per_node = node_cpus / 
+            (pi->cores_per_socket * pi->threads_per_core);
+
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
-        //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
+
+        max_array_ent = pi->max_cpu_id;
+        pi->max_cpu_id = last_cpu(cpu_online_map);
+        max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
+
         ret = 0;
 
-#ifdef IA64_NUMA_PHYSINFO
-        /* fetch cpu_to_node pointer from guest */
-        get_xen_guest_handle(map, pi->cpu_to_node);
-
-        /* if set, fill out cpu_to_node array */
-        if (map != NULL) {
-            /* copy cpu to node mapping to domU */
-            memset(cpu_to_node_map, 0, sizeof(cpu_to_node_map));
-            for (i = 0; i < num_online_cpus(); i++) {
-                cpu_to_node_map[i] = cpu_to_node(i);
-                if (copy_to_guest_offset(pi->cpu_to_node, i,
-                                         &(cpu_to_node_map[i]), 1)) {
+        if (!guest_handle_is_null(pi->cpu_to_node)) {
+            for (i = 0; i <= max_array_ent; i++) {
+                uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
+                if (copy_to_guest_offset(pi->cpu_to_node, i, &node, 1)) {
                     ret = -EFAULT;
                     break;
                 }
             }
         }
-#endif
 
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
