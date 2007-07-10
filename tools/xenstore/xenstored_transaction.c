@@ -35,7 +35,6 @@
 #include "xenstored_domain.h"
 #include "xs_lib.h"
 #include "utils.h"
-#include "xenstored_test.h"
 
 struct changed_node
 {

@@ -179,12 +179,12 @@ unsigned long do_iret(void)
         goto exit_and_crash;
 
     /* Pop and restore EAX (clobbered by hypercall). */
-    if ( unlikely(__copy_from_user(&regs->eax, (void __user *)regs->esp, 4)) )
+    if ( unlikely(__copy_from_user(&regs->eax, (void *)regs->esp, 4)) )
         goto exit_and_crash;
     regs->esp += 4;
 
     /* Pop and restore CS and EIP. */
-    if ( unlikely(__copy_from_user(&regs->eip, (void __user *)regs->esp, 8)) )
+    if ( unlikely(__copy_from_user(&regs->eip, (void *)regs->esp, 8)) )
         goto exit_and_crash;
     regs->esp += 8;
 
@@ -192,7 +192,7 @@ unsigned long do_iret(void)
      * Pop, fix up and restore EFLAGS. We fix up in a local staging area
      * to avoid firing the BUG_ON(IOPL) check in arch_get_info_guest.
      */
-    if ( unlikely(__copy_from_user(&eflags, (void __user *)regs->esp, 4)) )
+    if ( unlikely(__copy_from_user(&eflags, (void *)regs->esp, 4)) )
         goto exit_and_crash;
     regs->esp += 4;
     regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
@@ -200,7 +200,7 @@ unsigned long do_iret(void)
     if ( vm86_mode(regs) )
     {
         /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
-        if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 24) )
+        if ( __copy_from_user(&regs->esp, (void *)regs->esp, 24) )
             goto exit_and_crash;
     }
     else if ( unlikely(ring_0(regs)) )
@@ -210,7 +210,7 @@ unsigned long do_iret(void)
     else if ( !ring_1(regs) )
     {
         /* Return to ring 2/3: pop and restore ESP and SS. */
-        if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 8) )
+        if ( __copy_from_user(&regs->esp, (void *)regs->esp, 8) )
             goto exit_and_crash;
     }
 

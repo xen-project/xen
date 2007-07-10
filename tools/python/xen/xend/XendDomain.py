@@ -49,7 +49,7 @@ from xen.xend.XendAPIConstants import *
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
-from xen.util import mkdir, security
+from xen.util import mkdir
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
@@ -486,7 +486,6 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
-            security.refresh_ssidref(config)
             dominfo = XendDomainInfo.restore(config)
             return dominfo
         finally:
@@ -1113,6 +1112,10 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot unpause privileged domain %s" % domid)
+            if dominfo._stateGet() not in (DOM_STATE_PAUSED, DOM_STATE_RUNNING):
+                raise VMBadState("Domain '%s' is not started" % domid,
+                                 POWER_STATE_NAMES[DOM_STATE_PAUSED],
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      int(dominfo.getDomid()))
             dominfo.unpause()
@@ -1138,6 +1141,10 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot pause privileged domain %s" % domid)
+            if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+                raise VMBadState("Domain '%s' is not started" % domid,
+                                 POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      int(dominfo.getDomid()))
             dominfo.pause()
@@ -1253,7 +1260,11 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
 
             if dominfo.getDomid() == DOM0_ID:
-                raise XendError("Cannot save privileged domain %i" % domid)
+                raise XendError("Cannot save privileged domain %s" % str(domid))
+            if dominfo._stateGet() != DOM_STATE_RUNNING:
+                raise VMBadState("Domain is not running",
+                                 POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
 
             oflags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
             if hasattr(os, "O_LARGEFILE"):
@@ -1399,10 +1410,15 @@ class XendDomain:
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
-        try:
-            return xc.sched_credit_domain_get(dominfo.getDomid())
-        except Exception, ex:
-            raise XendError(str(ex))
+        
+        if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            try:
+                return xc.sched_credit_domain_get(dominfo.getDomid())
+            except Exception, ex:
+                raise XendError(str(ex))
+        else:
+            return {'weight' : dominfo.getWeight(),
+                    'cap'    : dominfo.getCap()} 
     
     def domain_sched_credit_set(self, domid, weight = None, cap = None):
         """Set credit scheduler parameters for a domain.
@@ -1436,12 +1452,15 @@ class XendDomain:
             assert type(weight) == int
             assert type(cap) == int
 
-            rc = xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
+            rc = 0
+            if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+                rc = xc.sched_credit_domain_set(dominfo.getDomid(), weight, cap)
             if rc == 0:
                 if set_weight:
                     dominfo.setWeight(weight)
                 if set_cap:
                     dominfo.setCap(cap)
+                self.managed_config_save(dominfo)
             return rc
         except Exception, ex:
             log.exception(ex)

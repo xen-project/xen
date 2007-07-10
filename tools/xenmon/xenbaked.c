@@ -444,7 +444,7 @@ struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
  */
 unsigned int get_num_cpus(void)
 {
-    xc_physinfo_t physinfo;
+    xc_physinfo_t physinfo = { 0 };
     int xc_handle = xc_interface_open();
     int ret;
 

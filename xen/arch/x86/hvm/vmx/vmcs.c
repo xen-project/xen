@@ -45,6 +45,8 @@ u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
+static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
+
 static u32 vmcs_revision_id __read_mostly;
 
 static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
@@ -73,12 +75,12 @@ void vmx_init_vmcs_config(void)
 
     min = (PIN_BASED_EXT_INTR_MASK |
            PIN_BASED_NMI_EXITING);
-    opt = 0; /*PIN_BASED_VIRTUAL_NMIS*/
+    opt = PIN_BASED_VIRTUAL_NMIS;
     _vmx_pin_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PINBASED_CTLS);
 
     min = (CPU_BASED_HLT_EXITING |
-           CPU_BASED_INVDPG_EXITING |
+           CPU_BASED_INVLPG_EXITING |
            CPU_BASED_MWAIT_EXITING |
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
@@ -180,6 +182,9 @@ static void __vmx_clear_vmcs(void *info)
 
     v->arch.hvm_vmx.active_cpu = -1;
     v->arch.hvm_vmx.launched   = 0;
+
+    if ( v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs) )
+        this_cpu(current_vmcs) = NULL;
 }
 
 static void vmx_clear_vmcs(struct vcpu *v)
@@ -199,6 +204,7 @@ static void vmx_load_vmcs(struct vcpu *v)
 {
     __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
     v->arch.hvm_vmx.active_cpu = smp_processor_id();
+    this_cpu(current_vmcs) = v->arch.hvm_vmx.vmcs;
 }
 
 void vmx_vmcs_enter(struct vcpu *v)
@@ -312,7 +318,7 @@ static void construct_vmcs(struct vcpu *v)
     __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vmx_cpu_based_exec_control);
-    v->arch.hvm_vcpu.u.vmx.exec_control = vmx_cpu_based_exec_control;
+    v->arch.hvm_vmx.exec_control = vmx_cpu_based_exec_control;
     if ( vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL, vmx_secondary_exec_control);
 
@@ -512,7 +518,8 @@ void vmx_do_resume(struct vcpu *v)
 
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
     {
-        vmx_load_vmcs(v);
+        if ( v->arch.hvm_vmx.vmcs != this_cpu(current_vmcs) )
+            vmx_load_vmcs(v);
     }
     else
     {

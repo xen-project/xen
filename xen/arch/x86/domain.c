@@ -308,8 +308,6 @@ int switch_compat(struct domain *d)
 
     if ( d == NULL )
         return -EINVAL;
-    if ( compat_disabled )
-        return -ENOSYS;
     if ( !may_switch_mode(d) )
         return -EACCES;
     if ( is_pv_32on64_domain(d) )

@@ -27,7 +27,7 @@
 #include <asm/current.h>
 #include <asm/debugger.h>
 
-#define Dprintk(x...) printk(x)
+#define Dprintk(x...)
 
 static int cpu_has_hdec = 1;
 ulong ticks_per_usec;

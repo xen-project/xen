@@ -40,11 +40,13 @@ from XendPIFMetrics import XendPIFMetrics
 from XendVMMetrics import XendVMMetrics
 from XendPIF import XendPIF
 from XendPBD import XendPBD
+from XendXSPolicy import XendXSPolicy, XendACMPolicy
 
 from XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
 
 from xen.util.blkif import blkdev_name_to_number
+from xen.util import xsconstants
 
 
 AUTH_NONE = 'none'
@@ -467,6 +469,8 @@ classes = {
     'console'      : valid_console,
     'SR'           : valid_sr,
     'task'         : valid_task,
+    'XSPolicy'     : valid_object("XSPolicy"),
+    'ACMPolicy'    : valid_object("ACMPolicy"),
     'debug'        : valid_debug,
     'network'      : valid_object("network"),
     'PIF'          : valid_object("PIF"),
@@ -481,6 +485,8 @@ autoplug_classes = {
     'VM_metrics'  : XendVMMetrics,
     'PBD'         : XendPBD,
     'PIF_metrics' : XendPIFMetrics,
+    'XSPolicy'    : XendXSPolicy,
+    'ACMPolicy'   : XendACMPolicy,
 }
 
 class XendAPI(object):
@@ -1170,7 +1176,8 @@ class XendAPI(object):
                   'HVM_boot_params',
                   'platform',
                   'PCI_bus',
-                  'other_config']
+                  'other_config',
+                  'security_label']
 
     VM_methods = [('clone', 'VM'),
                   ('start', None),
@@ -1230,7 +1237,8 @@ class XendAPI(object):
         'HVM_boot_params',
         'platform',
         'PCI_bus',
-        'other_config']
+        'other_config',
+        'security_label']
         
     def VM_get(self, name, session, vm_ref):
         return xen_api_success(
@@ -1601,7 +1609,22 @@ class XendAPI(object):
         if dom:
             return xen_api_success([dom.get_uuid()])
         return xen_api_success([])
-    
+
+    def VM_get_security_label(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        label = dom.get_security_label()
+        return xen_api_success(label)
+
+    def VM_set_security_label(self, session, vm_ref, sec_label, old_label):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        (rc, errors, oldlabel, new_ssidref) = \
+                                 dom.set_security_label(sec_label, old_label)
+        if rc != xsconstants.XSERR_SUCCESS:
+            return xen_api_error(['SECURITY_ERROR', rc])
+        if rc == 0:
+            rc = new_ssidref
+        return xen_api_success(rc)
+
     def VM_create(self, session, vm_struct):
         xendom = XendDomain.instance()
         domuuid = XendTask.log_progress(0, 100,
@@ -1655,6 +1678,7 @@ class XendAPI(object):
             'domid': domid is None and -1 or domid,
             'is_control_domain': xeninfo.info['is_control_domain'],
             'metrics': xeninfo.get_metrics(),
+            'security_label': xeninfo.get_security_label(),
             'crash_dumps': []
         }
         return xen_api_success(record)
@@ -1952,7 +1976,8 @@ class XendAPI(object):
                    'runtime_properties']
     VIF_attr_rw = ['device',
                    'MAC',
-                   'MTU']
+                   'MTU',
+                   'security_label']
 
     VIF_attr_inst = VIF_attr_rw
 
@@ -2054,7 +2079,10 @@ class XendAPI(object):
         except Exception, exn:
             log.exception(exn)
             return xen_api_success({})
-    
+
+    def VIF_get_security_label(self, session, vif_ref):
+        return self._VIF_get(vif_ref, 'security_label')
+
     # Xen API: Class VIF_metrics
     # ----------------------------------------------------------------
 
@@ -2098,7 +2126,8 @@ class XendAPI(object):
                    'virtual_size',
                    'sharable',
                    'read_only',
-                   'other_config']
+                   'other_config',
+                   'security_label']
     VDI_attr_inst = VDI_attr_ro + VDI_attr_rw
 
     VDI_methods = [('destroy', None)]
@@ -2206,13 +2235,24 @@ class XendAPI(object):
         xennode = XendNode.instance()
         return xen_api_success(xennode.get_vdi_by_name_label(name))
 
+    def VDI_set_security_label(self, session, vdi_ref, sec_lab, old_lab):
+        vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+        rc = vdi.set_security_label(sec_lab, old_lab)
+        if rc < 0:
+            return xen_api_error(['SECURITY_ERROR', rc])
+        return xen_api_success(rc)
+
+    def VDI_get_security_label(self, session, vdi_ref):
+        vdi = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+        return xen_api_success(vdi.get_security_label())
 
     # Xen API: Class VTPM
     # ----------------------------------------------------------------
 
     VTPM_attr_rw = [ ]
     VTPM_attr_ro = ['VM',
-                    'backend']
+                    'backend',
+                    'runtime_properties' ]
 
     VTPM_attr_inst = VTPM_attr_rw
 
@@ -2289,6 +2329,18 @@ class XendAPI(object):
         vtpms = [d.get_vtpms() for d in XendDomain.instance().list('all')]
         vtpms = reduce(lambda x, y: x + y, vtpms)
         return xen_api_success(vtpms)
+
+    def VTPM_get_runtime_properties(self, _, vtpm_ref):
+        xendom = XendDomain.instance()
+        dominfo = xendom.get_vm_with_dev_uuid('vtpm', vtpm_ref)
+        device = dominfo.get_dev_config_by_uuid('vtpm', vtpm_ref)
+
+        try:
+            device_sxps = dominfo.getDeviceSxprs('vtpm')
+            device_dict = dict(device_sxps[0][1])
+            return xen_api_success(device_dict)
+        except:
+            return xen_api_success({})
 
     # Xen API: Class console
     # ----------------------------------------------------------------

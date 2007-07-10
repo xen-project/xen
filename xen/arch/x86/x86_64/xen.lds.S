@@ -68,12 +68,14 @@ SECTIONS
   .data.percpu : { *(.data.percpu) } :text
   __per_cpu_data_end = .;
   . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
-  . = ALIGN(STACK_SIZE);
+  . = ALIGN(PAGE_SIZE);
   __per_cpu_end = .;
 
   __bss_start = .;		/* BSS */
   .bss : {
+	. = ALIGN(STACK_SIZE);
 	*(.bss.stack_aligned)
+	. = ALIGN(PAGE_SIZE);
 	*(.bss.page_aligned)
 	*(.bss)
 	} :text

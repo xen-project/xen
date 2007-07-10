@@ -155,7 +155,8 @@ class SrvDomain(SrvDir):
     def op_domain_sched_credit_set(self, _, req):
         fn = FormFn(self.xd.domain_sched_credit_set,
                     [['dom', 'int'],
-                     ['weight', 'int']])
+                     ['weight', 'int'],
+                     ['cap', 'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 

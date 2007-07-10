@@ -26,9 +26,40 @@ extern unsigned long rtas_msr;
 extern unsigned long rtas_base;
 extern unsigned long rtas_end;
 
+struct rtas_args {
+    int ra_token;
+    int ra_nargs;
+    int ra_nrets;
+    int ra_args[10];
+} __attribute__ ((aligned(8)));
+
+struct rtas_token {
+    char *name;
+    int (*proxy)(int token, struct rtas_args *r);
+    int token;
+};
+
+extern struct rtas_token rt_power_off;
+extern struct rtas_token rt_system_reboot;
+extern struct rtas_token rt_nvram_fetch;
+extern struct rtas_token rt_nvram_store;
+extern struct rtas_token rt_manage_flash;
+extern struct rtas_token rt_validate_flash;
+extern struct rtas_token rt_update_reboot_flash;
+
+/* RTAS errors */
+#define RTAS_HW -1
+#define RTAS_BUSY -2
+#define RTAS_PARAMETER -3
+
+
 extern int prom_call(void *arg, unsigned base,
                      unsigned long func, unsigned long msr);
 extern int rtas_init(void *);
 extern int rtas_halt(void);
 extern int rtas_reboot(void);
+extern int rtas_proxy_init(void *m);
+extern int do_rtas_proxy(ulong arg);
+extern void *rtas_remote_addr(ulong addr, ulong length);
+extern int rtas_call(void *r);
 #endif

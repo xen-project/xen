@@ -18,7 +18,7 @@ endif
 # Used only by linux/Makefile.
 AFLAGS_KERNEL  += -mconstant-gp -nostdinc $(CPPFLAGS)
 
-CFLAGS	+= -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
+CFLAGS	+= -nostdinc -fno-builtin -fno-common
 CFLAGS	+= -mconstant-gp
 #CFLAGS  += -O3		# -O3 over-inlines making debugging tough!
 CFLAGS	+= -O2		# but no optimization causes compile errors!

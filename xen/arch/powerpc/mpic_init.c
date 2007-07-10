@@ -322,43 +322,6 @@ static int find_mpic(void)
     return rc;
 }
 
-#ifdef CONFIG_SHARE_MPIC
-static struct hw_interrupt_type hc_irq;
-
-static struct hw_interrupt_type *share_mpic(
-    struct hw_interrupt_type *mpic_irq,
-    struct hw_interrupt_type *xen_irq)
-{
-    hc_irq.startup = mpic_irq->startup;
-    mpic_irq->startup = xen_irq->startup;
-
-    hc_irq.enable = mpic_irq->enable;
-    mpic_irq->enable = xen_irq->enable;
-
-    hc_irq.disable = mpic_irq->disable;
-    mpic_irq->disable = xen_irq->disable;
-
-    hc_irq.shutdown = mpic_irq->shutdown;
-    mpic_irq->shutdown = xen_irq->shutdown;
-
-    hc_irq.ack = mpic_irq->ack;
-    mpic_irq->ack = xen_irq->ack;
-
-    hc_irq.end = mpic_irq->end;
-    mpic_irq->end = xen_irq->end;
-
-    hc_irq.set_affinity = mpic_irq->set_affinity;
-    mpic_irq->set_affinity = xen_irq->set_affinity;
-
-    return &hc_irq;
-}
-
-#else  /* CONFIG_SHARE_MPIC */
-
-#define share_mpic(M,X) (M)
-
-#endif
-
 static unsigned int mpic_startup_ipi(unsigned int irq)
 {
     mpic->hc_ipi.enable(irq);
@@ -395,7 +358,11 @@ int request_irq(unsigned int irq,
     return retval;
 }
 
-struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
+static void dummy_ack(unsigned int irq)
+{
+}
+
+void xen_mpic_init(void)
 {
     unsigned int isu_size;
     unsigned int irq_offset;
@@ -403,7 +370,6 @@ struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
     unsigned int ipi_offset;
     unsigned char *senses;
     unsigned int senses_count;
-    struct hw_interrupt_type *hit;
 
     printk("%s: start\n", __func__);
 
@@ -420,7 +386,7 @@ struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
 
     if (find_mpic()) {
         printk("%s: ERROR: Could not find open pic.\n", __func__);
-        return NULL;
+        return;
     }
 
     mpic = mpic_alloc(opic_addr,
@@ -431,17 +397,15 @@ struct hw_interrupt_type *xen_mpic_init(struct hw_interrupt_type *xen_irq)
     BUG_ON(mpic == NULL);
     mpic_init(mpic);
 
-    hit = share_mpic(&mpic->hc_irq, xen_irq);
-
     printk("%s: success\n", __func__);
 
-    mpic->hc_ipi.ack = xen_irq->ack;
+    mpic->hc_irq.ack = dummy_ack;
+    mpic->hc_ipi.ack = dummy_ack;
     mpic->hc_ipi.startup = mpic_startup_ipi;
     mpic_request_ipis();
-
-    return hit;
 }
 
+/* Note: reading the vector implicitly ACKs it in hardware. */
 int xen_mpic_get_irq(struct cpu_user_regs *regs)
 {
     BUG_ON(mpic == NULL);

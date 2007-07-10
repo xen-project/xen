@@ -211,23 +211,36 @@ void __init arch_init_memory(void)
         share_xen_page_with_guest(mfn_to_page(i), dom_io, XENSHARE_writable);
  
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
-    for ( i = 0, pfn = 0; i < e820.nr_map; i++ )
+    for ( i = 0, pfn = 0; pfn < max_page; i++ )
     {
-        if ( e820.map[i].type != E820_RAM )
-            continue;
-        /* Every page from cursor to start of next RAM region is I/O. */
-        rstart_pfn = PFN_UP(e820.map[i].addr);
-        rend_pfn   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
+        while ( (i < e820.nr_map) && (e820.map[i].type != E820_RAM) )
+            i++;
+
+        if ( i >= e820.nr_map )
+        {
+            /* No more RAM regions: mark as I/O right to end of memory map. */
+            rstart_pfn = rend_pfn = max_page;
+        }
+        else
+        {
+            /* Mark as I/O just up as far as next RAM region. */
+            rstart_pfn = min_t(unsigned long, max_page,
+                               PFN_UP(e820.map[i].addr));
+            rend_pfn   = max_t(unsigned long, rstart_pfn,
+                               PFN_DOWN(e820.map[i].addr + e820.map[i].size));
+        }
+
+        /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
         {
             BUG_ON(!mfn_valid(pfn));
             share_xen_page_with_guest(
                 mfn_to_page(pfn), dom_io, XENSHARE_writable);
         }
+
         /* Skip the RAM region. */
         pfn = rend_pfn;
     }
-    BUG_ON(pfn != max_page);
 
     subarch_init_memory();
 }
@@ -3655,8 +3668,9 @@ void memguard_unguard_range(void *p, unsigned long l)
 
 void memguard_guard_stack(void *p)
 {
-    BUILD_BUG_ON((DEBUG_STACK_SIZE + PAGE_SIZE) > STACK_SIZE);
-    p = (void *)((unsigned long)p + STACK_SIZE - DEBUG_STACK_SIZE - PAGE_SIZE);
+    BUILD_BUG_ON((PRIMARY_STACK_SIZE + PAGE_SIZE) > STACK_SIZE);
+    p = (void *)((unsigned long)p + STACK_SIZE -
+                 PRIMARY_STACK_SIZE - PAGE_SIZE);
     memguard_guard_range(p, PAGE_SIZE);
 }
 

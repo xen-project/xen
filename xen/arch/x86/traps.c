@@ -280,7 +280,7 @@ void show_stack_overflow(unsigned int cpu, unsigned long esp)
     unsigned long *stack, addr;
 
     esp_bottom = (esp | (STACK_SIZE - 1)) + 1;
-    esp_top    = esp_bottom - DEBUG_STACK_SIZE;
+    esp_top    = esp_bottom - PRIMARY_STACK_SIZE;
 
     printk("Valid stack range: %p-%p, sp=%p, tss.esp0=%p\n",
            (void *)esp_top, (void *)esp_bottom, (void *)esp,

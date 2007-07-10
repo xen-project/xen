@@ -97,7 +97,7 @@ void vmx_vmcs_exit(struct vcpu *v);
 #define CPU_BASED_VIRTUAL_INTR_PENDING        0x00000004
 #define CPU_BASED_USE_TSC_OFFSETING           0x00000008
 #define CPU_BASED_HLT_EXITING                 0x00000080
-#define CPU_BASED_INVDPG_EXITING              0x00000200
+#define CPU_BASED_INVLPG_EXITING              0x00000200
 #define CPU_BASED_MWAIT_EXITING               0x00000400
 #define CPU_BASED_RDPMC_EXITING               0x00000800
 #define CPU_BASED_RDTSC_EXITING               0x00001000
@@ -137,6 +137,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \
     (vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
+#define cpu_has_vmx_vnmi \
+    (vmx_pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS)
 #define cpu_has_vmx_msr_bitmap \
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
 extern char *vmx_msr_bitmap;

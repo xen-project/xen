@@ -93,6 +93,57 @@ static unsigned char insn_decode[256] = {
     X, X, X, X, X, X, O|M, O|M
 };
 
+static unsigned char twobyte_decode[256] = {
+    /* 0x00 - 0x0F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x10 - 0x1F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x20 - 0x2F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x30 - 0x3F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x40 - 0x4F */
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M,
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M,
+    /* 0x50 - 0x5F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x60 - 0x6F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x70 - 0x7F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x80 - 0x8F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0x90 - 0x9F */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0xA0 - 0xAF */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0xB0 - 0xBF */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0xC0 - 0xCF */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0xD0 - 0xDF */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0xE0 - 0xEF */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X,
+    /* 0xF0 - 0xFF */
+    X, X, X, X, X, X, X, X,
+    X, X, X, X, X, X, X, X
+};
+
 /*
  * Obtain the base and limit associated with the given segment selector.
  * The selector must identify a 32-bit code or data segment. Any segment that
@@ -275,6 +326,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     u8            *eip;         /* ptr to instruction start */
     u8            *pb, b;       /* ptr into instr. / current instr. byte */
     int            gs_override = 0;
+    int            twobyte = 0;
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(vm86_mode(regs)) || unlikely(!ring_3(regs)) )
@@ -337,12 +389,36 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
 
     decode = insn_decode[b]; /* opcode byte */
     pb++;
+    if ( decode == 0 && b == 0x0f )
+    {
+        twobyte = 1;
+
+        if ( get_user(b, pb) )
+        {
+            dprintk(XENLOG_DEBUG,
+                    "Fault while accessing byte %ld of instruction\n",
+                    (long)(pb-eip));
+            goto page_fault;
+        }
+
+        if ( (pb - eip) >= 15 )
+        {
+            dprintk(XENLOG_DEBUG, "Too many opcode bytes for a "
+                    "legal instruction\n");
+            goto fail;
+        }
+
+        decode = twobyte_decode[b];
+        pb++;
+    }
+
     if ( decode == 0 )
     {
-        dprintk(XENLOG_DEBUG, "Unsupported opcode %02x\n", b);
+        dprintk(XENLOG_DEBUG, "Unsupported %sopcode %02x\n",
+                twobyte ? "two byte " : "", b);
         goto fail;
     }
-    
+
     if ( !(decode & HAS_MODRM) )
     {
         /* Must be a <disp32>, or bail. */

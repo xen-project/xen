@@ -90,7 +90,9 @@ void vmx_vlapic_msr_changed(struct vcpu *v);
 #define INTR_INFO_VECTOR_MASK           0xff            /* 7:0 */
 #define INTR_INFO_INTR_TYPE_MASK        0x700           /* 10:8 */
 #define INTR_INFO_DELIVER_CODE_MASK     0x800           /* 11 */
+#define INTR_INFO_NMI_UNBLOCKED_BY_IRET 0x1000          /* 12 */
 #define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
+#define INTR_INFO_RESVD_BITS_MASK       0x7ffff000
 
 #define INTR_TYPE_EXT_INTR              (0 << 8)    /* external interrupt */
 #define INTR_TYPE_NMI                   (2 << 8)    /* NMI                */
@@ -259,28 +261,6 @@ static inline int __vmxon (u64 addr)
                            : "memory");
 
     return rc;
-}
-
-static inline int vmx_paging_enabled(struct vcpu *v)
-{
-    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
-    return ((cr0 & (X86_CR0_PE|X86_CR0_PG)) == (X86_CR0_PE|X86_CR0_PG));
-}
-
-static inline int vmx_long_mode_enabled(struct vcpu *v)
-{
-    return v->arch.hvm_vmx.efer & EFER_LMA;
-}
-
-static inline int vmx_lme_is_set(struct vcpu *v)
-{
-    return v->arch.hvm_vmx.efer & EFER_LME;
-}
-
-static inline int vmx_pgbit_test(struct vcpu *v)
-{
-    unsigned long cr0 = v->arch.hvm_vmx.cpu_shadow_cr0;
-    return (cr0 & X86_CR0_PG);
 }
 
 static inline void __vmx_inject_exception(struct vcpu *v, int trap, int type,

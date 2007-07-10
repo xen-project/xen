@@ -34,6 +34,7 @@ switch_to_kernel:
         jnc   1f
         movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
 1:      call  create_bounce_frame
+        andl  $~X86_EFLAGS_DF,UREGS_eflags(%rsp)
         jmp   test_all_events
 
 /* %rbx: struct vcpu, interrupts disabled */

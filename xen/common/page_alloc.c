@@ -46,6 +46,12 @@ static char opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
 /*
+ * no-bootscrub -> Free pages are not zeroed during boot.
+ */
+static int opt_bootscrub __initdata = 1;
+boolean_param("bootscrub", opt_bootscrub);
+
+/*
  * Bit width of the DMA heap.
  */
 static unsigned int  dma_bitsize = CONFIG_DMA_BITSIZE;
@@ -623,6 +629,9 @@ void __init scrub_heap_pages(void)
 {
     void *p;
     unsigned long mfn;
+
+    if ( !opt_bootscrub )
+        return;
 
     printk("Scrubbing Free RAM: ");
 

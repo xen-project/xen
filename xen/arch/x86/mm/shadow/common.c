@@ -506,7 +506,9 @@ void shadow_promote(struct vcpu *v, mfn_t gmfn, unsigned int type)
     ASSERT(mfn_valid(gmfn));
 
     /* We should never try to promote a gmfn that has writeable mappings */
-    ASSERT(sh_remove_write_access(v, gmfn, 0, 0) == 0);
+    ASSERT((page->u.inuse.type_info & PGT_type_mask) != PGT_writable_page
+           || (page->u.inuse.type_info & PGT_count_mask) == 0
+           || v->domain->is_shutting_down);
 
     /* Is the page already shadowed? */
     if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
@@ -1850,11 +1852,12 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
     perfc_incr(shadow_writeable_bf);
     hash_foreach(v, callback_mask, callbacks, gmfn);
 
-    /* If that didn't catch the mapping, something is very wrong */
+    /* If that didn't catch the mapping, then there's some non-pagetable
+     * mapping -- ioreq page, grant mapping, &c. */
     if ( (mfn_to_page(gmfn)->u.inuse.type_info & PGT_count_mask) != 0 )
     {
-        SHADOW_ERROR("can't find all writeable mappings of mfn %lx: "
-                      "%lu left\n", mfn_x(gmfn),
+        SHADOW_ERROR("can't remove write access to mfn %lx: guest has "
+                      "%lu special-use mappings of it\n", mfn_x(gmfn),
                       (mfn_to_page(gmfn)->u.inuse.type_info&PGT_count_mask));
         domain_crash(v->domain);
     }
@@ -2733,11 +2736,11 @@ static int shadow_test_disable(struct domain *d)
  * shadow processing jobs.
  */
 void
-shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p, 
+shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
+                       l1_pgentry_t *p, mfn_t table_mfn, 
                        l1_pgentry_t new, unsigned int level)
 {
     struct domain *d = v->domain;
-    mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
     mfn_t mfn;
     
     shadow_lock(d);

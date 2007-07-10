@@ -318,7 +318,8 @@ gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,dis
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.""")
 
-gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,backend=DOM,vifname=NAME",
+gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT," + \
+          "backend=DOM,vifname=NAME,rate=RATE,model=MODEL,accel=ACCEL",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
@@ -330,6 +331,9 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,ba
           If backend is not specified the default backend driver domain is used.
           If vifname is not specified the backend virtual interface will have name vifD.N
           where D is the domain id and N is the interface id.
+          If rate is not specified the default rate is used.
+          If model is not specified the default model is used.
+          If accel is not specified an accelerator plugin module is not used.
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
 
@@ -710,7 +714,7 @@ def configure_vifs(config_devs, vals):
 
         def f(k):
             if k not in ['backend', 'bridge', 'ip', 'mac', 'script', 'type',
-                         'vifname', 'rate', 'model']:
+                         'vifname', 'rate', 'model', 'accel']:
                 err('Invalid vif option: ' + k)
 
             config_vif.append([k, d[k]])

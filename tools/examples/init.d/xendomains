@@ -221,22 +221,26 @@ start()
     if [ "$XENDOMAINS_RESTORE" = "true" ] &&
        contains_something "$XENDOMAINS_SAVE"
     then
-	XENDOMAINS_SAVED=`/bin/ls $XENDOMAINS_SAVE/* | grep -v 'lost+found'`
 	mkdir -p $(dirname "$LOCKFILE")
 	touch $LOCKFILE
 	echo -n "Restoring Xen domains:"
 	saved_domains=`ls $XENDOMAINS_SAVE`
-	for dom in $XENDOMAINS_SAVED; do
-	    echo -n " ${dom##*/}"
-	    xm restore $dom
-	    if [ $? -ne 0 ]; then
-		rc_failed $?
-		echo -n '!'
-	    else
-		# mv $dom ${dom%/*}/.${dom##*/}
-		rm $dom
-	    fi
-	done
+        for dom in $XENDOMAINS_SAVE/*; do
+            if [ -f $dom ] ; then
+                HEADER=`head -c 16 $dom | head -n 1 2> /dev/null`
+                if [ $HEADER = "LinuxGuestRecord" ]; then
+                    echo -n " ${dom##*/}"
+                    xm restore $dom
+                    if [ $? -ne 0 ]; then
+                        rc_failed $?
+                        echo -n '!'
+                    else
+                        # mv $dom ${dom%/*}/.${dom##*/}
+                        rm $dom
+                    fi
+                fi
+            fi
+        done
 	echo .
     fi
 
@@ -260,7 +264,6 @@ start()
 	    if [ $? -eq 0 ] || is_running $dom; then
 		echo -n "(skip)"
 	    else
-		echo "(booting)"
 		xm create --quiet --defconfig $dom
 		if [ $? -ne 0 ]; then
 		    rc_failed $?

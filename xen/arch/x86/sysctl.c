@@ -23,6 +23,10 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
+#include <asm/numa.h>
+#include <xen/nodemask.h>
+
+#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
 long arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
@@ -34,25 +38,41 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_physinfo:
     {
+        uint32_t i, max_array_ent;
+
         xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
 
         pi->threads_per_core =
             cpus_weight(cpu_sibling_map[0]);
         pi->cores_per_socket =
             cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
-        pi->sockets_per_node = 
-            num_online_cpus() / cpus_weight(cpu_core_map[0]);
+        pi->nr_nodes = num_online_nodes();
+        pi->sockets_per_node = num_online_cpus() / 
+            (pi->nr_nodes * pi->cores_per_socket * pi->threads_per_core);
 
-        pi->nr_nodes         = 1;
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = cpu_khz;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
-        ret = 0;
-        if ( copy_to_guest(u_sysctl, sysctl, 1) )
-            ret = -EFAULT;
+
+        max_array_ent = pi->max_cpu_id;
+        pi->max_cpu_id = last_cpu(cpu_online_map);
+        max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
+
+        ret = -EFAULT;
+        if ( !guest_handle_is_null(pi->cpu_to_node) )
+        {
+            for ( i = 0; i <= max_array_ent; i++ )
+            {
+                uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
+                if ( copy_to_guest_offset(pi->cpu_to_node, i, &node, 1) )
+                    break;
+            }
+        }
+
+        ret = copy_to_guest(u_sysctl, sysctl, 1) ? -EFAULT : 0;
     }
     break;
     

@@ -15,17 +15,22 @@
 # Copyright (C) 2006 International Business Machines Corp.
 # Author: Reiner Sailer
 # Author: Bryan D. Payne <bdpayne@us.ibm.com>
+# Author: Stefan Berger <stefanb@us.ibm.com>
 #============================================================================
 
 import commands
 import logging
-import sys, os, string, re
-import traceback
-import shutil
+import os, string, re
+import threading
+import struct
+import stat
 from xen.lowlevel import acm
 from xen.xend import sxp
+from xen.xend import XendConstants
 from xen.xend.XendLogging import log
-from xen.util import dictio
+from xen.xend.XendError import VmError
+from xen.util import dictio, xsconstants
+from xen.xend.XendConstants import *
 
 #global directories and tools for security management
 policy_dir_prefix = "/etc/xen/acm-security/policies"
@@ -60,6 +65,10 @@ policy_name_re = re.compile(".*[chwall|ste|chwall_ste].*", re.IGNORECASE)
 #other global variables
 NULL_SSIDREF = 0
 
+#general Rlock for map files; only one lock for all mapfiles
+__mapfile_lock = threading.RLock()
+__resfile_lock = threading.RLock()
+
 log = logging.getLogger("xend.util.security")
 
 # Our own exception definition. It is masked (pass) if raised and
@@ -75,12 +84,18 @@ class ACMError(Exception):
 def err(msg):
     """Raise ACM exception.
     """
-    sys.stderr.write("ACMError: " + msg + "\n")
     raise ACMError(msg)
 
 
 
 active_policy = None
+
+
+def mapfile_lock():
+    __mapfile_lock.acquire()
+
+def mapfile_unlock():
+    __mapfile_lock.release()
 
 
 def refresh_security_policy():
@@ -106,6 +121,39 @@ def on():
     return (active_policy not in ['INACTIVE', 'NULL'])
 
 
+def calc_dom_ssidref_from_info(info):
+    """
+       Calculate a domain's ssidref from the security_label in its
+       info.
+       This function is called before the domain is started and
+       makes sure that:
+        - the type of the policy is the same as indicated in the label
+        - the name of the policy is the same as indicated in the label
+        - calculates an up-to-date ssidref for the domain
+       The latter is necessary since the domain's ssidref could have
+       changed due to changes to the policy.
+    """
+    import xen.xend.XendConfig
+    if isinstance(info, xen.xend.XendConfig.XendConfig):
+        if info.has_key('security_label'):
+            seclab = info['security_label']
+            tmp = seclab.split(":")
+            if len(tmp) != 3:
+                raise VmError("VM label '%s' in wrong format." % seclab)
+            typ, policyname, vmlabel = seclab.split(":")
+            if typ != xsconstants.ACM_POLICY_ID:
+                raise VmError("Policy type '%s' not supported." % typ)
+            refresh_security_policy()
+            if active_policy != policyname:
+                raise VmError("Active policy '%s' different than "
+                              "what in VM's label ('%s')." %
+                              (active_policy, policyname))
+            ssidref = label2ssidref(vmlabel, policyname, "dom")
+            return ssidref
+        else:
+            return 0
+    raise VmError("security.calc_dom_ssidref_from_info: info of type '%s'"
+                  "not supported." % type(info))
 
 # Assumes a 'security' info  [security access_control ...] [ssidref ...]
 def get_security_info(info, field):
@@ -144,7 +192,6 @@ def get_security_info(info, field):
         return 0
     else:
         return None
-
 
 
 def get_security_printlabel(info):
@@ -250,32 +297,37 @@ def ssidref2label(ssidref_var):
     else:
         err("Instance type of ssidref not supported (must be of type 'str' or 'int')")
 
-    (primary, secondary, f, pol_exists) = getmapfile(None)
-    if not f:
-        if (pol_exists):
-            err("Mapping file for policy \'" + policyname + "\' not found.\n" +
-                "Please use makepolicy command to create mapping file!")
-        else:
-            err("Policy file for \'" + active_policy + "\' not found.")
+    try:
+        mapfile_lock()
 
-    #2. get labelnames for both ssidref parts
-    pri_ssid = ssidref & 0xffff
-    sec_ssid = ssidref >> 16
-    pri_null_ssid = NULL_SSIDREF & 0xffff
-    sec_null_ssid = NULL_SSIDREF >> 16
-    pri_labels = []
-    sec_labels = []
-    labels = []
+        (primary, secondary, f, pol_exists) = getmapfile(None)
+        if not f:
+            if (pol_exists):
+                err("Mapping file for policy not found.\n" +
+                    "Please use makepolicy command to create mapping file!")
+            else:
+                err("Policy file for \'" + active_policy + "\' not found.")
 
-    for line in f:
-        l = line.split()
-        if (len(l) < 5) or (l[0] != "LABEL->SSID"):
-            continue
-        if primary and (l[2] == primary) and (int(l[4], 16) == pri_ssid):
-            pri_labels.append(l[3])
-        if secondary and (l[2] == secondary) and (int(l[4], 16) == sec_ssid):
-            sec_labels.append(l[3])
-    f.close()
+        #2. get labelnames for both ssidref parts
+        pri_ssid = ssidref & 0xffff
+        sec_ssid = ssidref >> 16
+        pri_null_ssid = NULL_SSIDREF & 0xffff
+        sec_null_ssid = NULL_SSIDREF >> 16
+        pri_labels = []
+        sec_labels = []
+        labels = []
+
+        for line in f:
+            l = line.split()
+            if (len(l) < 5) or (l[0] != "LABEL->SSID"):
+                continue
+            if primary and (l[2] == primary) and (int(l[4], 16) == pri_ssid):
+                pri_labels.append(l[3])
+            if secondary and (l[2] == secondary) and (int(l[4], 16) == sec_ssid):
+                sec_labels.append(l[3])
+        f.close()
+    finally:
+        mapfile_unlock()
 
     #3. get the label that is in both lists (combination must be a single label)
     if (primary == "CHWALL") and (pri_ssid == pri_null_ssid) and (sec_ssid != sec_null_ssid):
@@ -297,7 +349,7 @@ def ssidref2label(ssidref_var):
 
 
 
-def label2ssidref(labelname, policyname, type):
+def label2ssidref(labelname, policyname, typ):
     """
     returns ssidref corresponding to labelname;
     maps current policy to default directory
@@ -307,42 +359,51 @@ def label2ssidref(labelname, policyname, type):
         err("Cannot translate labels for \'" + policyname + "\' policy.")
 
     allowed_types = ['ANY']
-    if type == 'dom':
+    if typ == 'dom':
         allowed_types.append('VM')
-    elif type == 'res':
+    elif typ == 'res':
         allowed_types.append('RES')
     else:
         err("Invalid type.  Must specify 'dom' or 'res'.")
 
-    (primary, secondary, f, pol_exists) = getmapfile(policyname)
+    try:
+        mapfile_lock()
+        (primary, secondary, f, pol_exists) = getmapfile(policyname)
 
-    #2. get labelnames for ssidref parts and find a common label
-    pri_ssid = []
-    sec_ssid = []
-    for line in f:
-        l = line.split()
-        if (len(l) < 5) or (l[0] != "LABEL->SSID"):
-            continue
-        if primary and (l[1] in allowed_types) and (l[2] == primary) and (l[3] == labelname):
-            pri_ssid.append(int(l[4], 16))
-        if secondary and (l[1] in allowed_types) and (l[2] == secondary) and (l[3] == labelname):
-            sec_ssid.append(int(l[4], 16))
-    f.close()
-    if (type == 'res') and (primary == "CHWALL") and (len(pri_ssid) == 0):
-        pri_ssid.append(NULL_SSIDREF)
-    elif (type == 'res') and (secondary == "CHWALL") and (len(sec_ssid) == 0):
-        sec_ssid.append(NULL_SSIDREF)
+        #2. get labelnames for ssidref parts and find a common label
+        pri_ssid = []
+        sec_ssid = []
+        for line in f:
+            l = line.split()
+            if (len(l) < 5) or (l[0] != "LABEL->SSID"):
+                continue
+            if primary and (l[1] in allowed_types) and \
+                           (l[2] == primary) and \
+                           (l[3] == labelname):
+                pri_ssid.append(int(l[4], 16))
+            if secondary and (l[1] in allowed_types) and \
+                             (l[2] == secondary) and \
+                             (l[3] == labelname):
+                sec_ssid.append(int(l[4], 16))
+        f.close()
+        if (typ == 'res') and (primary == "CHWALL") and (len(pri_ssid) == 0):
+            pri_ssid.append(NULL_SSIDREF)
+        elif (typ == 'res') and (secondary == "CHWALL") and \
+             (len(sec_ssid) == 0):
+            sec_ssid.append(NULL_SSIDREF)
 
-    #3. sanity check and composition of ssidref
-    if (len(pri_ssid) == 0) or ((len(sec_ssid) == 0) and (secondary != "NULL")):
-        err("Label \'" + labelname + "\' not found.")
-    elif (len(pri_ssid) > 1) or (len(sec_ssid) > 1):
-        err("Label \'" + labelname + "\' not unique in policy (policy error)")
-    if secondary == "NULL":
-        return pri_ssid[0]
-    else:
-        return (sec_ssid[0] << 16) | pri_ssid[0]
-
+        #3. sanity check and composition of ssidref
+        if (len(pri_ssid) == 0) or ((len(sec_ssid) == 0) and \
+            (secondary != "NULL")):
+            err("Label \'" + labelname + "\' not found.")
+        elif (len(pri_ssid) > 1) or (len(sec_ssid) > 1):
+            err("Label \'" + labelname + "\' not unique in policy (policy error)")
+        if secondary == "NULL":
+            return pri_ssid[0]
+        else:
+            return (sec_ssid[0] << 16) | pri_ssid[0]
+    finally:
+       mapfile_unlock()
 
 
 def refresh_ssidref(config):
@@ -381,8 +442,9 @@ def refresh_ssidref(config):
                     err("Illegal field in access_control")
     #verify policy is correct
     if active_policy != policyname:
-        err("Policy \'" + policyname + "\' in label does not match active policy \'"
-            + active_policy +"\'!")
+        err("Policy \'" + str(policyname) +
+            "\' in label does not match active policy \'"
+            + str(active_policy) +"\'!")
 
     new_ssidref = label2ssidref(labelname, policyname, 'dom')
     if not new_ssidref:
@@ -470,6 +532,25 @@ def get_decision(arg1, arg2):
         err("Cannot determine decision (Invalid parameter).")
 
 
+def hv_chg_policy(bin_pol, del_array, chg_array):
+    """
+        Change the binary policy in the hypervisor
+        The 'del_array' and 'chg_array' give hints about deleted ssidrefs
+        and changed ssidrefs which can be due to deleted VM labels
+        or reordered VM labels
+    """
+    rc = -xsconstants.XSERR_GENERAL_FAILURE
+    errors = ""
+    if not on():
+        err("No policy active.")
+    try:
+        rc, errors = acm.chgpolicy(bin_pol, del_array, chg_array)
+    except Exception, e:
+        pass
+    if (len(errors) > 0):
+        rc = -xsconstants.XSERR_HV_OP_FAILED
+    return rc, errors
+
 
 def make_policy(policy_name):
     policy_file = string.join(string.split(policy_name, "."), "/")
@@ -479,8 +560,6 @@ def make_policy(policy_name):
     (ret, output) = commands.getstatusoutput(xensec_xml2bin + " -d " + policy_dir_prefix + " " + policy_file)
     if ret:
         err("Creating policy failed:\n" + output)
-
-
 
 def load_policy(policy_name):
     global active_policy
@@ -538,8 +617,8 @@ def list_labels(policy_name, condition):
 
 
 def get_res_label(resource):
-    """Returns resource label information (label, policy) if it exists.
-       Otherwise returns null label and policy.
+    """Returns resource label information (policytype, label, policy) if
+       it exists. Otherwise returns null label and policy.
     """
     def default_res_label():
         ssidref = NULL_SSIDREF
@@ -547,23 +626,19 @@ def get_res_label(resource):
             label = ssidref2label(ssidref)
         else:
             label = None
-        return (label, 'NULL')
+        return (xsconstants.ACM_POLICY_ID, 'NULL', label)
 
-    (label, policy) = default_res_label()
 
-    # load the resource label file
-    res_label_cache = {}
-    try:
-        res_label_cache = dictio.dict_read("resources", res_label_filename)
-    except:
-        log.info("Resource label file not found.")
-        return default_res_label()
+    tmp = get_resource_label(resource)
+    if len(tmp) == 2:
+        policytype = xsconstants.ACM_POLICY_ID
+        policy, label = tmp
+    elif len(tmp) == 3:
+        policytype, policy, label = tmp
+    else:
+        policytype, policy, label = default_res_label()
 
-    # find the resource information
-    if res_label_cache.has_key(resource):
-        (policy, label) = res_label_cache[resource]
-
-    return (label, policy)
+    return (policytype, label, policy)
 
 
 def get_res_security_details(resource):
@@ -582,7 +657,7 @@ def get_res_security_details(resource):
     (label, ssidref, policy) = default_security_details()
 
     # find the entry associated with this resource
-    (label, policy) = get_res_label(resource)
+    (policytype, label, policy) = get_res_label(resource)
     if policy == 'NULL':
         log.info("Resource label for "+resource+" not in file, using DEFAULT.")
         return default_security_details()
@@ -596,8 +671,29 @@ def get_res_security_details(resource):
 
     return (label, ssidref, policy)
 
+def security_label_to_details(seclab):
+    """ Convert a Xen-API type of security label into details """
+    def default_security_details():
+        ssidref = NULL_SSIDREF
+        if on():
+            label = ssidref2label(ssidref)
+        else:
+            label = None
+        policy = active_policy
+        return (label, ssidref, policy)
 
-def unify_resname(resource):
+    (policytype, policy, label) = seclab.split(":")
+
+    # is this resource label for the running policy?
+    if policy == active_policy:
+        ssidref = label2ssidref(label, policy, 'res')
+    else:
+        log.info("Resource label not for active policy, using DEFAULT.")
+        return default_security_details()
+
+    return (label, ssidref, policy)
+
+def unify_resname(resource, mustexist=True):
     """Makes all resource locations absolute. In case of physical
     resources, '/dev/' is added to local file names"""
 
@@ -606,28 +702,53 @@ def unify_resname(resource):
 
     # sanity check on resource name
     try:
-        (type, resfile) = resource.split(":", 1)
+        (typ, resfile) = resource.split(":", 1)
     except:
         err("Resource spec '%s' contains no ':' delimiter" % resource)
 
-    if type == "tap":
+    if typ == "tap":
         try:
             (subtype, resfile) = resfile.split(":")
         except:
             err("Resource spec '%s' contains no tap subtype" % resource)
 
-    if type in ["phy", "tap"]:
+    import os
+    if typ in ["phy", "tap"]:
         if not resfile.startswith("/"):
             resfile = "/dev/" + resfile
+        if mustexist:
+            stats = os.lstat(resfile)
+            if stat.S_ISLNK(stats[stat.ST_MODE]):
+                resolved = os.readlink(resfile)
+                if resolved[0] != "/":
+                    resfile = os.path.join(os.path.dirname(resfile), resolved)
+                    resfile = os.path.abspath(resfile)
+                else:
+                    resfile = resolved
+                stats = os.lstat(resfile)
+            if not (stat.S_ISBLK(stats[stat.ST_MODE])):
+                err("Invalid resource")
+
+    if typ in [ "file", "tap" ]:
+        if mustexist:
+            stats = os.lstat(resfile)
+            if stat.S_ISLNK(stats[stat.ST_MODE]):
+                resfile = os.readlink(resfile)
+                stats = os.lstat(resfile)
+            if not stat.S_ISREG(stats[stat.ST_MODE]):
+                err("Invalid resource")
 
     #file: resources must specified with absolute path
-    if (not resfile.startswith("/")) or (not os.path.exists(resfile)):
-        err("Invalid resource.")
+    #vlan resources don't start with '/'
+    if typ != "vlan":
+        if (not resfile.startswith("/")) or \
+           (mustexist and not os.path.exists(resfile)):
+            err("Invalid resource.")
 
     # from here on absolute file names with resources
-    if type == "tap":
-        type = type + ":" + subtype
-    resource = type + ":" + resfile
+    if typ == "tap":
+        typ = typ + ":" + subtype
+    resource = typ + ":" + resfile
     return resource
 
 
@@ -662,9 +783,481 @@ def res_security_check(resource, domain_label):
     else:
         # Note, we can't canonicalise the resource here, because people using
         # xm without ACM are free to use relative paths.
-        (label, policy) = get_res_label(resource)
+        (policytype, label, policy) = get_res_label(resource)
         if policy != 'NULL':
             raise ACMError("Security is off, but '"+resource+"' is labeled")
             rtnval = 0
 
     return rtnval
+
+def res_security_check_xapi(rlabel, rssidref, rpolicy, xapi_dom_label):
+    """Checks if the given resource can be used by the given domain
+       label.  Returns 1 if the resource can be used, otherwise 0.
+    """
+    rtnval = 1
+    # if security is on, ask the hypervisor for a decision
+    if on():
+        typ, dpolicy, domain_label = xapi_dom_label.split(":")
+        if not dpolicy or not domain_label:
+            raise VmError("VM security label in wrong format.")
+        if active_policy != rpolicy:
+            raise VmError("Resource's policy '%s' != active policy '%s'" %
+                          (rpolicy, active_policy))
+        domac = ['access_control']
+        domac.append(['policy', active_policy])
+        domac.append(['label', domain_label])
+        domac.append(['type', 'dom'])
+        decision = get_decision(domac, ['ssidref', str(rssidref)])
+
+        log.info("Access Control Decision : %s" % decision)
+        # provide descriptive error messages
+        if decision == 'DENIED':
+            if rlabel == ssidref2label(NULL_SSIDREF):
+                #raise ACMError("Resource is not labeled")
+                rtnval = 0
+            else:
+                #raise ACMError("Permission denied for resource because label '"+rlabel+"' is not allowed")
+                rtnval = 0
+
+    # security is off, make sure resource isn't labeled
+    else:
+        # Note, we can't canonicalise the resource here, because people using
+        # xm without ACM are free to use relative paths.
+        if rpolicy != 'NULL':
+            #raise ACMError("Security is off, but resource is labeled")
+            rtnval = 0
+
+    return rtnval
+
+
+def set_resource_label_xapi(resource, reslabel_xapi, oldlabel_xapi):
+    """Assign a resource label to a resource
+    @param resource: The name of a resource, i.e., "phy:/dev/hda", or
+              "tap:qcow:/path/to/file.qcow"
+
+    @param reslabel_xapi: A resource label foramtted as in all other parts of
+                          the Xen-API, i.e., ACM:xm-test:blue"
+    @rtype: int
+    @return Success (0) or failure value (< 0)
+    """
+    olabel = ""
+    if reslabel_xapi == "":
+        return rm_resource_label(resource, oldlabel_xapi)
+    typ, policyref, label = reslabel_xapi.split(":")
+    if typ != xsconstants.ACM_POLICY_ID:
+        return -xsconstants.XSERR_WRONG_POLICY_TYPE
+    if not policyref or not label:
+        return -xsconstants.XSERR_BAD_LABEL_FORMAT
+    if oldlabel_xapi not in [ "" ]:
+        tmp = oldlabel_xapi.split(":")
+        if len(tmp) != 3:
+            return -xsconstants.XSERR_BAD_LABEL_FORMAT
+        otyp, opolicyref, olabel = tmp
+        # Only ACM is supported
+        if otyp != xsconstants.ACM_POLICY_ID:
+            return -xsconstants.XSERR_WRONG_POLICY_TYPE
+    return set_resource_label(resource, typ, policyref, label, olabel)
+
+def is_resource_in_use(resource):
+    """ Investigate all running domains whether they use this device """
+    from xen.xend import XendDomain
+    dominfos = XendDomain.instance().list('all')
+    lst = []
+    for dominfo in dominfos:
+        if is_resource_in_use_by_dom(dominfo, resource):
+            lst.append(dominfo)
+    return lst
+
+def devices_equal(res1, res2):
+    """ Determine whether two devices are equal """
+    return (unify_resname(res1) == unify_resname(res2))
+
+def is_resource_in_use_by_dom(dominfo, resource):
+    """ Determine whether a resources is in use by a given domain
+        @return True or False
+    """
+    if not dominfo.domid:
+        return False
+    if dominfo._stateGet() not in [ DOM_STATE_RUNNING ]:
+        return False
+    devs = dominfo.info['devices']
+    uuids = devs.keys()
+    for uuid in uuids:
+        dev = devs[uuid]
+        if len(dev) >= 2 and dev[1].has_key('uname'):
+            # dev[0] is type, i.e. 'vbd'
+            if devices_equal(dev[1]['uname'], resource):
+                log.info("RESOURCE IN USE: Domain %d uses %s." %
+                         (dominfo.domid, resource))
+                return True
+    return False
+
+
+def get_domain_resources(dominfo):
+    """ Collect all resources of a domain in a map where each entry of
+        the map is a list.
+        Entries are strored in the following formats:
+          tap:qcow:/path/xyz.qcow
+    """
+    resources = { 'vbd' : [], 'tap' : []}
+    devs = dominfo.info['devices']
+    uuids = devs.keys()
+    for uuid in uuids:
+        dev = devs[uuid]
+        typ = dev[0]
+        if typ in [ 'vbd', 'tap' ]:
+            resources[typ].append(dev[1]['uname'])
+
+    return resources
+
+
+def resources_compatible_with_vmlabel(xspol, dominfo, vmlabel):
+    """
+       Check whether the resources' labels are compatible with the
+       given VM label. This is a function to be used when for example
+       a running domain is to get the new label 'vmlabel'
+    """
+    if not xspol:
+        return False
+
+    try:
+        __resfile_lock.acquire()
+        try:
+            access_control = dictio.dict_read("resources",
+                                              res_label_filename)
+        except:
+            return False
+        return __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
+                                                   access_control)
+    finally:
+        __resfile_lock.release()
+    return False
+
+
+def __resources_compatible_with_vmlabel(xspol, dominfo, vmlabel,
+                                        access_control):
+    """
+        Check whether the resources' labels are compatible with the
+        given VM label. The access_control parameter provides a
+        dictionary of the resource name to resource label mappings
+        under which the evaluation should be done.
+    """
+    resources = get_domain_resources(dominfo)
+    reslabels = []  # all resource labels
+    polname = xspol.get_name()
+    for key in resources.keys():
+        for res in resources[key]:
+            try:
+                tmp = access_control[res]
+                if len(tmp) != 3:
+                    return False
+
+                if polname != tmp[1]:
+                    return False
+                label = tmp[2]
+                if not label in reslabels:
+                    reslabels.append(label)
+            except:
+                return False
+    # Check that all resource labes have a common STE type with the
+    # vmlabel
+    rc = xspol.policy_check_vmlabel_against_reslabels(vmlabel, reslabels)
+    return rc;
+
+def set_resource_label(resource, policytype, policyref, reslabel, \
+                       oreslabel = None):
+    """Assign a label to a resource
+       If the old label (oreslabel) is given, then the resource must have
+       that old label.
+       A resource label may be changed if
+       - the resource is not in use
+    @param resource  : The name of a resource, i.e., "phy:/dev/hda"
+    @param policyref : The name of the policy
+    @param reslabel     : the resource label within the policy
+    @param oreslabel    : optional current resource label
+
+    @rtype: int
+    @return Success (0) or failure value (< 0)
+    """
+    try:
+        resource = unify_resname(resource, mustexist=False)
+    except Exception:
+        return -xsconstants.XSERR_BAD_RESOURCE_FORMAT
+
+    domains = is_resource_in_use(resource)
+    if len(domains) > 0:
+        return -xsconstants.XSERR_RESOURCE_IN_USE
+
+    try:
+        __resfile_lock.acquire()
+        access_control = {}
+        try:
+             access_control = dictio.dict_read("resources", res_label_filename)
+        except:
+            pass
+        if oreslabel:
+            if not access_control.has_key(resource):
+                return -xsconstants.XSERR_BAD_LABEL
+            tmp = access_control[resource]
+            if len(tmp) != 3:
+                return -xsconstants.XSERR_BAD_LABEL
+            if tmp[2] != oreslabel:
+                return -xsconstants.XSERR_BAD_LABEL
+        if reslabel != "":
+            new_entry = { resource : tuple([policytype, policyref, reslabel])}
+            access_control.update(new_entry)
+        else:
+            if access_control.has_key(resource):
+                del access_control[resource]
+        dictio.dict_write(access_control, "resources", res_label_filename)
+    finally:
+        __resfile_lock.release()
+    return xsconstants.XSERR_SUCCESS
+
+def rm_resource_label(resource, oldlabel_xapi):
+    """Remove a resource label from a physical resource
+    @param resource: The name of a resource, i.e., "phy:/dev/hda"
+
+    @rtype: int
+    @return Success (0) or failure value (< 0)
+    """
+    tmp = oldlabel_xapi.split(":")
+    if len(tmp) != 3:
+        return -xsconstants.XSERR_BAD_LABEL_FORMAT
+    otyp, opolicyref, olabel = tmp
+    # Only ACM is supported
+    if otyp != xsconstants.ACM_POLICY_ID and \
+       otyp != xsconstants.INVALID_POLICY_PREFIX + xsconstants.ACM_POLICY_ID:
+        return -xsconstants.XSERR_WRONG_POLICY_TYPE
+    return set_resource_label(resource, "", "", "", olabel)
+
+def get_resource_label_xapi(resource):
+    """Get the assigned resource label of a physical resource
+      in the format used by then Xen-API, i.e., "ACM:xm-test:blue"
+
+      @rtype: string
+      @return the string representing policy type, policy name and label of
+              the resource
+    """
+    res = get_resource_label(resource)
+    return format_resource_label(res)
+
+def format_resource_label(res):
+    if res:
+        if len(res) == 2:
+            return xsconstants.ACM_POLICY_ID + ":" + res[0] + ":" + res[1]
+        if len(res) == 3:
+            return ":".join(res)
+    return ""
+
+def get_resource_label(resource):
+    """Get the assigned resource label of a given resource
+    @param resource: The name of a resource, i.e., "phy:/dev/hda"
+
+    @rtype: list
+    @return tuple of (policy name, resource label), i.e., (xm-test, blue)
+    """
+    try:
+        resource = unify_resname(resource, mustexist=False)
+    except Exception:
+        return []
+
+    reslabel_map = get_labeled_resources()
+
+    if reslabel_map.has_key(resource):
+        return list(reslabel_map[resource])
+    else:
+        #Try to resolve each label entry
+        for key, value in reslabel_map.items():
+            try:
+                if resource == unify_resname(key):
+                    return list(value)
+            except:
+                pass
+
+    return []
+
+
+def get_labeled_resources_xapi():
+    """ Get a map of all labeled resource with the labels formatted in the
+        xen-api resource label format.
+    """
+    reslabel_map = get_labeled_resources()
+    for key, labeldata in reslabel_map.items():
+        reslabel_map[key] = format_resource_label(labeldata)
+    return reslabel_map
+
+
+def get_labeled_resources():
+    """Get a map of all labeled resources
+    @rtype: list
+    @return list of labeled resources
+    """
+    try:
+        __resfile_lock.acquire()
+        try:
+            access_control = dictio.dict_read("resources", res_label_filename)
+        except:
+            return {}
+    finally:
+        __resfile_lock.release()
+    return access_control
+
+
+def relabel_domains(relabel_list):
+    """
+      Relabel the given domains to have a new ssidref.
+      @param relabel_list: a list containing tuples of domid, ssidref
+                           example: [ [0, 0x00020002] ]
+    """
+    rel_rules = ""
+    for r in relabel_list:
+        log.info("Relabeling domain with domid %d to new ssidref 0x%08x",
+                r[0], r[1])
+        rel_rules += struct.pack("ii", r[0], r[1])
+    try:
+        rc, errors = acm.relabel_domains(rel_rules)
+    except Exception, e:
+        log.info("Error after relabel_domains: %s" % str(e))
+        rc = -xsconstants.XSERR_GENERAL_FAILURE
+        errors = ""
+    if (len(errors) > 0):
+        rc = -xsconstants.XSERR_HV_OP_FAILED
+    return rc, errors
+
+
+def change_acm_policy(bin_pol, del_array, chg_array,
+                      vmlabel_map, reslabel_map, cur_acmpol, new_acmpol):
+    """
+       Change the ACM policy of the system by relabeling
+       domains and resources first and doing some access checks.
+       Then update the policy in the hypervisor. If this is all successful,
+       relabel the domains permanently and commit the relabed resources.
+
+       Need to do / check the following:
+        - relabel all resources where there is a 'from' field in
+          the policy. [ NOT DOING THIS: and mark those as unlabeled where the label
+          does not appear in the new policy anymore (deletion) ]
+        - relabel all VMs where there is a 'from' field in the
+          policy and mark those as unlabeled where the label
+          does not appear in the new policy anymore; no running
+          or paused VM may be unlabeled through this
+        - check that under the new labeling conditions the VMs
+          still have access to their resources as before. Unlabeled
+          resources are inaccessible. If this check fails, the
+          update failed.
+        - Attempt changes in the hypervisor; if this step fails,
+          roll back the relabeling of resources and VMs
+        - Make the relabeling of resources and VMs permanent
+    """
+    rc = xsconstants.XSERR_SUCCESS
+
+    domain_label_map = {}
+    new_policyname = new_acmpol.get_name()
+    new_policytype = new_acmpol.get_type_name()
+    cur_policyname = cur_acmpol.get_name()
+    cur_policytype = cur_acmpol.get_type_name()
+    polnew_reslabels = new_acmpol.policy_get_resourcelabel_names()
+    errors=""
+
+    try:
+        __resfile_lock.acquire()
+        mapfile_lock()
+
+        # Get all domains' dominfo.
+        from xen.xend import XendDomain
+        dominfos = XendDomain.instance().list('all')
+
+        log.info("----------------------------------------------")
+        # relabel resources
+
+        access_control = {}
+        try:
+            access_control = dictio.dict_read("resources", res_label_filename)
+        finally:
+            pass
+        for key, labeldata in access_control.items():
+            if len(labeldata) == 2:
+                policy, label = labeldata
+                policytype = xsconstants.ACM_POLICY_ID
+            elif len(labeldata) == 3:
+                policytype, policy, label = labeldata
+            else:
+                return -xsconstants.XSERR_BAD_LABEL_FORMAT, ""
+
+            if policytype != cur_policytype or \
+               policy     != cur_policyname:
+                continue
+
+            # label been renamed or deleted?
+            if reslabel_map.has_key(label) and cur_policyname == policy:
+                label = reslabel_map[label]
+            elif label not in polnew_reslabels:
+                policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
+            # Update entry
+            access_control[key] = \
+                   tuple([ policytype, new_policyname, label ])
+
+        # All resources have new labels in the access_control map
+        # There may still be labels in there that are invalid now.
+
+        # Do this in memory without writing to disk:
+        #  - Relabel all domains independent of whether they are running
+        #    or not
+        #  - later write back to config files
+        polnew_vmlabels = new_acmpol.policy_get_virtualmachinelabel_names()
+
+        for dominfo in dominfos:
+            sec_lab = dominfo.get_security_label()
+            if not sec_lab:
+                continue
+            policytype, policy, vmlabel = sec_lab.split(":")
+            name  = dominfo.getName()
+
+            if policytype != cur_policytype or \
+               policy     != cur_policyname:
+                continue
+
+            new_vmlabel = vmlabel
+            if vmlabel_map.has_key(vmlabel):
+                new_vmlabel = vmlabel_map[vmlabel]
+            if new_vmlabel not in polnew_vmlabels:
+                policytype = xsconstants.INVALID_POLICY_PREFIX + policytype
+            new_seclab = "%s:%s:%s" % \
+                    (policytype, new_policyname, new_vmlabel)
+
+            domain_label_map[dominfo] = [ sec_lab, new_seclab ]
+
+            if dominfo._stateGet() in (DOM_STATE_PAUSED, DOM_STATE_RUNNING):
+                compatible = __resources_compatible_with_vmlabel(new_acmpol,
+                                                      dominfo,
+                                                      new_vmlabel,
+                                                      access_control)
+                log.info("Domain %s with new label '%s' can access its "
+                         "resources? : %s" %
+                         (name, new_vmlabel, str(compatible)))
+                log.info("VM labels in new domain: %s" %
+                         new_acmpol.policy_get_virtualmachinelabel_names())
+                if not compatible:
+                    return (-xsconstants.XSERR_RESOURCE_ACCESS, "")
+
+        rc, errors = hv_chg_policy(bin_pol, del_array, chg_array)
+        if rc == 0:
+            # Write the relabeled resources back into the file
+            dictio.dict_write(access_control, "resources", res_label_filename)
+            # Properly update all VMs to their new labels
+            for dominfo, labels in domain_label_map.items():
+                sec_lab, new_seclab = labels
+                if sec_lab != new_seclab:
+                    log.info("Updating domain %s to new label '%s'." % \
+                             (new_seclab, sec_lab))
+                    # This better be working!
+                    dominfo.set_security_label(new_seclab,
+                                               sec_lab,
+                                               new_acmpol)
+    finally:
+        log.info("----------------------------------------------")
+        mapfile_unlock()
+        __resfile_lock.release()
+
+    return rc, errors

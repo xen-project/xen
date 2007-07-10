@@ -15,7 +15,7 @@ PROGRAMS_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
 
 INCLUDES += -I $(XEN_LIBXC) -I $(XEN_XENSTORE)
 
-CFLAGS += -Werror -fno-strict-aliasing
+CFLAGS += -Werror
 CFLAGS += $(INCLUDES)
 
 # Make gcc generate dependencies.

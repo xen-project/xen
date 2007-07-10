@@ -700,13 +700,7 @@ def xm_save(args):
     if serverType == SERVER_XEN_API:       
         server.xenapi.VM.save(get_single_vm(dom), savefile, checkpoint)
     else:
-        try:
-            dominfo = parse_doms_info(server.xend.domain(dom))
-        except xmlrpclib.Fault, ex:
-            raise ex
-    
-        domid = dominfo['domid']
-        server.xend.domain.save(domid, savefile, checkpoint)
+        server.xend.domain.save(dom, savefile, checkpoint)
     
 def xm_restore(args):
     arg_check(args, "restore", 1, 2)
@@ -1529,7 +1523,7 @@ def xm_sched_credit(args):
 
     doms = filter(lambda x : domid_match(domid, x),
                   [parse_doms_info(dom)
-                  for dom in getDomains(None, 'running')])
+                  for dom in getDomains(None, 'all')])
 
     if weight is None and cap is None:
         if domid is not None and doms == []: 
@@ -1545,7 +1539,7 @@ def xm_sched_credit(args):
                         server.xenapi.VM.get_metrics(
                             get_single_vm(d['name'])))
                 else:
-                    info = server.xend.domain.sched_credit_get(d['domid'])
+                    info = server.xend.domain.sched_credit_get(d['name'])
             except xmlrpclib.Fault:
                 pass
 
@@ -1557,8 +1551,8 @@ def xm_sched_credit(args):
             info['cap']    = int(info['cap'])
             
             info['name']  = d['name']
-            info['domid'] = int(d['domid'])
-            print( ("%(name)-32s %(domid)5d %(weight)6d %(cap)4d") % info)
+            info['domid'] = str(d['domid'])
+            print( ("%(name)-32s %(domid)5s %(weight)6d %(cap)4d") % info)
     else:
         if domid is None:
             # place holder for system-wide scheduler parameters
@@ -1566,14 +1560,24 @@ def xm_sched_credit(args):
             usage('sched-credit')
 
         if serverType == SERVER_XEN_API:
-            server.xenapi.VM.add_to_VCPUs_params_live(
-                get_single_vm(domid),
-                "weight",
-                weight)
-            server.xenapi.VM.add_to_VCPUs_params_live(
-                get_single_vm(domid),
-                "cap",
-                cap)            
+            if doms[0]['domid']:
+                server.xenapi.VM.add_to_VCPUs_params_live(
+                    get_single_vm(domid),
+                    "weight",
+                    weight)
+                server.xenapi.VM.add_to_VCPUs_params_live(
+                    get_single_vm(domid),
+                    "cap",
+                    cap)
+            else:
+                server.xenapi.VM.add_to_VCPUs_params(
+                    get_single_vm(domid),
+                    "weight",
+                    weight)
+                server.xenapi.VM.add_to_VCPUs_params(
+                    get_single_vm(domid),
+                    "cap",
+                    cap)
         else:
             result = server.xend.domain.sched_credit_set(domid, weight, cap)
             if result != 0:

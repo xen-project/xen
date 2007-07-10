@@ -53,6 +53,8 @@
 #define set_segment_register(name, value)  \
     asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
+enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
+
 int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                          int inst_len);
 asmlinkage void do_IRQ(struct cpu_user_regs *);
@@ -69,7 +71,7 @@ static void *root_vmcb[NR_CPUS] __read_mostly;
 /* hardware assisted paging bits */
 extern int opt_hap_enabled;
 
-static inline void svm_inject_exception(struct vcpu *v, int trap, 
+static void svm_inject_exception(struct vcpu *v, int trap, 
                                         int ev, int error_code)
 {
     eventinj_t event;
@@ -98,6 +100,57 @@ static void stop_svm(void)
     write_efer(read_efer() & ~EFER_SVME);
 }
 
+#ifdef __x86_64__
+
+static int svm_lme_is_set(struct vcpu *v)
+{
+    u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;
+    return guest_efer & EFER_LME;
+}
+
+static int svm_long_mode_enabled(struct vcpu *v)
+{
+    u64 guest_efer = v->arch.hvm_svm.cpu_shadow_efer;
+    return guest_efer & EFER_LMA;
+}
+
+#else /* __i386__ */
+
+static int svm_lme_is_set(struct vcpu *v)
+{ return 0; }
+static int svm_long_mode_enabled(struct vcpu *v)
+{ return 0; }
+
+#endif
+
+static int svm_cr4_pae_is_set(struct vcpu *v)
+{
+    unsigned long guest_cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+    return guest_cr4 & X86_CR4_PAE;
+}
+
+static int svm_paging_enabled(struct vcpu *v)
+{
+    unsigned long guest_cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
+    return (guest_cr0 & X86_CR0_PE) && (guest_cr0 & X86_CR0_PG);
+}
+
+static int svm_pae_enabled(struct vcpu *v)
+{
+    unsigned long guest_cr4 = v->arch.hvm_svm.cpu_shadow_cr4;
+    return svm_paging_enabled(v) && (guest_cr4 & X86_CR4_PAE);
+}
+
+static int svm_nx_enabled(struct vcpu *v)
+{
+    return v->arch.hvm_svm.cpu_shadow_efer & EFER_NX;
+}
+
+static int svm_pgbit_test(struct vcpu *v)
+{
+    return v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PG;
+}
+
 static void svm_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
 {
@@ -122,7 +175,7 @@ static void svm_store_cpu_guest_regs(
     }
 }
 
-static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
+static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
     u32 ecx = regs->ecx;
@@ -149,7 +202,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             goto gp_fault;
         }
 
-#ifdef __x86_64__
         if ( (msr_content & EFER_LME) && !svm_lme_is_set(v) )
         {
             /* EFER.LME transition from 0 to 1. */
@@ -170,7 +222,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                 goto gp_fault;
             }
         }
-#endif /* __x86_64__ */
 
         v->arch.hvm_svm.cpu_shadow_efer = msr_content;
         vmcb->efer = msr_content | EFER_SVME;
@@ -188,14 +239,14 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         break;
 
     default:
-        return 0;
+        return HNDL_unhandled;
     }
 
-    return 1;
+    return HNDL_done;
 
  gp_fault:
     svm_inject_exception(v, TRAP_gp_fault, 1, 0);
-    return 0;
+    return HNDL_exception_raised;
 }
 
 
@@ -204,7 +255,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 #define savedebug(_v,_reg) \
     asm volatile ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
 
-static inline void svm_save_dr(struct vcpu *v)
+static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -224,7 +275,7 @@ static inline void svm_save_dr(struct vcpu *v)
 }
 
 
-static inline void __restore_debug_registers(struct vcpu *v)
+static void __restore_debug_registers(struct vcpu *v)
 {
     loaddebug(&v->arch.guest_context, 0);
     loaddebug(&v->arch.guest_context, 1);
@@ -546,7 +597,7 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
-static inline void svm_restore_dr(struct vcpu *v)
+static void svm_restore_dr(struct vcpu *v)
 {
     if ( unlikely(v->arch.guest_context.debugreg[7] & 0xFF) )
         __restore_debug_registers(v);
@@ -636,11 +687,8 @@ static void svm_sync_vmcb(struct vcpu *v)
 static unsigned long svm_get_segment_base(struct vcpu *v, enum x86_segment seg)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int long_mode = 0;
+    int long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
 
-#ifdef __x86_64__
-    long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
-#endif
     switch ( seg )
     {
     case x86_seg_cs: return long_mode ? 0 : vmcb->cs.base;
@@ -807,9 +855,9 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
 #ifdef __x86_64__
     /* Resume use of ISTs now that the host TR is reinstated. */
-    idt_tables[cpu][TRAP_double_fault].a  |= 1UL << 32; /* IST1 */
-    idt_tables[cpu][TRAP_nmi].a           |= 2UL << 32; /* IST2 */
-    idt_tables[cpu][TRAP_machine_check].a |= 3UL << 32; /* IST3 */
+    idt_tables[cpu][TRAP_double_fault].a  |= IST_DF << 32;
+    idt_tables[cpu][TRAP_nmi].a           |= IST_NMI << 32;
+    idt_tables[cpu][TRAP_machine_check].a |= IST_MCE << 32;
 #endif
 }
 
@@ -832,9 +880,9 @@ static void svm_ctxt_switch_to(struct vcpu *v)
      * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
      * But this doesn't matter: the IST is only req'd to handle SYSCALL/SYSRET.
      */
-    idt_tables[cpu][TRAP_double_fault].a  &= ~(3UL << 32);
-    idt_tables[cpu][TRAP_nmi].a           &= ~(3UL << 32);
-    idt_tables[cpu][TRAP_machine_check].a &= ~(3UL << 32);
+    idt_tables[cpu][TRAP_double_fault].a  &= ~(7UL << 32);
+    idt_tables[cpu][TRAP_nmi].a           &= ~(7UL << 32);
+    idt_tables[cpu][TRAP_machine_check].a &= ~(7UL << 32);
 #endif
 
     svm_restore_dr(v);
@@ -1123,7 +1171,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb,
     __update_guest_eip(vmcb, inst_len);
 }
 
-static inline unsigned long *get_reg_p(
+static unsigned long *get_reg_p(
     unsigned int gpreg, 
     struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
@@ -1188,7 +1236,7 @@ static inline unsigned long *get_reg_p(
 }
 
 
-static inline unsigned long get_reg(
+static unsigned long get_reg(
     unsigned int gpreg, struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
     unsigned long *gp;
@@ -1197,7 +1245,7 @@ static inline unsigned long get_reg(
 }
 
 
-static inline void set_reg(
+static void set_reg(
     unsigned int gpreg, unsigned long value, 
     struct cpu_user_regs *regs, struct vmcb_struct *vmcb)
 {
@@ -1300,7 +1348,7 @@ static void svm_get_prefix_info(struct vcpu *v, unsigned int dir,
 
 
 /* Get the address of INS/OUTS instruction */
-static inline int svm_get_io_address(
+static int svm_get_io_address(
     struct vcpu *v, struct cpu_user_regs *regs,
     unsigned int size, ioio_info_t info,
     unsigned long *count, unsigned long *addr)
@@ -1311,10 +1359,8 @@ static inline int svm_get_io_address(
     svm_segment_register_t *seg = NULL;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-#ifdef __x86_64__
-    /* If we're in long mode, we shouldn't check the segment presence & limit */
+    /* If we're in long mode, don't check the segment presence & limit */
     long_mode = vmcb->cs.attr.fields.l && svm_long_mode_enabled(v);
-#endif
 
     /* d field of cs.attr is 1 for 32-bit, 0 for 16 or 64 bit. 
      * l field combined with EFER_LMA says whether it's 16 or 64 bit. 
@@ -1641,7 +1687,6 @@ static int svm_set_cr0(unsigned long value)
 
     if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
     {
-#if defined(__x86_64__)
         if ( svm_lme_is_set(v) )
         {
             if ( !svm_cr4_pae_is_set(v) )
@@ -1654,7 +1699,6 @@ static int svm_set_cr0(unsigned long value)
             v->arch.hvm_svm.cpu_shadow_efer |= EFER_LMA;
             vmcb->efer |= EFER_LMA | EFER_LME;
         }
-#endif  /* __x86_64__ */
 
         if ( !paging_mode_hap(v->domain) )
         {
@@ -1674,8 +1718,8 @@ static int svm_set_cr0(unsigned long value)
             if ( old_base_mfn )
                 put_page(mfn_to_page(old_base_mfn));
 
-            HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                        (unsigned long) (mfn << PAGE_SHIFT));
+            HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
+                        v->arch.hvm_vmx.cpu_cr3, mfn);
         }
     }
     else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
@@ -1702,8 +1746,7 @@ static int svm_set_cr0(unsigned long value)
     if ( (value ^ old_value) & X86_CR0_PG )
     {
         paging_update_paging_modes(v);
-        /* signal paging update to ASID handler */
-        svm_asid_g_update_paging (v);
+        svm_asid_g_update_paging(v);
     }
 
     return 1;
@@ -1852,8 +1895,8 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         {
             if ( svm_pgbit_test(v) )
             {
-                /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 3
+                /* The guest is a 32-bit PAE guest. */
                 unsigned long mfn, old_base_mfn;
                 mfn = get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT);
                 if ( !mfn_valid(mfn) || 
@@ -1863,7 +1906,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 /*
                  * Now arch.guest_table points to machine physical.
                  */
-
                 old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
                 v->arch.guest_table = pagetable_from_pfn(mfn);
                 if ( old_base_mfn )
@@ -1871,9 +1913,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                 paging_update_paging_modes(v);
                 /* signal paging update to ASID handler */
                 svm_asid_g_update_paging (v);
-
-                HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
-                            (unsigned long) (mfn << PAGE_SHIFT));
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, 
                             "Update CR3 value = %lx, mfn = %lx",
@@ -2067,7 +2106,7 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
     return result;
 }
 
-static inline void svm_do_msr_access(
+static void svm_do_msr_access(
     struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -2159,8 +2198,16 @@ static inline void svm_do_msr_access(
             break;
 
         default:
-            if ( !long_mode_do_msr_write(regs) )
+            switch ( long_mode_do_msr_write(regs) )
+            {
+            case HNDL_unhandled:
                 wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+                break;
+            case HNDL_exception_raised:
+                return;
+            case HNDL_done:
+                break;
+            }
             break;
         }
 
@@ -2170,7 +2217,7 @@ static inline void svm_do_msr_access(
     __update_guest_eip(vmcb, inst_len);
 }
 
-static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
+static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 {
     enum hvm_intack type = hvm_vcpu_has_pending_irq(current);
 

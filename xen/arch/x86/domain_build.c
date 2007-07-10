@@ -375,9 +375,6 @@ int __init construct_dom0(
             panic("Domain 0 expects too high a hypervisor start address.\n");
     }
 
-    if ( parms.f_required[0] /* Huh? -- kraxel */ )
-            panic("Domain 0 requires an unsupported hypervisor feature.\n");
-
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 

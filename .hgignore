@@ -67,6 +67,9 @@
 ^linux-[^/]*-xen0/.*$
 ^linux-[^/]*-xenU/.*$
 ^linux-[^/]*-paravirt/.*$
+^linux-[^/]*-mm/.*$
+^linux-[^/]*-rc/.*$
+^linux-[^/]*-tip/.*$
 ^linux-[^/]*\.patch$
 ^mkddbxen$
 ^netbsd-[^/]*-tools/.*$
@@ -241,6 +244,7 @@
 ^xen/arch/powerpc/dom0\.bin$
 ^xen/arch/powerpc/asm-offsets\.s$
 ^xen/arch/powerpc/firmware$
+^xen/arch/powerpc/firmware.dbg$
 ^xen/arch/powerpc/firmware_image.bin$
 ^xen/arch/powerpc/xen\.lds$
 ^xen/arch/powerpc/\.xen-syms$

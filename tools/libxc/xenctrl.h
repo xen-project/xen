@@ -153,7 +153,7 @@ typedef struct xc_dominfo {
     uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1,
                   paused:1, blocked:1, running:1,
-                  hvm:1;
+                  hvm:1, debugged:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;
@@ -485,6 +485,7 @@ int xc_readconsolering(int xc_handle,
 int xc_send_debug_keys(int xc_handle, char *keys);
 
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
+typedef uint32_t xc_cpu_to_node_t;
 int xc_physinfo(int xc_handle,
                 xc_physinfo_t *info);
 

@@ -122,7 +122,8 @@ struct paging_mode {
     void          (*update_cr3            )(struct vcpu *v, int do_locking);
     void          (*update_paging_modes   )(struct vcpu *v);
     void          (*write_p2m_entry       )(struct vcpu *v, unsigned long gfn,
-                                            l1_pgentry_t *p, l1_pgentry_t new, 
+                                            l1_pgentry_t *p, mfn_t table_mfn, 
+                                            l1_pgentry_t new, 
                                             unsigned int level);
     int           (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);
@@ -291,17 +292,22 @@ static inline void safe_write_pte(l1_pgentry_t *p, l1_pgentry_t new)
 }
 
 /* Atomically write a P2M entry and update the paging-assistance state 
- * appropriately. */
+ * appropriately. 
+ * Arguments: the domain in question, the GFN whose mapping is being updated, 
+ * a pointer to the entry to be written, the MFN in which the entry resides, 
+ * the new contents of the entry, and the level in the p2m tree at which 
+ * we are writing. */
 static inline void paging_write_p2m_entry(struct domain *d, unsigned long gfn, 
-                                          l1_pgentry_t *p, l1_pgentry_t new, 
-                                          unsigned int level)
+                                          l1_pgentry_t *p, mfn_t table_mfn,
+                                          l1_pgentry_t new, unsigned int level)
 {
     struct vcpu *v = current;
     if ( v->domain != d )
         v = d->vcpu[0];
     if ( likely(v && paging_mode_enabled(d) && v->arch.paging.mode != NULL) )
     {
-        return v->arch.paging.mode->write_p2m_entry(v, gfn, p, new, level);
+        return v->arch.paging.mode->write_p2m_entry(v, gfn, p, table_mfn,
+                                                    new, level);
     }
     else 
         safe_write_pte(p, new);

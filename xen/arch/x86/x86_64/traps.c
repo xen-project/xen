@@ -292,11 +292,11 @@ void __init percpu_traps_init(void)
 
     if ( cpu == 0 )
     {
-        /* Specify dedicated interrupt stacks for NMIs and double faults. */
+        /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
         set_intr_gate(TRAP_double_fault, &double_fault);
-        idt_table[TRAP_double_fault].a  |= 1UL << 32; /* IST1 */
-        idt_table[TRAP_nmi].a           |= 2UL << 32; /* IST2 */
-        idt_table[TRAP_machine_check].a |= 3UL << 32; /* IST3 */
+        idt_table[TRAP_double_fault].a  |= IST_DF << 32;
+        idt_table[TRAP_nmi].a           |= IST_NMI << 32;
+        idt_table[TRAP_machine_check].a |= IST_MCE << 32;
 
         /*
          * The 32-on-64 hypercall entry vector is only accessible from ring 1.
@@ -311,17 +311,20 @@ void __init percpu_traps_init(void)
     stack_bottom = (char *)get_stack_bottom();
     stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
 
-    /* Machine Check handler has its own per-CPU 1kB stack. */
-    init_tss[cpu].ist[2] = (unsigned long)&stack[1024];
+    /* IST_MAX IST pages + 1 syscall page + 1 guard page + primary stack. */
+    BUILD_BUG_ON((IST_MAX + 2) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
 
-    /* Double-fault handler has its own per-CPU 1kB stack. */
-    init_tss[cpu].ist[0] = (unsigned long)&stack[2048];
+    /* Machine Check handler has its own per-CPU 4kB stack. */
+    init_tss[cpu].ist[IST_MCE] = (unsigned long)&stack[IST_MCE * PAGE_SIZE];
 
-    /* NMI handler has its own per-CPU 1kB stack. */
-    init_tss[cpu].ist[1] = (unsigned long)&stack[3072];
+    /* Double-fault handler has its own per-CPU 4kB stack. */
+    init_tss[cpu].ist[IST_DF] = (unsigned long)&stack[IST_DF * PAGE_SIZE];
+
+    /* NMI handler has its own per-CPU 4kB stack. */
+    init_tss[cpu].ist[IST_NMI] = (unsigned long)&stack[IST_NMI * PAGE_SIZE];
 
     /* Trampoline for SYSCALL entry from long mode. */
-    stack = &stack[3072]; /* Skip the NMI and DF stacks. */
+    stack = &stack[IST_MAX * PAGE_SIZE]; /* Skip the IST stacks. */
     wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32));
     stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS64);
 

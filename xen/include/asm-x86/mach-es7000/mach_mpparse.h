@@ -3,9 +3,8 @@
 
 #include <xen/acpi.h>
 
-extern int parse_unisys_oem (char *oemptr);
+extern int parse_unisys_oem(char *oemptr);
 extern int find_unisys_acpi_oem_table(unsigned long *oem_addr);
-extern void setup_unisys(void);
 
 static inline int mps_oem_check(struct mp_config_table *mpc, char *oem,
 		char *productid)
@@ -36,10 +35,8 @@ static inline int acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 	if (!find_unisys_acpi_oem_table(&oem_addr)) {
 		if (es7000_check_dsdt())
 			return parse_unisys_oem((char *)oem_addr);
-		else {
-			setup_unisys();
+		else
 			return 1;
-		}
 	}
 	return 0;
 }

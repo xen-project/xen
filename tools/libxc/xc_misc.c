@@ -60,6 +60,8 @@ int xc_physinfo(int xc_handle,
 
     sysctl.cmd = XEN_SYSCTL_physinfo;
 
+    memcpy(&sysctl.u.physinfo, put_info, sizeof(*put_info));
+
     if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
         return ret;
 

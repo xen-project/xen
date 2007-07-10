@@ -29,7 +29,6 @@
 #include "xenstored_watch.h"
 #include "xs_lib.h"
 #include "utils.h"
-#include "xenstored_test.h"
 #include "xenstored_domain.h"
 
 extern int quota_nb_watch_per_domain;
@@ -195,17 +194,6 @@ void conn_delete_all_watches(struct connection *conn)
 		domain_watch_dec(conn);
 	}
 }
-
-#ifdef TESTING
-void dump_watches(struct connection *conn)
-{
-	struct watch *watch;
-
-	list_for_each_entry(watch, &conn->watches, list)
-		printf("    watch on %s token %s\n",
-		       watch->node, watch->token);
-}
-#endif
 
 /*
  * Local variables:

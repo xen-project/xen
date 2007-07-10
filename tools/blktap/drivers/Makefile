@@ -10,7 +10,6 @@ LIBAIO_DIR   = ../../libaio/src
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I $(XEN_LIBXC) -I $(LIBAIO_DIR)
 CFLAGS   += $(INCLUDES) -I. -I../../xenstore 
 CFLAGS   += -D_GNU_SOURCE

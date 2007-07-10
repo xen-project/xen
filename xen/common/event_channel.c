@@ -79,6 +79,9 @@ static int get_free_port(struct domain *d)
     struct evtchn *chn;
     int            port;
 
+    if ( d->is_dying )
+        return -EINVAL;
+
     for ( port = 0; port_is_valid(d, port); port++ )
         if ( evtchn_from_port(d, port)->state == ECS_FREE )
             return port;
@@ -374,14 +377,7 @@ static long __evtchn_close(struct domain *d1, int port1)
 
             /* If we unlock d1 then we could lose d2. Must get a reference. */
             if ( unlikely(!get_domain(d2)) )
-            {
-                /*
-                 * Failed to obtain a reference. No matter: d2 must be dying
-                 * and so will close this event channel for us.
-                 */
-                d2 = NULL;
-                goto out;
-            }
+                BUG();
 
             if ( d1 < d2 )
             {
@@ -403,7 +399,6 @@ static long __evtchn_close(struct domain *d1, int port1)
              * port in ECS_CLOSED. It must have passed through that state for
              * us to end up here, so it's a valid error to return.
              */
-            BUG_ON(d1 != current->domain);
             rc = -EINVAL;
             goto out;
         }
@@ -960,14 +955,22 @@ void evtchn_destroy(struct domain *d)
 {
     int i;
 
+    /* After this barrier no new event-channel allocations can occur. */
+    BUG_ON(!d->is_dying);
+    spin_barrier(&d->evtchn_lock);
+
+    /* Close all existing event channels. */
     for ( i = 0; port_is_valid(d, i); i++ )
     {
         evtchn_from_port(d, i)->consumer_is_xen = 0;
         (void)__evtchn_close(d, i);
     }
 
+    /* Free all event-channel buckets. */
+    spin_lock(&d->evtchn_lock);
     for ( i = 0; i < NR_EVTCHN_BUCKETS; i++ )
         xfree(d->evtchn[i]);
+    spin_unlock(&d->evtchn_lock);
 }
 
 /*

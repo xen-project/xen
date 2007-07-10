@@ -165,8 +165,6 @@
                 [1 - (&((k xen_ ## n *)0)->f1.f2.f3 != \
                    &((k compat_ ## n *)0)->f1.f2.f3) * 2]
 
-extern int compat_disabled;
-
 int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...);
 
 /* In-place translation functons: */

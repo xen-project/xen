@@ -16,6 +16,7 @@ obj-y += leap.o
 obj-y += memory.o
 obj-y += ofh.o
 obj-y += papr.o
+obj-y += rtas.o
 obj-y += services.o
 obj-y += vdevice.o
 obj-y += xencomm.o

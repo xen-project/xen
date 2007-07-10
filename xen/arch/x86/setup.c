@@ -109,7 +109,7 @@ extern void early_cpu_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
 
-char __attribute__ ((__section__(".bss.page_aligned"))) cpu0_stack[STACK_SIZE];
+char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
@@ -172,9 +172,10 @@ static unsigned long __initdata initial_images_start, initial_images_end;
 
 unsigned long __init initial_images_nrpages(void)
 {
-    unsigned long s = initial_images_start + PAGE_SIZE - 1;
-    unsigned long e = initial_images_end;
-    return ((e >> PAGE_SHIFT) - (s >> PAGE_SHIFT));
+    ASSERT(!(initial_images_start & ~PAGE_MASK));
+    ASSERT(!(initial_images_end   & ~PAGE_MASK));
+    return ((initial_images_end >> PAGE_SHIFT) -
+            (initial_images_start >> PAGE_SHIFT));
 }
 
 void __init discard_initial_images(void)
@@ -293,7 +294,7 @@ static void __init move_memory(
 static struct e820map __initdata boot_e820;
 
 /* Reserve area (@s,@e) in the temporary bootstrap e820 map. */
-static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
+static int __init reserve_in_boot_e820(unsigned long s, unsigned long e)
 {
     uint64_t rs, re;
     int i;
@@ -303,23 +304,28 @@ static void __init reserve_in_boot_e820(unsigned long s, unsigned long e)
         /* Have we found the e820 region that includes the specified range? */
         rs = boot_e820.map[i].addr;
         re = rs + boot_e820.map[i].size;
-        if ( (s < rs) || (e > re) )
-            continue;
-
-        /* Start fragment. */
-        boot_e820.map[i].size = s - rs;
-
-        /* End fragment. */
-        if ( e < re )
-        {
-            memmove(&boot_e820.map[i+1], &boot_e820.map[i],
-                    (boot_e820.nr_map-i) * sizeof(boot_e820.map[0]));
-            boot_e820.nr_map++;
-            i++;
-            boot_e820.map[i].addr = e;
-            boot_e820.map[i].size = re - e;
-        }
+        if ( (s >= rs) && (e <= re) )
+            goto found;
     }
+
+    return 0;
+
+ found:
+    /* Start fragment. */
+    boot_e820.map[i].size = s - rs;
+
+    /* End fragment. */
+    if ( e < re )
+    {
+        memmove(&boot_e820.map[i+1], &boot_e820.map[i],
+                (boot_e820.nr_map-i) * sizeof(boot_e820.map[0]));
+        boot_e820.nr_map++;
+        i++;
+        boot_e820.map[i].addr = e;
+        boot_e820.map[i].size = re - e;
+    }
+
+    return 1;
 }
 
 struct boot_video_info {
@@ -740,11 +746,18 @@ void __init __start_xen(unsigned long mbi_p)
         /* Is the region suitable for relocating the multiboot modules? */
         if ( !initial_images_start && (s < e) && ((e-s) >= modules_length) )
         {
-            e -= modules_length;
+            initial_images_end = e;
+            e = (e - modules_length) & PAGE_MASK;
             initial_images_start = e;
-            initial_images_end = initial_images_start + modules_length;
             move_memory(initial_images_start, 
                         mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
+        }
+
+        if ( !kexec_crash_area.start && (s < e) &&
+             ((e-s) >= kexec_crash_area.size) )
+        {
+            e = (e - kexec_crash_area.size) & PAGE_MASK;
+            kexec_crash_area.start = e;
         }
     }
 
@@ -768,6 +781,26 @@ void __init __start_xen(unsigned long mbi_p)
 #else
     init_boot_pages(xenheap_phys_end, 16<<20); /* Initial seed: 4MB */
 #endif
+
+    if ( kexec_crash_area.size != 0 )
+    {
+        unsigned long kdump_start = kexec_crash_area.start;
+        unsigned long kdump_size  = kexec_crash_area.size;
+
+        kdump_size = (kdump_size + PAGE_SIZE - 1) & PAGE_MASK;
+
+        if ( !reserve_in_boot_e820(kdump_start, kdump_size) )
+        {
+            printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at 0x%lx)"
+                   "\n", kdump_size >> 20, kdump_size >> 10, kdump_start);
+            kexec_crash_area.start = kexec_crash_area.size = 0;
+        }
+        else
+        {
+            printk("Kdump: %luMB (%lukB) at 0x%lx\n",
+                   kdump_size >> 20, kdump_size >> 10, kdump_start);
+        }
+    }
 
     /*
      * With the boot allocator now seeded, we can walk every RAM region and
@@ -795,51 +828,6 @@ void __init __start_xen(unsigned long mbi_p)
                 s >> PAGE_SHIFT, (map_e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
 
         init_boot_pages(s, e);
-    }
-
-    if ( (kexec_crash_area.size > 0) && (kexec_crash_area.start > 0) )
-    {
-        unsigned long kdump_start, kdump_size, k;
-
-        /* Mark images pages as free for now. */
-        init_boot_pages(initial_images_start, initial_images_end);
-
-        kdump_start = kexec_crash_area.start;
-        kdump_size = kexec_crash_area.size;
-
-        printk("Kdump: %luMB (%lukB) at 0x%lx\n",
-               kdump_size >> 20,
-               kdump_size >> 10,
-               kdump_start);
-
-        if ( (kdump_start & ~PAGE_MASK) || (kdump_size & ~PAGE_MASK) )
-            panic("Kdump parameters not page aligned\n");
-
-        kdump_start >>= PAGE_SHIFT;
-        kdump_size >>= PAGE_SHIFT;
-
-        /* Allocate pages for Kdump memory area. */
-        if ( !reserve_boot_pages(kdump_start, kdump_size) )
-            panic("Unable to reserve Kdump memory\n");
-
-        /* Allocate pages for relocated initial images. */
-        k = ((initial_images_end - initial_images_start) & ~PAGE_MASK) ? 1 : 0;
-        k += (initial_images_end - initial_images_start) >> PAGE_SHIFT;
-
-#if defined(CONFIG_X86_32)
-        /* Must allocate within bootstrap 1:1 limits. */
-        k = alloc_boot_low_pages(k, 1); /* 0x0 - BOOTSTRAP_DIRECTMAP_END */
-#else
-        k = alloc_boot_pages(k, 1);
-#endif
-        if ( k == 0 )
-            panic("Unable to allocate initial images memory\n");
-
-        move_memory(k << PAGE_SHIFT, initial_images_start, initial_images_end);
-
-        initial_images_end -= initial_images_start;
-        initial_images_start = k << PAGE_SHIFT;
-        initial_images_end += initial_images_start;
     }
 
     memguard_init();

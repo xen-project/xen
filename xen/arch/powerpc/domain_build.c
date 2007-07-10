@@ -68,6 +68,7 @@ int construct_dom0(struct domain *d,
     struct vcpu *v;
     ulong dst;
     u64 *ofh_tree;
+    ulong firmware_base;
     uint rma_nrpages = 1 << cpu_default_rma_order_pages();
     ulong rma_sz;
     ulong rma;
@@ -78,6 +79,7 @@ int construct_dom0(struct domain *d,
     ulong mod_len = 0;
     ulong shared_info_addr;
     uint extent_size = 1 << cpu_extent_order();
+    ulong sz;
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -86,26 +88,6 @@ int construct_dom0(struct domain *d,
         panic("No Dom0 image supplied\n");
 
     printk("*** LOADING DOMAIN 0 ***\n");
-
-    rc = elf_init(&elf, (void *)image_start, image_len);
-    if (rc)
-        return rc;
-#ifdef VERBOSE
-    elf_set_verbose(&elf);
-#endif
-    elf_parse_binary(&elf);
-    if (0 != (elf_xen_parse(&elf, &parms)))
-        return rc;
-
-    printk("Dom0 kernel: %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
-            elf_64bit(&elf) ? "64-bit" : "32-bit",
-            elf.pstart, elf.pend);
-
-    /* elf contains virtual addresses that can have the upper bits
-     * masked while running in real mode, so we do the masking as well
-     * as well */
-    parms.virt_kend = RM_MASK(parms.virt_kend, 42);
-    parms.virt_entry = RM_MASK(parms.virt_entry, 42);
 
     /* default is the max(1/16th of memory, CONFIG_MIN_DOM0_PAGES) */
     if (dom0_nrpages == 0) {
@@ -196,41 +178,43 @@ int construct_dom0(struct domain *d,
     v = d->vcpu[0];
     cpu_init_vcpu(v);
 
-    /* OF usually sits here:
-     *   - Linux needs it to be loaded before the vmlinux or initrd
-     *   - AIX demands it to be @ 32M.
-     */
-    dst = (32 << 20);
+    /* convert xen pointer shared_info into guest physical */
+    shared_info_addr = (ulong)d->shared_info - page_to_maddr(d->arch.rma_page);
 
-    /* Put stack below everything. */
-    v->arch.ctxt.gprs[1] = dst - STACK_FRAME_OVERHEAD;
+    /* start loading stuff */
+    rc = elf_init(&elf, (void *)image_start, image_len);
+    if (rc)
+        return rc;
+#ifdef VERBOSE
+    elf_set_verbose(&elf);
+#endif
+    elf_parse_binary(&elf);
+    if (0 != (elf_xen_parse(&elf, &parms)))
+        return rc;
 
-    /* copy relative to Xen */
-    dst += rma;
+    printk("Dom0 kernel: %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+            elf_64bit(&elf) ? "64-bit" : "32-bit",
+            elf.pstart, elf.pend);
 
-    ASSERT((dst - rma) + (ulong)firmware_image_size < eomem);
-    printk("loading OFH: 0x%lx, RMA: 0x%lx\n", dst, dst - rma);
-    memcpy((void *)dst, firmware_image_start, (ulong)firmware_image_size);
+    /* elf contains virtual addresses that can have the upper bits
+     * masked while running in real mode, so we do the masking as well
+     * as well */
+    parms.virt_kend = RM_MASK(parms.virt_kend, 42);
+    parms.virt_entry = RM_MASK(parms.virt_entry, 42);
 
-    v->arch.ctxt.gprs[5] = (dst - rma);
-    ofh_tree = (u64 *)(dst + 0x10);
-    ASSERT(*ofh_tree == 0xdeadbeef00000000);
-
-    /* accomodate for a modest bss section */
-    dst = ALIGN_UP(dst + (ulong)firmware_image_size + PAGE_SIZE, PAGE_SIZE);
-    ASSERT((dst - rma) + oftree_len < eomem);
-
-    *ofh_tree = dst - rma;
-    printk("loading OFD: 0x%lx RMA: 0x%lx, 0x%lx\n", dst, dst - rma,
-           oftree_len);
-    memcpy((void *)dst, (void *)oftree, oftree_len);
-    dst = ALIGN_UP(dst + oftree_len, PAGE_SIZE);
+    /* set the MSR bit correctly */
+    if (elf_64bit(&elf))
+        v->arch.ctxt.msr = MSR_SF;
+    else
+        v->arch.ctxt.msr = 0;
 
     /* Load the dom0 kernel. */
-    elf.dest = (void *)dst;
+    elf.dest = (void *)(parms.virt_kstart + rma);
+
     elf_load_binary(&elf);
-    v->arch.ctxt.pc = dst - rma + (parms.virt_entry - parms.virt_kstart);
-    dst = ALIGN_UP(dst + parms.virt_kend, PAGE_SIZE);
+    v->arch.ctxt.pc = parms.virt_entry;
+
+    dst = ALIGN_UP(parms.virt_kend + rma, PAGE_SIZE);
 
     /* Load the initrd. */
     if (initrd_len > 0) {
@@ -247,14 +231,45 @@ int construct_dom0(struct domain *d,
         printk("no initrd\n");
     }
 
-    if (elf_64bit(&elf)) {
-        v->arch.ctxt.msr = MSR_SF;
-    } else {
-        v->arch.ctxt.msr = 0;
-    }
-    v->arch.ctxt.gprs[2] = 0;
     v->arch.ctxt.gprs[3] = mod_start;
     v->arch.ctxt.gprs[4] = mod_len;
+
+    /* OF usually sits here:
+     *   - Linux needs it to be loaded before the vmlinux or initrd
+     *   - AIX demands it to be @ 32M.
+     */
+    firmware_base = (32 << 20);
+    if (dst - rma > firmware_base)
+    panic("Firmware [0x%lx] will over-write images ending: 0x%lx\n",
+          firmware_base, dst - rma);
+    dst = firmware_base + rma;
+
+    /* Put stack below firmware. */
+    v->arch.ctxt.gprs[1] = dst - rma - STACK_FRAME_OVERHEAD;
+    v->arch.ctxt.gprs[2] = 0;
+
+    ASSERT((dst - rma) + (ulong)firmware_image_size < eomem);
+    printk("loading OFH: 0x%lx, RMA: 0x%lx\n", dst, dst - rma);
+    memcpy((void *)dst, firmware_image_start, (ulong)firmware_image_size);
+
+    v->arch.ctxt.gprs[5] = (dst - rma);
+    ofh_tree = (u64 *)(dst + 0x10);
+    ASSERT(*ofh_tree == 0xdeadbeef00000000);
+
+    /* accomodate for a modest bss section */
+    dst = ALIGN_UP(dst + (ulong)firmware_image_size + PAGE_SIZE, PAGE_SIZE);
+
+    ASSERT((dst - rma) + oftree_len < eomem);
+
+    *ofh_tree = dst - rma;
+    printk("loading OFD: 0x%lx RMA: 0x%lx, 0x%lx\n", dst, dst - rma,
+           oftree_len);
+    memcpy((void *)dst, (void *)oftree, oftree_len);
+
+    /* fixup and add stuff for dom0 */
+    sz = ofd_dom0_fixup(d, *ofh_tree + rma, cmdline, shared_info_addr);
+    printk("modified OFD size: 0x%lx\n", sz);
+    dst = ALIGN_UP(dst + sz + PAGE_SIZE, PAGE_SIZE);
 
 	printk("dom0 initial register state:\n"
 			"    pc %016lx msr %016lx\n"
@@ -267,11 +282,6 @@ int construct_dom0(struct domain *d,
 			v->arch.ctxt.gprs[3],
 			v->arch.ctxt.gprs[4],
 			v->arch.ctxt.gprs[5]);
-
-    /* convert xen pointer shared_info into guest physical */
-    shared_info_addr = (ulong)d->shared_info - page_to_maddr(d->arch.rma_page);
-
-    ofd_dom0_fixup(d, *ofh_tree + rma, cmdline, shared_info_addr);
 
     v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);

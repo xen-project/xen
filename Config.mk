@@ -17,8 +17,9 @@ CONFIG_$(XEN_OS) := y
 SHELL     ?= /bin/sh
 
 # Tools to run on system hosting the build
-HOSTCC     = gcc
-HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCC      = gcc
+HOSTCFLAGS  = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCFLAGS += -fno-strict-aliasing
 
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
@@ -57,6 +58,8 @@ CFLAGS += -DNDEBUG
 else
 CFLAGS += -g
 endif
+
+CFLAGS += -fno-strict-aliasing
 
 CFLAGS += -std=gnu99
 

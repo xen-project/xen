@@ -73,10 +73,17 @@ class BlkifController(DevController):
             back['uuid'] = uuid
 
         if security.on():
-            (label, ssidref, policy) = security.get_res_security_details(uname)
-            back.update({'acm_label'  : label,
-                         'acm_ssidref': str(ssidref),
-                         'acm_policy' : policy})
+            (label, ssidref, policy) = \
+                                 security.get_res_security_details(uname)
+            domain_label = self.vm.get_security_label()
+            if domain_label:
+                rc = security.res_security_check_xapi(label, ssidref, policy,
+                                                      domain_label)
+                if rc == 0:
+                    raise VmError("VM's access to block device '%s' denied." %
+                                  uname)
+            else:
+                raise VmError("VM must have a security label.")
 
         devid = blkif.blkdev_name_to_number(dev)
         if devid is None:

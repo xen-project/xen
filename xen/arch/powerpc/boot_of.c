@@ -1073,31 +1073,40 @@ static int __init boot_of_rtas(module_t *mod, multiboot_info_t *mbi)
 static void * __init boot_of_devtree(module_t *mod, multiboot_info_t *mbi)
 {
     void *oft;
-    ulong oft_sz = 48 * PAGE_SIZE;
+    ulong alloc_sz = 32 << 10;    /* 32KiB should be plenty */
+    ulong sz;
 
     /* snapshot the tree */
-    oft = (void *)boot_of_alloc(oft_sz);
+    oft = (void *)boot_of_alloc(alloc_sz);
     if (oft == NULL)
         of_panic("Could not allocate OFD tree\n");
 
     of_printf("creating oftree at: 0x%p\n", oft);
     of_test("package-to-path");
-    oft = ofd_create(oft, oft_sz);
+    oft = ofd_create(oft, alloc_sz);
     pkg_save(oft);
+    sz = ofd_size(oft);
 
-    if (ofd_size(oft) > oft_sz)
-         of_panic("Could not fit all of native devtree\n");
+    if (sz > alloc_sz)
+        of_panic("Could not fit all of native devtree in 0x%lx of memory\n",
+            alloc_sz);
 
     boot_of_fixup_refs(oft);
     boot_of_fixup_chosen(oft);
 
-    if (ofd_size(oft) > oft_sz)
-         of_panic("Could not fit all devtree fixups\n");
+    if (sz > alloc_sz)
+         of_panic("Could not fit all devtree fixupsin 0x%lx of memory\n",
+            alloc_sz);
 
     ofd_walk(oft, __func__, OFD_ROOT, /* add_hype_props */ NULL, 2);
 
     mod->mod_start = (ulong)oft;
-    mod->mod_end = mod->mod_start + oft_sz;
+    mod->mod_end = ALIGN_UP(mod->mod_start + sz, PAGE_SIZE);
+
+    if (mod->mod_end -mod->mod_start > alloc_sz)
+        of_panic("Could not fit all devtree module in 0x%lx of memory\n",
+            alloc_sz);
+
     of_printf("%s: devtree mod @ 0x%016x - 0x%016x\n", __func__,
               mod->mod_start, mod->mod_end);
 
