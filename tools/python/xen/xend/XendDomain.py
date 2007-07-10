@@ -1112,6 +1112,10 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot unpause privileged domain %s" % domid)
+            if dominfo._stateGet() not in (DOM_STATE_PAUSED, DOM_STATE_RUNNING):
+                raise VMBadState("Domain '%s' is not started" % domid,
+                                 POWER_STATE_NAMES[DOM_STATE_PAUSED],
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      int(dominfo.getDomid()))
             dominfo.unpause()
@@ -1137,6 +1141,10 @@ class XendDomain:
                 raise XendInvalidDomain(str(domid))
             if dominfo.getDomid() == DOM0_ID:
                 raise XendError("Cannot pause privileged domain %s" % domid)
+            if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+                raise VMBadState("Domain '%s' is not started" % domid,
+                                 POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                                 POWER_STATE_NAMES[dominfo._stateGet()])
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      int(dominfo.getDomid()))
             dominfo.pause()
