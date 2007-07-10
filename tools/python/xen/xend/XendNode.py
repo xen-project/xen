@@ -580,14 +580,17 @@ class XendNode:
             str='none\n'
         return str[:-1];
 
+    def count_cpus(self, pinfo):
+        count=0
+        node_to_cpu=pinfo['node_to_cpu']
+        for i in range(0, pinfo['nr_nodes']):
+            count+=len(node_to_cpu[i])
+        return count;
 
     def physinfo(self):
         info = self.xc.physinfo()
 
-        info['nr_cpus'] = (info['nr_nodes'] *
-                           info['sockets_per_node'] *
-                           info['cores_per_socket'] *
-                           info['threads_per_core'])
+        info['nr_cpus'] = self.count_cpus(info)
         info['cpu_mhz'] = info['cpu_khz'] / 1000
         
         # physinfo is in KiB, need it in MiB
