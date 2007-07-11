@@ -283,9 +283,13 @@ static void vmx_create_event_channels(struct vcpu *v)
 	}
 }
 
+/*
+ * Event channel has destoryed in domain_kill(), so we needn't
+ * do anything here
+ */
 static void vmx_release_assist_channel(struct vcpu *v)
 {
-	free_xen_event_channel(v, v->arch.arch_vmx.xen_port);
+	return;
 }
 
 /*
