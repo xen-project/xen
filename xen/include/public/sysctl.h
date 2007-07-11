@@ -185,6 +185,18 @@ struct xen_sysctl_getcpuinfo {
 typedef struct xen_sysctl_getcpuinfo xen_sysctl_getcpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t); 
 
+#define XEN_SYSCTL_availheap         9
+struct xen_sysctl_availheap {
+    /* IN variables. */
+    uint32_t min_bitwidth;  /* Smallest address width (zero if don't care). */
+    uint32_t max_bitwidth;  /* Largest address width (zero if don't care). */
+    int32_t  node;          /* NUMA node of interest (-1 for all nodes). */
+    /* OUT variables. */
+    uint64_t avail_bytes;   /* Bytes available in the specified region. */
+};
+typedef struct xen_sysctl_availheap xen_sysctl_availheap_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_availheap_t);
+ 
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -197,6 +209,7 @@ struct xen_sysctl {
         struct xen_sysctl_getdomaininfolist getdomaininfolist;
         struct xen_sysctl_debug_keys        debug_keys;
         struct xen_sysctl_getcpuinfo        getcpuinfo;
+        struct xen_sysctl_availheap         availheap;
         uint8_t                             pad[128];
     } u;
 };

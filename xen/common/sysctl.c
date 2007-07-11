@@ -21,6 +21,8 @@
 #include <xen/keyhandler.h>
 #include <asm/current.h>
 #include <public/sysctl.h>
+#include <asm/numa.h>
+#include <xen/nodemask.h>
 
 extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
@@ -166,6 +168,18 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
+    }
+    break;
+
+    case XEN_SYSCTL_availheap:
+    { 
+        op->u.availheap.avail_bytes = avail_domheap_pages_region(
+            op->u.availheap.node,
+            op->u.availheap.min_bitwidth,
+            op->u.availheap.max_bitwidth);
+        op->u.availheap.avail_bytes <<= PAGE_SHIFT;
+
+        ret = copy_to_guest(u_sysctl, op, 1) ? -EFAULT : 0;
     }
     break;
 
