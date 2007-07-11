@@ -1,0 +1,267 @@
+        .text
+
+#include <xen/config.h>
+#include <xen/multiboot.h>
+#include <public/xen.h>
+#include <asm/asm_defns.h>
+#include <asm/desc.h>
+#include <asm/page.h>
+#include <asm/msr.h>
+
+#if defined(__x86_64__)
+
+        .code64
+
+#define GREG(x)         %r##x
+#define SAVED_GREG(x)   saved_r##x(%rip)
+#define DECLARE_GREG(x) saved_r##x:     .quad   0
+#define SAVE_GREG(x)    movq GREG(x), SAVED_GREG(x)
+#define LOAD_GREG(x)    movq SAVED_GREG(x), GREG(x)
+
+#define REF(x)          x(%rip)
+
+#define RDMSR(ind, m)                   \
+        xorq    %rdx, %rdx;             \
+        mov     $ind, %ecx;             \
+        rdmsr;                          \
+        shlq    $0x20, %rdx;              \
+        orq     %rax, %rdx;             \
+        movq    %rdx, m(%rip);
+
+#define WRMSR(ind, m)                   \
+        mov     $ind, %ecx;             \
+        movq    m(%rip), %rdx;          \
+        mov     %edx, %eax;             \
+        shrq    $0x20, %rdx;              \
+        wrmsr;
+
+#else /* !defined(__x86_64__) */
+
+        .code32
+
+#define GREG(x)         %e##x
+#define SAVED_GREG(x)   saved_e##x
+#define DECLARE_GREG(x) saved_e##x:     .long   0
+#define SAVE_GREG(x)    movl GREG(x), SAVED_GREG(x)
+#define LOAD_GREG(x)    movl SAVED_GREG(x), GREG(x)
+
+#define REF(x)          x
+
+#endif
+
+ENTRY(do_suspend_lowlevel)
+
+        SAVE_GREG(sp)
+        SAVE_GREG(ax)
+        SAVE_GREG(bx)
+        SAVE_GREG(cx)
+        SAVE_GREG(dx)
+        SAVE_GREG(bp)
+        SAVE_GREG(si)
+        SAVE_GREG(di)
+
+#if defined(__x86_64__)
+
+        SAVE_GREG(8)     # save r8...r15
+        SAVE_GREG(9)
+        SAVE_GREG(10)
+        SAVE_GREG(11)
+        SAVE_GREG(12)
+        SAVE_GREG(13)
+        SAVE_GREG(14)
+        SAVE_GREG(15)
+        pushfq;
+        popq    SAVED_GREG(flags)
+
+        mov     %cr8, GREG(ax)
+        mov     GREG(ax), REF(saved_cr8)
+
+        RDMSR(MSR_FS_BASE, saved_fs_base)
+        RDMSR(MSR_GS_BASE, saved_gs_base)
+        RDMSR(MSR_SHADOW_GS_BASE, saved_kernel_gs_base)
+
+#else /* !defined(__x86_64__) */
+
+        pushfl;
+        popl    SAVED_GREG(flags)
+
+#endif
+
+        mov     %ds, REF(saved_ds)
+        mov     %es, REF(saved_es)
+        mov     %fs, REF(saved_fs)
+        mov     %gs, REF(saved_gs)
+        mov     %ss, REF(saved_ss)
+
+        sgdt    REF(saved_gdt)
+        sidt    REF(saved_idt)
+        sldt    REF(saved_ldt)
+
+        mov     %cr0, GREG(ax)
+        mov     GREG(ax), REF(saved_cr0)
+
+        mov     %cr3, GREG(ax)
+        mov     GREG(ax), REF(saved_cr3)
+
+        call    save_rest_processor_state
+
+#if defined(__x86_64__)
+
+        mov     $3, %rdi
+        xor     %eax, %eax
+
+#else /* !defined(__x86_64__) */
+
+        push    $3
+
+#endif
+
+        /* enter sleep state physically */
+        call    acpi_enter_sleep_state
+        jmp     __ret_point
+
+        .align  16
+        .globl  __ret_point
+__ret_point:
+
+        /* mmu_cr4_features contains latest cr4 setting */
+        mov     REF(mmu_cr4_features), GREG(ax)
+        mov     GREG(ax), %cr4
+
+        mov     REF(saved_cr3), GREG(ax)
+        mov     GREG(ax), %cr3
+
+        mov     REF(saved_cr0), GREG(ax)
+        mov     GREG(ax), %cr0
+
+        lgdt    REF(saved_gdt)
+        lidt    REF(saved_idt)
+        lldt    REF(saved_ldt)
+
+        mov     REF(saved_ss), %ss
+        LOAD_GREG(sp)
+
+#if defined(__x86_64__)
+
+        mov     REF(saved_cr8), %rax
+        mov     %rax, %cr8
+
+        pushq   SAVED_GREG(flags)
+        popfq
+
+        /* Idle vcpu doesn't need segment selectors reload, since
+         * those may contain stale value from other domains and 
+         * reload may result page fault due to no matched gdt entry
+         */
+        mov     $(STACK_SIZE - 8), %rax
+        or      %rsp, %rax
+        and     $~7, %rax
+        mov     (%rax), %rax
+        mov     0x10(%rax), %rax
+        cmpw    $0x7fff, (%rax)
+        je      1f
+
+        /* These selectors are from guest, and thus need reload */
+        mov     REF(saved_ds), %ds
+        mov     REF(saved_es), %es
+        mov     REF(saved_fs), %fs
+
+        /* gs load is special */
+        mov     REF(saved_gs), %rsi
+        mov     $3, %rdi        # SEGBASE_GS_USER_SEL
+        call    do_set_segment_base
+
+1:
+        # MSR restore
+        WRMSR(MSR_FS_BASE, saved_fs_base)
+        WRMSR(MSR_GS_BASE, saved_gs_base)
+        WRMSR(MSR_SHADOW_GS_BASE, saved_kernel_gs_base)
+
+#else /* !defined(__x86_64__) */
+
+        pushl   SAVED_GREG(flags)
+        popfl
+
+        /* No reload to fs/gs, which is saved in bottom stack already */
+        mov     REF(saved_ds), %ds
+        mov     REF(saved_es), %es
+
+#endif
+
+        call restore_rest_processor_state
+
+        LOAD_GREG(bp)
+        LOAD_GREG(ax)
+        LOAD_GREG(bx)
+        LOAD_GREG(cx)
+        LOAD_GREG(dx)
+        LOAD_GREG(si)
+        LOAD_GREG(di)
+#if defined(__x86_64__)
+        LOAD_GREG(8)     # save r8...r15
+        LOAD_GREG(9)
+        LOAD_GREG(10)
+        LOAD_GREG(11)
+        LOAD_GREG(12)
+        LOAD_GREG(13)
+        LOAD_GREG(14)
+        LOAD_GREG(15)
+#endif
+        ret 
+
+.data
+        .align 16
+saved_ds:        .word   0
+saved_es:        .word   0
+saved_ss:        .word   0
+saved_gs:        .word   0
+saved_fs:        .word   0
+
+        .align 4
+        .globl   saved_magic
+saved_magic:     .long   0x9abcdef0
+
+        .align 8
+DECLARE_GREG(sp)
+DECLARE_GREG(bp)
+DECLARE_GREG(ax)
+DECLARE_GREG(bx)
+DECLARE_GREG(cx)
+DECLARE_GREG(dx)
+DECLARE_GREG(si)
+DECLARE_GREG(di)
+DECLARE_GREG(flags)
+
+#if defined(__x86_64__)
+
+DECLARE_GREG(8)
+DECLARE_GREG(9)
+DECLARE_GREG(10)
+DECLARE_GREG(11)
+DECLARE_GREG(12)
+DECLARE_GREG(13)
+DECLARE_GREG(14)
+DECLARE_GREG(15)
+
+saved_gdt:      .quad   0,0
+saved_idt:      .quad   0,0
+saved_ldt:      .quad   0,0
+
+saved_cr0:      .quad   0
+saved_cr3:      .quad   0
+saved_cr8:      .quad   0
+
+saved_gs_base:  .quad   0
+saved_fs_base:  .quad   0
+saved_kernel_gs_base:   .quad   0
+
+#else /* !defined(__x86_64__) */
+
+saved_gdt:      .long   0,0
+saved_idt:      .long   0,0
+saved_ldt:      .long   0
+
+saved_cr0:      .long   0
+saved_cr3:      .long   0
+
+#endif 

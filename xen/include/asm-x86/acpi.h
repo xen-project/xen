@@ -173,6 +173,14 @@ extern unsigned long acpi_wakeup_address;
 /* early initialization routine */
 extern void acpi_reserve_bootmem(void);
 
+extern unsigned long acpi_video_flags;
+extern unsigned long saved_videomode;
+struct xenpf_set_acpi_sleep;
+struct xenpf_enter_acpi_sleep;
+extern int set_acpi_sleep_info(struct xenpf_set_acpi_sleep *info);
+extern int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep);
+extern int acpi_enter_state(u32 state);
+
 #endif /*CONFIG_ACPI_SLEEP*/
 
 extern u8 x86_acpiid_to_apicid[];
