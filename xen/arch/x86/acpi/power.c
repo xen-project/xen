@@ -82,10 +82,27 @@ static void device_power_up(void)
     console_resume();
 }
 
+static void freeze_domains(void)
+{
+    struct domain *d;
+
+    for_each_domain(d)
+        if (d->domain_id != 0)
+            domain_pause(d);
+}
+
+static void thaw_domains(void)
+{
+    struct domain *d;
+
+    for_each_domain(d)
+        if (d->domain_id != 0)
+            domain_unpause(d);
+}
+
 /* Main interface to do xen specific suspend/resume */
 int enter_state(u32 state)
 {
-    struct domain *d;
     unsigned long flags;
     int error;
 
@@ -99,9 +116,9 @@ int enter_state(u32 state)
     if (!spin_trylock(&pm_lock))
         return -EBUSY;
     
-    for_each_domain(d)
-        if (d->domain_id != 0)
-            domain_pause(d);
+    freeze_domains();
+
+    hvm_suspend_cpu();
 
     pmprintk(XENLOG_INFO, "PM: Preparing system for %s sleep\n",
         acpi_states[state]);
@@ -135,13 +152,11 @@ int enter_state(u32 state)
  Done:
     local_irq_restore(flags);
 
-    for_each_domain(d)
-       if (d->domain_id!=0)
-           domain_unpause(d);
+    hvm_resume_cpu();
 
+    thaw_domains();
     spin_unlock(&pm_lock);
     return error;
-
 }
 
 /*

@@ -78,8 +78,7 @@ void hvm_enable(struct hvm_function_table *fns)
 
 void hvm_disable(void)
 {
-    if ( hvm_enabled )
-        hvm_funcs.disable();
+    hvm_suspend_cpu();
 }
 
 void hvm_stts(struct vcpu *v)

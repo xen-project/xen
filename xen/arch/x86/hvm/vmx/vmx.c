@@ -907,15 +907,6 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     vmx_restore_dr(v);
 }
 
-static void stop_vmx(void)
-{
-    if ( !(read_cr4() & X86_CR4_VMXE) )
-        return;
-
-    __vmxoff();
-    clear_in_cr4(X86_CR4_VMXE);
-}
-
 static void vmx_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
 {
@@ -1244,7 +1235,6 @@ static void disable_intercept_for_msr(u32 msr)
 
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
-    .disable              = stop_vmx,
     .domain_initialise    = vmx_domain_initialise,
     .domain_destroy       = vmx_domain_destroy,
     .vcpu_initialise      = vmx_vcpu_initialise,
@@ -1271,7 +1261,9 @@ static struct hvm_function_table vmx_function_table = {
     .inject_exception     = vmx_inject_exception,
     .init_ap_context      = vmx_init_ap_context,
     .init_hypercall_page  = vmx_init_hypercall_page,
-    .event_injection_faulted = vmx_event_injection_faulted
+    .event_injection_faulted = vmx_event_injection_faulted,
+    .suspend_cpu          = vmx_suspend_cpu,
+    .resume_cpu           = vmx_resume_cpu,
 };
 
 int start_vmx(void)

@@ -45,7 +45,9 @@ u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
+static DEFINE_PER_CPU(struct vmcs_struct *, host_vmcs);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
+static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 
 static u32 vmcs_revision_id __read_mostly;
 
@@ -185,34 +187,81 @@ static void vmx_free_vmcs(struct vmcs_struct *vmcs)
 static void __vmx_clear_vmcs(void *info)
 {
     struct vcpu *v = info;
+    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
 
-    __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    /* Otherwise we can nest (vmx_suspend_cpu() vs. vmx_clear_vmcs()). */
+    ASSERT(!local_irq_is_enabled());
 
-    v->arch.hvm_vmx.active_cpu = -1;
-    v->arch.hvm_vmx.launched   = 0;
+    if ( arch_vmx->active_cpu == smp_processor_id() )
+    {
+        __vmpclear(virt_to_maddr(arch_vmx->vmcs));
 
-    if ( v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs) )
-        this_cpu(current_vmcs) = NULL;
+        arch_vmx->active_cpu = -1;
+        arch_vmx->launched   = 0;
+
+        list_del(&arch_vmx->active_list);
+
+        if ( arch_vmx->vmcs == this_cpu(current_vmcs) )
+            this_cpu(current_vmcs) = NULL;
+    }
 }
 
 static void vmx_clear_vmcs(struct vcpu *v)
 {
     int cpu = v->arch.hvm_vmx.active_cpu;
 
-    if ( cpu == -1 )
-        return;
-
-    if ( cpu == smp_processor_id() )
-        return __vmx_clear_vmcs(v);
-
-    on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
+    if ( cpu != -1 )
+        on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
 }
 
 static void vmx_load_vmcs(struct vcpu *v)
 {
+    unsigned long flags;
+
+    local_irq_save(flags);
+
+    if ( v->arch.hvm_vmx.active_cpu == -1 )
+    {
+        list_add(&v->arch.hvm_vmx.active_list, &this_cpu(active_vmcs_list));
+        v->arch.hvm_vmx.active_cpu = smp_processor_id();
+    }
+
+    ASSERT(v->arch.hvm_vmx.active_cpu == smp_processor_id());
+
     __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-    v->arch.hvm_vmx.active_cpu = smp_processor_id();
     this_cpu(current_vmcs) = v->arch.hvm_vmx.vmcs;
+
+    local_irq_restore(flags);
+}
+
+void vmx_suspend_cpu(void)
+{
+    struct list_head *active_vmcs_list = &this_cpu(active_vmcs_list);
+    unsigned long flags;
+
+    local_irq_save(flags);
+
+    while ( !list_empty(active_vmcs_list) )
+        __vmx_clear_vmcs(list_entry(active_vmcs_list->next,
+                                    struct vcpu, arch.hvm_vmx.active_list));
+
+    if ( read_cr4() & X86_CR4_VMXE )
+    {
+        __vmxoff();
+        clear_in_cr4(X86_CR4_VMXE);
+    }
+
+    local_irq_restore(flags);
+}
+
+void vmx_resume_cpu(void)
+{
+    if ( !read_cr4() & X86_CR4_VMXE )
+    {
+        set_in_cr4(X86_CR4_VMXE);
+        if ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
+            BUG();
+    }
 }
 
 void vmx_vmcs_enter(struct vcpu *v)
@@ -247,12 +296,17 @@ void vmx_vmcs_exit(struct vcpu *v)
 
 struct vmcs_struct *vmx_alloc_host_vmcs(void)
 {
-    return vmx_alloc_vmcs();
+    ASSERT(this_cpu(host_vmcs) == NULL);
+    this_cpu(host_vmcs) = vmx_alloc_vmcs();
+    INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
+    return this_cpu(host_vmcs);
 }
 
 void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
 {
+    ASSERT(vmcs == this_cpu(host_vmcs));
     vmx_free_vmcs(vmcs);
+    this_cpu(host_vmcs) = NULL;
 }
 
 struct xgt_desc {
@@ -451,12 +505,17 @@ static void construct_vmcs(struct vcpu *v)
 
 int vmx_create_vmcs(struct vcpu *v)
 {
-    if ( v->arch.hvm_vmx.vmcs == NULL )
+    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+
+    if ( arch_vmx->vmcs == NULL )
     {
-        if ( (v->arch.hvm_vmx.vmcs = vmx_alloc_vmcs()) == NULL )
+        if ( (arch_vmx->vmcs = vmx_alloc_vmcs()) == NULL )
             return -ENOMEM;
 
-        __vmx_clear_vmcs(v);
+        INIT_LIST_HEAD(&arch_vmx->active_list);
+        __vmpclear(virt_to_maddr(arch_vmx->vmcs));
+        arch_vmx->active_cpu = -1;
+        arch_vmx->launched   = 0;
     }
 
     construct_vmcs(v);
