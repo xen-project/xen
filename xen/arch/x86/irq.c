@@ -656,42 +656,34 @@ static int __init setup_dump_irqs(void)
 __initcall(setup_dump_irqs);
 
 #ifdef CONFIG_HOTPLUG_CPU
-#include <mach_apic.h>
+#include <asm/mach-generic/mach_apic.h>
+#include <xen/delay.h>
 
 void fixup_irqs(cpumask_t map)
 {
-	unsigned int irq;
-	static int warned;
+    unsigned int irq;
+    static int warned;
 
-	for (irq = 0; irq < NR_IRQS; irq++) {
-		cpumask_t mask;
-		if (irq == 2)
-			continue;
+    for ( irq = 0; irq < NR_IRQS; irq++ )
+    {
+        cpumask_t mask;
+        if ( irq == 2 )
+            continue;
 
-		cpus_and(mask, irq_desc[irq].affinity, map);
-		if (any_online_cpu(mask) == NR_CPUS) {
-			printk("Breaking affinity for irq %i\n", irq);
-			mask = map;
-		}
-		if (irq_desc[irq].chip->set_affinity)
-			irq_desc[irq].chip->set_affinity(irq, mask);
-		else if (irq_desc[irq].action && !(warned++))
-			printk("Cannot set affinity for irq %i\n", irq);
-	}
+        cpus_and(mask, irq_desc[irq].affinity, map);
+        if ( any_online_cpu(mask) == NR_CPUS )
+        {
+            printk("Breaking affinity for irq %i\n", irq);
+            mask = map;
+        }
+        if ( irq_desc[irq].handler->set_affinity )
+            irq_desc[irq].handler->set_affinity(irq, mask);
+        else if ( irq_desc[irq].action && !(warned++) )
+            printk("Cannot set affinity for irq %i\n", irq);
+    }
 
-#if 0
-	barrier();
-	/* Ingo Molnar says: "after the IO-APIC masks have been redirected
-	   [note the nop - the interrupt-enable boundary on x86 is two
-	   instructions from sti] - to flush out pending hardirqs and
-	   IPIs. After this point nothing is supposed to reach this CPU." */
-	__asm__ __volatile__("sti; nop; cli");
-	barrier();
-#else
-	/* That doesn't seem sufficient.  Give it 1ms. */
-	local_irq_enable();
-	mdelay(1);
-	local_irq_disable();
-#endif
+    local_irq_enable();
+    mdelay(1);
+    local_irq_disable();
 }
 #endif

@@ -81,24 +81,23 @@ static void default_idle(void)
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
-	/* This must be done before dead CPU ack */
-	cpu_exit_clear();
-	wbinvd();
-	mb();
-	/* Ack it */
-	__get_cpu_var(cpu_state) = CPU_DEAD;
+    __cpu_disable();
+    /* This must be done before dead CPU ack */
+    cpu_exit_clear();
+    wbinvd();
+    mb();
+    /* Ack it */
+    __get_cpu_var(cpu_state) = CPU_DEAD;
 
-	/*
-	 * With physical CPU hotplug, we should halt the cpu
-	 */
-	local_irq_disable();
-	while (1)
-		halt();
+    /* With physical CPU hotplug, we should halt the cpu. */
+    local_irq_disable();
+    for ( ; ; )
+        halt();
 }
 #else
 static inline void play_dead(void)
 {
-	BUG();
+    BUG();
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
@@ -106,6 +105,8 @@ void idle_loop(void)
 {
     for ( ; ; )
     {
+        if (cpu_is_offline(smp_processor_id()))
+            play_dead();
         page_scrub_schedule_work();
         default_idle();
         do_softirq();

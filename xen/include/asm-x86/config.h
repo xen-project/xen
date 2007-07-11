@@ -40,6 +40,9 @@
 
 #define CONFIG_VGA 1
 
+#define CONFIG_HOTPLUG 1
+#define CONFIG_HOTPLUG_CPU 1
+
 #define HZ 100
 
 #define OPT_CONSOLE_STR "com1,vga"
