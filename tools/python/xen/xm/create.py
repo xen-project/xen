@@ -643,22 +643,12 @@ def configure_security(config, vals):
                                  ['policy', policy],
                                  ['label', label] ]
 
-        #ssidref cannot be specified together with access_control
-        if sxp.child_value(config, 'ssidref'):
-            err("ERROR: SSIDREF and access_control are mutually exclusive but both specified!")
-        #else calculate ssidre from label
+        #calculate ssidref from label
         ssidref = security.label2ssidref(label, policy, 'dom')
         if not ssidref :
             err("ERROR calculating ssidref from access_control.")
         security_label = ['security', [ config_access_control, ['ssidref' , ssidref ] ] ]
         config.append(security_label)
-    elif num == 0:
-        if hasattr(vals, 'ssidref'):
-            if not security.on():
-                err("ERROR: Security ssidref specified but no policy active.")
-            ssidref = getattr(vals, 'ssidref')
-            security_label = ['security', [ [ 'ssidref' , int(ssidref) ] ] ]
-            config.append(security_label)
     elif num > 1:
         err("VM config error: Multiple access_control definitions!")
 
@@ -1231,13 +1221,13 @@ def config_security_check(config, verbose):
 
         except security.ACMError:
             print "   %s: DENIED" % (resource)
-            (res_label, res_policy) = security.get_res_label(resource)
+            (poltype, res_label, res_policy) = security.get_res_label(resource)
             if not res_label:
                 res_label = ""
-            print "   --> res: %s (%s)" % (str(res_label),
-                                           str(res_policy))
-            print "   --> dom: %s (%s)" % (str(domain_label),
-                                           str(domain_policy))
+            print "   --> res: %s (%s:%s)" % (str(res_label),
+                                           str(poltype), str(res_policy))
+            print "   --> dom: %s (%s:%s)" % (str(domain_label),
+                                           str(poltype), str(domain_policy))
 
             answer = 0
 
