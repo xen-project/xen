@@ -1541,6 +1541,10 @@ class XendDomain:
         dominfo = self.domain_lookup_nr(domid)
         if not dominfo:
             raise XendInvalidDomain(str(domid))
+        if dominfo._stateGet() not in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            raise VMBadState("Domain '%s' is not started" % domid,
+                             POWER_STATE_NAMES[DOM_STATE_RUNNING],
+                             POWER_STATE_NAMES[dominfo._stateGet()])
         if trigger_name.lower() in TRIGGER_TYPE: 
             trigger = TRIGGER_TYPE[trigger_name.lower()]
         else:
