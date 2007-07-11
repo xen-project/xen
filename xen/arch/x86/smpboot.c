@@ -897,6 +897,85 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	return boot_error;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+void cpu_exit_clear(void)
+{
+	int cpu = raw_smp_processor_id();
+
+	idle_task_exit();
+
+	cpucount --;
+	cpu_uninit();
+	irq_ctx_exit(cpu);
+
+	cpu_clear(cpu, cpu_callout_map);
+	cpu_clear(cpu, cpu_callin_map);
+
+	cpu_clear(cpu, smp_commenced_mask);
+	unmap_cpu_to_logical_apicid(cpu);
+}
+
+struct warm_boot_cpu_info {
+	struct completion *complete;
+	int apicid;
+	int cpu;
+};
+
+static void __cpuinit do_warm_boot_cpu(void *p)
+{
+	struct warm_boot_cpu_info *info = p;
+	do_boot_cpu(info->apicid, info->cpu);
+	complete(info->complete);
+}
+
+static int __cpuinit __smp_prepare_cpu(int cpu)
+{
+	DECLARE_COMPLETION(done);
+	struct warm_boot_cpu_info info;
+	struct work_struct task;
+	int	apicid, ret;
+	struct Xgt_desc_struct *cpu_gdt_descr = &per_cpu(cpu_gdt_descr, cpu);
+
+	apicid = x86_cpu_to_apicid[cpu];
+	if (apicid == BAD_APICID) {
+		ret = -ENODEV;
+		goto exit;
+	}
+
+	/*
+	 * the CPU isn't initialized at boot time, allocate gdt table here.
+	 * cpu_init will initialize it
+	 */
+	if (!cpu_gdt_descr->address) {
+		cpu_gdt_descr->address = get_zeroed_page(GFP_KERNEL);
+		if (!cpu_gdt_descr->address)
+			printk(KERN_CRIT "CPU%d failed to allocate GDT\n", cpu);
+			ret = -ENOMEM;
+			goto exit;
+	}
+
+	info.complete = &done;
+	info.apicid = apicid;
+	info.cpu = cpu;
+	INIT_WORK(&task, do_warm_boot_cpu, &info);
+
+	tsc_sync_disabled = 1;
+
+	/* init low mem mapping */
+	clone_pgd_range(swapper_pg_dir, swapper_pg_dir + USER_PGD_PTRS,
+			KERNEL_PGD_PTRS);
+	flush_tlb_all();
+	schedule_work(&task);
+	wait_for_completion(&done);
+
+	tsc_sync_disabled = 0;
+	zap_low_mappings();
+	ret = 0;
+exit:
+	return ret;
+}
+#endif
+
 /*
  * Cycle through the processors sending APIC IPIs to boot each.
  */
@@ -1097,6 +1176,136 @@ void __devinit smp_prepare_boot_cpu(void)
 	/*per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;*/
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static void
+remove_siblinginfo(int cpu)
+{
+	int sibling;
+	struct cpuinfo_x86 *c = cpu_data;
+
+	for_each_cpu_mask(sibling, cpu_core_map[cpu]) {
+		cpu_clear(cpu, cpu_core_map[sibling]);
+		/*
+		 * last thread sibling in this cpu core going down
+		 */
+		if (cpus_weight(cpu_sibling_map[cpu]) == 1)
+			c[sibling].booted_cores--;
+	}
+			
+	for_each_cpu_mask(sibling, cpu_sibling_map[cpu])
+		cpu_clear(cpu, cpu_sibling_map[sibling]);
+	cpus_clear(cpu_sibling_map[cpu]);
+	cpus_clear(cpu_core_map[cpu]);
+	c[cpu].phys_proc_id = 0;
+	c[cpu].cpu_core_id = 0;
+	cpu_clear(cpu, cpu_sibling_setup_map);
+}
+
+int __cpu_disable(void)
+{
+	cpumask_t map = cpu_online_map;
+	int cpu = smp_processor_id();
+
+	/*
+	 * Perhaps use cpufreq to drop frequency, but that could go
+	 * into generic code.
+ 	 *
+	 * We won't take down the boot processor on i386 due to some
+	 * interrupts only being able to be serviced by the BSP.
+	 * Especially so if we're not using an IOAPIC	-zwane
+	 */
+	if (cpu == 0)
+		return -EBUSY;
+
+	clear_local_APIC();
+	/* Allow any queued timer interrupts to get serviced */
+	local_irq_enable();
+	mdelay(1);
+	local_irq_disable();
+
+	remove_siblinginfo(cpu);
+
+	cpu_clear(cpu, map);
+	fixup_irqs(map);
+	/* It's now safe to remove this processor from the online map */
+	cpu_clear(cpu, cpu_online_map);
+	return 0;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We don't do anything here: idle task is faking death itself. */
+	unsigned int i;
+
+	for (i = 0; i < 10; i++) {
+		/* They ack this in play_dead by setting CPU_DEAD */
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
+			printk ("CPU %d is now offline\n", cpu);
+			if (1 == num_online_cpus())
+				alternatives_smp_switch(0);
+			return;
+		}
+		msleep(100);
+	}
+ 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
+}
+
+/* From kernel/power/main.c */
+/* This is protected by pm_sem semaphore */
+static cpumask_t frozen_cpus;
+
+void disable_nonboot_cpus(void)
+{
+	int cpu, error;
+
+	error = 0;
+	cpus_clear(frozen_cpus);
+	printk("Freezing cpus ...\n");
+	for_each_online_cpu(cpu) {
+		if (cpu == 0)
+			continue;
+		error = cpu_down(cpu);
+		if (!error) {
+			cpu_set(cpu, frozen_cpus);
+			printk("CPU%d is down\n", cpu);
+			continue;
+		}
+		printk("Error taking cpu %d down: %d\n", cpu, error);
+	}
+	BUG_ON(raw_smp_processor_id() != 0);
+	if (error)
+		panic("cpus not sleeping");
+}
+
+void enable_nonboot_cpus(void)
+{
+	int cpu, error;
+
+	printk("Thawing cpus ...\n");
+	for_each_cpu_mask(cpu, frozen_cpus) {
+		error = cpu_up(cpu);
+		if (!error) {
+			printk("CPU%d is up\n", cpu);
+			continue;
+		}
+		printk("Error taking cpu %d up: %d\n", cpu, error);
+		panic("Not enough cpus");
+	}
+	cpus_clear(frozen_cpus);
+}
+#else /* ... !CONFIG_HOTPLUG_CPU */
+int __cpu_disable(void)
+{
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We said "no" in __cpu_disable */
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 int __devinit __cpu_up(unsigned int cpu)
 {
 	/* In case one didn't come up */
@@ -1116,6 +1325,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	}
 	return 0;
 }
+
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {

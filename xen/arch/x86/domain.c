@@ -76,6 +76,32 @@ static void default_idle(void)
         local_irq_enable();
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+#include <asm/nmi.h>
+/* We don't actually take CPU down, just spin without interrupts. */
+static inline void play_dead(void)
+{
+	/* This must be done before dead CPU ack */
+	cpu_exit_clear();
+	wbinvd();
+	mb();
+	/* Ack it */
+	__get_cpu_var(cpu_state) = CPU_DEAD;
+
+	/*
+	 * With physical CPU hotplug, we should halt the cpu
+	 */
+	local_irq_disable();
+	while (1)
+		halt();
+}
+#else
+static inline void play_dead(void)
+{
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 void idle_loop(void)
 {
     for ( ; ; )

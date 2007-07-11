@@ -256,6 +256,16 @@ struct call_data_struct {
 static DEFINE_SPINLOCK(call_lock);
 static struct call_data_struct *call_data;
 
+void lock_ipi_call_lock(void)
+{
+	spin_lock_irq(&call_lock);
+}
+
+void unlock_ipi_call_lock(void)
+{
+	spin_unlock_irq(&call_lock);
+}
+
 int smp_call_function(
     void (*func) (void *info),
     void *info,
