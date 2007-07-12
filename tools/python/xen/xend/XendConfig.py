@@ -636,6 +636,8 @@ class XendConfig(dict):
                 except ValueError, e:
                     raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
 
+        if not 'security' in cfg and sxp.child_value(sxp_cfg, 'security'):
+            cfg['security'] = sxp.child_value(sxp_cfg, 'security')
         if 'security' in cfg and not cfg.get('security_label'):
             secinfo = cfg['security']
             if isinstance(secinfo, list):

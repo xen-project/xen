@@ -870,17 +870,13 @@ def parse_doms_info(info):
         'up_time'  : up_time
         }
 
-    if serverType != SERVER_XEN_API:
-        from xen.util import security
-        parsed_info['seclabel'] = security.get_security_printlabel(info)
+    security_label = get_info('security_label', str, '')
+    tmp = security_label.split(":")
+    if len(tmp) != 3:
+        seclabel = ""
     else:
-        label = get_info('security_label', unicode, '')
-        tmp = label.split(":")
-        if len(tmp) != 3:
-            label = ""
-        else:
-            label = tmp[2]
-        parsed_info['seclabel'] = label
+        seclabel = tmp[2]
+    parsed_info['seclabel'] = seclabel
 
     if serverType == SERVER_XEN_API:
         parsed_info['mem'] = get_info('memory_actual', int, 0) / 1024
@@ -2047,18 +2043,6 @@ def parse_block_configuration(args):
            ['mode',  args[3]]]
     if len(args) == 5:
         vbd.append(['backend', args[4]])
-
-    if serverType != SERVER_XEN_API:
-        # verify that policy permits attaching this resource
-        from xen.util import security
-    
-        if security.on():
-            dominfo = server.xend.domain(dom)
-            label = security.get_security_printlabel(dominfo)
-        else:
-            label = None
-
-        security.res_security_check(args[1], label)
 
     return (dom, vbd)
 
