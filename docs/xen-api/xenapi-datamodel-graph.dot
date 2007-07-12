@@ -12,7 +12,7 @@
 digraph "Xen-API Class Diagram" {
 fontname="Verdana";
 
-node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user;
+node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user XSPolicy ACMPolicy;
 node [shape=ellipse]; PIF_metrics VIF_metrics VM_metrics VBD_metrics PBD_metrics VM_guest_metrics host_metrics;
 node [shape=box]; host_cpu console
 session -> host [ arrowhead="none" ]
@@ -36,4 +36,6 @@ VDI -> VBD [ arrowhead="crow", arrowtail="none" ]
 VBD -> VM [ arrowhead="none", arrowtail="crow" ]
 VTPM -> VM [ arrowhead="none", arrowtail="crow" ]
 VBD -> VBD_metrics [ arrowhead="none" ]
+XSPolicy -> host [ arrowhead="none" ]
+XSPolicy -> ACMPolicy [ arrowhead="none" ]
 }
